@@ -1,9 +1,7 @@
 mod components;
+mod editor;
 mod tree;
-use std::{
-    sync::{Arc, RwLock},
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use crossterm::event::{Event, KeyCode, KeyModifiers};
 use tree::file_tree;
@@ -13,10 +11,11 @@ use crate::state::{State, Tree};
 
 const TICK: Duration = Duration::from_millis(250);
 
-pub fn app(terminal: &mut Terminal<impl Backend>, state: Arc<RwLock<State>>) -> std::io::Result<()> {
+pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
+    let mut state = State::new();
     let mut clock = Instant::now();
     loop {
-        terminal.draw(|frame| file_tree(frame, state.clone()))?;
+        terminal.draw(|frame| file_tree(frame, &mut state))?;
 
         let timeout = TICK
             .checked_sub(clock.elapsed())
@@ -32,12 +31,12 @@ pub fn app(terminal: &mut Terminal<impl Backend>, state: Arc<RwLock<State>>) -> 
                     }
                     KeyModifiers::SHIFT => {
                         if matches!(key.code, KeyCode::Char('e')) || matches!(key.code, KeyCode::Char('E')) {
-                            state.write().expect("No deadlock!").switch_tree()
+                            state.switch_tree()
                         }
                     }
                     KeyModifiers::NONE => match key.code {
                         KeyCode::Down | KeyCode::Char('d') | KeyCode::Char('D') => {
-                            if let Some(tree) = &mut state.write().unwrap().file_tree {
+                            if let Some(tree) = &mut state.file_tree {
                                 if let Some(numba) = tree.state.selected() {
                                     if numba < tree.tree.len() - 1 {
                                         tree.state.select(Some(numba + 1));
@@ -50,7 +49,7 @@ pub fn app(terminal: &mut Terminal<impl Backend>, state: Arc<RwLock<State>>) -> 
                             }
                         }
                         KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
-                            if let Some(tree) = &mut state.write().unwrap().file_tree {
+                            if let Some(tree) = &mut state.file_tree {
                                 if let Some(numba) = tree.state.selected() {
                                     if numba == 0 {
                                         tree.state.select(Some(tree.tree.len() - 1))
@@ -63,7 +62,7 @@ pub fn app(terminal: &mut Terminal<impl Backend>, state: Arc<RwLock<State>>) -> 
                             }
                         }
                         KeyCode::Left => {
-                            if let Some(tree) = &mut state.write().unwrap().file_tree {
+                            if let Some(tree) = &mut state.file_tree {
                                 if let Some(numba) = tree.state.selected() {
                                     if let Some(path) = tree.tree.get(numba) {
                                         tree.expanded.retain(|expanded_path| expanded_path != path)
@@ -72,12 +71,12 @@ pub fn app(terminal: &mut Terminal<impl Backend>, state: Arc<RwLock<State>>) -> 
                             }
                         }
                         KeyCode::Right => {
-                            if let Some(tree) = &mut state.write().unwrap().file_tree {
+                            if let Some(tree) = &mut state.file_tree {
                                 expand_tree(tree)
                             }
                         }
                         KeyCode::Enter => {
-                            if let Some(tree) = &mut state.write().unwrap().file_tree {
+                            if let Some(tree) = &mut state.file_tree {
                                 expand_tree(tree)
                             }
                         }

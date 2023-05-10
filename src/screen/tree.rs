@@ -1,8 +1,4 @@
-use std::{
-    fs::DirEntry,
-    path::PathBuf,
-    sync::{Arc, RwLock},
-};
+use std::{fs::DirEntry, path::PathBuf};
 
 use tui::{
     backend::Backend,
@@ -21,8 +17,8 @@ use crate::state::State;
 //     name: String
 // }
 
-pub fn file_tree(terminal: &mut Frame<impl Backend>, state: Arc<RwLock<State>>) {
-    let mut tree = if let Some(tree) = &state.read().expect("should not lock!").file_tree {
+pub fn file_tree(terminal: &mut Frame<impl Backend>, state: &mut State) {
+    let mut tree = if let Some(tree) = &state.file_tree {
         tree.clone()
     } else {
         return;
@@ -46,11 +42,9 @@ pub fn file_tree(terminal: &mut Frame<impl Backend>, state: Arc<RwLock<State>>) 
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol("> ");
 
-    let mut state = state.write().expect("should not lock!");
     if let Some(tree) = &mut state.file_tree {
         tree.tree = buffer.clone();
     }
-    drop(state);
     terminal.render_stateful_widget(tasks, chunks[0], &mut tree.state);
 }
 

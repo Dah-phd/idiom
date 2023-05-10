@@ -14,10 +14,11 @@ pub struct Tree {
 pub struct File {
     location: PathBuf,
     content: Vec<String>,
+    err: Option<std::io::Error>,
 }
 
 impl File {
-    pub fn from_path() -> std::io::Result<Self> {
+    pub fn from_path(path: PathBuf) -> std::io::Result<Self> {
         todo!()
     }
 
@@ -25,7 +26,14 @@ impl File {
         todo!()
     }
 
-    fn load(&mut self) {}
+    fn load(&mut self) {
+        let content = std::fs::read_to_string(&self.location);
+    }
+}
+
+pub struct EdiotorState {
+    pub editors: Vec<File>,
+    pub state: ListState,
 }
 
 pub struct State {
@@ -34,20 +42,30 @@ pub struct State {
     pub ready_to_exit: bool,
     pub file_tree: Option<Tree>,
     pub buffer: String,
-    pub loaded: Vec<Vec<String>>,
+    pub opened_files: EdiotorState,
 }
 
-impl State {
-    pub fn new() -> Self {
+impl Default for State {
+    fn default() -> Self {
         Self {
             mode: messages::Mode::Select,
             select: None,
             ready_to_exit: false,
             file_tree: Some(Tree::default()),
             buffer: String::new(),
-            loaded: vec![],
+            opened_files: EdiotorState {
+                editors: vec![],
+                state: ListState::default(),
+            },
         }
     }
+}
+
+impl State {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn switch_tree(&mut self) {
         self.file_tree = if self.file_tree.is_none() {
             Some(Tree::default())

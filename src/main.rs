@@ -3,10 +3,8 @@ mod state;
 mod messages;
 mod screen;
 use screen::app;
-use state::State;
 
 use std::io::{stdout, Write};
-use std::sync::{Arc, RwLock};
 
 use crossterm::event::{KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags};
 use crossterm::execute;
@@ -35,9 +33,8 @@ fn graceful_exit(out: &mut impl Write) -> std::io::Result<()> {
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let out = stdout();
-    let state = Arc::new(RwLock::new(State::new()));
     let mut terminal = Terminal::new(CrosstermBackend::new(&out)).expect("should not fail!");
     prep(&mut terminal.backend_mut())?;
-    app(&mut terminal, state.clone())?;
+    app(&mut terminal)?;
     graceful_exit(&mut terminal.backend_mut())
 }
