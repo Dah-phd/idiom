@@ -4,7 +4,7 @@ mod linter;
 use file::File;
 use std::path::PathBuf;
 use tui::layout::{Constraint, Layout, Rect};
-use tui::style::{Color, Style, Modifier};
+use tui::style::{Color, Modifier, Style};
 use tui::text::{Span, Spans};
 use tui::widgets::{Block, Borders, List, ListItem, ListState, Tabs};
 use tui::{backend::Backend, Frame};
@@ -22,24 +22,25 @@ impl EditorState {
             .split(area);
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get(editor_id) {
-                let text_lines: Vec<ListItem> = file.content.iter().map(linter).collect();
-                let editor_content = List::new(text_lines).block(
+                let editor_content = List::new(file.content.iter().map(linter).collect::<Vec<ListItem>>()).block(
                     Block::default()
                         .borders(Borders::ALL)
                         .title(file.path.as_os_str().to_str().unwrap_or("Loading ...")),
                 );
+
                 frame.render_stateful_widget(editor_content, layout[1], &mut self.state);
+
                 let titles = self
                     .editors
                     .iter()
-                    .flat_map(|editor| editor.path.as_os_str().to_str())
-                    .map(|t| Spans::from(Span::styled(t, Style::default().fg(Color::Green))))
+                    .flat_map(try_file_to_tab)
                     .collect();
 
                 let tabs = Tabs::new(titles)
                     .block(Block::default().title("open editors"))
                     .highlight_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
                     .select(editor_id);
+
                 frame.render_widget(tabs, layout[0]);
             }
         }
@@ -57,6 +58,10 @@ impl EditorState {
             self.editors.push(opened_file);
         }
     }
+}
+
+fn try_file_to_tab(file:& File) -> Option<Spans> {
+    file.path.as_os_str().to_str().map(|t| Spans::from(Span::styled(t, Style::default().fg(Color::Green))))
 }
 
 fn linter(line: &String) -> ListItem {

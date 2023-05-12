@@ -1,12 +1,12 @@
 use std::time::{Duration, Instant};
 
+use crate::components::{EditorState, Tree};
 use crossterm::event::{Event, KeyCode, KeyModifiers};
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout},
     Terminal,
 };
-use crate::components::{EditorState, Tree};
 
 const TICK: Duration = Duration::from_millis(250);
 
@@ -37,38 +37,37 @@ pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                         }
                     }
                     KeyModifiers::SHIFT => {
-                        if matches!(key.code, KeyCode::Char('e')) || matches!(key.code, KeyCode::Char('E')) {
-                        }
+                        if matches!(key.code, KeyCode::Char('e')) || matches!(key.code, KeyCode::Char('E')) {}
                     }
                     KeyModifiers::NONE => match key.code {
                         KeyCode::Down | KeyCode::Char('d') | KeyCode::Char('D') => {
-                                if let Some(numba) = file_tree.state.selected() {
-                                    if numba < file_tree.tree.len() - 1 {
-                                        file_tree.state.select(Some(numba + 1));
-                                    } else {
-                                        file_tree.state.select(Some(0))
-                                    }
+                            if let Some(numba) = file_tree.state.selected() {
+                                if numba < file_tree.tree.len() - 1 {
+                                    file_tree.state.select(Some(numba + 1));
                                 } else {
                                     file_tree.state.select(Some(0))
                                 }
+                            } else {
+                                file_tree.state.select(Some(0))
+                            }
                         }
                         KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
-                                if let Some(numba) = file_tree.state.selected() {
-                                    if numba == 0 {
-                                        file_tree.state.select(Some(file_tree.tree.len() - 1))
-                                    } else {
-                                        file_tree.state.select(Some(numba - 1))
-                                    }
-                                } else {
+                            if let Some(numba) = file_tree.state.selected() {
+                                if numba == 0 {
                                     file_tree.state.select(Some(file_tree.tree.len() - 1))
+                                } else {
+                                    file_tree.state.select(Some(numba - 1))
                                 }
+                            } else {
+                                file_tree.state.select(Some(file_tree.tree.len() - 1))
+                            }
                         }
                         KeyCode::Left => {
-                                if let Some(numba) = file_tree.state.selected() {
-                                    if let Some(path) = file_tree.tree.get(numba) {
-                                        file_tree.expanded.retain(|expanded_path| expanded_path != path)
-                                    }
+                            if let Some(numba) = file_tree.state.selected() {
+                                if let Some(path) = file_tree.tree.get(numba) {
+                                    file_tree.expanded.retain(|expanded_path| expanded_path != path)
                                 }
+                            }
                         }
                         KeyCode::Right => {
                             if let Some(file_path) = file_tree.expand_dir_or_get_path() {
@@ -77,12 +76,12 @@ pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                         }
                         KeyCode::Enter => {
                             if let Some(file_path) = file_tree.expand_dir_or_get_path() {
-                                editor_state.new_from(file_path)
+                                editor_state.new_from(file_path);
                             }
                         }
                         KeyCode::Tab => {
                             if let Some(editor_id) = editor_state.state.selected() {
-                                if editor_id >= editor_state.editors.len() -1 {
+                                if editor_id >= editor_state.editors.len() - 1 {
                                     editor_state.state.select(Some(0))
                                 } else {
                                     editor_state.state.select(Some(editor_id + 1))
