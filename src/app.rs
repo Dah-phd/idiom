@@ -1,21 +1,28 @@
-mod components;
-mod editor;
-mod tree;
 use std::time::{Duration, Instant};
 
 use crossterm::event::{Event, KeyCode, KeyModifiers};
-use tree::file_tree;
-use tui::{backend::Backend, Terminal};
-
-use crate::state::{State, Tree};
+use tui::{
+    backend::Backend,
+    layout::{Constraint, Direction, Layout},
+    Terminal,
+};
+use crate::components::{EditorState, Tree};
 
 const TICK: Duration = Duration::from_millis(250);
 
 pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
-    let mut state = State::new();
     let mut clock = Instant::now();
+    let mut file_tree = Tree::default();
+    let mut editor_state = EditorState::default();
     loop {
-        terminal.draw(|frame| file_tree(frame, &mut state))?;
+        terminal.draw(|frame| {
+            let screen_areas = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(15), Constraint::Min(2)].as_ref())
+                .split(frame.size());
+            file_tree.render(frame, screen_areas[0]);
+            editor_state.render(frame, screen_areas[1]);
+        })?;
 
         let timeout = TICK
             .checked_sub(clock.elapsed())
@@ -31,53 +38,46 @@ pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                     }
                     KeyModifiers::SHIFT => {
                         if matches!(key.code, KeyCode::Char('e')) || matches!(key.code, KeyCode::Char('E')) {
-                            state.switch_tree()
                         }
                     }
                     KeyModifiers::NONE => match key.code {
                         KeyCode::Down | KeyCode::Char('d') | KeyCode::Char('D') => {
-                            if let Some(tree) = &mut state.file_tree {
-                                if let Some(numba) = tree.state.selected() {
-                                    if numba < tree.tree.len() - 1 {
-                                        tree.state.select(Some(numba + 1));
+                                if let Some(numba) = file_tree.state.selected() {
+                                    if numba < file_tree.tree.len() - 1 {
+                                        file_tree.state.select(Some(numba + 1));
                                     } else {
-                                        tree.state.select(Some(0))
+                                        file_tree.state.select(Some(0))
                                     }
                                 } else {
-                                    tree.state.select(Some(0))
+                                    file_tree.state.select(Some(0))
                                 }
-                            }
                         }
                         KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
-                            if let Some(tree) = &mut state.file_tree {
-                                if let Some(numba) = tree.state.selected() {
+                                if let Some(numba) = file_tree.state.selected() {
                                     if numba == 0 {
-                                        tree.state.select(Some(tree.tree.len() - 1))
+                                        file_tree.state.select(Some(file_tree.tree.len() - 1))
                                     } else {
-                                        tree.state.select(Some(numba - 1))
+                                        file_tree.state.select(Some(numba - 1))
                                     }
                                 } else {
-                                    tree.state.select(Some(tree.tree.len() - 1))
+                                    file_tree.state.select(Some(file_tree.tree.len() - 1))
                                 }
-                            }
                         }
                         KeyCode::Left => {
-                            if let Some(tree) = &mut state.file_tree {
-                                if let Some(numba) = tree.state.selected() {
-                                    if let Some(path) = tree.tree.get(numba) {
-                                        tree.expanded.retain(|expanded_path| expanded_path != path)
+                                if let Some(numba) = file_tree.state.selected() {
+                                    if let Some(path) = file_tree.tree.get(numba) {
+                                        file_tree.expanded.retain(|expanded_path| expanded_path != path)
                                     }
                                 }
-                            }
                         }
                         KeyCode::Right => {
-                            if let Some(tree) = &mut state.file_tree {
-                                expand_tree(tree)
+                            if let Some(file_path) = file_tree.expand_dir_or_get_path() {
+                                editor_state.new_from(file_path);
                             }
                         }
                         KeyCode::Enter => {
-                            if let Some(tree) = &mut state.file_tree {
-                                expand_tree(tree)
+                            if let Some(file_path) = file_tree.expand_dir_or_get_path() {
+                                editor_state.new_from(file_path)
                             }
                         }
                         _ => {}
@@ -92,12 +92,4 @@ pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
         }
     }
     Ok(())
-}
-
-fn expand_tree(tree: &mut Tree) {
-    if let Some(numba) = tree.state.selected() {
-        if let Some(path) = tree.tree.get(numba) {
-            tree.expanded.push(path.clone())
-        }
-    }
 }

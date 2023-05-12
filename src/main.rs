@@ -1,8 +1,7 @@
-mod state;
-// mod events;
 mod messages;
-mod screen;
-use screen::app;
+mod app;
+mod components;
+use app::app;
 
 use std::io::{stdout, Write};
 
