@@ -28,7 +28,7 @@ impl Tree {
             .tree
             .iter()
             .flat_map(use_proper_list_names)
-            .map(|i| ListItem::new(vec![Spans::from(Span::raw(i))]))
+            .map(|path| ListItem::new(vec![Spans::from(Span::raw(path))]))
             .collect();
 
         let file_tree = List::new(tasks)

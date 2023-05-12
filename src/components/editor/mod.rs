@@ -4,8 +4,9 @@ mod linter;
 use file::File;
 use std::path::PathBuf;
 use tui::layout::{Constraint, Layout, Rect};
+use tui::style::{Color, Style, Modifier};
 use tui::text::{Span, Spans};
-use tui::widgets::{Block, Borders, List, ListItem, ListState};
+use tui::widgets::{Block, Borders, List, ListItem, ListState, Tabs};
 use tui::{backend::Backend, Frame};
 
 #[derive(Default)]
@@ -27,7 +28,19 @@ impl EditorState {
                         .borders(Borders::ALL)
                         .title(file.path.as_os_str().to_str().unwrap_or("Loading ...")),
                 );
-                frame.render_stateful_widget(editor_content, layout[1], &mut self.state)
+                frame.render_stateful_widget(editor_content, layout[1], &mut self.state);
+                let titles = self
+                    .editors
+                    .iter()
+                    .flat_map(|editor| editor.path.as_os_str().to_str())
+                    .map(|t| Spans::from(Span::styled(t, Style::default().fg(Color::Green))))
+                    .collect();
+
+                let tabs = Tabs::new(titles)
+                    .block(Block::default().title("open editors"))
+                    .highlight_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                    .select(editor_id);
+                frame.render_widget(tabs, layout[0]);
             }
         }
     }

@@ -80,6 +80,15 @@ pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                                 editor_state.new_from(file_path)
                             }
                         }
+                        KeyCode::Tab => {
+                            if let Some(editor_id) = editor_state.state.selected() {
+                                if editor_id >= editor_state.editors.len() -1 {
+                                    editor_state.state.select(Some(0))
+                                } else {
+                                    editor_state.state.select(Some(editor_id + 1))
+                                }
+                            }
+                        }
                         _ => {}
                     },
                     _ => {}
