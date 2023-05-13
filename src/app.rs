@@ -1,7 +1,10 @@
 use std::time::{Duration, Instant};
 
-use crate::components::{EditorState, Tree};
-use crossterm::event::{Event, KeyCode, KeyModifiers};
+use crate::{
+    components::{EditorState, Tree},
+    messages::Mode,
+};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout},
@@ -11,6 +14,7 @@ use tui::{
 const TICK: Duration = Duration::from_millis(250);
 
 pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
+    let mut mode = Mode::Select;
     let mut clock = Instant::now();
     let mut file_tree = Tree::default();
     let mut editor_state = EditorState::default();
@@ -30,74 +34,115 @@ pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
 
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = crossterm::event::read()? {
-                match key.modifiers {
-                    KeyModifiers::CONTROL => {
-                        if matches!(key.code, KeyCode::Char('d')) {
+                match mode {
+                    Mode::Insert => insert_mode(&key, &mut file_tree, &mut editor_state),
+                    Mode::Select => {
+                        if select_mode(&key, &mut file_tree, &mut editor_state) {
                             break;
                         }
                     }
-                    KeyModifiers::SHIFT => {
-                        if matches!(key.code, KeyCode::Char('e')) || matches!(key.code, KeyCode::Char('E')) {}
-                    }
-                    KeyModifiers::NONE => match key.code {
-                        KeyCode::Down | KeyCode::Char('d') | KeyCode::Char('D') => {
-                            if let Some(numba) = file_tree.state.selected() {
-                                if numba < file_tree.tree.len() - 1 {
-                                    file_tree.state.select(Some(numba + 1));
-                                } else {
-                                    file_tree.state.select(Some(0))
-                                }
-                            } else {
-                                file_tree.state.select(Some(0))
-                            }
-                        }
-                        KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
-                            if let Some(numba) = file_tree.state.selected() {
-                                if numba == 0 {
-                                    file_tree.state.select(Some(file_tree.tree.len() - 1))
-                                } else {
-                                    file_tree.state.select(Some(numba - 1))
-                                }
-                            } else {
-                                file_tree.state.select(Some(file_tree.tree.len() - 1))
-                            }
-                        }
-                        KeyCode::Left => {
-                            if let Some(numba) = file_tree.state.selected() {
-                                if let Some(path) = file_tree.tree.get(numba) {
-                                    file_tree.expanded.retain(|expanded_path| expanded_path != path)
-                                }
-                            }
-                        }
-                        KeyCode::Right => {
-                            if let Some(file_path) = file_tree.expand_dir_or_get_path() {
-                                editor_state.new_from(file_path);
-                            }
-                        }
-                        KeyCode::Enter => {
-                            if let Some(file_path) = file_tree.expand_dir_or_get_path() {
-                                editor_state.new_from(file_path);
-                            }
-                        }
-                        KeyCode::Tab => {
-                            if let Some(editor_id) = editor_state.state.selected() {
-                                if editor_id >= editor_state.editors.len() - 1 {
-                                    editor_state.state.select(Some(0))
-                                } else {
-                                    editor_state.state.select(Some(editor_id + 1))
-                                }
-                            }
-                        }
-                        _ => {}
-                    },
-                    _ => {}
+                }
+                if matches!(key.code, KeyCode::Enter) {
+                    mode = Mode::Insert
+                }
+                if matches!(key.code, KeyCode::Esc) {
+                    mode = Mode::Select
                 }
             }
         }
-
         if clock.elapsed() >= TICK {
             clock = Instant::now();
         }
     }
     Ok(())
+}
+
+fn insert_mode(key: &KeyEvent, file_tree: &mut Tree, editor_state: &mut EditorState) {
+    if let Some(editor) = editor_state.get_active() {
+        match key.code {
+            KeyCode::Up => {
+                if editor.cursor.0 > 0 {
+                    editor.cursor.0 -= 1
+                }
+            }
+            KeyCode::Down => editor.cursor.0 += 1,
+            KeyCode::Left => {
+                if editor.cursor.1 > 0 {
+                    editor.cursor.1 -= 1
+                }
+            }
+            KeyCode::Right => editor.cursor.1 += 1,
+            KeyCode::Char(c) => editor.push_str(c.to_string().as_str()),
+            KeyCode::Enter => editor.new_line(),
+            KeyCode::Tab => editor.push_str("    "),
+            _ => {}
+        }
+    }
+}
+
+fn select_mode(key: &KeyEvent, file_tree: &mut Tree, editor_state: &mut EditorState) -> bool {
+    match key.modifiers {
+        KeyModifiers::CONTROL => {
+            if matches!(key.code, KeyCode::Char('d') | KeyCode::Char('D')) {
+                return true;
+            }
+        }
+
+        KeyModifiers::SHIFT => if matches!(key.code, KeyCode::Char('e')) || matches!(key.code, KeyCode::Char('E')) {},
+
+        KeyModifiers::NONE => match key.code {
+            KeyCode::Down | KeyCode::Char('d') | KeyCode::Char('D') => {
+                if let Some(numba) = file_tree.state.selected() {
+                    if numba < file_tree.tree.len() - 1 {
+                        file_tree.state.select(Some(numba + 1));
+                    } else {
+                        file_tree.state.select(Some(0))
+                    }
+                } else {
+                    file_tree.state.select(Some(0))
+                }
+            }
+            KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
+                if let Some(numba) = file_tree.state.selected() {
+                    if numba == 0 {
+                        file_tree.state.select(Some(file_tree.tree.len() - 1))
+                    } else {
+                        file_tree.state.select(Some(numba - 1))
+                    }
+                } else {
+                    file_tree.state.select(Some(file_tree.tree.len() - 1))
+                }
+            }
+            KeyCode::Left => {
+                if let Some(numba) = file_tree.state.selected() {
+                    if let Some(path) = file_tree.tree.get(numba) {
+                        file_tree.expanded.retain(|expanded_path| expanded_path != path)
+                    }
+                }
+            }
+            KeyCode::Right => {
+                if let Some(file_path) = file_tree.expand_dir_or_get_path() {
+                    editor_state.new_from(file_path);
+                }
+            }
+            KeyCode::Enter => {
+                if let Some(file_path) = file_tree.expand_dir_or_get_path() {
+                    editor_state.new_from(file_path);
+                }
+            }
+            KeyCode::Tab => {
+                if let Some(editor_id) = editor_state.state.selected() {
+                    if editor_id >= editor_state.editors.len() - 1 {
+                        editor_state.state.select(Some(0))
+                    } else {
+                        editor_state.state.select(Some(editor_id + 1))
+                    }
+                }
+            }
+            _ => {}
+        },
+
+        _ => {}
+    }
+    false
 }
