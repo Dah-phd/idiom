@@ -27,6 +27,12 @@ pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
             file_tree.render(frame, screen_areas[0]);
             editor_state.render(frame, screen_areas[1]);
         })?;
+        match mode {
+            Mode::Select => {
+                let _ = terminal.hide_cursor();
+            }
+            Mode::Insert => {}
+        }
 
         let timeout = TICK
             .checked_sub(clock.elapsed())
@@ -59,22 +65,20 @@ pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
 
 fn insert_mode(key: &KeyEvent, file_tree: &mut Tree, editor_state: &mut EditorState) {
     if let Some(editor) = editor_state.get_active() {
+        if matches!(key.modifiers, KeyModifiers::CONTROL) && matches!(key.code, KeyCode::Char('s') | KeyCode::Char('S')) {
+            editor.save();
+            return;
+        }
         match key.code {
-            KeyCode::Up => {
-                if editor.cursor.0 > 0 {
-                    editor.cursor.0 -= 1
-                }
-            }
-            KeyCode::Down => editor.cursor.0 += 1,
-            KeyCode::Left => {
-                if editor.cursor.1 > 0 {
-                    editor.cursor.1 -= 1
-                }
-            }
-            KeyCode::Right => editor.cursor.1 += 1,
+            KeyCode::Up => editor.navigate_up(),
+            KeyCode::Down => editor.navigate_down(),
+            KeyCode::Left => editor.navigate_left(),
+            KeyCode::Right => editor.navigate_right(),
             KeyCode::Char(c) => editor.push_str(c.to_string().as_str()),
+            KeyCode::Backspace => editor.backspace(),
             KeyCode::Enter => editor.new_line(),
-            KeyCode::Tab => editor.push_str("    "),
+            KeyCode::Tab => editor.indent(),
+            KeyCode::Delete => editor.del(),
             _ => {}
         }
     }
@@ -83,7 +87,10 @@ fn insert_mode(key: &KeyEvent, file_tree: &mut Tree, editor_state: &mut EditorSt
 fn select_mode(key: &KeyEvent, file_tree: &mut Tree, editor_state: &mut EditorState) -> bool {
     match key.modifiers {
         KeyModifiers::CONTROL => {
-            if matches!(key.code, KeyCode::Char('d') | KeyCode::Char('D')) {
+            if matches!(
+                key.code,
+                KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Char('q') | KeyCode::Char('Q')
+            ) {
                 return true;
             }
         }

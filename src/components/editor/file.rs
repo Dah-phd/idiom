@@ -1,7 +1,4 @@
 use std::path::PathBuf;
-use super::linter::linter;
-
-
 #[derive(Debug)]
 pub struct Editor {
     pub content: Vec<String>,
@@ -19,16 +16,79 @@ impl Editor {
         })
     }
 
-    pub fn push_str(&mut self, c:&str) {
+    pub fn navigate_up(&mut self) {
+        if self.cursor.0 > 0 {
+            self.cursor.0 -= 1;
+            self.adjust_cursor_max_char();
+        }
+    }
+
+    pub fn navigate_down(&mut self) {
+        if self.content.len() - 1 > self.cursor.0 {
+            self.cursor.0 += 1;
+            self.adjust_cursor_max_char();
+        }
+    }
+
+    fn adjust_cursor_max_char(&mut self) {
+        if let Some(line) = self.content.get(self.cursor.0) {
+            if line.len() < self.cursor.1 {
+                self.cursor.1 = line.len()
+            }
+        }
+    }
+
+    pub fn navigate_left(&mut self) {
+        if self.cursor.1 > 0 {
+            self.cursor.1 -= 1
+        } else if self.cursor.0 > 0 {
+            self.cursor.0 -= 1;
+            if let Some(line) = self.content.get(self.cursor.0) {
+                self.cursor.1 = line.len();
+            }
+        }
+    }
+    pub fn navigate_right(&mut self) {
+        if let Some(line) = self.content.get(self.cursor.0) {
+            if line.len() > self.cursor.1 {
+                self.cursor.1 += 1
+            } else if self.content.len() - 1 > self.cursor.0 {
+                self.cursor.0 += 1;
+                self.cursor.1 = 0;
+            }
+        }
+    }
+
+    pub fn push_str(&mut self, c: &str) {
         if let Some(line) = self.content.get_mut(self.cursor.0) {
             line.insert_str(self.cursor.1, c);
             self.cursor.1 += c.len();
         }
     }
 
+    pub fn backspace(&mut self) {
+        if let Some(line) = self.content.get_mut(self.cursor.0) {
+            if self.cursor.1 == 0 {
+                if !line.is_empty() {
+                    self.content.remove(self.cursor.0);
+                } else {
+                    self.navigate_left();
+                }
+            } else {
+            }
+        }
+    }
+
+    pub fn del(&mut self) {}
+
+    pub fn indent(&mut self) {
+        self.push_str("    ")
+    }
+
     pub fn new_line(&mut self) {
         if let Some(line) = self.content.get(self.cursor.0) {
-            if line.len() -1 > self.cursor.1 {
+            let indent = String::from("    ");
+            if line.len() - 1 > self.cursor.1 {
                 let (replace_line, new_line) = line.split_at(self.cursor.1);
                 let new_line = String::from(new_line);
                 self.content[self.cursor.0] = String::from(replace_line);
@@ -39,6 +99,10 @@ impl Editor {
             self.cursor.0 += 1;
             self.cursor.1 = 0;
         }
+    }
+
+    pub fn save(&self) {
+        std::fs::write(&self.path, self.content.join("\n")).unwrap();
     }
 
     pub fn compare(&self) -> Option<Vec<(usize, String)>> {

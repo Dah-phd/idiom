@@ -1,7 +1,10 @@
 mod messages;
+mod lsp;
 mod app;
 mod components;
 use app::app;
+use lsp::rust::start_lsp;
+use lsp_types::request::Initialize;
 
 use std::io::{stdout, Write};
 
@@ -29,8 +32,12 @@ fn graceful_exit(out: &mut impl Write) -> std::io::Result<()> {
     Ok(())
 }
 
+async fn debug() {
+}
+
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    debug().await;
     let out = stdout();
     let mut terminal = Terminal::new(CrosstermBackend::new(&out)).expect("should not fail!");
     prep(&mut terminal.backend_mut())?;
