@@ -67,19 +67,53 @@ impl Editor {
     }
 
     pub fn backspace(&mut self) {
-        if let Some(line) = self.content.get_mut(self.cursor.0) {
-            if self.cursor.1 == 0 {
-                if !line.is_empty() {
-                    self.content.remove(self.cursor.0);
+        // TODO needs work
+        if self.cursor.0 != 0 {
+            let previous = self.content.get(self.cursor.0 - 1).cloned();
+            let current = self.content.get_mut(self.cursor.0);
+            if let Some(line) = current {
+                let (frist, second) = line.split_at(self.cursor.1);
+                if frist.is_empty() {
+                    if let Some(previous) = previous {
+                        let prev_len = previous.len();
+                        (*line) = format!("{}{}", previous, second);
+                        self.cursor.0 -= 1;
+                        self.content.remove(self.cursor.0);
+                        self.cursor.1 = prev_len;
+                        return;
+                    }
                 } else {
-                    self.navigate_left();
+                    (*line) = format!("{}{}", &frist[..frist.len()-1], second)
                 }
-            } else {
             }
+
+        } else if let Some(line) = self.content.get_mut(self.cursor.0) {
+            let (first, second) = line.split_at(self.cursor.1);
+            if !first.is_empty() {
+                (*line) = format!("{}{}", &first[..first.len() - 1], second);
+            };
+        }
+        if self.cursor.1 != 0 {
+            self.cursor.1 -= 1;
         }
     }
 
-    pub fn del(&mut self) {}
+    pub fn del(&mut self) {
+        // TODO needs work
+        let next_line = self.content.get(self.cursor.1).cloned();
+        let current_line = self.content.get_mut(self.cursor.0);
+        if let Some(line) = current_line {
+            let (first, second) = line.split_at(self.cursor.1);
+            if second.is_empty() {
+                if let Some(new_content) = next_line {
+                    line.push_str(new_content.as_str());
+                    self.content.remove(self.cursor.0 + 1);
+                }
+            } else {
+                (*line) = format!("{}{}", first, &second[1..]);
+            }
+        }
+    }
 
     pub fn indent(&mut self) {
         self.push_str("    ")

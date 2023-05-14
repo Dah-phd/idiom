@@ -75,11 +75,16 @@ where
             },
         );
         let mut lsp = Self::new(server).await?;
-        lsp.send(init_request.stringify()).await;
+        let result = lsp.send(init_request.stringify()).await;
+        if let Err(_) = result {
+            lsp.dash_nine();
+            result?;
+        };
         Ok(lsp)
     }
 
     async fn new(mut server: Command) -> std::io::Result<Self> {
+        // TODO improve error handling!!! && test
         let mut inner = server
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -87,12 +92,14 @@ where
             .spawn()?;
 
         let mut stdin = inner.stdin.take().unwrap();
+
+        let pwd_uri = format!("file://{}", std::env::current_dir()?.as_os_str().to_str().unwrap());
         let request: LSPRequest<Initialize> = LSPRequest::with(
             0,
             InitializeParams {
                 process_id: Some(std::process::id()),
                 workspace_folders: Some(vec![WorkspaceFolder {
-                    uri: Url::parse("file:///home/dah/Documents/4_rust/idiom").unwrap(),
+                    uri: Url::parse(&pwd_uri).unwrap(),
                     name: "root".to_owned(),
                 }]),
                 ..Default::default()
@@ -124,5 +131,10 @@ where
     async fn send(&mut self, lsp_request: String) -> std::io::Result<()> {
         let _ = self.stdin.write(lsp_request.as_bytes()).await?;
         self.stdin.flush().await
+    }
+
+    fn dash_nine(&mut self) {
+        self.handler.abort();
+        self.inner.kill();
     }
 }
