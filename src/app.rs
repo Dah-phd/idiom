@@ -28,10 +28,13 @@ pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
             editor_state.render(frame, screen_areas[1]);
         })?;
         match mode {
+            Mode::Insert => {}
             Mode::Select => {
                 let _ = terminal.hide_cursor();
             }
-            Mode::Insert => {}
+            Mode::Popup => {
+                let _ = terminal.hide_cursor();
+            }
         }
 
         let timeout = TICK
@@ -47,6 +50,7 @@ pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                             break;
                         }
                     }
+                    Mode::Popup => {}
                 }
                 if matches!(key.code, KeyCode::Enter) {
                     mode = Mode::Insert
@@ -65,13 +69,26 @@ pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
 
 fn insert_mode(key: &KeyEvent, file_tree: &mut Tree, editor_state: &mut EditorState) {
     if let Some(editor) = editor_state.get_active() {
-        if matches!(key.modifiers, KeyModifiers::CONTROL) && matches!(key.code, KeyCode::Char('s') | KeyCode::Char('S')) {
+        if matches!(key.modifiers, KeyModifiers::CONTROL) && matches!(key.code, KeyCode::Char('s') | KeyCode::Char('S'))
+        {
             editor.save();
             return;
         }
         match key.code {
-            KeyCode::Up => editor.navigate_up(),
-            KeyCode::Down => editor.navigate_down(),
+            KeyCode::Up => {
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    editor.scroll_up()
+                } else {
+                    editor.navigate_up()
+                }
+            }
+            KeyCode::Down => {
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    editor.scroll_down()
+                } else {
+                    editor.navigate_down()
+                }
+            }
             KeyCode::Left => editor.navigate_left(),
             KeyCode::Right => editor.navigate_right(),
             KeyCode::Char(c) => editor.push_str(c.to_string().as_str()),

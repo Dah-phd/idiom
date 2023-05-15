@@ -3,6 +3,7 @@ use std::path::PathBuf;
 pub struct Editor {
     pub content: Vec<String>,
     pub cursor: (usize, usize), // line, char
+    pub file_position: usize,
     pub path: PathBuf,
 }
 
@@ -12,8 +13,21 @@ impl Editor {
         Ok(Self {
             content: content.split('\n').map(String::from).collect(),
             cursor: (0, 0),
+            file_position: 0,
             path,
         })
+    }
+
+    pub fn scroll_down(&mut self) {
+        if self.file_position < self.content.len() {
+            self.file_position += 1;
+        }
+    }
+
+    pub fn scroll_up(&mut self) {
+        if self.file_position != 0 {
+            self.file_position -= 1;
+        }
     }
 
     pub fn navigate_up(&mut self) {
@@ -83,10 +97,9 @@ impl Editor {
                         return;
                     }
                 } else {
-                    (*line) = format!("{}{}", &frist[..frist.len()-1], second)
+                    (*line) = format!("{}{}", &frist[..frist.len() - 1], second)
                 }
             }
-
         } else if let Some(line) = self.content.get_mut(self.cursor.0) {
             let (first, second) = line.split_at(self.cursor.1);
             if !first.is_empty() {
@@ -100,7 +113,7 @@ impl Editor {
 
     pub fn del(&mut self) {
         // TODO needs work
-        let next_line = self.content.get(self.cursor.1).cloned();
+        let next_line = self.content.get(self.cursor.0 + 1).cloned();
         let current_line = self.content.get_mut(self.cursor.0);
         if let Some(line) = current_line {
             let (first, second) = line.split_at(self.cursor.1);

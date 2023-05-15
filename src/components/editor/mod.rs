@@ -1,13 +1,13 @@
 mod file;
 mod linter;
 
-use linter::linter;
 use file::Editor;
+use linter::linter;
 use std::path::PathBuf;
 use tui::layout::{Constraint, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::text::{Span, Spans};
-use tui::widgets::{Block, Borders, List, ListItem, ListState, Tabs};
+use tui::widgets::{List, ListItem, ListState, Tabs};
 use tui::{backend::Backend, Frame};
 
 #[derive(Default)]
@@ -19,37 +19,34 @@ pub struct EditorState {
 impl EditorState {
     pub fn render(&mut self, frame: &mut Frame<impl Backend>, area: Rect) {
         let layout = Layout::default()
-            .constraints(vec![Constraint::Percentage(6), Constraint::Min(2)])
+            .constraints(vec![Constraint::Percentage(4), Constraint::Min(2)])
             .split(area);
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get(editor_id) {
-                let editor_content = List::new(file.content.iter().enumerate().map(linter).collect::<Vec<ListItem>>()).block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title(file.path.as_os_str().to_str().unwrap_or("Loading ...")),
-                );
-                frame.set_cursor(layout[1].x + 5 + file.cursor.1 as u16, layout[1].y + 1 + file.cursor.0 as u16);
-                frame.render_stateful_widget(editor_content, layout[1], &mut self.state);
+                let editor_content = List::new(file.content.iter().enumerate().map(linter).collect::<Vec<ListItem>>());
+                let row = layout[1].y + file.cursor.0 as u16;
+                let col = layout[1].x + 4 + file.cursor.1 as u16;
+                frame.set_cursor(col, row);
+                let mut editor_scroll = ListState::default();
+                editor_scroll.select(Some(file.file_position));
+                frame.render_stateful_widget(editor_content, layout[1], &mut editor_scroll);
 
-                let titles = self
-                    .editors
-                    .iter()
-                    .flat_map(try_file_to_tab)
-                    .collect();
+                let mut titles_unordered: Vec<_> = self.editors.iter().flat_map(try_file_to_tab).collect();
+                let mut titles = titles_unordered.split_off(editor_id);
+                titles.extend(titles_unordered);
 
                 let tabs = Tabs::new(titles)
-                    .block(Block::default().title("open editors"))
+                    .style(Style::default().add_modifier(Modifier::UNDERLINED))
                     .highlight_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
-                    .select(editor_id);
+                    .select(0);
 
                 frame.render_widget(tabs, layout[0]);
-                
             }
         }
     }
 
     pub fn get_active(&mut self) -> Option<&mut Editor> {
-        self.editors.get_mut( self.state.selected()?)
+        self.editors.get_mut(self.state.selected()?)
     }
 
     pub fn new_from(&mut self, file_path: PathBuf) {
@@ -66,6 +63,9 @@ impl EditorState {
     }
 }
 
-fn try_file_to_tab(file:& Editor) -> Option<Spans> {
-    file.path.as_os_str().to_str().map(|t| Spans::from(Span::styled(t, Style::default().fg(Color::Green))))
+fn try_file_to_tab(file: &Editor) -> Option<Spans> {
+    file.path
+        .as_os_str()
+        .to_str()
+        .map(|t| Spans::from(Span::styled(t, Style::default().fg(Color::Green))))
 }

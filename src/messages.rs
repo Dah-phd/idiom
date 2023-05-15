@@ -3,6 +3,7 @@ use std::path::PathBuf;
 pub enum Mode {
     Select,
     Insert,
+    Popup
 }
 
 impl Default for Mode {
