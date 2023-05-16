@@ -1,6 +1,7 @@
 mod file;
 mod linter;
 
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use file::Editor;
 use linter::linter;
 use std::path::PathBuf;
@@ -32,7 +33,7 @@ impl EditorState {
                         .collect::<Vec<ListItem>>(),
                 );
                 frame.set_cursor(
-                    layout[1].x + 4 + file.cursor.1 as u16,
+                    layout[1].x + 1 + (file.cursor.1 + max_digits) as u16,
                     layout[1].y + file.cursor.0 as u16,
                 );
                 frame.render_widget(editor_content, layout[1]);
@@ -66,6 +67,42 @@ impl EditorState {
             self.state.select(Some(self.editors.len()));
             self.editors.push(opened_file);
         }
+    }
+
+    pub fn key_map(&mut self, key: KeyEvent) -> bool {
+        if let Some(editor) = self.get_active() {
+            if matches!(key.modifiers, KeyModifiers::CONTROL)
+                && matches!(key.code, KeyCode::Char('s') | KeyCode::Char('S'))
+            {
+                editor.save();
+            }
+            match key.code {
+                KeyCode::Up => {
+                    if key.modifiers.contains(KeyModifiers::CONTROL) {
+                        editor.scroll_up()
+                    } else {
+                        editor.navigate_up()
+                    }
+                }
+                KeyCode::Down => {
+                    if key.modifiers.contains(KeyModifiers::CONTROL) {
+                        editor.scroll_down()
+                    } else {
+                        editor.navigate_down()
+                    }
+                }
+                KeyCode::Left => editor.navigate_left(),
+                KeyCode::Right => editor.navigate_right(),
+                KeyCode::Char(c) => editor.push_str(c.to_string().as_str()),
+                KeyCode::Backspace => editor.backspace(),
+                KeyCode::Enter => editor.new_line(),
+                KeyCode::Tab => editor.indent(),
+                KeyCode::Delete => editor.del(),
+                _ => return false,
+            }
+        }
+
+        true
     }
 }
 

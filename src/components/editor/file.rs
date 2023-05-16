@@ -1,4 +1,10 @@
 use std::path::PathBuf;
+
+use crossterm::style::Stylize;
+
+const INDENT_ENDINGS: &str = ":({";
+const UNIDENT_ENDINGS: &str = ")}";
+const INDENT_TYPE: &str = "    ";
 #[derive(Debug)]
 pub struct Editor {
     pub content: Vec<String>,
@@ -129,22 +135,50 @@ impl Editor {
     }
 
     pub fn indent(&mut self) {
-        self.push_str("    ")
+        self.push_str(INDENT_TYPE)
+    }
+
+    pub fn unindent(&mut self) {
+        if let Some(line) = self.content.get_mut(self.cursor.0) {
+            if line.starts_with(INDENT_TYPE) {
+                line.strip_prefix(INDENT_TYPE);
+            }
+        }
     }
 
     pub fn new_line(&mut self) {
         if let Some(line) = self.content.get(self.cursor.0) {
-            let indent = String::from("    ");
-            if line.len() - 1 > self.cursor.1 {
+            let new_line = if line.len() - 1 > self.cursor.1 {
                 let (replace_line, new_line) = line.split_at(self.cursor.1);
                 let new_line = String::from(new_line);
                 self.content[self.cursor.0] = String::from(replace_line);
-                self.content.insert(self.cursor.0 + 1, new_line);
+                new_line
             } else {
-                self.content.insert(self.cursor.0 + 1, String::new())
-            }
+                String::new()
+            };
+            self.content.insert(self.cursor.0 + 1, new_line);
             self.cursor.0 += 1;
             self.cursor.1 = 0;
+            self.get_indent();
+        }
+    }
+
+    fn get_indent(&mut self) {
+        if self.cursor.0 != 0 {
+            if let Some(mut prev_line) = self.content.get(self.cursor.0).cloned() {
+                if let Some(last) = prev_line.trim_end().chars().last() {
+                    if INDENT_ENDINGS.contains(last) {
+                        self.indent()
+                    }
+                    if UNIDENT_ENDINGS.contains(last) {
+                        self.unindent()
+                    }
+                }
+                if prev_line.starts_with(INDENT_TYPE) {
+                    self.indent();
+                    prev_line = prev_line[INDENT_TYPE.len()..].to_owned()
+                }
+            }
         }
     }
 
