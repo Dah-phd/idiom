@@ -23,16 +23,19 @@ impl EditorState {
             .split(area);
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get(editor_id) {
-                let digits_in_file_len = file.content.len().ilog10() + 1;
-                let editor_content = List::new(file.content[file.at_line..].iter().enumerate().map(|(idx, data)|{
-                    linter(idx+file.at_line, data, digits_in_file_len)}
-                ).collect::<Vec<ListItem>>());
-                let row = layout[1].y + file.cursor.0 as u16;
-                let col = layout[1].x + 4 + file.cursor.1 as u16;
-                frame.set_cursor(col, row);
-                let mut editor_scroll = ListState::default();
-                editor_scroll.select(Some(file.at_line));
-                frame.render_stateful_widget(editor_content, layout[1], &mut editor_scroll);
+                let max_digits = (file.content.len().ilog10() + 1) as usize;
+                let editor_content = List::new(
+                    file.content[file.at_line..]
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, content)| linter(idx + file.at_line, content, max_digits))
+                        .collect::<Vec<ListItem>>(),
+                );
+                frame.set_cursor(
+                    layout[1].x + 4 + file.cursor.1 as u16,
+                    layout[1].y + file.cursor.0 as u16,
+                );
+                frame.render_widget(editor_content, layout[1]);
 
                 let mut titles_unordered: Vec<_> = self.editors.iter().flat_map(try_file_to_tab).collect();
                 let mut titles = titles_unordered.split_off(editor_id);
