@@ -23,7 +23,8 @@ impl EditorState {
             .constraints(vec![Constraint::Percentage(4), Constraint::Min(2)])
             .split(area);
         if let Some(editor_id) = self.state.selected() {
-            if let Some(file) = self.editors.get(editor_id) {
+            if let Some(file) = self.editors.get_mut(editor_id) {
+                file.max_rows = layout[1].bottom();
                 let max_digits = (file.content.len().ilog10() + 1) as usize;
                 let editor_content = List::new(
                     file.content[file.at_line..]
@@ -34,7 +35,7 @@ impl EditorState {
                 );
                 frame.set_cursor(
                     layout[1].x + 1 + (file.cursor.1 + max_digits) as u16,
-                    layout[1].y + file.cursor.0 as u16,
+                    layout[1].y + (file.cursor.0 - file.at_line) as u16,
                 );
                 frame.render_widget(editor_content, layout[1]);
 

@@ -11,6 +11,7 @@ pub struct Editor {
     pub cursor: (usize, usize), // line, char
     pub at_line: usize,
     pub path: PathBuf,
+    pub max_rows: u16,
 }
 
 impl Editor {
@@ -21,29 +22,37 @@ impl Editor {
             cursor: (0, 0),
             at_line: 0,
             path,
+            max_rows: 0,
         })
     }
 
     pub fn scroll_down(&mut self) {
         if self.at_line < self.content.len() - 2 {
             self.at_line += 1;
+            self.navigate_down()
         }
     }
 
     pub fn scroll_up(&mut self) {
         if self.at_line != 0 {
             self.at_line -= 1;
+            self.navigate_up()
         }
     }
 
     pub fn navigate_up(&mut self) {
-        if self.cursor.0 > 0 {
+        if self.at_line >= self.cursor.0 {
+            self.scroll_up()
+        } else if self.cursor.0 > 0 {
             self.cursor.0 -= 1;
             self.adjust_cursor_max_char();
         }
     }
 
     pub fn navigate_down(&mut self) {
+        if self.cursor.0 > self.max_rows as usize - 3 + self.at_line  {
+            self.at_line += 1;
+        }
         if self.content.len() - 1 > self.cursor.0 {
             self.cursor.0 += 1;
             self.adjust_cursor_max_char();
