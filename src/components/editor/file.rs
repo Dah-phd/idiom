@@ -3,7 +3,7 @@ use std::path::PathBuf;
 pub struct Editor {
     pub content: Vec<String>,
     pub cursor: (usize, usize), // line, char
-    pub file_position: usize,
+    pub at_line: usize,
     pub path: PathBuf,
 }
 
@@ -13,20 +13,20 @@ impl Editor {
         Ok(Self {
             content: content.split('\n').map(String::from).collect(),
             cursor: (0, 0),
-            file_position: 0,
+            at_line: 0,
             path,
         })
     }
 
     pub fn scroll_down(&mut self) {
-        if self.file_position < self.content.len() {
-            self.file_position += 1;
+        if self.at_line < self.content.len() - 2 {
+            self.at_line += 1;
         }
     }
 
     pub fn scroll_up(&mut self) {
-        if self.file_position != 0 {
-            self.file_position -= 1;
+        if self.at_line != 0 {
+            self.at_line -= 1;
         }
     }
 

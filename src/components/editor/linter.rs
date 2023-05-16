@@ -1,10 +1,9 @@
 use tui::{widgets::ListItem, text::{Spans, Span}, style::{Color, Style}};
 
 
-pub fn linter(code_line: (usize, &String)) -> ListItem {
-    let (line, content) = code_line;
+pub fn linter(line:usize, content: &String, max_digits_in_line: u32) -> ListItem {
     ListItem::new(Spans::from(vec![
-        Span::styled(format!("{: >3} ", line), Style::default().fg(Color::Gray)),
+        Span::styled(format!("{: >4} ", line+1), Style::default().fg(Color::Gray)),
         Span::raw(content)
     ]))
 }

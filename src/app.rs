@@ -18,6 +18,7 @@ pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
     let mut clock = Instant::now();
     let mut file_tree = Tree::default();
     let mut editor_state = EditorState::default();
+
     loop {
         terminal.draw(|frame| {
             let screen_areas = Layout::default()
