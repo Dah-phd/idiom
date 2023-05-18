@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tui::{
     backend::Backend,
     layout::Rect,
@@ -14,12 +15,16 @@ pub struct Tree {
     pub expanded: Vec<PathBuf>,
     pub state: ListState,
     pub tree: Vec<PathBuf>,
+    pub is_hidden: bool,
 }
 
 impl Tree {
     pub fn render(&mut self, frame: &mut Frame<impl Backend>, area: Rect) {
-        self.tree.clear();
+        if self.is_hidden {
+            return;
+        }
 
+        self.tree.clear();
         for path in std::fs::read_dir("./").unwrap().flatten() {
             self.tree.extend(expand(path.path(), &self.expanded))
         }
@@ -50,6 +55,54 @@ impl Tree {
             }
         }
         None
+    }
+
+    pub fn map(&mut self, key: &KeyEvent) -> bool {
+        if matches!(key.code, KeyCode::Char('e') | KeyCode::Char('E'))
+            && key.modifiers.contains(KeyModifiers::CONTROL)
+        {
+            self.is_hidden = !self.is_hidden;
+            return true;
+        }
+        if self.is_hidden {
+            return false;
+        }
+        match key.modifiers {
+            KeyModifiers::NONE => match key.code {
+                KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
+                    if let Some(numba) = self.state.selected() {
+                        if numba == 0 {
+                            self.state.select(Some(self.tree.len() - 1))
+                        } else {
+                            self.state.select(Some(numba - 1))
+                        }
+                    } else {
+                        self.state.select(Some(self.tree.len() - 1))
+                    }
+                }
+                KeyCode::Down | KeyCode::Char('d') | KeyCode::Char('D') => {
+                    if let Some(numba) = self.state.selected() {
+                        if numba < self.tree.len() - 1 {
+                            self.state.select(Some(numba + 1));
+                        } else {
+                            self.state.select(Some(0))
+                        }
+                    } else {
+                        self.state.select(Some(0))
+                    }
+                },
+                KeyCode::Left => {
+                    if let Some(numba) = self.state.selected() {
+                        if let Some(path) = self.tree.get(numba) {
+                            self.expanded.retain(|expanded_path| expanded_path != path)
+                        }
+                    }
+                }
+                _ => return false,
+            },
+            _ => return false,
+        }
+        true
     }
 }
 

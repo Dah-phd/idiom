@@ -1,7 +1,5 @@
 use std::path::PathBuf;
 
-use crossterm::style::Stylize;
-
 const INDENT_ENDINGS: &str = ":({";
 const UNIDENT_ENDINGS: &str = ")}";
 const INDENT_TYPE: &str = "    ";
@@ -193,34 +191,5 @@ impl Editor {
 
     pub fn save(&self) {
         std::fs::write(&self.path, self.content.join("\n")).unwrap();
-    }
-
-    pub fn compare(&self) -> Option<Vec<(usize, String)>> {
-        let mut deltas = vec![];
-        let new_content = std::fs::read_to_string(&self.path)
-            .unwrap_or_default()
-            .split('\n')
-            .map(String::from)
-            .collect::<Vec<_>>();
-        let max = if self.content.len() > new_content.len() {
-            self.content.len()
-        } else {
-            new_content.len()
-        };
-
-        let empty_str = String::from("");
-        for idx in 0..max {
-            let line = self.content.get(idx).unwrap_or(&empty_str);
-            let new_line = new_content.get(idx).unwrap_or(&empty_str);
-            if line != new_line {
-                deltas.push((idx, format!("\nOLD LINE:\n{}\n NEW LINE:\n{}\n", line, new_line)))
-            }
-        }
-
-        if deltas.is_empty() {
-            return None;
-        }
-
-        Some(deltas)
     }
 }

@@ -1,7 +1,7 @@
 mod file;
 mod linter;
 
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use file::Editor;
 use linter::linter;
 use std::path::PathBuf;
@@ -70,40 +70,59 @@ impl EditorState {
         }
     }
 
-    pub fn key_map(&mut self, key: KeyEvent) -> bool {
+    pub fn map(&mut self, key: &KeyEvent) -> bool {
         if let Some(editor) = self.get_active() {
-            if matches!(key.modifiers, KeyModifiers::CONTROL)
-                && matches!(key.code, KeyCode::Char('s') | KeyCode::Char('S'))
-            {
-                editor.save();
-            }
-            match key.code {
-                KeyCode::Up => {
-                    if key.modifiers.contains(KeyModifiers::CONTROL) {
-                        editor.scroll_up()
-                    } else {
-                        editor.navigate_up()
+            match key.modifiers {
+                KeyModifiers::CONTROL => match key.code {
+                    KeyCode::Char(c) => match c {
+                        '[' => editor.unindent(),
+                        ']' => editor.indent(),
+                        _ => return false,
+                    },
+                    _ => return false,
+                },
+                KeyModifiers::NONE => match key.code {
+                    KeyCode::Up => {
+                        if key.modifiers.contains(KeyModifiers::CONTROL) {
+                            editor.scroll_up()
+                        } else {
+                            editor.navigate_up()
+                        }
                     }
-                }
-                KeyCode::Down => {
-                    if key.modifiers.contains(KeyModifiers::CONTROL) {
-                        editor.scroll_down()
-                    } else {
-                        editor.navigate_down()
+                    KeyCode::Down => {
+                        if key.modifiers.contains(KeyModifiers::CONTROL) {
+                            editor.scroll_down()
+                        } else {
+                            editor.navigate_down()
+                        }
                     }
-                }
-                KeyCode::Left => editor.navigate_left(),
-                KeyCode::Right => editor.navigate_right(),
-                KeyCode::Char(c) => editor.push_str(c.to_string().as_str()),
-                KeyCode::Backspace => editor.backspace(),
-                KeyCode::Enter => editor.new_line(),
-                KeyCode::Tab => editor.indent(),
-                KeyCode::Delete => editor.del(),
+                    KeyCode::Left => editor.navigate_left(),
+                    KeyCode::Right => editor.navigate_right(),
+                    KeyCode::Char(c) => editor.push_str(c.to_string().as_str()),
+                    KeyCode::Backspace => editor.backspace(),
+                    KeyCode::Enter => editor.new_line(),
+                    KeyCode::Tab => editor.indent(),
+                    KeyCode::Delete => editor.del(),
+                    _ => return false,
+                },
+                KeyModifiers::SHIFT => {}
+                KeyModifiers::ALT => {}
                 _ => return false,
             }
         }
-
         true
+    }
+
+    pub fn save(&mut self) {
+        if let Some(editor) = self.get_active() {
+            editor.save()
+        }
+    }
+
+    pub fn save_all(&mut self) {
+        for editor in self.editors.iter_mut() {
+            editor.save()
+        }
     }
 }
 
