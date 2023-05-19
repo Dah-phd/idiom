@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use crate::messages::FileType;
 
 const INDENT_ENDINGS: &str = ":({";
 const UNIDENT_ENDINGS: &str = ")}";
@@ -10,6 +11,7 @@ pub struct Editor {
     pub at_line: usize,
     pub path: PathBuf,
     pub max_rows: u16,
+    pub file_type: FileType,
 }
 
 impl Editor {
@@ -19,6 +21,7 @@ impl Editor {
             content: content.split('\n').map(String::from).collect(),
             cursor: (0, 0),
             at_line: 0,
+            file_type: FileType::derive_type(&path),
             path,
             max_rows: 0,
         })

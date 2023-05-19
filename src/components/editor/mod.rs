@@ -3,7 +3,7 @@ mod linter;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use file::Editor;
-use linter::linter;
+use linter::Linter;
 use std::path::PathBuf;
 use tui::layout::{Constraint, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
@@ -26,11 +26,12 @@ impl EditorState {
             if let Some(file) = self.editors.get_mut(editor_id) {
                 file.max_rows = layout[1].bottom();
                 let max_digits = (file.content.len().ilog10() + 1) as usize;
+                let mut linter = Linter::default();
                 let editor_content = List::new(
                     file.content[file.at_line..]
                         .iter()
                         .enumerate()
-                        .map(|(idx, content)| linter(idx + file.at_line, content, max_digits))
+                        .map(|(idx, content)| linter.linter(idx + file.at_line, content, max_digits))
                         .collect::<Vec<ListItem>>(),
                 );
                 frame.set_cursor(
