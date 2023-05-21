@@ -11,10 +11,10 @@ pub struct Theme {
 impl Default for Theme {
     fn default() -> Self {
         Self {
-            kword: Color::Rgb(69, 84, 113),
-            class: Color::Rgb(101, 155, 111),
-            default: Color::Rgb(130, 165, 187),
-            function: Color::Rgb(175, 153, 90),
+            kword: Color::Rgb(79, 106, 214),
+            class: Color::Rgb(112, 199, 176),
+            default: Color::Rgb(108, 149, 214),
+            function: Color::Rgb(218, 223, 170),
             blank: Color::White,
         }
     }

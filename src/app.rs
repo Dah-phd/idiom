@@ -47,9 +47,6 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
         if crossterm::event::poll(timeout)? {
             // TODO combine all controls in here!, should be easier to handle if something needs changin - this iwill be main
             if let Event::Key(key) = crossterm::event::read()? {
-                if key.modifiers.contains(KeyModifiers::CONTROL) && key.modifiers.contains(KeyModifiers::SHIFT) {
-                    panic!("WORKS!!")
-                }
                 if matches!(
                     key.code,
                     KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Char('q') | KeyCode::Char('Q')

@@ -24,7 +24,7 @@ where
     pub fn with(id: usize, params: T::Params) -> Self {
         Self {
             jsonrpc: String::from("2.0"),
-            id: 0,
+            id,
             method: <T as lsp_types::request::Request>::METHOD,
             params,
         }

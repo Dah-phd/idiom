@@ -1,44 +1,41 @@
-mod messages;
-mod lsp;
 mod app;
 mod components;
+mod lsp;
+mod messages;
 use app::app;
-use lsp::rust::start_lsp;
-use lsp_types::request::Initialize;
 
-use std::io::{stdout, Write};
-
-use crossterm::event::{KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags};
-use crossterm::execute;
-use crossterm::style::ResetColor;
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
+use crossterm::event::{KeyboardEnhancementFlags, PushKeyboardEnhancementFlags};
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
-fn prep(out: &mut impl Write) -> std::io::Result<()> {
-    enable_raw_mode()?;
-    execute!(
+fn prep(out: &mut impl std::io::Write) -> std::io::Result<()> {
+    crossterm::terminal::enable_raw_mode()?;
+    crossterm::execute!(
         out,
-        EnterAlternateScreen,
-        ResetColor,
+        crossterm::terminal::EnterAlternateScreen,
+        crossterm::style::ResetColor,
         PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
     )?;
     Ok(())
 }
 
-fn graceful_exit(out: &mut impl Write) -> std::io::Result<()> {
-    execute!(out, ResetColor, LeaveAlternateScreen, PopKeyboardEnhancementFlags)?;
-    disable_raw_mode()?;
+fn graceful_exit(out: &mut impl std::io::Write) -> std::io::Result<()> {
+    crossterm::execute!(
+        out,
+        crossterm::style::ResetColor,
+        crossterm::terminal::LeaveAlternateScreen,
+        crossterm::event::PopKeyboardEnhancementFlags
+    )?;
+    crossterm::terminal::disable_raw_mode()?;
     Ok(())
 }
 
-async fn debug() {
-}
+async fn debug() {}
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     debug().await;
-    let out = stdout();
+    let out = std::io::stdout();
     let mut terminal = Terminal::new(CrosstermBackend::new(&out)).expect("should not fail!");
     prep(&mut terminal.backend_mut())?;
     app(&mut terminal).await?;
