@@ -3,7 +3,7 @@ mod linter;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use file::Editor;
-use linter::Linter;
+use linter::{Linter, RustSyntax};
 use std::path::PathBuf;
 use tui::layout::{Constraint, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
@@ -26,7 +26,7 @@ impl EditorState {
             if let Some(file) = self.editors.get_mut(editor_id) {
                 file.max_rows = layout[1].bottom();
                 let max_digits = (file.content.len().ilog10() + 1) as usize;
-                let mut linter = Linter::default();
+                let mut linter = RustSyntax::default();
                 let editor_content = List::new(
                     file.content[file.at_line..]
                         .iter()

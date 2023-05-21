@@ -1,125 +1,36 @@
+mod rust_key_words;
+mod theme;
+pub use rust_key_words::RustSyntax;
 use tui::{
     style::{Color, Style},
     text::{Span, Spans},
     widgets::ListItem,
 };
 
-const WHITE_SPACE: char = ' ';
-const COLORS: [Color; 3] = [Color::Magenta, Color::Blue, Color::Yellow];
+use self::theme::Theme;
 
-pub struct Linter {
-    curly: Vec<Color>,
-    brackets: Vec<Color>,
-    square: Vec<Color>,
-    last_token: String,
-    key_words: Vec<&'static str>,
-    last_key_words: Vec<String>,
-}
+pub const COLORS: [Color; 3] = [Color::Magenta, Color::Blue, Color::Yellow];
 
-impl Default for Linter {
-    fn default() -> Self {
-        Self {
-            last_key_words: vec![],
-            curly: vec![],
-            brackets: vec![],
-            square: vec![],
-            last_token: String::new(),
-            key_words: vec!["fn", "pub", "struct", "enum"],
-        }
-    }
-}
 
-impl Linter {
-    pub fn linter<'a>(&mut self, idx: usize, content: &'a String, max_digits: usize) -> ListItem<'a> {
+pub trait Linter<T: Default = Self> {
+    fn get_token_buffer(&mut self) -> &mut String;
+
+    fn handled_key_word(&mut self) -> Option<Span<'static>>;
+
+    fn process_line(&mut self, content: &String, spans: &mut Vec<Span>);
+
+    fn get_theme(&self) -> &Theme;
+
+    fn linter<'a>(&mut self, idx: usize, content: &'a String, max_digits: usize) -> ListItem<'a> {
         let mut spans = vec![Span::styled(
             get_line_num(idx, max_digits),
             Style::default().fg(Color::Gray),
         )];
         self.process_line(content, &mut spans);
-        ListItem::new(Spans::from(spans))
-    }
-
-    fn process_line(&mut self, content: &String, spans: &mut Vec<Span>) {
-        let char_stream = content.chars();
-        for ch in char_stream {
-            match ch {
-                WHITE_SPACE => {
-                    spans.push(self.drain_buf());
-                    self.last_token.push(ch);
-                }
-                '.' => {
-                    spans.push(self.drain_buf());
-                    spans.push(self.white_char(ch));
-                }
-                '<' => {
-                    spans.push(self.drain_buf());
-                    spans.push(self.white_char(ch))
-                }
-                '>' => {
-                    spans.push(self.drain_buf());
-                    spans.push(self.white_char(ch))
-                }
-                '(' => {
-                    spans.push(self.drain_buf_colored(Color::LightYellow));
-                    let color = len_to_color(Some(self.brackets.len()));
-                    self.last_token.push(ch);
-                    self.brackets.push(color);
-                    spans.push(self.drain_buf_colored(color));
-                }
-                ')' => {
-                    let color = if let Some(color) = self.brackets.pop() {
-                        color
-                    } else {
-                        len_to_color(None)
-                    };
-                    spans.push(self.drain_buf());
-                    self.last_token.push(ch);
-                    spans.push(self.drain_buf_colored(color));
-                }
-                '{' => {
-                    spans.push(self.drain_buf());
-                    let color = len_to_color(Some(self.curly.len()));
-                    self.last_token.push(ch);
-                    self.curly.push(color);
-                    spans.push(self.drain_buf_colored(color));
-                }
-                '}' => {
-                    let color = if let Some(color) = self.curly.pop() {
-                        color
-                    } else {
-                        len_to_color(None)
-                    };
-                    spans.push(self.drain_buf());
-                    self.last_token.push(ch);
-                    spans.push(self.drain_buf_colored(color));
-                }
-                '[' => {
-                    spans.push(self.drain_buf());
-                    let color = len_to_color(Some(self.square.len()));
-                    self.last_token.push(ch);
-                    self.square.push(color);
-                    spans.push(self.drain_buf_colored(color));
-                }
-                ']' => {
-                    let color = if let Some(color) = self.square.pop() {
-                        color
-                    } else {
-                        len_to_color(None)
-                    };
-                    spans.push(self.drain_buf());
-                    self.last_token.push(ch);
-                    spans.push(self.drain_buf_colored(color));
-                }
-                ':' => {
-                    spans.push(self.drain_buf());
-                    spans.push(self.white_char(ch))
-                }
-                _ => self.last_token.push(ch),
-            }
-        }
-        if !self.last_token.is_empty() {
+        if !self.get_token_buffer().is_empty() {
             spans.push(self.drain_buf());
         }
+        ListItem::new(Spans::from(spans))
     }
 
     fn white_char(&mut self, ch: char) -> Span<'static> {
@@ -137,7 +48,7 @@ impl Linter {
             return span;
         }
         Span::styled(
-            self.last_token.drain(..).collect::<String>(),
+            self.get_token_buffer().drain(..).collect::<String>(),
             Style {
                 fg: Some(color),
                 ..Default::default()
@@ -150,24 +61,9 @@ impl Linter {
             return span;
         }
         Span::styled(
-            self.last_token.drain(..).collect::<String>(),
-            Style::default().fg(Color::LightBlue),
+            self.get_token_buffer().drain(..).collect::<String>(),
+            Style::default().fg(self.get_theme().default),
         )
-    }
-
-    fn handled_key_word(&mut self) -> Option<Span<'static>> {
-        if self.key_words.contains(&self.last_token.trim()) {
-            self.last_key_words.push(self.last_token.to_owned());
-            Some(Span::styled(
-                self.last_token.drain(..).collect::<String>(),
-                Style {
-                    fg: Some(Color::Blue),
-                    ..Default::default()
-                },
-            ))
-        } else {
-            None
-        }
     }
 }
 fn len_to_color(len: Option<usize>) -> Color {
@@ -179,10 +75,10 @@ fn len_to_color(len: Option<usize>) -> Color {
 }
 
 fn get_line_num(idx: usize, max_digits: usize) -> String {
-    let mut as_str = idx.to_string();
+    let mut as_str = (idx+1).to_string();
     while as_str.len() < max_digits {
-        as_str.insert(0, WHITE_SPACE)
+        as_str.insert(0, ' ')
     }
-    as_str.push(WHITE_SPACE);
+    as_str.push(' ');
     as_str
 }

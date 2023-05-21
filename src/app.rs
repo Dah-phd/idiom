@@ -2,7 +2,8 @@ use std::time::{Duration, Instant};
 
 use crate::{
     components::{EditorState, Tree},
-    messages::Mode,
+    lsp::{self, LSP},
+    messages::{FileType, Mode},
 };
 use crossterm::event::{Event, KeyCode, KeyModifiers};
 use tui::{
@@ -13,11 +14,12 @@ use tui::{
 
 const TICK: Duration = Duration::from_millis(250);
 
-pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
+pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
     let mut mode = Mode::Select;
     let mut clock = Instant::now();
     let mut file_tree = Tree::default();
     let mut editor_state = EditorState::default();
+    let mut lsp_servers: Vec<LSP> = vec![];
 
     loop {
         terminal.draw(|frame| {
@@ -51,7 +53,8 @@ pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                 if matches!(
                     key.code,
                     KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Char('q') | KeyCode::Char('Q')
-                ) && key.modifiers.contains(KeyModifiers::CONTROL) {
+                ) && key.modifiers.contains(KeyModifiers::CONTROL)
+                {
                     break;
                 };
                 if match mode {
@@ -66,13 +69,33 @@ pub fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                         KeyCode::Right => {
                             if let Some(file_path) = file_tree.expand_dir_or_get_path() {
                                 editor_state.new_from(file_path);
+                                if let Some(editor) = editor_state.get_active() {
+                                    match editor.file_type {
+                                        FileType::Rust => {
+                                            if let Ok(lsp) = LSP::start(lsp::rust::start_lsp()).await {
+                                                lsp_servers.push(lsp)
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
                             }
                         }
                         KeyCode::Enter => {
                             if let Some(file_path) = file_tree.expand_dir_or_get_path() {
                                 if !file_path.is_dir() {
                                     editor_state.new_from(file_path);
-                                    mode = Mode::Insert
+                                    mode = Mode::Insert;
+                                    if let Some(editor) = editor_state.get_active() {
+                                        match editor.file_type {
+                                            FileType::Rust => {
+                                                if let Ok(lsp) = LSP::start(lsp::rust::start_lsp()).await {
+                                                    lsp_servers.push(lsp)
+                                                }
+                                            }
+                                            _ => {}
+                                        }
+                                    }
                                 }
                             }
                         }

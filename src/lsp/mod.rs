@@ -1,4 +1,8 @@
 pub mod rust;
+pub mod request;
+use request::LSPRequest;
+use std::collections::HashMap;
+use std::future::Future;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 
@@ -8,74 +12,30 @@ use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
-use lsp_types::request::{Initialize, Request};
-use lsp_types::{InitializeParams, Url, WorkspaceFolder};
-use serde::Serialize;
-use serde_json::to_string;
+use lsp_types::request::{Initialize, RegisterCapability, Request};
+use lsp_types::{InitializeParams, Url, WorkspaceFolder, RegistrationParams, Registration};
 
-#[derive(Serialize)]
-pub struct LSPRequest<T>
-where
-    T: lsp_types::request::Request,
-    T::Params: serde::Serialize,
-    T::Result: serde::de::DeserializeOwned,
-{
-    jsonrpc: String,
-    id: usize,
-    method: &'static str,
-    params: T::Params,
-}
-
-impl<T> LSPRequest<T>
-where
-    T: lsp_types::request::Request,
-    T::Params: serde::Serialize,
-    T::Result: serde::de::DeserializeOwned,
-{
-    fn with(id: usize, params: T::Params) -> Self {
-        Self {
-            jsonrpc: String::from("2.0"),
-            id: 0,
-            method: <T as lsp_types::request::Request>::METHOD,
-            params,
-        }
-    }
-
-    fn stringify(&self) -> String {
-        if let Ok(request) = to_string(self) {
-            format!("Content-Length: {}\r\n\r\n{}", request.len(), request)
-        } else {
-            "".to_owned()
-        }
-    }
-}
-
-pub struct LSP<T>
-where
-    T: Request,
-{
+#[allow(clippy::upper_case_acronyms)]
+pub struct LSP {
     que: Arc<Mutex<Vec<String>>>,
     counter: usize,
-    requests: Vec<LSPRequest<T>>,
+    requests: HashMap<usize, (&'static str, String)>,
     inner: Child,
     handler: JoinHandle<()>,
     stdin: ChildStdin,
 }
 
-impl<T> LSP<T>
-where
-    T: Request,
-{
+impl LSP {
     pub async fn start(server: Command) -> std::io::Result<Self> {
         let init_request: LSPRequest<Initialize> = LSPRequest::with(
-            0,
+            1,
             InitializeParams {
                 process_id: Some(std::process::id()),
                 ..Default::default()
             },
         );
         let mut lsp = Self::new(server).await?;
-        let result = lsp.send(init_request.stringify()).await;
+        let result = lsp.send(init_request.stringify(), init_request.method).await;
         if let Err(_) = result {
             lsp.dash_nine();
             result?;
@@ -121,16 +81,29 @@ where
         Ok(Self {
             que,
             counter: 1,
-            requests: vec![],
+            requests: HashMap::default(),
             inner,
             handler,
             stdin,
         })
     }
 
-    async fn send(&mut self, lsp_request: String) -> std::io::Result<()> {
+    async fn send(&mut self, lsp_request: String, method: &'static str) -> std::io::Result<()> {
+        self.requests.insert(self.counter, (method, lsp_request.to_owned()));
+        self.counter += 1;
         let _ = self.stdin.write(lsp_request.as_bytes()).await?;
         self.stdin.flush().await
+    }
+
+    pub fn register(&mut self, registrations: Vec<Registration>) {
+        self.counter += 1;
+        let request:LSPRequest<RegisterCapability> = LSPRequest::with(
+            self.counter,
+            RegistrationParams {
+                registrations
+            }
+        );
+        self.send(request.stringify(), request.method);
     }
 
     fn dash_nine(&mut self) {

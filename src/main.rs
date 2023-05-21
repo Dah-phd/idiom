@@ -41,6 +41,6 @@ async fn main() -> std::io::Result<()> {
     let out = stdout();
     let mut terminal = Terminal::new(CrosstermBackend::new(&out)).expect("should not fail!");
     prep(&mut terminal.backend_mut())?;
-    app(&mut terminal)?;
+    app(&mut terminal).await?;
     graceful_exit(&mut terminal.backend_mut())
 }
