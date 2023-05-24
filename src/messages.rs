@@ -22,6 +22,7 @@ pub enum FileType {
     Toml,
     Unknown
 }
+
 impl FileType {
     pub fn derive_type(path: &PathBuf) -> Self {
         if let Some(extension_os_str) = path.extension() {
@@ -39,5 +40,4 @@ impl FileType {
         };
         Self::Unknown
     }
-
 }

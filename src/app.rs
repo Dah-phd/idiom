@@ -2,8 +2,8 @@ use std::time::{Duration, Instant};
 
 use crate::{
     components::{EditorState, Tree},
-    lsp::{self, LSP},
-    messages::{FileType, Mode},
+    lsp::LSP,
+    messages::Mode,
 };
 use crossterm::event::{Event, KeyCode, KeyModifiers};
 use tui::{
@@ -25,11 +25,15 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
         terminal.draw(|frame| {
             let screen_areas = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(15), Constraint::Min(2)].as_ref())
+                .constraints([
+                    Constraint::Percentage(if file_tree.is_hidden { 0 } else { 15 }),
+                    Constraint::Min(2),
+                ])
                 .split(frame.size());
             file_tree.render(frame, screen_areas[0]);
             editor_state.render(frame, screen_areas[1]);
         })?;
+
         match mode {
             Mode::Insert => {}
             Mode::Select => {
@@ -67,13 +71,8 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                             if let Some(file_path) = file_tree.expand_dir_or_get_path() {
                                 editor_state.new_from(file_path);
                                 if let Some(editor) = editor_state.get_active() {
-                                    match editor.file_type {
-                                        FileType::Rust => {
-                                            if let Ok(lsp) = LSP::start(lsp::rust::start_lsp()).await {
-                                                lsp_servers.push(lsp)
-                                            }
-                                        }
-                                        _ => {}
+                                    if let Ok(lsp) = LSP::from(&editor.file_type).await {
+                                        lsp_servers.push(lsp)
                                     }
                                 }
                             }
@@ -84,13 +83,8 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                                     editor_state.new_from(file_path);
                                     mode = Mode::Insert;
                                     if let Some(editor) = editor_state.get_active() {
-                                        match editor.file_type {
-                                            FileType::Rust => {
-                                                if let Ok(lsp) = LSP::start(lsp::rust::start_lsp()).await {
-                                                    lsp_servers.push(lsp)
-                                                }
-                                            }
-                                            _ => {}
+                                        if let Ok(lsp) = LSP::from(&editor.file_type).await {
+                                            lsp_servers.push(lsp)
                                         }
                                     }
                                 }

@@ -1,6 +1,4 @@
 use serde::Serialize;
-use serde_json::to_string;
-use lsp_types::request::{Request};
 
 #[derive(Serialize)]
 pub struct LSPRequest<T>
@@ -27,14 +25,6 @@ where
             id,
             method: <T as lsp_types::request::Request>::METHOD,
             params,
-        }
-    }
-
-    pub fn stringify(&self) -> String {
-        if let Ok(request) = to_string(self) {
-            format!("Content-Length: {}\r\n\r\n{}", request.len(), request)
-        } else {
-            "".to_owned()
         }
     }
 }

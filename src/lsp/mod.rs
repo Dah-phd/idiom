@@ -1,8 +1,8 @@
 pub mod rust;
 pub mod request;
 use request::LSPRequest;
+use serde_json::to_string;
 use std::collections::HashMap;
-use std::future::Future;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 
@@ -11,9 +11,12 @@ use tokio::process::{Child, ChildStdin, Command};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
+use anyhow::{Result, anyhow};
 
-use lsp_types::request::{Initialize, RegisterCapability, Request};
+use lsp_types::lsp_request;
 use lsp_types::{InitializeParams, Url, WorkspaceFolder, RegistrationParams, Registration};
+
+use crate::messages::FileType;
 
 #[allow(clippy::upper_case_acronyms)]
 pub struct LSP {
@@ -26,25 +29,14 @@ pub struct LSP {
 }
 
 impl LSP {
-    pub async fn start(server: Command) -> std::io::Result<Self> {
-        let init_request: LSPRequest<Initialize> = LSPRequest::with(
-            1,
-            InitializeParams {
-                process_id: Some(std::process::id()),
-                ..Default::default()
-            },
-        );
-        let mut lsp = Self::new(server).await?;
-        let result = lsp.send(init_request.stringify(), init_request.method).await;
-        if let Err(_) = result {
-            lsp.dash_nine();
-            result?;
-        };
-        Ok(lsp)
+    pub async fn from(file_type: &FileType) -> Result<Self> {
+        match file_type {
+            FileType::Rust => Self::new(rust::start_lsp()).await,
+            _ => Err(anyhow!("Not supported LSP!"))
+        }
     }
 
-    async fn new(mut server: Command) -> std::io::Result<Self> {
-        // TODO improve error handling!!! && test
+    pub async fn new(mut server: Command) -> Result<Self> {
         let mut inner = server
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -54,7 +46,7 @@ impl LSP {
         let mut stdin = inner.stdin.take().unwrap();
 
         let pwd_uri = format!("file://{}", std::env::current_dir()?.as_os_str().to_str().unwrap());
-        let request: LSPRequest<Initialize> = LSPRequest::with(
+        let request: LSPRequest<lsp_request!("initialize")> = LSPRequest::with(
             0,
             InitializeParams {
                 process_id: Some(std::process::id()),
@@ -65,7 +57,7 @@ impl LSP {
                 ..Default::default()
             },
         );
-        let _ = stdin.write(request.stringify().as_bytes()).await?;
+        let _ = stdin.write(to_string(&request)?.as_bytes()).await?;
         stdin.flush().await?;
         let stderr = FramedRead::new(inner.stderr.take().unwrap(), BytesCodec::new());
         let stdout = FramedRead::new(inner.stdout.take().unwrap(), BytesCodec::new());
@@ -88,22 +80,31 @@ impl LSP {
         })
     }
 
-    async fn send(&mut self, lsp_request: String, method: &'static str) -> std::io::Result<()> {
+    fn process_request(&mut self) {
+        let result = self.que.lock().unwrap().pop();
+        if let Some(data) = result {
+
+        }
+    }
+
+    async fn send(&mut self, lsp_request: String, method: &'static str) -> Result<()> {
         self.requests.insert(self.counter, (method, lsp_request.to_owned()));
         self.counter += 1;
         let _ = self.stdin.write(lsp_request.as_bytes()).await?;
-        self.stdin.flush().await
+        self.stdin.flush().await?;
+        Ok(())
     }
 
-    pub fn register(&mut self, registrations: Vec<Registration>) {
+    pub async fn register(&mut self, registrations: Vec<Registration>) -> Result<()> {
         self.counter += 1;
-        let request:LSPRequest<RegisterCapability> = LSPRequest::with(
+        let request:LSPRequest<lsp_request!("client/registerCapability")> = LSPRequest::with(
             self.counter,
             RegistrationParams {
                 registrations
             }
         );
-        self.send(request.stringify(), request.method);
+
+        self.send(to_string(&request)?, request.method).await
     }
 
     fn dash_nine(&mut self) {

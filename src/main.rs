@@ -14,7 +14,7 @@ fn prep(out: &mut impl std::io::Write) -> std::io::Result<()> {
         out,
         crossterm::terminal::EnterAlternateScreen,
         crossterm::style::ResetColor,
-        PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
+        PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS)
     )?;
     Ok(())
 }

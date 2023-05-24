@@ -1,0 +1,2 @@
+[ERROR rust_analyzer] Unexpected error: expected initialize request, got error: receiving on an empty and disconnected channel
+expected initialize request, got error: receiving on an empty and disconnected channel
