@@ -37,7 +37,7 @@ impl Linter for RustSyntax {
         &self.theme
     }
 
-    fn process_line(&mut self, content: &String, spans: &mut Vec<Span>) {
+    fn process_line(&mut self, content: &str, spans: &mut Vec<Span>) {
         if content.starts_with("mod") {
             
         }

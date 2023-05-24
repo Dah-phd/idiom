@@ -1,4 +1,6 @@
 use serde::Serialize;
+use serde_json::to_string;
+use anyhow::Result;
 
 #[derive(Serialize)]
 pub struct LSPRequest<T>
@@ -26,5 +28,10 @@ where
             method: <T as lsp_types::request::Request>::METHOD,
             params,
         }
+    }
+
+    pub fn stringify(&self) -> Result<String> {
+        let request_msg = to_string(self)?;
+        Ok(format!("Content-Length: {}\r\n\r\n{}", request_msg.len(), request_msg))
     }
 }

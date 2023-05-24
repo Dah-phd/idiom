@@ -17,7 +17,7 @@ pub trait Linter<T: Default = Self> {
 
     fn handled_key_word(&mut self) -> Option<Span<'static>>;
 
-    fn process_line(&mut self, content: &String, spans: &mut Vec<Span>);
+    fn process_line(&mut self, content: &str, spans: &mut Vec<Span>);
 
     fn get_theme(&self) -> &Theme;
 

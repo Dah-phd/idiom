@@ -72,7 +72,10 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                                 editor_state.new_from(file_path);
                                 if let Some(editor) = editor_state.get_active() {
                                     if let Ok(lsp) = LSP::from(&editor.file_type).await {
-                                        lsp_servers.push(lsp)
+                                        for req in lsp.que.lock().unwrap().iter() {
+                                            println!("{}", req)
+                                        }
+                                        lsp_servers.push(lsp);
                                     }
                                 }
                             }

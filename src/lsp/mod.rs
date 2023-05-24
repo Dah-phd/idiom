@@ -1,7 +1,6 @@
 pub mod rust;
 pub mod request;
 use request::LSPRequest;
-use serde_json::to_string;
 use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
@@ -20,7 +19,7 @@ use crate::messages::FileType;
 
 #[allow(clippy::upper_case_acronyms)]
 pub struct LSP {
-    que: Arc<Mutex<Vec<String>>>,
+    pub que: Arc<Mutex<Vec<String>>>,
     counter: usize,
     requests: HashMap<usize, (&'static str, String)>,
     inner: Child,
@@ -57,8 +56,6 @@ impl LSP {
                 ..Default::default()
             },
         );
-        let _ = stdin.write(to_string(&request)?.as_bytes()).await?;
-        stdin.flush().await?;
         let stderr = FramedRead::new(inner.stderr.take().unwrap(), BytesCodec::new());
         let stdout = FramedRead::new(inner.stdout.take().unwrap(), BytesCodec::new());
         let mut stream = stdout.chain(stderr);
@@ -67,9 +64,14 @@ impl LSP {
         let handler = tokio::task::spawn(async move {
             while let Some(Ok(msg)) = stream.next().await {
                 let string = String::from_utf8_lossy(&msg);
+                let b: String = string.clone().into();
+                std::fs::write("resp.json", b);
                 que_for_handler.lock().unwrap().push(string.into());
+                 
             }
         });
+        let _ = stdin.write(request.stringify()?.as_bytes()).await?;
+        stdin.flush().await?;
         Ok(Self {
             que,
             counter: 1,
@@ -104,11 +106,12 @@ impl LSP {
             }
         );
 
-        self.send(to_string(&request)?, request.method).await
+        self.send(request.stringify()?, request.method).await
     }
 
-    fn dash_nine(&mut self) {
+    async fn dash_nine(&mut self) -> Result<()> {
         self.handler.abort();
-        self.inner.kill();
+        self.inner.kill().await?;
+        Ok(())
     }
 }
