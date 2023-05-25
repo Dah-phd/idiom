@@ -58,8 +58,7 @@ impl Tree {
     }
 
     pub fn map(&mut self, key: &KeyEvent) -> bool {
-        if matches!(key.code, KeyCode::Char('e') | KeyCode::Char('E'))
-            && key.modifiers.contains(KeyModifiers::CONTROL)
+        if matches!(key.code, KeyCode::Char('e') | KeyCode::Char('E')) && key.modifiers.contains(KeyModifiers::CONTROL)
         {
             self.is_hidden = !self.is_hidden;
             return true;
@@ -90,7 +89,7 @@ impl Tree {
                     } else {
                         self.state.select(Some(0))
                     }
-                },
+                }
                 KeyCode::Left => {
                     if let Some(numba) = self.state.selected() {
                         if let Some(path) = self.tree.get(numba) {

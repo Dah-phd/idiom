@@ -1,4 +1,4 @@
-use super::{Linter, COLORS, theme::Theme};
+use super::{theme::Theme, Linter, COLORS};
 use tui::{
     style::{Color, Style},
     text::Span,
@@ -38,12 +38,8 @@ impl Linter for RustSyntax {
     }
 
     fn process_line(&mut self, content: &str, spans: &mut Vec<Span>) {
-        if content.starts_with("mod") {
-            
-        }
-        if content.starts_with("use") {
-
-        }
+        if content.starts_with("mod") {}
+        if content.starts_with("use") {}
         let char_stream = content.chars();
         for ch in char_stream {
             match ch {

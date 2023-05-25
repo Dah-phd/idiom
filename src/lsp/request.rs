@@ -1,6 +1,6 @@
+use anyhow::Result;
 use serde::Serialize;
 use serde_json::to_string;
-use anyhow::Result;
 
 #[derive(Serialize)]
 pub struct LSPRequest<T>
@@ -32,6 +32,8 @@ where
 
     pub fn stringify(&self) -> Result<String> {
         let request_msg = to_string(self)?;
-        Ok(format!("Content-Length: {}\r\n\r\n{}", request_msg.len(), request_msg))
+        let ser_req = format!("Content-Length: {}\r\n\r\n{}", request_msg.len(), request_msg);
+        // std::fs::write("req.json", &ser_req);
+        Ok(ser_req)
     }
 }

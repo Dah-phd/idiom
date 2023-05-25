@@ -1,3 +1,4 @@
+mod cursor;
 mod file;
 mod linter;
 
@@ -24,19 +25,19 @@ impl EditorState {
             .split(area);
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get_mut(editor_id) {
-                file.max_rows = layout[1].bottom();
+                file.cursor.max_rows = layout[1].bottom();
                 let max_digits = (file.content.len().ilog10() + 1) as usize;
                 let mut linter = RustSyntax::default();
                 let editor_content = List::new(
-                    file.content[file.at_line..]
+                    file.content[file.cursor.at_line..]
                         .iter()
                         .enumerate()
-                        .map(|(idx, content)| linter.linter(idx + file.at_line, content, max_digits))
+                        .map(|(idx, content)| linter.linter(idx + file.cursor.at_line, content, max_digits))
                         .collect::<Vec<ListItem>>(),
                 );
                 frame.set_cursor(
-                    layout[1].x + 1 + (file.cursor.1 + max_digits) as u16,
-                    layout[1].y + (file.cursor.0 - file.at_line) as u16,
+                    layout[1].x + 1 + (file.cursor.position.char + max_digits) as u16,
+                    layout[1].y + (file.cursor.position.line - file.cursor.at_line) as u16,
                 );
                 frame.render_widget(editor_content, layout[1]);
 

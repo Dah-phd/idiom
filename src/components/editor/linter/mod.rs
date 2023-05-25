@@ -11,7 +11,6 @@ use self::theme::Theme;
 
 pub const COLORS: [Color; 3] = [Color::Magenta, Color::Blue, Color::Yellow];
 
-
 pub trait Linter<T: Default = Self> {
     fn get_token_buffer(&mut self) -> &mut String;
 
@@ -75,7 +74,7 @@ fn len_to_color(len: Option<usize>) -> Color {
 }
 
 fn get_line_num(idx: usize, max_digits: usize) -> String {
-    let mut as_str = (idx+1).to_string();
+    let mut as_str = (idx + 1).to_string();
     while as_str.len() < max_digits {
         as_str.insert(0, ' ')
     }

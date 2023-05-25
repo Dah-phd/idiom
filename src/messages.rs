@@ -3,7 +3,7 @@ use std::path::PathBuf;
 pub enum Mode {
     Select,
     Insert,
-    Popup
+    Popup,
 }
 
 impl Default for Mode {
@@ -20,7 +20,7 @@ pub enum FileType {
     Html,
     Yml,
     Toml,
-    Unknown
+    Unknown,
 }
 
 impl FileType {
@@ -34,8 +34,8 @@ impl FileType {
                     "yml" | "yaml" => Self::Yml,
                     "toml" => Self::Toml,
                     "html" => Self::Html,
-                    _ => Self::Unknown
-                }
+                    _ => Self::Unknown,
+                };
             };
         };
         Self::Unknown

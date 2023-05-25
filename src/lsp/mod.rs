@@ -1,21 +1,22 @@
-pub mod rust;
 pub mod request;
+pub mod rust;
+use crate::messages::FileType;
+use lsp_types::request::Initialize;
 use request::LSPRequest;
+
 use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 
+use anyhow::{anyhow, Result};
 use tokio::io::AsyncWriteExt;
 use tokio::process::{Child, ChildStdin, Command};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
-use anyhow::{Result, anyhow};
 
 use lsp_types::lsp_request;
-use lsp_types::{InitializeParams, Url, WorkspaceFolder, RegistrationParams, Registration};
-
-use crate::messages::FileType;
+use lsp_types::{InitializeParams, Registration, RegistrationParams, Url, WorkspaceFolder};
 
 #[allow(clippy::upper_case_acronyms)]
 pub struct LSP {
@@ -31,7 +32,7 @@ impl LSP {
     pub async fn from(file_type: &FileType) -> Result<Self> {
         match file_type {
             FileType::Rust => Self::new(rust::start_lsp()).await,
-            _ => Err(anyhow!("Not supported LSP!"))
+            _ => Err(anyhow!("Not supported LSP!")),
         }
     }
 
@@ -45,7 +46,7 @@ impl LSP {
         let mut stdin = inner.stdin.take().unwrap();
 
         let pwd_uri = format!("file://{}", std::env::current_dir()?.as_os_str().to_str().unwrap());
-        let request: LSPRequest<lsp_request!("initialize")> = LSPRequest::with(
+        let request: LSPRequest<Initialize> = LSPRequest::with(
             0,
             InitializeParams {
                 process_id: Some(std::process::id()),
@@ -63,14 +64,21 @@ impl LSP {
         let que_for_handler = Arc::clone(&que);
         let handler = tokio::task::spawn(async move {
             while let Some(Ok(msg)) = stream.next().await {
-                let string = String::from_utf8_lossy(&msg);
-                let b: String = string.clone().into();
-                std::fs::write("resp.json", b);
-                que_for_handler.lock().unwrap().push(string.into());
-                 
+                let string: String = String::from_utf8_lossy(&msg).into();
+                if let Some(json_start) = string.find('{') {
+                    if let Ok(obj) = serde_json::from_str::<serde_json::Value>(&string[json_start..]) {
+                        std::fs::write("debug.log", "Works!");
+                        // println!("{:?}", obj)
+                    } else {
+                        std::fs::write("debug.log", "Not work!");
+                    }
+                };
+                // std::fs::write("resp.json", &string);
+                que_for_handler.lock().unwrap().push(string);
             }
         });
-        let _ = stdin.write(request.stringify()?.as_bytes()).await?;
+        let ser_req = request.stringify()?;
+        let _ = stdin.write(ser_req.as_bytes()).await?;
         stdin.flush().await?;
         Ok(Self {
             que,
@@ -84,9 +92,7 @@ impl LSP {
 
     fn process_request(&mut self) {
         let result = self.que.lock().unwrap().pop();
-        if let Some(data) = result {
-
-        }
+        if let Some(data) = result {}
     }
 
     async fn send(&mut self, lsp_request: String, method: &'static str) -> Result<()> {
@@ -99,14 +105,11 @@ impl LSP {
 
     pub async fn register(&mut self, registrations: Vec<Registration>) -> Result<()> {
         self.counter += 1;
-        let request:LSPRequest<lsp_request!("client/registerCapability")> = LSPRequest::with(
-            self.counter,
-            RegistrationParams {
-                registrations
-            }
-        );
+        let request: LSPRequest<lsp_request!("client/registerCapability")> =
+            LSPRequest::with(self.counter, RegistrationParams { registrations });
 
-        self.send(request.stringify()?, request.method).await
+        let ser_req = request.stringify()?;
+        self.send(ser_req, request.method).await
     }
 
     async fn dash_nine(&mut self) -> Result<()> {
