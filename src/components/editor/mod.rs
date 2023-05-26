@@ -79,6 +79,9 @@ impl EditorState {
                     KeyCode::Char(c) => match c {
                         '[' => editor.unindent(),
                         ']' => editor.indent(),
+                        'c' | 'C' => editor.copy(),
+                        'x' | 'X' => editor.cut(),
+                        'v' | 'V' => editor.paste(),
                         _ => return false,
                     },
                     _ => return false,

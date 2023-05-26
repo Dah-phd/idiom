@@ -26,11 +26,15 @@ impl Editor {
         })
     }
 
-    pub fn cut(&mut self) {}
+    pub fn cut(&mut self) {
+        self.cursor.cut(&mut self.content)
+    }
 
     pub fn copy(&mut self) {}
 
-    pub fn paste(&mut self) {}
+    pub fn paste(&mut self) {
+        self.cursor.paste(&mut self.content)
+    }
 
     pub fn scroll_up(&mut self) {
         self.cursor.scroll_up_content(&mut self.content)

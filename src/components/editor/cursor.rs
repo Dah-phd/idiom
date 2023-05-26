@@ -5,10 +5,15 @@ pub struct Position {
 }
 
 #[derive(Default, Debug)]
+pub struct Select;
+
+#[derive(Default, Debug)]
 pub struct Cursor {
     pub position: Position,
     pub max_rows: u16,
     pub at_line: usize,
+    pub selected: Vec<Select>,
+    pub clipboard: Vec<String>,
 }
 
 impl Cursor {
@@ -71,6 +76,22 @@ impl Cursor {
             } else if content.len() - 1 > self.position.line {
                 self.position.line += 1;
                 self.position.char = 0;
+            }
+        }
+    }
+
+    pub fn paste(&mut self, content: &mut Vec<String>) {
+        if let Some(clip) = self.clipboard.pop() {
+            content.insert(self.position.line, clip);
+            self.position.line += 1;
+        }
+    }
+
+    pub fn cut(&mut self, content: &mut Vec<String>) {
+        if self.selected.is_empty() {
+            self.clipboard.push(content.remove(self.position.line));
+            if self.position.line >= content.len() {
+                self.position.line -= 1;
             }
         }
     }
