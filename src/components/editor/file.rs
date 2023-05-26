@@ -30,7 +30,9 @@ impl Editor {
         self.cursor.cut(&mut self.content)
     }
 
-    pub fn copy(&mut self) {}
+    pub fn copy(&mut self) {
+        self.cursor.copy(&mut self.content)
+    }
 
     pub fn paste(&mut self) {
         self.cursor.paste(&mut self.content)
@@ -61,53 +63,53 @@ impl Editor {
     }
 
     pub fn push_str(&mut self, c: &str) {
-        if let Some(line) = self.content.get_mut(self.cursor.position.line) {
-            line.insert_str(self.cursor.position.char, c);
-            self.cursor.position.char += c.len();
+        if let Some(line) = self.content.get_mut(self.cursor.line) {
+            line.insert_str(self.cursor.char, c);
+            self.cursor.char += c.len();
         }
     }
 
     pub fn backspace(&mut self) {
         // TODO needs work
-        if self.cursor.position.line != 0 {
-            let previous = self.content.get(self.cursor.position.line - 1).cloned();
-            let current = self.content.get_mut(self.cursor.position.line);
+        if self.cursor.line != 0 {
+            let previous = self.content.get(self.cursor.line - 1).cloned();
+            let current = self.content.get_mut(self.cursor.line);
             if let Some(line) = current {
-                let (frist, second) = line.split_at(self.cursor.position.char);
+                let (frist, second) = line.split_at(self.cursor.char);
                 if frist.is_empty() {
                     if let Some(previous) = previous {
                         let prev_len = previous.len();
                         (*line) = format!("{}{}", previous, second);
-                        self.cursor.position.line -= 1;
-                        self.content.remove(self.cursor.position.line);
-                        self.cursor.position.char = prev_len;
+                        self.cursor.line -= 1;
+                        self.content.remove(self.cursor.line);
+                        self.cursor.char = prev_len;
                         return;
                     }
                 } else {
                     (*line) = format!("{}{}", &frist[..frist.len() - 1], second)
                 }
             }
-        } else if let Some(line) = self.content.get_mut(self.cursor.position.line) {
-            let (first, second) = line.split_at(self.cursor.position.char);
+        } else if let Some(line) = self.content.get_mut(self.cursor.line) {
+            let (first, second) = line.split_at(self.cursor.char);
             if !first.is_empty() {
                 (*line) = format!("{}{}", &first[..first.len() - 1], second);
             };
         }
-        if self.cursor.position.char != 0 {
-            self.cursor.position.char -= 1;
+        if self.cursor.char != 0 {
+            self.cursor.char -= 1;
         }
     }
 
     pub fn del(&mut self) {
         // TODO needs work
-        let next_line = self.content.get(self.cursor.position.line + 1).cloned();
-        let current_line = self.content.get_mut(self.cursor.position.line);
+        let next_line = self.content.get(self.cursor.line + 1).cloned();
+        let current_line = self.content.get_mut(self.cursor.line);
         if let Some(line) = current_line {
-            let (first, second) = line.split_at(self.cursor.position.char);
+            let (first, second) = line.split_at(self.cursor.char);
             if second.is_empty() {
                 if let Some(new_content) = next_line {
                     line.push_str(new_content.as_str());
-                    self.content.remove(self.cursor.position.line + 1);
+                    self.content.remove(self.cursor.line + 1);
                 }
             } else {
                 (*line) = format!("{}{}", first, &second[1..]);
@@ -120,7 +122,7 @@ impl Editor {
     }
 
     pub fn unindent(&mut self) {
-        if let Some(line) = self.content.get_mut(self.cursor.position.line) {
+        if let Some(line) = self.content.get_mut(self.cursor.line) {
             if line.starts_with(INDENT_TYPE) {
                 let _ = line.strip_prefix(INDENT_TYPE);
             }
@@ -128,25 +130,25 @@ impl Editor {
     }
 
     pub fn new_line(&mut self) {
-        if let Some(line) = self.content.get(self.cursor.position.line) {
-            let new_line = if line.len() - 1 > self.cursor.position.char {
-                let (replace_line, new_line) = line.split_at(self.cursor.position.char);
+        if let Some(line) = self.content.get(self.cursor.line) {
+            let new_line = if line.len() - 1 > self.cursor.char {
+                let (replace_line, new_line) = line.split_at(self.cursor.char);
                 let new_line = String::from(new_line);
-                self.content[self.cursor.position.line] = String::from(replace_line);
+                self.content[self.cursor.line] = String::from(replace_line);
                 new_line
             } else {
                 String::new()
             };
-            self.content.insert(self.cursor.position.line + 1, new_line);
-            self.cursor.position.line += 1;
-            self.cursor.position.char = 0;
+            self.content.insert(self.cursor.line + 1, new_line);
+            self.cursor.line += 1;
+            self.cursor.char = 0;
             self.get_indent();
         }
     }
 
     fn get_indent(&mut self) {
-        if self.cursor.position.line != 0 {
-            if let Some(mut prev_line) = self.content.get(self.cursor.position.line).cloned() {
+        if self.cursor.line != 0 {
+            if let Some(mut prev_line) = self.content.get(self.cursor.line).cloned() {
                 if let Some(last) = prev_line.trim_end().chars().last() {
                     if INDENT_ENDINGS.contains(last) {
                         self.indent()

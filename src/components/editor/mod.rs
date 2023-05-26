@@ -36,8 +36,8 @@ impl EditorState {
                         .collect::<Vec<ListItem>>(),
                 );
                 frame.set_cursor(
-                    layout[1].x + 1 + (file.cursor.position.char + max_digits) as u16,
-                    layout[1].y + (file.cursor.position.line - file.cursor.at_line) as u16,
+                    layout[1].x + 1 + (file.cursor.char + max_digits) as u16,
+                    layout[1].y + (file.cursor.line - file.cursor.at_line) as u16,
                 );
                 frame.render_widget(editor_content, layout[1]);
 
