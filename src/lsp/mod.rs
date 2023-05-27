@@ -8,19 +8,22 @@ use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 
-use anyhow::{anyhow, Result};
 use tokio::io::AsyncWriteExt;
 use tokio::process::{Child, ChildStdin, Command};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
+use anyhow::{anyhow, Result};
+
+use serde_json::Value;
+
 use lsp_types::lsp_request;
 use lsp_types::{InitializeParams, Registration, RegistrationParams, Url, WorkspaceFolder};
 
 #[allow(clippy::upper_case_acronyms)]
 pub struct LSP {
-    pub que: Arc<Mutex<Vec<String>>>,
+    pub que: Arc<Mutex<HashMap<i64, serde_json::Value>>>,
     counter: usize,
     requests: HashMap<usize, (&'static str, String)>,
     inner: Child,
@@ -60,21 +63,20 @@ impl LSP {
         let stderr = FramedRead::new(inner.stderr.take().unwrap(), BytesCodec::new());
         let stdout = FramedRead::new(inner.stdout.take().unwrap(), BytesCodec::new());
         let mut stream = stdout.chain(stderr);
-        let que = Arc::new(Mutex::new(vec![]));
+        let que = Arc::new(Mutex::new(HashMap::new()));
         let que_for_handler = Arc::clone(&que);
         let handler = tokio::task::spawn(async move {
             while let Some(Ok(msg)) = stream.next().await {
                 let string: String = String::from_utf8_lossy(&msg).into();
                 if let Some(json_start) = string.find('{') {
                     if let Ok(obj) = serde_json::from_str::<serde_json::Value>(&string[json_start..]) {
-                        std::fs::write("debug.log", "Works!");
-                        // println!("{:?}", obj)
-                    } else {
-                        std::fs::write("debug.log", "Not work!");
+                        let id = obj.get("id").unwrap();
+                        let content = obj.get("result").unwrap();
+                        if id.is_i64() && content.is_object() {
+                            que_for_handler.lock().unwrap().insert(id.as_i64().unwrap(), content.clone());
+                        }
                     }
                 };
-                // std::fs::write("resp.json", &string);
-                que_for_handler.lock().unwrap().push(string);
             }
         });
         let ser_req = request.stringify()?;
@@ -91,8 +93,8 @@ impl LSP {
     }
 
     fn process_request(&mut self) {
-        let result = self.que.lock().unwrap().pop();
-        if let Some(data) = result {}
+        // let result = self.que.lock().unwrap().pop();
+        // if let Some(data) = result {}
     }
 
     async fn send(&mut self, lsp_request: String, method: &'static str) -> Result<()> {

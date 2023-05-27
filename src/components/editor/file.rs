@@ -46,20 +46,36 @@ impl Editor {
         self.cursor.scroll_down_content(&mut self.content)
     }
 
-    pub fn navigate_down(&mut self) {
-        self.cursor.navigate_down_content(&mut self.content)
-    }
-
-    pub fn navigate_up(&mut self) {
+    pub fn up(&mut self) {
         self.cursor.navigate_up_content(&mut self.content)
     }
 
-    pub fn navigate_left(&mut self) {
+    pub fn select_up(&mut self) {
+        self.cursor.select_up_content(&mut self.content)
+    }
+
+    pub fn down(&mut self) {
+        self.cursor.navigate_down_content(&mut self.content)
+    }
+
+    pub fn select_down(&mut self) {
+        self.cursor.select_down_content(&mut self.content)
+    }
+
+    pub fn left(&mut self) {
         self.cursor.navigate_left_content(&mut self.content)
     }
 
-    pub fn navigate_right(&mut self) {
+    pub fn select_left(&mut self) {
+        self.cursor.select_left_content(&mut self.content)
+    }
+
+    pub fn right(&mut self) {
         self.cursor.navigate_right_content(&mut self.content)
+    }
+
+    pub fn select_right(&mut self) {
+        self.cursor.select_right_content(&mut self.content)
     }
 
     pub fn push_str(&mut self, c: &str) {

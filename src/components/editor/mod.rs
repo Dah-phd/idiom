@@ -84,25 +84,15 @@ impl EditorState {
                         'v' | 'V' => editor.paste(),
                         _ => return false,
                     },
+                    KeyCode::Up => editor.scroll_up(),
+                    KeyCode::Down => editor.scroll_down(),
                     _ => return false,
                 },
                 KeyModifiers::NONE => match key.code {
-                    KeyCode::Up => {
-                        if key.modifiers.contains(KeyModifiers::CONTROL) {
-                            editor.scroll_up()
-                        } else {
-                            editor.navigate_up()
-                        }
-                    }
-                    KeyCode::Down => {
-                        if key.modifiers.contains(KeyModifiers::CONTROL) {
-                            editor.scroll_down()
-                        } else {
-                            editor.navigate_down()
-                        }
-                    }
-                    KeyCode::Left => editor.navigate_left(),
-                    KeyCode::Right => editor.navigate_right(),
+                    KeyCode::Up => editor.up(),
+                    KeyCode::Down => editor.down(),
+                    KeyCode::Left => editor.left(),
+                    KeyCode::Right => editor.right(),
                     KeyCode::Char(c) => editor.push_str(c.to_string().as_str()),
                     KeyCode::Backspace => editor.backspace(),
                     KeyCode::Enter => editor.new_line(),
@@ -110,7 +100,13 @@ impl EditorState {
                     KeyCode::Delete => editor.del(),
                     _ => return false,
                 },
-                KeyModifiers::SHIFT => {}
+                KeyModifiers::SHIFT => match key.code {
+                    KeyCode::Up => editor.select_up(),
+                    KeyCode::Down => editor.select_down(),
+                    KeyCode::Right => editor.select_right(),
+                    KeyCode::Left => editor.select_left(),
+                    _ => {}
+                }
                 KeyModifiers::ALT => {}
                 _ => return false,
             }
