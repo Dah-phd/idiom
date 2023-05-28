@@ -134,8 +134,8 @@ impl Cursor {
             } else if lines.len() == 1 {
                 let text = lines[0];
                 if let Some(current_line) = content.get_mut(self.line) {
-                    self.char += text.len();
                     current_line.insert_str(self.char, text);
+                    self.char += text.len();
                 }
             } else {
                 let len = lines.len();
