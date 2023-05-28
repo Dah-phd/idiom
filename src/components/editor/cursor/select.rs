@@ -28,10 +28,3 @@ impl Select {
         }
     }
 }
-
-#[derive(Debug)]
-pub enum Clip {
-    Line(String),
-    Text(String),
-    Section(Vec<String>),
-}

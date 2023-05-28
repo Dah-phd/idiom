@@ -20,7 +20,7 @@ pub trait Linter<T: Default = Self> {
 
     fn get_theme(&self) -> &Theme;
 
-    fn linter<'a>(&mut self, idx: usize, content: &'a String, max_digits: usize) -> ListItem<'a> {
+    fn linter<'a>(&mut self, idx: usize, content: &'a str, max_digits: usize) -> ListItem<'a> {
         let mut spans = vec![Span::styled(
             get_line_num(idx, max_digits),
             Style::default().fg(Color::Gray),

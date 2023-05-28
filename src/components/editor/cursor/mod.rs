@@ -1,5 +1,8 @@
+mod action;
+mod clipboard;
 mod select;
-use select::{Clip, Select};
+use clipboard::Clipboard;
+use select::Select;
 
 #[derive(Default, Debug)]
 pub struct Cursor {
@@ -8,7 +11,8 @@ pub struct Cursor {
     pub max_rows: u16,
     pub at_line: usize,
     pub selected: Select,
-    clipboard: Vec<Clip>,
+    clipboard: Clipboard,
+    should_paste_line: bool,
 }
 
 impl Cursor {
@@ -120,45 +124,48 @@ impl Cursor {
     }
 
     pub fn paste(&mut self, content: &mut Vec<String>) {
-        if let Some(clip) = self.clipboard.pop() {
-            match clip {
-                Clip::Line(line) => content.insert(self.line, line),
-                Clip::Text(text) => {
-                    if let Some(current_line) = content.get_mut(self.line) {
-                        current_line.insert_str(self.char, &text);
-                        self.char += text.len();
-                    }
+        if let Some(clip) = self.clipboard.get() {
+            let lines: Vec<_> = clip.split('\n').collect();
+            if lines.is_empty() {
+                return;
+            }
+            if self.should_paste_line && lines.len() == 2 && lines[1].is_empty() {
+                content.insert(self.line, lines[0].into())
+            } else if lines.len() == 1 {
+                let text = lines[0];
+                if let Some(current_line) = content.get_mut(self.line) {
+                    self.char += text.len();
+                    current_line.insert_str(self.char, text);
                 }
-                Clip::Section(vec) => {
-                    let len = vec.len();
-                    if len == 0 {
-                        return;
-                    }
-                    let line = content.remove(self.line);
-                    let (prefix, suffix) = line.split_at(self.char);
-                    let mut first_line = prefix.to_owned();
-                    if len == 1 {
-                        first_line.push_str(&vec[0]);
+            } else {
+                let len = lines.len();
+                if len == 0 {
+                    return;
+                }
+                let line = content.remove(self.line);
+                let (prefix, suffix) = line.split_at(self.char);
+                let mut first_line = prefix.to_owned();
+                if len == 1 {
+                    first_line.push_str(lines[0]);
+                    content.insert(self.line, first_line);
+                    content.insert(self.line + 1, suffix.to_owned());
+                } else {
+                    let mut iter_select = lines.iter().enumerate();
+                    if let Some((_, first_select)) = iter_select.next() {
+                        first_line.push_str(first_select);
                         content.insert(self.line, first_line);
-                        content.insert(self.line + 1, suffix.to_owned());
-                    } else {
-                        let mut iter_select = vec.iter().enumerate();
-                        if let Some((_, first_select)) = iter_select.next() {
-                            first_line.push_str(first_select);
-                            content.insert(self.line, first_line);
-                        }
-                        for (idx, select) in iter_select {
-                            let next_line = if idx == len - 1 {
-                                let mut last_line = select.to_owned();
-                                self.char = last_line.len();
-                                last_line.push_str(suffix);
-                                last_line
-                            } else {
-                                select.to_owned()
-                            };
-                            content.insert(self.line + 1, next_line);
-                            self.down(content);
-                        }
+                    }
+                    for (idx, select) in iter_select {
+                        let next_line = if idx == len - 1 {
+                            let mut last_line = select.to_string();
+                            self.char = last_line.len();
+                            last_line.push_str(suffix);
+                            last_line
+                        } else {
+                            select.to_string()
+                        };
+                        content.insert(self.line + 1, next_line);
+                        self.down(content);
                     }
                 }
             }
@@ -166,16 +173,20 @@ impl Cursor {
     }
 
     pub fn copy(&mut self, content: &[String]) {
+        self.should_paste_line = false;
         match self.selected {
             Select::None => {
                 if let Some(line) = content.get(self.line) {
-                    self.clipboard.push(Clip::Line(line.to_owned()));
+                    self.should_paste_line = true;
+                    let mut line = line.to_owned();
+                    line.push('\n');
+                    self.clipboard.push(line);
                 }
             }
             Select::Range(from, to) => {
                 if from.0 == to.0 {
                     if let Some(line) = content.get(from.0) {
-                        self.clipboard.push(Clip::Text(line[from.1..to.1].to_owned()));
+                        self.clipboard.push(line[from.1..to.1].to_owned());
                     }
                 } else {
                     let mut at_line = from.0;
@@ -193,7 +204,7 @@ impl Cursor {
                             }
                         }
                     }
-                    self.clipboard.push(Clip::Section(clip_vec))
+                    self.clipboard.push(clip_vec.join("\n"));
                 }
             }
             _ => {}
@@ -201,9 +212,12 @@ impl Cursor {
     }
 
     pub fn cut(&mut self, content: &mut Vec<String>) {
+        self.should_paste_line = false;
         match self.selected {
             Select::None => {
-                self.clipboard.push(Clip::Line(content.remove(self.line)));
+                let mut line = content.remove(self.line);
+                line.push('\n');
+                self.clipboard.push(line);
                 if self.line >= content.len() {
                     self.line -= 1;
                     self.char = content[self.line].len() - 1;
@@ -215,7 +229,7 @@ impl Cursor {
                 if from.0 == to.0 {
                     self.char = from.1;
                     let data = content.remove(from.0);
-                    self.clipboard.push(Clip::Text(data[from.1..to.1].to_owned()));
+                    self.clipboard.push(data[from.1..to.1].to_owned());
                     let mut payload = String::new();
                     payload.push_str(&data[..from.1]);
                     payload.push_str(&data[to.1..]);
@@ -235,7 +249,7 @@ impl Cursor {
                             clip_vec.push(content.remove(from.0))
                         }
                     }
-                    self.clipboard.push(Clip::Section(clip_vec));
+                    self.clipboard.push(clip_vec.join("\n"));
                     self.line = from.0;
                     self.char = from.1;
                     self.selected.drop();

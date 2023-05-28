@@ -1,3 +1,5 @@
+use copypasta::ClipboardProvider;
+
 use crate::messages::FileType;
 use std::path::PathBuf;
 
@@ -164,7 +166,7 @@ impl Editor {
 
     fn get_indent(&mut self) {
         if self.cursor.line != 0 {
-            if let Some(mut prev_line) = self.content.get(self.cursor.line).cloned() {
+            if let Some(prev_line) = self.content.get(self.cursor.line).cloned() {
                 if let Some(last) = prev_line.trim_end().chars().last() {
                     if INDENT_ENDINGS.contains(last) {
                         self.indent()
@@ -175,7 +177,6 @@ impl Editor {
                 }
                 if prev_line.starts_with(INDENT_TYPE) {
                     self.indent();
-                    prev_line = prev_line[INDENT_TYPE.len()..].to_owned()
                 }
             }
         }
