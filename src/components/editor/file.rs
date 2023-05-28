@@ -31,7 +31,7 @@ impl Editor {
     }
 
     pub fn copy(&mut self) {
-        self.cursor.copy(&mut self.content)
+        self.cursor.copy(&self.content)
     }
 
     pub fn paste(&mut self) {
@@ -147,7 +147,7 @@ impl Editor {
 
     pub fn new_line(&mut self) {
         if let Some(line) = self.content.get(self.cursor.line) {
-            let new_line = if line.len() - 1 > self.cursor.char {
+            let new_line = if line.len() > self.cursor.char {
                 let (replace_line, new_line) = line.split_at(self.cursor.char);
                 let new_line = String::from(new_line);
                 self.content[self.cursor.line] = String::from(replace_line);

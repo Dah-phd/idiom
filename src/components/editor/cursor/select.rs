@@ -12,10 +12,6 @@ impl Default for Select {
 }
 
 impl Select {
-    pub fn is_empty(&self) -> bool {
-        matches!(self, Self::None)
-    }
-
     pub fn drop(&mut self) {
         (*self) = Self::None;
     }

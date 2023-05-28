@@ -12,7 +12,7 @@ pub struct Cursor {
 }
 
 impl Cursor {
-    fn adjust_cursor_max_char(&mut self, content: &mut Vec<String>) {
+    fn adjust_cursor_max_char(&mut self, content: &mut [String]) {
         if let Some(line) = content.get(self.line) {
             if line.len() < self.char {
                 self.char = line.len()
@@ -75,7 +75,7 @@ impl Cursor {
         self.selected.push(self.line, self.char);
     }
 
-    fn left(&mut self, content: &mut Vec<String>) {
+    fn left(&mut self, content: &[String]) {
         if self.char > 0 {
             self.char -= 1
         } else if self.line > 0 {
@@ -86,12 +86,12 @@ impl Cursor {
         }
     }
 
-    pub fn navigate_left_content(&mut self, content: &mut Vec<String>) {
+    pub fn navigate_left_content(&mut self, content: &mut [String]) {
         self.selected.drop();
         self.left(content);
     }
 
-    pub fn select_left_content(&mut self, content: &mut Vec<String>) {
+    pub fn select_left_content(&mut self, content: &mut [String]) {
         self.selected.init(self.line, self.char);
         self.left(content);
         self.selected.push(self.line, self.char);
@@ -165,7 +165,7 @@ impl Cursor {
         }
     }
 
-    pub fn copy(&mut self, content: &Vec<String>) {
+    pub fn copy(&mut self, content: &[String]) {
         match self.selected {
             Select::None => {
                 if let Some(line) = content.get(self.line) {
