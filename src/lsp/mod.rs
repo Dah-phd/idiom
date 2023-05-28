@@ -73,7 +73,10 @@ impl LSP {
                         let id = obj.get("id").unwrap();
                         let content = obj.get("result").unwrap();
                         if id.is_i64() && content.is_object() {
-                            que_for_handler.lock().unwrap().insert(id.as_i64().unwrap(), content.clone());
+                            que_for_handler
+                                .lock()
+                                .unwrap()
+                                .insert(id.as_i64().unwrap(), content.clone());
                         }
                     }
                 };

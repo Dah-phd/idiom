@@ -59,6 +59,9 @@ impl Cursor {
     }
 
     fn down(&mut self, content: &mut Vec<String>) {
+        if content.is_empty() {
+            return;
+        }
         if self.line > self.max_rows as usize - 3 + self.at_line {
             self.at_line += 1;
         }

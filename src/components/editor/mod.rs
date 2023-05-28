@@ -19,6 +19,9 @@ pub struct EditorState {
 }
 
 impl EditorState {
+    pub fn len(&self) -> usize {
+        self.editors.len()
+    }
     pub fn render(&mut self, frame: &mut Frame<impl Backend>, area: Rect) {
         let layout = Layout::default()
             .constraints(vec![Constraint::Percentage(4), Constraint::Min(2)])
@@ -26,7 +29,11 @@ impl EditorState {
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get_mut(editor_id) {
                 file.cursor.max_rows = layout[1].bottom();
-                let max_digits = (file.content.len().ilog10() + 1) as usize;
+                let max_digits = if file.content.is_empty() {
+                    0
+                } else {
+                    (file.content.len().ilog10() + 1) as usize
+                };
                 let mut linter = RustSyntax::default();
                 let editor_content = List::new(
                     file.content[file.cursor.at_line..]
@@ -106,7 +113,7 @@ impl EditorState {
                     KeyCode::Right => editor.select_right(),
                     KeyCode::Left => editor.select_left(),
                     _ => {}
-                }
+                },
                 KeyModifiers::ALT => {}
                 _ => return false,
             }

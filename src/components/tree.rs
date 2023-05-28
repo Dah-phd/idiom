@@ -16,6 +16,7 @@ pub struct Tree {
     pub state: ListState,
     pub tree: Vec<PathBuf>,
     pub is_hidden: bool,
+    pub on_opened_tabs: bool,
 }
 
 impl Tree {
@@ -69,6 +70,7 @@ impl Tree {
         match key.modifiers {
             KeyModifiers::NONE => match key.code {
                 KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
+                    self.on_opened_tabs = false;
                     if let Some(numba) = self.state.selected() {
                         if numba == 0 {
                             self.state.select(Some(self.tree.len() - 1))
@@ -80,6 +82,7 @@ impl Tree {
                     }
                 }
                 KeyCode::Down | KeyCode::Char('d') | KeyCode::Char('D') => {
+                    self.on_opened_tabs = false;
                     if let Some(numba) = self.state.selected() {
                         if numba < self.tree.len() - 1 {
                             self.state.select(Some(numba + 1));

@@ -84,6 +84,9 @@ impl Editor {
         if let Some(line) = self.content.get_mut(self.cursor.line) {
             line.insert_str(self.cursor.char, c);
             self.cursor.char += c.len();
+        } else {
+            self.content.insert(self.cursor.line, c.to_owned());
+            self.cursor.char = c.len();
         }
     }
 
@@ -148,7 +151,10 @@ impl Editor {
     }
 
     pub fn new_line(&mut self) {
-        if let Some(line) = self.content.get(self.cursor.line) {
+        if self.content.is_empty() {
+            self.content.push(String::new());
+            self.cursor.line += 1;
+        } else if let Some(line) = self.content.get(self.cursor.line) {
             let new_line = if line.len() > self.cursor.char {
                 let (replace_line, new_line) = line.split_at(self.cursor.char);
                 let new_line = String::from(new_line);

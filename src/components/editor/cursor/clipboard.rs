@@ -15,7 +15,7 @@ impl Debug for Clipboard {
 impl Default for Clipboard {
     fn default() -> Self {
         Self {
-            ctx: ClipboardContext::new().unwrap()
+            ctx: ClipboardContext::new().unwrap(),
         }
     }
 }
@@ -25,7 +25,7 @@ impl Clipboard {
         self.ctx.get_contents().ok()
     }
 
-    pub fn push(&mut self, content:String) -> Option<()> {
+    pub fn push(&mut self, content: String) -> Option<()> {
         self.ctx.set_contents(content).ok()
     }
 }
