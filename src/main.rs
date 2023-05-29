@@ -2,6 +2,7 @@ mod app;
 mod components;
 mod lsp;
 mod messages;
+mod syntax;
 use app::app;
 
 use crossterm::event::{KeyboardEnhancementFlags, PushKeyboardEnhancementFlags};

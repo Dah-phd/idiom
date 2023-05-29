@@ -1,5 +1,6 @@
 use tui::style::Color;
 
+#[derive(Debug)]
 pub struct Theme {
     pub kword: Color,
     pub class: Color,

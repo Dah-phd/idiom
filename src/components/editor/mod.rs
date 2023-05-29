@@ -1,10 +1,9 @@
 mod cursor;
 mod file;
-mod linter;
 
+use crate::syntax::Lexer;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use file::Editor;
-use linter::{Linter, RustSyntax};
 use std::path::PathBuf;
 use tui::layout::{Constraint, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
@@ -22,6 +21,7 @@ impl EditorState {
     pub fn len(&self) -> usize {
         self.editors.len()
     }
+
     pub fn render(&mut self, frame: &mut Frame<impl Backend>, area: Rect) {
         let layout = Layout::default()
             .constraints(vec![Constraint::Percentage(4), Constraint::Min(2)])
@@ -34,12 +34,12 @@ impl EditorState {
                 } else {
                     (file.content.len().ilog10() + 1) as usize
                 };
-                let mut linter = RustSyntax::default();
+                let mut linter = Lexer::default();
                 let editor_content = List::new(
                     file.content[file.cursor.at_line..]
                         .iter()
                         .enumerate()
-                        .map(|(idx, content)| linter.linter(idx + file.cursor.at_line, content, max_digits))
+                        .map(|(idx, code_line)| linter.syntax_spans(idx + file.cursor.at_line, code_line, max_digits))
                         .collect::<Vec<ListItem>>(),
                 );
 

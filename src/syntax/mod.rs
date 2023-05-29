@@ -1,10 +1,18 @@
-use super::{theme::Theme, Linter, COLORS};
+mod theme;
 use tui::{
     style::{Color, Style},
-    text::Span,
+    text::{Span, Spans},
+    widgets::ListItem,
 };
 
-pub struct RustSyntax {
+use crate::messages::FileType;
+
+use self::theme::Theme;
+
+pub const COLORS: [Color; 3] = [Color::Magenta, Color::Blue, Color::Yellow];
+
+#[derive(Debug)]
+pub struct Lexer {
     curly: Vec<Color>,
     brackets: Vec<Color>,
     square: Vec<Color>,
@@ -14,7 +22,7 @@ pub struct RustSyntax {
     theme: Theme,
 }
 
-impl Default for RustSyntax {
+impl Default for Lexer {
     fn default() -> Self {
         Self {
             key_words: vec!["pub", "fn", "struct", "use", "mod", "let", "self", "mut"],
@@ -28,14 +36,15 @@ impl Default for RustSyntax {
     }
 }
 
-impl Linter for RustSyntax {
-    fn get_token_buffer(&mut self) -> &mut String {
-        &mut self.last_token
+impl Lexer {
+    pub fn from_type(file_type: &FileType) -> Self {
+        #[allow(clippy::match_single_binding)]
+        match file_type {
+            _ => Self::default(),
+        }
     }
 
-    fn get_theme(&self) -> &Theme {
-        &self.theme
-    }
+    pub fn max_line_digits_from(len: usize) {}
 
     fn process_line(&mut self, content: &str, spans: &mut Vec<Span>) {
         if content.starts_with("mod") {}
@@ -119,6 +128,12 @@ impl Linter for RustSyntax {
         }
     }
 
+    pub fn select(&mut self, from: (usize, usize), to: (usize, usize)) {}
+
+    pub fn set_theme(&mut self, theme: Theme) {
+        self.theme = theme
+    }
+
     fn handled_key_word(&mut self) -> Option<Span<'static>> {
         if self.key_words.contains(&self.last_token.trim()) {
             self.last_key_words.push(self.last_token.to_owned());
@@ -133,6 +148,51 @@ impl Linter for RustSyntax {
             None
         }
     }
+
+    pub fn syntax_spans<'a>(&mut self, idx: usize, content: &'a str, max_digits: usize) -> ListItem<'a> {
+        let mut spans = vec![Span::styled(
+            get_line_num(idx, max_digits),
+            Style::default().fg(Color::Gray),
+        )];
+        self.process_line(content, &mut spans);
+        if !self.last_token.is_empty() {
+            spans.push(self.drain_buf());
+        }
+        ListItem::new(Spans::from(spans))
+    }
+
+    fn white_char(&mut self, ch: char) -> Span<'static> {
+        Span::styled(
+            String::from(ch),
+            Style {
+                fg: Some(Color::White),
+                ..Default::default()
+            },
+        )
+    }
+
+    fn drain_buf_colored(&mut self, color: Color) -> Span<'static> {
+        if let Some(span) = self.handled_key_word() {
+            return span;
+        }
+        Span::styled(
+            self.last_token.drain(..).collect::<String>(),
+            Style {
+                fg: Some(color),
+                ..Default::default()
+            },
+        )
+    }
+
+    fn drain_buf(&mut self) -> Span<'static> {
+        if let Some(span) = self.handled_key_word() {
+            return span;
+        }
+        Span::styled(
+            self.last_token.drain(..).collect::<String>(),
+            Style::default().fg(self.theme.default),
+        )
+    }
 }
 
 fn len_to_color(len: Option<usize>) -> Color {
@@ -144,7 +204,7 @@ fn len_to_color(len: Option<usize>) -> Color {
 }
 
 fn get_line_num(idx: usize, max_digits: usize) -> String {
-    let mut as_str = idx.to_string();
+    let mut as_str = (idx + 1).to_string();
     while as_str.len() < max_digits {
         as_str.insert(0, ' ')
     }

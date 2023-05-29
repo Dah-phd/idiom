@@ -12,7 +12,7 @@ impl Default for Mode {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub enum FileType {
     Rust,
     Python,
