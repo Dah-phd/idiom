@@ -1,6 +1,5 @@
-use std::path::PathBuf;
-
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use std::path::PathBuf;
 use tui::{
     backend::Backend,
     layout::Rect,
@@ -9,6 +8,12 @@ use tui::{
     widgets::{Block, Borders, List, ListItem, ListState},
     Frame,
 };
+
+#[cfg(not(target_os = "windows"))]
+const DIR_SEP: char = '/';
+
+#[cfg(target_os = "windows")]
+const DIR_SEP: char = '\\';
 
 #[derive(Clone, Default)]
 pub struct Tree {
@@ -39,8 +44,7 @@ impl Tree {
 
         let file_tree = List::new(tasks)
             .block(Block::default().borders(Borders::ALL).title("Explorer"))
-            .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-            .highlight_symbol(">");
+            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
         frame.render_stateful_widget(file_tree, area, &mut self.state);
     }
@@ -121,16 +125,18 @@ fn expand(path: PathBuf, expansions: &Vec<PathBuf>) -> Vec<PathBuf> {
 
 #[allow(clippy::ptr_arg)]
 fn use_proper_list_names(current_path: &PathBuf) -> Option<String> {
-    let path_str = current_path.as_os_str().to_str()?;
+    let path_str = &current_path.as_os_str().to_str()?[2..];
     let mut buffer = String::new();
-    let mut path_split = path_str.split('/').peekable();
-    let _ = path_split.next();
+    let mut path_split = path_str.split(DIR_SEP).peekable();
     while let Some(path_element) = path_split.next() {
         if path_split.peek().is_none() {
             buffer.push_str(path_element)
         } else {
             buffer.push_str("  ")
         }
+    }
+    if current_path.is_dir() {
+        buffer.push_str("/..");
     }
     Some(buffer)
 }

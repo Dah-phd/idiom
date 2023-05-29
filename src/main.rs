@@ -14,7 +14,7 @@ fn prep(out: &mut impl std::io::Write) -> std::io::Result<()> {
         out,
         crossterm::terminal::EnterAlternateScreen,
         crossterm::style::ResetColor,
-        PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS)
+        // PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS)
     )?;
     Ok(())
 }
@@ -24,7 +24,7 @@ fn graceful_exit(out: &mut impl std::io::Write) -> std::io::Result<()> {
         out,
         crossterm::style::ResetColor,
         crossterm::terminal::LeaveAlternateScreen,
-        crossterm::event::PopKeyboardEnhancementFlags
+        // crossterm::event::PopKeyboardEnhancementFlags
     )?;
     crossterm::terminal::disable_raw_mode()?;
     Ok(())

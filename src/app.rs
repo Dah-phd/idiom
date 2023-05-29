@@ -5,7 +5,7 @@ use crate::{
     lsp::LSP,
     messages::Mode,
 };
-use crossterm::event::{Event, KeyCode, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout},
@@ -51,6 +51,9 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
         if crossterm::event::poll(timeout)? {
             // TODO combine all controls in here!, should be easier to handle if something needs changin - this iwill be main
             if let Event::Key(key) = crossterm::event::read()? {
+                if matches!(key.kind, KeyEventKind::Release) {
+                    continue;
+                }
                 if matches!(
                     key.code,
                     KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Char('q') | KeyCode::Char('Q')

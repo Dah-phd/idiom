@@ -42,10 +42,12 @@ impl EditorState {
                         .map(|(idx, content)| linter.linter(idx + file.cursor.at_line, content, max_digits))
                         .collect::<Vec<ListItem>>(),
                 );
+
                 frame.set_cursor(
                     layout[1].x + 1 + (file.cursor.char + max_digits) as u16,
                     layout[1].y + (file.cursor.line - file.cursor.at_line) as u16,
                 );
+
                 frame.render_widget(editor_content, layout[1]);
 
                 let mut titles_unordered: Vec<_> = self.editors.iter().flat_map(try_file_to_tab).collect();

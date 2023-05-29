@@ -1,5 +1,3 @@
-use copypasta::ClipboardProvider;
-
 use crate::messages::FileType;
 use std::path::PathBuf;
 
@@ -91,6 +89,10 @@ impl Editor {
     }
 
     pub fn backspace(&mut self) {
+        if !self.cursor.selected.is_empty() {
+            let _returned_for_action_log = self.cursor.remove(&mut self.content);
+            return;
+        }
         // TODO needs work
         if self.cursor.line != 0 {
             let previous = self.content.get(self.cursor.line - 1).cloned();
@@ -122,10 +124,13 @@ impl Editor {
     }
 
     pub fn del(&mut self) {
+        if !self.cursor.selected.is_empty() {
+            let _returned_for_action_log = self.cursor.remove(&mut self.content);
+            return;
+        }
         // TODO needs work
         let next_line = self.content.get(self.cursor.line + 1).cloned();
-        let current_line = self.content.get_mut(self.cursor.line);
-        if let Some(line) = current_line {
+        if let Some(line) = self.content.get_mut(self.cursor.line) {
             let (first, second) = line.split_at(self.cursor.char);
             if second.is_empty() {
                 if let Some(new_content) = next_line {
