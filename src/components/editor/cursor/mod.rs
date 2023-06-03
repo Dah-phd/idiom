@@ -120,7 +120,7 @@ impl Cursor {
     }
 
     pub fn jump_left(&mut self, content: &[String]) {
-        
+
     }
 
     pub fn navigate_left_content(&mut self, content: &mut [String]) {
@@ -146,7 +146,9 @@ impl Cursor {
     }
 
     pub fn jump_right(&mut self, content: &mut Vec<String>) {
-        
+        let line = &content[self.line][self.char..];
+
+
     }
 
     pub fn navigate_right_content(&mut self, content: &mut Vec<String>) {
