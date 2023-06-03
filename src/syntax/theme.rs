@@ -7,6 +7,7 @@ pub struct Theme {
     pub function: Color,
     pub blank: Color,
     pub default: Color,
+    pub selected: Color,
 }
 
 impl Default for Theme {
@@ -17,6 +18,7 @@ impl Default for Theme {
             default: Color::Rgb(108, 149, 214),
             function: Color::Rgb(218, 223, 170),
             blank: Color::White,
+            selected: Color::Rgb(72, 72, 72),
         }
     }
 }

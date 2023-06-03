@@ -35,15 +35,10 @@ impl Editor {
     }
 
     pub fn paste(&mut self) {
+        if !self.cursor.selected.is_empty() {
+            let _returned_for_action_log = self.cursor.remove(&mut self.content);
+        }
         self.cursor.paste(&mut self.content)
-    }
-
-    pub fn scroll_up(&mut self) {
-        self.cursor.scroll_up_content(&mut self.content)
-    }
-
-    pub fn scroll_down(&mut self) {
-        self.cursor.scroll_down_content(&mut self.content)
     }
 
     pub fn up(&mut self) {
@@ -54,12 +49,28 @@ impl Editor {
         self.cursor.select_up_content(&mut self.content)
     }
 
+    pub fn scroll_up(&mut self) {
+        self.cursor.scroll_up_content(&mut self.content)
+    }
+
+    pub fn swap_up(&mut self) {
+        self.cursor.swap_up_line(&mut self.content)
+    }
+
     pub fn down(&mut self) {
         self.cursor.navigate_down_content(&mut self.content)
     }
 
     pub fn select_down(&mut self) {
         self.cursor.select_down_content(&mut self.content)
+    }
+
+    pub fn scroll_down(&mut self) {
+        self.cursor.scroll_down_content(&mut self.content)
+    }
+
+    pub fn swap_down(&mut self) {
+        self.cursor.swap_down_line(&mut self.content)
     }
 
     pub fn left(&mut self) {

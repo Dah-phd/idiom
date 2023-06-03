@@ -13,6 +13,9 @@ pub const COLORS: [Color; 3] = [Color::Magenta, Color::Blue, Color::Yellow];
 
 #[derive(Debug)]
 pub struct Lexer {
+    select: Option<((usize, usize), (usize, usize))>,
+    token_start: usize,
+    select_at_line: Option<(usize, usize)>,
     curly: Vec<Color>,
     brackets: Vec<Color>,
     square: Vec<Color>,
@@ -20,18 +23,23 @@ pub struct Lexer {
     key_words: Vec<&'static str>,
     last_key_words: Vec<String>,
     theme: Theme,
+    max_digits: usize,
 }
 
 impl Default for Lexer {
     fn default() -> Self {
         Self {
             key_words: vec!["pub", "fn", "struct", "use", "mod", "let", "self", "mut"],
+            select_at_line: None,
             curly: vec![],
             brackets: vec![],
             square: vec![],
             last_token: String::default(),
+            token_start: 0,
             last_key_words: vec![],
             theme: Theme::default(),
+            select: None,
+            max_digits: 0,
         }
     }
 }
@@ -44,36 +52,54 @@ impl Lexer {
         }
     }
 
-    pub fn max_line_digits_from(len: usize) {}
+    pub fn max_line_digits_from(&mut self, len: usize) {
+        self.max_digits = len
+    }
+
+    fn set_select_char_range(&mut self, at_line: usize, max_len: usize) {
+        if let Some(((from_line, from_char), (to_line, to_char))) = self.select {
+            if from_line > at_line || at_line > to_line {
+                self.select_at_line = None;
+            } else if from_line < at_line && at_line < to_line {
+                self.select_at_line = Some((0, max_len));
+            } else if from_line == at_line && at_line == to_line {
+                self.select_at_line = Some((from_char, to_char));
+            } else if from_line == at_line {
+                self.select_at_line = Some((from_char, max_len));
+            } else if to_line == at_line {
+                self.select_at_line = Some((0, to_char))
+            }
+        }
+    }
 
     fn process_line(&mut self, content: &str, spans: &mut Vec<Span>) {
         if content.starts_with("mod") {}
         if content.starts_with("use") {}
-        let char_stream = content.chars();
-        for ch in char_stream {
+        let char_stream = content.chars().enumerate();
+        for (idx, ch) in char_stream {
             match ch {
                 ' ' => {
-                    spans.push(self.drain_buf());
+                    self.drain_buf(idx, spans);
                     self.last_token.push(ch);
                 }
                 '.' => {
-                    spans.push(self.drain_buf());
-                    spans.push(self.white_char(ch));
+                    self.drain_buf(idx, spans);
+                    self.white_char(idx, ch, spans);
                 }
                 '<' => {
-                    spans.push(self.drain_buf());
-                    spans.push(self.white_char(ch))
+                    self.drain_buf(idx, spans);
+                    self.white_char(idx, ch, spans)
                 }
                 '>' => {
-                    spans.push(self.drain_buf());
-                    spans.push(self.white_char(ch))
+                    self.drain_buf(idx, spans);
+                    self.white_char(idx, ch, spans)
                 }
                 '(' => {
-                    spans.push(self.drain_buf_colored(self.theme.function));
+                    self.drain_buf_colored(idx, self.theme.function, spans);
                     let color = len_to_color(Some(self.brackets.len()));
                     self.last_token.push(ch);
                     self.brackets.push(color);
-                    spans.push(self.drain_buf_colored(color));
+                    self.drain_buf_colored(idx, color, spans);
                 }
                 ')' => {
                     let color = if let Some(color) = self.brackets.pop() {
@@ -81,16 +107,16 @@ impl Lexer {
                     } else {
                         len_to_color(None)
                     };
-                    spans.push(self.drain_buf());
+                    self.drain_buf(idx, spans);
                     self.last_token.push(ch);
-                    spans.push(self.drain_buf_colored(color));
+                    self.drain_buf_colored(idx, color, spans);
                 }
                 '{' => {
-                    spans.push(self.drain_buf());
+                    self.drain_buf(idx, spans);
                     let color = len_to_color(Some(self.curly.len()));
                     self.last_token.push(ch);
                     self.curly.push(color);
-                    spans.push(self.drain_buf_colored(color));
+                    self.drain_buf_colored(idx, color, spans);
                 }
                 '}' => {
                     let color = if let Some(color) = self.curly.pop() {
@@ -98,16 +124,16 @@ impl Lexer {
                     } else {
                         len_to_color(None)
                     };
-                    spans.push(self.drain_buf());
+                    self.drain_buf(idx, spans);
                     self.last_token.push(ch);
-                    spans.push(self.drain_buf_colored(color));
+                    self.drain_buf_colored(idx, color, spans);
                 }
                 '[' => {
-                    spans.push(self.drain_buf());
+                    self.drain_buf(idx, spans);
                     let color = len_to_color(Some(self.square.len()));
                     self.last_token.push(ch);
                     self.square.push(color);
-                    spans.push(self.drain_buf_colored(color));
+                    self.drain_buf_colored(idx, color, spans);
                 }
                 ']' => {
                     let color = if let Some(color) = self.square.pop() {
@@ -115,83 +141,146 @@ impl Lexer {
                     } else {
                         len_to_color(None)
                     };
-                    spans.push(self.drain_buf());
+                    self.drain_buf(idx, spans);
                     self.last_token.push(ch);
-                    spans.push(self.drain_buf_colored(color));
+                    self.drain_buf_colored(idx, color, spans);
                 }
                 ':' => {
-                    spans.push(self.drain_buf());
-                    spans.push(self.white_char(ch))
+                    self.drain_buf(idx, spans);
+                    self.white_char(idx, ch, spans)
                 }
                 _ => self.last_token.push(ch),
             }
         }
     }
 
-    pub fn select(&mut self, from: (usize, usize), to: (usize, usize)) {}
+    pub fn select(&mut self, range: (&(usize, usize), &(usize, usize))) {
+        self.select = Some((*range.0, *range.1))
+    }
 
     pub fn set_theme(&mut self, theme: Theme) {
         self.theme = theme
     }
 
-    fn handled_key_word(&mut self) -> Option<Span<'static>> {
+    fn handled_key_word(&mut self, idx: usize, spans: &mut Vec<Span>) -> bool {
         if self.key_words.contains(&self.last_token.trim()) {
             self.last_key_words.push(self.last_token.to_owned());
-            Some(Span::styled(
-                self.last_token.drain(..).collect::<String>(),
-                Style {
-                    fg: Some(self.theme.kword),
-                    ..Default::default()
-                },
-            ))
-        } else {
-            None
+            self.drain_with_select(idx, self.theme.kword, spans);
+            return true;
         }
+        false
     }
 
-    pub fn syntax_spans<'a>(&mut self, idx: usize, content: &'a str, max_digits: usize) -> ListItem<'a> {
+    pub fn syntax_spans<'a>(&mut self, idx: usize, content: &'a str) -> ListItem<'a> {
         let mut spans = vec![Span::styled(
-            get_line_num(idx, max_digits),
+            get_line_num(idx, self.max_digits),
             Style::default().fg(Color::Gray),
         )];
-        self.process_line(content, &mut spans);
-        if !self.last_token.is_empty() {
-            spans.push(self.drain_buf());
+        self.set_select_char_range(idx, content.len());
+        self.token_start = 0;
+        if self.select_at_line.is_some() && content.is_empty() {
+            spans.push(Span {
+                content: " ".into(),
+                style: Style {
+                    bg: Some(self.theme.selected),
+                    ..Default::default()
+                },
+            })
+        } else {
+            self.process_line(content, &mut spans);
+            if !self.last_token.is_empty() {
+                self.drain_buf(content.len().checked_sub(1).unwrap_or_default(), &mut spans);
+            }
         }
         ListItem::new(Spans::from(spans))
     }
 
-    fn white_char(&mut self, ch: char) -> Span<'static> {
-        Span::styled(
-            String::from(ch),
-            Style {
-                fg: Some(Color::White),
-                ..Default::default()
-            },
-        )
+    fn white_char(&mut self, idx: usize, ch: char, spans: &mut Vec<Span>) {
+        if matches!(self.select_at_line, Some((from, to)) if from <= idx && idx <= to) {
+            spans.push(Span::styled(
+                String::from(ch),
+                Style {
+                    bg: Some(self.theme.selected),
+                    fg: Some(Color::White),
+                    ..Default::default()
+                },
+            ));
+        } else {
+            spans.push(Span::styled(
+                String::from(ch),
+                Style {
+                    fg: Some(Color::White),
+                    ..Default::default()
+                },
+            ))
+        }
+        self.token_start += 1;
     }
 
-    fn drain_buf_colored(&mut self, color: Color) -> Span<'static> {
-        if let Some(span) = self.handled_key_word() {
-            return span;
+    fn drain_buf_colored(&mut self, idx: usize, color: Color, spans: &mut Vec<Span>) {
+        if !self.handled_key_word(idx, spans) {
+            self.drain_with_select(idx, color, spans)
         }
-        Span::styled(
-            self.last_token.drain(..).collect::<String>(),
-            Style {
-                fg: Some(color),
-                ..Default::default()
-            },
-        )
     }
 
-    fn drain_buf(&mut self) -> Span<'static> {
-        if let Some(span) = self.handled_key_word() {
-            return span;
+    fn drain_buf(&mut self, idx: usize, spans: &mut Vec<Span>) {
+        if !self.handled_key_word(idx, spans) {
+            self.drain_with_select(idx, self.theme.default, spans)
         }
-        Span::styled(
-            self.last_token.drain(..).collect::<String>(),
-            Style::default().fg(self.theme.default),
-        )
+    }
+
+    #[allow(clippy::collapsible_else_if)]
+    fn drain_with_select(&mut self, token_end: usize, color: Color, spans: &mut Vec<Span>) {
+        let style = Style {
+            fg: Some(color),
+            ..Default::default()
+        };
+        if let Some((select_start, select_end)) = self.select_at_line {
+            if select_start <= self.token_start && token_end <= select_end {
+                spans.push(Span::styled(
+                    self.last_token.drain(..).collect::<String>(),
+                    style.bg(self.theme.selected),
+                ));
+            } else if select_end <= self.token_start || token_end <= select_start {
+                spans.push(Span::styled(self.last_token.drain(..).collect::<String>(), style));
+            } else {
+                if select_start <= self.token_start {
+                    spans.push(Span::styled(
+                        self.last_token
+                            .drain(..(select_end - self.token_start))
+                            .collect::<String>(),
+                        style.bg(self.theme.selected),
+                    ));
+                    spans.push(Span::styled(self.last_token.drain(..).collect::<String>(), style));
+                } else if self.token_start <= select_start && select_end <= token_end {
+                    spans.push(Span::styled(
+                        self.last_token
+                            .drain(..(select_start - self.token_start))
+                            .collect::<String>(),
+                        style,
+                    ));
+                    spans.push(Span::styled(
+                        self.last_token.drain(..(select_end - select_start)).collect::<String>(),
+                        style.bg(self.theme.selected),
+                    ));
+                    spans.push(Span::styled(self.last_token.drain(..).collect::<String>(), style));
+                } else {
+                    spans.push(Span::styled(
+                        self.last_token
+                            .drain(..(select_start - self.token_start))
+                            .collect::<String>(),
+                        style,
+                    ));
+                    spans.push(Span::styled(
+                        self.last_token.drain(..).collect::<String>(),
+                        style.bg(self.theme.selected),
+                    ));
+                };
+            }
+        } else {
+            spans.push(Span::styled(self.last_token.drain(..).collect::<String>(), style));
+        }
+        self.token_start = token_end;
     }
 }
 

@@ -35,11 +35,15 @@ impl EditorState {
                     (file.content.len().ilog10() + 1) as usize
                 };
                 let mut linter = Lexer::default();
+                if let Some(range) = file.cursor.selected.get() {
+                    linter.select(range);
+                }
+                linter.max_line_digits_from(max_digits);
                 let editor_content = List::new(
                     file.content[file.cursor.at_line..]
                         .iter()
                         .enumerate()
-                        .map(|(idx, code_line)| linter.syntax_spans(idx + file.cursor.at_line, code_line, max_digits))
+                        .map(|(idx, code_line)| linter.syntax_spans(idx + file.cursor.at_line, code_line))
                         .collect::<Vec<ListItem>>(),
                 );
 
@@ -98,11 +102,11 @@ impl EditorState {
                     _ => return false,
                 },
                 KeyModifiers::NONE => match key.code {
+                    KeyCode::Char(c) => editor.push_str(c.to_string().as_str()),
                     KeyCode::Up => editor.up(),
                     KeyCode::Down => editor.down(),
                     KeyCode::Left => editor.left(),
                     KeyCode::Right => editor.right(),
-                    KeyCode::Char(c) => editor.push_str(c.to_string().as_str()),
                     KeyCode::Backspace => editor.backspace(),
                     KeyCode::Enter => editor.new_line(),
                     KeyCode::Tab => editor.indent(),
@@ -110,13 +114,18 @@ impl EditorState {
                     _ => return false,
                 },
                 KeyModifiers::SHIFT => match key.code {
+                    KeyCode::Char(c) => editor.push_str(c.to_string().as_str()),
                     KeyCode::Up => editor.select_up(),
                     KeyCode::Down => editor.select_down(),
                     KeyCode::Right => editor.select_right(),
                     KeyCode::Left => editor.select_left(),
-                    _ => {}
+                    _ => return false,
                 },
-                KeyModifiers::ALT => {}
+                KeyModifiers::ALT => match key.code {
+                    KeyCode::Up => editor.swap_up(),
+                    KeyCode::Down => editor.swap_down(),
+                    _ => return false,
+                }
                 _ => return false,
             }
         }

@@ -4,6 +4,8 @@ mod select;
 use clipboard::Clipboard;
 use select::Select;
 
+const JUPM_BLOCKS: &str = " :.,({";
+
 #[derive(Default, Debug)]
 pub struct Cursor {
     pub line: usize,
@@ -24,10 +26,12 @@ impl Cursor {
         }
     }
 
-    pub fn scroll_down_content(&mut self, content: &mut Vec<String>) {
-        if self.at_line < content.len() - 2 {
-            self.at_line += 1;
-            self.navigate_down_content(content)
+    fn up(&mut self, content: &mut Vec<String>) {
+        if self.at_line >= self.line {
+            self.scroll_up_content(content)
+        } else if self.line > 0 {
+            self.line -= 1;
+            self.adjust_cursor_max_char(content);
         }
     }
 
@@ -35,15 +39,6 @@ impl Cursor {
         if self.at_line != 0 {
             self.at_line -= 1;
             self.navigate_up_content(content)
-        }
-    }
-
-    fn up(&mut self, content: &mut Vec<String>) {
-        if self.at_line >= self.line {
-            self.scroll_up_content(content)
-        } else if self.line > 0 {
-            self.line -= 1;
-            self.adjust_cursor_max_char(content);
         }
     }
 
@@ -56,6 +51,16 @@ impl Cursor {
         self.selected.init(self.line, self.char);
         self.up(content);
         self.selected.push(self.line, self.char);
+    }
+
+    pub fn swap_up_line(&mut self, content: &mut Vec<String>) {
+        if self.at_line >= self.line {
+            self.scroll_up_content(content)
+        } else if self.line > 0 {
+            let new_line = self.line -1;
+            content.swap(self.line, new_line);
+            self.line = new_line;
+        }
     }
 
     fn down(&mut self, content: &mut Vec<String>) {
@@ -71,6 +76,13 @@ impl Cursor {
         }
     }
 
+    pub fn scroll_down_content(&mut self, content: &mut Vec<String>) {
+        if self.at_line < content.len() - 2 {
+            self.at_line += 1;
+            self.navigate_down_content(content)
+        }
+    }
+
     pub fn navigate_down_content(&mut self, content: &mut Vec<String>) {
         self.selected.drop();
         self.down(content);
@@ -82,6 +94,20 @@ impl Cursor {
         self.selected.push(self.line, self.char);
     }
 
+    pub fn swap_down_line(&mut self, content: &mut Vec<String>) {
+        if content.is_empty() {
+            return;
+        }
+        if self.line > self.max_rows as usize - 3 + self.at_line {
+            self.at_line += 1;
+        }
+        if content.len() - 1 > self.line {
+            let new_line = self.line + 1;
+            content.swap(self.line, new_line);
+            self.line = new_line;
+        }
+    }
+
     fn left(&mut self, content: &[String]) {
         if self.char > 0 {
             self.char -= 1
@@ -91,6 +117,10 @@ impl Cursor {
                 self.char = line.len();
             }
         }
+    }
+
+    pub fn jump_left(&mut self, content: &[String]) {
+        
     }
 
     pub fn navigate_left_content(&mut self, content: &mut [String]) {
@@ -113,6 +143,10 @@ impl Cursor {
                 self.char = 0;
             }
         }
+    }
+
+    pub fn jump_right(&mut self, content: &mut Vec<String>) {
+        
     }
 
     pub fn navigate_right_content(&mut self, content: &mut Vec<String>) {
