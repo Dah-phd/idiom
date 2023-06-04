@@ -29,7 +29,7 @@ pub struct Lexer {
 impl Default for Lexer {
     fn default() -> Self {
         Self {
-            key_words: vec!["pub", "fn", "struct", "use", "mod", "let", "self", "mut"],
+            key_words: vec!["pub", "fn", "struct", "use", "mod", "let", "self", "mut", "crate"],
             select_at_line: None,
             curly: vec![],
             brackets: vec![],
@@ -52,8 +52,13 @@ impl Lexer {
         }
     }
 
-    pub fn max_line_digits_from(&mut self, len: usize) {
-        self.max_digits = len
+    pub fn line_number_max_digits(&mut self, content: &[String]) -> usize {
+        self.max_digits = if content.is_empty() {
+            0
+        } else {
+            (content.len().ilog10() + 1) as usize
+        };
+        self.max_digits
     }
 
     fn set_select_char_range(&mut self, at_line: usize, max_len: usize) {
@@ -73,33 +78,52 @@ impl Lexer {
     }
 
     fn process_line(&mut self, content: &str, spans: &mut Vec<Span>) {
-        if content.starts_with("mod") {}
-        if content.starts_with("use") {}
-        let char_stream = content.chars().enumerate();
-        for (idx, ch) in char_stream {
+        if content.starts_with("mod") | content.starts_with("use") {
+            for (idx, ch) in content.chars().enumerate() {
+                match ch {
+                    ' ' => {
+                        self.drain_buf_object(idx, spans);
+                        self.last_token.push(ch);
+                    }
+                    '.' | '<' | '>' | ':' | '?' | '&' | '=' | '+' | '-' | ',' | ';' => {
+                        self.drain_buf_object(idx, spans);
+                        self.white_char(idx, ch, spans);
+                    }
+                    _ => self.last_token.push(ch),
+                }
+            }
+            return;
+        }
+        let mut char_steam = content.chars().enumerate().peekable();
+        while let Some((token_end, ch)) = char_steam.next() {
             match ch {
                 ' ' => {
-                    self.drain_buf(idx, spans);
+                    self.drain_buf(token_end, spans);
                     self.last_token.push(ch);
                 }
-                '.' => {
-                    self.drain_buf(idx, spans);
-                    self.white_char(idx, ch, spans);
+                '.' | '<' | '>' | '?' | '&' | '=' | '+' | '-' | ',' | ';' => {
+                    self.drain_buf(token_end, spans);
+                    self.white_char(token_end, ch, spans);
                 }
-                '<' => {
-                    self.drain_buf(idx, spans);
-                    self.white_char(idx, ch, spans)
+                ':' => {
+                    if matches!(char_steam.peek(), Some((_, next_ch)) if next_ch == &':') {
+                        self.drain_buf_colored(token_end, self.theme.class, spans);
+                        self.white_char(token_end, ch, spans);
+                    } else {
+                        self.drain_buf(token_end, spans);
+                        self.white_char(token_end, ch, spans);
+                    }
                 }
-                '>' => {
-                    self.drain_buf(idx, spans);
-                    self.white_char(idx, ch, spans)
+                '!' => {
+                    self.last_token.push(ch);
+                    self.drain_buf_colored(token_end, self.theme.kword, spans);
                 }
                 '(' => {
-                    self.drain_buf_colored(idx, self.theme.function, spans);
+                    self.drain_buf_colored(token_end, self.theme.function, spans);
                     let color = len_to_color(Some(self.brackets.len()));
                     self.last_token.push(ch);
                     self.brackets.push(color);
-                    self.drain_buf_colored(idx, color, spans);
+                    self.drain_buf_colored(token_end, color, spans);
                 }
                 ')' => {
                     let color = if let Some(color) = self.brackets.pop() {
@@ -107,16 +131,16 @@ impl Lexer {
                     } else {
                         len_to_color(None)
                     };
-                    self.drain_buf(idx, spans);
+                    self.drain_buf(token_end, spans);
                     self.last_token.push(ch);
-                    self.drain_buf_colored(idx, color, spans);
+                    self.drain_buf_colored(token_end, color, spans);
                 }
                 '{' => {
-                    self.drain_buf(idx, spans);
+                    self.drain_buf(token_end, spans);
                     let color = len_to_color(Some(self.curly.len()));
                     self.last_token.push(ch);
                     self.curly.push(color);
-                    self.drain_buf_colored(idx, color, spans);
+                    self.drain_buf_colored(token_end, color, spans);
                 }
                 '}' => {
                     let color = if let Some(color) = self.curly.pop() {
@@ -124,16 +148,16 @@ impl Lexer {
                     } else {
                         len_to_color(None)
                     };
-                    self.drain_buf(idx, spans);
+                    self.drain_buf(token_end, spans);
                     self.last_token.push(ch);
-                    self.drain_buf_colored(idx, color, spans);
+                    self.drain_buf_colored(token_end, color, spans);
                 }
                 '[' => {
-                    self.drain_buf(idx, spans);
+                    self.drain_buf(token_end, spans);
                     let color = len_to_color(Some(self.square.len()));
                     self.last_token.push(ch);
                     self.square.push(color);
-                    self.drain_buf_colored(idx, color, spans);
+                    self.drain_buf_colored(token_end, color, spans);
                 }
                 ']' => {
                     let color = if let Some(color) = self.square.pop() {
@@ -141,13 +165,9 @@ impl Lexer {
                     } else {
                         len_to_color(None)
                     };
-                    self.drain_buf(idx, spans);
+                    self.drain_buf(token_end, spans);
                     self.last_token.push(ch);
-                    self.drain_buf_colored(idx, color, spans);
-                }
-                ':' => {
-                    self.drain_buf(idx, spans);
-                    self.white_char(idx, ch, spans)
+                    self.drain_buf_colored(token_end, color, spans);
                 }
                 _ => self.last_token.push(ch),
             }
@@ -162,11 +182,21 @@ impl Lexer {
         self.theme = theme
     }
 
-    fn handled_key_word(&mut self, idx: usize, spans: &mut Vec<Span>) -> bool {
+    fn handled_key_word(&mut self, token_end: usize, spans: &mut Vec<Span>) -> bool {
         if self.key_words.contains(&self.last_token.trim()) {
             self.last_key_words.push(self.last_token.to_owned());
-            self.drain_with_select(idx, self.theme.kword, spans);
+            self.drain_with_select(token_end, self.theme.kword, spans);
             return true;
+        }
+        false
+    }
+
+    fn handled_object(&mut self, token_end: usize, spans: &mut Vec<Span>) -> bool {
+        if let Some(ch) = self.last_token.trim().chars().next() {
+            if ch.is_uppercase() {
+                self.drain_with_select(token_end, self.theme.class, spans);
+                return true;
+            }
         }
         false
     }
@@ -217,15 +247,21 @@ impl Lexer {
         self.token_start += 1;
     }
 
-    fn drain_buf_colored(&mut self, idx: usize, color: Color, spans: &mut Vec<Span>) {
-        if !self.handled_key_word(idx, spans) {
-            self.drain_with_select(idx, color, spans)
+    fn drain_buf_object(&mut self, token_end: usize, spans: &mut Vec<Span>) {
+        if !self.handled_key_word(token_end, spans) {
+            self.drain_with_select(token_end, self.theme.class, spans)
         }
     }
 
-    fn drain_buf(&mut self, idx: usize, spans: &mut Vec<Span>) {
-        if !self.handled_key_word(idx, spans) {
-            self.drain_with_select(idx, self.theme.default, spans)
+    fn drain_buf_colored(&mut self, token_end: usize, color: Color, spans: &mut Vec<Span>) {
+        if !self.handled_key_word(token_end, spans) && !self.handled_object(token_end, spans) {
+            self.drain_with_select(token_end, color, spans)
+        }
+    }
+
+    fn drain_buf(&mut self, token_end: usize, spans: &mut Vec<Span>) {
+        if !self.handled_key_word(token_end, spans) && !self.handled_object(token_end, spans) {
+            self.drain_with_select(token_end, self.theme.default, spans)
         }
     }
 

@@ -232,7 +232,7 @@ impl Cursor {
 
     pub fn remove(&mut self, content: &mut Vec<String>) -> String {
         if let Some((from, to)) = self.selected.get() {
-            if from.0 == to.0 {
+            let data = if from.0 == to.0 {
                 self.char = from.1;
                 let data = content.remove(from.0);
                 let mut payload = String::new();
@@ -257,9 +257,10 @@ impl Cursor {
                 }
                 self.line = from.0;
                 self.char = from.1;
-                self.selected.drop();
                 clip_vec.join("\n")
-            }
+            };
+            self.selected.drop();
+            data
         } else {
             let mut line = content.remove(self.line);
             line.push('\n');

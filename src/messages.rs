@@ -12,6 +12,11 @@ impl Default for Mode {
     }
 }
 
+pub enum Command {
+    Exit,
+    None
+}
+
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
 pub enum FileType {
     Rust,

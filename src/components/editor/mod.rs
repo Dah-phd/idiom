@@ -29,16 +29,11 @@ impl EditorState {
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get_mut(editor_id) {
                 file.cursor.max_rows = layout[1].bottom();
-                let max_digits = if file.content.is_empty() {
-                    0
-                } else {
-                    (file.content.len().ilog10() + 1) as usize
-                };
-                let mut linter = Lexer::default();
+                let mut linter = Lexer::from_type(&file.file_type);
                 if let Some(range) = file.cursor.selected.get() {
                     linter.select(range);
                 }
-                linter.max_line_digits_from(max_digits);
+                let max_digits = linter.line_number_max_digits(&file.content);
                 let editor_content = List::new(
                     file.content[file.cursor.at_line..]
                         .iter()
@@ -107,9 +102,9 @@ impl EditorState {
                     KeyCode::Down => editor.down(),
                     KeyCode::Left => editor.left(),
                     KeyCode::Right => editor.right(),
-                    KeyCode::Backspace => editor.backspace(),
                     KeyCode::Enter => editor.new_line(),
                     KeyCode::Tab => editor.indent(),
+                    KeyCode::Backspace => editor.backspace(),
                     KeyCode::Delete => editor.del(),
                     _ => return false,
                 },

@@ -75,14 +75,16 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                                 editor_state.new_from(file_path);
                                 if let Some(editor) = editor_state.get_active() {
                                     if let Ok(lsp) = LSP::from(&editor.file_type).await {
-                                        for req in lsp.que.lock().unwrap().iter() {}
+                                        for req in lsp.que.lock().unwrap().iter() {
+                                            let _ = req;
+                                        }
                                         lsp_servers.push(lsp);
                                     }
                                 }
                             }
                         }
                         KeyCode::Enter => {
-                            if file_tree.on_opened_tabs {
+                            if file_tree.on_open_tabs {
                                 mode = Mode::Insert;
                             } else if let Some(file_path) = file_tree.expand_dir_or_get_path() {
                                 if !file_path.is_dir() {
@@ -98,7 +100,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                         }
                         KeyCode::Tab => {
                             if let Some(editor_id) = editor_state.state.selected() {
-                                file_tree.on_opened_tabs = true;
+                                file_tree.on_open_tabs = true;
                                 if editor_id >= editor_state.len() - 1 {
                                     editor_state.state.select(Some(0))
                                 } else {
@@ -112,7 +114,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                         KeyCode::Char('s') | KeyCode::Char('S') => editor_state.save(),
                         KeyCode::Tab => {
                             if let Some(editor_id) = editor_state.state.selected() {
-                                file_tree.on_opened_tabs = true;
+                                file_tree.on_open_tabs = true;
                                 if editor_id == 0 {
                                     editor_state.state.select(Some(editor_state.len() - 1))
                                 } else {
