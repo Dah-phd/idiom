@@ -26,6 +26,13 @@ impl Editor {
         })
     }
 
+    pub fn is_saved(&self) -> bool {
+        if let Ok(file_content) = std::fs::read_to_string(&self.path){
+            return self.content.eq(&file_content.lines().map(String::from).collect::<Vec<_>>())
+        };
+        false
+    }
+
     pub fn cut(&mut self) {
         self.cursor.cut(&mut self.content)
     }
@@ -77,12 +84,20 @@ impl Editor {
         self.cursor.navigate_left_content(&mut self.content)
     }
 
+    pub fn left_jump(&mut self) {
+        self.cursor.left_jump(&self.content)
+    }
+
     pub fn select_left(&mut self) {
         self.cursor.select_left_content(&mut self.content)
     }
 
     pub fn right(&mut self) {
         self.cursor.navigate_right_content(&mut self.content)
+    }
+
+    pub fn right_jump(&mut self) {
+        self.cursor.right_jump(&self.content)
     }
 
     pub fn select_right(&mut self) {

@@ -18,6 +18,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
     let mut mode = Mode::Select;
     let mut clock = Instant::now();
     let mut file_tree = Tree::default();
+    let mut hide_file_tree = false;
     let mut editor_state = EditorState::default();
     let mut lsp_servers: Vec<LSP> = vec![];
 
@@ -26,11 +27,13 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
             let screen_areas = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([
-                    Constraint::Percentage(if file_tree.is_hidden { 0 } else { 15 }),
+                    Constraint::Percentage(if matches!(mode, Mode::Select) || !hide_file_tree { 15 } else { 0 }),
                     Constraint::Min(2),
                 ])
                 .split(frame.size());
-            file_tree.render(frame, screen_areas[0]);
+            if matches!(mode, Mode::Select) || !hide_file_tree {
+                file_tree.render(frame, screen_areas[0]);
+            }
             editor_state.render(frame, screen_areas[1]);
         })?;
 
@@ -59,7 +62,11 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                     KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Char('q') | KeyCode::Char('Q')
                 ) && key.modifiers.contains(KeyModifiers::CONTROL)
                 {
-                    break;
+                    if editor_state.are_updates_saved() {
+                        break;
+                    } else {
+                        panic!("WORKS!")
+                    }
                 };
                 if match mode {
                     Mode::Insert => editor_state.map(&key),
@@ -112,6 +119,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                     },
                     KeyModifiers::CONTROL => match key.code {
                         KeyCode::Char('s') | KeyCode::Char('S') => editor_state.save(),
+                        KeyCode::Char('e') | KeyCode::Char('E') => hide_file_tree = !hide_file_tree,
                         KeyCode::Tab => {
                             if let Some(editor_id) = editor_state.state.selected() {
                                 file_tree.on_open_tabs = true;

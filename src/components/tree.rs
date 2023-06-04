@@ -20,16 +20,11 @@ pub struct Tree {
     pub expanded: Vec<PathBuf>,
     pub state: ListState,
     pub tree: Vec<PathBuf>,
-    pub is_hidden: bool,
     pub on_open_tabs: bool,
 }
 
 impl Tree {
     pub fn render(&mut self, frame: &mut Frame<impl Backend>, area: Rect) {
-        if self.is_hidden {
-            return;
-        }
-
         self.tree.clear();
         for path in std::fs::read_dir("./").unwrap().flatten() {
             self.tree.extend(expand(path.path(), &self.expanded))
@@ -63,14 +58,6 @@ impl Tree {
     }
 
     pub fn map(&mut self, key: &KeyEvent) -> bool {
-        if matches!(key.code, KeyCode::Char('e') | KeyCode::Char('E')) && key.modifiers.contains(KeyModifiers::CONTROL)
-        {
-            self.is_hidden = !self.is_hidden;
-            return true;
-        }
-        if self.is_hidden {
-            return false;
-        }
         match key.modifiers {
             KeyModifiers::NONE => match key.code {
                 KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {

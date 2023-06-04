@@ -2,6 +2,7 @@ mod action;
 mod clipboard;
 mod select;
 use clipboard::Clipboard;
+use crossterm::style::Stylize;
 use select::Select;
 
 const JUPM_BLOCKS: &str = " :.,({";
@@ -57,7 +58,7 @@ impl Cursor {
         if self.at_line >= self.line {
             self.scroll_up_content(content)
         } else if self.line > 0 {
-            let new_line = self.line -1;
+            let new_line = self.line - 1;
             content.swap(self.line, new_line);
             self.line = new_line;
         }
@@ -119,8 +120,31 @@ impl Cursor {
         }
     }
 
-    pub fn jump_left(&mut self, content: &[String]) {
-
+    pub fn left_jump(&mut self, content: &[String]) {
+        let mut line = &content[self.line][..self.char];
+        let mut found_word = false;
+        let mut last_was_char = false;
+        loop {
+            if line.is_empty() || line.chars().all(|c| !c.is_alphabetic()) {
+                if self.line > 0 {
+                    self.line -= 1;
+                    line = &content[self.line];
+                    self.char = line.len();
+                } else {
+                    return;
+                }
+            }
+            for ch in line.chars().rev() {
+                if last_was_char && found_word && !ch.is_alphabetic() {
+                    return;
+                }
+                self.char -= 1;
+                if !found_word && ch.is_alphabetic() {
+                    last_was_char = true;
+                    found_word = true;
+                };
+            }
+        }
     }
 
     pub fn navigate_left_content(&mut self, content: &mut [String]) {
@@ -145,10 +169,31 @@ impl Cursor {
         }
     }
 
-    pub fn jump_right(&mut self, content: &mut Vec<String>) {
-        let line = &content[self.line][self.char..];
-
-
+    pub fn right_jump(&mut self, content: &[String]) {
+        let mut line = &content[self.line][self.char..];
+        let mut found_word = false;
+        let mut last_was_char = false;
+        loop {
+            if line.is_empty() || line.chars().all(|c| !c.is_alphabetic() && c != '_') {
+                if content.len() - 1 > self.line {
+                    self.line += 1;
+                    self.char = 0;
+                    line = &content[self.line];
+                } else {
+                    return;
+                }
+            }
+            for ch in line.chars() {
+                if last_was_char && found_word && !ch.is_alphabetic() && ch != '_' {
+                    return;
+                }
+                self.char += 1;
+                if !found_word && ch.is_alphabetic() || ch == '_' {
+                    last_was_char = true;
+                    found_word = true;
+                };
+            }
+        }
     }
 
     pub fn navigate_right_content(&mut self, content: &mut Vec<String>) {

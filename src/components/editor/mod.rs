@@ -94,6 +94,8 @@ impl EditorState {
                     },
                     KeyCode::Up => editor.scroll_up(),
                     KeyCode::Down => editor.scroll_down(),
+                    KeyCode::Left => editor.left_jump(),
+                    KeyCode::Right => editor.right_jump(),
                     _ => return false,
                 },
                 KeyModifiers::NONE => match key.code {
@@ -122,6 +124,15 @@ impl EditorState {
                     _ => return false,
                 }
                 _ => return false,
+            }
+        }
+        true
+    }
+
+    pub fn are_updates_saved(&self) -> bool {
+        for editor in self.editors.iter() {
+            if !editor.is_saved() {
+                return false
             }
         }
         true
