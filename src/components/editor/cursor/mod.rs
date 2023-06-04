@@ -122,10 +122,9 @@ impl Cursor {
 
     pub fn left_jump(&mut self, content: &[String]) {
         let mut line = &content[self.line][..self.char];
-        let mut found_word = false;
         let mut last_was_char = false;
         loop {
-            if line.is_empty() || line.chars().all(|c| !c.is_alphabetic()) {
+            if line.is_empty() || line.chars().all(|c| !c.is_alphabetic() && c != '_') {
                 if self.line > 0 {
                     self.line -= 1;
                     line = &content[self.line];
@@ -135,13 +134,15 @@ impl Cursor {
                 }
             }
             for ch in line.chars().rev() {
-                if last_was_char && found_word && !ch.is_alphabetic() {
+                if last_was_char && !ch.is_alphabetic() && ch != '_' || self.char == 0 {
+                    if self.at_line >= self.line && self.at_line > 0 {
+                        self.at_line -= 1;
+                    }
                     return;
                 }
                 self.char -= 1;
-                if !found_word && ch.is_alphabetic() {
+                if ch.is_alphabetic() || ch == '_' {
                     last_was_char = true;
-                    found_word = true;
                 };
             }
         }
@@ -185,6 +186,9 @@ impl Cursor {
             }
             for ch in line.chars() {
                 if last_was_char && found_word && !ch.is_alphabetic() && ch != '_' {
+                    if self.line > self.max_rows as usize - 3 + self.at_line {
+                        self.at_line += 1;
+                    }
                     return;
                 }
                 self.char += 1;
