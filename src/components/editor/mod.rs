@@ -86,7 +86,7 @@ impl EditorState {
                 KeyModifiers::CONTROL => match key.code {
                     KeyCode::Char(c) => match c {
                         '[' => editor.unindent(),
-                        ']' => editor.indent(),
+                        ']' => editor.indent_start(),
                         'c' | 'C' => editor.copy(),
                         'x' | 'X' => editor.cut(),
                         'v' | 'V' => editor.paste(),
@@ -99,7 +99,7 @@ impl EditorState {
                     _ => return false,
                 },
                 KeyModifiers::NONE => match key.code {
-                    KeyCode::Char(c) => editor.push_str(c.to_string().as_str()),
+                    KeyCode::Char(c) => editor.push(c),
                     KeyCode::Up => editor.up(),
                     KeyCode::Down => editor.down(),
                     KeyCode::Left => editor.left(),
@@ -111,7 +111,7 @@ impl EditorState {
                     _ => return false,
                 },
                 KeyModifiers::SHIFT => match key.code {
-                    KeyCode::Char(c) => editor.push_str(c.to_string().as_str()),
+                    KeyCode::Char(c) => editor.push(c),
                     KeyCode::Up => editor.select_up(),
                     KeyCode::Down => editor.select_down(),
                     KeyCode::Right => editor.select_right(),
@@ -122,7 +122,7 @@ impl EditorState {
                     KeyCode::Up => editor.swap_up(),
                     KeyCode::Down => editor.swap_down(),
                     _ => return false,
-                }
+                },
                 _ => return false,
             }
         }
@@ -132,7 +132,7 @@ impl EditorState {
     pub fn are_updates_saved(&self) -> bool {
         for editor in self.editors.iter() {
             if !editor.is_saved() {
-                return false
+                return false;
             }
         }
         true

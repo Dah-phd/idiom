@@ -1,10 +1,10 @@
-use crate::messages::FileType;
+use crate::messages::{FileType, Configs};
 use std::path::PathBuf;
 
 use super::cursor::Cursor;
 
 const INDENT_ENDINGS: &str = ":({";
-const UNIDENT_ENDINGS: &str = ")}";
+const UNIDENT_ENDINGS: &str = "}";
 const INDENT_TYPE: &str = "    ";
 
 #[derive(Debug)]
@@ -15,7 +15,7 @@ pub struct Editor {
     pub file_type: FileType,
 }
 
-impl Editor {
+impl Editor{
     pub fn from_path(path: PathBuf) -> std::io::Result<Self> {
         let content = std::fs::read_to_string(&path)?;
         Ok(Self {
@@ -27,8 +27,10 @@ impl Editor {
     }
 
     pub fn is_saved(&self) -> bool {
-        if let Ok(file_content) = std::fs::read_to_string(&self.path){
-            return self.content.eq(&file_content.lines().map(String::from).collect::<Vec<_>>())
+        if let Ok(file_content) = std::fs::read_to_string(&self.path) {
+            return self
+                .content
+                .eq(&file_content.lines().map(String::from).collect::<Vec<_>>());
         };
         false
     }
@@ -104,13 +106,21 @@ impl Editor {
         self.cursor.select_right_content(&mut self.content)
     }
 
-    pub fn push_str(&mut self, c: &str) {
+    pub fn push(&mut self, c: char) {
         if let Some(line) = self.content.get_mut(self.cursor.line) {
-            line.insert_str(self.cursor.char, c);
-            self.cursor.char += c.len();
+            line.insert(self.cursor.char, c);
+            self.cursor.char += 1;
+            match c {
+                '{' => line.insert(self.cursor.char, '}'),
+                '(' => line.insert(self.cursor.char, ')'),
+                '[' => line.insert(self.cursor.char, ']'),
+                '"' => line.insert(self.cursor.char, '"'),
+                '\'' => line.insert(self.cursor.char, '\''),
+                _ => ()
+            }
         } else {
-            self.content.insert(self.cursor.line, c.to_owned());
-            self.cursor.char = c.len();
+            self.content.insert(self.cursor.line, c.to_string());
+            self.cursor.char = 1;
         }
     }
 
@@ -170,13 +180,27 @@ impl Editor {
     }
 
     pub fn indent(&mut self) {
-        self.push_str(INDENT_TYPE)
+        if let Some(line) = self.content.get_mut(self.cursor.line) {
+            line.insert_str(self.cursor.char, INDENT_TYPE);
+            self.cursor.char += INDENT_TYPE.len();
+        } else {
+            self.content.insert(self.cursor.line, INDENT_TYPE.to_owned());
+            self.cursor.char = INDENT_TYPE.len();
+        }
+    }
+
+    pub fn indent_start(&mut self) {
+        if let Some(line) = self.content.get_mut(self.cursor.line) {
+            line.insert_str(0, INDENT_TYPE);
+            self.cursor.char += INDENT_TYPE.len();
+        }
     }
 
     pub fn unindent(&mut self) {
         if let Some(line) = self.content.get_mut(self.cursor.line) {
             if line.starts_with(INDENT_TYPE) {
-                let _ = line.strip_prefix(INDENT_TYPE);
+                line.replace_range(..INDENT_TYPE.len(), "");
+                self.cursor.char -= INDENT_TYPE.len();
             }
         }
     }
@@ -202,21 +226,24 @@ impl Editor {
     }
 
     fn get_indent(&mut self) {
-        if self.cursor.line != 0 {
-            if let Some(prev_line) = self.content.get(self.cursor.line).cloned() {
-                if let Some(last) = prev_line.trim_end().chars().last() {
-                    if INDENT_ENDINGS.contains(last) {
-                        self.indent()
-                    }
-                    if UNIDENT_ENDINGS.contains(last) {
-                        self.unindent()
-                    }
+        if self.cursor.line == 0 {
+            return;
+        }
+
+        if let Some(prev_line) = self.content.get(self.cursor.line - 1).cloned() {
+            if let Some(last) = prev_line.trim_end().chars().last() {
+                if INDENT_ENDINGS.contains(last) {
+                    self.indent_start()
                 }
-                if prev_line.starts_with(INDENT_TYPE) {
-                    self.indent();
+                if UNIDENT_ENDINGS.contains(last) {
+                    self.unindent()
                 }
             }
+            if prev_line.starts_with(INDENT_TYPE) {
+                self.indent_start();
+            }
         }
+        self.cursor.char = self.content[self.cursor.line].len();
     }
 
     pub fn save(&self) {
