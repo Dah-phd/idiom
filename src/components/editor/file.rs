@@ -14,7 +14,7 @@ pub struct Editor {
     pub file_type: FileType,
 }
 
-impl Editor{
+impl Editor {
     pub fn from_path(path: PathBuf) -> std::io::Result<Self> {
         let content = std::fs::read_to_string(&path)?;
         Ok(Self {
@@ -115,7 +115,7 @@ impl Editor{
                 '[' => line.insert(self.cursor.char, ']'),
                 '"' => line.insert(self.cursor.char, '"'),
                 '\'' => line.insert(self.cursor.char, '\''),
-                _ => ()
+                _ => (),
             }
         } else {
             self.content.insert(self.cursor.line, c.to_string());
@@ -209,7 +209,7 @@ impl Editor{
             self.content.push(String::new());
             self.cursor.line += 1;
             return;
-        } 
+        }
         let line = &self.content[self.cursor.line];
         let new_line = if line.len() > self.cursor.char {
             let (replace_line, new_line) = line.split_at(self.cursor.char);
@@ -239,7 +239,7 @@ impl Editor{
             }
         }
 
-        let indent = get_whitespaces_start(prev_line);
+        let indent = prev_line.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
         curr_line.insert_str(0, &indent);
         self.cursor.char = curr_line.len();
     }
@@ -247,15 +247,4 @@ impl Editor{
     pub fn save(&self) {
         std::fs::write(&self.path, self.content.join("\n")).unwrap();
     }
-}
-
-fn get_whitespaces_start(line: &str) -> String {
-    let mut buffer = String::new();
-    for c in line.chars() {
-        if !c.is_whitespace() {
-            break;
-        }
-        buffer.push(c)
-    }
-    buffer
 }

@@ -27,7 +27,11 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
             let screen_areas = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([
-                    Constraint::Percentage(if matches!(mode, Mode::Select) || !hide_file_tree { 15 } else { 0 }),
+                    Constraint::Percentage(if matches!(mode, Mode::Select) || !hide_file_tree {
+                        15
+                    } else {
+                        0
+                    }),
                     Constraint::Min(2),
                 ])
                 .split(frame.size());

@@ -14,7 +14,7 @@ impl Default for Mode {
 
 pub enum Command {
     Exit,
-    None
+    None,
 }
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]
@@ -55,13 +55,13 @@ pub struct Configs {
 impl Default for Configs {
     fn default() -> Self {
         Self {
-            indent: "    ".to_owned()
+            indent: "    ".to_owned(),
         }
     }
 }
 
 impl Configs {
     pub fn get_indent(&self) -> &str {
-        return &self.indent
+        return &self.indent;
     }
 }
