@@ -9,7 +9,7 @@ use crate::messages::FileType;
 
 use self::theme::Theme;
 
-pub const COLORS: [Color; 3] = [Color::Magenta, Color::Blue, Color::Yellow];
+pub const COLORS: [Color; 3] = [Color::LightMagenta, Color::Yellow, Color::Blue];
 
 #[derive(Debug)]
 pub struct Lexer {

@@ -232,16 +232,21 @@ impl Editor {
 
         let prev_line = &self.content[self.cursor.line - 1].clone();
         let curr_line = &mut self.content[self.cursor.line];
+        let indent = prev_line.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
+        curr_line.insert_str(0, &indent);
+        self.cursor.char = indent.len();
 
         if let Some(last) = prev_line.trim_end().chars().last() {
             if INDENT_ENDINGS.contains(last) {
-                curr_line.insert_str(0, INDENT_TYPE)
+                if let Some(first) = curr_line.trim_start().chars().next() {
+                    if (last, first) == ('{', '}') || (last, first) == ('(', ')') || (last, first) == ('[', ']') {
+                        self.content.insert(self.cursor.line, indent);
+                    }
+                }
+                self.content[self.cursor.line].insert_str(0, INDENT_TYPE);
+                self.cursor.char += INDENT_TYPE.len();
             }
         }
-
-        let indent = prev_line.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
-        curr_line.insert_str(0, &indent);
-        self.cursor.char = curr_line.len();
     }
 
     pub fn save(&self) {
