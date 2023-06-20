@@ -1,10 +1,9 @@
-use crate::messages::{FileType, Configs};
+use crate::messages::FileType;
 use std::path::PathBuf;
 
 use super::cursor::Cursor;
 
 const INDENT_ENDINGS: &str = ":({";
-const UNIDENT_ENDINGS: &str = "}";
 const INDENT_TYPE: &str = "    ";
 
 #[derive(Debug)]
@@ -209,20 +208,21 @@ impl Editor{
         if self.content.is_empty() {
             self.content.push(String::new());
             self.cursor.line += 1;
-        } else if let Some(line) = self.content.get(self.cursor.line) {
-            let new_line = if line.len() > self.cursor.char {
-                let (replace_line, new_line) = line.split_at(self.cursor.char);
-                let new_line = String::from(new_line);
-                self.content[self.cursor.line] = String::from(replace_line);
-                new_line
-            } else {
-                String::new()
-            };
-            self.content.insert(self.cursor.line + 1, new_line);
-            self.cursor.line += 1;
-            self.cursor.char = 0;
-            self.get_indent();
-        }
+            return;
+        } 
+        let line = &self.content[self.cursor.line];
+        let new_line = if line.len() > self.cursor.char {
+            let (replace_line, new_line) = line.split_at(self.cursor.char);
+            let new_line = String::from(new_line);
+            self.content[self.cursor.line] = String::from(replace_line);
+            new_line
+        } else {
+            String::new()
+        };
+        self.content.insert(self.cursor.line + 1, new_line);
+        self.cursor.line += 1;
+        self.cursor.char = 0;
+        self.get_indent();
     }
 
     fn get_indent(&mut self) {
@@ -230,23 +230,32 @@ impl Editor{
             return;
         }
 
-        if let Some(prev_line) = self.content.get(self.cursor.line - 1).cloned() {
-            if let Some(last) = prev_line.trim_end().chars().last() {
-                if INDENT_ENDINGS.contains(last) {
-                    self.indent_start()
-                }
-                if UNIDENT_ENDINGS.contains(last) {
-                    self.unindent()
-                }
-            }
-            if prev_line.starts_with(INDENT_TYPE) {
-                self.indent_start();
+        let prev_line = &self.content[self.cursor.line - 1].clone();
+        let curr_line = &mut self.content[self.cursor.line];
+
+        if let Some(last) = prev_line.trim_end().chars().last() {
+            if INDENT_ENDINGS.contains(last) {
+                curr_line.insert_str(0, INDENT_TYPE)
             }
         }
-        self.cursor.char = self.content[self.cursor.line].len();
+
+        let indent = get_whitespaces_start(prev_line);
+        curr_line.insert_str(0, &indent);
+        self.cursor.char = curr_line.len();
     }
 
     pub fn save(&self) {
         std::fs::write(&self.path, self.content.join("\n")).unwrap();
     }
+}
+
+fn get_whitespaces_start(line: &str) -> String {
+    let mut buffer = String::new();
+    for c in line.chars() {
+        if !c.is_whitespace() {
+            break;
+        }
+        buffer.push(c)
+    }
+    buffer
 }
