@@ -1,9 +1,15 @@
 use std::path::PathBuf;
 
+use tui::{Frame, backend::Backend};
+
+use crate::components::popups::Popup;
+
+
+#[derive(Debug, Clone)]
 pub enum Mode {
     Select,
     Insert,
-    Popup,
+    Popup((Box<Mode>, Popup)),
 }
 
 impl Default for Mode {
@@ -12,9 +18,19 @@ impl Default for Mode {
     }
 }
 
-pub enum Command {
-    Exit,
-    None,
+impl Mode {
+    pub fn popup(self, popup: Popup) -> Self {
+        if matches!(self, Self::Popup((_,_ ))) {
+            return self;
+        }
+        Self::Popup((Box::new(self), popup))
+    }
+
+    pub fn clear_popup(&mut self) {
+        if let Self::Popup((mode, _)) = self {
+            (*self) = *mode.clone();
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone)]

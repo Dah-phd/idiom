@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use crate::{
-    components::{EditorState, Tree},
+    components::{EditorState, Tree, popups::Popup},
     lsp::LSP,
     messages::Mode,
 };
@@ -15,7 +15,7 @@ use tui::{
 const TICK: Duration = Duration::from_millis(250);
 
 pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
-    let mut mode = Mode::Select;
+    let mut mode = Mode::Select; //Mode::Select;
     let mut clock = Instant::now();
     let mut file_tree = Tree::default();
     let mut hide_file_tree = false;
@@ -39,16 +39,13 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                 file_tree.render(frame, screen_areas[0]);
             }
             editor_state.render(frame, screen_areas[1]);
+            if let Mode::Popup((_, popup)) = &mut mode {
+                popup.render(frame);
+            }
         })?;
 
-        match mode {
-            Mode::Insert => {}
-            Mode::Select => {
-                let _ = terminal.hide_cursor();
-            }
-            Mode::Popup => {
-                let _ = terminal.hide_cursor();
-            }
+        if matches!(mode, Mode::Select) {
+            let _ = terminal.hide_cursor();
         }
 
         let timeout = TICK
@@ -72,10 +69,10 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                         panic!("WORKS!")
                     }
                 };
-                if match mode {
+                if match &mut mode {
                     Mode::Insert => editor_state.map(&key),
                     Mode::Select => file_tree.map(&key),
-                    Mode::Popup => true,
+                    Mode::Popup((_, popup)) => popup.map(&key),
                 } {
                     continue;
                 }

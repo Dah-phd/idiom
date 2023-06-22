@@ -99,6 +99,10 @@ impl Tree {
     }
 }
 
+fn create_file(path: &str) {
+    
+}
+
 fn expand(path: PathBuf, expansions: &Vec<PathBuf>) -> Vec<PathBuf> {
     let mut buffer = vec![path.clone()];
     if path.is_dir() && expansions.contains(&path) {
