@@ -3,6 +3,8 @@ mod components;
 mod lsp;
 mod messages;
 mod syntax;
+mod utils;
+
 use app::app;
 
 use tui::backend::CrosstermBackend;

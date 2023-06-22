@@ -1,4 +1,4 @@
-use crate::messages::FileType;
+use crate::{messages::FileType, utils::trim_start_inplace};
 use std::path::PathBuf;
 
 use super::cursor::Cursor;
@@ -62,7 +62,9 @@ impl Editor {
     }
 
     pub fn swap_up(&mut self) {
-        self.cursor.swap_up_line(&mut self.content)
+        self.cursor.swap_up_line(&mut self.content);
+        trim_start_inplace(&mut self.content[self.cursor.line]);
+        self.get_indent()
     }
 
     pub fn down(&mut self) {
@@ -78,7 +80,9 @@ impl Editor {
     }
 
     pub fn swap_down(&mut self) {
-        self.cursor.swap_down_line(&mut self.content)
+        self.cursor.swap_down_line(&mut self.content);
+        trim_start_inplace(&mut self.content[self.cursor.line]);
+        self.get_indent()
     }
 
     pub fn left(&mut self) {
@@ -199,7 +203,7 @@ impl Editor {
         if let Some(line) = self.content.get_mut(self.cursor.line) {
             if line.starts_with(INDENT_TYPE) {
                 line.replace_range(..INDENT_TYPE.len(), "");
-                self.cursor.char -= INDENT_TYPE.len();
+                self.cursor.char = self.cursor.char.checked_sub(INDENT_TYPE.len()).unwrap_or_default();
             }
         }
     }
