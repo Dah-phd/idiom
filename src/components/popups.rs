@@ -1,6 +1,12 @@
 use crossterm::event::KeyEvent;
-use tui::{layout::{Direction, Constraint, Layout, Rect, Alignment}, widgets::{Borders, Block, Clear, Paragraph, Wrap}, style::{Color, Style, Modifier}, Frame, backend::Backend, text::Span};
-
+use tui::{
+    backend::Backend,
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Color, Modifier, Style},
+    text::Span,
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
+    Frame,
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct Popup {
@@ -11,12 +17,12 @@ pub struct Popup {
 
 impl Popup {
     pub fn render(&mut self, frame: &mut Frame<impl Backend>) {
-    let size = frame.size();
+        let size = frame.size();
 
-    let block = Block::default().title("Popup").borders(Borders::ALL);
-    let area = centered_rect(60, 20, size);
-    frame.render_widget(Clear, area); //this clears out the background
-    frame.render_widget(block, area);
+        let block = Block::default().title("Popup").borders(Borders::ALL);
+        let area = centered_rect(60, 20, size);
+        frame.render_widget(Clear, area); //this clears out the background
+        frame.render_widget(block, area);
     }
 
     pub fn map(&mut self, key: &KeyEvent) -> bool {

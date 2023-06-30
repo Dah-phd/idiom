@@ -21,23 +21,17 @@ pub struct Tree {
     pub state: ListState,
     pub tree: Vec<PathBuf>,
     pub on_open_tabs: bool,
+    pub input: Option<String>,
 }
 
 impl Tree {
     pub fn render(&mut self, frame: &mut Frame<impl Backend>, area: Rect) {
-        self.tree.clear();
-        for path in std::fs::read_dir("./").unwrap().flatten() {
-            self.tree.extend(expand(path.path(), &self.expanded))
-        }
+        let mut tree = TreePath::default();
+        tree.expand(&self.expanded);
+        self.tree = tree.flatten();
+        let str_paths: Vec<ListItem<'_>> = self.tree.iter().map(stringify_path).collect();
 
-        let tasks: Vec<ListItem> = self
-            .tree
-            .iter()
-            .flat_map(use_proper_list_names)
-            .map(|path| ListItem::new(vec![Spans::from(Span::raw(path))]))
-            .collect();
-
-        let file_tree = List::new(tasks)
+        let file_tree = List::new(str_paths)
             .block(Block::default().borders(Borders::ALL).title("Explorer"))
             .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
@@ -45,17 +39,32 @@ impl Tree {
     }
 
     pub fn expand_dir_or_get_path(&mut self) -> Option<PathBuf> {
-        if let Some(numba) = self.state.selected() {
-            if let Some(path) = self.tree.get(numba) {
-                if path.is_dir() {
-                    self.expanded.push(path.clone())
-                } else {
-                    return Some(path.clone());
-                }
-            }
+        let path = self.get_path()?;
+        if path.is_dir() {
+            self.expanded.push(path);
+            None
+        } else {
+            Some(path)
         }
-        None
     }
+
+    fn get_path(&mut self) -> Option<PathBuf> {
+        Some(self.tree[self.state.selected()?].clone())
+    }
+
+    pub fn enter_file_name(&mut self) {
+        let path = self.state.selected();
+    }
+
+    pub fn rename(&mut self) -> Option<PathBuf> {
+        let new_name = self.input.take()?;
+        std::fs::rename(self.get_path()?, &new_name).ok()?;
+        Some(PathBuf::from(new_name))
+    }
+
+    fn create_file(&mut self) {}
+
+    fn delete_file(&mut self) {}
 
     pub fn map(&mut self, key: &KeyEvent) -> bool {
         match key.modifiers {
@@ -93,30 +102,101 @@ impl Tree {
                 }
                 _ => return false,
             },
+            KeyModifiers::CONTROL => match key.code {
+                KeyCode::Char('n') | KeyCode::Char('N') => panic!("force quit!"),
+                _ => return false,
+            },
             _ => return false,
         }
         true
     }
 }
 
-fn create_file(path: &str) {
-    
+#[derive(Debug, Clone)]
+pub enum TreePath {
+    Folder { path: PathBuf, tree: Option<Vec<TreePath>> },
+    File(PathBuf),
 }
 
-fn expand(path: PathBuf, expansions: &Vec<PathBuf>) -> Vec<PathBuf> {
-    let mut buffer = vec![path.clone()];
-    if path.is_dir() && expansions.contains(&path) {
-        for nested in std::fs::read_dir(path).unwrap().flatten() {
-            buffer.extend(expand(nested.path(), expansions));
+impl Default for TreePath {
+    fn default() -> Self {
+        let path = PathBuf::from("./");
+        let mut tree = vec![];
+        for path in std::fs::read_dir(&path).unwrap().flatten() {
+            let path = path.path();
+            if path.is_dir() {
+                tree.push(Self::Folder { path, tree: None })
+            } else {
+                tree.push(Self::File(path))
+            }
+        }
+        Self::Folder { path, tree: Some(tree) }
+    }
+}
+
+impl TreePath {
+    fn probe(&mut self) {
+        (*self) = Self::default();
+    }
+
+    fn flatten(self) -> Vec<PathBuf> {
+        let mut buffer = Vec::new();
+        match self {
+            Self::File(path) => buffer.push(path),
+            Self::Folder { path, tree } => {
+                buffer.push(path);
+                if let Some(nester_tree) = tree {
+                    for tree_element in nester_tree {
+                        buffer.extend(tree_element.flatten());
+                    }
+                }
+            }
+        }
+        buffer
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::File(_) => 1,
+            Self::Folder { path, tree } => {
+                let mut len = if path == &PathBuf::from("./") { 0 } else { 1 };
+                if let Some(nested_tree) = tree {
+                    for tree_element in nested_tree {
+                        len += tree_element.len();
+                    }
+                }
+                len
+            }
         }
     }
-    // TODO ordering
-    buffer
+
+    fn expand(&mut self, expanded: &Vec<PathBuf>) {
+        if let Self::Folder { path, tree } = self {
+            if let Some(tree) = tree {
+                for nested in tree {
+                    nested.expand(expanded);
+                }
+            } else if expanded.contains(path) {
+                let mut tree_buffer = vec![];
+                for nested in std::fs::read_dir(path).unwrap().flatten() {
+                    let path = nested.path();
+                    if path.is_dir() {
+                        let mut folder = Self::Folder { path, tree: None };
+                        folder.expand(expanded);
+                        tree_buffer.push(folder)
+                    } else {
+                        tree_buffer.push(Self::File(path))
+                    }
+                }
+                (*tree) = Some(tree_buffer);
+            }
+        }
+    }
 }
 
 #[allow(clippy::ptr_arg)]
-fn use_proper_list_names(current_path: &PathBuf) -> Option<String> {
-    let path_str = &current_path.as_os_str().to_str()?[2..];
+fn stringify_path(current_path: &PathBuf) -> ListItem<'static> {
+    let path_str = &current_path.as_path().display().to_string()[2..];
     let mut buffer = String::new();
     let mut path_split = path_str.split(DIR_SEP).peekable();
     while let Some(path_element) = path_split.next() {
@@ -129,5 +209,5 @@ fn use_proper_list_names(current_path: &PathBuf) -> Option<String> {
     if current_path.is_dir() {
         buffer.push_str("/..");
     }
-    Some(buffer)
+    ListItem::new(buffer)
 }

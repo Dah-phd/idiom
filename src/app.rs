@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use crate::{
-    components::{EditorState, Tree, popups::Popup},
+    components::{popups::Popup, EditorState, Tree},
     lsp::LSP,
     messages::Mode,
 };

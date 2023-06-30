@@ -1,9 +1,8 @@
 use std::path::PathBuf;
 
-use tui::{Frame, backend::Backend};
+use tui::{backend::Backend, Frame};
 
 use crate::components::popups::Popup;
-
 
 #[derive(Debug, Clone)]
 pub enum Mode {
@@ -20,7 +19,7 @@ impl Default for Mode {
 
 impl Mode {
     pub fn popup(self, popup: Popup) -> Self {
-        if matches!(self, Self::Popup((_,_ ))) {
+        if matches!(self, Self::Popup((_, _))) {
             return self;
         }
         Self::Popup((Box::new(self), popup))
