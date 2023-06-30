@@ -31,7 +31,8 @@ impl Tree {
         let mut tree = TreePath::default();
         tree.expand(&self.expanded);
         self.tree = tree.flatten();
-        let str_paths: Vec<ListItem<'_>> = self.tree.iter().map(stringify_path).collect();
+        self.tree.retain(not_expcluded_path);
+        let str_paths: Vec<ListItem<'_>> = self.tree.iter().map(path_to_list_item).collect();
 
         let file_tree = List::new(str_paths)
             .block(Block::default().borders(Borders::ALL).title("Explorer"))
@@ -153,7 +154,6 @@ impl TreePath {
                 }
             }
         }
-        buffer.retain(|path| path != &PathBuf::from("./.git"));
         buffer
     }
 
@@ -184,7 +184,7 @@ impl TreePath {
 }
 
 #[allow(clippy::ptr_arg)]
-fn stringify_path(current_path: &PathBuf) -> ListItem<'static> {
+fn path_to_list_item(current_path: &PathBuf) -> ListItem<'static> {
     let path_str = &current_path.as_path().display().to_string()[2..];
     let mut buffer = String::new();
     let mut path_split = path_str.split(DIR_SEP).peekable();
@@ -211,4 +211,8 @@ fn order_tree_path(left: &TreePath, right: &TreePath) -> Ordering {
         (true, false) => Ordering::Less,
         (false, true) => Ordering::Greater,
     }
+}
+
+fn not_expcluded_path(path: &PathBuf) -> bool {
+    path.is_file() || (path != &PathBuf::from("./.git") && path != &PathBuf::from("./"))
 }
