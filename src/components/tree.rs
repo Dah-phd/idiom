@@ -1,10 +1,12 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use std::path::PathBuf;
+use std::{
+    cmp::{Ord, Ordering},
+    path::PathBuf,
+};
 use tui::{
     backend::Backend,
     layout::Rect,
     style::{Modifier, Style},
-    text::{Span, Spans},
     widgets::{Block, Borders, List, ListItem, ListState},
     Frame,
 };
@@ -121,24 +123,23 @@ pub enum TreePath {
 impl Default for TreePath {
     fn default() -> Self {
         let path = PathBuf::from("./");
-        let mut tree = vec![];
+        let mut tree_buffer = vec![];
         for path in std::fs::read_dir(&path).unwrap().flatten() {
             let path = path.path();
             if path.is_dir() {
-                tree.push(Self::Folder { path, tree: None })
+                tree_buffer.push(Self::Folder { path, tree: None })
             } else {
-                tree.push(Self::File(path))
+                tree_buffer.push(Self::File(path))
             }
         }
-        Self::Folder { path, tree: Some(tree) }
+        Self::Folder {
+            path,
+            tree: Some(tree_buffer),
+        }
     }
 }
 
 impl TreePath {
-    fn probe(&mut self) {
-        (*self) = Self::default();
-    }
-
     fn flatten(self) -> Vec<PathBuf> {
         let mut buffer = Vec::new();
         match self {
@@ -152,27 +153,14 @@ impl TreePath {
                 }
             }
         }
+        buffer.retain(|path| path != &PathBuf::from("./.git"));
         buffer
-    }
-
-    fn len(&self) -> usize {
-        match self {
-            Self::File(_) => 1,
-            Self::Folder { path, tree } => {
-                let mut len = if path == &PathBuf::from("./") { 0 } else { 1 };
-                if let Some(nested_tree) = tree {
-                    for tree_element in nested_tree {
-                        len += tree_element.len();
-                    }
-                }
-                len
-            }
-        }
     }
 
     fn expand(&mut self, expanded: &Vec<PathBuf>) {
         if let Self::Folder { path, tree } = self {
             if let Some(tree) = tree {
+                tree.sort_by(order_tree_path);
                 for nested in tree {
                     nested.expand(expanded);
                 }
@@ -188,6 +176,7 @@ impl TreePath {
                         tree_buffer.push(Self::File(path))
                     }
                 }
+                tree_buffer.sort_by(order_tree_path);
                 (*tree) = Some(tree_buffer);
             }
         }
@@ -210,4 +199,16 @@ fn stringify_path(current_path: &PathBuf) -> ListItem<'static> {
         buffer.push_str("/..");
     }
     ListItem::new(buffer)
+}
+
+fn order_tree_path(left: &TreePath, right: &TreePath) -> Ordering {
+    match (
+        matches!(left, TreePath::Folder { .. }),
+        matches!(right, TreePath::Folder { .. }),
+    ) {
+        (true, true) => Ordering::Equal,
+        (false, false) => Ordering::Equal,
+        (true, false) => Ordering::Less,
+        (false, true) => Ordering::Greater,
+    }
 }
