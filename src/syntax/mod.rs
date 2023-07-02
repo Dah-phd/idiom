@@ -4,11 +4,8 @@ use tui::{
     text::{Span, Spans},
     widgets::ListItem,
 };
-
 use crate::messages::FileType;
-
 use self::theme::Theme;
-
 pub const COLORS: [Color; 3] = [Color::LightMagenta, Color::Yellow, Color::Blue];
 
 #[derive(Debug)]

@@ -2,10 +2,7 @@ mod action;
 mod clipboard;
 mod select;
 use clipboard::Clipboard;
-use crossterm::style::Stylize;
 use select::Select;
-
-const JUPM_BLOCKS: &str = " :.,({";
 
 #[derive(Default, Debug)]
 pub struct Cursor {

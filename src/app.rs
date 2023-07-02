@@ -1,21 +1,28 @@
 use std::time::{Duration, Instant};
 
 use crate::{
-    components::{popups::Popup, EditorState, Tree},
+    components::{
+        popups::{editor_popups::save_all_popup},
+        EditorState, Tree,
+    },
     lsp::LSP,
-    messages::Mode,
+    messages::{Mode, PopupMessage},
 };
-use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyModifiers};
+
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout},
     Terminal,
 };
 
+#[cfg(target_os = "windows")]
+use crossterm::event::KeyEventKind;
+
 const TICK: Duration = Duration::from_millis(250);
 
 pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
-    let mut mode = Mode::Select; //Mode::Select;
+    let mut mode = Mode::Select;
     let mut clock = Instant::now();
     let mut file_tree = Tree::default();
     let mut hide_file_tree = false;
@@ -54,6 +61,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
 
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = crossterm::event::read()? {
+                #[cfg(target_os = "windows")]
                 if matches!(key.kind, KeyEventKind::Release) {
                     continue;
                 }
@@ -62,16 +70,27 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                     KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Char('q') | KeyCode::Char('Q')
                 ) && key.modifiers.contains(KeyModifiers::CONTROL)
                 {
-                    if editor_state.are_updates_saved() {
+                    if editor_state.are_updates_saved() && !matches!(mode, Mode::Popup(..)) {
                         break;
                     } else {
-                        panic!("WORKS!")
+                        mode = mode.popup(save_all_popup())
                     }
                 };
                 if match &mut mode {
                     Mode::Insert => editor_state.map(&key),
                     Mode::Select => file_tree.map(&key),
-                    Mode::Popup((_, popup)) => popup.map(&key),
+                    Mode::Popup((_, popup)) => match popup.map(&key) {
+                        PopupMessage::None => continue,
+                        PopupMessage::Exit => break,
+                        PopupMessage::Done => {
+                            mode.clear_popup();
+                            true
+                        },
+                        PopupMessage::SaveAndExit => {
+                            editor_state.save_all();
+                            break;
+                        }
+                    },
                 } {
                     continue;
                 }

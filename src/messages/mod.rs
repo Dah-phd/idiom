@@ -1,8 +1,8 @@
 use std::path::PathBuf;
-
-use tui::{backend::Backend, Frame};
-
 use crate::components::popups::Popup;
+
+mod popups;
+pub use popups::PopupMessage;
 
 #[derive(Debug, Clone)]
 pub enum Mode {
@@ -44,6 +44,7 @@ pub enum FileType {
 }
 
 impl FileType {
+    #[allow(clippy::ptr_arg)]
     pub fn derive_type(path: &PathBuf) -> Self {
         if let Some(extension_os_str) = path.extension() {
             if let Some(extension) = extension_os_str.to_str() {
@@ -59,24 +60,5 @@ impl FileType {
             };
         };
         Self::Unknown
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Configs {
-    indent: String,
-}
-
-impl Default for Configs {
-    fn default() -> Self {
-        Self {
-            indent: "    ".to_owned(),
-        }
-    }
-}
-
-impl Configs {
-    pub fn get_indent(&self) -> &str {
-        return &self.indent;
     }
 }

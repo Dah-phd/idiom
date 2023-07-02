@@ -129,6 +129,10 @@ impl EditorState {
         true
     }
 
+    pub fn close(&mut self, path: &PathBuf) {
+        self.editors.retain(|editor| !editor.path.starts_with(path) && &editor.path != path)
+    }
+
     pub fn are_updates_saved(&self) -> bool {
         for editor in self.editors.iter() {
             if !editor.is_saved() {
