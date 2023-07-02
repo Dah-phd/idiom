@@ -3,5 +3,5 @@ pub enum PopupMessage {
     Exit,
     SaveAndExit,
     None,
-    Done
+    Done,
 }

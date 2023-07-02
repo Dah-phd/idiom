@@ -1,11 +1,11 @@
 mod theme;
+use self::theme::Theme;
+use crate::messages::FileType;
 use tui::{
     style::{Color, Style},
     text::{Span, Spans},
     widgets::ListItem,
 };
-use crate::messages::FileType;
-use self::theme::Theme;
 pub const COLORS: [Color; 3] = [Color::LightMagenta, Color::Yellow, Color::Blue];
 
 #[derive(Debug)]

@@ -1,8 +1,10 @@
-use crossterm::event::{KeyEvent, KeyCode};
+use crossterm::event::{KeyCode, KeyEvent};
 use tui::{
     backend::Backend,
-    layout::{Constraint, Direction, Layout, Rect},
-    widgets::{Block, Borders, Clear},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Modifier, Style},
+    text::{Span, Spans},
+    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
     Frame,
 };
 
@@ -14,6 +16,7 @@ pub struct Popup {
     pub message: String,
     pub buttons: Vec<Button>,
     pub size: Option<(u16, u16)>,
+    pub state: usize,
 }
 
 impl Popup {
@@ -23,15 +26,63 @@ impl Popup {
         let area = centered_rect(percent_x, percent_y, frame.size());
         frame.render_widget(Clear, area);
         frame.render_widget(block, area);
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .margin(2)
+            .split(area);
+
+        let buttons: Vec<_> = self
+            .buttons
+            .iter()
+            .enumerate()
+            .map(|(idx, button)| {
+                if self.state == idx {
+                    Span::styled(&button.name, Style::default().add_modifier(Modifier::REVERSED))
+                } else {
+                    Span::raw(&button.name)
+                }
+            })
+            .collect();
+
+        let p = Paragraph::new(Span::from(self.message.to_owned())).alignment(Alignment::Center);
+        let options = Paragraph::new(Spans::from(buttons)).alignment(Alignment::Center);
+
+        frame.render_widget(p, chunks[0]);
+        frame.render_widget(options, chunks[1]);
     }
 
     pub fn map(&mut self, key: &KeyEvent) -> PopupMessage {
-        if let Some(button) = self.buttons.iter().find(|button| 
-            matches!(&button.key, Some(key_code) if key_code.contains(&key.code))                    
-        ) {
+        if let Some(button) = self
+            .buttons
+            .iter()
+            .find(|button| matches!(&button.key, Some(key_code) if key_code.contains(&key.code)))
+        {
             return (button.command)();
         }
-        PopupMessage::None
+
+        match key.code {
+            KeyCode::Enter => (self.buttons[self.state].command)(),
+            KeyCode::Left => {
+                if self.state > 0 {
+                    self.state -= 1;
+                } else {
+                    self.state = self.buttons.len() - 1;
+                }
+                PopupMessage::None
+            }
+            KeyCode::Right => {
+                if self.state < self.buttons.len() - 1 {
+                    self.state += 1;
+                } else {
+                    self.state = 0;
+                }
+                PopupMessage::None
+            }
+            KeyCode::Esc => PopupMessage::Done,
+            _ => PopupMessage::None,
+        }
     }
 }
 
@@ -39,14 +90,12 @@ impl Popup {
 pub struct Button {
     pub command: fn() -> PopupMessage,
     pub name: String,
-    pub key: Option<Vec<KeyCode>>
+    pub key: Option<Vec<KeyCode>>,
 }
 
 impl std::fmt::Debug for Button {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("").field(
-            &self.name
-        ).finish()
+        f.debug_tuple("").field(&self.name).finish()
     }
 }
 

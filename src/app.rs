@@ -1,10 +1,7 @@
 use std::time::{Duration, Instant};
 
 use crate::{
-    components::{
-        popups::{editor_popups::save_all_popup},
-        EditorState, Tree,
-    },
+    components::{popups::editor_popups::save_all_popup, EditorState, Tree},
     lsp::LSP,
     messages::{Mode, PopupMessage},
 };
@@ -85,7 +82,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                         PopupMessage::Done => {
                             mode.clear_popup();
                             true
-                        },
+                        }
                         PopupMessage::SaveAndExit => {
                             editor_state.save_all();
                             break;
