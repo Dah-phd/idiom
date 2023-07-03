@@ -1,12 +1,10 @@
-use std::fmt::format;
-
 use crossterm::event::{KeyCode, KeyEvent};
 use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Span, Spans},
-    widgets::{Block, Borders, Clear, Paragraph, Tabs},
+    widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
 
