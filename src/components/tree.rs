@@ -64,12 +64,6 @@ impl Tree {
         Some(())
     }
 
-    pub fn rename(&mut self) -> Option<()> {
-        let new_name = self.input.take()?;
-        std::fs::rename(&self.tree[self.state.selected()?], new_name).ok()?;
-        Some(())
-    }
-
     fn create_new(&mut self) -> Option<PathBuf> {
         let numba = self.state.selected()?;
         let mut new_file = if numba == 0 {

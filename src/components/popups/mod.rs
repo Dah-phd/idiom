@@ -1,10 +1,12 @@
+use std::fmt::format;
+
 use crossterm::event::{KeyCode, KeyEvent};
 use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Span, Spans},
-    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph, Tabs},
     Frame,
 };
 
@@ -29,28 +31,18 @@ impl Popup {
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
             .margin(2)
             .split(area);
 
-        let buttons: Vec<_> = self
-            .buttons
-            .iter()
-            .enumerate()
-            .map(|(idx, button)| {
-                if self.state == idx {
-                    Span::styled(&button.name, Style::default().add_modifier(Modifier::REVERSED))
-                } else {
-                    Span::raw(&button.name)
-                }
-            })
-            .collect();
-
-        let p = Paragraph::new(Span::from(self.message.to_owned())).alignment(Alignment::Center);
-        let options = Paragraph::new(Spans::from(buttons)).alignment(Alignment::Center);
-
-        frame.render_widget(p, chunks[0]);
-        frame.render_widget(options, chunks[1]);
+        frame.render_widget(
+            Paragraph::new(Span::from(self.message.to_owned())).alignment(Alignment::Center),
+            chunks[0],
+        );
+        frame.render_widget(
+            Paragraph::new(Spans::from(self.spans_from_buttons())).alignment(Alignment::Center),
+            chunks[1],
+        );
     }
 
     pub fn map(&mut self, key: &KeyEvent) -> PopupMessage {
@@ -83,6 +75,21 @@ impl Popup {
             KeyCode::Esc => PopupMessage::Done,
             _ => PopupMessage::None,
         }
+    }
+
+    fn spans_from_buttons(&self) -> Vec<Span<'_>> {
+        self.buttons
+            .iter()
+            .enumerate()
+            .map(|(idx, button)| {
+                let padded_name = format!("  {}  ", button.name);
+                if self.state == idx {
+                    Span::styled(padded_name, Style::default().add_modifier(Modifier::REVERSED))
+                } else {
+                    Span::raw(padded_name)
+                }
+            })
+            .collect()
     }
 }
 
