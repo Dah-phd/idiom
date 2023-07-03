@@ -93,7 +93,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                 }
                 match key.modifiers {
                     KeyModifiers::NONE => match key.code {
-                        KeyCode::Right => {
+                        KeyCode::Right | KeyCode::Char('d') | KeyCode::Char('D') => {
                             if let Some(file_path) = file_tree.expand_dir_or_get_path() {
                                 editor_state.new_from(file_path);
                                 if let Some(editor) = editor_state.get_active() {

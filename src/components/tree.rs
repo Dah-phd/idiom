@@ -106,7 +106,7 @@ impl Tree {
                         self.state.select(Some(self.tree.len() - 1))
                     }
                 }
-                KeyCode::Down | KeyCode::Char('d') | KeyCode::Char('D') => {
+                KeyCode::Down | KeyCode::Char('s') | KeyCode::Char('S') => {
                     self.on_open_tabs = false;
                     if let Some(numba) = self.state.selected() {
                         if numba < self.tree.len() - 1 {
@@ -118,7 +118,7 @@ impl Tree {
                         self.state.select(Some(0))
                     }
                 }
-                KeyCode::Left => {
+                KeyCode::Left | KeyCode::Char('a') | KeyCode::Char('A') => {
                     if let Some(numba) = self.state.selected() {
                         if let Some(path) = self.tree.get(numba) {
                             self.expanded.retain(|expanded_path| expanded_path != path)
