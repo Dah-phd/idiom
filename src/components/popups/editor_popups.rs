@@ -4,7 +4,7 @@ use crossterm::event::KeyCode;
 
 pub fn save_all_popup() -> Popup {
     Popup {
-        message: "Not all editors are saved! Press Y/Return to save all N/Esc to exit anyway.".into(),
+        message: "Not all opened editors are saved!".into(),
         state: 0,
         buttons: vec![
             Button {
@@ -14,7 +14,7 @@ pub fn save_all_popup() -> Popup {
             },
             Button {
                 command: || PopupMessage::Exit,
-                name: "Exit (N)".into(),
+                name: "Don't save (N)".into(),
                 key: Some(vec![KeyCode::Char('n'), KeyCode::Char('N')]),
             },
         ],
