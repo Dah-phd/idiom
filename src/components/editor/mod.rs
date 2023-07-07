@@ -108,6 +108,7 @@ impl EditorState {
                     KeyCode::Tab => editor.indent(),
                     KeyCode::Backspace => editor.backspace(),
                     KeyCode::Delete => editor.del(),
+                    KeyCode::F(5) => self.refresh(),
                     _ => return false,
                 },
                 KeyModifiers::SHIFT => match key.code {
@@ -152,6 +153,12 @@ impl EditorState {
     pub fn save_all(&mut self) {
         for editor in self.editors.iter_mut() {
             editor.save()
+        }
+    }
+
+    fn refresh(&mut self) {
+        for editor in self.editors.iter_mut() {
+            editor.configs.refresh()
         }
     }
 }

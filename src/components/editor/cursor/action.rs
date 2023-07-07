@@ -8,6 +8,8 @@ pub struct ActionLogger {
 }
 
 impl ActionLogger {
+    pub fn tick(&mut self) {}
+
     pub fn push(&mut self, action: Action) {
         self.done.push(action)
     }

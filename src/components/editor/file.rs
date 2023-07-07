@@ -1,13 +1,14 @@
-use crate::{messages::FileType, utils::trim_start_inplace};
+use crate::{
+    messages::{EditorConfigs, FileType},
+    utils::trim_start_inplace,
+};
 use std::path::PathBuf;
 
 use super::cursor::Cursor;
 
-const INDENT_ENDINGS: &str = ":({";
-const INDENT_TYPE: &str = "    ";
-
 #[derive(Debug)]
 pub struct Editor {
+    pub configs: EditorConfigs,
     pub cursor: Cursor,
     pub content: Vec<String>,
     pub path: PathBuf,
@@ -18,6 +19,7 @@ impl Editor {
     pub fn from_path(path: PathBuf) -> std::io::Result<Self> {
         let content = std::fs::read_to_string(&path)?;
         Ok(Self {
+            configs: EditorConfigs::default(),
             cursor: Cursor::default(),
             content: content.lines().map(String::from).collect(),
             file_type: FileType::derive_type(&path),
@@ -184,26 +186,30 @@ impl Editor {
 
     pub fn indent(&mut self) {
         if let Some(line) = self.content.get_mut(self.cursor.line) {
-            line.insert_str(self.cursor.char, INDENT_TYPE);
-            self.cursor.char += INDENT_TYPE.len();
+            line.insert_str(self.cursor.char, &self.configs.indent);
+            self.cursor.char += self.configs.indent.len();
         } else {
-            self.content.insert(self.cursor.line, INDENT_TYPE.to_owned());
-            self.cursor.char = INDENT_TYPE.len();
+            self.content.insert(self.cursor.line, self.configs.indent.to_owned());
+            self.cursor.char = self.configs.indent.len();
         }
     }
 
     pub fn indent_start(&mut self) {
         if let Some(line) = self.content.get_mut(self.cursor.line) {
-            line.insert_str(0, INDENT_TYPE);
-            self.cursor.char += INDENT_TYPE.len();
+            line.insert_str(0, &self.configs.indent);
+            self.cursor.char += self.configs.indent.len();
         }
     }
 
     pub fn unindent(&mut self) {
         if let Some(line) = self.content.get_mut(self.cursor.line) {
-            if line.starts_with(INDENT_TYPE) {
-                line.replace_range(..INDENT_TYPE.len(), "");
-                self.cursor.char = self.cursor.char.checked_sub(INDENT_TYPE.len()).unwrap_or_default();
+            if line.starts_with(&self.configs.indent) {
+                line.replace_range(..self.configs.indent.len(), "");
+                self.cursor.char = self
+                    .cursor
+                    .char
+                    .checked_sub(self.configs.indent.len())
+                    .unwrap_or_default();
             }
         }
     }
@@ -241,14 +247,14 @@ impl Editor {
         self.cursor.char = indent.len();
 
         if let Some(last) = prev_line.trim_end().chars().last() {
-            if INDENT_ENDINGS.contains(last) {
+            if self.configs.indent_after.contains(last) {
                 if let Some(first) = curr_line.trim_start().chars().next() {
                     if (last, first) == ('{', '}') || (last, first) == ('(', ')') || (last, first) == ('[', ']') {
                         self.content.insert(self.cursor.line, indent);
                     }
                 }
-                self.content[self.cursor.line].insert_str(0, INDENT_TYPE);
-                self.cursor.char += INDENT_TYPE.len();
+                self.content[self.cursor.line].insert_str(0, &self.configs.indent);
+                self.cursor.char += self.configs.indent.len();
             }
         }
     }

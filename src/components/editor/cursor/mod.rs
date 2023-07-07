@@ -4,8 +4,6 @@ mod select;
 use clipboard::Clipboard;
 use select::Select;
 
-use self::action::{Action, ActionLogger};
-
 #[derive(Default, Debug)]
 pub struct Cursor {
     pub line: usize,
@@ -13,7 +11,6 @@ pub struct Cursor {
     pub max_rows: u16,
     pub at_line: usize,
     pub selected: Select,
-    pub logger: ActionLogger,
     clipboard: Clipboard,
     should_paste_line: bool,
 }
@@ -60,7 +57,6 @@ impl Cursor {
         } else if self.line > 0 {
             let new_line = self.line - 1;
             content.swap(self.line, new_line);
-            // self.logger.push(Action::Swap { from: self.line, to: new_line });
             self.line = new_line;
         }
     }
@@ -106,7 +102,6 @@ impl Cursor {
         if content.len() - 1 > self.line {
             let new_line = self.line + 1;
             content.swap(self.line, new_line);
-            // self.logger.push(Action::Swap { from: self.line, to: new_line });
             self.line = new_line;
         }
     }
