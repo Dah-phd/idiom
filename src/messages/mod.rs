@@ -1,9 +1,11 @@
 use crate::components::popups::Popup;
 use std::path::PathBuf;
 
+mod action_map;
 mod configs;
 mod popups;
-pub use configs::EditorConfigs;
+pub use action_map::EditorAction;
+pub use configs::{EditorConfigs, EditorKeyMap, KeyMap};
 pub use popups::PopupMessage;
 
 #[derive(Debug, Clone)]

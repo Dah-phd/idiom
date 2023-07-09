@@ -1,6 +1,7 @@
 mod cursor;
 mod file;
 
+use crate::messages::{EditorAction, EditorKeyMap};
 use crate::syntax::Lexer;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use file::Editor;
@@ -11,13 +12,21 @@ use tui::text::{Span, Spans};
 use tui::widgets::{List, ListItem, ListState, Tabs};
 use tui::{backend::Backend, Frame};
 
-#[derive(Default)]
 pub struct EditorState {
     pub editors: Vec<Editor>,
     pub state: ListState,
+    key_map: EditorKeyMap,
 }
 
 impl EditorState {
+    pub fn new(key_map: EditorKeyMap) -> Self {
+        Self {
+            editors: Vec::default(),
+            state: ListState::default(),
+            key_map,
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.editors.len()
     }
@@ -81,53 +90,40 @@ impl EditorState {
     }
 
     pub fn map(&mut self, key: &KeyEvent) -> bool {
+        let action = self.key_map.map(key);
         if let Some(editor) = self.get_active() {
-            match key.modifiers {
-                KeyModifiers::CONTROL => match key.code {
-                    KeyCode::Char(c) => match c {
-                        '[' => editor.unindent(),
-                        ']' => editor.indent_start(),
-                        'c' | 'C' => editor.copy(),
-                        'x' | 'X' => editor.cut(),
-                        'v' | 'V' => editor.paste(),
-                        _ => return false,
-                    },
-                    KeyCode::Up => editor.scroll_up(),
-                    KeyCode::Down => editor.scroll_down(),
-                    KeyCode::Left => editor.left_jump(),
-                    KeyCode::Right => editor.right_jump(),
-                    _ => return false,
-                },
-                KeyModifiers::NONE => match key.code {
-                    KeyCode::Char(c) => editor.push(c),
-                    KeyCode::Up => editor.up(),
-                    KeyCode::Down => editor.down(),
-                    KeyCode::Left => editor.left(),
-                    KeyCode::Right => editor.right(),
-                    KeyCode::Enter => editor.new_line(),
-                    KeyCode::Tab => editor.indent(),
-                    KeyCode::Backspace => editor.backspace(),
-                    KeyCode::Delete => editor.del(),
-                    KeyCode::F(5) => self.refresh(),
-                    _ => return false,
-                },
-                KeyModifiers::SHIFT => match key.code {
-                    KeyCode::Char(c) => editor.push(c),
-                    KeyCode::Up => editor.select_up(),
-                    KeyCode::Down => editor.select_down(),
-                    KeyCode::Right => editor.select_right(),
-                    KeyCode::Left => editor.select_left(),
-                    _ => return false,
-                },
-                KeyModifiers::ALT => match key.code {
-                    KeyCode::Up => editor.swap_up(),
-                    KeyCode::Down => editor.swap_down(),
-                    _ => return false,
-                },
-                _ => return false,
+            if let Some(action) = action {
+                match action {
+                    EditorAction::Char(ch) => editor.push(ch),
+                    EditorAction::NewLine => editor.new_line(),
+                    EditorAction::Indent => editor.indent(),
+                    EditorAction::Backspace => editor.backspace(),
+                    EditorAction::Delete => editor.del(),
+                    EditorAction::IndentStart => editor.indent_start(),
+                    EditorAction::Unintent => editor.unindent(),
+                    EditorAction::Up => editor.up(),
+                    EditorAction::Down => editor.down(),
+                    EditorAction::Left => editor.left(),
+                    EditorAction::Right => editor.right(),
+                    EditorAction::SelectUp => editor.select_up(),
+                    EditorAction::SelectDown => editor.select_down(),
+                    EditorAction::SelectLeft => editor.select_left(),
+                    EditorAction::SelectRight => editor.select_right(),
+                    EditorAction::ScrollUp => editor.scroll_up(),
+                    EditorAction::ScrollDown => editor.scroll_down(),
+                    EditorAction::SwapUp => editor.swap_up(),
+                    EditorAction::SwapDown => editor.swap_down(),
+                    EditorAction::JumpLeft => editor.jump_left(),
+                    EditorAction::JumpRight => editor.jump_right(),
+                    EditorAction::Cut => editor.cut(),
+                    EditorAction::Copy => editor.copy(),
+                    EditorAction::Paste => editor.paste(),
+                    EditorAction::Refresh => self.refresh(),
+                }
+                return true;
             }
         }
-        true
+        false
     }
 
     pub fn close(&mut self, path: &PathBuf) {

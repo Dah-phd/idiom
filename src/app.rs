@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use crate::{
     components::{popups::editor_popups::save_all_popup, EditorState, Tree},
     lsp::LSP,
-    messages::{Mode, PopupMessage},
+    messages::{KeyMap, Mode, PopupMessage},
 };
 use crossterm::event::{Event, KeyCode, KeyModifiers};
 
@@ -19,12 +19,15 @@ use crossterm::event::KeyEventKind;
 const TICK: Duration = Duration::from_millis(250);
 
 pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
+    let configs = KeyMap::default();
     let mut mode = Mode::Select;
     let mut clock = Instant::now();
     let mut file_tree = Tree::default();
     let mut hide_file_tree = false;
-    let mut editor_state = EditorState::default();
+    let mut editor_state = EditorState::new(configs.editor_key_map());
     let mut lsp_servers: Vec<LSP> = vec![];
+
+    drop(configs);
 
     loop {
         terminal.draw(|frame| {

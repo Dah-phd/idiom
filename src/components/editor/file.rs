@@ -91,7 +91,7 @@ impl Editor {
         self.cursor.navigate_left_content(&mut self.content)
     }
 
-    pub fn left_jump(&mut self) {
+    pub fn jump_left(&mut self) {
         self.cursor.left_jump(&self.content)
     }
 
@@ -103,7 +103,7 @@ impl Editor {
         self.cursor.navigate_right_content(&mut self.content)
     }
 
-    pub fn right_jump(&mut self) {
+    pub fn jump_right(&mut self) {
         self.cursor.right_jump(&self.content)
     }
 
