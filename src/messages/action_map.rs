@@ -28,6 +28,8 @@ const INSERT: &str = "insert";
 const F: &str = "f";
 const ESC: &str = "esc";
 
+// EDITOR
+
 #[derive(Debug, Clone, Copy)]
 pub enum EditorAction {
     Char(char),
@@ -89,30 +91,30 @@ pub struct EditorUserKeyMap {
 impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
     fn from(val: EditorUserKeyMap) -> Self {
         let mut hash = HashMap::default();
-        hash.insert(parse_key(&val.new_line), EditorAction::NewLine);
-        hash.insert(parse_key(&val.indent), EditorAction::Indent);
-        hash.insert(parse_key(&val.backspace), EditorAction::Backspace);
-        hash.insert(parse_key(&val.delete), EditorAction::Delete);
-        hash.insert(parse_key(&val.indent_start), EditorAction::IndentStart);
-        hash.insert(parse_key(&val.unindent), EditorAction::Unintent);
-        hash.insert(parse_key(&val.up), EditorAction::Up);
-        hash.insert(parse_key(&val.down), EditorAction::Down);
-        hash.insert(parse_key(&val.left), EditorAction::Left);
-        hash.insert(parse_key(&val.right), EditorAction::Right);
-        hash.insert(parse_key(&val.select_up), EditorAction::SelectUp);
-        hash.insert(parse_key(&val.select_down), EditorAction::SelectDown);
-        hash.insert(parse_key(&val.select_left), EditorAction::SelectLeft);
-        hash.insert(parse_key(&val.select_right), EditorAction::SelectRight);
-        hash.insert(parse_key(&val.scroll_up), EditorAction::ScrollUp);
-        hash.insert(parse_key(&val.scroll_down), EditorAction::ScrollDown);
-        hash.insert(parse_key(&val.swap_up), EditorAction::SwapUp);
-        hash.insert(parse_key(&val.swap_down), EditorAction::SwapDown);
-        hash.insert(parse_key(&val.jump_left), EditorAction::JumpLeft);
-        hash.insert(parse_key(&val.jump_right), EditorAction::JumpRight);
-        hash.insert(parse_key(&val.cut), EditorAction::Cut);
-        hash.insert(parse_key(&val.copy), EditorAction::Copy);
-        hash.insert(parse_key(&val.paste), EditorAction::Paste);
-        hash.insert(parse_key(&val.refresh), EditorAction::Refresh);
+        insert_key_event(&mut hash, &val.new_line, EditorAction::NewLine);
+        insert_key_event(&mut hash, &val.indent, EditorAction::Indent);
+        insert_key_event(&mut hash, &val.backspace, EditorAction::Backspace);
+        insert_key_event(&mut hash, &val.delete, EditorAction::Delete);
+        insert_key_event(&mut hash, &val.indent_start, EditorAction::IndentStart);
+        insert_key_event(&mut hash, &val.unindent, EditorAction::Unintent);
+        insert_key_event(&mut hash, &val.up, EditorAction::Up);
+        insert_key_event(&mut hash, &val.down, EditorAction::Down);
+        insert_key_event(&mut hash, &val.left, EditorAction::Left);
+        insert_key_event(&mut hash, &val.right, EditorAction::Right);
+        insert_key_event(&mut hash, &val.select_up, EditorAction::SelectUp);
+        insert_key_event(&mut hash, &val.select_down, EditorAction::SelectDown);
+        insert_key_event(&mut hash, &val.select_left, EditorAction::SelectLeft);
+        insert_key_event(&mut hash, &val.select_right, EditorAction::SelectRight);
+        insert_key_event(&mut hash, &val.scroll_up, EditorAction::ScrollUp);
+        insert_key_event(&mut hash, &val.scroll_down, EditorAction::ScrollDown);
+        insert_key_event(&mut hash, &val.swap_up, EditorAction::SwapUp);
+        insert_key_event(&mut hash, &val.swap_down, EditorAction::SwapDown);
+        insert_key_event(&mut hash, &val.jump_left, EditorAction::JumpLeft);
+        insert_key_event(&mut hash, &val.jump_right, EditorAction::JumpRight);
+        insert_key_event(&mut hash, &val.cut, EditorAction::Cut);
+        insert_key_event(&mut hash, &val.copy, EditorAction::Copy);
+        insert_key_event(&mut hash, &val.paste, EditorAction::Paste);
+        insert_key_event(&mut hash, &val.refresh, EditorAction::Refresh);
         hash
     }
 }
@@ -148,7 +150,11 @@ impl EditorUserKeyMap {
     }
 }
 
+// TREE
+
 pub enum TreeAction {}
+
+// SUPPORT functions
 
 fn parse_key(keys: &str) -> KeyEvent {
     let mut modifier = KeyModifiers::NONE;
@@ -191,4 +197,34 @@ fn parse_key(keys: &str) -> KeyEvent {
 
 fn replace_option<T>(key_code: &mut Option<T>, value: T) {
     key_code.replace(value);
+}
+
+fn split_mod_char_key_event(key: KeyEvent) -> Vec<KeyEvent> {
+    let mut events = vec![key];
+    if key.modifiers != KeyModifiers::NONE {
+        if let KeyCode::Char(ch) = key.code {
+            if ch.is_lowercase() {
+                if let Some(new_ch) = ch.to_lowercase().next() {
+                    if ch != new_ch {
+                        events.push(KeyEvent::new(KeyCode::Char(new_ch), key.modifiers))
+                    }
+                }
+            }
+            if ch.is_uppercase() {
+                if let Some(new_ch) = ch.to_uppercase().next() {
+                    if ch != new_ch {
+                        events.push(KeyEvent::new(KeyCode::Char(new_ch), key.modifiers))
+                    }
+                }
+            }
+        }
+    }
+    events
+}
+
+fn insert_key_event<T: Copy>(hash: &mut HashMap<KeyEvent, T>, serialized_key: &str, action: T) {
+    let key_events = split_mod_char_key_event(parse_key(serialized_key));
+    for key_event in key_events {
+        hash.insert(key_event, action);
+    }
 }
