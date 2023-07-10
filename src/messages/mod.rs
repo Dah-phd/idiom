@@ -4,7 +4,7 @@ use std::path::PathBuf;
 mod action_map;
 mod configs;
 mod popups;
-pub use action_map::EditorAction;
+pub use action_map::{EditorAction, GeneralAction};
 pub use configs::{EditorConfigs, EditorKeyMap, KeyMap};
 pub use popups::PopupMessage;
 

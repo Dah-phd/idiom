@@ -19,7 +19,7 @@ impl Editor {
     pub fn from_path(path: PathBuf) -> std::io::Result<Self> {
         let content = std::fs::read_to_string(&path)?;
         Ok(Self {
-            configs: EditorConfigs::default(),
+            configs: EditorConfigs::new(),
             cursor: Cursor::default(),
             content: content.lines().map(String::from).collect(),
             file_type: FileType::derive_type(&path),

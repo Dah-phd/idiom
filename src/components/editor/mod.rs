@@ -3,7 +3,7 @@ mod file;
 
 use crate::messages::{EditorAction, EditorKeyMap};
 use crate::syntax::Lexer;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::KeyEvent;
 use file::Editor;
 use std::path::PathBuf;
 use tui::layout::{Constraint, Layout, Rect};
@@ -118,12 +118,22 @@ impl EditorState {
                     EditorAction::Cut => editor.cut(),
                     EditorAction::Copy => editor.copy(),
                     EditorAction::Paste => editor.paste(),
-                    EditorAction::Refresh => self.refresh(),
+                    EditorAction::Save => editor.save(),
+                    EditorAction::Close => self.close_active(),
                 }
                 return true;
             }
         }
         false
+    }
+
+    fn close_active(&mut self) {
+        let path = if let Some(editor) = self.get_active() {
+            editor.path.clone()
+        } else {
+            return;
+        };
+        self.close(&path)
     }
 
     pub fn close(&mut self, path: &PathBuf) {
@@ -152,7 +162,7 @@ impl EditorState {
         }
     }
 
-    fn refresh(&mut self) {
+    pub fn refresh(&mut self) {
         for editor in self.editors.iter_mut() {
             editor.configs.refresh()
         }

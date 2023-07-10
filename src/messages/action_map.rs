@@ -23,6 +23,7 @@ const END: &str = "end";
 const PAGEUP: &str = "pageup";
 const PAGEDOWN: &str = "pagedown";
 const TAB: &str = "tab";
+const BACKTAB: &str = "backtab";
 const DELETE: &str = "delete";
 const INSERT: &str = "insert";
 const F: &str = "f";
@@ -56,7 +57,8 @@ pub enum EditorAction {
     Cut,
     Copy,
     Paste,
-    Refresh,
+    Save,
+    Close,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,7 +87,8 @@ pub struct EditorUserKeyMap {
     cut: String,
     copy: String,
     paste: String,
-    refresh: String,
+    save: String,
+    close: String,
 }
 
 impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
@@ -114,52 +117,136 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
         insert_key_event(&mut hash, &val.cut, EditorAction::Cut);
         insert_key_event(&mut hash, &val.copy, EditorAction::Copy);
         insert_key_event(&mut hash, &val.paste, EditorAction::Paste);
-        insert_key_event(&mut hash, &val.refresh, EditorAction::Refresh);
+        insert_key_event(&mut hash, &val.save, EditorAction::Save);
+        insert_key_event(&mut hash, &val.close, EditorAction::Close);
         hash
     }
 }
 
-impl EditorUserKeyMap {
-    pub fn default_configs() -> Self {
+impl Default for EditorUserKeyMap {
+    fn default() -> Self {
         Self {
             new_line: String::from(ENTER),
             indent: String::from(TAB),
             backspace: String::from(BACKSPACE),
             delete: String::from(DELETE),
-            indent_start: format!("{} + {}", CTRL, ']'),
-            unindent: format!("{} + {}", CTRL, '['),
+            indent_start: format!("{} && {}", CTRL, ']'),
+            unindent: format!("{} && {}", SHIFT, TAB),
             up: String::from(UP),
             down: String::from(DOWN),
             left: String::from(LEFT),
             right: String::from(RIGHT),
-            select_up: format!("{} + {}", SHIFT, UP),
-            select_down: format!("{} + {}", SHIFT, DOWN),
-            select_left: format!("{} + {}", SHIFT, LEFT),
-            select_right: format!("{} + {}", SHIFT, RIGHT),
-            scroll_up: format!("{} + {}", CTRL, UP),
-            scroll_down: format!("{} + {}", CTRL, DOWN),
-            swap_up: format!("{} + {}", ALT, UP),
-            swap_down: format!("{} + {}", ALT, DOWN),
-            jump_left: format!("{} + {}", CTRL, LEFT),
-            jump_right: format!("{} + {}", CTRL, RIGHT),
-            cut: format!("{} + {}", CTRL, 'x'),
-            copy: format!("{} + {}", CTRL, 'c'),
-            paste: format!("{} + {}", CTRL, 'v'),
-            refresh: format!("{}{}", F, '5'),
+            select_up: format!("{} && {}", SHIFT, UP),
+            select_down: format!("{} && {}", SHIFT, DOWN),
+            select_left: format!("{} && {}", SHIFT, LEFT),
+            select_right: format!("{} && {}", SHIFT, RIGHT),
+            scroll_up: format!("{} && {}", CTRL, UP),
+            scroll_down: format!("{} && {}", CTRL, DOWN),
+            swap_up: format!("{} && {}", ALT, UP),
+            swap_down: format!("{} && {}", ALT, DOWN),
+            jump_left: format!("{} && {}", CTRL, LEFT),
+            jump_right: format!("{} && {}", CTRL, RIGHT),
+            cut: format!("{} && {}", CTRL, 'x'),
+            copy: format!("{} && {}", CTRL, 'c'),
+            paste: format!("{} && {}", CTRL, 'v'),
+            save: format!("{} && {}", CTRL, 's'),
+            close: format!("{} && {} || {} && {}", CTRL, 'q', CTRL, 'd'),
         }
     }
 }
 
 // TREE
 
-pub enum TreeAction {}
+#[derive(Debug, Clone, Copy)]
+pub enum GeneralAction {
+    Char(char),
+    Up,
+    Down,
+    Shrink,
+    Expand,
+    FinishOrSelect,
+    SaveAll,
+    FileTreeModeOrCancelInput,
+    NewFile,
+    DeleteFile,
+    BackspaceTreeInput,
+    Exit,
+    HideFileTree,
+    NextTab,
+    PreviousTab,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeneralUserKeyMap {
+    up_file_tree: String,
+    down_file_tree: String,
+    shrink_path: String,
+    expand_file_tree_or_open_file: String,
+    finish_or_select: String,
+    save_all: String,
+    file_tree_mod_or_cancel_input: String,
+    new_file: String,
+    delete_file: String,
+    backspace_tree_input: String,
+    exit: String,
+    hide_file_tree: String,
+    next_tab: String,
+    previous_tab: String,
+}
+
+impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
+    fn from(val: GeneralUserKeyMap) -> Self {
+        let mut hash = HashMap::default();
+        insert_key_event(&mut hash, &val.up_file_tree, GeneralAction::Up);
+        insert_key_event(&mut hash, &val.down_file_tree, GeneralAction::Down);
+        insert_key_event(&mut hash, &val.shrink_path, GeneralAction::Shrink);
+        insert_key_event(&mut hash, &val.expand_file_tree_or_open_file, GeneralAction::Expand);
+        insert_key_event(&mut hash, &val.finish_or_select, GeneralAction::FinishOrSelect);
+        insert_key_event(&mut hash, &val.save_all, GeneralAction::SaveAll);
+        insert_key_event(
+            &mut hash,
+            &val.file_tree_mod_or_cancel_input,
+            GeneralAction::FileTreeModeOrCancelInput,
+        );
+        insert_key_event(&mut hash, &val.new_file, GeneralAction::NewFile);
+        insert_key_event(&mut hash, &val.delete_file, GeneralAction::DeleteFile);
+        insert_key_event(&mut hash, &val.backspace_tree_input, GeneralAction::BackspaceTreeInput);
+        insert_key_event(&mut hash, &val.exit, GeneralAction::Exit);
+        insert_key_event(&mut hash, &val.hide_file_tree, GeneralAction::HideFileTree);
+        insert_key_event(&mut hash, &val.next_tab, GeneralAction::NextTab);
+        insert_key_event(&mut hash, &val.previous_tab, GeneralAction::PreviousTab);
+        hash
+    }
+}
+
+impl Default for GeneralUserKeyMap {
+    fn default() -> Self {
+        Self {
+            up_file_tree: format!("{} || {} || {}", UP, 'w', 'W'),
+            down_file_tree: format!("{} || {} || {}", DOWN, 's', 'S'),
+            shrink_path: format!("{} || {} || {}", LEFT, 'a', 'A'),
+            expand_file_tree_or_open_file: format!("{} || {} || {}", RIGHT, 'd', 'D'),
+            finish_or_select: String::from(ENTER),
+            save_all: format!("{} && {}", CTRL, 's'),
+            file_tree_mod_or_cancel_input: String::from(ESC),
+            new_file: format!("{} && {}", CTRL, 'n'),
+            delete_file: format!("{} && {}", SHIFT, DELETE),
+            backspace_tree_input: String::from(BACKSPACE),
+            exit: format!("{} && {} || {} && {}", CTRL, 'd', CTRL, 'q'),
+            hide_file_tree: format!("{} && {}", CTRL, 'e'),
+            next_tab: String::from(TAB),
+            previous_tab: format!("{} && {}", CTRL, TAB),
+        }
+    }
+}
 
 // SUPPORT functions
 
 fn parse_key(keys: &str) -> KeyEvent {
     let mut modifier = KeyModifiers::NONE;
     let mut code = None;
-    for key in keys.split('+') {
+    for key in keys.split("&&") {
         let trimmed = key.trim();
         if trimmed.len() == 1 {
             if let Some(ch) = trimmed.chars().next() {
@@ -192,7 +279,18 @@ fn parse_key(keys: &str) -> KeyEvent {
             _ => {}
         }
     }
-    KeyEvent::new(code.unwrap_or(KeyCode::Null), modifier)
+    let mut key_event = KeyEvent::new(code.unwrap_or(KeyCode::Null), modifier);
+    if key_event.code == KeyCode::BackTab {
+        key_event.modifiers.toggle(KeyModifiers::SHIFT)
+    }
+    if key_event.code == KeyCode::Tab && key_event.modifiers.contains(KeyModifiers::SHIFT) {
+        key_event.code = KeyCode::BackTab
+    }
+    if key_event.code == KeyCode::Char('[') && key_event.modifiers.contains(KeyModifiers::CONTROL) {
+        key_event.code = KeyCode::Esc;
+        key_event.modifiers.remove(KeyModifiers::CONTROL)
+    }
+    key_event
 }
 
 fn replace_option<T>(key_code: &mut Option<T>, value: T) {
@@ -222,9 +320,11 @@ fn split_mod_char_key_event(key: KeyEvent) -> Vec<KeyEvent> {
     events
 }
 
-fn insert_key_event<T: Copy>(hash: &mut HashMap<KeyEvent, T>, serialized_key: &str, action: T) {
-    let key_events = split_mod_char_key_event(parse_key(serialized_key));
-    for key_event in key_events {
-        hash.insert(key_event, action);
+fn insert_key_event<T: Copy>(hash: &mut HashMap<KeyEvent, T>, serialized_keys: &str, action: T) {
+    for serialized_key in serialized_keys.split("||") {
+        let key_events = split_mod_char_key_event(parse_key(serialized_key));
+        for key_event in key_events {
+            hash.insert(key_event, action);
+        }
     }
 }

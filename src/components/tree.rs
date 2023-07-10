@@ -1,4 +1,3 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::{cmp::Ordering, path::PathBuf};
 use tui::{
     backend::Backend,
@@ -7,6 +6,8 @@ use tui::{
     widgets::{Block, Borders, List, ListItem, ListState},
     Frame,
 };
+
+use crate::messages::GeneralAction;
 
 #[cfg(not(target_os = "windows"))]
 const DIR_SEP: char = '/';
@@ -91,97 +92,84 @@ impl Tree {
         .ok()
     }
 
-    fn map_tree(&mut self, key: &KeyEvent) -> bool {
-        match key.modifiers {
-            KeyModifiers::NONE => match key.code {
-                KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
-                    self.on_open_tabs = false;
-                    if let Some(numba) = self.state.selected() {
-                        if numba == 0 {
-                            self.state.select(Some(self.tree.len() - 1))
-                        } else {
-                            self.state.select(Some(numba - 1))
-                        }
-                    } else {
+    fn map_tree(&mut self, action: &GeneralAction) -> bool {
+        match action {
+            GeneralAction::Up => {
+                self.on_open_tabs = false;
+                if let Some(numba) = self.state.selected() {
+                    if numba == 0 {
                         self.state.select(Some(self.tree.len() - 1))
+                    } else {
+                        self.state.select(Some(numba - 1))
                     }
+                } else {
+                    self.state.select(Some(self.tree.len() - 1))
                 }
-                KeyCode::Down | KeyCode::Char('s') | KeyCode::Char('S') => {
-                    self.on_open_tabs = false;
-                    if let Some(numba) = self.state.selected() {
-                        if numba < self.tree.len() - 1 {
-                            self.state.select(Some(numba + 1));
-                        } else {
-                            self.state.select(Some(0))
-                        }
+            }
+            GeneralAction::Down => {
+                self.on_open_tabs = false;
+                if let Some(numba) = self.state.selected() {
+                    if numba < self.tree.len() - 1 {
+                        self.state.select(Some(numba + 1));
                     } else {
                         self.state.select(Some(0))
                     }
+                } else {
+                    self.state.select(Some(0))
                 }
-                KeyCode::Left | KeyCode::Char('a') | KeyCode::Char('A') => {
-                    if let Some(numba) = self.state.selected() {
-                        if let Some(path) = self.tree.get(numba) {
-                            self.expanded.retain(|expanded_path| expanded_path != path)
-                        }
+            }
+            GeneralAction::Shrink => {
+                if let Some(numba) = self.state.selected() {
+                    if let Some(path) = self.tree.get(numba) {
+                        self.expanded.retain(|expanded_path| expanded_path != path)
                     }
                 }
-                _ => return false,
-            },
-            KeyModifiers::CONTROL => match key.code {
-                KeyCode::Char('n') | KeyCode::Char('N') => {
-                    self.input = Some(String::new());
-                    if let Some(numba) = self.state.selected() {
-                        self.state.select(Some(numba + 1));
-                    } else {
-                        self.state.select(Some(0));
-                    }
+            }
+            GeneralAction::NewFile => {
+                self.input = Some(String::new());
+                if let Some(numba) = self.state.selected() {
+                    self.state.select(Some(numba + 1));
+                } else {
+                    self.state.select(Some(0));
                 }
-                _ => return false,
-            },
-            KeyModifiers::SHIFT => match key.code {
-                KeyCode::Delete => {
-                    self.delete_file();
-                }
-                _ => return false,
-            },
+            }
+            GeneralAction::DeleteFile => {
+                self.delete_file();
+            }
             _ => return false,
         }
         true
     }
 
-    fn map_input(&mut self, key: &KeyEvent) -> bool {
+    fn map_input(&mut self, action: &GeneralAction) -> bool {
         if let Some(input) = &mut self.input {
-            match key.modifiers {
-                KeyModifiers::NONE => match key.code {
-                    KeyCode::Char(c) => input.push(c),
-                    KeyCode::Backspace => {
-                        input.pop();
-                    }
-                    KeyCode::Esc => self.input = None,
-                    KeyCode::Enter => {
-                        if let Some(path) = self.create_new() {
-                            if let Some(parent) = path.parent() {
-                                if !self.expanded.contains(&PathBuf::from(parent)) {
-                                    self.expanded.push(parent.into())
-                                }
+            match action {
+                GeneralAction::Char(ch) => input.push(*ch),
+                GeneralAction::BackspaceTreeInput => {
+                    input.pop();
+                }
+                GeneralAction::FileTreeModeOrCancelInput => self.input = None,
+                GeneralAction::FinishOrSelect => {
+                    if let Some(path) = self.create_new() {
+                        if let Some(parent) = path.parent() {
+                            if !self.expanded.contains(&PathBuf::from(parent)) {
+                                self.expanded.push(parent.into())
                             }
-                        };
-                    }
-                    _ => return false,
-                },
+                        }
+                    };
+                }
                 _ => return false,
             }
-            true
-        } else {
-            false
+            return true;
         }
+        false
     }
 
-    pub fn map(&mut self, key: &KeyEvent) -> bool {
+    pub fn map(&mut self, action: &GeneralAction) -> bool {
         if self.input.is_none() {
-            self.map_tree(key)
+            self.map_tree(action)
         } else {
-            self.map_input(key)
+            self.map_input(action)
         }
     }
 }
