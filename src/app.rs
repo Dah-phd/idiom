@@ -26,7 +26,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
     let mut hide_file_tree = false;
     let mut editor_state = EditorState::new(configs.editor_key_map());
     let mut lsp_servers: Vec<LSP> = vec![];
-    let general_key_map = configs.general_key_map();
+    let mut general_key_map = configs.general_key_map();
 
     drop(configs);
 
@@ -126,7 +126,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                     GeneralAction::NextTab => {
                         if let Some(editor_id) = editor_state.state.selected() {
                             file_tree.on_open_tabs = true;
-                            if editor_id >= editor_state.len() - 1 {
+                            if editor_id >= editor_state.editors.len() - 1 {
                                 editor_state.state.select(Some(0))
                             } else {
                                 editor_state.state.select(Some(editor_id + 1))
@@ -140,11 +140,16 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
                         if let Some(editor_id) = editor_state.state.selected() {
                             file_tree.on_open_tabs = true;
                             if editor_id == 0 {
-                                editor_state.state.select(Some(editor_state.len() - 1))
+                                editor_state.state.select(Some(editor_state.editors.len() - 1))
                             } else {
                                 editor_state.state.select(Some(editor_id - 1))
                             }
                         }
+                    }
+                    GeneralAction::RefreshSettings => {
+                        let new_key_map = KeyMap::new();
+                        general_key_map = new_key_map.general_key_map();
+                        editor_state.refresh_cfg(new_key_map.editor_key_map());
                     }
                     _ => {}
                 }

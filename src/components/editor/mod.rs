@@ -27,10 +27,6 @@ impl EditorState {
         }
     }
 
-    pub fn len(&self) -> usize {
-        self.editors.len()
-    }
-
     pub fn render(&mut self, frame: &mut Frame<impl Backend>, area: Rect) {
         let layout = Layout::default()
             .constraints(vec![Constraint::Percentage(4), Constraint::Min(2)])
@@ -162,7 +158,8 @@ impl EditorState {
         }
     }
 
-    pub fn refresh(&mut self) {
+    pub fn refresh_cfg(&mut self, new_key_map: EditorKeyMap) {
+        self.key_map = new_key_map;
         for editor in self.editors.iter_mut() {
             editor.configs.refresh()
         }

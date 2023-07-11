@@ -218,6 +218,7 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
         insert_key_event(&mut hash, &val.hide_file_tree, GeneralAction::HideFileTree);
         insert_key_event(&mut hash, &val.next_tab, GeneralAction::NextTab);
         insert_key_event(&mut hash, &val.previous_tab, GeneralAction::PreviousTab);
+        insert_key_event(&mut hash, &val.refresh_settings, GeneralAction::RefreshSettings);
         hash
     }
 }
