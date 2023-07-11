@@ -278,7 +278,7 @@ impl Cursor {
 
     pub fn remove(&mut self, content: &mut Vec<String>) -> String {
         if let Some((from, to)) = self.selected.get() {
-            let data = if from.0 == to.0 {
+            let clip = if from.0 == to.0 {
                 self.char = from.1;
                 let data = content.remove(from.0);
                 let mut payload = String::new();
@@ -287,18 +287,19 @@ impl Cursor {
                 content.insert(from.0, payload);
                 data[from.1..to.1].to_owned()
             } else {
+                let (remaining, clipped) = content[from.0].split_at(from.1);
+                let mut clip_vec = vec![clipped.to_owned()];
+                content[from.0] = remaining.to_owned();
                 let mut last_line = to.0;
-                let mut clip_vec = Vec::new();
-                clip_vec.push(content.remove(from.0)[from.1..].to_owned());
                 while from.0 < last_line {
                     last_line -= 1;
                     if from.0 == last_line {
-                        if let Some(last_line) = content.get_mut(from.0) {
-                            clip_vec.push(last_line[..to.1].to_owned());
-                            (*last_line) = String::from(&last_line[to.1..]);
-                        }
+                        let final_clip = content.remove(from.0 + 1);
+                        let (clipped, remaining) = final_clip.split_at(to.1);
+                        content[from.0].push_str(remaining);
+                        clip_vec.push(clipped.to_owned())
                     } else {
-                        clip_vec.push(content.remove(from.0))
+                        clip_vec.push(content.remove(from.0 + 1))
                     }
                 }
                 self.line = from.0;
@@ -306,17 +307,17 @@ impl Cursor {
                 clip_vec.join("\n")
             };
             self.selected.drop();
-            data
+            clip
         } else {
-            let mut line = content.remove(self.line);
-            line.push('\n');
+            let mut clip = content.remove(self.line);
+            clip.push('\n');
             if self.line >= content.len() {
                 self.line -= 1;
                 self.char = content[self.line].len() - 1;
             } else {
                 self.char = 0;
             }
-            line
+            clip
         }
     }
 

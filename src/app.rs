@@ -5,7 +5,7 @@ use crate::{
     lsp::LSP,
     messages::{GeneralAction, KeyMap, Mode, PopupMessage},
 };
-use crossterm::event::{Event, KeyCode, KeyModifiers};
+use crossterm::event::Event;
 
 use tui::{
     backend::Backend,
@@ -62,21 +62,6 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
 
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = crossterm::event::read()? {
-                #[cfg(target_os = "windows")]
-                if matches!(key.kind, KeyEventKind::Release) {
-                    continue;
-                }
-                if matches!(
-                    key.code,
-                    KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Char('q') | KeyCode::Char('Q')
-                ) && key.modifiers.contains(KeyModifiers::CONTROL)
-                {
-                    if editor_state.are_updates_saved() && !matches!(mode, Mode::Popup(..)) {
-                        break;
-                    } else {
-                        mode = mode.popup(save_all_popup())
-                    }
-                };
                 if matches!(mode, Mode::Insert) && editor_state.map(&key) {
                     continue;
                 }

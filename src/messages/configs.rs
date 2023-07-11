@@ -131,27 +131,6 @@ impl KeyMap {
     }
 }
 
-// fn setup_config<T: Deserialize<'de> + Serialize + Default>(path: &str) -> T {
-//     if let Some(config_json) = read_config_file(path) {
-//         match serde_json::from_slice::<T>(&config_json) {
-//             Ok(configs) => configs,
-//             Err(error) => {
-//                 match error.classify() {
-//                     Category::Data => {}
-//                     Category::Eof => {}
-//                     Category::Io => {}
-//                     Category::Syntax => {}
-//                 };
-//                 write_config_file(KEY_MAP, &T::default());
-//                 T::default()
-//             }
-//         }
-//     } else {
-//         write_config_file(KEY_MAP, &T::default());
-//         T::default()
-//     }
-// }
-
 fn read_config_file(path: &str) -> Option<Vec<u8>> {
     let mut config_file = config_dir()?;
     config_file.push(CONFIG_FOLDER);

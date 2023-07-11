@@ -174,6 +174,7 @@ pub enum GeneralAction {
     HideFileTree,
     NextTab,
     PreviousTab,
+    RefreshSettings,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -193,6 +194,7 @@ pub struct GeneralUserKeyMap {
     hide_file_tree: String,
     next_tab: String,
     previous_tab: String,
+    refresh_settings: String,
 }
 
 impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
@@ -237,6 +239,7 @@ impl Default for GeneralUserKeyMap {
             hide_file_tree: format!("{} && {}", CTRL, 'e'),
             next_tab: String::from(TAB),
             previous_tab: format!("{} && {}", CTRL, TAB),
+            refresh_settings: format!("{}5", F),
         }
     }
 }
@@ -270,6 +273,7 @@ fn parse_key(keys: &str) -> KeyEvent {
             DELETE => replace_option(&mut code, KeyCode::Delete),
             INSERT => replace_option(&mut code, KeyCode::Insert),
             ESC => replace_option(&mut code, KeyCode::Esc),
+            BACKTAB => replace_option(&mut code, KeyCode::BackTab),
             SHIFT => modifier.toggle(KeyModifiers::SHIFT),
             CTRL => modifier.toggle(KeyModifiers::CONTROL),
             ALT => modifier.toggle(KeyModifiers::ALT),
@@ -277,6 +281,14 @@ fn parse_key(keys: &str) -> KeyEvent {
             HYPER => modifier.toggle(KeyModifiers::HYPER),
             SUPER => modifier.toggle(KeyModifiers::SUPER),
             _ => {}
+        }
+        if trimmed_case_indif.starts_with(F) {
+            let (_, serialized_value) = trimmed_case_indif.split_at(1);
+            if let Ok(f_value) = serialized_value.parse::<u8>() {
+                if f_value <= 12 {
+                    replace_option(&mut code, KeyCode::F(f_value))
+                }
+            }
         }
     }
     let mut key_event = KeyEvent::new(code.unwrap_or(KeyCode::Null), modifier);
@@ -293,8 +305,8 @@ fn parse_key(keys: &str) -> KeyEvent {
     key_event
 }
 
-fn replace_option<T>(key_code: &mut Option<T>, value: T) {
-    key_code.replace(value);
+fn replace_option<T>(code: &mut Option<T>, value: T) {
+    code.replace(value);
 }
 
 fn split_mod_char_key_event(key: KeyEvent) -> Vec<KeyEvent> {
@@ -320,8 +332,8 @@ fn split_mod_char_key_event(key: KeyEvent) -> Vec<KeyEvent> {
     events
 }
 
-fn insert_key_event<T: Copy>(hash: &mut HashMap<KeyEvent, T>, serialized_keys: &str, action: T) {
-    for serialized_key in serialized_keys.split("||") {
+fn insert_key_event<T: Copy>(hash: &mut HashMap<KeyEvent, T>, se_keys: &str, action: T) {
+    for serialized_key in se_keys.split("||") {
         let key_events = split_mod_char_key_event(parse_key(serialized_key));
         for key_event in key_events {
             hash.insert(key_event, action);
