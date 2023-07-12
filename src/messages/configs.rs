@@ -2,8 +2,10 @@ use std::collections::HashMap;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use dirs::config_dir;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::error::Category;
+
+use crate::syntax::DEFAULT_THEME_FILE;
 
 use super::action_map::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap};
 
@@ -17,6 +19,7 @@ pub struct EditorConfigs {
     pub indent: String,
     pub indent_after: String,
     pub format_on_save: bool,
+    pub theme_file_in_config_dir: String,
 }
 
 impl Default for EditorConfigs {
@@ -25,30 +28,14 @@ impl Default for EditorConfigs {
             indent: "    ".to_owned(),
             indent_after: ":({".to_owned(),
             format_on_save: true,
+            theme_file_in_config_dir: String::from(DEFAULT_THEME_FILE),
         }
     }
 }
 
 impl EditorConfigs {
     pub fn new() -> Self {
-        if let Some(config_json) = read_config_file(EDITOR_CONFIGS) {
-            match serde_json::from_slice::<EditorConfigs>(&config_json) {
-                Ok(configs) => configs,
-                Err(error) => {
-                    match error.classify() {
-                        Category::Data => {}
-                        Category::Eof => {}
-                        Category::Io => {}
-                        Category::Syntax => {}
-                    };
-                    write_config_file(EDITOR_CONFIGS, &Self::default());
-                    Self::default()
-                }
-            }
-        } else {
-            write_config_file(EDITOR_CONFIGS, &Self::default());
-            Self::default()
-        }
+        load_or_create_config(EDITOR_CONFIGS)
     }
 }
 
@@ -98,24 +85,7 @@ pub struct KeyMap {
 
 impl KeyMap {
     pub fn new() -> Self {
-        if let Some(config_json) = read_config_file(KEY_MAP) {
-            match serde_json::from_slice::<Self>(&config_json) {
-                Ok(configs) => configs,
-                Err(error) => {
-                    match error.classify() {
-                        Category::Data => {}
-                        Category::Eof => {}
-                        Category::Io => {}
-                        Category::Syntax => {}
-                    };
-                    write_config_file(KEY_MAP, &Self::default());
-                    Self::default()
-                }
-            }
-        } else {
-            write_config_file(KEY_MAP, &Self::default());
-            Self::default()
-        }
+        load_or_create_config(KEY_MAP)
     }
 
     pub fn editor_key_map(&self) -> EditorKeyMap {
@@ -128,6 +98,27 @@ impl KeyMap {
         GeneralKeyMap {
             key_map: self.general_key_map.clone().into(),
         }
+    }
+}
+
+pub fn load_or_create_config<T: Default + DeserializeOwned + Serialize>(path: &str) -> T {
+    if let Some(config_json) = read_config_file(path) {
+        match serde_json::from_slice::<T>(&config_json) {
+            Ok(configs) => configs,
+            Err(error) => {
+                match error.classify() {
+                    Category::Data => {}
+                    Category::Eof => {}
+                    Category::Io => {}
+                    Category::Syntax => {}
+                };
+                write_config_file(path, &T::default());
+                T::default()
+            }
+        }
+    } else {
+        write_config_file(path, &T::default());
+        T::default()
     }
 }
 

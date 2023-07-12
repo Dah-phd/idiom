@@ -1,5 +1,5 @@
 mod theme;
-use self::theme::Theme;
+pub use self::theme::{Theme, DEFAULT_THEME_FILE};
 use crate::messages::FileType;
 use tui::{
     style::{Color, Style},
@@ -10,7 +10,8 @@ pub const COLORS: [Color; 3] = [Color::LightMagenta, Color::Yellow, Color::Blue]
 
 #[derive(Debug)]
 pub struct Lexer {
-    select: Option<((usize, usize), (usize, usize))>,
+    pub select: Option<((usize, usize), (usize, usize))>,
+    pub theme: Theme,
     token_start: usize,
     select_at_line: Option<(usize, usize)>,
     curly: Vec<Color>,
@@ -19,7 +20,6 @@ pub struct Lexer {
     last_token: String,
     key_words: Vec<&'static str>,
     last_key_words: Vec<String>,
-    theme: Theme,
     max_digits: usize,
 }
 
@@ -42,10 +42,26 @@ impl Default for Lexer {
 }
 
 impl Lexer {
-    pub fn from_type(file_type: &FileType) -> Self {
+    pub fn new(theme: Theme) -> Self {
+        Self {
+            key_words: vec!["pub", "fn", "struct", "use", "mod", "let", "self", "mut", "crate"],
+            select_at_line: None,
+            curly: vec![],
+            brackets: vec![],
+            square: vec![],
+            last_token: String::default(),
+            token_start: 0,
+            last_key_words: vec![],
+            theme,
+            select: None,
+            max_digits: 0,
+        }
+    }
+
+    pub fn from_type(file_type: &FileType, theme: Theme) -> Self {
         #[allow(clippy::match_single_binding)]
         match file_type {
-            _ => Self::default(),
+            _ => Self::new(theme),
         }
     }
 
@@ -104,7 +120,7 @@ impl Lexer {
                 }
                 ':' => {
                     if matches!(char_steam.peek(), Some((_, next_ch)) if next_ch == &':') {
-                        self.drain_buf_colored(token_end, self.theme.class, spans);
+                        self.drain_buf_colored(token_end, self.theme.class_or_struct, spans);
                         self.white_char(token_end, ch, spans);
                     } else {
                         self.drain_buf(token_end, spans);
@@ -113,10 +129,10 @@ impl Lexer {
                 }
                 '!' => {
                     self.last_token.push(ch);
-                    self.drain_buf_colored(token_end, self.theme.kword, spans);
+                    self.drain_buf_colored(token_end, self.theme.key_words, spans);
                 }
                 '(' => {
-                    self.drain_buf_colored(token_end, self.theme.function, spans);
+                    self.drain_buf_colored(token_end, self.theme.functions, spans);
                     let color = len_to_color(Some(self.brackets.len()));
                     self.last_token.push(ch);
                     self.brackets.push(color);
@@ -171,18 +187,10 @@ impl Lexer {
         }
     }
 
-    pub fn select(&mut self, range: (&(usize, usize), &(usize, usize))) {
-        self.select = Some((*range.0, *range.1))
-    }
-
-    pub fn set_theme(&mut self, theme: Theme) {
-        self.theme = theme
-    }
-
     fn handled_key_word(&mut self, token_end: usize, spans: &mut Vec<Span>) -> bool {
         if self.key_words.contains(&self.last_token.trim()) {
             self.last_key_words.push(self.last_token.to_owned());
-            self.drain_with_select(token_end, self.theme.kword, spans);
+            self.drain_with_select(token_end, self.theme.key_words, spans);
             return true;
         }
         false
@@ -191,7 +199,7 @@ impl Lexer {
     fn handled_object(&mut self, token_end: usize, spans: &mut Vec<Span>) -> bool {
         if let Some(ch) = self.last_token.trim().chars().next() {
             if ch.is_uppercase() {
-                self.drain_with_select(token_end, self.theme.class, spans);
+                self.drain_with_select(token_end, self.theme.class_or_struct, spans);
                 return true;
             }
         }
@@ -246,7 +254,7 @@ impl Lexer {
 
     fn drain_buf_object(&mut self, token_end: usize, spans: &mut Vec<Span>) {
         if !self.handled_key_word(token_end, spans) {
-            self.drain_with_select(token_end, self.theme.class, spans)
+            self.drain_with_select(token_end, self.theme.class_or_struct, spans)
         }
     }
 

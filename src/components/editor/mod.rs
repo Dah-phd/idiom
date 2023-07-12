@@ -1,20 +1,20 @@
 mod cursor;
 mod file;
 
-use crate::messages::{EditorAction, EditorKeyMap};
-use crate::syntax::Lexer;
+use crate::messages::{EditorAction, EditorConfigs, EditorKeyMap};
 use crossterm::event::KeyEvent;
 use file::Editor;
 use std::path::PathBuf;
 use tui::layout::{Constraint, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::text::{Span, Spans};
-use tui::widgets::{List, ListItem, ListState, Tabs};
+use tui::widgets::{ListState, Tabs};
 use tui::{backend::Backend, Frame};
 
 pub struct EditorState {
     pub editors: Vec<Editor>,
     pub state: ListState,
+    base_config: EditorConfigs,
     key_map: EditorKeyMap,
 }
 
@@ -23,6 +23,7 @@ impl EditorState {
         Self {
             editors: Vec::default(),
             state: ListState::default(),
+            base_config: EditorConfigs::new(),
             key_map,
         }
     }
@@ -34,22 +35,12 @@ impl EditorState {
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get_mut(editor_id) {
                 file.cursor.max_rows = layout[1].bottom();
-                let mut linter = Lexer::from_type(&file.file_type);
-                if let Some(range) = file.cursor.selected.get() {
-                    linter.select(range);
-                }
-                let max_digits = linter.line_number_max_digits(&file.content);
-                let editor_content = List::new(
-                    file.content[file.cursor.at_line..]
-                        .iter()
-                        .enumerate()
-                        .map(|(idx, code_line)| linter.syntax_spans(idx + file.cursor.at_line, code_line))
-                        .collect::<Vec<ListItem>>(),
-                );
-
+                let cursor_x_offset = 1 + file.cursor.char;
+                let cursor_y_offset = file.cursor.line - file.cursor.at_line;
+                let (digits_offset, editor_content) = file.get_list_widget();
                 frame.set_cursor(
-                    layout[1].x + 1 + (file.cursor.char + max_digits) as u16,
-                    layout[1].y + (file.cursor.line - file.cursor.at_line) as u16,
+                    layout[1].x + (cursor_x_offset + digits_offset) as u16,
+                    layout[1].y + cursor_y_offset as u16,
                 );
 
                 frame.render_widget(editor_content, layout[1]);
@@ -79,7 +70,7 @@ impl EditorState {
                 return;
             }
         }
-        if let Ok(opened_file) = Editor::from_path(file_path) {
+        if let Ok(opened_file) = Editor::from_path(file_path, self.base_config.clone()) {
             self.state.select(Some(self.editors.len()));
             self.editors.push(opened_file);
         }
@@ -160,8 +151,9 @@ impl EditorState {
 
     pub fn refresh_cfg(&mut self, new_key_map: EditorKeyMap) {
         self.key_map = new_key_map;
+        self.base_config.refresh();
         for editor in self.editors.iter_mut() {
-            editor.configs.refresh()
+            editor.refresh_cfg(&self.base_config)
         }
     }
 }

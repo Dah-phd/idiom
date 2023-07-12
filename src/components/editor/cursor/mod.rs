@@ -208,44 +208,48 @@ impl Cursor {
         self.selected.push(self.line, self.char);
     }
 
-    pub fn paste(&mut self, content: &mut Vec<String>) {
-        if let Some(clip) = self.clipboard.get() {
-            let mut lines: Vec<_> = clip.split('\n').collect();
-            if lines.is_empty() {
-                return;
-            }
-            if self.should_paste_line && lines.len() == 2 && lines[1].is_empty() {
-                content.insert(self.line, lines[0].into())
-            } else if lines.len() == 1 {
-                let text = lines[0];
-                content[self.line].insert_str(self.char, lines[0]);
-                self.char += text.len();
+    fn insert_clip(&mut self, clip: String, content: &mut Vec<String>) {
+        let mut lines: Vec<_> = clip.split('\n').collect();
+        if lines.is_empty() {
+            return;
+        }
+        if self.should_paste_line && lines.len() == 2 && lines[1].is_empty() {
+            content.insert(self.line, lines[0].into())
+        } else if lines.len() == 1 {
+            let text = lines[0];
+            content[self.line].insert_str(self.char, lines[0]);
+            self.char += text.len();
+        } else {
+            let line = content.remove(self.line);
+            let (prefix, suffix) = line.split_at(self.char);
+            let mut first_line = prefix.to_owned();
+            if lines.len() == 1 {
+                first_line.push_str(lines[0]);
+                content.insert(self.line, first_line);
+                content.insert(self.line + 1, suffix.to_owned());
             } else {
-                let line = content.remove(self.line);
-                let (prefix, suffix) = line.split_at(self.char);
-                let mut first_line = prefix.to_owned();
-                if lines.len() == 1 {
-                    first_line.push_str(lines[0]);
-                    content.insert(self.line, first_line);
-                    content.insert(self.line + 1, suffix.to_owned());
-                } else {
-                    first_line.push_str(lines.remove(0));
-                    content.insert(self.line, first_line);
-                    let last_idx = lines.len() - 1;
-                    for (idx, select) in lines.iter().enumerate() {
-                        let next_line = if idx == last_idx {
-                            let mut last_line = select.to_string();
-                            self.char = last_line.len();
-                            last_line.push_str(suffix);
-                            last_line
-                        } else {
-                            select.to_string()
-                        };
-                        content.insert(self.line + 1, next_line);
-                        self.down(content);
-                    }
+                first_line.push_str(lines.remove(0));
+                content.insert(self.line, first_line);
+                let last_idx = lines.len() - 1;
+                for (idx, select) in lines.iter().enumerate() {
+                    let next_line = if idx == last_idx {
+                        let mut last_line = select.to_string();
+                        self.char = last_line.len();
+                        last_line.push_str(suffix);
+                        last_line
+                    } else {
+                        select.to_string()
+                    };
+                    content.insert(self.line + 1, next_line);
+                    self.down(content);
                 }
             }
+        }
+    }
+
+    pub fn paste(&mut self, content: &mut Vec<String>) {
+        if let Some(clip) = self.clipboard.get() {
+            self.insert_clip(clip, content)
         }
     }
 
@@ -281,15 +285,12 @@ impl Cursor {
             let clip = if from.0 == to.0 {
                 self.char = from.1;
                 let data = content.remove(from.0);
-                let mut payload = String::new();
-                payload.push_str(&data[..from.1]);
+                let mut payload = String::from(&data[..from.1]);
                 payload.push_str(&data[to.1..]);
                 content.insert(from.0, payload);
                 data[from.1..to.1].to_owned()
             } else {
-                let (remaining, clipped) = content[from.0].split_at(from.1);
-                let mut clip_vec = vec![clipped.to_owned()];
-                content[from.0] = remaining.to_owned();
+                let mut clip_vec = vec![content[from.0].split_off(from.1)];
                 let mut last_line = to.0;
                 while from.0 < last_line {
                     last_line -= 1;

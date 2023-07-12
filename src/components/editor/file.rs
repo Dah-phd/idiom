@@ -1,5 +1,8 @@
+use tui::widgets::{List, ListItem};
+
 use crate::{
     messages::{EditorConfigs, FileType},
+    syntax::{Lexer, Theme},
     utils::trim_start_inplace,
 };
 use std::path::PathBuf;
@@ -8,6 +11,7 @@ use super::cursor::Cursor;
 
 #[derive(Debug)]
 pub struct Editor {
+    pub linter: Lexer,
     pub configs: EditorConfigs,
     pub cursor: Cursor,
     pub content: Vec<String>,
@@ -16,15 +20,30 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn from_path(path: PathBuf) -> std::io::Result<Self> {
+    pub fn from_path(path: PathBuf, configs: EditorConfigs) -> std::io::Result<Self> {
         let content = std::fs::read_to_string(&path)?;
+        let file_type = FileType::derive_type(&path);
         Ok(Self {
-            configs: EditorConfigs::new(),
+            linter: Lexer::from_type(&file_type, Theme::from(&configs.theme_file_in_config_dir)),
+            configs,
             cursor: Cursor::default(),
             content: content.lines().map(String::from).collect(),
-            file_type: FileType::derive_type(&path),
+            file_type,
             path,
         })
+    }
+
+    pub fn get_list_widget(&mut self) -> (usize, List<'_>) {
+        self.linter.select = self.cursor.selected.get().map(|(x, y)| (*x, *y));
+        let max_digits = self.linter.line_number_max_digits(&self.content);
+        let editor_content = List::new(
+            self.content[self.cursor.at_line..]
+                .iter()
+                .enumerate()
+                .map(|(idx, code_line)| self.linter.syntax_spans(idx + self.cursor.at_line, code_line))
+                .collect::<Vec<ListItem>>(),
+        );
+        (max_digits, editor_content)
     }
 
     pub fn is_saved(&self) -> bool {
@@ -261,5 +280,10 @@ impl Editor {
 
     pub fn save(&self) {
         std::fs::write(&self.path, self.content.join("\n")).unwrap();
+    }
+
+    pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {
+        self.configs = new_cfg.clone();
+        self.linter.theme = Theme::from(&self.configs.theme_file_in_config_dir);
     }
 }

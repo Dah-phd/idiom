@@ -5,7 +5,7 @@ mod action_map;
 mod configs;
 mod popups;
 pub use action_map::{EditorAction, GeneralAction};
-pub use configs::{EditorConfigs, EditorKeyMap, KeyMap};
+pub use configs::{load_or_create_config, EditorConfigs, EditorKeyMap, KeyMap};
 pub use popups::PopupMessage;
 
 #[derive(Debug, Clone)]
