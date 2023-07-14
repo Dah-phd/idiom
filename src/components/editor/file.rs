@@ -153,33 +153,22 @@ impl Editor {
             let _returned_for_action_log = self.cursor.remove(&mut self.content);
             return;
         }
-        // TODO needs work
         if self.cursor.line != 0 {
-            let previous = self.content.get(self.cursor.line - 1).cloned();
-            let current = self.content.get_mut(self.cursor.line);
-            if let Some(line) = current {
-                let (frist, second) = line.split_at(self.cursor.char);
-                if frist.is_empty() {
-                    if let Some(previous) = previous {
-                        let prev_len = previous.len();
-                        (*line) = format!("{}{}", previous, second);
-                        self.cursor.line -= 1;
-                        self.content.remove(self.cursor.line);
-                        self.cursor.char = prev_len;
-                        return;
-                    }
-                } else {
-                    (*line) = format!("{}{}", &frist[..frist.len() - 1], second)
-                }
+            if self.cursor.char == 0 {
+                let current_line = self.content.remove(self.cursor.line);
+                self.cursor.line -= 1;
+                let prev_line = &mut self.content[self.cursor.line];
+                self.cursor.char = prev_line.len();
+                prev_line.push_str(&current_line);
+            } else {
+                let _returned_for_action_log = self.content[self.cursor.line].remove(self.cursor.char - 1);
+                self.cursor.char -= 1;
             }
         } else if let Some(line) = self.content.get_mut(self.cursor.line) {
-            let (first, second) = line.split_at(self.cursor.char);
-            if !first.is_empty() {
-                (*line) = format!("{}{}", &first[..first.len() - 1], second);
-            };
-        }
-        if self.cursor.char != 0 {
-            self.cursor.char -= 1;
+            if self.cursor.char != 0 {
+                let _returned_for_action_log = line.remove(self.cursor.char - 1);
+                self.cursor.char -= 1;
+            }
         }
     }
 
@@ -191,14 +180,13 @@ impl Editor {
         // TODO needs work
         let next_line = self.content.get(self.cursor.line + 1).cloned();
         if let Some(line) = self.content.get_mut(self.cursor.line) {
-            let (first, second) = line.split_at(self.cursor.char);
-            if second.is_empty() {
+            if line.len() == self.cursor.char {
                 if let Some(new_content) = next_line {
                     line.push_str(new_content.as_str());
                     self.content.remove(self.cursor.line + 1);
                 }
             } else {
-                (*line) = format!("{}{}", first, &second[1..]);
+                let _returned_for_action_log = line.remove(self.cursor.char);
             }
         }
     }
