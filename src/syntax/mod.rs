@@ -74,6 +74,14 @@ impl Lexer {
         self.max_digits
     }
 
+    pub fn reset(&mut self, select: Option<(&(usize, usize), &(usize, usize))>) {
+        self.curly.clear();
+        self.brackets.clear();
+        self.square.clear();
+        self.last_key_words.clear();
+        self.select = select.map(|(x, y)| (*x, *y))
+    }
+
     fn set_select_char_range(&mut self, at_line: usize, max_len: usize) {
         if let Some(((from_line, from_char), (to_line, to_char))) = self.select {
             if from_line > at_line || at_line > to_line {

@@ -34,7 +34,7 @@ impl Editor {
     }
 
     pub fn get_list_widget(&mut self) -> (usize, List<'_>) {
-        self.linter.select = self.cursor.selected.get().map(|(x, y)| (*x, *y));
+        self.linter.reset(self.cursor.selected.get());
         let max_digits = self.linter.line_number_max_digits(&self.content);
         let editor_content = List::new(
             self.content[self.cursor.at_line..]
