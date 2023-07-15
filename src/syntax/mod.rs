@@ -144,51 +144,39 @@ impl Lexer {
                 }
                 '(' => {
                     self.drain_buf_colored(token_end, self.theme.functions, spans);
-                    let color = len_to_color(Some(self.brackets.len()));
+                    let color = len_to_color(self.brackets.len());
                     self.last_token.push(ch);
                     self.brackets.push(color);
                     self.drain_buf_colored(token_end, color, spans);
                 }
                 ')' => {
-                    let color = if let Some(color) = self.brackets.pop() {
-                        color
-                    } else {
-                        len_to_color(None)
-                    };
+                    let color = self.brackets.pop().unwrap_or(default_color());
                     self.drain_buf(token_end, spans);
                     self.last_token.push(ch);
                     self.drain_buf_colored(token_end, color, spans);
                 }
                 '{' => {
                     self.drain_buf(token_end, spans);
-                    let color = len_to_color(Some(self.curly.len()));
+                    let color = len_to_color(self.curly.len());
                     self.last_token.push(ch);
                     self.curly.push(color);
                     self.drain_buf_colored(token_end, color, spans);
                 }
                 '}' => {
-                    let color = if let Some(color) = self.curly.pop() {
-                        color
-                    } else {
-                        len_to_color(None)
-                    };
+                    let color = self.curly.pop().unwrap_or(default_color());
                     self.drain_buf(token_end, spans);
                     self.last_token.push(ch);
                     self.drain_buf_colored(token_end, color, spans);
                 }
                 '[' => {
                     self.drain_buf(token_end, spans);
-                    let color = len_to_color(Some(self.square.len()));
+                    let color = len_to_color(self.square.len());
                     self.last_token.push(ch);
                     self.square.push(color);
                     self.drain_buf_colored(token_end, color, spans);
                 }
                 ']' => {
-                    let color = if let Some(color) = self.square.pop() {
-                        color
-                    } else {
-                        len_to_color(None)
-                    };
+                    let color = self.square.pop().unwrap_or(default_color());
                     self.drain_buf(token_end, spans);
                     self.last_token.push(ch);
                     self.drain_buf_colored(token_end, color, spans);
@@ -330,12 +318,12 @@ impl Lexer {
     }
 }
 
-fn len_to_color(len: Option<usize>) -> Color {
-    if let Some(len) = len {
-        COLORS[len % COLORS.len()]
-    } else {
-        COLORS[COLORS.len() - 1]
-    }
+fn default_color() -> Color {
+    COLORS[COLORS.len() - 1]
+}
+
+fn len_to_color(len: usize) -> Color {
+    COLORS[len % COLORS.len()]
 }
 
 fn get_line_num(idx: usize, max_digits: usize) -> String {
