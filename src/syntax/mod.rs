@@ -1,5 +1,6 @@
 mod theme;
 pub use self::theme::{Theme, DEFAULT_THEME_FILE};
+use crate::components::CursorPosition;
 use crate::messages::FileType;
 use tui::{
     style::{Color, Style},
@@ -10,7 +11,7 @@ pub const COLORS: [Color; 3] = [Color::LightMagenta, Color::Yellow, Color::Blue]
 
 #[derive(Debug)]
 pub struct Lexer {
-    pub select: Option<((usize, usize), (usize, usize))>,
+    pub select: Option<(CursorPosition, CursorPosition)>,
     pub theme: Theme,
     token_start: usize,
     select_at_line: Option<(usize, usize)>,
@@ -74,27 +75,29 @@ impl Lexer {
         self.max_digits
     }
 
-    pub fn reset(&mut self, select: Option<(&(usize, usize), &(usize, usize))>) {
+    pub fn reset(&mut self, select: Option<(&CursorPosition, &CursorPosition)>) {
         self.curly.clear();
         self.brackets.clear();
         self.square.clear();
         self.last_key_words.clear();
-        self.select = select.map(|(x, y)| (*x, *y))
+        self.select = select.map(|(from, to)| (*from, *to))
     }
 
     fn set_select_char_range(&mut self, at_line: usize, max_len: usize) {
-        if let Some(((from_line, from_char), (to_line, to_char))) = self.select {
-            if from_line > at_line || at_line > to_line {
+        if let Some((from, to)) = self.select {
+            if from.line > at_line || at_line > to.line {
                 self.select_at_line = None;
-            } else if from_line < at_line && at_line < to_line {
+            } else if from.line < at_line && at_line < to.line {
                 self.select_at_line = Some((0, max_len));
-            } else if from_line == at_line && at_line == to_line {
-                self.select_at_line = Some((from_char, to_char));
-            } else if from_line == at_line {
-                self.select_at_line = Some((from_char, max_len));
-            } else if to_line == at_line {
-                self.select_at_line = Some((0, to_char))
+            } else if from.line == at_line && at_line == to.line {
+                self.select_at_line = Some((from.char, to.char));
+            } else if from.line == at_line {
+                self.select_at_line = Some((from.char, max_len));
+            } else if to.line == at_line {
+                self.select_at_line = Some((0, to.char))
             }
+        } else {
+            self.select_at_line = None
         }
     }
 
