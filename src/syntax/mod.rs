@@ -242,7 +242,7 @@ impl Lexer {
     }
 
     fn white_char(&mut self, idx: usize, ch: char, spans: &mut Vec<Span>) {
-        if matches!(self.select_at_line, Some((from, to)) if from <= idx && idx <= to) {
+        if matches!(self.select_at_line, Some((from, to)) if from <= idx && idx < to) {
             spans.push(Span::styled(
                 String::from(ch),
                 Style {
@@ -288,7 +288,7 @@ impl Lexer {
             ..Default::default()
         };
         if let Some((select_start, select_end)) = self.select_at_line {
-            if select_start <= self.token_start && token_end <= select_end {
+            if select_start <= self.token_start && token_end < select_end {
                 spans.push(Span::styled(
                     self.last_token.drain(..).collect::<String>(),
                     style.bg(self.theme.selected),
@@ -298,29 +298,23 @@ impl Lexer {
             } else {
                 if select_start <= self.token_start {
                     spans.push(Span::styled(
-                        self.last_token
-                            .drain(..(select_end - self.token_start))
-                            .collect::<String>(),
+                        drain_token_checked(&mut self.last_token, select_end - self.token_start),
                         style.bg(self.theme.selected),
                     ));
                     spans.push(Span::styled(self.last_token.drain(..).collect::<String>(), style));
                 } else if self.token_start <= select_start && select_end <= token_end {
                     spans.push(Span::styled(
-                        self.last_token
-                            .drain(..(select_start - self.token_start))
-                            .collect::<String>(),
+                        drain_token_checked(&mut self.last_token, select_start - self.token_start),
                         style,
                     ));
                     spans.push(Span::styled(
-                        self.last_token.drain(..(select_end - select_start)).collect::<String>(),
+                        drain_token_checked(&mut self.last_token, select_end - select_start),
                         style.bg(self.theme.selected),
                     ));
                     spans.push(Span::styled(self.last_token.drain(..).collect::<String>(), style));
                 } else {
                     spans.push(Span::styled(
-                        self.last_token
-                            .drain(..(select_start - self.token_start))
-                            .collect::<String>(),
+                        drain_token_checked(&mut self.last_token, select_start - self.token_start),
                         style,
                     ));
                     spans.push(Span::styled(
@@ -351,4 +345,12 @@ fn get_line_num(idx: usize, max_digits: usize) -> String {
     }
     as_str.push(' ');
     as_str
+}
+
+fn drain_token_checked(token: &mut String, last_idx: usize) -> String {
+    if last_idx >= token.len() {
+        token.drain(..).collect()
+    } else {
+        token.drain(..last_idx).collect()
+    }
 }

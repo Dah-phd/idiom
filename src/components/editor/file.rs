@@ -64,9 +64,6 @@ impl Editor {
     }
 
     pub fn paste(&mut self) {
-        if !self.cursor.selected.is_empty() {
-            let _returned_for_action_log = self.cursor.remove(&mut self.content);
-        }
         self.cursor.paste(&mut self.content)
     }
 
@@ -149,46 +146,11 @@ impl Editor {
     }
 
     pub fn backspace(&mut self) {
-        if !self.cursor.selected.is_empty() {
-            let _returned_for_action_log = self.cursor.remove(&mut self.content);
-            return;
-        }
-        if self.cursor.line != 0 {
-            if self.cursor.char == 0 {
-                let current_line = self.content.remove(self.cursor.line);
-                self.cursor.line -= 1;
-                let prev_line = &mut self.content[self.cursor.line];
-                self.cursor.char = prev_line.len();
-                prev_line.push_str(&current_line);
-            } else {
-                let _returned_for_action_log = self.content[self.cursor.line].remove(self.cursor.char - 1);
-                self.cursor.char -= 1;
-            }
-        } else if let Some(line) = self.content.get_mut(self.cursor.line) {
-            if self.cursor.char != 0 {
-                let _returned_for_action_log = line.remove(self.cursor.char - 1);
-                self.cursor.char -= 1;
-            }
-        }
+        self.cursor.backspace(&mut self.content)
     }
 
     pub fn del(&mut self) {
-        if !self.cursor.selected.is_empty() {
-            let _returned_for_action_log = self.cursor.remove(&mut self.content);
-            return;
-        }
-        // TODO needs work
-        let next_line = self.content.get(self.cursor.line + 1).cloned();
-        if let Some(line) = self.content.get_mut(self.cursor.line) {
-            if line.len() == self.cursor.char {
-                if let Some(new_content) = next_line {
-                    line.push_str(new_content.as_str());
-                    self.content.remove(self.cursor.line + 1);
-                }
-            } else {
-                let _returned_for_action_log = line.remove(self.cursor.char);
-            }
-        }
+        self.cursor.del(&mut self.content)
     }
 
     pub fn indent(&mut self) {
