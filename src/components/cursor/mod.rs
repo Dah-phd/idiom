@@ -208,6 +208,35 @@ impl Cursor {
         self.selected.push(self.line, self.char);
     }
 
+    pub fn insert(&mut self, text: &str, content: &mut Vec<String>) {
+        if let Some(line) = content.get_mut(self.line) {
+            line.insert_str(self.char, text);
+            self.char += text.len();
+        } else {
+            content.insert(self.line, text.to_owned());
+            self.char = text.len();
+        }
+    }
+
+    pub fn insert_at(&mut self, idx: usize, text: &str, content: &mut Vec<String>) {
+        if let Some(line) = content.get_mut(self.line) {
+            line.insert_str(idx, text);
+            self.char += text.len();
+        } else {
+            content.insert(self.line, text.to_owned());
+            self.char = text.len();
+        }
+    }
+
+    pub fn strip_prefix(&mut self, prefix: &str, content: &mut [String]) {
+        if let Some(line) = content.get_mut(self.line) {
+            if line.starts_with(prefix) {
+                line.replace_range(..prefix.len(), "");
+                self.char = self.char.checked_sub(prefix.len()).unwrap_or_default();
+            }
+        }
+    }
+
     pub fn del(&mut self, content: &mut Vec<String>) {
         if !self.selected.is_empty() {
             let _returned_for_action_log = self.remove(content);

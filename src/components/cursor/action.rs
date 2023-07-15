@@ -1,5 +1,3 @@
-use crate::components::editor::file::Editor;
-
 #[derive(Debug, Default)]
 pub struct ActionLogger {
     buffer: Option<Action>,
@@ -63,49 +61,49 @@ impl ActionLogger {
         }
     }
 
-    fn handle_action(action: &Action, editor: &mut Editor) {
-        match &action {
-            Action::Swap { from, to } => {
-                editor.cursor.line = *from;
-                if from < to {
-                    editor.swap_down()
-                } else {
-                    editor.swap_up()
-                }
-            }
-            Action::UpdateState { new: _, old } => editor.content = old.lines().map(|line| line.to_owned()).collect(),
-            Action::NewLine { line, content } => {
-                editor.content.insert(*line, content.to_owned());
-            }
-            Action::RemoveLine { line, content: _ } => {
-                editor.content.remove(*line);
-            }
-            Action::Insert { position, content } => {
-                editor.content[position.line].insert_str(position.char, content);
-                editor.cursor.line = position.line;
-                editor.cursor.char = position.char + content.len();
-            }
-            Action::Remove { position, content } => {
-                editor.content[position.line].replace_range(position.char..(position.char + content.len()), "");
-                editor.cursor.line = position.line;
-                editor.cursor.char = position.char;
-            }
-        }
-    }
+    // fn handle_action(action: &Action, editor: &mut Editor) {
+    //     match &action {
+    //         Action::Swap { from, to } => {
+    //             editor.cursor.line = *from;
+    //             if from < to {
+    //                 editor.swap_down()
+    //             } else {
+    //                 editor.swap_up()
+    //             }
+    //         }
+    //         Action::UpdateState { new: _, old } => editor.content = old.lines().map(|line| line.to_owned()).collect(),
+    //         Action::NewLine { line, content } => {
+    //             editor.content.insert(*line, content.to_owned());
+    //         }
+    //         Action::RemoveLine { line, content: _ } => {
+    //             editor.content.remove(*line);
+    //         }
+    //         Action::Insert { position, content } => {
+    //             editor.content[position.line].insert_str(position.char, content);
+    //             editor.cursor.line = position.line;
+    //             editor.cursor.char = position.char + content.len();
+    //         }
+    //         Action::Remove { position, content } => {
+    //             editor.content[position.line].replace_range(position.char..(position.char + content.len()), "");
+    //             editor.cursor.line = position.line;
+    //             editor.cursor.char = position.char;
+    //         }
+    //     }
+    // }
 
-    fn undo(&mut self, editor: &mut Editor) {
-        if let Some(action) = self.done.pop() {
-            Self::handle_action(&action, editor);
-            self.undone.push(action.reverse())
-        }
-    }
+    // fn undo(&mut self, editor: &mut Editor) {
+    //     if let Some(action) = self.done.pop() {
+    //         Self::handle_action(&action, editor);
+    //         self.undone.push(action.reverse())
+    //     }
+    // }
 
-    fn redo(&mut self, editor: &mut Editor) {
-        if let Some(action) = self.undone.pop() {
-            Self::handle_action(&action, editor);
-            self.done.push(action.reverse())
-        }
-    }
+    // fn redo(&mut self, editor: &mut Editor) {
+    //     if let Some(action) = self.undone.pop() {
+    //         Self::handle_action(&action, editor);
+    //         self.done.push(action.reverse())
+    //     }
+    // }
 }
 
 #[derive(Debug)]

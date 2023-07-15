@@ -1,4 +1,3 @@
-pub mod cursor;
 mod file;
 
 use crate::messages::{EditorAction, EditorConfigs, EditorKeyMap};

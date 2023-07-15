@@ -7,7 +7,7 @@ use crate::{
 };
 use std::path::PathBuf;
 
-use super::cursor::Cursor;
+use crate::components::cursor::Cursor;
 
 #[derive(Debug)]
 pub struct Editor {
@@ -154,33 +154,15 @@ impl Editor {
     }
 
     pub fn indent(&mut self) {
-        if let Some(line) = self.content.get_mut(self.cursor.line) {
-            line.insert_str(self.cursor.char, &self.configs.indent);
-            self.cursor.char += self.configs.indent.len();
-        } else {
-            self.content.insert(self.cursor.line, self.configs.indent.to_owned());
-            self.cursor.char = self.configs.indent.len();
-        }
+        self.cursor.insert(&self.configs.indent, &mut self.content)
     }
 
     pub fn indent_start(&mut self) {
-        if let Some(line) = self.content.get_mut(self.cursor.line) {
-            line.insert_str(0, &self.configs.indent);
-            self.cursor.char += self.configs.indent.len();
-        }
+        self.cursor.insert_at(0, &self.configs.indent, &mut self.content);
     }
 
     pub fn unindent(&mut self) {
-        if let Some(line) = self.content.get_mut(self.cursor.line) {
-            if line.starts_with(&self.configs.indent) {
-                line.replace_range(..self.configs.indent.len(), "");
-                self.cursor.char = self
-                    .cursor
-                    .char
-                    .checked_sub(self.configs.indent.len())
-                    .unwrap_or_default();
-            }
-        }
+        self.cursor.strip_prefix(&self.configs.indent, &mut self.content);
     }
 
     pub fn new_line(&mut self) {
@@ -208,7 +190,7 @@ impl Editor {
         if self.cursor.line == 0 {
             return;
         }
-
+        // TODO needs work
         let prev_line = &self.content[self.cursor.line - 1].clone();
         let curr_line = &mut self.content[self.cursor.line];
         let indent = prev_line.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
