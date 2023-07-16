@@ -69,6 +69,9 @@ impl Editor {
     }
 
     pub fn cut(&mut self) {
+        if self.content.is_empty() {
+            return;
+        }
         self.should_paste_line = false;
         let cut_content = self.remove();
         self.clipboard.push(cut_content);
@@ -363,6 +366,9 @@ impl Editor {
     }
 
     pub fn backspace(&mut self) {
+        if self.content.is_empty() {
+            return;
+        }
         if !self.select.is_empty() {
             let _returned_for_action_log = self.remove();
             return;
@@ -387,21 +393,20 @@ impl Editor {
     }
 
     pub fn del(&mut self) {
+        if self.content.is_empty() {
+            return;
+        }
         if !self.select.is_empty() {
             let _returned_for_action_log = self.remove();
             return;
         }
-        // TODO needs work
-        let next_line = self.content.get(self.cursor.line + 1).cloned();
-        if let Some(line) = self.content.get_mut(self.cursor.line) {
-            if line.len() == self.cursor.char {
-                if let Some(new_content) = next_line {
-                    line.push_str(new_content.as_str());
-                    self.content.remove(self.cursor.line + 1);
-                }
-            } else {
-                let _returned_for_action_log = line.remove(self.cursor.char);
+        if self.content[self.cursor.line].len() == self.cursor.char {
+            if self.content.len() > self.cursor.line + 1 {
+                let next_line = self.content.remove(self.cursor.line + 1);
+                self.content[self.cursor.line].push_str(&next_line);
             }
+        } else {
+            let _returned_for_action_log = self.content[self.cursor.line].remove(self.cursor.char);
         }
     }
 
@@ -467,7 +472,7 @@ impl Editor {
         } else {
             let mut clip = self.content.remove(self.cursor.line);
             clip.push('\n');
-            if self.cursor.line >= self.content.len() {
+            if self.cursor.line >= self.content.len() && !self.content.is_empty() {
                 self.cursor.line -= 1;
                 self.cursor.char = self.content[self.cursor.line].len() - 1;
             } else {
@@ -528,16 +533,15 @@ impl Editor {
         if self.cursor.line == 0 {
             return;
         }
-        // TODO needs work
-        let prev_line = &self.content[self.cursor.line - 1].clone();
-        let curr_line = &mut self.content[self.cursor.line];
-        let indent = prev_line.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
-        curr_line.insert_str(0, &indent);
+        let indent = self.content[self.cursor.line - 1]
+            .chars()
+            .take_while(|&c| c.is_whitespace())
+            .collect::<String>();
+        self.content[self.cursor.line].insert_str(0, &indent);
         self.cursor.char = indent.len();
-
-        if let Some(last) = prev_line.trim_end().chars().last() {
+        if let Some(last) = self.content[self.cursor.line - 1].trim_end().chars().last() {
             if self.configs.indent_after.contains(last) {
-                if let Some(first) = curr_line.trim_start().chars().next() {
+                if let Some(first) = self.content[self.cursor.line].trim_start().chars().next() {
                     if (last, first) == ('{', '}') || (last, first) == ('(', ')') || (last, first) == ('[', ']') {
                         self.content.insert(self.cursor.line, indent);
                     }
