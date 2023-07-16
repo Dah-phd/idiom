@@ -1,8 +1,8 @@
-mod select;
-mod clipboard;
 mod action;
+mod clipboard;
+mod select;
 use clipboard::Clipboard;
-pub use select::{Select, CursorPosition};
+pub use select::{CursorPosition, Select};
 use tui::widgets::{List, ListItem};
 
 use crate::{
@@ -11,7 +11,6 @@ use crate::{
     utils::trim_start_inplace,
 };
 use std::path::PathBuf;
-
 
 #[derive(Debug)]
 pub struct Editor {
@@ -79,7 +78,8 @@ impl Editor {
         self.should_paste_line = false;
         if let Some((from, to)) = self.select.get() {
             if from.line == to.line {
-                self.clipboard.push(self.content[from.line][from.char..to.char].to_owned());
+                self.clipboard
+                    .push(self.content[from.line][from.char..to.char].to_owned());
             } else {
                 let mut at_line = from.line;
                 let mut clip_vec = Vec::new();
@@ -214,6 +214,17 @@ impl Editor {
     }
 
     pub fn jump_left(&mut self) {
+        self.select.drop();
+        self._jump_left();
+    }
+
+    pub fn jump_left_select(&mut self) {
+        self.select.init(self.cursor.line, self.cursor.char);
+        self.jump_left();
+        self.select.push(self.cursor.line, self.cursor.char);
+    }
+
+    fn _jump_left(&mut self) {
         let mut line = &self.content[self.cursor.line][..self.cursor.char];
         let mut last_was_char = false;
         loop {
@@ -264,6 +275,17 @@ impl Editor {
     }
 
     pub fn jump_right(&mut self) {
+        self.select.drop();
+        self._jump_right();
+    }
+
+    pub fn jump_right_select(&mut self) {
+        self.select.init(self.cursor.line, self.cursor.char);
+        self.jump_right();
+        self.select.push(self.cursor.line, self.cursor.char);
+    }
+
+    pub fn _jump_right(&mut self) {
         let mut line = &self.content[self.cursor.line][self.cursor.char..];
         let mut found_word = false;
         let mut last_was_char = false;
@@ -390,15 +412,28 @@ impl Editor {
     }
 
     pub fn unindent(&mut self) {
-       if let Some(line) = self.content.get_mut(self.cursor.line) {
+        if let Some(line) = self.content.get_mut(self.cursor.line) {
             if line.starts_with(&self.configs.indent) {
                 line.replace_range(..self.configs.indent.len(), "");
-                self.cursor.char = self.cursor.char.checked_sub(self.configs.indent.len()).unwrap_or_default();
+                self.cursor.char = self
+                    .cursor
+                    .char
+                    .checked_sub(self.configs.indent.len())
+                    .unwrap_or_default();
             }
         }
     }
 
-    pub fn remove(&mut self) -> String {
+    pub fn save(&self) {
+        std::fs::write(&self.path, self.content.join("\n")).unwrap();
+    }
+
+    pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {
+        self.configs = new_cfg.clone();
+        self.linter.theme = Theme::from(&self.configs.theme_file_in_config_dir);
+    }
+
+    fn remove(&mut self) -> String {
         if let Some((from, to)) = self.select.get() {
             let clip = if from.line == to.line {
                 self.cursor.char = from.char;
@@ -509,15 +544,6 @@ impl Editor {
                 self.cursor.char += self.configs.indent.len();
             }
         }
-    }
-
-    pub fn save(&self) {
-        std::fs::write(&self.path, self.content.join("\n")).unwrap();
-    }
-
-    pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {
-        self.configs = new_cfg.clone();
-        self.linter.theme = Theme::from(&self.configs.theme_file_in_config_dir);
     }
 
     fn indent_at(&mut self, idx: usize) {
