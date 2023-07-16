@@ -1,6 +1,6 @@
 mod theme;
 pub use self::theme::{Theme, DEFAULT_THEME_FILE};
-use crate::components::cursor::CursorPosition;
+use crate::components::editor::CursorPosition;
 use crate::messages::FileType;
 use tui::{
     style::{Color, Style},

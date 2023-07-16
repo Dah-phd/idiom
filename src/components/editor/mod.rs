@@ -1,4 +1,5 @@
 mod file;
+pub use file::CursorPosition;
 
 use crate::messages::{EditorAction, EditorConfigs, EditorKeyMap};
 use crossterm::event::KeyEvent;
@@ -33,9 +34,9 @@ impl EditorState {
             .split(area);
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get_mut(editor_id) {
-                file.cursor.max_rows = layout[1].bottom();
+                file.max_rows = layout[1].bottom();
                 let cursor_x_offset = 1 + file.cursor.char;
-                let cursor_y_offset = file.cursor.line - file.cursor.at_line;
+                let cursor_y_offset = file.cursor.line - file.at_line;
                 let (digits_offset, editor_content) = file.get_list_widget();
                 frame.set_cursor(
                     layout[1].x + (cursor_x_offset + digits_offset) as u16,

@@ -1,4 +1,3 @@
-pub mod cursor;
 pub mod editor;
 pub mod popups;
 pub mod tree;
