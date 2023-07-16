@@ -139,6 +139,7 @@ impl Editor {
     }
 
     pub fn swap_up(&mut self) {
+        self.select.drop();
         if self.at_line >= self.cursor.line {
             self.scroll_up()
         } else if self.cursor.line > 0 {
@@ -182,6 +183,7 @@ impl Editor {
     }
 
     pub fn swap_down(&mut self) {
+        self.select.drop();
         if self.content.is_empty() {
             return;
         }
