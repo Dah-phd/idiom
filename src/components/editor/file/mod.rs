@@ -222,7 +222,7 @@ impl Editor {
 
     pub fn jump_left_select(&mut self) {
         self.select.init(self.cursor.line, self.cursor.char);
-        self.jump_left();
+        self._jump_left();
         self.select.push(self.cursor.line, self.cursor.char);
     }
 
@@ -283,7 +283,7 @@ impl Editor {
 
     pub fn jump_right_select(&mut self) {
         self.select.init(self.cursor.line, self.cursor.char);
-        self.jump_right();
+        self._jump_right();
         self.select.push(self.cursor.line, self.cursor.char);
     }
 
