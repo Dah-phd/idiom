@@ -13,9 +13,6 @@ use tui::{
     Terminal,
 };
 
-#[cfg(target_os = "windows")]
-use crossterm::event::KeyEventKind;
-
 const TICK: Duration = Duration::from_millis(250);
 
 pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {

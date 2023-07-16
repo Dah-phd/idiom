@@ -16,12 +16,11 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 
 use anyhow::{anyhow, Result};
 
-use serde_json::Value;
-
 use lsp_types::lsp_request;
 use lsp_types::{InitializeParams, Registration, RegistrationParams, Url, WorkspaceFolder};
 
 #[allow(clippy::upper_case_acronyms)]
+#[allow(dead_code)]
 pub struct LSP {
     pub que: Arc<Mutex<HashMap<i64, serde_json::Value>>>,
     counter: usize,
@@ -31,6 +30,7 @@ pub struct LSP {
     stdin: ChildStdin,
 }
 
+#[allow(dead_code)]
 impl LSP {
     pub async fn from(file_type: &FileType) -> Result<Self> {
         match file_type {
