@@ -37,6 +37,18 @@ impl EditorConfigs {
     pub fn new() -> Self {
         load_or_create_config(EDITOR_CONFIGS)
     }
+
+    pub fn derive_indent_from(&self, prev_line: &str) -> (usize, String) {
+        let mut indent = prev_line.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
+        let mut indent_offset = indent.len();
+        if let Some(last) = prev_line.trim_end().chars().last() {
+            if self.indent_after.contains(last) {
+                indent.insert_str(0, &self.indent);
+                indent_offset += &self.indent.len();
+            }
+        };
+        (indent_offset, indent)
+    }
 }
 
 impl EditorConfigs {

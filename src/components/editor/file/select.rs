@@ -1,4 +1,4 @@
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct CursorPosition {
     pub line: usize,
     pub char: usize,
@@ -40,9 +40,9 @@ impl Select {
         }
     }
 
-    pub fn push(&mut self, line: usize, char: usize) {
+    pub fn push(&mut self, position: &CursorPosition) {
         if let Self::Range(_, to) = self {
-            (*to) = (line, char).into()
+            (*to) = *position
         }
     }
 

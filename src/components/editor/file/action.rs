@@ -1,3 +1,5 @@
+use crate::utils::{derive_end_cursor_position, LimitedQue};
+
 use super::select::CursorPosition;
 use super::Editor;
 use std::time::{Duration, Instant};
@@ -7,8 +9,8 @@ const TICK: Duration = Duration::from_millis(100);
 #[derive(Debug)]
 pub struct ActionLogger {
     buffer: Option<Action>,
-    done: Vec<Action>,
-    undone: Vec<Action>,
+    pub done: LimitedQue<Action>,
+    pub undone: LimitedQue<Action>,
     clock: Instant,
 }
 
@@ -16,8 +18,8 @@ impl Default for ActionLogger {
     fn default() -> Self {
         Self {
             buffer: Option::default(),
-            done: Vec::default(),
-            undone: Vec::default(),
+            done: LimitedQue::default(),
+            undone: LimitedQue::default(),
             clock: Instant::now(),
         }
     }
@@ -31,52 +33,11 @@ impl ActionLogger {
         }
     }
 
-    pub fn push(&mut self, action: Action) {
-        self.done.push(action)
-    }
+    pub fn replace(&mut self, at: CursorPosition, new: impl Into<String>, old: impl Into<String>) {}
 
-    fn new_line(&mut self, line: usize) {
-        self.push_buffer();
-        self.done.push(Action::NewLine {
-            line,
-            content: String::new(),
-        })
-    }
+    pub fn remove(&mut self, position: CursorPosition, content: String) {}
 
-    fn push_char(&mut self, position: (usize, usize), ch: char) {
-        if let Some(Action::Insert { position: _, content }) = &mut self.buffer {
-            content.push(ch)
-        }
-        self.push_buffer();
-        self.buffer = Some(Action::Insert {
-            position: position.into(),
-            content: String::from(ch),
-        });
-    }
-
-    fn del_char(&mut self, position: (usize, usize), ch: char) {
-        if let Some(Action::Remove { position: _, content }) = &mut self.buffer {
-            content.push(ch)
-        }
-        self.push_buffer();
-        self.buffer = Some(Action::Remove {
-            position: position.into(),
-            content: String::from(ch),
-        })
-    }
-
-    fn pull_char(&mut self, position: (usize, usize), ch: char) {
-        let position_new: CursorPosition = position.into();
-        if let Some(Action::Remove { position, content }) = &mut self.buffer {
-            content.insert(0, ch);
-            (*position) = position_new;
-        }
-        self.push_buffer();
-        self.buffer = Some(Action::Remove {
-            position: position_new,
-            content: String::from(ch),
-        })
-    }
+    pub fn push_char(&mut self, new_position: CursorPosition, ch: char) {}
 
     fn push_buffer(&mut self) {
         if let Some(buffer) = self.buffer.take() {
@@ -84,70 +45,20 @@ impl ActionLogger {
         }
     }
 
-    fn handle_action(action: &Action, editor: &mut Editor) {
-        match &action {
-            Action::Swap { from, to } => {
-                editor.cursor.line = *from;
-                if from < to {
-                    editor.swap_down()
-                } else {
-                    editor.swap_up()
-                }
-            }
-            Action::UpdateState { new: _, old } => editor.content = old.lines().map(|line| line.to_owned()).collect(),
-            Action::NewLine { line, content } => {
-                editor.content.insert(*line, content.to_owned());
-            }
-            Action::RemoveLine { line, content: _ } => {
-                editor.content.remove(*line);
-            }
-            Action::Insert { position, content } => {
-                editor.content[position.line].insert_str(position.char, content);
-                editor.cursor.line = position.line;
-                editor.cursor.char = position.char + content.len();
-            }
-            Action::Remove { position, content } => {
-                editor.content[position.line].replace_range(position.char..(position.char + content.len()), "");
-                editor.cursor.line = position.line;
-                editor.cursor.char = position.char;
-            }
-        }
+    pub fn undo(&mut self, editor: &mut Vec<String>) {
+        self.push_buffer();
+        if let Some(action) = self.done.pop() {}
     }
 
-    fn undo(&mut self, editor: &mut Editor) {
-        if let Some(action) = self.done.pop() {
-            Self::handle_action(&action, editor);
-            self.undone.push(action.reverse())
-        }
-    }
-
-    fn redo(&mut self, editor: &mut Editor) {
-        if let Some(action) = self.undone.pop() {
-            Self::handle_action(&action, editor);
-            self.done.push(action.reverse())
-        }
+    pub fn redo(&mut self, content: &mut Vec<String>) {
+        self.push_buffer();
+        if let Some(action) = self.undone.pop() {}
     }
 }
 
 #[derive(Debug)]
-pub enum Action {
-    NewLine { line: usize, content: String },
-    RemoveLine { line: usize, content: String },
-    Insert { position: CursorPosition, content: String },
-    Remove { position: CursorPosition, content: String },
-    Swap { from: usize, to: usize },
-    UpdateState { new: String, old: String },
+pub struct Action {
+    cursor: CursorPosition,
 }
 
-impl Action {
-    fn reverse(self) -> Self {
-        match self {
-            Self::NewLine { line, content } => Self::RemoveLine { line, content },
-            Self::RemoveLine { line, content } => Self::NewLine { line, content },
-            Self::Insert { position, content } => Self::Remove { position, content },
-            Self::Remove { position, content } => Self::Insert { position, content },
-            Self::Swap { from, to } => Self::Swap { from: to, to: from },
-            Self::UpdateState { new, old } => Self::UpdateState { new: old, old: new },
-        }
-    }
-}
+impl Action {}

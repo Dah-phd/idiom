@@ -20,6 +20,7 @@ pub struct Lexer {
     square: Vec<Color>,
     last_token: String,
     key_words: Vec<&'static str>,
+    frow_control: Vec<&'static str>,
     last_key_words: Vec<String>,
     max_digits: usize,
 }
@@ -28,6 +29,7 @@ impl Default for Lexer {
     fn default() -> Self {
         Self {
             key_words: vec!["pub", "fn", "struct", "use", "mod", "let", "self", "mut", "crate"],
+            frow_control: vec!["if", "loop", "for", "while", "break", "continue"], //TODO add color to flow control
             select_at_line: None,
             curly: vec![],
             brackets: vec![],
@@ -46,6 +48,7 @@ impl Lexer {
     pub fn new(theme: Theme) -> Self {
         Self {
             key_words: vec!["pub", "fn", "struct", "use", "mod", "let", "self", "mut", "crate"],
+            frow_control: vec!["if", "loop", "for", "while", "break", "continue"],
             select_at_line: None,
             curly: vec![],
             brackets: vec![],
@@ -190,6 +193,11 @@ impl Lexer {
         if self.key_words.contains(&self.last_token.trim()) {
             self.last_key_words.push(self.last_token.to_owned());
             self.drain_with_select(token_end, self.theme.key_words, spans);
+            return true;
+        }
+        if self.frow_control.contains(&self.last_token.trim()) {
+            self.last_key_words.push(self.last_token.to_owned());
+            self.drain_with_select(token_end, self.theme.flow_control, spans);
             return true;
         }
         false

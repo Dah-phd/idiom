@@ -8,7 +8,7 @@ use tui::widgets::{List, ListItem};
 use crate::{
     messages::{EditorConfigs, FileType},
     syntax::{Lexer, Theme},
-    utils::trim_start_inplace,
+    utils::{get_closing_char, trim_start_inplace},
 };
 use std::path::PathBuf;
 
@@ -20,6 +20,7 @@ pub struct Editor {
     select: Select,
     clipboard: Clipboard,
     should_paste_line: bool,
+    // action_logger: ActionLogger,
     pub max_rows: u16,
     pub at_line: usize,
     pub content: Vec<String>,
@@ -38,6 +39,7 @@ impl Editor {
             select: Select::default(),
             clipboard: Clipboard::default(),
             should_paste_line: false,
+            // action_logger: ActionLogger::default(),
             max_rows: 0,
             at_line: 0,
             content: content.lines().map(String::from).collect(),
@@ -131,7 +133,7 @@ impl Editor {
     pub fn select_up(&mut self) {
         self.select.init(self.cursor.line, self.cursor.char);
         self._up();
-        self.select.push(self.cursor.line, self.cursor.char);
+        self.select.push(&self.cursor);
     }
 
     pub fn scroll_up(&mut self) {
@@ -145,13 +147,19 @@ impl Editor {
         self.select.drop();
         if self.at_line >= self.cursor.line {
             self.scroll_up()
-        } else if self.cursor.line > 0 {
+        };
+        if self.cursor.line > 0 {
             let new_line = self.cursor.line - 1;
             self.content.swap(self.cursor.line, new_line);
+            let (offset, indent) = self
+                .configs
+                .derive_indent_from(&self.content[new_line.checked_sub(1).unwrap_or(self.cursor.line)]);
+            let line = &mut self.content[self.cursor.line];
+            line.insert_str(0, &indent);
+            self.cursor.char += offset;
+            trim_start_inplace(line);
             self.cursor.line = new_line;
         }
-        trim_start_inplace(&mut self.content[self.cursor.line]);
-        self.get_indent()
     }
 
     pub fn down(&mut self) {
@@ -175,7 +183,7 @@ impl Editor {
     pub fn select_down(&mut self) {
         self.select.init(self.cursor.line, self.cursor.char);
         self._down();
-        self.select.push(self.cursor.line, self.cursor.char);
+        self.select.push(&self.cursor);
     }
 
     pub fn scroll_down(&mut self) {
@@ -194,12 +202,15 @@ impl Editor {
             self.at_line += 1;
         }
         if self.content.len() - 1 > self.cursor.line {
-            let new_line = self.cursor.line + 1;
-            self.content.swap(self.cursor.line, new_line);
-            self.cursor.line = new_line;
+            let new_cursor_line = self.cursor.line + 1;
+            self.content.swap(self.cursor.line, new_cursor_line);
+            let (offset, indent) = self.configs.derive_indent_from(&self.content[self.cursor.line]);
+            let line = &mut self.content[new_cursor_line];
+            trim_start_inplace(line);
+            line.insert_str(0, &indent);
+            self.cursor.line = new_cursor_line;
+            self.cursor.char += offset;
         }
-        trim_start_inplace(&mut self.content[self.cursor.line]);
-        self.get_indent()
     }
 
     pub fn left(&mut self) {
@@ -215,6 +226,9 @@ impl Editor {
             if let Some(line) = self.content.get(self.cursor.line) {
                 self.cursor.char = line.len();
             }
+            if self.cursor.line < self.at_line {
+                self.at_line -= 1;
+            }
         }
     }
 
@@ -226,41 +240,29 @@ impl Editor {
     pub fn jump_left_select(&mut self) {
         self.select.init(self.cursor.line, self.cursor.char);
         self._jump_left();
-        self.select.push(self.cursor.line, self.cursor.char);
+        self.select.push(&self.cursor);
     }
 
     fn _jump_left(&mut self) {
         let mut line = &self.content[self.cursor.line][..self.cursor.char];
         let mut last_was_char = false;
-        loop {
-            if line.is_empty() || line.chars().all(|c| !c.is_alphabetic() && c != '_') {
-                if self.cursor.line > 0 {
-                    self.cursor.line -= 1;
-                    line = &self.content[self.cursor.line];
-                    self.cursor.char = line.len();
-                } else {
-                    return;
-                }
+        if line.is_empty() && self.cursor.line > 0 {
+            self._left();
+            line = &self.content[self.cursor.line][..self.cursor.char];
+        }
+        for ch in line.chars().rev() {
+            if last_was_char && !ch.is_alphabetic() || self.cursor.char == 0 {
+                return;
             }
-            for ch in line.chars().rev() {
-                if last_was_char && !ch.is_alphabetic() && ch != '_' || self.cursor.char == 0 {
-                    if self.at_line >= self.cursor.line && self.at_line > 0 {
-                        self.at_line -= 1;
-                    }
-                    return;
-                }
-                self.cursor.char -= 1;
-                if ch.is_alphabetic() || ch == '_' {
-                    last_was_char = true;
-                };
-            }
+            self.cursor.char -= 1;
+            last_was_char = ch.is_alphabetic();
         }
     }
 
     pub fn select_left(&mut self) {
         self.select.init(self.cursor.line, self.cursor.char);
         self._left();
-        self.select.push(self.cursor.line, self.cursor.char);
+        self.select.push(&self.cursor);
     }
 
     pub fn right(&mut self) {
@@ -275,6 +277,9 @@ impl Editor {
             } else if self.content.len() - 1 > self.cursor.line {
                 self.cursor.line += 1;
                 self.cursor.char = 0;
+                if self.cursor.line > self.max_rows as usize - 3 + self.at_line {
+                    self.at_line += 1;
+                }
             }
         }
     }
@@ -287,43 +292,29 @@ impl Editor {
     pub fn jump_right_select(&mut self) {
         self.select.init(self.cursor.line, self.cursor.char);
         self._jump_right();
-        self.select.push(self.cursor.line, self.cursor.char);
+        self.select.push(&self.cursor);
     }
 
     pub fn _jump_right(&mut self) {
         let mut line = &self.content[self.cursor.line][self.cursor.char..];
-        let mut found_word = false;
         let mut last_was_char = false;
-        loop {
-            if line.is_empty() || line.chars().all(|c| !c.is_alphabetic() && c != '_') {
-                if self.content.len() - 1 > self.cursor.line {
-                    self.cursor.line += 1;
-                    self.cursor.char = 0;
-                    line = &self.content[self.cursor.line];
-                } else {
-                    return;
-                }
+        if line.is_empty() && self.content.len() - 1 > self.cursor.line {
+            self._right();
+            line = &self.content[self.cursor.line][self.cursor.char..];
+        }
+        for ch in line.chars() {
+            if last_was_char && !ch.is_alphabetic() {
+                return;
             }
-            for ch in line.chars() {
-                if last_was_char && found_word && !ch.is_alphabetic() && ch != '_' {
-                    if self.cursor.line > self.max_rows as usize - 3 + self.at_line {
-                        self.at_line += 1;
-                    }
-                    return;
-                }
-                self.cursor.char += 1;
-                if !found_word && ch.is_alphabetic() || ch == '_' {
-                    last_was_char = true;
-                    found_word = true;
-                };
-            }
+            self.cursor.char += 1;
+            last_was_char = ch.is_alphabetic();
         }
     }
 
     pub fn select_right(&mut self) {
         self.select.init(self.cursor.line, self.cursor.char);
         self._right();
-        self.select.push(self.cursor.line, self.cursor.char);
+        self.select.push(&self.cursor);
     }
 
     pub fn new_line(&mut self) {
@@ -332,35 +323,40 @@ impl Editor {
             self.cursor.line += 1;
             return;
         }
-        let line = &self.content[self.cursor.line];
-        let new_line = if line.len() > self.cursor.char {
-            let (replace_line, new_line) = line.split_at(self.cursor.char);
-            let new_line = String::from(new_line);
-            self.content[self.cursor.line] = String::from(replace_line);
-            new_line
+        let prev_line = &mut self.content[self.cursor.line];
+        let mut line = if prev_line.len() >= self.cursor.char {
+            prev_line.split_off(self.cursor.char)
         } else {
             String::new()
         };
-        self.content.insert(self.cursor.line + 1, new_line);
+        let (offset, indent) = self.configs.derive_indent_from(prev_line);
         self.cursor.line += 1;
-        self.cursor.char = 0;
-        self.get_indent();
-    }
-
-    pub fn push(&mut self, c: char) {
-        if let Some(line) = self.content.get_mut(self.cursor.line) {
-            line.insert(self.cursor.char, c);
-            self.cursor.char += 1;
-            match c {
-                '{' => line.insert(self.cursor.char, '}'),
-                '(' => line.insert(self.cursor.char, ')'),
-                '[' => line.insert(self.cursor.char, ']'),
-                '"' => line.insert(self.cursor.char, '"'),
-                '\'' => line.insert(self.cursor.char, '\''),
-                _ => (),
+        self.cursor.char = offset;
+        if let Some(last) = prev_line.trim_end().chars().last() {
+            if let Some(first) = line.trim_start().chars().next() {
+                if (last, first) == ('{', '}') || (last, first) == ('(', ')') || (last, first) == ('[', ']') {
+                    if let Some(bracket_indent) = indent.strip_prefix(&self.configs.indent) {
+                        line.insert_str(0, bracket_indent);
+                    }
+                    self.content.insert(self.cursor.line, line);
+                    self.content.insert(self.cursor.line, indent);
+                }
             }
         } else {
-            self.content.insert(self.cursor.line, c.to_string());
+            line.insert_str(0, &indent);
+            self.content.insert(self.cursor.line, line);
+        }
+    }
+
+    pub fn push(&mut self, ch: char) {
+        if let Some(line) = self.content.get_mut(self.cursor.line) {
+            line.insert(self.cursor.char, ch);
+            self.cursor.char += 1;
+            if let Some(closing) = get_closing_char(ch) {
+                line.insert(self.cursor.char, closing)
+            }
+        } else {
+            self.content.insert(self.cursor.line, ch.to_string());
             self.cursor.char = 1;
         }
     }
@@ -521,37 +517,6 @@ impl Editor {
         }
     }
 
-    fn adjust_cursor_max_char(&mut self) {
-        if let Some(line) = self.content.get(self.cursor.line) {
-            if line.len() < self.cursor.char {
-                self.cursor.char = line.len()
-            }
-        }
-    }
-
-    fn get_indent(&mut self) {
-        if self.cursor.line == 0 {
-            return;
-        }
-        let indent = self.content[self.cursor.line - 1]
-            .chars()
-            .take_while(|&c| c.is_whitespace())
-            .collect::<String>();
-        self.content[self.cursor.line].insert_str(0, &indent);
-        self.cursor.char = indent.len();
-        if let Some(last) = self.content[self.cursor.line - 1].trim_end().chars().last() {
-            if self.configs.indent_after.contains(last) {
-                if let Some(first) = self.content[self.cursor.line].trim_start().chars().next() {
-                    if (last, first) == ('{', '}') || (last, first) == ('(', ')') || (last, first) == ('[', ']') {
-                        self.content.insert(self.cursor.line, indent);
-                    }
-                }
-                self.content[self.cursor.line].insert_str(0, &self.configs.indent);
-                self.cursor.char += self.configs.indent.len();
-            }
-        }
-    }
-
     fn indent_at(&mut self, idx: usize) {
         if let Some(line) = self.content.get_mut(self.cursor.line) {
             line.insert_str(idx, &self.configs.indent);
@@ -559,6 +524,14 @@ impl Editor {
         } else {
             self.content.insert(self.cursor.line, self.configs.indent.to_owned());
             self.cursor.char = self.configs.indent.len();
+        }
+    }
+
+    fn adjust_cursor_max_char(&mut self) {
+        if let Some(line) = self.content.get(self.cursor.line) {
+            if line.len() < self.cursor.char {
+                self.cursor.char = line.len()
+            }
         }
     }
 }
