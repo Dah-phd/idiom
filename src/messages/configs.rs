@@ -26,7 +26,7 @@ impl Default for EditorConfigs {
     fn default() -> Self {
         Self {
             indent: "    ".to_owned(),
-            indent_after: ":({".to_owned(),
+            indent_after: "({[".to_owned(),
             format_on_save: true,
             theme_file_in_config_dir: String::from(DEFAULT_THEME_FILE),
         }

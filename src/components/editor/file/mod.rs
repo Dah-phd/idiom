@@ -340,12 +340,12 @@ impl Editor {
                     }
                     self.content.insert(self.cursor.line, line);
                     self.content.insert(self.cursor.line, indent);
+                    return;
                 }
             }
-        } else {
-            line.insert_str(0, &indent);
-            self.content.insert(self.cursor.line, line);
         }
+        line.insert_str(0, &indent);
+        self.content.insert(self.cursor.line, line);
     }
 
     pub fn push(&mut self, ch: char) {
