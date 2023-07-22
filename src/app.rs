@@ -1,4 +1,7 @@
-use std::time::{Duration, Instant};
+use std::{
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 use crate::{
     components::{popups::editor_popups::save_all_popup, EditorState, Tree},
@@ -15,7 +18,7 @@ use tui::{
 
 const TICK: Duration = Duration::from_millis(250);
 
-pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
+pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBuf>) -> std::io::Result<()> {
     let configs = KeyMap::new();
     let mut mode = Mode::Select;
     let mut clock = Instant::now();
@@ -24,6 +27,11 @@ pub async fn app(terminal: &mut Terminal<impl Backend>) -> std::io::Result<()> {
     let mut editor_state = EditorState::new(configs.editor_key_map());
     let mut lsp_servers: Vec<LSP> = vec![];
     let mut general_key_map = configs.general_key_map();
+    if let Some(path) = open_file {
+        editor_state.new_from(path);
+        mode = Mode::Insert;
+        hide_file_tree = true;
+    }
 
     drop(configs);
 

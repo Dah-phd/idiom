@@ -1,7 +1,9 @@
+mod langs;
 mod theme;
 pub use self::theme::{Theme, DEFAULT_THEME_FILE};
 use crate::components::editor::CursorPosition;
 use crate::messages::FileType;
+use langs::Lang;
 use tui::{
     style::{Color, Style},
     text::{Span, Spans},
@@ -19,36 +21,15 @@ pub struct Lexer {
     brackets: Vec<Color>,
     square: Vec<Color>,
     last_token: String,
-    key_words: Vec<&'static str>,
-    frow_control: Vec<&'static str>,
+    lang: Lang,
     last_key_words: Vec<String>,
     max_digits: usize,
 }
 
-impl Default for Lexer {
-    fn default() -> Self {
-        Self {
-            key_words: vec!["pub", "fn", "struct", "use", "mod", "let", "self", "mut", "crate"],
-            frow_control: vec!["if", "loop", "for", "while", "break", "continue"], //TODO add color to flow control
-            select_at_line: None,
-            curly: vec![],
-            brackets: vec![],
-            square: vec![],
-            last_token: String::default(),
-            token_start: 0,
-            last_key_words: vec![],
-            theme: Theme::default(),
-            select: None,
-            max_digits: 0,
-        }
-    }
-}
-
 impl Lexer {
-    pub fn new(theme: Theme) -> Self {
+    pub fn from_type(file_type: &FileType, theme: Theme) -> Self {
         Self {
-            key_words: vec!["pub", "fn", "struct", "use", "mod", "let", "self", "mut", "crate"],
-            frow_control: vec!["if", "loop", "for", "while", "break", "continue"],
+            lang: file_type.into(),
             select_at_line: None,
             curly: vec![],
             brackets: vec![],
@@ -59,13 +40,6 @@ impl Lexer {
             theme,
             select: None,
             max_digits: 0,
-        }
-    }
-
-    pub fn from_type(file_type: &FileType, theme: Theme) -> Self {
-        #[allow(clippy::match_single_binding)]
-        match file_type {
-            _ => Self::new(theme),
         }
     }
 
@@ -105,7 +79,7 @@ impl Lexer {
     }
 
     fn process_line(&mut self, content: &str, spans: &mut Vec<Span>) {
-        if content.starts_with("mod") | content.starts_with("use") {
+        if self.lang.mod_import.iter().any(|key| content.starts_with(key)) {
             for (idx, ch) in content.chars().enumerate() {
                 match ch {
                     ' ' => {
@@ -190,12 +164,12 @@ impl Lexer {
     }
 
     fn handled_key_word(&mut self, token_end: usize, spans: &mut Vec<Span>) -> bool {
-        if self.key_words.contains(&self.last_token.trim()) {
+        if self.lang.key_words.contains(&self.last_token.trim()) {
             self.last_key_words.push(self.last_token.to_owned());
             self.drain_with_select(token_end, self.theme.key_words, spans);
             return true;
         }
-        if self.frow_control.contains(&self.last_token.trim()) {
+        if self.lang.frow_control.contains(&self.last_token.trim()) {
             self.last_key_words.push(self.last_token.to_owned());
             self.drain_with_select(token_end, self.theme.flow_control, spans);
             return true;
