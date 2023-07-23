@@ -1,7 +1,7 @@
 use super::select::CursorPosition;
 use std::time::{Duration, Instant};
 
-const TICK: Duration = Duration::from_millis(100);
+const TICK: Duration = Duration::from_millis(150);
 
 #[derive(Debug)]
 pub struct ActionLogger {
@@ -37,7 +37,7 @@ impl ActionLogger {
     pub fn init_replace_from_select(&mut self, from: &CursorPosition, to: &CursorPosition, content: &[String]) {
         self.undone.clear();
         self.push_buffer();
-        self.replace_base = Some((*from, content[from.line..to.line].to_owned()))
+        self.replace_base = Some((*from, content[from.line..=to.line].to_owned()))
     }
 
     pub fn init_replace(&mut self, cursor: CursorPosition, old_content: &[String]) {

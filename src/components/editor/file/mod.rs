@@ -165,18 +165,12 @@ impl Editor {
         if self.cursor.line > 0 {
             let new_line = self.cursor.line - 1;
             self.action_logger
-                .init_replace(self.cursor, &self.content[new_line..self.cursor.line + 1]);
-            self.content.swap(self.cursor.line, new_line);
-            let (offset, indent) = self
-                .configs
-                .derive_indent_from(&self.content[new_line.checked_sub(1).unwrap_or(self.cursor.line)]);
-            let line = &mut self.content[self.cursor.line];
-            line.insert_str(0, &indent);
-            self.cursor.char += offset;
-            trim_start_inplace(line);
+                .init_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line + 1]);
+            let (char_offset, _) = self.swap(new_line, self.cursor.line);
             self.cursor.line = new_line;
+            self.cursor.char = self.cursor.char.saturating_add_signed(char_offset);
             self.action_logger
-                .finish_replace(self.cursor, &self.content[new_line..new_line + 2])
+                .finish_replace(self.cursor, &self.content[self.cursor.line..self.cursor.line + 2])
         }
     }
 
@@ -222,16 +216,12 @@ impl Editor {
         if self.content.len() - 1 > self.cursor.line {
             let new_cursor_line = self.cursor.line + 1;
             self.action_logger
-                .init_replace(self.cursor, &self.content[self.cursor.line..new_cursor_line + 1]);
-            self.content.swap(self.cursor.line, new_cursor_line);
-            let (offset, indent) = self.configs.derive_indent_from(&self.content[self.cursor.line]);
-            let line = &mut self.content[new_cursor_line];
-            trim_start_inplace(line);
-            line.insert_str(0, &indent);
+                .init_replace(self.cursor, &self.content[self.cursor.line..=new_cursor_line]);
+            let (_, char_offset) = self.swap(self.cursor.line, new_cursor_line);
+            self.cursor.char = self.cursor.char.saturating_add_signed(char_offset);
             self.cursor.line = new_cursor_line;
-            self.cursor.char += offset;
             self.action_logger
-                .finish_replace(self.cursor, &self.content[new_cursor_line - 1..new_cursor_line + 1])
+                .finish_replace(self.cursor, &self.content[new_cursor_line - 1..=new_cursor_line])
         }
     }
 
@@ -355,9 +345,9 @@ impl Editor {
         } else {
             String::new()
         };
-        let (offset, indent) = self.configs.derive_indent_from(prev_line);
+        let indent = self.configs.derive_indent_from(prev_line);
         self.cursor.line += 1;
-        self.cursor.char = offset;
+        self.cursor.char = indent.len();
         if let Some(last) = prev_line.trim_end().chars().last() {
             if let Some(first) = line.trim_start().chars().next() {
                 if (last, first) == ('{', '}') || (last, first) == ('(', ')') || (last, first) == ('[', ']') {
@@ -401,21 +391,22 @@ impl Editor {
         if let Some((from, to)) = self.select.get() {
             self.action_logger.init_replace_from_select(from, to, &self.content);
             self.remove();
-            self.action_logger.finish_replace(self.cursor, &[]);
+            self.action_logger
+                .finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line]);
             return;
         }
         if self.cursor.line != 0 {
             if self.cursor.char == 0 {
                 let prev_line_idx = self.cursor.line - 1;
                 self.action_logger
-                    .init_replace(self.cursor, &self.content[prev_line_idx..self.cursor.line + 1]);
+                    .init_replace(self.cursor, &self.content[prev_line_idx..=self.cursor.line]);
                 let current_line = self.content.remove(self.cursor.line);
                 self.cursor.line -= 1;
                 let prev_line = &mut self.content[self.cursor.line];
                 self.cursor.char = prev_line.len();
                 prev_line.push_str(&current_line);
                 self.action_logger
-                    .finish_replace(self.cursor, &self.content[self.cursor.line..self.cursor.line + 1]);
+                    .finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line]);
             } else {
                 let line = &mut self.content[self.cursor.line];
                 self.action_logger.backspace(&self.cursor, line);
@@ -438,17 +429,18 @@ impl Editor {
         if let Some((from, to)) = self.select.get() {
             self.action_logger.init_replace_from_select(from, to, &self.content);
             self.remove();
-            self.action_logger.finish_replace(self.cursor, &[]);
+            self.action_logger
+                .finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line]);
             return;
         }
         if self.content[self.cursor.line].len() == self.cursor.char {
             if self.content.len() > self.cursor.line + 1 {
                 self.action_logger
-                    .init_replace(self.cursor, &self.content[self.cursor.line..self.cursor.line + 2]);
+                    .init_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line + 1]);
                 let next_line = self.content.remove(self.cursor.line + 1);
                 self.content[self.cursor.line].push_str(&next_line);
                 self.action_logger
-                    .finish_replace(self.cursor, &self.content[self.cursor.line..self.cursor.line + 1])
+                    .finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line])
             }
         } else {
             let line = &mut self.content[self.cursor.line];
@@ -485,6 +477,33 @@ impl Editor {
     pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {
         self.configs = new_cfg.clone();
         self.linter.theme = Theme::from(&self.configs.theme_file_in_config_dir);
+    }
+
+    fn get_indent_from_prev_line(&self, current_idx: usize) -> Option<String> {
+        Some(
+            self.configs
+                .derive_indent_from(&self.content[current_idx.checked_sub(1)?]),
+        )
+    }
+
+    fn swap(&mut self, from: usize, to: usize) -> (isize, isize) {
+        // from should be always smaller than to - unchecked
+        self.content.swap(from, to);
+        let offset1 = if let Some(indent) = self.get_indent_from_prev_line(from) {
+            let line = &mut self.content[from];
+            indent.len() as isize - trim_start_inplace(line) as isize
+        } else {
+            let line = &mut self.content[from];
+            trim_start_inplace(line) as isize
+        };
+        let offset2 = if let Some(indent) = self.get_indent_from_prev_line(to) {
+            let line = &mut self.content[to];
+            indent.len() as isize - trim_start_inplace(line) as isize
+        } else {
+            let line = &mut self.content[to];
+            trim_start_inplace(line) as isize
+        };
+        (offset1, offset2)
     }
 
     fn remove(&mut self) -> String {
