@@ -8,6 +8,7 @@
     * test backspace & del
 * theme trait for diff languages
 * LSP support
+* test swaps
 
 ## Target langs:
 * RUST
