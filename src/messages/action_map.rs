@@ -59,6 +59,8 @@ pub enum EditorAction {
     Cut,
     Copy,
     Paste,
+    Undo,
+    Redo,
     Save,
     Close,
 }
@@ -91,6 +93,8 @@ pub struct EditorUserKeyMap {
     cut: String,
     copy: String,
     paste: String,
+    undo: String,
+    redo: String,
     save: String,
     close: String,
 }
@@ -123,6 +127,8 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
         insert_key_event(&mut hash, &val.cut, EditorAction::Cut);
         insert_key_event(&mut hash, &val.copy, EditorAction::Copy);
         insert_key_event(&mut hash, &val.paste, EditorAction::Paste);
+        insert_key_event(&mut hash, &val.undo, EditorAction::Undo);
+        insert_key_event(&mut hash, &val.redo, EditorAction::Redo);
         insert_key_event(&mut hash, &val.save, EditorAction::Save);
         insert_key_event(&mut hash, &val.close, EditorAction::Close);
         hash
@@ -157,6 +163,8 @@ impl Default for EditorUserKeyMap {
             cut: format!("{} && {}", CTRL, 'x'),
             copy: format!("{} && {}", CTRL, 'c'),
             paste: format!("{} && {}", CTRL, 'v'),
+            undo: format!("{} && {}", CTRL, 'z'),
+            redo: format!("{} && {}", CTRL, 'y'),
             save: format!("{} && {}", CTRL, 's'),
             close: format!("{} && {} || {} && {}", CTRL, 'q', CTRL, 'd'),
         }
@@ -337,6 +345,10 @@ fn split_mod_char_key_event(key: KeyEvent) -> Vec<KeyEvent> {
                 }
             }
         }
+    }
+    #[cfg(target_os = "linux")]
+    if key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char(']') {
+        events.push(KeyEvent::new(KeyCode::Char('5'), key.modifiers))
     }
     events
 }

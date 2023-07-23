@@ -36,6 +36,9 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
     drop(configs);
 
     loop {
+        if matches!(mode, Mode::Select) {
+            let _ = terminal.hide_cursor();
+        }
         terminal.draw(|frame| {
             let screen_areas = Layout::default()
                 .direction(Direction::Horizontal)
@@ -56,10 +59,6 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                 popup.render(frame);
             }
         })?;
-
-        if matches!(mode, Mode::Select) {
-            let _ = terminal.hide_cursor();
-        }
 
         let timeout = TICK
             .checked_sub(clock.elapsed())

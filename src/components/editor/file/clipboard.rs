@@ -1,6 +1,5 @@
-use std::fmt::Debug;
-
 use cli_clipboard::{ClipboardContext, ClipboardProvider};
+use std::fmt::Debug;
 
 pub struct Clipboard {
     ctx: ClipboardContext,

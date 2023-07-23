@@ -107,6 +107,8 @@ impl EditorState {
                     EditorAction::Cut => editor.cut(),
                     EditorAction::Copy => editor.copy(),
                     EditorAction::Paste => editor.paste(),
+                    EditorAction::Undo => editor.undo(),
+                    EditorAction::Redo => editor.redo(),
                     EditorAction::Save => editor.save(),
                     EditorAction::Close => self.close_active(),
                 }

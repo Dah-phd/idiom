@@ -9,6 +9,7 @@ use std::path::PathBuf;
 
 use app::app;
 
+// use crossterm::event::{PushKeyboardEnhancementFlags, PopKeyboardEnhancementFlags, KeyboardEnhancementFlags};
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
@@ -18,6 +19,7 @@ fn prep(out: &mut impl std::io::Write) -> std::io::Result<()> {
         out,
         crossterm::terminal::EnterAlternateScreen,
         crossterm::style::ResetColor,
+        crossterm::cursor::SetCursorStyle::BlinkingBar,
     )?;
     Ok(())
 }

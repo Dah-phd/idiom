@@ -12,6 +12,8 @@ use crate::{
 };
 use std::path::PathBuf;
 
+use self::action::ActionLogger;
+
 #[derive(Debug)]
 pub struct Editor {
     pub linter: Lexer,
@@ -20,7 +22,7 @@ pub struct Editor {
     select: Select,
     clipboard: Clipboard,
     should_paste_line: bool,
-    // action_logger: ActionLogger,
+    action_logger: ActionLogger,
     pub max_rows: u16,
     pub at_line: usize,
     pub content: Vec<String>,
@@ -39,7 +41,7 @@ impl Editor {
             select: Select::default(),
             clipboard: Clipboard::default(),
             should_paste_line: false,
-            // action_logger: ActionLogger::default(),
+            action_logger: ActionLogger::default(),
             max_rows: 0,
             at_line: 0,
             content: content.lines().map(String::from).collect(),
@@ -116,6 +118,18 @@ impl Editor {
         }
     }
 
+    pub fn undo(&mut self) {
+        if let Some(cursor) = self.action_logger.undo(&mut self.content) {
+            self.cursor = cursor;
+        }
+    }
+
+    pub fn redo(&mut self) {
+        if let Some(cursor) = self.action_logger.redo(&mut self.content) {
+            self.cursor = cursor;
+        }
+    }
+
     pub fn up(&mut self) {
         self.select.drop();
         self._up()
@@ -150,6 +164,8 @@ impl Editor {
         };
         if self.cursor.line > 0 {
             let new_line = self.cursor.line - 1;
+            self.action_logger
+                .init_replace(self.cursor, &self.content[new_line..self.cursor.line + 1]);
             self.content.swap(self.cursor.line, new_line);
             let (offset, indent) = self
                 .configs
@@ -159,6 +175,8 @@ impl Editor {
             self.cursor.char += offset;
             trim_start_inplace(line);
             self.cursor.line = new_line;
+            self.action_logger
+                .finish_replace(self.cursor, &self.content[new_line..new_line + 2])
         }
     }
 
@@ -203,6 +221,8 @@ impl Editor {
         }
         if self.content.len() - 1 > self.cursor.line {
             let new_cursor_line = self.cursor.line + 1;
+            self.action_logger
+                .init_replace(self.cursor, &self.content[self.cursor.line..new_cursor_line + 1]);
             self.content.swap(self.cursor.line, new_cursor_line);
             let (offset, indent) = self.configs.derive_indent_from(&self.content[self.cursor.line]);
             let line = &mut self.content[new_cursor_line];
@@ -210,6 +230,8 @@ impl Editor {
             line.insert_str(0, &indent);
             self.cursor.line = new_cursor_line;
             self.cursor.char += offset;
+            self.action_logger
+                .finish_replace(self.cursor, &self.content[new_cursor_line - 1..new_cursor_line + 1])
         }
     }
 
@@ -319,11 +341,15 @@ impl Editor {
 
     pub fn new_line(&mut self) {
         if self.content.is_empty() {
+            self.action_logger.init_replace(self.cursor, &[]);
             self.content.push(String::new());
             self.cursor.line += 1;
+            self.action_logger
+                .finish_replace(self.cursor, &self.content[self.cursor.line - 1..self.cursor.line]);
             return;
         }
         let prev_line = &mut self.content[self.cursor.line];
+        self.action_logger.init_replace(self.cursor, &[prev_line.to_owned()]);
         let mut line = if prev_line.len() >= self.cursor.char {
             prev_line.split_off(self.cursor.char)
         } else {
@@ -340,22 +366,29 @@ impl Editor {
                     }
                     self.content.insert(self.cursor.line, line);
                     self.content.insert(self.cursor.line, indent);
+                    self.action_logger
+                        .finish_replace(self.cursor, &self.content[self.cursor.line - 1..self.cursor.line + 2]);
                     return;
                 }
             }
         }
         line.insert_str(0, &indent);
         self.content.insert(self.cursor.line, line);
+        self.action_logger
+            .init_replace(self.cursor, &self.content[self.cursor.line - 1..self.cursor.line + 1]);
     }
 
     pub fn push(&mut self, ch: char) {
         if let Some(line) = self.content.get_mut(self.cursor.line) {
+            self.action_logger.push_char(&self.cursor, line, ch);
             line.insert(self.cursor.char, ch);
             self.cursor.char += 1;
             if let Some(closing) = get_closing_char(ch) {
-                line.insert(self.cursor.char, closing)
+                line.insert(self.cursor.char, closing);
+                self.action_logger.inser_char(&self.cursor, line, closing);
             }
         } else {
+            self.action_logger.push_char(&self.cursor, "", ch);
             self.content.insert(self.cursor.line, ch.to_string());
             self.cursor.char = 1;
         }
@@ -365,24 +398,34 @@ impl Editor {
         if self.content.is_empty() {
             return;
         }
-        if !self.select.is_empty() {
-            let _returned_for_action_log = self.remove();
+        if let Some((from, to)) = self.select.get() {
+            self.action_logger.init_replace_from_select(from, to, &self.content);
+            self.remove();
+            self.action_logger.finish_replace(self.cursor, &[]);
             return;
         }
         if self.cursor.line != 0 {
             if self.cursor.char == 0 {
+                let prev_line_idx = self.cursor.line - 1;
+                self.action_logger
+                    .init_replace(self.cursor, &self.content[prev_line_idx..self.cursor.line + 1]);
                 let current_line = self.content.remove(self.cursor.line);
                 self.cursor.line -= 1;
                 let prev_line = &mut self.content[self.cursor.line];
                 self.cursor.char = prev_line.len();
                 prev_line.push_str(&current_line);
+                self.action_logger
+                    .finish_replace(self.cursor, &self.content[self.cursor.line..self.cursor.line + 1]);
             } else {
-                let _returned_for_action_log = self.content[self.cursor.line].remove(self.cursor.char - 1);
+                let line = &mut self.content[self.cursor.line];
+                self.action_logger.backspace(&self.cursor, line);
+                line.remove(self.cursor.char - 1);
                 self.cursor.char -= 1;
             }
         } else if let Some(line) = self.content.get_mut(self.cursor.line) {
             if self.cursor.char != 0 {
-                let _returned_for_action_log = line.remove(self.cursor.char - 1);
+                self.action_logger.backspace(&self.cursor, line);
+                line.remove(self.cursor.char - 1);
                 self.cursor.char -= 1;
             }
         }
@@ -392,17 +435,25 @@ impl Editor {
         if self.content.is_empty() {
             return;
         }
-        if !self.select.is_empty() {
-            let _returned_for_action_log = self.remove();
+        if let Some((from, to)) = self.select.get() {
+            self.action_logger.init_replace_from_select(from, to, &self.content);
+            self.remove();
+            self.action_logger.finish_replace(self.cursor, &[]);
             return;
         }
         if self.content[self.cursor.line].len() == self.cursor.char {
             if self.content.len() > self.cursor.line + 1 {
+                self.action_logger
+                    .init_replace(self.cursor, &self.content[self.cursor.line..self.cursor.line + 2]);
                 let next_line = self.content.remove(self.cursor.line + 1);
                 self.content[self.cursor.line].push_str(&next_line);
+                self.action_logger
+                    .finish_replace(self.cursor, &self.content[self.cursor.line..self.cursor.line + 1])
             }
         } else {
-            let _returned_for_action_log = self.content[self.cursor.line].remove(self.cursor.char);
+            let line = &mut self.content[self.cursor.line];
+            self.action_logger.del(&self.cursor, line);
+            line.remove(self.cursor.char);
         }
     }
 

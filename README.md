@@ -3,6 +3,9 @@
 ## Current version support basic file tree and navigation:
 ## TODO!
 * action history - redo/undo
+    * new lines not reflected properly
+    * copy paste cut - not implemented
+    * test backspace & del
 * theme trait for diff languages
 * LSP support
 
