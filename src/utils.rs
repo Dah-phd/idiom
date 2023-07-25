@@ -1,9 +1,11 @@
-pub fn trim_start_inplace(line: &mut String) -> usize {
+use crate::components::editor::Offset;
+
+pub fn trim_start_inplace(line: &mut String) -> Offset {
     if let Some(idx) = line.find(|c: char| !c.is_whitespace()) {
         line.replace_range(..idx, "");
-        return idx + 1;
+        return Offset::Neg(idx + 1);
     };
-    0
+    Offset::Pos(0)
 }
 
 pub fn get_closing_char(ch: char) -> Option<char> {

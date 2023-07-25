@@ -5,7 +5,7 @@ use dirs::config_dir;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::error::Category;
 
-use crate::syntax::DEFAULT_THEME_FILE;
+use crate::{components::editor::Offset, syntax::DEFAULT_THEME_FILE, utils::trim_start_inplace};
 
 use super::action_map::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap};
 
@@ -18,6 +18,7 @@ const KEY_MAP: &str = ".keys";
 pub struct EditorConfigs {
     pub indent: String,
     pub indent_after: String,
+    pub unindent_before: String,
     pub format_on_save: bool,
     pub theme_file_in_config_dir: String,
 }
@@ -27,6 +28,7 @@ impl Default for EditorConfigs {
         Self {
             indent: "    ".to_owned(),
             indent_after: "({[".to_owned(),
+            unindent_before: "]})".to_owned(),
             format_on_save: true,
             theme_file_in_config_dir: String::from(DEFAULT_THEME_FILE),
         }
@@ -46,6 +48,25 @@ impl EditorConfigs {
             }
         };
         indent
+    }
+
+    pub fn indent_from_prev(&self, prev_line: &str, line: &mut String) -> Offset {
+        let indent = self.derive_indent_from(prev_line);
+        let offset = trim_start_inplace(line) + indent.len();
+        line.insert_str(0, &indent);
+        offset + self.unindent_if_before_pattern(line)
+    }
+
+    pub fn unindent_if_before_pattern(&self, line: &mut String) -> Offset {
+        if line.starts_with(&self.indent) {
+            if let Some(first) = line.trim_start().chars().next() {
+                if self.unindent_before.contains(first) {
+                    line.replace_range(..self.indent.len(), "");
+                    return Offset::Neg(self.indent.len());
+                }
+            }
+        }
+        Offset::Pos(0)
     }
 }
 

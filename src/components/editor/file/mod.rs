@@ -2,7 +2,7 @@ mod action;
 mod clipboard;
 mod select;
 use clipboard::Clipboard;
-pub use select::{CursorPosition, Select};
+pub use select::{CursorPosition, Offset, Select};
 use tui::widgets::{List, ListItem};
 
 use crate::{
@@ -168,7 +168,7 @@ impl Editor {
                 .init_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line + 1]);
             let (char_offset, _) = self.swap(new_line, self.cursor.line);
             self.cursor.line = new_line;
-            self.cursor.char = self.cursor.char.saturating_add_signed(char_offset);
+            self.cursor.offset_char(char_offset);
             self.action_logger
                 .finish_replace(self.cursor, &self.content[self.cursor.line..self.cursor.line + 2])
         }
@@ -218,7 +218,7 @@ impl Editor {
             self.action_logger
                 .init_replace(self.cursor, &self.content[self.cursor.line..=new_cursor_line]);
             let (_, char_offset) = self.swap(self.cursor.line, new_cursor_line);
-            self.cursor.char = self.cursor.char.saturating_add_signed(char_offset);
+            self.cursor.offset_char(char_offset);
             self.cursor.line = new_cursor_line;
             self.action_logger
                 .finish_replace(self.cursor, &self.content[new_cursor_line - 1..=new_cursor_line])
@@ -346,14 +346,13 @@ impl Editor {
             String::new()
         };
         let indent = self.configs.derive_indent_from(prev_line);
+        line.insert_str(0, &indent);
         self.cursor.line += 1;
         self.cursor.char = indent.len();
         if let Some(last) = prev_line.trim_end().chars().last() {
             if let Some(first) = line.trim_start().chars().next() {
-                if (last, first) == ('{', '}') || (last, first) == ('(', ')') || (last, first) == ('[', ']') {
-                    if let Some(bracket_indent) = indent.strip_prefix(&self.configs.indent) {
-                        line.insert_str(0, bracket_indent);
-                    }
+                if [('{', '}'), ('(', ')'), ('[', ']')].contains(&(last, first)) {
+                    self.configs.unindent_if_before_pattern(&mut line);
                     self.content.insert(self.cursor.line, line);
                     self.content.insert(self.cursor.line, indent);
                     self.action_logger
@@ -479,31 +478,24 @@ impl Editor {
         self.linter.theme = Theme::from(&self.configs.theme_file_in_config_dir);
     }
 
-    fn get_indent_from_prev_line(&self, current_idx: usize) -> Option<String> {
-        Some(
-            self.configs
-                .derive_indent_from(&self.content[current_idx.checked_sub(1)?]),
-        )
+    fn get_and_indent_line(&mut self, idx: usize) -> (Offset, &mut String) {
+        if idx > 0 {
+            let (prev_split, current_split) = self.content.split_at_mut(idx);
+            let prev = &prev_split[idx - 1];
+            let line = &mut current_split[0];
+            (self.configs.indent_from_prev(prev, line), line)
+        } else {
+            let line = &mut self.content[idx];
+            (trim_start_inplace(line), line)
+        }
     }
 
-    fn swap(&mut self, from: usize, to: usize) -> (isize, isize) {
+    fn swap(&mut self, from: usize, to: usize) -> (Offset, Offset) {
         // from should be always smaller than to - unchecked
         self.content.swap(from, to);
-        let offset1 = if let Some(indent) = self.get_indent_from_prev_line(from) {
-            let line = &mut self.content[from];
-            indent.len() as isize - trim_start_inplace(line) as isize
-        } else {
-            let line = &mut self.content[from];
-            trim_start_inplace(line) as isize
-        };
-        let offset2 = if let Some(indent) = self.get_indent_from_prev_line(to) {
-            let line = &mut self.content[to];
-            indent.len() as isize - trim_start_inplace(line) as isize
-        } else {
-            let line = &mut self.content[to];
-            trim_start_inplace(line) as isize
-        };
-        (offset1, offset2)
+        let (offset, _) = self.get_and_indent_line(from);
+        let (offset2, _) = self.get_and_indent_line(to);
+        (offset, offset2)
     }
 
     fn remove(&mut self) -> String {

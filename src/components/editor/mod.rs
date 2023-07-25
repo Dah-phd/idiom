@@ -1,5 +1,5 @@
 mod file;
-pub use file::CursorPosition;
+pub use file::{CursorPosition, Offset};
 
 use crate::messages::{EditorAction, EditorConfigs, EditorKeyMap};
 use crossterm::event::KeyEvent;
