@@ -17,6 +17,10 @@ impl From<(usize, usize)> for CursorPosition {
 
 #[allow(dead_code)]
 impl CursorPosition {
+    pub fn line_range(&self, sub: usize, add: usize) -> std::ops::Range<usize> {
+        self.line.checked_sub(sub).unwrap_or_default()..self.line + add
+    }
+
     pub fn offset_char(&mut self, offset: Offset) {
         match offset {
             Offset::Neg(val) => self.char = self.char.checked_sub(val).unwrap_or_default(),

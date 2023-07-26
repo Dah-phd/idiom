@@ -54,10 +54,10 @@ impl EditorConfigs {
         let indent = self.derive_indent_from(prev_line);
         let offset = trim_start_inplace(line) + indent.len();
         line.insert_str(0, &indent);
-        offset + self.unindent_if_before_pattern(line)
+        offset + self.unindent_if_before_base_pattern(line)
     }
 
-    pub fn unindent_if_before_pattern(&self, line: &mut String) -> Offset {
+    pub fn unindent_if_before_base_pattern(&self, line: &mut String) -> Offset {
         if line.starts_with(&self.indent) {
             if let Some(first) = line.trim_start().chars().next() {
                 if self.unindent_before.contains(first) {

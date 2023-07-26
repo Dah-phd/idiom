@@ -333,9 +333,9 @@ impl Editor {
         if self.content.is_empty() {
             self.action_logger.init_replace(self.cursor, &[]);
             self.content.push(String::new());
-            self.cursor.line += 1;
             self.action_logger
-                .finish_replace(self.cursor, &self.content[self.cursor.line - 1..self.cursor.line]);
+                .finish_replace(self.cursor, &self.content[self.cursor.line_range(0, 1)]);
+            self.cursor.line += 1;
             return;
         }
         let prev_line = &mut self.content[self.cursor.line];
@@ -352,11 +352,11 @@ impl Editor {
         if let Some(last) = prev_line.trim_end().chars().last() {
             if let Some(first) = line.trim_start().chars().next() {
                 if [('{', '}'), ('(', ')'), ('[', ']')].contains(&(last, first)) {
-                    self.configs.unindent_if_before_pattern(&mut line);
+                    self.configs.unindent_if_before_base_pattern(&mut line);
                     self.content.insert(self.cursor.line, line);
                     self.content.insert(self.cursor.line, indent);
                     self.action_logger
-                        .finish_replace(self.cursor, &self.content[self.cursor.line - 1..self.cursor.line + 2]);
+                        .finish_replace(self.cursor, &self.content[self.cursor.line_range(1, 2)]);
                     return;
                 }
             }
@@ -364,7 +364,7 @@ impl Editor {
         line.insert_str(0, &indent);
         self.content.insert(self.cursor.line, line);
         self.action_logger
-            .init_replace(self.cursor, &self.content[self.cursor.line - 1..self.cursor.line + 1]);
+            .init_replace(self.cursor, &self.content[self.cursor.line_range(1, 1)]);
     }
 
     pub fn push(&mut self, ch: char) {
@@ -460,11 +460,7 @@ impl Editor {
         if let Some(line) = self.content.get_mut(self.cursor.line) {
             if line.starts_with(&self.configs.indent) {
                 line.replace_range(..self.configs.indent.len(), "");
-                self.cursor.char = self
-                    .cursor
-                    .char
-                    .checked_sub(self.configs.indent.len())
-                    .unwrap_or_default();
+                self.cursor.diff_char(self.configs.indent.len());
             }
         }
     }
@@ -478,14 +474,14 @@ impl Editor {
         self.linter.theme = Theme::from(&self.configs.theme_file_in_config_dir);
     }
 
-    fn get_and_indent_line(&mut self, idx: usize) -> (Offset, &mut String) {
-        if idx > 0 {
-            let (prev_split, current_split) = self.content.split_at_mut(idx);
-            let prev = &prev_split[idx - 1];
+    fn get_and_indent_line(&mut self, line_idx: usize) -> (Offset, &mut String) {
+        if line_idx > 0 {
+            let (prev_split, current_split) = self.content.split_at_mut(line_idx);
+            let prev = &prev_split[line_idx - 1];
             let line = &mut current_split[0];
             (self.configs.indent_from_prev(prev, line), line)
         } else {
-            let line = &mut self.content[idx];
+            let line = &mut self.content[line_idx];
             (trim_start_inplace(line), line)
         }
     }
