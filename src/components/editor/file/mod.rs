@@ -164,13 +164,16 @@ impl Editor {
         };
         if self.cursor.line > 0 {
             let new_line = self.cursor.line - 1;
-            self.action_logger
-                .init_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line + 1]);
+            self.action_logger.init_repalce_from_line(
+                new_line,
+                self.cursor,
+                &self.content[new_line..=self.cursor.line],
+            );
             let (char_offset, _) = self.swap(new_line, self.cursor.line);
             self.cursor.line = new_line;
             self.cursor.offset_char(char_offset);
             self.action_logger
-                .finish_replace(self.cursor, &self.content[self.cursor.line..self.cursor.line + 2])
+                .finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line + 1])
         }
     }
 
@@ -364,7 +367,7 @@ impl Editor {
         line.insert_str(0, &indent);
         self.content.insert(self.cursor.line, line);
         self.action_logger
-            .init_replace(self.cursor, &self.content[self.cursor.line_range(1, 1)]);
+            .finish_replace(self.cursor, &self.content[self.cursor.line_range(1, 1)]);
     }
 
     pub fn push(&mut self, ch: char) {

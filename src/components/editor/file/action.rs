@@ -4,8 +4,43 @@ use std::time::{Duration, Instant};
 const TICK: Duration = Duration::from_millis(150);
 
 #[derive(Debug)]
+struct ReplaceBuilder {
+    from_line: usize,
+    cursor: CursorPosition,
+    old_content: Vec<String>,
+}
+
+impl ReplaceBuilder {
+    fn new(from_line: usize, cursor: CursorPosition, old_content: Vec<String>) -> Self {
+        Self {
+            from_line,
+            cursor,
+            old_content,
+        }
+    }
+
+    fn from_cursor(cursor: CursorPosition, old_content: Vec<String>) -> Self {
+        Self {
+            from_line: cursor.line,
+            cursor,
+            old_content,
+        }
+    }
+
+    fn collect(self, new_cursor: CursorPosition, new: Vec<String>) -> Action {
+        Action {
+            from_line: self.from_line,
+            old_cursor: self.cursor,
+            new_cursor,
+            old: self.old_content,
+            new,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct ActionLogger {
-    replace_base: Option<(CursorPosition, Vec<String>)>,
+    replace_builder: Option<ReplaceBuilder>,
     buffer: Option<Action>,
     pub done: Vec<Action>,
     pub undone: Vec<Action>,
@@ -15,7 +50,7 @@ pub struct ActionLogger {
 impl Default for ActionLogger {
     fn default() -> Self {
         Self {
-            replace_base: Option::default(),
+            replace_builder: Option::default(),
             buffer: Option::default(),
             done: Vec::default(),
             undone: Vec::default(),
@@ -37,24 +72,27 @@ impl ActionLogger {
     pub fn init_replace_from_select(&mut self, from: &CursorPosition, to: &CursorPosition, content: &[String]) {
         self.undone.clear();
         self.push_buffer();
-        self.replace_base = Some((*from, content[from.line..=to.line].to_owned()))
+        self.replace_builder = Some(ReplaceBuilder::from_cursor(
+            *from,
+            content[from.line..=to.line].to_owned(),
+        ))
+    }
+
+    pub fn init_repalce_from_line(&mut self, from_line: usize, cursor: CursorPosition, old_content: &[String]) {
+        self.undone.clear();
+        self.push_buffer();
+        self.replace_builder = Some(ReplaceBuilder::new(from_line, cursor, old_content.into()))
     }
 
     pub fn init_replace(&mut self, cursor: CursorPosition, old_content: &[String]) {
         self.undone.clear();
         self.push_buffer();
-        self.replace_base = Some((cursor, old_content.into()))
+        self.replace_builder = Some(ReplaceBuilder::from_cursor(cursor, old_content.to_owned()))
     }
 
     pub fn finish_replace(&mut self, new_cursor: CursorPosition, new: &[String]) {
-        if let Some((old_cursor, old)) = self.replace_base.take() {
-            self.done.push(Action {
-                from_line: old_cursor.line,
-                old_cursor,
-                new_cursor,
-                old,
-                new: new.into(),
-            })
+        if let Some(builder) = self.replace_builder.take() {
+            self.done.push(builder.collect(new_cursor, new.into()))
         }
     }
 
