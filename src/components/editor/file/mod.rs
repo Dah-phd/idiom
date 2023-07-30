@@ -21,7 +21,6 @@ pub struct Editor {
     pub cursor: CursorPosition,
     select: Select,
     clipboard: Clipboard,
-    should_paste_line: bool,
     action_logger: ActionLogger,
     pub max_rows: u16,
     pub at_line: usize,
@@ -40,7 +39,6 @@ impl Editor {
             cursor: CursorPosition::default(),
             select: Select::default(),
             clipboard: Clipboard::default(),
-            should_paste_line: false,
             action_logger: ActionLogger::default(),
             max_rows: 0,
             at_line: 0,
@@ -76,7 +74,6 @@ impl Editor {
         if self.content.is_empty() {
             return;
         }
-        self.should_paste_line = false;
         let c = if let Some((from, _to, clip)) = self.select.extract_logged(&mut self.content, &mut self.action_logger)
         {
             self.cursor = from;
@@ -100,7 +97,6 @@ impl Editor {
     }
 
     pub fn copy(&mut self) {
-        self.should_paste_line = false;
         if let Some((from, to)) = self.select.get() {
             if from.line == to.line {
                 self.clipboard
@@ -120,7 +116,6 @@ impl Editor {
                 self.clipboard.push(clip_vec.join("\n"));
             }
         } else {
-            self.should_paste_line = true;
             let mut line = self.content[self.cursor.line].to_owned();
             line.push('\n');
             self.clipboard.push(line);
@@ -128,9 +123,42 @@ impl Editor {
     }
 
     pub fn paste(&mut self) {
-        self.select.extract_select(&mut self.content);
+        if let Some((from, _to, _clip)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
+            self.cursor = from;
+        } else {
+            self.action_logger.init_replace(self.cursor, &[]);
+        };
         if let Some(clip) = self.clipboard.get() {
-            self.insert_clip(clip)
+            let mut lines: Vec<_> = clip.split('\n').collect();
+            let start_line = self.cursor.line;
+            if lines.len() == 1 {
+                let text = lines[0];
+                self.content[self.cursor.line].insert_str(self.cursor.char, lines[0]);
+                self.cursor.char += text.len();
+            } else {
+                let line = self.content.remove(self.cursor.line);
+                let (prefix, suffix) = line.split_at(self.cursor.char);
+                let mut first_line = prefix.to_owned();
+                first_line.push_str(lines.remove(0));
+                self.content.insert(self.cursor.line, first_line);
+                let last_idx = lines.len() - 1;
+                for (idx, select) in lines.iter().enumerate() {
+                    let next_line = if idx == last_idx {
+                        let mut last_line = select.to_string();
+                        self.cursor.char = last_line.len();
+                        last_line.push_str(suffix);
+                        last_line
+                    } else {
+                        select.to_string()
+                    };
+                    self.content.insert(self.cursor.line + 1, next_line);
+                    self.down();
+                }
+            }
+            self.action_logger
+                .finish_replace(self.cursor, &self.content[start_line..=self.cursor.line])
+        } else {
+            self.action_logger.finish_replace(self.cursor, &[])
         }
     }
 
@@ -509,45 +537,6 @@ impl Editor {
         let (offset, _) = self.get_and_indent_line(from);
         let (offset2, _) = self.get_and_indent_line(to);
         (offset, offset2)
-    }
-
-    fn insert_clip(&mut self, clip: String) {
-        let mut lines: Vec<_> = clip.split('\n').collect();
-        if lines.is_empty() {
-            return;
-        }
-        if self.should_paste_line && lines.len() == 2 && lines[1].is_empty() {
-            self.content.insert(self.cursor.line, lines[0].into())
-        } else if lines.len() == 1 {
-            let text = lines[0];
-            self.content[self.cursor.line].insert_str(self.cursor.char, lines[0]);
-            self.cursor.char += text.len();
-        } else {
-            let line = self.content.remove(self.cursor.line);
-            let (prefix, suffix) = line.split_at(self.cursor.char);
-            let mut first_line = prefix.to_owned();
-            if lines.len() == 1 {
-                first_line.push_str(lines[0]);
-                self.content.insert(self.cursor.line, first_line);
-                self.content.insert(self.cursor.line + 1, suffix.to_owned());
-            } else {
-                first_line.push_str(lines.remove(0));
-                self.content.insert(self.cursor.line, first_line);
-                let last_idx = lines.len() - 1;
-                for (idx, select) in lines.iter().enumerate() {
-                    let next_line = if idx == last_idx {
-                        let mut last_line = select.to_string();
-                        self.cursor.char = last_line.len();
-                        last_line.push_str(suffix);
-                        last_line
-                    } else {
-                        select.to_string()
-                    };
-                    self.content.insert(self.cursor.line + 1, next_line);
-                    self.down();
-                }
-            }
-        }
     }
 
     fn indent_at(&mut self, idx: usize) {

@@ -137,13 +137,6 @@ impl Select {
         None
     }
 
-    pub fn extract_select(&mut self, content: &mut Vec<String>) -> CutContent {
-        if let Self::Range(from, to) = std::mem::replace(self, Self::None) {
-            return Some((from, to, clip_content(&from, &to, content)));
-        }
-        None
-    }
-
     pub fn init(&mut self, line: usize, char: usize) {
         if matches!(self, Select::None) {
             (*self) = Self::Range((line, char).into(), (line, char).into())
