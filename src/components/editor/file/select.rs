@@ -1,5 +1,8 @@
 use std::ops::{Add, Sub};
 
+use super::action::ActionLogger;
+type CutContent = Option<(CursorPosition, CursorPosition, String)>;
+
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct CursorPosition {
     pub line: usize,
@@ -122,12 +125,23 @@ impl Default for Select {
 }
 
 impl Select {
-    pub fn is_empty(&self) -> bool {
-        matches!(self, Select::None)
-    }
-
     pub fn drop(&mut self) {
         (*self) = Self::None;
+    }
+
+    pub fn extract_logged(&mut self, content: &mut Vec<String>, action_logger: &mut ActionLogger) -> CutContent {
+        if let Self::Range(from, to) = std::mem::replace(self, Self::None) {
+            action_logger.init_replace_from_select(&from, &to, content);
+            return Some((from, to, clip_content(&from, &to, content)));
+        }
+        None
+    }
+
+    pub fn extract_select(&mut self, content: &mut Vec<String>) -> CutContent {
+        if let Self::Range(from, to) = std::mem::replace(self, Self::None) {
+            return Some((from, to, clip_content(&from, &to, content)));
+        }
+        None
     }
 
     pub fn init(&mut self, line: usize, char: usize) {
@@ -153,5 +167,29 @@ impl Select {
                 }
             }
         }
+    }
+}
+
+fn clip_content(from: &CursorPosition, to: &CursorPosition, content: &mut Vec<String>) -> String {
+    if from.line == to.line {
+        let line = &mut content[from.line];
+        let clip = line[from.char..to.char].to_owned();
+        line.replace_range(from.char..to.char, "");
+        clip
+    } else {
+        let mut clip_vec = vec![content[from.line].split_off(from.char)];
+        let mut last_line = to.line;
+        while from.line < last_line {
+            last_line -= 1;
+            if from.line == last_line {
+                let final_clip = content.remove(from.line + 1);
+                let (clipped, remaining) = final_clip.split_at(to.char);
+                content[from.line].push_str(remaining);
+                clip_vec.push(clipped.to_owned())
+            } else {
+                clip_vec.push(content.remove(from.line + 1))
+            }
+        }
+        clip_vec.join("\n")
     }
 }

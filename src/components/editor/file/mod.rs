@@ -77,8 +77,26 @@ impl Editor {
             return;
         }
         self.should_paste_line = false;
-        let cut_content = self.remove();
-        self.clipboard.push(cut_content);
+        let c = if let Some((from, _to, clip)) = self.select.extract_logged(&mut self.content, &mut self.action_logger)
+        {
+            self.cursor = from;
+            self.action_logger.finish_replace(self.cursor, &[]);
+            clip
+        } else {
+            self.action_logger
+                .init_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line]);
+            let mut clip = self.content.remove(self.cursor.line);
+            clip.push('\n');
+            if self.cursor.line >= self.content.len() && !self.content.is_empty() {
+                self.cursor.line -= 1;
+                self.cursor.char = self.content[self.cursor.line].len() - 1;
+            } else {
+                self.cursor.char = 0;
+            }
+            self.action_logger.finish_replace(self.cursor, &[]);
+            clip
+        };
+        self.clipboard.push(c);
     }
 
     pub fn copy(&mut self) {
@@ -110,9 +128,7 @@ impl Editor {
     }
 
     pub fn paste(&mut self) {
-        if !self.select.is_empty() {
-            let _returned_for_action_log = self.remove();
-        }
+        self.select.extract_select(&mut self.content);
         if let Some(clip) = self.clipboard.get() {
             self.insert_clip(clip)
         }
@@ -390,9 +406,8 @@ impl Editor {
         if self.content.is_empty() {
             return;
         }
-        if let Some((from, to)) = self.select.get() {
-            self.action_logger.init_replace_from_select(from, to, &self.content);
-            self.remove();
+        if let Some((from, _to, _clip)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
+            self.cursor = from;
             self.action_logger
                 .finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line]);
             return;
@@ -428,9 +443,8 @@ impl Editor {
         if self.content.is_empty() {
             return;
         }
-        if let Some((from, to)) = self.select.get() {
-            self.action_logger.init_replace_from_select(from, to, &self.content);
-            self.remove();
+        if let Some((from, _to, _clip)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
+            self.cursor = from;
             self.action_logger
                 .finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line]);
             return;
@@ -495,48 +509,6 @@ impl Editor {
         let (offset, _) = self.get_and_indent_line(from);
         let (offset2, _) = self.get_and_indent_line(to);
         (offset, offset2)
-    }
-
-    fn remove(&mut self) -> String {
-        if let Some((from, to)) = self.select.get() {
-            let clip = if from.line == to.line {
-                self.cursor.char = from.char;
-                let data = self.content.remove(from.line);
-                let mut payload = String::from(&data[..from.char]);
-                payload.push_str(&data[to.char..]);
-                self.content.insert(from.line, payload);
-                data[from.char..to.char].to_owned()
-            } else {
-                let mut clip_vec = vec![self.content[from.line].split_off(from.char)];
-                let mut last_line = to.line;
-                while from.line < last_line {
-                    last_line -= 1;
-                    if from.line == last_line {
-                        let final_clip = self.content.remove(from.line + 1);
-                        let (clipped, remaining) = final_clip.split_at(to.char);
-                        self.content[from.line].push_str(remaining);
-                        clip_vec.push(clipped.to_owned())
-                    } else {
-                        clip_vec.push(self.content.remove(from.line + 1))
-                    }
-                }
-                self.cursor.line = from.line;
-                self.cursor.char = from.char;
-                clip_vec.join("\n")
-            };
-            self.select.drop();
-            clip
-        } else {
-            let mut clip = self.content.remove(self.cursor.line);
-            clip.push('\n');
-            if self.cursor.line >= self.content.len() && !self.content.is_empty() {
-                self.cursor.line -= 1;
-                self.cursor.char = self.content[self.cursor.line].len() - 1;
-            } else {
-                self.cursor.char = 0;
-            }
-            clip
-        }
     }
 
     fn insert_clip(&mut self, clip: String) {
