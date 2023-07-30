@@ -174,6 +174,20 @@ impl Editor {
         }
     }
 
+    pub fn end_of_line(&mut self) {
+        self.cursor.char = self.content[self.cursor.line].len();
+    }
+
+    pub fn start_of_line(&mut self) {
+        self.cursor.char = 0;
+        for ch in self.content[self.cursor.line].chars() {
+            if !ch.is_whitespace() {
+                break;
+            }
+            self.cursor.char += 1;
+        }
+    }
+
     pub fn up(&mut self) {
         self.select.drop();
         self._up()

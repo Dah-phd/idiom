@@ -104,6 +104,8 @@ impl EditorState {
                     EditorAction::JumpLeftSelect => editor.jump_left_select(),
                     EditorAction::JumpRight => editor.jump_right(),
                     EditorAction::JumpRightSelect => editor.jump_right_select(),
+                    EditorAction::EndOfLine => editor.end_of_line(),
+                    EditorAction::StartOfLine => editor.start_of_line(),
                     EditorAction::Cut => editor.cut(),
                     EditorAction::Copy => editor.copy(),
                     EditorAction::Paste => editor.paste(),

@@ -56,6 +56,8 @@ pub enum EditorAction {
     JumpLeftSelect,
     JumpRight,
     JumpRightSelect,
+    EndOfLine,
+    StartOfLine,
     Cut,
     Copy,
     Paste,
@@ -90,6 +92,8 @@ pub struct EditorUserKeyMap {
     jump_left_select: String,
     jump_right: String,
     jump_right_select: String,
+    end_of_line: String,
+    start_of_line: String,
     cut: String,
     copy: String,
     paste: String,
@@ -124,6 +128,8 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
         insert_key_event(&mut hash, &val.jump_left_select, EditorAction::JumpLeftSelect);
         insert_key_event(&mut hash, &val.jump_right, EditorAction::JumpRight);
         insert_key_event(&mut hash, &val.jump_right_select, EditorAction::JumpRightSelect);
+        insert_key_event(&mut hash, &val.end_of_line, EditorAction::EndOfLine);
+        insert_key_event(&mut hash, &val.start_of_line, EditorAction::StartOfLine);
         insert_key_event(&mut hash, &val.cut, EditorAction::Cut);
         insert_key_event(&mut hash, &val.copy, EditorAction::Copy);
         insert_key_event(&mut hash, &val.paste, EditorAction::Paste);
@@ -160,6 +166,8 @@ impl Default for EditorUserKeyMap {
             jump_left_select: format!("{} && {} && {}", CTRL, SHIFT, LEFT),
             jump_right: format!("{} && {}", CTRL, RIGHT),
             jump_right_select: format!("{} && {} && {}", CTRL, SHIFT, RIGHT),
+            end_of_line: String::from(END),
+            start_of_line: String::from(HOME),
             cut: format!("{} && {}", CTRL, 'x'),
             copy: format!("{} && {}", CTRL, 'c'),
             paste: format!("{} && {}", CTRL, 'v'),
