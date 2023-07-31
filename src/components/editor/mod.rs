@@ -34,7 +34,7 @@ impl EditorState {
             .split(area);
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get_mut(editor_id) {
-                file.max_rows = layout[1].bottom();
+                file.set_max_rows(layout[1].bottom());
                 let cursor_x_offset = 1 + file.cursor.char;
                 let cursor_y_offset = file.cursor.line - file.at_line;
                 let (digits_offset, editor_content) = file.get_list_widget();

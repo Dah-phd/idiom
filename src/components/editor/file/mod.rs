@@ -22,7 +22,7 @@ pub struct Editor {
     select: Select,
     clipboard: Clipboard,
     action_logger: ActionLogger,
-    pub max_rows: u16,
+    pub max_rows: usize,
     pub at_line: usize,
     pub content: Vec<String>,
     pub path: PathBuf,
@@ -51,8 +51,9 @@ impl Editor {
     pub fn get_list_widget(&mut self) -> (usize, List<'_>) {
         self.linter.reset(self.select.get());
         let max_digits = self.linter.line_number_max_digits(&self.content);
+        let render_till_line = self.content.len().min(self.at_line + self.max_rows);
         let editor_content = List::new(
-            self.content[self.at_line..]
+            self.content[self.at_line..render_till_line]
                 .iter()
                 .enumerate()
                 .map(|(idx, code_line)| self.linter.syntax_spans(idx + self.at_line, code_line))
@@ -182,7 +183,7 @@ impl Editor {
         if !self.content.is_empty() {
             self.cursor.line = self.content.len() - 1;
             self.cursor.char = self.content[self.cursor.line].len();
-            self.at_line = self.content.len() - self.max_rows as usize + 3;
+            self.at_line = self.content.len() - self.max_rows + 3;
         }
     }
 
@@ -258,7 +259,7 @@ impl Editor {
         if self.content.is_empty() {
             return;
         }
-        if self.cursor.line > self.max_rows as usize - 3 + self.at_line {
+        if self.cursor.line > self.max_rows - 3 + self.at_line {
             self.at_line += 1;
         }
         if self.content.len() - 1 > self.cursor.line {
@@ -285,7 +286,7 @@ impl Editor {
         if self.content.is_empty() {
             return;
         }
-        if self.cursor.line > self.max_rows as usize - 3 + self.at_line {
+        if self.cursor.line > self.max_rows - 3 + self.at_line {
             self.at_line += 1;
         }
         if self.content.len() - 1 > self.cursor.line {
@@ -364,7 +365,7 @@ impl Editor {
             } else if self.content.len() - 1 > self.cursor.line {
                 self.cursor.line += 1;
                 self.cursor.char = 0;
-                if self.cursor.line > self.max_rows as usize - 3 + self.at_line {
+                if self.cursor.line > self.max_rows - 3 + self.at_line {
                     self.at_line += 1;
                 }
             }
@@ -582,6 +583,16 @@ impl Editor {
             if line.len() < self.cursor.char {
                 self.cursor.char = line.len()
             }
+        }
+    }
+
+    pub fn set_max_rows(&mut self, max_rows: u16) {
+        self.max_rows = max_rows as usize;
+        if self.cursor.line < self.at_line {
+            self.at_line = self.cursor.line
+        }
+        if self.cursor.line > self.at_line + self.max_rows {
+            self.at_line = self.cursor.line - self.max_rows
         }
     }
 }
