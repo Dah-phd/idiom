@@ -178,6 +178,20 @@ impl Editor {
         self.cursor.char = self.content[self.cursor.line].len();
     }
 
+    pub fn end_of_file(&mut self) {
+        if !self.content.is_empty() {
+            self.cursor.line = self.content.len() - 1;
+            self.cursor.char = self.content[self.cursor.line].len();
+            self.at_line = self.content.len() - self.max_rows as usize + 3;
+        }
+    }
+
+    pub fn start_of_file(&mut self) {
+        self.at_line = 0;
+        self.cursor.line = 0;
+        self.cursor.char = 0;
+    }
+
     pub fn start_of_line(&mut self) {
         self.cursor.char = 0;
         for ch in self.content[self.cursor.line].chars() {
