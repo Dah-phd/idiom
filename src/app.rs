@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    components::{popups::editor_popups::save_all_popup, EditorState, Tree},
+    components::{popups::editor_popups::go_to_line_popup, popups::editor_popups::save_all_popup, EditorState, Tree},
     lsp::LSP,
     messages::{GeneralAction, KeyMap, Mode, PopupMessage},
 };
@@ -81,6 +81,13 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                             editor_state.save_all();
                             break;
                         }
+                        PopupMessage::GoToLine(line_idx) => {
+                            if let Some(editor) = editor_state.get_active() {
+                                editor.go_to(line_idx)
+                            }
+                            mode.clear_popup();
+                            continue;
+                        }
                     }
                 }
                 let action = if let Some(action) = general_key_map.map(&key) {
@@ -154,6 +161,9 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                         let new_key_map = KeyMap::new();
                         general_key_map = new_key_map.general_key_map();
                         editor_state.refresh_cfg(new_key_map.editor_key_map());
+                    }
+                    GeneralAction::GoToLinePopup if matches!(mode, Mode::Insert) => {
+                        mode = mode.popup(go_to_line_popup());
                     }
                     _ => {}
                 }

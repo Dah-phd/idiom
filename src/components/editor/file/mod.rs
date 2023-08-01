@@ -202,6 +202,13 @@ impl Editor {
         }
     }
 
+    pub fn go_to(&mut self, line: usize) {
+        if self.content.len() >= line {
+            self.cursor.line = line;
+            self.cursor.char = 0;
+        }
+    }
+
     pub fn up(&mut self) {
         self.select.drop();
         self._up()

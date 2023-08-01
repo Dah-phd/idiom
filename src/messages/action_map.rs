@@ -207,6 +207,7 @@ pub enum GeneralAction {
     NextTab,
     PreviousTab,
     RefreshSettings,
+    GoToLinePopup,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -227,6 +228,7 @@ pub struct GeneralUserKeyMap {
     next_tab: String,
     previous_tab: String,
     refresh_settings: String,
+    go_to_line: String,
 }
 
 impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
@@ -251,6 +253,7 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
         insert_key_event(&mut hash, &val.next_tab, GeneralAction::NextTab);
         insert_key_event(&mut hash, &val.previous_tab, GeneralAction::PreviousTab);
         insert_key_event(&mut hash, &val.refresh_settings, GeneralAction::RefreshSettings);
+        insert_key_event(&mut hash, &val.go_to_line, GeneralAction::GoToLinePopup);
         hash
     }
 }
@@ -273,6 +276,7 @@ impl Default for GeneralUserKeyMap {
             next_tab: String::from(TAB),
             previous_tab: format!("{} && {}", CTRL, TAB),
             refresh_settings: format!("{}5", F),
+            go_to_line: format!("{} && {}", CTRL, 'g'),
         }
     }
 }

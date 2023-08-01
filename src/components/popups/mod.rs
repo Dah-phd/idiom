@@ -14,6 +14,7 @@ pub mod editor_popups;
 #[derive(Debug, Default, Clone)]
 pub struct Popup {
     pub message: String,
+    message_as_buffer_builder: Option<fn(char) -> Option<char>>,
     pub buttons: Vec<Button>,
     pub size: Option<(u16, u16)>,
     pub state: usize,
@@ -30,17 +31,12 @@ impl Popup {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
-            .margin(2)
+            .margin(1)
             .split(area);
 
-        frame.render_widget(
-            Paragraph::new(Span::from(self.message.to_owned())).alignment(Alignment::Center),
-            chunks[0],
-        );
-        frame.render_widget(
-            Paragraph::new(Spans::from(self.spans_from_buttons())).alignment(Alignment::Center),
-            chunks[1],
-        );
+        frame.render_widget(self.p_from_message(), chunks[0]);
+
+        frame.render_widget(self.spans_from_buttons(), chunks[1]);
     }
 
     pub fn map(&mut self, key: &KeyEvent) -> PopupMessage {
@@ -49,11 +45,23 @@ impl Popup {
             .iter()
             .find(|button| matches!(&button.key, Some(key_code) if key_code.contains(&key.code)))
         {
-            return (button.command)();
+            return (button.command)(self);
         }
 
         match key.code {
-            KeyCode::Enter => (self.buttons[self.state].command)(),
+            KeyCode::Char(ch) if self.message_as_buffer_builder.is_some() => {
+                if let Some(buffer_builder) = self.message_as_buffer_builder {
+                    if let Some(ch) = buffer_builder(ch) {
+                        self.message.push(ch);
+                    }
+                }
+                PopupMessage::None
+            }
+            KeyCode::Backspace if self.message_as_buffer_builder.is_some() => {
+                self.message.pop();
+                PopupMessage::None
+            }
+            KeyCode::Enter => (self.buttons[self.state].command)(self),
             KeyCode::Left => {
                 if self.state > 0 {
                     self.state -= 1;
@@ -75,25 +83,39 @@ impl Popup {
         }
     }
 
-    fn spans_from_buttons(&self) -> Vec<Span<'_>> {
-        self.buttons
-            .iter()
-            .enumerate()
-            .map(|(idx, button)| {
-                let padded_name = format!("  {}  ", button.name);
-                if self.state == idx {
-                    Span::styled(padded_name, Style::default().add_modifier(Modifier::REVERSED))
-                } else {
-                    Span::raw(padded_name)
-                }
-            })
-            .collect()
+    fn p_from_message(&self) -> Paragraph {
+        if self.message_as_buffer_builder.is_none() {
+            return Paragraph::new(Span::from(self.message.to_owned())).alignment(Alignment::Center);
+        }
+        Paragraph::new(Spans::from(vec![
+            Span::raw(" -> "),
+            Span::raw(self.message.to_owned()),
+            Span::styled("|", Style::default().add_modifier(Modifier::SLOW_BLINK)),
+        ]))
+    }
+
+    fn spans_from_buttons(&self) -> Paragraph<'_> {
+        Paragraph::new(Spans::from(
+            self.buttons
+                .iter()
+                .enumerate()
+                .map(|(idx, button)| {
+                    let padded_name = format!("  {}  ", button.name);
+                    if self.state == idx {
+                        Span::styled(padded_name, Style::default().add_modifier(Modifier::REVERSED))
+                    } else {
+                        Span::raw(padded_name)
+                    }
+                })
+                .collect::<Vec<_>>(),
+        ))
+        .alignment(Alignment::Center)
     }
 }
 
 #[derive(Clone)]
 pub struct Button {
-    pub command: fn() -> PopupMessage,
+    pub command: fn(&mut Popup) -> PopupMessage,
     pub name: String,
     pub key: Option<Vec<KeyCode>>,
 }
