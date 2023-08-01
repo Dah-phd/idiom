@@ -42,7 +42,7 @@ impl Editor {
             action_logger: ActionLogger::default(),
             max_rows: 0,
             at_line: 0,
-            content: content.lines().map(String::from).collect(),
+            content: content.split('\n').map(String::from).collect(),
             file_type,
             path,
         })
@@ -183,7 +183,6 @@ impl Editor {
         if !self.content.is_empty() {
             self.cursor.line = self.content.len() - 1;
             self.cursor.char = self.content[self.cursor.line].len();
-            self.at_line = self.content.len() - self.max_rows + 3;
         }
     }
 
@@ -209,9 +208,7 @@ impl Editor {
     }
 
     fn _up(&mut self) {
-        if self.at_line >= self.cursor.line {
-            self.scroll_up()
-        } else if self.cursor.line > 0 {
+        if self.cursor.line > 0 {
             self.cursor.line -= 1;
             self.adjust_cursor_max_char();
         }
@@ -232,9 +229,6 @@ impl Editor {
 
     pub fn swap_up(&mut self) {
         self.select.drop();
-        if self.at_line >= self.cursor.line {
-            self.scroll_up()
-        };
         if self.cursor.line > 0 {
             let new_line = self.cursor.line - 1;
             self.action_logger.init_repalce_from_line(
@@ -259,9 +253,6 @@ impl Editor {
         if self.content.is_empty() {
             return;
         }
-        if self.cursor.line > self.max_rows - 3 + self.at_line {
-            self.at_line += 1;
-        }
         if self.content.len() - 1 > self.cursor.line {
             self.cursor.line += 1;
             self.adjust_cursor_max_char();
@@ -285,9 +276,6 @@ impl Editor {
         self.select.drop();
         if self.content.is_empty() {
             return;
-        }
-        if self.cursor.line > self.max_rows - 3 + self.at_line {
-            self.at_line += 1;
         }
         if self.content.len() - 1 > self.cursor.line {
             let new_cursor_line = self.cursor.line + 1;
@@ -365,9 +353,6 @@ impl Editor {
             } else if self.content.len() - 1 > self.cursor.line {
                 self.cursor.line += 1;
                 self.cursor.char = 0;
-                if self.cursor.line > self.max_rows - 3 + self.at_line {
-                    self.at_line += 1;
-                }
             }
         }
     }
@@ -591,8 +576,8 @@ impl Editor {
         if self.cursor.line < self.at_line {
             self.at_line = self.cursor.line
         }
-        if self.cursor.line > self.at_line + self.max_rows {
-            self.at_line = self.cursor.line - self.max_rows
+        if self.cursor.line > self.max_rows - 3 + self.at_line {
+            self.at_line = self.cursor.line + 2 - self.max_rows
         }
     }
 }
