@@ -130,7 +130,10 @@ impl Select {
     }
 
     pub fn extract_logged(&mut self, content: &mut Vec<String>, action_logger: &mut ActionLogger) -> CutContent {
-        if let Self::Range(from, to) = std::mem::replace(self, Self::None) {
+        if let Self::Range(mut from, mut to) = std::mem::replace(self, Self::None) {
+            if to.line < from.line || to.line == from.line && to.char < from.char {
+                (from, to) = (to, from);
+            };
             action_logger.init_replace_from_select(&from, &to, content);
             return Some((from, to, clip_content(&from, &to, content)));
         }

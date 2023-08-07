@@ -75,11 +75,10 @@ impl Editor {
         if self.content.is_empty() {
             return;
         }
-        let c = if let Some((from, _to, clip)) = self.select.extract_logged(&mut self.content, &mut self.action_logger)
-        {
+        let c = if let Some((from, .., c)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
             self.cursor = from;
             self.action_logger.finish_replace(self.cursor, &[]);
-            clip
+            c
         } else {
             self.action_logger
                 .init_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line]);
@@ -124,7 +123,7 @@ impl Editor {
     }
 
     pub fn paste(&mut self) {
-        if let Some((from, _to, _clip)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
+        if let Some((from, ..)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
             self.cursor = from;
         } else {
             self.action_logger.init_replace(self.cursor, &[]);
@@ -436,7 +435,28 @@ impl Editor {
     }
 
     pub fn push(&mut self, ch: char) {
-        if let Some(line) = self.content.get_mut(self.cursor.line) {
+        if let Some((from, to)) = self.select.get() {
+            self.cursor = *from;
+            self.cursor.char += 1;
+            let replace = if let Some(closing) = get_closing_char(ch) {
+                self.action_logger.init_replace_from_select(from, to, &self.content);
+                self.content[from.line].insert(from.char, ch);
+                if from.line == to.line {
+                    self.content[to.line].insert(to.char + 1, closing);
+                } else {
+                    self.content[to.line].insert(to.char, closing);
+                }
+                from.line..to.line
+            } else {
+                let (from, ..) = self
+                    .select
+                    .extract_logged(&mut self.content, &mut self.action_logger)
+                    .unwrap();
+                self.content[from.line].insert(from.char, ch);
+                from.line..from.line + 1
+            };
+            self.action_logger.finish_replace(self.cursor, &self.content[replace]);
+        } else if let Some(line) = self.content.get_mut(self.cursor.line) {
             self.action_logger.push_char(&self.cursor, line, ch);
             line.insert(self.cursor.char, ch);
             self.cursor.char += 1;
@@ -455,7 +475,7 @@ impl Editor {
         if self.content.is_empty() {
             return;
         }
-        if let Some((from, _to, _clip)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
+        if let Some((from, ..)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
             self.cursor = from;
             self.action_logger
                 .finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line]);
@@ -492,7 +512,7 @@ impl Editor {
         if self.content.is_empty() {
             return;
         }
-        if let Some((from, _to, _clip)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
+        if let Some((from, ..)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
             self.cursor = from;
             self.action_logger
                 .finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line]);
