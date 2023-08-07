@@ -36,12 +36,14 @@ impl Mode {
     }
 }
 
-#[derive(Debug, PartialEq, Hash, Eq, Clone)]
+#[derive(Debug, PartialEq, Hash, Eq, Clone, Copy)]
 pub enum FileType {
     Rust,
     Python,
     JavaScript,
+    TypeScript,
     Html,
+    C,
     Yml,
     Toml,
     Unknown,
@@ -64,5 +66,22 @@ impl FileType {
             };
         };
         Self::Unknown
+    }
+}
+
+impl From<&FileType> for String {
+    fn from(value: &FileType) -> String {
+        match value {
+            FileType::Rust => "rust",
+            FileType::Python => "python",
+            FileType::TypeScript => "typescript",
+            FileType::JavaScript => "javascript",
+            FileType::Html => "html",
+            FileType::C => "c",
+            FileType::Yml => "yaml",
+            FileType::Toml => "toml",
+            _ => "unknown",
+        }
+        .to_owned()
     }
 }

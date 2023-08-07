@@ -8,6 +8,7 @@ use crate::{
     lsp::LSP,
     messages::{GeneralAction, KeyMap, Mode, PopupMessage},
 };
+
 use crossterm::event::Event;
 
 use tui::{
@@ -16,9 +17,11 @@ use tui::{
     Terminal,
 };
 
+use anyhow::Result;
+
 const TICK: Duration = Duration::from_millis(250);
 
-pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBuf>) -> std::io::Result<()> {
+pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBuf>) -> Result<()> {
     let configs = KeyMap::new();
     let mut mode = Mode::Select;
     let mut clock = Instant::now();
@@ -111,7 +114,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                             editor_state.new_from(file_path);
                             if let Some(editor) = editor_state.get_active() {
                                 if let Ok(lsp) = LSP::from(&editor.file_type).await {
-                                    for req in lsp.que.lock().unwrap().iter() {
+                                    for req in lsp.responses.lock().unwrap().iter() {
                                         let _ = req;
                                     }
                                     lsp_servers.push(lsp);
@@ -172,6 +175,9 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
         if clock.elapsed() >= TICK {
             clock = Instant::now();
         }
+    }
+    for lsp in lsp_servers.iter_mut() {
+        let _ = lsp.graceful_exit().await;
     }
     Ok(())
 }

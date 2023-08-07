@@ -49,7 +49,7 @@ impl Editor {
     }
 
     pub fn get_list_widget(&mut self) -> (usize, List<'_>) {
-        self.linter.reset(self.select.get());
+        self.linter.set_select(self.select.get());
         let max_digits = self.linter.line_number_max_digits(&self.content);
         let render_till_line = self.content.len().min(self.at_line + self.max_rows);
         let editor_content = List::new(

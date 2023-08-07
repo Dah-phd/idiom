@@ -1,4 +1,5 @@
 mod langs;
+mod rust;
 mod theme;
 pub use self::theme::{Theme, DEFAULT_THEME_FILE};
 use crate::components::editor::CursorPosition;
@@ -15,13 +16,14 @@ pub const COLORS: [Color; 3] = [Color::LightMagenta, Color::Yellow, Color::Blue]
 pub struct Lexer {
     pub select: Option<(CursorPosition, CursorPosition)>,
     pub theme: Theme,
+    line_processor: fn(&mut Lexer, content: &str, spans: &mut Vec<Span>),
+    lang: Lang,
     token_start: usize,
     select_at_line: Option<(usize, usize)>,
     curly: Vec<Color>,
     brackets: Vec<Color>,
     square: Vec<Color>,
     last_token: String,
-    lang: Lang,
     last_key_words: Vec<String>,
     max_digits: usize,
 }
@@ -29,6 +31,7 @@ pub struct Lexer {
 impl Lexer {
     pub fn from_type(file_type: &FileType, theme: Theme) -> Self {
         Self {
+            line_processor: derive_line_processor(file_type),
             lang: file_type.into(),
             select_at_line: None,
             curly: vec![],
@@ -52,7 +55,7 @@ impl Lexer {
         self.max_digits
     }
 
-    pub fn reset(&mut self, select: Option<(&CursorPosition, &CursorPosition)>) {
+    pub fn set_select(&mut self, select: Option<(&CursorPosition, &CursorPosition)>) {
         self.curly.clear();
         self.brackets.clear();
         self.square.clear();
@@ -79,88 +82,7 @@ impl Lexer {
     }
 
     fn process_line(&mut self, content: &str, spans: &mut Vec<Span>) {
-        if self.lang.mod_import.iter().any(|key| content.starts_with(key)) {
-            for (idx, ch) in content.chars().enumerate() {
-                match ch {
-                    ' ' => {
-                        self.drain_buf_object(idx, spans);
-                        self.last_token.push(ch);
-                    }
-                    '.' | '<' | '>' | ':' | '?' | '&' | '=' | '+' | '-' | ',' | ';' => {
-                        self.drain_buf_object(idx, spans);
-                        self.white_char(idx, ch, spans);
-                    }
-                    _ => self.last_token.push(ch),
-                }
-            }
-            return;
-        }
-        let mut char_steam = content.chars().enumerate().peekable();
-        while let Some((token_end, ch)) = char_steam.next() {
-            match ch {
-                ' ' => {
-                    self.drain_buf(token_end, spans);
-                    self.last_token.push(ch);
-                }
-                '.' | '<' | '>' | '?' | '&' | '=' | '+' | '-' | ',' | ';' => {
-                    self.drain_buf(token_end, spans);
-                    self.white_char(token_end, ch, spans);
-                }
-                ':' => {
-                    if matches!(char_steam.peek(), Some((_, next_ch)) if next_ch == &':') {
-                        self.drain_buf_colored(token_end, self.theme.class_or_struct, spans);
-                        self.white_char(token_end, ch, spans);
-                    } else {
-                        self.drain_buf(token_end, spans);
-                        self.white_char(token_end, ch, spans);
-                    }
-                }
-                '!' => {
-                    self.last_token.push(ch);
-                    self.drain_buf_colored(token_end, self.theme.key_words, spans);
-                }
-                '(' => {
-                    self.drain_buf_colored(token_end, self.theme.functions, spans);
-                    let color = len_to_color(self.brackets.len());
-                    self.last_token.push(ch);
-                    self.brackets.push(color);
-                    self.drain_buf_colored(token_end, color, spans);
-                }
-                ')' => {
-                    let color = self.brackets.pop().unwrap_or(default_color());
-                    self.drain_buf(token_end, spans);
-                    self.last_token.push(ch);
-                    self.drain_buf_colored(token_end, color, spans);
-                }
-                '{' => {
-                    self.drain_buf(token_end, spans);
-                    let color = len_to_color(self.curly.len());
-                    self.last_token.push(ch);
-                    self.curly.push(color);
-                    self.drain_buf_colored(token_end, color, spans);
-                }
-                '}' => {
-                    let color = self.curly.pop().unwrap_or(default_color());
-                    self.drain_buf(token_end, spans);
-                    self.last_token.push(ch);
-                    self.drain_buf_colored(token_end, color, spans);
-                }
-                '[' => {
-                    self.drain_buf(token_end, spans);
-                    let color = len_to_color(self.square.len());
-                    self.last_token.push(ch);
-                    self.square.push(color);
-                    self.drain_buf_colored(token_end, color, spans);
-                }
-                ']' => {
-                    let color = self.square.pop().unwrap_or(default_color());
-                    self.drain_buf(token_end, spans);
-                    self.last_token.push(ch);
-                    self.drain_buf_colored(token_end, color, spans);
-                }
-                _ => self.last_token.push(ch),
-            }
-        }
+        (self.line_processor)(self, content, spans)
     }
 
     fn handled_key_word(&mut self, token_end: usize, spans: &mut Vec<Span>) -> bool {
@@ -298,14 +220,14 @@ impl Lexer {
         }
         self.token_start = token_end;
     }
-}
 
-fn default_color() -> Color {
-    COLORS[COLORS.len() - 1]
-}
+    fn default_color() -> Color {
+        COLORS[COLORS.len() - 1]
+    }
 
-fn len_to_color(len: usize) -> Color {
-    COLORS[len % COLORS.len()]
+    fn len_to_color(len: usize) -> Color {
+        COLORS[len % COLORS.len()]
+    }
 }
 
 fn get_line_num(idx: usize, max_digits: usize) -> String {
@@ -322,5 +244,12 @@ fn drain_token_checked(token: &mut String, last_idx: usize) -> String {
         token.drain(..).collect()
     } else {
         token.drain(..last_idx).collect()
+    }
+}
+
+fn derive_line_processor(file_type: &FileType) -> fn(&mut Lexer, content: &str, spans: &mut Vec<Span>) {
+    match file_type {
+        FileType::Rust => rust::rust_processor,
+        _ => rust::rust_processor,
     }
 }
