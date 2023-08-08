@@ -77,7 +77,8 @@ impl Editor {
         }
         let c = if let Some((from, .., c)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
             self.cursor = from;
-            self.action_logger.finish_replace(self.cursor, &[]);
+            self.action_logger
+                .finish_replace(self.cursor, &self.content[self.cursor.as_range()]);
             c
         } else {
             self.action_logger
@@ -90,7 +91,8 @@ impl Editor {
             } else {
                 self.cursor.char = 0;
             }
-            self.action_logger.finish_replace(self.cursor, &[]);
+            self.action_logger
+                .finish_replace(self.cursor, &self.content[self.cursor.as_range()]);
             clip
         };
         self.clipboard.push(c);
@@ -126,7 +128,8 @@ impl Editor {
         if let Some((from, ..)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
             self.cursor = from;
         } else {
-            self.action_logger.init_replace(self.cursor, &[]);
+            self.action_logger
+                .init_replace(self.cursor, &self.content[self.cursor.as_range()]);
         };
         if let Some(clip) = self.clipboard.get() {
             let mut lines: Vec<_> = clip.split('\n').collect();
@@ -158,7 +161,8 @@ impl Editor {
             self.action_logger
                 .finish_replace(self.cursor, &self.content[start_line..=self.cursor.line])
         } else {
-            self.action_logger.finish_replace(self.cursor, &[])
+            self.action_logger
+                .finish_replace(self.cursor, &self.content[self.cursor.as_range()])
         }
     }
 
@@ -398,7 +402,8 @@ impl Editor {
 
     pub fn new_line(&mut self) {
         if self.content.is_empty() {
-            self.action_logger.init_replace(self.cursor, &[]);
+            self.action_logger
+                .init_replace(self.cursor, &self.content[self.cursor.as_range()]);
             self.content.push(String::new());
             self.action_logger
                 .finish_replace(self.cursor, &self.content[self.cursor.line_range(0, 1)]);

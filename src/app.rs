@@ -176,8 +176,5 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
             clock = Instant::now();
         }
     }
-    for lsp in lsp_servers.iter_mut() {
-        let _ = lsp.graceful_exit().await;
-    }
     Ok(())
 }

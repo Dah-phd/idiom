@@ -4,6 +4,7 @@ mod python;
 mod request;
 mod rust;
 use crate::messages::FileType;
+use crate::utils::{split_arc_mutex, split_arc_mutex_async};
 use lsp_types::notification::{DidOpenTextDocument, Exit, Initialized};
 use lsp_types::request::{HoverRequest, Initialize, References, Shutdown, SignatureHelpRequest};
 use messages::LSPMessage;
@@ -68,11 +69,10 @@ impl LSP {
         let stderr = FramedRead::new(inner.stderr.take().unwrap(), BytesCodec::new());
         let stdout = FramedRead::new(inner.stdout.take().unwrap(), BytesCodec::new());
         let mut stream = stdout.chain(stderr);
-        let (responses, responses_handler) = to_split_arc_mutex(HashMap::new());
-        let (notifications, notifications_handler) = to_split_arc_mutex(Vec::new());
-        let requests = Arc::new(tokio::sync::Mutex::new(Vec::new()));
-        let requests_handler = Arc::clone(&requests);
-        let (errs, errs_handler) = to_split_arc_mutex(Vec::new());
+        let (responses, responses_handler) = split_arc_mutex(HashMap::new());
+        let (notifications, notifications_handler) = split_arc_mutex(Vec::new());
+        let (errs, errs_handler) = split_arc_mutex(Vec::new());
+        let (requests, requests_handler) = split_arc_mutex_async(Vec::new());
         let handler = tokio::task::spawn(async move {
             while let Some(Ok(msg)) = stream.next().await {
                 let lsp_message = String::from_utf8_lossy(&msg);
@@ -267,10 +267,4 @@ impl LSP {
         self.inner.kill().await?;
         Ok(())
     }
-}
-
-fn to_split_arc_mutex<T>(inner: T) -> (Arc<Mutex<T>>, Arc<Mutex<T>>) {
-    let arc = Arc::new(Mutex::new(inner));
-    let clone = Arc::clone(&arc);
-    (arc, clone)
 }

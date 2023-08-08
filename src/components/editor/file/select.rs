@@ -1,4 +1,4 @@
-use std::ops::{Add, Sub};
+use std::ops::{Add, RangeInclusive, Sub};
 
 use super::action::ActionLogger;
 type CutContent = Option<(CursorPosition, CursorPosition, String)>;
@@ -36,6 +36,10 @@ impl CursorPosition {
             Offset::Neg(val) => self.line = self.line.checked_sub(val).unwrap_or_default(),
             Offset::Pos(val) => self.line += val,
         }
+    }
+
+    pub fn as_range(&self) -> RangeInclusive<usize> {
+        self.line..=self.line
     }
 
     pub fn diff_char(&mut self, offset: usize) {
