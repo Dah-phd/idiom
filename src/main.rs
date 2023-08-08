@@ -1,19 +1,16 @@
 mod app;
 mod components;
+mod configs;
 mod lsp;
-mod messages;
 mod syntax;
 mod utils;
-
-use std::path::PathBuf;
-
+use anyhow::Result;
 use app::app;
-
-// use crossterm::event::{PushKeyboardEnhancementFlags, PopKeyboardEnhancementFlags, KeyboardEnhancementFlags};
+use std::path::PathBuf;
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
-fn prep(out: &mut impl std::io::Write) -> std::io::Result<()> {
+fn prep(out: &mut impl std::io::Write) -> Result<()> {
     crossterm::terminal::enable_raw_mode()?;
     crossterm::execute!(
         out,
@@ -24,7 +21,7 @@ fn prep(out: &mut impl std::io::Write) -> std::io::Result<()> {
     Ok(())
 }
 
-fn graceful_exit(out: &mut impl std::io::Write) -> std::io::Result<()> {
+fn graceful_exit(out: &mut impl std::io::Write) -> Result<()> {
     crossterm::execute!(
         out,
         crossterm::style::ResetColor,
@@ -46,11 +43,8 @@ fn cli() -> Option<PathBuf> {
     None
 }
 
-async fn debug() {}
-
 #[tokio::main]
-async fn main() -> std::io::Result<()> {
-    debug().await;
+async fn main() -> Result<()> {
     let out = std::io::stdout();
     let mut terminal = Terminal::new(CrosstermBackend::new(&out)).expect("should not fail!");
     prep(&mut terminal.backend_mut())?;

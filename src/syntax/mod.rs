@@ -3,7 +3,7 @@ mod rust;
 mod theme;
 pub use self::theme::{Theme, DEFAULT_THEME_FILE};
 use crate::components::editor::CursorPosition;
-use crate::messages::FileType;
+use crate::configs::FileType;
 use langs::Lang;
 use tui::{
     style::{Color, Style},

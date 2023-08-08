@@ -1,5 +1,5 @@
 use super::{Button, Popup};
-use crate::messages::PopupMessage;
+use crate::configs::PopupMessage;
 use crossterm::event::KeyCode;
 
 pub fn save_all_popup() -> Popup {

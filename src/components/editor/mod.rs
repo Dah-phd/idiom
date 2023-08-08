@@ -1,7 +1,7 @@
 mod file;
 pub use file::{CursorPosition, Offset};
 
-use crate::messages::{EditorAction, EditorConfigs, EditorKeyMap};
+use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap};
 use crossterm::event::KeyEvent;
 use file::Editor;
 use std::path::PathBuf;

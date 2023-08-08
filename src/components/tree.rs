@@ -7,7 +7,7 @@ use tui::{
     Frame,
 };
 
-use crate::messages::GeneralAction;
+use crate::configs::GeneralAction;
 
 #[cfg(not(target_os = "windows"))]
 const DIR_SEP: char = '/';

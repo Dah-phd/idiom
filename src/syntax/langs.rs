@@ -1,4 +1,4 @@
-use crate::messages::FileType;
+use crate::configs::FileType;
 
 #[derive(Debug)]
 pub struct Lang {

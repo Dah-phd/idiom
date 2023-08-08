@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tui::style::Color;
 
-use crate::messages::load_or_create_config;
+use crate::configs::load_or_create_config;
 
 pub const DEFAULT_THEME_FILE: &str = "default_theme.json";
 

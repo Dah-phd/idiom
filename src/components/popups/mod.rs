@@ -8,7 +8,7 @@ use tui::{
     Frame,
 };
 
-use crate::messages::PopupMessage;
+use crate::configs::PopupMessage;
 pub mod editor_popups;
 
 #[derive(Debug, Default, Clone)]

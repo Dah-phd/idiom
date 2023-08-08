@@ -6,7 +6,7 @@ pub use select::{CursorPosition, Offset, Select};
 use tui::widgets::{List, ListItem};
 
 use crate::{
-    messages::{EditorConfigs, FileType},
+    configs::{EditorConfigs, FileType},
     syntax::{Lexer, Theme},
     utils::{get_closing_char, trim_start_inplace},
 };

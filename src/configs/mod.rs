@@ -1,3 +1,11 @@
+mod files;
+mod popups;
+mod types;
+pub use files::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap};
+pub use types::{FileType, Mode};
+
+pub use popups::PopupMessage;
+
 use std::collections::HashMap;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -6,8 +14,6 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::error::Category;
 
 use crate::{components::editor::Offset, syntax::DEFAULT_THEME_FILE, utils::trim_start_inplace};
-
-use super::action_map::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap};
 
 const CONFIG_FOLDER: &str = "idiom";
 const EDITOR_CONFIGS: &str = ".editor";

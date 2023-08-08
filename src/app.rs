@@ -5,8 +5,8 @@ use std::{
 
 use crate::{
     components::{popups::editor_popups::go_to_line_popup, popups::editor_popups::save_all_popup, EditorState, Tree},
+    configs::{GeneralAction, KeyMap, Mode, PopupMessage},
     lsp::LSP,
-    messages::{GeneralAction, KeyMap, Mode, PopupMessage},
 };
 
 use crossterm::event::Event;

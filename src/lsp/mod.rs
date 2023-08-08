@@ -3,7 +3,7 @@ mod notification;
 mod python;
 mod request;
 mod rust;
-use crate::messages::FileType;
+use crate::configs::FileType;
 use crate::utils::{split_arc_mutex, split_arc_mutex_async};
 use lsp_types::notification::{DidOpenTextDocument, Exit, Initialized};
 use lsp_types::request::{HoverRequest, Initialize, References, Shutdown, SignatureHelpRequest};
