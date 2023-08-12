@@ -76,14 +76,14 @@ impl Editor {
         if self.content.is_empty() {
             return;
         }
-        let c = if let Some((from, .., c)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
+        if let Some((from, .., clip)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
             self.cursor = from;
             self.action_logger
                 .finish_replace(self.cursor, &self.content[self.cursor.as_range()]);
-            c
+            self.clipboard.push(clip);
         } else {
             self.action_logger
-                .init_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line]);
+                .init_replace(self.cursor, &self.content[self.cursor.as_range()]);
             let mut clip = self.content.remove(self.cursor.line);
             clip.push('\n');
             if self.cursor.line >= self.content.len() && !self.content.is_empty() {
@@ -92,11 +92,9 @@ impl Editor {
             } else {
                 self.cursor.char = 0;
             }
-            self.action_logger
-                .finish_replace(self.cursor, &self.content[self.cursor.as_range()]);
-            clip
-        };
-        self.clipboard.push(c);
+            self.action_logger.finish_replace(self.cursor, &[]);
+            self.clipboard.push(clip);
+        }
     }
 
     pub fn copy(&mut self) {
