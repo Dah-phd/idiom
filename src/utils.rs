@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 pub fn trim_start_inplace(line: &mut String) -> Offset {
     if let Some(idx) = line.find(|c: char| !c.is_whitespace()) {
         line.replace_range(..idx, "");
-        return Offset::Neg(idx + 1);
+        return Offset::Neg(idx);
     };
     Offset::Pos(0)
 }

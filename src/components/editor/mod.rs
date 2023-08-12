@@ -1,9 +1,12 @@
 mod file;
 pub use file::{CursorPosition, Offset};
 
-use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap};
+use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType};
+use crate::lsp::{LSPMessage, LSP};
 use crossterm::event::KeyEvent;
 use file::Editor;
+use serde_json::Value;
+use std::collections::{hash_map::Entry, HashMap};
 use std::path::PathBuf;
 use tui::layout::{Constraint, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
@@ -16,6 +19,9 @@ pub struct EditorState {
     pub state: ListState,
     base_config: EditorConfigs,
     key_map: EditorKeyMap,
+    lsp_servers: HashMap<FileType, LSP>,
+    noifications: HashMap<FileType, Vec<LSPMessage>>,
+    diagnostics: HashMap<PathBuf, Value>,
 }
 
 impl EditorState {
@@ -25,6 +31,9 @@ impl EditorState {
             state: ListState::default(),
             base_config: EditorConfigs::new(),
             key_map,
+            lsp_servers: HashMap::new(),
+            noifications: HashMap::new(),
+            diagnostics: HashMap::new(),
         }
     }
 
@@ -63,7 +72,7 @@ impl EditorState {
         self.editors.get_mut(self.state.selected()?)
     }
 
-    pub fn new_from(&mut self, file_path: PathBuf) {
+    pub async fn new_from(&mut self, file_path: PathBuf) {
         for (idx, file) in self.editors.iter().enumerate() {
             if file_path == file.path {
                 self.state.select(Some(idx));
@@ -71,8 +80,24 @@ impl EditorState {
             }
         }
         if let Ok(opened_file) = Editor::from_path(file_path, self.base_config.clone()) {
+            if let Entry::Vacant(e) = self.lsp_servers.entry(opened_file.file_type) {
+                if let Ok(lsp) = LSP::from(&opened_file.file_type).await {
+                    e.insert(lsp);
+                }
+            }
             self.state.select(Some(self.editors.len()));
             self.editors.push(opened_file);
+        }
+    }
+
+    pub fn drain_notifications(&mut self) {
+        for (file_type, lsp) in self.lsp_servers.iter_mut() {
+            if let Ok(mut notifications) = lsp.notifications.try_lock() {
+                if notifications.is_empty() {
+                    continue;
+                }
+                self.noifications.insert(*file_type, notifications.drain(..).collect());
+            }
         }
     }
 

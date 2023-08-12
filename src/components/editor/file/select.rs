@@ -51,9 +51,19 @@ impl CursorPosition {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum Offset {
     Pos(usize),
     Neg(usize),
+}
+
+impl From<Offset> for usize {
+    fn from(value: Offset) -> Self {
+        match value {
+            Offset::Neg(val) => val,
+            Offset::Pos(val) => val,
+        }
+    }
 }
 
 impl Add for Offset {

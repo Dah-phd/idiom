@@ -96,21 +96,30 @@ impl ActionLogger {
         }
     }
 
-    pub fn backspace(&mut self, cursor: &CursorPosition, old_line: &str) {
+    pub fn prep_buffer(&mut self, cursor: &CursorPosition, current_line: &str) {
         self.undone.clear();
         self.tick();
         if let Some(action) = &mut self.buffer {
             if &action.new_cursor == cursor {
-                action.new_cursor.char -= 1;
-                action.new[0].remove(action.new_cursor.char);
                 return;
             }
             self.push_buffer();
         }
-        let mut action = Action::basic(*cursor, old_line);
-        action.new_cursor.char -= 1;
-        action.new[0].remove(action.new_cursor.char);
-        self.set_buffer(action);
+        self.set_buffer(Action::basic(*cursor, current_line))
+    }
+
+    pub fn backspace(&mut self, cursor: &CursorPosition) {
+        if let Some(action) = &mut self.buffer {
+            action.new[0].replace_range(cursor.char..action.new_cursor.char, "");
+            action.new_cursor = *cursor;
+        }
+    }
+
+    pub fn buffer_str(&mut self, string: &str, new_cursor: CursorPosition) {
+        if let Some(action) = &mut self.buffer {
+            action.new[0].insert_str(action.new_cursor.char, string);
+            action.new_cursor = new_cursor;
+        }
     }
 
     pub fn del(&mut self, cursor: &CursorPosition, old_line: &str) {

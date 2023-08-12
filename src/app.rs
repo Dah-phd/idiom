@@ -31,7 +31,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
     let mut lsp_servers: Vec<LSP> = vec![];
     let mut general_key_map = configs.general_key_map();
     if let Some(path) = open_file {
-        editor_state.new_from(path);
+        editor_state.new_from(path).await;
         mode = Mode::Insert;
         hide_file_tree = true;
     }
@@ -111,7 +111,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                     }
                     GeneralAction::Expand => {
                         if let Some(file_path) = file_tree.expand_dir_or_get_path() {
-                            editor_state.new_from(file_path);
+                            editor_state.new_from(file_path).await;
                             if let Some(editor) = editor_state.get_active() {
                                 if let Ok(lsp) = LSP::from(&editor.file_type).await {
                                     for req in lsp.responses.lock().unwrap().iter() {
@@ -127,7 +127,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                             mode = Mode::Insert;
                         } else if let Some(file_path) = file_tree.expand_dir_or_get_path() {
                             if !file_path.is_dir() {
-                                editor_state.new_from(file_path);
+                                editor_state.new_from(file_path).await;
                                 mode = Mode::Insert;
                                 if let Some(editor) = editor_state.get_active() {
                                     if let Ok(lsp) = LSP::from(&editor.file_type).await {

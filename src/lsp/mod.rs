@@ -7,7 +7,7 @@ use crate::configs::FileType;
 use crate::utils::{split_arc_mutex, split_arc_mutex_async};
 use lsp_types::notification::{DidOpenTextDocument, Exit, Initialized};
 use lsp_types::request::{HoverRequest, Initialize, References, Shutdown, SignatureHelpRequest};
-use messages::LSPMessage;
+pub use messages::LSPMessage;
 use request::LSPRequest;
 
 use std::collections::HashMap;
@@ -124,6 +124,10 @@ impl LSP {
             handler,
             stdin,
         })
+    }
+
+    pub fn is_live(&self) -> bool {
+        !self.handler.is_finished()
     }
 
     pub async fn auto_responde(&mut self) {

@@ -23,7 +23,9 @@ const KEY_MAP: &str = ".keys";
 #[serde(rename_all = "camelCase")]
 pub struct EditorConfigs {
     pub indent: String,
+    #[serde(skip, default = "get_indent_after")]
     pub indent_after: String,
+    #[serde(skip, default = "get_unident_before")]
     pub unindent_before: String,
     pub format_on_save: bool,
     pub theme_file_in_config_dir: String,
@@ -33,8 +35,8 @@ impl Default for EditorConfigs {
     fn default() -> Self {
         Self {
             indent: "    ".to_owned(),
-            indent_after: "({[".to_owned(),
-            unindent_before: "]})".to_owned(),
+            indent_after: get_indent_after(),
+            unindent_before: get_unident_before(),
             format_on_save: true,
             theme_file_in_config_dir: String::from(DEFAULT_THEME_FILE),
         }
@@ -44,6 +46,30 @@ impl Default for EditorConfigs {
 impl EditorConfigs {
     pub fn new() -> Self {
         load_or_create_config(EDITOR_CONFIGS)
+    }
+
+    pub fn update_by_file_type(&mut self, file_type: &FileType) {
+        #[allow(clippy::single_match)]
+        match file_type {
+            FileType::Python => self.indent_after.push(':'),
+            _ => (),
+        }
+    }
+
+    pub fn backspace_indent_handler(&self, line: &mut String, from_idx: usize) -> Offset {
+        //! does not handle from_idx == 0
+        let prefix = line[..from_idx].trim_start_matches(&self.indent);
+        if prefix.is_empty() {
+            line.replace_range(..self.indent.len(), "");
+            return Offset::Neg(self.indent.len());
+        }
+        if prefix.chars().all(|c| c.is_whitespace()) {
+            let remove_chars_len = prefix.len();
+            line.replace_range(from_idx - remove_chars_len..from_idx, "");
+            return Offset::Neg(remove_chars_len);
+        }
+        line.remove(from_idx - 1);
+        Offset::Neg(1)
     }
 
     pub fn derive_indent_from(&self, prev_line: &str) -> String {
@@ -175,4 +201,12 @@ fn write_config_file<T: Serialize>(path: &str, configs: &T) -> Option<()> {
     config_file.push(path);
     let serialized = serde_json::to_string_pretty(configs).ok()?;
     std::fs::write(config_file, serialized).ok()
+}
+
+fn get_indent_after() -> String {
+    String::from("({[")
+}
+
+fn get_unident_before() -> String {
+    String::from("]})")
 }

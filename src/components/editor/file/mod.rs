@@ -30,9 +30,10 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn from_path(path: PathBuf, configs: EditorConfigs) -> std::io::Result<Self> {
+    pub fn from_path(path: PathBuf, mut configs: EditorConfigs) -> std::io::Result<Self> {
         let content = std::fs::read_to_string(&path)?;
         let file_type = FileType::derive_type(&path);
+        configs.update_by_file_type(&file_type);
         Ok(Self {
             linter: Lexer::from_type(&file_type, Theme::from(&configs.theme_file_in_config_dir)),
             configs,
@@ -433,7 +434,6 @@ impl Editor {
                 }
             }
         }
-        line.insert_str(0, &indent);
         self.content.insert(self.cursor.line, line);
         self.action_logger
             .finish_replace(self.cursor, &self.content[self.cursor.line_range(1, 1)]);
@@ -477,39 +477,30 @@ impl Editor {
     }
 
     pub fn backspace(&mut self) {
-        if self.content.is_empty() {
+        if self.content.is_empty() || self.cursor.line == 0 && self.cursor.char == 0 {
             return;
         }
         if let Some((from, ..)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
             self.cursor = from;
             self.action_logger
                 .finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line]);
-            return;
-        }
-        if self.cursor.line != 0 {
-            if self.cursor.char == 0 {
-                let prev_line_idx = self.cursor.line - 1;
-                self.action_logger
-                    .init_replace(self.cursor, &self.content[prev_line_idx..=self.cursor.line]);
-                let current_line = self.content.remove(self.cursor.line);
-                self.cursor.line -= 1;
-                let prev_line = &mut self.content[self.cursor.line];
-                self.cursor.char = prev_line.len();
-                prev_line.push_str(&current_line);
-                self.action_logger
-                    .finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line]);
-            } else {
-                let line = &mut self.content[self.cursor.line];
-                self.action_logger.backspace(&self.cursor, line);
-                line.remove(self.cursor.char - 1);
-                self.cursor.char -= 1;
-            }
-        } else if let Some(line) = self.content.get_mut(self.cursor.line) {
-            if self.cursor.char != 0 {
-                self.action_logger.backspace(&self.cursor, line);
-                line.remove(self.cursor.char - 1);
-                self.cursor.char -= 1;
-            }
+        } else if self.cursor.char == 0 {
+            let prev_line_idx = self.cursor.line - 1;
+            self.action_logger
+                .init_replace(self.cursor, &self.content[prev_line_idx..=self.cursor.line]);
+            let current_line = self.content.remove(self.cursor.line);
+            self.cursor.line -= 1;
+            let prev_line = &mut self.content[self.cursor.line];
+            self.cursor.char = prev_line.len();
+            prev_line.push_str(&current_line);
+            self.action_logger
+                .finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line]);
+        } else {
+            let line = &mut self.content[self.cursor.line];
+            self.action_logger.prep_buffer(&self.cursor, line);
+            let offset = self.configs.backspace_indent_handler(line, self.cursor.char);
+            self.cursor.offset_char(offset);
+            self.action_logger.backspace(&self.cursor);
         }
     }
 
@@ -521,9 +512,7 @@ impl Editor {
             self.cursor = from;
             self.action_logger
                 .finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line]);
-            return;
-        }
-        if self.content[self.cursor.line].len() == self.cursor.char {
+        } else if self.content[self.cursor.line].len() == self.cursor.char {
             if self.content.len() > self.cursor.line + 1 {
                 self.action_logger
                     .init_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line + 1]);
@@ -540,7 +529,17 @@ impl Editor {
     }
 
     pub fn indent(&mut self) {
-        self.indent_at(self.cursor.char)
+        if let Some((from, ..)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
+            self.indent_at(self.cursor.char);
+            self.cursor = from;
+            self.action_logger
+                .finish_replace(self.cursor, &self.content[self.cursor.as_range()])
+        } else {
+            self.action_logger
+                .prep_buffer(&self.cursor, &self.content[self.cursor.line]);
+            self.indent_at(self.cursor.char);
+            self.action_logger.buffer_str(&self.configs.indent, self.cursor);
+        }
     }
 
     pub fn indent_start(&mut self) {
@@ -550,8 +549,10 @@ impl Editor {
     pub fn unindent(&mut self) {
         if let Some(line) = self.content.get_mut(self.cursor.line) {
             if line.starts_with(&self.configs.indent) {
+                self.action_logger.init_replace(self.cursor, &[line.to_owned()]);
                 line.replace_range(..self.configs.indent.len(), "");
                 self.cursor.diff_char(self.configs.indent.len());
+                self.action_logger.finish_replace(self.cursor, &[line.to_owned()])
             }
         }
     }
