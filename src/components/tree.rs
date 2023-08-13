@@ -1,13 +1,12 @@
+use crate::configs::GeneralAction;
 use std::{cmp::Ordering, path::PathBuf};
 use tui::{
     backend::Backend,
-    layout::Rect,
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     widgets::{Block, Borders, List, ListItem, ListState},
     Frame,
 };
-
-use crate::configs::GeneralAction;
 
 #[cfg(not(target_os = "windows"))]
 const DIR_SEP: char = '/';
@@ -15,8 +14,9 @@ const DIR_SEP: char = '/';
 #[cfg(target_os = "windows")]
 const DIR_SEP: char = '\\';
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Tree {
+    active: bool,
     pub expanded: Vec<PathBuf>,
     pub state: ListState,
     pub tree: Vec<PathBuf>,
@@ -25,7 +25,25 @@ pub struct Tree {
 }
 
 impl Tree {
-    pub fn render(&mut self, frame: &mut Frame<impl Backend>, area: Rect) {
+    pub fn new(active: bool) -> Self {
+        Self {
+            active,
+            expanded: Vec::default(),
+            state: ListState::default(),
+            tree: Vec::default(),
+            on_open_tabs: false,
+            input: Option::default(),
+        }
+    }
+
+    pub fn render(&mut self, frame: &mut Frame<impl Backend>, screen: Rect) -> Rect {
+        if !self.active {
+            return screen;
+        }
+        let areas = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(15), Constraint::Min(2)])
+            .split(screen);
         let mut tree = TreePath::default();
         tree.expand(&self.expanded);
         self.tree = tree.flatten();
@@ -38,7 +56,8 @@ impl Tree {
             .block(Block::default().borders(Borders::ALL).title("Explorer"))
             .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
-        frame.render_stateful_widget(file_tree, area, &mut self.state);
+        frame.render_stateful_widget(file_tree, areas[0], &mut self.state);
+        areas[1]
     }
 
     pub fn expand_dir_or_get_path(&mut self) -> Option<PathBuf> {
@@ -49,6 +68,18 @@ impl Tree {
         } else {
             Some(path)
         }
+    }
+
+    pub fn map(&mut self, action: &GeneralAction) -> bool {
+        if self.input.is_none() {
+            self.map_tree(action)
+        } else {
+            self.map_input(action)
+        }
+    }
+
+    pub fn toggle(&mut self) {
+        self.active = !self.active;
     }
 
     fn inject_input_if_exists(&self, paths: &mut Vec<ListItem<'_>>) -> Option<()> {
@@ -163,14 +194,6 @@ impl Tree {
             return true;
         }
         false
-    }
-
-    pub fn map(&mut self, action: &GeneralAction) -> bool {
-        if self.input.is_none() {
-            self.map_tree(action)
-        } else {
-            self.map_input(action)
-        }
     }
 }
 

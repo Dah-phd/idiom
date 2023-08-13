@@ -208,6 +208,7 @@ pub enum GeneralAction {
     PreviousTab,
     RefreshSettings,
     GoToLinePopup,
+    ToggleTerminal,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -229,6 +230,7 @@ pub struct GeneralUserKeyMap {
     previous_tab: String,
     refresh_settings: String,
     go_to_line: String,
+    toggle_terminal: String,
 }
 
 impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
@@ -254,6 +256,7 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
         insert_key_event(&mut hash, &val.previous_tab, GeneralAction::PreviousTab);
         insert_key_event(&mut hash, &val.refresh_settings, GeneralAction::RefreshSettings);
         insert_key_event(&mut hash, &val.go_to_line, GeneralAction::GoToLinePopup);
+        insert_key_event(&mut hash, &val.toggle_terminal, GeneralAction::ToggleTerminal);
         hash
     }
 }
@@ -277,6 +280,7 @@ impl Default for GeneralUserKeyMap {
             previous_tab: format!("{} && {}", CTRL, TAB),
             refresh_settings: format!("{}5", F),
             go_to_line: format!("{} && {}", CTRL, 'g'),
+            toggle_terminal: format!("{} && {}", CTRL, '`'),
         }
     }
 }
@@ -367,8 +371,10 @@ fn split_mod_char_key_event(key: KeyEvent) -> Vec<KeyEvent> {
         }
     }
     #[cfg(target_os = "linux")]
-    if key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char(']') {
-        events.push(KeyEvent::new(KeyCode::Char('5'), key.modifiers))
+    match (key.modifiers, key.code) {
+        (KeyModifiers::CONTROL, KeyCode::Char(']')) => events.push(KeyEvent::new(KeyCode::Char('5'), key.modifiers)),
+        (KeyModifiers::CONTROL, KeyCode::Char('`')) => events.push(KeyEvent::new(KeyCode::Char(' '), key.modifiers)),
+        _ => (),
     }
     events
 }

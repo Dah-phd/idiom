@@ -1,39 +1,33 @@
+use crate::{
+    components::{
+        popups::editor_popups::go_to_line_popup, popups::editor_popups::save_all_popup, EditorState, EditorTerminal,
+        Tree,
+    },
+    configs::{GeneralAction, KeyMap, Mode, PopupMessage},
+    lsp::LSP,
+};
+use anyhow::Result;
+use crossterm::event::Event;
 use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
+use tui::{backend::Backend, Terminal};
 
-use crate::{
-    components::{popups::editor_popups::go_to_line_popup, popups::editor_popups::save_all_popup, EditorState, Tree},
-    configs::{GeneralAction, KeyMap, Mode, PopupMessage},
-    lsp::LSP,
-};
-
-use crossterm::event::Event;
-
-use tui::{
-    backend::Backend,
-    layout::{Constraint, Direction, Layout},
-    Terminal,
-};
-
-use anyhow::Result;
-
-const TICK: Duration = Duration::from_millis(250);
+const TICK: Duration = Duration::from_millis(100);
 
 pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBuf>) -> Result<()> {
     let configs = KeyMap::new();
     let mut mode = Mode::Select;
     let mut clock = Instant::now();
-    let mut file_tree = Tree::default();
-    let mut hide_file_tree = false;
+    let mut file_tree = Tree::new(open_file.is_none());
     let mut editor_state = EditorState::new(configs.editor_key_map());
     let mut lsp_servers: Vec<LSP> = vec![];
     let mut general_key_map = configs.general_key_map();
+    let mut tmux = EditorTerminal::new().unwrap(); //TODO: Handle error variant
     if let Some(path) = open_file {
         editor_state.new_from(path).await;
         mode = Mode::Insert;
-        hide_file_tree = true;
     }
 
     drop(configs);
@@ -43,21 +37,9 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
             let _ = terminal.hide_cursor();
         }
         terminal.draw(|frame| {
-            let screen_areas = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Percentage(if matches!(mode, Mode::Select) || !hide_file_tree {
-                        15
-                    } else {
-                        0
-                    }),
-                    Constraint::Min(2),
-                ])
-                .split(frame.size());
-            if matches!(mode, Mode::Select) || !hide_file_tree {
-                file_tree.render(frame, screen_areas[0]);
-            }
-            editor_state.render(frame, screen_areas[1]);
+            let mut screen = file_tree.render(frame, frame.size());
+            screen = tmux.render(frame, screen);
+            editor_state.render(frame, screen);
             if let Mode::Popup((_, popup)) = &mut mode {
                 popup.render(frame);
             }
@@ -69,7 +51,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
 
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = crossterm::event::read()? {
-                if matches!(mode, Mode::Insert) && editor_state.map(&key) {
+                if matches!(mode, Mode::Insert) && !tmux.active && editor_state.map(&key) {
                     continue;
                 }
                 if let Mode::Popup((_, popup)) = &mut mode {
@@ -98,7 +80,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                 } else {
                     continue;
                 };
-                if file_tree.map(&action) {
+                if tmux.map(&action).await || file_tree.map(&action) {
                     continue;
                 }
                 match action {
@@ -149,7 +131,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                     }
                     GeneralAction::FileTreeModeOrCancelInput => mode = Mode::Select,
                     GeneralAction::SaveAll => editor_state.save(),
-                    GeneralAction::HideFileTree => hide_file_tree = !hide_file_tree,
+                    GeneralAction::HideFileTree => file_tree.toggle(),
                     GeneralAction::PreviousTab => {
                         if let Some(editor_id) = editor_state.state.selected() {
                             file_tree.on_open_tabs = true;
@@ -168,7 +150,10 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                     GeneralAction::GoToLinePopup if matches!(mode, Mode::Insert) => {
                         mode = mode.popup(go_to_line_popup());
                     }
-                    _ => {}
+                    GeneralAction::ToggleTerminal => {
+                        tmux.toggle();
+                    }
+                    _ => (),
                 }
             }
         }

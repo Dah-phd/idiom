@@ -1,10 +1,9 @@
 mod file;
-pub use file::{CursorPosition, Offset};
-
 use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType};
 use crate::lsp::{LSPMessage, LSP};
 use crossterm::event::KeyEvent;
 use file::Editor;
+pub use file::{CursorPosition, Offset};
 use serde_json::Value;
 use std::collections::{hash_map::Entry, HashMap};
 use std::path::PathBuf;
