@@ -1,12 +1,13 @@
 mod file;
 use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType};
-use crate::lsp::{LSPMessage, LSP};
+use crate::lsp::LSP;
 use crossterm::event::KeyEvent;
 use file::Editor;
 pub use file::{CursorPosition, Offset};
-use serde_json::Value;
 use std::collections::{hash_map::Entry, HashMap};
 use std::path::PathBuf;
+use std::rc::Rc;
+use tokio::sync::Mutex;
 use tui::layout::{Constraint, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::text::{Span, Spans};
@@ -18,9 +19,6 @@ pub struct EditorState {
     pub state: ListState,
     base_config: EditorConfigs,
     key_map: EditorKeyMap,
-    lsp_servers: HashMap<FileType, LSP>,
-    noifications: HashMap<FileType, Vec<LSPMessage>>,
-    diagnostics: HashMap<PathBuf, Value>,
 }
 
 impl EditorState {
@@ -30,16 +28,13 @@ impl EditorState {
             state: ListState::default(),
             base_config: EditorConfigs::new(),
             key_map,
-            lsp_servers: HashMap::new(),
-            noifications: HashMap::new(),
-            diagnostics: HashMap::new(),
         }
     }
 
-    pub fn render(&mut self, frame: &mut Frame<impl Backend>, area: Rect) {
+    pub fn render(&mut self, frame: &mut Frame<impl Backend>, screen: Rect) {
         let layout = Layout::default()
             .constraints(vec![Constraint::Percentage(4), Constraint::Min(2)])
-            .split(area);
+            .split(screen);
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get_mut(editor_id) {
                 file.set_max_rows(layout[1].bottom());
@@ -61,8 +56,15 @@ impl EditorState {
                     .style(Style::default().add_modifier(Modifier::UNDERLINED))
                     .highlight_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
                     .select(0);
-
                 frame.render_widget(tabs, layout[0]);
+            }
+        }
+    }
+
+    pub async fn lsp_updates(&mut self) {
+        if let Some(editor_id) = self.state.selected() {
+            if let Some(file) = self.editors.get_mut(editor_id) {
+                file.update_lsp().await;
             }
         }
     }
@@ -71,17 +73,29 @@ impl EditorState {
         self.editors.get_mut(self.state.selected()?)
     }
 
-    pub async fn new_from(&mut self, file_path: PathBuf) {
+    pub async fn new_from(&mut self, file_path: PathBuf, lsp_servers: &mut HashMap<FileType, Rc<Mutex<LSP>>>) {
         for (idx, file) in self.editors.iter().enumerate() {
             if file_path == file.path {
                 self.state.select(Some(idx));
                 return;
             }
         }
-        if let Ok(opened_file) = Editor::from_path(file_path, self.base_config.clone()) {
-            if let Entry::Vacant(e) = self.lsp_servers.entry(opened_file.file_type) {
-                if let Ok(lsp) = LSP::from(&opened_file.file_type).await {
-                    e.insert(lsp);
+        if let Ok(mut opened_file) = Editor::from_path(file_path, self.base_config.clone()) {
+            match lsp_servers.entry(opened_file.file_type) {
+                Entry::Vacant(entry) => {
+                    if let Ok(mut lsp) = LSP::from(&opened_file.file_type).await {
+                        if let Some(..) = lsp.initialized().await {
+                            if let Some(..) = lsp.file_did_open(&opened_file.path).await {
+                                let lsp_rc = Rc::new(Mutex::new(lsp));
+                                opened_file.lsp = Some(Rc::clone(&lsp_rc));
+                                entry.insert(lsp_rc);
+                            }
+                        }
+                    }
+                }
+                Entry::Occupied(entry) => {
+                    let lsp_rc = Rc::clone(entry.get());
+                    opened_file.lsp = Some(lsp_rc);
                 }
             }
             self.state.select(Some(self.editors.len()));
@@ -89,18 +103,7 @@ impl EditorState {
         }
     }
 
-    pub fn drain_notifications(&mut self) {
-        for (file_type, lsp) in self.lsp_servers.iter_mut() {
-            if let Ok(mut notifications) = lsp.notifications.try_lock() {
-                if notifications.is_empty() {
-                    continue;
-                }
-                self.noifications.insert(*file_type, notifications.drain(..).collect());
-            }
-        }
-    }
-
-    pub fn map(&mut self, key: &KeyEvent) -> bool {
+    pub async fn map(&mut self, key: &KeyEvent) -> bool {
         let action = self.key_map.map(key);
         if let Some(editor) = self.get_active() {
             if let Some(action) = action {
@@ -137,7 +140,7 @@ impl EditorState {
                     EditorAction::Paste => editor.paste(),
                     EditorAction::Undo => editor.undo(),
                     EditorAction::Redo => editor.redo(),
-                    EditorAction::Save => editor.save(),
+                    EditorAction::Save => editor.save().await,
                     EditorAction::Close => self.close_active(),
                 }
                 return true;
@@ -169,15 +172,15 @@ impl EditorState {
         true
     }
 
-    pub fn save(&mut self) {
+    pub async fn save(&mut self) {
         if let Some(editor) = self.get_active() {
-            editor.save()
+            editor.save().await;
         }
     }
 
-    pub fn save_all(&mut self) {
+    pub async fn save_all(&mut self) {
         for editor in self.editors.iter_mut() {
-            editor.save()
+            editor.save().await;
         }
     }
 

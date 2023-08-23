@@ -4,14 +4,12 @@ use crate::{
         Tree,
     },
     configs::{GeneralAction, KeyMap, Mode, PopupMessage},
-    lsp::LSP,
 };
 use anyhow::Result;
 use crossterm::event::Event;
-use std::{
-    path::PathBuf,
-    time::{Duration, Instant},
-};
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::time::{Duration, Instant};
 use tui::{backend::Backend, Terminal};
 
 const TICK: Duration = Duration::from_millis(100);
@@ -22,11 +20,12 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
     let mut clock = Instant::now();
     let mut file_tree = Tree::new(open_file.is_none());
     let mut editor_state = EditorState::new(configs.editor_key_map());
-    let mut lsp_servers: Vec<LSP> = vec![];
     let mut general_key_map = configs.general_key_map();
-    let mut tmux = EditorTerminal::new().unwrap(); //TODO: Handle error variant
+    let mut tmux = EditorTerminal::new();
+    let mut lsp_servers = HashMap::new();
+
     if let Some(path) = open_file {
-        editor_state.new_from(path).await;
+        editor_state.new_from(path, &mut lsp_servers).await;
         mode = Mode::Insert;
     }
 
@@ -37,13 +36,14 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
             let _ = terminal.hide_cursor();
         }
         terminal.draw(|frame| {
-            let mut screen = file_tree.render(frame, frame.size());
-            screen = tmux.render(frame, screen);
+            let mut screen = frame.size();
+            screen = file_tree.render_with_remainder(frame, screen);
+            screen = tmux.render_with_remainder(frame, screen);
             editor_state.render(frame, screen);
-            if let Mode::Popup((_, popup)) = &mut mode {
-                popup.render(frame);
-            }
+            mode.render_popup_if_exists(frame);
         })?;
+
+        editor_state.lsp_updates().await;
 
         let timeout = TICK
             .checked_sub(clock.elapsed())
@@ -51,11 +51,11 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
 
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = crossterm::event::read()? {
-                if matches!(mode, Mode::Insert) && !tmux.active && editor_state.map(&key) {
+                if matches!(mode, Mode::Insert) && !tmux.active && editor_state.map(&key).await {
                     continue;
                 }
                 if let Mode::Popup((_, popup)) = &mut mode {
-                    match popup.map(&key) {
+                    match popup.map(&key).await {
                         PopupMessage::None => continue,
                         PopupMessage::Exit => break,
                         PopupMessage::Done => {
@@ -63,7 +63,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                             continue;
                         }
                         PopupMessage::SaveAndExit => {
-                            editor_state.save_all();
+                            editor_state.save_all().await;
                             break;
                         }
                         PopupMessage::GoToLine(line_idx) => {
@@ -93,15 +93,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                     }
                     GeneralAction::Expand => {
                         if let Some(file_path) = file_tree.expand_dir_or_get_path() {
-                            editor_state.new_from(file_path).await;
-                            if let Some(editor) = editor_state.get_active() {
-                                if let Ok(lsp) = LSP::from(&editor.file_type).await {
-                                    for req in lsp.responses.lock().unwrap().iter() {
-                                        let _ = req;
-                                    }
-                                    lsp_servers.push(lsp);
-                                }
-                            }
+                            editor_state.new_from(file_path, &mut lsp_servers).await;
                         }
                     }
                     GeneralAction::FinishOrSelect => {
@@ -109,13 +101,8 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                             mode = Mode::Insert;
                         } else if let Some(file_path) = file_tree.expand_dir_or_get_path() {
                             if !file_path.is_dir() {
-                                editor_state.new_from(file_path).await;
+                                editor_state.new_from(file_path, &mut lsp_servers).await;
                                 mode = Mode::Insert;
-                                if let Some(editor) = editor_state.get_active() {
-                                    if let Ok(lsp) = LSP::from(&editor.file_type).await {
-                                        lsp_servers.push(lsp)
-                                    }
-                                }
                             }
                         }
                     }
@@ -130,7 +117,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                         }
                     }
                     GeneralAction::FileTreeModeOrCancelInput => mode = Mode::Select,
-                    GeneralAction::SaveAll => editor_state.save(),
+                    GeneralAction::SaveAll => editor_state.save().await,
                     GeneralAction::HideFileTree => file_tree.toggle(),
                     GeneralAction::PreviousTab => {
                         if let Some(editor_id) = editor_state.state.selected() {

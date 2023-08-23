@@ -1,3 +1,5 @@
+pub mod editor_popups;
+use crate::configs::PopupMessage;
 use crossterm::event::{KeyCode, KeyEvent};
 use tui::{
     backend::Backend,
@@ -7,9 +9,6 @@ use tui::{
     widgets::{Block, Borders, Clear, Paragraph},
     Frame,
 };
-
-use crate::configs::PopupMessage;
-pub mod editor_popups;
 
 #[derive(Debug, Default, Clone)]
 pub struct Popup {
@@ -39,7 +38,7 @@ impl Popup {
         frame.render_widget(self.spans_from_buttons(), chunks[1]);
     }
 
-    pub fn map(&mut self, key: &KeyEvent) -> PopupMessage {
+    pub async fn map(&mut self, key: &KeyEvent) -> PopupMessage {
         if let Some(button) = self
             .buttons
             .iter()
@@ -115,9 +114,9 @@ impl Popup {
 
 #[derive(Clone)]
 pub struct Button {
-    pub command: fn(&mut Popup) -> PopupMessage,
-    pub name: String,
-    pub key: Option<Vec<KeyCode>>,
+    command: fn(&mut Popup) -> PopupMessage,
+    name: String,
+    key: Option<Vec<KeyCode>>,
 }
 
 impl std::fmt::Debug for Button {

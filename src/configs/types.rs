@@ -1,3 +1,5 @@
+use tui::{backend::Backend, Frame};
+
 use crate::components::popups::Popup;
 use std::path::PathBuf;
 
@@ -15,6 +17,12 @@ impl Default for Mode {
 }
 
 impl Mode {
+    pub fn render_popup_if_exists(&mut self, frame: &mut Frame<impl Backend>) {
+        if let Self::Popup((.., popup)) = self {
+            popup.render(frame)
+        }
+    }
+
     pub fn popup(self, popup: Popup) -> Self {
         if matches!(self, Self::Popup((_, _))) {
             return self;

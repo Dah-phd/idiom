@@ -7,26 +7,30 @@ use tui::widgets::{List, ListItem};
 
 use crate::{
     configs::{EditorConfigs, FileType},
+    lsp::LSP,
     syntax::{Lexer, Theme},
     utils::{get_closing_char, trim_start_inplace},
 };
 use std::path::PathBuf;
+use std::rc::Rc;
+use tokio::sync::Mutex;
 
 use self::action::ActionLogger;
 
 #[derive(Debug)]
 pub struct Editor {
-    pub linter: Lexer,
-    pub configs: EditorConfigs,
     pub cursor: CursorPosition,
+    pub lsp: Option<Rc<Mutex<LSP>>>,
+    pub file_type: FileType,
+    pub path: PathBuf,
+    pub at_line: usize,
+    linter: Lexer,
+    configs: EditorConfigs,
     select: Select,
     clipboard: Clipboard,
     action_logger: ActionLogger,
-    pub max_rows: usize,
-    pub at_line: usize,
-    pub content: Vec<String>,
-    pub path: PathBuf,
-    pub file_type: FileType,
+    max_rows: usize,
+    content: Vec<String>,
 }
 
 impl Editor {
@@ -37,6 +41,7 @@ impl Editor {
         Ok(Self {
             linter: Lexer::from_type(&file_type, Theme::from(&configs.theme_file_in_config_dir)),
             configs,
+            lsp: None,
             cursor: CursorPosition::default(),
             select: Select::default(),
             clipboard: Clipboard::default(),
@@ -50,6 +55,7 @@ impl Editor {
     }
 
     pub fn get_list_widget(&mut self) -> (usize, List<'_>) {
+        self.get_diagnostics();
         self.linter.set_select(self.select.get());
         let max_digits = self.linter.line_number_max_digits(&self.content);
         let render_till_line = self.content.len().min(self.at_line + self.max_rows);
@@ -61,6 +67,27 @@ impl Editor {
                 .collect::<Vec<ListItem>>(),
         );
         (max_digits, editor_content)
+    }
+
+    pub fn get_diagnostics(&mut self) {
+        if let Some(lsp) = self.lsp.as_mut() {
+            if let Ok(guard) = lsp.try_lock() {
+                let diagnostics = guard.get_diagnostics(&self.path);
+                if diagnostics.is_some() {
+                    self.linter.diagnostics = diagnostics
+                }
+            }
+        }
+    }
+
+    pub async fn update_lsp(&mut self) {
+        if let Some(lsp) = self.lsp.as_mut() {
+            if let Ok(mut guard) = lsp.try_lock() {
+                if let Some((version, content_changes)) = self.action_logger.get_text_edits() {
+                    guard.file_did_change(&self.path, version, content_changes).await;
+                }
+            }
+        }
     }
 
     pub fn is_saved(&self) -> bool {
@@ -555,7 +582,10 @@ impl Editor {
         }
     }
 
-    pub fn save(&self) {
+    pub async fn save(&mut self) {
+        if let Some(lsp) = self.lsp.as_mut() {
+            lsp.lock().await.file_did_save(&self.path).await;
+        }
         std::fs::write(&self.path, self.content.join("\n")).unwrap();
     }
 

@@ -4,8 +4,8 @@ mod python;
 mod request;
 mod rust;
 use crate::configs::FileType;
-use crate::utils::{split_arc_mutex, split_arc_mutex_async};
-use lsp_types::notification::{DidOpenTextDocument, Exit, Initialized};
+use crate::utils::{into_guard, split_arc_mutex, split_arc_mutex_async};
+use lsp_types::notification::{DidChangeTextDocument, DidOpenTextDocument, DidSaveTextDocument, Exit, Initialized};
 use lsp_types::request::{HoverRequest, Initialize, References, Shutdown, SignatureHelpRequest};
 pub use messages::LSPMessage;
 use request::LSPRequest;
@@ -23,22 +23,25 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 
 use anyhow::{anyhow, Result};
 
-use lsp_types::Url;
 use lsp_types::{
-    DidOpenTextDocumentParams, HoverParams, InitializedParams, NumberOrString, PartialResultParams, Position,
-    ReferenceContext, ReferenceParams, SignatureHelpParams, TextDocumentIdentifier, TextDocumentItem,
-    TextDocumentPositionParams, WorkDoneProgressParams,
+    DidChangeTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams, HoverParams, InitializedParams,
+    PartialResultParams, Position, PublishDiagnosticsParams, ReferenceContext, ReferenceParams, SignatureHelpParams,
+    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Url,
+    VersionedTextDocumentIdentifier, WorkDoneProgressParams,
 };
 
 use self::messages::done_auto_response;
+pub use self::messages::{Diagnostic, GeneralNotification, Request, Response};
 use self::notification::LSPNotification;
 
+#[derive(Debug)]
 #[allow(clippy::upper_case_acronyms)]
 #[allow(dead_code)]
 pub struct LSP {
-    pub responses: Arc<Mutex<HashMap<i64, LSPMessage>>>,
-    pub notifications: Arc<Mutex<Vec<LSPMessage>>>,
-    pub requests: Arc<tokio::sync::Mutex<Vec<LSPMessage>>>,
+    pub responses: Arc<Mutex<HashMap<i64, Response>>>,
+    pub notifications: Arc<Mutex<Vec<GeneralNotification>>>,
+    pub requests: Arc<tokio::sync::Mutex<Vec<Request>>>,
+    pub diagnostics: Arc<Mutex<HashMap<PathBuf, Diagnostic>>>,
     pub errs: Arc<Mutex<Vec<String>>>,
     language: FileType,
     counter: usize,
@@ -73,33 +76,21 @@ impl LSP {
         let (notifications, notifications_handler) = split_arc_mutex(Vec::new());
         let (errs, errs_handler) = split_arc_mutex(Vec::new());
         let (requests, requests_handler) = split_arc_mutex_async(Vec::new());
+        let (diagnostics, diagnostics_handler) = split_arc_mutex(HashMap::new());
         let handler = tokio::task::spawn(async move {
             while let Some(Ok(msg)) = stream.next().await {
                 let lsp_message = String::from_utf8_lossy(&msg);
                 for msg in lsp_message.split("Content-Length") {
                     if let Some(msg) = LSPMessage::parse(msg) {
                         match msg {
-                            LSPMessage::Response { id, .. } => match responses_handler.lock() {
-                                Ok(mut guard) => {
-                                    guard.insert(id, msg);
-                                }
-                                Err(poisoned) => {
-                                    poisoned.into_inner().insert(id, msg);
-                                }
-                            },
-                            LSPMessage::ResponseErr { id, .. } => match responses_handler.lock() {
-                                Ok(mut guard) => {
-                                    guard.insert(id, msg);
-                                }
-                                Err(poisoned) => {
-                                    poisoned.into_inner().insert(id, msg);
-                                }
-                            },
-                            LSPMessage::Notification { .. } => match notifications_handler.lock() {
-                                Ok(mut guard) => guard.push(msg),
-                                Err(poisoned) => poisoned.into_inner().push(msg),
-                            },
-                            LSPMessage::Request { .. } => requests_handler.lock().await.push(msg),
+                            LSPMessage::Response(inner) => {
+                                into_guard(&responses_handler).insert(inner.id, inner);
+                            }
+                            LSPMessage::Notification(inner) => into_guard(&notifications_handler).push(inner),
+                            LSPMessage::Diagnostic(uri, params) => {
+                                into_guard(&diagnostics_handler).insert(uri, params);
+                            }
+                            LSPMessage::Request(inner) => requests_handler.lock().await.push(inner),
                         }
                     } else if !msg.is_empty() {
                         match errs_handler.lock() {
@@ -117,6 +108,7 @@ impl LSP {
             responses,
             notifications,
             requests,
+            diagnostics,
             errs,
             counter: 0,
             language,
@@ -128,6 +120,14 @@ impl LSP {
 
     pub fn is_live(&self) -> bool {
         !self.handler.is_finished()
+    }
+
+    pub fn get_diagnostics(&self, doctument: &Path) -> Option<PublishDiagnosticsParams> {
+        self.diagnostics
+            .try_lock()
+            .ok()?
+            .get_mut(&doctument.canonicalize().ok()?)?
+            .take()
     }
 
     pub async fn auto_responde(&mut self) {
@@ -142,28 +142,50 @@ impl LSP {
         requests.retain(|_| keep.remove(0));
     }
 
-    pub fn get(&self, id: i64) -> Option<LSPMessage> {
+    pub fn get(&self, id: i64) -> Option<Response> {
         let mut que = self.responses.try_lock().ok()?;
         que.remove(&id)
     }
 
     pub async fn initialized(&mut self) -> Option<()> {
-        let notification: LSPNotification<Initialized> = LSPNotification::with(InitializedParams {});
-        self.notify(notification.stringify().ok()?).await.ok()
+        self.notify::<Initialized>(LSPNotification::with(InitializedParams {}))
+            .await
+            .ok()
     }
 
     pub async fn file_did_open(&mut self, path: &PathBuf) -> Option<()> {
         let content = std::fs::read_to_string(path).ok()?;
         let notification: LSPNotification<DidOpenTextDocument> = LSPNotification::with(DidOpenTextDocumentParams {
             text_document: TextDocumentItem {
-                uri: Url::parse(&format!("file:///{}", path.as_os_str().to_str()?)).ok()?,
+                uri: as_url(path)?,
                 language_id: String::from(&self.language),
                 version: 0,
                 text: content,
             },
         });
-        let lsp_message = notification.stringify().ok()?;
-        self.notify(lsp_message).await.ok()
+        self.notify(notification).await.ok()
+    }
+
+    pub async fn file_did_save(&mut self, path: &PathBuf) -> Option<()> {
+        let content = std::fs::read_to_string(path).ok()?;
+        let notification: LSPNotification<DidSaveTextDocument> = LSPNotification::with(DidSaveTextDocumentParams {
+            text_document: TextDocumentIdentifier { uri: as_url(path)? },
+            text: Some(content),
+        });
+        self.notify(notification).await.ok()
+    }
+
+    pub async fn file_did_change(
+        &mut self,
+        path: &Path,
+        version: i32,
+        content_changes: Vec<TextDocumentContentChangeEvent>,
+    ) -> Option<()> {
+        let notification: LSPNotification<DidChangeTextDocument> = LSPNotification::with(DidChangeTextDocumentParams {
+            text_document: VersionedTextDocumentIdentifier::new(as_url(path)?, version),
+            content_changes,
+        });
+        self.notify(notification).await.ok()
     }
 
     pub async fn request_references(&mut self, path: &Path, line: u32, char: u32) -> Option<usize> {
@@ -171,17 +193,13 @@ impl LSP {
             0,
             ReferenceParams {
                 text_document_position: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier {
-                        uri: Url::parse(&format!("file:///{}", path.as_os_str().to_str()?)).ok()?,
-                    },
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: Position::new(line, char),
                 },
                 context: ReferenceContext {
                     include_declaration: true,
                 },
-                work_done_progress_params: WorkDoneProgressParams {
-                    work_done_token: Some(NumberOrString::String(format!("ref{}", self.counter))),
-                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
                 partial_result_params: PartialResultParams::default(),
             },
         );
@@ -193,9 +211,7 @@ impl LSP {
             self.counter,
             HoverParams {
                 text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier {
-                        uri: Url::parse(&format!("file:///{}", path.as_os_str().to_str()?)).ok()?,
-                    },
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: Position::new(line, char),
                 },
                 work_done_progress_params: WorkDoneProgressParams::default(),
@@ -210,9 +226,7 @@ impl LSP {
             SignatureHelpParams {
                 context: None,
                 text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier {
-                        uri: Url::parse(&format!("file:///{}", path.as_os_str().to_str()?)).ok()?,
-                    },
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: Position::new(line, char),
                 },
                 work_done_progress_params: WorkDoneProgressParams::default(),
@@ -245,11 +259,18 @@ impl LSP {
         T::Result: serde::de::DeserializeOwned,
     {
         let message = response.stringify()?;
-        self.notify(message).await
+        let _ = self.stdin.write(message.as_bytes()).await?;
+        self.stdin.flush().await?;
+        Ok(())
     }
 
-    async fn notify(&mut self, lsp_notification: String) -> Result<()> {
-        let _ = self.stdin.write(lsp_notification.as_bytes()).await?;
+    async fn notify<T>(&mut self, notification: LSPNotification<T>) -> Result<()>
+    where
+        T: lsp_types::notification::Notification,
+        T::Params: serde::Serialize,
+    {
+        let message = notification.stringify()?;
+        let _ = self.stdin.write(message.as_bytes()).await?;
         self.stdin.flush().await?;
         Ok(())
     }
@@ -260,8 +281,7 @@ impl LSP {
         self.request(shoutdown_request)
             .await
             .ok_or(anyhow!("Failed to notify shoutdown"))?;
-        let exit: LSPNotification<Exit> = LSPNotification::with(());
-        self.notify(exit.stringify()?).await?;
+        self.notify::<Exit>(LSPNotification::with(())).await?;
         self.dash_nine().await?;
         Ok(())
     }
@@ -271,4 +291,8 @@ impl LSP {
         self.inner.kill().await?;
         Ok(())
     }
+}
+
+fn as_url(path: &Path) -> Option<Url> {
+    Url::parse(&format!("file:///{}", path.as_os_str().to_str()?)).ok()
 }

@@ -1,3 +1,5 @@
+use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
+
 use super::select::CursorPosition;
 use std::time::{Duration, Instant};
 
@@ -42,6 +44,8 @@ impl ReplaceBuilder {
 pub struct ActionLogger {
     replace_builder: Option<ReplaceBuilder>,
     buffer: Option<Action>,
+    version: i32,
+    text_edits: Vec<TextDocumentContentChangeEvent>,
     pub done: Vec<Action>,
     pub undone: Vec<Action>,
     clock: Instant,
@@ -53,6 +57,8 @@ impl Default for ActionLogger {
             replace_builder: Option::default(),
             buffer: Option::default(),
             done: Vec::default(),
+            text_edits: Vec::default(),
+            version: 0,
             undone: Vec::default(),
             clock: Instant::now(),
         }
@@ -92,7 +98,7 @@ impl ActionLogger {
 
     pub fn finish_replace(&mut self, new_cursor: CursorPosition, new: &[String]) {
         if let Some(builder) = self.replace_builder.take() {
-            self.done.push(builder.collect(new_cursor, new.into()))
+            self.push_done(builder.collect(new_cursor, new.into()));
         }
     }
 
@@ -169,7 +175,25 @@ impl ActionLogger {
 
     fn push_buffer(&mut self) {
         if let Some(buffer) = self.buffer.take() {
-            self.done.push(buffer)
+            self.push_done(buffer)
+        }
+    }
+
+    fn push_done(&mut self, action: Action) {
+        self.text_edits.push(action.get_text_edit());
+        self.done.push(action)
+    }
+
+    fn push_undone(&mut self, action: Action) {
+        self.text_edits.push(action.get_text_edit());
+        self.undone.push(action)
+    }
+
+    pub fn get_text_edits(&mut self) -> Option<(i32, Vec<TextDocumentContentChangeEvent>)> {
+        if self.text_edits.is_empty() {
+            None
+        } else {
+            Some((self.version, self.text_edits.drain(..).collect()))
         }
     }
 
@@ -177,7 +201,7 @@ impl ActionLogger {
         self.push_buffer();
         let action = self.done.pop()?;
         let old_cursor = action.restore(content);
-        self.undone.push(action.reverse());
+        self.push_undone(action.reverse());
         Some(old_cursor)
     }
 
@@ -185,7 +209,7 @@ impl ActionLogger {
         self.push_buffer();
         let action = self.undone.pop()?;
         let old_cursor = action.restore(content);
-        self.done.push(action.reverse());
+        self.push_done(action.reverse());
         Some(old_cursor)
     }
 }
@@ -229,5 +253,19 @@ impl Action {
             content.insert(self.from_line, line.into())
         }
         self.old_cursor
+    }
+
+    fn get_text_edit(&self) -> TextDocumentContentChangeEvent {
+        let start = Position::new(self.old_cursor.line as u32, 0);
+        let end = Position::new(
+            start.line + (self.old.len() as u32 - 1),
+            self.old.last().map(|line| line.len()).unwrap_or_default() as u32,
+        );
+        let range = Range::new(start, end);
+        TextDocumentContentChangeEvent {
+            range: Some(range),
+            range_length: None,
+            text: self.new.join("\n"),
+        }
     }
 }

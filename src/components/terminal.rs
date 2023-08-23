@@ -22,7 +22,7 @@ pub struct EditorTerminal {
 }
 
 impl EditorTerminal {
-    pub fn render(&mut self, frame: &mut Frame<impl Backend>, screen: Rect) -> Rect {
+    pub fn render_with_remainder(&mut self, frame: &mut Frame<impl Backend>, screen: Rect) -> Rect {
         if !self.active {
             return screen;
         }
@@ -49,14 +49,14 @@ impl EditorTerminal {
         self.active = !self.active
     }
 
-    pub fn new() -> Result<Self> {
-        Ok(Self {
+    pub fn new() -> Self {
+        Self {
             active: false,
             history: Vec::new(),
             process: None,
             out_buffer: Arc::new(Mutex::new(Vec::new())),
             cmd_buffer: String::new(),
-        })
+        }
     }
 
     pub async fn map(&mut self, general_action: &GeneralAction) -> bool {

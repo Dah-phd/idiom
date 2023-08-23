@@ -1,5 +1,8 @@
 use crate::configs::GeneralAction;
-use std::{cmp::Ordering, path::PathBuf};
+use std::{
+    cmp::Ordering,
+    path::{Path, PathBuf},
+};
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
@@ -36,7 +39,7 @@ impl Tree {
         }
     }
 
-    pub fn render(&mut self, frame: &mut Frame<impl Backend>, screen: Rect) -> Rect {
+    pub fn render_with_remainder(&mut self, frame: &mut Frame<impl Backend>, screen: Rect) -> Rect {
         if !self.active {
             return screen;
         }
@@ -305,8 +308,7 @@ fn not_expcluded_path(path: &PathBuf) -> bool {
     }
 }
 
-#[allow(clippy::ptr_arg)]
-fn get_dir_path(path: &PathBuf) -> PathBuf {
+fn get_dir_path(path: &Path) -> PathBuf {
     if path.is_file() {
         if let Some(parent) = path.parent() {
             parent.into()
@@ -314,6 +316,6 @@ fn get_dir_path(path: &PathBuf) -> PathBuf {
             PathBuf::from("./")
         }
     } else {
-        path.clone()
+        path.into()
     }
 }

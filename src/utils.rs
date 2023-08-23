@@ -1,5 +1,5 @@
 use crate::components::editor::Offset;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 pub fn trim_start_inplace(line: &mut String) -> Offset {
     if let Some(idx) = line.find(|c: char| !c.is_whitespace()) {
@@ -30,4 +30,11 @@ pub fn split_arc_mutex_async<T>(inner: T) -> (Arc<tokio::sync::Mutex<T>>, Arc<to
     let arc = Arc::new(tokio::sync::Mutex::new(inner));
     let clone = Arc::clone(&arc);
     (arc, clone)
+}
+
+pub fn into_guard<T>(mutex: &Mutex<T>) -> MutexGuard<T> {
+    match mutex.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
 }

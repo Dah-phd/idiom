@@ -5,6 +5,7 @@ pub use self::theme::{Theme, DEFAULT_THEME_FILE};
 use crate::components::editor::CursorPosition;
 use crate::configs::FileType;
 use langs::Lang;
+use lsp_types::{DiagnosticSeverity, PublishDiagnosticsParams};
 use tui::{
     style::{Color, Style},
     text::{Span, Spans},
@@ -16,6 +17,7 @@ pub const COLORS: [Color; 3] = [Color::LightMagenta, Color::Yellow, Color::Blue]
 pub struct Lexer {
     pub select: Option<(CursorPosition, CursorPosition)>,
     pub theme: Theme,
+    pub diagnostics: Option<PublishDiagnosticsParams>,
     line_processor: fn(&mut Lexer, content: &str, spans: &mut Vec<Span>),
     lang: Lang,
     token_start: usize,
@@ -33,6 +35,7 @@ impl Lexer {
         Self {
             line_processor: derive_line_processor(file_type),
             lang: file_type.into(),
+            diagnostics: None,
             select_at_line: None,
             curly: vec![],
             brackets: vec![],
@@ -81,10 +84,6 @@ impl Lexer {
         }
     }
 
-    fn process_line(&mut self, content: &str, spans: &mut Vec<Span>) {
-        (self.line_processor)(self, content, spans)
-    }
-
     fn handled_key_word(&mut self, token_end: usize, spans: &mut Vec<Span>) -> bool {
         if self.lang.key_words.contains(&self.last_token.trim()) {
             self.last_key_words.push(self.last_token.to_owned());
@@ -125,9 +124,35 @@ impl Lexer {
                 },
             })
         } else {
-            self.process_line(content, &mut spans);
+            (self.line_processor)(self, content, &mut spans);
             if !self.last_token.is_empty() {
                 self.drain_buf(content.len().checked_sub(1).unwrap_or_default(), &mut spans);
+            }
+            if let Some(diagnostics) = &self.diagnostics {
+                for diagnostic in diagnostics.diagnostics.iter() {
+                    if idx == diagnostic.range.start.line as usize {
+                        match diagnostic.severity {
+                            Some(severity) => match severity {
+                                DiagnosticSeverity::ERROR => spans.push(Span::styled(
+                                    format!("    {}", diagnostic.message),
+                                    Style::default().fg(Color::Red),
+                                )),
+                                DiagnosticSeverity::WARNING => spans.push(Span::styled(
+                                    format!("    {}", diagnostic.message),
+                                    Style::default().fg(Color::LightYellow),
+                                )),
+                                _ => spans.push(Span::styled(
+                                    format!("    {}", diagnostic.message),
+                                    Style::default().fg(Color::Gray),
+                                )),
+                            },
+                            None => spans.push(Span::styled(
+                                format!("    {}", diagnostic.message),
+                                Style::default().fg(Color::Gray),
+                            )),
+                        }
+                    }
+                }
             }
         }
         ListItem::new(Spans::from(spans))

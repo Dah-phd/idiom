@@ -61,21 +61,17 @@ where
                     workspace: Some(WorkspaceClientCapabilities { ..Default::default() }),
                     text_document: Some(TextDocumentClientCapabilities {
                         synchronization: Some(TextDocumentSyncClientCapabilities {
-                            dynamic_registration: Some(true),
                             will_save: Some(true),
                             did_save: Some(true),
                             ..Default::default()
                         }),
                         hover: Some(HoverClientCapabilities {
                             content_format: Some(vec![MarkupKind::PlainText]),
-                            dynamic_registration: Some(true),
+                            ..Default::default()
                         }),
-                        references: Some(ReferenceClientCapabilities {
-                            dynamic_registration: Some(true),
-                        }),
+                        references: Some(ReferenceClientCapabilities::default()),
                         signature_help: Some(SignatureHelpClientCapabilities {
                             context_support: Some(true),
-                            dynamic_registration: Some(true),
                             ..Default::default()
                         }),
                         ..Default::default()
