@@ -166,6 +166,19 @@ impl Select {
         }
     }
 
+    pub fn get_mut(&mut self) -> Option<(&mut CursorPosition, &mut CursorPosition)> {
+        match self {
+            Self::None => None,
+            Self::Range(from, to) => {
+                if from.line > to.line || from.line == to.line && from.char > to.char {
+                    Some((to, from))
+                } else {
+                    Some((from, to))
+                }
+            }
+        }
+    }
+
     pub fn get(&self) -> Option<(&CursorPosition, &CursorPosition)> {
         match self {
             Self::None => None,

@@ -465,17 +465,17 @@ impl Editor {
     }
 
     pub fn push(&mut self, ch: char) {
-        if let Some((from, to)) = self.select.get() {
+        if let Some((from, to)) = self.select.get_mut() {
             self.cursor = *from;
             self.cursor.char += 1;
             let replace = if let Some(closing) = get_closing_char(ch) {
                 self.action_logger.init_replace_from_select(from, to, &self.content);
                 self.content[from.line].insert(from.char, ch);
+                from.char += 1;
                 if from.line == to.line {
-                    self.content[to.line].insert(to.char + 1, closing);
-                } else {
-                    self.content[to.line].insert(to.char, closing);
+                    to.char += 1;
                 }
+                self.content[to.line].insert(to.char, closing);
                 from.line..to.line
             } else {
                 let (from, ..) = self

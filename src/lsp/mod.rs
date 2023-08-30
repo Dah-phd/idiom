@@ -5,7 +5,9 @@ mod request;
 mod rust;
 use crate::configs::FileType;
 use crate::utils::{into_guard, split_arc_mutex, split_arc_mutex_async};
-use lsp_types::notification::{DidChangeTextDocument, DidOpenTextDocument, DidSaveTextDocument, Exit, Initialized};
+use lsp_types::notification::{
+    DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Exit, Initialized,
+};
 use lsp_types::request::{HoverRequest, Initialize, References, Shutdown, SignatureHelpRequest};
 pub use messages::LSPMessage;
 use request::LSPRequest;
@@ -24,10 +26,10 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 use anyhow::{anyhow, Result};
 
 use lsp_types::{
-    DidChangeTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams, HoverParams, InitializedParams,
-    PartialResultParams, Position, PublishDiagnosticsParams, ReferenceContext, ReferenceParams, SignatureHelpParams,
-    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Url,
-    VersionedTextDocumentIdentifier, WorkDoneProgressParams,
+    DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
+    HoverParams, InitializedParams, PartialResultParams, Position, PublishDiagnosticsParams, ReferenceContext,
+    ReferenceParams, SignatureHelpParams, TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
+    TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
 };
 
 use self::messages::done_auto_response;
@@ -93,10 +95,7 @@ impl LSP {
                             LSPMessage::Request(inner) => requests_handler.lock().await.push(inner),
                         }
                     } else if !msg.is_empty() {
-                        match errs_handler.lock() {
-                            Ok(mut guard) => guard.push(msg.to_owned()),
-                            Err(poisoned) => poisoned.into_inner().push(msg.to_owned()),
-                        }
+                        into_guard(&errs_handler).push(msg.to_owned());
                     }
                 }
             }
@@ -184,6 +183,13 @@ impl LSP {
         let notification: LSPNotification<DidChangeTextDocument> = LSPNotification::with(DidChangeTextDocumentParams {
             text_document: VersionedTextDocumentIdentifier::new(as_url(path)?, version),
             content_changes,
+        });
+        self.notify(notification).await.ok()
+    }
+
+    pub async fn file_did_close(&mut self, path: &Path) -> Option<()> {
+        let notification: LSPNotification<DidCloseTextDocument> = LSPNotification::with(DidCloseTextDocumentParams {
+            text_document: TextDocumentIdentifier { uri: as_url(path)? },
         });
         self.notify(notification).await.ok()
     }

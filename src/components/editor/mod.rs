@@ -141,7 +141,7 @@ impl EditorState {
                     EditorAction::Undo => editor.undo(),
                     EditorAction::Redo => editor.redo(),
                     EditorAction::Save => editor.save().await,
-                    EditorAction::Close => self.close_active(),
+                    EditorAction::Close => self.close_active().await,
                 }
                 return true;
             }
@@ -149,8 +149,11 @@ impl EditorState {
         false
     }
 
-    fn close_active(&mut self) {
+    async fn close_active(&mut self) {
         let path = if let Some(editor) = self.get_active() {
+            if let Some(lsp) = editor.lsp.as_mut() {
+                lsp.lock().await.file_did_close(&editor.path).await;
+            };
             editor.path.clone()
         } else {
             return;
