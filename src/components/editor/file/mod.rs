@@ -459,7 +459,7 @@ impl Editor {
                     to.char += 1;
                 }
                 self.content[to.line].insert(to.char, closing);
-                from.line..to.line
+                from.line..to.line + 1
             } else {
                 self.cursor = *from;
                 let (from, ..) = self.select.extract_logged(&mut self.content, &mut self.action_logger).unwrap();
