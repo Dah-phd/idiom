@@ -39,10 +39,7 @@ impl EditorTerminal {
     }
 
     fn get_list_widget(&mut self) -> Vec<ListItem> {
-        self.history
-            .iter()
-            .map(|line| ListItem::new(Span::from(line.to_owned())))
-            .collect::<Vec<ListItem>>()
+        self.history.iter().map(|line| ListItem::new(Span::from(line.to_owned()))).collect::<Vec<ListItem>>()
     }
 
     pub fn toggle(&mut self) {

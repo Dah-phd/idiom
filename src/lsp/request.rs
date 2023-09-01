@@ -44,10 +44,7 @@ where
     pub fn init_request() -> Result<LSPRequest<Initialize>> {
         let pwd_uri = format!(
             "file:///{}",
-            std::env::current_dir()?
-                .as_os_str()
-                .to_str()
-                .ok_or(anyhow!("pwd conversion err"))?
+            std::env::current_dir()?.as_os_str().to_str().ok_or(anyhow!("pwd conversion err"))?
         );
         let uri = Url::parse(&pwd_uri)?;
         Ok(LSPRequest::with(

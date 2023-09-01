@@ -39,10 +39,8 @@ impl Popup {
     }
 
     pub async fn map(&mut self, key: &KeyEvent) -> PopupMessage {
-        if let Some(button) = self
-            .buttons
-            .iter()
-            .find(|button| matches!(&button.key, Some(key_code) if key_code.contains(&key.code)))
+        if let Some(button) =
+            self.buttons.iter().find(|button| matches!(&button.key, Some(key_code) if key_code.contains(&key.code)))
         {
             return (button.command)(self);
         }

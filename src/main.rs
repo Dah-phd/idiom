@@ -9,8 +9,6 @@ use std::path::PathBuf;
 
 use app::app;
 
-use lsp::LSP;
-
 use anyhow::Result;
 use tui::backend::CrosstermBackend;
 use tui::Terminal;

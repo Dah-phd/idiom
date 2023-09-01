@@ -63,11 +63,7 @@ impl LSP {
     }
 
     async fn new(mut server: Command, language: FileType) -> Result<Self> {
-        let mut inner = server
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .stdin(Stdio::piped())
-            .spawn()?;
+        let mut inner = server.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::piped()).spawn()?;
 
         let mut stdin = inner.stdin.take().unwrap();
         let request = LSPRequest::<Initialize>::init_request()?;
@@ -122,11 +118,7 @@ impl LSP {
     }
 
     pub fn get_diagnostics(&self, doctument: &Path) -> Option<PublishDiagnosticsParams> {
-        self.diagnostics
-            .try_lock()
-            .ok()?
-            .get_mut(&doctument.canonicalize().ok()?)?
-            .take()
+        self.diagnostics.try_lock().ok()?.get_mut(&doctument.canonicalize().ok()?)?.take()
     }
 
     pub async fn auto_responde(&mut self) {
@@ -147,9 +139,7 @@ impl LSP {
     }
 
     pub async fn initialized(&mut self) -> Option<()> {
-        self.notify::<Initialized>(LSPNotification::with(InitializedParams {}))
-            .await
-            .ok()
+        self.notify::<Initialized>(LSPNotification::with(InitializedParams {})).await.ok()
     }
 
     pub async fn file_did_open(&mut self, path: &PathBuf) -> Option<()> {
@@ -284,9 +274,7 @@ impl LSP {
     pub async fn graceful_exit(&mut self) -> Result<()> {
         self.counter += 1;
         let shoutdown_request: LSPRequest<Shutdown> = LSPRequest::with(self.counter, ());
-        self.request(shoutdown_request)
-            .await
-            .ok_or(anyhow!("Failed to notify shoutdown"))?;
+        self.request(shoutdown_request).await.ok_or(anyhow!("Failed to notify shoutdown"))?;
         self.notify::<Exit>(LSPNotification::with(())).await?;
         self.dash_nine().await?;
         Ok(())

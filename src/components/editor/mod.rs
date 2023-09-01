@@ -32,9 +32,7 @@ impl EditorState {
     }
 
     pub fn render(&mut self, frame: &mut Frame<impl Backend>, screen: Rect) {
-        let layout = Layout::default()
-            .constraints(vec![Constraint::Percentage(4), Constraint::Min(2)])
-            .split(screen);
+        let layout = Layout::default().constraints(vec![Constraint::Percentage(4), Constraint::Min(2)]).split(screen);
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get_mut(editor_id) {
                 file.set_max_rows(layout[1].bottom());
@@ -88,6 +86,9 @@ impl EditorState {
                             if let Some(..) = lsp.file_did_open(&opened_file.path).await {
                                 let lsp_rc = Rc::new(Mutex::new(lsp));
                                 opened_file.lsp = Some(Rc::clone(&lsp_rc));
+                                for opened_editor in self.editors.iter_mut() {
+                                    opened_editor.lsp = Some(Rc::clone(&lsp_rc))
+                                }
                                 entry.insert(lsp_rc);
                             }
                         }
@@ -162,8 +163,7 @@ impl EditorState {
     }
 
     pub fn close(&mut self, path: &PathBuf) {
-        self.editors
-            .retain(|editor| !editor.path.starts_with(path) && &editor.path != path)
+        self.editors.retain(|editor| !editor.path.starts_with(path) && &editor.path != path)
     }
 
     pub fn are_updates_saved(&self) -> bool {
@@ -197,8 +197,5 @@ impl EditorState {
 }
 
 fn try_file_to_tab(file: &Editor) -> Option<Spans> {
-    file.path
-        .as_os_str()
-        .to_str()
-        .map(|t| Spans::from(Span::styled(t, Style::default().fg(Color::Green))))
+    file.path.as_os_str().to_str().map(|t| Spans::from(Span::styled(t, Style::default().fg(Color::Green))))
 }

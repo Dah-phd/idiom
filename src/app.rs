@@ -45,9 +45,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
 
         editor_state.lsp_updates().await;
 
-        let timeout = TICK
-            .checked_sub(clock.elapsed())
-            .unwrap_or_else(|| Duration::from_secs(0));
+        let timeout = TICK.checked_sub(clock.elapsed()).unwrap_or_else(|| Duration::from_secs(0));
 
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = crossterm::event::read()? {
