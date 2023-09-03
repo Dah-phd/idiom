@@ -25,11 +25,7 @@ fn prep(out: &mut impl std::io::Write) -> Result<()> {
 }
 
 fn graceful_exit(out: &mut impl std::io::Write) -> Result<()> {
-    crossterm::execute!(
-        out,
-        crossterm::style::ResetColor,
-        crossterm::terminal::LeaveAlternateScreen,
-    )?;
+    crossterm::execute!(out, crossterm::style::ResetColor, crossterm::terminal::LeaveAlternateScreen,)?;
     crossterm::terminal::disable_raw_mode()?;
     Ok(())
 }

@@ -242,11 +242,7 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
         insert_key_event(&mut hash, &val.expand_file_tree_or_open_file, GeneralAction::Expand);
         insert_key_event(&mut hash, &val.finish_or_select, GeneralAction::FinishOrSelect);
         insert_key_event(&mut hash, &val.save_all, GeneralAction::SaveAll);
-        insert_key_event(
-            &mut hash,
-            &val.file_tree_mod_or_cancel_input,
-            GeneralAction::FileTreeModeOrCancelInput,
-        );
+        insert_key_event(&mut hash, &val.file_tree_mod_or_cancel_input, GeneralAction::FileTreeModeOrCancelInput);
         insert_key_event(&mut hash, &val.new_file, GeneralAction::NewFile);
         insert_key_event(&mut hash, &val.delete_file, GeneralAction::DeleteFile);
         insert_key_event(&mut hash, &val.backspace_tree_input, GeneralAction::BackspaceTreeInput);

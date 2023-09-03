@@ -11,10 +11,7 @@ pub struct CursorPosition {
 
 impl From<(usize, usize)> for CursorPosition {
     fn from(value: (usize, usize)) -> Self {
-        Self {
-            line: value.0,
-            char: value.1,
-        }
+        Self { line: value.0, char: value.1 }
     }
 }
 

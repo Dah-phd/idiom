@@ -23,12 +23,7 @@ pub struct EditorState {
 
 impl EditorState {
     pub fn new(key_map: EditorKeyMap) -> Self {
-        Self {
-            editors: Vec::default(),
-            state: ListState::default(),
-            base_config: EditorConfigs::new(),
-            key_map,
-        }
+        Self { editors: Vec::default(), state: ListState::default(), base_config: EditorConfigs::new(), key_map }
     }
 
     pub fn render(&mut self, frame: &mut Frame<impl Backend>, screen: Rect) {

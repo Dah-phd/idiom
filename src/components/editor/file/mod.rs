@@ -425,11 +425,8 @@ impl Editor {
         }
         let prev_line = &mut self.content[self.cursor.line];
         self.action_logger.init_replace(self.cursor, &[prev_line.to_owned()]);
-        let mut line = if prev_line.len() >= self.cursor.char {
-            prev_line.split_off(self.cursor.char)
-        } else {
-            String::new()
-        };
+        let mut line =
+            if prev_line.len() >= self.cursor.char { prev_line.split_off(self.cursor.char) } else { String::new() };
         let indent = self.configs.derive_indent_from(prev_line);
         line.insert_str(0, &indent);
         self.cursor.line += 1;

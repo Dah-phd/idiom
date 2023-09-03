@@ -14,29 +14,15 @@ struct ReplaceBuilder {
 
 impl ReplaceBuilder {
     fn new(from_line: usize, cursor: CursorPosition, old_content: Vec<String>) -> Self {
-        Self {
-            from_line,
-            cursor,
-            old_content,
-        }
+        Self { from_line, cursor, old_content }
     }
 
     fn from_cursor(cursor: CursorPosition, old_content: Vec<String>) -> Self {
-        Self {
-            from_line: cursor.line,
-            cursor,
-            old_content,
-        }
+        Self { from_line: cursor.line, cursor, old_content }
     }
 
     fn collect(self, new_cursor: CursorPosition, new: Vec<String>) -> Action {
-        Action {
-            from_line: self.from_line,
-            old_cursor: self.cursor,
-            new_cursor,
-            old: self.old_content,
-            new,
-        }
+        Action { from_line: self.from_line, old_cursor: self.cursor, new_cursor, old: self.old_content, new }
     }
 }
 
@@ -78,10 +64,7 @@ impl ActionLogger {
     pub fn init_replace_from_select(&mut self, from: &CursorPosition, to: &CursorPosition, content: &[String]) {
         self.undone.clear();
         self.push_buffer();
-        self.replace_builder = Some(ReplaceBuilder::from_cursor(
-            *from,
-            content[from.line..=to.line].to_owned(),
-        ))
+        self.replace_builder = Some(ReplaceBuilder::from_cursor(*from, content[from.line..=to.line].to_owned()))
     }
 
     pub fn init_repalce_from_line(&mut self, from_line: usize, cursor: CursorPosition, old_content: &[String]) {
@@ -262,10 +245,6 @@ impl Action {
             self.old.last().map(|line| line.len()).unwrap_or_default() as u32,
         );
         let range = Range::new(start, end);
-        TextDocumentContentChangeEvent {
-            range: Some(range),
-            range_length: None,
-            text: self.new.join("\n"),
-        }
+        TextDocumentContentChangeEvent { range: Some(range), range_length: None, text: self.new.join("\n") }
     }
 }

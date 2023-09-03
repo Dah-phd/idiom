@@ -99,18 +99,7 @@ impl LSP {
         let ser_req = request.stringify()?;
         let _ = stdin.write(ser_req.as_bytes()).await?;
         stdin.flush().await?;
-        Ok(Self {
-            responses,
-            notifications,
-            requests,
-            diagnostics,
-            errs,
-            counter: 0,
-            language,
-            inner,
-            handler,
-            stdin,
-        })
+        Ok(Self { responses, notifications, requests, diagnostics, errs, counter: 0, language, inner, handler, stdin })
     }
 
     pub fn is_live(&self) -> bool {
@@ -192,9 +181,7 @@ impl LSP {
                     text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: Position::new(line, char),
                 },
-                context: ReferenceContext {
-                    include_declaration: true,
-                },
+                context: ReferenceContext { include_declaration: true },
                 work_done_progress_params: WorkDoneProgressParams::default(),
                 partial_result_params: PartialResultParams::default(),
             },

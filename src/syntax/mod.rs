@@ -50,11 +50,7 @@ impl Lexer {
     }
 
     pub fn line_number_max_digits(&mut self, content: &[String]) -> usize {
-        self.max_digits = if content.is_empty() {
-            0
-        } else {
-            (content.len().ilog10() + 1) as usize
-        };
+        self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
         self.max_digits
     }
 
@@ -118,10 +114,7 @@ impl Lexer {
         if self.select_at_line.is_some() && content.is_empty() {
             spans.push(Span {
                 content: " ".into(),
-                style: Style {
-                    bg: Some(self.theme.selected),
-                    ..Default::default()
-                },
+                style: Style { bg: Some(self.theme.selected), ..Default::default() },
             })
         } else {
             (self.line_processor)(self, content, &mut spans);
@@ -162,20 +155,10 @@ impl Lexer {
         if matches!(self.select_at_line, Some((from, to)) if from <= idx && idx < to) {
             spans.push(Span::styled(
                 String::from(ch),
-                Style {
-                    bg: Some(self.theme.selected),
-                    fg: Some(Color::White),
-                    ..Default::default()
-                },
+                Style { bg: Some(self.theme.selected), fg: Some(Color::White), ..Default::default() },
             ));
         } else {
-            spans.push(Span::styled(
-                String::from(ch),
-                Style {
-                    fg: Some(Color::White),
-                    ..Default::default()
-                },
-            ))
+            spans.push(Span::styled(String::from(ch), Style { fg: Some(Color::White), ..Default::default() }))
         }
         self.token_start += 1;
     }
@@ -200,16 +183,10 @@ impl Lexer {
 
     #[allow(clippy::collapsible_else_if)]
     fn drain_with_select(&mut self, token_end: usize, color: Color, spans: &mut Vec<Span>) {
-        let style = Style {
-            fg: Some(color),
-            ..Default::default()
-        };
+        let style = Style { fg: Some(color), ..Default::default() };
         if let Some((select_start, select_end)) = self.select_at_line {
             if select_start <= self.token_start && token_end < select_end {
-                spans.push(Span::styled(
-                    self.last_token.drain(..).collect::<String>(),
-                    style.bg(self.theme.selected),
-                ));
+                spans.push(Span::styled(self.last_token.drain(..).collect::<String>(), style.bg(self.theme.selected)));
             } else if select_end <= self.token_start || token_end <= select_start {
                 spans.push(Span::styled(self.last_token.drain(..).collect::<String>(), style));
             } else {

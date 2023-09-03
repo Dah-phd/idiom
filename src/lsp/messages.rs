@@ -101,12 +101,7 @@ impl Diagnostic {
                 _ => warnings += 1,
             }
         }
-        Self {
-            updated: true,
-            errors,
-            warnings,
-            params,
-        }
+        Self { updated: true, errors, warnings, params }
     }
 
     pub fn take(&mut self) -> Option<PublishDiagnosticsParams> {

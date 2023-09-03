@@ -13,9 +13,7 @@ impl Debug for Clipboard {
 
 impl Default for Clipboard {
     fn default() -> Self {
-        Self {
-            ctx: ClipboardContext::new().unwrap(),
-        }
+        Self { ctx: ClipboardContext::new().unwrap() }
     }
 }
 

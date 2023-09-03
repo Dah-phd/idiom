@@ -152,15 +152,11 @@ impl KeyMap {
     }
 
     pub fn editor_key_map(&self) -> EditorKeyMap {
-        EditorKeyMap {
-            key_map: self.editor_key_map.clone().into(),
-        }
+        EditorKeyMap { key_map: self.editor_key_map.clone().into() }
     }
 
     pub fn general_key_map(&self) -> GeneralKeyMap {
-        GeneralKeyMap {
-            key_map: self.general_key_map.clone().into(),
-        }
+        GeneralKeyMap { key_map: self.general_key_map.clone().into() }
     }
 }
 

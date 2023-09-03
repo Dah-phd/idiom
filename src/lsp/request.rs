@@ -27,12 +27,7 @@ where
     T::Result: serde::de::DeserializeOwned,
 {
     pub fn with(id: usize, params: T::Params) -> Self {
-        Self {
-            jsonrpc: String::from("2.0"),
-            id,
-            method: <T as lsp_types::request::Request>::METHOD,
-            params,
-        }
+        Self { jsonrpc: String::from("2.0"), id, method: <T as lsp_types::request::Request>::METHOD, params }
     }
 
     pub fn stringify(&self) -> Result<String> {
@@ -42,18 +37,13 @@ where
     }
 
     pub fn init_request() -> Result<LSPRequest<Initialize>> {
-        let pwd_uri = format!(
-            "file:///{}",
-            std::env::current_dir()?.as_os_str().to_str().ok_or(anyhow!("pwd conversion err"))?
-        );
+        let pwd_uri =
+            format!("file:///{}", std::env::current_dir()?.as_os_str().to_str().ok_or(anyhow!("pwd conversion err"))?);
         let uri = Url::parse(&pwd_uri)?;
         Ok(LSPRequest::with(
             0,
             InitializeParams {
-                workspace_folders: Some(vec![WorkspaceFolder {
-                    uri,
-                    name: "root".to_owned(),
-                }]),
+                workspace_folders: Some(vec![WorkspaceFolder { uri, name: "root".to_owned() }]),
                 capabilities: ClientCapabilities {
                     workspace: Some(WorkspaceClientCapabilities { ..Default::default() }),
                     text_document: Some(TextDocumentClientCapabilities {
