@@ -26,15 +26,15 @@ impl Tree {
         if !self.active {
             return screen;
         }
+
         let areas = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(15), Constraint::Min(2)])
             .split(screen);
 
-        let file_tree = List::new(self.fs.as_widgets()).block(Block::default().borders(Borders::ALL).title("Explorer"));
-
+        let block = Block::default().borders(Borders::ALL).title("Explorer");
+        let file_tree = List::new(self.fs.as_widgets(&self.input, self.active)).block(block);
         frame.render_widget(file_tree, areas[0]);
-
         areas[1]
     }
 

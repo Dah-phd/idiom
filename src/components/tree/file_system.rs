@@ -7,6 +7,7 @@ use tui::widgets::ListItem;
 const TICK: Duration = Duration::from_millis(500);
 
 pub struct FileSystem {
+    base_path: PathBuf,
     tree: Vec<TreePath>,
     selected: *mut TreePath,
     select_base_idx: usize,
@@ -16,13 +17,13 @@ pub struct FileSystem {
 impl Default for FileSystem {
     fn default() -> Self {
         let ignores: [PathBuf; 1] = [PathBuf::from("./.git")];
-        let path = PathBuf::from("./");
-        let mut tree = get_nested_paths(&path)
+        let base_path = PathBuf::from("./");
+        let mut tree = get_nested_paths(&base_path)
             .filter(|path| !ignores.contains(path))
             .map(|path| TreePath::with_parent(path, std::ptr::null_mut()))
             .collect::<Vec<_>>();
         tree.sort_by(order_tree_path);
-        Self { tree, selected: std::ptr::null_mut(), clock: Instant::now(), select_base_idx: 0 }
+        Self { base_path, tree, selected: std::ptr::null_mut(), clock: Instant::now(), select_base_idx: 0 }
     }
 }
 
@@ -73,20 +74,38 @@ impl FileSystem {
         }
     }
 
-    pub fn as_widgets(&mut self) -> Vec<ListItem<'_>> {
-        let should_refresh = self.clock.elapsed() >= TICK;
+    pub fn as_widgets(&mut self, input: &Option<String>, update: bool) -> Vec<ListItem<'_>> {
+        let should_refresh = self.clock.elapsed() >= TICK && update;
         let mut buffer = vec![];
         let selected_path = self.get_selected().map(|selected| selected.path()).cloned();
+        if should_refresh {
+            self.refresh();
+            self.clock = Instant::now();
+        }
         for path in self.tree.iter_mut() {
             if should_refresh {
                 path.refresh();
             }
             buffer.extend(path.as_widgets(&selected_path))
         }
-        if should_refresh {
-            self.clock = Instant::now();
-        }
         buffer
+    }
+
+    pub fn refresh(&mut self) {
+        let updated_tree = get_nested_paths(&self.base_path).collect::<Vec<_>>();
+        for path in updated_tree.iter() {
+            if !self.tree.iter().any(|tp| tp.path() == path) {
+                self.tree.push(TreePath::with_parent(path.clone(), std::ptr::null_mut()))
+            }
+        }
+        self.tree.retain_mut(|el| {
+            if updated_tree.contains(el.path()) {
+                el.refresh();
+                return true;
+            }
+            false
+        });
+        self.tree.sort_by(order_tree_path)
     }
 
     pub fn select_next(&mut self) {
