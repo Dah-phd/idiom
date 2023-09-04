@@ -1,7 +1,8 @@
 use crate::{
     components::{
-        popups::editor_popups::go_to_line_popup, popups::editor_popups::save_all_popup, EditorState, EditorTerminal,
-        Tree,
+        popups::editor_popups::go_to_line_popup,
+        popups::{editor_popups::save_all_popup, tree_popups::create_file_popup},
+        EditorState, EditorTerminal, Tree,
     },
     configs::{GeneralAction, KeyMap, Mode, PopupMessage},
 };
@@ -56,18 +57,23 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                     match popup.map(&key).await {
                         PopupMessage::None => continue,
                         PopupMessage::Exit => break,
-                        PopupMessage::Done => {
-                            mode.clear_popup();
-                            continue;
-                        }
                         PopupMessage::SaveAndExit => {
                             editor_state.save_all().await;
                             break;
+                        }
+                        PopupMessage::Done => {
+                            mode.clear_popup();
+                            continue;
                         }
                         PopupMessage::GoToLine(line_idx) => {
                             if let Some(editor) = editor_state.get_active() {
                                 editor.go_to(line_idx)
                             }
+                            mode.clear_popup();
+                            continue;
+                        }
+                        PopupMessage::CreatFile(name) => {
+                            file_tree.create_new(name);
                             mode.clear_popup();
                             continue;
                         }
@@ -82,6 +88,9 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                     continue;
                 }
                 match action {
+                    GeneralAction::NewFile => {
+                        mode = mode.popup(create_file_popup(file_tree.select_parent_name()));
+                    }
                     GeneralAction::Exit => {
                         if editor_state.are_updates_saved() && !matches!(mode, Mode::Popup(..)) {
                             break;

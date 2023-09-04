@@ -20,16 +20,6 @@ pub enum TreePath {
 }
 
 impl TreePath {
-    pub fn as_widgets(&self, selected_path: &Option<PathBuf>) -> Vec<ListItem<'_>> {
-        let mut buffer = vec![self.as_list_item(selected_path)];
-        if let Self::Folder { tree: Some(tree), .. } = self {
-            for tree_element in tree {
-                buffer.extend(tree_element.as_widgets(selected_path));
-            }
-        }
-        buffer
-    }
-
     pub fn with_parent(path: PathBuf, parent: *mut Self) -> Self {
         if path.is_dir() {
             return Self::Folder { path, parent, tree: None, errors: 0, warnings: 0 };
@@ -42,6 +32,16 @@ impl TreePath {
             Self::File { path, .. } => path,
             Self::Folder { path, .. } => path,
         }
+    }
+
+    pub fn as_widgets(&self, selected_path: &Option<PathBuf>) -> Vec<ListItem<'_>> {
+        let mut buffer = vec![self.as_list_item(selected_path)];
+        if let Self::Folder { tree: Some(tree), .. } = self {
+            for tree_element in tree {
+                buffer.extend(tree_element.as_widgets(selected_path));
+            }
+        }
+        buffer
     }
 
     pub fn path_mut(&mut self) -> &mut PathBuf {
@@ -73,23 +73,18 @@ impl TreePath {
     }
 
     pub fn new_file(&mut self, name: String) -> Result<PathBuf> {
+        self.expand();
         let mut new_file = self.path().clone();
+        if new_file.is_file() {
+            return Err(anyhow!("Select is file not a directory!"));
+        }
         new_file.push(name);
         if !new_file.exists() {
             std::fs::write(&new_file, "")?;
-            self.push(new_file.clone());
+            self.refresh();
             return Ok(new_file);
         }
         Err(anyhow!("File already exists! {:?}", new_file))
-    }
-
-    fn push(&mut self, path: PathBuf) {
-        let ptr: *mut Self = self;
-        self.expand();
-        if let Self::Folder { tree: Some(tree), .. } = self {
-            tree.push(TreePath::with_parent(path, ptr));
-            tree.sort_by(order_tree_path);
-        };
     }
 
     pub fn parent(&mut self) -> Option<&mut Self> {
@@ -125,7 +120,7 @@ impl TreePath {
         path.starts_with(self.path())
     }
 
-    pub fn next(&mut self) -> Option<*mut Self> {
+    pub fn path_below(&mut self) -> Option<*mut Self> {
         if let Some(tree) = self.tree() {
             if let Some(first) = tree.first_mut() {
                 return Some(first);
@@ -153,7 +148,7 @@ impl TreePath {
         None
     }
 
-    pub fn prev(&mut self) -> Option<*mut Self> {
+    pub fn path_above(&mut self) -> Option<*mut Self> {
         let path = self.path().clone();
         if let Some(parent) = self.parent() {
             let ptr: *mut TreePath = parent;
@@ -173,7 +168,7 @@ impl TreePath {
         None
     }
 
-    fn last_child(&mut self) -> Option<*mut Self> {
+    pub fn last_child(&mut self) -> Option<*mut Self> {
         if let Some(tree) = self.tree() {
             if let Some(last) = tree.last_mut() {
                 return last.last_child();

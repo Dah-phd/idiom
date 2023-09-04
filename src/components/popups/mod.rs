@@ -1,4 +1,5 @@
 pub mod editor_popups;
+pub mod tree_popups;
 use crate::configs::PopupMessage;
 use crossterm::event::{KeyCode, KeyEvent};
 use tui::{
