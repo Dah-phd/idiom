@@ -1,4 +1,4 @@
-use super::tree_paths::{order_tree_path, TreePath};
+use super::tree_paths::{self, order_tree_path, TreePath};
 use crate::utils::get_nested_paths;
 use anyhow::{anyhow, Result};
 use std::path::PathBuf;
@@ -91,7 +91,6 @@ impl FileSystem {
     pub fn as_widget(&mut self) -> List<'_> {
         let should_refresh = self.clock.elapsed() >= TICK;
         let mut buffer = vec![];
-        let selected_path = self.get_selected().map(|selected| selected.path()).cloned();
         if should_refresh {
             self.force_refresh();
         }
@@ -99,7 +98,7 @@ impl FileSystem {
             if should_refresh {
                 path.refresh();
             }
-            buffer.extend(path.as_widgets(&selected_path))
+            buffer.extend(path.as_widgets())
         }
         List::new(buffer)
     }
@@ -107,13 +106,15 @@ impl FileSystem {
     pub fn select_down(&mut self) {
         if let Some(selected) = self.get_selected() {
             if let Some(ptr) = selected.path_below() {
-                self.selected = ptr;
+                self.select(ptr);
             } else if self.select_base_idx < self.tree.len() - 1 {
                 self.select_base_idx += 1;
-                self.selected = &mut self.tree[self.select_base_idx];
+                let ptr = &mut self.tree[self.select_base_idx] as *mut TreePath;
+                self.select(ptr);
             }
         } else if let Some(first) = self.tree.first_mut() {
-            self.selected = first;
+            let ptr = first as *mut TreePath;
+            self.select(ptr);
             self.select_base_idx = 0
         };
     }
@@ -121,16 +122,28 @@ impl FileSystem {
     pub fn select_up(&mut self) {
         if let Some(selected) = self.get_selected() {
             if let Some(ptr) = selected.path_above() {
-                self.selected = ptr;
+                self.select(ptr);
             } else if self.select_base_idx > 0 {
                 self.select_base_idx -= 1;
                 let base_path = &mut self.tree[self.select_base_idx];
-                self.selected = if let Some(ptr) = base_path.last_child() { ptr } else { base_path };
+                let ptr = if let Some(ptr) = base_path.last_child() { ptr } else { base_path };
+                self.select(ptr);
             }
         } else if let Some(last) = self.tree.last_mut() {
-            self.selected = last;
+            let ptr: *mut TreePath = last;
+            self.select(ptr);
             self.select_base_idx = self.tree.len() - 1;
         };
+    }
+
+    fn select(&mut self, ptr: *mut TreePath) {
+        if let Some(tree_path) = self.get_selected() {
+            tree_path.deselect();
+        }
+        self.selected = ptr;
+        if let Some(tree_path) = self.get_selected() {
+            tree_path.select();
+        }
     }
 
     fn force_refresh(&mut self) {

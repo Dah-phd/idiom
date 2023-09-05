@@ -15,16 +15,17 @@ const DIR_SEP: char = '\\';
 
 #[derive(Debug)]
 pub enum TreePath {
-    Folder { path: PathBuf, parent: *mut Self, tree: Option<Vec<TreePath>>, errors: usize, warnings: usize },
-    File { path: PathBuf, parent: *mut Self, errors: usize, warnings: usize },
+    Folder { path: PathBuf, parent: *mut Self, tree: Option<Vec<TreePath>>, dispaly: String, style: Style },
+    File { path: PathBuf, parent: *mut Self, dispaly: String, style: Style },
 }
 
 impl TreePath {
     pub fn with_parent(path: PathBuf, parent: *mut Self) -> Self {
+        let dispaly = get_path_display(&path);
         if path.is_dir() {
-            return Self::Folder { path, parent, tree: None, errors: 0, warnings: 0 };
+            return Self::Folder { path, parent, tree: None, dispaly, style: Style::default() };
         }
-        Self::File { path, parent, errors: 0, warnings: 0 }
+        Self::File { path, parent, dispaly, style: Style::default() }
     }
 
     pub fn path(&self) -> &PathBuf {
@@ -34,14 +35,36 @@ impl TreePath {
         }
     }
 
-    pub fn as_widgets(&self, selected_path: &Option<PathBuf>) -> Vec<ListItem<'_>> {
-        let mut buffer = vec![self.as_list_item(selected_path)];
+    pub fn as_widgets(&self) -> Vec<ListItem<'_>> {
+        let mut buffer = vec![self.as_list_item()];
         if let Self::Folder { tree: Some(tree), .. } = self {
             for tree_element in tree {
-                buffer.extend(tree_element.as_widgets(selected_path));
+                buffer.extend(tree_element.as_widgets());
             }
         }
         buffer
+    }
+
+    pub fn select(&mut self) {
+        match self {
+            Self::File { style, .. } => {
+                style.add_modifier = Modifier::REVERSED;
+            }
+            Self::Folder { style, .. } => {
+                style.add_modifier = Modifier::REVERSED;
+            }
+        }
+    }
+
+    pub fn deselect(&mut self) {
+        match self {
+            Self::File { style, .. } => {
+                style.add_modifier = Modifier::empty();
+            }
+            Self::Folder { style, .. } => {
+                style.add_modifier = Modifier::empty();
+            }
+        }
     }
 
     pub fn path_mut(&mut self) -> &mut PathBuf {
@@ -56,20 +79,6 @@ impl TreePath {
             return Some(tree);
         }
         None
-    }
-
-    pub fn errors(&self) -> usize {
-        match self {
-            Self::File { errors, .. } => *errors,
-            Self::Folder { errors, .. } => *errors,
-        }
-    }
-
-    pub fn warnings(&self) -> usize {
-        match self {
-            Self::File { warnings, .. } => *warnings,
-            Self::Folder { warnings, .. } => *warnings,
-        }
     }
 
     pub fn new_file(&mut self, name: String) -> Result<PathBuf> {
@@ -189,35 +198,40 @@ impl TreePath {
         }
     }
 
-    pub fn as_list_item(&self, selected_path: &Option<PathBuf>) -> ListItem {
-        let path_str = &self.path().as_path().display().to_string()[2..];
-        let mut buffer = String::new();
-        let mut path_split = path_str.split(DIR_SEP).peekable();
-        while let Some(path_element) = path_split.next() {
-            if path_split.peek().is_none() {
-                buffer.push_str(path_element)
-            } else {
-                buffer.push_str("  ")
-            }
+    fn display(&self) -> &str {
+        match self {
+            Self::File { dispaly, .. } => &dispaly,
+            Self::Folder { dispaly, .. } => &dispaly,
         }
-        if self.path().is_dir() {
-            buffer.push_str("/..");
-        }
-        let mut style = Style::default();
-        if matches!(selected_path, Some(path) if path == self.path()) {
-            style = style.add_modifier(Modifier::REVERSED);
-        }
-        let errors = self.errors();
-        let warnings = self.warnings();
-        if errors != 0 {
-            style = style.fg(Color::Red);
-            buffer.push_str(&format!(" {}", errors));
-        } else if warnings != 0 {
-            style = style.fg(Color::Yellow);
-            buffer.push_str(&format!(" {}", warnings));
-        }
-        ListItem::new(buffer).style(style)
     }
+
+    fn style(&self) -> Style {
+        match self {
+            Self::File { style, .. } => *style,
+            Self::Folder { style, .. } => *style,
+        }
+    }
+
+    pub fn as_list_item(&self) -> ListItem {
+        ListItem::new(self.display()).style(self.style())
+    }
+}
+
+fn get_path_display(path: &PathBuf) -> String {
+    let path_str = &path.as_path().display().to_string()[2..];
+    let mut buffer = String::new();
+    let mut path_split = path_str.split(DIR_SEP).peekable();
+    while let Some(path_element) = path_split.next() {
+        if path_split.peek().is_none() {
+            buffer.push_str(path_element)
+        } else {
+            buffer.push_str("  ")
+        }
+    }
+    if path.is_dir() {
+        buffer.push_str("/..");
+    }
+    buffer
 }
 
 pub fn order_tree_path(left: &TreePath, right: &TreePath) -> Ordering {
