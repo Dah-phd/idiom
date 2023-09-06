@@ -200,6 +200,7 @@ pub enum GeneralAction {
     SaveAll,
     FileTreeModeOrCancelInput,
     NewFile,
+    RenameFile,
     DeleteFile,
     BackspaceTreeInput,
     Exit,
@@ -222,6 +223,7 @@ pub struct GeneralUserKeyMap {
     save_all: String,
     file_tree_mod_or_cancel_input: String,
     new_file: String,
+    rename_file: String,
     delete_file: String,
     backspace_tree_input: String,
     exit: String,
@@ -244,6 +246,7 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
         insert_key_event(&mut hash, &val.save_all, GeneralAction::SaveAll);
         insert_key_event(&mut hash, &val.file_tree_mod_or_cancel_input, GeneralAction::FileTreeModeOrCancelInput);
         insert_key_event(&mut hash, &val.new_file, GeneralAction::NewFile);
+        insert_key_event(&mut hash, &val.rename_file, GeneralAction::RenameFile);
         insert_key_event(&mut hash, &val.delete_file, GeneralAction::DeleteFile);
         insert_key_event(&mut hash, &val.backspace_tree_input, GeneralAction::BackspaceTreeInput);
         insert_key_event(&mut hash, &val.exit, GeneralAction::Exit);
@@ -268,6 +271,7 @@ impl Default for GeneralUserKeyMap {
             save_all: format!("{} && {}", CTRL, 's'),
             file_tree_mod_or_cancel_input: String::from(ESC),
             new_file: format!("{} && {}", CTRL, 'n'),
+            rename_file: format!("{}2", F),
             delete_file: format!("{} && {}", SHIFT, DELETE),
             backspace_tree_input: String::from(BACKSPACE),
             exit: format!("{} && {} || {} && {}", CTRL, 'd', CTRL, 'q'),

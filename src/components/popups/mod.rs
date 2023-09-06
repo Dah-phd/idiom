@@ -14,6 +14,7 @@ use tui::{
 #[derive(Debug, Default, Clone)]
 pub struct Popup {
     pub message: String,
+    title: Option<String>,
     message_as_buffer_builder: Option<fn(char) -> Option<char>>,
     pub buttons: Vec<Button>,
     pub size: Option<(u16, u16)>,
@@ -22,7 +23,7 @@ pub struct Popup {
 
 impl Popup {
     pub fn render(&mut self, frame: &mut Frame<impl Backend>) {
-        let block = Block::default().title("Propmpt").borders(Borders::ALL);
+        let block = Block::default().title(self.title()).borders(Borders::ALL);
         let (percent_x, percent_y) = self.size.unwrap_or((60, 20));
         let area = centered_rect(percent_x, percent_y, frame.size());
         frame.render_widget(Clear, area);
@@ -86,10 +87,17 @@ impl Popup {
             return Paragraph::new(Span::from(self.message.to_owned())).alignment(Alignment::Center);
         }
         Paragraph::new(Spans::from(vec![
-            Span::raw(" -> "),
+            Span::raw(" >> "),
             Span::raw(self.message.to_owned()),
             Span::styled("|", Style::default().add_modifier(Modifier::SLOW_BLINK)),
         ]))
+    }
+
+    fn title(&self) -> String {
+        if let Some(title) = &self.title {
+            return format!("{title} ");
+        }
+        "Prompt".to_owned()
     }
 
     fn spans_from_buttons(&self) -> Paragraph<'_> {

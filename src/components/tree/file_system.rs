@@ -1,7 +1,7 @@
-use super::tree_paths::{self, order_tree_path, TreePath};
+use super::tree_paths::{new_file_or_folder, order_tree_path, TreePath};
 use crate::utils::get_nested_paths;
 use anyhow::{anyhow, Result};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use tui::widgets::List;
 
@@ -43,24 +43,32 @@ impl FileSystem {
             }
             self.select_up();
             self.force_refresh();
+            self.reset_select_idx();
             return Ok(());
         }
         Err(anyhow!("No file selected!"))
     }
 
-    pub fn new_file(&mut self, name: String) -> Option<PathBuf> {
-        if let Some(parent) = self.get_selected().and_then(|selected| selected.parent()) {
-            return parent.new_file(name).ok();
-        } else {
-            let mut path = PathBuf::from("./");
-            path.push(name);
-            if !path.exists() {
-                std::fs::write(&path, "").ok()?;
-                self.force_refresh();
-                return Some(path);
+    pub fn new_file_or_folder(&mut self, name: String) -> Option<PathBuf> {
+        if let Some(selected) = self.get_selected() {
+            if matches!(selected, TreePath::Folder { .. }) {
+                return selected.new_file_or_folder(name).ok();
+            };
+            selected.refresh();
+            if let Some(parent) = selected.parent() {
+                return parent.new_file_or_folder(name).ok();
             }
         }
-        None
+        self.new_file_or_folder_base(name)
+    }
+
+    pub fn new_file_or_folder_base(&mut self, name: String) -> Option<PathBuf> {
+        let path = PathBuf::from("./");
+        let result = new_file_or_folder(path, &name).ok()?;
+        self.drop_select();
+        self.force_refresh();
+        self.select_in_base_path(&result);
+        Some(result)
     }
 
     pub fn open(&mut self) -> Option<PathBuf> {
@@ -75,11 +83,9 @@ impl FileSystem {
 
     pub fn rename(&mut self, new_name: &str) -> Option<()> {
         let selected = self.get_selected()?;
-        std::fs::rename(selected.path(), new_name).ok()?;
-        let path_ref = selected.path_mut();
-        path_ref.pop();
-        path_ref.push(new_name);
-        Some(())
+        let result = selected.rename(new_name);
+        self.force_refresh();
+        result
     }
 
     pub fn close(&mut self) {
@@ -136,6 +142,29 @@ impl FileSystem {
         };
     }
 
+    fn reset_select_idx(&mut self) {
+        if let Some(selected) = self.get_selected() {
+            let path = selected.path().clone();
+            for (idx, tree_path) in self.tree.iter().enumerate() {
+                if tree_path.is_parent(&path) {
+                    self.select_base_idx = idx;
+                    return;
+                }
+            }
+        }
+    }
+
+    fn select_in_base_path(&mut self, path: &PathBuf) {
+        for tree_path in self.tree.iter_mut() {
+            if path == tree_path.path() {
+                tree_path.select();
+                self.selected = tree_path;
+                self.reset_select_idx();
+                return;
+            }
+        }
+    }
+
     fn select(&mut self, ptr: *mut TreePath) {
         if let Some(tree_path) = self.get_selected() {
             tree_path.deselect();
@@ -144,6 +173,13 @@ impl FileSystem {
         if let Some(tree_path) = self.get_selected() {
             tree_path.select();
         }
+    }
+
+    fn drop_select(&mut self) {
+        if let Some(tree_path) = self.get_selected() {
+            tree_path.deselect();
+        }
+        self.selected = std::ptr::null_mut();
     }
 
     fn force_refresh(&mut self) {

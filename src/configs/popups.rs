@@ -1,6 +1,8 @@
 #[derive(Debug, Clone)]
 pub enum PopupMessage {
-    CreatFile(String),
+    CreateFileOrFolder(String),
+    CreateFileOrFolderBase(String),
+    RenameFile(String),
     GoToLine(usize),
     Exit,
     SaveAndExit,

@@ -5,8 +5,8 @@ use crossterm::event::KeyCode;
 pub fn save_all_popup() -> Popup {
     Popup {
         message: "Not all opened editors are saved!".into(),
-        state: 0,
         message_as_buffer_builder: None,
+        title: None,
         buttons: vec![
             Button {
                 command: |_| PopupMessage::SaveAndExit,
@@ -20,6 +20,7 @@ pub fn save_all_popup() -> Popup {
             },
         ],
         size: Some((40, 20)),
+        state: 0,
     }
 }
 
@@ -27,6 +28,7 @@ pub fn go_to_line_popup() -> Popup {
     Popup {
         message: String::new(),
         message_as_buffer_builder: Some(|ch| if ch.is_numeric() { Some(ch) } else { None }),
+        title: None,
         buttons: vec![Button {
             command: |popup| {
                 if let Ok(line) = popup.message.parse::<usize>() {

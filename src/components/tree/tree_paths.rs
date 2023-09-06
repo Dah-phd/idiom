@@ -3,15 +3,15 @@ use anyhow::{anyhow, Result};
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
 use tui::{
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     widgets::ListItem,
 };
 
 #[cfg(not(target_os = "windows"))]
-const DIR_SEP: char = '/';
+pub const DIR_SEP: char = '/';
 
 #[cfg(target_os = "windows")]
-const DIR_SEP: char = '\\';
+pub const DIR_SEP: char = '\\';
 
 #[derive(Debug)]
 pub enum TreePath {
@@ -67,6 +67,21 @@ impl TreePath {
         }
     }
 
+    pub fn is_dir(&self) -> bool {
+        matches!(self, Self::Folder { .. })
+    }
+
+    pub fn rename(&mut self, new_name: &str) -> Option<()> {
+        let path_ref = self.path_mut();
+        std::fs::rename(&path_ref, new_name).ok()?;
+        let new_dispaly = get_path_display(path_ref);
+        match self {
+            Self::File { dispaly, .. } => *dispaly = new_dispaly,
+            Self::Folder { dispaly, .. } => *dispaly = new_dispaly,
+        }
+        Some(())
+    }
+
     pub fn path_mut(&mut self) -> &mut PathBuf {
         match self {
             Self::File { path, .. } => path,
@@ -81,19 +96,14 @@ impl TreePath {
         None
     }
 
-    pub fn new_file(&mut self, name: String) -> Result<PathBuf> {
+    pub fn new_file_or_folder(&mut self, name: String) -> Result<PathBuf> {
         self.expand();
-        let mut new_file = self.path().clone();
-        if new_file.is_file() {
-            return Err(anyhow!("Select is file not a directory!"));
+        if matches!(self, Self::File { .. }) {
+            return Err(anyhow!("Parent is file not a directory!"));
         }
-        new_file.push(name);
-        if !new_file.exists() {
-            std::fs::write(&new_file, "")?;
-            self.refresh();
-            return Ok(new_file);
-        }
-        Err(anyhow!("File already exists! {:?}", new_file))
+        let result = new_file_or_folder(self.path().clone(), &name);
+        self.refresh();
+        result
     }
 
     pub fn parent(&mut self) -> Option<&mut Self> {
@@ -200,8 +210,8 @@ impl TreePath {
 
     fn display(&self) -> &str {
         match self {
-            Self::File { dispaly, .. } => &dispaly,
-            Self::Folder { dispaly, .. } => &dispaly,
+            Self::File { dispaly, .. } => dispaly,
+            Self::Folder { dispaly, .. } => dispaly,
         }
     }
 
@@ -217,8 +227,8 @@ impl TreePath {
     }
 }
 
-fn get_path_display(path: &PathBuf) -> String {
-    let path_str = &path.as_path().display().to_string()[2..];
+fn get_path_display(path: &Path) -> String {
+    let path_str = &path.display().to_string()[2..];
     let mut buffer = String::new();
     let mut path_split = path_str.split(DIR_SEP).peekable();
     while let Some(path_element) = path_split.next() {
@@ -232,6 +242,20 @@ fn get_path_display(path: &PathBuf) -> String {
         buffer.push_str("/..");
     }
     buffer
+}
+
+pub fn new_file_or_folder(mut path: PathBuf, name: &str) -> Result<PathBuf> {
+    if let Some(folder) = name.strip_suffix(DIR_SEP) {
+        path.push(folder);
+        std::fs::create_dir(&path)?;
+    } else {
+        path.push(name);
+        if path.exists() {
+            return Err(anyhow!("File already exists! {:?}", path));
+        }
+        std::fs::write(&path, "")?;
+    }
+    Ok(path)
 }
 
 pub fn order_tree_path(left: &TreePath, right: &TreePath) -> Ordering {

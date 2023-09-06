@@ -46,8 +46,11 @@ impl Tree {
         self.active = !self.active;
     }
 
-    pub fn select_parent_name(&mut self) -> String {
+    pub fn get_first_selected_folder(&mut self) -> String {
         if let Some(selected) = self.fs.get_selected() {
+            if selected.is_dir() {
+                return selected.path().display().to_string();
+            }
             if let Some(parent) = selected.parent() {
                 return parent.path().display().to_string();
             }
@@ -55,8 +58,16 @@ impl Tree {
         "./".to_owned()
     }
 
-    pub fn create_new(&mut self, name: String) {
-        self.fs.new_file(name);
+    pub fn create_file_or_folder(&mut self, name: String) {
+        self.fs.new_file_or_folder(name);
+    }
+
+    pub fn create_file_or_folder_base(&mut self, name: String) {
+        self.fs.new_file_or_folder_base(name);
+    }
+
+    pub fn rename_file(&mut self, new_name: String) {
+        self.fs.rename(&new_name);
     }
 
     fn delete_file(&mut self) -> Option<()> {

@@ -1,7 +1,10 @@
 use crate::{
     components::{
         popups::editor_popups::go_to_line_popup,
-        popups::{editor_popups::save_all_popup, tree_popups::create_file_popup},
+        popups::{
+            editor_popups::save_all_popup,
+            tree_popups::{create_file_popup, rename_file_popup},
+        },
         EditorState, EditorTerminal, Tree,
     },
     configs::{GeneralAction, KeyMap, Mode, PopupMessage},
@@ -72,8 +75,18 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                             mode.clear_popup();
                             continue;
                         }
-                        PopupMessage::CreatFile(name) => {
-                            file_tree.create_new(name);
+                        PopupMessage::CreateFileOrFolder(name) => {
+                            file_tree.create_file_or_folder(name);
+                            mode.clear_popup();
+                            continue;
+                        }
+                        PopupMessage::CreateFileOrFolderBase(name) => {
+                            file_tree.create_file_or_folder_base(name);
+                            mode.clear_popup();
+                            continue;
+                        }
+                        PopupMessage::RenameFile(name) => {
+                            file_tree.rename_file(name);
                             mode.clear_popup();
                             continue;
                         }
@@ -89,7 +102,10 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                 }
                 match action {
                     GeneralAction::NewFile => {
-                        mode = mode.popup(create_file_popup(file_tree.select_parent_name()));
+                        mode = mode.popup(create_file_popup(file_tree.get_first_selected_folder()));
+                    }
+                    GeneralAction::RenameFile => {
+                        mode = mode.popup(rename_file_popup(file_tree.get_first_selected_folder()));
                     }
                     GeneralAction::Exit => {
                         if editor_state.are_updates_saved() && !matches!(mode, Mode::Popup(..)) {
