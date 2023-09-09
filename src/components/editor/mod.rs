@@ -21,6 +21,8 @@ pub struct EditorState {
     key_map: EditorKeyMap,
 }
 
+type LSPPool = HashMap<FileType, Rc<Mutex<LSP>>>;
+
 impl EditorState {
     pub fn new(key_map: EditorKeyMap) -> Self {
         Self { editors: Vec::default(), state: ListState::default(), base_config: EditorConfigs::new(), key_map }
@@ -66,7 +68,7 @@ impl EditorState {
         self.editors.get_mut(self.state.selected()?)
     }
 
-    pub async fn new_from(&mut self, file_path: PathBuf, lsp_servers: &mut HashMap<FileType, Rc<Mutex<LSP>>>) {
+    pub async fn new_from(&mut self, file_path: PathBuf, lsp_servers: &mut LSPPool) {
         for (idx, file) in self.editors.iter().enumerate() {
             if file_path == file.path {
                 self.state.select(Some(idx));
@@ -96,6 +98,13 @@ impl EditorState {
             }
             self.state.select(Some(self.editors.len()));
             self.editors.push(opened_file);
+        }
+    }
+
+    pub async fn new_at_line(&mut self, file_path: PathBuf, line: usize, lsp_servers: &mut LSPPool) {
+        self.new_from(file_path, lsp_servers).await;
+        if let Some(editor) = self.get_active() {
+            editor.go_to(line);
         }
     }
 

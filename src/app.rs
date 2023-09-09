@@ -66,10 +66,10 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             editor_state.save_all().await;
                             break;
                         }
-                        PopupMessage::Open((path, _)) => {
+                        PopupMessage::Open((path, line)) => {
                             file_tree.select_by_path(&path);
                             if !path.is_dir() {
-                                editor_state.new_from(path, &mut lsp_servers).await;
+                                editor_state.new_at_line(path, line, &mut lsp_servers).await;
                                 mode = Mode::Insert;
                             } else {
                                 mode = Mode::Select;

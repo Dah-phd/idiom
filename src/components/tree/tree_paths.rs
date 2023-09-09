@@ -155,7 +155,7 @@ impl TreePath {
                 if let Ok(content) = maybe_content {
                     for (idx, line) in content.lines().enumerate() {
                         if line.contains(pattern) {
-                            buffer.push((path.clone(), line.to_owned(), idx + 1))
+                            buffer.push((path.clone(), line.to_owned(), idx))
                         }
                     }
                 }
