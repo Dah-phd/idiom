@@ -41,13 +41,35 @@ pub fn rename_file_popup(path: String) -> Popup {
     }
 }
 
-pub fn find_in_file_popup(options: Vec<(PathBuf, String, usize)>) -> PopupSelector<(PathBuf, String, usize)> {
+pub fn find_paths_popup() -> Popup {
+    Popup {
+        message: String::new(),
+        message_as_buffer_builder: Some(Some),
+        title: Some("Find in tree".to_owned()),
+        buttons: vec![
+            Button {
+                command: |popup| PopupMessage::SelectPath(popup.message.to_owned()),
+                name: "Search paths".to_owned(),
+                key: None,
+            },
+            Button {
+                command: |popup| PopupMessage::SelectFileLine(popup.message.to_owned()),
+                name: "Search files".to_owned(),
+                key: None,
+            },
+        ],
+        size: Some((20, 16)),
+        state: 0,
+    }
+}
+
+pub fn select_tree_file_popup(options: Vec<(PathBuf, String, usize)>) -> PopupSelector<(PathBuf, String, usize)> {
     PopupSelector {
         options,
         display: |(path, text, _)| format!("{}\n    {text}", path.display()),
         command: |popup| {
             if let Some((path, _, idx)) = popup.options.get(popup.state) {
-                return PopupMessage::OpenFile((path.clone(), *idx));
+                return PopupMessage::Open((path.clone(), *idx));
             }
             PopupMessage::Done
         },
@@ -56,13 +78,13 @@ pub fn find_in_file_popup(options: Vec<(PathBuf, String, usize)>) -> PopupSelect
     }
 }
 
-pub fn find_file_popup(options: Vec<PathBuf>) -> PopupSelector<PathBuf> {
+pub fn select_file_popup(options: Vec<PathBuf>) -> PopupSelector<PathBuf> {
     PopupSelector {
         options,
         display: |path| path.display().to_string(),
         command: |popup| {
             if let Some(path) = popup.options.get(popup.state) {
-                return PopupMessage::OpenFile((path.clone(), 0));
+                return PopupMessage::Open((path.clone(), 0));
             }
             PopupMessage::Done
         },

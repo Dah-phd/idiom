@@ -146,6 +146,68 @@ impl TreePath {
         }
         None
     }
+
+    pub fn search_in_files(&mut self, pattern: &str, buffer: &mut Vec<(PathBuf, String, usize)>) {
+        self.expand();
+        match self {
+            Self::File { path, .. } => {
+                let maybe_content = std::fs::read_to_string(&path);
+                if let Ok(content) = maybe_content {
+                    for (idx, line) in content.lines().enumerate() {
+                        if line.contains(pattern) {
+                            buffer.push((path.clone(), line.to_owned(), idx + 1))
+                        }
+                    }
+                }
+            }
+            Self::Folder { tree: Some(tree), .. } => {
+                for tree_path in tree {
+                    tree_path.search_in_files(pattern, buffer)
+                }
+            }
+            _ => (),
+        }
+    }
+
+    pub fn search_in_paths(mut self, pattern: &str, buffer: &mut Vec<PathBuf>) {
+        self.expand();
+        match self {
+            Self::File { path, display } => {
+                if display.contains(pattern) {
+                    buffer.push(path);
+                }
+            }
+            Self::Folder { path, tree, display } => {
+                if display.contains(pattern) {
+                    buffer.push(path);
+                    if let Some(tree) = tree {
+                        for tree_path in tree {
+                            tree_path.collect_all_paths(buffer);
+                        }
+                    }
+                } else if let Some(tree) = tree {
+                    for tree_path in tree {
+                        tree_path.search_in_paths(pattern, buffer);
+                    }
+                }
+            }
+        }
+    }
+
+    fn collect_all_paths(mut self, buffer: &mut Vec<PathBuf>) {
+        self.expand();
+        match self {
+            Self::File { path, .. } => buffer.push(path),
+            Self::Folder { path, tree, .. } => {
+                buffer.push(path);
+                if let Some(tree) = tree {
+                    for tree_path in tree {
+                        tree_path.collect_all_paths(buffer);
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn order_tree_path(left: &TreePath, right: &TreePath) -> Ordering {

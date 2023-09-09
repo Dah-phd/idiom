@@ -2,6 +2,7 @@ use crate::components::editor::Offset;
 use anyhow::{anyhow, Result};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
+use tui::layout::{Constraint, Direction, Layout, Rect};
 
 pub fn trim_start_inplace(line: &mut String) -> Offset {
     if let Some(idx) = line.find(|c: char| !c.is_whitespace()) {
@@ -84,4 +85,30 @@ pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> Result<PathBuf> {
     }
 
     Ok(path)
+}
+
+pub fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Percentage((100 - percent_y) / 2),
+                Constraint::Percentage(percent_y),
+                Constraint::Percentage((100 - percent_y) / 2),
+            ]
+            .as_ref(),
+        )
+        .split(r);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [
+                Constraint::Percentage((100 - percent_x) / 2),
+                Constraint::Percentage(percent_x),
+                Constraint::Percentage((100 - percent_x) / 2),
+            ]
+            .as_ref(),
+        )
+        .split(popup_layout[1])[1]
 }

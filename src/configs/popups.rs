@@ -4,7 +4,9 @@ use std::path::PathBuf;
 pub enum PopupMessage {
     CreateFileOrFolder(String),
     CreateFileOrFolderBase(String),
-    OpenFile((PathBuf, usize)),
+    Open((PathBuf, usize)),
+    SelectPath(String),
+    SelectFileLine(String),
     RenameFile(String),
     GoToLine(usize),
     Exit,

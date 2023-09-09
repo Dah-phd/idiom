@@ -3,7 +3,9 @@ use crate::{
         popups::editor_popups::go_to_line_popup,
         popups::{
             editor_popups::save_all_popup,
-            tree_popups::{create_file_popup, rename_file_popup},
+            tree_popups::{
+                create_file_popup, find_paths_popup, rename_file_popup, select_file_popup, select_tree_file_popup,
+            },
         },
         EditorState, EditorTerminal, Tree,
     },
@@ -64,14 +66,23 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             editor_state.save_all().await;
                             break;
                         }
-                        PopupMessage::OpenFile((path, _)) => {
-                            editor_state.new_from(path, &mut lsp_servers).await;
-                            mode = mode.clear_popup();
+                        PopupMessage::Open((path, _)) => {
+                            file_tree.select_by_path(&path);
+                            if !path.is_dir() {
+                                editor_state.new_from(path, &mut lsp_servers).await;
+                                mode = Mode::Insert;
+                            } else {
+                                mode = Mode::Select;
+                            }
                             continue;
                         }
-                        PopupMessage::None => continue,
-                        PopupMessage::Done => {
-                            mode = mode.clear_popup();
+                        PopupMessage::SelectPath(pattern) => {
+                            mode = Mode::Select.popup(Box::new(select_file_popup(file_tree.search_paths(pattern))));
+                            continue;
+                        }
+                        PopupMessage::SelectFileLine(pattern) => {
+                            mode =
+                                Mode::Select.popup(Box::new(select_tree_file_popup(file_tree.search_files(pattern))));
                             continue;
                         }
                         PopupMessage::GoToLine(line_idx) => {
@@ -104,6 +115,11 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             mode = mode.clear_popup();
                             continue;
                         }
+                        PopupMessage::None => continue,
+                        PopupMessage::Done => {
+                            mode = mode.clear_popup();
+                            continue;
+                        }
                     }
                 }
                 let action = if let Some(action) = general_key_map.map(&key) {
@@ -115,18 +131,14 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                     continue;
                 }
                 match action {
+                    GeneralAction::FindInTree => {
+                        mode = mode.popup(Box::new(find_paths_popup()));
+                    }
                     GeneralAction::NewFile => {
                         mode = mode.popup(Box::new(create_file_popup(file_tree.get_first_selected_folder())));
                     }
                     GeneralAction::RenameFile => {
                         mode = mode.popup(Box::new(rename_file_popup(file_tree.get_first_selected_folder())));
-                    }
-                    GeneralAction::Exit => {
-                        if editor_state.are_updates_saved() && !matches!(mode, Mode::Popup(..)) {
-                            break;
-                        } else {
-                            mode = mode.popup(Box::new(save_all_popup()))
-                        }
                     }
                     GeneralAction::Expand => {
                         if let Some(file_path) = file_tree.expand_dir_or_get_path() {
@@ -151,6 +163,13 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             } else {
                                 editor_state.state.select(Some(editor_id + 1))
                             }
+                        }
+                    }
+                    GeneralAction::Exit => {
+                        if editor_state.are_updates_saved() && !matches!(mode, Mode::Popup(..)) {
+                            break;
+                        } else {
+                            mode = mode.popup(Box::new(save_all_popup()))
                         }
                     }
                     GeneralAction::FileTreeModeOrCancelInput => mode = Mode::Select,

@@ -202,6 +202,7 @@ pub enum GeneralAction {
     NewFile,
     RenameFile,
     DeleteFile,
+    FindInTree,
     BackspaceTreeInput,
     Exit,
     HideFileTree,
@@ -225,6 +226,7 @@ pub struct GeneralUserKeyMap {
     new_file: String,
     rename_file: String,
     delete_file: String,
+    find_in_tree: String,
     backspace_tree_input: String,
     exit: String,
     hide_file_tree: String,
@@ -248,6 +250,7 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
         insert_key_event(&mut hash, &val.new_file, GeneralAction::NewFile);
         insert_key_event(&mut hash, &val.rename_file, GeneralAction::RenameFile);
         insert_key_event(&mut hash, &val.delete_file, GeneralAction::DeleteFile);
+        insert_key_event(&mut hash, &val.find_in_tree, GeneralAction::FindInTree);
         insert_key_event(&mut hash, &val.backspace_tree_input, GeneralAction::BackspaceTreeInput);
         insert_key_event(&mut hash, &val.exit, GeneralAction::Exit);
         insert_key_event(&mut hash, &val.hide_file_tree, GeneralAction::HideFileTree);
@@ -263,16 +266,17 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
 impl Default for GeneralUserKeyMap {
     fn default() -> Self {
         Self {
-            up_file_tree: format!("{} || {} || {}", UP, 'w', 'W'),
-            down_file_tree: format!("{} || {} || {}", DOWN, 's', 'S'),
-            shrink_path: format!("{} || {} || {}", LEFT, 'a', 'A'),
-            expand_file_tree_or_open_file: format!("{} || {} || {}", RIGHT, 'd', 'D'),
+            up_file_tree: format!("{UP} || w || W"),
+            down_file_tree: format!("{DOWN} || s || S"),
+            shrink_path: format!("{LEFT} || d || D"),
+            expand_file_tree_or_open_file: format!("{RIGHT} || d || D"),
             finish_or_select: String::from(ENTER),
-            save_all: format!("{} && {}", CTRL, 's'),
+            save_all: format!("{CTRL} && s"),
             file_tree_mod_or_cancel_input: String::from(ESC),
-            new_file: format!("{} && {}", CTRL, 'n'),
-            rename_file: format!("{}2", F),
-            delete_file: format!("{} && {}", SHIFT, DELETE),
+            new_file: format!("{CTRL} && n"),
+            rename_file: format!("{F}2"),
+            delete_file: format!("{SHIFT} && {DELETE}"),
+            find_in_tree: format!("{CTRL} && f"),
             backspace_tree_input: String::from(BACKSPACE),
             exit: format!("{} && {} || {} && {}", CTRL, 'd', CTRL, 'q'),
             hide_file_tree: format!("{} && {}", CTRL, 'e'),

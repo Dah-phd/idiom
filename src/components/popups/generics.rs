@@ -2,10 +2,11 @@ use std::io::Stdout;
 
 use super::PopupInterface;
 use crate::configs::PopupMessage;
+use crate::utils::centered_rect;
 use crossterm::event::{KeyCode, KeyEvent};
 use tui::{
     backend::CrosstermBackend,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Layout},
     style::{Modifier, Style},
     text::{Span, Spans},
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
@@ -130,20 +131,27 @@ pub struct PopupSelector<T> {
 
 impl<T> PopupInterface for PopupSelector<T> {
     fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>) {
-        let block = Block::default().title("Select").borders(Borders::ALL);
         let (percent_x, percent_y) = self.size.unwrap_or((60, 20));
         let area = centered_rect(percent_x, percent_y, frame.size());
         frame.render_widget(Clear, area);
-        frame.render_widget(block, area);
 
-        let chunks = Layout::default().margin(1).split(area);
         let mut state = ListState::default();
         state.select(Some(self.state));
-        let options = self.options.iter().map(|el| ListItem::new((self.display)(el))).collect::<Vec<_>>();
-        frame.render_stateful_widget(List::new(options), chunks[0], &mut state);
+        let options = if self.options.is_empty() {
+            vec![ListItem::new("No results found!")]
+        } else {
+            self.options.iter().map(|el| ListItem::new((self.display)(el))).collect::<Vec<_>>()
+        };
+        let list = List::new(options)
+            .block(Block::default().borders(Borders::ALL).title("Select"))
+            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+        frame.render_stateful_widget(list, area, &mut state);
     }
 
     fn map(&mut self, key: &KeyEvent) -> PopupMessage {
+        if self.options.is_empty() {
+            return PopupMessage::Done;
+        }
         match key.code {
             KeyCode::Enter => (self.command)(self),
             KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
@@ -181,28 +189,13 @@ impl std::fmt::Debug for Button {
     }
 }
 
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Percentage((100 - percent_y) / 2),
-                Constraint::Percentage(percent_y),
-                Constraint::Percentage((100 - percent_y) / 2),
-            ]
-            .as_ref(),
-        )
-        .split(r);
-
-    Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints(
-            [
-                Constraint::Percentage((100 - percent_x) / 2),
-                Constraint::Percentage(percent_x),
-                Constraint::Percentage((100 - percent_x) / 2),
-            ]
-            .as_ref(),
-        )
-        .split(popup_layout[1])[1]
+pub fn message(content: String) -> Popup {
+    Popup {
+        message: content,
+        title: Some("Message".to_owned()),
+        message_as_buffer_builder: None,
+        buttons: vec![Button { command: |_| PopupMessage::Done, name: "Ok".to_owned(), key: None }],
+        size: Some((20, 16)),
+        state: 0,
+    }
 }

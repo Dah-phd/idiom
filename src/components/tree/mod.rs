@@ -81,10 +81,50 @@ impl Tree {
         true
     }
 
+    pub fn expand_dir_or_get_path(&mut self) -> Option<PathBuf> {
+        let tree_path = self.get_selected()?;
+        if tree_path.path().is_dir() {
+            tree_path.expand();
+            self.force_sync();
+            None
+        } else {
+            Some(tree_path.path().clone())
+        }
+    }
+
     fn shrink(&mut self) {
         if let Some(tree_path) = self.get_selected() {
             tree_path.take_tree();
             self.force_sync();
+        }
+    }
+
+    fn select_up(&mut self) {
+        if self.tree_ptrs.is_empty() {
+            return;
+        }
+        if let Some(idx) = self.state.selected() {
+            if idx == 0 {
+                return;
+            }
+            self.unsafe_select(idx - 1);
+        } else {
+            self.unsafe_select(self.tree_ptrs.len() - 1);
+        }
+    }
+
+    fn select_down(&mut self) {
+        if self.tree_ptrs.is_empty() {
+            return;
+        }
+        if let Some(idx) = self.state.selected() {
+            let new_idx = idx + 1;
+            if self.tree_ptrs.len() == new_idx {
+                return;
+            }
+            self.unsafe_select(new_idx);
+        } else {
+            self.unsafe_select(0);
         }
     }
 
@@ -126,14 +166,26 @@ impl Tree {
         Ok(())
     }
 
-    pub fn expand_dir_or_get_path(&mut self) -> Option<PathBuf> {
-        let tree_path = self.get_selected()?;
-        if tree_path.path().is_dir() {
-            tree_path.expand();
+    pub fn search_paths(&self, pattern: String) -> Vec<PathBuf> {
+        let tree = self.tree.clone();
+        let mut buffer = Vec::new();
+        tree.search_in_paths(pattern.as_str(), &mut buffer);
+        buffer
+    }
+
+    pub fn search_files(&self, pattern: String) -> Vec<(PathBuf, String, usize)> {
+        let mut tree = self.tree.clone();
+        let mut buffer = Vec::new();
+        tree.search_in_files(pattern.as_str(), &mut buffer);
+        buffer
+    }
+
+    pub fn select_by_path(&mut self, path: &PathBuf) {
+        self.state.select(None);
+        if self.tree.expand_contained(path) {
+            self.state.select(Some(0));
+            self.selected_path = path.clone();
             self.force_sync();
-            None
-        } else {
-            Some(tree_path.path().clone())
         }
     }
 
@@ -194,44 +246,6 @@ impl Tree {
                     self.selected_path = PathBuf::from("./");
                 }
             }
-        }
-    }
-
-    pub fn select_by_path(&mut self, path: &PathBuf) {
-        self.state.select(None);
-        if self.tree.expand_contained(path) {
-            self.state.select(Some(0));
-            self.selected_path = path.clone();
-            self.force_sync();
-        }
-    }
-
-    fn select_up(&mut self) {
-        if self.tree_ptrs.is_empty() {
-            return;
-        }
-        if let Some(idx) = self.state.selected() {
-            if idx == 0 {
-                return;
-            }
-            self.unsafe_select(idx - 1);
-        } else {
-            self.unsafe_select(self.tree_ptrs.len() - 1);
-        }
-    }
-
-    fn select_down(&mut self) {
-        if self.tree_ptrs.is_empty() {
-            return;
-        }
-        if let Some(idx) = self.state.selected() {
-            let new_idx = idx + 1;
-            if self.tree_ptrs.len() == new_idx {
-                return;
-            }
-            self.unsafe_select(new_idx);
-        } else {
-            self.unsafe_select(0);
         }
     }
 
