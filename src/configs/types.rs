@@ -1,39 +1,43 @@
-use tui::{backend::Backend, Frame};
+use crossterm::event::KeyEvent;
+use tui::{backend::CrosstermBackend, Frame};
 
-use crate::components::popups::Popup;
-use std::path::PathBuf;
+use crate::components::popups::PopupInterface;
+use std::{io::Stdout, path::PathBuf};
 
-#[derive(Debug, Clone)]
+use super::PopupMessage;
+
 pub enum Mode {
     Select,
     Insert,
-    Popup((Box<Mode>, Popup)),
-}
-
-impl Default for Mode {
-    fn default() -> Self {
-        Self::Select
-    }
+    Popup((Box<Mode>, Box<dyn PopupInterface>)),
 }
 
 impl Mode {
-    pub fn render_popup_if_exists(&mut self, frame: &mut Frame<impl Backend>) {
+    pub fn render_popup_if_exists(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>) {
         if let Self::Popup((.., popup)) = self {
             popup.render(frame)
         }
     }
 
-    pub fn popup(self, popup: Popup) -> Self {
+    pub fn popup_map(&mut self, key: &KeyEvent) -> Option<PopupMessage> {
+        if let Self::Popup((.., popup)) = self {
+            return Some(popup.map(key));
+        }
+        None
+    }
+
+    pub fn popup(self, popup: Box<dyn PopupInterface>) -> Self {
         if matches!(self, Self::Popup((_, _))) {
             return self;
         }
         Self::Popup((Box::new(self), popup))
     }
 
-    pub fn clear_popup(&mut self) {
+    pub fn clear_popup(self) -> Self {
         if let Self::Popup((mode, _)) = self {
-            (*self) = *mode.clone();
+            return *mode;
         }
+        self
     }
 }
 

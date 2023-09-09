@@ -11,14 +11,14 @@ use crate::{
 };
 use anyhow::Result;
 use crossterm::event::Event;
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use tui::{backend::Backend, Terminal};
+use std::{collections::HashMap, io::Stdout};
+use tui::{backend::CrosstermBackend, Terminal};
 
 const TICK: Duration = Duration::from_millis(100);
 
-pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBuf>) -> Result<()> {
+pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: Option<PathBuf>) -> Result<()> {
     let configs = KeyMap::new();
     let mut mode = Mode::Select;
     let mut clock = Instant::now();
@@ -29,6 +29,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
     let mut lsp_servers = HashMap::new();
 
     if let Some(path) = open_file {
+        file_tree.select_by_path(&path);
         editor_state.new_from(path, &mut lsp_servers).await;
         mode = Mode::Insert;
     }
@@ -56,38 +57,51 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                 if matches!(mode, Mode::Insert) && !tmux.active && editor_state.map(&key).await {
                     continue;
                 }
-                if let Mode::Popup((_, popup)) = &mut mode {
-                    match popup.map(&key).await {
-                        PopupMessage::None => continue,
+                if let Some(msg) = mode.popup_map(&key) {
+                    match msg {
                         PopupMessage::Exit => break,
                         PopupMessage::SaveAndExit => {
                             editor_state.save_all().await;
                             break;
                         }
+                        PopupMessage::OpenFile((path, _)) => {
+                            editor_state.new_from(path, &mut lsp_servers).await;
+                            mode = mode.clear_popup();
+                            continue;
+                        }
+                        PopupMessage::None => continue,
                         PopupMessage::Done => {
-                            mode.clear_popup();
+                            mode = mode.clear_popup();
                             continue;
                         }
                         PopupMessage::GoToLine(line_idx) => {
                             if let Some(editor) = editor_state.get_active() {
                                 editor.go_to(line_idx)
                             }
-                            mode.clear_popup();
+                            mode = mode.clear_popup();
                             continue;
                         }
                         PopupMessage::CreateFileOrFolder(name) => {
-                            file_tree.create_file_or_folder(name);
-                            mode.clear_popup();
+                            if let Ok(new_path) = file_tree.create_file_or_folder(name) {
+                                if !new_path.is_dir() {
+                                    editor_state.new_from(new_path, &mut lsp_servers).await;
+                                }
+                            }
+                            mode = mode.clear_popup();
                             continue;
                         }
                         PopupMessage::CreateFileOrFolderBase(name) => {
-                            file_tree.create_file_or_folder_base(name);
-                            mode.clear_popup();
+                            if let Ok(new_path) = file_tree.create_file_or_folder_base(name) {
+                                if !new_path.is_dir() {
+                                    editor_state.new_from(new_path, &mut lsp_servers).await;
+                                }
+                            }
+                            mode = mode.clear_popup();
                             continue;
                         }
                         PopupMessage::RenameFile(name) => {
                             file_tree.rename_file(name);
-                            mode.clear_popup();
+                            mode = mode.clear_popup();
                             continue;
                         }
                     }
@@ -102,16 +116,16 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                 }
                 match action {
                     GeneralAction::NewFile => {
-                        mode = mode.popup(create_file_popup(file_tree.get_first_selected_folder()));
+                        mode = mode.popup(Box::new(create_file_popup(file_tree.get_first_selected_folder())));
                     }
                     GeneralAction::RenameFile => {
-                        mode = mode.popup(rename_file_popup(file_tree.get_first_selected_folder()));
+                        mode = mode.popup(Box::new(rename_file_popup(file_tree.get_first_selected_folder())));
                     }
                     GeneralAction::Exit => {
                         if editor_state.are_updates_saved() && !matches!(mode, Mode::Popup(..)) {
                             break;
                         } else {
-                            mode = mode.popup(save_all_popup())
+                            mode = mode.popup(Box::new(save_all_popup()))
                         }
                     }
                     GeneralAction::Expand => {
@@ -158,7 +172,7 @@ pub async fn app(terminal: &mut Terminal<impl Backend>, open_file: Option<PathBu
                         editor_state.refresh_cfg(new_key_map.editor_key_map());
                     }
                     GeneralAction::GoToLinePopup if matches!(mode, Mode::Insert) => {
-                        mode = mode.popup(go_to_line_popup());
+                        mode = mode.popup(Box::new(go_to_line_popup()));
                     }
                     GeneralAction::ToggleTerminal => {
                         tmux.toggle();

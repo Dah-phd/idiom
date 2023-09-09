@@ -1,132 +1,103 @@
 use crate::utils::get_nested_paths;
-use anyhow::{anyhow, Result};
-use std::cmp::Ordering;
-use std::path::{Path, PathBuf};
-use tui::{
-    style::{Modifier, Style},
-    widgets::ListItem,
+use std::{
+    cmp::Ordering,
+    collections::HashSet,
+    path::{Path, PathBuf},
 };
 
-#[cfg(not(target_os = "windows"))]
-pub const DIR_SEP: char = '/';
-
-#[cfg(target_os = "windows")]
-pub const DIR_SEP: char = '\\';
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TreePath {
-    Folder { path: PathBuf, parent: *mut Self, tree: Option<Vec<TreePath>>, dispaly: String, style: Style },
-    File { path: PathBuf, parent: *mut Self, dispaly: String, style: Style },
+    Folder { path: PathBuf, tree: Option<Vec<TreePath>>, display: String },
+    File { path: PathBuf, display: String },
+}
+
+impl Default for TreePath {
+    fn default() -> Self {
+        let path = PathBuf::from("./");
+        let mut tree_buffer = get_nested_paths(&path).map(|p| p.into()).collect::<Vec<Self>>();
+        tree_buffer.sort_by(order_tree_path);
+        Self::Folder { display: get_path_display(&path), path, tree: Some(tree_buffer) }
+    }
+}
+
+impl From<PathBuf> for TreePath {
+    fn from(value: PathBuf) -> Self {
+        let display = get_path_display(&value);
+        if value.is_dir() {
+            Self::Folder { path: value, tree: None, display }
+        } else {
+            Self::File { path: value, display }
+        }
+    }
 }
 
 impl TreePath {
-    pub fn with_parent(path: PathBuf, parent: *mut Self) -> Self {
-        let dispaly = get_path_display(&path);
-        if path.is_dir() {
-            return Self::Folder { path, parent, tree: None, dispaly, style: Style::default() };
-        }
-        Self::File { path, parent, dispaly, style: Style::default() }
-    }
-
-    pub fn path(&self) -> &PathBuf {
-        match self {
-            Self::File { path, .. } => path,
-            Self::Folder { path, .. } => path,
-        }
-    }
-
-    pub fn as_widgets(&self) -> Vec<ListItem<'_>> {
-        let mut buffer = vec![self.as_list_item()];
-        if let Self::Folder { tree: Some(tree), .. } = self {
-            for tree_element in tree {
-                buffer.extend(tree_element.as_widgets());
-            }
-        }
-        buffer
-    }
-
-    pub fn select(&mut self) {
-        match self {
-            Self::File { style, .. } => {
-                style.add_modifier = Modifier::REVERSED;
-            }
-            Self::Folder { style, .. } => {
-                style.add_modifier = Modifier::REVERSED;
-            }
-        }
-    }
-
-    pub fn deselect(&mut self) {
-        match self {
-            Self::File { style, .. } => {
-                style.add_modifier = Modifier::empty();
-            }
-            Self::Folder { style, .. } => {
-                style.add_modifier = Modifier::empty();
-            }
-        }
-    }
-
-    pub fn is_dir(&self) -> bool {
-        matches!(self, Self::Folder { .. })
-    }
-
-    pub fn rename(&mut self, new_name: &str) -> Option<()> {
-        let path_ref = self.path_mut();
-        std::fs::rename(&path_ref, new_name).ok()?;
-        let new_dispaly = get_path_display(path_ref);
-        match self {
-            Self::File { dispaly, .. } => *dispaly = new_dispaly,
-            Self::Folder { dispaly, .. } => *dispaly = new_dispaly,
-        }
-        Some(())
-    }
-
-    pub fn path_mut(&mut self) -> &mut PathBuf {
-        match self {
-            Self::File { path, .. } => path,
-            Self::Folder { path, .. } => path,
-        }
-    }
-
-    pub fn tree(&mut self) -> Option<&mut Vec<Self>> {
-        if let Self::Folder { tree: Some(tree), .. } = self {
-            return Some(tree);
-        }
-        None
-    }
-
-    pub fn new_file_or_folder(&mut self, name: String) -> Result<PathBuf> {
-        self.expand();
-        if matches!(self, Self::File { .. }) {
-            return Err(anyhow!("Parent is file not a directory!"));
-        }
-        let result = new_file_or_folder(self.path().clone(), &name);
-        self.refresh();
-        result
-    }
-
-    pub fn parent(&mut self) -> Option<&mut Self> {
-        unsafe {
-            match self {
-                Self::File { parent, .. } => parent.as_mut(),
-                Self::Folder { parent, .. } => parent.as_mut(),
-            }
-        }
-    }
-
-    pub fn refresh(&mut self) {
-        let ptr: *mut Self = self;
-        if let Self::Folder { path, tree: Some(tree), .. } = self {
-            let updated_tree = get_nested_paths(path).collect::<Vec<_>>();
-            for path in updated_tree.iter() {
-                if !tree.iter().any(|tree_element| tree_element.path() == path) {
-                    tree.push(TreePath::with_parent(path.clone(), ptr))
+    pub fn sync_flat_ptrs(&mut self, buffer: &mut Vec<*mut Self>, ignore_base_paths: &[PathBuf]) {
+        buffer.clear();
+        if let Some(base_tree) = self.tree_mut() {
+            for base_path in base_tree {
+                if !ignore_base_paths.contains(base_path.path()) {
+                    base_path.fill_flat_ptrs(buffer);
                 }
             }
-            tree.retain_mut(|el| {
-                if updated_tree.contains(el.path()) {
-                    el.refresh();
+        }
+    }
+
+    fn fill_flat_ptrs(&mut self, buffer: &mut Vec<*mut Self>) {
+        buffer.push(self);
+        if let Some(tree) = self.tree_mut() {
+            for tree_path in tree {
+                tree_path.fill_flat_ptrs(buffer);
+            }
+        }
+    }
+
+    pub fn expand(&mut self) {
+        if let Self::Folder { tree, path, .. } = self {
+            if tree.is_some() {
+                return;
+            }
+            let mut buffer = Vec::new();
+            for nested_path in get_nested_paths(path) {
+                buffer.push(nested_path.into())
+            }
+            buffer.sort_by(order_tree_path);
+            tree.replace(buffer);
+        }
+    }
+
+    pub fn expand_contained(&mut self, path: &PathBuf) -> bool {
+        if self.path() == path {
+            return true;
+        }
+        if path.starts_with(self.path()) {
+            let should_shrink = self.tree_mut().is_none();
+            self.expand();
+            if let Some(nested_tree) = self.tree_mut() {
+                for tree_path in nested_tree {
+                    if tree_path.expand_contained(path) {
+                        return true;
+                    }
+                }
+            }
+            if should_shrink {
+                let _ = self.take_tree();
+            }
+        }
+        false
+    }
+
+    pub fn sync(&mut self) {
+        if let Self::Folder { path, tree: Some(tree), .. } = self {
+            let updated_tree = get_nested_paths(path).collect::<HashSet<_>>();
+            for path in updated_tree.iter() {
+                if !tree.iter().any(|tree_element| tree_element.path() == path) {
+                    tree.push(path.clone().into())
+                }
+            }
+            tree.retain_mut(|tree_path| {
+                if updated_tree.contains(tree_path.path()) {
+                    tree_path.sync();
                     return true;
                 }
                 false
@@ -135,102 +106,61 @@ impl TreePath {
         }
     }
 
-    pub fn is_parent(&self, path: &Path) -> bool {
-        path.starts_with(self.path())
+    pub fn display(&self) -> &str {
+        match self {
+            Self::Folder { display, .. } => display,
+            Self::File { display, .. } => display,
+        }
     }
 
-    pub fn path_below(&mut self) -> Option<*mut Self> {
-        if let Some(tree) = self.tree() {
-            if let Some(first) = tree.first_mut() {
-                return Some(first);
+    pub fn path(&self) -> &PathBuf {
+        match self {
+            Self::Folder { path, .. } => path,
+            Self::File { path, .. } => path,
+        }
+    }
+
+    pub fn update_path(&mut self, new_path: PathBuf) {
+        match self {
+            Self::File { path, display } => {
+                *display = get_path_display(&new_path);
+                *path = new_path;
+            }
+            Self::Folder { path, display, .. } => {
+                *display = get_path_display(&new_path);
+                *path = new_path;
             }
         }
-        self.next_in_parent()
     }
 
-    fn next_in_parent(&mut self) -> Option<*mut Self> {
-        let path = self.path().clone();
-        if let Some(parent) = self.parent() {
-            if let Some(tree) = parent.tree() {
-                let mut return_next = false;
-                for tree_path in tree {
-                    if return_next {
-                        return Some(tree_path);
-                    }
-                    if tree_path.path() == &path {
-                        return_next = true;
-                    }
-                }
-            }
-            return parent.next_in_parent();
+    pub fn take_tree(&mut self) -> Option<Vec<Self>> {
+        if let Self::Folder { tree, .. } = self {
+            return tree.take();
         }
         None
     }
 
-    pub fn path_above(&mut self) -> Option<*mut Self> {
-        let path = self.path().clone();
-        if let Some(parent) = self.parent() {
-            let ptr: *mut TreePath = parent;
-            if let Some(tree) = parent.tree() {
-                let mut return_next = false;
-                for tree_path in tree.iter_mut().rev() {
-                    if return_next {
-                        return tree_path.last_child();
-                    }
-                    if tree_path.path() == &path {
-                        return_next = true;
-                    }
-                }
-            }
-            return Some(ptr);
+    fn tree_mut(&mut self) -> Option<&mut Vec<TreePath>> {
+        if let Self::Folder { tree: Some(tree), .. } = self {
+            return Some(tree);
         }
         None
     }
+}
 
-    pub fn last_child(&mut self) -> Option<*mut Self> {
-        if let Some(tree) = self.tree() {
-            if let Some(last) = tree.last_mut() {
-                return last.last_child();
-            }
-        }
-        Some(self)
-    }
-
-    pub fn expand(&mut self) {
-        let parent: *mut Self = self;
-        if let Self::Folder { path, tree, .. } = self {
-            if tree.is_some() {
-                return;
-            }
-            let mut nested_tree = get_nested_paths(path).map(|p| Self::with_parent(p, parent)).collect::<Vec<_>>();
-            nested_tree.sort_by(order_tree_path);
-            *tree = Some(nested_tree);
-        }
-    }
-
-    fn display(&self) -> &str {
-        match self {
-            Self::File { dispaly, .. } => dispaly,
-            Self::Folder { dispaly, .. } => dispaly,
-        }
-    }
-
-    fn style(&self) -> Style {
-        match self {
-            Self::File { style, .. } => *style,
-            Self::Folder { style, .. } => *style,
-        }
-    }
-
-    pub fn as_list_item(&self) -> ListItem {
-        ListItem::new(self.display()).style(self.style())
+fn order_tree_path(left: &TreePath, right: &TreePath) -> Ordering {
+    match (matches!(left, TreePath::Folder { .. }), matches!(right, TreePath::Folder { .. })) {
+        (true, true) => Ordering::Equal,
+        (false, false) => Ordering::Equal,
+        (true, false) => Ordering::Less,
+        (false, true) => Ordering::Greater,
     }
 }
 
 fn get_path_display(path: &Path) -> String {
     let path_str = &path.display().to_string()[2..];
     let mut buffer = String::new();
-    let mut path_split = path_str.split(DIR_SEP).peekable();
+    let mut path_split = path_str.split(std::path::MAIN_SEPARATOR).peekable();
     while let Some(path_element) = path_split.next() {
         if path_split.peek().is_none() {
             buffer.push_str(path_element)
@@ -242,27 +172,4 @@ fn get_path_display(path: &Path) -> String {
         buffer.push_str("/..");
     }
     buffer
-}
-
-pub fn new_file_or_folder(mut path: PathBuf, name: &str) -> Result<PathBuf> {
-    if let Some(folder) = name.strip_suffix(DIR_SEP) {
-        path.push(folder);
-        std::fs::create_dir(&path)?;
-    } else {
-        path.push(name);
-        if path.exists() {
-            return Err(anyhow!("File already exists! {:?}", path));
-        }
-        std::fs::write(&path, "")?;
-    }
-    Ok(path)
-}
-
-pub fn order_tree_path(left: &TreePath, right: &TreePath) -> Ordering {
-    match (matches!(left, TreePath::Folder { .. }), matches!(right, TreePath::Folder { .. })) {
-        (true, true) => Ordering::Equal,
-        (false, false) => Ordering::Equal,
-        (true, false) => Ordering::Less,
-        (false, true) => Ordering::Greater,
-    }
 }

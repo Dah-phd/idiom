@@ -5,9 +5,9 @@ mod lsp;
 mod syntax;
 mod utils;
 
-use std::path::PathBuf;
-
 use app::app;
+
+use std::path::{PathBuf, MAIN_SEPARATOR};
 
 use anyhow::Result;
 use tui::backend::CrosstermBackend;
@@ -35,6 +35,9 @@ fn cli() -> Option<PathBuf> {
     let path = PathBuf::from(argv.get(1)?).canonicalize().ok()?;
     if path.is_file() {
         std::env::set_current_dir(path.parent()?).ok()?;
+        if let Some(Some(path_ptr)) = argv.get(1).map(|s| s.split(MAIN_SEPARATOR).last()) {
+            return Some(PathBuf::from(format!("./{}", path_ptr)));
+        }
         return Some(path);
     } else {
         std::env::set_current_dir(path).ok()?;

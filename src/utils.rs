@@ -1,4 +1,5 @@
 use crate::components::editor::Offset;
+use anyhow::{anyhow, Result};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -45,4 +46,42 @@ pub fn get_nested_paths(path: &PathBuf) -> impl Iterator<Item = PathBuf> {
         Ok(iter) => iter.flatten().map(|p| p.path()),
         Err(_) => panic!(),
     }
+}
+
+pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> Result<PathBuf> {
+    let mut path = if base_path.is_dir() {
+        base_path
+    } else if let Some(parent) = base_path.parent() {
+        parent.into()
+    } else {
+        PathBuf::from("./")
+    };
+
+    if add.ends_with('/') || add.ends_with(std::path::MAIN_SEPARATOR) {
+        path.push(add);
+        std::fs::create_dir_all(&path)?;
+    } else {
+        if add.contains('/') {
+            let mut split: Vec<&str> = add.split('/').collect();
+            let file_name = split.pop();
+            let stem = split.join("/");
+            path.push(stem);
+            std::fs::create_dir_all(&path)?;
+            if let Some(file_name) = file_name {
+                path.push(file_name);
+                if path.exists() {
+                    return Err(anyhow!("File already exists!"));
+                }
+                std::fs::write(&path, "")?;
+            }
+        } else {
+            if path.exists() {
+                return Err(anyhow!("File already exists!"));
+            }
+            path.push(add);
+        }
+        std::fs::write(&path, "")?;
+    }
+
+    Ok(path)
 }
