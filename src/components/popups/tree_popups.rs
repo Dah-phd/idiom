@@ -53,7 +53,7 @@ pub fn find_paths_popup() -> Popup {
                 key: None,
             },
             Button {
-                command: |popup| PopupMessage::SelectFileLine(popup.message.to_owned()),
+                command: |popup| PopupMessage::SelectTreeFiles(popup.message.to_owned()),
                 name: "Search files".to_owned(),
                 key: None,
             },

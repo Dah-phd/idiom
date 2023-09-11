@@ -1,4 +1,4 @@
-use super::{Button, Popup};
+use super::{Button, Popup, PopupSelector};
 use crate::configs::PopupMessage;
 use crossterm::event::KeyCode;
 
@@ -41,5 +41,30 @@ pub fn go_to_line_popup() -> Popup {
         }],
         size: Some((20, 16)),
         state: 0,
+    }
+}
+
+pub fn find_in_editor_popup() -> Popup {
+    Popup {
+        message: String::new(),
+        title: Some("Search opened file".to_owned()),
+        message_as_buffer_builder: Some(Some),
+        buttons: vec![Button {
+            command: |popup| PopupMessage::SelectOpenedFile(popup.message.to_owned()),
+            name: "Search".to_owned(),
+            key: None,
+        }],
+        size: Some((20, 16)),
+        state: 0,
+    }
+}
+
+pub fn select_editor_line(options: Vec<(usize, String)>) -> PopupSelector<(usize, String)> {
+    PopupSelector {
+        options,
+        display: |(idx, line)| line.to_owned(),
+        command: |popup| PopupMessage::GoToLine(popup.options[popup.state].0),
+        state: 0,
+        size: Some((40, 30)),
     }
 }

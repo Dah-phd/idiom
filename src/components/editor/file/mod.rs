@@ -92,7 +92,7 @@ impl Editor {
 
     pub fn is_saved(&self) -> bool {
         if let Ok(file_content) = std::fs::read_to_string(&self.path) {
-            return self.content.eq(&file_content.lines().map(String::from).collect::<Vec<_>>());
+            return self.content.eq(&file_content.split('\n').map(String::from).collect::<Vec<_>>());
         };
         false
     }
@@ -122,26 +122,9 @@ impl Editor {
 
     pub fn copy(&mut self) {
         if let Some((from, to)) = self.select.get() {
-            if from.line == to.line {
-                self.clipboard.push(self.content[from.line][from.char..to.char].to_owned());
-            } else {
-                let mut at_line = from.line;
-                let mut clip_vec = Vec::new();
-                clip_vec.push(self.content[from.line][from.char..].to_owned());
-                while at_line < to.line {
-                    at_line += 1;
-                    if at_line != to.line {
-                        clip_vec.push(self.content[at_line].to_owned())
-                    } else {
-                        clip_vec.push(self.content[at_line][..to.char].to_owned())
-                    }
-                }
-                self.clipboard.push(clip_vec.join("\n"));
-            }
+            self.clipboard.copy(&mut self.content, from, to);
         } else {
-            let mut line = self.content[self.cursor.line].to_owned();
-            line.push('\n');
-            self.clipboard.push(line);
+            self.clipboard.copy_line(&mut self.content, &self.cursor);
         }
     }
 
@@ -151,33 +134,9 @@ impl Editor {
         } else {
             self.action_logger.init_replace(self.cursor, &self.content[self.cursor.as_range()]);
         };
-        if let Some(clip) = self.clipboard.get() {
-            let mut lines: Vec<_> = clip.split('\n').collect();
+        if let Some(new_cursor) = self.clipboard.paste(&mut self.content, self.cursor) {
             let start_line = self.cursor.line;
-            if lines.len() == 1 {
-                let text = lines[0];
-                self.content[self.cursor.line].insert_str(self.cursor.char, lines[0]);
-                self.cursor.char += text.len();
-            } else {
-                let line = self.content.remove(self.cursor.line);
-                let (prefix, suffix) = line.split_at(self.cursor.char);
-                let mut first_line = prefix.to_owned();
-                first_line.push_str(lines.remove(0));
-                self.content.insert(self.cursor.line, first_line);
-                let last_idx = lines.len() - 1;
-                for (idx, select) in lines.iter().enumerate() {
-                    let next_line = if idx == last_idx {
-                        let mut last_line = select.to_string();
-                        self.cursor.char = last_line.len();
-                        last_line.push_str(suffix);
-                        last_line
-                    } else {
-                        select.to_string()
-                    };
-                    self.content.insert(self.cursor.line + 1, next_line);
-                    self.down();
-                }
-            }
+            self.cursor = new_cursor;
             self.action_logger.finish_replace(self.cursor, &self.content[start_line..=self.cursor.line])
         } else {
             self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.as_range()])
@@ -194,6 +153,16 @@ impl Editor {
         if let Some(cursor) = self.action_logger.redo(&mut self.content) {
             self.cursor = cursor;
         }
+    }
+
+    pub fn search_file(&self, pattern: &str) -> Vec<(usize, String)> {
+        let mut buffer = Vec::new();
+        for (idx, slice) in self.content.windows(3).enumerate() {
+            if (idx % 2) == 0 && slice[0].contains(pattern) {
+                buffer.push((idx, slice.join("\n")));
+            }
+        }
+        buffer
     }
 
     pub fn end_of_line(&mut self) {

@@ -2,7 +2,7 @@ use crate::{
     components::{
         popups::editor_popups::go_to_line_popup,
         popups::{
-            editor_popups::save_all_popup,
+            editor_popups::{find_in_editor_popup, save_all_popup, select_editor_line},
             tree_popups::{
                 create_file_popup, find_paths_popup, rename_file_popup, select_file_popup, select_tree_file_popup,
             },
@@ -80,9 +80,17 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             mode = Mode::Select.popup(Box::new(select_file_popup(file_tree.search_paths(pattern))));
                             continue;
                         }
-                        PopupMessage::SelectFileLine(pattern) => {
+                        PopupMessage::SelectTreeFiles(pattern) => {
                             mode =
                                 Mode::Select.popup(Box::new(select_tree_file_popup(file_tree.search_files(pattern))));
+                            continue;
+                        }
+                        PopupMessage::SelectOpenedFile(pattern) => {
+                            if let Some(editor) = editor_state.get_active() {
+                                mode = Mode::Insert.popup(Box::new(select_editor_line(editor.search_file(&pattern))));
+                            } else {
+                                mode = mode.clear_popup();
+                            }
                             continue;
                         }
                         PopupMessage::GoToLine(line_idx) => {
@@ -131,8 +139,12 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                     continue;
                 }
                 match action {
-                    GeneralAction::FindInTree => {
-                        mode = mode.popup(Box::new(find_paths_popup()));
+                    GeneralAction::Find => {
+                        if matches!(mode, Mode::Insert) {
+                            mode = mode.popup(Box::new(find_in_editor_popup()));
+                        } else {
+                            mode = mode.popup(Box::new(find_paths_popup()));
+                        }
                     }
                     GeneralAction::NewFile => {
                         mode = mode.popup(Box::new(create_file_popup(file_tree.get_first_selected_folder())));
