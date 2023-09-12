@@ -1,4 +1,6 @@
-use crate::utils::get_nested_paths;
+use tokio::task::JoinSet;
+
+use crate::utils::{get_nested_paths, trim_start};
 use std::{
     cmp::Ordering,
     collections::HashSet,
@@ -147,22 +149,27 @@ impl TreePath {
         None
     }
 
-    pub fn search_in_files(&mut self, pattern: &str, buffer: &mut Vec<(PathBuf, String, usize)>) {
+    pub fn search_in_files(mut self, pattern: &str, buffer: &mut JoinSet<Vec<(PathBuf, String, usize)>>) {
         self.expand();
         match self {
             Self::File { path, .. } => {
-                let maybe_content = std::fs::read_to_string(&path);
-                if let Ok(content) = maybe_content {
-                    for (idx, line) in content.lines().enumerate() {
-                        if line.contains(pattern) {
-                            buffer.push((path.clone(), line.to_owned(), idx))
+                let pattern = pattern.to_owned();
+                buffer.spawn(async move {
+                    let maybe_content = std::fs::read_to_string(&path);
+                    let mut buffer = Vec::new();
+                    if let Ok(content) = maybe_content {
+                        for (idx, line) in content.lines().enumerate() {
+                            if line.contains(&pattern) {
+                                buffer.push((path.clone(), trim_start(line.to_owned()), idx))
+                            }
                         }
                     }
-                }
+                    buffer
+                });
             }
             Self::Folder { tree: Some(tree), .. } => {
                 for tree_path in tree {
-                    tree_path.search_in_files(pattern, buffer)
+                    tree_path.search_in_files(pattern, buffer);
                 }
             }
             _ => (),

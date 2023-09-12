@@ -12,6 +12,11 @@ pub fn trim_start_inplace(line: &mut String) -> Offset {
     Offset::Pos(0)
 }
 
+pub fn trim_start(mut line: String) -> String {
+    trim_start_inplace(&mut line);
+    line
+}
+
 pub fn get_closing_char(ch: char) -> Option<char> {
     match ch {
         '{' => Some('}'),
@@ -111,4 +116,24 @@ pub fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
             .as_ref(),
         )
         .split(popup_layout[1])[1]
+}
+
+pub fn find_code_blocks(buffer: &mut Vec<(usize, String)>, content: &[String], pattern: &str) {
+    let mut content_iter = content.iter().enumerate().peekable();
+    while let Some((idx, line)) = content_iter.next() {
+        if !line.contains(pattern) {
+            continue;
+        }
+        let mut line = line.to_owned();
+        let white_chars_len = trim_start_inplace(&mut line).unwrap();
+        if let Some((_, next_line)) = content_iter.peek() {
+            if let Some(first_non_white) = next_line.find(|c: char| !c.is_whitespace()) {
+                if first_non_white >= white_chars_len {
+                    line.push('\n');
+                    line.push_str(&next_line[white_chars_len..]);
+                }
+            }
+        }
+        buffer.push((idx, line));
+    }
 }

@@ -6,6 +6,7 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
+use tokio::task::JoinSet;
 use tree_paths::TreePath;
 use tui::{
     backend::Backend,
@@ -173,11 +174,17 @@ impl Tree {
         buffer
     }
 
-    pub fn search_files(&self, pattern: String) -> Vec<(PathBuf, String, usize)> {
-        let mut tree = self.tree.clone();
-        let mut buffer = Vec::new();
-        tree.search_in_files(pattern.as_str(), &mut buffer);
-        buffer
+    pub async fn search_files(&self, pattern: String) -> Vec<(PathBuf, String, usize)> {
+        let tree = self.tree.clone();
+        let mut buffer = JoinSet::new();
+        tree.search_in_files(&pattern, &mut buffer);
+        let mut results = Vec::new();
+        while let Some(result) = buffer.join_next().await {
+            if let Ok(result) = result {
+                results.extend(result)
+            }
+        }
+        results
     }
 
     pub fn select_by_path(&mut self, path: &PathBuf) {

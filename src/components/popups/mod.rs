@@ -5,6 +5,7 @@ use std::io::Stdout;
 
 use crate::configs::PopupMessage;
 use crossterm::event::KeyEvent;
+pub use generics::message;
 pub use generics::{Button, Popup, PopupSelector};
 use tui::{backend::CrosstermBackend, Frame};
 

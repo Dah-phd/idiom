@@ -1,6 +1,7 @@
 use crate::{
     components::{
         popups::editor_popups::go_to_line_popup,
+        popups::message,
         popups::{
             editor_popups::{find_in_editor_popup, save_all_popup, select_editor_line},
             tree_popups::{
@@ -81,8 +82,8 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             continue;
                         }
                         PopupMessage::SelectTreeFiles(pattern) => {
-                            mode =
-                                Mode::Select.popup(Box::new(select_tree_file_popup(file_tree.search_files(pattern))));
+                            mode = Mode::Select
+                                .popup(Box::new(select_tree_file_popup(file_tree.search_files(pattern).await)));
                             continue;
                         }
                         PopupMessage::SelectOpenedFile(pattern) => {
@@ -119,8 +120,10 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             continue;
                         }
                         PopupMessage::RenameFile(name) => {
-                            file_tree.rename_file(name);
                             mode = mode.clear_popup();
+                            if let Err(error) = file_tree.rename_file(name) {
+                                mode = mode.popup(Box::new(message(error.to_string())))
+                            }
                             continue;
                         }
                         PopupMessage::None => continue,

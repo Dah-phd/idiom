@@ -9,7 +9,7 @@ use crate::{
     configs::{EditorConfigs, FileType},
     lsp::LSP,
     syntax::{Lexer, Theme},
-    utils::{get_closing_char, trim_start_inplace},
+    utils::{find_code_blocks, get_closing_char, trim_start_inplace},
 };
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -157,11 +157,7 @@ impl Editor {
 
     pub fn search_file(&self, pattern: &str) -> Vec<(usize, String)> {
         let mut buffer = Vec::new();
-        for (idx, slice) in self.content.windows(3).enumerate() {
-            if (idx % 2) == 0 && slice[0].contains(pattern) {
-                buffer.push((idx, slice.join("\n")));
-            }
-        }
+        find_code_blocks(&mut buffer, &self.content, pattern);
         buffer
     }
 

@@ -54,6 +54,15 @@ pub enum Offset {
     Neg(usize),
 }
 
+impl Offset {
+    pub fn unwrap(self) -> usize {
+        match self {
+            Self::Neg(inner) => inner,
+            Self::Pos(inner) => inner,
+        }
+    }
+}
+
 impl From<Offset> for usize {
     fn from(value: Offset) -> Self {
         match value {

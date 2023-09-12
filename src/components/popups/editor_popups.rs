@@ -62,7 +62,7 @@ pub fn find_in_editor_popup() -> Popup {
 pub fn select_editor_line(options: Vec<(usize, String)>) -> PopupSelector<(usize, String)> {
     PopupSelector {
         options,
-        display: |(idx, line)| line.to_owned(),
+        display: |(_, line)| line.to_owned(),
         command: |popup| PopupMessage::GoToLine(popup.options[popup.state].0),
         state: 0,
         size: Some((40, 30)),
