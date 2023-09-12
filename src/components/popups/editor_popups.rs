@@ -65,6 +65,6 @@ pub fn select_editor_line(options: Vec<(usize, String)>) -> PopupSelector<(usize
         display: |(_, line)| line.to_owned(),
         command: |popup| PopupMessage::GoToLine(popup.options[popup.state].0),
         state: 0,
-        size: Some((40, 30)),
+        size: None,
     }
 }

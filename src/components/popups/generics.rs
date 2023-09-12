@@ -131,7 +131,7 @@ pub struct PopupSelector<T> {
 
 impl<T> PopupInterface for PopupSelector<T> {
     fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>) {
-        let (percent_x, percent_y) = self.size.unwrap_or((60, 20));
+        let (percent_x, percent_y) = self.size.unwrap_or((60, 40));
         let area = centered_rect(percent_x, percent_y, frame.size());
         frame.render_widget(Clear, area);
 

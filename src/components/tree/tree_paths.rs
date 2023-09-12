@@ -5,6 +5,7 @@ use std::{
     cmp::Ordering,
     collections::HashSet,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 #[derive(Debug, Clone)]
@@ -149,17 +150,16 @@ impl TreePath {
         None
     }
 
-    pub fn search_in_files(mut self, pattern: &str, buffer: &mut JoinSet<Vec<(PathBuf, String, usize)>>) {
+    pub fn search_in_files(mut self, pattern: Arc<str>, buffer: &mut JoinSet<Vec<(PathBuf, String, usize)>>) {
         self.expand();
         match self {
             Self::File { path, .. } => {
-                let pattern = pattern.to_owned();
                 buffer.spawn(async move {
                     let maybe_content = std::fs::read_to_string(&path);
                     let mut buffer = Vec::new();
                     if let Ok(content) = maybe_content {
                         for (idx, line) in content.lines().enumerate() {
-                            if line.contains(&pattern) {
+                            if line.contains(&*pattern) {
                                 buffer.push((path.clone(), trim_start(line.to_owned()), idx))
                             }
                         }
@@ -169,7 +169,7 @@ impl TreePath {
             }
             Self::Folder { tree: Some(tree), .. } => {
                 for tree_path in tree {
-                    tree_path.search_in_files(pattern, buffer);
+                    tree_path.search_in_files(Arc::clone(&pattern), buffer);
                 }
             }
             _ => (),
