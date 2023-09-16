@@ -4,7 +4,7 @@ use lsp_types::{
     notification::{Notification, PublishDiagnostics},
     DiagnosticSeverity, PublishDiagnosticsParams,
 };
-use serde_json::{from_str, from_value, Value};
+use serde_json::{from_value, Value};
 use tokio::process::ChildStdin;
 
 #[derive(Debug)]
@@ -13,53 +13,47 @@ pub enum LSPMessage {
     Response(Response),
     Notification(GeneralNotification),
     Diagnostic(PathBuf, Diagnostic),
+    Unknown(Value),
 }
 
 impl LSPMessage {
-    pub fn parse(lsp_message: &str) -> Option<LSPMessage> {
-        if let Some(json_start) = lsp_message.find('{') {
-            if let Ok(mut obj) = from_str::<serde_json::Value>(&lsp_message[json_start..]) {
-                if let Some(id) = obj.get_mut("id") {
-                    let id = id.take();
-                    if let Some(result) = &mut obj.get_mut("result") {
-                        return Some(LSPMessage::Response(Response {
-                            id: id.as_i64()?,
-                            error: None,
-                            result: Some(result.take()),
-                        }));
-                    }
-                    if let Some(error) = obj.get_mut("error") {
-                        return Some(LSPMessage::Response(Response {
-                            id: id.as_i64()?,
-                            result: None,
-                            error: Some(error.take()),
-                        }));
-                    }
-                    if let Some(method) = obj.get_mut("method") {
-                        return Some(LSPMessage::Request(Request {
-                            id: id.to_string(),
-                            method: method.to_string(),
-                            params: obj.get_mut("params").map(|p| p.take()),
-                        }));
-                    }
-                }
-                if let Some(method) = obj.get("method") {
-                    if method == PublishDiagnostics::METHOD {
-                        let params = obj.get_mut("params").map(|p| p.take())?;
-                        let diagnostics = from_value::<PublishDiagnosticsParams>(params).ok()?;
-                        return Some(LSPMessage::Diagnostic(
-                            diagnostics.uri.as_str()[7..].into(),
-                            Diagnostic::new(diagnostics),
-                        ));
-                    }
-                    return Some(LSPMessage::Notification(GeneralNotification {
-                        method: method.to_string(),
-                        params: obj.get_mut("params").map(|p| p.take()),
-                    }));
-                }
+    pub fn parse(mut obj: Value) -> LSPMessage {
+        if let Some(id) = obj.get_mut("id") {
+            let id = id.take();
+            if let Some(result) = &mut obj.get_mut("result") {
+                return LSPMessage::Response(Response {
+                    id: id.as_i64().unwrap(),
+                    error: None,
+                    result: Some(result.take()),
+                });
             }
+            if let Some(error) = obj.get_mut("error") {
+                return LSPMessage::Response(Response {
+                    id: id.as_i64().unwrap(),
+                    result: None,
+                    error: Some(error.take()),
+                });
+            }
+            if let Some(method) = obj.get_mut("method") {
+                return LSPMessage::Request(Request {
+                    id: id.to_string(),
+                    method: method.to_string(),
+                    params: obj.get_mut("params").map(|p| p.take()),
+                });
+            }
+        }
+        if let Some(method) = obj.get("method") {
+            if method == PublishDiagnostics::METHOD {
+                let params = obj.get_mut("params").map(|p| p.take()).unwrap();
+                let diagnostics = from_value::<PublishDiagnosticsParams>(params).unwrap();
+                return LSPMessage::Diagnostic(diagnostics.uri.as_str()[7..].into(), Diagnostic::new(diagnostics));
+            }
+            return LSPMessage::Notification(GeneralNotification {
+                method: method.to_string(),
+                params: obj.get_mut("params").map(|p| p.take()),
+            });
         };
-        None
+        LSPMessage::Unknown(obj)
     }
 }
 

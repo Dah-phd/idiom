@@ -197,6 +197,7 @@ pub enum GeneralAction {
     Shrink,
     Expand,
     FinishOrSelect,
+    SelectOpenEditor,
     SaveAll,
     FileTreeModeOrCancelInput,
     NewFile,
@@ -221,6 +222,7 @@ pub struct GeneralUserKeyMap {
     shrink_path: String,
     expand_file_tree_or_open_file: String,
     finish_or_select: String,
+    select_open_editor: String,
     save_all: String,
     file_tree_mod_or_cancel_input: String,
     new_file: String,
@@ -245,6 +247,7 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
         insert_key_event(&mut hash, &val.shrink_path, GeneralAction::Shrink);
         insert_key_event(&mut hash, &val.expand_file_tree_or_open_file, GeneralAction::Expand);
         insert_key_event(&mut hash, &val.finish_or_select, GeneralAction::FinishOrSelect);
+        insert_key_event(&mut hash, &val.select_open_editor, GeneralAction::SelectOpenEditor);
         insert_key_event(&mut hash, &val.save_all, GeneralAction::SaveAll);
         insert_key_event(&mut hash, &val.file_tree_mod_or_cancel_input, GeneralAction::FileTreeModeOrCancelInput);
         insert_key_event(&mut hash, &val.new_file, GeneralAction::NewFile);
@@ -271,6 +274,7 @@ impl Default for GeneralUserKeyMap {
             shrink_path: format!("{LEFT} || d || D"),
             expand_file_tree_or_open_file: format!("{RIGHT} || d || D"),
             finish_or_select: String::from(ENTER),
+            select_open_editor: format!("{CTRL} && {UP} || {CTRL} && {DOWN}"),
             save_all: format!("{CTRL} && s"),
             file_tree_mod_or_cancel_input: String::from(ESC),
             new_file: format!("{CTRL} && n"),

@@ -150,6 +150,27 @@ impl TreePath {
         None
     }
 
+    pub fn shallow_copy(&self) -> Self {
+        match self {
+            Self::File { .. } => self.clone(),
+            Self::Folder { path, display, .. } => {
+                Self::Folder { path: path.clone(), tree: None, display: display.clone() }
+            }
+        }
+    }
+
+    pub async fn search_tree_files(self, pattern: String) -> Vec<(PathBuf, String, usize)> {
+        let mut buffer = JoinSet::new();
+        self.search_in_files(pattern.into(), &mut buffer);
+        let mut results = Vec::new();
+        while let Some(result) = buffer.join_next().await {
+            if let Ok(result) = result {
+                results.extend(result)
+            }
+        }
+        results
+    }
+
     pub fn search_in_files(mut self, pattern: Arc<str>, buffer: &mut JoinSet<Vec<(PathBuf, String, usize)>>) {
         self.expand();
         match self {
@@ -174,6 +195,12 @@ impl TreePath {
             }
             _ => (),
         }
+    }
+
+    pub fn search_tree_paths(self, pattern: String) -> Vec<PathBuf> {
+        let mut buffer = Vec::new();
+        self.search_in_paths(pattern.as_str(), &mut buffer);
+        buffer
     }
 
     pub fn search_in_paths(mut self, pattern: &str, buffer: &mut Vec<PathBuf>) {

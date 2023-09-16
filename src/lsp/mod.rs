@@ -1,3 +1,4 @@
+mod json_stream;
 mod messages;
 mod notification;
 mod python;
@@ -9,8 +10,7 @@ use lsp_types::notification::{
     DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Exit, Initialized,
 };
 use lsp_types::request::{HoverRequest, Initialize, References, Shutdown, SignatureHelpRequest};
-pub use messages::LSPMessage;
-use request::LSPRequest;
+use serde_json::{from_value, Value};
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -20,21 +20,21 @@ use std::sync::{Arc, Mutex};
 use tokio::io::AsyncWriteExt;
 use tokio::process::{Child, ChildStdin, Command};
 use tokio::task::JoinHandle;
-use tokio_stream::StreamExt;
-use tokio_util::codec::{BytesCodec, FramedRead};
 
 use anyhow::{anyhow, Result};
 
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-    HoverParams, InitializedParams, PartialResultParams, Position, PublishDiagnosticsParams, ReferenceContext,
-    ReferenceParams, SignatureHelpParams, TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
-    TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
+    HoverParams, InitializeResult, InitializedParams, PartialResultParams, Position, PublishDiagnosticsParams,
+    ReferenceContext, ReferenceParams, SignatureHelpParams, TextDocumentContentChangeEvent, TextDocumentIdentifier,
+    TextDocumentItem, TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
 };
 
-use self::messages::done_auto_response;
-pub use self::messages::{Diagnostic, GeneralNotification, Request, Response};
-use self::notification::LSPNotification;
+use json_stream::JsonRpc;
+use messages::done_auto_response;
+pub use messages::{Diagnostic, GeneralNotification, LSPMessage, Request, Response};
+use notification::LSPNotification;
+use request::LSPRequest;
 
 #[derive(Debug)]
 #[allow(clippy::upper_case_acronyms)]
@@ -44,7 +44,8 @@ pub struct LSP {
     pub notifications: Arc<Mutex<Vec<GeneralNotification>>>,
     pub requests: Arc<tokio::sync::Mutex<Vec<Request>>>,
     pub diagnostics: Arc<Mutex<HashMap<PathBuf, Diagnostic>>>,
-    pub errs: Arc<Mutex<Vec<String>>>,
+    pub errs: Arc<Mutex<Vec<Value>>>,
+    pub initialized: InitializeResult,
     language: FileType,
     counter: usize,
     inner: Child,
@@ -65,41 +66,62 @@ impl LSP {
     async fn new(mut server: Command, language: FileType) -> Result<Self> {
         let mut inner = server.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::piped()).spawn()?;
 
-        let mut stdin = inner.stdin.take().unwrap();
-        let request = LSPRequest::<Initialize>::init_request()?;
-        let stderr = FramedRead::new(inner.stderr.take().unwrap(), BytesCodec::new());
-        let stdout = FramedRead::new(inner.stdout.take().unwrap(), BytesCodec::new());
-        let mut stream = stdout.chain(stderr);
+        // splitting subprocess
+        let mut json_rpc = JsonRpc::new(&mut inner)?;
+        let mut stdin = inner.stdin.take().ok_or(anyhow!("LSP stdin"))?;
+
+        // setting up storage
         let (responses, responses_handler) = split_arc_mutex(HashMap::new());
         let (notifications, notifications_handler) = split_arc_mutex(Vec::new());
         let (errs, errs_handler) = split_arc_mutex(Vec::new());
         let (requests, requests_handler) = split_arc_mutex_async(Vec::new());
         let (diagnostics, diagnostics_handler) = split_arc_mutex(HashMap::new());
+
+        // sending init requests
+        let _ = stdin.write(LSPRequest::<Initialize>::init_request()?.stringify()?.as_bytes()).await?;
+        stdin.flush().await?;
+        let mut msg = json_rpc.next().await?;
+        let initialized: InitializeResult = from_value(msg.get_mut("result").unwrap().take())?;
+
+        // starting response handler
         let handler = tokio::task::spawn(async move {
-            while let Some(Ok(msg)) = stream.next().await {
-                let lsp_message = String::from_utf8_lossy(&msg);
-                for msg in lsp_message.split("Content-Length") {
-                    if let Some(msg) = LSPMessage::parse(msg) {
-                        match msg {
-                            LSPMessage::Response(inner) => {
-                                into_guard(&responses_handler).insert(inner.id, inner);
-                            }
-                            LSPMessage::Notification(inner) => into_guard(&notifications_handler).push(inner),
-                            LSPMessage::Diagnostic(uri, params) => {
-                                into_guard(&diagnostics_handler).insert(uri, params);
-                            }
-                            LSPMessage::Request(inner) => requests_handler.lock().await.push(inner),
-                        }
-                    } else if !msg.is_empty() {
-                        into_guard(&errs_handler).push(msg.to_owned());
+            while let Ok(msg) = json_rpc.next().await {
+                match LSPMessage::parse(msg) {
+                    LSPMessage::Response(inner) => {
+                        into_guard(&responses_handler).insert(inner.id, inner);
                     }
+                    LSPMessage::Notification(inner) => into_guard(&notifications_handler).push(inner),
+                    LSPMessage::Diagnostic(uri, params) => {
+                        into_guard(&diagnostics_handler).insert(uri, params);
+                    }
+                    LSPMessage::Request(inner) => requests_handler.lock().await.push(inner),
+                    LSPMessage::Unknown(unknown) => into_guard(&errs_handler).push(unknown),
                 }
             }
         });
-        let ser_req = request.stringify()?;
-        let _ = stdin.write(ser_req.as_bytes()).await?;
-        stdin.flush().await?;
-        Ok(Self { responses, notifications, requests, diagnostics, errs, counter: 0, language, inner, handler, stdin })
+
+        let mut lsp = Self {
+            responses,
+            notifications,
+            requests,
+            diagnostics,
+            errs,
+            counter: 0,
+            language,
+            inner,
+            handler,
+            stdin,
+            initialized,
+        };
+
+        //initialized
+        lsp.initialized().await?;
+        Ok(lsp)
+    }
+
+    pub async fn restart(&mut self) -> Result<()> {
+        *self = Self::from(&self.language).await?;
+        Ok(())
     }
 
     pub fn is_live(&self) -> bool {
@@ -127,8 +149,8 @@ impl LSP {
         que.remove(&id)
     }
 
-    pub async fn initialized(&mut self) -> Option<()> {
-        self.notify::<Initialized>(LSPNotification::with(InitializedParams {})).await.ok()
+    async fn initialized(&mut self) -> Result<()> {
+        self.notify::<Initialized>(LSPNotification::with(InitializedParams {})).await
     }
 
     pub async fn file_did_open(&mut self, path: &PathBuf) -> Option<()> {

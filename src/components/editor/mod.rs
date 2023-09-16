@@ -56,6 +56,10 @@ impl EditorState {
         }
     }
 
+    pub fn tabs(&self) -> Vec<String> {
+        self.editors.iter().map(|editor| editor.path.display().to_string()).collect()
+    }
+
     pub async fn lsp_updates(&mut self) {
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get_mut(editor_id) {
@@ -79,15 +83,13 @@ impl EditorState {
             match lsp_servers.entry(opened_file.file_type) {
                 Entry::Vacant(entry) => {
                     if let Ok(mut lsp) = LSP::from(&opened_file.file_type).await {
-                        if let Some(..) = lsp.initialized().await {
-                            if let Some(..) = lsp.file_did_open(&opened_file.path).await {
-                                let lsp_rc = Rc::new(Mutex::new(lsp));
-                                opened_file.lsp = Some(Rc::clone(&lsp_rc));
-                                for opened_editor in self.editors.iter_mut() {
-                                    opened_editor.lsp = Some(Rc::clone(&lsp_rc))
-                                }
-                                entry.insert(lsp_rc);
+                        if let Some(..) = lsp.file_did_open(&opened_file.path).await {
+                            let lsp_rc = Rc::new(Mutex::new(lsp));
+                            opened_file.lsp = Some(Rc::clone(&lsp_rc));
+                            for opened_editor in self.editors.iter_mut() {
+                                opened_editor.lsp = Some(Rc::clone(&lsp_rc))
                             }
+                            entry.insert(lsp_rc);
                         }
                     }
                 }

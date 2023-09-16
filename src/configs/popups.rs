@@ -5,6 +5,7 @@ pub enum PopupMessage {
     CreateFileOrFolder(String),
     CreateFileOrFolderBase(String),
     Open((PathBuf, usize)),
+    ActivateEditor(usize),
     SelectPath(String),
     SelectTreeFiles(String),
     SelectOpenedFile(String),

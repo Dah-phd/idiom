@@ -6,7 +6,6 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
-use tokio::task::JoinSet;
 use tree_paths::TreePath;
 use tui::{
     backend::Backend,
@@ -167,24 +166,20 @@ impl Tree {
         Ok(())
     }
 
+    pub fn search_select_paths(&self, pattern: String) -> Vec<PathBuf> {
+        self.get_first_selected_folder().search_tree_paths(pattern)
+    }
+
     pub fn search_paths(&self, pattern: String) -> Vec<PathBuf> {
-        let tree = self.tree.clone();
-        let mut buffer = Vec::new();
-        tree.search_in_paths(pattern.as_str(), &mut buffer);
-        buffer
+        self.tree.shallow_copy().search_tree_paths(pattern)
+    }
+
+    pub async fn search_select_files(&self, pattern: String) -> Vec<(PathBuf, String, usize)> {
+        self.get_first_selected_folder().search_tree_files(pattern).await
     }
 
     pub async fn search_files(&self, pattern: String) -> Vec<(PathBuf, String, usize)> {
-        let tree = self.tree.clone();
-        let mut buffer = JoinSet::new();
-        tree.search_in_files(pattern.into(), &mut buffer);
-        let mut results = Vec::new();
-        while let Some(result) = buffer.join_next().await {
-            if let Ok(result) = result {
-                results.extend(result)
-            }
-        }
-        results
+        self.tree.shallow_copy().search_tree_files(pattern).await
     }
 
     pub fn select_by_path(&mut self, path: &PathBuf) {
@@ -196,7 +191,7 @@ impl Tree {
         }
     }
 
-    pub fn get_first_selected_folder(&self) -> String {
+    pub fn get_first_selected_folder_display(&self) -> String {
         if let Some(tree_path) = self.get_selected() {
             if tree_path.path().is_dir() {
                 return tree_path.path().as_path().display().to_string();
@@ -206,6 +201,18 @@ impl Tree {
             }
         }
         "./".to_owned()
+    }
+
+    fn get_first_selected_folder(&self) -> TreePath {
+        if let Some(tree_path) = self.get_selected() {
+            if tree_path.path().is_dir() {
+                return tree_path.shallow_copy();
+            }
+            if let Some(parent) = tree_path.path().parent() {
+                return PathBuf::from(parent).into();
+            }
+        }
+        PathBuf::from("./").into()
     }
 
     pub fn toggle(&mut self) {

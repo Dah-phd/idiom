@@ -1,11 +1,11 @@
 use crate::{
     components::{
-        popups::editor_popups::go_to_line_popup,
+        popups::editor_popups::{go_to_line_popup, select_editor_popup},
         popups::message,
         popups::{
-            editor_popups::{find_in_editor_popup, save_all_popup, select_editor_line},
+            editor_popups::{find_in_editor_popup, save_all_popup, select_line_popup},
             tree_popups::{
-                create_file_popup, find_paths_popup, rename_file_popup, select_file_popup, select_tree_file_popup,
+                create_file_popup, find_in_tree_popup, rename_file_popup, select_file_popup, select_tree_file_popup,
             },
         },
         EditorState, EditorTerminal, Tree,
@@ -77,6 +77,11 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             }
                             continue;
                         }
+                        PopupMessage::ActivateEditor(idx) => {
+                            editor_state.state.select(Some(idx));
+                            mode = mode.clear_popup();
+                            continue;
+                        }
                         PopupMessage::SelectPath(pattern) => {
                             mode = Mode::Select.popup(Box::new(select_file_popup(file_tree.search_paths(pattern))));
                             continue;
@@ -88,7 +93,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                         }
                         PopupMessage::SelectOpenedFile(pattern) => {
                             if let Some(editor) = editor_state.get_active() {
-                                mode = Mode::Insert.popup(Box::new(select_editor_line(editor.search_file(&pattern))));
+                                mode = Mode::Insert.popup(Box::new(select_line_popup(editor.search_file(&pattern))));
                             } else {
                                 mode = mode.clear_popup();
                             }
@@ -146,14 +151,17 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                         if matches!(mode, Mode::Insert) {
                             mode = mode.popup(Box::new(find_in_editor_popup()));
                         } else {
-                            mode = mode.popup(Box::new(find_paths_popup()));
+                            mode = mode.popup(Box::new(find_in_tree_popup()));
                         }
                     }
+                    GeneralAction::SelectOpenEditor => {
+                        mode = mode.popup(Box::new(select_editor_popup(editor_state.tabs())))
+                    }
                     GeneralAction::NewFile => {
-                        mode = mode.popup(Box::new(create_file_popup(file_tree.get_first_selected_folder())));
+                        mode = mode.popup(Box::new(create_file_popup(file_tree.get_first_selected_folder_display())));
                     }
                     GeneralAction::RenameFile => {
-                        mode = mode.popup(Box::new(rename_file_popup(file_tree.get_first_selected_folder())));
+                        mode = mode.popup(Box::new(rename_file_popup(file_tree.get_first_selected_folder_display())));
                     }
                     GeneralAction::Expand => {
                         if let Some(file_path) = file_tree.expand_dir_or_get_path() {

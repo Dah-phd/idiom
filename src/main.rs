@@ -6,8 +6,11 @@ mod syntax;
 mod utils;
 
 use app::app;
+use configs::FileType;
+use lsp::LSP;
 
 use std::path::{PathBuf, MAIN_SEPARATOR};
+use std::time::Duration;
 
 use anyhow::Result;
 use tui::backend::CrosstermBackend;
@@ -45,11 +48,21 @@ fn cli() -> Option<PathBuf> {
     None
 }
 
+async fn debug() {
+    let t = FileType::Rust;
+    let mut lsp = LSP::from(&t).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(3333)).await;
+    println!("{:?}", lsp.errs.lock());
+    panic!("\n\n\nend");
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    // debug().await;
     let out = std::io::stdout();
     let mut terminal = Terminal::new(CrosstermBackend::new(&out)).expect("should not fail!");
     prep(&mut terminal.backend_mut())?;
     app(&mut terminal, cli()).await?;
-    graceful_exit(&mut terminal.backend_mut())
+    graceful_exit(&mut terminal.backend_mut())?;
+    Ok(())
 }

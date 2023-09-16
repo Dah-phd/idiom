@@ -59,11 +59,21 @@ pub fn find_in_editor_popup() -> Popup {
     }
 }
 
-pub fn select_editor_line(options: Vec<(usize, String)>) -> PopupSelector<(usize, String)> {
+pub fn select_line_popup(options: Vec<(usize, String)>) -> PopupSelector<(usize, String)> {
     PopupSelector {
         options,
         display: |(_, line)| line.to_owned(),
         command: |popup| PopupMessage::GoToLine(popup.options[popup.state].0),
+        state: 0,
+        size: None,
+    }
+}
+
+pub fn select_editor_popup(options: Vec<String>) -> PopupSelector<String> {
+    PopupSelector {
+        options,
+        display: |editor| editor.to_owned(),
+        command: |popup| PopupMessage::ActivateEditor(popup.state),
         state: 0,
         size: None,
     }

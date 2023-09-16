@@ -41,7 +41,7 @@ pub fn rename_file_popup(path: String) -> Popup {
     }
 }
 
-pub fn find_paths_popup() -> Popup {
+pub fn find_in_tree_popup() -> Popup {
     Popup {
         message: String::new(),
         message_as_buffer_builder: Some(Some),

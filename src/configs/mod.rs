@@ -1,7 +1,7 @@
-mod files;
+mod keymap;
 mod popups;
 mod types;
-pub use files::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap};
+pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap};
 pub use types::{FileType, Mode};
 
 pub use popups::PopupMessage;
