@@ -60,16 +60,15 @@ impl JsonRpc {
     }
 
     pub fn update_expected_len(&mut self) -> Result<()> {
-        if self.msg.starts_with("Content-Length:") {
+        if self.msg.starts_with("Content-Length:") && self.msg.contains("\r\n\r\n") {
             let msg_len: String = self.msg.chars().take_while(is_end_of_line).filter(|c| c.is_numeric()).collect();
             self.expected_len = msg_len.parse()?;
             self.msg = self.msg.drain(..).skip_while(|c| c != &'{').collect();
+        } else if self.msg.is_empty() {
+            self.expected_len = 0; // remove expectation if no message is left
         }
-        if self.msg.is_empty() {
-            self.expected_len = 0;
-        }
-        if self.expected_len == 0 {
-            self.msg.clear();
+        if self.expected_len == 0 && !self.msg.starts_with('C') {
+            self.msg.clear(); // clear unexpected string junk
         }
         Ok(())
     }
