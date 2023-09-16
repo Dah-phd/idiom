@@ -54,7 +54,7 @@ impl JsonRpc {
     }
 
     pub fn produce_object(&mut self) -> Option<Value> {
-        if self.msg.len() < self.expected_len {
+        if self.msg.is_empty() || self.msg.len() < self.expected_len {
             return None;
         }
         let object: Value = from_str(&self.msg[..self.expected_len]).ok()?;
