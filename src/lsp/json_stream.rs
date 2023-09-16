@@ -26,6 +26,9 @@ impl JsonRpc {
     }
 
     pub async fn next(&mut self) -> Result<Value> {
+        if !self.parsed_objects.is_empty() {
+            return Ok(self.parsed_objects.remove(0)); // ensure all objects are sent
+        }
         while self.parsed_objects.is_empty() {
             match self.inner.next().await.ok_or(anyhow!("Finished!"))? {
                 Ok(result) => self.parse(result.into())?,
