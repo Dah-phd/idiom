@@ -21,7 +21,7 @@ pub fn create_file_popup(path: String) -> Popup {
         message_as_buffer_builder: Some(Some),
         title: Some(format!("New in {}", path)),
         buttons,
-        size: Some((20, 16)),
+        size: Some((40, 4)),
         state: 0,
     }
 }
@@ -36,7 +36,7 @@ pub fn rename_file_popup(path: String) -> Popup {
             name: format!("Rename: {path}"),
             key: None,
         }],
-        size: Some((20, 16)),
+        size: Some((40, 4)),
         state: 0,
     }
 }
@@ -58,7 +58,7 @@ pub fn find_in_tree_popup() -> Popup {
                 key: None,
             },
         ],
-        size: Some((20, 16)),
+        size: None,
         state: 0,
     }
 }
@@ -73,8 +73,8 @@ pub fn select_tree_file_popup(options: Vec<(PathBuf, String, usize)>) -> PopupSe
             }
             PopupMessage::Done
         },
-        state: 0,
         size: None,
+        state: 0,
     }
 }
 
@@ -88,7 +88,7 @@ pub fn select_file_popup(options: Vec<PathBuf>) -> PopupSelector<PathBuf> {
             }
             PopupMessage::Done
         },
-        state: 0,
         size: None,
+        state: 0,
     }
 }

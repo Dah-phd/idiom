@@ -1,4 +1,4 @@
-use tui::text::Span;
+use ratatui::text::Span;
 
 use super::Lexer;
 

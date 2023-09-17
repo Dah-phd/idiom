@@ -6,7 +6,7 @@ use crate::components::editor::CursorPosition;
 use crate::configs::FileType;
 use langs::Lang;
 use lsp_types::{DiagnosticSeverity, PublishDiagnosticsParams};
-use tui::{
+use ratatui::{
     style::{Color, Style},
     text::{Span, Spans},
     widgets::ListItem,

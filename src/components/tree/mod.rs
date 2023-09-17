@@ -2,18 +2,18 @@ mod tree_paths;
 use crate::configs::GeneralAction;
 use crate::utils::build_file_or_folder;
 use anyhow::Result;
-use std::{
-    path::PathBuf,
-    time::{Duration, Instant},
-};
-use tree_paths::TreePath;
-use tui::{
+use ratatui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     widgets::{Block, Borders, List, ListItem, ListState},
     Frame,
 };
+use std::{
+    path::PathBuf,
+    time::{Duration, Instant},
+};
+use tree_paths::TreePath;
 
 const TICK: Duration = Duration::from_millis(500);
 

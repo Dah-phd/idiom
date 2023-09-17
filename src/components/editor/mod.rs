@@ -1,18 +1,19 @@
 mod file;
+mod footer;
 use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType};
 use crate::lsp::LSP;
 use crossterm::event::KeyEvent;
 use file::Editor;
 pub use file::{CursorPosition, Offset};
+use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{ListState, Tabs};
+use ratatui::{backend::Backend, Frame};
 use std::collections::{hash_map::Entry, HashMap};
 use std::path::PathBuf;
 use std::rc::Rc;
 use tokio::sync::Mutex;
-use tui::layout::{Constraint, Layout, Rect};
-use tui::style::{Color, Modifier, Style};
-use tui::text::{Span, Spans};
-use tui::widgets::{ListState, Tabs};
-use tui::{backend::Backend, Frame};
 
 pub struct EditorState {
     pub editors: Vec<Editor>,
@@ -29,7 +30,7 @@ impl EditorState {
     }
 
     pub fn render(&mut self, frame: &mut Frame<impl Backend>, screen: Rect) {
-        let layout = Layout::default().constraints(vec![Constraint::Percentage(4), Constraint::Min(2)]).split(screen);
+        let layout = Layout::default().constraints([Constraint::Length(1), Constraint::Percentage(100)]).split(screen);
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get_mut(editor_id) {
                 file.set_max_rows(layout[1].bottom());
@@ -202,6 +203,6 @@ impl EditorState {
     }
 }
 
-fn try_file_to_tab(file: &Editor) -> Option<Spans> {
-    file.path.as_os_str().to_str().map(|t| Spans::from(Span::styled(t, Style::default().fg(Color::Green))))
+fn try_file_to_tab(file: &Editor) -> Option<Line> {
+    file.path.as_os_str().to_str().map(|t| Line::from(Span::styled(t, Style::default().fg(Color::Green))))
 }

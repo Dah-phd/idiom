@@ -1,16 +1,16 @@
 use crate::configs::GeneralAction;
 use anyhow::Result;
+use ratatui::backend::Backend;
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::text::Span;
+use ratatui::widgets::{List, ListItem};
+use ratatui::Frame;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use tokio::process::{Child, Command};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
-use tui::backend::Backend;
-use tui::layout::{Constraint, Direction, Layout, Rect};
-use tui::text::Span;
-use tui::widgets::{List, ListItem};
-use tui::Frame;
 
 #[derive(Debug)]
 pub struct EditorTerminal {

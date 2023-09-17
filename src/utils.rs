@@ -1,8 +1,8 @@
 use crate::components::editor::Offset;
 use anyhow::{anyhow, Result};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
-use tui::layout::{Constraint, Direction, Layout, Rect};
 
 pub fn trim_start_inplace(line: &mut String) -> Offset {
     if let Some(idx) = line.find(|c: char| !c.is_whitespace()) {
@@ -92,30 +92,25 @@ pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> Result<PathBuf> {
     Ok(path)
 }
 
-pub fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::default()
+pub fn centered_rect_static(h: u16, v: u16, rect: Rect) -> Rect {
+    let h_diff = rect.width.checked_sub(h).unwrap_or_default() / 2;
+    let v_diff = rect.height.checked_sub(v).unwrap_or_default() / 2;
+    let first_split = Layout::default()
         .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Percentage((100 - percent_y) / 2),
-                Constraint::Percentage(percent_y),
-                Constraint::Percentage((100 - percent_y) / 2),
-            ]
-            .as_ref(),
-        )
-        .split(r);
-
+        .constraints([
+            Constraint::Length(v_diff),
+            Constraint::Min(v),
+            Constraint::Length(v_diff),
+        ])
+        .split(rect);
     Layout::default()
         .direction(Direction::Horizontal)
-        .constraints(
-            [
-                Constraint::Percentage((100 - percent_x) / 2),
-                Constraint::Percentage(percent_x),
-                Constraint::Percentage((100 - percent_x) / 2),
-            ]
-            .as_ref(),
-        )
-        .split(popup_layout[1])[1]
+        .constraints([
+            Constraint::Length(h_diff),
+            Constraint::Min(h),
+            Constraint::Length(h_diff),
+        ])
+        .split(first_split[1])[1]
 }
 
 pub fn find_code_blocks(buffer: &mut Vec<(usize, String)>, content: &[String], pattern: &str) {

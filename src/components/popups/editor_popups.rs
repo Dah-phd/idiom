@@ -19,7 +19,7 @@ pub fn save_all_popup() -> Popup {
                 key: Some(vec![KeyCode::Char('n'), KeyCode::Char('N')]),
             },
         ],
-        size: Some((40, 20)),
+        size: Some((40, 4)),
         state: 0,
     }
 }
@@ -39,7 +39,7 @@ pub fn go_to_line_popup() -> Popup {
             name: "GO".into(),
             key: None,
         }],
-        size: Some((20, 16)),
+        size: Some((30, 4)),
         state: 0,
     }
 }
@@ -54,7 +54,7 @@ pub fn find_in_editor_popup() -> Popup {
             name: "Search".to_owned(),
             key: None,
         }],
-        size: Some((20, 16)),
+        size: Some((40, 4)),
         state: 0,
     }
 }

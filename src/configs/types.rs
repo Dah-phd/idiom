@@ -1,5 +1,5 @@
 use crossterm::event::KeyEvent;
-use tui::{backend::CrosstermBackend, Frame};
+use ratatui::{backend::CrosstermBackend, Frame};
 
 use crate::components::popups::PopupInterface;
 use std::{io::Stdout, path::PathBuf};

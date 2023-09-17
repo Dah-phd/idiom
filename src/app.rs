@@ -14,10 +14,10 @@ use crate::{
 };
 use anyhow::Result;
 use crossterm::event::Event;
+use ratatui::{backend::CrosstermBackend, Terminal};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use std::{collections::HashMap, io::Stdout};
-use tui::{backend::CrosstermBackend, Terminal};
 
 const TICK: Duration = Duration::from_millis(100);
 

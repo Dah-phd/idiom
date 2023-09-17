@@ -2,13 +2,13 @@ use std::io::Stdout;
 
 use super::PopupInterface;
 use crate::configs::PopupMessage;
-use crate::utils::centered_rect;
+use crate::utils::centered_rect_static;
 use crossterm::event::{KeyCode, KeyEvent};
-use tui::{
+use ratatui::{
     backend::CrosstermBackend,
     layout::{Alignment, Constraint, Layout},
     style::{Modifier, Style},
-    text::{Span, Spans},
+    text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
     Frame,
 };
@@ -25,8 +25,8 @@ pub struct Popup {
 impl PopupInterface for Popup {
     fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>) {
         let block = Block::default().title(self.title()).borders(Borders::ALL);
-        let (percent_x, percent_y) = self.size.unwrap_or((60, 20));
-        let area = centered_rect(percent_x, percent_y, frame.size());
+        let (h, v) = self.size.unwrap_or((40, 6));
+        let area = centered_rect_static(h, v, frame.size());
         frame.render_widget(Clear, area);
         frame.render_widget(block, area);
 
@@ -40,13 +40,12 @@ impl PopupInterface for Popup {
         frame.render_widget(self.spans_from_buttons(), chunks[1]);
     }
 
-    fn map(&mut self, key: &KeyEvent) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent) -> PopupMessage {
         if let Some(button) =
             self.buttons.iter().find(|button| matches!(&button.key, Some(key_code) if key_code.contains(&key.code)))
         {
             return (button.command)(self);
         }
-
         match key.code {
             KeyCode::Char(ch) if self.message_as_buffer_builder.is_some() => {
                 if let Some(buffer_builder) = self.message_as_buffer_builder {
@@ -88,7 +87,7 @@ impl Popup {
         if self.message_as_buffer_builder.is_none() {
             return Paragraph::new(Span::from(self.message.to_owned())).alignment(Alignment::Center);
         }
-        Paragraph::new(Spans::from(vec![
+        Paragraph::new(Line::from(vec![
             Span::raw(" >> "),
             Span::raw(self.message.to_owned()),
             Span::styled("|", Style::default().add_modifier(Modifier::SLOW_BLINK)),
@@ -103,7 +102,7 @@ impl Popup {
     }
 
     fn spans_from_buttons(&self) -> Paragraph<'_> {
-        Paragraph::new(Spans::from(
+        Paragraph::new(Line::from(
             self.buttons
                 .iter()
                 .enumerate()
@@ -131,8 +130,8 @@ pub struct PopupSelector<T> {
 
 impl<T> PopupInterface for PopupSelector<T> {
     fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>) {
-        let (percent_x, percent_y) = self.size.unwrap_or((60, 40));
-        let area = centered_rect(percent_x, percent_y, frame.size());
+        let (h, v) = self.size.unwrap_or((120, 20));
+        let area = centered_rect_static(h, v, frame.size());
         frame.render_widget(Clear, area);
 
         let mut state = ListState::default();
@@ -148,7 +147,7 @@ impl<T> PopupInterface for PopupSelector<T> {
         frame.render_stateful_widget(list, area, &mut state);
     }
 
-    fn map(&mut self, key: &KeyEvent) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent) -> PopupMessage {
         if self.options.is_empty() {
             return PopupMessage::Done;
         }

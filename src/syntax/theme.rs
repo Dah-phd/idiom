@@ -1,5 +1,5 @@
+use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
-use tui::style::Color;
 
 use crate::configs::load_or_create_config;
 

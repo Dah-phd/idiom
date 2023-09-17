@@ -2,8 +2,8 @@ mod action;
 mod clipboard;
 mod select;
 use clipboard::Clipboard;
+use ratatui::widgets::{List, ListItem};
 pub use select::{CursorPosition, Offset, Select};
-use tui::widgets::{List, ListItem};
 
 use crate::{
     configs::{EditorConfigs, FileType},
