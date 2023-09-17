@@ -175,7 +175,9 @@ impl Tree {
     }
 
     pub async fn search_select_files(&self, pattern: String) -> Vec<(PathBuf, String, usize)> {
-        self.get_first_selected_folder().search_tree_files(pattern).await
+        if let Some(tree_path) = self.get_selected() { tree_path.shallow_copy() } else { PathBuf::from("./").into() }
+            .search_tree_files(pattern)
+            .await
     }
 
     pub async fn search_files(&self, pattern: String) -> Vec<(PathBuf, String, usize)> {

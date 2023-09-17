@@ -83,10 +83,20 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             continue;
                         }
                         PopupMessage::SelectPath(pattern) => {
+                            mode =
+                                Mode::Select.popup(Box::new(select_file_popup(file_tree.search_select_paths(pattern))));
+                            continue;
+                        }
+                        PopupMessage::SelectPathFull(pattern) => {
                             mode = Mode::Select.popup(Box::new(select_file_popup(file_tree.search_paths(pattern))));
                             continue;
                         }
                         PopupMessage::SelectTreeFiles(pattern) => {
+                            mode = Mode::Select
+                                .popup(Box::new(select_tree_file_popup(file_tree.search_select_files(pattern).await)));
+                            continue;
+                        }
+                        PopupMessage::SelectTreeFilesFull(pattern) => {
                             mode = Mode::Select
                                 .popup(Box::new(select_tree_file_popup(file_tree.search_files(pattern).await)));
                             continue;

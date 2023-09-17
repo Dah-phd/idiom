@@ -49,16 +49,26 @@ pub fn find_in_tree_popup() -> Popup {
         buttons: vec![
             Button {
                 command: |popup| PopupMessage::SelectPath(popup.message.to_owned()),
-                name: "Search paths".to_owned(),
+                name: "Paths".to_owned(),
                 key: None,
             },
             Button {
                 command: |popup| PopupMessage::SelectTreeFiles(popup.message.to_owned()),
-                name: "Search files".to_owned(),
+                name: "Files".to_owned(),
+                key: None,
+            },
+            Button {
+                command: |popup| PopupMessage::SelectPathFull(popup.message.to_owned()),
+                name: "All paths".to_owned(),
+                key: None,
+            },
+            Button {
+                command: |popup| PopupMessage::SelectTreeFilesFull(popup.message.to_owned()),
+                name: "All files".to_owned(),
                 key: None,
             },
         ],
-        size: None,
+        size: Some((65, 4)),
         state: 0,
     }
 }
