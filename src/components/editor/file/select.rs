@@ -197,6 +197,15 @@ impl Select {
             }
         }
     }
+
+    pub fn len(&self, content: &[String]) -> usize {
+        if let Some((from, to)) = self.get() {
+            if from.line == to.line {
+                return content[from.line][from.char..to.char].len();
+            };
+        }
+        0
+    }
 }
 
 fn clip_content(from: &CursorPosition, to: &CursorPosition, content: &mut Vec<String>) -> String {

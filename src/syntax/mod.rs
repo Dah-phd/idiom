@@ -8,7 +8,7 @@ use langs::Lang;
 use lsp_types::{DiagnosticSeverity, PublishDiagnosticsParams};
 use ratatui::{
     style::{Color, Style},
-    text::{Span, Spans},
+    text::{Line, Span},
     widgets::ListItem,
 };
 pub const COLORS: [Color; 3] = [Color::LightMagenta, Color::Yellow, Color::Blue];
@@ -148,7 +148,7 @@ impl Lexer {
                 }
             }
         }
-        ListItem::new(Spans::from(spans))
+        ListItem::new(Line::from(spans))
     }
 
     fn white_char(&mut self, idx: usize, ch: char, spans: &mut Vec<Span>) {

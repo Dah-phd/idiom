@@ -8,7 +8,7 @@ use crate::{
                 create_file_popup, find_in_tree_popup, rename_file_popup, select_file_popup, select_tree_file_popup,
             },
         },
-        EditorState, EditorTerminal, Tree,
+        EditorState, EditorTerminal, Footer, Tree,
     },
     configs::{GeneralAction, KeyMap, Mode, PopupMessage},
 };
@@ -27,6 +27,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
     let mut clock = Instant::now();
     let mut file_tree = Tree::new(open_file.is_none());
     let mut editor_state = EditorState::new(configs.editor_key_map());
+    let mut footer = Footer::default();
     let mut general_key_map = configs.general_key_map();
     let mut tmux = EditorTerminal::new();
     let mut lsp_servers = HashMap::new();
@@ -47,7 +48,8 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
             let mut screen = frame.size();
             screen = file_tree.render_with_remainder(frame, screen);
             screen = tmux.render_with_remainder(frame, screen);
-            editor_state.render(frame, screen);
+            screen = editor_state.render_with_remainder(frame, screen);
+            footer.render(frame, screen, editor_state.get_stats());
             mode.render_popup_if_exists(frame);
         })?;
 

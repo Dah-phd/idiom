@@ -1,5 +1,4 @@
 mod file;
-mod footer;
 use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType};
 use crate::lsp::LSP;
 use crossterm::event::KeyEvent;
@@ -29,8 +28,14 @@ impl EditorState {
         Self { editors: Vec::default(), state: ListState::default(), base_config: EditorConfigs::new(), key_map }
     }
 
-    pub fn render(&mut self, frame: &mut Frame<impl Backend>, screen: Rect) {
-        let layout = Layout::default().constraints([Constraint::Length(1), Constraint::Percentage(100)]).split(screen);
+    pub fn render_with_remainder(&mut self, frame: &mut Frame<impl Backend>, screen: Rect) -> Rect {
+        let layout = Layout::default()
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(screen.height.checked_sub(3).unwrap_or_default()),
+                Constraint::Length(1),
+            ])
+            .split(screen);
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get_mut(editor_id) {
                 file.set_max_rows(layout[1].bottom());
@@ -55,6 +60,57 @@ impl EditorState {
                 frame.render_widget(tabs, layout[0]);
             }
         }
+        layout[2]
+    }
+
+    pub async fn map(&mut self, key: &KeyEvent) -> bool {
+        let action = self.key_map.map(key);
+        if let Some(editor) = self.get_active() {
+            if let Some(action) = action {
+                match action {
+                    EditorAction::Char(ch) => editor.push(ch),
+                    EditorAction::NewLine => editor.new_line(),
+                    EditorAction::Indent => editor.indent(),
+                    EditorAction::Backspace => editor.backspace(),
+                    EditorAction::Delete => editor.del(),
+                    EditorAction::IndentStart => editor.indent_start(),
+                    EditorAction::Unintent => editor.unindent(),
+                    EditorAction::Up => editor.up(),
+                    EditorAction::Down => editor.down(),
+                    EditorAction::Left => editor.left(),
+                    EditorAction::Right => editor.right(),
+                    EditorAction::SelectUp => editor.select_up(),
+                    EditorAction::SelectDown => editor.select_down(),
+                    EditorAction::SelectLeft => editor.select_left(),
+                    EditorAction::SelectRight => editor.select_right(),
+                    EditorAction::ScrollUp => editor.scroll_up(),
+                    EditorAction::ScrollDown => editor.scroll_down(),
+                    EditorAction::SwapUp => editor.swap_up(),
+                    EditorAction::SwapDown => editor.swap_down(),
+                    EditorAction::JumpLeft => editor.jump_left(),
+                    EditorAction::JumpLeftSelect => editor.jump_left_select(),
+                    EditorAction::JumpRight => editor.jump_right(),
+                    EditorAction::JumpRightSelect => editor.jump_right_select(),
+                    EditorAction::EndOfLine => editor.end_of_line(),
+                    EditorAction::EndOfFile => editor.end_of_file(),
+                    EditorAction::StartOfLine => editor.start_of_line(),
+                    EditorAction::StartOfFile => editor.start_of_file(),
+                    EditorAction::Cut => editor.cut(),
+                    EditorAction::Copy => editor.copy(),
+                    EditorAction::Paste => editor.paste(),
+                    EditorAction::Undo => editor.undo(),
+                    EditorAction::Redo => editor.redo(),
+                    EditorAction::Save => editor.save().await,
+                    EditorAction::Close => self.close_active().await,
+                }
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn get_stats(&self) -> Option<(usize, &CursorPosition)> {
+        self.editors.get(self.state.selected()?).map(|editor| editor.get_stats())
     }
 
     pub fn tabs(&self) -> Vec<String> {
@@ -109,52 +165,6 @@ impl EditorState {
         if let Some(editor) = self.get_active() {
             editor.go_to(line);
         }
-    }
-
-    pub async fn map(&mut self, key: &KeyEvent) -> bool {
-        let action = self.key_map.map(key);
-        if let Some(editor) = self.get_active() {
-            if let Some(action) = action {
-                match action {
-                    EditorAction::Char(ch) => editor.push(ch),
-                    EditorAction::NewLine => editor.new_line(),
-                    EditorAction::Indent => editor.indent(),
-                    EditorAction::Backspace => editor.backspace(),
-                    EditorAction::Delete => editor.del(),
-                    EditorAction::IndentStart => editor.indent_start(),
-                    EditorAction::Unintent => editor.unindent(),
-                    EditorAction::Up => editor.up(),
-                    EditorAction::Down => editor.down(),
-                    EditorAction::Left => editor.left(),
-                    EditorAction::Right => editor.right(),
-                    EditorAction::SelectUp => editor.select_up(),
-                    EditorAction::SelectDown => editor.select_down(),
-                    EditorAction::SelectLeft => editor.select_left(),
-                    EditorAction::SelectRight => editor.select_right(),
-                    EditorAction::ScrollUp => editor.scroll_up(),
-                    EditorAction::ScrollDown => editor.scroll_down(),
-                    EditorAction::SwapUp => editor.swap_up(),
-                    EditorAction::SwapDown => editor.swap_down(),
-                    EditorAction::JumpLeft => editor.jump_left(),
-                    EditorAction::JumpLeftSelect => editor.jump_left_select(),
-                    EditorAction::JumpRight => editor.jump_right(),
-                    EditorAction::JumpRightSelect => editor.jump_right_select(),
-                    EditorAction::EndOfLine => editor.end_of_line(),
-                    EditorAction::EndOfFile => editor.end_of_file(),
-                    EditorAction::StartOfLine => editor.start_of_line(),
-                    EditorAction::StartOfFile => editor.start_of_file(),
-                    EditorAction::Cut => editor.cut(),
-                    EditorAction::Copy => editor.copy(),
-                    EditorAction::Paste => editor.paste(),
-                    EditorAction::Undo => editor.undo(),
-                    EditorAction::Redo => editor.redo(),
-                    EditorAction::Save => editor.save().await,
-                    EditorAction::Close => self.close_active().await,
-                }
-                return true;
-            }
-        }
-        false
     }
 
     async fn close_active(&mut self) {

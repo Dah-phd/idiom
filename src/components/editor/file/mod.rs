@@ -24,9 +24,9 @@ pub struct Editor {
     pub file_type: FileType,
     pub path: PathBuf,
     pub at_line: usize,
+    select: Select,
     linter: Lexer,
     configs: EditorConfigs,
-    select: Select,
     clipboard: Clipboard,
     action_logger: ActionLogger,
     max_rows: usize,
@@ -67,6 +67,10 @@ impl Editor {
                 .collect::<Vec<ListItem>>(),
         );
         (max_digits, editor_content)
+    }
+
+    pub fn get_stats(&self) -> (usize, &CursorPosition) {
+        (self.select.len(&self.content), &self.cursor)
     }
 
     pub fn get_diagnostics(&mut self) {
