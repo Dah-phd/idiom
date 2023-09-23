@@ -1,7 +1,7 @@
-use crate::components::editor::CursorPosition;
+use crate::components::editor::DocStats;
 use ratatui::{
     backend::Backend,
-    layout::Rect,
+    layout::{Alignment, Rect},
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
@@ -23,26 +23,30 @@ impl Default for Footer {
 }
 
 impl Footer {
-    pub fn render(&mut self, frame: &mut Frame<impl Backend>, screen: Rect, stats: Option<(usize, &CursorPosition)>) {
+    pub fn render(&mut self, frame: &mut Frame<impl Backend>, screen: Rect, stats: Option<DocStats>) {
         let widget = self.widget_with_stats(stats);
         frame.render_widget(widget, screen);
     }
 
-    fn widget_with_stats(&mut self, stats: Option<(usize, &CursorPosition)>) -> Paragraph {
-        let line = if let Some((selected, cursor)) = stats {
-            if selected == 0 {
-                format!("{}    Ln {}, Col {}", self.get_message(), cursor.line, cursor.char)
-            } else {
-                format!("{}    Ln {}, Col {} ({} selected)", self.get_message(), cursor.line, cursor.char, selected)
+    fn widget_with_stats(&mut self, stats: Option<DocStats>) -> Paragraph {
+        let line = if let Some((doc_len, selected, cur)) = stats {
+            let msg = self.get_message();
+            match selected {
+                0 => format!("{msg}    Doc Len {doc_len}, Ln {}, Col {}", cur.line, cur.char),
+                _ => format!("{msg}    Doc Len {doc_len}, Ln {}, Col {} ({selected} selected)", cur.line, cur.char),
             }
         } else {
             String::from(self.get_message())
         };
-        Paragraph::new(line).alignment(ratatui::prelude::Alignment::Right).block(Block::default().borders(Borders::TOP))
+        Paragraph::new(line).alignment(Alignment::Right).block(Block::default().borders(Borders::TOP))
     }
 
     pub fn message(&mut self, message: String) {
-        self.message_que.push(message);
+        if self.message.is_empty() && self.message_que.is_empty() {
+            self.message = message;
+        } else {
+            self.message_que.push(message);
+        }
     }
 
     fn get_message(&mut self) -> &str {

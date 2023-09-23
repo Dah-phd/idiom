@@ -17,6 +17,10 @@ use tokio::sync::Mutex;
 
 use self::action::ActionLogger;
 
+type DocLen = usize;
+type SelectLen = usize;
+pub type DocStats<'a> = (DocLen, SelectLen, &'a CursorPosition);
+
 #[derive(Debug)]
 pub struct Editor {
     pub cursor: CursorPosition,
@@ -69,8 +73,8 @@ impl Editor {
         (max_digits, editor_content)
     }
 
-    pub fn get_stats(&self) -> (usize, &CursorPosition) {
-        (self.select.len(&self.content), &self.cursor)
+    pub fn get_stats(&self) -> DocStats {
+        (self.content.len(), self.select.len(&self.content), &self.cursor)
     }
 
     pub fn get_diagnostics(&mut self) {

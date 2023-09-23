@@ -3,7 +3,7 @@ use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType};
 use crate::lsp::LSP;
 use crossterm::event::KeyEvent;
 use file::Editor;
-pub use file::{CursorPosition, Offset};
+pub use file::{CursorPosition, DocStats, Offset};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -109,7 +109,7 @@ impl EditorState {
         false
     }
 
-    pub fn get_stats(&self) -> Option<(usize, &CursorPosition)> {
+    pub fn get_stats(&self) -> Option<DocStats> {
         self.editors.get(self.state.selected()?).map(|editor| editor.get_stats())
     }
 
@@ -180,7 +180,12 @@ impl EditorState {
     }
 
     pub fn close(&mut self, path: &PathBuf) {
-        self.editors.retain(|editor| !editor.path.starts_with(path) && &editor.path != path)
+        self.editors.retain(|editor| !editor.path.starts_with(path) && &editor.path != path);
+        match self.state.selected() {
+            _ if self.editors.is_empty() => self.state.select(None),
+            Some(select) if select >= self.editors.len() => self.state.select(Some(self.editors.len() - 1)),
+            _ => (),
+        };
     }
 
     pub fn are_updates_saved(&self) -> bool {

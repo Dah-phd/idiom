@@ -2,8 +2,9 @@ use crate::configs::GeneralAction;
 use anyhow::Result;
 use ratatui::backend::Backend;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::Stylize;
 use ratatui::text::Span;
-use ratatui::widgets::{List, ListItem};
+use ratatui::widgets::{Block, Borders, List, ListItem};
 use ratatui::Frame;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
@@ -33,8 +34,8 @@ impl EditorTerminal {
             .split(screen);
         let prompt = self.prompt();
         let mut list = self.get_list_widget();
-        list.push(ListItem::new(Span::from(prompt)));
-        frame.render_widget(List::new(list), screen_areas[1]);
+        list.push(ListItem::new(Span::from(prompt).bold()));
+        frame.render_widget(List::new(list).block(Block::default().borders(Borders::TOP)), screen_areas[1]);
         screen_areas[0]
     }
 

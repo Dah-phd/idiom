@@ -1,4 +1,8 @@
+use ignore::gitignore::Gitignore;
+use ignore::Match;
 use tokio::task::JoinSet;
+
+const GIT: &str = "./.git";
 
 use crate::utils::{get_nested_paths, trim_start};
 use std::{
@@ -16,10 +20,7 @@ pub enum TreePath {
 
 impl Default for TreePath {
     fn default() -> Self {
-        let path = PathBuf::from("./");
-        let mut tree_buffer = get_nested_paths(&path).map(|p| p.into()).collect::<Vec<Self>>();
-        tree_buffer.sort_by(order_tree_path);
-        Self::Folder { display: get_path_display(&path), path, tree: Some(tree_buffer) }
+        Self::clean_from("./")
     }
 }
 
@@ -35,22 +36,32 @@ impl From<PathBuf> for TreePath {
 }
 
 impl TreePath {
-    pub fn sync_flat_ptrs(&mut self, buffer: &mut Vec<*mut Self>, ignore_base_paths: &[PathBuf]) {
+    pub fn clean_from(path: &str) -> Self {
+        let path = PathBuf::from(path);
+        if !path.is_dir() {
+            return Self::File { display: get_path_display(&path), path };
+        }
+        let mut tree_buffer = get_nested_paths(&path)
+            .filter_map(|p| if p.starts_with(GIT) { None } else { Some(p.into()) })
+            .collect::<Vec<Self>>();
+        tree_buffer.sort_by(order_tree_path);
+        Self::Folder { display: get_path_display(&path), path, tree: Some(tree_buffer) }
+    }
+
+    pub fn sync_flat_ptrs(&mut self, buffer: &mut Vec<*mut Self>) {
         buffer.clear();
         if let Some(base_tree) = self.tree_mut() {
             for base_path in base_tree {
-                if !ignore_base_paths.contains(base_path.path()) {
-                    base_path.fill_flat_ptrs(buffer);
-                }
+                base_path.collect_flat_ptrs(buffer);
             }
         }
     }
 
-    fn fill_flat_ptrs(&mut self, buffer: &mut Vec<*mut Self>) {
+    fn collect_flat_ptrs(&mut self, buffer: &mut Vec<*mut Self>) {
         buffer.push(self);
         if let Some(tree) = self.tree_mut() {
             for tree_path in tree {
-                tree_path.fill_flat_ptrs(buffer);
+                tree_path.collect_flat_ptrs(buffer);
             }
         }
     }
@@ -90,22 +101,15 @@ impl TreePath {
         false
     }
 
+    pub fn sync_base(&mut self) {
+        if let Self::Folder { path, tree: Some(tree), .. } = self {
+            merge_trees(tree, get_nested_paths(path).filter(|p| !p.starts_with(GIT)).collect());
+        }
+    }
+
     pub fn sync(&mut self) {
         if let Self::Folder { path, tree: Some(tree), .. } = self {
-            let updated_tree = get_nested_paths(path).collect::<HashSet<_>>();
-            for path in updated_tree.iter() {
-                if !tree.iter().any(|tree_element| tree_element.path() == path) {
-                    tree.push(path.clone().into())
-                }
-            }
-            tree.retain_mut(|tree_path| {
-                if updated_tree.contains(tree_path.path()) {
-                    tree_path.sync();
-                    return true;
-                }
-                false
-            });
-            tree.sort_by(order_tree_path)
+            merge_trees(tree, get_nested_paths(path).collect());
         }
     }
 
@@ -161,7 +165,8 @@ impl TreePath {
 
     pub async fn search_tree_files(self, pattern: String) -> Vec<(PathBuf, String, usize)> {
         let mut buffer = JoinSet::new();
-        self.search_in_files(pattern.into(), &mut buffer);
+        let gitgnore = Gitignore::new("./.gitignore").0;
+        self.search_in_files(pattern.into(), &mut buffer, &gitgnore);
         let mut results = Vec::new();
         while let Some(result) = buffer.join_next().await {
             if let Ok(result) = result {
@@ -171,7 +176,16 @@ impl TreePath {
         results
     }
 
-    pub fn search_in_files(mut self, pattern: Arc<str>, buffer: &mut JoinSet<Vec<(PathBuf, String, usize)>>) {
+    pub fn search_in_files(
+        mut self,
+        pattern: Arc<str>,
+        buffer: &mut JoinSet<Vec<(PathBuf, String, usize)>>,
+        gitignore: &Gitignore,
+    ) {
+        let path = self.path();
+        if matches!(gitignore.matched(path, path.is_dir()), Match::Ignore(..)) {
+            return;
+        };
         self.expand();
         match self {
             Self::File { path, .. } => {
@@ -190,7 +204,10 @@ impl TreePath {
             }
             Self::Folder { tree: Some(tree), .. } => {
                 for tree_path in tree {
-                    tree_path.search_in_files(Arc::clone(&pattern), buffer);
+                    if tree_path.path().starts_with(GIT) {
+                        continue;
+                    }
+                    tree_path.search_in_files(Arc::clone(&pattern), buffer, gitignore);
                 }
             }
             _ => (),
@@ -199,11 +216,16 @@ impl TreePath {
 
     pub fn search_tree_paths(self, pattern: String) -> Vec<PathBuf> {
         let mut buffer = Vec::new();
-        self.search_in_paths(pattern.as_str(), &mut buffer);
+        let gitignore = Gitignore::new("./.gitignore").0;
+        self.search_in_paths(pattern.as_str(), &mut buffer, &gitignore);
         buffer
     }
 
-    pub fn search_in_paths(mut self, pattern: &str, buffer: &mut Vec<PathBuf>) {
+    pub fn search_in_paths(mut self, pattern: &str, buffer: &mut Vec<PathBuf>, gitignore: &Gitignore) {
+        let path = self.path();
+        if matches!(gitignore.matched(path, path.is_dir()), Match::Ignore(..)) {
+            return;
+        }
         self.expand();
         match self {
             Self::File { path, display } => {
@@ -221,7 +243,10 @@ impl TreePath {
                     }
                 } else if let Some(tree) = tree {
                     for tree_path in tree {
-                        tree_path.search_in_paths(pattern, buffer);
+                        if tree_path.path().starts_with(GIT) {
+                            continue;
+                        }
+                        tree_path.search_in_paths(pattern, buffer, gitignore);
                     }
                 }
             }
@@ -268,4 +293,20 @@ fn get_path_display(path: &Path) -> String {
         buffer.push_str("/..");
     }
     buffer
+}
+
+fn merge_trees(tree: &mut Vec<TreePath>, new_tree_set: HashSet<PathBuf>) {
+    for path in new_tree_set.iter() {
+        if !tree.iter().any(|tree_element| tree_element.path() == path) {
+            tree.push(path.clone().into())
+        }
+    }
+    tree.retain_mut(|tree_path| {
+        if new_tree_set.contains(tree_path.path()) {
+            tree_path.sync();
+            return true;
+        }
+        false
+    });
+    tree.sort_by(order_tree_path)
 }

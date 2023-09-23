@@ -15,26 +15,24 @@ use std::{
 };
 use tree_paths::TreePath;
 
-const TICK: Duration = Duration::from_millis(500);
+const TICK: Duration = Duration::from_secs(1);
 
 #[derive(Clone)]
 pub struct Tree {
+    pub on_open_tabs: bool,
     active: bool,
     state: ListState,
     selected_path: PathBuf,
     tree: TreePath,
     tree_ptrs: Vec<*mut TreePath>,
     clock: Instant,
-    ignore_base_paths: Vec<PathBuf>,
-    pub on_open_tabs: bool,
 }
 
 impl Tree {
     pub fn new(active: bool) -> Self {
-        let ignore_base_paths = vec![PathBuf::from("./.git")];
         let mut tree = TreePath::default();
         let mut tree_ptrs = Vec::new();
-        tree.sync_flat_ptrs(&mut tree_ptrs, &ignore_base_paths);
+        tree.sync_flat_ptrs(&mut tree_ptrs);
         Self {
             active,
             state: ListState::default(),
@@ -42,7 +40,6 @@ impl Tree {
             tree,
             tree_ptrs,
             clock: Instant::now(),
-            ignore_base_paths,
             on_open_tabs: false,
         }
     }
@@ -242,8 +239,8 @@ impl Tree {
     }
 
     fn force_sync(&mut self) {
-        self.tree.sync();
-        self.tree.sync_flat_ptrs(&mut self.tree_ptrs, &self.ignore_base_paths);
+        self.tree.sync_base();
+        self.tree.sync_flat_ptrs(&mut self.tree_ptrs);
         self.fix_select_by_path();
         self.clock = Instant::now();
     }
