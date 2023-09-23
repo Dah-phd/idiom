@@ -28,14 +28,8 @@ impl EditorState {
         Self { editors: Vec::default(), state: ListState::default(), base_config: EditorConfigs::new(), key_map }
     }
 
-    pub fn render_with_remainder(&mut self, frame: &mut Frame<impl Backend>, screen: Rect) -> Rect {
-        let layout = Layout::default()
-            .constraints([
-                Constraint::Length(1),
-                Constraint::Length(screen.height.checked_sub(3).unwrap_or_default()),
-                Constraint::Length(1),
-            ])
-            .split(screen);
+    pub fn render(&mut self, frame: &mut Frame<impl Backend>, screen: Rect) {
+        let layout = Layout::default().constraints([Constraint::Length(1), Constraint::default()]).split(screen);
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get_mut(editor_id) {
                 file.set_max_rows(layout[1].bottom());
@@ -60,7 +54,6 @@ impl EditorState {
                 frame.render_widget(tabs, layout[0]);
             }
         }
-        layout[2]
     }
 
     pub async fn map(&mut self, key: &KeyEvent) -> bool {

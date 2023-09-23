@@ -34,8 +34,6 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
     let mut footer = Footer::default();
     let mut tmux = EditorTerminal::new();
 
-    footer.message("test".to_owned());
-
     // CLI SETUP
     if let Some(path) = open_file {
         file_tree.select_by_path(&path);
@@ -52,9 +50,9 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
         terminal.draw(|frame| {
             let mut screen = frame.size();
             screen = file_tree.render_with_remainder(frame, screen);
+            screen = footer.render_with_remainder(frame, screen, editor_state.get_stats());
             screen = tmux.render_with_remainder(frame, screen);
-            screen = editor_state.render_with_remainder(frame, screen);
-            footer.render(frame, screen, editor_state.get_stats());
+            editor_state.render(frame, screen);
             mode.render_popup_if_exists(frame);
         })?;
 

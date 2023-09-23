@@ -1,7 +1,7 @@
 use crate::components::editor::DocStats;
 use ratatui::{
     backend::Backend,
-    layout::{Alignment, Rect},
+    layout::{Alignment, Constraint, Layout, Rect},
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
@@ -23,9 +23,21 @@ impl Default for Footer {
 }
 
 impl Footer {
-    pub fn render(&mut self, frame: &mut Frame<impl Backend>, screen: Rect, stats: Option<DocStats>) {
+    pub fn render_with_remainder(
+        &mut self,
+        frame: &mut Frame<impl Backend>,
+        screen: Rect,
+        stats: Option<DocStats>,
+    ) -> Rect {
         let widget = self.widget_with_stats(stats);
-        frame.render_widget(widget, screen);
+        let layout = Layout::default()
+            .constraints([
+                Constraint::Length(screen.height.checked_sub(2).unwrap_or_default()),
+                Constraint::Length(1),
+            ])
+            .split(screen);
+        frame.render_widget(widget, layout[1]);
+        layout[0]
     }
 
     fn widget_with_stats(&mut self, stats: Option<DocStats>) -> Paragraph {
