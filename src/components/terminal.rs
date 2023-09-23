@@ -63,6 +63,9 @@ impl EditorTerminal {
         }
         match general_action {
             GeneralAction::Char(ch) => self.cmd_buffer.push(*ch),
+            GeneralAction::BackspaceInput => {
+                self.cmd_buffer.pop();
+            }
             GeneralAction::ToggleTerminal | GeneralAction::FileTreeModeOrCancelInput | GeneralAction::Exit => {
                 self.active = false
             }

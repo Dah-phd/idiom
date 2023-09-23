@@ -192,6 +192,7 @@ impl Default for EditorUserKeyMap {
 #[derive(Debug, Clone, Copy)]
 pub enum GeneralAction {
     Char(char),
+    BackspaceInput,
     Up,
     Down,
     Shrink,
@@ -204,7 +205,6 @@ pub enum GeneralAction {
     RenameFile,
     DeleteFile,
     Find,
-    BackspaceTreeInput,
     Exit,
     HideFileTree,
     NextTab,
@@ -254,7 +254,7 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
         insert_key_event(&mut hash, &val.rename_file, GeneralAction::RenameFile);
         insert_key_event(&mut hash, &val.delete_file, GeneralAction::DeleteFile);
         insert_key_event(&mut hash, &val.find_in_tree, GeneralAction::Find);
-        insert_key_event(&mut hash, &val.backspace_tree_input, GeneralAction::BackspaceTreeInput);
+        insert_key_event(&mut hash, &val.backspace_tree_input, GeneralAction::BackspaceInput);
         insert_key_event(&mut hash, &val.exit, GeneralAction::Exit);
         insert_key_event(&mut hash, &val.hide_file_tree, GeneralAction::HideFileTree);
         insert_key_event(&mut hash, &val.next_tab, GeneralAction::NextTab);
