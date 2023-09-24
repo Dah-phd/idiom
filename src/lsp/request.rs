@@ -1,11 +1,17 @@
+use std::path::Path;
+
 use anyhow::{anyhow, Result};
 use lsp_types::{
-    request::Initialize, ClientCapabilities, HoverClientCapabilities, InitializeParams, MarkupKind,
-    ReferenceClientCapabilities, SignatureHelpClientCapabilities, TextDocumentClientCapabilities,
-    TextDocumentSyncClientCapabilities, Url, WorkspaceClientCapabilities, WorkspaceFolder,
+    request::{HoverRequest, Initialize, References, SignatureHelpRequest},
+    ClientCapabilities, HoverClientCapabilities, HoverParams, InitializeParams, MarkupKind, PartialResultParams,
+    Position, ReferenceClientCapabilities, ReferenceContext, ReferenceParams, SignatureHelpClientCapabilities,
+    SignatureHelpParams, TextDocumentClientCapabilities, TextDocumentIdentifier, TextDocumentPositionParams,
+    TextDocumentSyncClientCapabilities, Url, WorkDoneProgressParams, WorkspaceClientCapabilities, WorkspaceFolder,
 };
 use serde::Serialize;
 use serde_json::to_string;
+
+use super::as_url;
 
 #[derive(Serialize)]
 pub struct LSPRequest<T>
@@ -34,6 +40,48 @@ where
         let request_msg = to_string(self)?;
         let ser_req = format!("Content-Length: {}\r\n\r\n{}", request_msg.len(), request_msg);
         Ok(ser_req)
+    }
+
+    pub fn references(path: &Path, line: u32, char: u32) -> Option<LSPRequest<References>> {
+        Some(LSPRequest::with(
+            0,
+            ReferenceParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
+                    position: Position::new(line, char),
+                },
+                context: ReferenceContext { include_declaration: true },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            },
+        ))
+    }
+
+    pub fn signature_help(path: &Path, line: u32, char: u32) -> Option<LSPRequest<SignatureHelpRequest>> {
+        Some(LSPRequest::with(
+            0,
+            SignatureHelpParams {
+                context: None,
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
+                    position: Position::new(line, char),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            },
+        ))
+    }
+
+    pub fn hover(path: &Path, line: u32, char: u32) -> Option<LSPRequest<HoverRequest>> {
+        Some(LSPRequest::with(
+            0,
+            HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
+                    position: Position::new(line, char),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            },
+        ))
     }
 
     pub fn init_request() -> Result<LSPRequest<Initialize>> {

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use lsp_types::notification::Notification;
 use serde::Serialize;
 use serde_json::to_string;
 
@@ -19,7 +20,7 @@ where
     T::Params: serde::Serialize,
 {
     pub fn with(params: T::Params) -> Self {
-        Self { jsonrpc: String::from("2.0"), method: <T as lsp_types::notification::Notification>::METHOD, params }
+        Self { jsonrpc: String::from("2.0"), method: <T as Notification>::METHOD, params }
     }
 
     pub fn stringify(&self) -> Result<String> {

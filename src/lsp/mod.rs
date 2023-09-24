@@ -25,9 +25,8 @@ use anyhow::{anyhow, Result};
 
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-    HoverParams, InitializeResult, InitializedParams, PartialResultParams, Position, PublishDiagnosticsParams,
-    ReferenceContext, ReferenceParams, SignatureHelpParams, TextDocumentContentChangeEvent, TextDocumentIdentifier,
-    TextDocumentItem, TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
+    InitializeResult, InitializedParams, PublishDiagnosticsParams, TextDocumentContentChangeEvent,
+    TextDocumentIdentifier, TextDocumentItem, Url, VersionedTextDocumentIdentifier,
 };
 
 use json_stream::JsonRpc;
@@ -196,48 +195,15 @@ impl LSP {
     }
 
     pub async fn request_references(&mut self, path: &Path, line: u32, char: u32) -> Option<usize> {
-        let request: LSPRequest<References> = LSPRequest::with(
-            0,
-            ReferenceParams {
-                text_document_position: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path)?),
-                    position: Position::new(line, char),
-                },
-                context: ReferenceContext { include_declaration: true },
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: PartialResultParams::default(),
-            },
-        );
-        self.request(request).await
+        self.request(LSPRequest::<References>::references(path, line, char)?).await
     }
 
-    pub async fn request_hover(&mut self, path: &Path, line: u32, char: u32) -> Option<usize> {
-        let request: LSPRequest<HoverRequest> = LSPRequest::with(
-            self.counter,
-            HoverParams {
-                text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path)?),
-                    position: Position::new(line, char),
-                },
-                work_done_progress_params: WorkDoneProgressParams::default(),
-            },
-        );
-        self.request(request).await
+    pub async fn hover(&mut self, path: &Path, line: u32, char: u32) -> Option<usize> {
+        self.request(LSPRequest::<HoverRequest>::hover(path, line, char)?).await
     }
 
-    pub async fn request_signiture_help(&mut self, path: &Path, line: u32, char: u32) -> Option<usize> {
-        let request: LSPRequest<SignatureHelpRequest> = LSPRequest::with(
-            self.counter,
-            SignatureHelpParams {
-                context: None,
-                text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path)?),
-                    position: Position::new(line, char),
-                },
-                work_done_progress_params: WorkDoneProgressParams::default(),
-            },
-        );
-        self.request(request).await
+    pub async fn signiture_help(&mut self, path: &Path, line: u32, char: u32) -> Option<usize> {
+        self.request(LSPRequest::<SignatureHelpRequest>::signature_help(path, line, char)?).await
     }
 
     async fn request<T>(&mut self, mut request: LSPRequest<T>) -> Option<usize>

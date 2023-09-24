@@ -74,8 +74,8 @@ impl FileType {
     }
 }
 
-impl From<&FileType> for String {
-    fn from(value: &FileType) -> String {
+impl From<&FileType> for &'static str {
+    fn from(value: &FileType) -> Self {
         match value {
             FileType::Rust => "rust",
             FileType::Python => "python",
@@ -87,6 +87,12 @@ impl From<&FileType> for String {
             FileType::Toml => "toml",
             _ => "unknown",
         }
-        .to_owned()
+    }
+}
+
+impl From<&FileType> for String {
+    fn from(value: &FileType) -> String {
+        let string: &'static str = value.into();
+        string.to_owned()
     }
 }
