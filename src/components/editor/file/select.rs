@@ -1,5 +1,7 @@
 use std::ops::{Add, RangeInclusive, Sub};
 
+use lsp_types::Position;
+
 use super::action::ActionLogger;
 type CutContent = Option<(CursorPosition, CursorPosition, String)>;
 
@@ -7,6 +9,12 @@ type CutContent = Option<(CursorPosition, CursorPosition, String)>;
 pub struct CursorPosition {
     pub line: usize,
     pub char: usize,
+}
+
+impl From<&CursorPosition> for Position {
+    fn from(value: &CursorPosition) -> Self {
+        Position { line: value.line as u32, character: value.char as u32 }
+    }
 }
 
 impl From<(usize, usize)> for CursorPosition {

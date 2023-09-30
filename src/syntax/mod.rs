@@ -1,16 +1,24 @@
 mod langs;
+mod lsp_tokens;
+mod modal;
 mod rust;
 mod theme;
+use self::modal::{AutoComplete, LSPResponseType, Modal};
 pub use self::theme::{Theme, DEFAULT_THEME_FILE};
 use crate::components::editor::CursorPosition;
 use crate::configs::FileType;
+use crate::lsp::LSP;
 use langs::Lang;
 use lsp_types::{DiagnosticSeverity, PublishDiagnosticsParams};
 use ratatui::{
+    prelude::CrosstermBackend,
     style::{Color, Style},
     text::{Line, Span},
     widgets::ListItem,
+    Frame,
 };
+use std::{io::Stdout, path::Path, rc::Rc};
+use tokio::sync::Mutex;
 pub const COLORS: [Color; 3] = [Color::LightMagenta, Color::Yellow, Color::Blue];
 
 #[derive(Debug)]
@@ -18,6 +26,9 @@ pub struct Lexer {
     pub select: Option<(CursorPosition, CursorPosition)>,
     pub theme: Theme,
     pub diagnostics: Option<PublishDiagnosticsParams>,
+    pub lsp: Option<Rc<Mutex<LSP>>>,
+    modal: Option<AutoComplete>,
+    requests: Vec<LSPResponseType>,
     line_processor: fn(&mut Lexer, content: &str, spans: &mut Vec<Span>),
     lang: Lang,
     token_start: usize,
@@ -31,8 +42,17 @@ pub struct Lexer {
 }
 
 impl Lexer {
+    pub fn new(file_type: &FileType, theme: Theme, lsp: Rc<Mutex<LSP>>) -> Self {
+        let mut lexer = Self::from_type(file_type, theme);
+        lexer.lsp = Some(lsp);
+        lexer
+    }
+
     pub fn from_type(file_type: &FileType, theme: Theme) -> Self {
         Self {
+            lsp: None,
+            modal: None,
+            requests: Vec::new(),
             line_processor: derive_line_processor(file_type),
             lang: file_type.into(),
             diagnostics: None,
@@ -49,18 +69,87 @@ impl Lexer {
         }
     }
 
-    pub fn line_number_max_digits(&mut self, content: &[String]) -> usize {
-        self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
-        self.max_digits
-    }
-
-    pub fn set_select(&mut self, select: Option<(&CursorPosition, &CursorPosition)>) {
+    pub fn context(
+        &mut self,
+        content: &[String],
+        c: &CursorPosition,
+        select: Option<(&CursorPosition, &CursorPosition)>,
+        path: &Path,
+    ) -> usize {
+        self.get_diagnostics(path);
+        self.get_lsp_responses(c);
         self.curly.clear();
         self.brackets.clear();
         self.square.clear();
         self.last_key_words.clear();
-        self.select = select.map(|(from, to)| (*from, *to))
+        self.select = select.map(|(from, to)| (*from, *to));
+        self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
+        self.max_digits
     }
+
+    pub fn render_modal(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, x: u16, y: u16) {
+        if let Some(modal) = self.modal.as_mut() {
+            modal.render_at(frame, x, y);
+        }
+    }
+
+    fn get_diagnostics(&mut self, path: &Path) {
+        if let Some(lsp) = self.lsp.as_mut() {
+            if let Ok(guard) = lsp.try_lock() {
+                let diagnostics = guard.get_diagnostics(path);
+                if diagnostics.is_some() {
+                    self.diagnostics = diagnostics
+                }
+            }
+        }
+    }
+
+    pub async fn get_autocomplete(&mut self, path: &Path, c: &CursorPosition) {
+        if let Some(lsp) = self.lsp.as_mut() {
+            if let Ok(mut guard) = lsp.try_lock() {
+                if let Some(id) = guard.completion(path, c).await {
+                    self.requests.push(LSPResponseType::Completion(id));
+                }
+            }
+        }
+    }
+
+    pub async fn signiture_help(&mut self, path: &Path, c: &CursorPosition) {
+        if let Some(lsp) = self.lsp.as_mut() {
+            if let Ok(mut guard) = lsp.try_lock() {
+                if let Some(id) = guard.completion(path, c).await {
+                    self.requests.push(LSPResponseType::SignitureHelp(id));
+                };
+            }
+        }
+    }
+
+    fn get_lsp_responses(&mut self, c: &CursorPosition) {
+        if self.requests.is_empty() {
+            return;
+        }
+        if let Some(lsp) = self.lsp.as_mut() {
+            if let Ok(guard) = lsp.try_lock() {
+                if let Some(request) = self.requests.first() {
+                    if let Some(response) = guard.get(request.id()) {
+                        if let Some(value) = response.result {
+                            if let Ok(completions) = request.parse(value) {
+                                self.modal = Some(AutoComplete::new(c, completions));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // pub fn set_tokens(&mut self, response: Value) {
+    //     if let Ok(result) = from_value::<SemanticTokensResult>(response) {
+    //         if let SemanticTokensResult::Tokens(tokens) = result {
+    //             panic!("{:?}", &tokens.data[..4]);
+    //         }
+    //     }
+    // }
 
     fn set_select_char_range(&mut self, at_line: usize, max_len: usize) {
         if let Some((from, to)) = self.select {

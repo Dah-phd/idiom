@@ -60,6 +60,7 @@ pub enum EditorAction {
     EndOfFile,
     StartOfLine,
     StartOfFile,
+    Help,
     Cut,
     Copy,
     Paste,
@@ -98,6 +99,7 @@ pub struct EditorUserKeyMap {
     end_of_file: String,
     start_of_line: String,
     start_of_file: String,
+    help: String,
     cut: String,
     copy: String,
     paste: String,
@@ -136,6 +138,7 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
         insert_key_event(&mut hash, &val.end_of_file, EditorAction::EndOfFile);
         insert_key_event(&mut hash, &val.start_of_line, EditorAction::StartOfLine);
         insert_key_event(&mut hash, &val.start_of_file, EditorAction::StartOfFile);
+        insert_key_event(&mut hash, &val.help, EditorAction::Help);
         insert_key_event(&mut hash, &val.cut, EditorAction::Cut);
         insert_key_event(&mut hash, &val.copy, EditorAction::Copy);
         insert_key_event(&mut hash, &val.paste, EditorAction::Paste);
@@ -176,6 +179,7 @@ impl Default for EditorUserKeyMap {
             end_of_file: format!("{} && {}", CTRL, END),
             start_of_line: String::from(HOME),
             start_of_file: format!("{} && {}", CTRL, HOME),
+            help: format!("{}1", F),
             cut: format!("{} && {}", CTRL, 'x'),
             copy: format!("{} && {}", CTRL, 'c'),
             paste: format!("{} && {}", CTRL, 'v'),

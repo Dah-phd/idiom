@@ -67,24 +67,16 @@ pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> Result<PathBuf> {
         path.push(add);
         std::fs::create_dir_all(&path)?;
     } else {
-        if add.contains('/') {
-            let mut split: Vec<&str> = add.split('/').collect();
-            let file_name = split.pop();
-            let stem = split.join("/");
-            path.push(stem);
-            std::fs::create_dir_all(&path)?;
-            if let Some(file_name) = file_name {
-                path.push(file_name);
-                if path.exists() {
-                    return Err(anyhow!("File already exists!"));
-                }
-                std::fs::write(&path, "")?;
-            }
-        } else {
+        let mut split: Vec<&str> = add.split('/').collect();
+        let file_name = split.pop();
+        let stem = split.join("/");
+        path.push(stem);
+        std::fs::create_dir_all(&path)?;
+        if let Some(file_name) = file_name {
+            path.push(file_name);
             if path.exists() {
                 return Err(anyhow!("File already exists!"));
             }
-            path.push(add);
         }
         std::fs::write(&path, "")?;
     }

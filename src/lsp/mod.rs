@@ -4,12 +4,16 @@ mod notification;
 mod python;
 mod request;
 mod rust;
+use crate::components::editor::CursorPosition;
 use crate::configs::FileType;
 use crate::utils::{into_guard, split_arc_mutex, split_arc_mutex_async};
 use lsp_types::notification::{
     DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Exit, Initialized,
 };
-use lsp_types::request::{HoverRequest, Initialize, References, Shutdown, SignatureHelpRequest};
+use lsp_types::request::{
+    Completion, HoverRequest, Initialize, References, SemanticTokensFullRequest, SemanticTokensRangeRequest, Shutdown,
+    SignatureHelpRequest,
+};
 use serde_json::{from_value, Value};
 
 use std::collections::HashMap;
@@ -46,7 +50,7 @@ pub struct LSP {
     pub errs: Arc<Mutex<Vec<Value>>>,
     pub initialized: InitializeResult,
     language: FileType,
-    counter: usize,
+    counter: i64,
     inner: Child,
     handler: JoinHandle<()>,
     stdin: ChildStdin,
@@ -143,17 +147,17 @@ impl LSP {
         requests.retain(|_| keep.remove(0));
     }
 
-    pub fn get(&self, id: i64) -> Option<Response> {
+    pub fn get(&self, id: &i64) -> Option<Response> {
         let mut que = self.responses.try_lock().ok()?;
-        que.remove(&id)
+        que.remove(id)
     }
 
     async fn initialized(&mut self) -> Result<()> {
         self.notify::<Initialized>(LSPNotification::with(InitializedParams {})).await
     }
 
-    pub async fn file_did_open(&mut self, path: &PathBuf) -> Option<()> {
-        let content = std::fs::read_to_string(path).ok()?;
+    pub async fn file_did_open(&mut self, path: &PathBuf) -> Result<()> {
+        let content = std::fs::read_to_string(path)?;
         let notification: LSPNotification<DidOpenTextDocument> = LSPNotification::with(DidOpenTextDocumentParams {
             text_document: TextDocumentItem {
                 uri: as_url(path)?,
@@ -162,16 +166,16 @@ impl LSP {
                 text: content,
             },
         });
-        self.notify(notification).await.ok()
+        self.notify(notification).await
     }
 
-    pub async fn file_did_save(&mut self, path: &PathBuf) -> Option<()> {
-        let content = std::fs::read_to_string(path).ok()?;
+    pub async fn file_did_save(&mut self, path: &PathBuf) -> Result<()> {
+        let content = std::fs::read_to_string(path)?;
         let notification: LSPNotification<DidSaveTextDocument> = LSPNotification::with(DidSaveTextDocumentParams {
             text_document: TextDocumentIdentifier { uri: as_url(path)? },
             text: Some(content),
         });
-        self.notify(notification).await.ok()
+        self.notify(notification).await
     }
 
     pub async fn file_did_change(
@@ -179,34 +183,46 @@ impl LSP {
         path: &Path,
         version: i32,
         content_changes: Vec<TextDocumentContentChangeEvent>,
-    ) -> Option<()> {
+    ) -> Result<()> {
         let notification: LSPNotification<DidChangeTextDocument> = LSPNotification::with(DidChangeTextDocumentParams {
             text_document: VersionedTextDocumentIdentifier::new(as_url(path)?, version),
             content_changes,
         });
-        self.notify(notification).await.ok()
+        self.notify(notification).await
     }
 
-    pub async fn file_did_close(&mut self, path: &Path) -> Option<()> {
+    pub async fn file_did_close(&mut self, path: &Path) -> Result<()> {
         let notification: LSPNotification<DidCloseTextDocument> = LSPNotification::with(DidCloseTextDocumentParams {
             text_document: TextDocumentIdentifier { uri: as_url(path)? },
         });
-        self.notify(notification).await.ok()
+        self.notify(notification).await
     }
 
-    pub async fn request_references(&mut self, path: &Path, line: u32, char: u32) -> Option<usize> {
-        self.request(LSPRequest::<References>::references(path, line, char)?).await
+    pub async fn semantics(&mut self, path: &Path) -> Option<i64> {
+        self.request(LSPRequest::<SemanticTokensFullRequest>::semantics_full(path)?).await
     }
 
-    pub async fn hover(&mut self, path: &Path, line: u32, char: u32) -> Option<usize> {
-        self.request(LSPRequest::<HoverRequest>::hover(path, line, char)?).await
+    pub async fn semantic_range(&mut self, path: &Path, from: &CursorPosition, to: &CursorPosition) -> Option<i64> {
+        self.request(LSPRequest::<SemanticTokensRangeRequest>::semantics_range(path, from, to)?).await
     }
 
-    pub async fn signiture_help(&mut self, path: &Path, line: u32, char: u32) -> Option<usize> {
-        self.request(LSPRequest::<SignatureHelpRequest>::signature_help(path, line, char)?).await
+    pub async fn completion(&mut self, path: &Path, c: &CursorPosition) -> Option<i64> {
+        self.request(LSPRequest::<Completion>::completion(path, c)?).await
     }
 
-    async fn request<T>(&mut self, mut request: LSPRequest<T>) -> Option<usize>
+    pub async fn references(&mut self, path: &Path, c: &CursorPosition) -> Option<i64> {
+        self.request(LSPRequest::<References>::references(path, c)?).await
+    }
+
+    pub async fn hover(&mut self, path: &Path, c: &CursorPosition) -> Option<i64> {
+        self.request(LSPRequest::<HoverRequest>::hover(path, c)?).await
+    }
+
+    pub async fn signiture_help(&mut self, path: &Path, c: &CursorPosition) -> Option<i64> {
+        self.request(LSPRequest::<SignatureHelpRequest>::signature_help(path, c.line as u32, c.char as u32)?).await
+    }
+
+    async fn request<T>(&mut self, mut request: LSPRequest<T>) -> Option<i64>
     where
         T: lsp_types::request::Request,
         T::Params: serde::Serialize,
@@ -262,6 +278,6 @@ impl LSP {
     }
 }
 
-fn as_url(path: &Path) -> Option<Url> {
-    Url::parse(&format!("file:///{}", path.as_os_str().to_str()?)).ok()
+fn as_url(path: &Path) -> Result<Url> {
+    Ok(Url::parse(&format!("file:///{}", path.canonicalize()?.display()))?)
 }

@@ -178,7 +178,7 @@ impl<T> PopupInterface for PopupSelector<T> {
 #[derive(Clone)]
 pub struct Button {
     pub command: fn(&mut Popup) -> PopupMessage,
-    pub name: String,
+    pub name: &'static str,
     pub key: Option<Vec<KeyCode>>,
 }
 
@@ -193,7 +193,7 @@ pub fn message(content: String) -> Popup {
         message: content,
         title: Some("Message".to_owned()),
         message_as_buffer_builder: None,
-        buttons: vec![Button { command: |_| PopupMessage::Done, name: "Ok".to_owned(), key: None }],
+        buttons: vec![Button { command: |_| PopupMessage::Done, name: "Ok", key: None }],
         size: Some((20, 16)),
         state: 0,
     }

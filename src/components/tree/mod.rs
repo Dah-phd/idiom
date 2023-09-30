@@ -228,7 +228,7 @@ impl Tree {
         buffer
     }
 
-    fn get_selected(&self) -> Option<&mut TreePath> {
+    pub fn get_selected(&self) -> Option<&mut TreePath> {
         unsafe { self.tree_ptrs.get(self.state.selected()?)?.as_mut() }
     }
 

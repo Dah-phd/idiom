@@ -7,13 +7,10 @@ pub use select::{CursorPosition, Offset, Select};
 
 use crate::{
     configs::{EditorConfigs, FileType},
-    lsp::LSP,
     syntax::{Lexer, Theme},
     utils::{find_code_blocks, get_closing_char, trim_start_inplace},
 };
 use std::path::PathBuf;
-use std::rc::Rc;
-use tokio::sync::Mutex;
 
 use self::action::ActionLogger;
 
@@ -24,12 +21,11 @@ pub type DocStats<'a> = (DocLen, SelectLen, &'a CursorPosition);
 #[derive(Debug)]
 pub struct Editor {
     pub cursor: CursorPosition,
-    pub lsp: Option<Rc<Mutex<LSP>>>,
     pub file_type: FileType,
     pub path: PathBuf,
     pub at_line: usize,
+    pub lexer: Lexer,
     select: Select,
-    linter: Lexer,
     configs: EditorConfigs,
     clipboard: Clipboard,
     action_logger: ActionLogger,
@@ -43,9 +39,8 @@ impl Editor {
         let file_type = FileType::derive_type(&path);
         configs.update_by_file_type(&file_type);
         Ok(Self {
-            linter: Lexer::from_type(&file_type, Theme::from(&configs.theme_file_in_config_dir)),
+            lexer: Lexer::from_type(&file_type, Theme::from(&configs.theme_file_in_config_dir)),
             configs,
-            lsp: None,
             cursor: CursorPosition::default(),
             select: Select::default(),
             clipboard: Clipboard::default(),
@@ -59,15 +54,13 @@ impl Editor {
     }
 
     pub fn get_list_widget(&mut self) -> (usize, List<'_>) {
-        self.get_diagnostics();
-        self.linter.set_select(self.select.get());
-        let max_digits = self.linter.line_number_max_digits(&self.content);
+        let max_digits = self.lexer.context(&self.content, &self.cursor, self.select.get(), &self.path);
         let render_till_line = self.content.len().min(self.at_line + self.max_rows);
         let editor_content = List::new(
             self.content[self.at_line..render_till_line]
                 .iter()
                 .enumerate()
-                .map(|(idx, code_line)| self.linter.syntax_spans(idx + self.at_line, code_line))
+                .map(|(idx, code_line)| self.lexer.syntax_spans(idx + self.at_line, code_line))
                 .collect::<Vec<ListItem>>(),
         );
         (max_digits, editor_content)
@@ -77,22 +70,15 @@ impl Editor {
         (self.content.len(), self.select.len(&self.content), &self.cursor)
     }
 
-    pub fn get_diagnostics(&mut self) {
-        if let Some(lsp) = self.lsp.as_mut() {
-            if let Ok(guard) = lsp.try_lock() {
-                let diagnostics = guard.get_diagnostics(&self.path);
-                if diagnostics.is_some() {
-                    self.linter.diagnostics = diagnostics
-                }
-            }
-        }
+    pub async fn help(&mut self) {
+        self.lexer.get_autocomplete(&self.path, &self.cursor).await;
     }
 
     pub async fn update_lsp(&mut self) {
-        if let Some(lsp) = self.lsp.as_mut() {
+        if let Some(lsp) = self.lexer.lsp.as_mut() {
             if let Ok(mut guard) = lsp.try_lock() {
                 if let Some((version, content_changes)) = self.action_logger.get_text_edits() {
-                    guard.file_did_change(&self.path, version, content_changes).await;
+                    let _ = guard.file_did_change(&self.path, version, content_changes).await;
                 }
             }
         }
@@ -527,15 +513,15 @@ impl Editor {
     }
 
     pub async fn save(&mut self) {
-        if let Some(lsp) = self.lsp.as_mut() {
-            lsp.lock().await.file_did_save(&self.path).await;
+        if let Some(lsp) = self.lexer.lsp.as_mut() {
+            let _ = lsp.lock().await.file_did_save(&self.path).await;
         }
         std::fs::write(&self.path, self.content.join("\n")).unwrap();
     }
 
     pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {
         self.configs = new_cfg.clone();
-        self.linter.theme = Theme::from(&self.configs.theme_file_in_config_dir);
+        self.lexer.theme = Theme::from(&self.configs.theme_file_in_config_dir);
     }
 
     fn get_and_indent_line(&mut self, line_idx: usize) -> (Offset, &mut String) {

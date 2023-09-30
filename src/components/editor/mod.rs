@@ -5,11 +5,13 @@ use crossterm::event::KeyEvent;
 use file::Editor;
 pub use file::{CursorPosition, DocStats, Offset};
 use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::prelude::CrosstermBackend;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{ListState, Tabs};
 use ratatui::{backend::Backend, Frame};
 use std::collections::{hash_map::Entry, HashMap};
+use std::io::Stdout;
 use std::path::PathBuf;
 use std::rc::Rc;
 use tokio::sync::Mutex;
@@ -28,7 +30,7 @@ impl EditorState {
         Self { editors: Vec::default(), state: ListState::default(), base_config: EditorConfigs::new(), key_map }
     }
 
-    pub fn render(&mut self, frame: &mut Frame<impl Backend>, screen: Rect) {
+    pub fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, screen: Rect) {
         let layout = Layout::default().constraints([Constraint::Length(1), Constraint::default()]).split(screen);
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get_mut(editor_id) {
@@ -36,10 +38,9 @@ impl EditorState {
                 let cursor_x_offset = 1 + file.cursor.char;
                 let cursor_y_offset = file.cursor.line - file.at_line;
                 let (digits_offset, editor_content) = file.get_list_widget();
-                frame.set_cursor(
-                    layout[1].x + (cursor_x_offset + digits_offset) as u16,
-                    layout[1].y + cursor_y_offset as u16,
-                );
+                let x_cursor = layout[1].x + (cursor_x_offset + digits_offset) as u16;
+                let y_cursor = layout[1].y + cursor_y_offset as u16;
+                frame.set_cursor(x_cursor, y_cursor);
 
                 frame.render_widget(editor_content, layout[1]);
 
@@ -88,6 +89,7 @@ impl EditorState {
                     EditorAction::EndOfFile => editor.end_of_file(),
                     EditorAction::StartOfLine => editor.start_of_line(),
                     EditorAction::StartOfFile => editor.start_of_file(),
+                    EditorAction::Help => editor.help().await,
                     EditorAction::Cut => editor.cut(),
                     EditorAction::Copy => editor.copy(),
                     EditorAction::Paste => editor.paste(),
@@ -133,11 +135,11 @@ impl EditorState {
             match lsp_servers.entry(opened_file.file_type) {
                 Entry::Vacant(entry) => {
                     if let Ok(mut lsp) = LSP::from(&opened_file.file_type).await {
-                        if let Some(..) = lsp.file_did_open(&opened_file.path).await {
+                        if let Ok(..) = lsp.file_did_open(&opened_file.path).await {
                             let lsp_rc = Rc::new(Mutex::new(lsp));
-                            opened_file.lsp = Some(Rc::clone(&lsp_rc));
+                            opened_file.lexer.lsp = Some(Rc::clone(&lsp_rc));
                             for opened_editor in self.editors.iter_mut() {
-                                opened_editor.lsp = Some(Rc::clone(&lsp_rc))
+                                opened_editor.lexer.lsp = Some(Rc::clone(&lsp_rc));
                             }
                             entry.insert(lsp_rc);
                         }
@@ -145,7 +147,7 @@ impl EditorState {
                 }
                 Entry::Occupied(entry) => {
                     let lsp_rc = Rc::clone(entry.get());
-                    opened_file.lsp = Some(lsp_rc);
+                    opened_file.lexer.lsp = Some(lsp_rc);
                 }
             }
             self.state.select(Some(self.editors.len()));
@@ -162,8 +164,8 @@ impl EditorState {
 
     async fn close_active(&mut self) {
         let path = if let Some(editor) = self.get_active() {
-            if let Some(lsp) = editor.lsp.as_mut() {
-                lsp.lock().await.file_did_close(&editor.path).await;
+            if let Some(lsp) = editor.lexer.lsp.as_mut() {
+                let _ = lsp.lock().await.file_did_close(&editor.path).await;
             };
             editor.path.clone()
         } else {
