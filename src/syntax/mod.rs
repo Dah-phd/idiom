@@ -5,9 +5,10 @@ mod rust;
 mod theme;
 use self::modal::{AutoComplete, LSPResponseType, Modal};
 pub use self::theme::{Theme, DEFAULT_THEME_FILE};
-use crate::components::editor::CursorPosition;
 use crate::configs::FileType;
 use crate::lsp::LSP;
+use crate::{components::editor::CursorPosition, configs::EditorAction};
+use crossterm::event::KeyEvent;
 use langs::Lang;
 use lsp_types::{DiagnosticSeverity, PublishDiagnosticsParams};
 use ratatui::{
@@ -18,7 +19,7 @@ use ratatui::{
     Frame,
 };
 use std::{io::Stdout, path::Path, rc::Rc};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, MutexGuard};
 pub const COLORS: [Color; 3] = [Color::LightMagenta, Color::Yellow, Color::Blue];
 
 #[derive(Debug)]
@@ -42,12 +43,6 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn new(file_type: &FileType, theme: Theme, lsp: Rc<Mutex<LSP>>) -> Self {
-        let mut lexer = Self::from_type(file_type, theme);
-        lexer.lsp = Some(lsp);
-        lexer
-    }
-
     pub fn from_type(file_type: &FileType, theme: Theme) -> Self {
         Self {
             lsp: None,
@@ -87,41 +82,47 @@ impl Lexer {
         self.max_digits
     }
 
-    pub fn render_modal(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, x: u16, y: u16) {
+    pub fn exposre_lsp(&mut self) -> Option<MutexGuard<'_, LSP>> {
+        let lsp_mutex = self.lsp.as_mut()?;
+        lsp_mutex.try_lock().ok()
+    }
+
+    pub fn render_modal_if_exist(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, x: u16, y: u16) {
         if let Some(modal) = self.modal.as_mut() {
             modal.render_at(frame, x, y);
         }
     }
 
-    fn get_diagnostics(&mut self, path: &Path) {
-        if let Some(lsp) = self.lsp.as_mut() {
-            if let Ok(guard) = lsp.try_lock() {
-                let diagnostics = guard.get_diagnostics(path);
-                if diagnostics.is_some() {
-                    self.diagnostics = diagnostics
-                }
-            }
+    pub fn map_modal_if_exists(&mut self, key: &EditorAction) {
+        if let Some(modal) = self.modal.as_mut() {
+            modal.map(key)
         }
     }
 
-    pub async fn get_autocomplete(&mut self, path: &Path, c: &CursorPosition) {
-        if let Some(lsp) = self.lsp.as_mut() {
-            if let Ok(mut guard) = lsp.try_lock() {
-                if let Some(id) = guard.completion(path, c).await {
-                    self.requests.push(LSPResponseType::Completion(id));
-                }
-            }
+    fn get_diagnostics(&mut self, path: &Path) -> Option<()> {
+        let diagnostics = self.exposre_lsp()?.get_diagnostics(path);
+        if diagnostics.is_some() {
+            self.diagnostics = diagnostics;
         }
+        Some(())
     }
 
-    pub async fn signiture_help(&mut self, path: &Path, c: &CursorPosition) {
-        if let Some(lsp) = self.lsp.as_mut() {
-            if let Ok(mut guard) = lsp.try_lock() {
-                if let Some(id) = guard.completion(path, c).await {
-                    self.requests.push(LSPResponseType::SignitureHelp(id));
-                };
-            }
-        }
+    pub async fn get_autocomplete(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
+        let id = self.exposre_lsp()?.completion(path, c).await?;
+        self.requests.push(LSPResponseType::Completion(id));
+        Some(())
+    }
+
+    pub async fn get_hover(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
+        let id = self.exposre_lsp()?.hover(path, c).await?;
+        self.requests.push(LSPResponseType::Hover(id));
+        Some(())
+    }
+
+    pub async fn get_signiture_help(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
+        let id = self.exposre_lsp()?.signiture_help(path, c).await?;
+        self.requests.push(LSPResponseType::SignitureHelp(id));
+        Some(())
     }
 
     fn get_lsp_responses(&mut self, c: &CursorPosition) {
@@ -130,26 +131,19 @@ impl Lexer {
         }
         if let Some(lsp) = self.lsp.as_mut() {
             if let Ok(guard) = lsp.try_lock() {
-                if let Some(request) = self.requests.first() {
-                    if let Some(response) = guard.get(request.id()) {
-                        if let Some(value) = response.result {
-                            if let Ok(completions) = request.parse(value) {
-                                self.modal = Some(AutoComplete::new(c, completions));
-                            }
+                let request = self.requests.remove(0);
+                if let Some(response) = guard.get(request.id()) {
+                    if let Some(value) = response.result {
+                        if let Ok(completions) = request.parse(value) {
+                            self.modal = Some(AutoComplete::new(c, completions));
                         }
                     }
+                } else {
+                    self.requests.insert(0, request);
                 }
             }
         }
     }
-
-    // pub fn set_tokens(&mut self, response: Value) {
-    //     if let Ok(result) = from_value::<SemanticTokensResult>(response) {
-    //         if let SemanticTokensResult::Tokens(tokens) = result {
-    //             panic!("{:?}", &tokens.data[..4]);
-    //         }
-    //     }
-    // }
 
     fn set_select_char_range(&mut self, at_line: usize, max_len: usize) {
         if let Some((from, to)) = self.select {

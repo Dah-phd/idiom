@@ -9,7 +9,7 @@ use ratatui::prelude::CrosstermBackend;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{ListState, Tabs};
-use ratatui::{backend::Backend, Frame};
+use ratatui::Frame;
 use std::collections::{hash_map::Entry, HashMap};
 use std::io::Stdout;
 use std::path::PathBuf;
@@ -40,9 +40,10 @@ impl EditorState {
                 let (digits_offset, editor_content) = file.get_list_widget();
                 let x_cursor = layout[1].x + (cursor_x_offset + digits_offset) as u16;
                 let y_cursor = layout[1].y + cursor_y_offset as u16;
-                frame.set_cursor(x_cursor, y_cursor);
 
+                frame.set_cursor(x_cursor, y_cursor);
                 frame.render_widget(editor_content, layout[1]);
+                file.lexer.render_modal_if_exist(frame, x_cursor, y_cursor);
 
                 let mut titles_unordered: Vec<_> = self.editors.iter().flat_map(try_file_to_tab).collect();
                 let mut titles = titles_unordered.split_off(editor_id);

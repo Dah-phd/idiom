@@ -1,5 +1,5 @@
 mod parser;
-use crate::components::editor::CursorPosition;
+use crate::{components::editor::CursorPosition, configs::EditorAction};
 use crossterm::event::KeyEvent;
 use lsp_types::CompletionItem;
 pub use parser::LSPResponseType;
@@ -12,7 +12,7 @@ use ratatui::{
 use std::io::Stdout;
 
 pub trait Modal {
-    fn map(&mut self, key: &KeyEvent);
+    fn map(&mut self, key: &EditorAction);
     fn render_at(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, x: u16, y: u16);
 }
 
@@ -23,7 +23,7 @@ pub struct AutoComplete {
 }
 
 impl Modal for AutoComplete {
-    fn map(&mut self, key: &KeyEvent) {
+    fn map(&mut self, key: &EditorAction) {
         todo!();
     }
     fn render_at(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, x: u16, y: u16) {
