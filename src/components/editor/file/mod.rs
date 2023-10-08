@@ -71,7 +71,7 @@ impl Editor {
     }
 
     pub async fn help(&mut self) {
-        self.lexer.get_autocomplete(&self.path, &self.cursor).await;
+        self.lexer.get_signitures(&self.path, &self.cursor).await;
     }
 
     pub async fn update_lsp(&mut self) {

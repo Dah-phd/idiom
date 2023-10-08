@@ -3,12 +3,11 @@ mod lsp_tokens;
 mod modal;
 mod rust;
 mod theme;
-use self::modal::{AutoComplete, LSPResponseType, Modal};
+use self::modal::{AutoComplete, Info, LSPResponseType, LSPResult, Modal};
 pub use self::theme::{Theme, DEFAULT_THEME_FILE};
 use crate::configs::FileType;
 use crate::lsp::LSP;
 use crate::{components::editor::CursorPosition, configs::EditorAction};
-use crossterm::event::KeyEvent;
 use langs::Lang;
 use lsp_types::{DiagnosticSeverity, PublishDiagnosticsParams};
 use ratatui::{
@@ -18,17 +17,17 @@ use ratatui::{
     widgets::ListItem,
     Frame,
 };
+use std::fmt::Debug;
 use std::{io::Stdout, path::Path, rc::Rc};
 use tokio::sync::{Mutex, MutexGuard};
 pub const COLORS: [Color; 3] = [Color::LightMagenta, Color::Yellow, Color::Blue];
 
-#[derive(Debug)]
 pub struct Lexer {
     pub select: Option<(CursorPosition, CursorPosition)>,
     pub theme: Theme,
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub lsp: Option<Rc<Mutex<LSP>>>,
-    modal: Option<AutoComplete>,
+    modal: Option<Box<dyn Modal>>,
     requests: Vec<LSPResponseType>,
     line_processor: fn(&mut Lexer, content: &str, spans: &mut Vec<Span>),
     lang: Lang,
@@ -40,6 +39,12 @@ pub struct Lexer {
     last_token: String,
     last_key_words: Vec<String>,
     max_digits: usize,
+}
+
+impl Debug for Lexer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Lexer")
+    }
 }
 
 impl Lexer {
@@ -95,7 +100,9 @@ impl Lexer {
 
     pub fn map_modal_if_exists(&mut self, key: &EditorAction) {
         if let Some(modal) = self.modal.as_mut() {
-            modal.map(key)
+            if modal.map_and_finish(key) {
+                self.modal = None;
+            }
         }
     }
 
@@ -119,9 +126,9 @@ impl Lexer {
         Some(())
     }
 
-    pub async fn get_signiture_help(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
+    pub async fn get_signitures(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
         let id = self.exposre_lsp()?.signiture_help(path, c).await?;
-        self.requests.push(LSPResponseType::SignitureHelp(id));
+        self.requests.push(LSPResponseType::SignatureHelp(id));
         Some(())
     }
 
@@ -134,8 +141,17 @@ impl Lexer {
                 let request = self.requests.remove(0);
                 if let Some(response) = guard.get(request.id()) {
                     if let Some(value) = response.result {
-                        if let Ok(completions) = request.parse(value) {
-                            self.modal = Some(AutoComplete::new(c, completions));
+                        match request.parse(value) {
+                            LSPResult::Completion(completion) => {
+                                self.modal = Some(Box::new(AutoComplete::new(c, completion)));
+                            }
+                            LSPResult::Hover(hover) => {
+                                self.modal = Some(Box::new(Info::from_hover(hover)));
+                            }
+                            LSPResult::SignatureHelp(signature) => {
+                                self.modal = Some(Box::new(Info::from_signature(signature)));
+                            }
+                            LSPResult::None => (),
                         }
                     }
                 } else {

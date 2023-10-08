@@ -62,6 +62,7 @@ impl EditorState {
         let action = self.key_map.map(key);
         if let Some(editor) = self.get_active() {
             if let Some(action) = action {
+                editor.lexer.map_modal_if_exists(&action);
                 match action {
                     EditorAction::Char(ch) => editor.push(ch),
                     EditorAction::NewLine => editor.new_line(),
