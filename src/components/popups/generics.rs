@@ -183,8 +183,8 @@ impl<T> PopupInterface for PopupSelector<T> {
 }
 
 pub struct PopupActiveSelector<T: Clone> {
-    options: Vec<T>,
-    pattern: String,
+    pub options: Vec<T>,
+    pub pattern: String,
     state: usize,
     command: fn(&mut Self) -> PopupMessage,
     on_update: PopupMessage,
@@ -213,7 +213,7 @@ impl<T: Clone> PopupActiveSelector<T> {
             pattern: String::new(),
             state: 0,
             command,
-            on_update: PopupMessage::UpdateFooter,
+            on_update: PopupMessage::UpdateEditor,
             footer_callback: None,
             editor_callback: Some(callback),
             tree_callback: None,
@@ -226,7 +226,7 @@ impl<T: Clone> PopupActiveSelector<T> {
             pattern: String::new(),
             state: 0,
             command,
-            on_update: PopupMessage::UpdateFooter,
+            on_update: PopupMessage::UpdateTree,
             footer_callback: None,
             editor_callback: None,
             tree_callback: Some(callback),
@@ -240,10 +240,6 @@ impl<T: Clone> PopupActiveSelector<T> {
             self.state = 0;
         }
         self.options.get(self.state).cloned()
-    }
-
-    pub fn get_options(&mut self) -> &mut Vec<T> {
-        &mut self.options
     }
 }
 
@@ -262,7 +258,9 @@ impl<T: Clone> PopupInterface for PopupActiveSelector<T> {
             _ => PopupMessage::None,
         }
     }
-    fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>) {}
+    fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>) {
+        todo!()
+    }
     fn update_editor(&mut self, editor_state: &mut crate::components::EditorState) {
         if let Some(cb) = self.editor_callback {
             (cb)(self, editor_state);

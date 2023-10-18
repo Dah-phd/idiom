@@ -118,13 +118,13 @@ impl Editor {
         }
     }
 
-    pub fn find(&mut self, pat: String, buffer: &mut Vec<Select>) {
+    pub fn find(&mut self, pat: &str, buffer: &mut Vec<Select>) {
         buffer.clear();
         if pat.len() < 3 {
             return;
         }
         for (line_idx, line_content) in self.content.iter().enumerate() {
-            for (char_idx, _) in line_content.match_indices(pat.as_str()) {
+            for (char_idx, _) in line_content.match_indices(pat) {
                 buffer.push(Select::Range((line_idx, char_idx).into(), (line_idx, char_idx + pat.len()).into()));
             }
         }

@@ -74,13 +74,22 @@ pub fn find_in_editor_popup() -> Box<Popup> {
     })
 }
 
-// pub fn find_in_editor_popup_2() -> Box<PopupActiveSelector<Select>> {
-//     Box::new(PopupActiveSelector {
-//         pattern: String::new(),
-//     }
-
-//     )
-// }
+pub fn find_in_editor_popup_2() -> Box<PopupActiveSelector<Select>> {
+    Box::new(PopupActiveSelector::for_editor(
+        |popup| {
+            if let Some(select) = popup.next() {
+                PopupMessage::GoToSelect(select)
+            } else {
+                PopupMessage::None
+            }
+        },
+        |popup, editor_state| {
+            if let Some(editor) = editor_state.get_active() {
+                editor.find(popup.pattern.as_str(), &mut popup.options)
+            }
+        },
+    ))
+}
 
 pub fn select_line_popup(options: Vec<(usize, String)>) -> Box<PopupSelector<(usize, String)>> {
     Box::new(PopupSelector {
