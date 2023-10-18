@@ -1,4 +1,4 @@
-use lsp_types::{CompletionItem, CompletionResponse, Hover, SignatureHelp};
+use lsp_types::{CompletionItem, CompletionResponse, Hover, SignatureHelp, WorkspaceEdit};
 use serde_json::{from_value, Value};
 
 #[derive(Debug)]
@@ -6,6 +6,7 @@ pub enum LSPResponseType {
     Completion(i64),
     Hover(i64),
     SignatureHelp(i64),
+    Renames(i64),
 }
 
 impl LSPResponseType {
@@ -14,6 +15,7 @@ impl LSPResponseType {
             Self::Completion(id) => id,
             Self::Hover(id) => id,
             Self::SignatureHelp(id) => id,
+            Self::Renames(id) => id,
         }
     }
 
@@ -37,6 +39,11 @@ impl LSPResponseType {
                     return LSPResult::SignatureHelp(response);
                 }
             }
+            Self::Renames(..) => {
+                if let Ok(response) = from_value::<WorkspaceEdit>(value) {
+                    return LSPResult::Renames(response);
+                }
+            }
         }
         LSPResult::None
     }
@@ -46,5 +53,6 @@ pub enum LSPResult {
     Completion(Vec<CompletionItem>),
     Hover(Hover),
     SignatureHelp(SignatureHelp),
+    Renames(WorkspaceEdit),
     None,
 }

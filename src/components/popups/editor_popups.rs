@@ -1,5 +1,5 @@
-use super::{Button, Popup, PopupSelector};
-use crate::configs::PopupMessage;
+use super::{generics::PopupActiveSelector, Button, Popup, PopupSelector};
+use crate::{components::editor::Select, configs::PopupMessage};
 use crossterm::event::KeyCode;
 
 pub fn save_all_popup() -> Box<Popup> {
@@ -44,6 +44,21 @@ pub fn go_to_line_popup() -> Box<Popup> {
     })
 }
 
+pub fn rename_var_popup() -> Box<Popup> {
+    Box::new(Popup {
+        message: String::new(),
+        title: None,
+        message_as_buffer_builder: Some(Some),
+        buttons: vec![Button {
+            command: |popup| PopupMessage::Rename(popup.message.to_owned()),
+            name: "Rename",
+            key: None,
+        }],
+        size: Some((50, 4)),
+        state: 0,
+    })
+}
+
 pub fn find_in_editor_popup() -> Box<Popup> {
     Box::new(Popup {
         message: String::new(),
@@ -58,6 +73,14 @@ pub fn find_in_editor_popup() -> Box<Popup> {
         state: 0,
     })
 }
+
+// pub fn find_in_editor_popup_2() -> Box<PopupActiveSelector<Select>> {
+//     Box::new(PopupActiveSelector {
+//         pattern: String::new(),
+//     }
+
+//     )
+// }
 
 pub fn select_line_popup(options: Vec<(usize, String)>) -> Box<PopupSelector<(usize, String)>> {
     Box::new(PopupSelector {

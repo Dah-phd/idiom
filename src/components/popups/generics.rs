@@ -1,8 +1,9 @@
 use std::io::Stdout;
 
 use super::PopupInterface;
-use crate::configs::PopupMessage;
+use crate::components::{EditorState, Tree};
 use crate::utils::centered_rect_static;
+use crate::{components::Footer, configs::PopupMessage};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     backend::CrosstermBackend,
@@ -80,6 +81,9 @@ impl PopupInterface for Popup {
             _ => PopupMessage::None,
         }
     }
+    fn update_editor(&mut self, _editor_state: &mut crate::components::EditorState) {}
+    fn update_tree(&mut self, _file_tree: &mut crate::components::Tree) {}
+    fn update_footer(&mut self, _footer: &mut crate::components::Footer) {}
 }
 
 impl Popup {
@@ -171,6 +175,107 @@ impl<T> PopupInterface for PopupSelector<T> {
             }
             KeyCode::Esc => PopupMessage::Done,
             _ => PopupMessage::None,
+        }
+    }
+    fn update_editor(&mut self, _editor_state: &mut crate::components::EditorState) {}
+    fn update_tree(&mut self, _file_tree: &mut crate::components::Tree) {}
+    fn update_footer(&mut self, _footer: &mut crate::components::Footer) {}
+}
+
+pub struct PopupActiveSelector<T: Clone> {
+    options: Vec<T>,
+    pattern: String,
+    state: usize,
+    command: fn(&mut Self) -> PopupMessage,
+    on_update: PopupMessage,
+    footer_callback: Option<fn(&mut Self, &mut Footer)>,
+    editor_callback: Option<fn(&mut Self, &mut EditorState)>,
+    tree_callback: Option<fn(&mut Self, &mut Tree)>,
+}
+
+impl<T: Clone> PopupActiveSelector<T> {
+    pub fn for_footer(command: fn(&mut Self) -> PopupMessage, callback: fn(&mut Self, &mut Footer)) -> Self {
+        Self {
+            options: Vec::new(),
+            pattern: String::new(),
+            state: 0,
+            command,
+            on_update: PopupMessage::UpdateFooter,
+            footer_callback: Some(callback),
+            editor_callback: None,
+            tree_callback: None,
+        }
+    }
+
+    pub fn for_editor(command: fn(&mut Self) -> PopupMessage, callback: fn(&mut Self, &mut EditorState)) -> Self {
+        Self {
+            options: Vec::new(),
+            pattern: String::new(),
+            state: 0,
+            command,
+            on_update: PopupMessage::UpdateFooter,
+            footer_callback: None,
+            editor_callback: Some(callback),
+            tree_callback: None,
+        }
+    }
+
+    pub fn for_tree(command: fn(&mut Self) -> PopupMessage, callback: fn(&mut Self, &mut Tree)) -> Self {
+        Self {
+            options: Vec::new(),
+            pattern: String::new(),
+            state: 0,
+            command,
+            on_update: PopupMessage::UpdateFooter,
+            footer_callback: None,
+            editor_callback: None,
+            tree_callback: Some(callback),
+        }
+    }
+
+    pub fn next(&mut self) -> Option<T> {
+        if self.options.len() - 1 > self.state {
+            self.state += 1;
+        } else {
+            self.state = 0;
+        }
+        self.options.get(self.state).cloned()
+    }
+
+    pub fn get_options(&mut self) -> &mut Vec<T> {
+        &mut self.options
+    }
+}
+
+impl<T: Clone> PopupInterface for PopupActiveSelector<T> {
+    fn key_map(&mut self, key: &KeyEvent) -> PopupMessage {
+        match key.code {
+            KeyCode::Enter => (self.command)(self),
+            KeyCode::Char(ch) => {
+                self.pattern.push(ch);
+                self.on_update.clone()
+            }
+            KeyCode::Backspace => {
+                self.pattern.pop();
+                self.on_update.clone()
+            }
+            _ => PopupMessage::None,
+        }
+    }
+    fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>) {}
+    fn update_editor(&mut self, editor_state: &mut crate::components::EditorState) {
+        if let Some(cb) = self.editor_callback {
+            (cb)(self, editor_state);
+        }
+    }
+    fn update_tree(&mut self, file_tree: &mut crate::components::Tree) {
+        if let Some(cb) = self.tree_callback {
+            (cb)(self, file_tree);
+        }
+    }
+    fn update_footer(&mut self, footer: &mut crate::components::Footer) {
+        if let Some(cb) = self.footer_callback {
+            (cb)(self, footer);
         }
     }
 }

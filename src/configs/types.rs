@@ -1,7 +1,11 @@
 use crossterm::event::KeyEvent;
 use ratatui::{backend::CrosstermBackend, Frame};
 
-use crate::components::popups::PopupInterface;
+use crate::components::{
+    editor::{self, EditorState},
+    popups::PopupInterface,
+    Footer, Tree,
+};
 use std::{io::Stdout, path::PathBuf};
 
 use super::PopupMessage;
@@ -19,13 +23,6 @@ impl Mode {
         }
     }
 
-    pub fn popup_map(&mut self, key: &KeyEvent) -> Option<PopupMessage> {
-        if let Self::Popup((.., popup)) = self {
-            return Some(popup.map(key));
-        }
-        None
-    }
-
     pub fn popup(self, popup: Box<dyn PopupInterface>) -> Self {
         if matches!(self, Self::Popup((_, _))) {
             return self;
@@ -38,6 +35,31 @@ impl Mode {
             return *mode;
         }
         self
+    }
+
+    pub fn popup_map(&mut self, key: &KeyEvent) -> Option<PopupMessage> {
+        if let Self::Popup((.., popup)) = self {
+            return Some(popup.map(key));
+        }
+        None
+    }
+
+    pub fn update_editor(&mut self, editor_state: &mut EditorState) {
+        if let Self::Popup((_, popup)) = self {
+            popup.update_editor(editor_state);
+        }
+    }
+
+    pub fn update_tree(&mut self, file_tree: &mut Tree) {
+        if let Self::Popup((_, popup)) = self {
+            popup.update_tree(file_tree);
+        }
+    }
+
+    pub fn update_footer(&mut self, footer: &mut Footer) {
+        if let Self::Popup((_, popup)) = self {
+            popup.update_footer(footer);
+        }
     }
 }
 

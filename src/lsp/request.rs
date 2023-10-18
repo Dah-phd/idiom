@@ -3,11 +3,11 @@ use std::path::Path;
 use anyhow::Result;
 use lsp_types::{
     request::{
-        Completion, HoverRequest, Initialize, References, SemanticTokensFullRequest, SemanticTokensRangeRequest,
-        SignatureHelpRequest,
+        Completion, HoverRequest, Initialize, References, Rename, SemanticTokensFullRequest,
+        SemanticTokensRangeRequest, SignatureHelpRequest,
     },
     ClientCapabilities, CompletionParams, HoverClientCapabilities, HoverParams, InitializeParams, MarkupKind,
-    PartialResultParams, Position, Range, ReferenceClientCapabilities, ReferenceContext, ReferenceParams,
+    PartialResultParams, Position, Range, ReferenceClientCapabilities, ReferenceContext, ReferenceParams, RenameParams,
     SemanticTokensParams, SemanticTokensRangeParams, SignatureHelpClientCapabilities, SignatureHelpParams,
     TextDocumentClientCapabilities, TextDocumentIdentifier, TextDocumentPositionParams,
     TextDocumentSyncClientCapabilities, WorkDoneProgressParams, WorkspaceClientCapabilities, WorkspaceFolder,
@@ -59,6 +59,20 @@ where
                 context: ReferenceContext { include_declaration: true },
                 work_done_progress_params: WorkDoneProgressParams::default(),
                 partial_result_params: PartialResultParams::default(),
+            },
+        ))
+    }
+
+    pub fn rename(path: &Path, c: &CursorPosition, new_name: String) -> Option<LSPRequest<Rename>> {
+        Some(LSPRequest::with(
+            0,
+            RenameParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                    position: c.into(),
+                },
+                new_name,
+                work_done_progress_params: WorkDoneProgressParams::default(),
             },
         ))
     }

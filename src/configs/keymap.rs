@@ -206,7 +206,7 @@ pub enum GeneralAction {
     SaveAll,
     FileTreeModeOrCancelInput,
     NewFile,
-    RenameFile,
+    Rename,
     DeleteFile,
     Find,
     Exit,
@@ -255,7 +255,7 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
         insert_key_event(&mut hash, &val.save_all, GeneralAction::SaveAll);
         insert_key_event(&mut hash, &val.file_tree_mod_or_cancel_input, GeneralAction::FileTreeModeOrCancelInput);
         insert_key_event(&mut hash, &val.new_file, GeneralAction::NewFile);
-        insert_key_event(&mut hash, &val.rename_file, GeneralAction::RenameFile);
+        insert_key_event(&mut hash, &val.rename_file, GeneralAction::Rename);
         insert_key_event(&mut hash, &val.delete_file, GeneralAction::DeleteFile);
         insert_key_event(&mut hash, &val.find_in_tree, GeneralAction::Find);
         insert_key_event(&mut hash, &val.backspace_tree_input, GeneralAction::BackspaceInput);

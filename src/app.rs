@@ -1,7 +1,7 @@
 use crate::{
     components::{
         popups::editor_popups::{go_to_line_popup, select_editor_popup},
-        popups::message,
+        popups::{editor_popups::rename_var_popup, message},
         popups::{
             editor_popups::{find_in_editor_popup, save_all_popup, select_line_popup},
             tree_popups::{
@@ -15,9 +15,9 @@ use crate::{
 use anyhow::Result;
 use crossterm::event::Event;
 use ratatui::{backend::CrosstermBackend, Terminal};
+use std::io::Stdout;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use std::{collections::HashMap, io::Stdout};
 
 const TICK: Duration = Duration::from_millis(100);
 
@@ -26,18 +26,17 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
     let mut clock = Instant::now();
     let mut mode = Mode::Select;
     let mut general_key_map = configs.general_key_map();
-    let mut lsp_servers = HashMap::new();
 
     // COMPONENTS
     let mut file_tree = Tree::new(open_file.is_none());
-    let mut editor_state = EditorState::new(configs.editor_key_map());
+    let mut editor_state = EditorState::from(configs.editor_key_map());
     let mut footer = Footer::default();
     let mut tmux = EditorTerminal::new();
 
     // CLI SETUP
     if let Some(path) = open_file {
         file_tree.select_by_path(&path);
-        editor_state.new_from(path, &mut lsp_servers).await;
+        editor_state.new_from(path).await;
         mode = Mode::Insert;
     }
 
@@ -56,7 +55,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
             mode.render_popup_if_exists(frame);
         })?;
 
-        editor_state.lsp_updates().await;
+        editor_state.lexer_updates().await;
 
         let timeout = TICK.checked_sub(clock.elapsed()).unwrap_or_else(|| Duration::from_secs(0));
 
@@ -75,7 +74,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                         PopupMessage::Open((path, line)) => {
                             file_tree.select_by_path(&path);
                             if !path.is_dir() {
-                                editor_state.new_at_line(path, line, &mut lsp_servers).await;
+                                editor_state.new_at_line(path, line).await;
                                 mode = Mode::Insert;
                             } else {
                                 mode = Mode::Select;
@@ -112,6 +111,11 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             }
                             continue;
                         }
+                        PopupMessage::GoToSelect(select) => {
+                            if let Some(editor) = editor_state.get_active() {
+                                editor.go_to_select(select);
+                            }
+                        }
                         PopupMessage::GoToLine(line_idx) => {
                             if let Some(editor) = editor_state.get_active() {
                                 editor.go_to(line_idx)
@@ -119,10 +123,22 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             mode = mode.clear_popup();
                             continue;
                         }
+                        PopupMessage::UpdateEditor => {
+                            mode.update_editor(&mut editor_state);
+                            continue;
+                        }
+                        PopupMessage::UpdateFooter => {
+                            mode.update_footer(&mut footer);
+                            continue;
+                        }
+                        PopupMessage::UpdateTree => {
+                            mode.update_tree(&mut file_tree);
+                            continue;
+                        }
                         PopupMessage::CreateFileOrFolder(name) => {
                             if let Ok(new_path) = file_tree.create_file_or_folder(name) {
                                 if !new_path.is_dir() {
-                                    editor_state.new_from(new_path, &mut lsp_servers).await;
+                                    editor_state.new_from(new_path).await;
                                 }
                             }
                             mode = mode.clear_popup();
@@ -131,11 +147,16 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                         PopupMessage::CreateFileOrFolderBase(name) => {
                             if let Ok(new_path) = file_tree.create_file_or_folder_base(name) {
                                 if !new_path.is_dir() {
-                                    editor_state.new_from(new_path, &mut lsp_servers).await;
+                                    editor_state.new_from(new_path).await;
                                     mode = Mode::Insert;
                                 }
                             }
                             mode = mode.clear_popup();
+                            continue;
+                        }
+                        PopupMessage::Rename(new_name) => {
+                            mode = mode.clear_popup();
+                            editor_state.renames(new_name).await;
                             continue;
                         }
                         PopupMessage::RenameFile(name) => {
@@ -174,14 +195,20 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                     GeneralAction::NewFile => {
                         mode = mode.popup(create_file_popup(file_tree.get_first_selected_folder_display()));
                     }
-                    GeneralAction::RenameFile => {
-                        if let Some(tree_path) = file_tree.get_selected() {
-                            mode = mode.popup(rename_file_popup(tree_path.path().display().to_string()));
+                    GeneralAction::Rename => match mode {
+                        Mode::Insert => {
+                            mode = mode.popup(rename_var_popup());
                         }
-                    }
+                        Mode::Select => {
+                            if let Some(tree_path) = file_tree.get_selected() {
+                                mode = mode.popup(rename_file_popup(tree_path.path().display().to_string()));
+                            }
+                        }
+                        _ => (),
+                    },
                     GeneralAction::Expand => {
                         if let Some(file_path) = file_tree.expand_dir_or_get_path() {
-                            editor_state.new_from(file_path, &mut lsp_servers).await;
+                            editor_state.new_from(file_path).await;
                         }
                     }
                     GeneralAction::FinishOrSelect => {
@@ -189,7 +216,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             mode = Mode::Insert;
                         } else if let Some(file_path) = file_tree.expand_dir_or_get_path() {
                             if !file_path.is_dir() {
-                                editor_state.new_from(file_path, &mut lsp_servers).await;
+                                editor_state.new_from(file_path).await;
                                 mode = Mode::Insert;
                             }
                         }

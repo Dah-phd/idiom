@@ -28,12 +28,12 @@ impl Modal for AutoComplete {
     }
 
     fn render_at(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, x: u16, y: u16) {
-        let screen_part = Rect { x, y: y + 1, width: x + 20, height: y + 5 };
+        let base = frame.size();
+        let screen_part = Rect { x, y: y + 1, width: base.width.min(45), height: base.height.min(7) };
         let complitions =
             self.completions.iter().map(|c| ListItem::new(c.label.as_str())).collect::<Vec<ListItem<'_>>>();
-        let list = List::new(complitions).block(Block::default().borders(Borders::all()));
         frame.render_widget(Clear, screen_part);
-        frame.render_widget(list, screen_part);
+        frame.render_widget(List::new(complitions).block(Block::default().borders(Borders::all())), screen_part);
     }
 }
 
@@ -53,9 +53,13 @@ impl<'a> Modal for Info<'a> {
     }
 
     fn render_at(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, x: u16, y: u16) {
-        let screen_part = Rect { x, y: y + 1, width: x + 20, height: y + 5 };
+        let base = frame.size();
+        let screen_part = Rect { x, y: y + 1, width: base.width.min(60), height: base.height.min(7) };
         frame.render_widget(Clear, screen_part);
-        frame.render_widget(List::new(self.items.as_slice()), screen_part);
+        frame.render_widget(
+            List::new(self.items.as_slice()).block(Block::default().borders(Borders::all())),
+            screen_part,
+        );
     }
 }
 
@@ -65,13 +69,21 @@ impl<'a> Info<'a> {
         match hover.contents {
             HoverContents::Array(arr) => {
                 for value in arr {
-                    items.push(ListItem::new(Line::from(parse_markedstr(value))));
+                    for line in parse_markedstr(value).lines() {
+                        items.push(ListItem::new(Line::from(String::from(line))));
+                    }
                 }
             }
             HoverContents::Markup(markup) => {
-                items.push(ListItem::new(Line::from(markup.value)));
+                for line in markup.value.lines() {
+                    items.push(ListItem::new(Line::from(String::from(line))));
+                }
             }
-            HoverContents::Scalar(value) => items.push(ListItem::new(Line::from(parse_markedstr(value)))),
+            HoverContents::Scalar(value) => {
+                for line in parse_markedstr(value).lines() {
+                    items.push(ListItem::new(Line::from(String::from(line))));
+                }
+            }
         }
         Self { items }
     }
@@ -82,8 +94,16 @@ impl<'a> Info<'a> {
             items.push(ListItem::new(Line::from(sig_help.label)));
             if let Some(text) = sig_help.documentation {
                 match text {
-                    Documentation::MarkupContent(c) => items.push(ListItem::new(Line::from(c.value))),
-                    Documentation::String(s) => items.push(ListItem::new(Line::from(s))),
+                    Documentation::MarkupContent(c) => {
+                        for line in c.value.lines() {
+                            items.push(ListItem::new(Line::from(String::from(line))));
+                        }
+                    }
+                    Documentation::String(s) => {
+                        for line in s.lines() {
+                            items.push(ListItem::new(Line::from(String::from(line))));
+                        }
+                    }
                 }
             }
         }

@@ -1,6 +1,6 @@
 use std::ops::{Add, RangeInclusive, Sub};
 
-use lsp_types::Position;
+use lsp_types::{Position, Range};
 
 use super::action::ActionLogger;
 type CutContent = Option<(CursorPosition, CursorPosition, String)>;
@@ -20,6 +20,12 @@ impl From<&CursorPosition> for Position {
 impl From<(usize, usize)> for CursorPosition {
     fn from(value: (usize, usize)) -> Self {
         Self { line: value.0, char: value.1 }
+    }
+}
+
+impl From<Position> for CursorPosition {
+    fn from(value: Position) -> Self {
+        Self { line: value.line as usize, char: value.character as usize }
     }
 }
 
@@ -152,7 +158,17 @@ impl Default for Select {
     }
 }
 
+impl From<Range> for Select {
+    fn from(value: Range) -> Self {
+        Self::Range(value.start.into(), value.end.into())
+    }
+}
+
 impl Select {
+    pub fn take(&mut self) -> Self {
+        std::mem::take(self)
+    }
+
     pub fn drop(&mut self) {
         (*self) = Self::None;
     }

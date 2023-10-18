@@ -11,8 +11,8 @@ use lsp_types::notification::{
     DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Exit, Initialized,
 };
 use lsp_types::request::{
-    Completion, HoverRequest, Initialize, References, SemanticTokensFullRequest, SemanticTokensRangeRequest, Shutdown,
-    SignatureHelpRequest,
+    Completion, HoverRequest, Initialize, References, Rename, SemanticTokensFullRequest, SemanticTokensRangeRequest,
+    Shutdown, SignatureHelpRequest,
 };
 use serde_json::{from_value, Value};
 
@@ -196,6 +196,10 @@ impl LSP {
             text_document: TextDocumentIdentifier { uri: as_url(path)? },
         });
         self.notify(notification).await
+    }
+
+    pub async fn renames(&mut self, path: &Path, c: &CursorPosition, new_name: String) -> Option<i64> {
+        self.request(LSPRequest::<Rename>::rename(path, c, new_name)?).await
     }
 
     pub async fn semantics(&mut self, path: &Path) -> Option<i64> {

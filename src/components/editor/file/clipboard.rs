@@ -24,8 +24,8 @@ impl Clipboard {
         self.ctx.get_contents().ok()
     }
 
-    pub fn push(&mut self, content: String) -> Option<()> {
-        self.ctx.set_contents(content).ok()
+    pub fn push(&mut self, clip: String) -> Option<()> {
+        self.ctx.set_contents(clip).ok()
     }
 
     pub fn copy(&mut self, content: &mut [String], from: &CursorPosition, to: &CursorPosition) {

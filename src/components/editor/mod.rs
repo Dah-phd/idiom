@@ -1,9 +1,11 @@
 mod file;
 use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType};
 use crate::lsp::LSP;
+use anyhow::Result;
 use crossterm::event::KeyEvent;
 use file::Editor;
-pub use file::{CursorPosition, DocStats, Offset};
+pub use file::{CursorPosition, DocStats, Offset, Select};
+use lsp_types::WorkspaceEdit;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::prelude::CrosstermBackend;
 use ratatui::style::{Color, Modifier, Style};
@@ -16,20 +18,29 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use tokio::sync::Mutex;
 
+type LSPPool = HashMap<FileType, Rc<Mutex<LSP>>>;
+
 pub struct EditorState {
     pub editors: Vec<Editor>,
     pub state: ListState,
     base_config: EditorConfigs,
     key_map: EditorKeyMap,
+    lsp_servers: LSPPool,
 }
 
-type LSPPool = HashMap<FileType, Rc<Mutex<LSP>>>;
+impl From<EditorKeyMap> for EditorState {
+    fn from(key_map: EditorKeyMap) -> Self {
+        Self {
+            editors: Vec::default(),
+            state: ListState::default(),
+            base_config: EditorConfigs::new(),
+            key_map,
+            lsp_servers: HashMap::new(),
+        }
+    }
+}
 
 impl EditorState {
-    pub fn new(key_map: EditorKeyMap) -> Self {
-        Self { editors: Vec::default(), state: ListState::default(), base_config: EditorConfigs::new(), key_map }
-    }
-
     pub fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, screen: Rect) {
         let layout = Layout::default().constraints([Constraint::Length(1), Constraint::default()]).split(screen);
         if let Some(editor_id) = self.state.selected() {
@@ -91,7 +102,7 @@ impl EditorState {
                     EditorAction::EndOfFile => editor.end_of_file(),
                     EditorAction::StartOfLine => editor.start_of_line(),
                     EditorAction::StartOfFile => editor.start_of_file(),
-                    EditorAction::Help => editor.help().await,
+                    EditorAction::Help => editor.hover().await,
                     EditorAction::Cut => editor.cut(),
                     EditorAction::Copy => editor.copy(),
                     EditorAction::Paste => editor.paste(),
@@ -114,51 +125,80 @@ impl EditorState {
         self.editors.iter().map(|editor| editor.path.display().to_string()).collect()
     }
 
-    pub async fn lsp_updates(&mut self) {
-        if let Some(editor_id) = self.state.selected() {
-            if let Some(file) = self.editors.get_mut(editor_id) {
-                file.update_lsp().await;
-            }
-        }
-    }
-
     pub fn get_active(&mut self) -> Option<&mut Editor> {
         self.editors.get_mut(self.state.selected()?)
     }
 
-    pub async fn new_from(&mut self, file_path: PathBuf, lsp_servers: &mut LSPPool) {
+    pub async fn renames(&mut self, new_name: String) {
+        if let Some(editor) = self.get_active() {
+            editor.renames(new_name).await;
+        }
+    }
+
+    pub async fn lexer_updates(&mut self) {
+        if let Some(file) = self.get_active() {
+            file.update_lsp().await;
+            if let Some(edits) = file.lexer.workspace_edit.take() {
+                self.apply_edits(edits).await;
+            }
+        }
+    }
+
+    async fn apply_edits(&mut self, edits: WorkspaceEdit) {
+        if let Some(edits) = edits.changes {
+            for (file_url, file_edits) in edits {
+                if let Some(editor) = self.get_editor(file_url.path()) {
+                    editor.apply_file_edits(file_edits);
+                } else if let Ok(mut editor) = self.build_editor(PathBuf::from(file_url.path())).await {
+                    editor.apply_file_edits(file_edits);
+                }
+            }
+        }
+    }
+
+    fn get_editor<T: Into<PathBuf>>(&mut self, path: T) -> Option<&mut Editor> {
+        let path: PathBuf = path.into();
+        self.editors.iter_mut().find(|editor| editor.path == path)
+    }
+
+    async fn build_editor(&mut self, file_path: PathBuf) -> Result<Editor> {
+        let mut editor = Editor::from_path(file_path, self.base_config.clone())?;
+        match self.lsp_servers.entry(editor.file_type) {
+            Entry::Vacant(entry) => {
+                if let Ok(mut lsp) = LSP::from(&editor.file_type).await {
+                    if let Ok(..) = lsp.file_did_open(&editor.path).await {
+                        let lsp_rc = Rc::new(Mutex::new(lsp));
+                        editor.lexer.lsp = Some(Rc::clone(&lsp_rc));
+                        for opened_editor in self.editors.iter_mut() {
+                            opened_editor.lexer.lsp = Some(Rc::clone(&lsp_rc));
+                        }
+                        entry.insert(lsp_rc);
+                    }
+                }
+            }
+            Entry::Occupied(entry) => {
+                let lsp_rc = Rc::clone(entry.get());
+                editor.lexer.lsp = Some(lsp_rc);
+            }
+        }
+        Ok(editor)
+    }
+
+    pub async fn new_from(&mut self, file_path: PathBuf) {
         for (idx, file) in self.editors.iter().enumerate() {
             if file_path == file.path {
                 self.state.select(Some(idx));
                 return;
             }
         }
-        if let Ok(mut opened_file) = Editor::from_path(file_path, self.base_config.clone()) {
-            match lsp_servers.entry(opened_file.file_type) {
-                Entry::Vacant(entry) => {
-                    if let Ok(mut lsp) = LSP::from(&opened_file.file_type).await {
-                        if let Ok(..) = lsp.file_did_open(&opened_file.path).await {
-                            let lsp_rc = Rc::new(Mutex::new(lsp));
-                            opened_file.lexer.lsp = Some(Rc::clone(&lsp_rc));
-                            for opened_editor in self.editors.iter_mut() {
-                                opened_editor.lexer.lsp = Some(Rc::clone(&lsp_rc));
-                            }
-                            entry.insert(lsp_rc);
-                        }
-                    }
-                }
-                Entry::Occupied(entry) => {
-                    let lsp_rc = Rc::clone(entry.get());
-                    opened_file.lexer.lsp = Some(lsp_rc);
-                }
-            }
+        if let Ok(editor) = self.build_editor(file_path).await {
             self.state.select(Some(self.editors.len()));
-            self.editors.push(opened_file);
+            self.editors.push(editor);
         }
     }
 
-    pub async fn new_at_line(&mut self, file_path: PathBuf, line: usize, lsp_servers: &mut LSPPool) {
-        self.new_from(file_path, lsp_servers).await;
+    pub async fn new_at_line(&mut self, file_path: PathBuf, line: usize) {
+        self.new_from(file_path).await;
         if let Some(editor) = self.get_active() {
             editor.go_to(line);
         }

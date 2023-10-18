@@ -5,11 +5,12 @@ mod rust;
 mod theme;
 use self::modal::{AutoComplete, Info, LSPResponseType, LSPResult, Modal};
 pub use self::theme::{Theme, DEFAULT_THEME_FILE};
+use crate::components::editor::CursorPosition;
+use crate::configs::EditorAction;
 use crate::configs::FileType;
 use crate::lsp::LSP;
-use crate::{components::editor::CursorPosition, configs::EditorAction};
 use langs::Lang;
-use lsp_types::{DiagnosticSeverity, PublishDiagnosticsParams};
+use lsp_types::{DiagnosticSeverity, PublishDiagnosticsParams, WorkspaceEdit};
 use ratatui::{
     prelude::CrosstermBackend,
     style::{Color, Style},
@@ -27,17 +28,17 @@ pub struct Lexer {
     pub theme: Theme,
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub lsp: Option<Rc<Mutex<LSP>>>,
+    pub workspace_edit: Option<WorkspaceEdit>,
     modal: Option<Box<dyn Modal>>,
     requests: Vec<LSPResponseType>,
     line_processor: fn(&mut Lexer, content: &str, spans: &mut Vec<Span>),
     lang: Lang,
-    token_start: usize,
     select_at_line: Option<(usize, usize)>,
     curly: Vec<Color>,
     brackets: Vec<Color>,
     square: Vec<Color>,
+    token_start: usize,
     last_token: String,
-    last_key_words: Vec<String>,
     max_digits: usize,
 }
 
@@ -50,21 +51,21 @@ impl Debug for Lexer {
 impl Lexer {
     pub fn from_type(file_type: &FileType, theme: Theme) -> Self {
         Self {
+            select: None,
+            theme,
+            diagnostics: None,
             lsp: None,
             modal: None,
             requests: Vec::new(),
             line_processor: derive_line_processor(file_type),
             lang: file_type.into(),
-            diagnostics: None,
             select_at_line: None,
+            workspace_edit: None,
             curly: vec![],
             brackets: vec![],
             square: vec![],
-            last_token: String::default(),
             token_start: 0,
-            last_key_words: vec![],
-            theme,
-            select: None,
+            last_token: String::default(),
             max_digits: 0,
         }
     }
@@ -81,13 +82,12 @@ impl Lexer {
         self.curly.clear();
         self.brackets.clear();
         self.square.clear();
-        self.last_key_words.clear();
         self.select = select.map(|(from, to)| (*from, *to));
         self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
         self.max_digits
     }
 
-    pub fn exposre_lsp(&mut self) -> Option<MutexGuard<'_, LSP>> {
+    pub fn expose_lsp(&mut self) -> Option<MutexGuard<'_, LSP>> {
         let lsp_mutex = self.lsp.as_mut()?;
         lsp_mutex.try_lock().ok()
     }
@@ -107,58 +107,69 @@ impl Lexer {
     }
 
     fn get_diagnostics(&mut self, path: &Path) -> Option<()> {
-        let diagnostics = self.exposre_lsp()?.get_diagnostics(path);
+        let diagnostics = self.expose_lsp()?.get_diagnostics(path);
         if diagnostics.is_some() {
             self.diagnostics = diagnostics;
         }
         Some(())
     }
 
+    pub async fn get_renames(&mut self, path: &Path, c: &CursorPosition, new_name: String) -> Option<()> {
+        let id = self.expose_lsp()?.renames(path, c, new_name).await?;
+        self.requests.push(LSPResponseType::Renames(id));
+        Some(())
+    }
+
     pub async fn get_autocomplete(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
-        let id = self.exposre_lsp()?.completion(path, c).await?;
+        if self.modal.is_some() {
+            return None;
+        }
+        let id = self.expose_lsp()?.completion(path, c).await?;
         self.requests.push(LSPResponseType::Completion(id));
         Some(())
     }
 
     pub async fn get_hover(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
-        let id = self.exposre_lsp()?.hover(path, c).await?;
+        if self.modal.is_some() {
+            return None;
+        }
+        let id = self.expose_lsp()?.hover(path, c).await?;
         self.requests.push(LSPResponseType::Hover(id));
         Some(())
     }
 
     pub async fn get_signitures(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
-        let id = self.exposre_lsp()?.signiture_help(path, c).await?;
+        let id = self.expose_lsp()?.signiture_help(path, c).await?;
         self.requests.push(LSPResponseType::SignatureHelp(id));
         Some(())
     }
 
-    fn get_lsp_responses(&mut self, c: &CursorPosition) {
+    fn get_lsp_responses(&mut self, c: &CursorPosition) -> Option<()> {
         if self.requests.is_empty() {
-            return;
+            return None;
         }
-        if let Some(lsp) = self.lsp.as_mut() {
-            if let Ok(guard) = lsp.try_lock() {
-                let request = self.requests.remove(0);
-                if let Some(response) = guard.get(request.id()) {
-                    if let Some(value) = response.result {
-                        match request.parse(value) {
-                            LSPResult::Completion(completion) => {
-                                self.modal = Some(Box::new(AutoComplete::new(c, completion)));
-                            }
-                            LSPResult::Hover(hover) => {
-                                self.modal = Some(Box::new(Info::from_hover(hover)));
-                            }
-                            LSPResult::SignatureHelp(signature) => {
-                                self.modal = Some(Box::new(Info::from_signature(signature)));
-                            }
-                            LSPResult::None => (),
-                        }
+        let lsp = self.lsp.as_mut()?.try_lock().ok()?;
+        let request = self.requests.remove(0);
+        if let Some(response) = lsp.get(request.id()) {
+            if let Some(value) = response.result {
+                match request.parse(value) {
+                    LSPResult::Completion(completion) => {
+                        self.modal = Some(Box::new(AutoComplete::new(c, completion)));
                     }
-                } else {
-                    self.requests.insert(0, request);
+                    LSPResult::Hover(hover) => {
+                        self.modal = Some(Box::new(Info::from_hover(hover)));
+                    }
+                    LSPResult::SignatureHelp(signature) => {
+                        self.modal = Some(Box::new(Info::from_signature(signature)));
+                    }
+                    LSPResult::Renames(workspace_edit) => self.workspace_edit = Some(workspace_edit),
+                    LSPResult::None => (),
                 }
             }
+        } else {
+            self.requests.push(request);
         }
+        None
     }
 
     fn set_select_char_range(&mut self, at_line: usize, max_len: usize) {
@@ -181,12 +192,10 @@ impl Lexer {
 
     fn handled_key_word(&mut self, token_end: usize, spans: &mut Vec<Span>) -> bool {
         if self.lang.key_words.contains(&self.last_token.trim()) {
-            self.last_key_words.push(self.last_token.to_owned());
             self.drain_with_select(token_end, self.theme.key_words, spans);
             return true;
         }
         if self.lang.frow_control.contains(&self.last_token.trim()) {
-            self.last_key_words.push(self.last_token.to_owned());
             self.drain_with_select(token_end, self.theme.flow_control, spans);
             return true;
         }

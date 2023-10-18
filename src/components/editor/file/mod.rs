@@ -2,6 +2,7 @@ mod action;
 mod clipboard;
 mod select;
 use clipboard::Clipboard;
+use lsp_types::TextEdit;
 use ratatui::widgets::{List, ListItem};
 pub use select::{CursorPosition, Offset, Select};
 
@@ -74,12 +75,22 @@ impl Editor {
         self.lexer.get_signitures(&self.path, &self.cursor).await;
     }
 
+    pub async fn autocomplete(&mut self) {
+        self.lexer.get_autocomplete(&self.path, &self.cursor).await;
+    }
+
+    pub async fn hover(&mut self) {
+        self.lexer.get_hover(&self.path, &self.cursor).await;
+    }
+
+    pub async fn renames(&mut self, new_name: String) {
+        self.lexer.get_renames(&self.path, &self.cursor, new_name).await;
+    }
+
     pub async fn update_lsp(&mut self) {
-        if let Some(lsp) = self.lexer.lsp.as_mut() {
-            if let Ok(mut guard) = lsp.try_lock() {
-                if let Some((version, content_changes)) = self.action_logger.get_text_edits() {
-                    let _ = guard.file_did_change(&self.path, version, content_changes).await;
-                }
+        if let Some(mut lsp) = self.lexer.expose_lsp() {
+            if let Some((version, content_changes)) = self.action_logger.get_text_edits() {
+                let _ = lsp.file_did_change(&self.path, version, content_changes).await;
             }
         }
     }
@@ -89,6 +100,38 @@ impl Editor {
             return self.content.eq(&file_content.split('\n').map(String::from).collect::<Vec<_>>());
         };
         false
+    }
+
+    pub fn apply_file_edits(&mut self, edits: Vec<TextEdit>) {
+        let old_select = self.select.take();
+        for edit in edits {
+            self.select = edit.range.into();
+            todo!();
+        }
+        self.select = old_select;
+    }
+
+    pub fn go_to_select(&mut self, select: Select) {
+        if let Select::Range(_, to) = select {
+            self.cursor = to;
+            self.select = select;
+        }
+    }
+
+    pub fn find(&mut self, pat: String, buffer: &mut Vec<Select>) {
+        buffer.clear();
+        if pat.len() < 3 {
+            return;
+        }
+        for (line_idx, line_content) in self.content.iter().enumerate() {
+            for (char_idx, _) in line_content.match_indices(pat.as_str()) {
+                buffer.push(Select::Range((line_idx, char_idx).into(), (line_idx, char_idx + pat.len()).into()));
+            }
+        }
+    }
+
+    pub fn replace(&mut self, old: String, new: String) {
+        todo!()
     }
 
     pub fn cut(&mut self) {

@@ -9,6 +9,8 @@ pub use generics::message;
 pub use generics::{Button, Popup, PopupSelector};
 use ratatui::{backend::CrosstermBackend, Frame};
 
+use super::{EditorState, Footer, Tree};
+
 pub trait PopupInterface {
     fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>);
     fn map(&mut self, key: &KeyEvent) -> PopupMessage {
@@ -24,4 +26,7 @@ pub trait PopupInterface {
         self.key_map(key)
     }
     fn key_map(&mut self, key: &KeyEvent) -> PopupMessage;
+    fn update_editor(&mut self, editor_state: &mut EditorState);
+    fn update_tree(&mut self, file_tree: &mut Tree);
+    fn update_footer(&mut self, footer: &mut Footer);
 }
