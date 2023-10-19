@@ -120,7 +120,7 @@ impl Editor {
 
     pub fn find(&mut self, pat: &str, buffer: &mut Vec<Select>) {
         buffer.clear();
-        if pat.len() < 3 {
+        if pat.is_empty() {
             return;
         }
         for (line_idx, line_content) in self.content.iter().enumerate() {

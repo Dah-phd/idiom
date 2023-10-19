@@ -2,9 +2,9 @@ use std::io::Stdout;
 
 use super::PopupInterface;
 use crate::components::{EditorState, Tree};
-use crate::utils::centered_rect_static;
+use crate::utils::{centered_rect_static, right_corner_rect_static};
 use crate::{components::Footer, configs::PopupMessage};
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Alignment, Constraint, Layout},
@@ -194,6 +194,7 @@ pub struct PopupActiveSelector<T: Clone> {
 }
 
 impl<T: Clone> PopupActiveSelector<T> {
+    #[allow(dead_code)]
     pub fn for_footer(command: fn(&mut Self) -> PopupMessage, callback: fn(&mut Self, &mut Footer)) -> Self {
         Self {
             options: Vec::new(),
@@ -220,6 +221,7 @@ impl<T: Clone> PopupActiveSelector<T> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn for_tree(command: fn(&mut Self) -> PopupMessage, callback: fn(&mut Self, &mut Tree)) -> Self {
         Self {
             options: Vec::new(),
@@ -247,6 +249,7 @@ impl<T: Clone> PopupInterface for PopupActiveSelector<T> {
     fn key_map(&mut self, key: &KeyEvent) -> PopupMessage {
         match key.code {
             KeyCode::Enter => (self.command)(self),
+            KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => PopupMessage::Done,
             KeyCode::Char(ch) => {
                 self.pattern.push(ch);
                 self.on_update.clone()
@@ -255,11 +258,21 @@ impl<T: Clone> PopupInterface for PopupActiveSelector<T> {
                 self.pattern.pop();
                 self.on_update.clone()
             }
+            KeyCode::Esc => PopupMessage::Done,
             _ => PopupMessage::None,
         }
     }
     fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>) {
-        todo!()
+        let area = right_corner_rect_static(50, 3, frame.size());
+        let block = Block::default().title("Find").borders(Borders::ALL);
+        frame.render_widget(Clear, area);
+        let paragrapth = Paragraph::new(Line::from(vec![
+            Span::raw(self.options.len().to_string()),
+            Span::raw(" >> "),
+            Span::raw(self.pattern.to_owned()),
+            Span::styled("|", Style::default().add_modifier(Modifier::SLOW_BLINK)),
+        ]));
+        frame.render_widget(paragrapth.block(block), area);
     }
     fn update_editor(&mut self, editor_state: &mut crate::components::EditorState) {
         if let Some(cb) = self.editor_callback {

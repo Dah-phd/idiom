@@ -59,7 +59,7 @@ pub fn rename_var_popup() -> Box<Popup> {
     })
 }
 
-pub fn find_in_editor_popup() -> Box<Popup> {
+pub fn find_in_editor_popup_2() -> Box<Popup> {
     Box::new(Popup {
         message: String::new(),
         title: Some("Search opened file".to_owned()),
@@ -74,7 +74,7 @@ pub fn find_in_editor_popup() -> Box<Popup> {
     })
 }
 
-pub fn find_in_editor_popup_2() -> Box<PopupActiveSelector<Select>> {
+pub fn find_in_editor_popup() -> Box<PopupActiveSelector<Select>> {
     Box::new(PopupActiveSelector::for_editor(
         |popup| {
             if let Some(select) = popup.next() {

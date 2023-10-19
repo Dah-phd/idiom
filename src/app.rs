@@ -114,7 +114,10 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                         PopupMessage::GoToSelect(select) => {
                             if let Some(editor) = editor_state.get_active() {
                                 editor.go_to_select(select);
+                            } else {
+                                mode = mode.clear_popup();
                             }
+                            continue;
                         }
                         PopupMessage::GoToLine(line_idx) => {
                             if let Some(editor) = editor_state.get_active() {
