@@ -243,6 +243,17 @@ impl<T: Clone> PopupActiveSelector<T> {
         }
         self.options.get(self.state).cloned()
     }
+
+    pub fn get_option_count(&self) -> String {
+        let len = self.options.len();
+        if len < 10 {
+            format!("  {len}")
+        } else if len < 100 {
+            format!(" {len}")
+        } else {
+            String::from("99+")
+        }
+    }
 }
 
 impl<T: Clone> PopupInterface for PopupActiveSelector<T> {
@@ -267,7 +278,7 @@ impl<T: Clone> PopupInterface for PopupActiveSelector<T> {
         let block = Block::default().title("Find").borders(Borders::ALL);
         frame.render_widget(Clear, area);
         let paragrapth = Paragraph::new(Line::from(vec![
-            Span::raw(self.options.len().to_string()),
+            Span::raw(self.get_option_count()),
             Span::raw(" >> "),
             Span::raw(self.pattern.to_owned()),
             Span::styled("|", Style::default().add_modifier(Modifier::SLOW_BLINK)),
