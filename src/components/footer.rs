@@ -1,7 +1,8 @@
-use crate::components::editor::DocStats;
+use crate::{components::editor::DocStats, configs::Mode};
 use ratatui::{
     backend::Backend,
     layout::{Alignment, Constraint, Layout, Rect},
+    text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
@@ -27,9 +28,10 @@ impl Footer {
         &mut self,
         frame: &mut Frame<impl Backend>,
         screen: Rect,
+        mode: &Mode,
         stats: Option<DocStats>,
     ) -> Rect {
-        let widget = self.widget_with_stats(stats);
+        let widget = self.widget_with_stats(mode, stats);
         let layout = Layout::default()
             .constraints([
                 Constraint::Length(screen.height.checked_sub(2).unwrap_or_default()),
@@ -40,17 +42,16 @@ impl Footer {
         layout[0]
     }
 
-    fn widget_with_stats(&mut self, stats: Option<DocStats>) -> Paragraph {
-        let line = if let Some((doc_len, selected, cur)) = stats {
-            let msg = self.get_message();
-            match selected {
-                0 => format!("{msg}    Doc Len {doc_len}, Ln {}, Col {}", cur.line, cur.char),
-                _ => format!("{msg}    Doc Len {doc_len}, Ln {}, Col {} ({selected} selected)", cur.line, cur.char),
-            }
-        } else {
-            String::from(self.get_message())
-        };
-        Paragraph::new(line).alignment(Alignment::Right).block(Block::default().borders(Borders::TOP))
+    fn widget_with_stats(&mut self, mode: &Mode, stats: Option<DocStats>) -> Paragraph {
+        let mut line = vec![Span::raw(self.get_message())];
+        if let Some((doc_len, selected, cur)) = stats {
+            line.push(Span::raw(match selected {
+                0 => format!("    Doc Len {doc_len}, Ln {}, Col {}", cur.line, cur.char),
+                _ => format!("    Doc Len {doc_len}, Ln {}, Col {} ({selected} selected)", cur.line, cur.char),
+            }));
+        }
+        line.push(Span::from(mode));
+        Paragraph::new(Line::from(line)).alignment(Alignment::Right).block(Block::default().borders(Borders::TOP))
     }
 
     pub fn message(&mut self, message: String) {

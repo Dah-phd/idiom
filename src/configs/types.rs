@@ -1,11 +1,12 @@
 use crossterm::event::KeyEvent;
-use ratatui::{backend::CrosstermBackend, Frame};
-
-use crate::components::{
-    editor::{self, EditorState},
-    popups::PopupInterface,
-    Footer, Tree,
+use ratatui::{
+    backend::CrosstermBackend,
+    style::{Color, Style},
+    text::Span,
+    Frame,
 };
+
+use crate::components::{editor::EditorState, popups::PopupInterface, Footer, Tree};
 use std::{io::Stdout, path::PathBuf};
 
 use super::PopupMessage;
@@ -14,6 +15,20 @@ pub enum Mode {
     Select,
     Insert,
     Popup((Box<Mode>, Box<dyn PopupInterface>)),
+}
+
+impl From<&Mode> for Span<'static> {
+    fn from(mode: &Mode) -> Self {
+        match mode {
+            Mode::Insert => Span::styled("  Insert  ", Style::default().fg(Color::Rgb(255, 0, 0))),
+            Mode::Select => Span::styled("  Select  ", Style::default().fg(Color::LightCyan)),
+            Mode::Popup((inner, _)) => match inner.as_ref() {
+                Mode::Insert => Span::styled("  Insert  ", Style::default().fg(Color::Gray)),
+                Mode::Select => Span::styled("  Select  ", Style::default().fg(Color::Gray)),
+                Mode::Popup(..) => Span::styled("  Nested  ", Style::default().fg(Color::Gray)),
+            },
+        }
+    }
 }
 
 impl Mode {
