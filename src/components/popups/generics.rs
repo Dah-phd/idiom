@@ -185,8 +185,9 @@ impl<T> PopupInterface for PopupSelector<T> {
 pub struct PopupActiveSelector<T: Clone> {
     pub options: Vec<T>,
     pub pattern: String,
-    state: usize,
+    pub state: usize,
     command: fn(&mut Self) -> PopupMessage,
+    to_selector: Option<fn(&mut Self) -> PopupMessage>,
     on_update: PopupMessage,
     footer_callback: Option<fn(&mut Self, &mut Footer)>,
     editor_callback: Option<fn(&mut Self, &mut EditorState)>,
@@ -195,12 +196,17 @@ pub struct PopupActiveSelector<T: Clone> {
 
 impl<T: Clone> PopupActiveSelector<T> {
     #[allow(dead_code)]
-    pub fn for_footer(command: fn(&mut Self) -> PopupMessage, callback: fn(&mut Self, &mut Footer)) -> Self {
+    pub fn for_footer(
+        command: fn(&mut Self) -> PopupMessage,
+        callback: fn(&mut Self, &mut Footer),
+        to_selector: Option<fn(&mut Self) -> PopupMessage>,
+    ) -> Self {
         Self {
             options: Vec::new(),
             pattern: String::new(),
             state: 0,
             command,
+            to_selector,
             on_update: PopupMessage::UpdateFooter,
             footer_callback: Some(callback),
             editor_callback: None,
@@ -208,12 +214,17 @@ impl<T: Clone> PopupActiveSelector<T> {
         }
     }
 
-    pub fn for_editor(command: fn(&mut Self) -> PopupMessage, callback: fn(&mut Self, &mut EditorState)) -> Self {
+    pub fn for_editor(
+        command: fn(&mut Self) -> PopupMessage,
+        callback: fn(&mut Self, &mut EditorState),
+        to_selector: Option<fn(&mut Self) -> PopupMessage>,
+    ) -> Self {
         Self {
             options: Vec::new(),
             pattern: String::new(),
             state: 0,
             command,
+            to_selector,
             on_update: PopupMessage::UpdateEditor,
             footer_callback: None,
             editor_callback: Some(callback),
@@ -222,12 +233,17 @@ impl<T: Clone> PopupActiveSelector<T> {
     }
 
     #[allow(dead_code)]
-    pub fn for_tree(command: fn(&mut Self) -> PopupMessage, callback: fn(&mut Self, &mut Tree)) -> Self {
+    pub fn for_tree(
+        command: fn(&mut Self) -> PopupMessage,
+        callback: fn(&mut Self, &mut Tree),
+        to_selector: Option<fn(&mut Self) -> PopupMessage>,
+    ) -> Self {
         Self {
             options: Vec::new(),
             pattern: String::new(),
             state: 0,
             command,
+            to_selector,
             on_update: PopupMessage::UpdateTree,
             footer_callback: None,
             editor_callback: None,
@@ -244,7 +260,7 @@ impl<T: Clone> PopupActiveSelector<T> {
         self.options.get(self.state).cloned()
     }
 
-    pub fn get_option_count(&self) -> String {
+    pub fn get_option_count_as_string(&self) -> String {
         let len = self.options.len();
         if len < 10 {
             format!("  {len}")
@@ -270,6 +286,13 @@ impl<T: Clone> PopupInterface for PopupActiveSelector<T> {
                 self.on_update.clone()
             }
             KeyCode::Esc => PopupMessage::Done,
+            KeyCode::Tab => {
+                if let Some(cb) = self.to_selector {
+                    (cb)(self)
+                } else {
+                    PopupMessage::Done
+                }
+            }
             _ => PopupMessage::None,
         }
     }
@@ -278,7 +301,7 @@ impl<T: Clone> PopupInterface for PopupActiveSelector<T> {
         let block = Block::default().title("Find").borders(Borders::ALL);
         frame.render_widget(Clear, area);
         let paragrapth = Paragraph::new(Line::from(vec![
-            Span::raw(self.get_option_count()),
+            Span::raw(self.get_option_count_as_string()),
             Span::raw(" >> "),
             Span::raw(self.pattern.to_owned()),
             Span::styled("|", Style::default().add_modifier(Modifier::SLOW_BLINK)),

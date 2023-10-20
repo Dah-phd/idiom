@@ -59,21 +59,6 @@ pub fn rename_var_popup() -> Box<Popup> {
     })
 }
 
-pub fn find_in_editor_popup_2() -> Box<Popup> {
-    Box::new(Popup {
-        message: String::new(),
-        title: Some("Search opened file".to_owned()),
-        message_as_buffer_builder: Some(Some),
-        buttons: vec![Button {
-            command: |popup| PopupMessage::SelectOpenedFile(popup.message.to_owned()),
-            name: "Search",
-            key: None,
-        }],
-        size: Some((40, 4)),
-        state: 0,
-    })
-}
-
 pub fn find_in_editor_popup() -> Box<PopupActiveSelector<Select>> {
     Box::new(PopupActiveSelector::for_editor(
         |popup| {
@@ -85,9 +70,11 @@ pub fn find_in_editor_popup() -> Box<PopupActiveSelector<Select>> {
         },
         |popup, editor_state| {
             if let Some(editor) = editor_state.get_active() {
-                editor.find(popup.pattern.as_str(), &mut popup.options)
+                editor.find(popup.pattern.as_str(), &mut popup.options);
+                popup.state = popup.options.len().checked_sub(1).unwrap_or_default();
             }
         },
+        Some(|popup| PopupMessage::SelectOpenedFile(popup.pattern.to_owned())),
     ))
 }
 
