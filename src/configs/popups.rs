@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 
-use crate::components::editor::Select;
+use crate::components::workspace::Select;
 
 #[derive(Debug, Clone)]
 pub enum PopupMessage {
     CreateFileOrFolder(String),
     CreateFileOrFolderBase(String),
-    Open((PathBuf, usize)),
+    Open(PathBuf, usize),
     ActivateEditor(usize),
     SelectPath(String),
     SelectPathFull(String),
@@ -17,7 +17,8 @@ pub enum PopupMessage {
     RenameFile(String),
     GoToLine(usize),
     GoToSelect(Select),
-    UpdateEditor,
+    ReplaceSelect(String, Select),
+    UpdateWorkspace,
     UpdateFooter,
     UpdateTree,
     Exit,

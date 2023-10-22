@@ -1,14 +1,17 @@
 use crate::{
     components::{
         popups::editor_popups::{go_to_line_popup, select_editor_popup},
-        popups::{editor_popups::rename_var_popup, message},
         popups::{
             editor_popups::{find_in_editor_popup, save_all_popup, select_line_popup},
             tree_popups::{
                 create_file_popup, find_in_tree_popup, rename_file_popup, select_file_popup, select_tree_file_popup,
             },
         },
-        EditorState, EditorTerminal, Footer, Tree,
+        popups::{
+            editor_popups::{rename_var_popup, replace_in_editor_popup},
+            message,
+        },
+        EditorTerminal, Footer, Tree, Workspace,
     },
     configs::{GeneralAction, KeyMap, Mode, PopupMessage},
 };
@@ -29,14 +32,14 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
 
     // COMPONENTS
     let mut file_tree = Tree::new(open_file.is_none());
-    let mut editor_state = EditorState::from(configs.editor_key_map());
+    let mut workspace = Workspace::from(configs.editor_key_map());
     let mut footer = Footer::default();
     let mut tmux = EditorTerminal::new();
 
     // CLI SETUP
     if let Some(path) = open_file {
         file_tree.select_by_path(&path);
-        editor_state.new_from(path).await;
+        workspace.new_from(path).await;
         mode = Mode::Insert;
     }
 
@@ -49,32 +52,32 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
         terminal.draw(|frame| {
             let mut screen = frame.size();
             screen = file_tree.render_with_remainder(frame, screen);
-            screen = footer.render_with_remainder(frame, screen, &mode, editor_state.get_stats());
+            screen = footer.render_with_remainder(frame, screen, &mode, workspace.get_stats());
             screen = tmux.render_with_remainder(frame, screen);
-            editor_state.render(frame, screen);
+            workspace.render(frame, screen);
             mode.render_popup_if_exists(frame);
         })?;
 
-        editor_state.lexer_updates().await;
+        workspace.lexer_updates().await;
 
         let timeout = TICK.checked_sub(clock.elapsed()).unwrap_or_else(|| Duration::from_secs(0));
 
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = crossterm::event::read()? {
-                if matches!(mode, Mode::Insert) && !tmux.active && editor_state.map(&key).await {
+                if !tmux.active && workspace.map(&key, &mut mode).await {
                     continue;
                 }
                 if let Some(msg) = mode.popup_map(&key) {
                     match msg {
                         PopupMessage::Exit => break,
                         PopupMessage::SaveAndExit => {
-                            editor_state.save_all().await;
+                            workspace.save_all().await;
                             break;
                         }
-                        PopupMessage::Open((path, line)) => {
+                        PopupMessage::Open(path, line) => {
                             file_tree.select_by_path(&path);
                             if !path.is_dir() {
-                                editor_state.new_at_line(path, line).await;
+                                workspace.new_at_line(path, line).await;
                                 mode = Mode::Insert;
                             } else {
                                 mode = Mode::Select;
@@ -82,7 +85,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             continue;
                         }
                         PopupMessage::ActivateEditor(idx) => {
-                            editor_state.state.select(Some(idx));
+                            workspace.state.select(Some(idx));
                             mode = mode.clear_popup();
                             continue;
                         }
@@ -104,7 +107,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             continue;
                         }
                         PopupMessage::SelectOpenedFile(pattern) => {
-                            if let Some(editor) = editor_state.get_active() {
+                            if let Some(editor) = workspace.get_active() {
                                 mode = Mode::Insert.popup(select_line_popup(editor.search_file(&pattern)));
                             } else {
                                 mode = mode.clear_popup();
@@ -112,7 +115,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             continue;
                         }
                         PopupMessage::GoToSelect(select) => {
-                            if let Some(editor) = editor_state.get_active() {
+                            if let Some(editor) = workspace.get_active() {
                                 editor.go_to_select(select);
                             } else {
                                 mode = mode.clear_popup();
@@ -120,14 +123,21 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             continue;
                         }
                         PopupMessage::GoToLine(line_idx) => {
-                            if let Some(editor) = editor_state.get_active() {
+                            if let Some(editor) = workspace.get_active() {
                                 editor.go_to(line_idx)
                             }
                             mode = mode.clear_popup();
                             continue;
                         }
-                        PopupMessage::UpdateEditor => {
-                            mode.update_editor(&mut editor_state);
+                        PopupMessage::ReplaceSelect(new, select) => {
+                            if let Some(editor) = workspace.get_active() {
+                                editor.replace_select(select, new.as_str());
+                            }
+                            mode = mode.clear_popup();
+                            continue;
+                        }
+                        PopupMessage::UpdateWorkspace => {
+                            mode.update_workspace(&mut workspace);
                             continue;
                         }
                         PopupMessage::UpdateFooter => {
@@ -141,7 +151,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                         PopupMessage::CreateFileOrFolder(name) => {
                             if let Ok(new_path) = file_tree.create_file_or_folder(name) {
                                 if !new_path.is_dir() {
-                                    editor_state.new_from(new_path).await;
+                                    workspace.new_from(new_path).await;
                                 }
                             }
                             mode = mode.clear_popup();
@@ -150,7 +160,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                         PopupMessage::CreateFileOrFolderBase(name) => {
                             if let Ok(new_path) = file_tree.create_file_or_folder_base(name) {
                                 if !new_path.is_dir() {
-                                    editor_state.new_from(new_path).await;
+                                    workspace.new_from(new_path).await;
                                     mode = Mode::Insert;
                                 }
                             }
@@ -159,7 +169,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                         }
                         PopupMessage::Rename(new_name) => {
                             mode = mode.clear_popup();
-                            editor_state.renames(new_name).await;
+                            workspace.renames(new_name).await;
                             continue;
                         }
                         PopupMessage::RenameFile(name) => {
@@ -192,8 +202,11 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             mode = mode.popup(find_in_tree_popup());
                         }
                     }
+                    GeneralAction::Replace if matches!(mode, Mode::Insert) => {
+                        mode = mode.popup(replace_in_editor_popup());
+                    }
                     GeneralAction::SelectOpenEditor => {
-                        mode = mode.popup(select_editor_popup(editor_state.tabs()));
+                        mode = mode.popup(select_editor_popup(workspace.tabs()));
                     }
                     GeneralAction::NewFile => {
                         mode = mode.popup(create_file_popup(file_tree.get_first_selected_folder_display()));
@@ -211,7 +224,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                     },
                     GeneralAction::Expand => {
                         if let Some(file_path) = file_tree.expand_dir_or_get_path() {
-                            editor_state.new_from(file_path).await;
+                            workspace.new_from(file_path).await;
                         }
                     }
                     GeneralAction::FinishOrSelect => {
@@ -219,45 +232,45 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             mode = Mode::Insert;
                         } else if let Some(file_path) = file_tree.expand_dir_or_get_path() {
                             if !file_path.is_dir() {
-                                editor_state.new_from(file_path).await;
+                                workspace.new_from(file_path).await;
                                 mode = Mode::Insert;
                             }
                         }
                     }
                     GeneralAction::NextTab => {
-                        if let Some(editor_id) = editor_state.state.selected() {
+                        if let Some(editor_id) = workspace.state.selected() {
                             file_tree.on_open_tabs = true;
-                            if editor_id >= editor_state.editors.len() - 1 {
-                                editor_state.state.select(Some(0))
+                            if editor_id >= workspace.editors.len() - 1 {
+                                workspace.state.select(Some(0))
                             } else {
-                                editor_state.state.select(Some(editor_id + 1))
+                                workspace.state.select(Some(editor_id + 1))
                             }
                         }
                     }
                     GeneralAction::Exit => {
-                        if editor_state.are_updates_saved() && !matches!(mode, Mode::Popup(..)) {
+                        if workspace.are_updates_saved() && !matches!(mode, Mode::Popup(..)) {
                             break;
                         } else {
                             mode = mode.popup(save_all_popup());
                         }
                     }
                     GeneralAction::FileTreeModeOrCancelInput => mode = Mode::Select,
-                    GeneralAction::SaveAll => editor_state.save().await,
+                    GeneralAction::SaveAll => workspace.save().await,
                     GeneralAction::HideFileTree => file_tree.toggle(),
                     GeneralAction::PreviousTab => {
-                        if let Some(editor_id) = editor_state.state.selected() {
+                        if let Some(editor_id) = workspace.state.selected() {
                             file_tree.on_open_tabs = true;
                             if editor_id == 0 {
-                                editor_state.state.select(Some(editor_state.editors.len() - 1))
+                                workspace.state.select(Some(workspace.editors.len() - 1))
                             } else {
-                                editor_state.state.select(Some(editor_id - 1))
+                                workspace.state.select(Some(editor_id - 1))
                             }
                         }
                     }
                     GeneralAction::RefreshSettings => {
                         let new_key_map = KeyMap::new();
                         general_key_map = new_key_map.general_key_map();
-                        editor_state.refresh_cfg(new_key_map.editor_key_map());
+                        workspace.refresh_cfg(new_key_map.editor_key_map());
                     }
                     GeneralAction::GoToLinePopup if matches!(mode, Mode::Insert) => {
                         mode = mode.popup(go_to_line_popup());
@@ -273,5 +286,6 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
             clock = Instant::now();
         }
     }
+    workspace.graceful_exit().await;
     Ok(())
 }

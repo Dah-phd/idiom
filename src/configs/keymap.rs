@@ -209,6 +209,7 @@ pub enum GeneralAction {
     Rename,
     DeleteFile,
     Find,
+    Replace,
     Exit,
     HideFileTree,
     NextTab,
@@ -232,7 +233,8 @@ pub struct GeneralUserKeyMap {
     new_file: String,
     rename_file: String,
     delete_file: String,
-    find_in_tree: String,
+    find: String,
+    replace: String,
     backspace_tree_input: String,
     exit: String,
     hide_file_tree: String,
@@ -257,7 +259,8 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
         insert_key_event(&mut hash, &val.new_file, GeneralAction::NewFile);
         insert_key_event(&mut hash, &val.rename_file, GeneralAction::Rename);
         insert_key_event(&mut hash, &val.delete_file, GeneralAction::DeleteFile);
-        insert_key_event(&mut hash, &val.find_in_tree, GeneralAction::Find);
+        insert_key_event(&mut hash, &val.find, GeneralAction::Find);
+        insert_key_event(&mut hash, &val.replace, GeneralAction::Replace);
         insert_key_event(&mut hash, &val.backspace_tree_input, GeneralAction::BackspaceInput);
         insert_key_event(&mut hash, &val.exit, GeneralAction::Exit);
         insert_key_event(&mut hash, &val.hide_file_tree, GeneralAction::HideFileTree);
@@ -284,7 +287,8 @@ impl Default for GeneralUserKeyMap {
             new_file: format!("{CTRL} && n"),
             rename_file: format!("{F}2"),
             delete_file: format!("{SHIFT} && {DELETE}"),
-            find_in_tree: format!("{CTRL} && f"),
+            find: format!("{CTRL} && f"),
+            replace: format!("{CTRL} && h"),
             backspace_tree_input: String::from(BACKSPACE),
             exit: format!("{} && {} || {} && {}", CTRL, 'd', CTRL, 'q'),
             hide_file_tree: format!("{} && {}", CTRL, 'e'),

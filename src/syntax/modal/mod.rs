@@ -1,11 +1,11 @@
 mod parser;
-use crate::{components::editor::CursorPosition, configs::EditorAction};
+use crate::{components::workspace::CursorPosition, configs::EditorAction};
 use lsp_types::{CompletionItem, Documentation, Hover, HoverContents, MarkedString, SignatureHelp};
 pub use parser::{LSPResponseType, LSPResult};
 use ratatui::{
     backend::CrosstermBackend,
     prelude::Rect,
-    text::{Line, Span},
+    text::Line,
     widgets::{Block, Borders, Clear, List, ListItem},
     Frame,
 };

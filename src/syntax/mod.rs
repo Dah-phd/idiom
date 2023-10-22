@@ -5,7 +5,7 @@ mod rust;
 mod theme;
 use self::modal::{AutoComplete, Info, LSPResponseType, LSPResult, Modal};
 pub use self::theme::{Theme, DEFAULT_THEME_FILE};
-use crate::components::editor::CursorPosition;
+use crate::components::workspace::CursorPosition;
 use crate::configs::EditorAction;
 use crate::configs::FileType;
 use crate::lsp::LSP;

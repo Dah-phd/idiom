@@ -1,5 +1,5 @@
 use super::{generics::PopupActiveSelector, Button, Popup, PopupSelector};
-use crate::{components::editor::Select, configs::PopupMessage};
+use crate::{components::workspace::Select, configs::PopupMessage};
 use crossterm::event::KeyCode;
 
 pub fn save_all_popup() -> Box<Popup> {
@@ -71,17 +71,29 @@ pub fn find_in_editor_popup() -> Box<PopupActiveSelector<Select>> {
         |popup, editor_state| {
             if let Some(editor) = editor_state.get_active() {
                 editor.find(popup.pattern.as_str(), &mut popup.options);
-                popup.state = popup.options.len().checked_sub(1).unwrap_or_default();
             }
         },
         Some(|popup| PopupMessage::SelectOpenedFile(popup.pattern.to_owned())),
     ))
 }
 
+pub fn replace_in_editor_popup() -> Box<PopupActiveSelector<Select>> {
+    Box::new(PopupActiveSelector::default(
+        |popup| {
+            if let Some(select) = popup.drain_next() {
+                PopupMessage::ReplaceSelect(popup.pattern.to_owned(), select)
+            } else {
+                PopupMessage::Done
+            }
+        },
+        None,
+    ))
+}
+
 pub fn select_line_popup(options: Vec<(usize, String)>) -> Box<PopupSelector<(usize, String)>> {
     Box::new(PopupSelector {
         options,
-        display: |(_, line)| line.to_owned(),
+        display: |(idx, line)| format!("{idx}| {line}"),
         command: |popup| PopupMessage::GoToLine(popup.options[popup.state].0),
         state: 0,
         size: None,

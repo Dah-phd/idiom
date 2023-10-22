@@ -1,7 +1,7 @@
 use std::io::Stdout;
 
 use super::PopupInterface;
-use crate::components::{EditorState, Tree};
+use crate::components::{Tree, Workspace};
 use crate::utils::{centered_rect_static, right_corner_rect_static};
 use crate::{components::Footer, configs::PopupMessage};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -81,9 +81,9 @@ impl PopupInterface for Popup {
             _ => PopupMessage::None,
         }
     }
-    fn update_editor(&mut self, _editor_state: &mut crate::components::EditorState) {}
-    fn update_tree(&mut self, _file_tree: &mut crate::components::Tree) {}
-    fn update_footer(&mut self, _footer: &mut crate::components::Footer) {}
+    fn update_workspace(&mut self, _editor_state: &mut Workspace) {}
+    fn update_tree(&mut self, _file_tree: &mut Tree) {}
+    fn update_footer(&mut self, _footer: &mut Footer) {}
 }
 
 impl Popup {
@@ -177,9 +177,9 @@ impl<T> PopupInterface for PopupSelector<T> {
             _ => PopupMessage::None,
         }
     }
-    fn update_editor(&mut self, _editor_state: &mut crate::components::EditorState) {}
-    fn update_tree(&mut self, _file_tree: &mut crate::components::Tree) {}
-    fn update_footer(&mut self, _footer: &mut crate::components::Footer) {}
+    fn update_workspace(&mut self, _editor_state: &mut Workspace) {}
+    fn update_tree(&mut self, _file_tree: &mut Tree) {}
+    fn update_footer(&mut self, _footer: &mut Footer) {}
 }
 
 pub struct PopupActiveSelector<T: Clone> {
@@ -190,11 +190,25 @@ pub struct PopupActiveSelector<T: Clone> {
     to_selector: Option<fn(&mut Self) -> PopupMessage>,
     on_update: PopupMessage,
     footer_callback: Option<fn(&mut Self, &mut Footer)>,
-    editor_callback: Option<fn(&mut Self, &mut EditorState)>,
+    editor_callback: Option<fn(&mut Self, &mut Workspace)>,
     tree_callback: Option<fn(&mut Self, &mut Tree)>,
 }
 
 impl<T: Clone> PopupActiveSelector<T> {
+    pub fn default(command: fn(&mut Self) -> PopupMessage, to_selector: Option<fn(&mut Self) -> PopupMessage>) -> Self {
+        Self {
+            options: Vec::new(),
+            pattern: String::new(),
+            state: 0,
+            command,
+            to_selector,
+            on_update: PopupMessage::None,
+            footer_callback: None,
+            editor_callback: None,
+            tree_callback: None,
+        }
+    }
+
     #[allow(dead_code)]
     pub fn for_footer(
         command: fn(&mut Self) -> PopupMessage,
@@ -216,7 +230,7 @@ impl<T: Clone> PopupActiveSelector<T> {
 
     pub fn for_editor(
         command: fn(&mut Self) -> PopupMessage,
-        callback: fn(&mut Self, &mut EditorState),
+        callback: fn(&mut Self, &mut Workspace),
         to_selector: Option<fn(&mut Self) -> PopupMessage>,
     ) -> Self {
         Self {
@@ -225,7 +239,7 @@ impl<T: Clone> PopupActiveSelector<T> {
             state: 0,
             command,
             to_selector,
-            on_update: PopupMessage::UpdateEditor,
+            on_update: PopupMessage::UpdateWorkspace,
             footer_callback: None,
             editor_callback: Some(callback),
             tree_callback: None,
@@ -260,6 +274,11 @@ impl<T: Clone> PopupActiveSelector<T> {
         self.options.get(self.state).cloned()
     }
 
+    pub fn drain_next(&mut self) -> Option<T> {
+        self.next()?;
+        Some(self.options.remove(self.state))
+    }
+
     pub fn get_option_count_as_string(&self) -> String {
         let len = self.options.len();
         if len < 10 {
@@ -275,7 +294,7 @@ impl<T: Clone> PopupActiveSelector<T> {
 impl<T: Clone> PopupInterface for PopupActiveSelector<T> {
     fn key_map(&mut self, key: &KeyEvent) -> PopupMessage {
         match key.code {
-            KeyCode::Enter => (self.command)(self),
+            KeyCode::Enter | KeyCode::Right => (self.command)(self),
             KeyCode::Char('f') if key.modifiers.contains(KeyModifiers::CONTROL) => PopupMessage::Done,
             KeyCode::Char(ch) => {
                 self.pattern.push(ch);
@@ -285,7 +304,8 @@ impl<T: Clone> PopupInterface for PopupActiveSelector<T> {
                 self.pattern.pop();
                 self.on_update.clone()
             }
-            KeyCode::Esc => PopupMessage::Done,
+            KeyCode::Up => PopupMessage::None,
+            KeyCode::Esc | KeyCode::Left => PopupMessage::Done,
             KeyCode::Tab => {
                 if let Some(cb) = self.to_selector {
                     (cb)(self)
@@ -308,19 +328,22 @@ impl<T: Clone> PopupInterface for PopupActiveSelector<T> {
         ]));
         frame.render_widget(paragrapth.block(block), area);
     }
-    fn update_editor(&mut self, editor_state: &mut crate::components::EditorState) {
+    fn update_workspace(&mut self, workspace: &mut Workspace) {
         if let Some(cb) = self.editor_callback {
-            (cb)(self, editor_state);
+            (cb)(self, workspace);
+            self.state = self.options.len().checked_sub(1).unwrap_or_default();
         }
     }
-    fn update_tree(&mut self, file_tree: &mut crate::components::Tree) {
+    fn update_tree(&mut self, file_tree: &mut Tree) {
         if let Some(cb) = self.tree_callback {
             (cb)(self, file_tree);
+            self.state = self.options.len().checked_sub(1).unwrap_or_default();
         }
     }
-    fn update_footer(&mut self, footer: &mut crate::components::Footer) {
+    fn update_footer(&mut self, footer: &mut Footer) {
         if let Some(cb) = self.footer_callback {
             (cb)(self, footer);
+            self.state = self.options.len().checked_sub(1).unwrap_or_default();
         }
     }
 }

@@ -4,7 +4,7 @@ mod notification;
 mod python;
 mod request;
 mod rust;
-use crate::components::editor::CursorPosition;
+use crate::components::workspace::CursorPosition;
 use crate::configs::FileType;
 use crate::utils::{into_guard, split_arc_mutex, split_arc_mutex_async};
 use lsp_types::notification::{

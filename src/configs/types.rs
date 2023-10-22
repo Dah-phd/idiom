@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::components::{editor::EditorState, popups::PopupInterface, Footer, Tree};
+use crate::components::{popups::PopupInterface, workspace::Workspace, Footer, Tree};
 use std::{io::Stdout, path::PathBuf};
 
 use super::PopupMessage;
@@ -59,9 +59,9 @@ impl Mode {
         None
     }
 
-    pub fn update_editor(&mut self, editor_state: &mut EditorState) {
+    pub fn update_workspace(&mut self, workspace: &mut Workspace) {
         if let Self::Popup((_, popup)) = self {
-            popup.update_editor(editor_state);
+            popup.update_workspace(workspace);
         }
     }
 

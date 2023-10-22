@@ -1,3 +1,4 @@
+use super::utils::insert_clip;
 use cli_clipboard::{ClipboardContext, ClipboardProvider};
 use std::fmt::Debug;
 
@@ -53,36 +54,7 @@ impl Clipboard {
         self.push(line);
     }
 
-    pub fn paste(&mut self, content: &mut Vec<String>, mut cursor: CursorPosition) -> Option<CursorPosition> {
-        if let Some(clip) = self.get() {
-            let mut lines: Vec<_> = clip.split('\n').collect();
-            if lines.len() == 1 {
-                let text = lines[0];
-                content[cursor.line].insert_str(cursor.char, lines[0]);
-                cursor.char += text.len();
-                return Some(cursor);
-            } else {
-                let line = content.remove(cursor.line);
-                let (prefix, suffix) = line.split_at(cursor.char);
-                let mut first_line = prefix.to_owned();
-                first_line.push_str(lines.remove(0));
-                content.insert(cursor.line, first_line);
-                let last_idx = lines.len() - 1;
-                for (idx, select) in lines.iter().enumerate() {
-                    let next_line = if idx == last_idx {
-                        let mut last_line = select.to_string();
-                        cursor.char = last_line.len();
-                        last_line.push_str(suffix);
-                        last_line
-                    } else {
-                        select.to_string()
-                    };
-                    content.insert(cursor.line + 1, next_line);
-                    cursor.line += 1;
-                }
-                return Some(cursor);
-            }
-        }
-        None
+    pub fn paste(&mut self, content: &mut Vec<String>, cursor: CursorPosition) -> Option<CursorPosition> {
+        Some(insert_clip(self.get()?, content, cursor))
     }
 }

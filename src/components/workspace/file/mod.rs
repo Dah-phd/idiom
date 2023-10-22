@@ -1,10 +1,13 @@
 mod action;
 mod clipboard;
+mod cursor;
 mod select;
+mod utils;
 use clipboard::Clipboard;
+pub use cursor::{CursorPosition, Offset};
 use lsp_types::TextEdit;
 use ratatui::widgets::{List, ListItem};
-pub use select::{CursorPosition, Offset, Select};
+pub use select::Select;
 
 use crate::{
     configs::{EditorConfigs, FileType},
@@ -14,6 +17,7 @@ use crate::{
 use std::path::PathBuf;
 
 use self::action::ActionLogger;
+use self::utils::{backspace_indent_handler, derive_indent_from, indent_from_prev, unindent_if_before_base_pattern};
 
 type DocLen = usize;
 type SelectLen = usize;
@@ -130,8 +134,20 @@ impl Editor {
         }
     }
 
-    pub fn replace(&mut self, old: String, new: String) {
-        todo!()
+    pub fn mass_replace(&mut self, selects: Vec<Select>, new: &str) {
+        for select in selects {
+            self.replace_select(select, new);
+        }
+    }
+
+    pub fn replace_select(&mut self, select: Select, new: &str) {
+        self.select = select;
+        if let Some((from, ..)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
+            self.cursor = from;
+            self.content[self.cursor.line].insert_str(self.cursor.char, new);
+            self.cursor.char += new.len();
+            self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.as_range()]);
+        }
     }
 
     pub fn cut(&mut self) {
@@ -429,14 +445,14 @@ impl Editor {
         self.action_logger.init_replace(self.cursor, &[prev_line.to_owned()]);
         let mut line =
             if prev_line.len() >= self.cursor.char { prev_line.split_off(self.cursor.char) } else { String::new() };
-        let indent = self.configs.derive_indent_from(prev_line);
+        let indent = derive_indent_from(&self.configs, prev_line);
         line.insert_str(0, &indent);
         self.cursor.line += 1;
         self.cursor.char = indent.len();
         if let Some(last) = prev_line.trim_end().chars().last() {
             if let Some(first) = line.trim_start().chars().next() {
                 if [('{', '}'), ('(', ')'), ('[', ']')].contains(&(last, first)) {
-                    self.configs.unindent_if_before_base_pattern(&mut line);
+                    unindent_if_before_base_pattern(&self.configs, &mut line);
                     self.content.insert(self.cursor.line, line);
                     self.content.insert(self.cursor.line, indent);
                     self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.line_range(1, 2)]);
@@ -501,7 +517,7 @@ impl Editor {
         } else {
             let line = &mut self.content[self.cursor.line];
             self.action_logger.prep_buffer(&self.cursor, line);
-            let offset = self.configs.backspace_indent_handler(line, self.cursor.char);
+            let offset = backspace_indent_handler(&self.configs, line, self.cursor.char);
             self.cursor.offset_char(offset);
             self.action_logger.backspace(&self.cursor);
         }
@@ -572,7 +588,7 @@ impl Editor {
             let (prev_split, current_split) = self.content.split_at_mut(line_idx);
             let prev = &prev_split[line_idx - 1];
             let line = &mut current_split[0];
-            (self.configs.indent_from_prev(prev, line), line)
+            (indent_from_prev(&self.configs, prev, line), line)
         } else {
             let line = &mut self.content[line_idx];
             (trim_start_inplace(line), line)

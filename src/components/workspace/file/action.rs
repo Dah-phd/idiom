@@ -1,6 +1,8 @@
-use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
-
-use super::select::CursorPosition;
+use super::{
+    cursor::CursorPosition,
+    utils::{apply_and_rev_edit, into_content_event},
+};
+use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit};
 use std::time::{Duration, Instant};
 
 const TICK: Duration = Duration::from_millis(150);
@@ -40,8 +42,8 @@ pub struct ActionLogger {
 impl Default for ActionLogger {
     fn default() -> Self {
         Self {
-            replace_builder: Option::default(),
-            buffer: Option::default(),
+            replace_builder: None,
+            buffer: None,
             done: Vec::default(),
             text_edits: Vec::default(),
             version: 0,
@@ -176,6 +178,7 @@ impl ActionLogger {
         if self.text_edits.is_empty() {
             None
         } else {
+            self.version += 1;
             Some((self.version, self.text_edits.drain(..).collect()))
         }
     }

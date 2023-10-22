@@ -13,7 +13,7 @@ use dirs::config_dir;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::error::Category;
 
-use crate::{components::editor::Offset, syntax::DEFAULT_THEME_FILE, utils::trim_start_inplace};
+use crate::syntax::DEFAULT_THEME_FILE;
 
 const CONFIG_FOLDER: &str = "idiom";
 const EDITOR_CONFIGS: &str = ".editor";
@@ -54,51 +54,6 @@ impl EditorConfigs {
             FileType::Python => self.indent_after.push(':'),
             _ => (),
         }
-    }
-
-    pub fn backspace_indent_handler(&self, line: &mut String, from_idx: usize) -> Offset {
-        //! does not handle from_idx == 0
-        let prefix = line[..from_idx].trim_start_matches(&self.indent);
-        if prefix.is_empty() {
-            line.replace_range(..self.indent.len(), "");
-            return Offset::Neg(self.indent.len());
-        }
-        if prefix.chars().all(|c| c.is_whitespace()) {
-            let remove_chars_len = prefix.len();
-            line.replace_range(from_idx - remove_chars_len..from_idx, "");
-            return Offset::Neg(remove_chars_len);
-        }
-        line.remove(from_idx - 1);
-        Offset::Neg(1)
-    }
-
-    pub fn derive_indent_from(&self, prev_line: &str) -> String {
-        let mut indent = prev_line.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
-        if let Some(last) = prev_line.trim_end().chars().last() {
-            if self.indent_after.contains(last) {
-                indent.insert_str(0, &self.indent);
-            }
-        };
-        indent
-    }
-
-    pub fn indent_from_prev(&self, prev_line: &str, line: &mut String) -> Offset {
-        let indent = self.derive_indent_from(prev_line);
-        let offset = trim_start_inplace(line) + indent.len();
-        line.insert_str(0, &indent);
-        offset + self.unindent_if_before_base_pattern(line)
-    }
-
-    pub fn unindent_if_before_base_pattern(&self, line: &mut String) -> Offset {
-        if line.starts_with(&self.indent) {
-            if let Some(first) = line.trim_start().chars().next() {
-                if self.unindent_before.contains(first) {
-                    line.replace_range(..self.indent.len(), "");
-                    return Offset::Neg(self.indent.len());
-                }
-            }
-        }
-        Offset::Pos(0)
     }
 }
 

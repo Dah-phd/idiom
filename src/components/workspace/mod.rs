@@ -1,5 +1,5 @@
 mod file;
-use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType};
+use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType, Mode};
 use crate::lsp::LSP;
 use anyhow::Result;
 use crossterm::event::KeyEvent;
@@ -20,7 +20,7 @@ use tokio::sync::Mutex;
 
 type LSPPool = HashMap<FileType, Rc<Mutex<LSP>>>;
 
-pub struct EditorState {
+pub struct Workspace {
     pub editors: Vec<Editor>,
     pub state: ListState,
     base_config: EditorConfigs,
@@ -28,7 +28,7 @@ pub struct EditorState {
     lsp_servers: LSPPool,
 }
 
-impl From<EditorKeyMap> for EditorState {
+impl From<EditorKeyMap> for Workspace {
     fn from(key_map: EditorKeyMap) -> Self {
         Self {
             editors: Vec::default(),
@@ -40,7 +40,7 @@ impl From<EditorKeyMap> for EditorState {
     }
 }
 
-impl EditorState {
+impl Workspace {
     pub fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, screen: Rect) {
         let layout = Layout::default().constraints([Constraint::Length(1), Constraint::default()]).split(screen);
         if let Some(editor_id) = self.state.selected() {
@@ -69,7 +69,10 @@ impl EditorState {
         }
     }
 
-    pub async fn map(&mut self, key: &KeyEvent) -> bool {
+    pub async fn map(&mut self, key: &KeyEvent, mode: &mut Mode) -> bool {
+        if !matches!(mode, Mode::Insert) {
+            return false;
+        }
         let action = self.key_map.map(key);
         if let Some(editor) = self.get_active() {
             if let Some(action) = action {
@@ -109,7 +112,12 @@ impl EditorState {
                     EditorAction::Undo => editor.undo(),
                     EditorAction::Redo => editor.redo(),
                     EditorAction::Save => editor.save().await,
-                    EditorAction::Close => self.close_active().await,
+                    EditorAction::Close => {
+                        self.close_active().await;
+                        if self.state.selected().is_none() {
+                            *mode = Mode::Select;
+                        }
+                    }
                 }
                 return true;
             }
@@ -251,6 +259,13 @@ impl EditorState {
         self.base_config.refresh();
         for editor in self.editors.iter_mut() {
             editor.refresh_cfg(&self.base_config)
+        }
+    }
+
+    pub async fn graceful_exit(&mut self) {
+        for (_, lsp) in self.lsp_servers.iter_mut() {
+            let mut lsp = lsp.lock().await;
+            let _ = lsp.graceful_exit().await;
         }
     }
 }
