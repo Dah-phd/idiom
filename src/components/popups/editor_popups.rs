@@ -63,7 +63,7 @@ pub fn find_in_editor_popup() -> Box<PopupActiveSelector<Select>> {
     Box::new(PopupActiveSelector::for_editor(
         |popup| {
             if let Some(select) = popup.next() {
-                PopupMessage::GoToSelect(select)
+                PopupMessage::GoToSelect { select, should_clear: false }
             } else {
                 PopupMessage::None
             }
@@ -90,17 +90,20 @@ pub fn replace_in_editor_popup() -> Box<PopupActiveSelector<Select>> {
     ))
 }
 
-pub fn select_line_popup(options: Vec<(usize, String)>) -> Box<PopupSelector<(usize, String)>> {
+pub fn select_selector(options: Vec<(Select, String)>) -> Box<PopupSelector<(Select, String)>> {
     Box::new(PopupSelector {
         options,
-        display: |(idx, line)| format!("{idx}| {line}"),
-        command: |popup| PopupMessage::GoToLine(popup.options[popup.state].0),
+        display: |(select, line)| match select {
+            Select::Range(from, ..) => format!("({}) {line}", from.line + 1),
+            Select::None => line.to_owned(),
+        },
+        command: |popup| PopupMessage::GoToSelect { select: popup.options[popup.state].0, should_clear: true },
         state: 0,
         size: None,
     })
 }
 
-pub fn select_editor_popup(options: Vec<String>) -> Box<PopupSelector<String>> {
+pub fn editor_selector(options: Vec<String>) -> Box<PopupSelector<String>> {
     Box::new(PopupSelector {
         options,
         display: |editor| editor.to_owned(),

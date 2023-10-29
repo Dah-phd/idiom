@@ -16,7 +16,7 @@ pub enum PopupMessage {
     Rename(String),
     RenameFile(String),
     GoToLine(usize),
-    GoToSelect(Select),
+    GoToSelect { select: Select, should_clear: bool },
     ReplaceSelect(String, Select),
     UpdateWorkspace,
     UpdateFooter,

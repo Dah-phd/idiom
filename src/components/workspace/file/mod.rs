@@ -65,7 +65,7 @@ impl Editor {
             self.content[self.at_line..render_till_line]
                 .iter()
                 .enumerate()
-                .map(|(idx, code_line)| self.lexer.syntax_spans(idx + self.at_line, code_line))
+                .map(|(idx, code_line)| self.lexer.list_item(idx + self.at_line, code_line))
                 .collect::<Vec<ListItem>>(),
         );
         (max_digits, editor_content)
@@ -92,7 +92,7 @@ impl Editor {
     }
 
     pub async fn update_lsp(&mut self) {
-        if let Some(mut lsp) = self.lexer.expose_lsp() {
+        if let Some(mut lsp) = self.lexer.try_expose_lsp() {
             if let Some((version, content_changes)) = self.action_logger.get_text_edits() {
                 let _ = lsp.file_did_change(&self.path, version, content_changes).await;
             }
@@ -132,6 +132,20 @@ impl Editor {
                 buffer.push(Select::Range((line_idx, char_idx).into(), (line_idx, char_idx + pat.len()).into()));
             }
         }
+    }
+
+    pub fn find_with_line(&mut self, pat: &str) -> Vec<(Select, String)> {
+        let mut buffer = Vec::new();
+        if pat.is_empty() {
+            return buffer;
+        }
+        for (line_idx, line_content) in self.content.iter().enumerate() {
+            for (char_idx, _) in line_content.match_indices(pat) {
+                let select = Select::Range((line_idx, char_idx).into(), (line_idx, char_idx + pat.len()).into());
+                buffer.push((select, line_content.to_owned()));
+            }
+        }
+        buffer
     }
 
     pub fn mass_replace(&mut self, selects: Vec<Select>, new: &str) {

@@ -4,8 +4,6 @@ use ratatui::{
     widgets::ListItem,
 };
 
-use super::get_line_num;
-
 #[derive(Debug, Default)]
 pub struct LSPLinter {
     tokens: Vec<Vec<Token>>,
@@ -50,4 +48,13 @@ struct Token {
     from: usize,
     to: usize,
     token_type: usize,
+}
+
+fn get_line_num(idx: usize, max_digits: usize) -> String {
+    let mut as_str = (idx + 1).to_string();
+    while as_str.len() < max_digits {
+        as_str.insert(0, ' ')
+    }
+    as_str.push(' ');
+    as_str
 }

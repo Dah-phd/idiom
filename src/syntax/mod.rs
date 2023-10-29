@@ -1,8 +1,9 @@
 mod langs;
+mod line_builder;
 mod lsp_tokens;
 mod modal;
-mod rust;
 mod theme;
+use self::line_builder::{build_line, BracketColors};
 use self::modal::{AutoComplete, Info, LSPResponseType, LSPResult, Modal};
 pub use self::theme::{Theme, DEFAULT_THEME_FILE};
 use crate::components::workspace::CursorPosition;
@@ -10,35 +11,22 @@ use crate::configs::EditorAction;
 use crate::configs::FileType;
 use crate::lsp::LSP;
 use langs::Lang;
-use lsp_types::{DiagnosticSeverity, PublishDiagnosticsParams, WorkspaceEdit};
-use ratatui::{
-    prelude::CrosstermBackend,
-    style::{Color, Style},
-    text::{Line, Span},
-    widgets::ListItem,
-    Frame,
-};
+use lsp_types::{PublishDiagnosticsParams, WorkspaceEdit};
+use ratatui::{prelude::CrosstermBackend, widgets::ListItem, Frame};
 use std::fmt::Debug;
 use std::{io::Stdout, path::Path, rc::Rc};
 use tokio::sync::{Mutex, MutexGuard};
-pub const COLORS: [Color; 3] = [Color::LightMagenta, Color::Yellow, Color::Blue];
 
 pub struct Lexer {
-    pub select: Option<(CursorPosition, CursorPosition)>,
-    pub theme: Theme,
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub lsp: Option<Rc<Mutex<LSP>>>,
     pub workspace_edit: Option<WorkspaceEdit>,
+    pub theme: Theme,
+    lang: Lang,
+    select: Option<(CursorPosition, CursorPosition)>,
     modal: Option<Box<dyn Modal>>,
     requests: Vec<LSPResponseType>,
-    line_processor: fn(&mut Lexer, content: &str, spans: &mut Vec<Span>),
-    lang: Lang,
-    select_at_line: Option<(usize, usize)>,
-    curly: Vec<Color>,
-    brackets: Vec<Color>,
-    square: Vec<Color>,
-    token_start: usize,
-    last_token: String,
+    brackets: BracketColors,
     max_digits: usize,
 }
 
@@ -57,15 +45,9 @@ impl Lexer {
             lsp: None,
             modal: None,
             requests: Vec::new(),
-            line_processor: derive_line_processor(file_type),
             lang: file_type.into(),
-            select_at_line: None,
             workspace_edit: None,
-            curly: vec![],
-            brackets: vec![],
-            square: vec![],
-            token_start: 0,
-            last_token: String::default(),
+            brackets: BracketColors::default(),
             max_digits: 0,
         }
     }
@@ -79,15 +61,13 @@ impl Lexer {
     ) -> usize {
         self.get_diagnostics(path);
         self.get_lsp_responses(c);
-        self.curly.clear();
-        self.brackets.clear();
-        self.square.clear();
+        self.brackets.reset();
         self.select = select.map(|(from, to)| (*from, *to));
         self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
         self.max_digits
     }
 
-    pub fn expose_lsp(&mut self) -> Option<MutexGuard<'_, LSP>> {
+    pub fn try_expose_lsp(&mut self) -> Option<MutexGuard<'_, LSP>> {
         let lsp_mutex = self.lsp.as_mut()?;
         lsp_mutex.try_lock().ok()
     }
@@ -107,15 +87,13 @@ impl Lexer {
     }
 
     fn get_diagnostics(&mut self, path: &Path) -> Option<()> {
-        let diagnostics = self.expose_lsp()?.get_diagnostics(path);
-        if diagnostics.is_some() {
-            self.diagnostics = diagnostics;
-        }
+        let diagnostics = self.try_expose_lsp()?.get_diagnostics(path)?;
+        self.diagnostics.replace(diagnostics);
         Some(())
     }
 
     pub async fn get_renames(&mut self, path: &Path, c: &CursorPosition, new_name: String) -> Option<()> {
-        let id = self.expose_lsp()?.renames(path, c, new_name).await?;
+        let id = self.try_expose_lsp()?.renames(path, c, new_name).await?;
         self.requests.push(LSPResponseType::Renames(id));
         Some(())
     }
@@ -124,7 +102,7 @@ impl Lexer {
         if self.modal.is_some() {
             return None;
         }
-        let id = self.expose_lsp()?.completion(path, c).await?;
+        let id = self.try_expose_lsp()?.completion(path, c).await?;
         self.requests.push(LSPResponseType::Completion(id));
         Some(())
     }
@@ -133,13 +111,13 @@ impl Lexer {
         if self.modal.is_some() {
             return None;
         }
-        let id = self.expose_lsp()?.hover(path, c).await?;
+        let id = self.try_expose_lsp()?.hover(path, c).await?;
         self.requests.push(LSPResponseType::Hover(id));
         Some(())
     }
 
     pub async fn get_signitures(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
-        let id = self.expose_lsp()?.signiture_help(path, c).await?;
+        let id = self.try_expose_lsp()?.signiture_help(path, c).await?;
         self.requests.push(LSPResponseType::SignatureHelp(id));
         Some(())
     }
@@ -172,194 +150,22 @@ impl Lexer {
         None
     }
 
-    fn set_select_char_range(&mut self, at_line: usize, max_len: usize) {
-        if let Some((from, to)) = self.select {
-            if from.line > at_line || at_line > to.line {
-                self.select_at_line = None;
-            } else if from.line < at_line && at_line < to.line {
-                self.select_at_line = Some((0, max_len));
-            } else if from.line == at_line && at_line == to.line {
-                self.select_at_line = Some((from.char, to.char));
-            } else if from.line == at_line {
-                self.select_at_line = Some((from.char, max_len));
-            } else if to.line == at_line {
-                self.select_at_line = Some((0, to.char))
-            }
+    fn line_select(&mut self, at_line: usize, max_len: usize) -> Option<std::ops::Range<usize>> {
+        let (from, to) = self.select?;
+        if from.line > at_line || at_line > to.line {
+            None
+        } else if from.line < at_line && at_line < to.line {
+            Some(0..max_len)
+        } else if from.line == at_line && at_line == to.line {
+            Some(from.char..to.char)
+        } else if from.line == at_line {
+            Some(from.char..max_len)
         } else {
-            self.select_at_line = None
+            Some(0..to.char)
         }
     }
 
-    fn handled_key_word(&mut self, token_end: usize, spans: &mut Vec<Span>) -> bool {
-        if self.lang.key_words.contains(&self.last_token.trim()) {
-            self.drain_with_select(token_end, self.theme.key_words, spans);
-            return true;
-        }
-        if self.lang.frow_control.contains(&self.last_token.trim()) {
-            self.drain_with_select(token_end, self.theme.flow_control, spans);
-            return true;
-        }
-        false
-    }
-
-    fn handled_object(&mut self, token_end: usize, spans: &mut Vec<Span>) -> bool {
-        if let Some(ch) = self.last_token.trim().chars().next() {
-            if ch.is_uppercase() {
-                self.drain_with_select(token_end, self.theme.class_or_struct, spans);
-                return true;
-            }
-        }
-        false
-    }
-
-    pub fn syntax_spans<'a>(&mut self, idx: usize, content: &'a str) -> ListItem<'a> {
-        let mut spans = vec![Span::styled(
-            get_line_num(idx, self.max_digits),
-            Style::default().fg(Color::Gray),
-        )];
-        self.set_select_char_range(idx, content.len());
-        self.token_start = 0;
-        if self.select_at_line.is_some() && content.is_empty() {
-            spans.push(Span {
-                content: " ".into(),
-                style: Style { bg: Some(self.theme.selected), ..Default::default() },
-            })
-        } else {
-            (self.line_processor)(self, content, &mut spans);
-            if !self.last_token.is_empty() {
-                self.drain_buf(content.len().checked_sub(1).unwrap_or_default(), &mut spans);
-            }
-            if let Some(diagnostics) = &self.diagnostics {
-                for diagnostic in diagnostics.diagnostics.iter() {
-                    if idx == diagnostic.range.start.line as usize {
-                        match diagnostic.severity {
-                            Some(severity) => match severity {
-                                DiagnosticSeverity::ERROR => spans.push(Span::styled(
-                                    format!("    {}", diagnostic.message),
-                                    Style::default().fg(Color::Red),
-                                )),
-                                DiagnosticSeverity::WARNING => spans.push(Span::styled(
-                                    format!("    {}", diagnostic.message),
-                                    Style::default().fg(Color::LightYellow),
-                                )),
-                                _ => spans.push(Span::styled(
-                                    format!("    {}", diagnostic.message),
-                                    Style::default().fg(Color::Gray),
-                                )),
-                            },
-                            None => spans.push(Span::styled(
-                                format!("    {}", diagnostic.message),
-                                Style::default().fg(Color::Gray),
-                            )),
-                        }
-                    }
-                }
-            }
-        }
-        ListItem::new(Line::from(spans))
-    }
-
-    fn white_char(&mut self, idx: usize, ch: char, spans: &mut Vec<Span>) {
-        if matches!(self.select_at_line, Some((from, to)) if from <= idx && idx < to) {
-            spans.push(Span::styled(
-                String::from(ch),
-                Style { bg: Some(self.theme.selected), fg: Some(Color::White), ..Default::default() },
-            ));
-        } else {
-            spans.push(Span::styled(String::from(ch), Style { fg: Some(Color::White), ..Default::default() }))
-        }
-        self.token_start += 1;
-    }
-
-    fn drain_buf_object(&mut self, token_end: usize, spans: &mut Vec<Span>) {
-        if !self.handled_key_word(token_end, spans) {
-            self.drain_with_select(token_end, self.theme.class_or_struct, spans)
-        }
-    }
-
-    fn drain_buf_colored(&mut self, token_end: usize, color: Color, spans: &mut Vec<Span>) {
-        if !self.handled_key_word(token_end, spans) && !self.handled_object(token_end, spans) {
-            self.drain_with_select(token_end, color, spans)
-        }
-    }
-
-    fn drain_buf(&mut self, token_end: usize, spans: &mut Vec<Span>) {
-        if !self.handled_key_word(token_end, spans) && !self.handled_object(token_end, spans) {
-            self.drain_with_select(token_end, self.theme.default, spans)
-        }
-    }
-
-    #[allow(clippy::collapsible_else_if)]
-    fn drain_with_select(&mut self, token_end: usize, color: Color, spans: &mut Vec<Span>) {
-        let style = Style { fg: Some(color), ..Default::default() };
-        if let Some((select_start, select_end)) = self.select_at_line {
-            if select_start <= self.token_start && token_end < select_end {
-                spans.push(Span::styled(self.last_token.drain(..).collect::<String>(), style.bg(self.theme.selected)));
-            } else if select_end <= self.token_start || token_end <= select_start {
-                spans.push(Span::styled(self.last_token.drain(..).collect::<String>(), style));
-            } else {
-                if select_start <= self.token_start {
-                    spans.push(Span::styled(
-                        drain_token_checked(&mut self.last_token, select_end - self.token_start),
-                        style.bg(self.theme.selected),
-                    ));
-                    spans.push(Span::styled(self.last_token.drain(..).collect::<String>(), style));
-                } else if self.token_start <= select_start && select_end <= token_end {
-                    spans.push(Span::styled(
-                        drain_token_checked(&mut self.last_token, select_start - self.token_start),
-                        style,
-                    ));
-                    spans.push(Span::styled(
-                        drain_token_checked(&mut self.last_token, select_end - select_start),
-                        style.bg(self.theme.selected),
-                    ));
-                    spans.push(Span::styled(self.last_token.drain(..).collect::<String>(), style));
-                } else {
-                    spans.push(Span::styled(
-                        drain_token_checked(&mut self.last_token, select_start - self.token_start),
-                        style,
-                    ));
-                    spans.push(Span::styled(
-                        self.last_token.drain(..).collect::<String>(),
-                        style.bg(self.theme.selected),
-                    ));
-                };
-            }
-        } else {
-            spans.push(Span::styled(self.last_token.drain(..).collect::<String>(), style));
-        }
-        self.token_start = token_end;
-    }
-
-    fn default_color() -> Color {
-        COLORS[COLORS.len() - 1]
-    }
-
-    fn len_to_color(len: usize) -> Color {
-        COLORS[len % COLORS.len()]
-    }
-}
-
-fn get_line_num(idx: usize, max_digits: usize) -> String {
-    let mut as_str = (idx + 1).to_string();
-    while as_str.len() < max_digits {
-        as_str.insert(0, ' ')
-    }
-    as_str.push(' ');
-    as_str
-}
-
-fn drain_token_checked(token: &mut String, last_idx: usize) -> String {
-    if last_idx >= token.len() {
-        token.drain(..).collect()
-    } else {
-        token.drain(..last_idx).collect()
-    }
-}
-
-fn derive_line_processor(file_type: &FileType) -> fn(&mut Lexer, content: &str, spans: &mut Vec<Span>) {
-    match file_type {
-        FileType::Rust => rust::rust_processor,
-        _ => rust::rust_processor,
+    pub fn list_item<'a>(&mut self, idx: usize, content: &'a str) -> ListItem<'a> {
+        ListItem::new(build_line(self, idx, content))
     }
 }

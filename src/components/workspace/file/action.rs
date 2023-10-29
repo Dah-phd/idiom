@@ -56,9 +56,7 @@ impl Default for ActionLogger {
 impl ActionLogger {
     pub fn tick(&mut self) {
         if self.buffer.is_some() {
-            if self.clock.elapsed() >= TICK {
-                self.push_buffer();
-            }
+            self.push_buffer();
             self.clock = Instant::now();
         }
     }
@@ -159,22 +157,25 @@ impl ActionLogger {
     }
 
     fn push_buffer(&mut self) {
-        if let Some(buffer) = self.buffer.take() {
-            self.push_done(buffer)
+        if self.clock.elapsed() >= TICK {
+            if let Some(buffer) = self.buffer.take() {
+                self.push_done(buffer)
+            }
         }
     }
 
     fn push_done(&mut self, action: Action) {
         self.text_edits.push(action.get_text_edit());
-        self.done.push(action)
+        self.done.push(action);
     }
 
     fn push_undone(&mut self, action: Action) {
         self.text_edits.push(action.get_text_edit());
-        self.undone.push(action)
+        self.undone.push(action);
     }
 
     pub fn get_text_edits(&mut self) -> Option<(i32, Vec<TextDocumentContentChangeEvent>)> {
+        self.push_buffer();
         if self.text_edits.is_empty() {
             None
         } else {
@@ -244,7 +245,7 @@ impl Action {
     fn get_text_edit(&self) -> TextDocumentContentChangeEvent {
         let start = Position::new(self.old_cursor.line as u32, 0);
         let end = Position::new(
-            start.line + self.old.len() as u32,
+            start.line + self.old.len().checked_sub(1).unwrap_or_default() as u32,
             self.old.last().map(|line| line.len()).unwrap_or_default() as u32,
         );
         let range = Range::new(start, end);

@@ -10,8 +10,10 @@ pub struct Lang {
 impl Default for Lang {
     fn default() -> Self {
         Self {
-            key_words: vec!["pub", "fn", "struct", "use", "mod", "let", "self", "mut", "crate"],
-            frow_control: vec!["if", "loop", "for", "while", "break", "continue"],
+            key_words: vec![
+                "pub", "fn", "struct", "use", "mod", "let", "self", "mut", "crate", "async", "const", "super", "impl",
+            ],
+            frow_control: vec!["if", "loop", "for", "while", "break", "continue", "await"],
             mod_import: vec!["mod", "use", "pub mod", "pub use"],
         }
     }

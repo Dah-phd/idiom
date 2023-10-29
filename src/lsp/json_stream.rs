@@ -10,6 +10,7 @@ use crate::utils::{into_guard, split_arc_mutex};
 
 pub struct JsonRpc {
     inner: FramedRead<ChildStdout, BytesCodec>,
+    #[allow(dead_code)]
     stderr_handler: JoinHandle<()>,
     errors: Arc<Mutex<Vec<String>>>,
     msg: String,

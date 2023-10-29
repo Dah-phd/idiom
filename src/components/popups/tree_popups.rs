@@ -69,10 +69,10 @@ pub fn find_in_tree_popup() -> Box<Popup> {
     })
 }
 
-pub fn select_tree_file_popup(options: Vec<(PathBuf, String, usize)>) -> Box<PopupSelector<(PathBuf, String, usize)>> {
+pub fn tree_file_selector(options: Vec<(PathBuf, String, usize)>) -> Box<PopupSelector<(PathBuf, String, usize)>> {
     Box::new(PopupSelector {
         options,
-        display: |(path, text, idx)| format!("{}\n    {idx}| {text}", path.display()),
+        display: |(path, text, idx)| format!("{}\n    {}| {text}", path.display(), idx + 1),
         command: |popup| {
             if let Some((path, _, idx)) = popup.options.get(popup.state) {
                 return PopupMessage::Open(path.clone(), *idx);
@@ -84,7 +84,7 @@ pub fn select_tree_file_popup(options: Vec<(PathBuf, String, usize)>) -> Box<Pop
     })
 }
 
-pub fn select_file_popup(options: Vec<PathBuf>) -> Box<PopupSelector<PathBuf>> {
+pub fn file_selector(options: Vec<PathBuf>) -> Box<PopupSelector<PathBuf>> {
     Box::new(PopupSelector {
         options,
         display: |path| path.display().to_string(),

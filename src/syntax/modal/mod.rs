@@ -23,7 +23,7 @@ pub struct AutoComplete {
 }
 
 impl Modal for AutoComplete {
-    fn map_and_finish(&mut self, key: &EditorAction) -> bool {
+    fn map_and_finish(&mut self, _key: &EditorAction) -> bool {
         true
     }
 

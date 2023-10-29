@@ -41,7 +41,6 @@ use request::LSPRequest;
 
 #[derive(Debug)]
 #[allow(clippy::upper_case_acronyms)]
-#[allow(dead_code)]
 pub struct LSP {
     pub responses: Arc<Mutex<HashMap<i64, Response>>>,
     pub notifications: Arc<Mutex<Vec<GeneralNotification>>>,
@@ -56,7 +55,6 @@ pub struct LSP {
     stdin: ChildStdin,
 }
 
-#[allow(dead_code)]
 impl LSP {
     pub async fn from(file_type: &FileType) -> Result<Self> {
         match file_type {

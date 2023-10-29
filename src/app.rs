@@ -1,10 +1,10 @@
 use crate::{
     components::{
-        popups::editor_popups::{go_to_line_popup, select_editor_popup},
+        popups::editor_popups::{editor_selector, go_to_line_popup},
         popups::{
-            editor_popups::{find_in_editor_popup, save_all_popup, select_line_popup},
+            editor_popups::{find_in_editor_popup, save_all_popup, select_selector},
             tree_popups::{
-                create_file_popup, find_in_tree_popup, rename_file_popup, select_file_popup, select_tree_file_popup,
+                create_file_popup, file_selector, find_in_tree_popup, rename_file_popup, tree_file_selector,
             },
         },
         popups::{
@@ -90,41 +90,43 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             continue;
                         }
                         PopupMessage::SelectPath(pattern) => {
-                            mode = Mode::Select.popup(select_file_popup(file_tree.search_select_paths(pattern)));
+                            mode = Mode::Select.popup(file_selector(file_tree.search_select_paths(pattern)));
                             continue;
                         }
                         PopupMessage::SelectPathFull(pattern) => {
-                            mode = Mode::Select.popup(select_file_popup(file_tree.search_paths(pattern)));
+                            mode = Mode::Select.popup(file_selector(file_tree.search_paths(pattern)));
                             continue;
                         }
                         PopupMessage::SelectTreeFiles(pattern) => {
-                            mode = Mode::Select
-                                .popup(select_tree_file_popup(file_tree.search_select_files(pattern).await));
+                            mode = Mode::Select.popup(tree_file_selector(file_tree.search_select_files(pattern).await));
                             continue;
                         }
                         PopupMessage::SelectTreeFilesFull(pattern) => {
-                            mode = Mode::Select.popup(select_tree_file_popup(file_tree.search_files(pattern).await));
+                            mode = Mode::Select.popup(tree_file_selector(file_tree.search_files(pattern).await));
                             continue;
                         }
                         PopupMessage::SelectOpenedFile(pattern) => {
                             if let Some(editor) = workspace.get_active() {
-                                mode = Mode::Insert.popup(select_line_popup(editor.search_file(&pattern)));
+                                mode = Mode::Insert.popup(select_selector(editor.find_with_line(&pattern)));
                             } else {
                                 mode = mode.clear_popup();
                             }
                             continue;
                         }
-                        PopupMessage::GoToSelect(select) => {
+                        PopupMessage::GoToSelect { select, should_clear } => {
                             if let Some(editor) = workspace.get_active() {
                                 editor.go_to_select(select);
+                                if should_clear {
+                                    mode = mode.clear_popup();
+                                }
                             } else {
                                 mode = mode.clear_popup();
                             }
                             continue;
                         }
-                        PopupMessage::GoToLine(line_idx) => {
+                        PopupMessage::GoToLine(idx) => {
                             if let Some(editor) = workspace.get_active() {
-                                editor.go_to(line_idx)
+                                editor.go_to(idx);
                             }
                             mode = mode.clear_popup();
                             continue;
@@ -206,7 +208,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                         mode = mode.popup(replace_in_editor_popup());
                     }
                     GeneralAction::SelectOpenEditor => {
-                        mode = mode.popup(select_editor_popup(workspace.tabs()));
+                        mode = mode.popup(editor_selector(workspace.tabs()));
                     }
                     GeneralAction::NewFile => {
                         mode = mode.popup(create_file_popup(file_tree.get_first_selected_folder_display()));
