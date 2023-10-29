@@ -55,18 +55,63 @@ pub struct SpansBuffer<'a> {
     select_range: Option<std::ops::Range<usize>>,
     token_buffer: String,
     last_reset: usize,
+    last_char: char,
+    str_open: bool,
+    chr_open: bool,
+    is_class: bool,
+    is_keyword: bool,
 }
 
 impl<'a> SpansBuffer<'a> {
     fn new(spans: Vec<Span<'a>>, select_range: Option<std::ops::Range<usize>>) -> Self {
-        Self { spans, eror: None, warn: None, info: None, select_range, token_buffer: String::new(), last_reset: 0 }
+        Self {
+            spans,
+            eror: None,
+            warn: None,
+            info: None,
+            select_range,
+            token_buffer: String::new(),
+            last_reset: 0,
+            last_char: '\n',
+            str_open: false,
+            chr_open: false,
+            is_class: false,
+            is_keyword: false,
+        }
+    }
+
+    fn build_style(&self, idx: usize, color: Color) -> Style {
+        let style = Style { fg: Some(color), bg: self.get_select_style(idx), ..Default::default() };
+        if let Some(range) = &self.eror {
+            if range.contains(&idx) {
+                return style.add_modifier(Modifier::UNDERLINED).underline_color(Color::Red);
+            }
+        }
+        if let Some(range) = &self.warn {
+            if range.contains(&idx) {
+                return style.add_modifier(Modifier::UNDERLINED).underline_color(Color::LightYellow);
+            }
+        }
+        if let Some(range) = &self.info {
+            if range.contains(&idx) {
+                return style.add_modifier(Modifier::UNDERLINED).underline_color(Color::Gray);
+            }
+        }
+        style
+    }
+
+    fn get_select_style(&self, idx: usize) -> Option<Color> {
+        if let Some(range) = &self.select_range {
+            if range.contains(&idx) {
+                return Some(Color::Rgb(72, 72, 72));
+            }
+        }
+        None
     }
 
     fn push(&mut self, idx: usize, ch: char, color: Color) {
-        self.spans.push(Span::styled(
-            ch.to_string(),
-            build_style(idx, &self.select_range, &self.eror, &self.warn, &self.info, color),
-        ))
+        self.spans.push(Span::styled(ch.to_string(), self.build_style(idx, color)));
+        self.last_char = ch;
     }
 
     fn push_reset(&mut self, idx: usize, ch: char, color: Color) {
@@ -95,70 +140,86 @@ impl<'a> SpansBuffer<'a> {
         Line::from(self.spans)
     }
 
+    fn handle_lifetime_apostrophe(&mut self, idx: usize, ch: char, lexer: &Lexer) {
+        if self.last_char != '<' && self.last_char != '&' {
+            self.chr_open = true;
+            self.push_reset(idx, ch, lexer.theme.string);
+        } else {
+            self.is_keyword = true;
+            self.push_reset(idx, ch, lexer.theme.key_words);
+        };
+    }
+
+    fn handled_edgecases(&mut self, idx: usize, ch: char, lexer: &Lexer) -> bool {
+        if self.str_open {
+            self.push(idx, ch, lexer.theme.string);
+            if ch == '"' {
+                self.str_open = false;
+                self.last_reset = idx + 1;
+            }
+            return true;
+        }
+        if self.chr_open {
+            self.push(idx, ch, lexer.theme.string);
+            if ch == '\'' {
+                self.chr_open = false;
+                self.last_reset = idx + 1;
+            }
+            return true;
+        }
+        if self.is_class {
+            if ch.is_alphabetic() || ch == '_' || ch == '-' {
+                self.push(idx, ch, lexer.theme.class_or_struct);
+                return true;
+            }
+            self.is_class = false;
+        }
+        if self.is_keyword {
+            if ch.is_alphabetic() || ch == '_' {
+                self.push(idx, ch, lexer.theme.key_words);
+                return true;
+            }
+            self.is_keyword = false;
+        }
+        false
+    }
+
     pub fn process(&mut self, lexer: &mut Lexer, content: &str) {
-        let mut str_open = false;
-        let mut chr_open = false;
-        let mut is_class = false;
-        for (idx, ch) in content.char_indices() {
-            if str_open {
-                self.push(idx, ch, lexer.theme.string);
-                if ch == '"' {
-                    str_open = false;
-                    self.last_reset = idx + 1;
-                }
+        let mut chars = content.char_indices().peekable();
+        while let Some((idx, ch)) = chars.next() {
+            if self.handled_edgecases(idx, ch, lexer) {
                 continue;
-            }
-            if chr_open {
-                self.push(idx, ch, lexer.theme.string);
-                if ch == '\'' {
-                    chr_open = false;
-                    self.last_reset = idx + 1;
-                }
-                continue;
-            }
-            if is_class {
-                if ch.is_alphabetic() || ch == '_' || ch == '-' {
-                    self.push(idx, ch, lexer.theme.class_or_struct);
-                    continue;
-                }
-                is_class = false;
             }
             match ch {
                 ' ' => {
-                    if lexer.lang.key_words.contains(&self.token_buffer.as_str()) {
-                        self.update_fg(lexer.theme.key_words);
-                    }
                     if lexer.lang.frow_control.contains(&self.token_buffer.as_str()) {
                         self.update_fg(lexer.theme.flow_control);
+                    } else if lexer.lang.key_words.contains(&self.token_buffer.as_str()) {
+                        self.update_fg(lexer.theme.key_words);
                     }
                     self.push_reset(idx, ch, Color::White);
                 }
                 '.' | '<' | '>' | '?' | '&' | '=' | '+' | '-' | ',' | ';' | '|' => {
-                    if lexer.lang.key_words.contains(&self.token_buffer.as_str()) {
-                        self.update_fg(lexer.theme.key_words);
-                    }
                     if lexer.lang.frow_control.contains(&self.token_buffer.as_str()) {
                         self.update_fg(lexer.theme.flow_control);
+                    } else if lexer.lang.key_words.contains(&self.token_buffer.as_str()) {
+                        self.update_fg(lexer.theme.key_words);
                     }
                     self.push_reset(idx, ch, Color::White);
                 }
                 ':' => {
-                    if lexer.lang.key_words.contains(&self.token_buffer.as_str()) {
+                    if matches!(chars.peek(), Some((.., next_ch)) if &':' == next_ch) {
+                        self.update_fg(lexer.theme.class_or_struct);
+                    } else if lexer.lang.key_words.contains(&self.token_buffer.as_str()) {
                         self.update_fg(lexer.theme.key_words);
-                    }
-                    if lexer.lang.frow_control.contains(&self.token_buffer.as_str()) {
-                        self.update_fg(lexer.theme.flow_control)
                     }
                     self.push_reset(idx, ch, Color::White);
                 }
                 '"' => {
-                    str_open = true;
+                    self.str_open = true;
                     self.push_reset(idx, ch, lexer.theme.string);
                 }
-                '\'' => {
-                    chr_open = true;
-                    self.push_reset(idx, ch, lexer.theme.string);
-                }
+                '\'' => self.handle_lifetime_apostrophe(idx, ch, lexer),
                 '!' => {
                     self.update_fg(lexer.theme.key_words);
                     let color = if self.token_buffer.is_empty() { Color::White } else { lexer.theme.key_words };
@@ -183,7 +244,7 @@ impl<'a> SpansBuffer<'a> {
                         self.last_reset = idx + 1;
                     } else if ch.is_uppercase() && self.token_buffer.is_empty() {
                         self.push(idx, ch, lexer.theme.class_or_struct);
-                        is_class = true;
+                        self.is_class = true;
                     } else {
                         self.push_token(idx, ch, lexer.theme.default);
                     }
@@ -212,40 +273,4 @@ fn process_range(r: Range, max: usize) -> std::ops::Range<usize> {
         return r.start.character as usize..r.end.character as usize;
     }
     r.start.character as usize..max
-}
-
-fn get_sel_style(r: &Option<std::ops::Range<usize>>, idx: usize) -> Option<Color> {
-    if let Some(range) = r {
-        if range.contains(&idx) {
-            return Some(Color::Rgb(72, 72, 72));
-        }
-    }
-    None
-}
-
-fn build_style(
-    idx: usize,
-    sel: &Option<std::ops::Range<usize>>,
-    eror: &Option<std::ops::Range<usize>>,
-    warn: &Option<std::ops::Range<usize>>,
-    info: &Option<std::ops::Range<usize>>,
-    col: Color,
-) -> Style {
-    let style = Style { fg: Some(col), bg: get_sel_style(sel, idx), ..Default::default() };
-    if let Some(range) = eror {
-        if range.contains(&idx) {
-            return style.add_modifier(Modifier::UNDERLINED).underline_color(Color::Red);
-        }
-    }
-    if let Some(range) = warn {
-        if range.contains(&idx) {
-            return style.add_modifier(Modifier::UNDERLINED).underline_color(Color::LightYellow);
-        }
-    }
-    if let Some(range) = info {
-        if range.contains(&idx) {
-            return style.add_modifier(Modifier::UNDERLINED).underline_color(Color::Gray);
-        }
-    }
-    style
 }

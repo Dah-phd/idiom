@@ -12,8 +12,9 @@ impl Default for Lang {
         Self {
             key_words: vec![
                 "pub", "fn", "struct", "use", "mod", "let", "self", "mut", "crate", "async", "const", "super", "impl",
+                "Self",
             ],
-            frow_control: vec!["if", "loop", "for", "while", "break", "continue", "await"],
+            frow_control: vec!["if", "loop", "for", "in", "while", "break", "continue", "await"],
             mod_import: vec!["mod", "use", "pub mod", "pub use"],
         }
     }
