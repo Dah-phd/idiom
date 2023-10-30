@@ -1,17 +1,89 @@
+use lsp_types::SemanticTokensResult;
 use ratatui::{
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::ListItem,
 };
+use std::ops::Range;
+
+use super::Theme;
 
 #[derive(Debug, Default)]
 pub struct LSPLinter {
     tokens: Vec<Vec<Token>>,
-    style_map: Vec<Style>,
+    style_map: Vec<Color>,
+    eror: Option<Range<usize>>,
+    warn: Option<Range<usize>>,
+    info: Option<Range<usize>>,
+    select_range: Option<Range<usize>>,
     pub is_set: bool,
 }
 
 impl LSPLinter {
+    pub fn new(tokens_res: SemanticTokensResult) -> Self {
+        let mut tokens = Vec::new();
+        let mut inner_token = Vec::new();
+        let mut from = 0;
+        if let SemanticTokensResult::Tokens(tkns) = tokens_res {
+            for tkn in tkns.data {
+                for _ in 0..tkn.delta_line {
+                    from = 0;
+                    tokens.push(std::mem::take(&mut inner_token));
+                }
+                from += tkn.delta_start as usize;
+                inner_token.push(Token { from, len: tkn.length, token_type: tkn.token_type as usize });
+            }
+        }
+        Self { tokens, style_map: Vec::new(), eror: None, warn: None, info: None, select_range: None, is_set: true }
+    }
+
+    pub fn build_line<'a>(&self, line_idx: usize, content: &'a str, theme: &Theme) -> Vec<Span<'a>> {
+        let mut spans = Vec::new();
+        let mut style = Style { fg: Some(Color::White), ..Default::default() };
+        let mut len = 0;
+        let mut token_num = 0;
+        let token_line = self.tokens.get(line_idx);
+        for (idx, ch) in content.char_indices() {
+            if len == 0 {
+                if let Some(syntax_line) = token_line {
+                    if let Some(t) = syntax_line.get(token_num) {
+                        if t.from == idx {
+                            style.fg = Some(self.style_map.get(t.token_type).copied().unwrap_or(Color::White));
+                            len = t.len;
+                        } else {
+                            style.fg.replace(Color::White);
+                        }
+                    } else {
+                        style.fg.replace(Color::White);
+                    }
+                }
+            } else {
+                len -= 1;
+            }
+            let mut span = Span::styled(ch.to_string(), style);
+            if let Some(range) = &self.eror {
+                if range.contains(&idx) {
+                    span.style = span.style.add_modifier(Modifier::UNDERLINED).underline_color(Color::Red);
+                }
+            } else if let Some(range) = &self.warn {
+                if range.contains(&idx) {
+                    span.style = span.style.add_modifier(Modifier::UNDERLINED).underline_color(Color::LightYellow);
+                }
+            } else if let Some(range) = &self.info {
+                if range.contains(&idx) {
+                    span.style = span.style.add_modifier(Modifier::UNDERLINED).underline_color(Color::Gray);
+                }
+            }
+            if let Some(range) = &self.select_range {
+                if range.contains(&idx) {
+                    span.style.bg.replace(theme.selected);
+                }
+            }
+            spans.push(span);
+        }
+        spans
+    }
+
     pub fn map_styles(&mut self) {}
 
     pub fn set_tokens(&mut self) {
@@ -21,32 +93,12 @@ impl LSPLinter {
     pub fn new_line(&mut self, index: usize) {
         self.tokens.insert(index, Vec::new());
     }
-
-    pub fn highlited_line<'a>(&self, idx: usize, max_digits: usize, content: &'a str) -> Option<ListItem<'a>> {
-        let mut spans = vec![Span::styled(
-            get_line_num(idx, max_digits),
-            Style::default().fg(Color::Gray),
-        )];
-        let tokens = self.tokens.get(idx)?;
-        let mut last_idx = 0;
-        for token in tokens {
-            if last_idx != token.from {
-                spans.push(Span::raw(&content[0..token.from]));
-            }
-            spans.push(Span::styled(&content[token.from..token.to], self.style_map[token.token_type]));
-            last_idx = token.to;
-        }
-        if last_idx < content.len() {
-            spans.push(Span::raw(&content[last_idx..]));
-        }
-        Some(ListItem::new(Line::from(spans)))
-    }
 }
 
 #[derive(Debug)]
 struct Token {
     from: usize,
-    to: usize,
+    len: u32,
     token_type: usize,
 }
 

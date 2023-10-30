@@ -122,6 +122,12 @@ impl Lexer {
         Some(())
     }
 
+    pub async fn get_tokens(&mut self, path: &Path) -> Option<()> {
+        let id = self.try_expose_lsp()?.semantics(path).await?;
+        self.requests.push(LSPResponseType::TokensFull(id));
+        Some(())
+    }
+
     fn get_lsp_responses(&mut self, c: &CursorPosition) -> Option<()> {
         if self.requests.is_empty() {
             return None;
@@ -141,6 +147,7 @@ impl Lexer {
                         self.modal = Some(Box::new(Info::from_signature(signature)));
                     }
                     LSPResult::Renames(workspace_edit) => self.workspace_edit = Some(workspace_edit),
+                    LSPResult::Tokens(tokens) => panic!("{:?}", tokens),
                     LSPResult::None => (),
                 }
             }
