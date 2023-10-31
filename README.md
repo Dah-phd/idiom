@@ -2,11 +2,12 @@
 
 ## Current version support basic file tree and navigation:
 ## TODO!
-* action history - redo/undo
-    * new lines not reflected properly
-* theme trait for diff languages
-* LSP support
-* test swaps
+* finish replacement modal
+* finish workspace edits
+* create semantic token updates for lsp linter
+* semantic token styles for diff lsp langs
+* finish autocomplete
+* add tests for workspace and editor
 
 ## Target langs:
 * RUST
