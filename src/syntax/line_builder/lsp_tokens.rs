@@ -6,20 +6,19 @@ use ratatui::{
 };
 use std::ops::Range;
 
-use super::Theme;
+use crate::syntax::{langs::Lang, Theme};
 
 #[derive(Debug, Default)]
-pub struct LSPLinter {
+pub struct LineBuilder {
     tokens: Vec<Vec<Token>>,
-    style_map: Vec<Color>,
-    eror: Option<Range<usize>>,
-    warn: Option<Range<usize>>,
-    info: Option<Range<usize>>,
-    select_range: Option<Range<usize>>,
-    pub is_set: bool,
+    legend: Vec<Color>,
+    pub eror: Option<Range<usize>>,
+    pub warn: Option<Range<usize>>,
+    pub info: Option<Range<usize>>,
+    pub select_range: Option<Range<usize>>,
 }
 
-impl LSPLinter {
+impl LineBuilder {
     pub fn new(tokens_res: SemanticTokensResult) -> Self {
         let mut tokens = Vec::new();
         let mut inner_token = Vec::new();
@@ -34,10 +33,13 @@ impl LSPLinter {
                 inner_token.push(Token { from, len: tkn.length, token_type: tkn.token_type as usize });
             }
         }
-        Self { tokens, style_map: Vec::new(), eror: None, warn: None, info: None, select_range: None, is_set: true }
+        Self { tokens, legend: Vec::new(), eror: None, warn: None, info: None, select_range: None }
     }
 
-    pub fn build_line<'a>(&self, line_idx: usize, content: &'a str, theme: &Theme) -> Vec<Span<'a>> {
+    pub fn build_line<'a>(&self, line_idx: usize, content: &'a str, theme: &Theme) -> Option<Vec<Span<'a>>> {
+        if self.tokens.is_empty() || self.legend.is_empty() {
+            return None;
+        }
         let mut spans = Vec::new();
         let mut style = Style { fg: Some(Color::White), ..Default::default() };
         let mut len = 0;
@@ -48,8 +50,9 @@ impl LSPLinter {
                 if let Some(syntax_line) = token_line {
                     if let Some(t) = syntax_line.get(token_num) {
                         if t.from == idx {
-                            style.fg = Some(self.style_map.get(t.token_type).copied().unwrap_or(Color::White));
+                            style.fg = Some(self.legend.get(t.token_type).copied().unwrap_or(Color::White));
                             len = t.len;
+                            token_num += 1;
                         } else {
                             style.fg.replace(Color::White);
                         }
@@ -81,14 +84,17 @@ impl LSPLinter {
             }
             spans.push(span);
         }
-        spans
+        Some(spans)
     }
 
-    pub fn map_styles(&mut self) {}
-
-    pub fn set_tokens(&mut self) {
-        self.is_set = true;
+    pub fn get_color(&self, token_type: usize, theme: &Theme) -> Color {
+        if let Some(color) = self.legend.get(token_type) {
+            return *color;
+        }
+        theme.default
     }
+
+    pub fn map_styles(&mut self, lang: Lang, theme: &Theme) {}
 
     pub fn new_line(&mut self, index: usize) {
         self.tokens.insert(index, Vec::new());
@@ -100,13 +106,4 @@ struct Token {
     from: usize,
     len: u32,
     token_type: usize,
-}
-
-fn get_line_num(idx: usize, max_digits: usize) -> String {
-    let mut as_str = (idx + 1).to_string();
-    while as_str.len() < max_digits {
-        as_str.insert(0, ' ')
-    }
-    as_str.push(' ');
-    as_str
 }

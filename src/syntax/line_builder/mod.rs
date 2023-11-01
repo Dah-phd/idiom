@@ -1,4 +1,5 @@
 mod brackets;
+mod lsp_tokens;
 use super::Lexer;
 pub use brackets::BracketColors;
 use lsp_types::Range;

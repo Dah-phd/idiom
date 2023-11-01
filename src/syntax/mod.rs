@@ -1,6 +1,5 @@
 mod langs;
 mod line_builder;
-mod lsp_tokens;
 mod modal;
 mod theme;
 use self::line_builder::{build_line, BracketColors};
@@ -84,6 +83,10 @@ impl Lexer {
                 self.modal = None;
             }
         }
+    }
+
+    pub fn set_lsp(&mut self, lsp: Rc<Mutex<LSP>>) {
+        self.lsp = Some(lsp);
     }
 
     fn get_diagnostics(&mut self, path: &Path) -> Option<()> {
