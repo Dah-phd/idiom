@@ -62,6 +62,11 @@ impl Footer {
         }
     }
 
+    pub fn overwrite(&mut self, message: String) {
+        self.message = message;
+        self.clock = Instant::now();
+    }
+
     fn get_message(&mut self) -> &str {
         if self.message.is_empty() && self.message_que.is_empty() || self.clock.elapsed() <= MSG_DURATION {
             return &self.message;

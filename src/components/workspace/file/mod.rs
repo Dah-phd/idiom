@@ -92,11 +92,7 @@ impl Editor {
     }
 
     pub async fn update_lsp(&mut self) {
-        if let Some(mut lsp) = self.lexer.try_expose_lsp() {
-            if let Some((version, content_changes)) = self.action_logger.get_text_edits() {
-                let _ = lsp.file_did_change(&self.path, version, content_changes).await;
-            }
-        }
+        self.lexer.update_lsp(&self.path, self.action_logger.get_text_edits()).await;
     }
 
     pub fn is_saved(&self) -> bool {
@@ -594,7 +590,7 @@ impl Editor {
 
     pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {
         self.configs = new_cfg.clone();
-        self.lexer.theme = Theme::from(&self.configs.theme_file_in_config_dir);
+        self.lexer.new_theme(Theme::from(&self.configs.theme_file_in_config_dir));
     }
 
     fn get_and_indent_line(&mut self, line_idx: usize) -> (Offset, &mut String) {

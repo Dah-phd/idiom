@@ -1,6 +1,6 @@
 use crate::configs::FileType;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Lang {
     pub key_words: Vec<&'static str>,
     pub frow_control: Vec<&'static str>,
@@ -14,7 +14,9 @@ impl Default for Lang {
                 "pub", "fn", "struct", "use", "mod", "let", "self", "mut", "crate", "async", "const", "super", "impl",
                 "Self",
             ],
-            frow_control: vec!["if", "loop", "for", "in", "while", "break", "continue", "await"],
+            frow_control: vec![
+                "if", "loop", "for", "in", "while", "break", "continue", "await", "return", "match",
+            ],
             mod_import: vec!["mod", "use", "pub mod", "pub use"],
         }
     }

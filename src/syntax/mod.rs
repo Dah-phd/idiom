@@ -2,15 +2,16 @@ mod langs;
 mod line_builder;
 mod modal;
 mod theme;
-use self::line_builder::{build_line, BracketColors};
+use self::line_builder::LineBuilder;
 use self::modal::{AutoComplete, Info, LSPResponseType, LSPResult, Modal};
 pub use self::theme::{Theme, DEFAULT_THEME_FILE};
 use crate::components::workspace::CursorPosition;
 use crate::configs::EditorAction;
 use crate::configs::FileType;
 use crate::lsp::LSP;
-use langs::Lang;
-use lsp_types::{PublishDiagnosticsParams, WorkspaceEdit};
+use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent, WorkspaceEdit};
+use ratatui::style::{Color, Style};
+use ratatui::text::Span;
 use ratatui::{prelude::CrosstermBackend, widgets::ListItem, Frame};
 use std::fmt::Debug;
 use std::{io::Stdout, path::Path, rc::Rc};
@@ -20,12 +21,11 @@ pub struct Lexer {
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub lsp: Option<Rc<Mutex<LSP>>>,
     pub workspace_edit: Option<WorkspaceEdit>,
-    pub theme: Theme,
-    lang: Lang,
+    line_builder: LineBuilder,
+    ft: FileType,
     select: Option<(CursorPosition, CursorPosition)>,
     modal: Option<Box<dyn Modal>>,
     requests: Vec<LSPResponseType>,
-    brackets: BracketColors,
     max_digits: usize,
 }
 
@@ -38,16 +38,15 @@ impl Debug for Lexer {
 impl Lexer {
     pub fn from_type(file_type: &FileType, theme: Theme) -> Self {
         Self {
+            line_builder: (theme, file_type.into()).into(),
+            ft: *file_type,
             select: None,
-            theme,
-            diagnostics: None,
-            lsp: None,
             modal: None,
             requests: Vec::new(),
-            lang: file_type.into(),
-            workspace_edit: None,
-            brackets: BracketColors::default(),
             max_digits: 0,
+            diagnostics: None,
+            lsp: None,
+            workspace_edit: None,
         }
     }
 
@@ -60,10 +59,22 @@ impl Lexer {
     ) -> usize {
         self.get_diagnostics(path);
         self.get_lsp_responses(c);
-        self.brackets.reset();
+        self.line_builder.reset();
         self.select = select.map(|(from, to)| (*from, *to));
         self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
         self.max_digits
+    }
+
+    pub async fn update_lsp(&mut self, path: &Path, changes: Option<(i32, Vec<TextDocumentContentChangeEvent>)>) {
+        if let Some(mut lsp) = self.try_expose_lsp() {
+            if let Some((version, content_changes)) = changes {
+                let _ = lsp.file_did_change(path, version, content_changes).await;
+            }
+        }
+        if self.line_builder.should_update() {
+            self.line_builder.waiting = true;
+            self.get_tokens(path).await;
+        }
     }
 
     pub fn try_expose_lsp(&mut self) -> Option<MutexGuard<'_, LSP>> {
@@ -85,7 +96,10 @@ impl Lexer {
         }
     }
 
-    pub fn set_lsp(&mut self, lsp: Rc<Mutex<LSP>>) {
+    pub async fn set_lsp(&mut self, lsp: Rc<Mutex<LSP>>) {
+        if let Ok(guard) = lsp.try_lock() {
+            self.line_builder.map_styles(&self.ft, &guard.initialized.capabilities.semantic_tokens_provider);
+        }
         self.lsp = Some(lsp);
     }
 
@@ -150,7 +164,7 @@ impl Lexer {
                         self.modal = Some(Box::new(Info::from_signature(signature)));
                     }
                     LSPResult::Renames(workspace_edit) => self.workspace_edit = Some(workspace_edit),
-                    LSPResult::Tokens(tokens) => panic!("{:?}", tokens),
+                    LSPResult::Tokens(tokens) => self.line_builder.set_tokens(tokens),
                     LSPResult::None => (),
                 }
             }
@@ -176,6 +190,28 @@ impl Lexer {
     }
 
     pub fn list_item<'a>(&mut self, idx: usize, content: &'a str) -> ListItem<'a> {
-        ListItem::new(build_line(self, idx, content))
+        let spans = vec![Span::styled(
+            get_line_num(idx, self.max_digits),
+            Style { fg: Some(Color::Gray), ..Default::default() },
+        )];
+        ListItem::new(self.line_builder.build_line(idx, spans, &self.diagnostics, content))
     }
+
+    pub fn new_theme(&mut self, theme: Theme) {
+        self.line_builder.theme = theme;
+        if let Some(lsp_rc) = self.lsp.as_mut() {
+            if let Ok(lsp) = lsp_rc.try_lock() {
+                self.line_builder.map_styles(&self.ft, &lsp.initialized.capabilities.semantic_tokens_provider);
+            }
+        }
+    }
+}
+
+fn get_line_num(idx: usize, max_digits: usize) -> String {
+    let mut as_str = (idx + 1).to_string();
+    while as_str.len() < max_digits {
+        as_str.insert(0, ' ')
+    }
+    as_str.push(' ');
+    as_str
 }

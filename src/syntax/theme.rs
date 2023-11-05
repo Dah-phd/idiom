@@ -6,16 +6,20 @@ use crate::configs::load_or_create_config;
 pub const DEFAULT_THEME_FILE: &str = "default_theme.json";
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Theme {
     pub key_words: Color,
     pub flow_control: Color,
     pub class_or_struct: Color,
+    pub constant: Color,
     pub functions: Color,
     pub blank: Color,
     pub numeric: Color,
     pub default: Color,
     pub selected: Color,
     pub string: Color,
+    pub string_escape: Color,
+    pub comment: Color,
 }
 
 impl Default for Theme {
@@ -25,11 +29,14 @@ impl Default for Theme {
             numeric: Color::Rgb(153, 173, 142),
             flow_control: Color::LightMagenta,
             class_or_struct: Color::Rgb(112, 199, 176),
+            constant: Color::Rgb(73, 162, 215),
             default: Color::Rgb(157, 221, 254),
             functions: Color::Rgb(218, 223, 170),
-            blank: Color::White,
+            blank: Color::Reset,
             selected: Color::Rgb(72, 72, 72),
             string: Color::Yellow,
+            string_escape: Color::LightYellow,
+            comment: Color::Rgb(82, 113, 67),
         }
     }
 }

@@ -176,9 +176,9 @@ impl Workspace {
                 if let Ok(mut lsp) = LSP::from(&editor.file_type).await {
                     if let Ok(..) = lsp.file_did_open(&editor.path).await {
                         let lsp_rc = Rc::new(Mutex::new(lsp));
-                        editor.lexer.set_lsp(Rc::clone(&lsp_rc));
+                        editor.lexer.set_lsp(Rc::clone(&lsp_rc)).await;
                         for opened_editor in self.editors.iter_mut() {
-                            opened_editor.lexer.set_lsp(Rc::clone(&lsp_rc));
+                            opened_editor.lexer.set_lsp(Rc::clone(&lsp_rc)).await;
                         }
                         entry.insert(lsp_rc);
                     }
@@ -186,7 +186,9 @@ impl Workspace {
             }
             Entry::Occupied(entry) => {
                 let lsp_rc = Rc::clone(entry.get());
-                editor.lexer.set_lsp(lsp_rc);
+                if lsp_rc.lock().await.file_did_open(&editor.path).await.is_ok() {
+                    editor.lexer.set_lsp(lsp_rc).await;
+                }
             }
         }
         Ok(editor)
