@@ -22,10 +22,10 @@ pub struct LineBuilder {
     pub legend: Legend,
     pub theme: Theme,
     pub lang: Lang,
-    pub brackets: BracketColors,
-    pub eror: Option<Range<usize>>,
-    pub warn: Option<Range<usize>>,
-    pub info: Option<Range<usize>>,
+    brackets: BracketColors,
+    eror: Vec<Range<usize>>,
+    warn: Vec<Range<usize>>,
+    info: Vec<Range<usize>>,
     pub select_range: Option<Range<usize>>,
     pub waiting: bool,
     pub text_is_updated: bool,
@@ -39,9 +39,9 @@ impl From<(Theme, Lang)> for LineBuilder {
             theme: value.0,
             lang: value.1,
             brackets: BracketColors::default(),
-            eror: None,
-            warn: None,
-            info: None,
+            eror: Vec::new(),
+            warn: Vec::new(),
+            info: Vec::new(),
             select_range: None,
             waiting: false,
             text_is_updated: false,
@@ -82,30 +82,29 @@ impl LineBuilder {
         content: &'a str,
     ) -> Line<'a> {
         let mut buffer = Vec::new();
-        self.eror = None;
-        self.warn = None;
-        self.info = None;
+        self.eror.clear();
+        self.warn.clear();
+        self.info.clear();
         if let Some(diagnostics) = &diagnostics {
             for diagnostic in diagnostics.diagnostics.iter() {
                 if idx == diagnostic.range.start.line as usize {
                     match diagnostic.severity {
                         Some(severity) => match severity {
                             DiagnosticSeverity::ERROR => {
-                                self.eror.replace(add_span(&mut buffer, diagnostic, content.len(), Color::Red))
+                                self.eror.push(add_span(&mut buffer, diagnostic, content.len(), Color::Red))
                             }
                             DiagnosticSeverity::WARNING => {
-                                self.warn.replace(add_span(&mut buffer, diagnostic, content.len(), Color::LightYellow))
+                                self.warn.push(add_span(&mut buffer, diagnostic, content.len(), Color::LightYellow))
                             }
-                            _ => self.info.replace(add_span(&mut buffer, diagnostic, content.len(), Color::Gray)),
+                            _ => self.info.push(add_span(&mut buffer, diagnostic, content.len(), Color::Gray)),
                         },
-                        None => self.info.replace(add_span(&mut buffer, diagnostic, content.len(), Color::Gray)),
+                        None => self.info.push(add_span(&mut buffer, diagnostic, content.len(), Color::Gray)),
                     };
                 }
             }
         }
         let mut line = if self.tokens.is_empty() || self.legend.is_empty() || self.waiting || self.text_is_updated {
-            let mut internal_build =
-                SpansBuffer::new(init, self.select_range.take(), self.eror.take(), self.warn.take(), self.info.take());
+            let mut internal_build = SpansBuffer::new(init, self.select_range.take());
             internal_build.process(self, content);
             internal_build.collect()
         } else {
@@ -142,13 +141,7 @@ impl LineBuilder {
                     }
                 }
             }
-            if matches!(&self.eror, Some(range) if range.contains(&idx)) {
-                style = style.add_modifier(Modifier::UNDERLINED).underline_color(Color::Red);
-            } else if matches!(&self.warn, Some(range) if range.contains(&idx)) {
-                style = style.add_modifier(Modifier::UNDERLINED).underline_color(Color::LightYellow);
-            } else if matches!(&self.info, Some(range) if range.contains(&idx)) {
-                style = style.add_modifier(Modifier::UNDERLINED).underline_color(Color::Gray);
-            }
+            self.set_diagnostic_style(idx, &mut style);
             if matches!(&self.select_range, Some(range) if range.contains(&idx)) {
                 style.bg.replace(self.theme.selected);
             } else {
@@ -158,6 +151,28 @@ impl LineBuilder {
             spans.push(Span::styled(ch.to_string(), style));
         }
         spans
+    }
+
+    fn set_diagnostic_style(&self, idx: usize, style: &mut Style) {
+        for range in &self.eror {
+            if range.contains(&idx) {
+                *style = style.add_modifier(Modifier::UNDERLINED).underline_color(Color::Red);
+                return;
+            }
+        }
+        for range in &self.warn {
+            if range.contains(&idx) {
+                *style = style.add_modifier(Modifier::UNDERLINED).underline_color(Color::LightYellow);
+                return;
+            }
+        }
+        for range in &self.info {
+            if range.contains(&idx) {
+                *style = style.add_modifier(Modifier::UNDERLINED).underline_color(Color::Gray);
+                return;
+            }
+        }
+        style.add_modifier = Modifier::empty();
     }
 
     fn handle_keywords(&self, word: &str) -> Color {
