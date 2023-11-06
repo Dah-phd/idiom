@@ -66,8 +66,9 @@ impl Lexer {
     }
 
     pub async fn update_lsp(&mut self, path: &Path, changes: Option<(i32, Vec<TextDocumentContentChangeEvent>)>) {
-        if let Some(mut lsp) = self.try_expose_lsp() {
-            if let Some((version, content_changes)) = changes {
+        if let Some((version, content_changes)) = changes {
+            self.line_builder.text_is_updated = true;
+            if let Some(mut lsp) = self.try_expose_lsp() {
                 let _ = lsp.file_did_change(path, version, content_changes).await;
             }
         }

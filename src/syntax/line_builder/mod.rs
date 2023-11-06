@@ -116,13 +116,11 @@ impl LineBuilder {
 
     pub fn process_tokens<'a>(&mut self, line_idx: usize, content: &'a str, mut spans: Vec<Span<'a>>) -> Vec<Span<'a>> {
         let mut style = Style { fg: Some(Color::White), ..Default::default() };
-        let mut len = 0;
+        let mut len: u32 = 0;
         let mut token_num = 0;
         let token_line = self.tokens.get(line_idx);
         for (idx, ch) in content.char_indices() {
-            if len > 0 {
-                len -= 1;
-            }
+            len = len.saturating_sub(1);
             if len == 0 {
                 if let Some(syntax_line) = token_line {
                     if let Some(t) = syntax_line.get(token_num) {
@@ -189,7 +187,7 @@ impl LineBuilder {
     }
 
     pub fn should_update(&self) -> bool {
-        !self.waiting
+        !self.waiting && (self.tokens.len() < 2 || self.text_is_updated)
     }
 
     pub fn new_line(&mut self, index: usize) {
