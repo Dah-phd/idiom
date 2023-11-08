@@ -26,13 +26,6 @@ impl ReplaceBuilder {
     fn collect(self, new_cursor: CursorPosition, new: Vec<String>) -> Action {
         Action { from_line: self.from_line, old_cursor: self.cursor, new_cursor, old: self.old_content, new }
     }
-
-    fn test() {
-        println!("uraa");
-        println!("hello");
-        println!("world!");
-        println!("test");
-    }
 }
 
 #[derive(Debug)]
