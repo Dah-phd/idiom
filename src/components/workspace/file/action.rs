@@ -26,6 +26,13 @@ impl ReplaceBuilder {
     fn collect(self, new_cursor: CursorPosition, new: Vec<String>) -> Action {
         Action { from_line: self.from_line, old_cursor: self.cursor, new_cursor, old: self.old_content, new }
     }
+
+    fn test() {
+        println!("uraa");
+        println!("hello");
+        println!("world!");
+        println!("test");
+    }
 }
 
 #[derive(Debug)]
@@ -244,11 +251,12 @@ impl Action {
 
     fn get_text_edit(&self) -> TextDocumentContentChangeEvent {
         let start = Position::new(self.old_cursor.line as u32, 0);
-        let end = Position::new(
-            start.line + self.old.len().checked_sub(1).unwrap_or_default() as u32,
-            self.old.last().map(|line| line.len()).unwrap_or_default() as u32,
-        );
+        let end = Position::new(start.line + self.old.len() as u32, 0);
         let range = Range::new(start, end);
-        TextDocumentContentChangeEvent { range: Some(range), range_length: None, text: self.new.join("\n") }
+        let mut text = self.new.join("\n");
+        if !self.new.is_empty() {
+            text.push('\n');
+        }
+        TextDocumentContentChangeEvent { range: Some(range), range_length: None, text }
     }
 }

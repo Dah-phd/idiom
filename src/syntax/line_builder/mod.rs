@@ -128,7 +128,13 @@ impl LineBuilder {
                             len = t.len;
                             style.fg = Some(match self.legend.get_color(t.token_type, &self.theme) {
                                 ColorResult::Final(color) => color,
-                                ColorResult::KeyWord => self.handle_keywords(&content[idx..(idx + len as usize)]),
+                                ColorResult::KeyWord => {
+                                    if content.len() > idx + (len as usize) {
+                                        self.handle_keywords(&content[idx..(idx + len as usize)])
+                                    } else {
+                                        self.theme.key_words
+                                    }
+                                }
                             });
                             token_num += 1;
                         } else {
