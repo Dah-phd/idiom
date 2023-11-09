@@ -195,6 +195,7 @@ impl Lexer {
             get_line_num(idx, self.max_digits),
             Style { fg: Some(Color::Gray), ..Default::default() },
         )];
+        self.line_builder.select_range = self.line_select(idx, content.len());
         ListItem::new(self.line_builder.build_line(idx, spans, &self.diagnostics, content))
     }
 
