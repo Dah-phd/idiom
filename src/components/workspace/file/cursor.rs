@@ -2,9 +2,8 @@ use std::ops::{Add, RangeInclusive, Sub};
 
 use super::action::ActionLogger;
 use super::select::Select;
-use super::utils::{backspace_indent_handler, derive_indent_from, unindent_if_before_base_pattern};
+use super::utils::{backspace_indent_handler, derive_indent_from, get_closing_char, unindent_if_before_base_pattern};
 use crate::configs::EditorConfigs;
-use crate::utils::get_closing_char;
 use lsp_types::Position;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]

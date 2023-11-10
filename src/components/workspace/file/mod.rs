@@ -12,12 +12,15 @@ pub use select::Select;
 use crate::{
     configs::{EditorConfigs, FileType},
     syntax::{Lexer, Theme},
-    utils::{find_code_blocks, get_closing_char, trim_start_inplace},
+    utils::{find_code_blocks, trim_start_inplace},
 };
 use std::path::PathBuf;
 
 use self::action::ActionLogger;
-use self::utils::{backspace_indent_handler, derive_indent_from, indent_from_prev, unindent_if_before_base_pattern};
+use self::utils::{
+    backspace_indent_handler, derive_indent_from, get_closing_char, indent_from_prev, is_closing_repeat,
+    unindent_if_before_base_pattern,
+};
 
 type DocLen = usize;
 type SelectLen = usize;
@@ -493,6 +496,10 @@ impl Editor {
             self.cursor.char += 1;
             self.action_logger.finish_replace(self.cursor, &self.content[replace]);
         } else if let Some(line) = self.content.get_mut(self.cursor.line) {
+            if is_closing_repeat(line.as_str(), ch, self.cursor.char) {
+                self.cursor.char += 1;
+                return;
+            }
             self.action_logger.push_char(&self.cursor, line, ch);
             line.insert(self.cursor.char, ch);
             self.cursor.char += 1;

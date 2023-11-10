@@ -17,17 +17,6 @@ pub fn trim_start(mut line: String) -> String {
     line
 }
 
-pub fn get_closing_char(ch: char) -> Option<char> {
-    match ch {
-        '{' => Some('}'),
-        '(' => Some(')'),
-        '[' => Some(']'),
-        '"' => Some('"'),
-        '\'' => Some('\''),
-        _ => None,
-    }
-}
-
 pub fn split_arc_mutex<T>(inner: T) -> (Arc<Mutex<T>>, Arc<Mutex<T>>) {
     let arc = Arc::new(Mutex::new(inner));
     let clone = Arc::clone(&arc);

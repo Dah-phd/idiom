@@ -102,6 +102,36 @@ pub fn clip_content(from: &CursorPosition, to: &CursorPosition, content: &mut Ve
     }
 }
 
+pub fn get_closing_char(ch: char) -> Option<char> {
+    match ch {
+        '{' => Some('}'),
+        '(' => Some(')'),
+        '[' => Some(']'),
+        '"' => Some('"'),
+        '\'' => Some('\''),
+        _ => None,
+    }
+}
+
+pub fn get_opening_char(ch: char) -> Option<char> {
+    match ch {
+        '}' => Some('{'),
+        ')' => Some('('),
+        ']' => Some('['),
+        '"' => Some('"'),
+        '\'' => Some('\''),
+        _ => None,
+    }
+}
+
+pub fn is_closing_repeat(line: &str, ch: char, at: usize) -> bool {
+    if let Some(opening) = get_opening_char(ch) {
+        line[at..].starts_with(ch) && line[..at].contains(opening)
+    } else {
+        false
+    }
+}
+
 pub fn apply_and_rev_edit(edit: &mut TextEdit, content: &mut Vec<String>) {
     let clip = clip_content(&edit.range.start.into(), &edit.range.end.into(), content);
     let new_end = insert_clip(std::mem::replace(&mut edit.new_text, clip), content, edit.range.start.into());
