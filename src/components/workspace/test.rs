@@ -4,7 +4,7 @@ use crate::{
         file::test::{mock_editor, pull_line, select_eq},
         CursorPosition,
     },
-    configs::{mock_cfg::mock_editor_key_map, EditorConfigs},
+    configs::{test::mock_editor_key_map, EditorConfigs},
 };
 use ratatui::widgets::ListState;
 use std::collections::HashMap;

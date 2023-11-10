@@ -163,12 +163,4 @@ fn get_unident_before() -> String {
 }
 
 #[cfg(test)]
-pub(crate) mod mock_cfg {
-    use std::collections::HashMap;
-
-    use super::EditorKeyMap;
-
-    pub fn mock_editor_key_map() -> EditorKeyMap {
-        EditorKeyMap { key_map: HashMap::default() }
-    }
-}
+pub mod test;
