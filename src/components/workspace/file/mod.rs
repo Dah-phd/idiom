@@ -472,6 +472,9 @@ impl Editor {
                 }
             }
         }
+        if prev_line.chars().all(|c| c.is_whitespace()) && prev_line.len().rem_euclid(self.configs.indent.len()) == 0 {
+            prev_line.clear();
+        }
         self.content.insert(self.cursor.line, line);
         self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.line_range(1, 1)]);
     }
