@@ -453,8 +453,7 @@ impl Editor {
         }
         let prev_line = &mut self.content[self.cursor.line];
         self.action_logger.init_replace(self.cursor, &[prev_line.to_owned()]);
-        let mut line =
-            if prev_line.len() >= self.cursor.char { prev_line.split_off(self.cursor.char) } else { String::new() };
+        let mut line = prev_line.split_off(self.cursor.char);
         let indent = derive_indent_from(&self.configs, prev_line);
         line.insert_str(0, &indent);
         self.cursor.line += 1;
@@ -582,10 +581,10 @@ impl Editor {
     }
 
     pub async fn save(&mut self) {
+        std::fs::write(&self.path, self.content.join("\n")).unwrap();
         if let Some(lsp) = self.lexer.lsp.as_mut() {
             let _ = lsp.lock().await.file_did_save(&self.path).await;
         }
-        std::fs::write(&self.path, self.content.join("\n")).unwrap();
     }
 
     pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {
@@ -606,7 +605,7 @@ impl Editor {
     }
 
     fn swap(&mut self, from: usize, to: usize) -> (Offset, Offset) {
-        // from should be always smaller than to - unchecked
+        // ! from should be always smaller than to - unchecked
         self.content.swap(from, to);
         let (offset, _) = self.get_and_indent_line(from);
         let (offset2, _) = self.get_and_indent_line(to);
