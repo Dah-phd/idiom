@@ -9,11 +9,13 @@ use crate::components::workspace::CursorPosition;
 use crate::configs::EditorAction;
 use crate::configs::FileType;
 use crate::lsp::LSP;
+use anyhow::Result;
 use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent, WorkspaceEdit};
 use ratatui::style::{Color, Style};
 use ratatui::text::Span;
 use ratatui::{prelude::CrosstermBackend, widgets::ListItem, Frame};
 use std::fmt::Debug;
+use std::path::PathBuf;
 use std::{io::Stdout, path::Path, rc::Rc};
 use tokio::sync::{Mutex, MutexGuard};
 
@@ -97,11 +99,15 @@ impl Lexer {
         }
     }
 
-    pub async fn set_lsp(&mut self, lsp: Rc<Mutex<LSP>>) {
-        if let Ok(guard) = lsp.try_lock() {
+    pub async fn set_lsp(&mut self, lsp: Rc<Mutex<LSP>>, on_file: &PathBuf) {
+        {
+            let mut guard = lsp.lock().await;
+            if guard.file_did_open(on_file).await.is_err() {
+                return;
+            }
             self.line_builder.map_styles(&self.ft, &guard.initialized.capabilities.semantic_tokens_provider);
         }
-        self.lsp = Some(lsp);
+        self.lsp.replace(lsp);
     }
 
     fn get_diagnostics(&mut self, path: &Path) -> Option<()> {

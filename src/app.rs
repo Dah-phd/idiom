@@ -272,7 +272,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                     GeneralAction::RefreshSettings => {
                         let new_key_map = KeyMap::new();
                         general_key_map = new_key_map.general_key_map();
-                        workspace.refresh_cfg(new_key_map.editor_key_map());
+                        workspace.refresh_cfg(new_key_map.editor_key_map()).await;
                     }
                     GeneralAction::GoToLinePopup if matches!(mode, Mode::Insert) => {
                         mode = mode.popup(go_to_line_popup());
