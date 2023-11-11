@@ -3,7 +3,7 @@ mod generics;
 pub mod tree_popups;
 use std::io::Stdout;
 
-use crate::configs::PopupMessage;
+use crate::events::messages::PopupMessage;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 pub use generics::message;
 pub use generics::{Button, Popup, PopupSelector};

@@ -13,7 +13,9 @@ use crate::{
         },
         EditorTerminal, Footer, Tree, Workspace,
     },
-    configs::{GeneralAction, KeyMap, Mode, PopupMessage},
+    configs::{GeneralAction, KeyMap, Mode},
+    events::messages::PopupMessage,
+    events::Events,
 };
 use anyhow::Result;
 use crossterm::event::Event;
@@ -29,6 +31,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
     let mut clock = Instant::now();
     let mut mode = Mode::Select;
     let mut general_key_map = configs.general_key_map();
+    let mut events = Events::default();
 
     // COMPONENTS
     let mut file_tree = Tree::new(open_file.is_none());
@@ -284,6 +287,11 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                 }
             }
         }
+
+        events.exchange_footer(&mut footer);
+        events.exchange_ws(&mut workspace);
+        events.exchange_tree(&mut file_tree);
+
         if clock.elapsed() >= TICK {
             clock = Instant::now();
         }

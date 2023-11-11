@@ -3,7 +3,7 @@ use std::io::Stdout;
 use super::PopupInterface;
 use crate::components::{Tree, Workspace};
 use crate::utils::{centered_rect_static, right_corner_rect_static};
-use crate::{components::Footer, configs::PopupMessage};
+use crate::{components::Footer, events::messages::PopupMessage};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     backend::CrosstermBackend,

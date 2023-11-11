@@ -1,5 +1,5 @@
 use super::{generics::PopupActiveSelector, Button, Popup, PopupSelector};
-use crate::{components::workspace::Select, configs::PopupMessage};
+use crate::{components::workspace::Select, events::messages::PopupMessage};
 use crossterm::event::KeyCode;
 
 pub fn save_all_popup() -> Box<Popup> {

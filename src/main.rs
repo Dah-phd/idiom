@@ -1,6 +1,7 @@
 mod app;
 mod components;
 mod configs;
+mod events;
 mod lsp;
 mod syntax;
 mod utils;

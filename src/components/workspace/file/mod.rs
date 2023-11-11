@@ -117,6 +117,7 @@ impl Editor {
     pub fn go_to_select(&mut self, select: Select) {
         if let Select::Range(_, to) = select {
             self.cursor = to;
+            self.at_line = to.line.checked_sub(self.max_rows / 2).unwrap_or_default();
             self.select = select;
         }
     }
@@ -258,6 +259,7 @@ impl Editor {
         if self.content.len() >= line {
             self.cursor.line = line;
             self.cursor.char = 0;
+            self.at_line = line.checked_sub(self.max_rows / 2).unwrap_or_default();
         }
     }
 

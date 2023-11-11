@@ -1,10 +1,7 @@
 mod keymap;
-mod popups;
 mod types;
 pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap};
 pub use types::{FileType, Mode};
-
-pub use popups::PopupMessage;
 
 use std::collections::HashMap;
 

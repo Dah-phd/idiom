@@ -7,9 +7,8 @@ use ratatui::{
 };
 
 use crate::components::{popups::PopupInterface, workspace::Workspace, Footer, Tree};
+use crate::events::messages::PopupMessage;
 use std::{io::Stdout, path::PathBuf};
-
-use super::PopupMessage;
 
 pub enum Mode {
     Select,

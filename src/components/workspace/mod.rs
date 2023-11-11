@@ -12,6 +12,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{ListState, Tabs};
 use ratatui::Frame;
+use std::cell::RefCell;
 use std::collections::{hash_map::Entry, HashMap};
 use std::io::Stdout;
 use std::path::PathBuf;
