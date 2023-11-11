@@ -11,10 +11,11 @@ pub use select::Select;
 
 use crate::{
     configs::{EditorConfigs, FileType},
+    events::Events,
     syntax::{Lexer, Theme},
     utils::{find_code_blocks, trim_start_inplace},
 };
-use std::path::PathBuf;
+use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 use self::action::ActionLogger;
 use self::utils::{
@@ -42,12 +43,12 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn from_path(path: PathBuf, mut configs: EditorConfigs) -> std::io::Result<Self> {
+    pub fn from_path(path: PathBuf, mut configs: EditorConfigs, events: &Rc<RefCell<Events>>) -> std::io::Result<Self> {
         let content = std::fs::read_to_string(&path)?;
         let file_type = FileType::derive_type(&path);
         configs.update_by_file_type(&file_type);
         Ok(Self {
-            lexer: Lexer::from_type(&file_type, Theme::from(&configs.theme_file_in_config_dir)),
+            lexer: Lexer::from_type(&file_type, Theme::from(&configs.theme_file_in_config_dir), events),
             configs,
             cursor: CursorPosition::default(),
             select: Select::default(),

@@ -1,6 +1,6 @@
 mod tree_paths;
-use crate::configs::GeneralAction;
 use crate::utils::build_file_or_folder;
+use crate::{configs::GeneralAction, events::Events};
 use anyhow::Result;
 use ratatui::{
     backend::Backend,
@@ -9,7 +9,9 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState},
     Frame,
 };
+use std::rc::Rc;
 use std::{
+    cell::RefCell,
     path::PathBuf,
     time::{Duration, Instant},
 };
@@ -29,7 +31,7 @@ pub struct Tree {
 }
 
 impl Tree {
-    pub fn new(active: bool) -> Self {
+    pub fn new(active: bool, events: &Rc<RefCell<Events>>) -> Self {
         let mut tree = TreePath::default();
         let mut tree_ptrs = Vec::new();
         tree.sync_flat_ptrs(&mut tree_ptrs);

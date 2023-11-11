@@ -37,18 +37,29 @@ impl Mode {
         }
     }
 
-    pub fn popup(self, popup: Box<dyn PopupInterface>) -> Self {
-        if matches!(self, Self::Popup((_, _))) {
-            return self;
+    pub fn popup(&mut self, popup: Box<dyn PopupInterface>) {
+        match self {
+            Self::Insert => self.popup_insert(popup),
+            Self::Select => self.popup_select(popup),
+            _ => {}
         }
-        Self::Popup((Box::new(self), popup))
     }
 
-    pub fn clear_popup(self) -> Self {
+    pub fn popup_insert(&mut self, popup: Box<dyn PopupInterface>) {
+        *self = Self::Popup((Box::new(Self::Insert), popup));
+    }
+
+    pub fn popup_select(&mut self, popup: Box<dyn PopupInterface>) {
+        *self = Self::Popup((Box::new(Self::Select), popup));
+    }
+
+    pub fn clear_popup(&mut self) {
         if let Self::Popup((mode, _)) = self {
-            return *mode;
+            match **mode {
+                Self::Insert => *self = Self::Insert,
+                _ => *self = Self::Select,
+            }
         }
-        self
     }
 
     pub fn popup_map(&mut self, key: &KeyEvent) -> Option<PopupMessage> {
@@ -67,12 +78,6 @@ impl Mode {
     pub fn update_tree(&mut self, file_tree: &mut Tree) {
         if let Self::Popup((_, popup)) = self {
             popup.update_tree(file_tree);
-        }
-    }
-
-    pub fn update_footer(&mut self, footer: &mut Footer) {
-        if let Self::Popup((_, popup)) = self {
-            popup.update_footer(footer);
         }
     }
 }

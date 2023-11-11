@@ -5,6 +5,7 @@ use crate::{
         CursorPosition,
     },
     configs::{test::mock_editor_key_map, EditorConfigs},
+    events::Events,
 };
 use ratatui::widgets::ListState;
 use std::collections::HashMap;
@@ -15,6 +16,7 @@ fn mock_ws(content: Vec<String>) -> Workspace {
     Workspace {
         editors: vec![mock_editor(content)],
         state,
+        events: Events::new(),
         base_config: EditorConfigs::default(),
         key_map: mock_editor_key_map(),
         lsp_servers: HashMap::default(),

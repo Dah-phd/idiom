@@ -1,4 +1,5 @@
 use super::{generics::PopupActiveSelector, Button, Popup, PopupSelector};
+use crate::events::WorkspaceEvent;
 use crate::{components::workspace::Select, events::messages::PopupMessage};
 use crossterm::event::KeyCode;
 
@@ -32,7 +33,9 @@ pub fn go_to_line_popup() -> Box<Popup> {
         buttons: vec![Button {
             command: |popup| {
                 if let Ok(line) = popup.message.parse::<usize>() {
-                    return PopupMessage::GoToLine(line.checked_sub(1).unwrap_or_default());
+                    return PopupMessage::UpdateWorkspace(WorkspaceEvent::GoToLine(
+                        line.checked_sub(1).unwrap_or_default(),
+                    ));
                 }
                 PopupMessage::Done
             },
@@ -63,7 +66,7 @@ pub fn find_in_editor_popup() -> Box<PopupActiveSelector<Select>> {
     Box::new(PopupActiveSelector::for_editor(
         |popup| {
             if let Some(select) = popup.next() {
-                PopupMessage::GoToSelect { select, should_clear: false }
+                PopupMessage::UpdateWorkspace(WorkspaceEvent::GoToSelect { select, should_clear: false })
             } else {
                 PopupMessage::None
             }
@@ -73,7 +76,7 @@ pub fn find_in_editor_popup() -> Box<PopupActiveSelector<Select>> {
                 editor.find(popup.pattern.as_str(), &mut popup.options);
             }
         },
-        Some(|popup| PopupMessage::SelectOpenedFile(popup.pattern.to_owned())),
+        Some(|popup| WorkspaceEvent::SelectOpenedFile(popup.pattern.to_owned()).into()),
     ))
 }
 
@@ -81,7 +84,7 @@ pub fn replace_in_editor_popup() -> Box<PopupActiveSelector<Select>> {
     Box::new(PopupActiveSelector::default(
         |popup| {
             if let Some(select) = popup.drain_next() {
-                PopupMessage::ReplaceSelect(popup.pattern.to_owned(), select)
+                WorkspaceEvent::ReplaceSelect(popup.pattern.to_owned(), select).into()
             } else {
                 PopupMessage::Done
             }
@@ -97,7 +100,7 @@ pub fn select_selector(options: Vec<(Select, String)>) -> Box<PopupSelector<(Sel
             Select::Range(from, ..) => format!("({}) {line}", from.line + 1),
             Select::None => line.to_owned(),
         },
-        command: |popup| PopupMessage::GoToSelect { select: popup.options[popup.state].0, should_clear: true },
+        command: |popup| WorkspaceEvent::GoToSelect { select: popup.options[popup.state].0, should_clear: true }.into(),
         state: 0,
         size: None,
     })
@@ -107,7 +110,7 @@ pub fn editor_selector(options: Vec<String>) -> Box<PopupSelector<String>> {
     Box::new(PopupSelector {
         options,
         display: |editor| editor.to_owned(),
-        command: |popup| PopupMessage::ActivateEditor(popup.state),
+        command: |popup| WorkspaceEvent::ActivateEditor(popup.state).into(),
         state: 0,
         size: None,
     })

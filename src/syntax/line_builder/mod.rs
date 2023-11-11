@@ -50,7 +50,7 @@ impl From<(Theme, Lang)> for LineBuilder {
 }
 
 impl LineBuilder {
-    pub fn set_tokens(&mut self, tokens_res: SemanticTokensResult) {
+    pub fn set_tokens(&mut self, tokens_res: SemanticTokensResult) -> bool {
         let mut tokens = Vec::new();
         let mut inner_token = Vec::new();
         let mut from = 0;
@@ -68,6 +68,7 @@ impl LineBuilder {
         self.tokens = tokens;
         self.waiting = false;
         self.text_is_updated = false;
+        self.tokens.len() > 1
     }
 
     pub fn reset(&mut self) {

@@ -1,5 +1,6 @@
 use crate::components::Footer;
 
+#[derive(Debug, Clone)]
 pub enum FooterEvent {
     Message(String),
     Overwrite(String),

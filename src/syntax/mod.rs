@@ -8,12 +8,13 @@ pub use self::theme::{Theme, DEFAULT_THEME_FILE};
 use crate::components::workspace::CursorPosition;
 use crate::configs::EditorAction;
 use crate::configs::FileType;
+use crate::events::Events;
 use crate::lsp::LSP;
-use anyhow::Result;
 use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent, WorkspaceEdit};
 use ratatui::style::{Color, Style};
 use ratatui::text::Span;
 use ratatui::{prelude::CrosstermBackend, widgets::ListItem, Frame};
+use std::cell::RefCell;
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::{io::Stdout, path::Path, rc::Rc};
@@ -23,6 +24,7 @@ pub struct Lexer {
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub lsp: Option<Rc<Mutex<LSP>>>,
     pub workspace_edit: Option<WorkspaceEdit>,
+    pub events: Rc<RefCell<Events>>,
     line_builder: LineBuilder,
     ft: FileType,
     select: Option<(CursorPosition, CursorPosition)>,
@@ -38,7 +40,7 @@ impl Debug for Lexer {
 }
 
 impl Lexer {
-    pub fn from_type(file_type: &FileType, theme: Theme) -> Self {
+    pub fn from_type(file_type: &FileType, theme: Theme, events: &Rc<RefCell<Events>>) -> Self {
         Self {
             line_builder: (theme, file_type.into()).into(),
             ft: *file_type,
@@ -49,6 +51,7 @@ impl Lexer {
             diagnostics: None,
             lsp: None,
             workspace_edit: None,
+            events: Rc::clone(events),
         }
     }
 
@@ -76,7 +79,9 @@ impl Lexer {
         }
         if self.line_builder.should_update() {
             self.line_builder.waiting = true;
-            self.get_tokens(path).await;
+            if self.get_tokens(path).await.is_some() {
+                self.events.borrow_mut().message("Getting LSP syntax");
+            };
         }
     }
 
@@ -100,6 +105,7 @@ impl Lexer {
     }
 
     pub async fn set_lsp(&mut self, lsp: Rc<Mutex<LSP>>, on_file: &PathBuf) {
+        self.events.borrow_mut().message("Mapping LSP ...");
         {
             let mut guard = lsp.lock().await;
             if guard.file_did_open(on_file).await.is_err() {
@@ -107,6 +113,7 @@ impl Lexer {
             }
             self.line_builder.map_styles(&self.ft, &guard.initialized.capabilities.semantic_tokens_provider);
         }
+        self.events.borrow_mut().overwrite("LSP mapped!");
         self.lsp.replace(lsp);
     }
 
@@ -171,7 +178,11 @@ impl Lexer {
                         self.modal = Some(Box::new(Info::from_signature(signature)));
                     }
                     LSPResult::Renames(workspace_edit) => self.workspace_edit = Some(workspace_edit),
-                    LSPResult::Tokens(tokens) => self.line_builder.set_tokens(tokens),
+                    LSPResult::Tokens(tokens) => {
+                        if self.line_builder.set_tokens(tokens) {
+                            self.events.borrow_mut().overwrite("LSP tokens mapped!");
+                        };
+                    }
                     LSPResult::None => (),
                 }
             }

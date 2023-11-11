@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use super::{Button, Popup, PopupSelector};
-use crate::events::messages::PopupMessage;
+use crate::events::{messages::PopupMessage, TreeEvent};
 
 pub fn create_file_popup(path: String) -> Box<Popup> {
     let mut buttons = vec![Button {
@@ -32,7 +32,7 @@ pub fn rename_file_popup(path: String) -> Box<Popup> {
         message_as_buffer_builder: Some(Some),
         title: Some(format!("Rename: {path}")),
         buttons: vec![Button {
-            command: |popup| PopupMessage::RenameFile(popup.message.to_owned()),
+            command: |popup| TreeEvent::RenameFile(popup.message.to_owned()).into(),
             name: "Rename",
             key: None,
         }],
@@ -47,14 +47,18 @@ pub fn find_in_tree_popup() -> Box<Popup> {
         message_as_buffer_builder: Some(Some),
         title: Some("Find in tree".to_owned()),
         buttons: vec![
-            Button { command: |popup| PopupMessage::SelectPath(popup.message.to_owned()), name: "Paths", key: None },
+            Button {
+                command: |popup| PopupMessage::UpdateTree(TreeEvent::SelectPath(popup.message.to_owned())),
+                name: "Paths",
+                key: None,
+            },
             Button {
                 command: |popup| PopupMessage::SelectTreeFiles(popup.message.to_owned()),
                 name: "Files",
                 key: None,
             },
             Button {
-                command: |popup| PopupMessage::SelectPathFull(popup.message.to_owned()),
+                command: |popup| TreeEvent::SelectPathFull(popup.message.to_owned()).into(),
                 name: "All paths",
                 key: None,
             },

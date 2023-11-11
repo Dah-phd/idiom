@@ -28,5 +28,4 @@ pub trait PopupInterface {
     fn key_map(&mut self, key: &KeyEvent) -> PopupMessage;
     fn update_workspace(&mut self, workspace: &mut Workspace);
     fn update_tree(&mut self, file_tree: &mut Tree);
-    fn update_footer(&mut self, footer: &mut Footer);
 }

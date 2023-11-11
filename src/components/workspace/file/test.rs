@@ -1,5 +1,6 @@
 use crate::{
     configs::EditorConfigs,
+    events::Events,
     syntax::{Lexer, Theme},
 };
 
@@ -7,9 +8,10 @@ use super::{action::ActionLogger, clipboard::Clipboard, CursorPosition, Editor};
 
 pub fn mock_editor(content: Vec<String>) -> Editor {
     let file_type = crate::configs::FileType::Rust;
+    let events = Events::new();
     Editor {
         cursor: super::CursorPosition::default(),
-        lexer: Lexer::from_type(&file_type, Theme::default()),
+        lexer: Lexer::from_type(&file_type, Theme::default(), &events),
         file_type,
         path: "".into(),
         at_line: 0,

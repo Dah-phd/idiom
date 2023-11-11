@@ -2,8 +2,9 @@ use std::io::Stdout;
 
 use super::PopupInterface;
 use crate::components::{Tree, Workspace};
+use crate::events::messages::PopupMessage;
+use crate::events::WorkspaceEvent;
 use crate::utils::{centered_rect_static, right_corner_rect_static};
-use crate::{components::Footer, events::messages::PopupMessage};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     backend::CrosstermBackend,
@@ -83,7 +84,6 @@ impl PopupInterface for Popup {
     }
     fn update_workspace(&mut self, _editor_state: &mut Workspace) {}
     fn update_tree(&mut self, _file_tree: &mut Tree) {}
-    fn update_footer(&mut self, _footer: &mut Footer) {}
 }
 
 impl Popup {
@@ -179,7 +179,6 @@ impl<T> PopupInterface for PopupSelector<T> {
     }
     fn update_workspace(&mut self, _editor_state: &mut Workspace) {}
     fn update_tree(&mut self, _file_tree: &mut Tree) {}
-    fn update_footer(&mut self, _footer: &mut Footer) {}
 }
 
 pub struct PopupActiveSelector<T: Clone> {
@@ -189,7 +188,6 @@ pub struct PopupActiveSelector<T: Clone> {
     command: fn(&mut Self) -> PopupMessage,
     to_selector: Option<fn(&mut Self) -> PopupMessage>,
     on_update: PopupMessage,
-    footer_callback: Option<fn(&mut Self, &mut Footer)>,
     editor_callback: Option<fn(&mut Self, &mut Workspace)>,
     tree_callback: Option<fn(&mut Self, &mut Tree)>,
 }
@@ -203,26 +201,6 @@ impl<T: Clone> PopupActiveSelector<T> {
             command,
             to_selector,
             on_update: PopupMessage::None,
-            footer_callback: None,
-            editor_callback: None,
-            tree_callback: None,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn for_footer(
-        command: fn(&mut Self) -> PopupMessage,
-        callback: fn(&mut Self, &mut Footer),
-        to_selector: Option<fn(&mut Self) -> PopupMessage>,
-    ) -> Self {
-        Self {
-            options: Vec::new(),
-            pattern: String::new(),
-            state: 0,
-            command,
-            to_selector,
-            on_update: PopupMessage::UpdateFooter,
-            footer_callback: Some(callback),
             editor_callback: None,
             tree_callback: None,
         }
@@ -239,29 +217,9 @@ impl<T: Clone> PopupActiveSelector<T> {
             state: 0,
             command,
             to_selector,
-            on_update: PopupMessage::UpdateWorkspace,
-            footer_callback: None,
+            on_update: PopupMessage::UpdateWorkspace(WorkspaceEvent::PopupAccess),
             editor_callback: Some(callback),
             tree_callback: None,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn for_tree(
-        command: fn(&mut Self) -> PopupMessage,
-        callback: fn(&mut Self, &mut Tree),
-        to_selector: Option<fn(&mut Self) -> PopupMessage>,
-    ) -> Self {
-        Self {
-            options: Vec::new(),
-            pattern: String::new(),
-            state: 0,
-            command,
-            to_selector,
-            on_update: PopupMessage::UpdateTree,
-            footer_callback: None,
-            editor_callback: None,
-            tree_callback: Some(callback),
         }
     }
 
@@ -337,12 +295,6 @@ impl<T: Clone> PopupInterface for PopupActiveSelector<T> {
     fn update_tree(&mut self, file_tree: &mut Tree) {
         if let Some(cb) = self.tree_callback {
             (cb)(self, file_tree);
-            self.state = self.options.len().checked_sub(1).unwrap_or_default();
-        }
-    }
-    fn update_footer(&mut self, footer: &mut Footer) {
-        if let Some(cb) = self.footer_callback {
-            (cb)(self, footer);
             self.state = self.options.len().checked_sub(1).unwrap_or_default();
         }
     }

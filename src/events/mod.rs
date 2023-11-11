@@ -6,23 +6,32 @@ mod workspace_events;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use self::file_tree_events::TreeEvent;
-use self::footer_events::FooterEvent;
-use self::workspace_events::WorkspaceEvent;
+pub use self::file_tree_events::TreeEvent;
+pub use self::footer_events::FooterEvent;
+pub use self::workspace_events::WorkspaceEvent;
 use crate::components::Footer;
 use crate::components::Tree;
 use crate::components::Workspace;
+use crate::configs::Mode;
 
 #[derive(Default)]
 pub struct Events {
-    footer: Vec<FooterEvent>,
-    workspace: Vec<WorkspaceEvent>,
-    tree: Vec<TreeEvent>,
+    pub footer: Vec<FooterEvent>,
+    pub workspace: Vec<WorkspaceEvent>,
+    pub tree: Vec<TreeEvent>,
 }
 
 impl Events {
-    fn new() -> Rc<RefCell<Self>> {
+    pub fn new() -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self::default()))
+    }
+
+    pub fn message(&mut self, msg: &str) {
+        self.footer.push(FooterEvent::Message(msg.into()));
+    }
+
+    pub fn overwrite(&mut self, msg: &str) {
+        self.footer.push(FooterEvent::Overwrite(msg.into()))
     }
 
     pub fn exchange_footer(&mut self, footer: &mut Footer) {
@@ -31,15 +40,15 @@ impl Events {
         }
     }
 
-    pub fn exchange_ws(&mut self, workspace: &mut Workspace) {
+    pub fn exchange_ws(&mut self, workspace: &mut Workspace, mode: &mut Mode) {
         for event in self.workspace.drain(..) {
-            event.map(workspace);
+            event.map(workspace, mode);
         }
     }
 
-    pub fn exchange_tree(&mut self, tree: &mut Tree) {
+    pub fn exchange_tree(&mut self, tree: &mut Tree, mode: &mut Mode) {
         for event in self.tree.drain(..) {
-            event.map(tree);
+            event.map(tree, mode);
         }
     }
 }

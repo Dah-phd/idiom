@@ -1,5 +1,6 @@
 mod file;
 use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType, Mode};
+use crate::events::Events;
 use crate::lsp::LSP;
 use anyhow::Result;
 use crossterm::event::KeyEvent;
@@ -24,24 +25,24 @@ type LSPPool = HashMap<FileType, Rc<Mutex<LSP>>>;
 pub struct Workspace {
     pub editors: Vec<Editor>,
     pub state: ListState,
+    events: Rc<RefCell<Events>>,
     base_config: EditorConfigs,
     key_map: EditorKeyMap,
     lsp_servers: LSPPool,
 }
 
-impl From<EditorKeyMap> for Workspace {
-    fn from(key_map: EditorKeyMap) -> Self {
+impl Workspace {
+    pub fn new(key_map: EditorKeyMap, events: &Rc<RefCell<Events>>) -> Self {
         Self {
             editors: Vec::default(),
             state: ListState::default(),
             base_config: EditorConfigs::new(),
+            events: Rc::clone(events),
             key_map,
             lsp_servers: HashMap::new(),
         }
     }
-}
 
-impl Workspace {
     pub fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, screen: Rect) {
         let layout = Layout::default().constraints([Constraint::Length(1), Constraint::default()]).split(screen);
         if let Some(editor_id) = self.state.selected() {
@@ -171,7 +172,7 @@ impl Workspace {
     }
 
     async fn build_editor(&mut self, file_path: PathBuf) -> Result<Editor> {
-        let mut new = Editor::from_path(file_path, self.base_config.clone())?;
+        let mut new = Editor::from_path(file_path, self.base_config.clone(), &self.events)?;
         match self.lsp_servers.entry(new.file_type) {
             Entry::Vacant(entry) => {
                 if let Ok(lsp) = LSP::from(&new.file_type).await {

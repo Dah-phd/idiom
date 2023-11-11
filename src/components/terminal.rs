@@ -1,4 +1,5 @@
 use crate::configs::GeneralAction;
+use crate::events::Events;
 use anyhow::Result;
 use ratatui::backend::Backend;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
@@ -6,16 +7,18 @@ use ratatui::style::Stylize;
 use ratatui::text::Span;
 use ratatui::widgets::{Block, Borders, List, ListItem};
 use ratatui::Frame;
+use std::cell::RefCell;
 use std::process::Stdio;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use tokio::process::{Child, Command};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
-#[derive(Debug)]
 pub struct EditorTerminal {
     pub active: bool,
+    events: Rc<RefCell<Events>>,
     history: Vec<String>,
     process: Option<(Child, JoinHandle<()>)>,
     out_buffer: Arc<Mutex<Vec<String>>>,
@@ -47,9 +50,10 @@ impl EditorTerminal {
         self.active = !self.active
     }
 
-    pub fn new() -> Self {
+    pub fn new(events: &Rc<RefCell<Events>>) -> Self {
         Self {
             active: false,
+            events: Rc::clone(events),
             history: Vec::new(),
             process: None,
             out_buffer: Arc::new(Mutex::new(Vec::new())),
