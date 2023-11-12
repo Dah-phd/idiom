@@ -246,7 +246,7 @@ impl Action {
     }
 
     fn get_text_edit(&self) -> TextDocumentContentChangeEvent {
-        let start = Position::new(self.old_cursor.line as u32, 0);
+        let start = Position::new(self.old_cursor.line.min(self.new_cursor.line) as u32, 0);
         let end = Position::new(start.line + self.old.len() as u32, 0);
         let range = Range::new(start, end);
         let mut text = self.new.join("\n");

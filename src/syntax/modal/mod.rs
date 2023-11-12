@@ -112,7 +112,7 @@ impl AutoComplete {
 
     fn get_result(&mut self) -> LSPModalResult {
         if let Some(idx) = self.state.selected() {
-            LSPModalResult::Workspace(WorkspaceEvent::AutoComplete(self.completions[idx].label.to_owned()))
+            LSPModalResult::Workspace(WorkspaceEvent::AutoComplete(self.filtered.remove(idx).0))
         } else {
             LSPModalResult::Done
         }
@@ -244,7 +244,7 @@ fn parse_markedstr(value: MarkedString) -> String {
 pub fn should_complete(line: &str, idx: usize) -> bool {
     let mut last_char = ' ';
     for (char_idx, ch) in line.char_indices() {
-        if char_idx + 1 == idx && last_char.is_whitespace() && (ch.is_alphabetic() || ch == '_') {
+        if char_idx + 1 == idx && (last_char.is_whitespace() || last_char == '(') && (ch.is_alphabetic() || ch == '_') {
             return true;
         }
         last_char = ch;
