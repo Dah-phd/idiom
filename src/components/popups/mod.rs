@@ -9,7 +9,7 @@ pub use generics::message;
 pub use generics::{Button, Popup, PopupSelector};
 use ratatui::{backend::CrosstermBackend, Frame};
 
-use super::{Footer, Tree, Workspace};
+use super::{Tree, Workspace};
 
 pub trait PopupInterface {
     fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>);

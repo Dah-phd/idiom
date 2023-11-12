@@ -3,13 +3,14 @@ mod line_builder;
 mod modal;
 mod theme;
 use self::line_builder::LineBuilder;
-use self::modal::{AutoComplete, Info, LSPResponseType, LSPResult, Modal};
+use self::modal::{should_complete, LSPModal, LSPModalResult, LSPResponseType, LSPResult};
 pub use self::theme::{Theme, DEFAULT_THEME_FILE};
 use crate::components::workspace::CursorPosition;
 use crate::configs::EditorAction;
 use crate::configs::FileType;
 use crate::events::Events;
 use crate::lsp::LSP;
+use anyhow::anyhow;
 use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent, WorkspaceEdit};
 use ratatui::style::{Color, Style};
 use ratatui::text::Span;
@@ -28,14 +29,14 @@ pub struct Lexer {
     line_builder: LineBuilder,
     ft: FileType,
     select: Option<(CursorPosition, CursorPosition)>,
-    modal: Option<Box<dyn Modal>>,
+    modal: LSPModal,
     requests: Vec<LSPResponseType>,
     max_digits: usize,
 }
 
 impl Debug for Lexer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Lexer")
+        f.write_str(format!("LEXER: {:?}", self.ft).as_str())
     }
 }
 
@@ -45,7 +46,7 @@ impl Lexer {
             line_builder: (theme, file_type.into()).into(),
             ft: *file_type,
             select: None,
-            modal: None,
+            modal: LSPModal::default(),
             requests: Vec::new(),
             max_digits: 0,
             diagnostics: None,
@@ -58,12 +59,11 @@ impl Lexer {
     pub fn context(
         &mut self,
         content: &[String],
-        c: &CursorPosition,
         select: Option<(&CursorPosition, &CursorPosition)>,
         path: &Path,
     ) -> usize {
         self.get_diagnostics(path);
-        self.get_lsp_responses(c);
+        self.get_lsp_responses();
         self.line_builder.reset();
         self.select = select.map(|(from, to)| (*from, *to));
         self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
@@ -73,8 +73,26 @@ impl Lexer {
     pub async fn update_lsp(&mut self, path: &Path, changes: Option<(i32, Vec<TextDocumentContentChangeEvent>)>) {
         if let Some((version, content_changes)) = changes {
             self.line_builder.text_is_updated = true;
+            let mut error = None;
+            let mut restart = None;
             if let Some(mut lsp) = self.try_expose_lsp() {
-                let _ = lsp.file_did_change(path, version, content_changes).await;
+                match lsp.check_status().await {
+                    Ok(None) => {
+                        let _ = lsp.file_did_change(path, version, content_changes).await;
+                    }
+                    Ok(Some(err)) => {
+                        error.replace(err);
+                    }
+                    Err(err) => {
+                        error.replace(anyhow!("LSP crashed!"));
+                        restart.replace(err.to_string());
+                    }
+                };
+            }
+            if let Some(err) = error {
+                let mut events = self.events.borrow_mut();
+                events.overwrite(err.to_string());
+                events.message(restart.unwrap_or("LSP restarted!".to_string()));
             }
         }
         if self.line_builder.should_update() {
@@ -91,17 +109,24 @@ impl Lexer {
     }
 
     pub fn render_modal_if_exist(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, x: u16, y: u16) {
-        if let Some(modal) = self.modal.as_mut() {
-            modal.render_at(frame, x, y);
-        }
+        self.modal.render_at(frame, x, y);
     }
 
-    pub fn map_modal_if_exists(&mut self, key: &EditorAction) {
-        if let Some(modal) = self.modal.as_mut() {
-            if modal.map_and_finish(key) {
-                self.modal = None;
+    pub fn map_modal_if_exists(&mut self, key: &EditorAction) -> bool {
+        match self.modal.map_and_finish(key) {
+            LSPModalResult::Done => self.modal.clear(),
+            LSPModalResult::Teken => return true,
+            LSPModalResult::TakenDone => {
+                self.modal.clear();
+                return true;
             }
+            LSPModalResult::Workspace(event) => {
+                self.events.borrow_mut().workspace.push(event);
+                return true;
+            }
+            _ => (),
         }
+        false
     }
 
     pub async fn set_lsp(&mut self, lsp: Rc<Mutex<LSP>>, on_file: &PathBuf) {
@@ -129,19 +154,16 @@ impl Lexer {
         Some(())
     }
 
-    pub async fn get_autocomplete(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
-        if self.modal.is_some() {
+    pub async fn get_autocomplete(&mut self, path: &Path, c: &CursorPosition, line: &str) -> Option<()> {
+        if matches!(self.modal, LSPModal::AutoComplete(..)) || !should_complete(line, c.char) {
             return None;
         }
         let id = self.try_expose_lsp()?.completion(path, c).await?;
-        self.requests.push(LSPResponseType::Completion(id));
+        self.requests.push(LSPResponseType::Completion(id, line.to_owned()));
         Some(())
     }
 
     pub async fn get_hover(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
-        if self.modal.is_some() {
-            return None;
-        }
         let id = self.try_expose_lsp()?.hover(path, c).await?;
         self.requests.push(LSPResponseType::Hover(id));
         Some(())
@@ -159,7 +181,7 @@ impl Lexer {
         Some(())
     }
 
-    fn get_lsp_responses(&mut self, c: &CursorPosition) -> Option<()> {
+    fn get_lsp_responses(&mut self) -> Option<()> {
         if self.requests.is_empty() {
             return None;
         }
@@ -168,15 +190,9 @@ impl Lexer {
         if let Some(response) = lsp.get(request.id()) {
             if let Some(value) = response.result {
                 match request.parse(value) {
-                    LSPResult::Completion(completion) => {
-                        self.modal = Some(Box::new(AutoComplete::new(c, completion)));
-                    }
-                    LSPResult::Hover(hover) => {
-                        self.modal = Some(Box::new(Info::from_hover(hover)));
-                    }
-                    LSPResult::SignatureHelp(signature) => {
-                        self.modal = Some(Box::new(Info::from_signature(signature)));
-                    }
+                    LSPResult::Completion(completions, line) => self.modal.auto_complete(completions, line),
+                    LSPResult::Hover(hover) => self.modal.hover(hover),
+                    LSPResult::SignatureHelp(signature) => self.modal.signature(signature),
                     LSPResult::Renames(workspace_edit) => self.workspace_edit = Some(workspace_edit),
                     LSPResult::Tokens(tokens) => {
                         if self.line_builder.set_tokens(tokens) {

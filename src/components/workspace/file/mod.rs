@@ -3,6 +3,7 @@ mod clipboard;
 mod cursor;
 mod select;
 mod utils;
+use anyhow::Result;
 use clipboard::Clipboard;
 pub use cursor::{CursorPosition, Offset};
 use lsp_types::TextEdit;
@@ -17,10 +18,13 @@ use crate::{
 };
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
-use self::action::ActionLogger;
 use self::utils::{
     backspace_indent_handler, derive_indent_from, get_closing_char, indent_from_prev, is_closing_repeat,
     unindent_if_before_base_pattern,
+};
+use self::{
+    action::ActionLogger,
+    utils::{find_line_start, token_range_at},
 };
 
 type DocLen = usize;
@@ -63,7 +67,7 @@ impl Editor {
     }
 
     pub fn get_list_widget(&mut self) -> (usize, List<'_>) {
-        let max_digits = self.lexer.context(&self.content, &self.cursor, self.select.get(), &self.path);
+        let max_digits = self.lexer.context(&self.content, self.select.get(), &self.path);
         let render_till_line = self.content.len().min(self.at_line + self.max_rows);
         let editor_content = List::new(
             self.content[self.at_line..render_till_line]
@@ -83,10 +87,6 @@ impl Editor {
         self.lexer.get_signitures(&self.path, &self.cursor).await;
     }
 
-    pub async fn autocomplete(&mut self) {
-        self.lexer.get_autocomplete(&self.path, &self.cursor).await;
-    }
-
     pub async fn hover(&mut self) {
         self.lexer.get_hover(&self.path, &self.cursor).await;
     }
@@ -104,6 +104,13 @@ impl Editor {
             return self.content.eq(&file_content.split('\n').map(String::from).collect::<Vec<_>>());
         };
         false
+    }
+
+    pub fn replace_token(&mut self, new: String) {
+        self.action_logger.init_replace(self.cursor, &self.content[self.cursor.as_range()]);
+        let line = &mut self.content[self.cursor.line];
+        line.replace_range(token_range_at(line.as_str(), self.cursor.char), new.as_str());
+        self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.as_range()]);
     }
 
     pub fn apply_file_edits(&mut self, edits: Vec<TextEdit>) {
@@ -259,7 +266,7 @@ impl Editor {
     pub fn go_to(&mut self, line: usize) {
         if self.content.len() >= line {
             self.cursor.line = line;
-            self.cursor.char = 0;
+            self.cursor.char = find_line_start(self.content[line].as_str());
             self.at_line = line.checked_sub(self.max_rows / 2).unwrap_or_default();
         }
     }
@@ -482,7 +489,7 @@ impl Editor {
         self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.line_range(1, 1)]);
     }
 
-    pub fn push(&mut self, ch: char) {
+    pub async fn push(&mut self, ch: char) {
         if let Some((from, to)) = self.select.get_mut() {
             let replace = if let Some(closing) = get_closing_char(ch) {
                 self.action_logger.init_replace_from_select(from, to, &self.content);
@@ -518,6 +525,7 @@ impl Editor {
             self.content.insert(self.cursor.line, ch.to_string());
             self.cursor.char = 1;
         }
+        self.lexer.get_autocomplete(&self.path, &self.cursor, self.content[self.cursor.line].as_str()).await;
     }
 
     pub fn backspace(&mut self) {
@@ -594,10 +602,19 @@ impl Editor {
     }
 
     pub async fn save(&mut self) {
-        std::fs::write(&self.path, self.content.join("\n")).unwrap();
-        if let Some(lsp) = self.lexer.lsp.as_mut() {
-            let _ = lsp.lock().await.file_did_save(&self.path).await;
+        if self.try_write_file() {
+            if let Some(lsp) = self.lexer.lsp.as_mut() {
+                let _ = lsp.lock().await.file_did_save(&self.path).await;
+            }
         }
+    }
+
+    pub fn try_write_file(&self) -> bool {
+        if let Err(error) = std::fs::write(&self.path, self.content.join("\n")) {
+            self.lexer.events.borrow_mut().overwrite(error.to_string());
+            return false;
+        }
+        true
     }
 
     pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {

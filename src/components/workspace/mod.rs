@@ -78,9 +78,11 @@ impl Workspace {
         let action = self.key_map.map(key);
         if let Some(editor) = self.get_active() {
             if let Some(action) = action {
-                editor.lexer.map_modal_if_exists(&action);
+                if editor.lexer.map_modal_if_exists(&action) {
+                    return true;
+                };
                 match action {
-                    EditorAction::Char(ch) => editor.push(ch),
+                    EditorAction::Char(ch) => editor.push(ch).await,
                     EditorAction::NewLine => editor.new_line(),
                     EditorAction::Indent => editor.indent(),
                     EditorAction::Backspace => editor.backspace(),
@@ -148,18 +150,15 @@ impl Workspace {
     pub async fn lexer_updates(&mut self) {
         if let Some(file) = self.get_active() {
             file.update_lsp().await;
-            if let Some(edits) = file.lexer.workspace_edit.take() {
-                self.apply_edits(edits).await;
-            }
         }
     }
 
-    async fn apply_edits(&mut self, edits: WorkspaceEdit) {
+    pub fn apply_edits(&mut self, edits: WorkspaceEdit) {
         if let Some(edits) = edits.changes {
             for (file_url, file_edits) in edits {
                 if let Some(editor) = self.get_editor(file_url.path()) {
                     editor.apply_file_edits(file_edits);
-                } else if let Ok(mut editor) = self.build_editor(PathBuf::from(file_url.path())).await {
+                } else if let Ok(mut editor) = self.build_basic_editor(PathBuf::from(file_url.path())) {
                     editor.apply_file_edits(file_edits);
                 }
             }
@@ -169,6 +168,10 @@ impl Workspace {
     fn get_editor<T: Into<PathBuf>>(&mut self, path: T) -> Option<&mut Editor> {
         let path: PathBuf = path.into();
         self.editors.iter_mut().find(|editor| editor.path == path)
+    }
+
+    fn build_basic_editor(&mut self, file_path: PathBuf) -> Result<Editor> {
+        Ok(Editor::from_path(file_path, self.base_config.clone(), &self.events)?)
     }
 
     async fn build_editor(&mut self, file_path: PathBuf) -> Result<Editor> {
@@ -210,6 +213,10 @@ impl Workspace {
         if let Some(editor) = self.get_active() {
             editor.go_to(line);
         }
+    }
+
+    pub async fn full_sync(&mut self) {
+        todo!()
     }
 
     async fn close_active(&mut self) {

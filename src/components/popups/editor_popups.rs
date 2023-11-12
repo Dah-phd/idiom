@@ -53,7 +53,7 @@ pub fn rename_var_popup() -> Box<Popup> {
         title: None,
         message_as_buffer_builder: Some(Some),
         buttons: vec![Button {
-            command: |popup| PopupMessage::Rename(popup.message.to_owned()),
+            command: |popup| WorkspaceEvent::Rename(popup.message.to_owned()).into(),
             name: "Rename",
             key: None,
         }],
@@ -66,7 +66,7 @@ pub fn find_in_editor_popup() -> Box<PopupActiveSelector<Select>> {
     Box::new(PopupActiveSelector::for_editor(
         |popup| {
             if let Some(select) = popup.next() {
-                PopupMessage::UpdateWorkspace(WorkspaceEvent::GoToSelect { select, should_clear: false })
+                WorkspaceEvent::GoToSelect { select, should_clear: false }.into()
             } else {
                 PopupMessage::None
             }

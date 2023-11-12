@@ -30,13 +30,14 @@ impl ReplaceBuilder {
 
 #[derive(Debug)]
 pub struct ActionLogger {
+    pub done: Vec<Action>,
+    pub undone: Vec<Action>,
     replace_builder: Option<ReplaceBuilder>,
     buffer: Option<Action>,
     version: i32,
     text_edits: Vec<TextDocumentContentChangeEvent>,
-    pub done: Vec<Action>,
-    pub undone: Vec<Action>,
     clock: Instant,
+    pub last_push: Option<char>,
 }
 
 impl Default for ActionLogger {
@@ -49,6 +50,7 @@ impl Default for ActionLogger {
             version: 0,
             undone: Vec::default(),
             clock: Instant::now(),
+            last_push: None,
         }
     }
 }
@@ -128,6 +130,7 @@ impl ActionLogger {
 
     pub fn push_char(&mut self, cursor: &CursorPosition, old_line: &str, ch: char) {
         self.buffer_inser(cursor, old_line, ch, 1);
+        self.last_push.replace(ch);
     }
 
     pub fn inser_char(&mut self, cursor: &CursorPosition, old_line: &str, ch: char) {

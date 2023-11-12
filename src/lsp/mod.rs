@@ -25,7 +25,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::process::{Child, ChildStdin, Command};
 use tokio::task::JoinHandle;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Error, Result};
 
 use lsp_types::{
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
@@ -48,11 +48,13 @@ pub struct LSP {
     pub diagnostics: Arc<Mutex<HashMap<PathBuf, Diagnostic>>>,
     pub errs: Arc<Mutex<Vec<Value>>>,
     pub initialized: InitializeResult,
-    language: FileType,
+    lsp_err_msg: Arc<Mutex<Vec<String>>>,
+    file_type: FileType,
     counter: i64,
     inner: Child,
-    handler: JoinHandle<()>,
+    handler: JoinHandle<Error>,
     stdin: ChildStdin,
+    attempts: usize,
 }
 
 impl LSP {
@@ -79,40 +81,50 @@ impl LSP {
         let (diagnostics, diagnostics_handler) = split_arc_mutex(HashMap::new());
 
         // sending init requests
-        let _ = stdin.write(LSPRequest::<Initialize>::init_request()?.stringify()?.as_bytes()).await?;
+        stdin.write_all(LSPRequest::<Initialize>::init_request()?.stringify()?.as_bytes()).await?;
         stdin.flush().await?;
         let mut msg = json_rpc.next().await?;
         let initialized: InitializeResult = from_value(msg.get_mut("result").unwrap().take())?;
+        let lsp_err_msg = json_rpc.get_errors();
 
         // starting response handler
         let handler = tokio::task::spawn(async move {
-            while let Ok(msg) = json_rpc.next().await {
-                match LSPMessage::parse(msg) {
-                    LSPMessage::Response(inner) => {
-                        into_guard(&responses_handler).insert(inner.id, inner);
+            loop {
+                match json_rpc.next().await {
+                    Ok(msg) => {
+                        match LSPMessage::parse(msg) {
+                            LSPMessage::Response(inner) => {
+                                into_guard(&responses_handler).insert(inner.id, inner);
+                            }
+                            LSPMessage::Notification(inner) => into_guard(&notifications_handler).push(inner),
+                            LSPMessage::Diagnostic(uri, params) => {
+                                into_guard(&diagnostics_handler).insert(uri, params);
+                            }
+                            LSPMessage::Request(inner) => requests_handler.lock().await.push(inner),
+                            _ => (), //devnull
+                        }
                     }
-                    LSPMessage::Notification(inner) => into_guard(&notifications_handler).push(inner),
-                    LSPMessage::Diagnostic(uri, params) => {
-                        into_guard(&diagnostics_handler).insert(uri, params);
+                    Err(err) => {
+                        return err;
                     }
-                    LSPMessage::Request(inner) => requests_handler.lock().await.push(inner),
-                    LSPMessage::Unknown(unknown) => into_guard(&errs_handler).push(unknown),
                 }
             }
         });
 
         let mut lsp = Self {
             responses,
+            lsp_err_msg,
             notifications,
             requests,
             diagnostics,
             errs,
             counter: 0,
-            language,
+            file_type: language,
             inner,
             handler,
             stdin,
             initialized,
+            attempts: 5,
         };
 
         //initialized
@@ -120,13 +132,26 @@ impl LSP {
         Ok(lsp)
     }
 
-    pub async fn restart(&mut self) -> Result<()> {
-        *self = Self::from(&self.language).await?;
-        Ok(())
-    }
-
-    pub fn is_live(&self) -> bool {
-        !self.handler.is_finished()
+    pub async fn check_status(&mut self) -> Result<Option<Error>> {
+        if self.handler.is_finished() {
+            if self.attempts == 0 {
+                return Err(anyhow!("Unable to recover!"));
+            }
+            match Self::from(&self.file_type).await {
+                Ok(lsp) => {
+                    let broken = std::mem::replace(self, lsp);
+                    return Ok(Some(match broken.handler.await {
+                        Ok(err) => err,
+                        Err(join_err) => anyhow!("Failed to collect crash report! Join err {}", join_err.to_string()),
+                    }));
+                }
+                Err(err) => {
+                    self.attempts -= 1;
+                    return Err(anyhow!("LSP creashed! Failed to rebuild LSP!"));
+                }
+            };
+        }
+        Ok(None)
     }
 
     pub fn get_diagnostics(&self, doctument: &Path) -> Option<PublishDiagnosticsParams> {
@@ -159,7 +184,7 @@ impl LSP {
         let notification: LSPNotification<DidOpenTextDocument> = LSPNotification::with(DidOpenTextDocumentParams {
             text_document: TextDocumentItem {
                 uri: as_url(path)?,
-                language_id: String::from(&self.language),
+                language_id: String::from(&self.file_type),
                 version: 0,
                 text: content,
             },
@@ -233,9 +258,9 @@ impl LSP {
         self.counter += 1;
         request.id = self.counter;
         if let Ok(message) = request.stringify() {
-            if self.stdin.write(message.as_bytes()).await.is_ok() && self.stdin.flush().await.is_ok() {
-                return Some(self.counter);
-            }
+            self.stdin.write_all(message.as_bytes()).await.ok()?;
+            self.stdin.flush().await.ok()?;
+            return Some(self.counter);
         }
         self.counter -= 1;
         None
@@ -248,7 +273,7 @@ impl LSP {
         T::Result: serde::de::DeserializeOwned,
     {
         let message = response.stringify()?;
-        let _ = self.stdin.write(message.as_bytes()).await?;
+        self.stdin.write_all(message.as_bytes()).await?;
         self.stdin.flush().await?;
         Ok(())
     }
@@ -259,7 +284,7 @@ impl LSP {
         T::Params: serde::Serialize,
     {
         let message = notification.stringify()?;
-        let _ = self.stdin.write(message.as_bytes()).await?;
+        self.stdin.write_all(message.as_bytes()).await?;
         self.stdin.flush().await?;
         Ok(())
     }

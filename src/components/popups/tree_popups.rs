@@ -79,7 +79,7 @@ pub fn tree_file_selector(options: Vec<(PathBuf, String, usize)>) -> Box<PopupSe
         display: |(path, text, idx)| format!("{}\n    {}| {text}", path.display(), idx + 1),
         command: |popup| {
             if let Some((path, _, idx)) = popup.options.get(popup.state) {
-                return PopupMessage::Open(path.clone(), *idx);
+                return TreeEvent::OpenAtLine(path.clone(), *idx).into();
             }
             PopupMessage::Done
         },
@@ -94,7 +94,7 @@ pub fn file_selector(options: Vec<PathBuf>) -> Box<PopupSelector<PathBuf>> {
         display: |path| path.display().to_string(),
         command: |popup| {
             if let Some(path) = popup.options.get(popup.state) {
-                return PopupMessage::Open(path.clone(), 0);
+                return TreeEvent::Open(path.clone()).into();
             }
             PopupMessage::Done
         },

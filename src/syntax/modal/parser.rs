@@ -3,7 +3,7 @@ use serde_json::{from_value, Value};
 
 #[derive(Debug)]
 pub enum LSPResponseType {
-    Completion(i64),
+    Completion(i64, String),
     Hover(i64),
     SignatureHelp(i64),
     Renames(i64),
@@ -13,7 +13,7 @@ pub enum LSPResponseType {
 impl LSPResponseType {
     pub fn id(&self) -> &i64 {
         match self {
-            Self::Completion(id) => id,
+            Self::Completion(id, ..) => id,
             Self::Hover(id) => id,
             Self::SignatureHelp(id) => id,
             Self::Renames(id) => id,
@@ -23,11 +23,11 @@ impl LSPResponseType {
 
     pub fn parse(&self, value: Value) -> LSPResult {
         match self {
-            Self::Completion(..) => {
+            Self::Completion(.., line) => {
                 if let Ok(response) = from_value::<CompletionResponse>(value) {
                     return match response {
-                        CompletionResponse::Array(arr) => LSPResult::Completion(arr),
-                        CompletionResponse::List(ls) => LSPResult::Completion(ls.items),
+                        CompletionResponse::Array(arr) => LSPResult::Completion(arr, line.to_owned()),
+                        CompletionResponse::List(ls) => LSPResult::Completion(ls.items, line.to_owned()),
                     };
                 }
             }
@@ -57,7 +57,7 @@ impl LSPResponseType {
 }
 
 pub enum LSPResult {
-    Completion(Vec<CompletionItem>),
+    Completion(Vec<CompletionItem>, String),
     Hover(Hover),
     SignatureHelp(SignatureHelp),
     Renames(WorkspaceEdit),

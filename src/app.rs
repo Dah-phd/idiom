@@ -3,10 +3,8 @@ use crate::{
         popups::editor_popups::{editor_selector, go_to_line_popup},
         popups::editor_popups::{rename_var_popup, replace_in_editor_popup},
         popups::{
-            editor_popups::{find_in_editor_popup, save_all_popup, select_selector},
-            tree_popups::{
-                create_file_popup, file_selector, find_in_tree_popup, rename_file_popup, tree_file_selector,
-            },
+            editor_popups::{find_in_editor_popup, save_all_popup},
+            tree_popups::{create_file_popup, find_in_tree_popup, rename_file_popup, tree_file_selector},
         },
         EditorTerminal, Footer, Tree, Workspace,
     },
@@ -74,16 +72,6 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             workspace.save_all().await;
                             break;
                         }
-                        PopupMessage::Open(path, line) => {
-                            file_tree.select_by_path(&path);
-                            if !path.is_dir() {
-                                workspace.new_at_line(path, line).await;
-                                mode = Mode::Insert;
-                            } else {
-                                mode = Mode::Select;
-                            }
-                            continue;
-                        }
                         PopupMessage::SelectTreeFiles(pattern) => {
                             mode.popup_select(tree_file_selector(file_tree.search_select_files(pattern).await));
                             continue;
@@ -109,11 +97,6 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                                 }
                             }
                             mode.clear_popup();
-                            continue;
-                        }
-                        PopupMessage::Rename(new_name) => {
-                            mode.clear_popup();
-                            workspace.renames(new_name).await;
                             continue;
                         }
                         PopupMessage::UpdateWorkspace(event) => {
@@ -232,12 +215,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
             }
         }
 
-        {
-            let mut events_borrow = events.borrow_mut();
-            events_borrow.exchange_tree(&mut file_tree, &mut mode);
-            events_borrow.exchange_ws(&mut workspace, &mut mode);
-            events_borrow.exchange_footer(&mut footer);
-        }
+        Events::handle_events(&events, &mut file_tree, &mut workspace, &mut footer, &mut mode).await;
 
         if clock.elapsed() >= TICK {
             clock = Instant::now();

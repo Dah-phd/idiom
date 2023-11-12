@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use super::{CursorPosition, Offset};
 use crate::configs::EditorConfigs;
 use crate::utils::trim_start_inplace;
@@ -130,6 +132,36 @@ pub fn is_closing_repeat(line: &str, ch: char, at: usize) -> bool {
     } else {
         false
     }
+}
+
+pub fn find_line_start(line: &str) -> usize {
+    for (idx, ch) in line.char_indices() {
+        if !ch.is_whitespace() {
+            return idx;
+        }
+    }
+    0
+}
+
+pub fn token_range_at(line: &str, idx: usize) -> Range<usize> {
+    let mut token_start = 0;
+    let mut last_not_in_token = false;
+    for (char_idx, ch) in line.char_indices() {
+        if ch.is_alphabetic() || ch == '_' {
+            if last_not_in_token {
+                token_start = char_idx;
+            }
+            last_not_in_token = false;
+        } else if char_idx >= idx {
+            return token_start..char_idx;
+        } else {
+            last_not_in_token = true;
+        }
+    }
+    if idx < line.len() {
+        return token_start..line.len();
+    }
+    idx..idx
 }
 
 pub fn apply_and_rev_edit(edit: &mut TextEdit, content: &mut Vec<String>) {

@@ -26,11 +26,30 @@ impl Events {
         Rc::new(RefCell::new(Self::default()))
     }
 
-    pub fn message(&mut self, msg: &str) {
+    pub async fn handle_events(
+        event: &Rc<RefCell<Self>>,
+        tree: &mut Tree,
+        workspace: &mut Workspace,
+        footer: &mut Footer,
+        mode: &mut Mode,
+    ) {
+        let sync = {
+            let mut borrow = event.borrow_mut();
+            let mut sync_events = borrow.exchange_tree(tree, mode);
+            sync_events.append(&mut borrow.exchange_ws(workspace, mode));
+            borrow.exchange_footer(footer);
+            sync_events
+        };
+        for ev in sync {
+            ev.async_map(workspace, mode).await;
+        }
+    }
+
+    pub fn message(&mut self, msg: impl Into<String>) {
         self.footer.push(FooterEvent::Message(msg.into()));
     }
 
-    pub fn overwrite(&mut self, msg: &str) {
+    pub fn overwrite(&mut self, msg: impl Into<String>) {
         self.footer.push(FooterEvent::Overwrite(msg.into()))
     }
 
@@ -40,15 +59,11 @@ impl Events {
         }
     }
 
-    pub fn exchange_ws(&mut self, workspace: &mut Workspace, mode: &mut Mode) {
-        for event in self.workspace.drain(..) {
-            event.map(workspace, mode);
-        }
+    pub fn exchange_ws(&mut self, workspace: &mut Workspace, mode: &mut Mode) -> Vec<WorkspaceEvent> {
+        self.workspace.drain(..).flat_map(|e| e.map_if_sync(workspace, mode)).collect()
     }
 
-    pub fn exchange_tree(&mut self, tree: &mut Tree, mode: &mut Mode) {
-        for event in self.tree.drain(..) {
-            event.map(tree, mode);
-        }
+    pub fn exchange_tree(&mut self, tree: &mut Tree, mode: &mut Mode) -> Vec<WorkspaceEvent> {
+        self.tree.drain(..).flat_map(|e| e.map(tree, mode)).collect()
     }
 }
