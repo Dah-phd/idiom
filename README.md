@@ -4,10 +4,12 @@
 ## TODO!
 * finish replacement modal
 * finish workspace edits
-* create semantic token updates for lsp linter
-* semantic token styles for diff lsp langs
-* finish autocomplete
-* add tests for workspace and editor
+* test more autocomplete
+* add configs to fuzzy-matcher
+* auto sighelp calls
+* provide info on autocompletes if possible
+* partial semantic tokens call
+* (backlog)semantic token styles for diff lsp langs
 
 ## Target langs:
 * RUST
