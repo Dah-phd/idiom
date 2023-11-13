@@ -59,7 +59,9 @@ impl LSPModal {
     }
 
     pub fn auto_complete(&mut self, completions: Vec<CompletionItem>, line: String, idx: usize) {
-        *self = Self::AutoComplete(AutoComplete::new(completions, line, idx));
+        if let Some(modal) = AutoComplete::new(completions, line, idx) {
+            *self = Self::AutoComplete(modal);
+        }
     }
 
     pub fn hover(&mut self, hover: Hover) {
@@ -81,7 +83,7 @@ pub struct AutoComplete {
 }
 
 impl AutoComplete {
-    fn new(completions: Vec<CompletionItem>, line: String, idx: usize) -> Self {
+    fn new(completions: Vec<CompletionItem>, line: String, idx: usize) -> Option<Self> {
         let mut filter = String::new();
         for ch in line[..idx].chars() {
             if ch.is_alphabetic() || ch == '_' {
@@ -99,7 +101,11 @@ impl AutoComplete {
             matcher: SkimMatcherV2::default(),
         };
         modal.build_matches();
-        modal
+        if modal.filter.is_empty() {
+            None
+        } else {
+            Some(modal)
+        }
     }
 
     fn map_and_finish(&mut self, key: &EditorAction) -> LSPModalResult {
