@@ -93,7 +93,7 @@ impl AutoComplete {
     }
 
     fn map_and_finish(&mut self, key: &EditorAction) -> LSPModalResult {
-        if self.completions.is_empty() {
+        if self.completions.is_empty() || self.filtered.is_empty() {
             return LSPModalResult::Done;
         }
         match key {
@@ -122,11 +122,10 @@ impl AutoComplete {
         if ch.is_alphabetic() || ch == '_' {
             self.filter.push(ch);
             self.build_matches();
+            LSPModalResult::default()
+        } else {
+            LSPModalResult::Done
         }
-        if !self.filtered.is_empty() {
-            return LSPModalResult::default();
-        }
-        LSPModalResult::Done
     }
 
     fn build_matches(&mut self) {

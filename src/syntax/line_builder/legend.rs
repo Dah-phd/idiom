@@ -1,10 +1,7 @@
 use lsp_types::SemanticTokensServerCapabilities;
 use ratatui::style::Color;
 
-use crate::{
-    configs::FileType,
-    syntax::{langs::Lang, Theme},
-};
+use crate::{configs::FileType, syntax::Theme};
 
 #[derive(Clone, Copy, Debug)]
 pub enum ColorResult {

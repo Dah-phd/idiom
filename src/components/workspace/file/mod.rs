@@ -3,7 +3,6 @@ mod clipboard;
 mod cursor;
 mod select;
 mod utils;
-use anyhow::Result;
 use clipboard::Clipboard;
 pub use cursor::{CursorPosition, Offset};
 use lsp_types::TextEdit;

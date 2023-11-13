@@ -72,7 +72,7 @@ impl Lexer {
 
     pub async fn update_lsp(&mut self, path: &Path, changes: Option<(i32, Vec<TextDocumentContentChangeEvent>)>) {
         if let Some((version, content_changes)) = changes {
-            self.line_builder.text_is_updated = true;
+            self.line_builder.collect_changes(&content_changes);
             let mut error = None;
             let mut restart = None;
             if let Some(mut lsp) = self.try_expose_lsp() {
@@ -143,8 +143,8 @@ impl Lexer {
     }
 
     fn get_diagnostics(&mut self, path: &Path) -> Option<()> {
-        let diagnostics = self.try_expose_lsp()?.get_diagnostics(path)?;
-        self.diagnostics.replace(diagnostics);
+        let params = self.try_expose_lsp()?.get_diagnostics(path)?;
+        self.line_builder.set_diganostics(params);
         Some(())
     }
 
@@ -229,7 +229,7 @@ impl Lexer {
             Style { fg: Some(Color::Gray), ..Default::default() },
         )];
         self.line_builder.select_range = self.line_select(idx, content.len());
-        ListItem::new(self.line_builder.build_line(idx, spans, &self.diagnostics, content))
+        ListItem::new(self.line_builder.build_line(idx, spans, content))
     }
 
     pub fn new_theme(&mut self, theme: Theme) {
