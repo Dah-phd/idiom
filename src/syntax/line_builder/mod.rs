@@ -1,7 +1,6 @@
 mod brackets;
 mod internal;
 mod legend;
-use anyhow::Error;
 use brackets::BracketColors;
 use internal::SpansBuffer;
 use legend::{ColorResult, Legend};

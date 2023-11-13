@@ -45,13 +45,15 @@ impl LSPModal {
     }
 
     pub fn render_at(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, x: u16, y: u16) {
-        match self {
-            Self::None => (),
-            Self::AutoComplete(modal) => {
-                modal.render_at(frame, x, y);
-            }
-            Self::Info(modal) => {
-                modal.render_at(frame, x, y);
+        if let Some(area) = derive_model_rect(x, y + 1, frame.size()) {
+            match self {
+                Self::None => (),
+                Self::AutoComplete(modal) => {
+                    modal.render_at(frame, area);
+                }
+                Self::Info(modal) => {
+                    modal.render_at(frame, area);
+                }
             }
         }
     }
@@ -155,17 +157,15 @@ impl AutoComplete {
         LSPModalResult::Teken
     }
 
-    fn render_at(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, x: u16, y: u16) {
-        let base = frame.size();
-        let screen_part = Rect { x, y: y + 1, width: base.width.min(45), height: base.height.min(7) };
+    fn render_at(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, area: Rect) {
         let complitions =
             self.filtered.iter().map(|(item, _)| ListItem::new(item.as_str())).collect::<Vec<ListItem<'_>>>();
-        frame.render_widget(Clear, screen_part);
+        frame.render_widget(Clear, area);
         frame.render_stateful_widget(
             List::new(complitions)
                 .block(Block::default().borders(Borders::all()))
                 .highlight_style(Style::default().add_modifier(Modifier::REVERSED)),
-            screen_part,
+            area,
             &mut self.state,
         );
     }
@@ -176,14 +176,9 @@ pub struct Info {
 }
 
 impl Info {
-    fn render_at(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, x: u16, y: u16) {
-        let base = frame.size();
-        let screen_part = Rect { x, y: y + 1, width: base.width.min(60), height: base.height.min(7) };
-        frame.render_widget(Clear, screen_part);
-        frame.render_widget(
-            List::new(self.items.as_slice()).block(Block::default().borders(Borders::all())),
-            screen_part,
-        );
+    fn render_at(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, area: Rect) {
+        frame.render_widget(Clear, area);
+        frame.render_widget(List::new(self.items.as_slice()).block(Block::default().borders(Borders::all())), area);
     }
 
     pub fn from_hover(hover: Hover) -> Self {
@@ -249,4 +244,33 @@ pub fn should_complete(line: &str, idx: usize) -> bool {
         last_char = ch;
     }
     false
+}
+
+fn derive_model_rect(mut x: u16, mut y: u16, base: Rect) -> Option<Rect> {
+    let mut width = 60; //planned -> min 30 chars
+    let mut height = 7; //planned -> min 5 with 3 completions
+    if base.height < height + y {
+        if base.height < 5 + y {
+            if let Some(new_y) = y.checked_sub(8) {
+                if y > base.height {
+                    return None; // ! frame work sometime produces wierd y > protections against it
+                }
+                y = new_y;
+            } else {
+                y = y.checked_sub(6)?;
+                height = 5;
+            }
+        } else {
+            height = 5;
+        }
+    };
+    if base.width < width + x {
+        if base.width < 30 + x {
+            x = base.width.checked_sub(30)?;
+            width = 30;
+        } else {
+            width = base.width - x;
+        }
+    };
+    Some(Rect { x, y, width, height })
 }

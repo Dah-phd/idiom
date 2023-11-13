@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::components::{popups::PopupInterface, workspace::Workspace, Footer, Tree};
+use crate::components::{popups::PopupInterface, workspace::Workspace, Tree};
 use crate::events::messages::PopupMessage;
 use std::{io::Stdout, path::PathBuf};
 
