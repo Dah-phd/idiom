@@ -14,7 +14,7 @@ use lsp_types::request::{
     Completion, HoverRequest, Initialize, References, Rename, SemanticTokensFullRequest, SemanticTokensRangeRequest,
     Shutdown, SignatureHelpRequest,
 };
-use serde_json::{from_value, Value};
+use serde_json::from_value;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -46,7 +46,6 @@ pub struct LSP {
     pub notifications: Arc<Mutex<Vec<GeneralNotification>>>,
     pub requests: Arc<tokio::sync::Mutex<Vec<Request>>>,
     pub diagnostics: Arc<Mutex<HashMap<PathBuf, Diagnostic>>>,
-    pub errs: Arc<Mutex<Vec<Value>>>,
     pub initialized: InitializeResult,
     lsp_err_msg: Arc<Mutex<Vec<String>>>,
     file_type: FileType,
@@ -76,7 +75,6 @@ impl LSP {
         // setting up storage
         let (responses, responses_handler) = split_arc_mutex(HashMap::new());
         let (notifications, notifications_handler) = split_arc_mutex(Vec::new());
-        let (errs, errs_handler) = split_arc_mutex(Vec::new());
         let (requests, requests_handler) = split_arc_mutex_async(Vec::new());
         let (diagnostics, diagnostics_handler) = split_arc_mutex(HashMap::new());
 
@@ -117,7 +115,6 @@ impl LSP {
             notifications,
             requests,
             diagnostics,
-            errs,
             counter: 0,
             file_type: language,
             inner,
@@ -147,7 +144,7 @@ impl LSP {
                 }
                 Err(err) => {
                     self.attempts -= 1;
-                    return Err(anyhow!("LSP creashed! Failed to rebuild LSP!"));
+                    return Err(anyhow!("LSP creashed! Failed to rebuild LSP! {}", err.to_string()));
                 }
             };
         }
