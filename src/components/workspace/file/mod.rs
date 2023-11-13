@@ -108,7 +108,9 @@ impl Editor {
     pub fn replace_token(&mut self, new: String) {
         self.action_logger.init_replace(self.cursor, &self.content[self.cursor.as_range()]);
         let line = &mut self.content[self.cursor.line];
-        line.replace_range(token_range_at(line.as_str(), self.cursor.char), new.as_str());
+        let replace_range = token_range_at(line, self.cursor.char);
+        self.cursor.char = replace_range.start + new.len();
+        line.replace_range(replace_range, new.as_str());
         self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.as_range()]);
     }
 

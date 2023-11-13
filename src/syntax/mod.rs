@@ -122,6 +122,7 @@ impl Lexer {
             }
             LSPModalResult::Workspace(event) => {
                 self.events.borrow_mut().workspace.push(event);
+                self.modal.clear();
                 return true;
             }
             _ => (),
@@ -159,7 +160,7 @@ impl Lexer {
             return None;
         }
         let id = self.try_expose_lsp()?.completion(path, c).await?;
-        self.requests.push(LSPResponseType::Completion(id, line.to_owned()));
+        self.requests.push(LSPResponseType::Completion(id, line.to_owned(), c.char));
         Some(())
     }
 
@@ -190,7 +191,7 @@ impl Lexer {
         if let Some(response) = lsp.get(request.id()) {
             if let Some(value) = response.result {
                 match request.parse(value) {
-                    LSPResult::Completion(completions, line) => self.modal.auto_complete(completions, line),
+                    LSPResult::Completion(completions, line, idx) => self.modal.auto_complete(completions, line, idx),
                     LSPResult::Hover(hover) => self.modal.hover(hover),
                     LSPResult::SignatureHelp(signature) => self.modal.signature(signature),
                     LSPResult::Renames(workspace_edit) => self.workspace_edit = Some(workspace_edit),

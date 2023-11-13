@@ -153,15 +153,21 @@ pub fn token_range_at(line: &str, idx: usize) -> Range<usize> {
             }
             last_not_in_token = false;
         } else if char_idx >= idx {
+            if last_not_in_token {
+                return idx..idx;
+            }
             return token_start..char_idx;
         } else {
             last_not_in_token = true;
         }
     }
     if idx < line.len() {
-        return token_start..line.len();
+        token_start..line.len()
+    } else if !last_not_in_token && token_start <= idx {
+        token_start..idx
+    } else {
+        idx..idx
     }
-    idx..idx
 }
 
 pub fn apply_and_rev_edit(edit: &mut TextEdit, content: &mut Vec<String>) {

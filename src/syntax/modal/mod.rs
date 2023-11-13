@@ -58,8 +58,8 @@ impl LSPModal {
         }
     }
 
-    pub fn auto_complete(&mut self, completions: Vec<CompletionItem>, line: String) {
-        *self = Self::AutoComplete(AutoComplete::new(completions, line));
+    pub fn auto_complete(&mut self, completions: Vec<CompletionItem>, line: String, idx: usize) {
+        *self = Self::AutoComplete(AutoComplete::new(completions, line, idx));
     }
 
     pub fn hover(&mut self, hover: Hover) {
@@ -81,11 +81,19 @@ pub struct AutoComplete {
 }
 
 impl AutoComplete {
-    fn new(completions: Vec<CompletionItem>, line: String) -> Self {
+    fn new(completions: Vec<CompletionItem>, line: String, idx: usize) -> Self {
+        let mut filter = String::new();
+        for ch in line[..idx].chars() {
+            if ch.is_alphabetic() || ch == '_' {
+                filter.push(ch);
+            } else {
+                filter.clear();
+            }
+        }
         let mut modal = Self {
             state: ListState::default(),
             line,
-            filter: String::new(),
+            filter,
             filtered: Vec::new(),
             completions,
             matcher: SkimMatcherV2::default(),
@@ -104,10 +112,7 @@ impl AutoComplete {
             EditorAction::Char(ch) => self.push_filter(*ch),
             EditorAction::Down => self.down(),
             EditorAction::Up => self.up(),
-            EditorAction::Backspace => {
-                self.filter.pop();
-                LSPModalResult::default()
-            }
+            EditorAction::Backspace => self.filter_pop(),
             _ => LSPModalResult::Done,
         }
     }
@@ -117,6 +122,15 @@ impl AutoComplete {
             LSPModalResult::Workspace(WorkspaceEvent::AutoComplete(self.filtered.remove(idx).0))
         } else {
             LSPModalResult::Done
+        }
+    }
+
+    fn filter_pop(&mut self) -> LSPModalResult {
+        self.filter.pop();
+        if self.filter.is_empty() {
+            LSPModalResult::Done
+        } else {
+            LSPModalResult::default()
         }
     }
 
