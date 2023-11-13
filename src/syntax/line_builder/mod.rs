@@ -1,6 +1,7 @@
 mod brackets;
 mod internal;
 mod legend;
+use anyhow::Error;
 use brackets::BracketColors;
 use internal::SpansBuffer;
 use legend::{ColorResult, Legend};
@@ -195,7 +196,7 @@ impl DiagnosticData {
         for (range_idx, (start_idx, end_idx)) in self.range_data.iter().enumerate() {
             match end_idx {
                 Some(end_idx) if (start_idx..end_idx).contains(&idx) => return self.spans[range_idx].style.fg,
-                None if start_idx >= idx => return self.spans[range_idx].style.fg,
+                None if idx >= start_idx => return self.spans[range_idx].style.fg,
                 _ => {}
             }
         }
