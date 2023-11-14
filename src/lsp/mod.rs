@@ -81,8 +81,8 @@ impl LSP {
         // sending init requests
         stdin.write_all(LSPRequest::<Initialize>::init_request()?.stringify()?.as_bytes()).await?;
         stdin.flush().await?;
-        let msg = json_rpc.next().await?;
-        let initialized: InitializeResult = from_value(msg.unwrap()?)?;
+        let msg = json_rpc.next().await?.unwrap()?;
+        let initialized: InitializeResult = from_value(msg)?;
         let lsp_err_msg = json_rpc.get_errors();
 
         // starting response handler

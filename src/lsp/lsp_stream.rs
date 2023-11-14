@@ -23,8 +23,8 @@ pub struct LSPMessageStream {
 
 impl LSPMessageStream {
     pub fn new(child: &mut Child) -> Result<Self> {
-        let inner = child.stdout.take().ok_or(anyhow!("stdout"))?;
-        let mut stderr = FramedRead::new(child.stderr.take().ok_or(anyhow!("stderr"))?, BytesCodec::new());
+        let inner = child.stdout.take().ok_or(anyhow!("LSP stdout"))?;
+        let mut stderr = FramedRead::new(child.stderr.take().ok_or(anyhow!("LSP stderr"))?, BytesCodec::new());
         let (errors, errors_handler) = split_arc_mutex(Vec::new());
         Ok(Self {
             inner: FramedRead::new(inner, BytesCodec::new()),

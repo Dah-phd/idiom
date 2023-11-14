@@ -20,10 +20,17 @@ pub enum LSPMessage {
 impl LSPMessage {
     pub fn unwrap(self) -> Result<Value> {
         // gets value within if data is know at check time
+        // errors on response error
         match self {
             Self::Unknown(raw) => Some(raw),
             Self::Notification(notification) => notification.params,
-            Self::Response(resp) => resp.result.or(resp.error),
+            Self::Response(resp) => {
+                if resp.result.is_some() {
+                    resp.result
+                } else {
+                    return Err(anyhow!("Rsponse err: {:?}", resp.error));
+                }
+            }
             Self::Request(request) => request.params,
             _ => None,
         }
