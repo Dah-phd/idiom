@@ -1,7 +1,4 @@
-use ratatui::{
-    style::{Color, Style},
-    text::Span,
-};
+use ratatui::style::{Color, Style};
 
 pub const COLORS: [Color; 3] = [Color::LightMagenta, Color::LightYellow, Color::Blue];
 
@@ -41,18 +38,6 @@ impl BracketColors {
             }
             _ => (),
         };
-    }
-
-    pub fn map(&mut self, ch: char, style: Style) -> Option<Span<'static>> {
-        match ch {
-            '(' => Some(Span::styled(ch.to_string(), style.fg(self.open()))),
-            ')' => Some(Span::styled(ch.to_string(), style.fg(self.close()))),
-            '[' => Some(Span::styled(ch.to_string(), style.fg(self.square_open()))),
-            ']' => Some(Span::styled(ch.to_string(), style.fg(self.square_close()))),
-            '{' => Some(Span::styled(ch.to_string(), style.fg(self.curly_open()))),
-            '}' => Some(Span::styled(ch.to_string(), style.fg(self.curly_close()))),
-            _ => None,
-        }
     }
 
     pub fn open(&mut self) -> Color {

@@ -1,15 +1,12 @@
 use super::{DiagnosticData, LineBuilder};
 use ratatui::{
-    style::{Color, Modifier, Style},
+    style::{Color, Style},
     text::Span,
 };
-
-type MaybeRange = Option<std::ops::Range<usize>>;
 
 pub struct SpansBuffer<'a> {
     offset: usize,
     spans: Vec<Span<'a>>,
-    select_range: MaybeRange,
     token_buffer: String,
     last_reset: usize,
     last_char: char,
@@ -20,11 +17,10 @@ pub struct SpansBuffer<'a> {
 }
 
 impl<'a> SpansBuffer<'a> {
-    pub fn new(spans: Vec<Span<'a>>, select_range: MaybeRange) -> Self {
+    pub fn new(spans: Vec<Span<'a>>) -> Self {
         Self {
             offset: spans.len(),
             spans,
-            select_range,
             token_buffer: String::new(),
             last_reset: 0,
             last_char: '\n',
@@ -35,36 +31,46 @@ impl<'a> SpansBuffer<'a> {
         }
     }
 
-    fn build_style(&self, idx: usize, color: Color, diagnostic: Option<&DiagnosticData>) -> Style {
-        let style = Style { fg: Some(color), bg: self.get_select_style(idx), ..Default::default() };
-        if let Some(color) = &diagnostic.and_then(|d| d.check_ranges(&idx)) {
-            return style.add_modifier(Modifier::UNDERLINED).underline_color(*color);
-        }
+    fn build_style(
+        &self,
+        idx: usize,
+        color: Color,
+        diagnostic: Option<&DiagnosticData>,
+        builder: &LineBuilder,
+    ) -> Style {
+        let mut style = Style { fg: Some(color), ..Default::default() };
+        builder.set_diagnostic_style(idx, &mut style, diagnostic);
+        builder.set_select(&mut style, &idx);
         style
     }
 
-    fn get_select_style(&self, idx: usize) -> Option<Color> {
-        if let Some(range) = &self.select_range {
-            if range.contains(&idx) {
-                return Some(Color::Rgb(72, 72, 72));
-            }
-        }
-        None
-    }
-
-    fn push(&mut self, idx: usize, ch: char, color: Color, diagnostic: Option<&DiagnosticData>) {
-        self.spans.push(Span::styled(ch.to_string(), self.build_style(idx, color, diagnostic)));
+    fn push(&mut self, idx: usize, ch: char, color: Color, diagnostic: Option<&DiagnosticData>, builder: &LineBuilder) {
+        self.spans.push(Span::styled(ch.to_string(), self.build_style(idx, color, diagnostic, builder)));
         self.last_char = ch;
     }
 
-    fn push_reset(&mut self, idx: usize, ch: char, color: Color, diagnostic: Option<&DiagnosticData>) {
-        self.push(idx, ch, color, diagnostic);
+    fn push_reset(
+        &mut self,
+        idx: usize,
+        ch: char,
+        color: Color,
+        diagnostic: Option<&DiagnosticData>,
+        builder: &LineBuilder,
+    ) {
+        self.push(idx, ch, color, diagnostic, builder);
         self.token_buffer.clear();
         self.last_reset = idx + 1;
     }
 
-    fn push_token(&mut self, idx: usize, ch: char, color: Color, diagnostic: Option<&DiagnosticData>) {
-        self.push(idx, ch, color, diagnostic);
+    fn push_token(
+        &mut self,
+        idx: usize,
+        ch: char,
+        color: Color,
+        diagnostic: Option<&DiagnosticData>,
+        builder: &LineBuilder,
+    ) {
+        self.push(idx, ch, color, diagnostic, builder);
         self.token_buffer.push(ch);
     }
 
@@ -88,10 +94,10 @@ impl<'a> SpansBuffer<'a> {
     ) {
         if self.last_char != '<' && self.last_char != '&' {
             self.chr_open = true;
-            self.push_reset(idx, ch, builder.theme.string, diagnostic);
+            self.push_reset(idx, ch, builder.theme.string, diagnostic, builder);
         } else {
             self.is_keyword = true;
-            self.push_reset(idx, ch, builder.theme.key_words, diagnostic);
+            self.push_reset(idx, ch, builder.theme.key_words, diagnostic, builder);
         };
     }
 
@@ -103,7 +109,7 @@ impl<'a> SpansBuffer<'a> {
         diagnostic: Option<&DiagnosticData>,
     ) -> bool {
         if self.str_open {
-            self.push(idx, ch, builder.theme.string, diagnostic);
+            self.push(idx, ch, builder.theme.string, diagnostic, builder);
             if ch == '"' {
                 self.str_open = false;
                 self.last_reset = idx + 1;
@@ -111,7 +117,7 @@ impl<'a> SpansBuffer<'a> {
             return true;
         }
         if self.chr_open {
-            self.push(idx, ch, builder.theme.string, diagnostic);
+            self.push(idx, ch, builder.theme.string, diagnostic, builder);
             if ch == '\'' {
                 self.chr_open = false;
                 self.last_reset = idx + 1;
@@ -120,14 +126,14 @@ impl<'a> SpansBuffer<'a> {
         }
         if self.is_class {
             if ch.is_alphabetic() || ch == '_' || ch == '-' {
-                self.push(idx, ch, builder.theme.class_or_struct, diagnostic);
+                self.push(idx, ch, builder.theme.class_or_struct, diagnostic, builder);
                 return true;
             }
             self.is_class = false;
         }
         if self.is_keyword {
             if ch.is_alphabetic() || ch == '_' {
-                self.push(idx, ch, builder.theme.key_words, diagnostic);
+                self.push(idx, ch, builder.theme.key_words, diagnostic, builder);
                 return true;
             }
             self.is_keyword = false;
@@ -149,7 +155,7 @@ impl<'a> SpansBuffer<'a> {
                     } else if builder.lang.key_words.contains(&self.token_buffer.as_str()) {
                         self.update_fg(builder.theme.key_words);
                     }
-                    self.push_reset(idx, ch, Color::White, diagnostic);
+                    self.push_reset(idx, ch, Color::White, diagnostic, builder);
                 }
                 '.' | '<' | '>' | '?' | '&' | '=' | '+' | '-' | ',' | ';' | '|' => {
                     if builder.lang.frow_control.contains(&self.token_buffer.as_str()) {
@@ -157,7 +163,7 @@ impl<'a> SpansBuffer<'a> {
                     } else if builder.lang.key_words.contains(&self.token_buffer.as_str()) {
                         self.update_fg(builder.theme.key_words);
                     }
-                    self.push_reset(idx, ch, Color::White, diagnostic);
+                    self.push_reset(idx, ch, Color::White, diagnostic, builder);
                 }
                 ':' => {
                     if matches!(chars.peek(), Some((.., next_ch)) if &':' == next_ch) {
@@ -165,40 +171,40 @@ impl<'a> SpansBuffer<'a> {
                     } else if builder.lang.key_words.contains(&self.token_buffer.as_str()) {
                         self.update_fg(builder.theme.key_words);
                     }
-                    self.push_reset(idx, ch, Color::White, diagnostic);
+                    self.push_reset(idx, ch, Color::White, diagnostic, builder);
                 }
                 '"' => {
                     self.str_open = true;
-                    self.push_reset(idx, ch, builder.theme.string, diagnostic);
+                    self.push_reset(idx, ch, builder.theme.string, diagnostic, builder);
                 }
                 '\'' => self.handle_lifetime_apostrophe(idx, ch, builder, diagnostic),
                 '!' => {
                     self.update_fg(builder.theme.key_words);
                     let color = if self.token_buffer.is_empty() { Color::White } else { builder.theme.key_words };
-                    self.push_reset(idx, ch, color, diagnostic);
+                    self.push_reset(idx, ch, color, diagnostic, builder);
                 }
                 '(' => {
                     if let Some(first) = self.token_buffer.chars().next() {
                         let tc = if first.is_uppercase() { builder.theme.key_words } else { builder.theme.functions };
                         self.update_fg(tc);
                     }
-                    self.push(idx, ch, builder.brackets.open(), diagnostic);
+                    self.push(idx, ch, builder.brackets.open(), diagnostic, builder);
                     self.last_reset = idx + 1;
                 }
-                ')' => self.push_reset(idx, ch, builder.brackets.close(), diagnostic),
-                '{' => self.push_reset(idx, ch, builder.brackets.curly_open(), diagnostic),
-                '}' => self.push_reset(idx, ch, builder.brackets.curly_close(), diagnostic),
-                '[' => self.push_reset(idx, ch, builder.brackets.square_open(), diagnostic),
-                ']' => self.push_reset(idx, ch, builder.brackets.square_close(), diagnostic),
+                ')' => self.push_reset(idx, ch, builder.brackets.close(), diagnostic, builder),
+                '{' => self.push_reset(idx, ch, builder.brackets.curly_open(), diagnostic, builder),
+                '}' => self.push_reset(idx, ch, builder.brackets.curly_close(), diagnostic, builder),
+                '[' => self.push_reset(idx, ch, builder.brackets.square_open(), diagnostic, builder),
+                ']' => self.push_reset(idx, ch, builder.brackets.square_close(), diagnostic, builder),
                 _ => {
                     if ch.is_numeric() {
-                        self.push(idx, ch, builder.theme.numeric, diagnostic);
+                        self.push(idx, ch, builder.theme.numeric, diagnostic, builder);
                         self.last_reset = idx + 1;
                     } else if ch.is_uppercase() && self.token_buffer.is_empty() {
-                        self.push(idx, ch, builder.theme.class_or_struct, diagnostic);
+                        self.push(idx, ch, builder.theme.class_or_struct, diagnostic, builder);
                         self.is_class = true;
                     } else {
-                        self.push_token(idx, ch, builder.theme.default, diagnostic);
+                        self.push_token(idx, ch, builder.theme.default, diagnostic, builder);
                     }
                 }
             }

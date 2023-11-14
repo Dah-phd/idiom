@@ -102,7 +102,7 @@ impl LineBuilder {
 
     pub fn build_line<'a>(&mut self, idx: usize, init: Vec<Span<'a>>, content: &'a str) -> Line<'a> {
         let line = if self.tokens.is_empty() || self.legend.is_empty() || self.waiting || self.text_is_updated {
-            let mut internal_build = SpansBuffer::new(init, self.select_range.take());
+            let mut internal_build = SpansBuffer::new(init);
             internal_build.process(self, content, idx);
             internal_build.collect()
         } else {
@@ -144,13 +144,11 @@ impl LineBuilder {
                 }
             }
             self.set_diagnostic_style(idx, &mut style, diagnostic);
-            if matches!(&self.select_range, Some(range) if range.contains(&idx)) {
-                style.bg.replace(self.theme.selected);
-            } else {
-                style.bg = None;
-            }
+            self.set_select(&mut style, &idx);
             self.brackets.map_style(ch, &mut style);
             spans.push(Span::styled(ch.to_string(), style));
+            style.add_modifier = Modifier::empty();
+            style.bg = None;
         }
         if let Some(diagnostic) = diagnostic {
             spans.extend(diagnostic.spans.iter().cloned());
@@ -158,11 +156,16 @@ impl LineBuilder {
         spans
     }
 
-    fn set_diagnostic_style(&self, idx: usize, style: &mut Style, diagnostic: Option<&DiagnosticData>) {
+    fn set_diagnostic_style(&self, idx: usize, mut style: &mut Style, diagnostic: Option<&DiagnosticData>) {
         if let Some(color) = diagnostic.and_then(|d| d.check_ranges(&idx)) {
-            *style = style.add_modifier(Modifier::UNDERLINED).underline_color(color);
-        } else {
-            style.add_modifier = Modifier::empty();
+            style.add_modifier = style.add_modifier.union(Modifier::UNDERLINED);
+            style.underline_color.replace(color);
+        }
+    }
+
+    fn set_select(&self, style: &mut Style, idx: &usize) {
+        if matches!(&self.select_range, Some(range) if range.contains(idx)) {
+            style.bg.replace(self.theme.selected);
         }
     }
 
