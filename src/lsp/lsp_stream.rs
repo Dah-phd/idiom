@@ -8,7 +8,9 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::utils::{into_guard, split_arc_mutex};
 
-pub struct JsonRpc {
+use super::LSPMessage;
+
+pub struct LSPMessageStream {
     inner: FramedRead<ChildStdout, BytesCodec>,
     #[allow(dead_code)]
     stderr_handler: JoinHandle<()>,
@@ -19,7 +21,7 @@ pub struct JsonRpc {
     expected_len: usize,
 }
 
-impl JsonRpc {
+impl LSPMessageStream {
     pub fn new(child: &mut Child) -> Result<Self> {
         let inner = child.stdout.take().ok_or(anyhow!("stdout"))?;
         let mut stderr = FramedRead::new(child.stderr.take().ok_or(anyhow!("stderr"))?, BytesCodec::new());
@@ -45,10 +47,10 @@ impl JsonRpc {
         Arc::clone(&self.errors)
     }
 
-    pub async fn next(&mut self) -> Result<Value> {
+    pub async fn next(&mut self) -> Result<LSPMessage> {
         self.check_errors()?;
         if !self.parsed_que.is_empty() {
-            return Ok(self.parsed_que.remove(0)); // ensure all objects are sent
+            return Ok(self.parsed_que.remove(0).into()); // ensure all objects are sent
         }
         while self.parsed_que.is_empty() {
             match self.inner.next().await.ok_or(anyhow!("LSP crashed!"))? {
@@ -68,7 +70,7 @@ impl JsonRpc {
             }
             self.parse()?;
         }
-        Ok(self.parsed_que.remove(0))
+        Ok(self.parsed_que.remove(0).into())
     }
 
     fn check_errors(&mut self) -> Result<()> {

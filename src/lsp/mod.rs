@@ -1,4 +1,4 @@
-mod json_stream;
+mod lsp_stream;
 mod messages;
 mod notification;
 mod python;
@@ -33,7 +33,7 @@ use lsp_types::{
     TextDocumentIdentifier, TextDocumentItem, Url, VersionedTextDocumentIdentifier,
 };
 
-use json_stream::JsonRpc;
+use lsp_stream::LSPMessageStream;
 use messages::done_auto_response;
 pub use messages::{Diagnostic, GeneralNotification, LSPMessage, Request, Response};
 use notification::LSPNotification;
@@ -69,7 +69,7 @@ impl LSP {
         let mut inner = server.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::piped()).spawn()?;
 
         // splitting subprocess
-        let mut json_rpc = JsonRpc::new(&mut inner)?;
+        let mut json_rpc = LSPMessageStream::new(&mut inner)?;
         let mut stdin = inner.stdin.take().ok_or(anyhow!("LSP stdin"))?;
 
         // setting up storage
@@ -81,8 +81,8 @@ impl LSP {
         // sending init requests
         stdin.write_all(LSPRequest::<Initialize>::init_request()?.stringify()?.as_bytes()).await?;
         stdin.flush().await?;
-        let mut msg = json_rpc.next().await?;
-        let initialized: InitializeResult = from_value(msg.get_mut("result").unwrap().take())?;
+        let msg = json_rpc.next().await?;
+        let initialized: InitializeResult = from_value(msg.unwrap()?)?;
         let lsp_err_msg = json_rpc.get_errors();
 
         // starting response handler
@@ -90,7 +90,7 @@ impl LSP {
             loop {
                 match json_rpc.next().await {
                     Ok(msg) => {
-                        match LSPMessage::parse(msg) {
+                        match msg {
                             LSPMessage::Response(inner) => {
                                 into_guard(&responses_handler).insert(inner.id, inner);
                             }

@@ -158,7 +158,7 @@ impl AutoComplete {
                 self.matcher.fuzzy_match(&item.label, &self.filter).map(|score| (item.label.to_owned(), score))
             })
             .collect();
-        self.filtered.sort_by(|(_, idx), (_, rhidx)| idx.cmp(rhidx));
+        self.filtered.sort_by(|(_, idx), (_, rhidx)| rhidx.cmp(idx));
         self.state.select(Some(0));
     }
 

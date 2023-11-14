@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use anyhow::{anyhow, Result};
 use lsp_types::{
     notification::{Notification, PublishDiagnostics},
     DiagnosticSeverity, PublishDiagnosticsParams,
@@ -17,14 +18,26 @@ pub enum LSPMessage {
 }
 
 impl LSPMessage {
+    pub fn unwrap(self) -> Result<Value> {
+        // gets value within if data is know at check time
+        match self {
+            Self::Unknown(raw) => Some(raw),
+            Self::Notification(notification) => notification.params,
+            Self::Response(resp) => resp.result.or(resp.error),
+            Self::Request(request) => request.params,
+            _ => None,
+        }
+        .ok_or(anyhow!("Unexpected type!"))
+    }
+
     pub fn parse(mut obj: Value) -> LSPMessage {
         if let Some(id) = obj.get_mut("id") {
             let id = id.take();
             if let Some(result) = &mut obj.get_mut("result") {
                 return LSPMessage::Response(Response {
                     id: id.as_i64().unwrap(),
-                    error: None,
                     result: Some(result.take()),
+                    error: None,
                 });
             }
             if let Some(error) = obj.get_mut("error") {
@@ -54,6 +67,12 @@ impl LSPMessage {
             });
         };
         LSPMessage::Unknown(obj)
+    }
+}
+
+impl From<Value> for LSPMessage {
+    fn from(obj: Value) -> Self {
+        Self::parse(obj)
     }
 }
 
