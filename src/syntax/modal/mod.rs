@@ -107,8 +107,9 @@ impl RenameVariable {
     }
 
     fn render_at(&mut self, frame: &mut Frame, area: Rect) {
-        let block = Block::default().title("Find").borders(Borders::ALL);
+        let block = Block::default().title("Rename").borders(Borders::ALL);
         let p = Paragraph::new(Line::from(vec![
+            Span::raw(" >> "),
             Span::raw(self.new_name.as_str()),
             Span::styled("|", Style::default().add_modifier(Modifier::SLOW_BLINK)),
         ]));
