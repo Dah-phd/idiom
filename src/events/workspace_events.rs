@@ -1,4 +1,4 @@
-use lsp_types::WorkspaceEdit;
+use lsp_types::{request::GotoDeclarationResponse, GotoDefinitionResponse, Location, LocationLink, WorkspaceEdit};
 
 use crate::{
     components::{popups::editor_popups::select_selector, workspace::Select, Workspace},
@@ -90,5 +90,27 @@ impl WorkspaceEvent {
 impl From<WorkspaceEdit> for WorkspaceEvent {
     fn from(value: WorkspaceEdit) -> Self {
         Self::WorkspaceEdit(value)
+    }
+}
+
+impl From<Location> for WorkspaceEvent {
+    fn from(value: Location) -> Self {
+        Self::Open(PathBuf::from(value.uri.path()), value.range.start.line as usize)
+    }
+}
+
+impl From<LocationLink> for WorkspaceEvent {
+    fn from(value: LocationLink) -> Self {
+        Self::Open(PathBuf::from(value.target_uri.path()), value.target_range.start.line as usize)
+    }
+}
+
+impl From<GotoDeclarationResponse> for WorkspaceEvent {
+    fn from(value: GotoDeclarationResponse) -> Self {
+        match value {
+            GotoDeclarationResponse::Scalar(location) => location.into(),
+            GotoDeclarationResponse::Array(mut arr) => arr.remove(0).into(), // ! handle multi select
+            GotoDefinitionResponse::Link(mut links) => links.remove(0).into(), // ! handle muti select
+        }
     }
 }

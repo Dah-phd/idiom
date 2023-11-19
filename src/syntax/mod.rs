@@ -188,6 +188,18 @@ impl Lexer {
         Some(())
     }
 
+    pub async fn go_to_declaration(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
+        let id = self.try_expose_lsp()?.declaration(path, c).await?;
+        self.requests.push(LSPResponseType::Declaration(id));
+        Some(())
+    }
+
+    pub async fn go_to_definition(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
+        let id = self.try_expose_lsp()?.definition(path, c).await?;
+        self.requests.push(LSPResponseType::Definition(id));
+        Some(())
+    }
+
     pub async fn get_signitures(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
         let id = self.try_expose_lsp()?.signiture_help(path, c).await?;
         self.requests.push(LSPResponseType::SignatureHelp(id));
@@ -225,6 +237,12 @@ impl Lexer {
                         if self.line_builder.set_tokens(tokens) {
                             self.events.borrow_mut().overwrite("LSP tokens mapped!");
                         };
+                    }
+                    LSPResult::Declaration(declaration) => {
+                        self.events.borrow_mut().workspace.push(declaration.into());
+                    }
+                    LSPResult::Definition(definition) => {
+                        self.events.borrow_mut().workspace.push(definition.into());
                     }
                     LSPResult::None => (),
                 }

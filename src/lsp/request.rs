@@ -3,13 +3,13 @@ use std::path::Path;
 use anyhow::Result;
 use lsp_types::{
     request::{
-        Completion, HoverRequest, Initialize, References, Rename, SemanticTokensFullRequest,
-        SemanticTokensRangeRequest, SignatureHelpRequest,
+        Completion, GotoDeclaration, GotoDeclarationParams, GotoDefinition, HoverRequest, Initialize, References,
+        Rename, SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
     },
-    ClientCapabilities, CompletionParams, HoverClientCapabilities, HoverParams, InitializeParams, MarkupKind,
-    PartialResultParams, Position, Range, ReferenceClientCapabilities, ReferenceContext, ReferenceParams, RenameParams,
-    SemanticTokensParams, SemanticTokensRangeParams, SignatureHelpClientCapabilities, SignatureHelpParams,
-    TextDocumentClientCapabilities, TextDocumentIdentifier, TextDocumentPositionParams,
+    ClientCapabilities, CompletionParams, GotoDefinitionParams, HoverClientCapabilities, HoverParams, InitializeParams,
+    MarkupKind, PartialResultParams, Range, ReferenceClientCapabilities, ReferenceContext, ReferenceParams,
+    RenameParams, SemanticTokensParams, SemanticTokensRangeParams, SignatureHelpClientCapabilities,
+    SignatureHelpParams, TextDocumentClientCapabilities, TextDocumentIdentifier, TextDocumentPositionParams,
     TextDocumentSyncClientCapabilities, WorkDoneProgressParams, WorkspaceClientCapabilities, WorkspaceFolder,
 };
 use serde::Serialize;
@@ -104,6 +104,34 @@ where
         ))
     }
 
+    pub fn declaration(path: &Path, c: &CursorPosition) -> Option<LSPRequest<GotoDeclaration>> {
+        Some(LSPRequest::with(
+            0,
+            GotoDeclarationParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                    position: c.into(),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            },
+        ))
+    }
+
+    pub fn definition(path: &Path, c: &CursorPosition) -> Option<LSPRequest<GotoDefinition>> {
+        Some(LSPRequest::with(
+            0,
+            GotoDefinitionParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                    position: c.into(),
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            },
+        ))
+    }
+
     pub fn completion(path: &Path, c: &CursorPosition) -> Option<LSPRequest<Completion>> {
         Some(LSPRequest::with(
             0,
@@ -119,14 +147,14 @@ where
         ))
     }
 
-    pub fn signature_help(path: &Path, line: u32, char: u32) -> Option<LSPRequest<SignatureHelpRequest>> {
+    pub fn signature_help(path: &Path, c: &CursorPosition) -> Option<LSPRequest<SignatureHelpRequest>> {
         Some(LSPRequest::with(
             0,
             SignatureHelpParams {
                 context: None,
                 text_document_position_params: TextDocumentPositionParams {
                     text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
-                    position: Position::new(line, char),
+                    position: c.into(),
                 },
                 work_done_progress_params: WorkDoneProgressParams::default(),
             },

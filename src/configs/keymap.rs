@@ -60,6 +60,7 @@ pub enum EditorAction {
     EndOfFile,
     StartOfLine,
     StartOfFile,
+    GoToDeclaration,
     Help,
     LSPRename,
     Cut,
@@ -101,6 +102,7 @@ pub struct EditorUserKeyMap {
     end_of_file: String,
     start_of_line: String,
     start_of_file: String,
+    go_to_declaration: String,
     help: String,
     lsp_rename: String,
     cut: String,
@@ -142,6 +144,7 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
         insert_key_event(&mut hash, &val.end_of_file, EditorAction::EndOfFile);
         insert_key_event(&mut hash, &val.start_of_line, EditorAction::StartOfLine);
         insert_key_event(&mut hash, &val.start_of_file, EditorAction::StartOfFile);
+        insert_key_event(&mut hash, &val.go_to_declaration, EditorAction::GoToDeclaration);
         insert_key_event(&mut hash, &val.help, EditorAction::Help);
         insert_key_event(&mut hash, &val.lsp_rename, EditorAction::LSPRename);
         insert_key_event(&mut hash, &val.cut, EditorAction::Cut);
@@ -185,6 +188,7 @@ impl Default for EditorUserKeyMap {
             end_of_file: format!("{} && {}", CTRL, END),
             start_of_line: String::from(HOME),
             start_of_file: format!("{} && {}", CTRL, HOME),
+            go_to_declaration: format!("{F}12"),
             help: format!("{}1", F),
             lsp_rename: format!("{}2", F),
             cut: format!("{} && {}", CTRL, 'x'),

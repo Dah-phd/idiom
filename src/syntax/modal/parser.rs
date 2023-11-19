@@ -1,4 +1,7 @@
-use lsp_types::{CompletionItem, CompletionResponse, Hover, SemanticTokensResult, SignatureHelp, WorkspaceEdit};
+use lsp_types::{
+    request::GotoDeclarationResponse, CompletionItem, CompletionResponse, GotoDefinitionResponse, Hover,
+    SemanticTokensResult, SignatureHelp, WorkspaceEdit,
+};
 use serde_json::{from_value, Value};
 
 #[derive(Debug)]
@@ -8,6 +11,8 @@ pub enum LSPResponseType {
     SignatureHelp(i64),
     Renames(i64),
     TokensFull(i64),
+    Definition(i64),
+    Declaration(i64),
 }
 
 impl LSPResponseType {
@@ -18,6 +23,8 @@ impl LSPResponseType {
             Self::SignatureHelp(id) => id,
             Self::Renames(id) => id,
             Self::TokensFull(id) => id,
+            Self::Definition(id) => id,
+            Self::Declaration(id) => id,
         }
     }
 
@@ -51,6 +58,16 @@ impl LSPResponseType {
                     return LSPResult::Tokens(response);
                 }
             }
+            Self::Definition(..) => {
+                if let Ok(response) = from_value::<GotoDefinitionResponse>(value) {
+                    return LSPResult::Definition(response);
+                }
+            }
+            Self::Declaration(..) => {
+                if let Ok(response) = from_value::<GotoDeclarationResponse>(value) {
+                    return LSPResult::Declaration(response);
+                }
+            }
         }
         LSPResult::None
     }
@@ -62,5 +79,7 @@ pub enum LSPResult {
     SignatureHelp(SignatureHelp),
     Renames(WorkspaceEdit),
     Tokens(SemanticTokensResult),
+    Definition(GotoDefinitionResponse),
+    Declaration(GotoDeclarationResponse),
     None,
 }

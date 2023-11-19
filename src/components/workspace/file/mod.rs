@@ -86,6 +86,10 @@ impl Editor {
         self.lexer.get_signitures(&self.path, &self.cursor).await;
     }
 
+    pub async fn declaration(&mut self) {
+        self.lexer.go_to_declaration(&self.path, &self.cursor).await;
+    }
+
     pub async fn hover(&mut self) {
         self.lexer.get_hover(&self.path, &self.cursor).await;
     }

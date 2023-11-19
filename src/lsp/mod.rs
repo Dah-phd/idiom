@@ -11,8 +11,8 @@ use lsp_types::notification::{
     DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Exit, Initialized,
 };
 use lsp_types::request::{
-    Completion, HoverRequest, Initialize, References, Rename, SemanticTokensFullRequest, SemanticTokensRangeRequest,
-    Shutdown, SignatureHelpRequest,
+    Completion, GotoDeclaration, GotoDefinition, HoverRequest, Initialize, References, Rename,
+    SemanticTokensFullRequest, SemanticTokensRangeRequest, Shutdown, SignatureHelpRequest,
 };
 use serde_json::from_value;
 
@@ -234,6 +234,14 @@ impl LSP {
         self.request(LSPRequest::<Completion>::completion(path, c)?).await
     }
 
+    pub async fn declaration(&mut self, path: &Path, c: &CursorPosition) -> Option<i64> {
+        self.request(LSPRequest::<GotoDeclaration>::declaration(path, c)?).await
+    }
+
+    pub async fn definition(&mut self, path: &Path, c: &CursorPosition) -> Option<i64> {
+        self.request(LSPRequest::<GotoDefinition>::definition(path, c)?).await
+    }
+
     pub async fn references(&mut self, path: &Path, c: &CursorPosition) -> Option<i64> {
         self.request(LSPRequest::<References>::references(path, c)?).await
     }
@@ -243,7 +251,7 @@ impl LSP {
     }
 
     pub async fn signiture_help(&mut self, path: &Path, c: &CursorPosition) -> Option<i64> {
-        self.request(LSPRequest::<SignatureHelpRequest>::signature_help(path, c.line as u32, c.char as u32)?).await
+        self.request(LSPRequest::<SignatureHelpRequest>::signature_help(path, c)?).await
     }
 
     async fn request<T>(&mut self, mut request: LSPRequest<T>) -> Option<i64>

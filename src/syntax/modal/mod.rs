@@ -1,5 +1,4 @@
 mod parser;
-use std::fmt::format;
 
 use crate::{components::workspace::CursorPosition, configs::EditorAction, events::WorkspaceEvent};
 use fuzzy_matcher::{

@@ -108,6 +108,7 @@ impl Workspace {
                     EditorAction::EndOfFile => editor.end_of_file(),
                     EditorAction::StartOfLine => editor.start_of_line(),
                     EditorAction::StartOfFile => editor.start_of_file(),
+                    EditorAction::GoToDeclaration => editor.declaration().await,
                     EditorAction::Help => editor.hover().await,
                     EditorAction::LSPRename => editor.start_renames(),
                     EditorAction::Undo => editor.undo(),
