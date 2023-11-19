@@ -1,5 +1,3 @@
-use std::io::Stdout;
-
 use super::PopupInterface;
 use crate::components::{Tree, Workspace};
 use crate::events::messages::PopupMessage;
@@ -7,7 +5,6 @@ use crate::events::WorkspaceEvent;
 use crate::utils::{centered_rect_static, right_corner_rect_static};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
-    backend::CrosstermBackend,
     layout::{Alignment, Constraint, Layout},
     style::{Modifier, Style},
     text::{Line, Span},
@@ -25,7 +22,7 @@ pub struct Popup {
 }
 
 impl PopupInterface for Popup {
-    fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>) {
+    fn render(&mut self, frame: &mut Frame) {
         let block = Block::default().title(self.title()).borders(Borders::ALL);
         let (h, v) = self.size.unwrap_or((40, 6));
         let area = centered_rect_static(h, v, frame.size());
@@ -133,7 +130,7 @@ pub struct PopupSelector<T> {
 }
 
 impl<T> PopupInterface for PopupSelector<T> {
-    fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>) {
+    fn render(&mut self, frame: &mut Frame) {
         let (h, v) = self.size.unwrap_or((120, 20));
         let area = centered_rect_static(h, v, frame.size());
         frame.render_widget(Clear, area);
@@ -274,7 +271,7 @@ impl<T: Clone> PopupInterface for PopupActiveSelector<T> {
             _ => PopupMessage::None,
         }
     }
-    fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>) {
+    fn render(&mut self, frame: &mut Frame) {
         let area = right_corner_rect_static(50, 3, frame.size());
         let block = Block::default().title("Find").borders(Borders::ALL);
         frame.render_widget(Clear, area);

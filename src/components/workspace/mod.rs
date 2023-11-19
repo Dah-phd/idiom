@@ -2,20 +2,18 @@ mod file;
 use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType, Mode};
 use crate::events::Events;
 use crate::lsp::LSP;
+use crate::utils::get_contents_once;
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 use file::Editor;
 pub use file::{CursorPosition, DocStats, Offset, Select};
-use lsp_types::WorkspaceEdit;
+use lsp_types::{DocumentChanges, OneOf, WorkspaceEdit};
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::prelude::CrosstermBackend;
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
 use ratatui::widgets::{ListState, Tabs};
 use ratatui::Frame;
 use std::cell::RefCell;
 use std::collections::{hash_map::Entry, HashMap};
-use std::io::Stdout;
 use std::path::PathBuf;
 use std::rc::Rc;
 use tokio::sync::Mutex;
@@ -43,22 +41,23 @@ impl Workspace {
         }
     }
 
-    pub fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, screen: Rect) {
-        let layout = Layout::default().constraints([Constraint::Length(1), Constraint::default()]).split(screen);
+    pub fn render(&mut self, frame: &mut Frame, area: Rect) {
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get_mut(editor_id) {
+                let layout = Layout::default().constraints([Constraint::Length(1), Constraint::default()]).split(area);
+                let area = layout[1];
                 file.set_max_rows(layout[1].bottom());
                 let cursor_x_offset = 1 + file.cursor.char;
                 let cursor_y_offset = file.cursor.line - file.at_line;
-                let (digits_offset, editor_content) = file.get_list_widget();
-                let x_cursor = layout[1].x + (cursor_x_offset + digits_offset) as u16;
-                let y_cursor = layout[1].y + cursor_y_offset as u16;
+                let (digits_offset, editor_content) = file.get_list_widget_with_context();
+                let x_cursor = area.x + (cursor_x_offset + digits_offset) as u16;
+                let y_cursor = area.y + cursor_y_offset as u16;
 
                 frame.set_cursor(x_cursor, y_cursor);
-                frame.render_widget(editor_content, layout[1]);
+                frame.render_widget(editor_content, area);
                 file.lexer.render_modal_if_exist(frame, x_cursor, y_cursor);
 
-                let mut titles_unordered: Vec<_> = self.editors.iter().flat_map(try_file_to_tab).collect();
+                let mut titles_unordered: Vec<_> = self.editors.iter().map(|e| e.display.to_owned()).collect();
                 let mut titles = titles_unordered.split_off(editor_id);
                 titles.extend(titles_unordered);
 
@@ -78,7 +77,7 @@ impl Workspace {
         let action = self.key_map.map(key);
         if let Some(editor) = self.get_active() {
             if let Some(action) = action {
-                if editor.lexer.map_modal_if_exists(&action) {
+                if editor.lexer.map_modal_if_exists(&action, &editor.path).await {
                     return true;
                 };
                 match action {
@@ -110,12 +109,33 @@ impl Workspace {
                     EditorAction::StartOfLine => editor.start_of_line(),
                     EditorAction::StartOfFile => editor.start_of_file(),
                     EditorAction::Help => editor.hover().await,
-                    EditorAction::Cut => editor.cut(),
-                    EditorAction::Copy => editor.copy(),
-                    EditorAction::Paste => editor.paste(),
+                    EditorAction::LSPRename => editor.start_renames(),
                     EditorAction::Undo => editor.undo(),
                     EditorAction::Redo => editor.redo(),
                     EditorAction::Save => editor.save().await,
+                    EditorAction::Cancel => return false,
+                    EditorAction::Cut => {
+                        if let Some(clip) = editor.cut() {
+                            let mut events = self.events.borrow_mut();
+                            if let Err(err) = events.clipboard_push(clip) {
+                                events.overwrite(err.to_string());
+                            }
+                        }
+                    }
+                    EditorAction::Copy => {
+                        if let Some(clip) = editor.copy() {
+                            let mut events = self.events.borrow_mut();
+                            if let Err(err) = events.clipboard_push(clip) {
+                                events.overwrite(err.to_string());
+                            }
+                        }
+                    }
+                    EditorAction::Paste => {
+                        // ! rework this ctx is available in events
+                        if let Ok(clip) = get_contents_once() {
+                            editor.paste(clip);
+                        }
+                    }
                     EditorAction::Close => {
                         self.close_active().await;
                         if self.state.selected().is_none() {
@@ -134,17 +154,11 @@ impl Workspace {
     }
 
     pub fn tabs(&self) -> Vec<String> {
-        self.editors.iter().map(|editor| editor.path.display().to_string()).collect()
+        self.editors.iter().map(|editor| editor.display.to_owned()).collect()
     }
 
     pub fn get_active(&mut self) -> Option<&mut Editor> {
         self.editors.get_mut(self.state.selected()?)
-    }
-
-    pub async fn renames(&mut self, new_name: String) {
-        if let Some(editor) = self.get_active() {
-            editor.renames(new_name).await;
-        }
     }
 
     pub async fn lexer_updates(&mut self) {
@@ -160,7 +174,41 @@ impl Workspace {
                     editor.apply_file_edits(file_edits);
                 } else if let Ok(mut editor) = self.build_basic_editor(PathBuf::from(file_url.path())) {
                     editor.apply_file_edits(file_edits);
+                    editor.try_write_file();
                 }
+            }
+        }
+        if let Some(documet_edit) = edits.document_changes {
+            match documet_edit {
+                DocumentChanges::Edits(edits) => {
+                    for mut edit in edits {
+                        if let Some(editor) = self.get_editor(edit.text_document.uri.path()) {
+                            let edits = edit
+                                .edits
+                                .drain(..)
+                                .map(|edit| match edit {
+                                    OneOf::Left(edit) => edit,
+                                    OneOf::Right(annotated) => annotated.text_edit,
+                                })
+                                .collect();
+                            editor.apply_file_edits(edits);
+                        } else if let Ok(mut editor) =
+                            self.build_basic_editor(PathBuf::from(edit.text_document.uri.path()))
+                        {
+                            let edits = edit
+                                .edits
+                                .drain(..)
+                                .map(|edit| match edit {
+                                    OneOf::Left(edit) => edit,
+                                    OneOf::Right(annotated) => annotated.text_edit,
+                                })
+                                .collect();
+                            editor.apply_file_edits(edits);
+                            editor.try_write_file();
+                        };
+                    }
+                }
+                DocumentChanges::Operations(operations) => {}
             }
         }
     }
@@ -197,7 +245,7 @@ impl Workspace {
 
     pub async fn new_from(&mut self, file_path: PathBuf) {
         for (idx, file) in self.editors.iter().enumerate() {
-            if file_path == file.path {
+            if file.path == file_path {
                 self.state.select(Some(idx));
                 return;
             }
@@ -273,10 +321,6 @@ impl Workspace {
             let _ = lsp.graceful_exit().await;
         }
     }
-}
-
-fn try_file_to_tab(file: &Editor) -> Option<Line> {
-    file.path.as_os_str().to_str().map(|t| Line::from(Span::styled(t, Style::default().fg(Color::Green))))
 }
 
 #[cfg(test)]

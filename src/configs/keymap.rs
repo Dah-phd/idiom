@@ -61,12 +61,14 @@ pub enum EditorAction {
     StartOfLine,
     StartOfFile,
     Help,
+    LSPRename,
     Cut,
     Copy,
     Paste,
     Undo,
     Redo,
     Save,
+    Cancel,
     Close,
 }
 
@@ -100,12 +102,14 @@ pub struct EditorUserKeyMap {
     start_of_line: String,
     start_of_file: String,
     help: String,
+    lsp_rename: String,
     cut: String,
     copy: String,
     paste: String,
     undo: String,
     redo: String,
     save: String,
+    cancel: String,
     close: String,
 }
 
@@ -139,12 +143,14 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
         insert_key_event(&mut hash, &val.start_of_line, EditorAction::StartOfLine);
         insert_key_event(&mut hash, &val.start_of_file, EditorAction::StartOfFile);
         insert_key_event(&mut hash, &val.help, EditorAction::Help);
+        insert_key_event(&mut hash, &val.lsp_rename, EditorAction::LSPRename);
         insert_key_event(&mut hash, &val.cut, EditorAction::Cut);
         insert_key_event(&mut hash, &val.copy, EditorAction::Copy);
         insert_key_event(&mut hash, &val.paste, EditorAction::Paste);
         insert_key_event(&mut hash, &val.undo, EditorAction::Undo);
         insert_key_event(&mut hash, &val.redo, EditorAction::Redo);
         insert_key_event(&mut hash, &val.save, EditorAction::Save);
+        insert_key_event(&mut hash, &val.cancel, EditorAction::Cancel);
         insert_key_event(&mut hash, &val.close, EditorAction::Close);
         hash
     }
@@ -180,12 +186,14 @@ impl Default for EditorUserKeyMap {
             start_of_line: String::from(HOME),
             start_of_file: format!("{} && {}", CTRL, HOME),
             help: format!("{}1", F),
+            lsp_rename: format!("{}2", F),
             cut: format!("{} && {}", CTRL, 'x'),
             copy: format!("{} && {}", CTRL, 'c'),
             paste: format!("{} && {}", CTRL, 'v'),
             undo: format!("{} && {}", CTRL, 'z'),
             redo: format!("{} && {}", CTRL, 'y'),
             save: format!("{} && {}", CTRL, 's'),
+            cancel: String::from(ESC),
             close: format!("{} && {} || {} && {}", CTRL, 'q', CTRL, 'd'),
         }
     }

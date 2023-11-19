@@ -1,5 +1,6 @@
 use crate::components::workspace::Offset;
 use anyhow::{anyhow, Result};
+use copypasta::{ClipboardContext, ClipboardProvider};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -118,4 +119,9 @@ pub fn find_code_blocks(buffer: &mut Vec<(usize, String)>, content: &[String], p
         }
         buffer.push((idx, line));
     }
+}
+
+pub fn get_contents_once() -> Result<String, Box<dyn std::error::Error + Send + Sync + 'static>> {
+    let mut ctx = ClipboardContext::new()?;
+    ctx.get_contents()
 }

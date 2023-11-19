@@ -1,7 +1,7 @@
 use crate::{
     components::{
+        popups::editor_popups::replace_in_editor_popup,
         popups::editor_popups::{editor_selector, go_to_line_popup},
-        popups::editor_popups::{rename_var_popup, replace_in_editor_popup},
         popups::{
             editor_popups::{find_in_editor_popup, save_all_popup},
             tree_popups::{create_file_popup, find_in_tree_popup, rename_file_popup, tree_file_selector},
@@ -19,7 +19,7 @@ use std::io::Stdout;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-const TICK: Duration = Duration::from_millis(100);
+const TICK: Duration = Duration::from_millis(10);
 
 pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: Option<PathBuf>) -> Result<()> {
     let configs = KeyMap::new();
@@ -143,17 +143,13 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                     GeneralAction::NewFile => {
                         mode.popup(create_file_popup(file_tree.get_first_selected_folder_display()));
                     }
-                    GeneralAction::Rename => match mode {
-                        Mode::Insert => {
-                            mode.popup(rename_var_popup());
-                        }
-                        Mode::Select => {
+                    GeneralAction::Rename => {
+                        if matches!(mode, Mode::Select) {
                             if let Some(tree_path) = file_tree.get_selected() {
                                 mode.popup(rename_file_popup(tree_path.path().display().to_string()));
                             }
                         }
-                        _ => (),
-                    },
+                    }
                     GeneralAction::Expand => {
                         if let Some(file_path) = file_tree.expand_dir_or_get_path() {
                             workspace.new_from(file_path).await;

@@ -1,8 +1,10 @@
 mod brackets;
 mod internal;
+mod langs;
 mod legend;
 use brackets::BracketColors;
 use internal::SpansBuffer;
+use langs::Lang;
 use legend::{ColorResult, Legend};
 
 use lsp_types::{
@@ -18,9 +20,9 @@ use std::{
     ops::Range,
 };
 
-use crate::{configs::FileType, syntax::langs::Lang, syntax::Theme};
+use crate::syntax::Theme;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct LineBuilder {
     pub tokens: Vec<Vec<Token>>,
     pub legend: Legend,
@@ -176,9 +178,9 @@ impl LineBuilder {
         self.theme.key_words
     }
 
-    pub fn map_styles(&mut self, ft: &FileType, tokens_res: &Option<SemanticTokensServerCapabilities>) {
+    pub fn map_styles(&mut self, tokens_res: &Option<SemanticTokensServerCapabilities>) {
         if let Some(capabilities) = tokens_res {
-            self.legend.map_styles(ft, &self.theme, capabilities)
+            self.legend.map_styles(&self.lang.file_type, &self.theme, capabilities)
         }
     }
 

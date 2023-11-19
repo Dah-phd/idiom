@@ -1,6 +1,5 @@
 use crate::{components::workspace::DocStats, configs::Mode};
 use ratatui::{
-    backend::Backend,
     layout::{Alignment, Constraint, Layout, Rect},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
@@ -26,7 +25,7 @@ impl Default for Footer {
 impl Footer {
     pub fn render_with_remainder(
         &mut self,
-        frame: &mut Frame<impl Backend>,
+        frame: &mut Frame,
         screen: Rect,
         mode: &Mode,
         stats: Option<DocStats>,

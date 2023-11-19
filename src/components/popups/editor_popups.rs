@@ -47,21 +47,6 @@ pub fn go_to_line_popup() -> Box<Popup> {
     })
 }
 
-pub fn rename_var_popup() -> Box<Popup> {
-    Box::new(Popup {
-        message: String::new(),
-        title: None,
-        message_as_buffer_builder: Some(Some),
-        buttons: vec![Button {
-            command: |popup| WorkspaceEvent::Rename(popup.message.to_owned()).into(),
-            name: "Rename",
-            key: None,
-        }],
-        size: Some((50, 4)),
-        state: 0,
-    })
-}
-
 pub fn find_in_editor_popup() -> Box<PopupActiveSelector<Select>> {
     Box::new(PopupActiveSelector::for_editor(
         |popup| {

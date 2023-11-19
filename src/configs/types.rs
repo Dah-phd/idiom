@@ -1,6 +1,5 @@
 use crossterm::event::KeyEvent;
 use ratatui::{
-    backend::CrosstermBackend,
     style::{Color, Style},
     text::Span,
     Frame,
@@ -8,7 +7,7 @@ use ratatui::{
 
 use crate::components::{popups::PopupInterface, workspace::Workspace, Tree};
 use crate::events::messages::PopupMessage;
-use std::{io::Stdout, path::PathBuf};
+use std::path::PathBuf;
 
 pub enum Mode {
     Select,
@@ -31,7 +30,7 @@ impl From<&Mode> for Span<'static> {
 }
 
 impl Mode {
-    pub fn render_popup_if_exists(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>) {
+    pub fn render_popup_if_exists(&mut self, frame: &mut Frame) {
         if let Self::Popup((.., popup)) = self {
             popup.render(frame)
         }

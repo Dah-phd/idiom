@@ -1,9 +1,8 @@
 mod action;
-mod clipboard;
+mod action_alt;
 mod cursor;
 mod select;
-mod utils;
-use clipboard::Clipboard;
+pub mod utils;
 pub use cursor::{CursorPosition, Offset};
 use lsp_types::TextEdit;
 use ratatui::widgets::{List, ListItem};
@@ -18,7 +17,7 @@ use crate::{
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 use self::utils::{
-    backspace_indent_handler, derive_indent_from, get_closing_char, indent_from_prev, is_closing_repeat,
+    backspace_indent_handler, derive_indent_from, get_closing_char, indent_from_prev, insert_clip, is_closing_repeat,
     unindent_if_before_base_pattern,
 };
 use self::{
@@ -34,12 +33,12 @@ pub type DocStats<'a> = (DocLen, SelectLen, &'a CursorPosition);
 pub struct Editor {
     pub cursor: CursorPosition,
     pub file_type: FileType,
+    pub display: String,
     pub path: PathBuf,
     pub at_line: usize,
     pub lexer: Lexer,
     select: Select,
     configs: EditorConfigs,
-    clipboard: Clipboard,
     action_logger: ActionLogger,
     max_rows: usize,
     content: Vec<String>,
@@ -49,23 +48,24 @@ impl Editor {
     pub fn from_path(path: PathBuf, mut configs: EditorConfigs, events: &Rc<RefCell<Events>>) -> std::io::Result<Self> {
         let content = std::fs::read_to_string(&path)?;
         let file_type = FileType::derive_type(&path);
+        let display = path.display().to_string();
         configs.update_by_file_type(&file_type);
         Ok(Self {
-            lexer: Lexer::from_type(&file_type, Theme::from(&configs.theme_file_in_config_dir), events),
+            lexer: Lexer::with_context(file_type, Theme::from(&configs.theme_file_in_config_dir), events),
             configs,
             cursor: CursorPosition::default(),
             select: Select::default(),
-            clipboard: Clipboard::default(),
             action_logger: ActionLogger::default(),
             max_rows: 0,
             at_line: 0,
             content: content.split('\n').map(String::from).collect(),
             file_type,
-            path,
+            display,
+            path: path.canonicalize()?,
         })
     }
 
-    pub fn get_list_widget(&mut self) -> (usize, List<'_>) {
+    pub fn get_list_widget_with_context(&mut self) -> (usize, List<'_>) {
         let max_digits = self.lexer.context(&self.content, self.select.get(), &self.path);
         let render_till_line = self.content.len().min(self.at_line + self.max_rows);
         let editor_content = List::new(
@@ -90,8 +90,8 @@ impl Editor {
         self.lexer.get_hover(&self.path, &self.cursor).await;
     }
 
-    pub async fn renames(&mut self, new_name: String) {
-        self.lexer.get_renames(&self.path, &self.cursor, new_name).await;
+    pub fn start_renames(&mut self) {
+        self.lexer.start_renames(&self.cursor);
     }
 
     pub async fn update_lsp(&mut self) {
@@ -114,13 +114,29 @@ impl Editor {
         self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.as_range()]);
     }
 
+    pub fn mass_replace(&mut self, selects: Vec<Select>, new: &str) {
+        for select in selects {
+            self.replace_select(select, new);
+        }
+    }
+
+    pub fn replace_select(&mut self, select: Select, new_clip: &str) {
+        self.select = select;
+        if let Some((from, ..)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
+            let start_line = from.line;
+            self.cursor = insert_clip(new_clip.to_owned(), &mut self.content, from);
+            self.action_logger.finish_replace(self.cursor, &self.content[start_line..=self.cursor.line]);
+        }
+    }
+
     pub fn apply_file_edits(&mut self, edits: Vec<TextEdit>) {
         let old_select = self.select.take();
+        let cursor = self.cursor;
         for edit in edits {
-            self.select = edit.range.into();
-            todo!();
+            self.replace_select(edit.range.into(), &edit.new_text);
         }
         self.select = old_select;
+        self.cursor = cursor;
     }
 
     pub fn go_to_select(&mut self, select: Select) {
@@ -157,30 +173,13 @@ impl Editor {
         buffer
     }
 
-    pub fn mass_replace(&mut self, selects: Vec<Select>, new: &str) {
-        for select in selects {
-            self.replace_select(select, new);
-        }
-    }
-
-    pub fn replace_select(&mut self, select: Select, new: &str) {
-        self.select = select;
-        if let Some((from, ..)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
-            self.cursor = from;
-            self.content[self.cursor.line].insert_str(self.cursor.char, new);
-            self.cursor.char += new.len();
-            self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.as_range()]);
-        }
-    }
-
-    pub fn cut(&mut self) {
+    pub fn cut(&mut self) -> Option<String> {
         if self.content.is_empty() {
-            return;
-        }
-        if let Some((from, .., clip)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
+            None
+        } else if let Some((from, .., clip)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
             self.cursor = from;
             self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.as_range()]);
-            self.clipboard.push(clip);
+            Some(clip)
         } else {
             self.action_logger.init_replace(self.cursor, &self.content[self.cursor.as_range()]);
             let mut clip = self.content.remove(self.cursor.line);
@@ -192,31 +191,46 @@ impl Editor {
                 self.cursor.char = 0;
             }
             self.action_logger.finish_replace(self.cursor, &[]);
-            self.clipboard.push(clip);
+            Some(clip)
         }
     }
 
-    pub fn copy(&mut self) {
-        if let Some((from, to)) = self.select.get() {
-            self.clipboard.copy(&mut self.content, from, to);
+    pub fn copy(&mut self) -> Option<String> {
+        if self.content.is_empty() {
+            None
+        } else if let Some((from, to)) = self.select.get() {
+            if from.line == to.line {
+                Some(self.content[from.line][from.char..to.char].to_owned())
+            } else {
+                let mut at_line = from.line;
+                let mut clip_vec = Vec::new();
+                clip_vec.push(self.content[from.line][from.char..].to_owned());
+                while at_line < to.line {
+                    at_line += 1;
+                    if at_line != to.line {
+                        clip_vec.push(self.content[at_line].to_owned())
+                    } else {
+                        clip_vec.push(self.content[at_line][..to.char].to_owned())
+                    }
+                }
+                Some(clip_vec.join("\n"))
+            }
         } else {
-            self.clipboard.copy_line(&mut self.content, &self.cursor);
+            let mut line = self.content[self.cursor.line].to_owned();
+            line.push('\n');
+            Some(line)
         }
     }
 
-    pub fn paste(&mut self) {
+    pub fn paste(&mut self, clip: String) {
         if let Some((from, ..)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
             self.cursor = from;
         } else {
             self.action_logger.init_replace(self.cursor, &self.content[self.cursor.as_range()]);
         };
-        if let Some(new_cursor) = self.clipboard.paste(&mut self.content, self.cursor) {
-            let start_line = self.cursor.line;
-            self.cursor = new_cursor;
-            self.action_logger.finish_replace(self.cursor, &self.content[start_line..=self.cursor.line])
-        } else {
-            self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.as_range()])
-        }
+        let start_line = self.cursor.line;
+        self.cursor = insert_clip(clip, &mut self.content, self.cursor);
+        self.action_logger.finish_replace(self.cursor, &self.content[start_line..=self.cursor.line])
     }
 
     pub fn undo(&mut self) {

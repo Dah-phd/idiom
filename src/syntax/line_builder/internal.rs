@@ -152,7 +152,7 @@ impl<'a> SpansBuffer<'a> {
                 ' ' => {
                     if builder.lang.frow_control.contains(&self.token_buffer.as_str()) {
                         self.update_fg(builder.theme.flow_control);
-                    } else if builder.lang.key_words.contains(&self.token_buffer.as_str()) {
+                    } else if builder.lang.is_keyword(self.token_buffer.as_str()) {
                         self.update_fg(builder.theme.key_words);
                     }
                     self.push_reset(idx, ch, Color::White, diagnostic, builder);
@@ -160,7 +160,7 @@ impl<'a> SpansBuffer<'a> {
                 '.' | '<' | '>' | '?' | '&' | '=' | '+' | '-' | ',' | ';' | '|' => {
                     if builder.lang.frow_control.contains(&self.token_buffer.as_str()) {
                         self.update_fg(builder.theme.flow_control);
-                    } else if builder.lang.key_words.contains(&self.token_buffer.as_str()) {
+                    } else if builder.lang.is_keyword(self.token_buffer.as_str()) {
                         self.update_fg(builder.theme.key_words);
                     }
                     self.push_reset(idx, ch, Color::White, diagnostic, builder);
@@ -168,7 +168,7 @@ impl<'a> SpansBuffer<'a> {
                 ':' => {
                     if matches!(chars.peek(), Some((.., next_ch)) if &':' == next_ch) {
                         self.update_fg(builder.theme.class_or_struct);
-                    } else if builder.lang.key_words.contains(&self.token_buffer.as_str()) {
+                    } else if builder.lang.is_keyword(self.token_buffer.as_str()) {
                         self.update_fg(builder.theme.key_words);
                     }
                     self.push_reset(idx, ch, Color::White, diagnostic, builder);

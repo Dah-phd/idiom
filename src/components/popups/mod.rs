@@ -1,18 +1,17 @@
 pub mod editor_popups;
 mod generics;
 pub mod tree_popups;
-use std::io::Stdout;
 
 use crate::events::messages::PopupMessage;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 pub use generics::message;
 pub use generics::{Button, Popup, PopupSelector};
-use ratatui::{backend::CrosstermBackend, Frame};
+use ratatui::Frame;
 
 use super::{Tree, Workspace};
 
 pub trait PopupInterface {
-    fn render(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>);
+    fn render(&mut self, frame: &mut Frame);
     fn map(&mut self, key: &KeyEvent) -> PopupMessage {
         match key {
             KeyEvent { code: KeyCode::Char('d') | KeyCode::Char('D'), modifiers: KeyModifiers::CONTROL, .. } => {

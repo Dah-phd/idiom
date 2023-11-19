@@ -1,7 +1,6 @@
 use crate::configs::GeneralAction;
 use crate::events::Events;
 use anyhow::Result;
-use ratatui::backend::Backend;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::Stylize;
 use ratatui::text::Span;
@@ -26,7 +25,7 @@ pub struct EditorTerminal {
 }
 
 impl EditorTerminal {
-    pub fn render_with_remainder(&mut self, frame: &mut Frame<impl Backend>, screen: Rect) -> Rect {
+    pub fn render_with_remainder(&mut self, frame: &mut Frame, screen: Rect) -> Rect {
         if !self.active {
             return screen;
         }

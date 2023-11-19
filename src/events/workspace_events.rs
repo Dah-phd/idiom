@@ -1,3 +1,5 @@
+use lsp_types::WorkspaceEdit;
+
 use crate::{
     components::{popups::editor_popups::select_selector, workspace::Select, Workspace},
     configs::Mode,
@@ -15,9 +17,8 @@ pub enum WorkspaceEvent {
     SelectOpenedFile(String),
     SelectTreeFiles(String),
     Open(PathBuf, usize),
-    Rename(String),
     FullSync,
-    // WorkspaceEdit(WorkspaceEdit),
+    WorkspaceEdit(WorkspaceEdit),
 }
 
 impl WorkspaceEvent {
@@ -62,6 +63,7 @@ impl WorkspaceEvent {
                     editor.replace_token(completion);
                 }
             }
+            Self::WorkspaceEdit(edits) => workspace.apply_edits(edits),
             _ => return Some(self),
         }
         None
@@ -77,14 +79,16 @@ impl WorkspaceEvent {
                     *mode = Mode::Select;
                 }
             }
-            Self::Rename(new_name) => {
-                mode.clear_popup();
-                workspace.renames(new_name).await;
-            }
             Self::FullSync => {
                 workspace.full_sync().await;
             }
             _ => (),
         }
+    }
+}
+
+impl From<WorkspaceEdit> for WorkspaceEvent {
+    fn from(value: WorkspaceEdit) -> Self {
+        Self::WorkspaceEdit(value)
     }
 }

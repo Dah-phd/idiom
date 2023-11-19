@@ -1,75 +1,133 @@
 mod parser;
-use crate::{configs::EditorAction, events::WorkspaceEvent};
-use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
+use crate::{components::workspace::CursorPosition, configs::EditorAction, events::WorkspaceEvent};
+use fuzzy_matcher::{
+    skim::{SkimMatcherV2, SkimScoreConfig},
+    FuzzyMatcher,
+};
 use lsp_types::{CompletionItem, Documentation, Hover, HoverContents, MarkedString, SignatureHelp};
 pub use parser::{LSPResponseType, LSPResult};
 use ratatui::{
-    backend::CrosstermBackend,
     prelude::Rect,
     style::{Modifier, Style},
-    text::Line,
-    widgets::{Block, Borders, Clear, List, ListItem, ListState},
+    text::{Line, Span},
+    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
     Frame,
 };
-use std::io::Stdout;
-
-#[derive(Default)]
 pub enum LSPModal {
     AutoComplete(AutoComplete),
+    RenameVar(RenameVariable),
     Info(Info),
-    #[default]
-    None,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub enum LSPModalResult {
-    Teken,
+    Taken,
     #[default]
     None,
     Done,
     TakenDone,
     Workspace(WorkspaceEvent),
+    RenameVar(String, CursorPosition),
+}
+
+impl<T> From<&[T]> for LSPModalResult {
+    fn from(value: &[T]) -> Self {
+        if value.is_empty() {
+            LSPModalResult::Done
+        } else {
+            LSPModalResult::default()
+        }
+    }
 }
 
 impl LSPModal {
-    pub fn map_and_finish(&mut self, key: &EditorAction) -> LSPModalResult {
+    pub fn map_and_finish(&mut self, action: &EditorAction) -> LSPModalResult {
+        if matches!(action, EditorAction::Cancel | EditorAction::Close) {
+            return LSPModalResult::TakenDone;
+        }
         match self {
-            Self::None => LSPModalResult::None,
-            Self::AutoComplete(modal) => modal.map_and_finish(key),
+            Self::AutoComplete(modal) => modal.map_and_finish(action),
             Self::Info(..) => LSPModalResult::Done,
+            Self::RenameVar(modal) => modal.map_and_finish(action),
         }
     }
 
-    pub fn clear(&mut self) {
-        *self = Self::None;
-    }
-
-    pub fn render_at(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, x: u16, y: u16) {
-        if let Some(area) = derive_model_rect(x, y + 1, frame.size()) {
-            match self {
-                Self::None => (),
-                Self::AutoComplete(modal) => {
+    pub fn render_at(&mut self, frame: &mut Frame, x: u16, y: u16) {
+        match self {
+            Self::AutoComplete(modal) => {
+                if let Some(area) = dynamic_cursor_rect_sized_height(modal.filtered.len(), x, y + 1, frame.size()) {
+                    frame.render_widget(Clear, area);
                     modal.render_at(frame, area);
                 }
-                Self::Info(modal) => {
+            }
+            Self::RenameVar(modal) => {
+                if let Some(area) = dynamic_cursor_rect_sized_height(1, x, y + 1, frame.size()) {
+                    frame.render_widget(Clear, area);
+                    modal.render_at(frame, area);
+                }
+            }
+            Self::Info(modal) => {
+                if let Some(area) = dynamic_cursor_rect_sized_height(modal.items.len(), x, y + 1, frame.size()) {
+                    frame.render_widget(Clear, area);
                     modal.render_at(frame, area);
                 }
             }
         }
     }
 
-    pub fn auto_complete(&mut self, completions: Vec<CompletionItem>, line: String, idx: usize) {
-        if let Some(modal) = AutoComplete::new(completions, line, idx) {
-            *self = Self::AutoComplete(modal);
+    pub fn auto_complete(completions: Vec<CompletionItem>, line: String, idx: usize) -> Option<Self> {
+        let modal = AutoComplete::new(completions, line, idx);
+        if !modal.filtered.is_empty() {
+            return Some(LSPModal::AutoComplete(modal));
         }
+        None
     }
 
-    pub fn hover(&mut self, hover: Hover) {
-        *self = Self::Info(Info::from_hover(hover));
+    pub fn hover(hover: Hover) -> Self {
+        Self::Info(Info::from_hover(hover))
     }
 
-    pub fn signature(&mut self, signature: SignatureHelp) {
-        *self = Self::Info(Info::from_signature(signature));
+    pub fn signature(signature: SignatureHelp) -> Self {
+        Self::Info(Info::from_signature(signature))
+    }
+
+    pub fn renames_at(c: CursorPosition) -> Self {
+        Self::RenameVar(RenameVariable::new(c))
+    }
+}
+
+pub struct RenameVariable {
+    new_name: String,
+    cursor: CursorPosition,
+}
+
+impl RenameVariable {
+    fn new(cursor: CursorPosition) -> Self {
+        Self { new_name: String::new(), cursor }
+    }
+
+    fn render_at(&mut self, frame: &mut Frame, area: Rect) {
+        let block = Block::default().title("Find").borders(Borders::ALL);
+        let p = Paragraph::new(Line::from(vec![
+            Span::raw(self.new_name.as_str()),
+            Span::styled("|", Style::default().add_modifier(Modifier::SLOW_BLINK)),
+        ]));
+        frame.render_widget(p.block(block), area);
+    }
+
+    fn map_and_finish(&mut self, action: &EditorAction) -> LSPModalResult {
+        match action {
+            EditorAction::Char(ch) => {
+                self.new_name.push(*ch);
+                LSPModalResult::Taken
+            }
+            EditorAction::Backspace => {
+                self.new_name.pop();
+                LSPModalResult::Taken
+            }
+            EditorAction::NewLine => LSPModalResult::RenameVar(self.new_name.to_owned(), self.cursor),
+            _ => LSPModalResult::Taken,
+        }
     }
 }
 
@@ -83,7 +141,7 @@ pub struct AutoComplete {
 }
 
 impl AutoComplete {
-    fn new(completions: Vec<CompletionItem>, line: String, idx: usize) -> Option<Self> {
+    fn new(completions: Vec<CompletionItem>, line: String, idx: usize) -> Self {
         let mut filter = String::new();
         for ch in line[..idx].chars() {
             if ch.is_alphabetic() || ch == '_' {
@@ -98,22 +156,14 @@ impl AutoComplete {
             filter,
             filtered: Vec::new(),
             completions,
-            matcher: SkimMatcherV2::default(),
+            matcher: SkimMatcherV2::default().score_config(SkimScoreConfig { score_match: 1000, ..Default::default() }),
         };
         modal.build_matches();
-        if modal.filter.is_empty() {
-            None
-        } else {
-            Some(modal)
-        }
+        modal
     }
 
-    fn map_and_finish(&mut self, key: &EditorAction) -> LSPModalResult {
-        if self.completions.is_empty() || self.filtered.is_empty() {
-            return LSPModalResult::Done;
-        }
-        match key {
-            EditorAction::Close => LSPModalResult::TakenDone,
+    fn map_and_finish(&mut self, action: &EditorAction) -> LSPModalResult {
+        match action {
             EditorAction::NewLine | EditorAction::Indent => self.get_result(),
             EditorAction::Char(ch) => self.push_filter(*ch),
             EditorAction::Down => self.down(),
@@ -133,18 +183,18 @@ impl AutoComplete {
 
     fn filter_pop(&mut self) -> LSPModalResult {
         self.filter.pop();
+        self.build_matches();
         if self.filter.is_empty() {
-            LSPModalResult::Done
-        } else {
-            LSPModalResult::default()
+            return LSPModalResult::Done;
         }
+        self.filtered.as_slice().into()
     }
 
     fn push_filter(&mut self, ch: char) -> LSPModalResult {
         if ch.is_alphabetic() || ch == '_' {
             self.filter.push(ch);
             self.build_matches();
-            LSPModalResult::default()
+            self.filtered.as_slice().into()
         } else {
             LSPModalResult::Done
         }
@@ -167,20 +217,19 @@ impl AutoComplete {
             let new_idx = idx + 1;
             self.state.select(Some(if self.filtered.len() > new_idx { new_idx } else { 0 }));
         }
-        LSPModalResult::Teken
+        LSPModalResult::Taken
     }
 
     fn up(&mut self) -> LSPModalResult {
         if let Some(idx) = self.state.selected() {
             self.state.select(Some(idx.checked_sub(1).unwrap_or(self.filtered.len() - 1)));
         }
-        LSPModalResult::Teken
+        LSPModalResult::Taken
     }
 
-    fn render_at(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, area: Rect) {
+    fn render_at(&mut self, frame: &mut Frame, area: Rect) {
         let complitions =
             self.filtered.iter().map(|(item, _)| ListItem::new(item.as_str())).collect::<Vec<ListItem<'_>>>();
-        frame.render_widget(Clear, area);
         frame.render_stateful_widget(
             List::new(complitions)
                 .block(Block::default().borders(Borders::all()))
@@ -196,11 +245,6 @@ pub struct Info {
 }
 
 impl Info {
-    fn render_at(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, area: Rect) {
-        frame.render_widget(Clear, area);
-        frame.render_widget(List::new(self.items.as_slice()).block(Block::default().borders(Borders::all())), area);
-    }
-
     pub fn from_hover(hover: Hover) -> Self {
         let mut items = Vec::new();
         match hover.contents {
@@ -246,6 +290,10 @@ impl Info {
         }
         Self { items }
     }
+
+    fn render_at(&mut self, frame: &mut Frame, area: Rect) {
+        frame.render_widget(List::new(self.items.as_slice()).block(Block::default().borders(Borders::all())), area);
+    }
 }
 
 fn parse_markedstr(value: MarkedString) -> String {
@@ -255,33 +303,34 @@ fn parse_markedstr(value: MarkedString) -> String {
     }
 }
 
-pub fn should_complete(line: &str, idx: usize) -> bool {
-    let mut last_char = ' ';
-    for (char_idx, ch) in line.char_indices() {
-        if char_idx + 1 == idx && (last_char.is_whitespace() || last_char == '(') && (ch.is_alphabetic() || ch == '_') {
-            return true;
-        }
-        last_char = ch;
-    }
-    false
-}
-
-fn derive_model_rect(mut x: u16, mut y: u16, base: Rect) -> Option<Rect> {
-    let mut width = 60; //planned -> min 30 chars
-    let mut height = 7; //planned -> min 5 with 3 completions
+fn dynamic_cursor_rect_sized_height(
+    lines: usize, // min 3
+    mut x: u16,
+    mut y: u16,
+    base: Rect,
+) -> Option<Rect> {
+    //  ______________
+    // |y,x _____     |
+    // |   |     |    | base hight (y)
+    // |   |     | h..|
+    // |   |     |    |
+    // |    -----     |
+    // |    width(60) |
+    //  --------------
+    //   base.width (x)
+    //
+    let mut height = (lines.min(5) + 2) as u16;
+    let mut width = 60;
     if base.height < height + y {
-        if base.height < 5 + y {
-            if let Some(new_y) = y.checked_sub(8) {
-                if y > base.height {
-                    return None; // ! frame work sometime produces wierd y > protections against it
-                }
-                y = new_y;
-            } else {
-                y = y.checked_sub(6)?;
-                height = 5;
-            }
+        if base.height > 3 + y {
+            height = base.height - y;
+        } else if y > 3 && base.height > y {
+            // ensures overflowed y's are handled
+            let new_y = y.saturating_sub(height + 1);
+            height = y - (new_y + 1);
+            y = new_y;
         } else {
-            height = 5;
+            return None;
         }
     };
     if base.width < width + x {

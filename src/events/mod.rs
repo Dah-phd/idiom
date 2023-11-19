@@ -2,7 +2,9 @@ mod file_tree_events;
 mod footer_events;
 pub mod messages;
 mod workspace_events;
+use anyhow::{anyhow, Result};
 
+use copypasta::{ClipboardContext, ClipboardProvider};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -19,11 +21,16 @@ pub struct Events {
     pub footer: Vec<FooterEvent>,
     pub workspace: Vec<WorkspaceEvent>,
     pub tree: Vec<TreeEvent>,
+    pub clipboard: Option<ClipboardContext>,
 }
 
 impl Events {
     pub fn new() -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self::default()))
+        let mut events = Self::default();
+        if let Ok(clipboard) = ClipboardContext::new() {
+            events.clipboard.replace(clipboard);
+        }
+        Rc::new(RefCell::new(events))
     }
 
     pub async fn handle_events(
@@ -43,6 +50,20 @@ impl Events {
         for ev in sync {
             ev.async_map(workspace, mode).await;
         }
+    }
+
+    pub fn clipboard_push(&mut self, clip: String) -> Result<()> {
+        if let Some(ctx) = &mut self.clipboard {
+            if let Err(err) = ctx.set_contents(clip) {
+                return Err(anyhow!("Clipboard error: {}", err.to_string()));
+            }
+            return Ok(());
+        }
+        Err(anyhow!("Clipboard context not present!"))
+    }
+
+    pub fn clipboard_pull(&mut self) -> Option<String> {
+        self.clipboard.as_mut()?.get_contents().ok()
     }
 
     pub fn message(&mut self, msg: impl Into<String>) {

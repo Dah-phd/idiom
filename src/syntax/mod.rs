@@ -1,9 +1,8 @@
-mod langs;
 mod line_builder;
 mod modal;
 mod theme;
 use self::line_builder::LineBuilder;
-use self::modal::{should_complete, LSPModal, LSPModalResult, LSPResponseType, LSPResult};
+use self::modal::{LSPModal, LSPModalResult, LSPResponseType, LSPResult};
 pub use self::theme::{Theme, DEFAULT_THEME_FILE};
 use crate::components::workspace::CursorPosition;
 use crate::configs::EditorAction;
@@ -14,11 +13,11 @@ use anyhow::anyhow;
 use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent, WorkspaceEdit};
 use ratatui::style::{Color, Style};
 use ratatui::text::Span;
-use ratatui::{prelude::CrosstermBackend, widgets::ListItem, Frame};
+use ratatui::{widgets::ListItem, Frame};
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::path::PathBuf;
-use std::{io::Stdout, path::Path, rc::Rc};
+use std::{path::Path, rc::Rc};
 use tokio::sync::{Mutex, MutexGuard};
 
 pub struct Lexer {
@@ -27,26 +26,24 @@ pub struct Lexer {
     pub workspace_edit: Option<WorkspaceEdit>,
     pub events: Rc<RefCell<Events>>,
     line_builder: LineBuilder,
-    ft: FileType,
     select: Option<(CursorPosition, CursorPosition)>,
-    modal: LSPModal,
+    modal: Option<LSPModal>,
     requests: Vec<LSPResponseType>,
     max_digits: usize,
 }
 
 impl Debug for Lexer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(format!("LEXER: {:?}", self.ft).as_str())
+        f.write_str(format!("LEXER: {:?}", self.line_builder.lang.file_type).as_str())
     }
 }
 
 impl Lexer {
-    pub fn from_type(file_type: &FileType, theme: Theme, events: &Rc<RefCell<Events>>) -> Self {
+    pub fn with_context(file_type: FileType, theme: Theme, events: &Rc<RefCell<Events>>) -> Self {
         Self {
             line_builder: (theme, file_type.into()).into(),
-            ft: *file_type,
             select: None,
-            modal: LSPModal::default(),
+            modal: None,
             requests: Vec::new(),
             max_digits: 0,
             diagnostics: None,
@@ -108,24 +105,35 @@ impl Lexer {
         lsp_mutex.try_lock().ok()
     }
 
-    pub fn render_modal_if_exist(&mut self, frame: &mut Frame<CrosstermBackend<&Stdout>>, x: u16, y: u16) {
-        self.modal.render_at(frame, x, y);
+    pub fn render_modal_if_exist(&mut self, frame: &mut Frame, x: u16, y: u16) {
+        if let Some(modal) = &mut self.modal {
+            modal.render_at(frame, x, y);
+        }
     }
 
-    pub fn map_modal_if_exists(&mut self, key: &EditorAction) -> bool {
-        match self.modal.map_and_finish(key) {
-            LSPModalResult::Done => self.modal.clear(),
-            LSPModalResult::Teken => return true,
-            LSPModalResult::TakenDone => {
-                self.modal.clear();
-                return true;
+    pub async fn map_modal_if_exists(&mut self, key: &EditorAction, path: &Path) -> bool {
+        if let Some(modal) = &mut self.modal {
+            match modal.map_and_finish(key) {
+                LSPModalResult::Taken => return true,
+                LSPModalResult::TakenDone => {
+                    self.modal.take();
+                    return true;
+                }
+                LSPModalResult::Done => {
+                    self.modal.take();
+                }
+                LSPModalResult::Workspace(event) => {
+                    self.events.borrow_mut().workspace.push(event);
+                    self.modal.take();
+                    return true;
+                }
+                LSPModalResult::RenameVar(new_name, c) => {
+                    self.get_renames(path, &c, new_name).await;
+                    self.modal.take();
+                    return true;
+                }
+                _ => (),
             }
-            LSPModalResult::Workspace(event) => {
-                self.events.borrow_mut().workspace.push(event);
-                self.modal.clear();
-                return true;
-            }
-            _ => (),
         }
         false
     }
@@ -137,7 +145,7 @@ impl Lexer {
             if guard.file_did_open(on_file).await.is_err() {
                 return;
             }
-            self.line_builder.map_styles(&self.ft, &guard.initialized.capabilities.semantic_tokens_provider);
+            self.line_builder.map_styles(&guard.initialized.capabilities.semantic_tokens_provider);
         }
         self.events.borrow_mut().overwrite("LSP mapped!");
         self.lsp.replace(lsp);
@@ -149,6 +157,15 @@ impl Lexer {
         Some(())
     }
 
+    pub fn start_renames(&mut self, c: &CursorPosition) {
+        if let Some(lsp) = self.try_expose_lsp() {
+            if lsp.initialized.capabilities.rename_provider.is_none() {
+                return;
+            }
+        }
+        self.modal.replace(LSPModal::renames_at(*c));
+    }
+
     pub async fn get_renames(&mut self, path: &Path, c: &CursorPosition, new_name: String) -> Option<()> {
         let id = self.try_expose_lsp()?.renames(path, c, new_name).await?;
         self.requests.push(LSPResponseType::Renames(id));
@@ -156,7 +173,8 @@ impl Lexer {
     }
 
     pub async fn get_autocomplete(&mut self, path: &Path, c: &CursorPosition, line: &str) -> Option<()> {
-        if matches!(self.modal, LSPModal::AutoComplete(..)) || !should_complete(line, c.char) {
+        if matches!(self.modal, Some(LSPModal::AutoComplete(..))) || !self.line_builder.lang.completelable(line, c.char)
+        {
             return None;
         }
         let id = self.try_expose_lsp()?.completion(path, c).await?;
@@ -191,10 +209,18 @@ impl Lexer {
         if let Some(response) = lsp.get(request.id()) {
             if let Some(value) = response.result {
                 match request.parse(value) {
-                    LSPResult::Completion(completions, line, idx) => self.modal.auto_complete(completions, line, idx),
-                    LSPResult::Hover(hover) => self.modal.hover(hover),
-                    LSPResult::SignatureHelp(signature) => self.modal.signature(signature),
-                    LSPResult::Renames(workspace_edit) => self.workspace_edit = Some(workspace_edit),
+                    LSPResult::Completion(completions, line, idx) => {
+                        self.modal = LSPModal::auto_complete(completions, line, idx);
+                    }
+                    LSPResult::Hover(hover) => {
+                        self.modal.replace(LSPModal::hover(hover));
+                    }
+                    LSPResult::SignatureHelp(signature) => {
+                        self.modal.replace(LSPModal::signature(signature));
+                    }
+                    LSPResult::Renames(workspace_edit) => {
+                        self.events.borrow_mut().workspace.push(workspace_edit.into());
+                    }
                     LSPResult::Tokens(tokens) => {
                         if self.line_builder.set_tokens(tokens) {
                             self.events.borrow_mut().overwrite("LSP tokens mapped!");
@@ -237,7 +263,7 @@ impl Lexer {
         self.line_builder.theme = theme;
         if let Some(lsp_rc) = self.lsp.as_mut() {
             if let Ok(lsp) = lsp_rc.try_lock() {
-                self.line_builder.map_styles(&self.ft, &lsp.initialized.capabilities.semantic_tokens_provider);
+                self.line_builder.map_styles(&lsp.initialized.capabilities.semantic_tokens_provider);
             }
         }
     }

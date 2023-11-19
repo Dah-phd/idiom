@@ -3,7 +3,6 @@ use crate::utils::build_file_or_folder;
 use crate::{configs::GeneralAction, events::Events};
 use anyhow::Result;
 use ratatui::{
-    backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     widgets::{Block, Borders, List, ListItem, ListState},
@@ -48,7 +47,7 @@ impl Tree {
         }
     }
 
-    pub fn render_with_remainder(&mut self, frame: &mut Frame<impl Backend>, screen: Rect) -> Rect {
+    pub fn render_with_remainder(&mut self, frame: &mut Frame, screen: Rect) -> Rect {
         if !self.active {
             return screen;
         }

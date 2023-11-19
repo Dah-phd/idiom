@@ -30,14 +30,14 @@ impl ReplaceBuilder {
 
 #[derive(Debug)]
 pub struct ActionLogger {
-    pub done: Vec<Action>,
-    pub undone: Vec<Action>,
+    done: Vec<Action>,
+    undone: Vec<Action>,
     replace_builder: Option<ReplaceBuilder>,
     buffer: Option<Action>,
     version: i32,
     text_edits: Vec<TextDocumentContentChangeEvent>,
     clock: Instant,
-    pub last_push: Option<char>,
+    last_push: Option<char>,
 }
 
 impl Default for ActionLogger {

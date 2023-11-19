@@ -152,7 +152,7 @@ impl LSP {
     }
 
     pub fn get_diagnostics(&self, doctument: &Path) -> Option<PublishDiagnosticsParams> {
-        self.diagnostics.try_lock().ok()?.get_mut(&doctument.canonicalize().ok()?)?.take()
+        self.diagnostics.try_lock().ok()?.get_mut(doctument)?.take()
     }
 
     pub async fn auto_responde(&mut self) {
@@ -303,5 +303,5 @@ impl LSP {
 }
 
 fn as_url(path: &Path) -> Result<Url> {
-    Ok(Url::parse(&format!("file:///{}", path.canonicalize()?.display()))?)
+    Ok(Url::parse(&format!("file:///{}", path.display()))?)
 }
