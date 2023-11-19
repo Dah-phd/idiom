@@ -1,4 +1,6 @@
 mod parser;
+use std::fmt::format;
+
 use crate::{components::workspace::CursorPosition, configs::EditorAction, events::WorkspaceEvent};
 use fuzzy_matcher::{
     skim::{SkimMatcherV2, SkimScoreConfig},
@@ -91,23 +93,24 @@ impl LSPModal {
         Self::Info(Info::from_signature(signature))
     }
 
-    pub fn renames_at(c: CursorPosition) -> Self {
-        Self::RenameVar(RenameVariable::new(c))
+    pub fn renames_at(c: CursorPosition, title: &str) -> Self {
+        Self::RenameVar(RenameVariable::new(c, title))
     }
 }
 
 pub struct RenameVariable {
     new_name: String,
     cursor: CursorPosition,
+    title: String,
 }
 
 impl RenameVariable {
-    fn new(cursor: CursorPosition) -> Self {
-        Self { new_name: String::new(), cursor }
+    fn new(cursor: CursorPosition, title: &str) -> Self {
+        Self { new_name: String::new(), cursor, title: format!("Rename: {} ", title) }
     }
 
     fn render_at(&mut self, frame: &mut Frame, area: Rect) {
-        let block = Block::default().title("Rename").borders(Borders::ALL);
+        let block = Block::default().title(self.title.as_str()).borders(Borders::ALL);
         let p = Paragraph::new(Line::from(vec![
             Span::raw(" >> "),
             Span::raw(self.new_name.as_str()),

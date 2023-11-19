@@ -157,13 +157,13 @@ impl Lexer {
         Some(())
     }
 
-    pub fn start_renames(&mut self, c: &CursorPosition) {
+    pub fn start_renames(&mut self, c: &CursorPosition, title: &str) {
         if let Some(lsp) = self.try_expose_lsp() {
             if lsp.initialized.capabilities.rename_provider.is_none() {
                 return;
             }
         }
-        self.modal.replace(LSPModal::renames_at(*c));
+        self.modal.replace(LSPModal::renames_at(*c, title));
     }
 
     pub async fn get_renames(&mut self, path: &Path, c: &CursorPosition, new_name: String) -> Option<()> {

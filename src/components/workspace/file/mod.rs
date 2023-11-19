@@ -91,7 +91,9 @@ impl Editor {
     }
 
     pub fn start_renames(&mut self) {
-        self.lexer.start_renames(&self.cursor);
+        let line = &self.content[self.cursor.line];
+        let token_range = token_range_at(line, self.cursor.char);
+        self.lexer.start_renames(&self.cursor, &line[token_range]);
     }
 
     pub async fn update_lsp(&mut self) {
