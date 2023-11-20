@@ -4,16 +4,12 @@ mod notification;
 mod python;
 mod request;
 mod rust;
-use crate::components::workspace::CursorPosition;
 use crate::configs::FileType;
 use crate::utils::{into_guard, split_arc_mutex, split_arc_mutex_async};
 use lsp_types::notification::{
     DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Exit, Initialized,
 };
-use lsp_types::request::{
-    Completion, GotoDeclaration, GotoDefinition, HoverRequest, Initialize, References, Rename,
-    SemanticTokensFullRequest, SemanticTokensRangeRequest, Shutdown, SignatureHelpRequest,
-};
+use lsp_types::request::{Initialize, Shutdown};
 use serde_json::from_value;
 
 use std::collections::HashMap;
@@ -23,6 +19,7 @@ use std::sync::{Arc, Mutex};
 
 use tokio::io::AsyncWriteExt;
 use tokio::process::{Child, ChildStdin, Command};
+use tokio::sync::mpsc::{self, Sender};
 use tokio::task::JoinHandle;
 
 use anyhow::{anyhow, Error, Result};
@@ -37,7 +34,7 @@ use lsp_stream::LSPMessageStream;
 use messages::done_auto_response;
 pub use messages::{Diagnostic, GeneralNotification, LSPMessage, Request, Response};
 use notification::LSPNotification;
-use request::LSPRequest;
+pub use request::LSPRequest;
 
 #[derive(Debug)]
 #[allow(clippy::upper_case_acronyms)]
@@ -51,8 +48,9 @@ pub struct LSP {
     file_type: FileType,
     counter: i64,
     inner: Child,
-    handler: JoinHandle<Error>,
-    stdin: ChildStdin,
+    lsp_json_handler: JoinHandle<Error>,
+    lsp_send_handler: JoinHandle<Result<()>>,
+    lsp_send_channel: Sender<String>,
     attempts: usize,
 }
 
@@ -86,7 +84,7 @@ impl LSP {
         let lsp_err_msg = json_rpc.get_errors();
 
         // starting response handler
-        let handler = tokio::task::spawn(async move {
+        let lsp_json_handler = tokio::task::spawn(async move {
             loop {
                 match json_rpc.next().await {
                     Ok(msg) => {
@@ -109,6 +107,18 @@ impl LSP {
             }
         });
 
+        // starting sending channel
+        let (lsp_send_channel, mut rx) = mpsc::channel::<String>(100);
+
+        // starting send handler
+        let lsp_send_handler = tokio::task::spawn(async move {
+            while let Some(msg) = rx.recv().await {
+                stdin.write_all(msg.as_bytes()).await?;
+                stdin.flush().await?;
+            }
+            Ok(())
+        });
+
         let mut lsp = Self {
             responses,
             lsp_err_msg,
@@ -118,8 +128,9 @@ impl LSP {
             counter: 0,
             file_type: language,
             inner,
-            handler,
-            stdin,
+            lsp_json_handler,
+            lsp_send_handler,
+            lsp_send_channel,
             initialized,
             attempts: 5,
         };
@@ -130,14 +141,14 @@ impl LSP {
     }
 
     pub async fn check_status(&mut self) -> Result<Option<Error>> {
-        if self.handler.is_finished() {
+        if self.lsp_json_handler.is_finished() {
             if self.attempts == 0 {
                 return Err(anyhow!("Unable to recover!"));
             }
             match Self::from(&self.file_type).await {
                 Ok(lsp) => {
                     let broken = std::mem::replace(self, lsp);
-                    return Ok(Some(match broken.handler.await {
+                    return Ok(Some(match broken.lsp_json_handler.await {
                         Ok(err) => err,
                         Err(join_err) => anyhow!("Failed to collect crash report! Join err {}", join_err.to_string()),
                     }));
@@ -162,7 +173,7 @@ impl LSP {
         }
         let mut keep = Vec::new();
         for request in requests.iter_mut() {
-            keep.push(!done_auto_response(request, &mut self.stdin).await);
+            keep.push(!done_auto_response(request, &mut self.lsp_send_channel).await);
         }
         requests.retain(|_| keep.remove(0));
     }
@@ -218,43 +229,11 @@ impl LSP {
         self.notify(notification).await
     }
 
-    pub async fn renames(&mut self, path: &Path, c: &CursorPosition, new_name: String) -> Option<i64> {
-        self.request(LSPRequest::<Rename>::rename(path, c, new_name)?).await
+    pub fn aquire_channel(&mut self) -> Sender<String> {
+        self.lsp_send_channel.clone()
     }
 
-    pub async fn semantics(&mut self, path: &Path) -> Option<i64> {
-        self.request(LSPRequest::<SemanticTokensFullRequest>::semantics_full(path)?).await
-    }
-
-    pub async fn semantic_range(&mut self, path: &Path, from: &CursorPosition, to: &CursorPosition) -> Option<i64> {
-        self.request(LSPRequest::<SemanticTokensRangeRequest>::semantics_range(path, from, to)?).await
-    }
-
-    pub async fn completion(&mut self, path: &Path, c: &CursorPosition) -> Option<i64> {
-        self.request(LSPRequest::<Completion>::completion(path, c)?).await
-    }
-
-    pub async fn declaration(&mut self, path: &Path, c: &CursorPosition) -> Option<i64> {
-        self.request(LSPRequest::<GotoDeclaration>::declaration(path, c)?).await
-    }
-
-    pub async fn definition(&mut self, path: &Path, c: &CursorPosition) -> Option<i64> {
-        self.request(LSPRequest::<GotoDefinition>::definition(path, c)?).await
-    }
-
-    pub async fn references(&mut self, path: &Path, c: &CursorPosition) -> Option<i64> {
-        self.request(LSPRequest::<References>::references(path, c)?).await
-    }
-
-    pub async fn hover(&mut self, path: &Path, c: &CursorPosition) -> Option<i64> {
-        self.request(LSPRequest::<HoverRequest>::hover(path, c)?).await
-    }
-
-    pub async fn signiture_help(&mut self, path: &Path, c: &CursorPosition) -> Option<i64> {
-        self.request(LSPRequest::<SignatureHelpRequest>::signature_help(path, c)?).await
-    }
-
-    async fn request<T>(&mut self, mut request: LSPRequest<T>) -> Option<i64>
+    pub async fn request<T>(&mut self, mut request: LSPRequest<T>) -> Result<i64>
     where
         T: lsp_types::request::Request,
         T::Params: serde::Serialize,
@@ -262,13 +241,8 @@ impl LSP {
     {
         self.counter += 1;
         request.id = self.counter;
-        if let Ok(message) = request.stringify() {
-            self.stdin.write_all(message.as_bytes()).await.ok()?;
-            self.stdin.flush().await.ok()?;
-            return Some(self.counter);
-        }
-        self.counter -= 1;
-        None
+        self.lsp_send_channel.send(request.stringify()?).await?;
+        Ok(self.counter)
     }
 
     pub async fn response<T>(&mut self, response: LSPRequest<T>) -> Result<()>
@@ -277,9 +251,7 @@ impl LSP {
         T::Params: serde::Serialize,
         T::Result: serde::de::DeserializeOwned,
     {
-        let message = response.stringify()?;
-        self.stdin.write_all(message.as_bytes()).await?;
-        self.stdin.flush().await?;
+        self.lsp_send_channel.send(response.stringify()?).await?;
         Ok(())
     }
 
@@ -288,23 +260,22 @@ impl LSP {
         T: lsp_types::notification::Notification,
         T::Params: serde::Serialize,
     {
-        let message = notification.stringify()?;
-        self.stdin.write_all(message.as_bytes()).await?;
-        self.stdin.flush().await?;
+        self.lsp_send_channel.send(notification.stringify()?).await?;
         Ok(())
     }
 
     pub async fn graceful_exit(&mut self) -> Result<()> {
         self.counter += 1;
         let shoutdown_request: LSPRequest<Shutdown> = LSPRequest::with(self.counter, ());
-        self.request(shoutdown_request).await.ok_or(anyhow!("Failed to notify shoutdown"))?;
+        self.request(shoutdown_request).await?;
         self.notify::<Exit>(LSPNotification::with(())).await?;
         self.dash_nine().await?;
         Ok(())
     }
 
     async fn dash_nine(&mut self) -> Result<()> {
-        self.handler.abort();
+        self.lsp_json_handler.abort();
+        self.lsp_send_handler.abort();
         self.inner.kill().await?;
         Ok(())
     }

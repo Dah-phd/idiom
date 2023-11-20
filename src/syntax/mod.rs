@@ -8,8 +8,11 @@ use crate::components::workspace::CursorPosition;
 use crate::configs::EditorAction;
 use crate::configs::FileType;
 use crate::events::Events;
-use crate::lsp::LSP;
+use crate::lsp::{LSPRequest, LSP};
 use anyhow::anyhow;
+use lsp_types::request::{
+    Completion, GotoDeclaration, GotoDefinition, HoverRequest, Rename, SemanticTokensFullRequest, SignatureHelpRequest,
+};
 use lsp_types::{PublishDiagnosticsParams, ServerCapabilities, TextDocumentContentChangeEvent, WorkspaceEdit};
 use ratatui::style::{Color, Style};
 use ratatui::text::Span;
@@ -18,6 +21,7 @@ use std::cell::RefCell;
 use std::fmt::Debug;
 use std::path::PathBuf;
 use std::{path::Path, rc::Rc};
+use tokio::sync::mpsc::Sender;
 use tokio::sync::{Mutex, MutexGuard};
 
 pub struct Lexer {
@@ -25,6 +29,7 @@ pub struct Lexer {
     pub workspace_edit: Option<WorkspaceEdit>,
     pub events: Rc<RefCell<Events>>,
     pub lsp: Option<Rc<Mutex<LSP>>>,
+    lsp_channel: Option<Sender<String>>,
     capabilities: ServerCapabilities,
     line_builder: LineBuilder,
     select: Option<(CursorPosition, CursorPosition)>,
@@ -51,6 +56,7 @@ impl Lexer {
             workspace_edit: None,
             events: Rc::clone(events),
             lsp: None,
+            lsp_channel: None,
             capabilities: ServerCapabilities::default(),
         }
     }
@@ -74,7 +80,8 @@ impl Lexer {
             self.line_builder.collect_changes(&content_changes);
             let mut error = None;
             let mut restart = None;
-            if let Some(mut lsp) = self.try_expose_lsp() {
+            if let Some(lsp) = self.lsp.as_mut() {
+                let mut lsp = lsp.lock().await;
                 match lsp.check_status().await {
                     Ok(None) => {
                         let _ = lsp.file_did_change(path, version, content_changes).await;
@@ -154,6 +161,7 @@ impl Lexer {
                 return;
             }
             self.capabilities = guard.initialized.capabilities.clone();
+            self.lsp_channel.replace(guard.aquire_channel());
         }
         self.line_builder.map_styles(&self.capabilities.semantic_tokens_provider);
         self.events.borrow_mut().overwrite("LSP mapped!");
@@ -177,7 +185,7 @@ impl Lexer {
 
     pub async fn get_renames(&mut self, path: &Path, c: &CursorPosition, new_name: String) -> Option<()> {
         self.capabilities.rename_provider.as_ref()?;
-        let id = self.try_expose_lsp()?.renames(path, c, new_name).await?;
+        let id = self.send_request(LSPRequest::<Rename>::rename(path, c, new_name)?).await?;
         self.requests.push(LSPResponseType::Renames(id));
         Some(())
     }
@@ -187,44 +195,61 @@ impl Lexer {
         {
             return None;
         }
-        let id = self.try_expose_lsp()?.completion(path, c).await?;
+        let id = self.send_request(LSPRequest::<Completion>::completion(path, c)?).await?;
         self.requests.push(LSPResponseType::Completion(id, line.to_owned(), c.char));
         Some(())
     }
 
     pub async fn get_hover(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
         self.capabilities.hover_provider.as_ref()?;
-        let id = self.try_expose_lsp()?.hover(path, c).await?;
+        let id = self.send_request(LSPRequest::<HoverRequest>::hover(path, c)?).await?;
         self.requests.push(LSPResponseType::Hover(id));
         Some(())
     }
 
     pub async fn go_to_declaration(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
         self.capabilities.declaration_provider.as_ref()?;
-        let id = self.try_expose_lsp()?.declaration(path, c).await?;
+        let id = self.send_request(LSPRequest::<GotoDeclaration>::declaration(path, c)?).await?;
         self.requests.push(LSPResponseType::Declaration(id));
         Some(())
     }
 
     pub async fn go_to_definition(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
         self.capabilities.definition_provider.as_ref()?;
-        let id = self.try_expose_lsp()?.definition(path, c).await?;
+        let id = self.send_request(LSPRequest::<GotoDefinition>::definition(path, c)?).await?;
         self.requests.push(LSPResponseType::Definition(id));
         Some(())
     }
 
     pub async fn get_signitures(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
         self.capabilities.signature_help_provider.as_ref()?;
-        let id = self.try_expose_lsp()?.signiture_help(path, c).await?;
+        let id = self.send_request(LSPRequest::<SignatureHelpRequest>::signature_help(path, c)?).await?;
         self.requests.push(LSPResponseType::SignatureHelp(id));
         Some(())
     }
 
     pub async fn get_tokens(&mut self, path: &Path) -> Option<()> {
         self.capabilities.semantic_tokens_provider.as_ref()?;
-        let id = self.try_expose_lsp()?.semantics(path).await?;
+        let id = self.send_request(LSPRequest::<SemanticTokensFullRequest>::semantics_full(path)?).await?;
         self.requests.push(LSPResponseType::TokensFull(id));
         Some(())
+    }
+
+    // error handler!
+    async fn send_request<T>(&mut self, reqeust: LSPRequest<T>) -> Option<i64>
+    where
+        T: lsp_types::request::Request,
+        T::Params: serde::Serialize,
+        T::Result: serde::de::DeserializeOwned,
+    {
+        let send_result = self.try_expose_lsp()?.request(reqeust).await;
+        match send_result {
+            Ok(id) => Some(id),
+            Err(err) => {
+                self.events.borrow_mut().overwrite(format!("ERR on {} with {err}", T::METHOD));
+                None
+            }
+        }
     }
 
     fn get_lsp_responses(&mut self) -> Option<()> {

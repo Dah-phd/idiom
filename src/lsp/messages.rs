@@ -6,7 +6,7 @@ use lsp_types::{
     DiagnosticSeverity, PublishDiagnosticsParams,
 };
 use serde_json::{from_value, Value};
-use tokio::process::ChildStdin;
+use tokio::{process::ChildStdin, sync::mpsc::Sender};
 
 #[derive(Debug)]
 pub enum LSPMessage {
@@ -134,7 +134,7 @@ impl Diagnostic {
 }
 
 #[allow(unused_variables)]
-pub async fn done_auto_response(lsp_message: &mut Request, stdin: &mut ChildStdin) -> bool {
+pub async fn done_auto_response(lsp_message: &mut Request, channel: &mut Sender<String>) -> bool {
     #[allow(clippy::match_single_binding)]
     match lsp_message.method.as_str() {
         _ => (),
