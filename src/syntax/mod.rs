@@ -9,7 +9,6 @@ use crate::configs::EditorAction;
 use crate::configs::FileType;
 use crate::events::Events;
 use crate::lsp::{LSPRequest, LSP};
-use anyhow::anyhow;
 use lsp_types::request::{
     Completion, GotoDeclaration, GotoDefinition, HoverRequest, Rename, SemanticTokensFullRequest, SignatureHelpRequest,
 };
@@ -28,8 +27,8 @@ pub struct Lexer {
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub workspace_edit: Option<WorkspaceEdit>,
     pub events: Rc<RefCell<Events>>,
+    pub lsp_channel: Option<Sender<String>>,
     pub lsp: Option<Rc<Mutex<LSP>>>,
-    lsp_channel: Option<Sender<String>>,
     capabilities: ServerCapabilities,
     line_builder: LineBuilder,
     select: Option<(CursorPosition, CursorPosition)>,
@@ -55,8 +54,8 @@ impl Lexer {
             diagnostics: None,
             workspace_edit: None,
             events: Rc::clone(events),
-            lsp: None,
             lsp_channel: None,
+            lsp: None,
             capabilities: ServerCapabilities::default(),
         }
     }
@@ -78,27 +77,8 @@ impl Lexer {
     pub async fn update_lsp(&mut self, path: &Path, changes: Option<(i32, Vec<TextDocumentContentChangeEvent>)>) {
         if let Some((version, content_changes)) = changes {
             self.line_builder.collect_changes(&content_changes);
-            let mut error = None;
-            let mut restart = None;
-            if let Some(lsp) = self.lsp.as_mut() {
-                let mut lsp = lsp.lock().await;
-                match lsp.check_status().await {
-                    Ok(None) => {
-                        let _ = lsp.file_did_change(path, version, content_changes).await;
-                    }
-                    Ok(Some(err)) => {
-                        error.replace(err);
-                    }
-                    Err(err) => {
-                        error.replace(anyhow!("LSP crashed!"));
-                        restart.replace(err.to_string());
-                    }
-                };
-            }
-            if let Some(err) = error {
-                let mut events = self.events.borrow_mut();
-                events.overwrite(err.to_string());
-                events.message(restart.unwrap_or("LSP restarted!".to_string()));
+            if let Some(channel) = self.lsp_channel.as_mut() {
+                let _ = LSP::file_did_change(channel, path, version, content_changes).await;
             }
         }
         if self.line_builder.should_update() {
@@ -153,15 +133,16 @@ impl Lexer {
         false
     }
 
-    pub async fn set_lsp(&mut self, lsp: Rc<Mutex<LSP>>, on_file: &PathBuf) {
+    pub async fn set_lsp(&mut self, lsp: Rc<Mutex<LSP>>, on_file: &PathBuf, file_type: &FileType) {
         self.events.borrow_mut().message("Mapping LSP ...");
         {
             let mut guard = lsp.lock().await;
-            if guard.file_did_open(on_file).await.is_err() {
+            let mut channel = guard.aquire_channel();
+            if LSP::file_did_open(&mut channel, on_file, file_type).await.is_err() {
                 return;
             }
-            self.capabilities = guard.initialized.capabilities.clone();
             self.lsp_channel.replace(guard.aquire_channel());
+            self.capabilities = guard.initialized.capabilities.clone();
         }
         self.line_builder.map_styles(&self.capabilities.semantic_tokens_provider);
         self.events.borrow_mut().overwrite("LSP mapped!");

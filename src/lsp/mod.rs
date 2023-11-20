@@ -18,7 +18,7 @@ use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 
 use tokio::io::AsyncWriteExt;
-use tokio::process::{Child, ChildStdin, Command};
+use tokio::process::{Child, Command};
 use tokio::sync::mpsc::{self, Sender};
 use tokio::task::JoinHandle;
 
@@ -187,48 +187,6 @@ impl LSP {
         self.notify::<Initialized>(LSPNotification::with(InitializedParams {})).await
     }
 
-    pub async fn file_did_open(&mut self, path: &PathBuf) -> Result<()> {
-        let content = std::fs::read_to_string(path)?;
-        let notification: LSPNotification<DidOpenTextDocument> = LSPNotification::with(DidOpenTextDocumentParams {
-            text_document: TextDocumentItem {
-                uri: as_url(path)?,
-                language_id: String::from(&self.file_type),
-                version: 0,
-                text: content,
-            },
-        });
-        self.notify(notification).await
-    }
-
-    pub async fn file_did_save(&mut self, path: &PathBuf) -> Result<()> {
-        let content = std::fs::read_to_string(path)?;
-        let notification: LSPNotification<DidSaveTextDocument> = LSPNotification::with(DidSaveTextDocumentParams {
-            text_document: TextDocumentIdentifier { uri: as_url(path)? },
-            text: Some(content),
-        });
-        self.notify(notification).await
-    }
-
-    pub async fn file_did_change(
-        &mut self,
-        path: &Path,
-        version: i32,
-        content_changes: Vec<TextDocumentContentChangeEvent>,
-    ) -> Result<()> {
-        let notification: LSPNotification<DidChangeTextDocument> = LSPNotification::with(DidChangeTextDocumentParams {
-            text_document: VersionedTextDocumentIdentifier::new(as_url(path)?, version),
-            content_changes,
-        });
-        self.notify(notification).await
-    }
-
-    pub async fn file_did_close(&mut self, path: &Path) -> Result<()> {
-        let notification: LSPNotification<DidCloseTextDocument> = LSPNotification::with(DidCloseTextDocumentParams {
-            text_document: TextDocumentIdentifier { uri: as_url(path)? },
-        });
-        self.notify(notification).await
-    }
-
     pub fn aquire_channel(&mut self) -> Sender<String> {
         self.lsp_send_channel.clone()
     }
@@ -277,6 +235,52 @@ impl LSP {
         self.lsp_json_handler.abort();
         self.lsp_send_handler.abort();
         self.inner.kill().await?;
+        Ok(())
+    }
+
+    pub async fn file_did_change(
+        channel: &mut Sender<String>,
+        path: &Path,
+        version: i32,
+        content_changes: Vec<TextDocumentContentChangeEvent>,
+    ) -> Result<()> {
+        let notification: LSPNotification<DidChangeTextDocument> = LSPNotification::with(DidChangeTextDocumentParams {
+            text_document: VersionedTextDocumentIdentifier::new(as_url(path)?, version),
+            content_changes,
+        });
+        channel.send(notification.stringify()?).await?;
+        Ok(())
+    }
+
+    pub async fn file_did_open(channel: &mut Sender<String>, path: &PathBuf, file_type: &FileType) -> Result<()> {
+        let content = std::fs::read_to_string(path)?;
+        let notification: LSPNotification<DidOpenTextDocument> = LSPNotification::with(DidOpenTextDocumentParams {
+            text_document: TextDocumentItem {
+                uri: as_url(path)?,
+                language_id: String::from(file_type),
+                version: 0,
+                text: content,
+            },
+        });
+        channel.send(notification.stringify()?).await?;
+        Ok(())
+    }
+
+    pub async fn file_did_save(channel: &mut Sender<String>, path: &PathBuf) -> Result<()> {
+        let content = std::fs::read_to_string(path)?;
+        let notification: LSPNotification<DidSaveTextDocument> = LSPNotification::with(DidSaveTextDocumentParams {
+            text_document: TextDocumentIdentifier { uri: as_url(path)? },
+            text: Some(content),
+        });
+        channel.send(notification.stringify()?).await?;
+        Ok(())
+    }
+
+    pub async fn file_did_close(channel: &mut Sender<String>, path: &Path) -> Result<()> {
+        let notification: LSPNotification<DidCloseTextDocument> = LSPNotification::with(DidCloseTextDocumentParams {
+            text_document: TextDocumentIdentifier { uri: as_url(path)? },
+        });
+        channel.send(notification.stringify()?).await?;
         Ok(())
     }
 }

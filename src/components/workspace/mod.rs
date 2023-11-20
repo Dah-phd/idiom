@@ -275,16 +275,16 @@ impl Workspace {
             Entry::Vacant(entry) => {
                 if let Ok(lsp) = LSP::from(&new.file_type).await {
                     let lsp_rc = Rc::new(Mutex::new(lsp));
-                    new.lexer.set_lsp(Rc::clone(&lsp_rc), &new.path).await;
+                    new.lexer.set_lsp(Rc::clone(&lsp_rc), &new.path, &new.file_type).await;
                     for editor in self.editors.iter_mut().filter(|e| e.file_type == new.file_type) {
-                        editor.lexer.set_lsp(Rc::clone(&lsp_rc), &editor.path).await;
+                        editor.lexer.set_lsp(Rc::clone(&lsp_rc), &editor.path, &editor.file_type).await;
                     }
                     entry.insert(lsp_rc);
                 }
             }
             Entry::Occupied(entry) => {
                 let lsp_rc = Rc::clone(entry.get());
-                new.lexer.set_lsp(lsp_rc, &new.path).await;
+                new.lexer.set_lsp(lsp_rc, &new.path, &new.file_type).await;
             }
         }
         Ok(new)
@@ -317,8 +317,8 @@ impl Workspace {
     async fn close_active(&mut self) {
         if let Some(index) = self.state.selected() {
             let editor = self.editors.remove(index);
-            if let Some(lsp) = editor.lexer.lsp {
-                let _ = lsp.lock().await.file_did_close(&editor.path).await;
+            if let Some(mut channel) = editor.lexer.lsp_channel {
+                let _ = LSP::file_did_close(&mut channel, &editor.path).await;
             }
             if self.editors.is_empty() {
                 self.state.select(None);
@@ -356,7 +356,7 @@ impl Workspace {
             editor.refresh_cfg(&self.base_config);
             if let Some(lsp) = self.lsp_servers.get(&editor.file_type) {
                 if editor.lexer.lsp.is_none() {
-                    editor.lexer.set_lsp(Rc::clone(lsp), &editor.path).await;
+                    editor.lexer.set_lsp(Rc::clone(lsp), &editor.path, &editor.file_type).await;
                 }
             }
         }

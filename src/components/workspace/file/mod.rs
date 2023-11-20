@@ -11,6 +11,7 @@ pub use select::Select;
 use crate::{
     configs::{EditorConfigs, FileType},
     events::Events,
+    lsp::LSP,
     syntax::{Lexer, Theme},
     utils::{find_code_blocks, trim_start_inplace},
 };
@@ -624,8 +625,8 @@ impl Editor {
 
     pub async fn save(&mut self) {
         if self.try_write_file() {
-            if let Some(lsp) = self.lexer.lsp.as_mut() {
-                let _ = lsp.lock().await.file_did_save(&self.path).await;
+            if let Some(channel) = self.lexer.lsp_channel.as_mut() {
+                let _ = LSP::file_did_save(channel, &self.path).await;
             }
         }
     }
