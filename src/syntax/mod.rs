@@ -217,39 +217,42 @@ impl Lexer {
             return None;
         }
         let lsp = self.lsp.as_mut()?.try_lock().ok()?;
-        let request = self.requests.remove(0);
-        if let Some(response) = lsp.get(request.id()) {
-            if let Some(value) = response.result {
-                match request.parse(value) {
-                    LSPResult::Completion(completions, line, idx) => {
-                        self.modal = LSPModal::auto_complete(completions, line, idx);
+        let mut unresolved_requests = Vec::new();
+        for request in self.requests.drain(..) {
+            if let Some(response) = lsp.get(request.id()) {
+                if let Some(value) = response.result {
+                    match request.parse(value) {
+                        LSPResult::Completion(completions, line, idx) => {
+                            self.modal = LSPModal::auto_complete(completions, line, idx);
+                        }
+                        LSPResult::Hover(hover) => {
+                            self.modal.replace(LSPModal::hover(hover));
+                        }
+                        LSPResult::SignatureHelp(signature) => {
+                            self.modal.replace(LSPModal::signature(signature));
+                        }
+                        LSPResult::Renames(workspace_edit) => {
+                            self.events.borrow_mut().workspace.push(workspace_edit.into());
+                        }
+                        LSPResult::Tokens(tokens) => {
+                            if self.line_builder.set_tokens(tokens) {
+                                self.events.borrow_mut().overwrite("LSP tokens mapped!");
+                            };
+                        }
+                        LSPResult::Declaration(declaration) => {
+                            self.events.borrow_mut().workspace.push(declaration.into());
+                        }
+                        LSPResult::Definition(definition) => {
+                            self.events.borrow_mut().workspace.push(definition.into());
+                        }
+                        LSPResult::None => (),
                     }
-                    LSPResult::Hover(hover) => {
-                        self.modal.replace(LSPModal::hover(hover));
-                    }
-                    LSPResult::SignatureHelp(signature) => {
-                        self.modal.replace(LSPModal::signature(signature));
-                    }
-                    LSPResult::Renames(workspace_edit) => {
-                        self.events.borrow_mut().workspace.push(workspace_edit.into());
-                    }
-                    LSPResult::Tokens(tokens) => {
-                        if self.line_builder.set_tokens(tokens) {
-                            self.events.borrow_mut().overwrite("LSP tokens mapped!");
-                        };
-                    }
-                    LSPResult::Declaration(declaration) => {
-                        self.events.borrow_mut().workspace.push(declaration.into());
-                    }
-                    LSPResult::Definition(definition) => {
-                        self.events.borrow_mut().workspace.push(definition.into());
-                    }
-                    LSPResult::None => (),
                 }
+            } else {
+                unresolved_requests.push(request);
             }
-        } else {
-            self.requests.push(request);
         }
+        self.requests = unresolved_requests;
         None
     }
 
