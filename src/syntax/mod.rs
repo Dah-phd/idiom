@@ -10,7 +10,7 @@ use crate::configs::FileType;
 use crate::events::Events;
 use crate::lsp::LSP;
 use anyhow::anyhow;
-use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent, WorkspaceEdit};
+use lsp_types::{PublishDiagnosticsParams, ServerCapabilities, TextDocumentContentChangeEvent, WorkspaceEdit};
 use ratatui::style::{Color, Style};
 use ratatui::text::Span;
 use ratatui::{widgets::ListItem, Frame};
@@ -22,9 +22,10 @@ use tokio::sync::{Mutex, MutexGuard};
 
 pub struct Lexer {
     pub diagnostics: Option<PublishDiagnosticsParams>,
-    pub lsp: Option<Rc<Mutex<LSP>>>,
     pub workspace_edit: Option<WorkspaceEdit>,
     pub events: Rc<RefCell<Events>>,
+    pub lsp: Option<Rc<Mutex<LSP>>>,
+    capabilities: ServerCapabilities,
     line_builder: LineBuilder,
     select: Option<(CursorPosition, CursorPosition)>,
     modal: Option<LSPModal>,
@@ -47,9 +48,10 @@ impl Lexer {
             requests: Vec::new(),
             max_digits: 0,
             diagnostics: None,
-            lsp: None,
             workspace_edit: None,
             events: Rc::clone(events),
+            lsp: None,
+            capabilities: ServerCapabilities::default(),
         }
     }
 
@@ -102,7 +104,13 @@ impl Lexer {
 
     pub fn try_expose_lsp(&mut self) -> Option<MutexGuard<'_, LSP>> {
         let lsp_mutex = self.lsp.as_mut()?;
-        lsp_mutex.try_lock().ok()
+        match lsp_mutex.try_lock() {
+            Ok(lsp) => Some(lsp),
+            Err(err) => {
+                self.events.borrow_mut().overwrite(format!("Failed to aquirre lsp: {err}"));
+                None
+            }
+        }
     }
 
     pub fn render_modal_if_exist(&mut self, frame: &mut Frame, x: u16, y: u16) {
@@ -145,8 +153,9 @@ impl Lexer {
             if guard.file_did_open(on_file).await.is_err() {
                 return;
             }
-            self.line_builder.map_styles(&guard.initialized.capabilities.semantic_tokens_provider);
+            self.capabilities = guard.initialized.capabilities.clone();
         }
+        self.line_builder.map_styles(&self.capabilities.semantic_tokens_provider);
         self.events.borrow_mut().overwrite("LSP mapped!");
         self.lsp.replace(lsp);
     }
@@ -167,6 +176,7 @@ impl Lexer {
     }
 
     pub async fn get_renames(&mut self, path: &Path, c: &CursorPosition, new_name: String) -> Option<()> {
+        self.capabilities.rename_provider.as_ref()?;
         let id = self.try_expose_lsp()?.renames(path, c, new_name).await?;
         self.requests.push(LSPResponseType::Renames(id));
         Some(())
@@ -183,30 +193,35 @@ impl Lexer {
     }
 
     pub async fn get_hover(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
+        self.capabilities.hover_provider.as_ref()?;
         let id = self.try_expose_lsp()?.hover(path, c).await?;
         self.requests.push(LSPResponseType::Hover(id));
         Some(())
     }
 
     pub async fn go_to_declaration(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
+        self.capabilities.declaration_provider.as_ref()?;
         let id = self.try_expose_lsp()?.declaration(path, c).await?;
         self.requests.push(LSPResponseType::Declaration(id));
         Some(())
     }
 
     pub async fn go_to_definition(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
+        self.capabilities.definition_provider.as_ref()?;
         let id = self.try_expose_lsp()?.definition(path, c).await?;
         self.requests.push(LSPResponseType::Definition(id));
         Some(())
     }
 
     pub async fn get_signitures(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
+        self.capabilities.signature_help_provider.as_ref()?;
         let id = self.try_expose_lsp()?.signiture_help(path, c).await?;
         self.requests.push(LSPResponseType::SignatureHelp(id));
         Some(())
     }
 
     pub async fn get_tokens(&mut self, path: &Path) -> Option<()> {
+        self.capabilities.semantic_tokens_provider.as_ref()?;
         let id = self.try_expose_lsp()?.semantics(path).await?;
         self.requests.push(LSPResponseType::TokensFull(id));
         Some(())
