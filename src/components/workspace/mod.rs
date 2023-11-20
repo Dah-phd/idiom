@@ -7,7 +7,7 @@ use anyhow::Result;
 use crossterm::event::KeyEvent;
 use file::Editor;
 pub use file::{CursorPosition, DocStats, Offset, Select};
-use lsp_types::{DocumentChanges, OneOf, WorkspaceEdit};
+use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{ListState, Tabs};
@@ -176,42 +176,88 @@ impl Workspace {
                 } else if let Ok(mut editor) = self.build_basic_editor(PathBuf::from(file_url.path())) {
                     editor.apply_file_edits(file_edits);
                     editor.try_write_file();
+                } else {
+                    self.events.borrow_mut().overwrite(format!("Unable to build editor for {}", file_url.path()));
                 }
             }
         }
         if let Some(documet_edit) = edits.document_changes {
             match documet_edit {
                 DocumentChanges::Edits(edits) => {
-                    for mut edit in edits {
-                        if let Some(editor) = self.get_editor(edit.text_document.uri.path()) {
-                            let edits = edit
-                                .edits
-                                .drain(..)
-                                .map(|edit| match edit {
-                                    OneOf::Left(edit) => edit,
-                                    OneOf::Right(annotated) => annotated.text_edit,
-                                })
-                                .collect();
-                            editor.apply_file_edits(edits);
-                        } else if let Ok(mut editor) =
-                            self.build_basic_editor(PathBuf::from(edit.text_document.uri.path()))
-                        {
-                            let edits = edit
-                                .edits
-                                .drain(..)
-                                .map(|edit| match edit {
-                                    OneOf::Left(edit) => edit,
-                                    OneOf::Right(annotated) => annotated.text_edit,
-                                })
-                                .collect();
-                            editor.apply_file_edits(edits);
-                            editor.try_write_file();
-                        };
+                    for text_document_edit in edits {
+                        self.handle_text_document_edit(text_document_edit);
                     }
                 }
-                DocumentChanges::Operations(operations) => {}
+                DocumentChanges::Operations(operations) => {
+                    for operation in operations {
+                        match operation {
+                            DocumentChangeOperation::Edit(text_document_edit) => {
+                                self.handle_text_document_edit(text_document_edit);
+                            }
+                            DocumentChangeOperation::Op(operation) => {
+                                if let Err(err) = self.handle_tree_operations(operation) {
+                                    self.events.borrow_mut().overwrite(format!("Failed file tree operation: {err}"));
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
+    }
+
+    fn handle_text_document_edit(&mut self, mut text_document_edit: TextDocumentEdit) {
+        if let Some(editor) = self.get_editor(text_document_edit.text_document.uri.path()) {
+            let edits = text_document_edit
+                .edits
+                .drain(..)
+                .map(|edit| match edit {
+                    OneOf::Left(edit) => edit,
+                    OneOf::Right(annotated) => annotated.text_edit,
+                })
+                .collect();
+            editor.apply_file_edits(edits);
+        } else if let Ok(mut editor) =
+            self.build_basic_editor(PathBuf::from(text_document_edit.text_document.uri.path()))
+        {
+            let edits = text_document_edit
+                .edits
+                .drain(..)
+                .map(|edit| match edit {
+                    OneOf::Left(edit) => edit,
+                    OneOf::Right(annotated) => annotated.text_edit,
+                })
+                .collect();
+            editor.apply_file_edits(edits);
+            editor.try_write_file();
+        } else {
+            self.events
+                .borrow_mut()
+                .overwrite(format!("Unable to build editor for {}", text_document_edit.text_document.uri.path()));
+        };
+    }
+
+    fn handle_tree_operations(&mut self, operation: ResourceOp) -> anyhow::Result<()> {
+        match operation {
+            ResourceOp::Create(create) => (),
+            ResourceOp::Delete(delete) => {
+                let search_path = PathBuf::from(delete.uri.path()).canonicalize()?;
+                if search_path.is_file() {
+                    std::fs::remove_file(search_path)?;
+                } else {
+                    std::fs::remove_dir_all(search_path)?;
+                }
+            }
+            ResourceOp::Rename(rename) => {
+                std::fs::rename(rename.old_uri.path(), rename.new_uri.path())?;
+                if let Some(editor) = self.get_editor(rename.old_uri.path()) {
+                    let path = PathBuf::from(rename.new_uri.path());
+                    editor.display = path.display().to_string();
+                    editor.path = path;
+                }
+            }
+        }
+        Ok(())
     }
 
     fn get_editor<T: Into<PathBuf>>(&mut self, path: T) -> Option<&mut Editor> {

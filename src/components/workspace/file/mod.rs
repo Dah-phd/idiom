@@ -145,6 +145,14 @@ impl Editor {
         self.cursor = cursor;
     }
 
+    pub fn go_to(&mut self, line: usize) {
+        if self.content.len() >= line {
+            self.cursor.line = line;
+            self.cursor.char = find_line_start(self.content[line].as_str());
+            self.at_line = line.checked_sub(self.max_rows / 2).unwrap_or_default();
+        }
+    }
+
     pub fn go_to_select(&mut self, select: Select) {
         if let Select::Range(_, to) = select {
             self.cursor = to;
@@ -281,14 +289,6 @@ impl Editor {
                 break;
             }
             self.cursor.char += 1;
-        }
-    }
-
-    pub fn go_to(&mut self, line: usize) {
-        if self.content.len() >= line {
-            self.cursor.line = line;
-            self.cursor.char = find_line_start(self.content[line].as_str());
-            self.at_line = line.checked_sub(self.max_rows / 2).unwrap_or_default();
         }
     }
 
