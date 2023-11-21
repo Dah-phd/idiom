@@ -8,28 +8,23 @@ use crate::components::workspace::CursorPosition;
 use crate::configs::EditorAction;
 use crate::configs::FileType;
 use crate::events::Events;
-use crate::lsp::{LSPRequest, LSP};
+use crate::lsp::{LSPClient, LSPRequest};
 use lsp_types::request::{
     Completion, GotoDeclaration, GotoDefinition, HoverRequest, Rename, SemanticTokensFullRequest, SignatureHelpRequest,
 };
-use lsp_types::{PublishDiagnosticsParams, ServerCapabilities, TextDocumentContentChangeEvent, WorkspaceEdit};
+use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent, WorkspaceEdit};
 use ratatui::style::{Color, Style};
 use ratatui::text::Span;
 use ratatui::{widgets::ListItem, Frame};
 use std::cell::RefCell;
 use std::fmt::Debug;
-use std::path::PathBuf;
 use std::{path::Path, rc::Rc};
-use tokio::sync::mpsc::Sender;
-use tokio::sync::{Mutex, MutexGuard};
 
 pub struct Lexer {
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub workspace_edit: Option<WorkspaceEdit>,
     pub events: Rc<RefCell<Events>>,
-    pub lsp_channel: Option<Sender<String>>,
-    pub lsp: Option<Rc<Mutex<LSP>>>,
-    capabilities: ServerCapabilities,
+    pub lsp_client: Option<LSPClient>,
     line_builder: LineBuilder,
     select: Option<(CursorPosition, CursorPosition)>,
     modal: Option<LSPModal>,
@@ -54,9 +49,7 @@ impl Lexer {
             diagnostics: None,
             workspace_edit: None,
             events: Rc::clone(events),
-            lsp_channel: None,
-            lsp: None,
-            capabilities: ServerCapabilities::default(),
+            lsp_client: None,
         }
     }
 
@@ -77,26 +70,18 @@ impl Lexer {
     pub async fn update_lsp(&mut self, path: &Path, changes: Option<(i32, Vec<TextDocumentContentChangeEvent>)>) {
         if let Some((version, content_changes)) = changes {
             self.line_builder.collect_changes(&content_changes);
-            if let Some(channel) = self.lsp_channel.as_mut() {
-                let _ = LSP::file_did_change(channel, path, version, content_changes).await;
+            if let Some(client) = self.lsp_client.as_mut() {
+                if let Err(err) = client.file_did_change(path, version, content_changes) {
+                    let mut events = self.events.borrow_mut();
+                    events.overwrite(format!("Failed to sync with lsp: {err}"));
+                }
             }
         }
         if self.line_builder.should_update() {
             self.line_builder.waiting = true;
-            if self.get_tokens(path).await.is_some() {
+            if self.get_tokens(path).is_some() {
                 self.events.borrow_mut().message("Getting LSP syntax");
             };
-        }
-    }
-
-    pub fn try_expose_lsp(&mut self) -> Option<MutexGuard<'_, LSP>> {
-        let lsp_mutex = self.lsp.as_mut()?;
-        match lsp_mutex.try_lock() {
-            Ok(lsp) => Some(lsp),
-            Err(err) => {
-                self.events.borrow_mut().overwrite(format!("Failed to aquirre lsp: {err}"));
-                None
-            }
         }
     }
 
@@ -106,7 +91,7 @@ impl Lexer {
         }
     }
 
-    pub async fn map_modal_if_exists(&mut self, key: &EditorAction, path: &Path) -> bool {
+    pub fn map_modal_if_exists(&mut self, key: &EditorAction, path: &Path) -> bool {
         if let Some(modal) = &mut self.modal {
             match modal.map_and_finish(key) {
                 LSPModalResult::Taken => return true,
@@ -123,7 +108,7 @@ impl Lexer {
                     return true;
                 }
                 LSPModalResult::RenameVar(new_name, c) => {
-                    self.get_renames(path, &c, new_name).await;
+                    self.get_renames(path, &c, new_name);
                     self.modal.take();
                     return true;
                 }
@@ -133,111 +118,99 @@ impl Lexer {
         false
     }
 
-    pub async fn set_lsp(&mut self, lsp: Rc<Mutex<LSP>>, on_file: &PathBuf, file_type: &FileType) {
+    pub fn set_lsp_client(&mut self, mut client: LSPClient, on_file: &Path, file_type: &FileType, content: String) {
         self.events.borrow_mut().message("Mapping LSP ...");
-        {
-            let mut guard = lsp.lock().await;
-            let mut channel = guard.aquire_channel();
-            if LSP::file_did_open(&mut channel, on_file, file_type).await.is_err() {
-                return;
-            }
-            self.lsp_channel.replace(guard.aquire_channel());
-            self.capabilities = guard.initialized.capabilities.clone();
+        if client.file_did_open(on_file, file_type, content).is_err() {
+            return;
         }
-        self.line_builder.map_styles(&self.capabilities.semantic_tokens_provider);
+        self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
+        self.lsp_client.replace(client);
         self.events.borrow_mut().overwrite("LSP mapped!");
-        self.lsp.replace(lsp);
     }
 
     fn get_diagnostics(&mut self, path: &Path) -> Option<()> {
-        let params = self.try_expose_lsp()?.get_diagnostics(path)?;
+        let client = self.lsp_client.as_mut()?;
+        let params = client.get_diagnostics(path)?;
         self.line_builder.set_diganostics(params);
         Some(())
     }
 
     pub fn start_renames(&mut self, c: &CursorPosition, title: &str) {
-        if let Some(lsp) = self.try_expose_lsp() {
-            if lsp.initialized.capabilities.rename_provider.is_none() {
+        if let Some(client) = self.lsp_client.as_mut() {
+            if client.capabilities.rename_provider.is_none() {
                 return;
             }
         }
         self.modal.replace(LSPModal::renames_at(*c, title));
     }
 
-    pub async fn get_renames(&mut self, path: &Path, c: &CursorPosition, new_name: String) -> Option<()> {
-        self.capabilities.rename_provider.as_ref()?;
-        let id = self.send_request(LSPRequest::<Rename>::rename(path, c, new_name)?).await?;
+    pub fn get_renames(&mut self, path: &Path, c: &CursorPosition, new_name: String) -> Option<()> {
+        self.lsp_client.as_ref()?.capabilities.rename_provider.as_ref()?;
+        let id = self.send_request(LSPRequest::<Rename>::rename(path, c, new_name)?)?;
         self.requests.push(LSPResponseType::Renames(id));
         Some(())
     }
 
-    pub async fn get_autocomplete(&mut self, path: &Path, c: &CursorPosition, line: &str) -> Option<()> {
+    pub fn get_autocomplete(&mut self, path: &Path, c: &CursorPosition, line: &str) -> Option<()> {
         if matches!(self.modal, Some(LSPModal::AutoComplete(..))) || !self.line_builder.lang.completelable(line, c.char)
         {
             return None;
         }
-        let id = self.send_request(LSPRequest::<Completion>::completion(path, c)?).await?;
+        let id = self.send_request(LSPRequest::<Completion>::completion(path, c)?)?;
         self.requests.push(LSPResponseType::Completion(id, line.to_owned(), c.char));
         Some(())
     }
 
-    pub async fn get_hover(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
-        self.capabilities.hover_provider.as_ref()?;
-        let id = self.send_request(LSPRequest::<HoverRequest>::hover(path, c)?).await?;
+    pub fn get_hover(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
+        self.lsp_client.as_ref()?.capabilities.hover_provider.as_ref()?;
+        let id = self.send_request(LSPRequest::<HoverRequest>::hover(path, c)?)?;
         self.requests.push(LSPResponseType::Hover(id));
         Some(())
     }
 
-    pub async fn go_to_declaration(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
-        self.capabilities.declaration_provider.as_ref()?;
-        let id = self.send_request(LSPRequest::<GotoDeclaration>::declaration(path, c)?).await?;
+    pub fn go_to_declaration(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
+        self.lsp_client.as_ref()?.capabilities.declaration_provider.as_ref()?;
+        let id = self.send_request(LSPRequest::<GotoDeclaration>::declaration(path, c)?)?;
         self.requests.push(LSPResponseType::Declaration(id));
         Some(())
     }
 
-    pub async fn go_to_definition(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
-        self.capabilities.definition_provider.as_ref()?;
-        let id = self.send_request(LSPRequest::<GotoDefinition>::definition(path, c)?).await?;
+    pub fn go_to_definition(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
+        self.lsp_client.as_ref()?.capabilities.definition_provider.as_ref()?;
+        let id = self.send_request(LSPRequest::<GotoDefinition>::definition(path, c)?)?;
         self.requests.push(LSPResponseType::Definition(id));
         Some(())
     }
 
-    pub async fn get_signitures(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
-        self.capabilities.signature_help_provider.as_ref()?;
-        let id = self.send_request(LSPRequest::<SignatureHelpRequest>::signature_help(path, c)?).await?;
+    pub fn get_signitures(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
+        self.lsp_client.as_ref()?.capabilities.signature_help_provider.as_ref()?;
+        let id = self.send_request(LSPRequest::<SignatureHelpRequest>::signature_help(path, c)?)?;
         self.requests.push(LSPResponseType::SignatureHelp(id));
         Some(())
     }
 
-    pub async fn get_tokens(&mut self, path: &Path) -> Option<()> {
-        self.capabilities.semantic_tokens_provider.as_ref()?;
-        let id = self.send_request(LSPRequest::<SemanticTokensFullRequest>::semantics_full(path)?).await?;
+    pub fn get_tokens(&mut self, path: &Path) -> Option<()> {
+        self.lsp_client.as_ref()?.capabilities.semantic_tokens_provider.as_ref()?;
+        let id = self.send_request(LSPRequest::<SemanticTokensFullRequest>::semantics_full(path)?)?;
         self.requests.push(LSPResponseType::TokensFull(id));
         Some(())
     }
 
     // error handler!
-    async fn send_request<T>(&mut self, reqeust: LSPRequest<T>) -> Option<i64>
+    fn send_request<T>(&mut self, request: LSPRequest<T>) -> Option<i64>
     where
         T: lsp_types::request::Request,
         T::Params: serde::Serialize,
         T::Result: serde::de::DeserializeOwned,
     {
-        let send_result = self.try_expose_lsp()?.request(reqeust).await;
-        match send_result {
-            Ok(id) => Some(id),
-            Err(err) => {
-                self.events.borrow_mut().overwrite(format!("ERR on {} with {err}", T::METHOD));
-                None
-            }
-        }
+        self.lsp_client.as_mut().as_mut()?.request(request)
     }
 
     fn get_lsp_responses(&mut self) -> Option<()> {
         if self.requests.is_empty() {
             return None;
         }
-        let lsp = self.lsp.as_mut()?.try_lock().ok()?;
+        let lsp = self.lsp_client.as_mut()?;
         let mut unresolved_requests = Vec::new();
         for request in self.requests.drain(..) {
             if let Some(response) = lsp.get(request.id()) {
@@ -303,10 +276,8 @@ impl Lexer {
 
     pub fn new_theme(&mut self, theme: Theme) {
         self.line_builder.theme = theme;
-        if let Some(lsp_rc) = self.lsp.as_mut() {
-            if let Ok(lsp) = lsp_rc.try_lock() {
-                self.line_builder.map_styles(&lsp.initialized.capabilities.semantic_tokens_provider);
-            }
+        if let Some(client) = self.lsp_client.as_mut() {
+            self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
         }
     }
 }

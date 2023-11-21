@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use anyhow::Result;
 use lsp_types::{
     request::{
@@ -14,6 +12,7 @@ use lsp_types::{
 };
 use serde::Serialize;
 use serde_json::to_string;
+use std::path::Path;
 
 use crate::components::workspace::CursorPosition;
 

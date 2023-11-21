@@ -16,9 +16,6 @@ use std::cell::RefCell;
 use std::collections::{hash_map::Entry, HashMap};
 use std::path::PathBuf;
 use std::rc::Rc;
-use tokio::sync::Mutex;
-
-type LSPPool = HashMap<FileType, Rc<Mutex<LSP>>>;
 
 pub struct Workspace {
     pub editors: Vec<Editor>,
@@ -26,7 +23,7 @@ pub struct Workspace {
     events: Rc<RefCell<Events>>,
     base_config: EditorConfigs,
     key_map: EditorKeyMap,
-    lsp_servers: LSPPool,
+    lsp_servers: HashMap<FileType, LSP>,
 }
 
 impl Workspace {
@@ -70,18 +67,18 @@ impl Workspace {
         }
     }
 
-    pub async fn map(&mut self, key: &KeyEvent, mode: &mut Mode) -> bool {
+    pub fn map(&mut self, key: &KeyEvent, mode: &mut Mode) -> bool {
         if !matches!(mode, Mode::Insert) {
             return false;
         }
         let action = self.key_map.map(key);
         if let Some(editor) = self.get_active() {
             if let Some(action) = action {
-                if editor.lexer.map_modal_if_exists(&action, &editor.path).await {
+                if editor.lexer.map_modal_if_exists(&action, &editor.path) {
                     return true;
                 };
                 match action {
-                    EditorAction::Char(ch) => editor.push(ch).await,
+                    EditorAction::Char(ch) => editor.push(ch),
                     EditorAction::NewLine => editor.new_line(),
                     EditorAction::Indent => editor.indent(),
                     EditorAction::Backspace => editor.backspace(),
@@ -108,12 +105,12 @@ impl Workspace {
                     EditorAction::EndOfFile => editor.end_of_file(),
                     EditorAction::StartOfLine => editor.start_of_line(),
                     EditorAction::StartOfFile => editor.start_of_file(),
-                    EditorAction::GoToDeclaration => editor.declaration().await,
-                    EditorAction::Help => editor.hover().await,
+                    EditorAction::GoToDeclaration => editor.declaration(),
+                    EditorAction::Help => editor.hover(),
                     EditorAction::LSPRename => editor.start_renames(),
                     EditorAction::Undo => editor.undo(),
                     EditorAction::Redo => editor.redo(),
-                    EditorAction::Save => editor.save().await,
+                    EditorAction::Save => editor.save(),
                     EditorAction::Cancel => return false,
                     EditorAction::Cut => {
                         if let Some(clip) = editor.cut() {
@@ -138,7 +135,7 @@ impl Workspace {
                         }
                     }
                     EditorAction::Close => {
-                        self.close_active().await;
+                        self.close_active();
                         if self.state.selected().is_none() {
                             *mode = Mode::Select;
                         }
@@ -274,17 +271,20 @@ impl Workspace {
         match self.lsp_servers.entry(new.file_type) {
             Entry::Vacant(entry) => {
                 if let Ok(lsp) = LSP::from(&new.file_type).await {
-                    let lsp_rc = Rc::new(Mutex::new(lsp));
-                    new.lexer.set_lsp(Rc::clone(&lsp_rc), &new.path, &new.file_type).await;
+                    new.lexer.set_lsp_client(lsp.aquire_client(), &new.path, &new.file_type, new.stringify());
                     for editor in self.editors.iter_mut().filter(|e| e.file_type == new.file_type) {
-                        editor.lexer.set_lsp(Rc::clone(&lsp_rc), &editor.path, &editor.file_type).await;
+                        editor.lexer.set_lsp_client(
+                            lsp.aquire_client(),
+                            &editor.path,
+                            &editor.file_type,
+                            editor.stringify(),
+                        );
                     }
-                    entry.insert(lsp_rc);
+                    entry.insert(lsp);
                 }
             }
             Entry::Occupied(entry) => {
-                let lsp_rc = Rc::clone(entry.get());
-                new.lexer.set_lsp(lsp_rc, &new.path, &new.file_type).await;
+                new.lexer.set_lsp_client(entry.get().aquire_client(), &new.path, &new.file_type, new.stringify());
             }
         }
         Ok(new)
@@ -310,15 +310,33 @@ impl Workspace {
         }
     }
 
-    pub async fn full_sync(&mut self) {
-        todo!()
+    pub async fn check_lsp(&mut self, ft: FileType) -> Option<String> {
+        let lsp = self.lsp_servers.get_mut(&ft)?;
+        match lsp.check_status().await {
+            Ok(data) => Some(match data {
+                None => "LSP function is normal".to_owned(),
+                Some(err) => {
+                    self.full_sync(&ft).await;
+                    format!("LSP recoved after: {err}")
+                }
+            }),
+            Err(err) => Some(err.to_string()),
+        }
     }
 
-    async fn close_active(&mut self) {
+    pub async fn full_sync(&mut self, ft: &FileType) {
+        if let Some(lsp) = self.lsp_servers.get(ft) {
+            for editor in self.editors.iter_mut().filter(|e| &e.file_type == ft) {
+                editor.lexer.set_lsp_client(lsp.aquire_client(), &editor.path, ft, editor.stringify());
+            }
+        }
+    }
+
+    fn close_active(&mut self) {
         if let Some(index) = self.state.selected() {
             let editor = self.editors.remove(index);
-            if let Some(mut channel) = editor.lexer.lsp_channel {
-                let _ = LSP::file_did_close(&mut channel, &editor.path).await;
+            if let Some(mut client) = editor.lexer.lsp_client {
+                let _ = client.file_did_close(&editor.path);
             }
             if self.editors.is_empty() {
                 self.state.select(None);
@@ -337,15 +355,15 @@ impl Workspace {
         true
     }
 
-    pub async fn save(&mut self) {
+    pub fn save(&mut self) {
         if let Some(editor) = self.get_active() {
-            editor.save().await;
+            editor.save();
         }
     }
 
-    pub async fn save_all(&mut self) {
+    pub fn save_all(&mut self) {
         for editor in self.editors.iter_mut() {
-            editor.save().await;
+            editor.save();
         }
     }
 
@@ -355,8 +373,13 @@ impl Workspace {
         for editor in self.editors.iter_mut() {
             editor.refresh_cfg(&self.base_config);
             if let Some(lsp) = self.lsp_servers.get(&editor.file_type) {
-                if editor.lexer.lsp.is_none() {
-                    editor.lexer.set_lsp(Rc::clone(lsp), &editor.path, &editor.file_type).await;
+                if editor.lexer.lsp_client.is_none() {
+                    editor.lexer.set_lsp_client(
+                        lsp.aquire_client(),
+                        &editor.path,
+                        &editor.file_type,
+                        editor.stringify(),
+                    );
                 }
             }
         }
@@ -364,7 +387,6 @@ impl Workspace {
 
     pub async fn graceful_exit(&mut self) {
         for (_, lsp) in self.lsp_servers.iter_mut() {
-            let mut lsp = lsp.lock().await;
             let _ = lsp.graceful_exit().await;
         }
     }

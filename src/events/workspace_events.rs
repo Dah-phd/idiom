@@ -2,7 +2,7 @@ use lsp_types::{request::GotoDeclarationResponse, GotoDefinitionResponse, Locati
 
 use crate::{
     components::{popups::editor_popups::select_selector, workspace::Select, Workspace},
-    configs::Mode,
+    configs::{FileType, Mode},
 };
 use std::path::PathBuf;
 
@@ -17,7 +17,7 @@ pub enum WorkspaceEvent {
     SelectOpenedFile(String),
     SelectTreeFiles(String),
     Open(PathBuf, usize),
-    FullSync,
+    CheckLSP(FileType),
     WorkspaceEdit(WorkspaceEdit),
 }
 
@@ -79,8 +79,8 @@ impl WorkspaceEvent {
                     *mode = Mode::Select;
                 }
             }
-            Self::FullSync => {
-                workspace.full_sync().await;
+            Self::CheckLSP(ft) => {
+                workspace.check_lsp(ft).await;
             }
             _ => (),
         }

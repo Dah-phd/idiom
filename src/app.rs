@@ -19,7 +19,7 @@ use std::io::Stdout;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-const TICK: Duration = Duration::from_millis(10);
+const TICK: Duration = Duration::from_millis(15);
 
 pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: Option<PathBuf>) -> Result<()> {
     let configs = KeyMap::new();
@@ -62,14 +62,14 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
 
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = crossterm::event::read()? {
-                if !tmux.active && workspace.map(&key, &mut mode).await {
+                if !tmux.active && workspace.map(&key, &mut mode) {
                     continue;
                 }
                 if let Some(msg) = mode.popup_map(&key) {
                     match msg {
                         PopupMessage::Exit => break,
                         PopupMessage::SaveAndExit => {
-                            workspace.save_all().await;
+                            workspace.save_all();
                             break;
                         }
                         PopupMessage::SelectTreeFiles(pattern) => {
@@ -183,7 +183,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                         }
                     }
                     GeneralAction::FileTreeModeOrCancelInput => mode = Mode::Select,
-                    GeneralAction::SaveAll => workspace.save().await,
+                    GeneralAction::SaveAll => workspace.save(),
                     GeneralAction::HideFileTree => file_tree.toggle(),
                     GeneralAction::PreviousTab => {
                         if let Some(editor_id) = workspace.state.selected() {

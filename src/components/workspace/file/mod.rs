@@ -11,7 +11,6 @@ pub use select::Select;
 use crate::{
     configs::{EditorConfigs, FileType},
     events::Events,
-    lsp::LSP,
     syntax::{Lexer, Theme},
     utils::{find_code_blocks, trim_start_inplace},
 };
@@ -83,16 +82,16 @@ impl Editor {
         (self.content.len(), self.select.len(&self.content), &self.cursor)
     }
 
-    pub async fn help(&mut self) {
-        self.lexer.get_signitures(&self.path, &self.cursor).await;
+    pub fn help(&mut self) {
+        self.lexer.get_signitures(&self.path, &self.cursor);
     }
 
-    pub async fn declaration(&mut self) {
-        self.lexer.go_to_declaration(&self.path, &self.cursor).await;
+    pub fn declaration(&mut self) {
+        self.lexer.go_to_declaration(&self.path, &self.cursor);
     }
 
-    pub async fn hover(&mut self) {
-        self.lexer.get_hover(&self.path, &self.cursor).await;
+    pub fn hover(&mut self) {
+        self.lexer.get_hover(&self.path, &self.cursor);
     }
 
     pub fn start_renames(&mut self) {
@@ -511,7 +510,7 @@ impl Editor {
         self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.line_range(1, 1)]);
     }
 
-    pub async fn push(&mut self, ch: char) {
+    pub fn push(&mut self, ch: char) {
         if let Some((from, to)) = self.select.get_mut() {
             let replace = if let Some(closing) = get_closing_char(ch) {
                 self.action_logger.init_replace_from_select(from, to, &self.content);
@@ -547,7 +546,7 @@ impl Editor {
             self.content.insert(self.cursor.line, ch.to_string());
             self.cursor.char = 1;
         }
-        self.lexer.get_autocomplete(&self.path, &self.cursor, self.content[self.cursor.line].as_str()).await;
+        self.lexer.get_autocomplete(&self.path, &self.cursor, self.content[self.cursor.line].as_str());
     }
 
     pub fn backspace(&mut self) {
@@ -623,10 +622,10 @@ impl Editor {
         }
     }
 
-    pub async fn save(&mut self) {
+    pub fn save(&mut self) {
         if self.try_write_file() {
-            if let Some(channel) = self.lexer.lsp_channel.as_mut() {
-                let _ = LSP::file_did_save(channel, &self.path).await;
+            if let Some(client) = self.lexer.lsp_client.as_mut() {
+                let _ = client.file_did_save(&self.path);
             }
         }
     }
@@ -642,6 +641,10 @@ impl Editor {
     pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {
         self.configs = new_cfg.clone();
         self.lexer.new_theme(Theme::from(&self.configs.theme_file_in_config_dir));
+    }
+
+    pub fn stringify(&self) -> String {
+        self.content.join("\n")
     }
 
     fn get_and_indent_line(&mut self, line_idx: usize) -> (Offset, &mut String) {
