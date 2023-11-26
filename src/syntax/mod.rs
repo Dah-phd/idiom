@@ -68,20 +68,20 @@ impl Lexer {
     }
 
     pub async fn update_lsp(&mut self, path: &Path, changes: Option<(i32, Vec<TextDocumentContentChangeEvent>)>) {
-        if let Some((version, content_changes)) = changes {
-            self.line_builder.collect_changes(&content_changes);
-            if let Some(client) = self.lsp_client.as_mut() {
+        if let Some(client) = self.lsp_client.as_mut() {
+            if let Some((version, content_changes)) = changes {
+                self.line_builder.collect_changes(&content_changes);
                 if let Err(err) = client.file_did_change(path, version, content_changes) {
                     let mut events = self.events.borrow_mut();
                     events.overwrite(format!("Failed to sync with lsp: {err}"));
                 }
             }
-        }
-        if self.line_builder.should_update() {
-            self.line_builder.waiting = true;
-            if self.get_tokens(path).is_some() {
-                self.events.borrow_mut().message("Getting LSP syntax");
-            };
+            if self.line_builder.should_update() {
+                self.line_builder.waiting = true;
+                if self.get_tokens(path).is_some() {
+                    self.events.borrow_mut().message("Getting LSP syntax");
+                };
+            }
         }
     }
 

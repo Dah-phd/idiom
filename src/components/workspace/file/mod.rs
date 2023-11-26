@@ -1,12 +1,9 @@
-mod action;
-mod action_alt;
 mod cursor;
-mod select;
-pub mod utils;
-pub use cursor::{CursorPosition, Offset};
+mod utils;
+use cursor::Cursor;
+pub use cursor::{CursorPosition, Offset, Select};
 use lsp_types::TextEdit;
 use ratatui::widgets::{List, ListItem};
-pub use select::Select;
 
 use crate::{
     configs::{EditorConfigs, FileType},
@@ -16,34 +13,26 @@ use crate::{
 };
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
-use self::utils::{
-    backspace_indent_handler, derive_indent_from, get_closing_char, indent_from_prev, insert_clip, is_closing_repeat,
-    unindent_if_before_base_pattern,
-};
-use self::{
-    action::ActionLogger,
-    utils::{find_line_start, token_range_at},
-};
+use self::utils::{copy_content, find_line_start, token_range_at};
 
 type DocLen = usize;
 type SelectLen = usize;
-pub type DocStats<'a> = (DocLen, SelectLen, &'a CursorPosition);
+pub type DocStats<'a> = (DocLen, SelectLen, CursorPosition);
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Editor {
-    pub cursor: CursorPosition,
     pub file_type: FileType,
     pub display: String,
     pub path: PathBuf,
     pub at_line: usize,
     pub lexer: Lexer,
-    select: Select,
-    configs: EditorConfigs,
-    action_logger: ActionLogger,
+    pub cursor: Cursor,
     max_rows: usize,
     content: Vec<String>,
 }
 
+#[allow(dead_code)]
 impl Editor {
     pub fn from_path(path: PathBuf, mut configs: EditorConfigs, events: &Rc<RefCell<Events>>) -> std::io::Result<Self> {
         let content = std::fs::read_to_string(&path)?;
@@ -51,11 +40,8 @@ impl Editor {
         let display = path.display().to_string();
         configs.update_by_file_type(&file_type);
         Ok(Self {
-            lexer: Lexer::with_context(file_type, Theme::from(&configs.theme_file_in_config_dir), events),
-            configs,
-            cursor: CursorPosition::default(),
-            select: Select::default(),
-            action_logger: ActionLogger::default(),
+            lexer: Lexer::with_context(file_type, Theme::from_path(&configs.theme_file_in_config_dir), events),
+            cursor: Cursor::new(configs),
             max_rows: 0,
             at_line: 0,
             content: content.split('\n').map(String::from).collect(),
@@ -66,7 +52,7 @@ impl Editor {
     }
 
     pub fn get_list_widget_with_context(&mut self) -> (usize, List<'_>) {
-        let max_digits = self.lexer.context(&self.content, self.select.get(), &self.path);
+        let max_digits = self.lexer.context(&self.content, self.cursor.select.get(), &self.path);
         let render_till_line = self.content.len().min(self.at_line + self.max_rows);
         let editor_content = List::new(
             self.content[self.at_line..render_till_line]
@@ -79,29 +65,29 @@ impl Editor {
     }
 
     pub fn get_stats(&self) -> DocStats {
-        (self.content.len(), self.select.len(&self.content), &self.cursor)
+        (self.content.len(), self.cursor.select.len(&self.content), self.cursor.position())
     }
 
     pub fn help(&mut self) {
-        self.lexer.get_signitures(&self.path, &self.cursor);
+        self.lexer.get_signitures(&self.path, &self.cursor.position());
     }
 
     pub fn declaration(&mut self) {
-        self.lexer.go_to_declaration(&self.path, &self.cursor);
+        self.lexer.go_to_declaration(&self.path, &self.cursor.position());
     }
 
     pub fn hover(&mut self) {
-        self.lexer.get_hover(&self.path, &self.cursor);
+        self.lexer.get_hover(&self.path, &self.cursor.position());
     }
 
     pub fn start_renames(&mut self) {
         let line = &self.content[self.cursor.line];
         let token_range = token_range_at(line, self.cursor.char);
-        self.lexer.start_renames(&self.cursor, &line[token_range]);
+        self.lexer.start_renames(&self.cursor.position(), &line[token_range]);
     }
 
     pub async fn update_lsp(&mut self) {
-        self.lexer.update_lsp(&self.path, self.action_logger.get_text_edits()).await;
+        self.lexer.update_lsp(&self.path, self.cursor.get_text_edits()).await;
     }
 
     pub fn is_saved(&self) -> bool {
@@ -111,41 +97,30 @@ impl Editor {
         false
     }
 
-    pub fn replace_token(&mut self, new: String) {
-        self.action_logger.init_replace(self.cursor, &self.content[self.cursor.as_range()]);
-        let line = &mut self.content[self.cursor.line];
-        let replace_range = token_range_at(line, self.cursor.char);
-        self.cursor.char = replace_range.start + new.len();
-        line.replace_range(replace_range, new.as_str());
-        self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.as_range()]);
-    }
-
-    pub fn mass_replace(&mut self, selects: Vec<Select>, new: &str) {
-        for select in selects {
-            self.replace_select(select, new);
-        }
-    }
-
     pub fn replace_select(&mut self, select: Select, new_clip: &str) {
-        self.select = select;
-        if let Some((from, ..)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
-            let start_line = from.line;
-            self.cursor = insert_clip(new_clip.to_owned(), &mut self.content, from);
-            self.action_logger.finish_replace(self.cursor, &self.content[start_line..=self.cursor.line]);
+        self.cursor.replace_select(select, new_clip, &mut self.content);
+    }
+
+    pub fn replace_token(&mut self, new: String) {
+        self.cursor.replace_token(new, &mut self.content);
+    }
+
+    pub fn mass_replace(&mut self, selects: Vec<Select>, new_clip: &str) {
+        for select in selects {
+            self.cursor.replace_select(select, new_clip, &mut self.content);
         }
     }
 
     pub fn apply_file_edits(&mut self, edits: Vec<TextEdit>) {
-        let old_select = self.select.take();
-        let cursor = self.cursor;
+        let cursor = self.cursor.position();
         for edit in edits {
-            self.replace_select(edit.range.into(), &edit.new_text);
+            self.cursor.replace_select(edit.range.into(), edit.new_text, &mut self.content);
         }
-        self.select = old_select;
-        self.cursor = cursor;
+        self.cursor.set_position(cursor);
     }
 
     pub fn go_to(&mut self, line: usize) {
+        self.cursor.drop_select();
         if self.content.len() >= line {
             self.cursor.line = line;
             self.cursor.char = find_line_start(self.content[line].as_str());
@@ -155,9 +130,9 @@ impl Editor {
 
     pub fn go_to_select(&mut self, select: Select) {
         if let Select::Range(_, to) = select {
-            self.cursor = to;
+            self.cursor.set_position(to);
             self.at_line = to.line.checked_sub(self.max_rows / 2).unwrap_or_default();
-            self.select = select;
+            self.cursor.select = select;
         }
     }
 
@@ -189,46 +164,16 @@ impl Editor {
 
     pub fn cut(&mut self) -> Option<String> {
         if self.content.is_empty() {
-            None
-        } else if let Some((from, .., clip)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
-            self.cursor = from;
-            self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.as_range()]);
-            Some(clip)
-        } else {
-            self.action_logger.init_replace(self.cursor, &self.content[self.cursor.as_range()]);
-            let mut clip = self.content.remove(self.cursor.line);
-            clip.push('\n');
-            if self.cursor.line >= self.content.len() && !self.content.is_empty() {
-                self.cursor.line -= 1;
-                self.cursor.char = self.content[self.cursor.line].len() - 1;
-            } else {
-                self.cursor.char = 0;
-            }
-            self.action_logger.finish_replace(self.cursor, &[]);
-            Some(clip)
+            return None;
         }
+        Some(self.cursor.cut(&mut self.content))
     }
 
     pub fn copy(&mut self) -> Option<String> {
         if self.content.is_empty() {
             None
-        } else if let Some((from, to)) = self.select.get() {
-            if from.line == to.line {
-                Some(self.content[from.line][from.char..to.char].to_owned())
-            } else {
-                let mut at_line = from.line;
-                let mut clip_vec = Vec::new();
-                clip_vec.push(self.content[from.line][from.char..].to_owned());
-                while at_line < to.line {
-                    at_line += 1;
-                    if at_line != to.line {
-                        clip_vec.push(self.content[at_line].to_owned())
-                    } else {
-                        clip_vec.push(self.content[at_line][..to.char].to_owned())
-                    }
-                }
-                Some(clip_vec.join("\n"))
-            }
+        } else if let Some((from, to)) = self.cursor.select.get() {
+            Some(copy_content(from, to, &self.content))
         } else {
             let mut line = self.content[self.cursor.line].to_owned();
             line.push('\n');
@@ -237,26 +182,15 @@ impl Editor {
     }
 
     pub fn paste(&mut self, clip: String) {
-        if let Some((from, ..)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
-            self.cursor = from;
-        } else {
-            self.action_logger.init_replace(self.cursor, &self.content[self.cursor.as_range()]);
-        };
-        let start_line = self.cursor.line;
-        self.cursor = insert_clip(clip, &mut self.content, self.cursor);
-        self.action_logger.finish_replace(self.cursor, &self.content[start_line..=self.cursor.line])
+        self.cursor.paste(clip, &mut self.content);
     }
 
     pub fn undo(&mut self) {
-        if let Some(cursor) = self.action_logger.undo(&mut self.content) {
-            self.cursor = cursor;
-        }
+        self.cursor.undo(&mut self.content);
     }
 
     pub fn redo(&mut self) {
-        if let Some(cursor) = self.action_logger.redo(&mut self.content) {
-            self.cursor = cursor;
-        }
+        self.cursor.redo(&mut self.content);
     }
 
     pub fn search_file(&self, pattern: &str) -> Vec<(usize, String)> {
@@ -293,7 +227,7 @@ impl Editor {
     }
 
     pub fn up(&mut self) {
-        self.select.drop();
+        self.cursor.drop_select();
         self._up()
     }
 
@@ -305,9 +239,9 @@ impl Editor {
     }
 
     pub fn select_up(&mut self) {
-        self.select.init(self.cursor.line, self.cursor.char);
+        self.cursor.init_select();
         self._up();
-        self.select.push(&self.cursor);
+        self.cursor.push_to_select();
     }
 
     pub fn scroll_up(&mut self) {
@@ -318,23 +252,17 @@ impl Editor {
     }
 
     pub fn swap_up(&mut self) {
-        self.select.drop();
+        self.cursor.drop_select();
         if self.cursor.line > 0 {
-            let new_line = self.cursor.line - 1;
-            self.action_logger.init_repalce_from_line(
-                new_line,
-                self.cursor,
-                &self.content[new_line..=self.cursor.line],
-            );
-            let (char_offset, _) = self.swap(new_line, self.cursor.line);
-            self.cursor.line = new_line;
+            let new_cursor_line = self.cursor.line - 1;
+            let (char_offset, _) = self.cursor.swap_down(new_cursor_line, &mut self.content);
+            self.cursor.line = new_cursor_line;
             self.cursor.offset_char(char_offset);
-            self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line + 1])
         }
     }
 
     pub fn down(&mut self) {
-        self.select.drop();
+        self.cursor.drop_select();
         self._down();
     }
 
@@ -349,9 +277,9 @@ impl Editor {
     }
 
     pub fn select_down(&mut self) {
-        self.select.init(self.cursor.line, self.cursor.char);
+        self.cursor.init_select();
         self._down();
-        self.select.push(&self.cursor);
+        self.cursor.push_to_select();
     }
 
     pub fn scroll_down(&mut self) {
@@ -362,22 +290,20 @@ impl Editor {
     }
 
     pub fn swap_down(&mut self) {
-        self.select.drop();
+        self.cursor.drop_select();
         if self.content.is_empty() {
             return;
         }
         if self.content.len() - 1 > self.cursor.line {
             let new_cursor_line = self.cursor.line + 1;
-            self.action_logger.init_replace(self.cursor, &self.content[self.cursor.line..=new_cursor_line]);
-            let (_, char_offset) = self.swap(self.cursor.line, new_cursor_line);
+            let (_, char_offset) = self.cursor.swap_down(self.cursor.line, &mut self.content);
             self.cursor.offset_char(char_offset);
             self.cursor.line = new_cursor_line;
-            self.action_logger.finish_replace(self.cursor, &self.content[new_cursor_line - 1..=new_cursor_line])
         }
     }
 
     pub fn left(&mut self) {
-        self.select.drop();
+        self.cursor.drop_select();
         self._left();
     }
 
@@ -396,14 +322,14 @@ impl Editor {
     }
 
     pub fn jump_left(&mut self) {
-        self.select.drop();
+        self.cursor.drop_select();
         self._jump_left();
     }
 
     pub fn jump_left_select(&mut self) {
-        self.select.init(self.cursor.line, self.cursor.char);
+        self.cursor.init_select();
         self._jump_left();
-        self.select.push(&self.cursor);
+        self.cursor.push_to_select();
     }
 
     fn _jump_left(&mut self) {
@@ -423,13 +349,13 @@ impl Editor {
     }
 
     pub fn select_left(&mut self) {
-        self.select.init(self.cursor.line, self.cursor.char);
+        self.cursor.init_select();
         self._left();
-        self.select.push(&self.cursor);
+        self.cursor.push_to_select();
     }
 
     pub fn right(&mut self) {
-        self.select.drop();
+        self.cursor.drop_select();
         self._right();
     }
 
@@ -445,14 +371,14 @@ impl Editor {
     }
 
     pub fn jump_right(&mut self) {
-        self.select.drop();
+        self.cursor.drop_select();
         self._jump_right();
     }
 
     pub fn jump_right_select(&mut self) {
-        self.select.init(self.cursor.line, self.cursor.char);
+        self.cursor.init_select();
         self._jump_right();
-        self.select.push(&self.cursor);
+        self.cursor.push_to_select();
     }
 
     pub fn _jump_right(&mut self) {
@@ -472,154 +398,38 @@ impl Editor {
     }
 
     pub fn select_right(&mut self) {
-        self.select.init(self.cursor.line, self.cursor.char);
+        self.cursor.init_select();
         self._right();
-        self.select.push(&self.cursor);
+        self.cursor.push_to_select();
     }
 
     pub fn new_line(&mut self) {
-        if self.content.is_empty() {
-            self.action_logger.init_replace(self.cursor, &self.content[self.cursor.as_range()]);
-            self.content.push(String::new());
-            self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.line_range(0, 1)]);
-            self.cursor.line += 1;
-            return;
-        }
-        let prev_line = &mut self.content[self.cursor.line];
-        self.action_logger.init_replace(self.cursor, &[prev_line.to_owned()]);
-        let mut line = prev_line.split_off(self.cursor.char);
-        let indent = derive_indent_from(&self.configs, prev_line);
-        line.insert_str(0, &indent);
-        self.cursor.line += 1;
-        self.cursor.char = indent.len();
-        if let Some(last) = prev_line.trim_end().chars().last() {
-            if let Some(first) = line.trim_start().chars().next() {
-                if [('{', '}'), ('(', ')'), ('[', ']')].contains(&(last, first)) {
-                    unindent_if_before_base_pattern(&self.configs, &mut line);
-                    self.content.insert(self.cursor.line, line);
-                    self.content.insert(self.cursor.line, indent);
-                    self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.line_range(1, 2)]);
-                    return;
-                }
-            }
-        }
-        if prev_line.chars().all(|c| c.is_whitespace()) && prev_line.len().rem_euclid(self.configs.indent.len()) == 0 {
-            prev_line.clear();
-        }
-        self.content.insert(self.cursor.line, line);
-        self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.line_range(1, 1)]);
+        self.cursor.new_line(&mut self.content);
     }
 
     pub fn push(&mut self, ch: char) {
-        if let Some((from, to)) = self.select.get_mut() {
-            let replace = if let Some(closing) = get_closing_char(ch) {
-                self.action_logger.init_replace_from_select(from, to, &self.content);
-                self.content[from.line].insert(from.char, ch);
-                from.char += 1;
-                if from.line == to.line {
-                    to.char += 1;
-                }
-                self.content[to.line].insert(to.char, closing);
-                from.line..to.line + 1
-            } else {
-                self.cursor = *from;
-                let (from, ..) = self.select.extract_logged(&mut self.content, &mut self.action_logger).unwrap();
-                self.content[from.line].insert(from.char, ch);
-                from.line..from.line + 1
-            };
-            self.cursor.char += 1;
-            self.action_logger.finish_replace(self.cursor, &self.content[replace]);
-        } else if let Some(line) = self.content.get_mut(self.cursor.line) {
-            if is_closing_repeat(line.as_str(), ch, self.cursor.char) {
-                self.cursor.char += 1;
-                return;
-            }
-            self.action_logger.push_char(&self.cursor, line, ch);
-            line.insert(self.cursor.char, ch);
-            self.cursor.char += 1;
-            if let Some(closing) = get_closing_char(ch) {
-                line.insert(self.cursor.char, closing);
-                self.action_logger.inser_char(&self.cursor, line, closing);
-            }
-        } else {
-            self.action_logger.push_char(&self.cursor, "", ch);
-            self.content.insert(self.cursor.line, ch.to_string());
-            self.cursor.char = 1;
-        }
-        self.lexer.get_autocomplete(&self.path, &self.cursor, self.content[self.cursor.line].as_str());
+        self.cursor.push_char(ch, &mut self.content);
+        self.lexer.get_autocomplete(&self.path, &self.cursor.position(), self.content[self.cursor.line].as_str());
     }
 
     pub fn backspace(&mut self) {
-        if self.content.is_empty() || self.cursor.line == 0 && self.cursor.char == 0 {
-            return;
-        }
-        if let Some((from, ..)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
-            self.cursor = from;
-            self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line]);
-        } else if self.cursor.char == 0 {
-            let prev_line_idx = self.cursor.line - 1;
-            self.action_logger.init_replace(self.cursor, &self.content[prev_line_idx..=self.cursor.line]);
-            let current_line = self.content.remove(self.cursor.line);
-            self.cursor.line -= 1;
-            let prev_line = &mut self.content[self.cursor.line];
-            self.cursor.char = prev_line.len();
-            prev_line.push_str(&current_line);
-            self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line]);
-        } else {
-            let line = &mut self.content[self.cursor.line];
-            self.action_logger.prep_buffer(&self.cursor, line);
-            let offset = backspace_indent_handler(&self.configs, line, self.cursor.char);
-            self.cursor.offset_char(offset);
-            self.action_logger.backspace(&self.cursor);
-        }
+        self.cursor.backspace(&mut self.content);
     }
 
     pub fn del(&mut self) {
-        if self.content.is_empty() {
-            return;
-        }
-        if let Some((from, ..)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
-            self.cursor = from;
-            self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line]);
-        } else if self.content[self.cursor.line].len() == self.cursor.char {
-            if self.content.len() > self.cursor.line + 1 {
-                self.action_logger.init_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line + 1]);
-                let next_line = self.content.remove(self.cursor.line + 1);
-                self.content[self.cursor.line].push_str(&next_line);
-                self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.line..=self.cursor.line])
-            }
-        } else {
-            let line = &mut self.content[self.cursor.line];
-            self.action_logger.del(&self.cursor, line);
-            line.remove(self.cursor.char);
-        }
+        self.cursor.del(&mut self.content);
     }
 
     pub fn indent(&mut self) {
-        if let Some((from, ..)) = self.select.extract_logged(&mut self.content, &mut self.action_logger) {
-            self.indent_at(self.cursor.char);
-            self.cursor = from;
-            self.action_logger.finish_replace(self.cursor, &self.content[self.cursor.as_range()])
-        } else {
-            self.action_logger.prep_buffer(&self.cursor, &self.content[self.cursor.line]);
-            self.indent_at(self.cursor.char);
-            self.action_logger.buffer_str(&self.configs.indent, self.cursor);
-        }
+        self.cursor.indent(&mut self.content);
     }
 
     pub fn indent_start(&mut self) {
-        self.indent_at(0)
+        self.cursor.indent_start(&mut self.content);
     }
 
     pub fn unindent(&mut self) {
-        if let Some(line) = self.content.get_mut(self.cursor.line) {
-            if line.starts_with(&self.configs.indent) {
-                self.action_logger.init_replace(self.cursor, &[line.to_owned()]);
-                line.replace_range(..self.configs.indent.len(), "");
-                self.cursor.diff_char(self.configs.indent.len());
-                self.action_logger.finish_replace(self.cursor, &[line.to_owned()])
-            }
-        }
+        self.cursor.unindent(&mut self.content);
     }
 
     pub fn save(&mut self) {
@@ -639,8 +449,8 @@ impl Editor {
     }
 
     pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {
-        self.configs = new_cfg.clone();
-        self.lexer.new_theme(Theme::from(&self.configs.theme_file_in_config_dir));
+        self.lexer.new_theme(Theme::from_path(&new_cfg.theme_file_in_config_dir));
+        self.cursor.source_configs(new_cfg);
     }
 
     pub fn stringify(&self) -> String {
@@ -652,28 +462,10 @@ impl Editor {
             let (prev_split, current_split) = self.content.split_at_mut(line_idx);
             let prev = &prev_split[line_idx - 1];
             let line = &mut current_split[0];
-            (indent_from_prev(&self.configs, prev, line), line)
+            (self.cursor.indent_from_prev(prev, line), line)
         } else {
             let line = &mut self.content[line_idx];
             (trim_start_inplace(line), line)
-        }
-    }
-
-    fn swap(&mut self, from: usize, to: usize) -> (Offset, Offset) {
-        // ! from should be always smaller than to - unchecked
-        self.content.swap(from, to);
-        let (offset, _) = self.get_and_indent_line(from);
-        let (offset2, _) = self.get_and_indent_line(to);
-        (offset, offset2)
-    }
-
-    fn indent_at(&mut self, idx: usize) {
-        if let Some(line) = self.content.get_mut(self.cursor.line) {
-            line.insert_str(idx, &self.configs.indent);
-            self.cursor.char += self.configs.indent.len();
-        } else {
-            self.content.insert(self.cursor.line, self.configs.indent.to_owned());
-            self.cursor.char = self.configs.indent.len();
         }
     }
 
@@ -695,6 +487,3 @@ impl Editor {
         }
     }
 }
-
-#[cfg(test)]
-pub mod test;

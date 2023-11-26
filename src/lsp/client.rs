@@ -1,6 +1,7 @@
 use anyhow::Result;
 use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument},
+    request::SemanticTokensFullRequest,
     PublishDiagnosticsParams, ServerCapabilities, TextDocumentContentChangeEvent,
 };
 use std::{
@@ -61,6 +62,14 @@ impl LSPClient {
     pub fn get(&self, id: &i64) -> Option<Response> {
         let mut que = self.responses.try_lock().ok()?;
         que.remove(id)
+    }
+
+    pub fn partial_tokens(&mut self, path: &Path) {}
+
+    pub fn full_tokens(&mut self, path: &Path) -> Option<i64> {
+        self.capabilities.semantic_tokens_provider.as_ref()?;
+        let id = self.request(LSPRequest::<SemanticTokensFullRequest>::semantics_full(path)?)?;
+        Some(id)
     }
 
     pub fn file_did_open(&mut self, path: &Path, file_type: &FileType, content: String) -> Result<()> {

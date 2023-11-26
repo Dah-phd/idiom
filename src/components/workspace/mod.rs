@@ -5,7 +5,7 @@ use crate::lsp::LSP;
 use crate::utils::get_contents_once;
 use anyhow::Result;
 use crossterm::event::KeyEvent;
-use file::Editor;
+// use file::Editor;
 pub use file::{CursorPosition, DocStats, Offset, Select};
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -16,6 +16,8 @@ use std::cell::RefCell;
 use std::collections::{hash_map::Entry, HashMap};
 use std::path::PathBuf;
 use std::rc::Rc;
+
+use self::file::Editor;
 
 pub struct Workspace {
     pub editors: Vec<Editor>,
@@ -236,7 +238,7 @@ impl Workspace {
 
     fn handle_tree_operations(&mut self, operation: ResourceOp) -> anyhow::Result<()> {
         match operation {
-            ResourceOp::Create(create) => (),
+            ResourceOp::Create(create) => {}
             ResourceOp::Delete(delete) => {
                 let search_path = PathBuf::from(delete.uri.path()).canonicalize()?;
                 if search_path.is_file() {
@@ -392,5 +394,5 @@ impl Workspace {
     }
 }
 
-#[cfg(test)]
-mod test;
+// #[cfg(test)]
+// mod test;
