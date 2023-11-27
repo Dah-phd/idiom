@@ -22,6 +22,30 @@ pub struct Action {
 }
 
 impl Action {
+    pub fn swap_lines() {
+        // let mut reverse_edit_text = content[from].to_owned();
+        // reverse_edit_text.push('\n');
+        // reverse_edit_text.push_str(&content[from + 1]);
+        // reverse_edit_text.push('\n');
+        // Self { reverse_edit_text, text_edit_range: ((from, 0).into(), (from + 2, 0).into()), reverse_len: 2 }
+        // let mut new_text = content[self.text_edit_range.0.line].to_owned();
+        // new_text.push('\n');
+        // new_text.push_str(&content[self.text_edit_range.0.line + 1]);
+        // new_text.push('\n');
+        // Action {
+        //     reverse_len: self.reverse_len,
+        //     reverse_text_edit: TextEdit {
+        //         range: Range::new(self.text_edit_range.0.into(), self.text_edit_range.1.into()),
+        //         new_text: self.reverse_edit_text,
+        //     },
+        //     len: self.reverse_len,
+        //     text_edit: TextEdit {
+        //         range: Range::new(self.text_edit_range.0.into(), self.text_edit_range.1.into()),
+        //         new_text,
+        //     },
+        // }
+    }
+
     pub fn merge_next_line(at_line: usize, content: &mut Vec<String>) -> Self {
         let removed_line = content.remove(at_line + 1);
         let merged_to = &mut content[at_line];
@@ -69,10 +93,9 @@ impl Action {
         }
     }
 
-    /// replace from range
-    pub fn replace_range(line: usize, char: usize, new_text: String, content: &mut [String]) -> Self {
+    pub fn replace_token(line: usize, char: usize, new_text: String, content: &mut [String]) -> Self {
         let code_line = &mut content[line];
-        let range = token_range_at(&code_line, char);
+        let range = token_range_at(code_line, char);
         let start = Position::new(line as u32, range.start as u32);
         let text_edit_range = Range::new(start, Position::new(line as u32, range.end as u32));
         let reverse_edit_range = Range::new(start, Position::new(line as u32, (range.start + new_text.len()) as u32));
@@ -86,7 +109,7 @@ impl Action {
         }
     }
 
-    pub fn reverse(&self) -> TextDocumentContentChangeEvent {
+    pub fn reverse_event(&self) -> TextDocumentContentChangeEvent {
         TextDocumentContentChangeEvent {
             range: Some(self.reverse_text_edit.range),
             range_length: None,
@@ -111,6 +134,7 @@ pub struct ActionBuilder {
 }
 
 impl ActionBuilder {
+    // OPENERS
     /// initialize builder collecting select if exists
     pub fn init(cursor: &mut Cursor, content: &mut Vec<String>) -> Self {
         if let Select::Range(from, to) = cursor.select.take() {
@@ -128,10 +152,6 @@ impl ActionBuilder {
         }
     }
 
-    pub fn empty_at(position: CursorPosition) -> Self {
-        Self { reverse_len: 1, reverse_edit_text: String::new(), text_edit_range: (position, position) }
-    }
-
     pub fn cut_range(from: CursorPosition, to: CursorPosition, content: &mut Vec<String>) -> Self {
         Self {
             reverse_edit_text: clip_content(&from, &to, content),
@@ -146,6 +166,10 @@ impl ActionBuilder {
         Self { reverse_edit_text, text_edit_range: ((line, 0).into(), (line + 1, 0).into()), reverse_len: 1 }
     }
 
+    pub fn empty_at(position: CursorPosition) -> Self {
+        Self { reverse_len: 1, reverse_edit_text: String::new(), text_edit_range: (position, position) }
+    }
+
     pub fn for_swap(content: &[String], from: usize) -> Self {
         let mut reverse_edit_text = content[from].to_owned();
         reverse_edit_text.push('\n');
@@ -153,6 +177,8 @@ impl ActionBuilder {
         reverse_edit_text.push('\n');
         Self { reverse_edit_text, text_edit_range: ((from, 0).into(), (from + 2, 0).into()), reverse_len: 2 }
     }
+
+    // FINISHERS
 
     pub fn finish_swap(self, content: &[String]) -> Action {
         let mut new_text = content[self.text_edit_range.0.line].to_owned();
@@ -232,6 +258,8 @@ impl ActionBuilder {
             len: cursor.line - self.text_edit_range.0.line + 1,
         }
     }
+
+    // UTILS
 
     pub fn and_clear_first_line(&mut self, line: &mut String) {
         self.text_edit_range.0.char = 0;

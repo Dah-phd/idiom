@@ -9,16 +9,14 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 pub fn mock_editor(content: Vec<String>) -> Editor {
-    let cfg = EditorConfigs::default();
     let ft = FileType::Unknown;
-    let theme = Theme::default();
     Editor {
-        lexer: Lexer::with_context(ft, theme, &Rc::new(RefCell::new(Events::default()))),
+        lexer: Lexer::with_context(ft, Theme::default(), &Rc::new(RefCell::new(Events::default()))),
         at_line: 0,
         file_type: ft,
         display: "".to_string(),
         path: PathBuf::from(""),
-        cursor: Cursor::new(cfg),
+        cursor: Cursor::new(EditorConfigs::default()),
         max_rows: 0,
         content,
     }

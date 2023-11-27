@@ -3,7 +3,7 @@ mod modal;
 mod theme;
 use self::line_builder::LineBuilder;
 use self::modal::{LSPModal, LSPModalResult, LSPResponseType, LSPResult};
-pub use self::theme::{Theme, DEFAULT_THEME_FILE};
+pub use self::theme::Theme;
 use crate::components::workspace::CursorPosition;
 use crate::configs::EditorAction;
 use crate::configs::FileType;
@@ -274,8 +274,8 @@ impl Lexer {
         ListItem::new(self.line_builder.build_line(idx, spans, content))
     }
 
-    pub fn new_theme(&mut self, theme: Theme) {
-        self.line_builder.theme = theme;
+    pub fn reload_theme(&mut self) {
+        self.line_builder.theme = Theme::new();
         if let Some(client) = self.lsp_client.as_mut() {
             self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
         }

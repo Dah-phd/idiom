@@ -3,8 +3,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::configs::load_or_create_config;
 
-pub const DEFAULT_THEME_FILE: &str = "default_theme.json";
-
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Theme {
@@ -41,14 +39,8 @@ impl Default for Theme {
     }
 }
 
-impl From<&String> for Theme {
-    fn from(path: &String) -> Self {
-        Self::from_path(path)
-    }
-}
-
 impl Theme {
-    pub fn from_path(path: &str) -> Self {
-        load_or_create_config(path)
+    pub fn new() -> Self {
+        load_or_create_config("theme.json")
     }
 }

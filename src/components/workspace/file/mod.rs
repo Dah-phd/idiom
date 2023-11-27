@@ -40,7 +40,7 @@ impl Editor {
         let display = path.display().to_string();
         configs.update_by_file_type(&file_type);
         Ok(Self {
-            lexer: Lexer::with_context(file_type, Theme::from_path(&configs.theme_file_in_config_dir), events),
+            lexer: Lexer::with_context(file_type, Theme::new(), events),
             cursor: Cursor::new(configs),
             max_rows: 0,
             at_line: 0,
@@ -175,9 +175,7 @@ impl Editor {
         } else if let Some((from, to)) = self.cursor.select.get() {
             Some(copy_content(from, to, &self.content))
         } else {
-            let mut line = self.content[self.cursor.line].to_owned();
-            line.push('\n');
-            Some(line)
+            Some(format!("{}\n", &self.content[self.cursor.line]))
         }
     }
 
@@ -228,10 +226,10 @@ impl Editor {
 
     pub fn up(&mut self) {
         self.cursor.drop_select();
-        self._up()
+        self.move_up()
     }
 
-    fn _up(&mut self) {
+    fn move_up(&mut self) {
         if self.cursor.line > 0 {
             self.cursor.line -= 1;
             self.adjust_cursor_max_char();
@@ -240,7 +238,7 @@ impl Editor {
 
     pub fn select_up(&mut self) {
         self.cursor.init_select();
-        self._up();
+        self.move_up();
         self.cursor.push_to_select();
     }
 
@@ -253,20 +251,21 @@ impl Editor {
 
     pub fn swap_up(&mut self) {
         self.cursor.drop_select();
-        if self.cursor.line > 0 {
-            let new_cursor_line = self.cursor.line - 1;
-            let (char_offset, _) = self.cursor.swap_down(new_cursor_line, &mut self.content);
-            self.cursor.line = new_cursor_line;
-            self.cursor.offset_char(char_offset);
+        if self.cursor.line == 0 {
+            return;
         }
+        let new_cursor_line = self.cursor.line - 1;
+        let (char_offset, _) = self.cursor.swap_down(new_cursor_line, &mut self.content);
+        self.cursor.line = new_cursor_line;
+        self.cursor.offset_char(char_offset);
     }
 
     pub fn down(&mut self) {
         self.cursor.drop_select();
-        self._down();
+        self.move_down();
     }
 
-    fn _down(&mut self) {
+    fn move_down(&mut self) {
         if self.content.is_empty() {
             return;
         }
@@ -278,7 +277,7 @@ impl Editor {
 
     pub fn select_down(&mut self) {
         self.cursor.init_select();
-        self._down();
+        self.move_down();
         self.cursor.push_to_select();
     }
 
@@ -304,10 +303,10 @@ impl Editor {
 
     pub fn left(&mut self) {
         self.cursor.drop_select();
-        self._left();
+        self.move_left();
     }
 
-    fn _left(&mut self) {
+    fn move_left(&mut self) {
         if self.cursor.char > 0 {
             self.cursor.char -= 1
         } else if self.cursor.line > 0 {
@@ -336,7 +335,7 @@ impl Editor {
         let mut line = &self.content[self.cursor.line][..self.cursor.char];
         let mut last_was_char = false;
         if line.is_empty() && self.cursor.line > 0 {
-            self._left();
+            self.move_left();
             line = &self.content[self.cursor.line][..self.cursor.char];
         }
         for ch in line.chars().rev() {
@@ -350,16 +349,16 @@ impl Editor {
 
     pub fn select_left(&mut self) {
         self.cursor.init_select();
-        self._left();
+        self.move_left();
         self.cursor.push_to_select();
     }
 
     pub fn right(&mut self) {
         self.cursor.drop_select();
-        self._right();
+        self.move_right();
     }
 
-    fn _right(&mut self) {
+    fn move_right(&mut self) {
         if let Some(line) = self.content.get(self.cursor.line) {
             if line.len() > self.cursor.char {
                 self.cursor.char += 1
@@ -385,7 +384,7 @@ impl Editor {
         let mut line = &self.content[self.cursor.line][self.cursor.char..];
         let mut last_was_char = false;
         if line.is_empty() && self.content.len() - 1 > self.cursor.line {
-            self._right();
+            self.move_right();
             line = &self.content[self.cursor.line][self.cursor.char..];
         }
         for ch in line.chars() {
@@ -399,7 +398,7 @@ impl Editor {
 
     pub fn select_right(&mut self) {
         self.cursor.init_select();
-        self._right();
+        self.move_right();
         self.cursor.push_to_select();
     }
 
@@ -449,24 +448,12 @@ impl Editor {
     }
 
     pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {
-        self.lexer.new_theme(Theme::from_path(&new_cfg.theme_file_in_config_dir));
+        self.lexer.reload_theme();
         self.cursor.source_configs(new_cfg);
     }
 
     pub fn stringify(&self) -> String {
         self.content.join("\n")
-    }
-
-    fn get_and_indent_line(&mut self, line_idx: usize) -> (Offset, &mut String) {
-        if line_idx > 0 {
-            let (prev_split, current_split) = self.content.split_at_mut(line_idx);
-            let prev = &prev_split[line_idx - 1];
-            let line = &mut current_split[0];
-            (self.cursor.indent_from_prev(prev, line), line)
-        } else {
-            let line = &mut self.content[line_idx];
-            (trim_start_inplace(line), line)
-        }
     }
 
     fn adjust_cursor_max_char(&mut self) {
