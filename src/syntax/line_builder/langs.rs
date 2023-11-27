@@ -48,7 +48,7 @@ impl From<FileType> for Lang {
                     "pub", "use", "mod", "let", "self", "mut", "crate", "async", "super", "impl", "Self",
                 ],
                 frow_control: vec![
-                    "if", "loop", "for", "in", "while", "break", "continue", "await", "return", "match",
+                    "if", "loop", "for", "in", "while", "break", "continue", "await", "return", "match", "else",
                 ],
                 mod_import: vec!["mod", "use", "pub mod", "pub use"],
             },
@@ -70,7 +70,7 @@ impl From<FileType> for Lang {
                     "pub", "use", "mod", "let", "self", "mut", "crate", "async", "super", "impl", "Self",
                 ],
                 frow_control: vec![
-                    "if", "loop", "for", "in", "while", "break", "continue", "await", "return", "match",
+                    "if", "loop", "for", "in", "while", "break", "continue", "await", "return", "match", "else",
                 ],
                 mod_import: vec!["mod", "use", "pub mod", "pub use", "from", "import"],
             },
