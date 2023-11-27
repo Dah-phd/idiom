@@ -10,7 +10,7 @@ use crate::{
 use ratatui::widgets::ListState;
 use std::collections::HashMap;
 
-fn mock_ws(content: Vec<String>) -> Workspace {
+pub fn mock_ws(content: Vec<String>) -> Workspace {
     let mut state = ListState::default();
     state.select(Some(0));
     Workspace {
@@ -40,23 +40,23 @@ fn test_move() {
     assert!(ws.get_active().is_some());
     if let Some(editor) = ws.get_active() {
         editor.down();
-        assert_eq!(editor.cursor, CursorPosition { char: 0, line: 1 });
+        assert_eq!(editor.cursor.position(), CursorPosition { char: 0, line: 1 });
         editor.end_of_line();
-        assert_eq!(editor.cursor, CursorPosition { char: 9, line: 1 });
+        assert_eq!(editor.cursor.position(), CursorPosition { char: 9, line: 1 });
         editor.right();
-        assert_eq!(editor.cursor, CursorPosition { char: 0, line: 2 });
+        assert_eq!(editor.cursor.position(), CursorPosition { char: 0, line: 2 });
         editor.left();
-        assert_eq!(editor.cursor, CursorPosition { char: 9, line: 1 });
+        assert_eq!(editor.cursor.position(), CursorPosition { char: 9, line: 1 });
         editor.down();
         editor.down();
         editor.end_of_line();
-        assert_eq!(editor.cursor, CursorPosition { char: 21, line: 3 });
+        assert_eq!(editor.cursor.position(), CursorPosition { char: 21, line: 3 });
         editor.down();
-        assert_eq!(editor.cursor, CursorPosition { char: 14, line: 4 });
+        assert_eq!(editor.cursor.position(), CursorPosition { char: 14, line: 4 });
         editor.left();
-        assert_eq!(editor.cursor, CursorPosition { char: 13, line: 4 });
+        assert_eq!(editor.cursor.position(), CursorPosition { char: 13, line: 4 });
         editor.right();
-        assert_eq!(editor.cursor, CursorPosition { char: 14, line: 4 });
+        assert_eq!(editor.cursor.position(), CursorPosition { char: 14, line: 4 });
     }
 }
 

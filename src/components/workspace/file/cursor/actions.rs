@@ -13,8 +13,6 @@ use super::{
 
 const TICK: Duration = Duration::from_millis(200);
 
-pub fn test() {}
-
 #[derive(Debug)]
 pub struct Action {
     reverse_len: usize,

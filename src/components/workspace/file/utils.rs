@@ -2,22 +2,6 @@ use std::ops::Range;
 
 use super::CursorPosition;
 
-pub fn backspace_indent_handler(indent: &str, line: &mut String, from_idx: usize) -> usize {
-    //! does not handle from_idx == 0
-    let prefix = line[..from_idx].trim_start_matches(indent);
-    if prefix.is_empty() {
-        line.replace_range(..indent.len(), "");
-        return indent.len();
-    }
-    if prefix.chars().all(|c| c.is_whitespace()) {
-        let remove_chars_len = prefix.len();
-        line.replace_range(from_idx - remove_chars_len..from_idx, "");
-        return remove_chars_len;
-    }
-    line.remove(from_idx - 1);
-    1
-}
-
 pub fn insert_clip(clip: String, content: &mut Vec<String>, mut cursor: CursorPosition) -> CursorPosition {
     let mut lines: Vec<_> = clip.split('\n').collect();
     if lines.len() == 1 {

@@ -487,3 +487,6 @@ impl Editor {
         }
     }
 }
+
+#[cfg(test)]
+pub mod test;
