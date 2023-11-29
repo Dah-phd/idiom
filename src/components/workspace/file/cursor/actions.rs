@@ -1,6 +1,6 @@
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit};
 
-use crate::components::workspace::file::utils::token_range_at;
+use crate::{components::workspace::file::utils::token_range_at, configs::EditorConfigs};
 
 use super::{
     super::utils::{clip_content, copy_content},
@@ -16,28 +16,27 @@ pub struct Action {
 }
 
 impl Action {
-    pub fn swap_lines() {
-        // let mut reverse_edit_text = content[from].to_owned();
-        // reverse_edit_text.push('\n');
-        // reverse_edit_text.push_str(&content[from + 1]);
-        // reverse_edit_text.push('\n');
-        // Self { reverse_edit_text, text_edit_range: ((from, 0).into(), (from + 2, 0).into()), reverse_len: 2 }
-        // let mut new_text = content[self.text_edit_range.0.line].to_owned();
-        // new_text.push('\n');
-        // new_text.push_str(&content[self.text_edit_range.0.line + 1]);
-        // new_text.push('\n');
-        // Action {
-        //     reverse_len: self.reverse_len,
-        //     reverse_text_edit: TextEdit {
-        //         range: Range::new(self.text_edit_range.0.into(), self.text_edit_range.1.into()),
-        //         new_text: self.reverse_edit_text,
-        //     },
-        //     len: self.reverse_len,
-        //     text_edit: TextEdit {
-        //         range: Range::new(self.text_edit_range.0.into(), self.text_edit_range.1.into()),
-        //         new_text,
-        //     },
-        // }
+    pub fn swap_down(from: usize, cfg: &EditorConfigs, content: &mut [String]) -> Self {
+        let to = from + 1;
+        let mut reverse_edit_text = content[from].to_owned();
+        reverse_edit_text.push('\n');
+        reverse_edit_text.push_str(&content[from + 1]);
+        reverse_edit_text.push('\n');
+        let text_edit_range: (CursorPosition, CursorPosition) = ((from, 0).into(), (from + 2, 0).into());
+        content.swap(from, to);
+        let _offset = cfg.indent_line(from, content);
+        let _offset2 = cfg.indent_line(to, content);
+        let mut new_text = content[text_edit_range.0.line].to_owned();
+        new_text.push('\n');
+        new_text.push_str(&content[text_edit_range.0.line + 1]);
+        new_text.push('\n');
+        let range = Range::new(Position::new(from as u32, 0), Position::new((from + 2) as u32, 0));
+        Self {
+            reverse_len: 2,
+            reverse_text_edit: TextEdit::new(range, reverse_edit_text),
+            len: 2,
+            text_edit: TextEdit::new(range, new_text),
+        }
     }
 
     pub fn merge_next_line(at_line: usize, content: &mut Vec<String>) -> Self {
@@ -162,35 +161,6 @@ impl ActionBuilder {
 
     pub fn empty_at(position: CursorPosition) -> Self {
         Self { reverse_len: 1, reverse_edit_text: String::new(), text_edit_range: (position, position) }
-    }
-
-    pub fn for_swap(content: &[String], from: usize) -> Self {
-        let mut reverse_edit_text = content[from].to_owned();
-        reverse_edit_text.push('\n');
-        reverse_edit_text.push_str(&content[from + 1]);
-        reverse_edit_text.push('\n');
-        Self { reverse_edit_text, text_edit_range: ((from, 0).into(), (from + 2, 0).into()), reverse_len: 2 }
-    }
-
-    // FINISHERS
-
-    pub fn finish_swap(self, content: &[String]) -> Action {
-        let mut new_text = content[self.text_edit_range.0.line].to_owned();
-        new_text.push('\n');
-        new_text.push_str(&content[self.text_edit_range.0.line + 1]);
-        new_text.push('\n');
-        Action {
-            reverse_len: self.reverse_len,
-            reverse_text_edit: TextEdit {
-                range: Range::new(self.text_edit_range.0.into(), self.text_edit_range.1.into()),
-                new_text: self.reverse_edit_text,
-            },
-            len: self.reverse_len,
-            text_edit: TextEdit {
-                range: Range::new(self.text_edit_range.0.into(), self.text_edit_range.1.into()),
-                new_text,
-            },
-        }
     }
 
     pub fn push_clip(self, clip: String, end: &CursorPosition) -> Action {

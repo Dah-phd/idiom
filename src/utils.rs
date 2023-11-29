@@ -1,16 +1,15 @@
-use crate::components::workspace::Offset;
 use anyhow::{anyhow, Result};
 use copypasta::{ClipboardContext, ClipboardProvider};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-pub fn trim_start_inplace(line: &mut String) -> Offset {
+pub fn trim_start_inplace(line: &mut String) -> usize {
     if let Some(idx) = line.find(|c: char| !c.is_whitespace()) {
         line.replace_range(..idx, "");
-        return Offset::Neg(idx);
+        idx;
     };
-    Offset::Pos(0)
+    0
 }
 
 pub fn trim_start(mut line: String) -> String {
@@ -108,7 +107,7 @@ pub fn find_code_blocks(buffer: &mut Vec<(usize, String)>, content: &[String], p
             continue;
         }
         let mut line = line.to_owned();
-        let white_chars_len = trim_start_inplace(&mut line).unwrap();
+        let white_chars_len = trim_start_inplace(&mut line);
         if let Some((_, next_line)) = content_iter.peek() {
             if let Some(first_non_white) = next_line.find(|c: char| !c.is_whitespace()) {
                 if first_non_white >= white_chars_len {

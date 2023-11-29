@@ -1,7 +1,7 @@
 mod cursor;
 mod utils;
 use cursor::Cursor;
-pub use cursor::{CursorPosition, Offset, Select};
+pub use cursor::{CursorPosition, Select};
 use lsp_types::TextEdit;
 use ratatui::widgets::{List, ListItem};
 
@@ -255,9 +255,8 @@ impl Editor {
             return;
         }
         let new_cursor_line = self.cursor.line - 1;
-        let (char_offset, _) = self.cursor.swap_down(new_cursor_line, &mut self.content);
+        self.cursor.swap_down(new_cursor_line, &mut self.content);
         self.cursor.line = new_cursor_line;
-        self.cursor.offset_char(char_offset);
     }
 
     pub fn down(&mut self) {
@@ -295,8 +294,7 @@ impl Editor {
         }
         if self.content.len() - 1 > self.cursor.line {
             let new_cursor_line = self.cursor.line + 1;
-            let (_, char_offset) = self.cursor.swap_down(self.cursor.line, &mut self.content);
-            self.cursor.offset_char(char_offset);
+            self.cursor.swap_down(self.cursor.line, &mut self.content);
             self.cursor.line = new_cursor_line;
         }
     }

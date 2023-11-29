@@ -7,7 +7,7 @@ use crate::utils::get_contents_once;
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 // use file::Editor;
-pub use file::{CursorPosition, DocStats, Offset, Select};
+pub use file::{CursorPosition, DocStats, Select};
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};

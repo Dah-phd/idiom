@@ -7,7 +7,7 @@ use actions::{Action, ActionBuilder};
 use lsp_types::TextDocumentContentChangeEvent;
 
 use crate::configs::EditorConfigs;
-pub use position::{CursorPosition, Offset};
+pub use position::CursorPosition;
 pub use select::Select;
 
 use super::utils::{get_closing_char, insert_clip, is_closing_repeat, remove_content};
@@ -78,15 +78,10 @@ impl Cursor {
 
     // UTILS
 
-    pub fn swap_down(&mut self, up_idx: usize, content: &mut [String]) -> (Offset, Offset) {
+    pub fn swap_down(&mut self, up_idx: usize, content: &mut [String]) {
+        self.drop_select();
         self.push_buffer();
-        let to = up_idx + 1;
-        let builder = ActionBuilder::for_swap(content, up_idx);
-        content.swap(up_idx, to);
-        let offset = self.cfg.indent_line(up_idx, content);
-        let offset2 = self.cfg.indent_line(to, content);
-        self.push_done(builder.finish_swap(content));
-        (offset, offset2)
+        self.push_done(Action::swap_down(up_idx, &self.cfg, content));
     }
 
     pub fn replace_token(&mut self, new: String, content: &mut [String]) {
@@ -322,13 +317,6 @@ impl Cursor {
         if let Some(action) = self.buffer.collect() {
             self.undone.clear();
             self.push_done(action);
-        }
-    }
-
-    pub fn offset_char(&mut self, offset: Offset) {
-        match offset {
-            Offset::Neg(val) => self.char = self.char.checked_sub(val).unwrap_or_default(),
-            Offset::Pos(val) => self.char += val,
         }
     }
 }
