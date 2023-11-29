@@ -1,7 +1,9 @@
+mod action_buffer;
 mod actions;
 mod position;
 mod select;
-use actions::{Action, ActionBuffer, ActionBuilder};
+use action_buffer::ActionBuffer;
+use actions::{Action, ActionBuilder};
 use lsp_types::TextDocumentContentChangeEvent;
 
 use crate::configs::EditorConfigs;
@@ -193,7 +195,7 @@ impl Cursor {
                 self.push_buffer();
                 self.push_done(Action::insertion(self.line as u32, self.char as u32, new_text));
             } else {
-                if let Some(action) = self.buffer.push(ch, self.line, self.char) {
+                if let Some(action) = self.buffer.push(self.line, self.char, ch) {
                     self.push_done(action);
                 }
                 line.insert(self.char, ch);
@@ -210,6 +212,7 @@ impl Cursor {
             return;
         }
         if let Some((from, to)) = self.select.take_option() {
+            self.push_buffer();
             self.set_position(from);
             self.push_done(ActionBuilder::cut_range(from, to, content).force_finish());
         } else if content[self.line].len() == self.char {
@@ -226,6 +229,7 @@ impl Cursor {
             return;
         }
         if let Some((from, to)) = self.select.take_option() {
+            self.push_buffer();
             self.set_position(from);
             self.push_done(ActionBuilder::cut_range(from, to, content).force_finish());
         } else if self.char == 0 {
@@ -238,7 +242,7 @@ impl Cursor {
             {
                 self.push_done(action);
             }
-            self.char = self.buffer.last_char;
+            self.char = self.buffer.last_char();
         }
     }
 

@@ -1,4 +1,5 @@
 mod file;
+mod file_tracker;
 use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType, Mode};
 use crate::events::Events;
 use crate::lsp::LSP;
@@ -238,7 +239,19 @@ impl Workspace {
 
     fn handle_tree_operations(&mut self, operation: ResourceOp) -> anyhow::Result<()> {
         match operation {
-            ResourceOp::Create(create) => {}
+            ResourceOp::Create(create) => {
+                let path = PathBuf::from(create.uri.path());
+                if path.exists() {
+                    if let Some(options) = create.options {
+                        if matches!(options.overwrite, Some(overwrite) if !overwrite)
+                            || matches!(options.ignore_if_exists, Some(ignore) if ignore)
+                        {
+                            return Err(anyhow::anyhow!("File {path:?} already exists!"));
+                        }
+                    }
+                };
+                std::fs::write(path, "")?;
+            }
             ResourceOp::Delete(delete) => {
                 let search_path = PathBuf::from(delete.uri.path()).canonicalize()?;
                 if search_path.is_file() {

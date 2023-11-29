@@ -158,7 +158,7 @@ impl LineBuilder {
         spans
     }
 
-    fn set_diagnostic_style(&self, idx: usize, mut style: &mut Style, diagnostic: Option<&DiagnosticData>) {
+    fn set_diagnostic_style(&self, idx: usize, style: &mut Style, diagnostic: Option<&DiagnosticData>) {
         if let Some(color) = diagnostic.and_then(|d| d.check_ranges(&idx)) {
             style.add_modifier = style.add_modifier.union(Modifier::UNDERLINED);
             style.underline_color.replace(color);

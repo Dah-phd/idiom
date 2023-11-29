@@ -21,12 +21,14 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
         content,
     }
 }
+
 pub fn select_eq(select: (CursorPosition, CursorPosition), editor: &Editor) -> bool {
     if let Some((p1, p2)) = editor.cursor.select.get() {
         return p1 == &select.0 && p2 == &select.1;
     }
     false
 }
+
 pub fn pull_line(editor: &Editor, idx: usize) -> Option<&String> {
     editor.content.get(idx)
 }

@@ -46,7 +46,7 @@ fn cli() -> Option<PathBuf> {
     None
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
     let out = std::io::stdout();
     let mut terminal = Terminal::new(CrosstermBackend::new(&out)).expect("should not fail!");

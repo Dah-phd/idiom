@@ -9,7 +9,7 @@ use crate::{
     configs::{EditorConfigs, FileType},
     events::Events,
     syntax::{Lexer, Theme},
-    utils::{find_code_blocks, trim_start_inplace},
+    utils::find_code_blocks,
 };
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
