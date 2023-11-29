@@ -216,6 +216,7 @@ impl Cursor {
             self.set_position(from);
             self.push_done(ActionBuilder::cut_range(from, to, content).force_finish());
         } else if content[self.line].len() == self.char {
+            self.push_buffer();
             if content.len() > self.line + 1 {
                 self.push_done(Action::merge_next_line(self.line, content));
             }
@@ -233,6 +234,7 @@ impl Cursor {
             self.set_position(from);
             self.push_done(ActionBuilder::cut_range(from, to, content).force_finish());
         } else if self.char == 0 {
+            self.push_buffer();
             self.line -= 1;
             let action = Action::merge_next_line(self.line, content);
             self.char = action.text_edit.range.start.character as usize;

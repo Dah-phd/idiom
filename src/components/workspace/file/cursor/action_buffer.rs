@@ -24,23 +24,20 @@ impl ActionBuffer {
             Self::Text(buf) => {
                 if buf.clock.elapsed() > TICK {
                     return Some(buf.into());
-                } else {
-                    std::mem::replace(self, Self::Text(buf));
-                }
+                };
+                let _ = std::mem::replace(self, Self::Text(buf));
             }
             Self::Backspace(buf) => {
                 if buf.clock.elapsed() > TICK {
                     return Some(buf.into());
-                } else {
-                    std::mem::replace(self, Self::Backspace(buf));
-                }
+                };
+                let _ = std::mem::replace(self, Self::Backspace(buf));
             }
             Self::Del(buf) => {
                 if buf.clock.elapsed() > TICK {
                     return Some(buf.into());
-                } else {
-                    std::mem::replace(self, Self::Del(buf));
-                }
+                };
+                let _ = std::mem::replace(self, Self::Del(buf));
             }
             Self::None => (),
         }
@@ -111,16 +108,16 @@ impl DelBuffer {
 }
 
 impl From<DelBuffer> for Action {
-    fn from(buffer: DelBuffer) -> Self {
-        let start = Position::new(buffer.line as u32, buffer.char as u32);
+    fn from(buf: DelBuffer) -> Self {
+        let start = Position::new(buf.line as u32, buf.char as u32);
         Action {
             len: 1,
             text_edit: TextEdit::new(
-                Range::new(start, Position::new(buffer.line as u32, (buffer.char - buffer.text.len()) as u32)),
+                Range::new(start, Position::new(buf.line as u32, (buf.char + buf.text.len()) as u32)),
                 String::new(),
             ),
             reverse_len: 1,
-            reverse_text_edit: TextEdit::new(Range::new(start, start), buffer.text),
+            reverse_text_edit: TextEdit::new(Range::new(start, start), buf.text),
         }
     }
 }
@@ -169,13 +166,13 @@ impl BackspaceBuffer {
 }
 
 impl From<BackspaceBuffer> for Action {
-    fn from(buffer: BackspaceBuffer) -> Self {
-        let end = Position::new(buffer.line as u32, buffer.last as u32);
+    fn from(buf: BackspaceBuffer) -> Self {
+        let end = Position::new(buf.line as u32, buf.last as u32);
         Action {
             reverse_len: 1,
-            reverse_text_edit: TextEdit::new(Range::new(end, end), buffer.text.chars().rev().collect()),
+            reverse_text_edit: TextEdit::new(Range::new(end, end), buf.text.chars().rev().collect()),
             len: 1,
-            text_edit: TextEdit::new(Range::new(end, Position::new(buffer.line as u32, buffer.char)), String::new()),
+            text_edit: TextEdit::new(Range::new(end, Position::new(buf.line as u32, buf.char)), String::new()),
         }
     }
 }
@@ -206,16 +203,16 @@ impl TextBuffer {
 }
 
 impl From<TextBuffer> for Action {
-    fn from(buffer: TextBuffer) -> Self {
-        let start = Position::new(buffer.line as u32, buffer.char);
+    fn from(buf: TextBuffer) -> Self {
+        let start = Position::new(buf.line as u32, buf.char);
         Action {
             reverse_len: 1,
             reverse_text_edit: TextEdit::new(
-                Range::new(start, Position::new(buffer.line as u32, buffer.last as u32)),
+                Range::new(start, Position::new(buf.line as u32, buf.last as u32)),
                 String::new(),
             ),
             len: 1,
-            text_edit: TextEdit::new(Range::new(start, start), buffer.text),
+            text_edit: TextEdit::new(Range::new(start, start), buf.text),
         }
     }
 }

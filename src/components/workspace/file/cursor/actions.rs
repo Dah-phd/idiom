@@ -1,8 +1,4 @@
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit};
-use std::{
-    cmp::Ordering,
-    time::{Duration, Instant},
-};
 
 use crate::components::workspace::file::utils::token_range_at;
 
@@ -10,8 +6,6 @@ use super::{
     super::utils::{clip_content, copy_content},
     Cursor, CursorPosition, Select,
 };
-
-const TICK: Duration = Duration::from_millis(200);
 
 #[derive(Debug)]
 pub struct Action {
