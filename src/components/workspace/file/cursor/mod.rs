@@ -94,12 +94,10 @@ impl Cursor {
     pub fn replace_select(&mut self, select: Select, new_clip: impl Into<String>, content: &mut Vec<String>) {
         if let Some((from, to)) = select.try_unwrap() {
             self.push_buffer();
-            let clip = new_clip.into();
             self.drop_select();
-            let builder = ActionBuilder::cut_range(from, to, content);
-            let end_point = insert_clip(clip.clone(), content, from);
-            self.push_done(builder.push_clip(clip, &end_point));
-            self.set_position(end_point);
+            let action = Action::replace_select(from, to, new_clip.into(), content);
+            self.set_position(action.end_position());
+            self.push_done(action);
         }
     }
 
@@ -175,9 +173,8 @@ impl Cursor {
     pub fn push_char(&mut self, ch: char, content: &mut Vec<String>) {
         if let Some((from, to)) = self.select.take_option() {
             self.push_buffer();
-            let builder = ActionBuilder::cut_range(from, to, content);
-            self.push_done(builder.force_finish());
             self.set_position(from);
+            self.push_done(Action::remove_select(from, to, content));
         }
         if let Some(line) = content.get_mut(self.line) {
             if is_closing_repeat(line.as_str(), ch, self.char) {
@@ -209,7 +206,7 @@ impl Cursor {
         if let Some((from, to)) = self.select.take_option() {
             self.push_buffer();
             self.set_position(from);
-            self.push_done(ActionBuilder::cut_range(from, to, content).force_finish());
+            self.push_done(Action::remove_select(from, to, content));
         } else if content[self.line].len() == self.char {
             self.push_buffer();
             if content.len() > self.line + 1 {
@@ -227,7 +224,7 @@ impl Cursor {
         if let Some((from, to)) = self.select.take_option() {
             self.push_buffer();
             self.set_position(from);
-            self.push_done(ActionBuilder::cut_range(from, to, content).force_finish());
+            self.push_done(Action::remove_select(from, to, content));
         } else if self.char == 0 {
             self.push_buffer();
             self.line -= 1;
@@ -245,24 +242,22 @@ impl Cursor {
 
     pub fn paste(&mut self, clip: String, content: &mut Vec<String>) {
         self.push_buffer();
-        let builder = if let Some((from, to)) = self.select.take_option() {
-            self.set_position(from);
-            ActionBuilder::cut_range(from, to, content)
+        let action = if let Some((from, to)) = self.select.take_option() {
+            Action::replace_select(from, to, clip, content)
         } else {
-            ActionBuilder::empty_at(self.position())
+            Action::insert_clip(self.position(), clip, content)
         };
-        let end_position = insert_clip(clip.clone(), content, self.position());
-        self.push_done(builder.push_clip(clip, &end_position));
-        self.set_position(end_position);
+        self.set_position(action.end_position());
+        self.push_done(action);
     }
 
     pub fn cut(&mut self, content: &mut Vec<String>) -> String {
         self.push_buffer();
-        let builder = if let Some((from, to)) = self.select.take_option() {
+        let action = if let Some((from, to)) = self.select.take_option() {
             self.set_position(from);
-            ActionBuilder::cut_range(from, to, content)
+            Action::remove_select(from, to, content)
         } else {
-            let action = ActionBuilder::cut_line(self.line, content);
+            let action = Action::remove_line(self.line, content);
             if self.line >= content.len() && content.len() != 1 {
                 self.line -= 1;
                 self.char = content[self.line].len();
@@ -271,8 +266,8 @@ impl Cursor {
             }
             action
         };
-        let clip = builder.reverse_edit_text.to_owned();
-        self.push_done(builder.force_finish());
+        let clip = action.reverse_text_edit.new_text.to_owned();
+        self.push_done(action);
         clip
     }
 

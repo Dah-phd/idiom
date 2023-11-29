@@ -1,6 +1,9 @@
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit};
 
-use crate::{components::workspace::file::utils::token_range_at, configs::EditorConfigs};
+use crate::{
+    components::workspace::file::utils::{insert_clip, token_range_at},
+    configs::EditorConfigs,
+};
 
 use super::{
     super::utils::{clip_content, copy_content},
@@ -86,6 +89,48 @@ impl Action {
         }
     }
 
+    pub fn insert_clip(from: CursorPosition, clip: String, content: &mut Vec<String>) -> Self {
+        let end = insert_clip(clip.clone(), content, from);
+        Action {
+            reverse_len: 1,
+            reverse_text_edit: TextEdit::new(Range::new(from.into(), end.into()), String::new()),
+            len: (end.line - from.line) + 1,
+            text_edit: TextEdit::new(Range::new(from.into(), from.into()), clip),
+        }
+    }
+
+    pub fn remove_line(line: usize, content: &mut Vec<String>) -> Self {
+        let mut removed_line = content.remove(line);
+        removed_line.push('\n');
+        let start = Position::new(line as u32, 0);
+        Action {
+            reverse_len: 2,
+            reverse_text_edit: TextEdit::new(Range::new(start, start), removed_line),
+            len: 1,
+            text_edit: TextEdit::new(Range::new(start, Position::new(line as u32 + 1, 0)), String::new()),
+        }
+    }
+
+    pub fn remove_select(from: CursorPosition, to: CursorPosition, content: &mut Vec<String>) -> Self {
+        Action {
+            reverse_len: to.line - from.line + 1,
+            reverse_text_edit: TextEdit::new(Range::new(from.into(), from.into()), clip_content(&from, &to, content)),
+            len: 1,
+            text_edit: TextEdit::new(Range::new(from.into(), to.into()), String::new()),
+        }
+    }
+
+    pub fn replace_select(from: CursorPosition, to: CursorPosition, clip: String, content: &mut Vec<String>) -> Self {
+        let reverse_edit_text = clip_content(&from, &to, content);
+        let end = if !clip.is_empty() { insert_clip(clip.clone(), content, from) } else { from };
+        Action {
+            reverse_len: to.line - from.line + 1,
+            reverse_text_edit: TextEdit::new(Range::new(from.into(), end.into()), reverse_edit_text),
+            len: (end.line - from.line) + 1,
+            text_edit: TextEdit { range: Range::new(from.into(), to.into()), new_text: clip },
+        }
+    }
+
     pub fn replace_token(line: usize, char: usize, new_text: String, content: &mut [String]) -> Self {
         let code_line = &mut content[line];
         let range = token_range_at(code_line, char);
@@ -100,6 +145,10 @@ impl Action {
             reverse_len: 1,
             reverse_text_edit: TextEdit::new(reverse_edit_range, replaced_text),
         }
+    }
+
+    pub fn end_position(&self) -> CursorPosition {
+        self.reverse_text_edit.range.start.into()
     }
 
     pub fn reverse_event(&self) -> TextDocumentContentChangeEvent {
@@ -145,52 +194,8 @@ impl ActionBuilder {
         }
     }
 
-    pub fn cut_range(from: CursorPosition, to: CursorPosition, content: &mut Vec<String>) -> Self {
-        Self {
-            reverse_edit_text: clip_content(&from, &to, content),
-            reverse_len: to.line - from.line + 1,
-            text_edit_range: (from, to),
-        }
-    }
-
-    pub fn cut_line(line: usize, content: &mut Vec<String>) -> Self {
-        let mut reverse_edit_text = content.remove(line);
-        reverse_edit_text.push('\n');
-        Self { reverse_edit_text, text_edit_range: ((line, 0).into(), (line + 1, 0).into()), reverse_len: 1 }
-    }
-
     pub fn empty_at(position: CursorPosition) -> Self {
         Self { reverse_len: 1, reverse_edit_text: String::new(), text_edit_range: (position, position) }
-    }
-
-    pub fn push_clip(self, clip: String, end: &CursorPosition) -> Action {
-        Action {
-            len: self.text_edit_range.0.line - end.line + 1,
-            text_edit: TextEdit {
-                range: Range::new(self.text_edit_range.0.into(), self.text_edit_range.1.into()),
-                new_text: clip,
-            },
-            reverse_len: self.reverse_len,
-            reverse_text_edit: TextEdit {
-                range: Range::new(self.text_edit_range.0.into(), end.into()),
-                new_text: self.reverse_edit_text,
-            },
-        }
-    }
-
-    pub fn force_finish(self) -> Action {
-        Action {
-            reverse_len: self.reverse_len,
-            reverse_text_edit: TextEdit {
-                range: Range::new(self.text_edit_range.0.into(), self.text_edit_range.0.into()),
-                new_text: self.reverse_edit_text,
-            },
-            len: 1,
-            text_edit: TextEdit {
-                range: Range::new(self.text_edit_range.0.into(), self.text_edit_range.1.into()),
-                new_text: String::new(),
-            },
-        }
     }
 
     pub fn raw_finish(self, position: CursorPosition, new_text: String) -> Action {
