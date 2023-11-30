@@ -32,7 +32,6 @@ pub struct Editor {
     content: Vec<String>,
 }
 
-#[allow(dead_code)]
 impl Editor {
     pub fn from_path(path: PathBuf, mut configs: EditorConfigs, events: &Rc<RefCell<Events>>) -> std::io::Result<Self> {
         let content = std::fs::read_to_string(&path)?;
@@ -255,7 +254,8 @@ impl Editor {
             return;
         }
         let new_cursor_line = self.cursor.line - 1;
-        self.cursor.swap_down(new_cursor_line, &mut self.content);
+        let (off, _) = self.cursor.swap_down(new_cursor_line, &mut self.content);
+        self.cursor.char = off.offset(self.cursor.char);
         self.cursor.line = new_cursor_line;
     }
 
@@ -294,7 +294,8 @@ impl Editor {
         }
         if self.content.len() - 1 > self.cursor.line {
             let new_cursor_line = self.cursor.line + 1;
-            self.cursor.swap_down(self.cursor.line, &mut self.content);
+            let (_, off) = self.cursor.swap_down(self.cursor.line, &mut self.content);
+            self.cursor.char = off.offset(self.cursor.char);
             self.cursor.line = new_cursor_line;
         }
     }

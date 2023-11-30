@@ -1,7 +1,7 @@
 use lsp_types::{Position, Range, TextEdit};
 use std::time::{Duration, Instant};
 
-use super::Action;
+use super::{actions::EditMetaData, Action};
 
 const TICK: Duration = Duration::from_millis(200);
 
@@ -111,12 +111,11 @@ impl From<DelBuffer> for Action {
     fn from(buf: DelBuffer) -> Self {
         let start = Position::new(buf.line as u32, buf.char as u32);
         Action {
-            len: 1,
+            meta: EditMetaData::default(),
             text_edit: TextEdit::new(
                 Range::new(start, Position::new(buf.line as u32, (buf.char + buf.text.len()) as u32)),
                 String::new(),
             ),
-            reverse_len: 1,
             reverse_text_edit: TextEdit::new(Range::new(start, start), buf.text),
         }
     }
@@ -169,9 +168,8 @@ impl From<BackspaceBuffer> for Action {
     fn from(buf: BackspaceBuffer) -> Self {
         let end = Position::new(buf.line as u32, buf.last as u32);
         Action {
-            reverse_len: 1,
+            meta: EditMetaData::default(),
             reverse_text_edit: TextEdit::new(Range::new(end, end), buf.text.chars().rev().collect()),
-            len: 1,
             text_edit: TextEdit::new(Range::new(end, Position::new(buf.line as u32, buf.char)), String::new()),
         }
     }
@@ -206,12 +204,11 @@ impl From<TextBuffer> for Action {
     fn from(buf: TextBuffer) -> Self {
         let start = Position::new(buf.line as u32, buf.char);
         Action {
-            reverse_len: 1,
+            meta: EditMetaData::default(),
             reverse_text_edit: TextEdit::new(
                 Range::new(start, Position::new(buf.line as u32, buf.last as u32)),
                 String::new(),
             ),
-            len: 1,
             text_edit: TextEdit::new(Range::new(start, start), buf.text),
         }
     }

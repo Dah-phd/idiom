@@ -1,4 +1,4 @@
-use std::ops::RangeInclusive;
+use std::ops::{Add, Sub};
 
 use lsp_types::Position;
 
@@ -38,20 +38,54 @@ impl From<&Position> for CursorPosition {
     }
 }
 
-impl CursorPosition {
-    pub fn line_range(&self, sub: usize, add: usize) -> std::ops::Range<usize> {
-        self.line.checked_sub(sub).unwrap_or_default()..self.line + add
-    }
+pub enum Offset {
+    Pos(usize),
+    Neg(usize),
+}
 
-    pub fn as_range(&self) -> RangeInclusive<usize> {
-        self.line..=self.line
+impl Offset {
+    fn offset(self, val: usize) -> usize {
+        match self {
+            Self::Pos(numba) => val + numba,
+            Self::Neg(numba) => val.checked_sub(numba).unwrap_or_default(),
+        }
     }
+}
 
-    pub fn diff_char(&mut self, offset: usize) {
-        self.char = self.char.checked_sub(offset).unwrap_or_default()
+impl Add<usize> for Offset {
+    type Output = Self;
+    fn add(self, rhs: usize) -> Self::Output {
+        match self {
+            Self::Pos(numba) => Self::Pos(numba + rhs),
+            Self::Neg(numba) => {
+                if numba > rhs {
+                    Self::Neg(numba - rhs)
+                } else {
+                    Self::Pos(rhs - numba)
+                }
+            }
+        }
     }
+}
 
-    pub fn diff_line(&mut self, offset: usize) {
-        self.line = self.line.checked_sub(offset).unwrap_or_default()
+impl Sub<usize> for Offset {
+    type Output = Offset;
+    fn sub(self, rhs: usize) -> Self::Output {
+        match self {
+            Self::Neg(numba) => Self::Neg(numba + rhs),
+            Self::Pos(numba) => {
+                if numba > rhs {
+                    Self::Pos(numba - rhs)
+                } else {
+                    Self::Neg(rhs - numba)
+                }
+            }
+        }
+    }
+}
+
+impl From<usize> for Offset {
+    fn from(value: usize) -> Self {
+        Self::Pos(value)
     }
 }

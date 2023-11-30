@@ -68,23 +68,18 @@ impl Select {
         }
     }
 
-    pub fn reduce_at(&mut self, line: usize, reduction: usize) {
+    pub fn reduce_at(&mut self, reduction: usize) {
         if let Self::Range(from, to) = self {
-            if from.line == line {
-                from.char = from.char.checked_sub(reduction).unwrap_or_default();
-            }
-            if to.line == line {
-                to.char = to.char.checked_sub(reduction).unwrap_or_default();
-            }
+            from.char = from.char.checked_sub(reduction).unwrap_or_default();
+            to.char = to.char.checked_sub(reduction).unwrap_or_default();
         }
     }
 
-    pub fn increase_at(&mut self, line: usize, increase: usize) {
+    pub fn increase_at(&mut self, increase: usize) {
         if let Self::Range(from, to) = self {
-            if from.line == line {
+            if from.line > to.line || from.line == to.line && from.char > to.char {
                 from.char += increase;
-            }
-            if to.line == line {
+            } else {
                 to.char += increase;
             }
         }

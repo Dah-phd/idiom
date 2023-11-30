@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use copypasta::{ClipboardContext, ClipboardProvider};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use std::ops::{Add, Sub};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -123,4 +124,56 @@ pub fn find_code_blocks(buffer: &mut Vec<(usize, String)>, content: &[String], p
 pub fn get_contents_once() -> Result<String, Box<dyn std::error::Error + Send + Sync + 'static>> {
     let mut ctx = ClipboardContext::new()?;
     ctx.get_contents()
+}
+
+pub enum Offset {
+    Pos(usize),
+    Neg(usize),
+}
+
+impl Offset {
+    pub fn offset(self, val: usize) -> usize {
+        match self {
+            Self::Pos(numba) => val + numba,
+            Self::Neg(numba) => val.checked_sub(numba).unwrap_or_default(),
+        }
+    }
+}
+
+impl Add<usize> for Offset {
+    type Output = Self;
+    fn add(self, rhs: usize) -> Self::Output {
+        match self {
+            Self::Pos(numba) => Self::Pos(numba + rhs),
+            Self::Neg(numba) => {
+                if numba > rhs {
+                    Self::Neg(numba - rhs)
+                } else {
+                    Self::Pos(rhs - numba)
+                }
+            }
+        }
+    }
+}
+
+impl Sub<usize> for Offset {
+    type Output = Offset;
+    fn sub(self, rhs: usize) -> Self::Output {
+        match self {
+            Self::Neg(numba) => Self::Neg(numba + rhs),
+            Self::Pos(numba) => {
+                if numba > rhs {
+                    Self::Pos(numba - rhs)
+                } else {
+                    Self::Neg(rhs - numba)
+                }
+            }
+        }
+    }
+}
+
+impl From<usize> for Offset {
+    fn from(value: usize) -> Self {
+        Self::Pos(value)
+    }
 }

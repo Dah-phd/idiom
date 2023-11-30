@@ -1,4 +1,4 @@
-use crate::utils::trim_start_inplace;
+use crate::utils::{trim_start_inplace, Offset};
 
 use super::load_or_create_config;
 use super::types::FileType;
@@ -62,21 +62,21 @@ impl EditorConfigs {
         indent
     }
 
-    pub fn indent_line(&self, line_idx: usize, content: &mut [String]) -> usize {
+    pub fn indent_line(&self, line_idx: usize, content: &mut [String]) -> Offset {
         if line_idx > 0 {
             let (prev_split, current_split) = content.split_at_mut(line_idx);
             let prev_line = &prev_split[line_idx - 1];
             if prev_line.chars().all(|c| c.is_whitespace()) {
-                return 0;
+                return Offset::Pos(0);
             }
             let line = &mut current_split[0];
             let indent = self.derive_indent_from(prev_line);
-            let offset = trim_start_inplace(line) + indent.len();
+            let offset = Offset::Pos(indent.len()) - trim_start_inplace(line);
             line.insert_str(0, &indent);
-            offset + self.unindent_if_before_base_pattern(line)
+            offset - self.unindent_if_before_base_pattern(line)
         } else {
             let line = &mut content[line_idx];
-            trim_start_inplace(line)
+            Offset::Neg(trim_start_inplace(line))
         }
     }
 

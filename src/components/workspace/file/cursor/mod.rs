@@ -6,7 +6,7 @@ use action_buffer::ActionBuffer;
 use actions::{Action, ActionBuilder};
 use lsp_types::TextDocumentContentChangeEvent;
 
-use crate::configs::EditorConfigs;
+use crate::{configs::EditorConfigs, utils::Offset};
 pub use position::CursorPosition;
 pub use select::Select;
 
@@ -78,10 +78,13 @@ impl Cursor {
 
     // UTILS
 
-    pub fn swap_down(&mut self, up_idx: usize, content: &mut [String]) {
+    pub fn swap_down(&mut self, up_idx: usize, content: &mut [String]) -> (Offset, Offset) {
+        // !TODO fix offsets on line swap
         self.drop_select();
         self.push_buffer();
-        self.push_done(Action::swap_down(up_idx, &self.cfg, content));
+        let (off, off2, action) = Action::swap_down(up_idx, &self.cfg, content);
+        self.push_done(action);
+        (off, off2)
     }
 
     pub fn replace_token(&mut self, new: String, content: &mut [String]) {
@@ -127,10 +130,8 @@ impl Cursor {
         if let Some(line) = content.get_mut(self.line) {
             if line.starts_with(&self.cfg.indent) {
                 self.push_buffer();
-                let mut old_text = line.split_off(self.cfg.indent.len());
-                std::mem::swap(line, &mut old_text);
                 self.char = self.char.checked_sub(self.cfg.indent.len()).unwrap_or_default();
-                self.push_done(Action::extract(self.line as u32, 0, old_text))
+                self.push_done(Action::extract_from_line(self.line, 0, self.cfg.indent.len(), line))
             }
         }
     }
