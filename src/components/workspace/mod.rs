@@ -7,7 +7,7 @@ use crate::utils::get_contents_once;
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 // use file::Editor;
-pub use file::{CursorPosition, DocStats, Select};
+pub use file::{CursorPosition, DocStats};
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -48,7 +48,7 @@ impl Workspace {
                 let area = layout[1];
                 file.set_max_rows(layout[1].bottom());
                 let cursor_x_offset = 1 + file.cursor.char;
-                let cursor_y_offset = file.cursor.line - file.at_line;
+                let cursor_y_offset = file.cursor.line - file.cursor.at_line;
                 let (digits_offset, editor_content) = file.get_list_widget_with_context();
                 let x_cursor = area.x + (cursor_x_offset + digits_offset) as u16;
                 let y_cursor = area.y + cursor_y_offset as u16;

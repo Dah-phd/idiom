@@ -1,7 +1,7 @@
 use lsp_types::{request::GotoDeclarationResponse, GotoDefinitionResponse, Location, LocationLink, WorkspaceEdit};
 
 use crate::{
-    components::{popups::editor_popups::select_selector, workspace::Select, Workspace},
+    components::{popups::editor_popups::select_selector, workspace::CursorPosition, Workspace},
     configs::{FileType, Mode},
 };
 use std::path::PathBuf;
@@ -9,9 +9,9 @@ use std::path::PathBuf;
 #[derive(Debug, Clone)]
 pub enum WorkspaceEvent {
     PopupAccess,
-    ReplaceSelect(String, Select),
+    ReplaceSelect(String, (CursorPosition, CursorPosition)),
     GoToLine(usize),
-    GoToSelect { select: Select, should_clear: bool },
+    GoToSelect { select: (CursorPosition, CursorPosition), should_clear: bool },
     AutoComplete(String),
     ActivateEditor(usize),
     SelectOpenedFile(String),
@@ -31,15 +31,15 @@ impl WorkspaceEvent {
                 mode.clear_popup();
             }
             Self::PopupAccess => mode.update_workspace(workspace),
-            Self::ReplaceSelect(new, select) => {
+            Self::ReplaceSelect(new, (from, to)) => {
                 if let Some(editor) = workspace.get_active() {
-                    editor.replace_select(select, new.as_str());
+                    editor.replace_select(from, to, new.as_str());
                 }
                 mode.clear_popup();
             }
-            Self::GoToSelect { select, should_clear } => {
+            Self::GoToSelect { select: (from, to), should_clear } => {
                 if let Some(editor) = workspace.get_active() {
-                    editor.go_to_select(select);
+                    editor.go_to_select(from, to);
                     if should_clear {
                         mode.clear_popup();
                     }

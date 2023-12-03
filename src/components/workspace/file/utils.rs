@@ -56,7 +56,7 @@ pub fn clip_content(from: &CursorPosition, to: &CursorPosition, content: &mut Ve
     }
 }
 
-pub fn remove_content(from: &CursorPosition, to: &CursorPosition, content: &mut Vec<String>) {
+pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<String>) {
     if from.line == to.line {
         if let Some(line) = content.get_mut(from.line) {
             line.replace_range(from.char..to.char, "")
@@ -78,7 +78,7 @@ pub fn remove_content(from: &CursorPosition, to: &CursorPosition, content: &mut 
     }
 }
 
-pub fn copy_content(from: &CursorPosition, to: &CursorPosition, content: &[String]) -> String {
+pub fn copy_content(from: CursorPosition, to: CursorPosition, content: &[String]) -> String {
     if from.line == to.line {
         content[from.line][from.char..to.char].to_owned()
     } else {

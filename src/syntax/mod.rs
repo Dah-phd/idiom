@@ -7,7 +7,7 @@ pub use self::theme::Theme;
 use crate::components::workspace::CursorPosition;
 use crate::configs::EditorAction;
 use crate::configs::FileType;
-use crate::events::Events;
+use crate::events::{Events, WorkspaceEvent};
 use crate::lsp::{LSPClient, LSPRequest};
 use lsp_types::request::{
     Completion, GotoDeclaration, GotoDefinition, HoverRequest, Rename, SemanticTokensFullRequest, SignatureHelpRequest,
@@ -67,14 +67,18 @@ impl Lexer {
         self.max_digits
     }
 
-    pub async fn update_lsp(&mut self, path: &Path, changes: Option<(i32, Vec<TextDocumentContentChangeEvent>)>) {
+    pub async fn update_lsp(
+        &mut self,
+        path: &Path,
+        version: i32,
+        content_changes: Vec<TextDocumentContentChangeEvent>,
+    ) {
         if let Some(client) = self.lsp_client.as_mut() {
-            if let Some((version, content_changes)) = changes {
-                self.line_builder.collect_changes(&content_changes);
-                if let Err(err) = client.file_did_change(path, version, content_changes) {
-                    let mut events = self.events.borrow_mut();
-                    events.overwrite(format!("Failed to sync with lsp: {err}"));
-                }
+            self.line_builder.collect_changes(&content_changes);
+            if let Err(err) = client.file_did_change(path, version, content_changes) {
+                let mut events = self.events.borrow_mut();
+                events.overwrite(format!("Failed to sync with lsp: {err}"));
+                events.workspace.push(WorkspaceEvent::CheckLSP(self.line_builder.lang.file_type));
             }
             if self.line_builder.should_update() {
                 self.line_builder.waiting = true;
@@ -126,6 +130,11 @@ impl Lexer {
         self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
         self.lsp_client.replace(client);
         self.events.borrow_mut().overwrite("LSP mapped!");
+        if self.get_tokens(on_file).is_some() {
+            self.line_builder.waiting = true;
+            self.line_builder.text_is_updated = true;
+            self.events.borrow_mut().message("Getting LSP syntax");
+        };
     }
 
     fn get_diagnostics(&mut self, path: &Path) -> Option<()> {

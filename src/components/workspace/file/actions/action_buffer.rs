@@ -1,7 +1,7 @@
 use lsp_types::{Position, Range, TextEdit};
 use std::time::{Duration, Instant};
 
-use super::{actions::EditMetaData, Action};
+use super::edits::{Edit, EditMetaData};
 
 const TICK: Duration = Duration::from_millis(200);
 
@@ -15,11 +15,11 @@ pub enum ActionBuffer {
 }
 
 impl ActionBuffer {
-    pub fn collect(&mut self) -> Option<Action> {
+    pub fn collect(&mut self) -> Option<Edit> {
         std::mem::take(self).into()
     }
 
-    pub fn timed_collect(&mut self) -> Option<Action> {
+    pub fn timed_collect(&mut self) -> Option<Edit> {
         match std::mem::take(self) {
             Self::Text(buf) => {
                 if buf.clock.elapsed() > TICK {
@@ -52,21 +52,21 @@ impl ActionBuffer {
         }
     }
 
-    pub fn push(&mut self, line: usize, char: usize, ch: char) -> Option<Action> {
+    pub fn push(&mut self, line: usize, char: usize, ch: char) -> Option<Edit> {
         if let Self::Text(buf) = self {
             return buf.push(line, char, ch);
         }
         std::mem::replace(self, Self::Text(TextBuffer::new(line, char, ch.into()))).into()
     }
 
-    pub fn del(&mut self, line: usize, char: usize, text: &mut String) -> Option<Action> {
+    pub fn del(&mut self, line: usize, char: usize, text: &mut String) -> Option<Edit> {
         if let Self::Del(buf) = self {
             return buf.del(line, char, text);
         }
         std::mem::replace(self, Self::Del(DelBuffer::new(line, char, text))).into()
     }
 
-    pub fn backspace(&mut self, line: usize, char: usize, text: &mut String, indent: &str) -> Option<Action> {
+    pub fn backspace(&mut self, line: usize, char: usize, text: &mut String, indent: &str) -> Option<Edit> {
         if let Self::Backspace(buf) = self {
             return buf.backspace(line, char, text, indent);
         }
@@ -74,7 +74,7 @@ impl ActionBuffer {
     }
 }
 
-impl From<ActionBuffer> for Option<Action> {
+impl From<ActionBuffer> for Option<Edit> {
     fn from(buffer: ActionBuffer) -> Self {
         match buffer {
             ActionBuffer::None => None,
@@ -97,7 +97,7 @@ impl DelBuffer {
     fn new(line: usize, char: usize, text: &mut String) -> Self {
         Self { line, char, text: text.remove(char).into(), clock: Instant::now() }
     }
-    fn del(&mut self, line: usize, char: usize, text: &mut String) -> Option<Action> {
+    fn del(&mut self, line: usize, char: usize, text: &mut String) -> Option<Edit> {
         if line == self.line && char == self.char && self.clock.elapsed() <= TICK {
             self.clock = Instant::now();
             self.text.push(text.remove(char));
@@ -107,10 +107,10 @@ impl DelBuffer {
     }
 }
 
-impl From<DelBuffer> for Action {
+impl From<DelBuffer> for Edit {
     fn from(buf: DelBuffer) -> Self {
         let start = Position::new(buf.line as u32, buf.char as u32);
-        Action {
+        Edit {
             meta: EditMetaData::default(),
             text_edit: TextEdit::new(
                 Range::new(start, Position::new(buf.line as u32, (buf.char + buf.text.len()) as u32)),
@@ -137,7 +137,7 @@ impl BackspaceBuffer {
         new
     }
 
-    fn backspace(&mut self, line: usize, char: usize, text: &mut String, indent: &str) -> Option<Action> {
+    fn backspace(&mut self, line: usize, char: usize, text: &mut String, indent: &str) -> Option<Edit> {
         if line == self.line && self.last == char && self.clock.elapsed() <= TICK {
             self.backspace_indent_handler(char, text, indent);
             return None;
@@ -164,10 +164,10 @@ impl BackspaceBuffer {
     }
 }
 
-impl From<BackspaceBuffer> for Action {
+impl From<BackspaceBuffer> for Edit {
     fn from(buf: BackspaceBuffer) -> Self {
         let end = Position::new(buf.line as u32, buf.last as u32);
-        Action {
+        Edit {
             meta: EditMetaData::default(),
             reverse_text_edit: TextEdit::new(Range::new(end, end), buf.text.chars().rev().collect()),
             text_edit: TextEdit::new(Range::new(end, Position::new(buf.line as u32, buf.char)), String::new()),
@@ -189,7 +189,7 @@ impl TextBuffer {
         Self { line, last: char + 1, char: char as u32, text, clock: Instant::now() }
     }
 
-    fn push(&mut self, line: usize, char: usize, ch: char) -> Option<Action> {
+    fn push(&mut self, line: usize, char: usize, ch: char) -> Option<Edit> {
         if line == self.line && char == self.last && self.clock.elapsed() <= TICK {
             self.clock = Instant::now();
             self.last += 1;
@@ -200,10 +200,10 @@ impl TextBuffer {
     }
 }
 
-impl From<TextBuffer> for Action {
+impl From<TextBuffer> for Edit {
     fn from(buf: TextBuffer) -> Self {
         let start = Position::new(buf.line as u32, buf.char);
-        Action {
+        Edit {
             meta: EditMetaData::default(),
             reverse_text_edit: TextEdit::new(
                 Range::new(start, Position::new(buf.line as u32, buf.last as u32)),

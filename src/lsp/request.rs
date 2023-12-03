@@ -183,7 +183,6 @@ where
                     workspace: Some(WorkspaceClientCapabilities { ..Default::default() }),
                     text_document: Some(TextDocumentClientCapabilities {
                         synchronization: Some(TextDocumentSyncClientCapabilities {
-                            will_save: Some(true),
                             did_save: Some(true),
                             ..Default::default()
                         }),

@@ -3,24 +3,24 @@ use std::fmt::Debug;
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit};
 
 use crate::{
-    components::workspace::file::utils::{insert_clip, token_range_at},
+    components::workspace::file::utils::{insert_clip, remove_content, token_range_at},
     configs::EditorConfigs,
     utils::Offset,
 };
 
 use super::{
     super::utils::{clip_content, copy_content},
-    Cursor, CursorPosition, Select,
+    Cursor, CursorPosition,
 };
 
 #[derive(Debug)]
-pub struct Action {
+pub struct Edit {
     pub meta: EditMetaData,
     pub reverse_text_edit: TextEdit,
     pub text_edit: TextEdit,
 }
 
-impl Action {
+impl Edit {
     pub fn swap_down(from: usize, cfg: &EditorConfigs, content: &mut [String]) -> (Offset, Offset, Self) {
         let to = from + 1;
         let mut reverse_edit_text = content[from].to_owned();
@@ -47,10 +47,10 @@ impl Action {
         )
     }
 
-    pub fn merge_next_line(at_line: usize, content: &mut Vec<String>) -> Self {
-        let removed_line = content.remove(at_line + 1);
-        let merged_to = &mut content[at_line];
-        let position_of_new_line = Position::new(at_line as u32, merged_to.len() as u32);
+    pub fn merge_next_line(from: usize, content: &mut Vec<String>) -> Self {
+        let removed_line = content.remove(from + 1);
+        let merged_to = &mut content[from];
+        let position_of_new_line = Position::new(from as u32, merged_to.len() as u32);
         merged_to.push_str(removed_line.as_ref());
         Self {
             meta: EditMetaData { from: 1, to: 1 },
@@ -59,7 +59,7 @@ impl Action {
                 String::from("\n"),
             ),
             text_edit: TextEdit::new(
-                Range::new(position_of_new_line, Position::new((at_line + 1) as u32, 0)),
+                Range::new(position_of_new_line, Position::new((from + 1) as u32, 0)),
                 String::new(),
             ),
         }
@@ -93,7 +93,7 @@ impl Action {
 
     pub fn insert_clip(from: CursorPosition, clip: String, content: &mut Vec<String>) -> Self {
         let end = insert_clip(clip.clone(), content, from);
-        Action {
+        Edit {
             meta: EditMetaData { from: 1, to: (end.line - from.line) + 1 },
             reverse_text_edit: TextEdit::new(Range::new(from.into(), end.into()), String::new()),
             text_edit: TextEdit::new(Range::new(from.into(), from.into()), clip),
@@ -104,7 +104,7 @@ impl Action {
         let mut removed_line = content.remove(line);
         removed_line.push('\n');
         let start = Position::new(line as u32, 0);
-        Action {
+        Edit {
             meta: EditMetaData { from: 2, to: 1 },
             reverse_text_edit: TextEdit::new(Range::new(start, start), removed_line),
             text_edit: TextEdit::new(Range::new(start, Position::new(line as u32 + 1, 0)), String::new()),
@@ -112,7 +112,7 @@ impl Action {
     }
 
     pub fn remove_select(from: CursorPosition, to: CursorPosition, content: &mut Vec<String>) -> Self {
-        Action {
+        Edit {
             meta: EditMetaData { from: to.line - from.line + 1, to: 1 },
             reverse_text_edit: TextEdit::new(Range::new(from.into(), from.into()), clip_content(&from, &to, content)),
             text_edit: TextEdit::new(Range::new(from.into(), to.into()), String::new()),
@@ -122,7 +122,7 @@ impl Action {
     pub fn replace_select(from: CursorPosition, to: CursorPosition, clip: String, content: &mut Vec<String>) -> Self {
         let reverse_edit_text = clip_content(&from, &to, content);
         let end = if !clip.is_empty() { insert_clip(clip.clone(), content, from) } else { from };
-        Action {
+        Edit {
             meta: EditMetaData { from: to.line - from.line + 1, to: (end.line - from.line) + 1 },
             reverse_text_edit: TextEdit::new(Range::new(from.into(), end.into()), reverse_edit_text),
             text_edit: TextEdit { range: Range::new(from.into(), to.into()), new_text: clip },
@@ -137,7 +137,7 @@ impl Action {
         let reverse_edit_range = Range::new(start, Position::new(line as u32, (range.start + new_text.len()) as u32));
         let replaced_text = code_line[range.clone()].to_owned();
         code_line.replace_range(range, &new_text);
-        Action {
+        Edit {
             meta: EditMetaData::default(),
             text_edit: TextEdit::new(text_edit_range, new_text),
             reverse_text_edit: TextEdit::new(reverse_edit_range, replaced_text),
@@ -146,6 +146,26 @@ impl Action {
 
     pub fn end_position(&self) -> CursorPosition {
         self.reverse_text_edit.range.start.into()
+    }
+
+    /// reverse the action (goes into undone)
+    pub fn apply_rev(
+        &self,
+        content: &mut Vec<String>,
+        events: &mut Vec<TextDocumentContentChangeEvent>,
+    ) -> CursorPosition {
+        let from = self.reverse_text_edit.range.start.into();
+        remove_content(from, self.reverse_text_edit.range.end.into(), content);
+        events.push(self.reverse_event());
+        insert_clip(self.reverse_text_edit.new_text.to_owned(), content, from)
+    }
+
+    /// dose edit (goes into done)
+    pub fn apply(&self, content: &mut Vec<String>, events: &mut Vec<TextDocumentContentChangeEvent>) -> CursorPosition {
+        let from = self.text_edit.range.start.into();
+        remove_content(from, self.text_edit.range.end.into(), content);
+        events.push(self.event());
+        insert_clip(self.text_edit.new_text.to_owned(), content, from)
     }
 
     pub fn reverse_event(&self) -> TextDocumentContentChangeEvent {
@@ -166,17 +186,17 @@ impl Action {
 }
 
 #[derive(Debug)]
-pub struct ActionBuilder {
+pub struct EditBuilder {
     pub reverse_edit_text: String,
     text_edit_range: (CursorPosition, CursorPosition),
     reverse_len: usize,
 }
 
-impl ActionBuilder {
+impl EditBuilder {
     // OPENERS
     /// initialize builder collecting select if exists
-    pub fn init(cursor: &mut Cursor, content: &mut Vec<String>) -> Self {
-        if let Select::Range(from, to) = cursor.select.take() {
+    pub fn init_alt(cursor: &mut Cursor, content: &mut Vec<String>) -> Self {
+        if let Some((from, to)) = cursor.select.take() {
             cursor.set_position(from);
             return Self {
                 reverse_edit_text: clip_content(&from, &to, content),
@@ -184,19 +204,15 @@ impl ActionBuilder {
                 text_edit_range: (from, to),
             };
         }
-        Self {
-            text_edit_range: (cursor.position(), cursor.position()),
-            reverse_edit_text: String::new(),
-            reverse_len: 1,
-        }
+        Self { text_edit_range: (cursor.into(), cursor.into()), reverse_edit_text: String::new(), reverse_len: 1 }
     }
 
     pub fn empty_at(position: CursorPosition) -> Self {
         Self { reverse_len: 1, reverse_edit_text: String::new(), text_edit_range: (position, position) }
     }
 
-    pub fn raw_finish(self, position: CursorPosition, new_text: String) -> Action {
-        Action {
+    pub fn raw_finish(self, position: CursorPosition, new_text: String) -> Edit {
+        Edit {
             meta: EditMetaData { from: self.reverse_len, to: 1 },
             reverse_text_edit: TextEdit {
                 range: Range::new(self.text_edit_range.0.into(), position.into()),
@@ -209,12 +225,12 @@ impl ActionBuilder {
         }
     }
 
-    pub fn finish(self, cursor: CursorPosition, content: &[String]) -> Action {
-        Action {
+    pub fn finish(self, cursor: CursorPosition, content: &[String]) -> Edit {
+        Edit {
             meta: EditMetaData { from: self.reverse_len, to: cursor.line - self.text_edit_range.0.line + 1 },
             text_edit: TextEdit {
                 range: Range::new(self.text_edit_range.0.into(), self.text_edit_range.1.into()),
-                new_text: copy_content(&self.text_edit_range.0, &cursor, content),
+                new_text: copy_content(self.text_edit_range.0, cursor, content),
             },
             reverse_text_edit: TextEdit {
                 range: Range::new(self.text_edit_range.0.into(), cursor.into()),

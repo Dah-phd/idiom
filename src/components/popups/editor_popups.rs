@@ -1,6 +1,7 @@
 use super::{generics::PopupActiveSelector, Button, Popup, PopupSelector};
+use crate::components::workspace::CursorPosition;
+use crate::events::messages::PopupMessage;
 use crate::events::WorkspaceEvent;
-use crate::{components::workspace::Select, events::messages::PopupMessage};
 use crossterm::event::KeyCode;
 
 pub fn save_all_popup() -> Box<Popup> {
@@ -47,7 +48,7 @@ pub fn go_to_line_popup() -> Box<Popup> {
     })
 }
 
-pub fn find_in_editor_popup() -> Box<PopupActiveSelector<Select>> {
+pub fn find_in_editor_popup() -> Box<PopupActiveSelector<(CursorPosition, CursorPosition)>> {
     Box::new(PopupActiveSelector::for_editor(
         |popup| {
             if let Some(select) = popup.next() {
@@ -65,7 +66,7 @@ pub fn find_in_editor_popup() -> Box<PopupActiveSelector<Select>> {
     ))
 }
 
-pub fn replace_in_editor_popup() -> Box<PopupActiveSelector<Select>> {
+pub fn replace_in_editor_popup() -> Box<PopupActiveSelector<(CursorPosition, CursorPosition)>> {
     Box::new(PopupActiveSelector::default(
         |popup| {
             if let Some(select) = popup.drain_next() {
@@ -78,13 +79,12 @@ pub fn replace_in_editor_popup() -> Box<PopupActiveSelector<Select>> {
     ))
 }
 
-pub fn select_selector(options: Vec<(Select, String)>) -> Box<PopupSelector<(Select, String)>> {
+pub fn select_selector(
+    options: Vec<((CursorPosition, CursorPosition), String)>,
+) -> Box<PopupSelector<((CursorPosition, CursorPosition), String)>> {
     Box::new(PopupSelector {
         options,
-        display: |(select, line)| match select {
-            Select::Range(from, ..) => format!("({}) {line}", from.line + 1),
-            Select::None => line.to_owned(),
-        },
+        display: |((from, _), line)| format!("({}) {line}", from.line + 1),
         command: |popup| WorkspaceEvent::GoToSelect { select: popup.options[popup.state].0, should_clear: true }.into(),
         state: 0,
         size: None,
