@@ -41,7 +41,7 @@ impl Debug for Lexer {
 impl Lexer {
     pub fn with_context(file_type: FileType, theme: Theme, events: &Rc<RefCell<Events>>) -> Self {
         Self {
-            line_builder: (theme, file_type.into()).into(),
+            line_builder: LineBuilder::new(theme, file_type.into()),
             select: None,
             modal: None,
             requests: Vec::new(),
@@ -59,8 +59,9 @@ impl Lexer {
         select: Option<(&CursorPosition, &CursorPosition)>,
         path: &Path,
     ) -> usize {
-        self.get_diagnostics(path);
         self.get_lsp_responses();
+        self.get_diagnostics(path);
+        self.get_tokens(path);
         self.line_builder.reset();
         self.select = select.map(|(from, to)| (*from, *to));
         self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
@@ -79,12 +80,6 @@ impl Lexer {
                 let mut events = self.events.borrow_mut();
                 events.overwrite(format!("Failed to sync with lsp: {err}"));
                 events.workspace.push(WorkspaceEvent::CheckLSP(self.line_builder.lang.file_type));
-            }
-            if self.line_builder.should_update() {
-                self.line_builder.waiting = true;
-                if self.get_tokens(path).is_some() {
-                    self.events.borrow_mut().message("Getting LSP syntax");
-                };
             }
         }
     }
@@ -130,11 +125,7 @@ impl Lexer {
         self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
         self.lsp_client.replace(client);
         self.events.borrow_mut().overwrite("LSP mapped!");
-        if self.get_tokens(on_file).is_some() {
-            self.line_builder.waiting = true;
-            self.line_builder.text_is_updated = true;
-            self.events.borrow_mut().message("Getting LSP syntax");
-        };
+        self.get_tokens(on_file);
     }
 
     fn get_diagnostics(&mut self, path: &Path) -> Option<()> {
@@ -200,8 +191,12 @@ impl Lexer {
 
     pub fn get_tokens(&mut self, path: &Path) -> Option<()> {
         self.lsp_client.as_ref()?.capabilities.semantic_tokens_provider.as_ref()?;
-        let id = self.send_request(LSPRequest::<SemanticTokensFullRequest>::semantics_full(path)?)?;
-        self.requests.push(LSPResponseType::TokensFull(id));
+        if self.line_builder.should_update() {
+            let id = self.send_request(LSPRequest::<SemanticTokensFullRequest>::semantics_full(path)?)?;
+            self.requests.push(LSPResponseType::TokensFull(id));
+            self.line_builder.waiting = true;
+            self.events.borrow_mut().message("Getting LSP syntax");
+        }
         Some(())
     }
 

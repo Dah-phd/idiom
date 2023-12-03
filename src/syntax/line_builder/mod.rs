@@ -35,23 +35,21 @@ pub struct LineBuilder {
     pub text_is_updated: bool,
 }
 
-impl From<(Theme, Lang)> for LineBuilder {
-    fn from(value: (Theme, Lang)) -> Self {
+impl LineBuilder {
+    pub fn new(theme: Theme, lang: Lang) -> Self {
         Self {
             tokens: Vec::new(),
             legend: Legend::default(),
-            theme: value.0,
-            lang: value.1,
+            theme,
+            lang,
             brackets: BracketColors::default(),
             diagnostics: HashMap::new(),
             select_range: None,
             waiting: false,
-            text_is_updated: false,
+            text_is_updated: true,
         }
     }
-}
 
-impl LineBuilder {
     pub fn set_diganostics(&mut self, params: PublishDiagnosticsParams) {
         self.diagnostics.clear();
         for diagnostic in params.diagnostics {
@@ -67,23 +65,24 @@ impl LineBuilder {
     }
 
     pub fn set_tokens(&mut self, tokens_res: SemanticTokensResult) -> bool {
-        let mut tokens = Vec::new();
         let mut inner_token = Vec::new();
         let mut from = 0;
+        self.tokens.clear();
         if let SemanticTokensResult::Tokens(tkns) = tokens_res {
             for tkn in tkns.data {
                 for _ in 0..tkn.delta_line {
                     from = 0;
-                    tokens.push(std::mem::take(&mut inner_token));
+                    self.tokens.push(std::mem::take(&mut inner_token));
                 }
                 from += tkn.delta_start as usize;
                 inner_token.push(Token { from, len: tkn.length, token_type: tkn.token_type as usize });
             }
-            tokens.push(inner_token);
+            self.tokens.push(inner_token);
         }
-        self.tokens = tokens;
+        if self.tokens.len() > 1 {
+            self.text_is_updated = false;
+        }
         self.waiting = false;
-        self.text_is_updated = false;
         self.tokens.len() > 1
     }
 
@@ -103,7 +102,7 @@ impl LineBuilder {
     }
 
     pub fn build_line<'a>(&mut self, idx: usize, init: Vec<Span<'a>>, content: &'a str) -> Line<'a> {
-        let line = if self.tokens.is_empty() || self.legend.is_empty() || self.waiting || self.text_is_updated {
+        let line = if self.waiting || self.text_is_updated || self.legend.is_empty() || self.tokens.len() <= 1 {
             let mut internal_build = SpansBuffer::new(init);
             internal_build.process(self, content, idx);
             internal_build.collect()
