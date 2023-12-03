@@ -1,6 +1,9 @@
-pub mod editor_popups;
 mod generics;
-pub mod tree_popups;
+pub mod popup_find;
+pub mod popup_replace;
+pub mod popups_editor;
+pub mod popups_tree;
+mod utils;
 
 use crate::events::messages::PopupMessage;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};

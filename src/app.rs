@@ -1,10 +1,10 @@
 use crate::{
     components::{
-        popups::editor_popups::replace_in_editor_popup,
-        popups::editor_popups::{editor_selector, go_to_line_popup},
         popups::{
-            editor_popups::{find_in_editor_popup, save_all_popup},
-            tree_popups::{create_file_popup, find_in_tree_popup, rename_file_popup, tree_file_selector},
+            popup_find::FindPopup,
+            popup_replace::ReplacePopup,
+            popups_editor::{go_to_line_popup, save_all_popup, selector_editors},
+            popups_tree::{create_file_popup, find_in_tree_popup, rename_file_popup, tree_file_selector},
         },
         EditorTerminal, Footer, Tree, Workspace,
     },
@@ -129,16 +129,16 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                 match action {
                     GeneralAction::Find => {
                         if matches!(mode, Mode::Insert) {
-                            mode.popup(find_in_editor_popup());
+                            mode.popup(FindPopup::new());
                         } else {
                             mode.popup(find_in_tree_popup());
                         }
                     }
                     GeneralAction::Replace if matches!(mode, Mode::Insert) => {
-                        mode.popup(replace_in_editor_popup());
+                        mode.popup(ReplacePopup::new());
                     }
                     GeneralAction::SelectOpenEditor => {
-                        mode.popup(editor_selector(workspace.tabs()));
+                        mode.popup(selector_editors(workspace.tabs()));
                     }
                     GeneralAction::NewFile => {
                         mode.popup(create_file_popup(file_tree.get_first_selected_folder_display()));

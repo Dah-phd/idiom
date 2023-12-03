@@ -1,4 +1,4 @@
-use super::{generics::PopupActiveSelector, Button, Popup, PopupSelector};
+use super::{Button, Popup, PopupSelector};
 use crate::components::workspace::CursorPosition;
 use crate::events::messages::PopupMessage;
 use crate::events::WorkspaceEvent;
@@ -48,38 +48,7 @@ pub fn go_to_line_popup() -> Box<Popup> {
     })
 }
 
-pub fn find_in_editor_popup() -> Box<PopupActiveSelector<(CursorPosition, CursorPosition)>> {
-    Box::new(PopupActiveSelector::for_editor(
-        |popup| {
-            if let Some(select) = popup.next() {
-                WorkspaceEvent::GoToSelect { select, should_clear: false }.into()
-            } else {
-                PopupMessage::None
-            }
-        },
-        |popup, editor_state| {
-            if let Some(editor) = editor_state.get_active() {
-                editor.find(popup.pattern.as_str(), &mut popup.options);
-            }
-        },
-        Some(|popup| WorkspaceEvent::SelectOpenedFile(popup.pattern.to_owned()).into()),
-    ))
-}
-
-pub fn replace_in_editor_popup() -> Box<PopupActiveSelector<(CursorPosition, CursorPosition)>> {
-    Box::new(PopupActiveSelector::default(
-        |popup| {
-            if let Some(select) = popup.drain_next() {
-                WorkspaceEvent::ReplaceSelect(popup.pattern.to_owned(), select).into()
-            } else {
-                PopupMessage::Done
-            }
-        },
-        None,
-    ))
-}
-
-pub fn select_selector(
+pub fn selector_ranges(
     options: Vec<((CursorPosition, CursorPosition), String)>,
 ) -> Box<PopupSelector<((CursorPosition, CursorPosition), String)>> {
     Box::new(PopupSelector {
@@ -91,7 +60,7 @@ pub fn select_selector(
     })
 }
 
-pub fn editor_selector(options: Vec<String>) -> Box<PopupSelector<String>> {
+pub fn selector_editors(options: Vec<String>) -> Box<PopupSelector<String>> {
     Box::new(PopupSelector {
         options,
         display: |editor| editor.to_owned(),

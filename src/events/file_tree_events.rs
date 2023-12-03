@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::{
     components::{
-        popups::{message, tree_popups::file_selector},
+        popups::{message, popups_tree::file_selector},
         Tree,
     },
     configs::Mode,

@@ -1,7 +1,11 @@
-use lsp_types::{request::GotoDeclarationResponse, GotoDefinitionResponse, Location, LocationLink, WorkspaceEdit};
+use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, WorkspaceEdit};
 
 use crate::{
-    components::{popups::editor_popups::select_selector, workspace::CursorPosition, Workspace},
+    components::{
+        popups::{popup_replace::ReplacePopup, popups_editor::selector_ranges},
+        workspace::CursorPosition,
+        Workspace,
+    },
     configs::{FileType, Mode},
 };
 use std::path::PathBuf;
@@ -10,11 +14,14 @@ use std::path::PathBuf;
 pub enum WorkspaceEvent {
     PopupAccess,
     ReplaceSelect(String, (CursorPosition, CursorPosition)),
+    ReplaceNextSelect(String, (CursorPosition, CursorPosition)),
+    ReplaceAll(String, Vec<(CursorPosition, CursorPosition)>),
     GoToLine(usize),
     GoToSelect { select: (CursorPosition, CursorPosition), should_clear: bool },
     AutoComplete(String),
     ActivateEditor(usize),
-    SelectOpenedFile(String),
+    FindSelector(String),
+    FindToReplace(String, Vec<(CursorPosition, CursorPosition)>),
     SelectTreeFiles(String),
     Open(PathBuf, usize),
     CheckLSP(FileType),
@@ -37,6 +44,17 @@ impl WorkspaceEvent {
                 }
                 mode.clear_popup();
             }
+            Self::ReplaceNextSelect(new, (from, to)) => {
+                if let Some(editor) = workspace.get_active() {
+                    editor.replace_select(from, to, new.as_str());
+                }
+            }
+            Self::ReplaceAll(clip, ranges) => {
+                if let Some(editor) = workspace.get_active() {
+                    editor.mass_replace(ranges, clip);
+                }
+                mode.clear_popup();
+            }
             Self::GoToSelect { select: (from, to), should_clear } => {
                 if let Some(editor) = workspace.get_active() {
                     editor.go_to_select(from, to);
@@ -51,12 +69,16 @@ impl WorkspaceEvent {
                 workspace.state.select(Some(idx));
                 mode.clear_popup();
             }
-            Self::SelectOpenedFile(pattern) => {
+            Self::FindSelector(pattern) => {
                 if let Some(editor) = workspace.get_active() {
-                    mode.popup_insert(select_selector(editor.find_with_line(&pattern)));
+                    mode.popup_insert(selector_ranges(editor.find_with_line(&pattern)));
                 } else {
                     mode.clear_popup();
                 }
+            }
+            Self::FindToReplace(pattern, options) => {
+                mode.clear_popup();
+                mode.popup(ReplacePopup::from_search(pattern, options));
             }
             Self::AutoComplete(completion) => {
                 if let Some(editor) = workspace.get_active() {
@@ -110,7 +132,7 @@ impl From<GotoDeclarationResponse> for WorkspaceEvent {
         match value {
             GotoDeclarationResponse::Scalar(location) => location.into(),
             GotoDeclarationResponse::Array(mut arr) => arr.remove(0).into(), // ! handle multi select
-            GotoDefinitionResponse::Link(mut links) => links.remove(0).into(), // ! handle muti select
+            GotoDeclarationResponse::Link(mut links) => links.remove(0).into(), // ! handle muti select
         }
     }
 }

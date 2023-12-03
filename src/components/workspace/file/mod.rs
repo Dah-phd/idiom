@@ -111,17 +111,15 @@ impl Editor {
         self.actions.replace_token(new, &mut self.cursor, &mut self.content);
     }
 
-    pub fn mass_replace(&mut self, mut selects: Vec<(CursorPosition, CursorPosition)>, new_clip: &str) {
-        selects.sort_by(|a, b| {
+    pub fn mass_replace(&mut self, mut ranges: Vec<(CursorPosition, CursorPosition)>, clip: String) {
+        ranges.sort_by(|a, b| {
             let line_ord = b.0.line.cmp(&a.0.line);
             if let Ordering::Equal = line_ord {
                 return b.0.char.cmp(&a.0.char);
             }
             line_ord
         });
-        for (from, to) in selects {
-            self.actions.replace_select(from, to, new_clip, &mut self.cursor, &mut self.content);
-        }
+        self.actions.mass_replace(&mut self.cursor, ranges, clip, &mut self.content);
     }
 
     pub fn apply_file_edits(&mut self, mut edits: Vec<TextEdit>) {
@@ -151,7 +149,6 @@ impl Editor {
     }
 
     pub fn find(&mut self, pat: &str, buffer: &mut Vec<(CursorPosition, CursorPosition)>) {
-        buffer.clear();
         if pat.is_empty() {
             return;
         }

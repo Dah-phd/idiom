@@ -1,6 +1,6 @@
 use super::{footer_events::FooterEvent, workspace_events::WorkspaceEvent, TreeEvent};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum PopupMessage {
     CreateFileOrFolder(String),
     CreateFileOrFolderBase(String),
@@ -11,8 +11,9 @@ pub enum PopupMessage {
     UpdateTree(TreeEvent),
     Exit,
     SaveAndExit,
-    None,
     Done,
+    #[default]
+    None,
 }
 
 impl From<TreeEvent> for PopupMessage {

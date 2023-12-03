@@ -12,8 +12,8 @@ use lsp_types::{TextDocumentContentChangeEvent, TextEdit};
 pub struct Actions {
     pub cfg: EditorConfigs,
     version: i32,
-    done: Vec<Action>,
-    undone: Vec<Action>,
+    done: Vec<EditType>,
+    undone: Vec<EditType>,
     events: Vec<TextDocumentContentChangeEvent>,
     buffer: ActionBuffer,
 }
@@ -87,11 +87,11 @@ impl Actions {
         self.push_done(actions);
     }
 
-    pub fn apply_edits(&mut self, edits: Vec<TextEdit>, content: &mut Vec<String>) {
+    pub fn apply_edits(&mut self, mut edits: Vec<TextEdit>, content: &mut Vec<String>) {
         self.push_buffer();
         let actions: Vec<Edit> = edits
-            .iter()
-            .map(|e| Edit::replace_select(e.range.start.into(), e.range.end.into(), e.new_text.to_owned(), content))
+            .drain(..)
+            .map(|e| Edit::replace_select(e.range.start.into(), e.range.end.into(), e.new_text, content))
             .collect();
         self.push_done(actions);
     }
@@ -301,20 +301,20 @@ impl Actions {
         self.version += 1;
         Some((self.version, std::mem::take(&mut self.events)))
     }
-    pub fn push_done(&mut self, edit: impl Into<Action>) {
-        let action: Action = edit.into();
+    pub fn push_done(&mut self, edit: impl Into<EditType>) {
+        let action: EditType = edit.into();
         action.collect_events(&mut self.events);
         self.done.push(action);
     }
 }
 
 #[derive(Debug)]
-pub enum Action {
+pub enum EditType {
     Single(Edit),
     Multi(Vec<Edit>),
 }
 
-impl Action {
+impl EditType {
     pub fn apply_rev(
         &self,
         content: &mut Vec<String>,
@@ -346,13 +346,13 @@ impl Action {
     }
 }
 
-impl From<Edit> for Action {
+impl From<Edit> for EditType {
     fn from(value: Edit) -> Self {
         Self::Single(value)
     }
 }
 
-impl From<Vec<Edit>> for Action {
+impl From<Vec<Edit>> for EditType {
     fn from(value: Vec<Edit>) -> Self {
         Self::Multi(value)
     }
