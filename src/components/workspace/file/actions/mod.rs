@@ -18,10 +18,9 @@ pub struct Actions {
     buffer: ActionBuffer,
 }
 
-#[allow(dead_code)]
 impl Actions {
     pub fn new(cfg: EditorConfigs) -> Self {
-        Self { cfg, ..Default::default() }
+        Self { cfg, events: Vec::with_capacity(2), ..Default::default() }
     }
 
     pub fn swap_up(&mut self, cursor: &mut Cursor, content: &mut [String]) {
@@ -299,7 +298,7 @@ impl Actions {
             return None;
         }
         self.version += 1;
-        Some((self.version, std::mem::take(&mut self.events)))
+        Some((self.version, self.events.drain(..).collect()))
     }
     pub fn push_done(&mut self, edit: impl Into<EditType>) {
         let action: EditType = edit.into();
