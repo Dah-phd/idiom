@@ -95,22 +95,24 @@ impl PopupInterface for ReplacePopup {
     }
 
     fn render(&mut self, frame: &mut Frame) {
-        let area = right_corner_rect_static(100, 3, frame.size());
+        let area = right_corner_rect_static(50, 4, frame.size());
         let block = Block::default().title("Replace").borders(Borders::ALL);
-        let mut spans = vec![
-            Span::raw(count_as_string(&self.options)),
-            Span::raw(" >> "),
+        let mut find = vec![
+            Span::raw(count_as_string(&self.options)), // 3
+            Span::raw(" > "),                          // 3
             Span::raw(self.pattern.to_owned()),
-            Span::raw(" <> "),
+        ];
+        let mut replace = vec![
+            Span::raw("Rep > "), // 6
             Span::raw(self.new_text.to_owned()),
         ];
         if self.on_text {
-            spans.push(Span::styled("|", Style::default().add_modifier(Modifier::SLOW_BLINK)));
+            replace.push(Span::styled("|", Style::default().add_modifier(Modifier::SLOW_BLINK)));
         } else {
-            spans.insert(3, Span::styled("|", Style::default().add_modifier(Modifier::SLOW_BLINK)));
-        }
+            find.push(Span::styled("|", Style::default().add_modifier(Modifier::SLOW_BLINK)));
+        };
         frame.render_widget(Clear, area);
-        frame.render_widget(Paragraph::new(Line::from(spans)).block(block), area);
+        frame.render_widget(Paragraph::new(vec![Line::from(find), Line::from(replace)]).block(block), area);
     }
 
     fn update_workspace(&mut self, workspace: &mut Workspace) {
