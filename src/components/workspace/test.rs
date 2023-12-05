@@ -57,6 +57,10 @@ fn test_move() {
         assert_eq!(editor.cursor.position(), CursorPosition { char: 13, line: 4 });
         editor.right();
         assert_eq!(editor.cursor.position(), CursorPosition { char: 14, line: 4 });
+        editor.down();
+        assert_eq!(editor.cursor.position(), CursorPosition { char: 8, line: 5 });
+        editor.up();
+        assert_eq!(editor.cursor.position(), CursorPosition { char: 14, line: 4 });
     }
 }
 

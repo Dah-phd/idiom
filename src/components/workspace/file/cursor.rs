@@ -18,6 +18,7 @@ impl Cursor {
     }
     pub fn end_of_line(&mut self, content: &[String]) {
         self.char = content[self.line].len();
+        self.phantm_char = self.char;
     }
 
     pub fn end_of_file(&mut self, content: &[String]) {
@@ -37,7 +38,8 @@ impl Cursor {
         self.char = 0;
         for ch in content[self.line].chars() {
             if !ch.is_whitespace() {
-                break;
+                self.phantm_char = self.char;
+                return;
             }
             self.char += 1;
         }

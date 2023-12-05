@@ -211,7 +211,7 @@ impl Editor {
     }
 
     pub fn end_of_line(&mut self) {
-        self.cursor.char = self.content[self.cursor.line].len();
+        self.cursor.end_of_line(&self.content);
     }
 
     pub fn end_of_file(&mut self) {

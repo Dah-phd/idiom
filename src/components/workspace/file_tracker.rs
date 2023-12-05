@@ -38,7 +38,7 @@ impl Default for FileTracker {
 impl FileTracker {
     pub async fn register(&mut self, path: &PathBuf) {
         let mut registered = self.registered.lock().await;
-        if registered.iter().find(|meta| &meta.path == path).is_some() {
+        if registered.iter().any(|meta| &meta.path == path) {
             return;
         }
         registered.push(path.into());
