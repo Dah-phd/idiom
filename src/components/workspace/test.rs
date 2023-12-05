@@ -1,4 +1,4 @@
-use super::Workspace;
+use super::{file::Editor, Workspace};
 use crate::{
     components::workspace::{
         file::test::{mock_editor, pull_line, select_eq},
@@ -35,137 +35,132 @@ fn base_ws() -> Workspace {
     ])
 }
 
+fn active(ws: &mut Workspace) -> &mut Editor {
+    ws.get_active().unwrap()
+}
+
 fn raw_keypress(ws: &mut Workspace, code: KeyCode) {
     ws.map(&KeyEvent::new(code, KeyModifiers::empty()), &mut Mode::Insert);
+}
+
+fn shift_keypress(ws: &mut Workspace, code: KeyCode) {
+    ws.map(&KeyEvent::new(code, KeyModifiers::SHIFT), &mut Mode::Insert);
 }
 
 #[test]
 fn test_move() {
     let mut ws = base_ws();
-    assert!(ws.get_active().is_some());
     raw_keypress(&mut ws, KeyCode::Down);
-    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 0, line: 1 });
+    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 0, line: 1 });
     raw_keypress(&mut ws, KeyCode::End);
-    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 9, line: 1 });
+    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 9, line: 1 });
     raw_keypress(&mut ws, KeyCode::Right);
-    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 0, line: 2 });
+    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 0, line: 2 });
     raw_keypress(&mut ws, KeyCode::Left);
-    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 9, line: 1 });
+    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 9, line: 1 });
     raw_keypress(&mut ws, KeyCode::Down);
     raw_keypress(&mut ws, KeyCode::Down);
     raw_keypress(&mut ws, KeyCode::End);
-    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 21, line: 3 });
+    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 21, line: 3 });
     raw_keypress(&mut ws, KeyCode::Down);
-    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 14, line: 4 });
+    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 14, line: 4 });
     raw_keypress(&mut ws, KeyCode::Left);
-    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 13, line: 4 });
+    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 13, line: 4 });
     raw_keypress(&mut ws, KeyCode::Right);
-    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 14, line: 4 });
+    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 14, line: 4 });
     raw_keypress(&mut ws, KeyCode::Down);
-    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 8, line: 5 });
+    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 8, line: 5 });
     raw_keypress(&mut ws, KeyCode::Up);
-    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 14, line: 4 });
+    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 14, line: 4 });
 }
 
 #[test]
 fn test_select() {
     let mut ws = base_ws();
-    assert!(ws.get_active().is_some());
-    if let Some(editor) = ws.get_active() {
-        editor.select_down();
-        assert!(select_eq((CursorPosition::default(), CursorPosition { line: 1, char: 0 }), editor));
-        editor.select_left();
-        assert!(select_eq((CursorPosition::default(), CursorPosition { line: 0, char: 12 }), editor));
-        editor.select_right();
-        assert!(select_eq((CursorPosition::default(), CursorPosition { line: 1, char: 0 }), editor));
-        editor.select_left();
-        editor.select_down();
-        assert!(select_eq((CursorPosition::default(), CursorPosition { char: 9, line: 1 }), editor));
-        editor.left();
-        editor.select_right();
-        assert!(select_eq((CursorPosition { char: 8, line: 1 }, CursorPosition { char: 9, line: 1 }), editor));
-        editor.select_left();
-        editor.select_left();
-        assert!(select_eq((CursorPosition { char: 7, line: 1 }, CursorPosition { char: 8, line: 1 }), editor));
-        editor.select_up();
-        assert!(select_eq((CursorPosition { char: 7, line: 0 }, CursorPosition { char: 8, line: 1 }), editor));
-    }
+    shift_keypress(&mut ws, KeyCode::Down);
+    assert!(select_eq((CursorPosition::default(), CursorPosition { line: 1, char: 0 }), active(&mut ws)));
+    shift_keypress(&mut ws, KeyCode::Left);
+    assert!(select_eq((CursorPosition::default(), CursorPosition { line: 0, char: 12 }), active(&mut ws)));
+    shift_keypress(&mut ws, KeyCode::Right);
+    assert!(select_eq((CursorPosition::default(), CursorPosition { line: 1, char: 0 }), active(&mut ws)));
+    shift_keypress(&mut ws, KeyCode::Left);
+    shift_keypress(&mut ws, KeyCode::Down);
+    assert!(select_eq((CursorPosition::default(), CursorPosition { char: 9, line: 1 }), active(&mut ws)));
+    raw_keypress(&mut ws, KeyCode::Left);
+    shift_keypress(&mut ws, KeyCode::Right);
+    assert!(select_eq((CursorPosition { char: 8, line: 1 }, CursorPosition { char: 9, line: 1 }), active(&mut ws)));
+    shift_keypress(&mut ws, KeyCode::Left);
+    shift_keypress(&mut ws, KeyCode::Left);
+    assert!(select_eq((CursorPosition { char: 7, line: 1 }, CursorPosition { char: 8, line: 1 }), active(&mut ws)));
+    shift_keypress(&mut ws, KeyCode::Up);
+    assert!(select_eq((CursorPosition { char: 7, line: 0 }, CursorPosition { char: 8, line: 1 }), active(&mut ws)));
 }
 
 #[test]
 fn test_chars() {
     let mut ws = base_ws();
-    assert!(ws.get_active().is_some());
-    if let Some(editor) = ws.get_active() {
-        editor.push('n');
-        assert_eq!(pull_line(editor, 0).unwrap(), "nhello world!");
-        editor.right();
-        editor.push('(');
-        assert_eq!(pull_line(editor, 0).unwrap(), "nh()ello world!");
-        editor.right();
-        editor.push('{');
-        assert_eq!(pull_line(editor, 0).unwrap(), "nh(){}ello world!");
-        editor.right();
-        editor.push('[');
-        assert_eq!(pull_line(editor, 0).unwrap(), "nh(){}[]ello world!");
-        editor.push('"');
-        assert_eq!(pull_line(editor, 0).unwrap(), "nh(){}[\"\"]ello world!");
-        editor.push('\'');
-        assert_eq!(pull_line(editor, 0).unwrap(), "nh(){}[\"''\"]ello world!");
-    }
+    raw_keypress(&mut ws, KeyCode::Char('n'));
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nhello world!");
+    raw_keypress(&mut ws, KeyCode::Right);
+    raw_keypress(&mut ws, KeyCode::Char('('));
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh()ello world!");
+    raw_keypress(&mut ws, KeyCode::Right);
+    raw_keypress(&mut ws, KeyCode::Char('{'));
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh(){}ello world!");
+    raw_keypress(&mut ws, KeyCode::Right);
+    raw_keypress(&mut ws, KeyCode::Char('['));
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh(){}[]ello world!");
+    raw_keypress(&mut ws, KeyCode::Char('"'));
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh(){}[\"\"]ello world!");
+    raw_keypress(&mut ws, KeyCode::Char('\''));
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh(){}[\"''\"]ello world!");
 }
 
 #[test]
 fn test_new_line() {
     let mut ws = base_ws();
-    assert!(ws.get_active().is_some());
-    if let Some(editor) = ws.get_active() {
-        editor.new_line();
-        assert_eq!(pull_line(editor, 0).unwrap(), "");
-        assert_eq!(pull_line(editor, 1).unwrap(), "hello world!");
-        editor.right();
-        editor.new_line();
-        assert_eq!(pull_line(editor, 1).unwrap(), "h");
-        assert_eq!(pull_line(editor, 2).unwrap(), "ello world!");
-        editor.end_of_line();
-        editor.new_line();
-        assert_eq!(pull_line(editor, 2).unwrap(), "ello world!");
-        assert_eq!(pull_line(editor, 3).unwrap(), "");
-    }
+    raw_keypress(&mut ws, KeyCode::Enter);
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "");
+    assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "hello world!");
+    raw_keypress(&mut ws, KeyCode::Right);
+    raw_keypress(&mut ws, KeyCode::Enter);
+    assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "h");
+    assert_eq!(pull_line(active(&mut ws), 2).unwrap(), "ello world!");
+    raw_keypress(&mut ws, KeyCode::End);
+    raw_keypress(&mut ws, KeyCode::Enter);
+    assert_eq!(pull_line(active(&mut ws), 2).unwrap(), "ello world!");
+    assert_eq!(pull_line(active(&mut ws), 3).unwrap(), "");
 }
 
 #[test]
 fn test_del() {
     let mut ws = base_ws();
     assert!(ws.get_active().is_some());
-    if let Some(editor) = ws.get_active() {
-        editor.del();
-        assert_eq!(pull_line(editor, 0).unwrap(), "ello world!");
-        editor.end_of_line();
-        editor.del();
-        assert_eq!(pull_line(editor, 0).unwrap(), "ello world!next line");
-        assert_eq!(pull_line(editor, 1).unwrap(), "     ");
-        editor.end_of_line();
-        editor.del();
-        assert_eq!(pull_line(editor, 1).unwrap(), "really long line here");
-    }
+    raw_keypress(&mut ws, KeyCode::Delete);
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "ello world!");
+    raw_keypress(&mut ws, KeyCode::End);
+    raw_keypress(&mut ws, KeyCode::Delete);
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "ello world!next line");
+    assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "     ");
+    raw_keypress(&mut ws, KeyCode::End);
+    raw_keypress(&mut ws, KeyCode::Delete);
+    assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "really long line here");
 }
 
 #[test]
 fn test_backspace() {
     let mut ws = base_ws();
-    assert!(ws.get_active().is_some());
     raw_keypress(&mut ws, KeyCode::Backspace);
-    assert_eq!(pull_line(ws.get_active().unwrap(), 0).unwrap(), "hello world!");
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "hello world!");
     raw_keypress(&mut ws, KeyCode::Down);
     raw_keypress(&mut ws, KeyCode::Backspace);
-    assert_eq!(pull_line(ws.get_active().unwrap(), 0).unwrap(), "hello world!next line");
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "hello world!next line");
     raw_keypress(&mut ws, KeyCode::Backspace);
-    assert_eq!(pull_line(ws.get_active().unwrap(), 0).unwrap(), "hello worldnext line");
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "hello worldnext line");
     raw_keypress(&mut ws, KeyCode::Down);
     raw_keypress(&mut ws, KeyCode::End);
     raw_keypress(&mut ws, KeyCode::Backspace);
-    assert_eq!(pull_line(ws.get_active().unwrap(), 1).unwrap(), "    ");
+    assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "    ");
     raw_keypress(&mut ws, KeyCode::Backspace);
-    assert_eq!(pull_line(ws.get_active().unwrap(), 1).unwrap(), "");
+    assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "");
 }
