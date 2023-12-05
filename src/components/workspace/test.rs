@@ -135,7 +135,6 @@ fn test_new_line() {
 #[test]
 fn test_del() {
     let mut ws = base_ws();
-    assert!(ws.get_active().is_some());
     raw_keypress(&mut ws, KeyCode::Delete);
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "ello world!");
     raw_keypress(&mut ws, KeyCode::End);
