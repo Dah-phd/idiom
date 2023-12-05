@@ -15,7 +15,9 @@ impl Cursor {
     pub fn set_position(&mut self, position: CursorPosition) {
         self.line = position.line;
         self.char = position.char;
+        self.phantm_char = position.char;
     }
+
     pub fn end_of_line(&mut self, content: &[String]) {
         self.char = content[self.line].len();
         self.phantm_char = self.char;

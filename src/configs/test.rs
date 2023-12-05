@@ -1,7 +1,5 @@
-use std::collections::HashMap;
-
-use super::EditorKeyMap;
+use super::{EditorKeyMap, EditorUserKeyMap};
 
 pub fn mock_editor_key_map() -> EditorKeyMap {
-    EditorKeyMap { key_map: HashMap::default() }
+    EditorKeyMap { key_map: EditorUserKeyMap::default().into() }
 }

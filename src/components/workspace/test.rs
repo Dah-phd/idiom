@@ -4,9 +4,10 @@ use crate::{
         file::test::{mock_editor, pull_line, select_eq},
         CursorPosition,
     },
-    configs::{test::mock_editor_key_map, EditorConfigs},
+    configs::{test::mock_editor_key_map, EditorConfigs, Mode},
     events::Events,
 };
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::widgets::ListState;
 use std::collections::HashMap;
 
@@ -27,41 +28,43 @@ fn base_ws() -> Workspace {
     mock_ws(vec![
         "hello world!".to_owned(),
         "next line".to_owned(),
-        "".to_owned(),
+        "     ".to_owned(),
         "really long line here".to_owned(),
         "short one here".to_owned(),
         "test msg".to_owned(),
     ])
 }
 
+fn raw_keypress(ws: &mut Workspace, code: KeyCode) {
+    ws.map(&KeyEvent::new(code, KeyModifiers::empty()), &mut Mode::Insert);
+}
+
 #[test]
 fn test_move() {
     let mut ws = base_ws();
     assert!(ws.get_active().is_some());
-    if let Some(editor) = ws.get_active() {
-        editor.down();
-        assert_eq!(editor.cursor.position(), CursorPosition { char: 0, line: 1 });
-        editor.end_of_line();
-        assert_eq!(editor.cursor.position(), CursorPosition { char: 9, line: 1 });
-        editor.right();
-        assert_eq!(editor.cursor.position(), CursorPosition { char: 0, line: 2 });
-        editor.left();
-        assert_eq!(editor.cursor.position(), CursorPosition { char: 9, line: 1 });
-        editor.down();
-        editor.down();
-        editor.end_of_line();
-        assert_eq!(editor.cursor.position(), CursorPosition { char: 21, line: 3 });
-        editor.down();
-        assert_eq!(editor.cursor.position(), CursorPosition { char: 14, line: 4 });
-        editor.left();
-        assert_eq!(editor.cursor.position(), CursorPosition { char: 13, line: 4 });
-        editor.right();
-        assert_eq!(editor.cursor.position(), CursorPosition { char: 14, line: 4 });
-        editor.down();
-        assert_eq!(editor.cursor.position(), CursorPosition { char: 8, line: 5 });
-        editor.up();
-        assert_eq!(editor.cursor.position(), CursorPosition { char: 14, line: 4 });
-    }
+    raw_keypress(&mut ws, KeyCode::Down);
+    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 0, line: 1 });
+    raw_keypress(&mut ws, KeyCode::End);
+    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 9, line: 1 });
+    raw_keypress(&mut ws, KeyCode::Right);
+    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 0, line: 2 });
+    raw_keypress(&mut ws, KeyCode::Left);
+    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 9, line: 1 });
+    raw_keypress(&mut ws, KeyCode::Down);
+    raw_keypress(&mut ws, KeyCode::Down);
+    raw_keypress(&mut ws, KeyCode::End);
+    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 21, line: 3 });
+    raw_keypress(&mut ws, KeyCode::Down);
+    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 14, line: 4 });
+    raw_keypress(&mut ws, KeyCode::Left);
+    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 13, line: 4 });
+    raw_keypress(&mut ws, KeyCode::Right);
+    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 14, line: 4 });
+    raw_keypress(&mut ws, KeyCode::Down);
+    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 8, line: 5 });
+    raw_keypress(&mut ws, KeyCode::Up);
+    assert_eq!(ws.get_active().unwrap().cursor.position(), CursorPosition { char: 14, line: 4 });
 }
 
 #[test]
@@ -141,7 +144,7 @@ fn test_del() {
         editor.end_of_line();
         editor.del();
         assert_eq!(pull_line(editor, 0).unwrap(), "ello world!next line");
-        assert_eq!(pull_line(editor, 1).unwrap(), "");
+        assert_eq!(pull_line(editor, 1).unwrap(), "     ");
         editor.end_of_line();
         editor.del();
         assert_eq!(pull_line(editor, 1).unwrap(), "really long line here");
@@ -149,4 +152,20 @@ fn test_del() {
 }
 
 #[test]
-fn test_backspace() {}
+fn test_backspace() {
+    let mut ws = base_ws();
+    assert!(ws.get_active().is_some());
+    raw_keypress(&mut ws, KeyCode::Backspace);
+    assert_eq!(pull_line(ws.get_active().unwrap(), 0).unwrap(), "hello world!");
+    raw_keypress(&mut ws, KeyCode::Down);
+    raw_keypress(&mut ws, KeyCode::Backspace);
+    assert_eq!(pull_line(ws.get_active().unwrap(), 0).unwrap(), "hello world!next line");
+    raw_keypress(&mut ws, KeyCode::Backspace);
+    assert_eq!(pull_line(ws.get_active().unwrap(), 0).unwrap(), "hello worldnext line");
+    raw_keypress(&mut ws, KeyCode::Down);
+    raw_keypress(&mut ws, KeyCode::End);
+    raw_keypress(&mut ws, KeyCode::Backspace);
+    assert_eq!(pull_line(ws.get_active().unwrap(), 1).unwrap(), "    ");
+    raw_keypress(&mut ws, KeyCode::Backspace);
+    assert_eq!(pull_line(ws.get_active().unwrap(), 1).unwrap(), "");
+}
