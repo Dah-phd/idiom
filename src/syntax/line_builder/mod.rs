@@ -2,6 +2,7 @@ mod brackets;
 mod internal;
 mod langs;
 mod legend;
+mod prism;
 use brackets::BracketColors;
 use internal::SpansBuffer;
 use langs::Lang;

@@ -2,6 +2,7 @@
 pub struct Cursor {
     pub line: usize,
     pub char: usize,
+    phantm_char: usize, // keeps record for up/down movement
     pub at_line: usize,
     pub select: Option<(CursorPosition, CursorPosition)>,
 }
@@ -110,6 +111,7 @@ impl Cursor {
                 self.at_line -= 1;
             }
         }
+        self.phantm_char = self.char;
     }
 
     pub fn jump_left(&mut self, content: &[String]) {
@@ -132,6 +134,7 @@ impl Cursor {
         }
         for ch in line.chars().rev() {
             if last_was_char && !ch.is_alphabetic() || self.char == 0 {
+                self.phantm_char = self.char;
                 return;
             }
             self.char -= 1;
@@ -159,6 +162,7 @@ impl Cursor {
                 self.char = 0;
             }
         }
+        self.phantm_char = self.char;
     }
 
     pub fn jump_right(&mut self, content: &[String]) {
@@ -181,6 +185,7 @@ impl Cursor {
         }
         for ch in line.chars() {
             if last_was_char && !ch.is_alphabetic() {
+                self.phantm_char = self.char;
                 return;
             }
             self.char += 1;
@@ -203,6 +208,7 @@ impl Cursor {
 
     pub fn adjust_char(&mut self, content: &[String]) {
         if let Some(line) = content.get(self.line) {
+            self.char = self.phantm_char;
             if line.len() < self.char {
                 self.char = line.len()
             }

@@ -5,7 +5,7 @@ use lsp_types::{
         Rename, SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
     },
     ClientCapabilities, CompletionParams, GotoDefinitionParams, HoverClientCapabilities, HoverParams, InitializeParams,
-    MarkupKind, PartialResultParams, Range, ReferenceClientCapabilities, ReferenceContext, ReferenceParams,
+    MarkupKind, PartialResultParams, Position, Range, ReferenceClientCapabilities, ReferenceContext, ReferenceParams,
     RenameParams, SemanticTokensParams, SemanticTokensRangeParams, SignatureHelpClientCapabilities,
     SignatureHelpParams, TextDocumentClientCapabilities, TextDocumentIdentifier, TextDocumentPositionParams,
     TextDocumentSyncClientCapabilities, WorkDoneProgressParams, WorkspaceClientCapabilities, WorkspaceFolder,
@@ -87,16 +87,12 @@ where
         ))
     }
 
-    pub fn semantics_range(
-        path: &Path,
-        from: &CursorPosition,
-        to: &CursorPosition,
-    ) -> Option<LSPRequest<SemanticTokensRangeRequest>> {
+    pub fn semantics_range(path: &Path, range: Range) -> Option<LSPRequest<SemanticTokensRangeRequest>> {
         Some(LSPRequest::with(
             0,
             SemanticTokensRangeParams {
                 text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
-                range: Range::new(from.into(), to.into()),
+                range,
                 work_done_progress_params: WorkDoneProgressParams::default(),
                 partial_result_params: PartialResultParams::default(),
             },
