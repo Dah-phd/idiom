@@ -5,7 +5,7 @@ use lsp_types::{
         Rename, SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
     },
     ClientCapabilities, CompletionParams, GotoDefinitionParams, HoverClientCapabilities, HoverParams, InitializeParams,
-    MarkupKind, PartialResultParams, Position, Range, ReferenceClientCapabilities, ReferenceContext, ReferenceParams,
+    MarkupKind, PartialResultParams, Range, ReferenceClientCapabilities, ReferenceContext, ReferenceParams,
     RenameParams, SemanticTokensParams, SemanticTokensRangeParams, SignatureHelpClientCapabilities,
     SignatureHelpParams, TextDocumentClientCapabilities, TextDocumentIdentifier, TextDocumentPositionParams,
     TextDocumentSyncClientCapabilities, WorkDoneProgressParams, WorkspaceClientCapabilities, WorkspaceFolder,
