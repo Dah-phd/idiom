@@ -37,8 +37,9 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
     // CLI SETUP
     if let Some(path) = open_file {
         file_tree.select_by_path(&path);
-        workspace.new_from(path).await;
-        mode = Mode::Insert;
+        if !footer.logged_if_error(workspace.new_from(path).await) {
+            mode = Mode::Insert;
+        };
     }
 
     drop(configs);
@@ -82,8 +83,8 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                         }
                         PopupMessage::CreateFileOrFolder(name) => {
                             if let Ok(new_path) = file_tree.create_file_or_folder(name) {
-                                if !new_path.is_dir() {
-                                    workspace.new_from(new_path).await;
+                                if !new_path.is_dir() && !footer.logged_if_error(workspace.new_from(new_path).await) {
+                                    mode = Mode::Insert;
                                 }
                             }
                             mode.clear_popup();
@@ -91,8 +92,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                         }
                         PopupMessage::CreateFileOrFolderBase(name) => {
                             if let Ok(new_path) = file_tree.create_file_or_folder_base(name) {
-                                if !new_path.is_dir() {
-                                    workspace.new_from(new_path).await;
+                                if !new_path.is_dir() && !footer.logged_if_error(workspace.new_from(new_path).await) {
                                     mode = Mode::Insert;
                                 }
                             }
@@ -152,15 +152,14 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                     }
                     GeneralAction::Expand => {
                         if let Some(file_path) = file_tree.expand_dir_or_get_path() {
-                            workspace.new_from(file_path).await;
+                            footer.logged_if_error(workspace.new_from(file_path).await);
                         }
                     }
                     GeneralAction::FinishOrSelect => {
                         if file_tree.on_open_tabs {
                             mode = Mode::Insert;
                         } else if let Some(file_path) = file_tree.expand_dir_or_get_path() {
-                            if !file_path.is_dir() {
-                                workspace.new_from(file_path).await;
+                            if !file_path.is_dir() && !footer.logged_if_error(workspace.new_from(file_path).await) {
                                 mode = Mode::Insert;
                             }
                         }

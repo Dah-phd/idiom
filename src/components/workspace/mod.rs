@@ -6,7 +6,6 @@ use crate::lsp::LSP;
 use crate::utils::get_contents_once;
 use anyhow::Result;
 use crossterm::event::KeyEvent;
-// use file::Editor;
 pub use file::{CursorPosition, DocStats};
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -114,7 +113,7 @@ impl Workspace {
                     EditorAction::Undo => editor.undo(),
                     EditorAction::Redo => editor.redo(),
                     EditorAction::Save => editor.save(),
-                    EditorAction::Cancel => return false,
+                    EditorAction::Cancel => return editor.cursor.select_take().is_some(),
                     EditorAction::Cut => {
                         if let Some(clip) = editor.cut() {
                             let mut events = self.events.borrow_mut();
@@ -237,7 +236,7 @@ impl Workspace {
         };
     }
 
-    fn handle_tree_operations(&mut self, operation: ResourceOp) -> anyhow::Result<()> {
+    fn handle_tree_operations(&mut self, operation: ResourceOp) -> Result<()> {
         match operation {
             ResourceOp::Create(create) => {
                 let path = PathBuf::from(create.uri.path());
@@ -305,24 +304,26 @@ impl Workspace {
         Ok(new)
     }
 
-    pub async fn new_from(&mut self, file_path: PathBuf) {
+    pub async fn new_from(&mut self, file_path: PathBuf) -> Result<()> {
+        let file_path = file_path.canonicalize()?;
         for (idx, file) in self.editors.iter().enumerate() {
             if file.path == file_path {
                 self.state.select(Some(idx));
-                return;
+                return Ok(());
             }
         }
-        if let Ok(editor) = self.build_editor(file_path).await {
-            self.state.select(Some(self.editors.len()));
-            self.editors.push(editor);
-        }
+        let editor = self.build_editor(file_path).await?;
+        self.state.select(Some(self.editors.len()));
+        self.editors.push(editor);
+        Ok(())
     }
 
-    pub async fn new_at_line(&mut self, file_path: PathBuf, line: usize) {
-        self.new_from(file_path).await;
+    pub async fn new_at_line(&mut self, file_path: PathBuf, line: usize) -> Result<()> {
+        self.new_from(file_path).await?;
         if let Some(editor) = self.get_active() {
             editor.go_to(line);
         }
+        Ok(())
     }
 
     pub async fn check_lsp(&mut self, ft: FileType) -> Option<String> {

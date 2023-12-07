@@ -94,8 +94,7 @@ impl WorkspaceEvent {
     pub async fn async_map(self, workspace: &mut Workspace, mode: &mut Mode) {
         match self {
             Self::Open(path, line) => {
-                if !path.is_dir() {
-                    workspace.new_at_line(path, line).await;
+                if !path.is_dir() && workspace.new_at_line(path, line).await.is_ok() {
                     *mode = Mode::Insert;
                 } else {
                     *mode = Mode::Select;

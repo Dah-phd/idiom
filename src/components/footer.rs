@@ -1,4 +1,5 @@
 use crate::{components::workspace::DocStats, configs::Mode};
+use anyhow::Result;
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     text::{Line, Span},
@@ -59,6 +60,13 @@ impl Footer {
         } else {
             self.message_que.push(message);
         }
+    }
+
+    pub fn logged_if_error<T>(&mut self, result: Result<T>) -> bool {
+        if let Err(error) = result {
+            self.overwrite(error.to_string());
+        };
+        false
     }
 
     pub fn overwrite(&mut self, message: String) {
