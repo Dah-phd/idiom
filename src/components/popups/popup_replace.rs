@@ -43,6 +43,10 @@ impl ReplacePopup {
         position
     }
 
+    fn get_state(&self) -> Option<(CursorPosition, CursorPosition)> {
+        self.options.get(self.state).cloned()
+    }
+
     fn push(&mut self, ch: char) {
         if self.on_text {
             self.new_text.push(ch);
@@ -67,7 +71,12 @@ impl PopupInterface for ReplacePopup {
                 if self.options.is_empty() {
                     return PopupMessage::None;
                 }
-                WorkspaceEvent::ReplaceNextSelect(self.new_text.to_owned(), self.drain_next()).into()
+                WorkspaceEvent::ReplaceNextSelect {
+                    new_text: self.new_text.to_owned(),
+                    select: self.drain_next(),
+                    next_select: self.get_state(),
+                }
+                .into()
             }
             KeyCode::Char('a' | 'A') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 if self.options.is_empty() {

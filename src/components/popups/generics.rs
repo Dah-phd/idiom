@@ -175,7 +175,9 @@ impl<T> PopupInterface for PopupSelector<T> {
             _ => PopupMessage::None,
         }
     }
+
     fn update_workspace(&mut self, _editor_state: &mut Workspace) {}
+
     fn update_tree(&mut self, _file_tree: &mut Tree) {}
 }
 

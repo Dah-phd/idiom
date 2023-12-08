@@ -14,10 +14,17 @@ use std::path::PathBuf;
 pub enum WorkspaceEvent {
     PopupAccess,
     ReplaceSelect(String, (CursorPosition, CursorPosition)),
-    ReplaceNextSelect(String, (CursorPosition, CursorPosition)),
+    ReplaceNextSelect {
+        new_text: String,
+        select: (CursorPosition, CursorPosition),
+        next_select: Option<(CursorPosition, CursorPosition)>,
+    },
     ReplaceAll(String, Vec<(CursorPosition, CursorPosition)>),
     GoToLine(usize),
-    GoToSelect { select: (CursorPosition, CursorPosition), should_clear: bool },
+    GoToSelect {
+        select: (CursorPosition, CursorPosition),
+        should_clear: bool,
+    },
     AutoComplete(String),
     ActivateEditor(usize),
     FindSelector(String),
@@ -44,9 +51,12 @@ impl WorkspaceEvent {
                 }
                 mode.clear_popup();
             }
-            Self::ReplaceNextSelect(new, (from, to)) => {
+            Self::ReplaceNextSelect { new_text, select: (from, to), next_select } => {
                 if let Some(editor) = workspace.get_active() {
-                    editor.replace_select(from, to, new.as_str());
+                    editor.replace_select(from, to, new_text.as_str());
+                    if let Some((from, to)) = next_select {
+                        editor.go_to_select(from, to);
+                    }
                 }
             }
             Self::ReplaceAll(clip, ranges) => {
