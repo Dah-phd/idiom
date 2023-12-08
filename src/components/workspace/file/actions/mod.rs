@@ -6,7 +6,7 @@ use crate::components::workspace::file::utils::{get_closing_char, is_closing_rep
 use crate::configs::EditorConfigs;
 use action_buffer::ActionBuffer;
 use edits::{Edit, EditBuilder};
-use lsp_types::{TextDocumentContentChangeEvent, TextEdit};
+use lsp_types::{Position, TextDocumentContentChangeEvent, TextEdit};
 
 #[derive(Debug, Default)]
 pub struct Actions {
@@ -111,22 +111,20 @@ impl Actions {
     pub fn indent_start(&mut self, cursor: &mut Cursor, content: &mut Vec<String>) {
         let builder = EditBuilder::empty_at(CursorPosition { line: cursor.line, char: 0 });
         self.indent_at(0, cursor, content);
-        self.push_done(
-            builder.raw_finish(
-                CursorPosition { line: cursor.line, char: self.cfg.indent.len() },
-                self.cfg.indent.to_owned(),
-            ),
-        )
+        self.push_done(builder.raw_finish(
+            Position { line: cursor.line as u32, character: self.cfg.indent.len() as u32 },
+            self.cfg.indent.to_owned(),
+        ))
     }
 
     fn indent_at(&mut self, idx: usize, cursor: &mut Cursor, content: &mut Vec<String>) {
         self.push_buffer();
         if let Some(line) = content.get_mut(cursor.line) {
             line.insert_str(idx, &self.cfg.indent);
-            cursor.char += self.cfg.indent.len();
+            cursor.add_char(self.cfg.indent.len());
         } else {
             content.insert(cursor.line, self.cfg.indent.to_owned());
-            cursor.char = self.cfg.indent.len();
+            cursor.set_char(self.cfg.indent.len());
         }
     }
 
@@ -134,7 +132,7 @@ impl Actions {
         if let Some(line) = content.get_mut(cursor.line) {
             if line.starts_with(&self.cfg.indent) {
                 self.push_buffer();
-                cursor.char = cursor.char.checked_sub(self.cfg.indent.len()).unwrap_or_default();
+                cursor.set_char(cursor.char.checked_sub(self.cfg.indent.len()).unwrap_or_default());
                 self.push_done(Edit::extract_from_line(cursor.line, 0, self.cfg.indent.len(), line))
             }
         }
@@ -154,7 +152,7 @@ impl Actions {
         let indent = self.cfg.derive_indent_from(prev_line);
         line.insert_str(0, &indent);
         cursor.line += 1;
-        cursor.char = indent.len();
+        cursor.set_char(indent.len());
         // expand scope
         if let Some(last) = prev_line.trim_end().chars().last() {
             if let Some(first) = line.trim_start().chars().next() {
@@ -183,7 +181,7 @@ impl Actions {
         }
         if let Some(line) = content.get_mut(cursor.line) {
             if is_closing_repeat(line.as_str(), ch, cursor.char) {
-                cursor.char += 1;
+                cursor.add_char(1);
                 return;
             }
             if let Some(closing) = get_closing_char(ch) {
@@ -197,7 +195,7 @@ impl Actions {
                 }
                 line.insert(cursor.char, ch);
             }
-            cursor.char += 1;
+            cursor.add_char(1);
         }
     }
 
@@ -231,7 +229,7 @@ impl Actions {
             self.push_buffer();
             cursor.line -= 1;
             let action = Edit::merge_next_line(cursor.line, content);
-            cursor.char = action.text_edit.range.start.character as usize;
+            cursor.set_char(action.text_edit.range.start.character as usize);
             self.push_done(action);
         } else {
             if let Some(action) =
@@ -239,7 +237,7 @@ impl Actions {
             {
                 self.push_done(action);
             }
-            cursor.char = self.buffer.last_char();
+            cursor.set_char(self.buffer.last_char());
         }
     }
 

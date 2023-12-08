@@ -211,11 +211,11 @@ impl EditBuilder {
         Self { reverse_len: 1, reverse_edit_text: String::new(), text_edit_range: (position, position) }
     }
 
-    pub fn raw_finish(self, position: CursorPosition, new_text: String) -> Edit {
+    pub fn raw_finish(self, position: Position, new_text: String) -> Edit {
         Edit {
             meta: EditMetaData { from: self.reverse_len, to: 1 },
             reverse_text_edit: TextEdit {
-                range: Range::new(self.text_edit_range.0.into(), position.into()),
+                range: Range::new(self.text_edit_range.0.into(), position),
                 new_text: self.reverse_edit_text,
             },
             text_edit: TextEdit {

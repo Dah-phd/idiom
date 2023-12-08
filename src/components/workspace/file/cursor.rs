@@ -1,3 +1,5 @@
+use lsp_types::Position;
+
 #[derive(Debug, Default)]
 pub struct Cursor {
     pub line: usize,
@@ -16,6 +18,21 @@ impl Cursor {
         self.line = position.line;
         self.char = position.char;
         self.phantm_char = position.char;
+    }
+
+    pub fn add_char(&mut self, offset: usize) {
+        self.char += offset;
+        self.phantm_char = self.char;
+    }
+
+    pub fn sub_char(&mut self, offset: usize) {
+        self.char -= offset;
+        self.phantm_char = self.char;
+    }
+
+    pub fn set_char(&mut self, char: usize) {
+        self.char = char;
+        self.phantm_char = char;
     }
 
     pub fn end_of_line(&mut self, content: &[String]) {
@@ -279,7 +296,17 @@ impl From<&Cursor> for CursorPosition {
     }
 }
 
-use lsp_types::Position;
+impl From<&Cursor> for Position {
+    fn from(value: &Cursor) -> Self {
+        Self { line: value.line as u32, character: value.char as u32 }
+    }
+}
+
+impl From<&mut Cursor> for Position {
+    fn from(value: &mut Cursor) -> Self {
+        Self { line: value.line as u32, character: value.char as u32 }
+    }
+}
 
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct CursorPosition {
