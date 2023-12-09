@@ -1,4 +1,5 @@
-use std::path::Path;
+use super::as_url;
+use crate::configs::FileType;
 
 use anyhow::Result;
 use lsp_types::{
@@ -10,10 +11,7 @@ use lsp_types::{
 };
 use serde::Serialize;
 use serde_json::to_string;
-
-use crate::configs::FileType;
-
-use super::as_url;
+use std::path::Path;
 
 #[derive(Serialize)]
 pub struct LSPNotification<T>

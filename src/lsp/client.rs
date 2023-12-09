@@ -1,3 +1,6 @@
+use super::{Diagnostic, LSPNotification, LSPRequest, Response};
+use crate::configs::FileType;
+
 use anyhow::Result;
 use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument},
@@ -12,10 +15,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tokio::sync::mpsc::UnboundedSender;
-
-use crate::configs::FileType;
-
-use super::{Diagnostic, LSPNotification, LSPRequest, Response};
 
 #[derive(Clone, Debug)]
 pub struct LSPClient {

@@ -12,12 +12,15 @@ use crate::{
     events::messages::PopupMessage,
     events::Events,
 };
+
 use anyhow::Result;
 use crossterm::event::Event;
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::io::Stdout;
-use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::{
+    io::Stdout,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 const TICK: Duration = Duration::from_millis(15);
 

@@ -1,14 +1,18 @@
 use super::LSPMessage;
-#[cfg(build = "debug")]
-use crate::utils::debug_to_file;
 use crate::utils::{into_guard, split_arc_mutex};
+
 use anyhow::{anyhow, Result};
 use serde_json::{from_str, Value};
 use std::sync::{Arc, Mutex};
-use tokio::process::{Child, ChildStdout};
-use tokio::task::JoinHandle;
+use tokio::{
+    process::{Child, ChildStdout},
+    task::JoinHandle,
+};
 use tokio_stream::StreamExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
+
+#[cfg(build = "debug")]
+use crate::utils::debug_to_file;
 
 pub struct LSPMessageStream {
     inner: FramedRead<ChildStdout, BytesCodec>,
@@ -43,10 +47,6 @@ impl LSPMessageStream {
                 }
             }),
         })
-    }
-
-    pub fn get_errors(&self) -> Arc<Mutex<Vec<String>>> {
-        Arc::clone(&self.errors)
     }
 
     pub async fn next(&mut self) -> Result<LSPMessage> {

@@ -8,11 +8,9 @@ mod utils;
 
 use app::app;
 
-use std::path::{PathBuf, MAIN_SEPARATOR};
-
 use anyhow::Result;
-use ratatui::backend::CrosstermBackend;
-use ratatui::Terminal;
+use ratatui::{backend::CrosstermBackend, Terminal};
+use std::path::{PathBuf, MAIN_SEPARATOR};
 
 fn prep(out: &mut impl std::io::Write) -> Result<()> {
     crossterm::terminal::enable_raw_mode()?;

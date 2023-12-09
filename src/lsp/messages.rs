@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use super::LSPClient;
 
 use anyhow::{anyhow, Result};
 use lsp_types::{
@@ -6,8 +6,7 @@ use lsp_types::{
     DiagnosticSeverity, PublishDiagnosticsParams,
 };
 use serde_json::{from_value, Value};
-
-use super::LSPClient;
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub enum LSPMessage {

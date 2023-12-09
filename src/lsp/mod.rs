@@ -5,27 +5,35 @@ mod notification;
 mod python;
 mod request;
 mod rust;
-use crate::configs::FileType;
-use crate::utils::{into_guard, split_arc_mutex, split_arc_mutex_async};
-use anyhow::{anyhow, Error, Result};
 pub use client::LSPClient;
 use lsp_stream::LSPMessageStream;
-use lsp_types::notification::{Exit, Initialized};
-use lsp_types::request::{Initialize, Shutdown};
-use lsp_types::{InitializeResult, InitializedParams, Url};
 use messages::done_auto_response;
 pub use messages::{Diagnostic, GeneralNotification, LSPMessage, Request, Response};
 pub use notification::LSPNotification;
 pub use request::LSPRequest;
+
+use crate::configs::FileType;
+use crate::utils::{into_guard, split_arc_mutex, split_arc_mutex_async};
+
+use anyhow::{anyhow, Error, Result};
+use lsp_types::{
+    notification::{Exit, Initialized},
+    request::{Initialize, Shutdown},
+    {InitializeResult, InitializedParams, Url},
+};
 use serde_json::from_value;
-use std::collections::HashMap;
-use std::path::Path;
-use std::process::Stdio;
-use std::sync::{Arc, Mutex};
-use tokio::io::AsyncWriteExt;
-use tokio::process::{Child, Command};
-use tokio::sync::mpsc;
-use tokio::task::JoinHandle;
+use std::{
+    collections::HashMap,
+    path::Path,
+    process::Stdio,
+    sync::{Arc, Mutex},
+};
+use tokio::{
+    io::AsyncWriteExt,
+    process::{Child, Command},
+    sync::mpsc,
+    task::JoinHandle,
+};
 
 #[cfg(build = "debug")]
 use crate::utils::debug_to_file;
@@ -35,7 +43,6 @@ use crate::utils::debug_to_file;
 pub struct LSP {
     pub notifications: Arc<Mutex<Vec<GeneralNotification>>>,
     pub requests: Arc<tokio::sync::Mutex<Vec<Request>>>,
-    lsp_err_msg: Arc<Mutex<Vec<String>>>,
     file_type: FileType,
     inner: Child,
     client: LSPClient,
@@ -71,7 +78,6 @@ impl LSP {
         stdin.flush().await?;
         let msg = json_rpc.next().await?.unwrap()?;
         let initialized: InitializeResult = from_value(msg)?;
-        let lsp_err_msg = json_rpc.get_errors();
 
         // starting response handler
         let lsp_json_handler = tokio::task::spawn(async move {
@@ -113,7 +119,6 @@ impl LSP {
         let client = LSPClient::new(diagnostics, responses, channel, initialized.capabilities.clone());
 
         let mut lsp = Self {
-            lsp_err_msg,
             notifications,
             requests,
             client,

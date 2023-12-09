@@ -1,9 +1,11 @@
 use anyhow::{anyhow, Result};
 use copypasta::{ClipboardContext, ClipboardProvider};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use std::ops::{Add, Sub};
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::{
+    ops::{Add, Sub},
+    path::PathBuf,
+    sync::{Arc, Mutex, MutexGuard},
+};
 
 pub fn trim_start_inplace(line: &mut String) -> usize {
     if let Some(idx) = line.find(|c: char| !c.is_whitespace()) {
@@ -179,6 +181,7 @@ impl From<usize> for Offset {
 }
 
 #[cfg(build = "debug")]
+#[allow(unused_must_use)]
 pub fn debug_to_file(path: &str, obj: impl Debug) {
     let mut data = std::fs::read_to_string(path).unwrap_or_default();
     data.push_str(&format!("\n{obj:?}"));

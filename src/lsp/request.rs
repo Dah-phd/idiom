@@ -1,3 +1,6 @@
+use super::as_url;
+use crate::components::workspace::CursorPosition;
+
 use anyhow::Result;
 use lsp_types::{
     request::{
@@ -13,10 +16,6 @@ use lsp_types::{
 use serde::Serialize;
 use serde_json::to_string;
 use std::path::Path;
-
-use crate::components::workspace::CursorPosition;
-
-use super::as_url;
 
 #[derive(Serialize)]
 pub struct LSPRequest<T>
