@@ -66,6 +66,12 @@ impl Events {
         self.clipboard.as_mut()?.get_contents().ok()
     }
 
+    pub fn try_ws_event(&mut self, value: impl TryInto<WorkspaceEvent>) {
+        if let Ok(event) = value.try_into() {
+            self.workspace.push(event);
+        }
+    }
+
     pub fn message(&mut self, msg: impl Into<String>) {
         self.footer.push(FooterEvent::Message(msg.into()));
     }

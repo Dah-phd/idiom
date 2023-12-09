@@ -136,12 +136,23 @@ impl From<LocationLink> for WorkspaceEvent {
     }
 }
 
-impl From<GotoDeclarationResponse> for WorkspaceEvent {
-    fn from(value: GotoDeclarationResponse) -> Self {
-        match value {
+impl TryFrom<GotoDeclarationResponse> for WorkspaceEvent {
+    type Error = ();
+    fn try_from(value: GotoDeclarationResponse) -> Result<Self, ()> {
+        Ok(match value {
             GotoDeclarationResponse::Scalar(location) => location.into(),
-            GotoDeclarationResponse::Array(mut arr) => arr.remove(0).into(), // ! handle multi select
-            GotoDeclarationResponse::Link(mut links) => links.remove(0).into(), // ! handle muti select
-        }
+            GotoDeclarationResponse::Array(mut arr) => {
+                if arr.is_empty() {
+                    return Err(());
+                }
+                arr.remove(0).into()
+            }
+            GotoDeclarationResponse::Link(mut links) => {
+                if links.is_empty() {
+                    return Err(());
+                }
+                links.remove(0).into()
+            }
+        })
     }
 }

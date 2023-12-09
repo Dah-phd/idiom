@@ -22,7 +22,6 @@ use std::{path::Path, rc::Rc};
 
 pub struct Lexer {
     pub diagnostics: Option<PublishDiagnosticsParams>,
-    pub workspace_edit: Option<WorkspaceEdit>,
     pub events: Rc<RefCell<Events>>,
     pub lsp_client: Option<LSPClient>,
     line_builder: LineBuilder,
@@ -47,7 +46,6 @@ impl Lexer {
             requests: Vec::new(),
             max_digits: 0,
             diagnostics: None,
-            workspace_edit: None,
             events: Rc::clone(events),
             lsp_client: None,
         }
@@ -59,12 +57,12 @@ impl Lexer {
         select: Option<(&CursorPosition, &CursorPosition)>,
         path: &Path,
     ) -> usize {
-        self.get_lsp_responses();
-        self.get_diagnostics(path);
-        self.get_tokens(path);
         self.line_builder.reset();
         self.select = select.map(|(from, to)| (*from, *to));
         self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
+        self.get_lsp_responses();
+        self.get_diagnostics(path);
+        self.get_tokens(path);
         self.max_digits
     }
 
@@ -210,48 +208,49 @@ impl Lexer {
         self.lsp_client.as_mut().as_mut()?.request(request)
     }
 
-    fn get_lsp_responses(&mut self) -> Option<()> {
-        if self.requests.is_empty() {
-            return None;
-        }
-        let lsp = self.lsp_client.as_mut()?;
-        let mut unresolved_requests = Vec::new();
-        for request in self.requests.drain(..) {
-            if let Some(response) = lsp.get(request.id()) {
-                if let Some(value) = response.result {
-                    match request.parse(value) {
-                        LSPResult::Completion(completions, line, idx) => {
-                            self.modal = LSPModal::auto_complete(completions, line, idx);
+    fn get_lsp_responses(&mut self) {
+        if let Some(lsp) = self.lsp_client.as_mut() {
+            let mut unresolved_requests = Vec::new();
+            for request in self.requests.drain(..) {
+                if let Some(response) = lsp.get(request.id()) {
+                    match request.parse(response.result) {
+                        Some(result) => match result {
+                            LSPResult::Completion(completions, line, idx) => {
+                                self.modal = LSPModal::auto_complete(completions, line, idx);
+                            }
+                            LSPResult::Hover(hover) => {
+                                self.modal.replace(LSPModal::hover(hover));
+                            }
+                            LSPResult::SignatureHelp(signature) => {
+                                self.modal.replace(LSPModal::signature(signature));
+                            }
+                            LSPResult::Renames(workspace_edit) => {
+                                self.events.borrow_mut().workspace.push(workspace_edit.into());
+                            }
+                            LSPResult::Tokens(tokens) => {
+                                if self.line_builder.set_tokens(tokens) {
+                                    self.events.borrow_mut().overwrite("LSP tokens mapped!");
+                                };
+                            }
+                            LSPResult::Declaration(declaration) => {
+                                self.events.borrow_mut().try_ws_event(declaration);
+                            }
+                            LSPResult::Definition(definition) => {
+                                self.events.borrow_mut().try_ws_event(definition);
+                            }
+                        },
+                        None => {
+                            if let Some(err) = response.error {
+                                self.events.borrow_mut().overwrite(err.to_string());
+                            }
                         }
-                        LSPResult::Hover(hover) => {
-                            self.modal.replace(LSPModal::hover(hover));
-                        }
-                        LSPResult::SignatureHelp(signature) => {
-                            self.modal.replace(LSPModal::signature(signature));
-                        }
-                        LSPResult::Renames(workspace_edit) => {
-                            self.events.borrow_mut().workspace.push(workspace_edit.into());
-                        }
-                        LSPResult::Tokens(tokens) => {
-                            if self.line_builder.set_tokens(tokens) {
-                                self.events.borrow_mut().overwrite("LSP tokens mapped!");
-                            };
-                        }
-                        LSPResult::Declaration(declaration) => {
-                            self.events.borrow_mut().workspace.push(declaration.into());
-                        }
-                        LSPResult::Definition(definition) => {
-                            self.events.borrow_mut().workspace.push(definition.into());
-                        }
-                        LSPResult::None => (),
                     }
+                } else {
+                    unresolved_requests.push(request);
                 }
-            } else {
-                unresolved_requests.push(request);
             }
+            self.requests = unresolved_requests;
         }
-        self.requests = unresolved_requests;
-        None
     }
 
     fn line_select(&mut self, at_line: usize, max_len: usize) -> Option<std::ops::Range<usize>> {

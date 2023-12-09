@@ -28,48 +28,19 @@ impl LSPResponseType {
         }
     }
 
-    pub fn parse(&self, value: Value) -> LSPResult {
-        match self {
-            Self::Completion(.., line, idx) => {
-                if let Ok(response) = from_value::<CompletionResponse>(value) {
-                    return match response {
-                        CompletionResponse::Array(arr) => LSPResult::Completion(arr, line.to_owned(), *idx),
-                        CompletionResponse::List(ls) => LSPResult::Completion(ls.items, line.to_owned(), *idx),
-                    };
-                }
-            }
-            Self::Hover(..) => {
-                if let Ok(response) = from_value::<Hover>(value) {
-                    return LSPResult::Hover(response);
-                }
-            }
-            Self::SignatureHelp(..) => {
-                if let Ok(response) = from_value::<SignatureHelp>(value) {
-                    return LSPResult::SignatureHelp(response);
-                }
-            }
-            Self::Renames(..) => {
-                if let Ok(response) = from_value::<WorkspaceEdit>(value) {
-                    return LSPResult::Renames(response);
-                }
-            }
-            Self::TokensFull(..) => {
-                if let Ok(response) = from_value::<SemanticTokensResult>(value) {
-                    return LSPResult::Tokens(response);
-                }
-            }
-            Self::Definition(..) => {
-                if let Ok(response) = from_value::<GotoDefinitionResponse>(value) {
-                    return LSPResult::Definition(response);
-                }
-            }
-            Self::Declaration(..) => {
-                if let Ok(response) = from_value::<GotoDeclarationResponse>(value) {
-                    return LSPResult::Declaration(response);
-                }
-            }
-        }
-        LSPResult::None
+    pub fn parse(&self, value: Option<Value>) -> Option<LSPResult> {
+        Some(match self {
+            Self::Completion(.., line, idx) => match from_value::<CompletionResponse>(value?).ok()? {
+                CompletionResponse::Array(arr) => LSPResult::Completion(arr, line.to_owned(), *idx),
+                CompletionResponse::List(ls) => LSPResult::Completion(ls.items, line.to_owned(), *idx),
+            },
+            Self::Hover(..) => LSPResult::Hover(from_value::<Hover>(value?).ok()?),
+            Self::SignatureHelp(..) => LSPResult::SignatureHelp(from_value::<SignatureHelp>(value?).ok()?),
+            Self::Renames(..) => LSPResult::Renames(from_value::<WorkspaceEdit>(value?).ok()?),
+            Self::TokensFull(..) => LSPResult::Tokens(from_value::<SemanticTokensResult>(value?).ok()?),
+            Self::Definition(..) => LSPResult::Definition(from_value::<GotoDefinitionResponse>(value?).ok()?),
+            Self::Declaration(..) => LSPResult::Declaration(from_value::<GotoDeclarationResponse>(value?).ok()?),
+        })
     }
 }
 
@@ -81,5 +52,4 @@ pub enum LSPResult {
     Tokens(SemanticTokensResult),
     Definition(GotoDefinitionResponse),
     Declaration(GotoDeclarationResponse),
-    None,
 }
