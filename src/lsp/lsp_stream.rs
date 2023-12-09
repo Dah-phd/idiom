@@ -1,3 +1,7 @@
+use super::LSPMessage;
+#[cfg(build = "debug")]
+use crate::utils::debug_to_file;
+use crate::utils::{into_guard, split_arc_mutex};
 use anyhow::{anyhow, Result};
 use serde_json::{from_str, Value};
 use std::sync::{Arc, Mutex};
@@ -5,10 +9,6 @@ use tokio::process::{Child, ChildStdout};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
-
-use crate::utils::{into_guard, split_arc_mutex};
-
-use super::LSPMessage;
 
 pub struct LSPMessageStream {
     inner: FramedRead<ChildStdout, BytesCodec>,
@@ -36,6 +36,8 @@ impl LSPMessageStream {
             stderr_handler: tokio::task::spawn(async move {
                 while let Some(Ok(err)) = stderr.next().await {
                     if let Ok(msg) = String::from_utf8(err.into()) {
+                        #[cfg(build = "debug")]
+                        debug_to_file("test_data.err", &msg);
                         into_guard(&errors_handler).push(msg);
                     }
                 }

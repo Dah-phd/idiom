@@ -9,10 +9,12 @@ use crate::configs::EditorAction;
 use crate::configs::FileType;
 use crate::events::{Events, WorkspaceEvent};
 use crate::lsp::{LSPClient, LSPRequest};
+#[cfg(build = "debug")]
+use crate::utils::debug_to_file;
 use lsp_types::request::{
     Completion, GotoDeclaration, GotoDefinition, HoverRequest, Rename, SemanticTokensFullRequest, SignatureHelpRequest,
 };
-use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent, WorkspaceEdit};
+use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent};
 use ratatui::style::{Color, Style};
 use ratatui::text::Span;
 use ratatui::{widgets::ListItem, Frame};
@@ -74,6 +76,8 @@ impl Lexer {
     ) {
         if let Some(client) = self.lsp_client.as_mut() {
             self.line_builder.collect_changes(&content_changes);
+            #[cfg(build = "debug")]
+            debug_to_file("test_data.sync", &content_changes);
             if let Err(err) = client.file_did_change(path, version, content_changes) {
                 let mut events = self.events.borrow_mut();
                 events.overwrite(format!("Failed to sync with lsp: {err}"));
@@ -229,7 +233,7 @@ impl Lexer {
                             }
                             LSPResult::Tokens(tokens) => {
                                 if self.line_builder.set_tokens(tokens) {
-                                    self.events.borrow_mut().overwrite("LSP tokens mapped!");
+                                    self.events.borrow_mut().message("LSP tokens mapped!");
                                 };
                             }
                             LSPResult::Declaration(declaration) => {

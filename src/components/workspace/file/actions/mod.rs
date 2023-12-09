@@ -181,10 +181,7 @@ impl Actions {
         }
         if let Some(line) = content.get_mut(cursor.line) {
             if is_closing_repeat(line.as_str(), ch, cursor.char) {
-                cursor.add_char(1);
-                return;
-            }
-            if let Some(closing) = get_closing_char(ch) {
+            } else if let Some(closing) = get_closing_char(ch) {
                 let new_text = format!("{ch}{closing}");
                 line.insert_str(cursor.char, &new_text);
                 self.push_buffer();

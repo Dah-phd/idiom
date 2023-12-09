@@ -177,3 +177,10 @@ impl From<usize> for Offset {
         Self::Pos(value)
     }
 }
+
+#[cfg(build = "debug")]
+pub fn debug_to_file(path: &str, obj: impl Debug) {
+    let mut data = std::fs::read_to_string(path).unwrap_or_default();
+    data.push_str(&format!("\n{obj:?}"));
+    std::fs::write(path, data);
+}

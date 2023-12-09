@@ -7,30 +7,28 @@ mod request;
 mod rust;
 use crate::configs::FileType;
 use crate::utils::{into_guard, split_arc_mutex, split_arc_mutex_async};
+use anyhow::{anyhow, Error, Result};
+pub use client::LSPClient;
+use lsp_stream::LSPMessageStream;
 use lsp_types::notification::{Exit, Initialized};
 use lsp_types::request::{Initialize, Shutdown};
+use lsp_types::{InitializeResult, InitializedParams, Url};
+use messages::done_auto_response;
+pub use messages::{Diagnostic, GeneralNotification, LSPMessage, Request, Response};
+pub use notification::LSPNotification;
+pub use request::LSPRequest;
 use serde_json::from_value;
-
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
-
 use tokio::io::AsyncWriteExt;
 use tokio::process::{Child, Command};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
-use anyhow::{anyhow, Error, Result};
-
-use lsp_types::{InitializeResult, InitializedParams, Url};
-
-pub use client::LSPClient;
-use lsp_stream::LSPMessageStream;
-use messages::done_auto_response;
-pub use messages::{Diagnostic, GeneralNotification, LSPMessage, Request, Response};
-pub use notification::LSPNotification;
-pub use request::LSPRequest;
+#[cfg(build = "debug")]
+use crate::utils::debug_to_file;
 
 #[derive(Debug)]
 #[allow(clippy::upper_case_acronyms)]
@@ -41,7 +39,7 @@ pub struct LSP {
     file_type: FileType,
     inner: Child,
     client: LSPClient,
-    lsp_json_handler: JoinHandle<Error>,
+    lsp_json_handler: JoinHandle<()>,
     lsp_send_handler: JoinHandle<Result<()>>,
     attempts: usize,
 }
@@ -79,21 +77,21 @@ impl LSP {
         let lsp_json_handler = tokio::task::spawn(async move {
             loop {
                 match json_rpc.next().await {
-                    Ok(msg) => {
-                        match msg {
-                            LSPMessage::Response(inner) => {
-                                into_guard(&responses_handler).insert(inner.id, inner);
-                            }
-                            LSPMessage::Notification(inner) => into_guard(&notifications_handler).push(inner),
-                            LSPMessage::Diagnostic(uri, params) => {
-                                into_guard(&diagnostics_handler).insert(uri, params);
-                            }
-                            LSPMessage::Request(inner) => requests_handler.lock().await.push(inner),
-                            _ => (), //devnull
+                    Ok(msg) => match msg {
+                        LSPMessage::Response(inner) => {
+                            into_guard(&responses_handler).insert(inner.id, inner);
                         }
-                    }
-                    Err(err) => {
-                        return err;
+                        LSPMessage::Notification(inner) => into_guard(&notifications_handler).push(inner),
+                        LSPMessage::Diagnostic(uri, params) => {
+                            into_guard(&diagnostics_handler).insert(uri, params);
+                        }
+                        LSPMessage::Request(inner) => requests_handler.lock().await.push(inner),
+                        _ => (),
+                    },
+                    Err(err) =>
+                    {
+                        #[cfg(build = "debug")]
+                        debug_to_file("test_data.reader", err.to_string())
                     }
                 }
             }
@@ -138,9 +136,11 @@ impl LSP {
             }
             match Self::from(&self.file_type).await {
                 Ok(lsp) => {
+                    #[cfg(build = "debug")]
+                    debug_to_file("test_data.restart", self.attempts);
                     let broken = std::mem::replace(self, lsp);
                     return Ok(Some(match broken.lsp_json_handler.await {
-                        Ok(err) => err,
+                        Ok(_) => anyhow!("LSP handler crashed!"),
                         Err(join_err) => anyhow!("Failed to collect crash report! Join err: {join_err}"),
                     }));
                 }
