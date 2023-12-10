@@ -89,7 +89,11 @@ impl LSP {
                     LSPMessage::Diagnostic(uri, params) => {
                         into_guard(&diagnostics_handler).insert(uri, params);
                     }
-                    LSPMessage::Request(inner) => requests_handler.lock().await.push(inner),
+                    LSPMessage::Request(inner) => {
+                        #[cfg(build = "debug")]
+                        debug_to_file("test_data.lsp_request", inner.to_string());
+                        requests_handler.lock().await.push(inner)
+                    }
                     LSPMessage::Error(_err) => {
                         #[cfg(build = "debug")]
                         debug_to_file("test_data.lsp_err", _err.to_string());
