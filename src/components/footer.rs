@@ -1,10 +1,10 @@
 use crate::{components::workspace::DocStats, configs::Mode};
 use anyhow::Result;
 use ratatui::{
-    layout::{Alignment, Constraint, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Padding, Paragraph},
     Frame,
 };
 use std::time::{Duration, Instant};
@@ -32,27 +32,15 @@ impl Footer {
         mode: &Mode,
         stats: Option<DocStats>,
     ) -> Rect {
-        let widget = self.widget_with_stats(mode, stats);
         let layout = Layout::default()
             .constraints([
                 Constraint::Length(screen.height.checked_sub(2).unwrap_or_default()),
                 Constraint::Length(1),
             ])
             .split(screen);
-        frame.render_widget(widget, layout[1]);
+        let area = self.message_with_remainder(frame, layout[1]);
+        frame.render_widget(self.widget_stats(mode, stats), area);
         layout[0]
-    }
-
-    fn widget_with_stats(&mut self, mode: &Mode, stats: Option<DocStats>) -> Paragraph {
-        let mut line = self.get_message();
-        if let Some((doc_len, selected, cur)) = stats {
-            line.push(Span::raw(match selected {
-                0 => format!("    Doc Len {doc_len}, Ln {}, Col {}", cur.line, cur.char),
-                _ => format!("    Doc Len {doc_len}, Ln {}, Col {} ({selected} selected)", cur.line, cur.char),
-            }));
-        }
-        line.push(Span::from(mode));
-        Paragraph::new(Line::from(line)).alignment(Alignment::Right).block(Block::default().borders(Borders::TOP))
     }
 
     pub fn logged_ok<T>(&mut self, result: Result<T>) -> Option<T> {
@@ -81,6 +69,37 @@ impl Footer {
         self.push_ahead(Message::success(message));
     }
 
+    fn message_with_remainder(&mut self, frame: &mut Frame, layout: Rect) -> Rect {
+        self.get_message();
+        if let Some(message) = self.message.as_ref() {
+            let paragraph_areas = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .split(layout);
+            frame.render_widget(message.widget(), paragraph_areas[0]);
+            return paragraph_areas[1];
+        }
+        layout
+    }
+
+    fn widget_stats(&mut self, mode: &Mode, stats: Option<DocStats>) -> Paragraph {
+        Paragraph::new(Line::from(
+            stats
+                .map(|(len, select, c)| {
+                    vec![
+                        Span::raw(match select {
+                            0 => format!("    Doc Len {len}, Ln {}, Col {}", c.line, c.char),
+                            _ => format!("    Doc Len {len}, Ln {}, Col {} ({select} selected)", c.line, c.char),
+                        }),
+                        Span::from(mode),
+                    ]
+                })
+                .unwrap_or_default(),
+        ))
+        .alignment(Alignment::Right)
+        .block(Block::default().borders(Borders::TOP))
+    }
+
     fn push_ahead(&mut self, msg: Message) {
         self.message_que.retain(|m| m.is_err());
         self.message_que.push(msg);
@@ -89,12 +108,11 @@ impl Footer {
         }
     }
 
-    fn get_message(&mut self) -> Vec<Span<'static>> {
+    fn get_message(&mut self) {
         if self.message.is_none() && self.message_que.is_empty() {
-            return Vec::new();
+            return;
         }
         self.que_pull_if_expaired();
-        self.message.as_ref().map(|m| m.vec()).unwrap_or_default()
     }
 
     fn que_pull_if_expaired(&mut self) {
@@ -116,9 +134,9 @@ impl Footer {
 
 #[derive(Debug)]
 enum Message {
-    Plain(Span<'static>),
-    Success(Span<'static>),
-    Error(Span<'static>),
+    Plain(Paragraph<'static>),
+    Success(Paragraph<'static>),
+    Error(Paragraph<'static>),
 }
 
 impl Message {
@@ -126,24 +144,33 @@ impl Message {
         matches!(self, Self::Error(..))
     }
 
-    fn vec(&self) -> Vec<Span<'static>> {
-        vec![match self {
+    fn widget(&self) -> Paragraph<'static> {
+        match self {
             Self::Error(span) => span,
             Self::Plain(span) => span,
             Self::Success(span) => span,
         }
-        .clone()]
+        .clone()
     }
 
     fn msg(message: String) -> Self {
-        Self::Plain(Span::raw(message))
+        Self::Plain(
+            Paragraph::new(Span::raw(message))
+                .block(Block::default().borders(Borders::TOP).padding(Padding::horizontal(2))),
+        )
     }
 
     fn success(message: String) -> Self {
-        Self::Success(Span::styled(message, Style { fg: Some(Color::Blue), ..Default::default() }))
+        Self::Success(
+            Paragraph::new(Span::styled(message, Style { fg: Some(Color::Blue), ..Default::default() }))
+                .block(Block::default().borders(Borders::TOP).padding(Padding::horizontal(2))),
+        )
     }
 
     fn err(message: String) -> Self {
-        Self::Error(Span::styled(message, Style { fg: Some(Color::Red), ..Default::default() }))
+        Self::Error(
+            Paragraph::new(Span::styled(message, Style { fg: Some(Color::Red), ..Default::default() }))
+                .block(Block::default().borders(Borders::TOP).padding(Padding::horizontal(2))),
+        )
     }
 }

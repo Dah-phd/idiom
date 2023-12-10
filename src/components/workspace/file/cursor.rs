@@ -289,6 +289,11 @@ impl Cursor {
             if from.line == to.line {
                 return content[from.line][from.char..to.char].len();
             };
+            let mut len = 0;
+            for line in content[from.line..to.line].iter() {
+                len += line.len();
+            }
+            return len;
         }
         0
     }
