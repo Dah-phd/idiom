@@ -3,9 +3,10 @@ use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType, Mode};
 use crate::events::Events;
 use crate::lsp::LSP;
 use crate::utils::get_contents_once;
+pub use file::{CursorPosition, DocStats, Editor};
+
 use anyhow::Result;
 use crossterm::event::KeyEvent;
-pub use file::{CursorPosition, DocStats, Editor};
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
