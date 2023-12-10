@@ -75,8 +75,7 @@ impl LSP {
         // sending init requests
         stdin.write_all(LSPRequest::<Initialize>::init_request()?.stringify()?.as_bytes()).await?;
         stdin.flush().await?;
-        let msg = json_rpc.next().await?.unwrap()?;
-        let initialized: InitializeResult = from_value(msg)?;
+        let capabilities = from_value::<InitializeResult>(json_rpc.next().await?.unwrap()?)?.capabilities;
 
         // starting response handler
         let lsp_json_handler = tokio::task::spawn(async move {
@@ -94,10 +93,12 @@ impl LSP {
                     LSPMessage::Error(_err) => {
                         #[cfg(build = "debug")]
                         debug_to_file("test_data.lsp_err", _err.to_string());
+                        // TODO: investigate handle
                     }
                     LSPMessage::Unknown(_obj) => {
                         #[cfg(build = "debug")]
                         debug_to_file("test_data.lsp_unknown", _obj.to_string());
+                        // TODO: investigate handle
                     }
                 }
             }
@@ -115,13 +116,10 @@ impl LSP {
             Ok(())
         });
 
-        // initial client
-        let client = LSPClient::new(diagnostics, responses, channel, initialized.capabilities.clone());
-
         let mut lsp = Self {
             notifications,
             requests,
-            client,
+            client: LSPClient::new(diagnostics, responses, channel, capabilities),
             file_type: language,
             inner,
             lsp_json_handler,
