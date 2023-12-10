@@ -104,6 +104,8 @@ pub struct GeneralNotification {
     pub params: Option<Value>,
 }
 
+/// Stores Diagnostics and metadata - to be used in editor to gain access to diagnostic params objects.
+/// updated flag is used to ensure only updated diagnostics are sent.
 #[derive(Debug)]
 pub struct Diagnostic {
     pub updated: bool,

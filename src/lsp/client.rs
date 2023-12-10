@@ -16,6 +16,13 @@ use std::{
 };
 use tokio::sync::mpsc::UnboundedSender;
 
+/// LSPClient
+/// Receives and sends messages to the LSP server running.
+/// Sending is done by channel.
+/// Received messages are stored in Mutex dicts.
+/// Responses are received by ID - so every editor can receive its answere only to send Requests.
+/// Failure on broken LSP server.
+/// Diagnostics are received from Diagnostic objec stored in hashmap based on path.
 #[derive(Clone, Debug)]
 pub struct LSPClient {
     diagnostics: Arc<Mutex<HashMap<PathBuf, Diagnostic>>>,
