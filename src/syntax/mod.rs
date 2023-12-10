@@ -9,8 +9,6 @@ use crate::configs::EditorAction;
 use crate::configs::FileType;
 use crate::events::{Events, WorkspaceEvent};
 use crate::lsp::{LSPClient, LSPRequest};
-#[cfg(build = "debug")]
-use crate::utils::debug_to_file;
 use lsp_types::request::{
     Completion, GotoDeclaration, GotoDefinition, HoverRequest, Rename, SemanticTokensFullRequest, SignatureHelpRequest,
 };
@@ -21,6 +19,9 @@ use ratatui::{widgets::ListItem, Frame};
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::{path::Path, rc::Rc};
+
+#[cfg(build = "debug")]
+use crate::utils::debug_to_file;
 
 pub struct Lexer {
     pub diagnostics: Option<PublishDiagnosticsParams>,
@@ -80,7 +81,7 @@ impl Lexer {
             debug_to_file("test_data.sync", &content_changes);
             if let Err(err) = client.file_did_change(path, version, content_changes) {
                 let mut events = self.events.borrow_mut();
-                events.overwrite(format!("Failed to sync with lsp: {err}"));
+                events.error(format!("Failed to sync with lsp: {err}"));
                 events.workspace.push(WorkspaceEvent::CheckLSP(self.line_builder.lang.file_type));
             }
         }
@@ -126,7 +127,7 @@ impl Lexer {
         }
         self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
         self.lsp_client.replace(client);
-        self.events.borrow_mut().overwrite("LSP mapped!");
+        self.events.borrow_mut().success("LSP mapped!");
         self.get_tokens(on_file);
     }
 
@@ -233,7 +234,7 @@ impl Lexer {
                             }
                             LSPResult::Tokens(tokens) => {
                                 if self.line_builder.set_tokens(tokens) {
-                                    self.events.borrow_mut().message("LSP tokens mapped!");
+                                    self.events.borrow_mut().success("LSP tokens mapped!");
                                 };
                             }
                             LSPResult::Declaration(declaration) => {
@@ -245,7 +246,7 @@ impl Lexer {
                         },
                         None => {
                             if let Some(err) = response.error {
-                                self.events.borrow_mut().overwrite(err.to_string());
+                                self.events.borrow_mut().error(err.to_string());
                             }
                         }
                     }

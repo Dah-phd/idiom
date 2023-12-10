@@ -134,7 +134,7 @@ impl Editor {
     }
 
     pub fn go_to(&mut self, line: usize) {
-        self.cursor.select = None;
+        self.cursor.select_drop();
         if self.content.len() >= line {
             self.cursor.line = line;
             self.cursor.char = find_line_start(self.content[line].as_str());
@@ -143,9 +143,8 @@ impl Editor {
     }
 
     pub fn go_to_select(&mut self, from: CursorPosition, to: CursorPosition) {
-        self.cursor.set_position(to);
         self.cursor.at_line = to.line.checked_sub(self.max_rows / 2).unwrap_or_default();
-        self.cursor.select = Some((from, to));
+        self.cursor.select_set(from, to);
     }
 
     pub fn find(&mut self, pat: &str, buffer: &mut Vec<(CursorPosition, CursorPosition)>) {
@@ -328,7 +327,7 @@ impl Editor {
 
     pub fn try_write_file(&self) -> bool {
         if let Err(error) = std::fs::write(&self.path, self.content.join("\n")) {
-            self.lexer.events.borrow_mut().overwrite(error.to_string());
+            self.lexer.events.borrow_mut().error(error.to_string());
             return false;
         }
         true

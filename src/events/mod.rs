@@ -76,8 +76,12 @@ impl Events {
         self.footer.push(FooterEvent::Message(msg.into()));
     }
 
-    pub fn overwrite(&mut self, msg: impl Into<String>) {
-        self.footer.push(FooterEvent::Overwrite(msg.into()))
+    pub fn error(&mut self, msg: impl Into<String>) {
+        self.footer.push(FooterEvent::Error(msg.into()));
+    }
+
+    pub fn success(&mut self, msg: impl Into<String>) {
+        self.footer.push(FooterEvent::Success(msg.into()));
     }
 
     pub fn exchange_footer(&mut self, footer: &mut Footer) {

@@ -27,7 +27,7 @@ impl Actions {
         if cursor.line == 0 {
             return;
         }
-        cursor.select = None;
+        cursor.select_drop();
         self.push_buffer();
         cursor.line -= 1;
         let (top, _, action) = Edit::swap_down(cursor.line, &self.cfg, content);
@@ -39,7 +39,7 @@ impl Actions {
         if content.is_empty() || content.len() - 1 <= cursor.line {
             return;
         }
-        cursor.select = None;
+        cursor.select_drop();
         self.push_buffer();
         let (_, bot, action) = Edit::swap_down(cursor.line, &self.cfg, content);
         cursor.line += 1;
@@ -63,7 +63,7 @@ impl Actions {
         content: &mut Vec<String>,
     ) {
         self.push_buffer();
-        cursor.select = None;
+        cursor.select_drop();
         let action = Edit::replace_select(from, to, clip.into(), content);
         cursor.set_position(action.end_position());
         self.push_done(action);
@@ -77,7 +77,7 @@ impl Actions {
         content: &mut Vec<String>,
     ) {
         self.push_buffer();
-        cursor.select = None;
+        cursor.select_drop();
         let actions: Vec<_> =
             ranges.drain(..).map(|(from, to)| Edit::replace_select(from, to, clip.to_owned(), content)).collect();
         if let Some(last) = actions.last() {
@@ -174,7 +174,7 @@ impl Actions {
     }
 
     pub fn push_char(&mut self, ch: char, cursor: &mut Cursor, content: &mut Vec<String>) {
-        if let Some((from, to)) = cursor.select.take() {
+        if let Some((from, to)) = cursor.select_take() {
             self.push_buffer();
             cursor.set_position(from);
             self.push_done(Edit::remove_select(from, to, content));
@@ -200,7 +200,7 @@ impl Actions {
         if content.is_empty() {
             return;
         }
-        if let Some((from, to)) = cursor.select.take() {
+        if let Some((from, to)) = cursor.select_take() {
             self.push_buffer();
             cursor.set_position(from);
             self.push_done(Edit::remove_select(from, to, content));
@@ -218,7 +218,7 @@ impl Actions {
         if content.is_empty() || cursor.line == 0 && cursor.char == 0 {
             return;
         }
-        if let Some((from, to)) = cursor.select.take() {
+        if let Some((from, to)) = cursor.select_take() {
             self.push_buffer();
             cursor.set_position(from);
             self.push_done(Edit::remove_select(from, to, content));
@@ -249,7 +249,7 @@ impl Actions {
 
     pub fn paste(&mut self, clip: String, cursor: &mut Cursor, content: &mut Vec<String>) {
         self.push_buffer();
-        let action = if let Some((from, to)) = cursor.select.take() {
+        let action = if let Some((from, to)) = cursor.select_take() {
             Edit::replace_select(from, to, clip, content)
         } else {
             Edit::insert_clip(cursor.into(), clip, content)
@@ -260,7 +260,7 @@ impl Actions {
 
     pub fn cut(&mut self, cursor: &mut Cursor, content: &mut Vec<String>) -> String {
         self.push_buffer();
-        let action = if let Some((from, to)) = cursor.select.take() {
+        let action = if let Some((from, to)) = cursor.select_take() {
             cursor.set_position(from);
             Edit::remove_select(from, to, content)
         } else {

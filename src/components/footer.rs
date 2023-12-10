@@ -2,24 +2,25 @@ use crate::{components::workspace::DocStats, configs::Mode};
 use anyhow::Result;
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
+    style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
 use std::time::{Duration, Instant};
 
-const MSG_DURATION: Duration = Duration::from_secs(5);
+const MSG_DURATION: Duration = Duration::from_secs(3);
 
 #[derive(Debug)]
 pub struct Footer {
     clock: Instant,
-    message: String,
-    message_que: Vec<String>,
+    message: Option<Message>,
+    message_que: Vec<Message>,
 }
 
 impl Default for Footer {
     fn default() -> Self {
-        Self { clock: Instant::now(), message: String::new(), message_que: Vec::new() }
+        Self { clock: Instant::now(), message: None, message_que: Vec::new() }
     }
 }
 
@@ -43,7 +44,7 @@ impl Footer {
     }
 
     fn widget_with_stats(&mut self, mode: &Mode, stats: Option<DocStats>) -> Paragraph {
-        let mut line = vec![Span::raw(self.get_message())];
+        let mut line = self.get_message();
         if let Some((doc_len, selected, cur)) = stats {
             line.push(Span::raw(match selected {
                 0 => format!("    Doc Len {doc_len}, Ln {}, Col {}", cur.line, cur.char),
@@ -54,37 +55,95 @@ impl Footer {
         Paragraph::new(Line::from(line)).alignment(Alignment::Right).block(Block::default().borders(Borders::TOP))
     }
 
-    pub fn message(&mut self, message: String) {
-        if self.message.is_empty() && self.message_que.is_empty() {
-            self.message = message;
-        } else {
-            self.message_que.push(message);
+    pub fn logged_ok<T>(&mut self, result: Result<T>) -> Option<T> {
+        match result {
+            Ok(val) => Some(val),
+            Err(err) => {
+                self.error(err.to_string());
+                None
+            }
         }
     }
 
-    pub fn error(&mut self, error: String) {}
-
-    pub fn logged_if_error<T>(&mut self, result: Result<T>) -> bool {
-        if let Err(error) = result {
-            self.overwrite(error.to_string());
-        };
-        false
+    pub fn message(&mut self, message: String) {
+        if self.message.is_none() && self.message_que.is_empty() {
+            self.message.replace(Message::msg(message));
+        } else {
+            self.message_que.push(Message::msg(message));
+        }
     }
 
-    pub fn overwrite(&mut self, message: String) {
-        self.message = message;
+    pub fn error(&mut self, message: String) {
+        self.push_ahead(Message::err(message));
+    }
+
+    pub fn success(&mut self, message: String) {
+        self.push_ahead(Message::success(message));
+    }
+
+    fn push_ahead(&mut self, msg: Message) {
+        self.message_que.retain(|m| m.is_err());
+        self.message_que.push(msg);
+        if matches!(&self.message, Some(maybe_err) if !maybe_err.is_err()) {
+            self.message = None;
+        }
+    }
+
+    fn get_message(&mut self) -> Vec<Span<'static>> {
+        if self.message.is_none() && self.message_que.is_empty() {
+            return Vec::new();
+        }
+        self.que_pull_if_expaired();
+        self.message.as_ref().map(|m| m.vec()).unwrap_or_default()
+    }
+
+    fn que_pull_if_expaired(&mut self) {
+        if self.message.is_some() && self.clock.elapsed() <= MSG_DURATION {
+            return;
+        }
+        match self.message_que.len() {
+            0 => self.message = None,
+            1..=3 => {
+                self.message.replace(self.message_que.remove(0));
+            }
+            _ => {
+                self.message_que = self.message_que.drain(..).rev().take(3).rev().collect();
+            }
+        }
         self.clock = Instant::now();
     }
+}
 
-    fn get_message(&mut self) -> &str {
-        if self.message.is_empty() && self.message_que.is_empty() || self.clock.elapsed() <= MSG_DURATION {
-            return &self.message;
+#[derive(Debug)]
+enum Message {
+    Plain(Span<'static>),
+    Success(Span<'static>),
+    Error(Span<'static>),
+}
+
+impl Message {
+    fn is_err(&self) -> bool {
+        matches!(self, Self::Error(..))
+    }
+
+    fn vec(&self) -> Vec<Span<'static>> {
+        vec![match self {
+            Self::Error(span) => span,
+            Self::Plain(span) => span,
+            Self::Success(span) => span,
         }
-        self.message.clear();
-        if !self.message_que.is_empty() {
-            self.message = self.message_que.remove(0);
-            self.clock = Instant::now();
-        }
-        &self.message
+        .clone()]
+    }
+
+    fn msg(message: String) -> Self {
+        Self::Plain(Span::raw(message))
+    }
+
+    fn success(message: String) -> Self {
+        Self::Success(Span::styled(message, Style { fg: Some(Color::Blue), ..Default::default() }))
+    }
+
+    fn err(message: String) -> Self {
+        Self::Error(Span::styled(message, Style { fg: Some(Color::Red), ..Default::default() }))
     }
 }

@@ -6,7 +6,7 @@ pub struct Cursor {
     pub char: usize,
     phantm_char: usize, // keeps record for up/down movement
     pub at_line: usize,
-    pub select: Option<(CursorPosition, CursorPosition)>,
+    select: Option<(CursorPosition, CursorPosition)>,
 }
 
 impl Cursor {
@@ -261,6 +261,16 @@ impl Cursor {
             }
         }
     }
+
+    pub fn select_drop(&mut self) {
+        self.select = None;
+    }
+
+    pub fn select_set(&mut self, from: CursorPosition, to: CursorPosition) {
+        self.set_position(to);
+        self.select.replace((from, to));
+    }
+
     pub fn select_take(&mut self) -> Option<(CursorPosition, CursorPosition)> {
         match self.select.take() {
             None => None,

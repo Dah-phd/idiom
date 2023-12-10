@@ -196,7 +196,7 @@ impl EditBuilder {
     // OPENERS
     /// initialize builder collecting select if exists
     pub fn init_alt(cursor: &mut Cursor, content: &mut Vec<String>) -> Self {
-        if let Some((from, to)) = cursor.select.take() {
+        if let Some((from, to)) = cursor.select_take() {
             cursor.set_position(from);
             return Self {
                 reverse_edit_text: clip_content(&from, &to, content),

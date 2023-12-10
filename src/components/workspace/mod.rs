@@ -118,7 +118,7 @@ impl Workspace {
                         if let Some(clip) = editor.cut() {
                             let mut events = self.events.borrow_mut();
                             if let Err(err) = events.clipboard_push(clip) {
-                                events.overwrite(err.to_string());
+                                events.error(err.to_string());
                             }
                         }
                     }
@@ -126,7 +126,7 @@ impl Workspace {
                         if let Some(clip) = editor.copy() {
                             let mut events = self.events.borrow_mut();
                             if let Err(err) = events.clipboard_push(clip) {
-                                events.overwrite(err.to_string());
+                                events.error(err.to_string());
                             }
                         }
                     }
@@ -176,7 +176,7 @@ impl Workspace {
                     editor.apply_file_edits(file_edits);
                     editor.try_write_file();
                 } else {
-                    self.events.borrow_mut().overwrite(format!("Unable to build editor for {}", file_url.path()));
+                    self.events.borrow_mut().error(format!("Unable to build editor for {}", file_url.path()));
                 }
             }
         }
@@ -195,7 +195,7 @@ impl Workspace {
                             }
                             DocumentChangeOperation::Op(operation) => {
                                 if let Err(err) = self.handle_tree_operations(operation) {
-                                    self.events.borrow_mut().overwrite(format!("Failed file tree operation: {err}"));
+                                    self.events.borrow_mut().error(format!("Failed file tree operation: {err}"));
                                 }
                             }
                         }
@@ -232,7 +232,7 @@ impl Workspace {
         } else {
             self.events
                 .borrow_mut()
-                .overwrite(format!("Unable to build editor for {}", text_document_edit.text_document.uri.path()));
+                .error(format!("Unable to build editor for {}", text_document_edit.text_document.uri.path()));
         };
     }
 
