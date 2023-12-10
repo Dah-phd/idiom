@@ -4,8 +4,8 @@ pub struct Prism {
 }
 
 impl Prism {
-    pub fn add() {}
-    pub fn remap() {}
+    pub fn add(&mut self) {}
+    pub fn remap(&mut self) {}
     pub fn reset(&mut self) {
         self.transforms.clear();
     }

@@ -1,6 +1,6 @@
 use super::LSPClient;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Error, Result};
 use lsp_types::{
     notification::{Notification, PublishDiagnostics},
     DiagnosticSeverity, PublishDiagnosticsParams,
@@ -15,6 +15,7 @@ pub enum LSPMessage {
     Notification(GeneralNotification),
     Diagnostic(PathBuf, Diagnostic),
     Unknown(Value),
+    Error(Error),
 }
 
 impl LSPMessage {

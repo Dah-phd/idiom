@@ -46,7 +46,7 @@ pub struct LSP {
     file_type: FileType,
     inner: Child,
     client: LSPClient,
-    lsp_json_handler: JoinHandle<()>,
+    lsp_json_handler: JoinHandle<Result<()>>,
     lsp_send_handler: JoinHandle<Result<()>>,
     attempts: usize,
 }
@@ -82,22 +82,23 @@ impl LSP {
         // starting response handler
         let lsp_json_handler = tokio::task::spawn(async move {
             loop {
-                match json_rpc.next().await {
-                    Ok(msg) => match msg {
-                        LSPMessage::Response(inner) => {
-                            into_guard(&responses_handler).insert(inner.id, inner);
-                        }
-                        LSPMessage::Notification(inner) => into_guard(&notifications_handler).push(inner),
-                        LSPMessage::Diagnostic(uri, params) => {
-                            into_guard(&diagnostics_handler).insert(uri, params);
-                        }
-                        LSPMessage::Request(inner) => requests_handler.lock().await.push(inner),
-                        _ => (),
-                    },
-                    Err(err) =>
-                    {
+                let msg = json_rpc.next().await?;
+                match msg {
+                    LSPMessage::Response(inner) => {
+                        into_guard(&responses_handler).insert(inner.id, inner);
+                    }
+                    LSPMessage::Notification(inner) => into_guard(&notifications_handler).push(inner),
+                    LSPMessage::Diagnostic(uri, params) => {
+                        into_guard(&diagnostics_handler).insert(uri, params);
+                    }
+                    LSPMessage::Request(inner) => requests_handler.lock().await.push(inner),
+                    LSPMessage::Error(_err) => {
                         #[cfg(build = "debug")]
-                        debug_to_file("test_data.reader", err.to_string())
+                        debug_to_file("test_data.lsp_err", _err.to_string());
+                    }
+                    LSPMessage::Unknown(_obj) => {
+                        #[cfg(build = "debug")]
+                        debug_to_file("test_data.lsp_unknown", _obj.to_string());
                     }
                 }
             }

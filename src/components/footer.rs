@@ -62,6 +62,8 @@ impl Footer {
         }
     }
 
+    pub fn error(&mut self, error: String) {}
+
     pub fn logged_if_error<T>(&mut self, result: Result<T>) -> bool {
         if let Err(error) = result {
             self.overwrite(error.to_string());

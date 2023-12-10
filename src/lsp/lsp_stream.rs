@@ -14,6 +14,12 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 #[cfg(build = "debug")]
 use crate::utils::debug_to_file;
 
+/// Streams LSPMessage every time next is called - it handles receiving, deserialization and objec parsing.
+/// LSPMessages are nothing more than wrapper around object determining type [Request, Notification, Response, Error, Unknown].
+/// Fail conditions:
+///  * stream end
+///  * bad bytes received from Codec
+///  * failure to parse message len
 pub struct LSPMessageStream {
     inner: FramedRead<ChildStdout, BytesCodec>,
     #[allow(dead_code)]
@@ -50,40 +56,30 @@ impl LSPMessageStream {
     }
 
     pub async fn next(&mut self) -> Result<LSPMessage> {
-        self.check_errors()?;
+        if let Some(err) = self.check_errors() {
+            return Ok(LSPMessage::Error(err));
+        };
         if !self.parsed_que.is_empty() {
             return Ok(self.parsed_que.remove(0).into()); // ensure all objects are sent
         }
         while self.parsed_que.is_empty() {
-            match self.inner.next().await.ok_or(anyhow!("LSP crashed!"))? {
-                Ok(bytes) => {
-                    self.buffer.append(&mut bytes.to_vec());
-                    match std::str::from_utf8(&self.buffer) {
-                        Ok(msg) => {
-                            self.str_buffer.push_str(msg);
-                            self.buffer.clear();
-                        }
-                        Err(_) => continue, // buffer is not complete
-                    };
+            let bytes = self.inner.next().await.ok_or(anyhow!("LSP CRASH: steam finished!!!"))??;
+            self.buffer.append(&mut bytes.to_vec());
+            match std::str::from_utf8(&self.buffer) {
+                Ok(msg) => {
+                    self.str_buffer.push_str(msg);
+                    self.buffer.clear();
                 }
-                Err(err) => {
-                    panic!("Unexpeced error from LSP json RCP! {}", err);
-                }
-            }
+                Err(_) => continue, // buffer is not fully read
+            };
             self.parse()?;
         }
         Ok(self.parsed_que.remove(0).into())
     }
 
-    fn check_errors(&mut self) -> Result<()> {
-        if let Ok(mut errors) = self.errors.try_lock() {
-            if !errors.is_empty() {
-                let err = Err(anyhow!(errors.join("\n")));
-                errors.clear();
-                return err;
-            }
-        }
-        Ok(())
+    fn check_errors(&mut self) -> Option<anyhow::Error> {
+        let mut errors = self.errors.try_lock().ok()?;
+        errors.drain(..).reduce(to_lines).map(|err| anyhow!(err))
     }
 
     fn parse(&mut self) -> Result<()> {
@@ -139,4 +135,10 @@ impl LSPMessageStream {
 
 fn is_end_of_line(c: &char) -> bool {
     c != &'\r' && c != &'\n'
+}
+
+fn to_lines(mut a: String, b: String) -> String {
+    a.push('\n');
+    a.push_str(&b);
+    a
 }

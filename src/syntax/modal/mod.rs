@@ -137,7 +137,7 @@ impl RenameVariable {
 pub struct AutoComplete {
     state: ListState,
     filter: String,
-    line: String,
+    // line: String,
     matcher: SkimMatcherV2,
     filtered: Vec<(String, i64)>,
     completions: Vec<CompletionItem>,
@@ -155,7 +155,7 @@ impl AutoComplete {
         }
         let mut modal = Self {
             state: ListState::default(),
-            line,
+            // line,
             filter,
             filtered: Vec::new(),
             completions,
