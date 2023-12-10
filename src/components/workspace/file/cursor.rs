@@ -285,17 +285,23 @@ impl Cursor {
     }
 
     pub fn select_len(&self, content: &[String]) -> usize {
-        if let Some((from, to)) = self.select_get() {
-            if from.line == to.line {
-                return content[from.line][from.char..to.char].len();
-            };
-            let mut len = 0;
-            for line in content[from.line..to.line].iter() {
-                len += line.len();
-            }
-            return len;
-        }
-        0
+        self.select_get()
+            .map(|(from, to)| {
+                if from.line == to.line {
+                    return content[from.line][from.char..to.char].len();
+                };
+                let mut iter = content[from.line..=to.line].iter().peekable();
+                let mut len = iter.next().map(|line| line[from.char..].len() + 1).unwrap_or_default();
+                while let Some(line) = iter.next() {
+                    if iter.peek().is_none() {
+                        len += line[..to.char].len();
+                    } else {
+                        len += line.len() + 1;
+                    }
+                }
+                len
+            })
+            .unwrap_or_default()
     }
 }
 
