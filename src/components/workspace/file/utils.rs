@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{ops::Range, path::PathBuf, time::SystemTime};
 
 use super::CursorPosition;
 
@@ -161,4 +161,9 @@ pub fn token_range_at(line: &str, idx: usize) -> Range<usize> {
     } else {
         idx..idx
     }
+}
+
+pub fn last_modified(path: &PathBuf) -> Option<SystemTime> {
+    let meta = std::fs::metadata(path).ok()?;
+    meta.modified().ok()
 }

@@ -16,6 +16,7 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
         file_type: ft,
         display: "".to_string(),
         path: PathBuf::from(""),
+        timestamp: None,
         cursor: Cursor::default(),
         actions: Actions::default(),
         max_rows: 0,

@@ -1,23 +1,24 @@
 mod file;
-mod file_tracker;
 use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType, Mode};
 use crate::events::Events;
 use crate::lsp::LSP;
 use crate::utils::get_contents_once;
 use anyhow::Result;
 use crossterm::event::KeyEvent;
-pub use file::{CursorPosition, DocStats};
+pub use file::{CursorPosition, DocStats, Editor};
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
-use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::widgets::{ListState, Tabs};
-use ratatui::Frame;
-use std::cell::RefCell;
-use std::collections::{hash_map::Entry, HashMap};
-use std::path::PathBuf;
-use std::rc::Rc;
-
-use self::file::Editor;
+use ratatui::{
+    layout::{Constraint, Layout, Rect},
+    style::{Color, Modifier, Style},
+    widgets::{ListState, Tabs},
+    Frame,
+};
+use std::{
+    cell::RefCell,
+    collections::{hash_map::Entry, HashMap},
+    path::PathBuf,
+    rc::Rc,
+};
 
 pub struct Workspace {
     pub editors: Vec<Editor>,
@@ -112,8 +113,8 @@ impl Workspace {
                     EditorAction::LSPRename => editor.start_renames(),
                     EditorAction::Undo => editor.undo(),
                     EditorAction::Redo => editor.redo(),
-                    EditorAction::Save => editor.save(),
                     EditorAction::Cancel => return editor.cursor.select_take().is_some(),
+                    EditorAction::Save => editor.save(),
                     EditorAction::Cut => {
                         if let Some(clip) = editor.cut() {
                             let mut events = self.events.borrow_mut();
@@ -357,7 +358,7 @@ impl Workspace {
             if self.editors.is_empty() {
                 self.state.select(None);
             } else if index >= self.editors.len() {
-                self.state.select(Some(index - 1))
+                self.state.select(Some(index - 1));
             }
         }
     }

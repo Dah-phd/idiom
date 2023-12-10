@@ -22,8 +22,7 @@ use crate::utils::debug_to_file;
 ///  * failure to parse message len
 pub struct LSPMessageStream {
     inner: FramedRead<ChildStdout, BytesCodec>,
-    #[allow(dead_code)]
-    stderr_handler: JoinHandle<()>,
+    _stderr: JoinHandle<()>,
     errors: Arc<Mutex<Vec<String>>>,
     str_buffer: String,
     buffer: Vec<u8>,
@@ -43,7 +42,7 @@ impl LSPMessageStream {
             errors,
             parsed_que: Vec::new(),
             expected_len: 0,
-            stderr_handler: tokio::task::spawn(async move {
+            _stderr: tokio::task::spawn(async move {
                 while let Some(Ok(err)) = stderr.next().await {
                     if let Ok(msg) = String::from_utf8(err.into()) {
                         #[cfg(build = "debug")]

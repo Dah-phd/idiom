@@ -12,11 +12,11 @@ use crate::{
     syntax::{Lexer, Theme},
     utils::find_code_blocks,
 };
-use std::{cell::RefCell, cmp::Ordering, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, cmp::Ordering, path::PathBuf, rc::Rc, time::SystemTime};
 
 use self::{
     actions::Actions,
-    utils::{copy_content, find_line_start, token_range_at},
+    utils::{copy_content, find_line_start, last_modified, token_range_at},
 };
 
 type DocLen = usize;
@@ -33,6 +33,7 @@ pub struct Editor {
     pub cursor: Cursor,
     pub actions: Actions,
     max_rows: usize,
+    timestamp: Option<SystemTime>,
     content: Vec<String>,
 }
 
@@ -51,6 +52,7 @@ impl Editor {
             file_type,
             display,
             path: path.canonicalize()?,
+            timestamp: last_modified(&path),
         })
     }
 
