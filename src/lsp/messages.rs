@@ -1,5 +1,3 @@
-use super::LSPClient;
-
 use anyhow::{anyhow, Error, Result};
 use lsp_types::{
     notification::{Notification, PublishDiagnostics},
@@ -134,13 +132,4 @@ impl Diagnostic {
         self.updated = false;
         Some(self.params.clone())
     }
-}
-
-#[allow(unused_variables, dead_code)]
-pub fn done_auto_response(lsp_message: &mut Request, client: &mut LSPClient) -> bool {
-    #[allow(clippy::match_single_binding)]
-    match lsp_message.method.as_str() {
-        _ => (),
-    }
-    false
 }

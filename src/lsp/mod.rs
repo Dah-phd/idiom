@@ -7,7 +7,6 @@ mod request;
 mod rust;
 pub use client::LSPClient;
 use lsp_stream::LSPMessageStream;
-use messages::done_auto_response;
 pub use messages::{Diagnostic, GeneralNotification, LSPMessage, Request, Response};
 pub use notification::LSPNotification;
 pub use request::LSPRequest;
@@ -157,18 +156,6 @@ impl LSP {
             };
         }
         Ok(None)
-    }
-
-    pub async fn auto_responde(&mut self) {
-        let mut requests = self.requests.lock().await;
-        if requests.is_empty() {
-            return;
-        }
-        let mut keep = Vec::new();
-        for request in requests.iter_mut() {
-            keep.push(!done_auto_response(request, &mut self.client));
-        }
-        requests.retain(|_| keep.remove(0));
     }
 
     async fn initialized(&mut self) -> Result<()> {
