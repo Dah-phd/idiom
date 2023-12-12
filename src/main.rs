@@ -1,7 +1,7 @@
 mod app;
 mod components;
 mod configs;
-mod events;
+mod global_state;
 mod lsp;
 mod syntax;
 mod utils;

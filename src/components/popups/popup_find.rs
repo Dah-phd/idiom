@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::{
     components::{workspace::CursorPosition, Tree, Workspace},
-    events::{messages::PopupMessage, WorkspaceEvent},
+    global_state::{messages::PopupMessage, WorkspaceEvent},
     utils::right_corner_rect_static,
 };
 

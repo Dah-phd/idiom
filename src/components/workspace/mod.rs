@@ -1,8 +1,7 @@
 mod file;
 use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType, Mode};
-use crate::events::Events;
+use crate::global_state::GlobalState;
 use crate::lsp::LSP;
-use crate::utils::get_contents_once;
 pub use file::{CursorPosition, DocStats, Editor};
 
 use anyhow::Result;
@@ -15,34 +14,30 @@ use ratatui::{
     Frame,
 };
 use std::{
-    cell::RefCell,
     collections::{hash_map::Entry, HashMap},
     path::PathBuf,
-    rc::Rc,
 };
 
 pub struct Workspace {
     pub editors: Vec<Editor>,
     pub state: ListState,
-    events: Rc<RefCell<Events>>,
     base_config: EditorConfigs,
     key_map: EditorKeyMap,
     lsp_servers: HashMap<FileType, LSP>,
 }
 
 impl Workspace {
-    pub fn new(key_map: EditorKeyMap, events: &Rc<RefCell<Events>>) -> Self {
+    pub fn new(key_map: EditorKeyMap) -> Self {
         Self {
             editors: Vec::default(),
             state: ListState::default(),
             base_config: EditorConfigs::new(),
-            events: Rc::clone(events),
             key_map,
             lsp_servers: HashMap::new(),
         }
     }
 
-    pub fn render(&mut self, frame: &mut Frame, area: Rect) {
+    pub fn render(&mut self, frame: &mut Frame, area: Rect, gs: &mut GlobalState) {
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get_mut(editor_id) {
                 let layout = Layout::default().constraints([Constraint::Length(1), Constraint::default()]).split(area);
@@ -50,7 +45,7 @@ impl Workspace {
                 file.set_max_rows(layout[1].bottom());
                 let cursor_x_offset = 1 + file.cursor.char;
                 let cursor_y_offset = file.cursor.line - file.cursor.at_line;
-                let (digits_offset, editor_content) = file.get_list_widget_with_context();
+                let (digits_offset, editor_content) = file.get_list_widget_with_context(gs);
                 let x_cursor = area.x + (cursor_x_offset + digits_offset) as u16;
                 let y_cursor = area.y + cursor_y_offset as u16;
 
@@ -71,14 +66,14 @@ impl Workspace {
         }
     }
 
-    pub fn map(&mut self, key: &KeyEvent, mode: &mut Mode) -> bool {
+    pub fn map(&mut self, key: &KeyEvent, mode: &mut Mode, gs: &mut GlobalState) -> bool {
         if !matches!(mode, Mode::Insert) {
             return false;
         }
         let action = self.key_map.map(key);
         if let Some(editor) = self.get_active() {
             if let Some(action) = action {
-                if editor.lexer.map_modal_if_exists(&action, &editor.path) {
+                if editor.lexer.map_modal_if_exists(&action, &editor.path, gs) {
                     return true;
                 };
                 match action {
@@ -115,27 +110,20 @@ impl Workspace {
                     EditorAction::Undo => editor.undo(),
                     EditorAction::Redo => editor.redo(),
                     EditorAction::Cancel => return editor.cursor.select_take().is_some(),
-                    EditorAction::Save => editor.save(),
+                    EditorAction::Save => editor.save(gs),
+                    EditorAction::Paste => {
+                        if let Some(clip) = gs.clipboard.pull() {
+                            editor.paste(clip);
+                        }
+                    }
                     EditorAction::Cut => {
                         if let Some(clip) = editor.cut() {
-                            let mut events = self.events.borrow_mut();
-                            if let Err(err) = events.clipboard_push(clip) {
-                                events.error(err.to_string());
-                            }
+                            gs.clipboard.push(clip);
                         }
                     }
                     EditorAction::Copy => {
                         if let Some(clip) = editor.copy() {
-                            let mut events = self.events.borrow_mut();
-                            if let Err(err) = events.clipboard_push(clip) {
-                                events.error(err.to_string());
-                            }
-                        }
-                    }
-                    EditorAction::Paste => {
-                        // ! rework this ctx is available in events
-                        if let Ok(clip) = get_contents_once() {
-                            editor.paste(clip);
+                            gs.clipboard.push(clip);
                         }
                     }
                     EditorAction::Close => {
@@ -163,22 +151,22 @@ impl Workspace {
         self.editors.get_mut(self.state.selected()?)
     }
 
-    pub async fn lexer_updates(&mut self) {
+    pub async fn lexer_updates(&mut self, gs: &mut GlobalState) {
         if let Some(file) = self.get_active() {
-            file.update_lsp().await;
+            file.update_lsp(gs).await;
         }
     }
 
-    pub fn apply_edits(&mut self, edits: WorkspaceEdit) {
+    pub fn apply_edits(&mut self, edits: WorkspaceEdit, events: &mut GlobalState) {
         if let Some(edits) = edits.changes {
             for (file_url, file_edits) in edits {
                 if let Some(editor) = self.get_editor(file_url.path()) {
                     editor.apply_file_edits(file_edits);
                 } else if let Ok(mut editor) = self.build_basic_editor(PathBuf::from(file_url.path())) {
                     editor.apply_file_edits(file_edits);
-                    editor.try_write_file();
+                    editor.try_write_file(events);
                 } else {
-                    self.events.borrow_mut().error(format!("Unable to build editor for {}", file_url.path()));
+                    events.error(format!("Unable to build editor for {}", file_url.path()));
                 }
             }
         }
@@ -186,18 +174,18 @@ impl Workspace {
             match documet_edit {
                 DocumentChanges::Edits(edits) => {
                     for text_document_edit in edits {
-                        self.handle_text_document_edit(text_document_edit);
+                        self.handle_text_document_edit(text_document_edit, events);
                     }
                 }
                 DocumentChanges::Operations(operations) => {
                     for operation in operations {
                         match operation {
                             DocumentChangeOperation::Edit(text_document_edit) => {
-                                self.handle_text_document_edit(text_document_edit);
+                                self.handle_text_document_edit(text_document_edit, events);
                             }
                             DocumentChangeOperation::Op(operation) => {
                                 if let Err(err) = self.handle_tree_operations(operation) {
-                                    self.events.borrow_mut().error(format!("Failed file tree operation: {err}"));
+                                    events.error(format!("Failed file tree operation: {err}"));
                                 }
                             }
                         }
@@ -207,7 +195,7 @@ impl Workspace {
         }
     }
 
-    fn handle_text_document_edit(&mut self, mut text_document_edit: TextDocumentEdit) {
+    fn handle_text_document_edit(&mut self, mut text_document_edit: TextDocumentEdit, events: &mut GlobalState) {
         if let Some(editor) = self.get_editor(text_document_edit.text_document.uri.path()) {
             let edits = text_document_edit
                 .edits
@@ -230,11 +218,9 @@ impl Workspace {
                 })
                 .collect();
             editor.apply_file_edits(edits);
-            editor.try_write_file();
+            editor.try_write_file(events);
         } else {
-            self.events
-                .borrow_mut()
-                .error(format!("Unable to build editor for {}", text_document_edit.text_document.uri.path()));
+            events.error(format!("Unable to build editor for {}", text_document_edit.text_document.uri.path()));
         };
     }
 
@@ -279,34 +265,35 @@ impl Workspace {
     }
 
     fn build_basic_editor(&mut self, file_path: PathBuf) -> Result<Editor> {
-        Ok(Editor::from_path(file_path, self.base_config.clone(), &self.events)?)
+        Ok(Editor::from_path(file_path, self.base_config.clone())?)
     }
 
-    async fn build_editor(&mut self, file_path: PathBuf) -> Result<Editor> {
-        let mut new = Editor::from_path(file_path, self.base_config.clone(), &self.events)?;
+    async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> Result<Editor> {
+        let mut new = Editor::from_path(file_path, self.base_config.clone())?;
         match self.lsp_servers.entry(new.file_type) {
             Entry::Vacant(entry) => {
                 if let Ok(lsp) = LSP::from(&new.file_type).await {
-                    new.lexer.set_lsp_client(lsp.aquire_client(), &new.path, &new.file_type, new.stringify());
+                    new.lexer.set_lsp_client(lsp.aquire_client(), &new.path, &new.file_type, new.stringify(), gs);
                     for editor in self.editors.iter_mut().filter(|e| e.file_type == new.file_type) {
                         editor.lexer.set_lsp_client(
                             lsp.aquire_client(),
                             &editor.path,
                             &editor.file_type,
                             editor.stringify(),
+                            gs,
                         );
                     }
                     entry.insert(lsp);
                 }
             }
             Entry::Occupied(entry) => {
-                new.lexer.set_lsp_client(entry.get().aquire_client(), &new.path, &new.file_type, new.stringify());
+                new.lexer.set_lsp_client(entry.get().aquire_client(), &new.path, &new.file_type, new.stringify(), gs);
             }
         }
         Ok(new)
     }
 
-    pub async fn new_from(&mut self, file_path: PathBuf) -> Result<()> {
+    pub async fn new_from(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> Result<()> {
         let file_path = file_path.canonicalize()?;
         for (idx, file) in self.editors.iter().enumerate() {
             if file.path == file_path {
@@ -314,27 +301,27 @@ impl Workspace {
                 return Ok(());
             }
         }
-        let editor = self.build_editor(file_path).await?;
+        let editor = self.build_editor(file_path, gs).await?;
         self.state.select(Some(self.editors.len()));
         self.editors.push(editor);
         Ok(())
     }
 
-    pub async fn new_at_line(&mut self, file_path: PathBuf, line: usize) -> Result<()> {
-        self.new_from(file_path).await?;
+    pub async fn new_at_line(&mut self, file_path: PathBuf, line: usize, gs: &mut GlobalState) -> Result<()> {
+        self.new_from(file_path, gs).await?;
         if let Some(editor) = self.get_active() {
             editor.go_to(line);
         }
         Ok(())
     }
 
-    pub async fn check_lsp(&mut self, ft: FileType) -> Option<String> {
+    pub async fn check_lsp(&mut self, ft: FileType, gs: &mut GlobalState) -> Option<String> {
         let lsp = self.lsp_servers.get_mut(&ft)?;
         match lsp.check_status().await {
             Ok(data) => Some(match data {
                 None => "LSP function is normal".to_owned(),
                 Some(err) => {
-                    self.full_sync(&ft).await;
+                    self.full_sync(&ft, gs).await;
                     format!("LSP recoved after: {err}")
                 }
             }),
@@ -342,10 +329,10 @@ impl Workspace {
         }
     }
 
-    pub async fn full_sync(&mut self, ft: &FileType) {
+    pub async fn full_sync(&mut self, ft: &FileType, gs: &mut GlobalState) {
         if let Some(lsp) = self.lsp_servers.get(ft) {
             for editor in self.editors.iter_mut().filter(|e| &e.file_type == ft) {
-                editor.lexer.set_lsp_client(lsp.aquire_client(), &editor.path, ft, editor.stringify());
+                editor.lexer.set_lsp_client(lsp.aquire_client(), &editor.path, ft, editor.stringify(), gs);
             }
         }
     }
@@ -373,19 +360,19 @@ impl Workspace {
         true
     }
 
-    pub fn save(&mut self) {
+    pub fn save(&mut self, gs: &mut GlobalState) {
         if let Some(editor) = self.get_active() {
-            editor.save();
+            editor.save(gs);
         }
     }
 
-    pub fn save_all(&mut self) {
+    pub fn save_all(&mut self, events: &mut GlobalState) {
         for editor in self.editors.iter_mut() {
-            editor.save();
+            editor.save(events);
         }
     }
 
-    pub async fn refresh_cfg(&mut self, new_key_map: EditorKeyMap) {
+    pub async fn refresh_cfg(&mut self, new_key_map: EditorKeyMap, gs: &mut GlobalState) {
         self.key_map = new_key_map;
         self.base_config.refresh();
         for editor in self.editors.iter_mut() {
@@ -397,6 +384,7 @@ impl Workspace {
                         &editor.path,
                         &editor.file_type,
                         editor.stringify(),
+                        gs,
                     );
                 }
             }

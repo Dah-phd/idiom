@@ -7,7 +7,7 @@ pub use self::theme::Theme;
 use crate::components::workspace::CursorPosition;
 use crate::configs::EditorAction;
 use crate::configs::FileType;
-use crate::events::{Events, WorkspaceEvent};
+use crate::global_state::{GlobalState, WorkspaceEvent};
 use crate::lsp::{LSPClient, LSPRequest};
 use lsp_types::request::{
     Completion, GotoDeclaration, GotoDefinition, HoverRequest, Rename, SemanticTokensFullRequest, SignatureHelpRequest,
@@ -16,16 +16,13 @@ use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent};
 use ratatui::style::{Color, Style};
 use ratatui::text::Span;
 use ratatui::{widgets::ListItem, Frame};
-use std::cell::RefCell;
-use std::fmt::Debug;
-use std::{path::Path, rc::Rc};
+use std::{fmt::Debug, path::Path};
 
 #[cfg(build = "debug")]
 use crate::utils::debug_to_file;
 
 pub struct Lexer {
     pub diagnostics: Option<PublishDiagnosticsParams>,
-    pub events: Rc<RefCell<Events>>,
     pub lsp_client: Option<LSPClient>,
     line_builder: LineBuilder,
     select: Option<(CursorPosition, CursorPosition)>,
@@ -41,7 +38,7 @@ impl Debug for Lexer {
 }
 
 impl Lexer {
-    pub fn with_context(file_type: FileType, theme: Theme, events: &Rc<RefCell<Events>>) -> Self {
+    pub fn with_context(file_type: FileType, theme: Theme) -> Self {
         Self {
             line_builder: LineBuilder::new(theme, file_type.into()),
             select: None,
@@ -49,7 +46,6 @@ impl Lexer {
             requests: Vec::new(),
             max_digits: 0,
             diagnostics: None,
-            events: Rc::clone(events),
             lsp_client: None,
         }
     }
@@ -59,13 +55,14 @@ impl Lexer {
         content: &[String],
         select: Option<(&CursorPosition, &CursorPosition)>,
         path: &Path,
+        gs: &mut GlobalState,
     ) -> usize {
         self.line_builder.reset();
         self.select = select.map(|(from, to)| (*from, *to));
         self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
-        self.get_lsp_responses();
+        self.get_lsp_responses(gs);
         self.get_diagnostics(path);
-        self.get_tokens(path);
+        self.get_tokens(path, gs);
         self.max_digits
     }
 
@@ -74,15 +71,15 @@ impl Lexer {
         path: &Path,
         version: i32,
         content_changes: Vec<TextDocumentContentChangeEvent>,
+        gs: &mut GlobalState,
     ) {
         if let Some(client) = self.lsp_client.as_mut() {
             self.line_builder.collect_changes(&content_changes);
             #[cfg(build = "debug")]
             debug_to_file("test_data.sync", &content_changes);
             if let Err(err) = client.file_did_change(path, version, content_changes) {
-                let mut events = self.events.borrow_mut();
-                events.error(format!("Failed to sync with lsp: {err}"));
-                events.workspace.push(WorkspaceEvent::CheckLSP(self.line_builder.lang.file_type));
+                gs.error(format!("Failed to sync with lsp: {err}"));
+                gs.workspace.push(WorkspaceEvent::CheckLSP(self.line_builder.lang.file_type));
             }
         }
     }
@@ -93,7 +90,7 @@ impl Lexer {
         }
     }
 
-    pub fn map_modal_if_exists(&mut self, key: &EditorAction, path: &Path) -> bool {
+    pub fn map_modal_if_exists(&mut self, key: &EditorAction, path: &Path, gs: &mut GlobalState) -> bool {
         if let Some(modal) = &mut self.modal {
             match modal.map_and_finish(key) {
                 LSPModalResult::Taken => return true,
@@ -105,7 +102,7 @@ impl Lexer {
                     self.modal.take();
                 }
                 LSPModalResult::Workspace(event) => {
-                    self.events.borrow_mut().workspace.push(event);
+                    gs.workspace.push(event);
                     self.modal.take();
                     return true;
                 }
@@ -120,15 +117,22 @@ impl Lexer {
         false
     }
 
-    pub fn set_lsp_client(&mut self, mut client: LSPClient, on_file: &Path, file_type: &FileType, content: String) {
-        self.events.borrow_mut().message("Mapping LSP ...");
+    pub fn set_lsp_client(
+        &mut self,
+        mut client: LSPClient,
+        on_file: &Path,
+        file_type: &FileType,
+        content: String,
+        gs: &mut GlobalState,
+    ) {
+        gs.message("Mapping LSP ...");
         if client.file_did_open(on_file, file_type, content).is_err() {
             return;
         }
         self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
         self.lsp_client.replace(client);
-        self.events.borrow_mut().success("LSP mapped!");
-        self.get_tokens(on_file);
+        gs.success("LSP mapped!");
+        self.get_tokens(on_file, gs);
     }
 
     fn get_diagnostics(&mut self, path: &Path) -> Option<()> {
@@ -192,13 +196,13 @@ impl Lexer {
         Some(())
     }
 
-    pub fn get_tokens(&mut self, path: &Path) -> Option<()> {
+    pub fn get_tokens(&mut self, path: &Path, gs: &mut GlobalState) -> Option<()> {
         self.lsp_client.as_ref()?.capabilities.semantic_tokens_provider.as_ref()?;
         if self.line_builder.should_update() {
             let id = self.send_request(LSPRequest::<SemanticTokensFullRequest>::semantics_full(path)?)?;
             self.requests.push(LSPResponseType::TokensFull(id));
             self.line_builder.waiting = true;
-            self.events.borrow_mut().message("Getting LSP syntax");
+            gs.message("Getting LSP syntax");
         }
         Some(())
     }
@@ -213,7 +217,7 @@ impl Lexer {
         self.lsp_client.as_mut().as_mut()?.request(request)
     }
 
-    fn get_lsp_responses(&mut self) {
+    fn get_lsp_responses(&mut self, gs: &mut GlobalState) {
         if let Some(lsp) = self.lsp_client.as_mut() {
             let mut unresolved_requests = Vec::new();
             for request in self.requests.drain(..) {
@@ -230,23 +234,23 @@ impl Lexer {
                                 self.modal.replace(LSPModal::signature(signature));
                             }
                             LSPResult::Renames(workspace_edit) => {
-                                self.events.borrow_mut().workspace.push(workspace_edit.into());
+                                gs.workspace.push(workspace_edit.into());
                             }
                             LSPResult::Tokens(tokens) => {
                                 if self.line_builder.set_tokens(tokens) {
-                                    self.events.borrow_mut().success("LSP tokens mapped!");
+                                    gs.success("LSP tokens mapped!");
                                 };
                             }
                             LSPResult::Declaration(declaration) => {
-                                self.events.borrow_mut().try_ws_event(declaration);
+                                gs.try_ws_event(declaration);
                             }
                             LSPResult::Definition(definition) => {
-                                self.events.borrow_mut().try_ws_event(definition);
+                                gs.try_ws_event(definition);
                             }
                         },
                         None => {
                             if let Some(err) = response.error {
-                                self.events.borrow_mut().error(err.to_string());
+                                gs.error(err.to_string());
                             }
                         }
                     }

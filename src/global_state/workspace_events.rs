@@ -10,6 +10,8 @@ use crate::{
 };
 use std::path::PathBuf;
 
+use super::GlobalState;
+
 #[derive(Debug, Clone)]
 pub enum WorkspaceEvent {
     PopupAccess,
@@ -36,7 +38,7 @@ pub enum WorkspaceEvent {
 }
 
 impl WorkspaceEvent {
-    pub fn map_if_sync(self, workspace: &mut Workspace, mode: &mut Mode) -> Option<WorkspaceEvent> {
+    pub async fn map_if_sync(self, workspace: &mut Workspace, mode: &mut Mode, gs: &mut GlobalState) {
         match self {
             Self::GoToLine(idx) => {
                 if let Some(editor) = workspace.get_active() {
@@ -95,23 +97,32 @@ impl WorkspaceEvent {
                     editor.replace_token(completion);
                 }
             }
-            Self::WorkspaceEdit(edits) => workspace.apply_edits(edits),
-            _ => return Some(self),
-        }
-        None
-    }
-
-    pub async fn async_map(self, workspace: &mut Workspace, mode: &mut Mode) {
-        match self {
+            Self::WorkspaceEdit(edits) => workspace.apply_edits(edits, gs),
             Self::Open(path, line) => {
-                if !path.is_dir() && workspace.new_at_line(path, line).await.is_ok() {
+                if !path.is_dir() && workspace.new_at_line(path, line, gs).await.is_ok() {
                     *mode = Mode::Insert;
                 } else {
                     *mode = Mode::Select;
                 }
             }
             Self::CheckLSP(ft) => {
-                workspace.check_lsp(ft).await;
+                workspace.check_lsp(ft, gs).await;
+            }
+            _ => (),
+        }
+    }
+
+    pub async fn async_map(self, workspace: &mut Workspace, mode: &mut Mode, gs: &mut GlobalState) {
+        match self {
+            Self::Open(path, line) => {
+                if !path.is_dir() && workspace.new_at_line(path, line, gs).await.is_ok() {
+                    *mode = Mode::Insert;
+                } else {
+                    *mode = Mode::Select;
+                }
+            }
+            Self::CheckLSP(ft) => {
+                workspace.check_lsp(ft, gs).await;
             }
             _ => (),
         }

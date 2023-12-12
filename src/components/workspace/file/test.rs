@@ -2,17 +2,14 @@ use super::actions::Actions;
 use super::CursorPosition;
 use super::{cursor::Cursor, Editor};
 use crate::configs::FileType;
-use crate::events::Events;
 use crate::syntax::Lexer;
 use crate::syntax::Theme;
-use std::cell::RefCell;
 use std::path::PathBuf;
-use std::rc::Rc;
 
 pub fn mock_editor(content: Vec<String>) -> Editor {
     let ft = FileType::Unknown;
     Editor {
-        lexer: Lexer::with_context(ft, Theme::default(), &Rc::new(RefCell::new(Events::default()))),
+        lexer: Lexer::with_context(ft, Theme::default()),
         file_type: ft,
         display: "".to_string(),
         path: PathBuf::from(""),

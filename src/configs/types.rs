@@ -6,7 +6,7 @@ use ratatui::{
 };
 
 use crate::components::{popups::PopupInterface, workspace::Workspace, Tree};
-use crate::events::messages::PopupMessage;
+use crate::global_state::messages::PopupMessage;
 use std::path::PathBuf;
 
 pub enum Mode {

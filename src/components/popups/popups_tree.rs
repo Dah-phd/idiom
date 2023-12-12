@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use super::{Button, Popup, PopupSelector};
-use crate::events::{messages::PopupMessage, TreeEvent};
+use crate::global_state::{messages::PopupMessage, TreeEvent};
 
 pub fn create_file_popup(path: String) -> Box<Popup> {
     let mut buttons = vec![Button {

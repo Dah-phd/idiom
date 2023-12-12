@@ -9,8 +9,8 @@ use crate::{
         EditorTerminal, Footer, Tree, Workspace,
     },
     configs::{GeneralAction, KeyMap, Mode},
-    events::messages::PopupMessage,
-    events::Events,
+    global_state::messages::PopupMessage,
+    global_state::GlobalState,
 };
 
 use anyhow::Result;
@@ -29,18 +29,18 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
     let mut clock = Instant::now();
     let mut mode = Mode::Select;
     let mut general_key_map = configs.general_key_map();
-    let events = Events::new();
+    let mut gs = GlobalState::default();
 
     // COMPONENTS
-    let mut file_tree = Tree::new(open_file.is_none(), &events);
-    let mut workspace = Workspace::new(configs.editor_key_map(), &events);
-    let mut tmux = EditorTerminal::new(&events);
+    let mut file_tree = Tree::new(open_file.is_none());
+    let mut workspace = Workspace::new(configs.editor_key_map());
+    let mut tmux = EditorTerminal::new();
     let mut footer = Footer::default();
 
     // CLI SETUP
     if let Some(path) = open_file {
         file_tree.select_by_path(&path);
-        if footer.logged_ok(workspace.new_from(path).await).is_some() {
+        if footer.logged_ok(workspace.new_from(path, &mut gs).await).is_some() {
             mode = Mode::Insert;
         };
     }
@@ -56,24 +56,24 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
             screen = file_tree.render_with_remainder(frame, screen);
             screen = footer.render_with_remainder(frame, screen, &mode, workspace.get_stats());
             screen = tmux.render_with_remainder(frame, screen);
-            workspace.render(frame, screen);
+            workspace.render(frame, screen, &mut gs);
             mode.render_popup_if_exists(frame);
         })?;
 
-        workspace.lexer_updates().await;
+        workspace.lexer_updates(&mut gs).await;
 
         let timeout = TICK.checked_sub(clock.elapsed()).unwrap_or_else(|| Duration::from_secs(0));
 
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = crossterm::event::read()? {
-                if !tmux.active && workspace.map(&key, &mut mode) {
+                if !tmux.active && workspace.map(&key, &mut mode, &mut gs) {
                     continue;
                 }
                 if let Some(msg) = mode.popup_map(&key) {
                     match msg {
                         PopupMessage::Exit => break,
                         PopupMessage::SaveAndExit => {
-                            workspace.save_all();
+                            workspace.save_all(&mut gs);
                             break;
                         }
                         PopupMessage::SelectTreeFiles(pattern) => {
@@ -86,7 +86,8 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                         }
                         PopupMessage::CreateFileOrFolder(name) => {
                             if let Ok(new_path) = file_tree.create_file_or_folder(name) {
-                                if !new_path.is_dir() && footer.logged_ok(workspace.new_from(new_path).await).is_some()
+                                if !new_path.is_dir()
+                                    && footer.logged_ok(workspace.new_from(new_path, &mut gs).await).is_some()
                                 {
                                     mode = Mode::Insert;
                                 }
@@ -96,7 +97,8 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                         }
                         PopupMessage::CreateFileOrFolderBase(name) => {
                             if let Ok(new_path) = file_tree.create_file_or_folder_base(name) {
-                                if !new_path.is_dir() && footer.logged_ok(workspace.new_from(new_path).await).is_some()
+                                if !new_path.is_dir()
+                                    && footer.logged_ok(workspace.new_from(new_path, &mut gs).await).is_some()
                                 {
                                     mode = Mode::Insert;
                                 }
@@ -105,15 +107,15 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                             continue;
                         }
                         PopupMessage::UpdateWorkspace(event) => {
-                            events.borrow_mut().workspace.push(event);
+                            gs.workspace.push(event);
                             continue;
                         }
                         PopupMessage::UpdateFooter(event) => {
-                            events.borrow_mut().footer.push(event);
+                            gs.footer.push(event);
                             continue;
                         }
                         PopupMessage::UpdateTree(event) => {
-                            events.borrow_mut().tree.push(event);
+                            gs.tree.push(event);
                             continue;
                         }
                         PopupMessage::None => continue,
@@ -157,14 +159,16 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                     }
                     GeneralAction::Expand => {
                         if let Some(file_path) = file_tree.expand_dir_or_get_path() {
-                            footer.logged_ok(workspace.new_from(file_path).await);
+                            footer.logged_ok(workspace.new_from(file_path, &mut gs).await);
                         }
                     }
                     GeneralAction::FinishOrSelect => {
                         if file_tree.on_open_tabs {
                             mode = Mode::Insert;
                         } else if let Some(file_path) = file_tree.expand_dir_or_get_path() {
-                            if !file_path.is_dir() && footer.logged_ok(workspace.new_from(file_path).await).is_some() {
+                            if !file_path.is_dir()
+                                && footer.logged_ok(workspace.new_from(file_path, &mut gs).await).is_some()
+                            {
                                 mode = Mode::Insert;
                             }
                         }
@@ -187,7 +191,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                         }
                     }
                     GeneralAction::FileTreeModeOrCancelInput => mode = Mode::Select,
-                    GeneralAction::SaveAll => workspace.save(),
+                    GeneralAction::SaveAll => workspace.save(&mut gs),
                     GeneralAction::HideFileTree => file_tree.toggle(),
                     GeneralAction::PreviousTab => {
                         if let Some(editor_id) = workspace.state.selected() {
@@ -202,7 +206,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                     GeneralAction::RefreshSettings => {
                         let new_key_map = KeyMap::new();
                         general_key_map = new_key_map.general_key_map();
-                        workspace.refresh_cfg(new_key_map.editor_key_map()).await;
+                        workspace.refresh_cfg(new_key_map.editor_key_map(), &mut gs).await;
                     }
                     GeneralAction::GoToLinePopup if matches!(mode, Mode::Insert) => {
                         mode.popup(go_to_line_popup());
@@ -215,7 +219,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
             }
         }
 
-        Events::handle_events(&events, &mut file_tree, &mut workspace, &mut footer, &mut mode).await;
+        gs.handle_events(&mut file_tree, &mut workspace, &mut footer, &mut mode).await;
 
         if clock.elapsed() >= TICK {
             clock = Instant::now();

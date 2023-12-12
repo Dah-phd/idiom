@@ -8,11 +8,11 @@ use ratatui::widgets::{List, ListItem};
 
 use crate::{
     configs::{EditorConfigs, FileType},
-    events::Events,
+    global_state::GlobalState,
     syntax::{Lexer, Theme},
     utils::find_code_blocks,
 };
-use std::{cell::RefCell, cmp::Ordering, path::PathBuf, rc::Rc, time::SystemTime};
+use std::{cmp::Ordering, path::PathBuf, time::SystemTime};
 
 use self::{
     actions::Actions,
@@ -38,13 +38,13 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn from_path(path: PathBuf, mut cfg: EditorConfigs, events: &Rc<RefCell<Events>>) -> std::io::Result<Self> {
+    pub fn from_path(path: PathBuf, mut cfg: EditorConfigs) -> std::io::Result<Self> {
         let content = std::fs::read_to_string(&path)?;
         let file_type = FileType::derive_type(&path);
         let display = path.display().to_string();
         cfg.update_by_file_type(&file_type);
         Ok(Self {
-            lexer: Lexer::with_context(file_type, Theme::new(), events),
+            lexer: Lexer::with_context(file_type, Theme::new()),
             cursor: Cursor::default(),
             actions: Actions::new(cfg),
             max_rows: 0,
@@ -56,8 +56,8 @@ impl Editor {
         })
     }
 
-    pub fn get_list_widget_with_context(&mut self) -> (usize, List<'_>) {
-        let max_digits = self.lexer.context(&self.content, self.cursor.select_get(), &self.path);
+    pub fn get_list_widget_with_context(&mut self, gs: &mut GlobalState) -> (usize, List<'_>) {
+        let max_digits = self.lexer.context(&self.content, self.cursor.select_get(), &self.path, gs);
         let render_till_line = self.content.len().min(self.cursor.at_line + self.max_rows);
         let editor_content = List::new(
             self.content[self.cursor.at_line..render_till_line]
@@ -91,9 +91,9 @@ impl Editor {
         self.lexer.start_renames(&self.cursor.position(), &line[token_range]);
     }
 
-    pub async fn update_lsp(&mut self) {
+    pub async fn update_lsp(&mut self, gs: &mut GlobalState) {
         if let Some((version, content_changes)) = self.actions.get_text_edits() {
-            self.lexer.update_lsp(&self.path, version, content_changes).await;
+            self.lexer.update_lsp(&self.path, version, content_changes, gs).await;
             self.lexer.get_autocomplete(&self.path, &self.cursor.position(), self.content[self.cursor.line].as_str());
         }
     }
@@ -319,17 +319,17 @@ impl Editor {
         self.actions.unindent(&mut self.cursor, &mut self.content);
     }
 
-    pub fn save(&mut self) {
-        if self.try_write_file() {
+    pub fn save(&mut self, events: &mut GlobalState) {
+        if self.try_write_file(events) {
             if let Some(client) = self.lexer.lsp_client.as_mut() {
                 let _ = client.file_did_save(&self.path);
             }
         }
     }
 
-    pub fn try_write_file(&self) -> bool {
+    pub fn try_write_file(&self, events: &mut GlobalState) -> bool {
         if let Err(error) = std::fs::write(&self.path, self.content.join("\n")) {
-            self.lexer.events.borrow_mut().error(error.to_string());
+            events.error(error.to_string());
             return false;
         }
         true

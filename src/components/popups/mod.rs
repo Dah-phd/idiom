@@ -5,7 +5,7 @@ pub mod popups_editor;
 pub mod popups_tree;
 mod utils;
 
-use crate::events::messages::PopupMessage;
+use crate::global_state::messages::PopupMessage;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 pub use generics::message;
 pub use generics::{Button, Popup, PopupSelector};
