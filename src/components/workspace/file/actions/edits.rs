@@ -53,7 +53,7 @@ impl Edit {
         let position_of_new_line = Position::new(from as u32, merged_to.len() as u32);
         merged_to.push_str(removed_line.as_ref());
         Self {
-            meta: EditMetaData { from: 1, to: 1 },
+            meta: EditMetaData { from: 2, to: 1 },
             reverse_text_edit: TextEdit::new(
                 Range::new(position_of_new_line, position_of_new_line),
                 String::from("\n"),
@@ -67,7 +67,7 @@ impl Edit {
 
     pub fn insertion(line: u32, char: u32, new_text: String) -> Self {
         Self {
-            meta: EditMetaData { from: 1, to: 1 },
+            meta: EditMetaData::default(),
             reverse_text_edit: TextEdit::new(
                 Range::new(Position::new(line, char), Position::new(line, char + new_text.len() as u32)),
                 String::new(),
@@ -82,7 +82,7 @@ impl Edit {
         let mut old_text = text.split_off(len);
         std::mem::swap(text, &mut old_text);
         Self {
-            meta: EditMetaData { from: 1, to: 1 },
+            meta: EditMetaData::default(),
             text_edit: TextEdit::new(
                 Range::new(position, Position::new(line as u32, (char + len) as u32)),
                 String::new(),
