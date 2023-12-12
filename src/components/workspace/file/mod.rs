@@ -58,6 +58,10 @@ impl Editor {
 
     pub fn get_list_widget_with_context(&mut self, gs: &mut GlobalState) -> (usize, List<'_>) {
         let max_digits = self.lexer.context(&self.content, self.cursor.select_get(), &self.path, gs);
+        if let Some((version, content_changes)) = self.actions.get_text_edits() {
+            self.lexer.update_lsp(&self.path, version, content_changes, gs);
+            self.lexer.get_autocomplete(&self.path, &self.cursor.position(), self.content[self.cursor.line].as_str());
+        }
         let render_till_line = self.content.len().min(self.cursor.at_line + self.max_rows);
         let editor_content = List::new(
             self.content[self.cursor.at_line..render_till_line]
@@ -89,13 +93,6 @@ impl Editor {
         let line = &self.content[self.cursor.line];
         let token_range = token_range_at(line, self.cursor.char);
         self.lexer.start_renames(&self.cursor.position(), &line[token_range]);
-    }
-
-    pub fn update_lsp(&mut self, gs: &mut GlobalState) {
-        if let Some((version, content_changes)) = self.actions.get_text_edits() {
-            self.lexer.update_lsp(&self.path, version, content_changes, gs);
-            self.lexer.get_autocomplete(&self.path, &self.cursor.position(), self.content[self.cursor.line].as_str());
-        }
     }
 
     pub fn is_saved(&self) -> bool {

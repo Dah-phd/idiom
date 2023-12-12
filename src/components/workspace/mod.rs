@@ -151,12 +151,6 @@ impl Workspace {
         self.editors.get_mut(self.state.selected()?)
     }
 
-    pub fn lexer_updates(&mut self, gs: &mut GlobalState) {
-        if let Some(file) = self.get_active() {
-            file.update_lsp(gs);
-        }
-    }
-
     pub fn apply_edits(&mut self, edits: WorkspaceEdit, events: &mut GlobalState) {
         if let Some(edits) = edits.changes {
             for (file_url, file_edits) in edits {
