@@ -1,5 +1,4 @@
 use crate::{components::workspace::DocStats, configs::Mode};
-use anyhow::Result;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
@@ -41,16 +40,6 @@ impl Footer {
         let area = self.message_with_remainder(frame, layout[1]);
         frame.render_widget(self.widget_stats(mode, stats), area);
         layout[0]
-    }
-
-    pub fn logged_ok<T>(&mut self, result: Result<T>) -> Option<T> {
-        match result {
-            Ok(val) => Some(val),
-            Err(err) => {
-                self.error(err.to_string());
-                None
-            }
-        }
     }
 
     pub fn message(&mut self, message: String) {

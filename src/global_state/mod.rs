@@ -3,7 +3,8 @@ mod file_tree_events;
 mod footer_events;
 pub mod messages;
 mod workspace_events;
-use clipboard::Clipboard;
+
+use std::path::PathBuf;
 
 pub use self::file_tree_events::TreeEvent;
 pub use self::footer_events::FooterEvent;
@@ -12,6 +13,9 @@ use crate::components::Footer;
 use crate::components::Tree;
 use crate::components::Workspace;
 use crate::configs::Mode;
+use clipboard::Clipboard;
+
+use anyhow::Result;
 
 #[derive(Default)]
 pub struct GlobalState {
@@ -57,6 +61,25 @@ impl GlobalState {
         for event in self.footer.drain(..) {
             event.map(footer);
         }
+    }
+
+    pub fn logged_ok<T>(&mut self, result: Result<T>) -> Option<T> {
+        match result {
+            Ok(val) => Some(val),
+            Err(err) => {
+                self.error(err.to_string());
+                None
+            }
+        }
+    }
+
+    /// Attempts to create new editor if err logs it and returns false else true.
+    pub async fn try_new_editor(&mut self, workspace: &mut Workspace, path: PathBuf) -> bool {
+        if let Err(err) = workspace.new_from(path, self).await {
+            self.error(err.to_string());
+            return false;
+        }
+        true
     }
 
     pub async fn exchange_ws(&mut self, workspace: &mut Workspace, mode: &mut Mode) {
