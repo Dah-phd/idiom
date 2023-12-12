@@ -151,9 +151,9 @@ impl Workspace {
         self.editors.get_mut(self.state.selected()?)
     }
 
-    pub async fn lexer_updates(&mut self, gs: &mut GlobalState) {
+    pub fn lexer_updates(&mut self, gs: &mut GlobalState) {
         if let Some(file) = self.get_active() {
-            file.update_lsp(gs).await;
+            file.update_lsp(gs);
         }
     }
 

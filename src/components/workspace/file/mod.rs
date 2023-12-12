@@ -91,9 +91,9 @@ impl Editor {
         self.lexer.start_renames(&self.cursor.position(), &line[token_range]);
     }
 
-    pub async fn update_lsp(&mut self, gs: &mut GlobalState) {
+    pub fn update_lsp(&mut self, gs: &mut GlobalState) {
         if let Some((version, content_changes)) = self.actions.get_text_edits() {
-            self.lexer.update_lsp(&self.path, version, content_changes, gs).await;
+            self.lexer.update_lsp(&self.path, version, content_changes, gs);
             self.lexer.get_autocomplete(&self.path, &self.cursor.position(), self.content[self.cursor.line].as_str());
         }
     }

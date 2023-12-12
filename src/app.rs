@@ -60,7 +60,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
             mode.render_popup_if_exists(frame);
         })?;
 
-        workspace.lexer_updates(&mut gs).await;
+        workspace.lexer_updates(&mut gs);
 
         let timeout = TICK.checked_sub(clock.elapsed()).unwrap_or_else(|| Duration::from_secs(0));
 

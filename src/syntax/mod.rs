@@ -66,7 +66,7 @@ impl Lexer {
         self.max_digits
     }
 
-    pub async fn update_lsp(
+    pub fn update_lsp(
         &mut self,
         path: &Path,
         version: i32,
