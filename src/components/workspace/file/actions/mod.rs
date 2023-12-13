@@ -1,9 +1,13 @@
 mod action_buffer;
 mod edits;
+use std::path::Path;
+
 use super::cursor::Cursor;
 use super::CursorPosition;
 use crate::components::workspace::file::utils::{get_closing_char, is_closing_repeat};
 use crate::configs::EditorConfigs;
+use crate::global_state::GlobalState;
+use crate::syntax::Lexer;
 use action_buffer::ActionBuffer;
 use edits::{Edit, EditBuilder};
 use lsp_types::{Position, TextDocumentContentChangeEvent, TextEdit};
@@ -285,16 +289,26 @@ impl Actions {
             self.done.push(action);
         }
     }
-    pub fn get_text_edits(&mut self) -> Option<(i32, Vec<TextDocumentContentChangeEvent>)> {
+
+    pub fn sync(&mut self, path: &Path, lexer: &mut Lexer, gs: &mut GlobalState) {
         if let Some(action) = self.buffer.timed_collect() {
             self.push_done(action);
         }
-        if self.events.is_empty() {
-            return None;
+        if !self.events.is_empty() {
+            self.version += 1;
+            lexer.sync_lsp(path, self.version, self.events.drain(..).collect(), gs);
         }
         self.version += 1;
-        Some((self.version, self.events.drain(..).collect()))
     }
+
+    pub fn force_sync(&mut self, path: &Path, lexer: &mut Lexer, gs: &mut GlobalState) {
+        self.push_buffer();
+        if !self.events.is_empty() {
+            self.version += 1;
+            lexer.sync_lsp(path, self.version, self.events.drain(..).collect(), gs);
+        }
+    }
+
     pub fn push_done(&mut self, edit: impl Into<EditType>) {
         let action: EditType = edit.into();
         action.collect_events(&mut self.events);

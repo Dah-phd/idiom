@@ -58,10 +58,7 @@ impl Editor {
 
     pub fn get_list_widget_with_context(&mut self, gs: &mut GlobalState) -> (usize, List<'_>) {
         let max_digits = self.lexer.context(&self.content, self.cursor.select_get(), &self.path, gs);
-        if let Some((version, content_changes)) = self.actions.get_text_edits() {
-            self.lexer.update_lsp(&self.path, version, content_changes, gs);
-            self.lexer.get_autocomplete(&self.path, &self.cursor.position(), self.content[self.cursor.line].as_str());
-        }
+        self.actions.sync(&self.path, &mut self.lexer, gs);
         let render_till_line = self.content.len().min(self.cursor.at_line + self.max_rows);
         let editor_content = List::new(
             self.content[self.cursor.at_line..render_till_line]
@@ -292,8 +289,13 @@ impl Editor {
         self.actions.new_line(&mut self.cursor, &mut self.content);
     }
 
-    pub fn push(&mut self, ch: char) {
+    pub fn push(&mut self, ch: char, gs: &mut GlobalState) {
         self.actions.push_char(ch, &mut self.cursor, &mut self.content);
+        let line = &self.content[self.cursor.line];
+        if self.lexer.should_autocomplete(self.cursor.char, line) {
+            self.actions.force_sync(&self.path, &mut self.lexer, gs);
+            self.lexer.get_autocomplete(&self.path, &self.cursor.position(), line);
+        }
     }
 
     pub fn backspace(&mut self) {

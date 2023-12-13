@@ -10,27 +10,23 @@ pub struct Lang {
 }
 
 impl Lang {
-    pub fn is_definition(&self, token: &str) -> bool {
-        self.declaration.contains(&token)
-    }
-
     pub fn is_keyword(&self, token: &str) -> bool {
         self.declaration.contains(&token) || self.key_words.contains(&token)
     }
 
     pub fn completelable(&self, line: &str, idx: usize) -> bool {
         let mut last_char = ' ';
+        let mut curr_token = String::new();
         let mut prev_token = String::new();
         for (char_idx, ch) in line.char_indices() {
             if ch.is_alphabetic() || ch == '_' {
                 if char_idx + 1 == idx {
-                    return (last_char.is_whitespace() || last_char == '(' || last_char == '.')
-                        && !self.is_definition(&prev_token);
+                    return " (.".contains(last_char) && !self.declaration.contains(&prev_token.as_str());
                 } else {
-                    prev_token.push(ch);
+                    curr_token.push(ch);
                 }
             } else {
-                prev_token.clear();
+                prev_token.extend(curr_token.drain(..));
             }
             last_char = ch;
         }

@@ -39,7 +39,7 @@ impl LSPClient {
         channel: UnboundedSender<String>,
         capabilities: ServerCapabilities,
     ) -> Self {
-        Self { diagnostics, responses, channel, request_counter: Rc::new(RefCell::new(0)), capabilities }
+        Self { diagnostics, responses, channel, request_counter: Rc::default(), capabilities }
     }
 
     pub fn request<T>(&mut self, mut request: LSPRequest<T>) -> Option<i64>

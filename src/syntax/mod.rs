@@ -66,7 +66,7 @@ impl Lexer {
         self.max_digits
     }
 
-    pub fn update_lsp(
+    pub fn sync_lsp(
         &mut self,
         path: &Path,
         version: i32,
@@ -156,6 +156,12 @@ impl Lexer {
         let id = self.send_request(LSPRequest::<Rename>::rename(path, c, new_name)?)?;
         self.requests.push(LSPResponseType::Renames(id));
         Some(())
+    }
+
+    pub fn should_autocomplete(&mut self, char_idx: usize, line: &str) -> bool {
+        self.lsp_client.is_some()
+            && self.line_builder.lang.completelable(line, char_idx)
+            && !matches!(self.modal, Some(LSPModal::AutoComplete(..)))
     }
 
     pub fn get_autocomplete(&mut self, path: &Path, c: &CursorPosition, line: &str) -> Option<()> {

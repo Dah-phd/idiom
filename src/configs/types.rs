@@ -18,12 +18,12 @@ pub enum Mode {
 impl From<&Mode> for Span<'static> {
     fn from(mode: &Mode) -> Self {
         match mode {
-            Mode::Insert => Span::styled("  Insert  ", Style::default().fg(Color::Rgb(255, 0, 0))),
-            Mode::Select => Span::styled("  Select  ", Style::default().fg(Color::LightCyan)),
+            Mode::Insert => Span::styled("  INSERT  ", Style::default().fg(Color::Rgb(255, 0, 0))),
+            Mode::Select => Span::styled("  SELECT  ", Style::default().fg(Color::LightCyan)),
             Mode::Popup((inner, _)) => match inner.as_ref() {
-                Mode::Insert => Span::styled("  Insert  ", Style::default().fg(Color::Gray)),
-                Mode::Select => Span::styled("  Select  ", Style::default().fg(Color::Gray)),
-                Mode::Popup(..) => Span::styled("  Nested  ", Style::default().fg(Color::Gray)),
+                Mode::Insert => Span::styled("  INSERT  ", Style::default().fg(Color::Gray)),
+                Mode::Select => Span::styled("  SELECT  ", Style::default().fg(Color::Gray)),
+                Mode::Popup(..) => Span::styled("  NESTED  ", Style::default().fg(Color::Gray)),
             },
         }
     }
