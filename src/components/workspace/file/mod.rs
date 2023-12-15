@@ -9,7 +9,7 @@ use ratatui::widgets::{List, ListItem};
 use crate::{
     configs::{EditorConfigs, FileType},
     global_state::GlobalState,
-    syntax::{Lexer, Theme},
+    syntax::Lexer,
     utils::find_code_blocks,
 };
 use std::{cmp::Ordering, path::PathBuf, time::SystemTime};
@@ -44,7 +44,7 @@ impl Editor {
         let display = path.display().to_string();
         cfg.update_by_file_type(&file_type);
         Ok(Self {
-            lexer: Lexer::with_context(file_type, Theme::new()),
+            lexer: Lexer::with_context(file_type),
             cursor: Cursor::default(),
             actions: Actions::new(cfg),
             max_rows: 0,
@@ -57,7 +57,7 @@ impl Editor {
     }
 
     pub fn get_list_widget_with_context(&mut self, gs: &mut GlobalState) -> (usize, List<'_>) {
-        let max_digits = self.lexer.context(&self.content, self.cursor.select_get(), &self.path, gs);
+        self.lexer.context(self.cursor.select_get(), &self.path, gs);
         self.actions.sync(&self.path, &mut self.lexer, gs);
         let render_till_line = self.content.len().min(self.cursor.at_line + self.max_rows);
         let editor_content = List::new(
@@ -67,7 +67,7 @@ impl Editor {
                 .map(|(idx, code_line)| self.lexer.list_item(idx + self.cursor.at_line, code_line))
                 .collect::<Vec<ListItem>>(),
         );
-        (max_digits, editor_content)
+        (self.lexer.calc_line_number_offset(&self.content), editor_content)
     }
 
     pub fn get_stats(&self) -> DocStats {

@@ -37,11 +37,11 @@ pub struct LineBuilder {
 }
 
 impl LineBuilder {
-    pub fn new(theme: Theme, lang: Lang) -> Self {
+    pub fn new(lang: Lang) -> Self {
         Self {
             tokens: Vec::new(),
             legend: Legend::default(),
-            theme,
+            theme: Theme::new(),
             lang,
             brackets: BracketColors::default(),
             diagnostics: HashMap::new(),

@@ -3,13 +3,12 @@ use super::CursorPosition;
 use super::{cursor::Cursor, Editor};
 use crate::configs::FileType;
 use crate::syntax::Lexer;
-use crate::syntax::Theme;
 use std::path::PathBuf;
 
 pub fn mock_editor(content: Vec<String>) -> Editor {
     let ft = FileType::Unknown;
     Editor {
-        lexer: Lexer::with_context(ft, Theme::default()),
+        lexer: Lexer::with_context(ft),
         file_type: ft,
         display: "".to_string(),
         path: PathBuf::from(""),

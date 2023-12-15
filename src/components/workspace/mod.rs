@@ -37,10 +37,11 @@ impl Workspace {
         }
     }
 
-    pub fn render(&mut self, frame: &mut Frame, area: Rect, gs: &mut GlobalState) {
+    pub fn render(&mut self, frame: &mut Frame, screen: Rect, gs: &mut GlobalState) {
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get_mut(editor_id) {
-                let layout = Layout::default().constraints([Constraint::Length(1), Constraint::default()]).split(area);
+                let layout =
+                    Layout::default().constraints([Constraint::Length(1), Constraint::default()]).split(screen);
                 let area = layout[1];
                 file.set_max_rows(layout[1].bottom());
                 let cursor_x_offset = 1 + file.cursor.char;

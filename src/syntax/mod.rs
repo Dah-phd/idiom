@@ -24,11 +24,11 @@ use crate::utils::debug_to_file;
 pub struct Lexer {
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub lsp_client: Option<LSPClient>,
+    pub max_digits: usize,
     line_builder: LineBuilder,
     select: Option<(CursorPosition, CursorPosition)>,
     modal: Option<LSPModal>,
     requests: Vec<LSPResponseType>,
-    max_digits: usize,
 }
 
 impl Debug for Lexer {
@@ -38,9 +38,9 @@ impl Debug for Lexer {
 }
 
 impl Lexer {
-    pub fn with_context(file_type: FileType, theme: Theme) -> Self {
+    pub fn with_context(file_type: FileType) -> Self {
         Self {
-            line_builder: LineBuilder::new(theme, file_type.into()),
+            line_builder: LineBuilder::new(file_type.into()),
             select: None,
             modal: None,
             requests: Vec::new(),
@@ -50,20 +50,12 @@ impl Lexer {
         }
     }
 
-    pub fn context(
-        &mut self,
-        content: &[String],
-        select: Option<(&CursorPosition, &CursorPosition)>,
-        path: &Path,
-        gs: &mut GlobalState,
-    ) -> usize {
+    pub fn context(&mut self, select: Option<(&CursorPosition, &CursorPosition)>, path: &Path, gs: &mut GlobalState) {
         self.line_builder.reset();
         self.select = select.map(|(from, to)| (*from, *to));
-        self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
         self.get_lsp_responses(gs);
         self.get_diagnostics(path);
         self.get_tokens(path, gs);
-        self.max_digits
     }
 
     pub fn sync_lsp(
@@ -82,6 +74,11 @@ impl Lexer {
                 gs.workspace.push(WorkspaceEvent::CheckLSP(self.line_builder.lang.file_type));
             }
         }
+    }
+
+    pub fn calc_line_number_offset(&mut self, content: &[String]) -> usize {
+        self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
+        self.max_digits
     }
 
     pub fn render_modal_if_exist(&mut self, frame: &mut Frame, x: u16, y: u16) {
@@ -133,13 +130,6 @@ impl Lexer {
         self.lsp_client.replace(client);
         gs.success("LSP mapped!");
         self.get_tokens(on_file, gs);
-    }
-
-    fn get_diagnostics(&mut self, path: &Path) -> Option<()> {
-        let client = self.lsp_client.as_mut()?;
-        let params = client.get_diagnostics(path)?;
-        self.line_builder.set_diganostics(params);
-        Some(())
     }
 
     pub fn start_renames(&mut self, c: &CursorPosition, title: &str) {
@@ -266,6 +256,13 @@ impl Lexer {
             }
             self.requests = unresolved_requests;
         }
+    }
+
+    fn get_diagnostics(&mut self, path: &Path) -> Option<()> {
+        let client = self.lsp_client.as_mut()?;
+        let params = client.get_diagnostics(path)?;
+        self.line_builder.set_diganostics(params);
+        Some(())
     }
 
     fn line_select(&mut self, at_line: usize, max_len: usize) -> Option<std::ops::Range<usize>> {
