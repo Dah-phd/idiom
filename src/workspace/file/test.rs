@@ -1,17 +1,20 @@
-use super::actions::Actions;
-use super::CursorPosition;
-use super::{cursor::Cursor, Editor};
+use super::super::{
+    cursor::{Cursor, CursorPosition},
+    Editor,
+};
 use crate::configs::FileType;
 use crate::syntax::Lexer;
+use crate::workspace::actions::Actions;
 use std::path::PathBuf;
 
 pub fn mock_editor(content: Vec<String>) -> Editor {
     let ft = FileType::Unknown;
+    let path = PathBuf::from("");
     Editor {
-        lexer: Lexer::with_context(ft),
+        lexer: Lexer::with_context(ft, &path),
         file_type: ft,
         display: "".to_string(),
-        path: PathBuf::from(""),
+        path,
         timestamp: None,
         cursor: Cursor::default(),
         actions: Actions::default(),
@@ -22,7 +25,7 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
 
 pub fn select_eq(select: (CursorPosition, CursorPosition), editor: &Editor) -> bool {
     if let Some((p1, p2)) = editor.cursor.select_get() {
-        return p1 == &select.0 && p2 == &select.1;
+        return p1 == select.0 && p2 == select.1;
     }
     false
 }

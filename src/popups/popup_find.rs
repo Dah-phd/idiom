@@ -7,9 +7,10 @@ use ratatui::{
 };
 
 use crate::{
-    components::{workspace::CursorPosition, Tree, Workspace},
     global_state::{messages::PopupMessage, WorkspaceEvent},
+    tree::Tree,
     utils::right_corner_rect_static,
+    workspace::{CursorPosition, Workspace},
 };
 
 use super::{

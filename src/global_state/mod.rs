@@ -9,10 +9,10 @@ use std::path::PathBuf;
 pub use self::file_tree_events::TreeEvent;
 pub use self::footer_events::FooterEvent;
 pub use self::workspace_events::WorkspaceEvent;
-use crate::components::Footer;
-use crate::components::Tree;
-use crate::components::Workspace;
 use crate::configs::Mode;
+use crate::footer::Footer;
+use crate::tree::Tree;
+use crate::workspace::Workspace;
 use clipboard::Clipboard;
 
 use anyhow::Result;

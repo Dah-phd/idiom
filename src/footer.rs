@@ -1,4 +1,4 @@
-use crate::{components::workspace::DocStats, configs::Mode};
+use crate::{configs::Mode, workspace::DocStats};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},

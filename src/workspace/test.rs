@@ -1,11 +1,11 @@
 use super::{file::Editor, Workspace};
 use crate::{
-    components::workspace::{
+    configs::{test::mock_editor_key_map, EditorConfigs, Mode},
+    global_state::GlobalState,
+    workspace::{
         file::test::{mock_editor, pull_line, select_eq},
         CursorPosition,
     },
-    configs::{test::mock_editor_key_map, EditorConfigs, Mode},
-    global_state::GlobalState,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::widgets::ListState;

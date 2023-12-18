@@ -249,14 +249,14 @@ impl Cursor {
         }
     }
 
-    pub fn select_get(&self) -> Option<(&CursorPosition, &CursorPosition)> {
+    pub fn select_get(&self) -> Option<(CursorPosition, CursorPosition)> {
         match self.select.as_ref() {
             None => None,
             Some((from, to)) => {
                 if from.line > to.line || from.line == to.line && from.char > to.char {
-                    Some((to, from))
+                    Some((*to, *from))
                 } else {
-                    Some((from, to))
+                    Some((*from, *to))
                 }
             }
         }

@@ -1,5 +1,5 @@
 use super::as_url;
-use crate::components::workspace::CursorPosition;
+use crate::workspace::CursorPosition;
 
 use anyhow::Result;
 use lsp_types::{
@@ -46,7 +46,7 @@ where
         Ok(ser_req)
     }
 
-    pub fn references(path: &Path, c: &CursorPosition) -> Option<LSPRequest<References>> {
+    pub fn references(path: &Path, c: CursorPosition) -> Option<LSPRequest<References>> {
         Some(LSPRequest::with(
             0,
             ReferenceParams {
@@ -61,7 +61,7 @@ where
         ))
     }
 
-    pub fn rename(path: &Path, c: &CursorPosition, new_name: String) -> Option<LSPRequest<Rename>> {
+    pub fn rename(path: &Path, c: CursorPosition, new_name: String) -> Option<LSPRequest<Rename>> {
         Some(LSPRequest::with(
             0,
             RenameParams {
@@ -98,7 +98,7 @@ where
         ))
     }
 
-    pub fn declaration(path: &Path, c: &CursorPosition) -> Option<LSPRequest<GotoDeclaration>> {
+    pub fn declaration(path: &Path, c: CursorPosition) -> Option<LSPRequest<GotoDeclaration>> {
         Some(LSPRequest::with(
             0,
             GotoDeclarationParams {
@@ -112,7 +112,7 @@ where
         ))
     }
 
-    pub fn definition(path: &Path, c: &CursorPosition) -> Option<LSPRequest<GotoDefinition>> {
+    pub fn definition(path: &Path, c: CursorPosition) -> Option<LSPRequest<GotoDefinition>> {
         Some(LSPRequest::with(
             0,
             GotoDefinitionParams {
@@ -126,7 +126,7 @@ where
         ))
     }
 
-    pub fn completion(path: &Path, c: &CursorPosition) -> Option<LSPRequest<Completion>> {
+    pub fn completion(path: &Path, c: CursorPosition) -> Option<LSPRequest<Completion>> {
         Some(LSPRequest::with(
             0,
             CompletionParams {
@@ -141,7 +141,7 @@ where
         ))
     }
 
-    pub fn signature_help(path: &Path, c: &CursorPosition) -> Option<LSPRequest<SignatureHelpRequest>> {
+    pub fn signature_help(path: &Path, c: CursorPosition) -> Option<LSPRequest<SignatureHelpRequest>> {
         Some(LSPRequest::with(
             0,
             SignatureHelpParams {
@@ -155,7 +155,7 @@ where
         ))
     }
 
-    pub fn hover(path: &Path, c: &CursorPosition) -> Option<LSPRequest<HoverRequest>> {
+    pub fn hover(path: &Path, c: CursorPosition) -> Option<LSPRequest<HoverRequest>> {
         Some(LSPRequest::with(
             0,
             HoverParams {

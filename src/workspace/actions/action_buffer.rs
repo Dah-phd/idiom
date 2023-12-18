@@ -111,7 +111,7 @@ impl From<DelBuffer> for Edit {
     fn from(buf: DelBuffer) -> Self {
         let start = Position::new(buf.line as u32, buf.char as u32);
         Edit {
-            meta: EditMetaData::default(),
+            meta: EditMetaData { start_line: buf.line, from: 1, to: 1 },
             text_edit: TextEdit::new(
                 Range::new(start, Position::new(buf.line as u32, (buf.char + buf.text.len()) as u32)),
                 String::new(),
@@ -168,7 +168,7 @@ impl From<BackspaceBuffer> for Edit {
     fn from(buf: BackspaceBuffer) -> Self {
         let end = Position::new(buf.line as u32, buf.last as u32);
         Edit {
-            meta: EditMetaData::default(),
+            meta: EditMetaData { start_line: buf.line, from: 1, to: 1 },
             reverse_text_edit: TextEdit::new(Range::new(end, end), buf.text.chars().rev().collect()),
             text_edit: TextEdit::new(Range::new(end, Position::new(buf.line as u32, buf.char)), String::new()),
         }
@@ -204,7 +204,7 @@ impl From<TextBuffer> for Edit {
     fn from(buf: TextBuffer) -> Self {
         let start = Position::new(buf.line as u32, buf.char);
         Edit {
-            meta: EditMetaData::default(),
+            meta: EditMetaData { start_line: buf.line, from: 1, to: 1 },
             reverse_text_edit: TextEdit::new(
                 Range::new(start, Position::new(buf.line as u32, buf.last as u32)),
                 String::new(),

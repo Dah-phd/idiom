@@ -1,7 +1,7 @@
 use super::{Button, Popup, PopupSelector};
-use crate::components::workspace::CursorPosition;
 use crate::global_state::messages::PopupMessage;
 use crate::global_state::WorkspaceEvent;
+use crate::workspace::CursorPosition;
 use crossterm::event::KeyCode;
 
 pub fn save_all_popup() -> Box<Popup> {

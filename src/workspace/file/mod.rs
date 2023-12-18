@@ -1,11 +1,8 @@
-mod actions;
-mod cursor;
-mod utils;
-use cursor::Cursor;
-pub use cursor::CursorPosition;
+use super::cursor::{Cursor, CursorPosition};
 use lsp_types::TextEdit;
 use ratatui::widgets::{List, ListItem};
 
+use crate::workspace::actions::Actions;
 use crate::{
     configs::{EditorConfigs, FileType},
     global_state::GlobalState,
@@ -14,10 +11,7 @@ use crate::{
 };
 use std::{cmp::Ordering, path::PathBuf, time::SystemTime};
 
-use self::{
-    actions::Actions,
-    utils::{copy_content, find_line_start, last_modified, token_range_at},
-};
+use super::utils::{copy_content, find_line_start, last_modified, token_range_at};
 
 type DocLen = usize;
 type SelectLen = usize;
@@ -44,7 +38,7 @@ impl Editor {
         let display = path.display().to_string();
         cfg.update_by_file_type(&file_type);
         Ok(Self {
-            lexer: Lexer::with_context(file_type),
+            lexer: Lexer::with_context(file_type, &path),
             cursor: Cursor::default(),
             actions: Actions::new(cfg),
             max_rows: 0,
@@ -57,8 +51,8 @@ impl Editor {
     }
 
     pub fn get_list_widget_with_context(&mut self, gs: &mut GlobalState) -> (usize, List<'_>) {
-        self.lexer.context(self.cursor.select_get(), &self.path, gs);
-        self.actions.sync(&self.path, &mut self.lexer, gs);
+        self.actions.sync(&mut self.lexer, &self.content, gs);
+        self.lexer.context(self.cursor.select_get(), gs);
         let render_till_line = self.content.len().min(self.cursor.at_line + self.max_rows);
         let editor_content = List::new(
             self.content[self.cursor.at_line..render_till_line]
@@ -75,21 +69,21 @@ impl Editor {
     }
 
     pub fn help(&mut self) {
-        self.lexer.get_signitures(&self.path, &self.cursor.position());
+        self.lexer.get_signitures(self.cursor.position());
     }
 
     pub fn declaration(&mut self) {
-        self.lexer.go_to_declaration(&self.path, &self.cursor.position());
+        self.lexer.go_to_declaration(self.cursor.position());
     }
 
     pub fn hover(&mut self) {
-        self.lexer.get_hover(&self.path, &self.cursor.position());
+        self.lexer.get_hover(self.cursor.position());
     }
 
     pub fn start_renames(&mut self) {
         let line = &self.content[self.cursor.line];
         let token_range = token_range_at(line, self.cursor.char);
-        self.lexer.start_renames(&self.cursor.position(), &line[token_range]);
+        self.lexer.start_rename(self.cursor.position(), &line[token_range]);
     }
 
     pub fn is_saved(&self) -> bool {
@@ -181,7 +175,7 @@ impl Editor {
         if self.content.is_empty() {
             None
         } else if let Some((from, to)) = self.cursor.select_get() {
-            Some(copy_content(*from, *to, &self.content))
+            Some(copy_content(from, to, &self.content))
         } else {
             Some(format!("{}\n", &self.content[self.cursor.line]))
         }
@@ -293,8 +287,8 @@ impl Editor {
         self.actions.push_char(ch, &mut self.cursor, &mut self.content);
         let line = &self.content[self.cursor.line];
         if self.lexer.should_autocomplete(self.cursor.char, line) {
-            self.actions.force_sync(&self.path, &mut self.lexer, gs);
-            self.lexer.get_autocomplete(&self.path, &self.cursor.position(), line);
+            self.actions.force_sync(&mut self.lexer, &self.content, gs);
+            self.lexer.get_autocomplete(self.cursor.position(), line);
         }
     }
 
@@ -320,9 +314,7 @@ impl Editor {
 
     pub fn save(&mut self, events: &mut GlobalState) {
         if self.try_write_file(events) {
-            if let Some(client) = self.lexer.lsp_client.as_mut() {
-                let _ = client.file_did_save(&self.path);
-            }
+            self.lexer.save();
         }
     }
 

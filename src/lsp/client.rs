@@ -1,10 +1,10 @@
 use super::{Diagnostic, LSPNotification, LSPRequest, Response};
-use crate::configs::FileType;
+use crate::{configs::FileType, workspace::CursorPosition};
 
 use anyhow::Result;
 use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument},
-    request::{SemanticTokensFullRequest, SemanticTokensRangeRequest},
+    request::{GotoDeclaration, GotoDefinition, Rename, SemanticTokensFullRequest, SemanticTokensRangeRequest},
     PublishDiagnosticsParams, Range, ServerCapabilities, TextDocumentContentChangeEvent,
 };
 use std::{
@@ -78,6 +78,20 @@ impl LSPClient {
     pub fn full_tokens(&mut self, path: &Path) -> Option<i64> {
         self.capabilities.semantic_tokens_provider.as_ref()?;
         self.request(LSPRequest::<SemanticTokensFullRequest>::semantics_full(path)?)
+    }
+
+    pub fn rename(&mut self, path: &Path, c: CursorPosition, new_name: String) -> Option<i64> {
+        self.request(LSPRequest::<Rename>::rename(path, c, new_name)?)
+    }
+
+    pub fn declarations(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
+        self.capabilities.declaration_provider.as_ref()?;
+        self.request(LSPRequest::<GotoDeclaration>::declaration(path, c)?)
+    }
+
+    pub fn definitions(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
+        self.capabilities.signature_help_provider.as_ref()?;
+        self.request(LSPRequest::<GotoDefinition>::definition(path, c)?)
     }
 
     pub fn file_did_open(&mut self, path: &Path, file_type: &FileType, content: String) -> Result<()> {

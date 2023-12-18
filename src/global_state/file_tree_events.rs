@@ -1,11 +1,9 @@
 use std::path::PathBuf;
 
 use crate::{
-    components::{
-        popups::{message, popups_tree::file_selector},
-        Tree,
-    },
     configs::Mode,
+    popups::{message, popups_tree::file_selector},
+    tree::Tree,
 };
 
 use super::WorkspaceEvent;
@@ -14,7 +12,6 @@ use super::WorkspaceEvent;
 pub enum TreeEvent {
     Open(PathBuf),
     OpenAtLine(PathBuf, usize),
-    SelectPath(String),
     RenameFile(String),
     SelectPathFull(String),
 }
@@ -29,9 +26,6 @@ impl TreeEvent {
             Self::OpenAtLine(path, line) => {
                 tree.select_by_path(&path);
                 return Some(WorkspaceEvent::Open(path, line));
-            }
-            Self::SelectPath(pattern) => {
-                mode.popup_select(file_selector(tree.search_select_paths(pattern)));
             }
             Self::RenameFile(name) => {
                 mode.clear_popup();

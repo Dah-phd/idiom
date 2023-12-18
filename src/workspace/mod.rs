@@ -1,8 +1,12 @@
-mod file;
+pub mod actions;
+pub mod cursor;
+pub mod file;
+pub mod utils;
 use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType, Mode};
 use crate::global_state::GlobalState;
 use crate::lsp::LSP;
-pub use file::{CursorPosition, DocStats, Editor};
+pub use cursor::CursorPosition;
+pub use file::{DocStats, Editor};
 
 use anyhow::Result;
 use crossterm::event::KeyEvent;
@@ -74,7 +78,7 @@ impl Workspace {
         let action = self.key_map.map(key);
         if let Some(editor) = self.get_active() {
             if let Some(action) = action {
-                if editor.lexer.map_modal_if_exists(&action, &editor.path, gs) {
+                if editor.lexer.map_modal_if_exists(&action, gs) {
                     return true;
                 };
                 match action {
@@ -106,7 +110,7 @@ impl Workspace {
                     EditorAction::StartOfLine => editor.start_of_line(),
                     EditorAction::StartOfFile => editor.start_of_file(),
                     EditorAction::GoToDeclaration => editor.declaration(),
-                    EditorAction::Help => editor.hover(),
+                    EditorAction::Help => editor.help(),
                     EditorAction::LSPRename => editor.start_renames(),
                     EditorAction::Undo => editor.undo(),
                     EditorAction::Redo => editor.redo(),
@@ -268,21 +272,15 @@ impl Workspace {
         match self.lsp_servers.entry(new.file_type) {
             Entry::Vacant(entry) => {
                 if let Ok(lsp) = LSP::from(&new.file_type).await {
-                    new.lexer.set_lsp_client(lsp.aquire_client(), &new.path, &new.file_type, new.stringify(), gs);
+                    new.lexer.set_lsp_client(lsp.aquire_client(), &new.file_type, new.stringify(), gs);
                     for editor in self.editors.iter_mut().filter(|e| e.file_type == new.file_type) {
-                        editor.lexer.set_lsp_client(
-                            lsp.aquire_client(),
-                            &editor.path,
-                            &editor.file_type,
-                            editor.stringify(),
-                            gs,
-                        );
+                        editor.lexer.set_lsp_client(lsp.aquire_client(), &editor.file_type, editor.stringify(), gs);
                     }
                     entry.insert(lsp);
                 }
             }
             Entry::Occupied(entry) => {
-                new.lexer.set_lsp_client(entry.get().aquire_client(), &new.path, &new.file_type, new.stringify(), gs);
+                new.lexer.set_lsp_client(entry.get().aquire_client(), &new.file_type, new.stringify(), gs);
             }
         }
         Ok(new)
@@ -327,7 +325,7 @@ impl Workspace {
     pub async fn full_sync(&mut self, ft: &FileType, gs: &mut GlobalState) {
         if let Some(lsp) = self.lsp_servers.get(ft) {
             for editor in self.editors.iter_mut().filter(|e| &e.file_type == ft) {
-                editor.lexer.set_lsp_client(lsp.aquire_client(), &editor.path, ft, editor.stringify(), gs);
+                editor.lexer.set_lsp_client(lsp.aquire_client(), ft, editor.stringify(), gs);
             }
         }
     }
@@ -374,13 +372,7 @@ impl Workspace {
             editor.refresh_cfg(&self.base_config);
             if let Some(lsp) = self.lsp_servers.get(&editor.file_type) {
                 if editor.lexer.lsp_client.is_none() {
-                    editor.lexer.set_lsp_client(
-                        lsp.aquire_client(),
-                        &editor.path,
-                        &editor.file_type,
-                        editor.stringify(),
-                        gs,
-                    );
+                    editor.lexer.set_lsp_client(lsp.aquire_client(), &editor.file_type, editor.stringify(), gs);
                 }
             }
         }

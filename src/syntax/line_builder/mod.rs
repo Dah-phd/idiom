@@ -2,15 +2,14 @@ mod brackets;
 mod internal;
 mod langs;
 mod legend;
-mod prism;
 use brackets::BracketColors;
 use internal::SpansBuffer;
 use langs::Lang;
 use legend::{ColorResult, Legend};
 
 use lsp_types::{
-    Diagnostic, DiagnosticSeverity, PublishDiagnosticsParams, SemanticTokensResult, SemanticTokensServerCapabilities,
-    TextDocumentContentChangeEvent,
+    Diagnostic, DiagnosticSeverity, PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult,
+    SemanticTokensServerCapabilities, TextDocumentContentChangeEvent,
 };
 use ratatui::{
     style::{Color, Modifier, Style},
@@ -19,9 +18,12 @@ use ratatui::{
 use std::{
     collections::{hash_map::Entry, HashMap},
     ops::Range,
+    path::Path,
 };
 
-use crate::syntax::Theme;
+use crate::{global_state::GlobalState, lsp::LSPClient, syntax::Theme, workspace::actions::EditMetaData};
+
+use super::modal::LSPResponseType;
 
 #[derive(Debug)]
 pub struct LineBuilder {
@@ -32,8 +34,8 @@ pub struct LineBuilder {
     brackets: BracketColors,
     diagnostics: HashMap<usize, DiagnosticData>,
     pub select_range: Option<Range<usize>>,
-    pub waiting: bool,
-    pub text_is_updated: bool,
+    pub file_was_saved: bool,
+    ignores: Vec<usize>,
 }
 
 impl LineBuilder {
@@ -46,12 +48,38 @@ impl LineBuilder {
             brackets: BracketColors::default(),
             diagnostics: HashMap::new(),
             select_range: None,
-            waiting: false,
-            text_is_updated: true,
+            file_was_saved: true,
+            ignores: Vec::new(),
         }
     }
 
     pub fn set_diganostics(&mut self, params: PublishDiagnosticsParams) {
+        self.diagnostics.clear();
+        if self.file_was_saved {
+            self.diagnostics_full(params);
+        } else {
+            self.diagnostics_error(params);
+        }
+    }
+
+    pub fn diagnostics_error(&mut self, params: PublishDiagnosticsParams) {
+        self.diagnostics.clear();
+        for d in params.diagnostics {
+            if !matches!(d.severity, Some(DiagnosticSeverity::ERROR)) {
+                continue;
+            }
+            match self.diagnostics.entry(d.range.start.line as usize) {
+                Entry::Occupied(mut e) => {
+                    e.get_mut().append(d);
+                }
+                Entry::Vacant(e) => {
+                    e.insert(d.into());
+                }
+            }
+        }
+    }
+
+    pub fn diagnostics_full(&mut self, params: PublishDiagnosticsParams) {
         self.diagnostics.clear();
         for diagnostic in params.diagnostics {
             match self.diagnostics.entry(diagnostic.range.start.line as usize) {
@@ -63,6 +91,7 @@ impl LineBuilder {
                 }
             };
         }
+        self.file_was_saved = false;
     }
 
     pub fn set_tokens(&mut self, tokens_res: SemanticTokensResult) -> bool {
@@ -80,22 +109,61 @@ impl LineBuilder {
             }
             self.tokens.push(inner_token);
         }
-        if self.tokens.len() > 1 {
-            self.text_is_updated = false;
-        }
-        self.waiting = false;
         self.tokens.len() > 1
     }
 
-    pub fn collect_changes(&mut self, changes: &[TextDocumentContentChangeEvent]) {
-        for change in changes {
-            if let Some(range) = change.range {
-                for updated_line in range.start.line as usize..range.end.line as usize {
-                    self.diagnostics.remove(&updated_line);
-                }
+    pub fn set_tokens_partial(&mut self, tokens: SemanticTokensRangeResult, gs: &mut GlobalState) {
+        let tokens = match tokens {
+            SemanticTokensRangeResult::Partial(data) => data.data,
+            SemanticTokensRangeResult::Tokens(data) => data.data,
+        };
+        let mut line_idx = 0;
+        let mut from = 0;
+        for token in tokens {
+            if token.delta_line != 0 {
+                from = 0;
+                line_idx += token.delta_line as usize;
+            }
+            from += token.delta_start as usize;
+            self.tokens[line_idx].push(Token { from, len: token.length, token_type: token.token_type as usize });
+            self.ignores.clear();
+            gs.error(format!("{:?}", self.ignores));
+        }
+    }
+
+    pub fn collect_changes(
+        &mut self,
+        path: &Path,
+        version: i32,
+        events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
+        content: &[String],
+        client: &mut LSPClient,
+    ) -> Option<LSPResponseType> {
+        if self.tokens.len() <= 1 {
+            // ensures that there is fully mapped tokens before doing normal processing
+            client.file_did_change(path, version, events.drain(..).map(|(_, edit)| edit).collect()).ok()?;
+            return client.full_tokens(path).map(LSPResponseType::Tokens);
+        }
+        match events.len() {
+            0 => None,
+            1 => {
+                let (meta, edit) = events.remove(0);
+                meta.correct_tokens(&mut self.tokens, &mut self.ignores);
+                client.file_did_change(path, version, vec![edit]).ok()?;
+                client.partial_tokens(path, meta.build_range(content)).map(LSPResponseType::TokensPartial)
+            }
+            _ => {
+                let edits = events
+                    .drain(..)
+                    .map(|(meta, edit)| {
+                        meta.correct_tokens(&mut self.tokens, &mut self.ignores);
+                        edit
+                    })
+                    .collect::<Vec<_>>();
+                client.file_did_change(path, version, edits).ok()?;
+                client.full_tokens(path).map(LSPResponseType::Tokens)
             }
         }
-        self.text_is_updated = true;
     }
 
     pub fn reset(&mut self) {
@@ -103,7 +171,7 @@ impl LineBuilder {
     }
 
     pub fn build_line<'a>(&mut self, idx: usize, init: Vec<Span<'a>>, content: &'a str) -> Line<'a> {
-        let line = if self.waiting || self.text_is_updated || self.legend.is_empty() || self.tokens.len() <= 1 {
+        let line = if self.ignores.contains(&idx) || self.legend.is_empty() || self.tokens.len() <= 1 {
             let mut internal_build = SpansBuffer::new(init);
             internal_build.process(self, content, idx);
             internal_build.collect()
@@ -182,10 +250,6 @@ impl LineBuilder {
         if let Some(capabilities) = tokens_res {
             self.legend.map_styles(&self.lang.file_type, &self.theme, capabilities)
         }
-    }
-
-    pub fn should_update(&self) -> bool {
-        !self.waiting && (self.tokens.len() < 2 || self.text_is_updated)
     }
 }
 

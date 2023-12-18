@@ -6,12 +6,11 @@ pub mod popups_tree;
 mod utils;
 
 use crate::global_state::messages::PopupMessage;
+use crate::{tree::Tree, workspace::Workspace};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 pub use generics::message;
 pub use generics::{Button, Popup, PopupSelector};
 use ratatui::Frame;
-
-use super::{Tree, Workspace};
 
 pub trait PopupInterface {
     fn render(&mut self, frame: &mut Frame);

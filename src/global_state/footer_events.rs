@@ -1,4 +1,4 @@
-use crate::components::Footer;
+use crate::footer::Footer;
 
 #[derive(Debug, Clone)]
 pub enum FooterEvent {

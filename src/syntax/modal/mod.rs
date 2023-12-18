@@ -1,6 +1,6 @@
 mod parser;
 
-use crate::{components::workspace::CursorPosition, configs::EditorAction, global_state::WorkspaceEvent};
+use crate::{configs::EditorAction, global_state::WorkspaceEvent, workspace::CursorPosition};
 use fuzzy_matcher::{
     skim::{SkimMatcherV2, SkimScoreConfig},
     FuzzyMatcher,

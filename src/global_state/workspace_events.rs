@@ -1,12 +1,9 @@
 use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, WorkspaceEdit};
 
 use crate::{
-    components::{
-        popups::{popup_replace::ReplacePopup, popups_editor::selector_ranges},
-        workspace::CursorPosition,
-        Workspace,
-    },
     configs::{FileType, Mode},
+    popups::{popup_replace::ReplacePopup, popups_editor::selector_ranges},
+    workspace::{CursorPosition, Workspace},
 };
 use std::path::PathBuf;
 

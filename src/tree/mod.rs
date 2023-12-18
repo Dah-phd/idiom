@@ -162,10 +162,6 @@ impl Tree {
         Ok(())
     }
 
-    pub fn search_select_paths(&self, pattern: String) -> Vec<PathBuf> {
-        self.get_first_selected_folder().search_tree_paths(pattern)
-    }
-
     pub fn search_paths(&self, pattern: String) -> Vec<PathBuf> {
         self.tree.shallow_copy().search_tree_paths(pattern)
     }
@@ -199,18 +195,6 @@ impl Tree {
             }
         }
         "./".to_owned()
-    }
-
-    fn get_first_selected_folder(&self) -> TreePath {
-        if let Some(tree_path) = self.get_selected() {
-            if tree_path.path().is_dir() {
-                return tree_path.shallow_copy();
-            }
-            if let Some(parent) = tree_path.path().parent() {
-                return PathBuf::from(parent).into();
-            }
-        }
-        PathBuf::from("./").into()
     }
 
     pub fn toggle(&mut self) {

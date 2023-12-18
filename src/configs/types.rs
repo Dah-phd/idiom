@@ -1,12 +1,11 @@
+use crate::{global_state::messages::PopupMessage, popups::PopupInterface, tree::Tree, workspace::Workspace};
+
 use crossterm::event::KeyEvent;
 use ratatui::{
     style::{Color, Style},
     text::Span,
     Frame,
 };
-
-use crate::components::{popups::PopupInterface, workspace::Workspace, Tree};
-use crate::global_state::messages::PopupMessage;
 use std::path::PathBuf;
 
 pub enum Mode {

@@ -1,15 +1,15 @@
 mod action_buffer;
 mod edits;
-use std::path::Path;
 
-use super::cursor::Cursor;
-use super::CursorPosition;
-use crate::components::workspace::file::utils::{get_closing_char, is_closing_repeat};
 use crate::configs::EditorConfigs;
 use crate::global_state::GlobalState;
 use crate::syntax::Lexer;
+use crate::workspace::{
+    cursor::{Cursor, CursorPosition},
+    utils::{get_closing_char, is_closing_repeat},
+};
 use action_buffer::ActionBuffer;
-use edits::{Edit, EditBuilder};
+pub use edits::{Edit, EditBuilder, EditMetaData};
 use lsp_types::{Position, TextDocumentContentChangeEvent, TextEdit};
 
 #[derive(Debug, Default)]
@@ -18,7 +18,7 @@ pub struct Actions {
     version: i32,
     done: Vec<EditType>,
     undone: Vec<EditType>,
-    events: Vec<TextDocumentContentChangeEvent>,
+    events: Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
     buffer: ActionBuffer,
 }
 
@@ -251,6 +251,15 @@ impl Actions {
         }
     }
 
+    pub fn redo(&mut self, cursor: &mut Cursor, content: &mut Vec<String>) {
+        self.push_buffer();
+        if let Some(action) = self.undone.pop() {
+            let position = action.apply(content, &mut self.events);
+            cursor.set_position(position);
+            self.done.push(action);
+        }
+    }
+
     pub fn paste(&mut self, clip: String, cursor: &mut Cursor, content: &mut Vec<String>) {
         self.push_buffer();
         let action = if let Some((from, to)) = cursor.select_take() {
@@ -281,31 +290,22 @@ impl Actions {
         clip
     }
 
-    pub fn redo(&mut self, cursor: &mut Cursor, content: &mut Vec<String>) {
-        self.push_buffer();
-        if let Some(action) = self.undone.pop() {
-            let position = action.apply(content, &mut self.events);
-            cursor.set_position(position);
-            self.done.push(action);
-        }
-    }
-
-    pub fn sync(&mut self, path: &Path, lexer: &mut Lexer, gs: &mut GlobalState) {
+    pub fn sync(&mut self, lexer: &mut Lexer, content: &[String], gs: &mut GlobalState) {
         if let Some(action) = self.buffer.timed_collect() {
             self.push_done(action);
         }
         if !self.events.is_empty() {
             self.version += 1;
-            lexer.sync_lsp(path, self.version, self.events.drain(..).collect(), gs);
+            lexer.sync_lsp(self.version, &mut self.events, content, gs);
         }
         self.version += 1;
     }
 
-    pub fn force_sync(&mut self, path: &Path, lexer: &mut Lexer, gs: &mut GlobalState) {
+    pub fn force_sync(&mut self, lexer: &mut Lexer, content: &[String], gs: &mut GlobalState) {
         self.push_buffer();
         if !self.events.is_empty() {
             self.version += 1;
-            lexer.sync_lsp(path, self.version, self.events.drain(..).collect(), gs);
+            lexer.sync_lsp(self.version, &mut self.events, content, gs);
         }
     }
 
@@ -326,7 +326,7 @@ impl EditType {
     pub fn apply_rev(
         &self,
         content: &mut Vec<String>,
-        events: &mut Vec<TextDocumentContentChangeEvent>,
+        events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
     ) -> CursorPosition {
         match self {
             Self::Single(action) => action.apply_rev(content, events),
@@ -335,19 +335,23 @@ impl EditType {
             }
         }
     }
-    pub fn apply(&self, content: &mut Vec<String>, events: &mut Vec<TextDocumentContentChangeEvent>) -> CursorPosition {
+    pub fn apply(
+        &self,
+        content: &mut Vec<String>,
+        events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
+    ) -> CursorPosition {
         match self {
             Self::Single(action) => action.apply(content, events),
             Self::Multi(actions) => actions.iter().map(|a| a.apply(content, events)).last().unwrap_or_default(),
         }
     }
 
-    pub fn collect_events(&self, events: &mut Vec<TextDocumentContentChangeEvent>) {
+    pub fn collect_events(&self, events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>) {
         match self {
-            Self::Single(action) => events.push(action.event()),
+            Self::Single(action) => events.push((action.meta, action.event())),
             Self::Multi(actions) => {
                 for action in actions {
-                    events.push(action.event());
+                    events.push((action.meta, action.event()));
                 }
             }
         }

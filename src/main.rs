@@ -1,10 +1,14 @@
 mod app;
-mod components;
 mod configs;
+mod footer;
 mod global_state;
 mod lsp;
+mod popups;
 mod syntax;
+mod terminal;
+mod tree;
 mod utils;
+mod workspace;
 
 use app::app;
 

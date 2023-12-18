@@ -1,7 +1,7 @@
 use super::PopupInterface;
-use crate::components::{Tree, Workspace};
 use crate::global_state::messages::PopupMessage;
 use crate::utils::centered_rect_static;
+use crate::{tree::Tree, workspace::Workspace};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Alignment, Constraint, Layout},

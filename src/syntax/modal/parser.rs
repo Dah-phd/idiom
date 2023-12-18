@@ -1,6 +1,6 @@
 use lsp_types::{
     request::GotoDeclarationResponse, CompletionItem, CompletionResponse, GotoDefinitionResponse, Hover,
-    SemanticTokensResult, SignatureHelp, WorkspaceEdit,
+    SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, WorkspaceEdit,
 };
 use serde_json::{from_value, Value};
 
@@ -10,7 +10,8 @@ pub enum LSPResponseType {
     Hover(i64),
     SignatureHelp(i64),
     Renames(i64),
-    TokensFull(i64),
+    Tokens(i64),
+    TokensPartial(i64),
     Definition(i64),
     Declaration(i64),
 }
@@ -22,7 +23,8 @@ impl LSPResponseType {
             Self::Hover(id) => id,
             Self::SignatureHelp(id) => id,
             Self::Renames(id) => id,
-            Self::TokensFull(id) => id,
+            Self::Tokens(id) => id,
+            Self::TokensPartial(id) => id,
             Self::Definition(id) => id,
             Self::Declaration(id) => id,
         }
@@ -37,7 +39,8 @@ impl LSPResponseType {
             Self::Hover(..) => LSPResult::Hover(from_value::<Hover>(value?).ok()?),
             Self::SignatureHelp(..) => LSPResult::SignatureHelp(from_value::<SignatureHelp>(value?).ok()?),
             Self::Renames(..) => LSPResult::Renames(from_value::<WorkspaceEdit>(value?).ok()?),
-            Self::TokensFull(..) => LSPResult::Tokens(from_value::<SemanticTokensResult>(value?).ok()?),
+            Self::Tokens(..) => LSPResult::Tokens(from_value::<SemanticTokensResult>(value?).ok()?),
+            Self::TokensPartial(..) => LSPResult::TokensPartial(from_value::<SemanticTokensRangeResult>(value?).ok()?),
             Self::Definition(..) => LSPResult::Definition(from_value::<GotoDefinitionResponse>(value?).ok()?),
             Self::Declaration(..) => LSPResult::Declaration(from_value::<GotoDeclarationResponse>(value?).ok()?),
         })
@@ -50,6 +53,7 @@ pub enum LSPResult {
     SignatureHelp(SignatureHelp),
     Renames(WorkspaceEdit),
     Tokens(SemanticTokensResult),
+    TokensPartial(SemanticTokensRangeResult),
     Definition(GotoDefinitionResponse),
     Declaration(GotoDeclarationResponse),
 }

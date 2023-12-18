@@ -1,16 +1,17 @@
 use crate::{
-    components::{
-        popups::{
-            popup_find::FindPopup,
-            popup_replace::ReplacePopup,
-            popups_editor::{go_to_line_popup, save_all_popup, selector_editors},
-            popups_tree::{create_file_popup, find_in_tree_popup, rename_file_popup, tree_file_selector},
-        },
-        EditorTerminal, Footer, Tree, Workspace,
-    },
     configs::{GeneralAction, KeyMap, Mode},
+    footer::Footer,
     global_state::messages::PopupMessage,
     global_state::GlobalState,
+    popups::{
+        popup_find::FindPopup,
+        popup_replace::ReplacePopup,
+        popups_editor::{go_to_line_popup, save_all_popup, selector_editors},
+        popups_tree::{create_file_popup, find_in_tree_popup, rename_file_popup, tree_file_selector},
+    },
+    terminal::EditorTerminal,
+    tree::Tree,
+    workspace::Workspace,
 };
 
 use anyhow::Result;

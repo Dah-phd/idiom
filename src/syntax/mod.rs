@@ -4,18 +4,18 @@ mod theme;
 use self::line_builder::LineBuilder;
 use self::modal::{LSPModal, LSPModalResult, LSPResponseType, LSPResult};
 pub use self::theme::Theme;
-use crate::components::workspace::CursorPosition;
 use crate::configs::EditorAction;
 use crate::configs::FileType;
-use crate::global_state::{GlobalState, WorkspaceEvent};
+use crate::global_state::GlobalState;
 use crate::lsp::{LSPClient, LSPRequest};
-use lsp_types::request::{
-    Completion, GotoDeclaration, GotoDefinition, HoverRequest, Rename, SemanticTokensFullRequest, SignatureHelpRequest,
-};
+use crate::workspace::actions::EditMetaData;
+use crate::workspace::CursorPosition;
+use lsp_types::request::{Completion, HoverRequest, SignatureHelpRequest};
 use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent};
 use ratatui::style::{Color, Style};
 use ratatui::text::Span;
 use ratatui::{widgets::ListItem, Frame};
+use std::path::PathBuf;
 use std::{fmt::Debug, path::Path};
 
 #[cfg(build = "debug")]
@@ -25,6 +25,7 @@ pub struct Lexer {
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub lsp_client: Option<LSPClient>,
     pub max_digits: usize,
+    pub path: PathBuf,
     line_builder: LineBuilder,
     select: Option<(CursorPosition, CursorPosition)>,
     modal: Option<LSPModal>,
@@ -38,11 +39,12 @@ impl Debug for Lexer {
 }
 
 impl Lexer {
-    pub fn with_context(file_type: FileType) -> Self {
+    pub fn with_context(file_type: FileType, path: &Path) -> Self {
         Self {
             line_builder: LineBuilder::new(file_type.into()),
             select: None,
             modal: None,
+            path: path.into(),
             requests: Vec::new(),
             max_digits: 0,
             diagnostics: None,
@@ -50,174 +52,18 @@ impl Lexer {
         }
     }
 
-    pub fn context(&mut self, select: Option<(&CursorPosition, &CursorPosition)>, path: &Path, gs: &mut GlobalState) {
+    pub fn context(&mut self, select: Option<(CursorPosition, CursorPosition)>, gs: &mut GlobalState) {
         self.line_builder.reset();
-        self.select = select.map(|(from, to)| (*from, *to));
-        self.get_lsp_responses(gs);
-        self.get_diagnostics(path);
-        self.get_tokens(path, gs);
-    }
-
-    pub fn sync_lsp(
-        &mut self,
-        path: &Path,
-        version: i32,
-        content_changes: Vec<TextDocumentContentChangeEvent>,
-        gs: &mut GlobalState,
-    ) {
+        self.select = select;
         if let Some(client) = self.lsp_client.as_mut() {
-            self.line_builder.collect_changes(&content_changes);
-            #[cfg(build = "debug")]
-            debug_to_file("test_data.sync", &content_changes);
-            if let Err(err) = client.file_did_change(path, version, content_changes) {
-                gs.error(format!("Failed to sync with lsp: {err}"));
-                gs.workspace.push(WorkspaceEvent::CheckLSP(self.line_builder.lang.file_type));
+            // diagnostics
+            if let Some(params) = client.get_diagnostics(&self.path) {
+                self.line_builder.set_diganostics(params);
             }
-        }
-    }
-
-    pub fn calc_line_number_offset(&mut self, content: &[String]) -> usize {
-        self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
-        self.max_digits
-    }
-
-    pub fn render_modal_if_exist(&mut self, frame: &mut Frame, x: u16, y: u16) {
-        if let Some(modal) = &mut self.modal {
-            modal.render_at(frame, x, y);
-        }
-    }
-
-    pub fn map_modal_if_exists(&mut self, key: &EditorAction, path: &Path, gs: &mut GlobalState) -> bool {
-        if let Some(modal) = &mut self.modal {
-            match modal.map_and_finish(key) {
-                LSPModalResult::Taken => return true,
-                LSPModalResult::TakenDone => {
-                    self.modal.take();
-                    return true;
-                }
-                LSPModalResult::Done => {
-                    self.modal.take();
-                }
-                LSPModalResult::Workspace(event) => {
-                    gs.workspace.push(event);
-                    self.modal.take();
-                    return true;
-                }
-                LSPModalResult::RenameVar(new_name, c) => {
-                    self.get_renames(path, &c, new_name);
-                    self.modal.take();
-                    return true;
-                }
-                _ => (),
-            }
-        }
-        false
-    }
-
-    pub fn set_lsp_client(
-        &mut self,
-        mut client: LSPClient,
-        on_file: &Path,
-        file_type: &FileType,
-        content: String,
-        gs: &mut GlobalState,
-    ) {
-        gs.message("Mapping LSP ...");
-        if client.file_did_open(on_file, file_type, content).is_err() {
-            return;
-        }
-        self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
-        self.lsp_client.replace(client);
-        gs.success("LSP mapped!");
-        self.get_tokens(on_file, gs);
-    }
-
-    pub fn start_renames(&mut self, c: &CursorPosition, title: &str) {
-        if let Some(client) = self.lsp_client.as_mut() {
-            if client.capabilities.rename_provider.is_none() {
-                return;
-            }
-        }
-        self.modal.replace(LSPModal::renames_at(*c, title));
-    }
-
-    pub fn get_renames(&mut self, path: &Path, c: &CursorPosition, new_name: String) -> Option<()> {
-        self.lsp_client.as_ref()?.capabilities.rename_provider.as_ref()?;
-        let id = self.send_request(LSPRequest::<Rename>::rename(path, c, new_name)?)?;
-        self.requests.push(LSPResponseType::Renames(id));
-        Some(())
-    }
-
-    pub fn should_autocomplete(&mut self, char_idx: usize, line: &str) -> bool {
-        self.lsp_client.is_some()
-            && self.line_builder.lang.completelable(line, char_idx)
-            && !matches!(self.modal, Some(LSPModal::AutoComplete(..)))
-    }
-
-    pub fn get_autocomplete(&mut self, path: &Path, c: &CursorPosition, line: &str) -> Option<()> {
-        if matches!(self.modal, Some(LSPModal::AutoComplete(..))) || !self.line_builder.lang.completelable(line, c.char)
-        {
-            return None;
-        }
-        let id = self.send_request(LSPRequest::<Completion>::completion(path, c)?)?;
-        self.requests.push(LSPResponseType::Completion(id, line.to_owned(), c.char));
-        Some(())
-    }
-
-    pub fn get_hover(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
-        self.lsp_client.as_ref()?.capabilities.hover_provider.as_ref()?;
-        let id = self.send_request(LSPRequest::<HoverRequest>::hover(path, c)?)?;
-        self.requests.push(LSPResponseType::Hover(id));
-        Some(())
-    }
-
-    pub fn go_to_declaration(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
-        self.lsp_client.as_ref()?.capabilities.declaration_provider.as_ref()?;
-        let id = self.send_request(LSPRequest::<GotoDeclaration>::declaration(path, c)?)?;
-        self.requests.push(LSPResponseType::Declaration(id));
-        Some(())
-    }
-
-    pub fn go_to_definition(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
-        self.lsp_client.as_ref()?.capabilities.definition_provider.as_ref()?;
-        let id = self.send_request(LSPRequest::<GotoDefinition>::definition(path, c)?)?;
-        self.requests.push(LSPResponseType::Definition(id));
-        Some(())
-    }
-
-    pub fn get_signitures(&mut self, path: &Path, c: &CursorPosition) -> Option<()> {
-        self.lsp_client.as_ref()?.capabilities.signature_help_provider.as_ref()?;
-        let id = self.send_request(LSPRequest::<SignatureHelpRequest>::signature_help(path, c)?)?;
-        self.requests.push(LSPResponseType::SignatureHelp(id));
-        Some(())
-    }
-
-    pub fn get_tokens(&mut self, path: &Path, gs: &mut GlobalState) -> Option<()> {
-        self.lsp_client.as_ref()?.capabilities.semantic_tokens_provider.as_ref()?;
-        if self.line_builder.should_update() {
-            let id = self.send_request(LSPRequest::<SemanticTokensFullRequest>::semantics_full(path)?)?;
-            self.requests.push(LSPResponseType::TokensFull(id));
-            self.line_builder.waiting = true;
-            gs.message("Getting LSP syntax");
-        }
-        Some(())
-    }
-
-    // error handler!
-    fn send_request<T>(&mut self, request: LSPRequest<T>) -> Option<i64>
-    where
-        T: lsp_types::request::Request,
-        T::Params: serde::Serialize,
-        T::Result: serde::de::DeserializeOwned,
-    {
-        self.lsp_client.as_mut().as_mut()?.request(request)
-    }
-
-    fn get_lsp_responses(&mut self, gs: &mut GlobalState) {
-        if let Some(lsp) = self.lsp_client.as_mut() {
+            // responses
             let mut unresolved_requests = Vec::new();
             for request in self.requests.drain(..) {
-                if let Some(response) = lsp.get(request.id()) {
+                if let Some(response) = client.get(request.id()) {
                     match request.parse(response.result) {
                         Some(result) => match result {
                             LSPResult::Completion(completions, line, idx) => {
@@ -235,7 +81,12 @@ impl Lexer {
                             LSPResult::Tokens(tokens) => {
                                 if self.line_builder.set_tokens(tokens) {
                                     gs.success("LSP tokens mapped!");
+                                } else if let Some(id) = client.full_tokens(&self.path) {
+                                    unresolved_requests.push(LSPResponseType::Tokens(id));
                                 };
+                            }
+                            LSPResult::TokensPartial(tokens) => {
+                                self.line_builder.set_tokens_partial(tokens, gs);
                             }
                             LSPResult::Declaration(declaration) => {
                                 gs.try_ws_event(declaration);
@@ -258,26 +109,146 @@ impl Lexer {
         }
     }
 
-    fn get_diagnostics(&mut self, path: &Path) -> Option<()> {
-        let client = self.lsp_client.as_mut()?;
-        let params = client.get_diagnostics(path)?;
-        self.line_builder.set_diganostics(params);
+    pub fn sync_lsp(
+        &mut self,
+        version: i32,
+        events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
+        content: &[String],
+        gs: &mut GlobalState,
+    ) {
+        if let Some(client) = self.lsp_client.as_mut() {
+            if let Some(request) = self.line_builder.collect_changes(&self.path, version, events, content, client) {
+                self.requests.push(request);
+            }
+        } else {
+            events.clear();
+        }
+    }
+
+    pub fn calc_line_number_offset(&mut self, content: &[String]) -> usize {
+        self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
+        self.max_digits
+    }
+
+    pub fn render_modal_if_exist(&mut self, frame: &mut Frame, x: u16, y: u16) {
+        if let Some(modal) = &mut self.modal {
+            modal.render_at(frame, x, y);
+        }
+    }
+
+    pub fn map_modal_if_exists(&mut self, key: &EditorAction, gs: &mut GlobalState) -> bool {
+        if let Some(modal) = &mut self.modal {
+            match modal.map_and_finish(key) {
+                LSPModalResult::Taken => return true,
+                LSPModalResult::TakenDone => {
+                    self.modal.take();
+                    return true;
+                }
+                LSPModalResult::Done => {
+                    self.modal.take();
+                }
+                LSPModalResult::Workspace(event) => {
+                    gs.workspace.push(event);
+                    self.modal.take();
+                    return true;
+                }
+                LSPModalResult::RenameVar(new_name, c) => {
+                    self.get_rename(c, new_name);
+                    self.modal.take();
+                    return true;
+                }
+                _ => (),
+            }
+        }
+        false
+    }
+
+    pub fn set_lsp_client(
+        &mut self,
+        mut client: LSPClient,
+        file_type: &FileType,
+        content: String,
+        gs: &mut GlobalState,
+    ) {
+        gs.message("Mapping LSP ...");
+        if client.file_did_open(&self.path, file_type, content).is_err() {
+            return;
+        }
+        self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
+        gs.success("LSP mapped!");
+        if let Some(id) = client.full_tokens(&self.path) {
+            self.requests.push(LSPResponseType::Tokens(id));
+            gs.message("Getting LSP semantic tokents ...");
+        };
+        self.lsp_client.replace(client);
+    }
+
+    pub fn start_rename(&mut self, c: CursorPosition, title: &str) {
+        if let Some(client) = self.lsp_client.as_mut() {
+            if client.capabilities.rename_provider.is_none() {
+                return;
+            }
+        }
+        self.modal.replace(LSPModal::renames_at(c, title));
+    }
+
+    pub fn get_rename(&mut self, c: CursorPosition, new_name: String) {
+        if let Some(id) = self
+            .lsp_client
+            .as_mut()
+            .and_then(|client| client.rename(&self.path, c, new_name))
+            .map(LSPResponseType::Renames)
+        {
+            self.requests.push(id);
+        }
+    }
+
+    pub fn should_autocomplete(&mut self, char_idx: usize, line: &str) -> bool {
+        self.lsp_client.is_some()
+            && self.line_builder.lang.completelable(line, char_idx)
+            && !matches!(self.modal, Some(LSPModal::AutoComplete(..)))
+    }
+
+    pub fn get_autocomplete(&mut self, c: CursorPosition, line: &str) -> Option<()> {
+        let id = self.send_request(LSPRequest::<Completion>::completion(&self.path, c)?)?;
+        self.requests.push(LSPResponseType::Completion(id, line.to_owned(), c.char));
         Some(())
     }
 
-    fn line_select(&mut self, at_line: usize, max_len: usize) -> Option<std::ops::Range<usize>> {
-        let (from, to) = self.select?;
-        if from.line > at_line || at_line > to.line {
-            None
-        } else if from.line < at_line && at_line < to.line {
-            Some(0..max_len)
-        } else if from.line == at_line && at_line == to.line {
-            Some(from.char..to.char)
-        } else if from.line == at_line {
-            Some(from.char..max_len)
-        } else {
-            Some(0..to.char)
+    pub fn get_hover(&mut self, c: CursorPosition) -> Option<()> {
+        self.lsp_client.as_ref()?.capabilities.hover_provider.as_ref()?;
+        let id = self.send_request(LSPRequest::<HoverRequest>::hover(&self.path, c)?)?;
+        self.requests.push(LSPResponseType::Hover(id));
+        Some(())
+    }
+
+    pub fn go_to_declaration(&mut self, c: CursorPosition) {
+        if let Some(id) = self
+            .lsp_client
+            .as_mut()
+            .and_then(|client| client.declarations(&self.path, c))
+            .map(LSPResponseType::Declaration)
+        {
+            self.requests.push(id);
         }
+    }
+
+    pub fn go_to_definition(&mut self, c: CursorPosition) {
+        if let Some(id) = self
+            .lsp_client
+            .as_mut()
+            .and_then(|client| client.definitions(&self.path, c))
+            .map(LSPResponseType::Definition)
+        {
+            self.requests.push(id);
+        }
+    }
+
+    pub fn get_signitures(&mut self, c: CursorPosition) -> Option<()> {
+        self.lsp_client.as_ref()?.capabilities.signature_help_provider.as_ref()?;
+        let id = self.send_request(LSPRequest::<SignatureHelpRequest>::signature_help(&self.path, c)?)?;
+        self.requests.push(LSPResponseType::SignatureHelp(id));
+        Some(())
     }
 
     pub fn list_item<'a>(&mut self, idx: usize, content: &'a str) -> ListItem<'a> {
@@ -293,6 +264,41 @@ impl Lexer {
         self.line_builder.theme = Theme::new();
         if let Some(client) = self.lsp_client.as_mut() {
             self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
+        }
+    }
+
+    pub fn save(&mut self) {
+        if let Some(client) = self.lsp_client.as_mut() {
+            let _ = client.file_did_save(&self.path);
+            if let Some(id) = client.full_tokens(&self.path) {
+                self.requests.push(LSPResponseType::Tokens(id));
+            }
+        }
+        self.line_builder.file_was_saved = true;
+    }
+
+    // error handler!
+    fn send_request<T>(&mut self, request: LSPRequest<T>) -> Option<i64>
+    where
+        T: lsp_types::request::Request,
+        T::Params: serde::Serialize,
+        T::Result: serde::de::DeserializeOwned,
+    {
+        self.lsp_client.as_mut().as_mut()?.request(request)
+    }
+
+    fn line_select(&mut self, at_line: usize, max_len: usize) -> Option<std::ops::Range<usize>> {
+        let (from, to) = self.select?;
+        if from.line > at_line || at_line > to.line {
+            None
+        } else if from.line < at_line && at_line < to.line {
+            Some(0..max_len)
+        } else if from.line == at_line && at_line == to.line {
+            Some(from.char..to.char)
+        } else if from.line == at_line {
+            Some(from.char..max_len)
+        } else {
+            Some(0..to.char)
         }
     }
 }

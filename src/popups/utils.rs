@@ -1,6 +1,6 @@
 use crate::{
-    components::workspace::CursorPosition,
     global_state::{messages::PopupMessage, WorkspaceEvent},
+    workspace::CursorPosition,
 };
 
 pub fn into_message(maybe_position: Option<(CursorPosition, CursorPosition)>) -> PopupMessage {
