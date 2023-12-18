@@ -2,7 +2,6 @@ mod action_buffer;
 mod edits;
 
 use crate::configs::EditorConfigs;
-use crate::global_state::GlobalState;
 use crate::syntax::Lexer;
 use crate::workspace::{
     cursor::{Cursor, CursorPosition},
@@ -290,22 +289,22 @@ impl Actions {
         clip
     }
 
-    pub fn sync(&mut self, lexer: &mut Lexer, content: &[String], gs: &mut GlobalState) {
+    pub fn sync(&mut self, lexer: &mut Lexer, content: &[String]) {
         if let Some(action) = self.buffer.timed_collect() {
             self.push_done(action);
         }
         if !self.events.is_empty() {
             self.version += 1;
-            lexer.sync_lsp(self.version, &mut self.events, content, gs);
+            lexer.sync_lsp(self.version, &mut self.events, content);
         }
         self.version += 1;
     }
 
-    pub fn force_sync(&mut self, lexer: &mut Lexer, content: &[String], gs: &mut GlobalState) {
+    pub fn force_sync(&mut self, lexer: &mut Lexer, content: &[String]) {
         self.push_buffer();
         if !self.events.is_empty() {
             self.version += 1;
-            lexer.sync_lsp(self.version, &mut self.events, content, gs);
+            lexer.sync_lsp(self.version, &mut self.events, content);
         }
     }
 

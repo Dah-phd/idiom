@@ -51,7 +51,7 @@ impl Editor {
     }
 
     pub fn get_list_widget_with_context(&mut self, gs: &mut GlobalState) -> (usize, List<'_>) {
-        self.actions.sync(&mut self.lexer, &self.content, gs);
+        self.actions.sync(&mut self.lexer, &self.content);
         self.lexer.context(self.cursor.select_get(), gs);
         let render_till_line = self.content.len().min(self.cursor.at_line + self.max_rows);
         let editor_content = List::new(
@@ -283,11 +283,11 @@ impl Editor {
         self.actions.new_line(&mut self.cursor, &mut self.content);
     }
 
-    pub fn push(&mut self, ch: char, gs: &mut GlobalState) {
+    pub fn push(&mut self, ch: char) {
         self.actions.push_char(ch, &mut self.cursor, &mut self.content);
         let line = &self.content[self.cursor.line];
         if self.lexer.should_autocomplete(self.cursor.char, line) {
-            self.actions.force_sync(&mut self.lexer, &self.content, gs);
+            self.actions.force_sync(&mut self.lexer, &self.content);
             self.lexer.get_autocomplete(self.cursor.position(), line);
         }
     }

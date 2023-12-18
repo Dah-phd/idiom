@@ -21,7 +21,7 @@ use std::{
     path::Path,
 };
 
-use crate::{global_state::GlobalState, lsp::LSPClient, syntax::Theme, workspace::actions::EditMetaData};
+use crate::{lsp::LSPClient, syntax::Theme, workspace::actions::EditMetaData};
 
 use super::modal::LSPResponseType;
 
@@ -112,7 +112,7 @@ impl LineBuilder {
         self.tokens.len() > 1
     }
 
-    pub fn set_tokens_partial(&mut self, tokens: SemanticTokensRangeResult, gs: &mut GlobalState) {
+    pub fn set_tokens_partial(&mut self, tokens: SemanticTokensRangeResult) {
         let tokens = match tokens {
             SemanticTokensRangeResult::Partial(data) => data.data,
             SemanticTokensRangeResult::Tokens(data) => data.data,
@@ -127,7 +127,6 @@ impl LineBuilder {
             from += token.delta_start as usize;
             self.tokens[line_idx].push(Token { from, len: token.length, token_type: token.token_type as usize });
             self.ignores.clear();
-            gs.error(format!("{:?}", self.ignores));
         }
     }
 

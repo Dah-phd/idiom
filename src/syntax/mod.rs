@@ -86,7 +86,7 @@ impl Lexer {
                                 };
                             }
                             LSPResult::TokensPartial(tokens) => {
-                                self.line_builder.set_tokens_partial(tokens, gs);
+                                self.line_builder.set_tokens_partial(tokens);
                             }
                             LSPResult::Declaration(declaration) => {
                                 gs.try_ws_event(declaration);
@@ -114,7 +114,6 @@ impl Lexer {
         version: i32,
         events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
         content: &[String],
-        gs: &mut GlobalState,
     ) {
         if let Some(client) = self.lsp_client.as_mut() {
             if let Some(request) = self.line_builder.collect_changes(&self.path, version, events, content, client) {

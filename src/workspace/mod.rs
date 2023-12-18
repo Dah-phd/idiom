@@ -82,7 +82,7 @@ impl Workspace {
                     return true;
                 };
                 match action {
-                    EditorAction::Char(ch) => editor.push(ch, gs),
+                    EditorAction::Char(ch) => editor.push(ch),
                     EditorAction::NewLine => editor.new_line(),
                     EditorAction::Indent => editor.indent(),
                     EditorAction::Backspace => editor.backspace(),
