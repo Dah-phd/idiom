@@ -214,10 +214,10 @@ impl TreePath {
         }
     }
 
-    pub fn search_tree_paths(self, pattern: String) -> Vec<PathBuf> {
+    pub fn search_tree_paths(self, pattern: &str) -> Vec<PathBuf> {
         let mut buffer = Vec::new();
         let gitignore = Gitignore::new("./.gitignore").0;
-        self.search_in_paths(pattern.as_str(), &mut buffer, &gitignore);
+        self.search_in_paths(pattern, &mut buffer, &gitignore);
         buffer
     }
 

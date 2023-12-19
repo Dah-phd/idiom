@@ -41,17 +41,12 @@ pub fn rename_file_popup(path: String) -> Box<Popup> {
     })
 }
 
-pub fn find_in_tree_popup() -> Box<Popup> {
+pub fn search_tree_files(pattern: String) -> Box<Popup> {
     Box::new(Popup {
-        message: String::new(),
+        message: pattern,
         message_as_buffer_builder: Some(Some),
         title: Some("Find in tree".to_owned()),
         buttons: vec![
-            Button {
-                command: |popup| TreeEvent::SelectPathFull(popup.message.to_owned()).into(),
-                name: "Paths",
-                key: None,
-            },
             Button {
                 command: |popup| PopupMessage::SelectTreeFiles(popup.message.to_owned()),
                 name: "Files",

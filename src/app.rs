@@ -6,8 +6,9 @@ use crate::{
     popups::{
         popup_find::FindPopup,
         popup_replace::ReplacePopup,
+        popup_tree_search::ActiveTreeSearch,
         popups_editor::{go_to_line_popup, save_all_popup, selector_editors},
-        popups_tree::{create_file_popup, find_in_tree_popup, rename_file_popup, tree_file_selector},
+        popups_tree::{create_file_popup, rename_file_popup, tree_file_selector},
     },
     terminal::EditorTerminal,
     tree::Tree,
@@ -133,7 +134,7 @@ pub async fn app(terminal: &mut Terminal<CrosstermBackend<&Stdout>>, open_file: 
                         if matches!(mode, Mode::Insert) {
                             mode.popup(FindPopup::new());
                         } else {
-                            mode.popup(find_in_tree_popup());
+                            mode.popup(ActiveTreeSearch::new());
                         }
                     }
                     GeneralAction::Replace if matches!(mode, Mode::Insert) => {

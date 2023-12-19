@@ -96,10 +96,8 @@ pub fn centered_rect_static(h: u16, v: u16, rect: Rect) -> Rect {
 }
 
 pub fn right_corner_rect_static(h: u16, v: u16, rect: Rect) -> Rect {
-    Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(100), Constraint::Min(h)])
-        .split(Layout::default().constraints([Constraint::Min(v), Constraint::Percentage(100)]).split(rect)[0])[1]
+    Layout::new(Direction::Horizontal, [Constraint::Percentage(100), Constraint::Min(h)])
+        .split(Layout::new(Direction::Vertical, [Constraint::Min(v), Constraint::Percentage(100)]).split(rect)[0])[1]
 }
 
 pub fn find_code_blocks(buffer: &mut Vec<(usize, String)>, content: &[String], pattern: &str) {

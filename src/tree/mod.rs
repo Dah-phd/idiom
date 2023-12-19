@@ -162,7 +162,7 @@ impl Tree {
         Ok(())
     }
 
-    pub fn search_paths(&self, pattern: String) -> Vec<PathBuf> {
+    pub fn search_paths(&self, pattern: &str) -> Vec<PathBuf> {
         self.tree.shallow_copy().search_tree_paths(pattern)
     }
 

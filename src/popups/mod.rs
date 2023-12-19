@@ -1,6 +1,7 @@
 mod generics;
 pub mod popup_find;
 pub mod popup_replace;
+pub mod popup_tree_search;
 pub mod popups_editor;
 pub mod popups_tree;
 mod utils;

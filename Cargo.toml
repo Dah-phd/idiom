@@ -7,13 +7,13 @@ edition = "2021"
 
 [dependencies]
 crossterm = "0.27.0"
-lsp-types = "0.94.0"
+lsp-types = "0.95.0"
 serde = { version = "1.0.163", features = ["derive"] }
 serde_json = "1.0.96"
-tokio = { version="1.28.0", features=["rt", "macros", "rt-multi-thread", "process", "io-util"] }
+tokio = { version="1.35.0", features=["rt", "macros", "rt-multi-thread", "process", "io-util"] }
 tokio-util = { version="0.7.7", features = ["codec", "io"] }
 tokio-stream = "0.1.12"
-ratatui = { version = "0.24.0", features = ["serde"] }
+ratatui = { version = "0.25.0", features = ["serde"] }
 unicode-width = "0.1"
 anyhow = "1.0.71"
 dirs = "5.0.1"

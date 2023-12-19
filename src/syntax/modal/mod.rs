@@ -295,7 +295,7 @@ impl Info {
     }
 
     fn render_at(&mut self, frame: &mut Frame, area: Rect) {
-        frame.render_widget(List::new(self.items.as_slice()).block(Block::default().borders(Borders::all())), area);
+        frame.render_widget(List::new(self.items.clone()).block(Block::default().borders(Borders::all())), area);
     }
 }
 

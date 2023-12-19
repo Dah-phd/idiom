@@ -122,6 +122,30 @@ impl Popup {
     }
 }
 
+#[derive(Clone)]
+pub struct Button {
+    pub command: fn(&mut Popup) -> PopupMessage,
+    pub name: &'static str,
+    pub key: Option<Vec<KeyCode>>,
+}
+
+impl std::fmt::Debug for Button {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("").field(&self.name).finish()
+    }
+}
+
+pub fn message(content: String) -> Popup {
+    Popup {
+        message: content,
+        title: Some("Message".to_owned()),
+        message_as_buffer_builder: None,
+        buttons: vec![Button { command: |_| PopupMessage::Done, name: "Ok", key: None }],
+        size: Some((20, 16)),
+        state: 0,
+    }
+}
+
 pub struct PopupSelector<T> {
     pub options: Vec<T>,
     pub display: fn(&T) -> String,
@@ -179,28 +203,4 @@ impl<T> PopupInterface for PopupSelector<T> {
     fn update_workspace(&mut self, _editor_state: &mut Workspace) {}
 
     fn update_tree(&mut self, _file_tree: &mut Tree) {}
-}
-
-#[derive(Clone)]
-pub struct Button {
-    pub command: fn(&mut Popup) -> PopupMessage,
-    pub name: &'static str,
-    pub key: Option<Vec<KeyCode>>,
-}
-
-impl std::fmt::Debug for Button {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("").field(&self.name).finish()
-    }
-}
-
-pub fn message(content: String) -> Popup {
-    Popup {
-        message: content,
-        title: Some("Message".to_owned()),
-        message_as_buffer_builder: None,
-        buttons: vec![Button { command: |_| PopupMessage::Done, name: "Ok", key: None }],
-        size: Some((20, 16)),
-        state: 0,
-    }
 }
