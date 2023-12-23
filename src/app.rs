@@ -113,16 +113,6 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                             }
                         }
                     }
-                    GeneralAction::NextTab => {
-                        if let Some(editor_id) = workspace.state.selected() {
-                            file_tree.on_open_tabs = true;
-                            if editor_id >= workspace.editors.len() - 1 {
-                                workspace.state.select(Some(0))
-                            } else {
-                                workspace.state.select(Some(editor_id + 1))
-                            }
-                        }
-                    }
                     GeneralAction::Exit => {
                         if workspace.are_updates_saved() && gs.popup.is_none() {
                             gs.exit = true;
@@ -133,6 +123,16 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                     GeneralAction::FileTreeModeOrCancelInput => gs.mode = Mode::Select,
                     GeneralAction::SaveAll => workspace.save(&mut gs),
                     GeneralAction::HideFileTree => file_tree.toggle(),
+                    GeneralAction::NextTab => {
+                        if let Some(editor_id) = workspace.state.selected() {
+                            file_tree.on_open_tabs = true;
+                            if editor_id >= workspace.editors.len() - 1 {
+                                workspace.state.select(Some(0))
+                            } else {
+                                workspace.state.select(Some(editor_id + 1))
+                            }
+                        }
+                    }
                     GeneralAction::PreviousTab => {
                         if let Some(editor_id) = workspace.state.selected() {
                             file_tree.on_open_tabs = true;
