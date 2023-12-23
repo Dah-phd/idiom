@@ -1,9 +1,47 @@
+use super::PopupMessage;
+use crate::workspace::CursorPosition;
 use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, WorkspaceEdit};
 
-use crate::{configs::FileType, workspace::CursorPosition};
+use crate::configs::FileType;
+use crate::footer::Footer;
 use std::path::PathBuf;
 
-use super::PopupMessage;
+#[derive(Debug, Clone)]
+pub enum TreeEvent {
+    PopupAccess,
+    Open(PathBuf),
+    OpenAtLine(PathBuf, usize),
+    OpenAtSelect(PathBuf, (CursorPosition, CursorPosition)),
+    CreateFileOrFolder(String),
+    CreateFileOrFolderBase(String),
+    RenameFile(String),
+    SearchFiles(String),
+    SelectTreeFiles(String),
+    SelectTreeFilesFull(String),
+}
+
+impl From<TreeEvent> for PopupMessage {
+    fn from(event: TreeEvent) -> Self {
+        PopupMessage::Tree(event)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FooterEvent {
+    Message(String),
+    Error(String),
+    Success(String),
+}
+
+impl FooterEvent {
+    pub fn map(self, footer: &mut Footer) {
+        match self {
+            Self::Message(message) => footer.message(message),
+            Self::Error(message) => footer.error(message),
+            Self::Success(message) => footer.success(message),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum WorkspaceEvent {

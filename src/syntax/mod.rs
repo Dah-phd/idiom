@@ -87,7 +87,7 @@ impl Lexer {
                             LSPResult::Tokens(tokens) => {
                                 if self.line_builder.set_tokens(tokens) {
                                     gs.success("LSP tokens mapped!");
-                                } else if let Some(id) = client.full_tokens(&self.path) {
+                                } else if let Some(id) = client.request_full_tokens(&self.path) {
                                     unresolved_requests.push(LSPResponseType::Tokens(id));
                                 };
                             }
@@ -181,11 +181,23 @@ impl Lexer {
         }
         self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
         gs.success("LSP mapped!");
-        if let Some(id) = client.full_tokens(&self.path) {
+        if let Some(id) = client.request_full_tokens(&self.path) {
             self.requests.push(LSPResponseType::Tokens(id));
             gs.message("Getting LSP semantic tokents ...");
         };
         self.lsp_client.replace(client);
+    }
+
+    pub fn should_autocomplete(&mut self, char_idx: usize, line: &str) -> bool {
+        self.lsp_client.is_some()
+            && self.line_builder.lang.completelable(line, char_idx)
+            && !matches!(self.modal, Some(LSPModal::AutoComplete(..)))
+    }
+
+    pub fn get_autocomplete(&mut self, c: CursorPosition, line: &str) {
+        if let Some(id) = self.lsp_client.as_mut().and_then(|client| client.request_completions(&self.path, c)) {
+            self.requests.push(LSPResponseType::Completion(id, line.to_owned(), c.char));
+        }
     }
 
     pub fn start_rename(&mut self, c: CursorPosition, title: &str) {
@@ -201,37 +213,26 @@ impl Lexer {
         if let Some(id) = self
             .lsp_client
             .as_mut()
-            .and_then(|client| client.rename(&self.path, c, new_name))
+            .and_then(|client| client.request_rename(&self.path, c, new_name))
             .map(LSPResponseType::Renames)
         {
             self.requests.push(id);
         }
     }
 
-    pub fn should_autocomplete(&mut self, char_idx: usize, line: &str) -> bool {
-        self.lsp_client.is_some()
-            && self.line_builder.lang.completelable(line, char_idx)
-            && !matches!(self.modal, Some(LSPModal::AutoComplete(..)))
-    }
-
-    pub fn get_autocomplete(&mut self, c: CursorPosition, line: &str) -> Option<()> {
-        let id = self.send_request(LSPRequest::<Completion>::completion(&self.path, c)?)?;
-        self.requests.push(LSPResponseType::Completion(id, line.to_owned(), c.char));
-        Some(())
-    }
-
-    pub fn get_hover(&mut self, c: CursorPosition) -> Option<()> {
-        self.lsp_client.as_ref()?.capabilities.hover_provider.as_ref()?;
-        let id = self.send_request(LSPRequest::<HoverRequest>::hover(&self.path, c)?)?;
-        self.requests.push(LSPResponseType::Hover(id));
-        Some(())
+    pub fn get_hover(&mut self, c: CursorPosition) {
+        if let Some(id) =
+            self.lsp_client.as_mut().and_then(|client| client.request_hover(&self.path, c)).map(LSPResponseType::Hover)
+        {
+            self.requests.push(id);
+        }
     }
 
     pub fn go_to_declaration(&mut self, c: CursorPosition) {
         if let Some(id) = self
             .lsp_client
             .as_mut()
-            .and_then(|client| client.declarations(&self.path, c))
+            .and_then(|client| client.request_declarations(&self.path, c))
             .map(LSPResponseType::Declaration)
         {
             self.requests.push(id);
@@ -242,7 +243,7 @@ impl Lexer {
         if let Some(id) = self
             .lsp_client
             .as_mut()
-            .and_then(|client| client.references(&self.path, c))
+            .and_then(|client| client.request_references(&self.path, c))
             .map(LSPResponseType::References)
         {
             self.requests.push(id);
@@ -253,18 +254,22 @@ impl Lexer {
         if let Some(id) = self
             .lsp_client
             .as_mut()
-            .and_then(|client| client.definitions(&self.path, c))
+            .and_then(|client| client.request_definitions(&self.path, c))
             .map(LSPResponseType::Definition)
         {
             self.requests.push(id);
         }
     }
 
-    pub fn get_signitures(&mut self, c: CursorPosition) -> Option<()> {
-        self.lsp_client.as_ref()?.capabilities.signature_help_provider.as_ref()?;
-        let id = self.send_request(LSPRequest::<SignatureHelpRequest>::signature_help(&self.path, c)?)?;
-        self.requests.push(LSPResponseType::SignatureHelp(id));
-        Some(())
+    pub fn get_signitures(&mut self, c: CursorPosition) {
+        if let Some(id) = self
+            .lsp_client
+            .as_mut()
+            .and_then(|client| client.request_signitures(&self.path, c))
+            .map(LSPResponseType::SignatureHelp)
+        {
+            self.requests.push(id);
+        }
     }
 
     pub fn list_item<'a>(&mut self, idx: usize, content: &'a str) -> ListItem<'a> {
@@ -286,21 +291,11 @@ impl Lexer {
     pub fn save(&mut self) {
         if let Some(client) = self.lsp_client.as_mut() {
             let _ = client.file_did_save(&self.path);
-            if let Some(id) = client.full_tokens(&self.path) {
+            if let Some(id) = client.request_full_tokens(&self.path) {
                 self.requests.push(LSPResponseType::Tokens(id));
             }
         }
         self.line_builder.file_was_saved = true;
-    }
-
-    // error handler!
-    fn send_request<T>(&mut self, request: LSPRequest<T>) -> Option<i64>
-    where
-        T: lsp_types::request::Request,
-        T::Params: serde::Serialize,
-        T::Result: serde::de::DeserializeOwned,
-    {
-        self.lsp_client.as_mut().as_mut()?.request(request)
     }
 
     fn line_select(&mut self, at_line: usize, max_len: usize) -> Option<std::ops::Range<usize>> {

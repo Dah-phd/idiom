@@ -1,23 +1,17 @@
 mod clipboard;
-mod file_tree_events;
-mod footer_events;
-mod workspace_events;
+mod events;
 
-use std::{collections::LinkedList, path::PathBuf};
-
-pub use self::file_tree_events::TreeEvent;
-pub use self::footer_events::FooterEvent;
-pub use self::workspace_events::WorkspaceEvent;
-use crate::footer::Footer;
-use crate::popups::{
-    popup_replace::ReplacePopup,
-    popups_editor::selector_ranges,
-    popups_tree::{search_tree_files, tree_file_selector},
-    PopupInterface,
+use crate::{
+    footer::Footer,
+    popups::popup_replace::ReplacePopup,
+    popups::popups_editor::selector_ranges,
+    popups::popups_tree::{search_tree_files, tree_file_selector},
+    popups::PopupInterface,
+    tree::Tree,
+    workspace::Workspace,
 };
-use crate::tree::Tree;
-use crate::workspace::Workspace;
 pub use clipboard::Clipboard;
+pub use events::{FooterEvent, TreeEvent, WorkspaceEvent};
 
 use crossterm::event::KeyEvent;
 use ratatui::{
@@ -25,6 +19,7 @@ use ratatui::{
     text::Span,
     Frame,
 };
+use std::{collections::LinkedList, path::PathBuf};
 
 #[derive(Default, Clone)]
 pub enum PopupMessage {

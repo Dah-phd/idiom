@@ -141,7 +141,7 @@ impl LineBuilder {
         if self.tokens.len() <= 1 {
             // ensures that there is fully mapped tokens before doing normal processing
             client.file_did_change(path, version, events.drain(..).map(|(_, edit)| edit).collect()).ok()?;
-            return client.full_tokens(path).map(LSPResponseType::Tokens);
+            return client.request_full_tokens(path).map(LSPResponseType::Tokens);
         }
         match events.len() {
             0 => None,
@@ -149,7 +149,7 @@ impl LineBuilder {
                 let (meta, edit) = events.remove(0);
                 meta.correct_tokens(&mut self.tokens, &mut self.ignores);
                 client.file_did_change(path, version, vec![edit]).ok()?;
-                client.partial_tokens(path, meta.build_range(content)).map(LSPResponseType::TokensPartial)
+                client.request_partial_tokens(path, meta.build_range(content)).map(LSPResponseType::TokensPartial)
             }
             _ => {
                 let edits = events
@@ -160,7 +160,7 @@ impl LineBuilder {
                     })
                     .collect::<Vec<_>>();
                 client.file_did_change(path, version, edits).ok()?;
-                client.full_tokens(path).map(LSPResponseType::Tokens)
+                client.request_full_tokens(path).map(LSPResponseType::Tokens)
             }
         }
     }

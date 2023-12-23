@@ -5,7 +5,8 @@ use anyhow::Result;
 use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument},
     request::{
-        GotoDeclaration, GotoDefinition, References, Rename, SemanticTokensFullRequest, SemanticTokensRangeRequest,
+        Completion, GotoDeclaration, GotoDefinition, HoverRequest, References, Rename, SemanticTokensFullRequest,
+        SemanticTokensRangeRequest, SignatureHelpRequest,
     },
     PublishDiagnosticsParams, Range, ServerCapabilities, TextDocumentContentChangeEvent,
 };
@@ -72,31 +73,45 @@ impl LSPClient {
         que.remove(id)
     }
 
-    pub fn partial_tokens(&mut self, path: &Path, range: Range) -> Option<i64> {
+    pub fn request_partial_tokens(&mut self, path: &Path, range: Range) -> Option<i64> {
         self.capabilities.semantic_tokens_provider.as_ref()?;
         self.request(LSPRequest::<SemanticTokensRangeRequest>::semantics_range(path, range)?)
     }
 
-    pub fn full_tokens(&mut self, path: &Path) -> Option<i64> {
+    pub fn request_full_tokens(&mut self, path: &Path) -> Option<i64> {
         self.capabilities.semantic_tokens_provider.as_ref()?;
         self.request(LSPRequest::<SemanticTokensFullRequest>::semantics_full(path)?)
     }
 
-    pub fn rename(&mut self, path: &Path, c: CursorPosition, new_name: String) -> Option<i64> {
+    pub fn request_completions(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
+        self.request(LSPRequest::<Completion>::completion(path, c)?)
+    }
+
+    pub fn request_rename(&mut self, path: &Path, c: CursorPosition, new_name: String) -> Option<i64> {
         self.request(LSPRequest::<Rename>::rename(path, c, new_name)?)
     }
 
-    pub fn references(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
+    pub fn request_signitures(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
+        self.capabilities.signature_help_provider.as_ref()?;
+        self.request(LSPRequest::<SignatureHelpRequest>::signature_help(path, c)?)
+    }
+
+    pub fn request_hover(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
+        self.capabilities.hover_provider.as_ref()?;
+        self.request(LSPRequest::<HoverRequest>::hover(path, c)?)
+    }
+
+    pub fn request_references(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
         self.capabilities.references_provider.as_ref()?;
         self.request(LSPRequest::<References>::references(path, c)?)
     }
 
-    pub fn declarations(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
+    pub fn request_declarations(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
         self.capabilities.declaration_provider.as_ref()?;
         self.request(LSPRequest::<GotoDeclaration>::declaration(path, c)?)
     }
 
-    pub fn definitions(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
+    pub fn request_definitions(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
         self.capabilities.definition_provider.as_ref()?;
         self.request(LSPRequest::<GotoDefinition>::definition(path, c)?)
     }

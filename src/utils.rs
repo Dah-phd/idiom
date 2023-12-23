@@ -74,6 +74,7 @@ pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> Result<PathBuf> {
     Ok(path)
 }
 
+#[allow(dead_code)]
 pub fn find_code_blocks(buffer: &mut Vec<(usize, String)>, content: &[String], pattern: &str) {
     let mut content_iter = content.iter().enumerate().peekable();
     while let Some((idx, line)) = content_iter.next() {

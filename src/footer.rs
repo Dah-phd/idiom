@@ -59,7 +59,7 @@ impl Footer {
     }
 
     fn message_with_remainder(&mut self, frame: &mut Frame, layout: Rect) -> Rect {
-        self.get_message();
+        self.update_message();
         if let Some(message) = self.message.as_ref() {
             let paragraph_areas = Layout::default()
                 .direction(Direction::Horizontal)
@@ -97,7 +97,7 @@ impl Footer {
         }
     }
 
-    fn get_message(&mut self) {
+    fn update_message(&mut self) {
         if self.message.is_none() && self.message_que.is_empty() {
             return;
         }
@@ -123,7 +123,7 @@ impl Footer {
 
 #[derive(Debug)]
 enum Message {
-    Plain(Paragraph<'static>),
+    Text(Paragraph<'static>),
     Success(Paragraph<'static>),
     Error(Paragraph<'static>),
 }
@@ -136,14 +136,14 @@ impl Message {
     fn widget(&self) -> Paragraph<'static> {
         match self {
             Self::Error(span) => span,
-            Self::Plain(span) => span,
+            Self::Text(span) => span,
             Self::Success(span) => span,
         }
         .clone()
     }
 
     fn msg(message: String) -> Self {
-        Self::Plain(
+        Self::Text(
             Paragraph::new(Span::raw(message))
                 .block(Block::default().borders(Borders::TOP).padding(Padding::horizontal(2))),
         )
