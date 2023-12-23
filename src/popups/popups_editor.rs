@@ -1,5 +1,5 @@
 use super::{Button, Popup, PopupSelector};
-use crate::global_state::messages::PopupMessage;
+use crate::global_state::PopupMessage;
 use crate::global_state::WorkspaceEvent;
 use crate::workspace::CursorPosition;
 use crossterm::event::KeyCode;
@@ -11,12 +11,12 @@ pub fn save_all_popup() -> Box<Popup> {
         title: None,
         buttons: vec![
             Button {
-                command: |_| PopupMessage::SaveAndExit,
+                command: |_| WorkspaceEvent::SaveAndExit.into(),
                 name: "Save All (Y)",
                 key: Some(vec![KeyCode::Char('y'), KeyCode::Char('Y')]),
             },
             Button {
-                command: |_| PopupMessage::Exit,
+                command: |_| WorkspaceEvent::Exit.into(),
                 name: "Don't save (N)",
                 key: Some(vec![KeyCode::Char('n'), KeyCode::Char('N')]),
             },
@@ -34,11 +34,9 @@ pub fn go_to_line_popup() -> Box<Popup> {
         buttons: vec![Button {
             command: |popup| {
                 if let Ok(line) = popup.message.parse::<usize>() {
-                    return PopupMessage::UpdateWorkspace(WorkspaceEvent::GoToLine(
-                        line.checked_sub(1).unwrap_or_default(),
-                    ));
+                    return WorkspaceEvent::GoToLine(line.checked_sub(1).unwrap_or_default()).into();
                 }
-                PopupMessage::Done
+                PopupMessage::Clear
             },
             name: "GO",
             key: None,

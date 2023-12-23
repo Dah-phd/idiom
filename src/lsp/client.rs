@@ -4,7 +4,9 @@ use crate::{configs::FileType, workspace::CursorPosition};
 use anyhow::Result;
 use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument},
-    request::{GotoDeclaration, GotoDefinition, Rename, SemanticTokensFullRequest, SemanticTokensRangeRequest},
+    request::{
+        GotoDeclaration, GotoDefinition, References, Rename, SemanticTokensFullRequest, SemanticTokensRangeRequest,
+    },
     PublishDiagnosticsParams, Range, ServerCapabilities, TextDocumentContentChangeEvent,
 };
 use std::{
@@ -84,13 +86,18 @@ impl LSPClient {
         self.request(LSPRequest::<Rename>::rename(path, c, new_name)?)
     }
 
+    pub fn references(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
+        self.capabilities.references_provider.as_ref()?;
+        self.request(LSPRequest::<References>::references(path, c)?)
+    }
+
     pub fn declarations(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
         self.capabilities.declaration_provider.as_ref()?;
         self.request(LSPRequest::<GotoDeclaration>::declaration(path, c)?)
     }
 
     pub fn definitions(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
-        self.capabilities.signature_help_provider.as_ref()?;
+        self.capabilities.definition_provider.as_ref()?;
         self.request(LSPRequest::<GotoDefinition>::definition(path, c)?)
     }
 

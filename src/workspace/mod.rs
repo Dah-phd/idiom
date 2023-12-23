@@ -2,8 +2,8 @@ pub mod actions;
 pub mod cursor;
 pub mod file;
 pub mod utils;
-use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType, Mode};
-use crate::global_state::GlobalState;
+use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType};
+use crate::global_state::{GlobalState, Mode};
 use crate::lsp::LSP;
 pub use cursor::CursorPosition;
 pub use file::{DocStats, Editor};
@@ -11,6 +11,7 @@ pub use file::{DocStats, Editor};
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
+use ratatui::layout::Direction;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -21,6 +22,8 @@ use std::{
     collections::{hash_map::Entry, HashMap},
     path::PathBuf,
 };
+
+const RECT_CONSTRAINT: [Constraint; 2] = [Constraint::Length(1), Constraint::Percentage(100)];
 
 pub struct Workspace {
     pub editors: Vec<Editor>,
@@ -44,8 +47,7 @@ impl Workspace {
     pub fn render(&mut self, frame: &mut Frame, screen: Rect, gs: &mut GlobalState) {
         if let Some(editor_id) = self.state.selected() {
             if let Some(file) = self.editors.get_mut(editor_id) {
-                let layout =
-                    Layout::default().constraints([Constraint::Length(1), Constraint::default()]).split(screen);
+                let layout = Layout::new(Direction::Vertical, RECT_CONSTRAINT).split(screen);
                 let area = layout[1];
                 file.set_max_rows(layout[1].bottom());
                 let cursor_x_offset = 1 + file.cursor.char;
@@ -71,8 +73,8 @@ impl Workspace {
         }
     }
 
-    pub fn map(&mut self, key: &KeyEvent, mode: &mut Mode, gs: &mut GlobalState) -> bool {
-        if !matches!(mode, Mode::Insert) {
+    pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
+        if !matches!(gs.mode, Mode::Insert) {
             return false;
         }
         let action = self.key_map.map(key);
@@ -97,6 +99,7 @@ impl Workspace {
                     EditorAction::SelectDown => editor.select_down(),
                     EditorAction::SelectLeft => editor.select_left(),
                     EditorAction::SelectRight => editor.select_right(),
+                    EditorAction::SelectToken => editor.select_token(),
                     EditorAction::ScrollUp => editor.scroll_up(),
                     EditorAction::ScrollDown => editor.scroll_down(),
                     EditorAction::SwapUp => editor.swap_up(),
@@ -109,6 +112,7 @@ impl Workspace {
                     EditorAction::EndOfFile => editor.end_of_file(),
                     EditorAction::StartOfLine => editor.start_of_line(),
                     EditorAction::StartOfFile => editor.start_of_file(),
+                    EditorAction::FindReferences => editor.references(),
                     EditorAction::GoToDeclaration => editor.declaration(),
                     EditorAction::Help => editor.help(),
                     EditorAction::LSPRename => editor.start_renames(),
@@ -134,7 +138,7 @@ impl Workspace {
                     EditorAction::Close => {
                         self.close_active();
                         if self.state.selected().is_none() {
-                            *mode = Mode::Select;
+                            gs.mode = Mode::Select;
                         }
                     }
                 }

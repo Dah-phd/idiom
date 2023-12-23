@@ -8,27 +8,40 @@ mod syntax;
 mod terminal;
 mod tree;
 mod utils;
+mod widgests;
 mod workspace;
 
 use app::app;
 
 use anyhow::Result;
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::path::{PathBuf, MAIN_SEPARATOR};
+use std::{
+    io::Stdout,
+    path::{PathBuf, MAIN_SEPARATOR},
+};
 
-fn prep(out: &mut impl std::io::Write) -> Result<()> {
+fn init_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
+    let mut terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
     crossterm::terminal::enable_raw_mode()?;
     crossterm::execute!(
-        out,
+        terminal.backend_mut(),
         crossterm::terminal::EnterAlternateScreen,
         crossterm::style::ResetColor,
-        crossterm::cursor::SetCursorStyle::BlinkingBar,
+        crossterm::cursor::SetCursorStyle::BlinkingBlock,
     )?;
-    Ok(())
+
+    // loading panic
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic| {
+        graceful_exit().unwrap();
+        original_hook(panic);
+    }));
+
+    Ok(terminal)
 }
 
-fn graceful_exit(out: &mut impl std::io::Write) -> Result<()> {
-    crossterm::execute!(out, crossterm::style::ResetColor, crossterm::terminal::LeaveAlternateScreen,)?;
+fn graceful_exit() -> Result<()> {
+    crossterm::execute!(std::io::stdout(), crossterm::style::ResetColor, crossterm::terminal::LeaveAlternateScreen,)?;
     crossterm::terminal::disable_raw_mode()?;
     Ok(())
 }
@@ -50,9 +63,7 @@ fn cli() -> Option<PathBuf> {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
-    let out = std::io::stdout();
-    let mut terminal = Terminal::new(CrosstermBackend::new(&out)).expect("should not fail!");
-    prep(&mut terminal.backend_mut())?;
-    app(&mut terminal, cli()).await?;
-    graceful_exit(&mut terminal.backend_mut())
+    let terminal = init_terminal()?;
+    app(terminal, cli()).await?;
+    graceful_exit()
 }

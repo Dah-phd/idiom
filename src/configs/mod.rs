@@ -3,7 +3,7 @@ mod keymap;
 mod types;
 pub use editor_config::EditorConfigs;
 pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap};
-pub use types::{FileType, Mode};
+pub use types::FileType;
 
 use std::collections::HashMap;
 

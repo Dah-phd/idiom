@@ -8,6 +8,7 @@ use crate::configs::EditorAction;
 use crate::configs::FileType;
 use crate::global_state::GlobalState;
 use crate::lsp::{LSPClient, LSPRequest};
+use crate::popups::popups_tree::refrence_selector;
 use crate::workspace::actions::EditMetaData;
 use crate::workspace::CursorPosition;
 use lsp_types::request::{Completion, HoverRequest, SignatureHelpRequest};
@@ -75,8 +76,13 @@ impl Lexer {
                             LSPResult::SignatureHelp(signature) => {
                                 self.modal.replace(LSPModal::signature(signature));
                             }
+                            LSPResult::References(locations) => {
+                                if let Some(locations) = locations {
+                                    gs.popup(refrence_selector(locations));
+                                }
+                            }
                             LSPResult::Renames(workspace_edit) => {
-                                gs.workspace.push(workspace_edit.into());
+                                gs.workspace.push_back(workspace_edit.into());
                             }
                             LSPResult::Tokens(tokens) => {
                                 if self.line_builder.set_tokens(tokens) {
@@ -147,7 +153,7 @@ impl Lexer {
                     self.modal.take();
                 }
                 LSPModalResult::Workspace(event) => {
-                    gs.workspace.push(event);
+                    gs.workspace.push_back(event);
                     self.modal.take();
                     return true;
                 }
@@ -227,6 +233,17 @@ impl Lexer {
             .as_mut()
             .and_then(|client| client.declarations(&self.path, c))
             .map(LSPResponseType::Declaration)
+        {
+            self.requests.push(id);
+        }
+    }
+
+    pub fn go_to_reference(&mut self, c: CursorPosition) {
+        if let Some(id) = self
+            .lsp_client
+            .as_mut()
+            .and_then(|client| client.references(&self.path, c))
+            .map(LSPResponseType::References)
         {
             self.requests.push(id);
         }

@@ -1,17 +1,19 @@
 use std::path::PathBuf;
 
+use lsp_types::Location;
+
 use super::{Button, Popup, PopupSelector};
-use crate::global_state::{messages::PopupMessage, TreeEvent};
+use crate::global_state::{PopupMessage, TreeEvent};
 
 pub fn create_file_popup(path: String) -> Box<Popup> {
     let mut buttons = vec![Button {
-        command: |popup| PopupMessage::CreateFileOrFolder(popup.message.to_owned()),
+        command: |popup| TreeEvent::CreateFileOrFolder(popup.message.to_owned()).into(),
         name: "Create",
         key: None,
     }];
     if path != "./" {
         buttons.push(Button {
-            command: |popup| PopupMessage::CreateFileOrFolderBase(popup.message.to_owned()),
+            command: |popup| TreeEvent::CreateFileOrFolderBase(popup.message.to_owned()).into(),
             name: "Create in ./",
             key: None,
         })
@@ -48,12 +50,12 @@ pub fn search_tree_files(pattern: String) -> Box<Popup> {
         title: Some("Find in tree".to_owned()),
         buttons: vec![
             Button {
-                command: |popup| PopupMessage::SelectTreeFiles(popup.message.to_owned()),
+                command: |popup| TreeEvent::SelectTreeFiles(popup.message.to_owned()).into(),
                 name: "Files",
                 key: None,
             },
             Button {
-                command: |popup| PopupMessage::SelectTreeFilesFull(popup.message.to_owned()),
+                command: |popup| TreeEvent::SelectTreeFilesFull(popup.message.to_owned()).into(),
                 name: "All files",
                 key: None,
             },
@@ -69,24 +71,24 @@ pub fn tree_file_selector(options: Vec<(PathBuf, String, usize)>) -> Box<PopupSe
         display: |(path, text, idx)| format!("{}\n    {}| {text}", path.display(), idx + 1),
         command: |popup| {
             if let Some((path, _, idx)) = popup.options.get(popup.state) {
-                return TreeEvent::OpenAtLine(path.clone(), *idx).into();
+                return PopupMessage::Tree(TreeEvent::OpenAtLine(path.clone(), *idx));
             }
-            PopupMessage::Done
+            PopupMessage::Clear
         },
         size: None,
         state: 0,
     })
 }
 
-pub fn file_selector(options: Vec<PathBuf>) -> Box<PopupSelector<PathBuf>> {
+pub fn refrence_selector(mut options: Vec<Location>) -> Box<PopupSelector<(PathBuf, usize)>> {
     Box::new(PopupSelector {
-        options,
-        display: |path| path.display().to_string(),
+        options: options.drain(..).map(|loc| (PathBuf::from(loc.uri.path()), loc.range.start.line as usize)).collect(),
+        display: |(path, idx)| format!("{} ({idx})", path.display()),
         command: |popup| {
-            if let Some(path) = popup.options.get(popup.state) {
-                return TreeEvent::Open(path.clone()).into();
+            if let Some((path, idx)) = popup.options.get(popup.state) {
+                return TreeEvent::OpenAtLine(path.clone(), *idx).into();
             }
-            PopupMessage::Done
+            PopupMessage::Clear
         },
         size: None,
         state: 0,

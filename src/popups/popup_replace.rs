@@ -7,9 +7,9 @@ use ratatui::{
 };
 
 use crate::{
-    global_state::{messages::PopupMessage, WorkspaceEvent},
+    global_state::{Clipboard, PopupMessage, WorkspaceEvent},
     tree::Tree,
-    utils::right_corner_rect_static,
+    widgests::right_corner_rect_static,
     workspace::{CursorPosition, Workspace},
 };
 
@@ -66,7 +66,7 @@ impl ReplacePopup {
 }
 
 impl PopupInterface for ReplacePopup {
-    fn key_map(&mut self, key: &KeyEvent) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard) -> PopupMessage {
         match key.code {
             KeyCode::Char('h' | 'H') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 if self.options.is_empty() {
@@ -99,7 +99,7 @@ impl PopupInterface for ReplacePopup {
             }
             KeyCode::Down | KeyCode::Enter => into_message(next_option(&self.options, &mut self.state)),
             KeyCode::Up => into_message(prev_option(&self.options, &mut self.state)),
-            KeyCode::Esc | KeyCode::Left => PopupMessage::Done,
+            KeyCode::Esc | KeyCode::Left => PopupMessage::Clear,
             _ => PopupMessage::None,
         }
     }

@@ -1,4 +1,4 @@
-use crate::{configs::Mode, workspace::DocStats};
+use crate::workspace::DocStats;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Style},
@@ -28,7 +28,7 @@ impl Footer {
         &mut self,
         frame: &mut Frame,
         screen: Rect,
-        mode: &Mode,
+        mode: Span<'static>,
         stats: Option<DocStats>,
     ) -> Rect {
         let layout = Layout::default()
@@ -71,7 +71,7 @@ impl Footer {
         layout
     }
 
-    fn widget_stats(&mut self, mode: &Mode, stats: Option<DocStats>) -> Paragraph {
+    fn widget_stats(&mut self, mode: Span<'static>, stats: Option<DocStats>) -> Paragraph {
         Paragraph::new(Line::from(
             stats
                 .map(|(len, select, c)| {
@@ -80,7 +80,7 @@ impl Footer {
                             0 => format!("    Doc Len {len}, Ln {}, Col {}", c.line, c.char),
                             _ => format!("    Doc Len {len}, Ln {}, Col {} ({select} selected)", c.line, c.char),
                         }),
-                        Span::from(mode),
+                        mode,
                     ]
                 })
                 .unwrap_or_default(),

@@ -1,6 +1,6 @@
 use super::PopupInterface;
-use crate::global_state::messages::PopupMessage;
-use crate::utils::centered_rect_static;
+use crate::global_state::{Clipboard, PopupMessage};
+use crate::widgests::centered_rect_static;
 use crate::{tree::Tree, workspace::Workspace};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
@@ -38,7 +38,7 @@ impl PopupInterface for Popup {
         frame.render_widget(self.spans_from_buttons(), chunks[1]);
     }
 
-    fn key_map(&mut self, key: &KeyEvent) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard) -> PopupMessage {
         if let Some(button) =
             self.buttons.iter().find(|button| matches!(&button.key, Some(key_code) if key_code.contains(&key.code)))
         {
@@ -74,7 +74,7 @@ impl PopupInterface for Popup {
                 }
                 PopupMessage::None
             }
-            KeyCode::Esc => PopupMessage::Done,
+            KeyCode::Esc => PopupMessage::Clear,
             _ => PopupMessage::None,
         }
     }
@@ -135,17 +135,6 @@ impl std::fmt::Debug for Button {
     }
 }
 
-pub fn message(content: String) -> Popup {
-    Popup {
-        message: content,
-        title: Some("Message".to_owned()),
-        message_as_buffer_builder: None,
-        buttons: vec![Button { command: |_| PopupMessage::Done, name: "Ok", key: None }],
-        size: Some((20, 16)),
-        state: 0,
-    }
-}
-
 pub struct PopupSelector<T> {
     pub options: Vec<T>,
     pub display: fn(&T) -> String,
@@ -173,9 +162,9 @@ impl<T> PopupInterface for PopupSelector<T> {
         frame.render_stateful_widget(list, area, &mut state);
     }
 
-    fn key_map(&mut self, key: &KeyEvent) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard) -> PopupMessage {
         if self.options.is_empty() {
-            return PopupMessage::Done;
+            return PopupMessage::Clear;
         }
         match key.code {
             KeyCode::Enter => (self.command)(self),
@@ -195,7 +184,7 @@ impl<T> PopupInterface for PopupSelector<T> {
                 }
                 PopupMessage::None
             }
-            KeyCode::Esc => PopupMessage::Done,
+            KeyCode::Esc => PopupMessage::Clear,
             _ => PopupMessage::None,
         }
     }

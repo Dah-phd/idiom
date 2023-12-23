@@ -1,11 +1,11 @@
 use crate::{
-    global_state::{messages::PopupMessage, WorkspaceEvent},
+    global_state::{PopupMessage, WorkspaceEvent},
     workspace::CursorPosition,
 };
 
 pub fn into_message(maybe_position: Option<(CursorPosition, CursorPosition)>) -> PopupMessage {
     if let Some(select) = maybe_position {
-        WorkspaceEvent::GoToSelect { select, should_clear: false }.into()
+        PopupMessage::Workspace(WorkspaceEvent::GoToSelect { select, should_clear: false })
     } else {
         PopupMessage::None
     }

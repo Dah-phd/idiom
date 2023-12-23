@@ -48,6 +48,7 @@ pub enum EditorAction {
     SelectDown,
     SelectLeft,
     SelectRight,
+    SelectToken,
     ScrollUp,
     ScrollDown,
     SwapUp,
@@ -60,6 +61,7 @@ pub enum EditorAction {
     EndOfFile,
     StartOfLine,
     StartOfFile,
+    FindReferences,
     GoToDeclaration,
     Help,
     LSPRename,
@@ -90,6 +92,7 @@ pub struct EditorUserKeyMap {
     select_down: String,
     select_left: String,
     select_right: String,
+    select_token: String,
     scroll_up: String,
     scroll_down: String,
     swap_up: String,
@@ -102,6 +105,7 @@ pub struct EditorUserKeyMap {
     end_of_file: String,
     start_of_line: String,
     start_of_file: String,
+    find_references: String,
     go_to_declaration: String,
     help: String,
     lsp_rename: String,
@@ -132,6 +136,7 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
         insert_key_event(&mut hash, &val.select_down, EditorAction::SelectDown);
         insert_key_event(&mut hash, &val.select_left, EditorAction::SelectLeft);
         insert_key_event(&mut hash, &val.select_right, EditorAction::SelectRight);
+        insert_key_event(&mut hash, &val.select_token, EditorAction::SelectToken);
         insert_key_event(&mut hash, &val.scroll_up, EditorAction::ScrollUp);
         insert_key_event(&mut hash, &val.scroll_down, EditorAction::ScrollDown);
         insert_key_event(&mut hash, &val.swap_up, EditorAction::SwapUp);
@@ -144,6 +149,7 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
         insert_key_event(&mut hash, &val.end_of_file, EditorAction::EndOfFile);
         insert_key_event(&mut hash, &val.start_of_line, EditorAction::StartOfLine);
         insert_key_event(&mut hash, &val.start_of_file, EditorAction::StartOfFile);
+        insert_key_event(&mut hash, &val.find_references, EditorAction::FindReferences);
         insert_key_event(&mut hash, &val.go_to_declaration, EditorAction::GoToDeclaration);
         insert_key_event(&mut hash, &val.help, EditorAction::Help);
         insert_key_event(&mut hash, &val.lsp_rename, EditorAction::LSPRename);
@@ -176,6 +182,7 @@ impl Default for EditorUserKeyMap {
             select_down: format!("{} && {}", SHIFT, DOWN),
             select_left: format!("{} && {}", SHIFT, LEFT),
             select_right: format!("{} && {}", SHIFT, RIGHT),
+            select_token: format!("{} && w", CTRL),
             scroll_up: format!("{} && {} || {}", CTRL, UP, PAGEUP),
             scroll_down: format!("{} && {} || {}", CTRL, DOWN, PAGEDOWN),
             swap_up: format!("{} && {}", ALT, UP),
@@ -188,6 +195,7 @@ impl Default for EditorUserKeyMap {
             end_of_file: format!("{} && {}", CTRL, END),
             start_of_line: String::from(HOME),
             start_of_file: format!("{} && {}", CTRL, HOME),
+            find_references: format!("{F}9"),
             go_to_declaration: format!("{F}12"),
             help: format!("{}1", F),
             lsp_rename: format!("{}2", F),

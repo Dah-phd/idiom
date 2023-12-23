@@ -1,8 +1,9 @@
 use super::PopupInterface;
 use crate::{
-    global_state::{messages::PopupMessage, TreeEvent},
+    global_state::{Clipboard, PopupMessage, TreeEvent},
     tree::Tree,
-    utils::centered_rect_static,
+    widgests::centered_rect_static,
+    widgests::TextField,
     workspace::Workspace,
 };
 
@@ -11,7 +12,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
+    widgets::{Block, Borders, Clear, List, ListItem, ListState},
     Frame,
 };
 use std::path::PathBuf;
@@ -20,12 +21,12 @@ use std::path::PathBuf;
 pub struct ActiveTreeSearch {
     options: Vec<PathBuf>,
     state: ListState,
-    pattern: String,
+    pattern: TextField,
 }
 
 impl ActiveTreeSearch {
     pub fn new() -> Box<Self> {
-        Box::default()
+        Box::new(Self { options: Vec::new(), state: ListState::default(), pattern: TextField::with_tree_access() })
     }
 
     fn next(&mut self) {
@@ -48,28 +49,18 @@ impl ActiveTreeSearch {
 }
 
 impl PopupInterface for ActiveTreeSearch {
-    fn key_map(&mut self, key: &KeyEvent) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, clipbard: &mut Clipboard) -> PopupMessage {
+        if let Some(msg) = self.pattern.map(key, clipbard) {
+            return msg;
+        }
         match key.code {
             KeyCode::Up => self.prev(),
             KeyCode::Down => self.next(),
-            KeyCode::Tab => return TreeEvent::SearchFiles(self.pattern.to_owned()).into(),
-            KeyCode::Char(ch) => {
-                self.pattern.push(ch);
-                return TreeEvent::PopupAccess.into();
-            }
-            KeyCode::Backspace => {
-                self.pattern.pop();
-                if self.pattern.is_empty() {
-                    self.options.clear();
-                    self.state.select(None);
-                    return PopupMessage::None;
-                }
-                return TreeEvent::PopupAccess.into();
-            }
+            KeyCode::Tab => return PopupMessage::Tree(TreeEvent::SearchFiles(self.pattern.text.to_owned())),
             KeyCode::Enter => {
                 return match self.state.selected() {
                     Some(idx) if !self.options.is_empty() => TreeEvent::Open(self.options.remove(idx)).into(),
-                    _ => PopupMessage::Done,
+                    _ => PopupMessage::Clear,
                 }
             }
             _ => {}
@@ -83,8 +74,7 @@ impl PopupInterface for ActiveTreeSearch {
         let split_areas =
             Layout::new(Direction::Vertical, [Constraint::Min(3), Constraint::Percentage(100)]).split(area);
         frame.render_widget(
-            Paragraph::new(self.pattern.to_owned())
-                .block(Block::default().borders(Borders::ALL).title("Search pattern ")),
+            self.pattern.widget().block(Block::default().borders(Borders::ALL).title("Search pattern ")),
             split_areas[0],
         );
 
@@ -93,7 +83,7 @@ impl PopupInterface for ActiveTreeSearch {
         } else {
             self.options
                 .iter()
-                .map(|el| ListItem::new(marked_pat_span(&el.display().to_string(), &self.pattern)))
+                .map(|el| ListItem::new(marked_pat_span(&el.display().to_string(), &self.pattern.text)))
                 .collect::<Vec<_>>()
         };
         let list = List::new(options)
@@ -103,7 +93,11 @@ impl PopupInterface for ActiveTreeSearch {
     }
 
     fn update_tree(&mut self, file_tree: &mut Tree) {
-        self.options = file_tree.search_paths(&self.pattern);
+        if self.pattern.text.is_empty() {
+            self.options.clear();
+        } else {
+            self.options = file_tree.search_paths(&self.pattern.text);
+        };
         self.state.select(None);
     }
 

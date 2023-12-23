@@ -7,7 +7,6 @@ use crate::{
     configs::{EditorConfigs, FileType},
     global_state::GlobalState,
     syntax::Lexer,
-    utils::find_code_blocks,
 };
 use std::{cmp::Ordering, path::PathBuf, time::SystemTime};
 
@@ -72,12 +71,27 @@ impl Editor {
         self.lexer.get_signitures(self.cursor.position());
     }
 
+    pub fn references(&mut self) {
+        self.lexer.go_to_reference(self.cursor.position());
+    }
+
     pub fn declaration(&mut self) {
         self.lexer.go_to_declaration(self.cursor.position());
     }
 
     pub fn hover(&mut self) {
         self.lexer.get_hover(self.cursor.position());
+    }
+
+    pub fn select_token(&mut self) {
+        let range = token_range_at(&self.content[self.cursor.line], self.cursor.char);
+        if !range.is_empty() {
+            self.cursor.set_char(range.end);
+            self.cursor.select_set(
+                CursorPosition { line: self.cursor.line, char: range.start },
+                CursorPosition { line: self.cursor.line, char: range.end },
+            )
+        }
     }
 
     pub fn start_renames(&mut self) {
@@ -191,12 +205,6 @@ impl Editor {
 
     pub fn redo(&mut self) {
         self.actions.redo(&mut self.cursor, &mut self.content);
-    }
-
-    pub fn search_file(&self, pattern: &str) -> Vec<(usize, String)> {
-        let mut buffer = Vec::new();
-        find_code_blocks(&mut buffer, &self.content, pattern);
-        buffer
     }
 
     pub fn end_of_line(&mut self) {
