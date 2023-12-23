@@ -74,11 +74,11 @@ impl Footer {
     fn widget_stats(&mut self, mode: Span<'static>, stats: Option<DocStats>) -> Paragraph {
         Paragraph::new(Line::from(
             stats
-                .map(|(len, select, c)| {
+                .map(|(len, sel, c)| {
                     vec![
-                        Span::raw(match select {
-                            0 => format!("    Doc Len {len}, Ln {}, Col {}", c.line, c.char),
-                            _ => format!("    Doc Len {len}, Ln {}, Col {} ({select} selected)", c.line, c.char),
+                        Span::raw(match sel {
+                            0 => format!("    Doc Len {len}, Ln {}, Col {}", c.line + 1, c.char + 1),
+                            _ => format!("    Doc Len {len}, Ln {}, Col {} ({sel} selected)", c.line + 1, c.char + 1),
                         }),
                         mode,
                     ]

@@ -173,6 +173,11 @@ impl GlobalState {
                     self.popup = None;
                     self.workspace.push_back(WorkspaceEvent::Open(path, line));
                 }
+                TreeEvent::OpenAtSelect(path, select) => {
+                    tree.select_by_path(&path);
+                    self.workspace.push_back(WorkspaceEvent::Open(path, 0));
+                    self.workspace.push_back(WorkspaceEvent::GoToSelect { select, should_clear: true });
+                }
                 TreeEvent::CreateFileOrFolder(name) => {
                     if let Ok(new_path) = tree.create_file_or_folder(name) {
                         if !new_path.is_dir() {

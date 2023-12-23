@@ -54,7 +54,7 @@ where
                     text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
                     position: c.into(),
                 },
-                context: ReferenceContext { include_declaration: true },
+                context: ReferenceContext { include_declaration: false },
                 work_done_progress_params: WorkDoneProgressParams::default(),
                 partial_result_params: PartialResultParams::default(),
             },

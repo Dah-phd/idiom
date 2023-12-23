@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use lsp_types::Location;
+use lsp_types::{Location, Range};
 
 use super::{Button, Popup, PopupSelector};
 use crate::global_state::{PopupMessage, TreeEvent};
@@ -80,13 +80,13 @@ pub fn tree_file_selector(options: Vec<(PathBuf, String, usize)>) -> Box<PopupSe
     })
 }
 
-pub fn refrence_selector(mut options: Vec<Location>) -> Box<PopupSelector<(PathBuf, usize)>> {
+pub fn refrence_selector(mut options: Vec<Location>) -> Box<PopupSelector<(PathBuf, Range)>> {
     Box::new(PopupSelector {
-        options: options.drain(..).map(|loc| (PathBuf::from(loc.uri.path()), loc.range.start.line as usize)).collect(),
-        display: |(path, idx)| format!("{} ({idx})", path.display()),
+        options: options.drain(..).map(|loc| (PathBuf::from(loc.uri.path()), loc.range)).collect(),
+        display: |(path, range)| format!("{} ({})", path.display(), range.start.line + 1),
         command: |popup| {
-            if let Some((path, idx)) = popup.options.get(popup.state) {
-                return TreeEvent::OpenAtLine(path.clone(), *idx).into();
+            if let Some((path, range)) = popup.options.get(popup.state) {
+                return TreeEvent::OpenAtSelect(path.clone(), (range.start.into(), range.end.into())).into();
             }
             PopupMessage::Clear
         },
