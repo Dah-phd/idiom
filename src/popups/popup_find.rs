@@ -6,7 +6,6 @@ use ratatui::{
 
 use crate::{
     global_state::{Clipboard, PopupMessage, WorkspaceEvent},
-    tree::Tree,
     widgests::{right_corner_rect_static, TextField},
     workspace::{CursorPosition, Workspace},
 };
@@ -59,6 +58,4 @@ impl PopupInterface for FindPopup {
         }
         self.state = self.options.len().checked_sub(1).unwrap_or_default();
     }
-
-    fn update_tree(&mut self, _: &mut Tree) {}
 }

@@ -1,7 +1,8 @@
 use super::PopupInterface;
-use crate::global_state::{Clipboard, PopupMessage};
-use crate::widgests::centered_rect_static;
-use crate::{tree::Tree, workspace::Workspace};
+use crate::{
+    global_state::{Clipboard, PopupMessage},
+    widgests::{centered_rect_static, Button},
+};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     layout::{Alignment, Constraint, Layout},
@@ -78,10 +79,6 @@ impl PopupInterface for Popup {
             _ => PopupMessage::None,
         }
     }
-
-    fn update_workspace(&mut self, _editor_state: &mut Workspace) {}
-
-    fn update_tree(&mut self, _file_tree: &mut Tree) {}
 }
 
 impl Popup {
@@ -119,19 +116,6 @@ impl Popup {
                 .collect::<Vec<_>>(),
         ))
         .alignment(Alignment::Center)
-    }
-}
-
-#[derive(Clone)]
-pub struct Button {
-    pub command: fn(&mut Popup) -> PopupMessage,
-    pub name: &'static str,
-    pub key: Option<Vec<KeyCode>>,
-}
-
-impl std::fmt::Debug for Button {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("").field(&self.name).finish()
     }
 }
 
@@ -188,8 +172,4 @@ impl<T> PopupInterface for PopupSelector<T> {
             _ => PopupMessage::None,
         }
     }
-
-    fn update_workspace(&mut self, _editor_state: &mut Workspace) {}
-
-    fn update_tree(&mut self, _file_tree: &mut Tree) {}
 }

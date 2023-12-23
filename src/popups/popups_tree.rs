@@ -1,9 +1,10 @@
-use std::path::PathBuf;
-
+use super::{Popup, PopupSelector};
+use crate::{
+    global_state::{PopupMessage, TreeEvent},
+    widgests::Button,
+};
 use lsp_types::{Location, Range};
-
-use super::{Button, Popup, PopupSelector};
-use crate::global_state::{PopupMessage, TreeEvent};
+use std::path::PathBuf;
 
 pub fn create_file_popup(path: String) -> Box<Popup> {
     let mut buttons = vec![Button {

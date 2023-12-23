@@ -1,6 +1,7 @@
-use super::{Button, Popup, PopupSelector};
+use super::{Popup, PopupSelector};
 use crate::global_state::PopupMessage;
 use crate::global_state::WorkspaceEvent;
+use crate::widgests::Button;
 use crate::workspace::CursorPosition;
 use crossterm::event::KeyCode;
 
