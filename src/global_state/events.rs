@@ -26,6 +26,12 @@ impl From<TreeEvent> for PopupMessage {
     }
 }
 
+impl From<Location> for TreeEvent {
+    fn from(loc: Location) -> Self {
+        Self::OpenAtSelect(PathBuf::from(loc.uri.path()), (loc.range.start.into(), loc.range.end.into()))
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum FooterEvent {
     Message(String),

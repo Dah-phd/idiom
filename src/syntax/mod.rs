@@ -83,11 +83,6 @@ impl Lexer {
                                     self.modal.replace(LSPModal::signature(signature));
                                 }
                             }
-                            LSPResult::References(locations) => {
-                                if let Some(locations) = locations {
-                                    gs.popup(refrence_selector(locations));
-                                }
-                            }
                             LSPResult::Renames(workspace_edit) => {
                                 gs.workspace.push_back(workspace_edit.into());
                             }
@@ -100,6 +95,15 @@ impl Lexer {
                             }
                             LSPResult::TokensPartial(tokens) => {
                                 self.line_builder.set_tokens_partial(tokens);
+                            }
+                            LSPResult::References(locations) => {
+                                if let Some(mut locations) = locations {
+                                    if locations.len() == 1 {
+                                        gs.tree.push(locations.remove(0).into());
+                                    } else {
+                                        gs.popup(refrence_selector(locations));
+                                    }
+                                }
                             }
                             LSPResult::Declaration(declaration) => {
                                 gs.try_ws_event(declaration);
