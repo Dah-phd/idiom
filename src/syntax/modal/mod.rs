@@ -1,11 +1,16 @@
 mod parser;
 
-use crate::{configs::EditorAction, global_state::WorkspaceEvent, workspace::CursorPosition};
+use crate::{
+    configs::EditorAction, global_state::WorkspaceEvent, widgests::dynamic_cursor_rect_sized_height,
+    workspace::CursorPosition,
+};
 use fuzzy_matcher::{
     skim::{SkimMatcherV2, SkimScoreConfig},
     FuzzyMatcher,
 };
-use lsp_types::{CompletionItem, Documentation, Hover, HoverContents, MarkedString, SignatureHelp};
+use lsp_types::{
+    CompletionItem, Documentation, Hover, HoverContents, MarkedString, SignatureHelp, SignatureInformation,
+};
 pub use parser::{LSPResponseType, LSPResult};
 use ratatui::{
     prelude::Rect,
@@ -14,6 +19,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
     Frame,
 };
+
 pub enum LSPModal {
     AutoComplete(AutoComplete),
     RenameVar(RenameVariable),
@@ -48,7 +54,7 @@ impl LSPModal {
         }
         match self {
             Self::AutoComplete(modal) => modal.map_and_finish(action),
-            Self::Info(..) => LSPModalResult::Done,
+            Self::Info(modal) => modal.map_and_finish(action),
             Self::RenameVar(modal) => modal.map_and_finish(action),
         }
     }
@@ -84,8 +90,24 @@ impl LSPModal {
         None
     }
 
+    pub fn hover_map(&mut self, hover: Hover) {
+        if let Self::Info(modal) = self {
+            modal.push_hover(hover);
+        } else {
+            *self = Self::hover(hover);
+        }
+    }
+
     pub fn hover(hover: Hover) -> Self {
         Self::Info(Info::from_hover(hover))
+    }
+
+    pub fn signature_map(&mut self, signature: SignatureHelp) {
+        if let Self::Info(modal) = self {
+            modal.insert_signature(signature);
+        } else {
+            *self = Self::signature(signature);
+        }
     }
 
     pub fn signature(signature: SignatureHelp) -> Self {
@@ -245,57 +267,112 @@ impl AutoComplete {
 
 pub struct Info {
     items: Vec<ListItem<'static>>,
+    state: ListState,
 }
 
 impl Info {
     pub fn from_hover(hover: Hover) -> Self {
         let mut items = Vec::new();
-        match hover.contents {
-            HoverContents::Array(arr) => {
-                for value in arr {
-                    for line in parse_markedstr(value).lines() {
-                        items.push(ListItem::new(Line::from(String::from(line))));
+        parse_hover(hover, &mut items);
+        Self { items, state: ListState::default() }
+    }
+
+    pub fn from_signature(signature: SignatureHelp) -> Self {
+        let mut items = Vec::new();
+        for info in signature.signatures {
+            parse_sig_info(info, &mut items);
+        }
+        Self { items, state: ListState::default() }
+    }
+
+    pub fn map_and_finish(&mut self, action: &EditorAction) -> LSPModalResult {
+        match action {
+            EditorAction::Down => {
+                if let Some(idx) = self.state.selected() {
+                    let idx = idx + 1;
+                    if self.items.len() > idx {
+                        self.state.select(Some(idx));
                     }
+                } else if !self.items.is_empty() {
+                    self.state.select(Some(0));
+                }
+                LSPModalResult::Taken
+            }
+            EditorAction::Up => {
+                if let Some(idx) = self.state.selected() {
+                    if idx > 0 {
+                        self.state.select(Some(idx - 1));
+                    }
+                } else if !self.items.is_empty() {
+                    self.state.select(Some(self.items.len() - 1));
+                }
+                LSPModalResult::Taken
+            }
+            _ => LSPModalResult::Done,
+        }
+    }
+
+    pub fn push_hover(&mut self, hover: Hover) {
+        parse_hover(hover, &mut self.items);
+        self.state.select(None);
+    }
+
+    pub fn insert_signature(&mut self, signature: SignatureHelp) {
+        for info in signature.signatures {
+            parse_sig_info(info, &mut self.items);
+        }
+        self.state.select(None);
+    }
+
+    fn render_at(&mut self, frame: &mut Frame, area: Rect) {
+        frame.render_stateful_widget(
+            List::new(self.items.clone()).block(Block::default().borders(Borders::all())),
+            area,
+            &mut self.state,
+        );
+    }
+}
+
+fn parse_sig_info(info: SignatureInformation, items: &mut Vec<ListItem<'static>>) {
+    let mut idx = 0;
+    items.insert(idx, ListItem::new(Line::from(info.label)));
+    if let Some(text) = info.documentation {
+        match text {
+            Documentation::MarkupContent(c) => {
+                for line in c.value.lines() {
+                    idx += 1;
+                    items.insert(idx, ListItem::new(Line::from(String::from(line))));
                 }
             }
-            HoverContents::Markup(markup) => {
-                for line in markup.value.lines() {
-                    items.push(ListItem::new(Line::from(String::from(line))));
+            Documentation::String(s) => {
+                for line in s.lines() {
+                    idx += 1;
+                    items.insert(idx, ListItem::new(Line::from(String::from(line))));
                 }
             }
-            HoverContents::Scalar(value) => {
+        }
+    }
+}
+
+fn parse_hover(hover: Hover, items: &mut Vec<ListItem<'static>>) {
+    match hover.contents {
+        HoverContents::Array(arr) => {
+            for value in arr {
                 for line in parse_markedstr(value).lines() {
                     items.push(ListItem::new(Line::from(String::from(line))));
                 }
             }
         }
-        Self { items }
-    }
-
-    pub fn from_signature(signature: SignatureHelp) -> Self {
-        let mut items = Vec::new();
-        for sig_help in signature.signatures {
-            items.push(ListItem::new(Line::from(sig_help.label)));
-            if let Some(text) = sig_help.documentation {
-                match text {
-                    Documentation::MarkupContent(c) => {
-                        for line in c.value.lines() {
-                            items.push(ListItem::new(Line::from(String::from(line))));
-                        }
-                    }
-                    Documentation::String(s) => {
-                        for line in s.lines() {
-                            items.push(ListItem::new(Line::from(String::from(line))));
-                        }
-                    }
-                }
+        HoverContents::Markup(markup) => {
+            for line in markup.value.lines() {
+                items.push(ListItem::new(Line::from(String::from(line))));
             }
         }
-        Self { items }
-    }
-
-    fn render_at(&mut self, frame: &mut Frame, area: Rect) {
-        frame.render_widget(List::new(self.items.clone()).block(Block::default().borders(Borders::all())), area);
+        HoverContents::Scalar(value) => {
+            for line in parse_markedstr(value).lines() {
+                items.push(ListItem::new(Line::from(String::from(line))));
+            }
+        }
     }
 }
 
@@ -304,45 +381,4 @@ fn parse_markedstr(value: MarkedString) -> String {
         MarkedString::LanguageString(data) => data.value,
         MarkedString::String(value) => value,
     }
-}
-
-fn dynamic_cursor_rect_sized_height(
-    lines: usize, // min 3
-    mut x: u16,
-    mut y: u16,
-    base: Rect,
-) -> Option<Rect> {
-    //  ______________
-    // |y,x _____     |
-    // |   |     |    | base hight (y)
-    // |   |     | h..|
-    // |   |     |    |
-    // |    -----     |
-    // |    width(60) |
-    //  --------------
-    //   base.width (x)
-    //
-    let mut height = (lines.min(5) + 2) as u16;
-    let mut width = 60;
-    if base.height < height + y {
-        if base.height > 3 + y {
-            height = base.height - y;
-        } else if y > 3 && base.height > y {
-            // ensures overflowed y's are handled
-            let new_y = y.saturating_sub(height + 1);
-            height = y - (new_y + 1);
-            y = new_y;
-        } else {
-            return None;
-        }
-    };
-    if base.width < width + x {
-        if base.width < 30 + x {
-            x = base.width.checked_sub(30)?;
-            width = 30;
-        } else {
-            width = base.width - x;
-        }
-    };
-    Some(Rect { x, y, width, height })
 }

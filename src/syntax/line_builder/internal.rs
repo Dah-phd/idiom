@@ -1,4 +1,5 @@
-use super::{DiagnosticData, LineBuilder};
+use super::diagnostics::DiagnosticLines;
+use super::LineBuilder;
 use ratatui::{
     style::{Color, Style},
     text::Span,
@@ -35,7 +36,7 @@ impl<'a> SpansBuffer<'a> {
         &self,
         idx: usize,
         color: Color,
-        diagnostic: Option<&DiagnosticData>,
+        diagnostic: Option<&DiagnosticLines>,
         builder: &LineBuilder,
     ) -> Style {
         let mut style = Style { fg: Some(color), ..Default::default() };
@@ -44,7 +45,14 @@ impl<'a> SpansBuffer<'a> {
         style
     }
 
-    fn push(&mut self, idx: usize, ch: char, color: Color, diagnostic: Option<&DiagnosticData>, builder: &LineBuilder) {
+    fn push(
+        &mut self,
+        idx: usize,
+        ch: char,
+        color: Color,
+        diagnostic: Option<&DiagnosticLines>,
+        builder: &LineBuilder,
+    ) {
         self.spans.push(Span::styled(ch.to_string(), self.build_style(idx, color, diagnostic, builder)));
         self.last_char = ch;
     }
@@ -54,7 +62,7 @@ impl<'a> SpansBuffer<'a> {
         idx: usize,
         ch: char,
         color: Color,
-        diagnostic: Option<&DiagnosticData>,
+        diagnostic: Option<&DiagnosticLines>,
         builder: &LineBuilder,
     ) {
         self.push(idx, ch, color, diagnostic, builder);
@@ -67,7 +75,7 @@ impl<'a> SpansBuffer<'a> {
         idx: usize,
         ch: char,
         color: Color,
-        diagnostic: Option<&DiagnosticData>,
+        diagnostic: Option<&DiagnosticLines>,
         builder: &LineBuilder,
     ) {
         self.push(idx, ch, color, diagnostic, builder);
@@ -90,7 +98,7 @@ impl<'a> SpansBuffer<'a> {
         idx: usize,
         ch: char,
         builder: &LineBuilder,
-        diagnostic: Option<&DiagnosticData>,
+        diagnostic: Option<&DiagnosticLines>,
     ) {
         if self.last_char != '<' && self.last_char != '&' {
             self.chr_open = true;
@@ -106,7 +114,7 @@ impl<'a> SpansBuffer<'a> {
         idx: usize,
         ch: char,
         builder: &LineBuilder,
-        diagnostic: Option<&DiagnosticData>,
+        diagnostic: Option<&DiagnosticLines>,
     ) -> bool {
         if self.str_open {
             self.push(idx, ch, builder.theme.string, diagnostic, builder);
@@ -210,7 +218,7 @@ impl<'a> SpansBuffer<'a> {
             }
         }
         if let Some(diagnostic) = diagnostic {
-            self.spans.extend(diagnostic.spans.iter().cloned());
+            self.spans.extend(diagnostic.data.iter().map(|d| d.span.clone()));
         }
     }
 }

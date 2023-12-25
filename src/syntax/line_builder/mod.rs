@@ -1,29 +1,25 @@
 mod brackets;
+mod diagnostics;
 mod internal;
 mod langs;
 mod legend;
+use super::modal::LSPResponseType;
+use crate::{lsp::LSPClient, syntax::Theme, workspace::actions::EditMetaData};
 use brackets::BracketColors;
+use diagnostics::{diagnostics_error, diagnostics_full, DiagnosticLines};
 use internal::SpansBuffer;
 use langs::Lang;
 use legend::{ColorResult, Legend};
 
 use lsp_types::{
-    Diagnostic, DiagnosticSeverity, PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult,
-    SemanticTokensServerCapabilities, TextDocumentContentChangeEvent,
+    PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
+    TextDocumentContentChangeEvent,
 };
 use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
 };
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    ops::Range,
-    path::Path,
-};
-
-use crate::{lsp::LSPClient, syntax::Theme, workspace::actions::EditMetaData};
-
-use super::modal::LSPResponseType;
+use std::{collections::HashMap, ops::Range, path::Path};
 
 #[derive(Debug)]
 pub struct LineBuilder {
@@ -31,8 +27,9 @@ pub struct LineBuilder {
     pub legend: Legend,
     pub theme: Theme,
     pub lang: Lang,
+    diagnostic_processor: fn(&mut Self, PublishDiagnosticsParams),
     brackets: BracketColors,
-    diagnostics: HashMap<usize, DiagnosticData>,
+    diagnostics: HashMap<usize, DiagnosticLines>,
     pub select_range: Option<Range<usize>>,
     pub file_was_saved: bool,
     ignores: Vec<usize>,
@@ -45,6 +42,7 @@ impl LineBuilder {
             legend: Legend::default(),
             theme: Theme::new(),
             lang,
+            diagnostic_processor: diagnostics_full,
             brackets: BracketColors::default(),
             diagnostics: HashMap::new(),
             select_range: None,
@@ -53,45 +51,14 @@ impl LineBuilder {
         }
     }
 
+    pub fn mark_saved(&mut self) {
+        self.file_was_saved = true;
+        self.diagnostic_processor = diagnostics_full;
+    }
+
     pub fn set_diganostics(&mut self, params: PublishDiagnosticsParams) {
         self.diagnostics.clear();
-        if self.file_was_saved {
-            self.diagnostics_full(params);
-        } else {
-            self.diagnostics_error(params);
-        }
-    }
-
-    pub fn diagnostics_error(&mut self, params: PublishDiagnosticsParams) {
-        self.diagnostics.clear();
-        for d in params.diagnostics {
-            if !matches!(d.severity, Some(DiagnosticSeverity::ERROR)) {
-                continue;
-            }
-            match self.diagnostics.entry(d.range.start.line as usize) {
-                Entry::Occupied(mut e) => {
-                    e.get_mut().append(d);
-                }
-                Entry::Vacant(e) => {
-                    e.insert(d.into());
-                }
-            }
-        }
-    }
-
-    pub fn diagnostics_full(&mut self, params: PublishDiagnosticsParams) {
-        self.diagnostics.clear();
-        for diagnostic in params.diagnostics {
-            match self.diagnostics.entry(diagnostic.range.start.line as usize) {
-                Entry::Occupied(mut e) => {
-                    e.get_mut().append(diagnostic);
-                }
-                Entry::Vacant(e) => {
-                    e.insert(diagnostic.into());
-                }
-            };
-        }
-        self.file_was_saved = false;
+        (self.diagnostic_processor)(self, params);
     }
 
     pub fn set_tokens(&mut self, tokens_res: SemanticTokensResult) -> bool {
@@ -138,6 +105,14 @@ impl LineBuilder {
         content: &[String],
         client: &mut LSPClient,
     ) -> Option<LSPResponseType> {
+        if self.file_was_saved {
+            // remove warnings on change after save
+            self.file_was_saved = false;
+            self.diagnostic_processor = diagnostics_error;
+            for (_, data) in self.diagnostics.iter_mut() {
+                data.drop_non_errs();
+            }
+        }
         if self.tokens.len() <= 1 {
             // ensures that there is fully mapped tokens before doing normal processing
             client.file_did_change(path, version, events.drain(..).map(|(_, edit)| edit).collect()).ok()?;
@@ -220,12 +195,12 @@ impl LineBuilder {
             style.bg = None;
         }
         if let Some(diagnostic) = diagnostic {
-            spans.extend(diagnostic.spans.iter().cloned());
+            spans.extend(diagnostic.data.iter().map(|d| d.span.clone()));
         }
         spans
     }
 
-    fn set_diagnostic_style(&self, idx: usize, style: &mut Style, diagnostic: Option<&DiagnosticData>) {
+    fn set_diagnostic_style(&self, idx: usize, style: &mut Style, diagnostic: Option<&DiagnosticLines>) {
         if let Some(color) = diagnostic.and_then(|d| d.check_ranges(&idx)) {
             style.add_modifier = style.add_modifier.union(Modifier::UNDERLINED);
             style.underline_color.replace(color);
@@ -253,70 +228,8 @@ impl LineBuilder {
 }
 
 #[derive(Debug)]
-struct DiagnosticData {
-    spans: Vec<Span<'static>>,
-    range_data: Vec<(usize, Option<usize>)>,
-}
-
-impl DiagnosticData {
-    fn check_ranges(&self, idx: &usize) -> Option<Color> {
-        for (range_idx, (start_idx, end_idx)) in self.range_data.iter().enumerate() {
-            match end_idx {
-                Some(end_idx) if (start_idx..end_idx).contains(&idx) => return self.spans[range_idx].style.fg,
-                None if idx >= start_idx => return self.spans[range_idx].style.fg,
-                _ => {}
-            }
-        }
-        None
-    }
-
-    fn append(&mut self, d: Diagnostic) {
-        match d.severity {
-            Some(DiagnosticSeverity::ERROR) => {
-                self.range_data.insert(0, range_to_tuple(d.range));
-                self.spans.insert(0, span_diagnostic(&d, Color::Red));
-            }
-            Some(DiagnosticSeverity::WARNING) => match self.spans[0].style.fg {
-                Some(Color::Gray) => {
-                    self.range_data.insert(0, range_to_tuple(d.range));
-                    self.spans.insert(0, span_diagnostic(&d, Color::LightYellow));
-                }
-                _ => {
-                    self.range_data.push(range_to_tuple(d.range));
-                    self.spans.push(span_diagnostic(&d, Color::LightYellow));
-                }
-            },
-            _ => {
-                self.range_data.push(range_to_tuple(d.range));
-                self.spans.push(span_diagnostic(&d, Color::Gray));
-            }
-        }
-    }
-}
-
-impl From<Diagnostic> for DiagnosticData {
-    fn from(diagnostic: Diagnostic) -> Self {
-        let mut spans = Vec::new();
-        match diagnostic.severity {
-            Some(DiagnosticSeverity::ERROR) => spans.push(span_diagnostic(&diagnostic, Color::Red)),
-            Some(DiagnosticSeverity::WARNING) => spans.push(span_diagnostic(&diagnostic, Color::LightYellow)),
-            _ => spans.push(span_diagnostic(&diagnostic, Color::Gray)),
-        };
-        Self { spans, range_data: vec![range_to_tuple(diagnostic.range)] }
-    }
-}
-
-#[derive(Debug)]
 pub struct Token {
     from: usize,
     len: u32,
     token_type: usize,
-}
-
-fn span_diagnostic(d: &Diagnostic, c: Color) -> Span<'static> {
-    Span::styled(format!("    {}", d.message), Style { fg: Some(c), ..Default::default() })
-}
-
-fn range_to_tuple(r: lsp_types::Range) -> (usize, Option<usize>) {
-    (r.start.character as usize, if r.start.line == r.end.line { Some(r.end.character as usize) } else { None })
 }

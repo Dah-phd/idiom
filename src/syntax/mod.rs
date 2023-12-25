@@ -70,10 +70,18 @@ impl Lexer {
                                 self.modal = LSPModal::auto_complete(completions, line, idx);
                             }
                             LSPResult::Hover(hover) => {
-                                self.modal.replace(LSPModal::hover(hover));
+                                if let Some(modal) = self.modal.as_mut() {
+                                    modal.hover_map(hover);
+                                } else {
+                                    self.modal.replace(LSPModal::hover(hover));
+                                }
                             }
                             LSPResult::SignatureHelp(signature) => {
-                                self.modal.replace(LSPModal::signature(signature));
+                                if let Some(modal) = self.modal.as_mut() {
+                                    modal.signature_map(signature);
+                                } else {
+                                    self.modal.replace(LSPModal::signature(signature));
+                                }
                             }
                             LSPResult::References(locations) => {
                                 if let Some(locations) = locations {
@@ -208,20 +216,23 @@ impl Lexer {
         self.modal.replace(LSPModal::renames_at(c, title));
     }
 
+    pub fn help(&mut self, c: CursorPosition) {
+        if let Some(client) = self.lsp_client.as_mut() {
+            if let Some(id) = client.request_signitures(&self.path, c).map(LSPResponseType::SignatureHelp) {
+                self.requests.push(id);
+            }
+            if let Some(id) = client.request_hover(&self.path, c).map(LSPResponseType::Hover) {
+                self.requests.push(id);
+            }
+        }
+    }
+
     pub fn get_rename(&mut self, c: CursorPosition, new_name: String) {
         if let Some(id) = self
             .lsp_client
             .as_mut()
             .and_then(|client| client.request_rename(&self.path, c, new_name))
             .map(LSPResponseType::Renames)
-        {
-            self.requests.push(id);
-        }
-    }
-
-    pub fn get_hover(&mut self, c: CursorPosition) {
-        if let Some(id) =
-            self.lsp_client.as_mut().and_then(|client| client.request_hover(&self.path, c)).map(LSPResponseType::Hover)
         {
             self.requests.push(id);
         }
@@ -260,17 +271,6 @@ impl Lexer {
         }
     }
 
-    pub fn get_signitures(&mut self, c: CursorPosition) {
-        if let Some(id) = self
-            .lsp_client
-            .as_mut()
-            .and_then(|client| client.request_signitures(&self.path, c))
-            .map(LSPResponseType::SignatureHelp)
-        {
-            self.requests.push(id);
-        }
-    }
-
     pub fn list_item<'a>(&mut self, idx: usize, content: &'a str) -> ListItem<'a> {
         let spans = vec![Span::styled(
             get_line_num(idx, self.max_digits),
@@ -294,7 +294,7 @@ impl Lexer {
                 self.requests.push(LSPResponseType::Tokens(id));
             }
         }
-        self.line_builder.file_was_saved = true;
+        self.line_builder.mark_saved();
     }
 
     fn line_select(&mut self, at_line: usize, max_len: usize) -> Option<std::ops::Range<usize>> {

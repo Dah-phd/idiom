@@ -68,7 +68,7 @@ impl Editor {
     }
 
     pub fn help(&mut self) {
-        self.lexer.get_signitures(self.cursor.position());
+        self.lexer.help(self.cursor.position());
     }
 
     pub fn references(&mut self) {
@@ -77,10 +77,6 @@ impl Editor {
 
     pub fn declaration(&mut self) {
         self.lexer.go_to_declaration(self.cursor.position());
-    }
-
-    pub fn hover(&mut self) {
-        self.lexer.get_hover(self.cursor.position());
     }
 
     pub fn select_token(&mut self) {

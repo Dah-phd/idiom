@@ -38,3 +38,44 @@ pub fn right_corner_rect_static(h: u16, v: u16, rect: Rect) -> Rect {
     Layout::new(Direction::Horizontal, [Constraint::Percentage(100), Constraint::Min(h)])
         .split(Layout::new(Direction::Vertical, [Constraint::Min(v), Constraint::Percentage(100)]).split(rect)[0])[1]
 }
+
+pub fn dynamic_cursor_rect_sized_height(
+    lines: usize, // min 3
+    mut x: u16,
+    mut y: u16,
+    base: Rect,
+) -> Option<Rect> {
+    //  ______________
+    // |y,x _____     |
+    // |   |     |    | base hight (y)
+    // |   |     | h..|
+    // |   |     |    |
+    // |    -----     |
+    // |    width(60) |
+    //  --------------
+    //   base.width (x)
+    //
+    let mut height = (lines.min(5) + 2) as u16;
+    let mut width = 60;
+    if base.height < height + y {
+        if base.height > 3 + y {
+            height = base.height - y;
+        } else if y > 3 && base.height > y {
+            // ensures overflowed y's are handled
+            let new_y = y.saturating_sub(height + 1);
+            height = y - (new_y + 1);
+            y = new_y;
+        } else {
+            return None;
+        }
+    };
+    if base.width < width + x {
+        if base.width < 30 + x {
+            x = base.width.checked_sub(30)?;
+            width = 30;
+        } else {
+            width = base.width - x;
+        }
+    };
+    Some(Rect { x, y, width, height })
+}
