@@ -18,6 +18,8 @@ pub struct EditorTerminal {
     process: Option<(Child, JoinHandle<()>)>,
     path: String,
     prompt: String,
+    at_line: usize,
+    max_rows: usize,
     out_buffer: Arc<Mutex<Vec<String>>>,
     cmd_buffer: String,
 }
@@ -36,16 +38,21 @@ impl EditorTerminal {
             .direction(Direction::Vertical)
             .constraints([Constraint::Percentage(50), Constraint::Min(2)])
             .split(screen);
-        frame.render_widget(
-            List::new(self.get_list_widget()).block(Block::default().borders(Borders::TOP)),
-            screen_areas[1],
-        );
+        let tmux_area = screen_areas[1];
+        self.max_rows = tmux_area.height as usize;
+        frame.render_widget(List::new(self.get_list_widget()).block(Block::default().borders(Borders::TOP)), tmux_area);
         screen_areas[0]
     }
 
     fn get_list_widget(&mut self) -> Vec<ListItem> {
         self.build_prompt();
-        let mut list = self.history.iter().map(|line| ListItem::new(line.to_owned())).collect::<Vec<ListItem>>();
+        let mut list = self
+            .history
+            .iter()
+            .skip(self.at_line)
+            .take(self.max_rows)
+            .map(|line| ListItem::new(line.to_owned()))
+            .collect::<Vec<ListItem>>();
         list.push(self.prompt.to_owned().into());
         list
     }
@@ -54,20 +61,36 @@ impl EditorTerminal {
         self.active = !self.active;
     }
 
+    fn prompt_to_last_line(&mut self) {
+        self.at_line = (self.history.len() + 2).checked_sub(self.max_rows).unwrap_or_default();
+    }
+
     pub async fn map(&mut self, general_action: &GeneralAction) -> bool {
         if !self.active {
             return false;
         }
         match general_action {
-            GeneralAction::Char(ch) => self.cmd_buffer.push(*ch),
+            GeneralAction::Up => {
+                //TODO prev command
+            }
+            GeneralAction::Down => {
+                //TODO next command
+            }
+            GeneralAction::Char(ch) => {
+                self.cmd_buffer.push(*ch);
+                self.prompt_to_last_line();
+            }
             GeneralAction::BackspaceInput => {
                 self.cmd_buffer.pop();
+                self.prompt_to_last_line();
             }
             GeneralAction::ToggleTerminal | GeneralAction::FileTreeModeOrCancelInput | GeneralAction::Exit => {
-                self.active = false
+                self.active = false;
+                self.prompt_to_last_line();
             }
             GeneralAction::FinishOrSelect => {
                 let _ = self.push_buffer().await;
+                self.prompt_to_last_line();
             }
             _ => (),
         }
@@ -75,10 +98,16 @@ impl EditorTerminal {
     }
 
     fn poll_results(&mut self) {
-        match self.out_buffer.lock() {
-            Ok(mut guard) => self.history.extend(guard.drain(..)),
-            Err(poisoned) => self.history.extend(poisoned.into_inner().drain(..)),
+        let mut guard = match self.out_buffer.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if guard.is_empty() {
+            return;
         }
+        self.history.extend(guard.drain(..));
+        drop(guard);
+        self.prompt_to_last_line();
     }
 
     fn build_prompt(&mut self) {
@@ -90,13 +119,20 @@ impl EditorTerminal {
     }
 
     async fn push_buffer(&mut self) -> Result<()> {
+        if self.cmd_buffer == "clear" {
+            self.history.push(self.prompt.to_owned());
+            self.cmd_buffer.clear();
+            self.at_line = self.history.len().checked_sub(1).unwrap_or_default();
+            return Ok(());
+        }
         let mut inner = Command::new("sh")
             .arg("-c")
             .arg(self.cmd_buffer.as_str())
             .stderr(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()?;
-        self.history.push(self.cmd_buffer.drain(..).collect());
+        self.history.push(self.prompt.to_owned());
+        self.cmd_buffer.clear();
         let out_handler = Arc::clone(&self.out_buffer);
         let stderr = FramedRead::new(inner.stderr.take().unwrap(), BytesCodec::new());
         let stdout = FramedRead::new(inner.stdout.take().unwrap(), BytesCodec::new());
