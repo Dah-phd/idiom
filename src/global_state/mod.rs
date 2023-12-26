@@ -85,7 +85,7 @@ impl GlobalState {
         }
     }
 
-    pub fn map_modal_if_exists(&mut self, key: &KeyEvent) -> bool {
+    pub fn map_popup_if_exists(&mut self, key: &KeyEvent) -> bool {
         if let Some(popup) = self.popup.as_mut() {
             match popup.map(key, &mut self.clipboard) {
                 PopupMessage::Clear => {

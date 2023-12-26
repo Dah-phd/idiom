@@ -64,7 +64,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
 
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = crossterm::event::read()? {
-                if !tmux.active && gs.map_modal_if_exists(&key) || workspace.map(&key, &mut gs) {
+                if !tmux.active && gs.map_popup_if_exists(&key) || workspace.map(&key, &mut gs) {
                     continue;
                 }
                 let action = if let Some(action) = general_key_map.map(&key) {

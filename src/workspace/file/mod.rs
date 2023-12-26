@@ -57,12 +57,13 @@ impl Editor {
     pub fn get_list_widget_with_context(&mut self, gs: &mut GlobalState) -> (usize, List<'_>) {
         self.actions.sync(&mut self.lexer, &self.content);
         self.lexer.context(self.cursor.select_get(), gs);
-        let render_till_line = self.content.len().min(self.cursor.at_line + self.max_rows);
         let editor_content = List::new(
-            self.content[self.cursor.at_line..render_till_line]
+            self.content
                 .iter()
                 .enumerate()
-                .map(|(idx, code_line)| self.lexer.list_item(idx + self.cursor.at_line, code_line))
+                .skip(self.cursor.at_line)
+                .take(self.max_rows)
+                .map(|(idx, code_line)| self.lexer.list_item(idx, code_line))
                 .collect::<Vec<ListItem>>(),
         );
         (self.lexer.calc_line_number_offset(&self.content), editor_content)

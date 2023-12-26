@@ -20,12 +20,13 @@ pub trait PopupInterface {
     fn render(&mut self, frame: &mut Frame);
     fn map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {
         match key {
-            KeyEvent { code: KeyCode::Char('d') | KeyCode::Char('D'), modifiers: KeyModifiers::CONTROL, .. } => {
+            KeyEvent { code: KeyCode::Char('d' | 'D'), modifiers: KeyModifiers::CONTROL, .. } => {
                 return PopupMessage::Clear
             }
-            KeyEvent { code: KeyCode::Char('q') | KeyCode::Char('Q'), modifiers: KeyModifiers::CONTROL, .. } => {
+            KeyEvent { code: KeyCode::Char('q' | 'Q'), modifiers: KeyModifiers::CONTROL, .. } => {
                 return PopupMessage::Clear
             }
+            KeyEvent { code: KeyCode::Esc, .. } => return PopupMessage::Clear,
             _ => (),
         }
         self.key_map(key, clipboard)
