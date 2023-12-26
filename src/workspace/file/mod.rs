@@ -8,7 +8,12 @@ use crate::{
     global_state::GlobalState,
     syntax::Lexer,
 };
-use std::{cmp::Ordering, path::PathBuf, time::SystemTime};
+use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
+use std::{
+    cmp::Ordering,
+    path::{Path, PathBuf},
+    time::SystemTime,
+};
 
 use super::utils::{copy_content, find_line_start, last_modified, token_range_at};
 
@@ -34,7 +39,7 @@ impl Editor {
     pub fn from_path(path: PathBuf, mut cfg: EditorConfigs) -> std::io::Result<Self> {
         let content = std::fs::read_to_string(&path)?;
         let file_type = FileType::derive_type(&path);
-        let display = path.display().to_string();
+        let display = build_display(&path);
         cfg.update_by_file_type(&file_type);
         Ok(Self {
             lexer: Lexer::with_context(file_type, &path),
@@ -44,8 +49,8 @@ impl Editor {
             content: content.split('\n').map(String::from).collect(),
             file_type,
             display,
-            path: path.canonicalize()?,
             timestamp: last_modified(&path),
+            path,
         })
     }
 
@@ -350,6 +355,20 @@ impl Editor {
             self.cursor.at_line = self.cursor.line + 2 - self.max_rows
         }
     }
+}
+
+fn build_display(path: &Path) -> String {
+    let mut buffer = Vec::new();
+    let mut text_path = path.display().to_string();
+    if let Ok(base_path) = PathBuf::from("./").canonicalize().map(|p| p.display().to_string()) {
+        if let Some(rel) = text_path.strip_prefix(&base_path).to_owned() {
+            text_path = rel.to_owned();
+        }
+    }
+    for part in text_path.split(MAIN_SEPARATOR).rev().take(2) {
+        buffer.insert(0, part);
+    }
+    buffer.join(MAIN_SEPARATOR_STR)
 }
 
 #[cfg(test)]
