@@ -1,19 +1,85 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::{
-    widgets::{Block, Borders, Clear},
-    Frame,
+use super::{
+    utils::{into_message, next_option, prev_option},
+    PopupInterface,
 };
-
 use crate::{
     global_state::{Clipboard, PopupMessage, WorkspaceEvent},
     widgests::{right_corner_rect_static, TextField},
     workspace::{CursorPosition, Workspace},
 };
-
-use super::{
-    utils::{into_message, next_option, prev_option},
-    PopupInterface,
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::{
+    widgets::{Block, Borders, Clear, Paragraph},
+    Frame,
 };
+
+#[derive(Default)]
+pub struct GoToLinePopup {
+    line_idx: String,
+    auto_jump: bool,
+}
+
+impl GoToLinePopup {
+    pub fn new() -> Box<Self> {
+        Box::default()
+    }
+}
+
+impl PopupInterface for GoToLinePopup {
+    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard) -> PopupMessage {
+        match key.code {
+            KeyCode::Enter => {
+                if self.auto_jump {
+                    return PopupMessage::Clear;
+                }
+                if let Ok(idx) = self.line_idx.parse::<usize>() {
+                    return WorkspaceEvent::GoToLine(idx.checked_sub(1).unwrap_or_default()).into();
+                }
+                PopupMessage::Clear
+            }
+            KeyCode::Char(ch) => {
+                if ch.is_numeric() {
+                    self.line_idx.push(ch);
+                    if self.auto_jump {
+                        return WorkspaceEvent::PopupAccess.into();
+                    };
+                };
+                PopupMessage::None
+            }
+            KeyCode::Backspace => {
+                if self.line_idx.pop().is_some() && self.auto_jump {
+                    return WorkspaceEvent::PopupAccess.into();
+                };
+                PopupMessage::None
+            }
+            KeyCode::Tab => {
+                self.auto_jump = !self.auto_jump;
+                PopupMessage::None
+            }
+            _ => PopupMessage::Clear,
+        }
+    }
+
+    fn render(&mut self, frame: &mut Frame) {
+        let area = right_corner_rect_static(50, 3, frame.size());
+        let block = if self.auto_jump {
+            Block::default().title("Autojump (Tab to switch back)")
+        } else {
+            Block::default().title("Go to line (Tab to switch mode)")
+        }
+        .borders(Borders::ALL);
+        frame.render_widget(Clear, area);
+        frame.render_widget(Paragraph::new(format!(" >> {}|", self.line_idx)).block(block), area);
+    }
+
+    fn update_workspace(&mut self, workspace: &mut Workspace) {
+        if let Some(editor) = workspace.get_active() {
+            if let Ok(idx) = self.line_idx.parse::<usize>() {
+                editor.go_to(idx.checked_sub(1).unwrap_or_default());
+            }
+        }
+    }
+}
 
 pub struct FindPopup {
     pub options: Vec<(CursorPosition, CursorPosition)>,

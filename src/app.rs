@@ -3,10 +3,10 @@ use crate::{
     footer::Footer,
     global_state::{GlobalState, Mode},
     popups::{
-        popup_find::FindPopup,
+        popup_find::{FindPopup, GoToLinePopup},
         popup_replace::ReplacePopup,
         popup_tree_search::ActiveTreeSearch,
-        popups_editor::{go_to_line_popup, save_all_popup, selector_editors},
+        popups_editor::{save_all_popup, selector_editors},
         popups_tree::{create_file_popup, rename_file_popup},
     },
     terminal::EditorTerminal,
@@ -149,7 +149,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                         workspace.refresh_cfg(new_key_map.editor_key_map(), &mut gs).await;
                     }
                     GeneralAction::GoToLinePopup if matches!(gs.mode, Mode::Insert) => {
-                        gs.popup(go_to_line_popup());
+                        gs.popup(GoToLinePopup::new());
                     }
                     GeneralAction::ToggleTerminal => {
                         tmux.toggle();
