@@ -1,7 +1,7 @@
 mod tree_paths;
-use crate::configs::GeneralAction;
 use crate::utils::build_file_or_folder;
 use anyhow::Result;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
@@ -64,12 +64,13 @@ impl Tree {
         areas[1]
     }
 
-    pub fn map(&mut self, action: &GeneralAction) -> bool {
-        match action {
-            GeneralAction::Up => self.select_up(),
-            GeneralAction::Down => self.select_down(),
-            GeneralAction::Shrink => self.shrink(),
-            GeneralAction::DeleteFile => {
+    pub fn map(&mut self, key: &KeyEvent) -> bool {
+        match key.code {
+            KeyCode::Up | KeyCode::Char('w' | 'W') => self.select_up(),
+            KeyCode::Down | KeyCode::Char('s' | 'S') => self.select_down(),
+            KeyCode::Left => self.shrink(),
+            KeyCode::Char('d' | 'D') if !key.modifiers.contains(KeyModifiers::CONTROL) => self.shrink(),
+            KeyCode::Delete if key.modifiers == KeyModifiers::SHIFT => {
                 let _ = self.delete_file();
             }
             _ => return false,

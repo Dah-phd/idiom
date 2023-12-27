@@ -37,11 +37,6 @@ pub struct GeneralKeyMap {
 
 impl GeneralKeyMap {
     pub fn map(&self, key: &KeyEvent) -> Option<GeneralAction> {
-        if let KeyCode::Char(ch) = key.code {
-            if key.modifiers == KeyModifiers::NONE || key.modifiers == KeyModifiers::SHIFT {
-                return Some(GeneralAction::Char(ch));
-            }
-        }
         self.key_map.get(key).copied()
     }
 }

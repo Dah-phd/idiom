@@ -9,7 +9,7 @@ use crate::{
         popups_editor::{save_all_popup, selector_editors},
         popups_tree::{create_file_popup, rename_file_popup},
     },
-    terminal::EditorTerminal,
+    runner::EditorTerminal,
     tree::Tree,
     workspace::Workspace,
 };
@@ -64,7 +64,12 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
 
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = crossterm::event::read()? {
-                if !tmux.active && gs.map_popup_if_exists(&key) || workspace.map(&key, &mut gs) {
+                // order matters
+                if gs.map_popup_if_exists(&key) // can be on top of all
+                    || tmux.map(&key, &mut gs).await // can be on top of workspace | tree
+                    || workspace.map(&key, &mut gs) // gs determines if should execute
+                    || file_tree.map(&key)
+                {
                     continue;
                 }
                 let action = if let Some(action) = general_key_map.map(&key) {
@@ -72,9 +77,6 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                 } else {
                     continue;
                 };
-                if tmux.map(&action).await || file_tree.map(&action) {
-                    continue;
-                }
                 match action {
                     GeneralAction::Find => {
                         if matches!(gs.mode, Mode::Insert) {
@@ -104,7 +106,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                             gs.try_new_editor(&mut workspace, file_path).await;
                         }
                     }
-                    GeneralAction::FinishOrSelect => {
+                    GeneralAction::PerformAction => {
                         if file_tree.on_open_tabs {
                             gs.mode = Mode::Insert;
                         } else if let Some(file_path) = file_tree.expand_dir_or_get_path() {

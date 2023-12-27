@@ -1,9 +1,11 @@
-use crate::configs::GeneralAction;
+mod commands;
+use crate::global_state::GlobalState;
 use anyhow::Result;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::widgets::{Block, Borders, List, ListItem};
 use ratatui::Frame;
-use std::path::PathBuf;
+use std::path::{PathBuf, MAIN_SEPARATOR};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use tokio::process::{Child, Command};
@@ -13,10 +15,13 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 
 #[derive(Default)]
 pub struct EditorTerminal {
-    pub active: bool,
+    active: bool,
+    idiom_prefix: String,
     history: Vec<String>,
+    cmd_histroy: Vec<String>,
+    at_history: usize,
     process: Option<(Child, JoinHandle<()>)>,
-    path: String,
+    path: PathBuf,
     prompt: String,
     at_line: usize,
     max_rows: usize,
@@ -26,7 +31,16 @@ pub struct EditorTerminal {
 
 impl EditorTerminal {
     pub fn new() -> Self {
-        Self { path: build_path(PathBuf::from("./")), ..Default::default() }
+        Self {
+            path: PathBuf::from("./").canonicalize().unwrap_or_default(),
+            idiom_prefix: String::from("%i"),
+            history: vec![
+                "This is not a true terminal but command executor.".to_owned(),
+                "It holds only basic functionality but does not support continious processes (not a pty).".to_owned(),
+                "Main goal is to have easy acces to git and build tools (such as cargo/pybuilder/tsc).".to_owned(),
+            ],
+            ..Default::default()
+        }
     }
 
     pub fn render_with_remainder(&mut self, frame: &mut Frame, screen: Rect) -> Rect {
@@ -40,7 +54,10 @@ impl EditorTerminal {
             .split(screen);
         let tmux_area = screen_areas[1];
         self.max_rows = tmux_area.height as usize;
-        frame.render_widget(List::new(self.get_list_widget()).block(Block::default().borders(Borders::TOP)), tmux_area);
+        frame.render_widget(
+            List::new(self.get_list_widget()).block(Block::default().title("Terminal").borders(Borders::TOP)),
+            tmux_area,
+        );
         screen_areas[0]
     }
 
@@ -65,30 +82,33 @@ impl EditorTerminal {
         self.at_line = (self.history.len() + 2).checked_sub(self.max_rows).unwrap_or_default();
     }
 
-    pub async fn map(&mut self, general_action: &GeneralAction) -> bool {
+    pub async fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         if !self.active {
             return false;
         }
-        match general_action {
-            GeneralAction::Up => {
-                //TODO prev command
-            }
-            GeneralAction::Down => {
-                //TODO next command
-            }
-            GeneralAction::Char(ch) => {
-                self.cmd_buffer.push(*ch);
-                self.prompt_to_last_line();
-            }
-            GeneralAction::BackspaceInput => {
-                self.cmd_buffer.pop();
-                self.prompt_to_last_line();
-            }
-            GeneralAction::ToggleTerminal | GeneralAction::FileTreeModeOrCancelInput | GeneralAction::Exit => {
+        match key {
+            KeyEvent { code: KeyCode::Esc, .. }
+            | KeyEvent { code: KeyCode::Char('d' | 'D' | 'q' | 'Q'), modifiers: KeyModifiers::CONTROL, .. } => {
                 self.active = false;
                 self.prompt_to_last_line();
             }
-            GeneralAction::FinishOrSelect => {
+            KeyEvent { code: KeyCode::Up, .. } => {
+                //TODO prev command
+            }
+            KeyEvent { code: KeyCode::Down, .. } => {
+                //TODO next command
+            }
+            KeyEvent { code: KeyCode::PageUp, .. } => {}
+            KeyEvent { code: KeyCode::PageDown, .. } => {}
+            KeyEvent { code: KeyCode::Char(ch), .. } => {
+                self.cmd_buffer.push(*ch);
+                self.prompt_to_last_line();
+            }
+            KeyEvent { code: KeyCode::Backspace, .. } => {
+                self.cmd_buffer.pop();
+                self.prompt_to_last_line();
+            }
+            KeyEvent { code: KeyCode::Enter, .. } => {
                 let _ = self.push_buffer().await;
                 self.prompt_to_last_line();
             }
@@ -112,27 +132,51 @@ impl EditorTerminal {
 
     fn build_prompt(&mut self) {
         if let Some(branch) = get_branch() {
-            self.prompt = format!("[{}] {branch}$ {}", self.path, self.cmd_buffer)
+            self.prompt = format!("[{}] {branch}$ {}", self.path.display(), self.cmd_buffer)
         } else {
-            self.prompt = format!("[{}]$ {}", self.path, self.cmd_buffer)
+            self.prompt = format!("[{}]$ {}", self.path.display(), self.cmd_buffer)
         }
     }
 
     async fn push_buffer(&mut self) -> Result<()> {
-        if self.cmd_buffer == "clear" {
-            self.history.push(self.prompt.to_owned());
-            self.cmd_buffer.clear();
+        self.history.push(self.prompt.to_owned());
+        let command = std::mem::take(&mut self.cmd_buffer);
+        if let Some(arg) = command.strip_prefix(&self.idiom_prefix) {
+            if arg.trim() == "clear" {
+                let mut new = Self::new();
+                new.active = true;
+                *self = new;
+            }
+            self.history.push(format!("IDIOM CMD {arg}"));
+            return Ok(());
+        }
+        if command == "clear" {
             self.at_line = self.history.len().checked_sub(1).unwrap_or_default();
             return Ok(());
         }
+        if let Some(arg) = command.strip_prefix("cd ") {
+            if arg.starts_with("..") {
+                for _ in arg.split(MAIN_SEPARATOR) {
+                    if let Some(parent) = self.path.parent() {
+                        self.path = PathBuf::from(parent).canonicalize().unwrap_or_default();
+                    }
+                }
+            } else if arg.starts_with('/') {
+                if let Ok(path) = PathBuf::from(arg).canonicalize() {
+                    if path.is_dir() {
+                        self.path = path;
+                    }
+                }
+            }
+            return Ok(());
+        }
         let mut inner = Command::new("sh")
+            .current_dir(&self.path)
             .arg("-c")
-            .arg(self.cmd_buffer.as_str())
+            .arg(&command)
             .stderr(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()?;
-        self.history.push(self.prompt.to_owned());
-        self.cmd_buffer.clear();
         let out_handler = Arc::clone(&self.out_buffer);
         let stderr = FramedRead::new(inner.stderr.take().unwrap(), BytesCodec::new());
         let stdout = FramedRead::new(inner.stdout.take().unwrap(), BytesCodec::new());
@@ -150,11 +194,6 @@ impl EditorTerminal {
         self.process.replace((inner, join_handler));
         Ok(())
     }
-}
-
-fn build_path(path: PathBuf) -> String {
-    let base = path.canonicalize().unwrap_or_default();
-    base.display().to_string()
 }
 
 fn get_branch() -> Option<String> {

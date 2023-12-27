@@ -215,19 +215,13 @@ impl Default for EditorUserKeyMap {
 
 #[derive(Debug, Clone, Copy)]
 pub enum GeneralAction {
-    Char(char),
-    BackspaceInput,
-    Up,
-    Down,
-    Shrink,
     Expand,
-    FinishOrSelect,
+    PerformAction,
     SelectOpenEditor,
     SaveAll,
     FileTreeModeOrCancelInput,
     NewFile,
     Rename,
-    DeleteFile,
     Find,
     Replace,
     Exit,
@@ -242,17 +236,13 @@ pub enum GeneralAction {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GeneralUserKeyMap {
-    up_file_tree: String,
-    down_file_tree: String,
-    shrink_path: String,
     expand_file_tree_or_open_file: String,
-    finish_or_select: String,
+    perform_action: String,
     select_open_editor: String,
     save_all: String,
     file_tree_mod_or_cancel_input: String,
     new_file: String,
     rename_file: String,
-    delete_file: String,
     find: String,
     replace: String,
     backspace_tree_input: String,
@@ -268,20 +258,15 @@ pub struct GeneralUserKeyMap {
 impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
     fn from(val: GeneralUserKeyMap) -> Self {
         let mut hash = HashMap::default();
-        insert_key_event(&mut hash, &val.up_file_tree, GeneralAction::Up);
-        insert_key_event(&mut hash, &val.down_file_tree, GeneralAction::Down);
-        insert_key_event(&mut hash, &val.shrink_path, GeneralAction::Shrink);
         insert_key_event(&mut hash, &val.expand_file_tree_or_open_file, GeneralAction::Expand);
-        insert_key_event(&mut hash, &val.finish_or_select, GeneralAction::FinishOrSelect);
+        insert_key_event(&mut hash, &val.perform_action, GeneralAction::PerformAction);
         insert_key_event(&mut hash, &val.select_open_editor, GeneralAction::SelectOpenEditor);
         insert_key_event(&mut hash, &val.save_all, GeneralAction::SaveAll);
         insert_key_event(&mut hash, &val.file_tree_mod_or_cancel_input, GeneralAction::FileTreeModeOrCancelInput);
         insert_key_event(&mut hash, &val.new_file, GeneralAction::NewFile);
         insert_key_event(&mut hash, &val.rename_file, GeneralAction::Rename);
-        insert_key_event(&mut hash, &val.delete_file, GeneralAction::DeleteFile);
         insert_key_event(&mut hash, &val.find, GeneralAction::Find);
         insert_key_event(&mut hash, &val.replace, GeneralAction::Replace);
-        insert_key_event(&mut hash, &val.backspace_tree_input, GeneralAction::BackspaceInput);
         insert_key_event(&mut hash, &val.exit, GeneralAction::Exit);
         insert_key_event(&mut hash, &val.hide_file_tree, GeneralAction::HideFileTree);
         insert_key_event(&mut hash, &val.next_tab, GeneralAction::NextTab);
@@ -296,17 +281,13 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
 impl Default for GeneralUserKeyMap {
     fn default() -> Self {
         Self {
-            up_file_tree: format!("{UP} || w || W"),
-            down_file_tree: format!("{DOWN} || s || S"),
-            shrink_path: format!("{LEFT} || d || D"),
             expand_file_tree_or_open_file: format!("{RIGHT} || d || D"),
-            finish_or_select: String::from(ENTER),
+            perform_action: String::from(ENTER),
             select_open_editor: format!("{CTRL} && {UP} || {CTRL} && {DOWN}"),
             save_all: format!("{CTRL} && s"),
             file_tree_mod_or_cancel_input: String::from(ESC),
             new_file: format!("{CTRL} && n"),
             rename_file: format!("{F}2"),
-            delete_file: format!("{SHIFT} && {DELETE}"),
             find: format!("{CTRL} && f"),
             replace: format!("{CTRL} && h"),
             backspace_tree_input: String::from(BACKSPACE),
