@@ -1,6 +1,6 @@
 use crate::global_state::{Clipboard, PopupMessage, TreeEvent, WorkspaceEvent};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::style::Color;
+use ratatui::style::{Color, Modifier};
 use ratatui::{
     style::Style,
     text::{Line, Span},
@@ -8,6 +8,22 @@ use ratatui::{
 };
 
 use super::count_as_string;
+
+const CURSOR: Style = Style {
+    fg: None,
+    bg: None,
+    underline_color: None,
+    add_modifier: Modifier::REVERSED,
+    sub_modifier: Modifier::empty(),
+};
+
+const SELECT: Style = Style {
+    fg: None,
+    bg: Some(Color::Rgb(72, 72, 72)),
+    underline_color: None,
+    add_modifier: Modifier::empty(),
+    sub_modifier: Modifier::empty(),
+};
 
 #[derive(Default)]
 pub struct TextField {
@@ -41,18 +57,38 @@ impl TextField {
     }
 
     fn insert_formatted_text(&self, buffer: &mut Vec<Span<'static>>) {
-        match self.select.as_ref().map(|(f, t)| if f > t { (t, f) } else { (f, t) }) {
-            Some((from, to)) => {
-                buffer.push(Span::raw(self.text[..*from].to_owned()));
-                buffer.push(Span::styled(
-                    self.text[*from..*to].to_owned(),
-                    Style { bg: Some(Color::Rgb(72, 72, 72)), ..Default::default() },
-                ));
-                buffer.push(Span::raw(self.text[*to..].to_owned()));
-            }
-            None => buffer.push(Span::raw(self.text.to_owned())),
+        match self.select.as_ref().map(|(f, t)| if f > t { (*t, *f) } else { (*f, *t) }) {
+            Some((from, to)) => self.text_cursor_select(from, to, buffer),
+            None => self.text_cursor(buffer),
         }
-        buffer.push(Span::styled(" ", Style { bg: Some(Color::White), ..Default::default() }));
+    }
+
+    fn text_cursor(&self, buffer: &mut Vec<Span<'static>>) {
+        if self.char == self.text.len() {
+            buffer.push(Span::raw(self.text.to_owned()));
+            buffer.push(Span::styled(" ", CURSOR));
+        } else {
+            buffer.push(Span::raw(self.text[..self.char].to_owned()));
+            buffer.push(Span::styled(self.text[self.char..=self.char].to_owned(), CURSOR));
+            buffer.push(Span::raw(self.text[self.char + 1..].to_owned()));
+        }
+    }
+
+    fn text_cursor_select(&self, from: usize, to: usize, buffer: &mut Vec<Span<'static>>) {
+        buffer.push(Span::raw(self.text[..from].to_owned()));
+        if from == self.char {
+            buffer.push(Span::styled(self.text[self.char..=self.char].to_owned(), CURSOR));
+            buffer.push(Span::styled(self.text[from + 1..to].to_owned(), SELECT));
+            buffer.push(Span::raw(self.text[to..].to_owned()));
+        } else if self.char == self.text.len() {
+            buffer.push(Span::styled(self.text[from..to].to_owned(), SELECT));
+            buffer.push(Span::raw(self.text[to..].to_owned()));
+            buffer.push(Span::styled(" ", CURSOR));
+        } else {
+            buffer.push(Span::styled(self.text[from..to].to_owned(), SELECT));
+            buffer.push(Span::styled(self.text[to..=to].to_owned(), CURSOR));
+            buffer.push(Span::raw(self.text[to + 1..].to_owned()));
+        }
     }
 
     pub fn map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> Option<PopupMessage> {
