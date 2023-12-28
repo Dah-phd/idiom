@@ -4,7 +4,6 @@ use crate::{
     tree::Tree,
     widgests::centered_rect_static,
     widgests::TextField,
-    workspace::Workspace,
 };
 
 use crossterm::event::{KeyCode, KeyEvent};
@@ -100,8 +99,6 @@ impl PopupInterface for ActiveTreeSearch {
         };
         self.state.select(None);
     }
-
-    fn update_workspace(&mut self, _: &mut Workspace) {}
 }
 
 fn marked_pat_span<'a>(option: &'a str, pat: &'a str) -> Line<'static> {
