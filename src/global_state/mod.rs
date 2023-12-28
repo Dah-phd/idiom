@@ -248,7 +248,7 @@ impl GlobalState {
                     }
                 }
                 WorkspaceEvent::ActivateEditor(idx) => {
-                    workspace.state.select(Some(idx));
+                    workspace.state.set(idx);
                     self.popup = None;
                 }
                 WorkspaceEvent::FindSelector(pattern) => {

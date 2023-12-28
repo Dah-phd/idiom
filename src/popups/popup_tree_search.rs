@@ -3,7 +3,7 @@ use crate::{
     global_state::{Clipboard, PopupMessage, TreeEvent},
     tree::Tree,
     widgests::centered_rect_static,
-    widgests::TextField,
+    widgests::{TextField, WrappedState},
 };
 
 use crossterm::event::{KeyCode, KeyEvent};
@@ -11,7 +11,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, ListState},
+    widgets::{Block, Borders, Clear, List, ListItem},
     Frame,
 };
 use std::path::PathBuf;
@@ -19,31 +19,13 @@ use std::path::PathBuf;
 #[derive(Default)]
 pub struct ActiveTreeSearch {
     options: Vec<PathBuf>,
-    state: ListState,
+    state: WrappedState,
     pattern: TextField,
 }
 
 impl ActiveTreeSearch {
     pub fn new() -> Box<Self> {
-        Box::new(Self { options: Vec::new(), state: ListState::default(), pattern: TextField::with_tree_access() })
-    }
-
-    fn next(&mut self) {
-        match self.state.selected() {
-            Some(idx) => {
-                let idx = idx + 1;
-                self.state.select(Some(if idx < self.options.len() { idx } else { 0 }));
-            }
-            None if !self.options.is_empty() => self.state.select(Some(0)),
-            _ => (),
-        }
-    }
-
-    fn prev(&mut self) {
-        match self.state.selected() {
-            Some(idx) => self.state.select(Some(if idx == 0 { self.options.len() - 1 } else { idx - 1 })),
-            None => self.state.select(Some(self.options.len() - 1)),
-        }
+        Box::new(Self { options: Vec::new(), state: WrappedState::default(), pattern: TextField::with_tree_access() })
     }
 }
 
@@ -53,8 +35,8 @@ impl PopupInterface for ActiveTreeSearch {
             return msg;
         }
         match key.code {
-            KeyCode::Up => self.prev(),
-            KeyCode::Down => self.next(),
+            KeyCode::Up => self.state.prev(&self.options),
+            KeyCode::Down => self.state.next(&self.options),
             KeyCode::Tab => return PopupMessage::Tree(TreeEvent::SearchFiles(self.pattern.text.to_owned())),
             KeyCode::Enter => {
                 return match self.state.selected() {
@@ -88,7 +70,7 @@ impl PopupInterface for ActiveTreeSearch {
         let list = List::new(options)
             .block(Block::default().borders(Borders::ALL))
             .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
-        frame.render_stateful_widget(list, split_areas[1], &mut self.state);
+        frame.render_stateful_widget(list, split_areas[1], self.state.get());
     }
 
     fn update_tree(&mut self, file_tree: &mut Tree) {
@@ -97,7 +79,7 @@ impl PopupInterface for ActiveTreeSearch {
         } else {
             self.options = file_tree.search_paths(&self.pattern.text);
         };
-        self.state.select(None);
+        self.state.drop();
     }
 }
 

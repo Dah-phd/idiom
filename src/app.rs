@@ -129,9 +129,9 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                         if let Some(editor_id) = workspace.state.selected() {
                             file_tree.on_open_tabs = true;
                             if editor_id >= workspace.editors.len() - 1 {
-                                workspace.state.select(Some(0))
+                                workspace.state.set(0)
                             } else {
-                                workspace.state.select(Some(editor_id + 1))
+                                workspace.state.set(editor_id + 1)
                             }
                         }
                     }
@@ -139,9 +139,9 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                         if let Some(editor_id) = workspace.state.selected() {
                             file_tree.on_open_tabs = true;
                             if editor_id == 0 {
-                                workspace.state.select(Some(workspace.editors.len() - 1))
+                                workspace.state.set(workspace.editors.len() - 1)
                             } else {
-                                workspace.state.select(Some(editor_id - 1))
+                                workspace.state.set(editor_id - 1)
                             }
                         }
                     }

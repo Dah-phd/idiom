@@ -2,18 +2,18 @@ use super::{file::Editor, Workspace};
 use crate::{
     configs::{test::mock_editor_key_map, EditorConfigs},
     global_state::{GlobalState, Mode},
+    widgests::WrappedState,
     workspace::{
         file::test::{mock_editor, pull_line, select_eq},
         CursorPosition,
     },
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::widgets::ListState;
 use std::collections::HashMap;
 
 pub fn mock_ws(content: Vec<String>) -> Workspace {
-    let mut state = ListState::default();
-    state.select(Some(0));
+    let mut state = WrappedState::default();
+    state.set(0);
     Workspace {
         editors: vec![mock_editor(content)],
         state,

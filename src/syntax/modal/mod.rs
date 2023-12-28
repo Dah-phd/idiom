@@ -1,7 +1,9 @@
 mod parser;
 
 use crate::{
-    configs::EditorAction, global_state::WorkspaceEvent, widgests::dynamic_cursor_rect_sized_height,
+    configs::EditorAction,
+    global_state::WorkspaceEvent,
+    widgests::{dynamic_cursor_rect_sized_height, WrappedState},
     workspace::CursorPosition,
 };
 use fuzzy_matcher::{
@@ -16,7 +18,7 @@ use ratatui::{
     prelude::Rect,
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
+    widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
     Frame,
 };
 
@@ -157,7 +159,7 @@ impl RenameVariable {
 }
 
 pub struct AutoComplete {
-    state: ListState,
+    state: WrappedState,
     filter: String,
     // line: String,
     matcher: SkimMatcherV2,
@@ -176,7 +178,7 @@ impl AutoComplete {
             }
         }
         let mut modal = Self {
-            state: ListState::default(),
+            state: WrappedState::default(),
             // line,
             filter,
             filtered: Vec::new(),
@@ -191,8 +193,14 @@ impl AutoComplete {
         match action {
             EditorAction::NewLine | EditorAction::Indent => self.get_result(),
             EditorAction::Char(ch) => self.push_filter(*ch),
-            EditorAction::Down => self.down(),
-            EditorAction::Up => self.up(),
+            EditorAction::Down => {
+                self.state.next(&self.filtered);
+                LSPModalResult::Taken
+            }
+            EditorAction::Up => {
+                self.state.prev(&self.filtered);
+                LSPModalResult::Taken
+            }
             EditorAction::Backspace => self.filter_pop(),
             _ => LSPModalResult::Done,
         }
@@ -234,22 +242,7 @@ impl AutoComplete {
             })
             .collect();
         self.filtered.sort_by(|(_, idx), (_, rhidx)| rhidx.cmp(idx));
-        self.state.select(Some(0));
-    }
-
-    fn down(&mut self) -> LSPModalResult {
-        if let Some(idx) = self.state.selected() {
-            let new_idx = idx + 1;
-            self.state.select(Some(if self.filtered.len() > new_idx { new_idx } else { 0 }));
-        }
-        LSPModalResult::Taken
-    }
-
-    fn up(&mut self) -> LSPModalResult {
-        if let Some(idx) = self.state.selected() {
-            self.state.select(Some(idx.checked_sub(1).unwrap_or(self.filtered.len() - 1)));
-        }
-        LSPModalResult::Taken
+        self.state.set(0);
     }
 
     fn render_at(&mut self, frame: &mut Frame, area: Rect) {
@@ -260,21 +253,21 @@ impl AutoComplete {
                 .block(Block::default().borders(Borders::all()))
                 .highlight_style(Style::default().add_modifier(Modifier::REVERSED)),
             area,
-            &mut self.state,
+            self.state.get(),
         );
     }
 }
 
 pub struct Info {
     items: Vec<ListItem<'static>>,
-    state: ListState,
+    state: WrappedState,
 }
 
 impl Info {
     pub fn from_hover(hover: Hover) -> Self {
         let mut items = Vec::new();
         parse_hover(hover, &mut items);
-        Self { items, state: ListState::default() }
+        Self { items, state: WrappedState::default() }
     }
 
     pub fn from_signature(signature: SignatureHelp) -> Self {
@@ -282,30 +275,17 @@ impl Info {
         for info in signature.signatures {
             parse_sig_info(info, &mut items);
         }
-        Self { items, state: ListState::default() }
+        Self { items, state: WrappedState::default() }
     }
 
     pub fn map_and_finish(&mut self, action: &EditorAction) -> LSPModalResult {
         match action {
             EditorAction::Down => {
-                if let Some(idx) = self.state.selected() {
-                    let idx = idx + 1;
-                    if self.items.len() > idx {
-                        self.state.select(Some(idx));
-                    }
-                } else if !self.items.is_empty() {
-                    self.state.select(Some(0));
-                }
+                self.state.next(&self.items);
                 LSPModalResult::Taken
             }
             EditorAction::Up => {
-                if let Some(idx) = self.state.selected() {
-                    if idx > 0 {
-                        self.state.select(Some(idx - 1));
-                    }
-                } else if !self.items.is_empty() {
-                    self.state.select(Some(self.items.len() - 1));
-                }
+                self.state.prev(&self.items);
                 LSPModalResult::Taken
             }
             _ => LSPModalResult::Done,
@@ -314,21 +294,21 @@ impl Info {
 
     pub fn push_hover(&mut self, hover: Hover) {
         parse_hover(hover, &mut self.items);
-        self.state.select(None);
+        self.state.drop();
     }
 
     pub fn insert_signature(&mut self, signature: SignatureHelp) {
         for info in signature.signatures {
             parse_sig_info(info, &mut self.items);
         }
-        self.state.select(None);
+        self.state.drop();
     }
 
     fn render_at(&mut self, frame: &mut Frame, area: Rect) {
         frame.render_stateful_widget(
             List::new(self.items.clone()).block(Block::default().borders(Borders::all())),
             area,
-            &mut self.state,
+            self.state.get(),
         );
     }
 }

@@ -5,6 +5,7 @@ pub mod utils;
 use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType};
 use crate::global_state::{GlobalState, Mode};
 use crate::lsp::LSP;
+use crate::widgests::WrappedState;
 pub use cursor::CursorPosition;
 pub use file::{DocStats, Editor};
 
@@ -15,7 +16,7 @@ use ratatui::layout::Direction;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{ListState, Tabs},
+    widgets::Tabs,
     Frame,
 };
 use std::{
@@ -27,7 +28,7 @@ const RECT_CONSTRAINT: [Constraint; 2] = [Constraint::Length(1), Constraint::Per
 
 pub struct Workspace {
     pub editors: Vec<Editor>,
-    pub state: ListState,
+    pub state: WrappedState,
     base_config: EditorConfigs,
     key_map: EditorKeyMap,
     lsp_servers: HashMap<FileType, LSP>,
@@ -37,7 +38,7 @@ impl Workspace {
     pub fn new(key_map: EditorKeyMap) -> Self {
         Self {
             editors: Vec::default(),
-            state: ListState::default(),
+            state: WrappedState::default(),
             base_config: EditorConfigs::new(),
             key_map,
             lsp_servers: HashMap::new(),
@@ -294,12 +295,12 @@ impl Workspace {
         let file_path = file_path.canonicalize()?;
         for (idx, file) in self.editors.iter().enumerate() {
             if file.path == file_path {
-                self.state.select(Some(idx));
+                self.state.set(idx);
                 return Ok(());
             }
         }
         let editor = self.build_editor(file_path, gs).await?;
-        self.state.select(Some(self.editors.len()));
+        self.state.set(self.editors.len());
         self.editors.push(editor);
         Ok(())
     }
@@ -341,9 +342,9 @@ impl Workspace {
                 let _ = client.file_did_close(&editor.path);
             }
             if self.editors.is_empty() {
-                self.state.select(None);
+                self.state.drop();
             } else if index >= self.editors.len() {
-                self.state.select(Some(index - 1));
+                self.state.set(index - 1);
             }
         }
     }
