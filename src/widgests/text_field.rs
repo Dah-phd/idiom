@@ -108,9 +108,12 @@ impl TextField {
             }
             KeyCode::Char('v' | 'V') if key.modifiers == KeyModifiers::CONTROL => {
                 if let Some(clip) = clipboard.pull() {
-                    self.take_selected();
-                    self.text.insert_str(self.char, clip.as_str());
-                    return Some(self.on_text_update.clone().unwrap_or_default());
+                    if !clip.contains('\n') {
+                        self.take_selected();
+                        self.text.insert_str(self.char, clip.as_str());
+                        self.char += clip.len();
+                        return Some(self.on_text_update.clone().unwrap_or_default());
+                    };
                 };
                 Some(PopupMessage::default())
             }
