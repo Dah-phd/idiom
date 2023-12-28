@@ -154,7 +154,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                         gs.popup(GoToLinePopup::new());
                     }
                     GeneralAction::ToggleTerminal => {
-                        tmux.toggle();
+                        tmux.active = true;
                     }
                     _ => (),
                 }
