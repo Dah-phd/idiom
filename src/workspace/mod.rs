@@ -114,7 +114,7 @@ impl Workspace {
                     EditorAction::StartOfLine => editor.start_of_line(),
                     EditorAction::StartOfFile => editor.start_of_file(),
                     EditorAction::FindReferences => editor.references(),
-                    EditorAction::GoToDeclaration => editor.declaration(),
+                    EditorAction::GoToDeclaration => editor.declarations(),
                     EditorAction::Help => editor.help(),
                     EditorAction::LSPRename => editor.start_renames(),
                     EditorAction::Undo => editor.undo(),

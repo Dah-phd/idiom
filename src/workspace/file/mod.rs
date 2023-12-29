@@ -81,7 +81,7 @@ impl Editor {
         self.lexer.go_to_reference(self.cursor.position());
     }
 
-    pub fn declaration(&mut self) {
+    pub fn declarations(&mut self) {
         self.lexer.go_to_declaration(self.cursor.position());
     }
 
