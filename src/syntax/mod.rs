@@ -298,7 +298,7 @@ impl Lexer {
             (Ordering::Less, Ordering::Less) => Some(0..max_len),
             (Ordering::Equal, Ordering::Equal) => Some(from.char..to.char),
             (Ordering::Equal, ..) => Some(from.char..max_len),
-            _ => Some(0..to.char),
+            (.., Ordering::Equal) => Some(0..to.char),
         }
     }
 }
