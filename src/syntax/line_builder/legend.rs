@@ -83,7 +83,9 @@ impl Legend {
                 }
                 FileType::Python => {}
                 FileType::C => {}
+                FileType::Cpp => {}
                 FileType::Html => {}
+                FileType::MarkDown => {}
                 FileType::JavaScript => {}
                 FileType::TypeScript => {}
                 FileType::Yml => {}

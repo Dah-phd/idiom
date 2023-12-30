@@ -8,8 +8,10 @@ pub enum FileType {
     TypeScript,
     Html,
     C,
+    Cpp,
     Yml,
     Toml,
+    MarkDown,
     Unknown,
 }
 
@@ -20,8 +22,12 @@ impl FileType {
             if let Some(extension) = extension_os_str.to_str() {
                 return match extension.to_lowercase().as_str() {
                     "rs" => Self::Rust,
+                    "c" => Self::C,
+                    "cpp" => Self::Cpp,
                     "py" | "pyw" => Self::Python,
+                    "md" => Self::MarkDown,
                     "js" => Self::JavaScript,
+                    "ts" => Self::TypeScript,
                     "yml" | "yaml" => Self::Yml,
                     "toml" => Self::Toml,
                     "html" => Self::Html,
@@ -42,9 +48,11 @@ impl From<&FileType> for &'static str {
             FileType::JavaScript => "javascript",
             FileType::Html => "html",
             FileType::C => "c",
+            FileType::Cpp => "c++",
             FileType::Yml => "yaml",
             FileType::Toml => "toml",
-            _ => "unknown",
+            FileType::MarkDown => "markdown",
+            FileType::Unknown => "unknown",
         }
     }
 }

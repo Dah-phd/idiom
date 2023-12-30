@@ -44,7 +44,7 @@ impl TreePath {
         let mut tree_buffer = get_nested_paths(&path)
             .filter_map(|p| if p.starts_with(GIT) { None } else { Some(p.into()) })
             .collect::<Vec<Self>>();
-        tree_buffer.sort_by(order_tree_path);
+        tree_buffer.sort_by(order_tree_paths);
         Self::Folder { display: get_path_display(&path), path, tree: Some(tree_buffer) }
     }
 
@@ -75,7 +75,7 @@ impl TreePath {
             for nested_path in get_nested_paths(path) {
                 buffer.push(nested_path.into())
             }
-            buffer.sort_by(order_tree_path);
+            buffer.sort_by(order_tree_paths);
             tree.replace(buffer);
         }
     }
@@ -269,7 +269,7 @@ impl TreePath {
     }
 }
 
-fn order_tree_path(left: &TreePath, right: &TreePath) -> Ordering {
+fn order_tree_paths(left: &TreePath, right: &TreePath) -> Ordering {
     match (left, right) {
         (TreePath::Folder { .. }, TreePath::File { .. }) => Ordering::Less,
         (TreePath::File { .. }, TreePath::Folder { .. }) => Ordering::Greater,
@@ -307,5 +307,5 @@ fn merge_trees(tree: &mut Vec<TreePath>, new_tree_set: HashSet<PathBuf>) {
         }
         false
     });
-    tree.sort_by(order_tree_path)
+    tree.sort_by(order_tree_paths)
 }
