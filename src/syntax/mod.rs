@@ -15,6 +15,7 @@ use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent};
 use ratatui::style::{Color, Style};
 use ratatui::text::Span;
 use ratatui::{widgets::ListItem, Frame};
+use std::cmp::Ordering;
 use std::path::PathBuf;
 use std::{fmt::Debug, path::Path};
 
@@ -292,16 +293,12 @@ impl Lexer {
 
     fn line_select(&mut self, at_line: usize, max_len: usize) -> Option<std::ops::Range<usize>> {
         let (from, to) = self.select?;
-        if from.line > at_line || at_line > to.line {
-            None
-        } else if from.line < at_line && at_line < to.line {
-            Some(0..max_len)
-        } else if from.line == at_line && at_line == to.line {
-            Some(from.char..to.char)
-        } else if from.line == at_line {
-            Some(from.char..max_len)
-        } else {
-            Some(0..to.char)
+        match (from.line.cmp(&at_line), at_line.cmp(&to.line)) {
+            (Ordering::Greater, ..) | (.., Ordering::Greater) => None,
+            (Ordering::Less, Ordering::Less) => Some(0..max_len),
+            (Ordering::Equal, Ordering::Equal) => Some(from.char..to.char),
+            (Ordering::Equal, ..) => Some(from.char..max_len),
+            _ => Some(0..to.char),
         }
     }
 }
