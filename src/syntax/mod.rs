@@ -106,10 +106,10 @@ impl Lexer {
                                 }
                             }
                             LSPResult::Declaration(declaration) => {
-                                gs.try_ws_event(declaration);
+                                gs.try_tree_event(declaration);
                             }
                             LSPResult::Definition(definition) => {
-                                gs.try_ws_event(definition);
+                                gs.try_tree_event(definition);
                             }
                         },
                         None => {
@@ -259,17 +259,6 @@ impl Lexer {
             .as_mut()
             .and_then(|client| client.request_references(&self.path, c))
             .map(LSPResponseType::References)
-        {
-            self.requests.push(id);
-        }
-    }
-
-    pub fn go_to_definition(&mut self, c: CursorPosition) {
-        if let Some(id) = self
-            .lsp_client
-            .as_mut()
-            .and_then(|client| client.request_definitions(&self.path, c))
-            .map(LSPResponseType::Definition)
         {
             self.requests.push(id);
         }

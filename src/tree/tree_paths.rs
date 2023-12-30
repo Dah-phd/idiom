@@ -80,16 +80,16 @@ impl TreePath {
         }
     }
 
-    pub fn expand_contained(&mut self, path: &PathBuf) -> bool {
-        if self.path() == path {
+    pub fn expand_contained(&mut self, rel_path: &PathBuf) -> bool {
+        if self.path() == rel_path {
             return true;
         }
-        if path.starts_with(self.path()) {
+        if rel_path.starts_with(self.path()) {
             let should_shrink = self.tree_mut().is_none();
             self.expand();
             if let Some(nested_tree) = self.tree_mut() {
                 for tree_path in nested_tree {
-                    if tree_path.expand_contained(path) {
+                    if tree_path.expand_contained(rel_path) {
                         return true;
                     }
                 }

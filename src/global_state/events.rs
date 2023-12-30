@@ -32,6 +32,15 @@ impl From<Location> for TreeEvent {
     }
 }
 
+impl From<LocationLink> for TreeEvent {
+    fn from(loc: LocationLink) -> Self {
+        Self::OpenAtSelect(
+            PathBuf::from(loc.target_uri.path()),
+            (loc.target_range.start.into(), loc.target_range.end.into()),
+        )
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum FooterEvent {
     Message(String),
@@ -92,13 +101,7 @@ impl From<Location> for WorkspaceEvent {
     }
 }
 
-impl From<LocationLink> for WorkspaceEvent {
-    fn from(value: LocationLink) -> Self {
-        Self::Open(PathBuf::from(value.target_uri.path()), value.target_range.start.line as usize)
-    }
-}
-
-impl TryFrom<GotoDeclarationResponse> for WorkspaceEvent {
+impl TryFrom<GotoDeclarationResponse> for TreeEvent {
     type Error = ();
     fn try_from(value: GotoDeclarationResponse) -> Result<Self, ()> {
         Ok(match value {

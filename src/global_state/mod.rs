@@ -104,9 +104,9 @@ impl GlobalState {
         false
     }
 
-    pub fn try_ws_event(&mut self, value: impl TryInto<WorkspaceEvent>) {
+    pub fn try_tree_event(&mut self, value: impl TryInto<TreeEvent>) {
         if let Ok(event) = value.try_into() {
-            self.workspace.push_back(event);
+            self.tree.push(event);
         }
     }
 

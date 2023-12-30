@@ -1,5 +1,5 @@
 mod tree_paths;
-use crate::utils::build_file_or_folder;
+use crate::utils::{build_file_or_folder, to_relative_path};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
@@ -178,6 +178,8 @@ impl Tree {
     }
 
     pub fn select_by_path(&mut self, path: &PathBuf) {
+        let rel_result = to_relative_path(path);
+        let path = rel_result.as_ref().unwrap_or(path);
         self.state.select(None);
         if self.tree.expand_contained(path) {
             self.state.select(Some(0));

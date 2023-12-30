@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use std::{
     ops::{Add, Sub},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex, MutexGuard},
 };
 
@@ -72,6 +72,31 @@ pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> Result<PathBuf> {
     }
 
     Ok(path)
+}
+
+pub fn to_relative_path(target_dir: &Path) -> Result<PathBuf> {
+    let cd = std::env::current_dir()?;
+    if target_dir.is_relative() {
+        return Ok(target_dir.into());
+    }
+    let mut result = PathBuf::from("./");
+    let mut path_before_current_dir = PathBuf::new();
+    let mut after_current_dir = false;
+    for component in target_dir.components() {
+        if after_current_dir {
+            result.push(component.as_os_str());
+        } else {
+            path_before_current_dir.push(component.as_os_str());
+        }
+        if path_before_current_dir == cd {
+            after_current_dir = true;
+        }
+    }
+    if result.to_string_lossy().is_empty() {
+        Err(anyhow!("Empty buffer!"))
+    } else {
+        Ok(result)
+    }
 }
 
 #[allow(dead_code)]
