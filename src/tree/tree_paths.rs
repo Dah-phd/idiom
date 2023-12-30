@@ -270,11 +270,10 @@ impl TreePath {
 }
 
 fn order_tree_path(left: &TreePath, right: &TreePath) -> Ordering {
-    match (matches!(left, TreePath::Folder { .. }), matches!(right, TreePath::Folder { .. })) {
-        (true, true) => Ordering::Equal,
-        (false, false) => Ordering::Equal,
-        (true, false) => Ordering::Less,
-        (false, true) => Ordering::Greater,
+    match (left, right) {
+        (TreePath::Folder { .. }, TreePath::File { .. }) => Ordering::Less,
+        (TreePath::File { .. }, TreePath::Folder { .. }) => Ordering::Greater,
+        _ => left.path().cmp(right.path()),
     }
 }
 
