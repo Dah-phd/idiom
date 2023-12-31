@@ -7,7 +7,7 @@ use super::modal::LSPResponseType;
 use crate::{lsp::LSPClient, syntax::Theme, workspace::actions::EditMetaData};
 use brackets::BracketColors;
 use diagnostics::{diagnostics_error, diagnostics_full, DiagnosticLines};
-use internal::SpansBuffer;
+use internal::generic_line;
 use langs::Lang;
 use legend::{ColorResult, Legend};
 
@@ -146,9 +146,7 @@ impl LineBuilder {
 
     pub fn build_line<'a>(&mut self, idx: usize, init: Vec<Span<'a>>, content: &'a str) -> Line<'a> {
         let line = if self.ignores.contains(&idx) || self.legend.is_empty() || self.tokens.len() <= 1 {
-            let mut internal_build = SpansBuffer::new(init);
-            internal_build.process(self, content, idx);
-            internal_build.collect()
+            generic_line(self, idx, content, init)
         } else {
             self.process_tokens(idx, content, init)
         };
