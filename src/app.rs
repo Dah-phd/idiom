@@ -48,9 +48,6 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
     drop(configs);
 
     loop {
-        if matches!(gs.mode, Mode::Select) {
-            let _ = terminal.hide_cursor();
-        }
         terminal.draw(|frame| {
             let mut screen = frame.size();
             screen = file_tree.render_with_remainder(frame, screen);
