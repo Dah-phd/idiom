@@ -10,9 +10,11 @@ use crate::global_state::GlobalState;
 use crate::lsp::LSPClient;
 use crate::popups::popups_tree::refrence_selector;
 use crate::workspace::actions::EditMetaData;
+use crate::workspace::cursor::Cursor;
 use crate::workspace::CursorPosition;
 use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent};
-use ratatui::style::{Color, Style};
+use ratatui::layout::Rect;
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Span;
 use ratatui::{widgets::ListItem, Frame};
 use std::cmp::Ordering;
@@ -22,12 +24,20 @@ use std::{fmt::Debug, path::Path};
 #[cfg(build = "debug")]
 use crate::utils::debug_to_file;
 
+const DIGIT_STYLE: Style = Style {
+    fg: Some(Color::Gray),
+    bg: None,
+    add_modifier: Modifier::empty(),
+    sub_modifier: Modifier::empty(),
+    underline_color: None,
+};
+
 pub struct Lexer {
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub lsp_client: Option<LSPClient>,
     pub max_digits: usize,
     pub path: PathBuf,
-    line_builder: LineBuilder,
+    pub line_builder: LineBuilder,
     select: Option<(CursorPosition, CursorPosition)>,
     modal: Option<LSPModal>,
     requests: Vec<LSPResponseType>,
@@ -53,9 +63,10 @@ impl Lexer {
         }
     }
 
-    pub fn context(&mut self, select: Option<(CursorPosition, CursorPosition)>, gs: &mut GlobalState) {
-        self.line_builder.reset();
-        self.select = select;
+    pub fn context(&mut self, cursor: &Cursor, content: &[String], gs: &mut GlobalState) {
+        self.line_builder.reset(cursor.position());
+        self.select = cursor.select_get();
+        self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
         if let Some(client) = self.lsp_client.as_mut() {
             // diagnostics
             if let Some(params) = client.get_diagnostics(&self.path) {
@@ -127,6 +138,10 @@ impl Lexer {
         }
     }
 
+    pub fn set_text_width(&mut self, area_width: usize) {
+        self.line_builder.text_width = area_width.checked_sub(self.max_digits).unwrap_or_default();
+    }
+
     pub fn sync_lsp(
         &mut self,
         version: i32,
@@ -142,13 +157,12 @@ impl Lexer {
         }
     }
 
-    pub fn calc_line_number_offset(&mut self, content: &[String]) -> usize {
-        self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
-        self.max_digits
-    }
-
-    pub fn render_modal_if_exist(&mut self, frame: &mut Frame, x: u16, y: u16) {
+    pub fn render_modal_if_exist(&mut self, frame: &mut Frame, area: Rect, cursor: &Cursor) {
         if let Some(modal) = &mut self.modal {
+            let cursor_x_offset = 1 + cursor.char;
+            let cursor_y_offset = cursor.line - cursor.at_line;
+            let x = area.x + (cursor_x_offset + self.max_digits) as u16;
+            let y = area.y + cursor_y_offset as u16;
             modal.render_at(frame, x, y);
         }
     }
@@ -266,12 +280,12 @@ impl Lexer {
     }
 
     pub fn list_item<'a>(&mut self, idx: usize, content: &'a str) -> ListItem<'a> {
-        let spans = vec![Span::styled(
-            get_line_num(idx, self.max_digits),
-            Style { fg: Some(Color::Gray), ..Default::default() },
-        )];
-        self.line_builder.select_range = self.line_select(idx, content.len());
-        ListItem::new(self.line_builder.build_line(idx, spans, content))
+        self.line_builder.build_line(
+            idx,
+            self.line_select(idx, content.len()),
+            content,
+            vec![Span::styled(format!("{: >1$} ", idx + 1, self.max_digits), DIGIT_STYLE)],
+        )
     }
 
     pub fn reload_theme(&mut self) {
@@ -291,7 +305,7 @@ impl Lexer {
         self.line_builder.mark_saved();
     }
 
-    fn line_select(&mut self, at_line: usize, max_len: usize) -> Option<std::ops::Range<usize>> {
+    fn line_select(&self, at_line: usize, max_len: usize) -> Option<std::ops::Range<usize>> {
         let (from, to) = self.select?;
         match (from.line.cmp(&at_line), at_line.cmp(&to.line)) {
             (Ordering::Greater, ..) | (.., Ordering::Greater) => None,
@@ -301,13 +315,4 @@ impl Lexer {
             (.., Ordering::Equal) => Some(0..to.char),
         }
     }
-}
-
-fn get_line_num(idx: usize, max_digits: usize) -> String {
-    let mut as_str = (idx + 1).to_string();
-    while as_str.len() < max_digits {
-        as_str.insert(0, ' ')
-    }
-    as_str.push(' ');
-    as_str
 }

@@ -50,16 +50,12 @@ impl Workspace {
             if let Some(file) = self.editors.get_mut(editor_id) {
                 let layout = Layout::new(Direction::Vertical, RECT_CONSTRAINT).split(screen);
                 let area = layout[1];
-                file.set_max_rows(layout[1].bottom());
-                let cursor_x_offset = 1 + file.cursor.char;
-                let cursor_y_offset = file.cursor.line - file.cursor.at_line;
-                let (digits_offset, editor_content) = file.get_list_widget_with_context(gs);
-                let x_cursor = area.x + (cursor_x_offset + digits_offset) as u16;
-                let y_cursor = area.y + cursor_y_offset as u16;
+                let tab_area = layout[0];
 
-                frame.set_cursor(x_cursor, y_cursor);
-                frame.render_widget(editor_content, area);
-                file.lexer.render_modal_if_exist(frame, x_cursor, y_cursor);
+                let editor_widget = file.collect_widget(&area, gs);
+                frame.render_widget(editor_widget, area);
+
+                file.lexer.render_modal_if_exist(frame, area, &file.cursor);
 
                 let mut titles_unordered: Vec<_> = self.editors.iter().map(|e| e.display.to_owned()).collect();
                 let mut titles = titles_unordered.split_off(editor_id);
@@ -69,7 +65,7 @@ impl Workspace {
                     .style(Style::default().add_modifier(Modifier::UNDERLINED))
                     .highlight_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
                     .select(0);
-                frame.render_widget(tabs, layout[0]);
+                frame.render_widget(tabs, tab_area);
             }
         }
     }

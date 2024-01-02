@@ -4,7 +4,11 @@ mod internal;
 mod langs;
 mod legend;
 use super::modal::LSPResponseType;
-use crate::{lsp::LSPClient, syntax::Theme, workspace::actions::EditMetaData};
+use crate::{
+    lsp::LSPClient,
+    syntax::Theme,
+    workspace::{actions::EditMetaData, CursorPosition},
+};
 use brackets::BracketColors;
 use diagnostics::{diagnostics_error, diagnostics_full, DiagnosticLines};
 use internal::generic_line;
@@ -18,34 +22,39 @@ use lsp_types::{
 use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
+    widgets::ListItem,
 };
 use std::{collections::HashMap, ops::Range, path::Path};
 
 #[derive(Debug)]
 pub struct LineBuilder {
-    pub tokens: Vec<Vec<Token>>,
-    pub legend: Legend,
     pub theme: Theme,
     pub lang: Lang,
-    diagnostic_processor: fn(&mut Self, PublishDiagnosticsParams),
+    pub text_width: usize,
+    select_range: Option<Range<usize>>,
+    legend: Legend,
+    tokens: Vec<Vec<Token>>,
+    cursor: CursorPosition,
     brackets: BracketColors,
     diagnostics: HashMap<usize, DiagnosticLines>,
-    pub select_range: Option<Range<usize>>,
-    pub file_was_saved: bool,
+    diagnostic_processor: fn(&mut Self, PublishDiagnosticsParams),
+    file_was_saved: bool,
     ignores: Vec<usize>,
 }
 
 impl LineBuilder {
     pub fn new(lang: Lang) -> Self {
         Self {
-            tokens: Vec::new(),
-            legend: Legend::default(),
             theme: Theme::new(),
             lang,
-            diagnostic_processor: diagnostics_full,
+            text_width: 0,
+            select_range: None,
+            legend: Legend::default(),
+            tokens: Vec::new(),
+            cursor: CursorPosition::default(),
             brackets: BracketColors::default(),
             diagnostics: HashMap::new(),
-            select_range: None,
+            diagnostic_processor: diagnostics_full,
             file_was_saved: true,
             ignores: Vec::new(),
         }
@@ -140,23 +149,31 @@ impl LineBuilder {
         }
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self, c: CursorPosition) {
+        self.cursor = c;
         self.brackets.reset();
     }
 
-    pub fn build_line<'a>(&mut self, idx: usize, init: Vec<Span<'a>>, content: &'a str) -> Line<'a> {
-        let line = if self.ignores.contains(&idx) || self.legend.is_empty() || self.tokens.len() <= 1 {
+    pub fn build_line<'a>(
+        &mut self,
+        idx: usize,
+        select: Option<Range<usize>>,
+        content: &'a str,
+        init: Vec<Span<'a>>,
+    ) -> ListItem<'a> {
+        self.select_range = select;
+        if self.ignores.contains(&idx) || self.legend.is_empty() || self.tokens.len() <= 1 {
             generic_line(self, idx, content, init)
         } else {
             self.process_tokens(idx, content, init)
-        };
-        Line::from(line)
+        }
     }
 
-    pub fn process_tokens<'a>(&mut self, line_idx: usize, content: &'a str, mut spans: Vec<Span<'a>>) -> Vec<Span<'a>> {
+    pub fn process_tokens<'a>(&mut self, line_idx: usize, content: &'a str, mut spans: Vec<Span<'a>>) -> ListItem<'a> {
         let mut style = Style { fg: Some(Color::White), ..Default::default() };
         let mut len: u32 = 0;
         let mut token_num = 0;
+        let offset = spans.len();
         let token_line = self.tokens.get(line_idx);
         let diagnostic = self.diagnostics.get(&line_idx);
         for (idx, ch) in content.char_indices() {
@@ -192,10 +209,44 @@ impl LineBuilder {
             style.add_modifier = Modifier::empty();
             style.bg = None;
         }
-        if let Some(diagnostic) = diagnostic {
-            spans.extend(diagnostic.data.iter().map(|d| d.span.clone()));
+        self.format_with_info(line_idx, offset, diagnostic, spans)
+    }
+
+    fn format_with_info<'a>(
+        &self,
+        line_idx: usize,
+        offset: usize,
+        diagnostic: Option<&DiagnosticLines>,
+        mut buffer: Vec<Span<'a>>,
+    ) -> ListItem<'a> {
+        // set cursor without the normal API
+        if line_idx == self.cursor.line {
+            let expected = self.cursor.char + offset;
+            if buffer.len() > expected {
+                buffer[self.cursor.char + offset].style.add_modifier = Modifier::REVERSED;
+            } else {
+                buffer.push(Span::styled(" ", Style { add_modifier: Modifier::REVERSED, ..Default::default() }))
+            }
+        };
+
+        if buffer.len() > self.text_width {
+            let mut lines = Vec::new();
+            while buffer.len() > self.text_width {
+                let mut line = buffer.drain(..self.text_width).collect::<Vec<_>>();
+                line.push(Span::raw("\n"));
+                lines.push(Line::from(line));
+            }
+            if let Some(diagnostic) = diagnostic {
+                buffer.extend(diagnostic.data.iter().map(|d| d.span.clone()));
+            }
+            lines.push(Line::from(buffer));
+            ListItem::from(lines)
+        } else {
+            if let Some(diagnostic) = diagnostic {
+                buffer.extend(diagnostic.data.iter().map(|d| d.span.clone()));
+            }
+            ListItem::from(Line::from(buffer))
         }
-        spans
     }
 
     fn set_diagnostic_style(&self, idx: usize, style: &mut Style, diagnostic: Option<&DiagnosticLines>) {

@@ -1,5 +1,6 @@
 use super::cursor::{Cursor, CursorPosition};
 use lsp_types::TextEdit;
+use ratatui::layout::Rect;
 use ratatui::widgets::{List, ListItem};
 
 use crate::workspace::actions::Actions;
@@ -54,10 +55,11 @@ impl Editor {
         })
     }
 
-    pub fn get_list_widget_with_context(&mut self, gs: &mut GlobalState) -> (usize, List<'_>) {
+    pub fn collect_widget(&mut self, area: &Rect, gs: &mut GlobalState) -> List<'_> {
+        self.set_render_size(area);
         self.actions.sync(&mut self.lexer, &self.content);
-        self.lexer.context(self.cursor.select_get(), gs);
-        let editor_content = List::new(
+        self.lexer.context(&self.cursor, &self.content, gs);
+        List::new(
             self.content
                 .iter()
                 .enumerate()
@@ -65,8 +67,7 @@ impl Editor {
                 .take(self.max_rows)
                 .map(|(idx, code_line)| self.lexer.list_item(idx, code_line))
                 .collect::<Vec<ListItem>>(),
-        );
-        (self.lexer.calc_line_number_offset(&self.content), editor_content)
+        )
     }
 
     pub fn get_stats(&self) -> DocStats {
@@ -347,14 +348,15 @@ impl Editor {
         text
     }
 
-    pub fn set_max_rows(&mut self, max_rows: u16) {
-        self.max_rows = max_rows as usize;
+    pub fn set_render_size(&mut self, area: &Rect) {
+        self.max_rows = area.bottom() as usize;
         if self.cursor.line < self.cursor.at_line {
             self.cursor.at_line = self.cursor.line
         }
         if self.cursor.line > self.max_rows - 3 + self.cursor.at_line {
             self.cursor.at_line = self.cursor.line + 2 - self.max_rows
         }
+        self.lexer.set_text_width(area.width as usize);
     }
 }
 

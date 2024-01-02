@@ -3,9 +3,29 @@ use super::LineBuilder;
 use ratatui::{
     style::{Color, Style},
     text::Span,
+    widgets::ListItem,
 };
 
-pub fn generic_line<'a>(builder: &mut LineBuilder, idx: usize, content: &str, buffer: Vec<Span<'a>>) -> Vec<Span<'a>> {
+pub fn mark_down_line<'a>(
+    _builder: &mut LineBuilder,
+    _idx: usize,
+    content: &str,
+    mut buffer: Vec<Span<'a>>,
+) -> Vec<Span<'a>> {
+    for ch in content.chars() {
+        match ch {
+            '#' => buffer.push(Span::styled(ch.to_string(), Style { fg: Some(Color::Blue), ..Default::default() })),
+            '*' => buffer.push(Span::styled(ch.to_string(), Style { fg: Some(Color::Blue), ..Default::default() })),
+            '[' | ']' => {
+                buffer.push(Span::styled(ch.to_string(), Style { fg: Some(Color::Magenta), ..Default::default() }))
+            }
+            _ => buffer.push(Span::raw(ch.to_string())),
+        }
+    }
+    buffer
+}
+
+pub fn generic_line<'a>(builder: &mut LineBuilder, idx: usize, content: &str, buffer: Vec<Span<'a>>) -> ListItem<'a> {
     let mut buf = SpanBuffer::from(buffer);
     let mut chars = content.char_indices().peekable();
     let diagnostic = builder.diagnostics.get(&idx);
@@ -74,10 +94,7 @@ pub fn generic_line<'a>(builder: &mut LineBuilder, idx: usize, content: &str, bu
             }
         }
     }
-    if let Some(diagnostic) = diagnostic {
-        buf.buffer.extend(diagnostic.data.iter().map(|d| d.span.clone()));
-    }
-    buf.buffer
+    builder.format_with_info(idx, buf.offset, diagnostic, buf.buffer)
 }
 
 #[derive(Default)]

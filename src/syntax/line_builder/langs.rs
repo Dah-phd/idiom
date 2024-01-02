@@ -57,6 +57,9 @@ impl From<FileType> for Lang {
                 ],
                 mod_import: vec!["import", "from"],
             },
+            FileType::MarkDown => {
+                Self { file_type, declaration: vec![], key_words: vec![], frow_control: vec![], mod_import: vec![] }
+            }
             _ => Self {
                 file_type,
                 declaration: vec![
