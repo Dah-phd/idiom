@@ -16,20 +16,21 @@ use ratatui::{
 };
 use std::path::PathBuf;
 
-#[derive(Default)]
-pub struct ActiveTreeSearch {
+const SELECTOR_CONSTRAINTS: [Constraint; 2] = [Constraint::Min(3), Constraint::Percentage(100)];
+
+pub struct ActivePathSearch {
     options: Vec<PathBuf>,
     state: WrappedState,
     pattern: TextField,
 }
 
-impl ActiveTreeSearch {
+impl ActivePathSearch {
     pub fn new() -> Box<Self> {
         Box::new(Self { options: Vec::new(), state: WrappedState::default(), pattern: TextField::with_tree_access() })
     }
 }
 
-impl PopupInterface for ActiveTreeSearch {
+impl PopupInterface for ActivePathSearch {
     fn key_map(&mut self, key: &KeyEvent, clipbard: &mut Clipboard) -> PopupMessage {
         if let Some(msg) = self.pattern.map(key, clipbard) {
             return msg;
@@ -52,10 +53,11 @@ impl PopupInterface for ActiveTreeSearch {
     fn render(&mut self, frame: &mut Frame) {
         let area = centered_rect_static(120, 20, frame.size());
         frame.render_widget(Clear, area);
-        let split_areas =
-            Layout::new(Direction::Vertical, [Constraint::Min(3), Constraint::Percentage(100)]).split(area);
+        let split_areas = Layout::new(Direction::Vertical, SELECTOR_CONSTRAINTS).split(area);
         frame.render_widget(
-            self.pattern.widget().block(Block::default().borders(Borders::ALL).title("Search pattern ")),
+            self.pattern
+                .widget()
+                .block(Block::new().borders(Borders::ALL).title("Search pattern (Tab to switch to in File search)")),
             split_areas[0],
         );
 
@@ -68,8 +70,8 @@ impl PopupInterface for ActiveTreeSearch {
                 .collect::<Vec<_>>()
         };
         let list = List::new(options)
-            .block(Block::default().borders(Borders::ALL))
-            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+            .block(Block::new().borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT))
+            .highlight_style(Style::new().add_modifier(Modifier::REVERSED));
         frame.render_stateful_widget(list, split_areas[1], self.state.get());
     }
 

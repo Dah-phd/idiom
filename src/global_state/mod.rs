@@ -128,16 +128,6 @@ impl GlobalState {
         }
     }
 
-    // pub fn logged_ok<T>(&mut self, result: Result<T>) -> Option<T> {
-    //     match result {
-    //         Ok(val) => Some(val),
-    //         Err(err) => {
-    //             self.error(err.to_string());
-    //             None
-    //         }
-    //     }
-    // }
-
     /// Attempts to create new editor if err logs it and returns false else true.
     pub async fn try_new_editor(&mut self, workspace: &mut Workspace, path: PathBuf) -> bool {
         if let Err(err) = workspace.new_from(path, self).await {

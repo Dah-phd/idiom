@@ -5,7 +5,7 @@ use crate::{
     popups::{
         popup_find::{FindPopup, GoToLinePopup},
         popup_replace::ReplacePopup,
-        popup_tree_search::ActiveTreeSearch,
+        popup_tree_search::ActivePathSearch,
         popups_editor::{save_all_popup, selector_editors},
         popups_tree::{create_file_popup, rename_file_popup},
     },
@@ -79,7 +79,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                         if matches!(gs.mode, Mode::Insert) {
                             gs.popup(FindPopup::new());
                         } else {
-                            gs.popup(ActiveTreeSearch::new());
+                            gs.popup(ActivePathSearch::new());
                         }
                     }
                     GeneralAction::Replace if matches!(gs.mode, Mode::Insert) => {

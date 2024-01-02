@@ -31,12 +31,14 @@ impl Footer {
         mode: Span<'static>,
         stats: Option<DocStats>,
     ) -> Rect {
-        let layout = Layout::default()
-            .constraints([
+        let layout = Layout::new(
+            Direction::Vertical,
+            [
                 Constraint::Length(screen.height.checked_sub(2).unwrap_or_default()),
                 Constraint::Length(1),
-            ])
-            .split(screen);
+            ],
+        )
+        .split(screen);
         let area = self.message_with_remainder(frame, layout[1]);
         frame.render_widget(self.widget_stats(mode, stats), area);
         layout[0]
@@ -61,10 +63,9 @@ impl Footer {
     fn message_with_remainder(&mut self, frame: &mut Frame, layout: Rect) -> Rect {
         self.update_message();
         if let Some(message) = self.message.as_ref() {
-            let paragraph_areas = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-                .split(layout);
+            let paragraph_areas =
+                Layout::new(Direction::Horizontal, [Constraint::Percentage(50), Constraint::Percentage(50)])
+                    .split(layout);
             frame.render_widget(message.widget(), paragraph_areas[0]);
             return paragraph_areas[1];
         }
@@ -72,21 +73,17 @@ impl Footer {
     }
 
     fn widget_stats(&mut self, mode: Span<'static>, stats: Option<DocStats>) -> Paragraph {
-        Paragraph::new(Line::from(
-            stats
-                .map(|(len, sel, c)| {
-                    vec![
-                        Span::raw(match sel {
-                            0 => format!("    Doc Len {len}, Ln {}, Col {}", c.line + 1, c.char + 1),
-                            _ => format!("    Doc Len {len}, Ln {}, Col {} ({sel} selected)", c.line + 1, c.char + 1),
-                        }),
-                        mode,
-                    ]
-                })
-                .unwrap_or_default(),
-        ))
-        .alignment(Alignment::Right)
-        .block(Block::default().borders(Borders::TOP))
+        let line = match stats {
+            None => Line::from(mode),
+            Some((len, sel, c)) => Line::from(vec![
+                Span::raw(match sel {
+                    0 => format!("    Doc Len {len}, Ln {}, Col {}", c.line + 1, c.char + 1),
+                    _ => format!("    Doc Len {len}, Ln {}, Col {} ({sel} selected)", c.line + 1, c.char + 1),
+                }),
+                mode,
+            ]),
+        };
+        Paragraph::new(line).alignment(Alignment::Right).block(Block::default().borders(Borders::TOP))
     }
 
     fn push_ahead(&mut self, msg: Message) {
