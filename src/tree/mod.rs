@@ -1,5 +1,8 @@
 mod tree_paths;
-use crate::utils::{build_file_or_folder, to_relative_path};
+use crate::{
+    global_state::{GlobalState, Mode},
+    utils::{build_file_or_folder, to_relative_path},
+};
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
@@ -43,8 +46,8 @@ impl Tree {
         }
     }
 
-    pub fn render_with_remainder(&mut self, frame: &mut Frame, screen: Rect) -> Rect {
-        if !self.active {
+    pub fn render_with_remainder(&mut self, frame: &mut Frame, screen: Rect, gs: &mut GlobalState) -> Rect {
+        if matches!(gs.mode, Mode::Insert) && !self.active {
             return screen;
         }
         let areas = Layout::default()

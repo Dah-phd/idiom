@@ -50,7 +50,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
     loop {
         terminal.draw(|frame| {
             let mut screen = frame.size();
-            screen = file_tree.render_with_remainder(frame, screen);
+            screen = file_tree.render_with_remainder(frame, screen, &mut gs);
             screen = footer.render_with_remainder(frame, screen, gs.mode_span(), workspace.get_stats());
             screen = tmux.render_with_remainder(frame, screen);
             workspace.render(frame, screen, &mut gs);

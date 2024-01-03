@@ -2,7 +2,7 @@ mod line_builder;
 mod modal;
 mod theme;
 use self::line_builder::LineBuilder;
-use self::modal::{LSPModal, LSPModalResult, LSPResponseType, LSPResult};
+use self::modal::{LSPModal, LSPResponseType, LSPResult, ModalMessage};
 pub use self::theme::Theme;
 use crate::configs::EditorAction;
 use crate::configs::FileType;
@@ -170,20 +170,20 @@ impl Lexer {
     pub fn map_modal_if_exists(&mut self, key: &EditorAction, gs: &mut GlobalState) -> bool {
         if let Some(modal) = &mut self.modal {
             match modal.map_and_finish(key) {
-                LSPModalResult::Taken => return true,
-                LSPModalResult::TakenDone => {
+                ModalMessage::Taken => return true,
+                ModalMessage::TakenDone => {
                     self.modal.take();
                     return true;
                 }
-                LSPModalResult::Done => {
+                ModalMessage::Done => {
                     self.modal.take();
                 }
-                LSPModalResult::Workspace(event) => {
+                ModalMessage::Workspace(event) => {
                     gs.workspace.push_back(event);
                     self.modal.take();
                     return true;
                 }
-                LSPModalResult::RenameVar(new_name, c) => {
+                ModalMessage::RenameVar(new_name, c) => {
                     self.get_rename(c, new_name);
                     self.modal.take();
                     return true;

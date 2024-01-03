@@ -26,7 +26,7 @@ pub enum LSPModal {
 }
 
 #[derive(Default, Debug)]
-pub enum LSPModalResult {
+pub enum ModalMessage {
     Taken,
     #[default]
     None,
@@ -36,20 +36,20 @@ pub enum LSPModalResult {
     RenameVar(String, CursorPosition),
 }
 
-impl<T> From<&[T]> for LSPModalResult {
+impl<T> From<&[T]> for ModalMessage {
     fn from(value: &[T]) -> Self {
         if value.is_empty() {
-            LSPModalResult::Done
+            ModalMessage::Done
         } else {
-            LSPModalResult::default()
+            ModalMessage::default()
         }
     }
 }
 
 impl LSPModal {
-    pub fn map_and_finish(&mut self, action: &EditorAction) -> LSPModalResult {
+    pub fn map_and_finish(&mut self, action: &EditorAction) -> ModalMessage {
         if matches!(action, EditorAction::Cancel | EditorAction::Close) {
-            return LSPModalResult::TakenDone;
+            return ModalMessage::TakenDone;
         }
         match self {
             Self::AutoComplete(modal) => modal.map_and_finish(action),
@@ -139,18 +139,18 @@ impl RenameVariable {
         frame.render_widget(p.block(block), area);
     }
 
-    fn map_and_finish(&mut self, action: &EditorAction) -> LSPModalResult {
+    fn map_and_finish(&mut self, action: &EditorAction) -> ModalMessage {
         match action {
             EditorAction::Char(ch) => {
                 self.new_name.push(*ch);
-                LSPModalResult::Taken
+                ModalMessage::Taken
             }
             EditorAction::Backspace => {
                 self.new_name.pop();
-                LSPModalResult::Taken
+                ModalMessage::Taken
             }
-            EditorAction::NewLine => LSPModalResult::RenameVar(self.new_name.to_owned(), self.cursor),
-            _ => LSPModalResult::Taken,
+            EditorAction::NewLine => ModalMessage::RenameVar(self.new_name.to_owned(), self.cursor),
+            _ => ModalMessage::Taken,
         }
     }
 }
@@ -186,47 +186,47 @@ impl AutoComplete {
         modal
     }
 
-    fn map_and_finish(&mut self, action: &EditorAction) -> LSPModalResult {
+    fn map_and_finish(&mut self, action: &EditorAction) -> ModalMessage {
         match action {
             EditorAction::NewLine | EditorAction::Indent => self.get_result(),
             EditorAction::Char(ch) => self.push_filter(*ch),
             EditorAction::Down => {
                 self.state.next(&self.filtered);
-                LSPModalResult::Taken
+                ModalMessage::Taken
             }
             EditorAction::Up => {
                 self.state.prev(&self.filtered);
-                LSPModalResult::Taken
+                ModalMessage::Taken
             }
             EditorAction::Backspace => self.filter_pop(),
-            _ => LSPModalResult::Done,
+            _ => ModalMessage::Done,
         }
     }
 
-    fn get_result(&mut self) -> LSPModalResult {
+    fn get_result(&mut self) -> ModalMessage {
         if let Some(idx) = self.state.selected() {
-            LSPModalResult::Workspace(WorkspaceEvent::AutoComplete(self.filtered.remove(idx).0))
+            ModalMessage::Workspace(WorkspaceEvent::AutoComplete(self.filtered.remove(idx).0))
         } else {
-            LSPModalResult::Done
+            ModalMessage::Done
         }
     }
 
-    fn filter_pop(&mut self) -> LSPModalResult {
+    fn filter_pop(&mut self) -> ModalMessage {
         self.filter.pop();
         self.build_matches();
         if self.filter.is_empty() {
-            return LSPModalResult::Done;
+            return ModalMessage::Done;
         }
         self.filtered.as_slice().into()
     }
 
-    fn push_filter(&mut self, ch: char) -> LSPModalResult {
+    fn push_filter(&mut self, ch: char) -> ModalMessage {
         if ch.is_alphabetic() || ch == '_' {
             self.filter.push(ch);
             self.build_matches();
             self.filtered.as_slice().into()
         } else {
-            LSPModalResult::Done
+            ModalMessage::Done
         }
     }
 
@@ -279,17 +279,17 @@ impl Info {
         Self { items, state: WrappedState::default() }
     }
 
-    pub fn map_and_finish(&mut self, action: &EditorAction) -> LSPModalResult {
+    pub fn map_and_finish(&mut self, action: &EditorAction) -> ModalMessage {
         match action {
             EditorAction::Down => {
                 self.state.next(&self.items);
-                LSPModalResult::Taken
+                ModalMessage::Taken
             }
             EditorAction::Up => {
                 self.state.prev(&self.items);
-                LSPModalResult::Taken
+                ModalMessage::Taken
             }
-            _ => LSPModalResult::Done,
+            _ => ModalMessage::Done,
         }
     }
 
