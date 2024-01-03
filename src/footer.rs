@@ -1,8 +1,8 @@
 use crate::workspace::DocStats;
 use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
-    text::{Line, Span},
+    text::Span,
     widgets::{Block, Borders, Padding, Paragraph},
     Frame,
 };
@@ -39,9 +39,31 @@ impl Footer {
             ],
         )
         .split(screen);
-        let area = self.message_with_remainder(frame, layout[1]);
-        frame.render_widget(self.widget_stats(mode, stats), area);
-        layout[0]
+        let footer_screen = layout[1];
+        let editor_screen = layout[0];
+        let message_p = self.get_message_widget().unwrap_or_default();
+        let (stat_size, stat_p) = if let Some((len, sel, c)) = stats {
+            let text = match sel {
+                0 => format!("    Doc Len {len}, Ln {}, Col {}", c.line + 1, c.char + 1),
+                _ => format!("    Doc Len {len}, Ln {}, Col {} ({sel} selected)", c.line + 1, c.char + 1),
+            };
+            (text.len(), Paragraph::new(Span::raw(text)))
+        } else {
+            (0, Paragraph::default())
+        };
+        let split = Layout::new(
+            Direction::Horizontal,
+            [
+                Constraint::Length(10),
+                Constraint::Length(footer_screen.width.checked_sub(10 + stat_size as u16).unwrap_or_default()),
+                Constraint::Length(stat_size as u16),
+            ],
+        )
+        .split(footer_screen);
+        frame.render_widget(Paragraph::new(mode).block(Block::new().borders(Borders::TOP)), split[0]);
+        frame.render_widget(message_p.block(Block::new().borders(Borders::TOP)), split[1]);
+        frame.render_widget(stat_p.block(Block::new().borders(Borders::TOP)), split[2]);
+        editor_screen
     }
 
     pub fn message(&mut self, message: String) {
@@ -60,32 +82,6 @@ impl Footer {
         self.push_ahead(Message::success(message));
     }
 
-    fn message_with_remainder(&mut self, frame: &mut Frame, layout: Rect) -> Rect {
-        self.update_message();
-        if let Some(message) = self.message.as_ref() {
-            let paragraph_areas =
-                Layout::new(Direction::Horizontal, [Constraint::Percentage(50), Constraint::Percentage(50)])
-                    .split(layout);
-            frame.render_widget(message.widget(), paragraph_areas[0]);
-            return paragraph_areas[1];
-        }
-        layout
-    }
-
-    fn widget_stats(&mut self, mode: Span<'static>, stats: Option<DocStats>) -> Paragraph {
-        let line = match stats {
-            None => Line::from(mode),
-            Some((len, sel, c)) => Line::from(vec![
-                Span::raw(match sel {
-                    0 => format!("    Doc Len {len}, Ln {}, Col {}", c.line + 1, c.char + 1),
-                    _ => format!("    Doc Len {len}, Ln {}, Col {} ({sel} selected)", c.line + 1, c.char + 1),
-                }),
-                mode,
-            ]),
-        };
-        Paragraph::new(line).alignment(Alignment::Right).block(Block::default().borders(Borders::TOP))
-    }
-
     fn push_ahead(&mut self, msg: Message) {
         self.message_que.retain(|m| m.is_err());
         self.message_que.push(msg);
@@ -94,11 +90,12 @@ impl Footer {
         }
     }
 
-    fn update_message(&mut self) {
+    fn get_message_widget(&mut self) -> Option<Paragraph<'static>> {
         if self.message.is_none() && self.message_que.is_empty() {
-            return;
+            return None;
         }
         self.que_pull_if_expaired();
+        self.message.as_ref().map(|m| m.widget())
     }
 
     fn que_pull_if_expaired(&mut self) {
