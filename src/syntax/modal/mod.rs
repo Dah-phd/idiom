@@ -1,11 +1,11 @@
 mod parser;
 
 use crate::{
-    configs::EditorAction,
-    global_state::WorkspaceEvent,
-    widgests::{dynamic_cursor_rect_sized_height, WrappedState},
+    global_state::{GlobalState, WorkspaceEvent},
+    widgests::{dynamic_cursor_rect_sized_height, TextField, WrappedState},
     workspace::CursorPosition,
 };
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use lsp_types::{
     CompletionItem, Documentation, Hover, HoverContents, MarkedString, SignatureHelp, SignatureInformation,
@@ -14,8 +14,8 @@ pub use parser::{LSPResponseType, LSPResult};
 use ratatui::{
     prelude::Rect,
     style::{Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
+    text::Line,
+    widgets::{Block, Borders, Clear, List, ListItem},
     Frame,
 };
 
@@ -32,7 +32,6 @@ pub enum ModalMessage {
     None,
     Done,
     TakenDone,
-    Workspace(WorkspaceEvent),
     RenameVar(String, CursorPosition),
 }
 
@@ -47,14 +46,20 @@ impl<T> From<&[T]> for ModalMessage {
 }
 
 impl LSPModal {
-    pub fn map_and_finish(&mut self, action: &EditorAction) -> ModalMessage {
-        if matches!(action, EditorAction::Cancel | EditorAction::Close) {
-            return ModalMessage::TakenDone;
-        }
-        match self {
-            Self::AutoComplete(modal) => modal.map_and_finish(action),
-            Self::Info(modal) => modal.map_and_finish(action),
-            Self::RenameVar(modal) => modal.map_and_finish(action),
+    pub fn map_and_finish(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> ModalMessage {
+        match key {
+            KeyEvent { code: KeyCode::Esc, .. } => ModalMessage::TakenDone,
+            KeyEvent { code: KeyCode::Char('q' | 'Q'), modifiers: KeyModifiers::CONTROL, .. } => {
+                ModalMessage::TakenDone
+            }
+            KeyEvent { code: KeyCode::Char('d' | 'D'), modifiers: KeyModifiers::CONTROL, .. } => {
+                ModalMessage::TakenDone
+            }
+            _ => match self {
+                Self::AutoComplete(modal) => modal.map_and_finish(key, gs),
+                Self::Info(modal) => modal.map_and_finish(key),
+                Self::RenameVar(modal) => modal.map_and_finish(key, gs),
+            },
         }
     }
 
@@ -119,37 +124,25 @@ impl LSPModal {
 }
 
 pub struct RenameVariable {
-    new_name: String,
+    new_name: TextField<()>,
     cursor: CursorPosition,
     title: String,
 }
 
 impl RenameVariable {
     fn new(cursor: CursorPosition, title: &str) -> Self {
-        Self { new_name: String::new(), cursor, title: format!("Rename: {} ", title) }
+        Self { new_name: TextField::basic(title.to_owned()), cursor, title: format!("Rename: {} ", title) }
     }
 
     fn render_at(&mut self, frame: &mut Frame, area: Rect) {
         let block = Block::default().title(self.title.as_str()).borders(Borders::ALL);
-        let p = Paragraph::new(Line::from(vec![
-            Span::raw(" >> "),
-            Span::raw(self.new_name.as_str()),
-            Span::styled("|", Style::default().add_modifier(Modifier::SLOW_BLINK)),
-        ]));
-        frame.render_widget(p.block(block), area);
+        frame.render_widget(self.new_name.widget().block(block), area);
     }
 
-    fn map_and_finish(&mut self, action: &EditorAction) -> ModalMessage {
-        match action {
-            EditorAction::Char(ch) => {
-                self.new_name.push(*ch);
-                ModalMessage::Taken
-            }
-            EditorAction::Backspace => {
-                self.new_name.pop();
-                ModalMessage::Taken
-            }
-            EditorAction::NewLine => ModalMessage::RenameVar(self.new_name.to_owned(), self.cursor),
+    fn map_and_finish(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> ModalMessage {
+        self.new_name.map(key, &mut gs.clipboard);
+        match key.code {
+            KeyCode::Enter => ModalMessage::RenameVar(self.new_name.text.to_owned(), self.cursor),
             _ => ModalMessage::Taken,
         }
     }
@@ -186,28 +179,25 @@ impl AutoComplete {
         modal
     }
 
-    fn map_and_finish(&mut self, action: &EditorAction) -> ModalMessage {
-        match action {
-            EditorAction::NewLine | EditorAction::Indent => self.get_result(),
-            EditorAction::Char(ch) => self.push_filter(*ch),
-            EditorAction::Down => {
+    fn map_and_finish(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> ModalMessage {
+        match key.code {
+            KeyCode::Enter | KeyCode::Tab => {
+                if let Some(idx) = self.state.selected() {
+                    gs.workspace.push_back(WorkspaceEvent::AutoComplete(self.filtered.remove(idx).0));
+                }
+                ModalMessage::TakenDone
+            }
+            KeyCode::Char(ch) => self.push_filter(ch),
+            KeyCode::Down => {
                 self.state.next(&self.filtered);
                 ModalMessage::Taken
             }
-            EditorAction::Up => {
+            KeyCode::Up => {
                 self.state.prev(&self.filtered);
                 ModalMessage::Taken
             }
-            EditorAction::Backspace => self.filter_pop(),
+            KeyCode::Backspace => self.filter_pop(),
             _ => ModalMessage::Done,
-        }
-    }
-
-    fn get_result(&mut self) -> ModalMessage {
-        if let Some(idx) = self.state.selected() {
-            ModalMessage::Workspace(WorkspaceEvent::AutoComplete(self.filtered.remove(idx).0))
-        } else {
-            ModalMessage::Done
         }
     }
 
@@ -279,13 +269,13 @@ impl Info {
         Self { items, state: WrappedState::default() }
     }
 
-    pub fn map_and_finish(&mut self, action: &EditorAction) -> ModalMessage {
-        match action {
-            EditorAction::Down => {
+    pub fn map_and_finish(&mut self, key: &KeyEvent) -> ModalMessage {
+        match key.code {
+            KeyCode::Down => {
                 self.state.next(&self.items);
                 ModalMessage::Taken
             }
-            EditorAction::Up => {
+            KeyCode::Up => {
                 self.state.prev(&self.items);
                 ModalMessage::Taken
             }

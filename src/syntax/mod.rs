@@ -4,7 +4,6 @@ mod theme;
 use self::line_builder::LineBuilder;
 use self::modal::{LSPModal, LSPResponseType, LSPResult, ModalMessage};
 pub use self::theme::Theme;
-use crate::configs::EditorAction;
 use crate::configs::FileType;
 use crate::global_state::GlobalState;
 use crate::lsp::LSPClient;
@@ -12,6 +11,7 @@ use crate::popups::popups_tree::refrence_selector;
 use crate::workspace::actions::EditMetaData;
 use crate::workspace::cursor::Cursor;
 use crate::workspace::CursorPosition;
+use crossterm::event::KeyEvent;
 use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent};
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -167,9 +167,9 @@ impl Lexer {
         }
     }
 
-    pub fn map_modal_if_exists(&mut self, key: &EditorAction, gs: &mut GlobalState) -> bool {
+    pub fn map_modal_if_exists(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         if let Some(modal) = &mut self.modal {
-            match modal.map_and_finish(key) {
+            match modal.map_and_finish(key, gs) {
                 ModalMessage::Taken => return true,
                 ModalMessage::TakenDone => {
                     self.modal.take();
@@ -177,11 +177,6 @@ impl Lexer {
                 }
                 ModalMessage::Done => {
                     self.modal.take();
-                }
-                ModalMessage::Workspace(event) => {
-                    gs.workspace.push_back(event);
-                    self.modal.take();
-                    return true;
                 }
                 ModalMessage::RenameVar(new_name, c) => {
                     self.get_rename(c, new_name);

@@ -76,10 +76,10 @@ impl Workspace {
         }
         let action = self.key_map.map(key);
         if let Some(editor) = self.get_active() {
+            if editor.lexer.map_modal_if_exists(key, gs) {
+                return true;
+            };
             if let Some(action) = action {
-                if editor.lexer.map_modal_if_exists(&action, gs) {
-                    return true;
-                };
                 match action {
                     EditorAction::Char(ch) => editor.push(ch),
                     EditorAction::NewLine => editor.new_line(),

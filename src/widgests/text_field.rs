@@ -26,20 +26,16 @@ const SELECT: Style = Style {
 };
 
 #[derive(Default)]
-pub struct TextField {
+pub struct TextField<T: Default + Clone> {
     pub text: String,
     char: usize,
     select: Option<(usize, usize)>,
-    on_text_update: Option<PopupMessage>,
+    on_text_update: Option<T>,
 }
 
-impl TextField {
-    pub fn with_tree_access() -> Self {
-        Self { on_text_update: Some(PopupMessage::Tree(TreeEvent::PopupAccess)), ..Default::default() }
-    }
-
-    pub fn with_editor_access() -> Self {
-        Self { on_text_update: Some(PopupMessage::Workspace(WorkspaceEvent::PopupAccess)), ..Default::default() }
+impl<T: Default + Clone> TextField<T> {
+    pub fn new(text: String, on_text_update: Option<T>) -> Self {
+        Self { char: text.len(), text, select: None, on_text_update }
     }
 
     /// returns blockless paragraph widget " >> inner text"
@@ -91,20 +87,20 @@ impl TextField {
         }
     }
 
-    pub fn map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> Option<PopupMessage> {
+    pub fn map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> Option<T> {
         match key.code {
             KeyCode::Char('c' | 'C') if key.modifiers == KeyModifiers::CONTROL => {
                 if let Some(clip) = self.get_selected() {
                     clipboard.push(clip);
                 };
-                Some(PopupMessage::default())
+                Some(T::default())
             }
             KeyCode::Char('x' | 'X') if key.modifiers == KeyModifiers::CONTROL => {
                 if let Some(clip) = self.take_selected() {
                     clipboard.push(clip);
                     return Some(self.on_text_update.clone().unwrap_or_default());
                 };
-                Some(PopupMessage::default())
+                Some(T::default())
             }
             KeyCode::Char('v' | 'V') if key.modifiers == KeyModifiers::CONTROL => {
                 if let Some(clip) = clipboard.pull() {
@@ -115,7 +111,7 @@ impl TextField {
                         return Some(self.on_text_update.clone().unwrap_or_default());
                     };
                 };
-                Some(PopupMessage::default())
+                Some(T::default())
             }
             KeyCode::Char(ch) => {
                 self.take_selected();
@@ -140,18 +136,18 @@ impl TextField {
             }
             KeyCode::End => {
                 self.char = self.text.len().saturating_sub(1);
-                Some(PopupMessage::default())
+                Some(T::default())
             }
             KeyCode::Left if key.modifiers == KeyModifiers::SHIFT => {
                 self.init_select();
                 self.char = self.char.saturating_sub(1);
                 self.push_select();
-                Some(PopupMessage::default())
+                Some(T::default())
             }
             KeyCode::Left => {
                 self.select = None;
                 self.char = self.char.saturating_sub(1);
-                Some(PopupMessage::default())
+                Some(T::default())
             }
             KeyCode::Right if key.modifiers == KeyModifiers::SHIFT => {
                 self.init_select();
@@ -159,14 +155,14 @@ impl TextField {
                     self.char += 1;
                 };
                 self.push_select();
-                Some(PopupMessage::default())
+                Some(T::default())
             }
             KeyCode::Right => {
                 self.select = None;
                 if self.text.len() > self.char {
                     self.char += 1;
                 };
-                Some(PopupMessage::default())
+                Some(T::default())
             }
             _ => None,
         }
@@ -201,5 +197,21 @@ impl TextField {
         self.text.replace_range(from..to, "");
         self.char = from;
         Some(clip)
+    }
+}
+
+impl TextField<PopupMessage> {
+    pub fn with_tree_access(text: String) -> Self {
+        Self::new(text, Some(PopupMessage::Tree(TreeEvent::PopupAccess)))
+    }
+
+    pub fn with_editor_access(text: String) -> Self {
+        Self::new(text, Some(PopupMessage::Workspace(WorkspaceEvent::PopupAccess)))
+    }
+}
+
+impl TextField<()> {
+    pub fn basic(text: String) -> Self {
+        Self { char: text.len(), text, ..Default::default() }
     }
 }

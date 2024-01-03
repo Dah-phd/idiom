@@ -83,13 +83,13 @@ impl PopupInterface for GoToLinePopup {
 
 pub struct FindPopup {
     pub options: Vec<(CursorPosition, CursorPosition)>,
-    pub pattern: TextField,
+    pub pattern: TextField<PopupMessage>,
     pub state: usize,
 }
 
 impl FindPopup {
     pub fn new() -> Box<Self> {
-        Box::new(Self { options: Vec::new(), pattern: TextField::with_editor_access(), state: 0 })
+        Box::new(Self { options: Vec::new(), pattern: TextField::with_editor_access(String::new()), state: 0 })
     }
 }
 

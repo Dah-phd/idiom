@@ -21,12 +21,16 @@ const SELECTOR_CONSTRAINTS: [Constraint; 2] = [Constraint::Min(3), Constraint::P
 pub struct ActivePathSearch {
     options: Vec<PathBuf>,
     state: WrappedState,
-    pattern: TextField,
+    pattern: TextField<PopupMessage>,
 }
 
 impl ActivePathSearch {
     pub fn new() -> Box<Self> {
-        Box::new(Self { options: Vec::new(), state: WrappedState::default(), pattern: TextField::with_tree_access() })
+        Box::new(Self {
+            options: Vec::new(),
+            state: WrappedState::default(),
+            pattern: TextField::with_tree_access(String::new()),
+        })
     }
 }
 
