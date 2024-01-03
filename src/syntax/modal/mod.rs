@@ -6,10 +6,7 @@ use crate::{
     widgests::{dynamic_cursor_rect_sized_height, WrappedState},
     workspace::CursorPosition,
 };
-use fuzzy_matcher::{
-    skim::{SkimMatcherV2, SkimScoreConfig},
-    FuzzyMatcher,
-};
+use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use lsp_types::{
     CompletionItem, Documentation, Hover, HoverContents, MarkedString, SignatureHelp, SignatureInformation,
 };
