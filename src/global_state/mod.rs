@@ -4,9 +4,8 @@ mod events;
 use crate::{
     footer::Footer,
     popups::popup_replace::ReplacePopup,
-    popups::popups_editor::selector_ranges,
-    popups::popups_tree::{search_tree_files, tree_file_selector},
     popups::PopupInterface,
+    popups::{popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges},
     tree::Tree,
     workspace::Workspace,
 };
@@ -152,7 +151,7 @@ impl GlobalState {
                     }
                 }
                 TreeEvent::SearchFiles(pattern) => {
-                    self.popup = Some(search_tree_files(pattern));
+                    self.popup = Some(ActiveFileSearch::new(pattern));
                 }
                 TreeEvent::Open(path) => {
                     tree.select_by_path(&path);
@@ -192,14 +191,6 @@ impl GlobalState {
                         self.footer.push(FooterEvent::Error(error.to_string()));
                     };
                     self.popup = None;
-                }
-                TreeEvent::SelectTreeFiles(pattern) => {
-                    self.mode = Mode::Select;
-                    self.popup = Some(tree_file_selector(tree.search_select_files(pattern).await));
-                }
-                TreeEvent::SelectTreeFilesFull(pattern) => {
-                    self.mode = Mode::Select;
-                    self.popup = Some(tree_file_selector(tree.search_files(pattern).await))
                 }
             }
         }

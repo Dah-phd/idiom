@@ -44,43 +44,6 @@ pub fn rename_file_popup(path: String) -> Box<Popup> {
     })
 }
 
-pub fn search_tree_files(pattern: String) -> Box<Popup> {
-    Box::new(Popup {
-        message: pattern,
-        message_as_buffer_builder: Some(Some),
-        title: Some("Find in tree".to_owned()),
-        buttons: vec![
-            Button {
-                command: |popup| TreeEvent::SelectTreeFiles(popup.message.to_owned()).into(),
-                name: "Files",
-                key: None,
-            },
-            Button {
-                command: |popup| TreeEvent::SelectTreeFilesFull(popup.message.to_owned()).into(),
-                name: "All files",
-                key: None,
-            },
-        ],
-        size: Some((55, 4)),
-        state: 0,
-    })
-}
-
-pub fn tree_file_selector(options: Vec<(PathBuf, String, usize)>) -> Box<PopupSelector<(PathBuf, String, usize)>> {
-    Box::new(PopupSelector {
-        options,
-        display: |(path, text, idx)| format!("{}\n    {}| {text}", path.display(), idx + 1),
-        command: |popup| {
-            if let Some((path, _, idx)) = popup.options.get(popup.state) {
-                return PopupMessage::Tree(TreeEvent::OpenAtLine(path.clone(), *idx));
-            }
-            PopupMessage::Clear
-        },
-        size: None,
-        state: 0,
-    })
-}
-
 pub fn refrence_selector(mut options: Vec<Location>) -> Box<PopupSelector<(PathBuf, Range)>> {
     Box::new(PopupSelector {
         options: options.drain(..).map(|loc| (PathBuf::from(loc.uri.path()), loc.range)).collect(),

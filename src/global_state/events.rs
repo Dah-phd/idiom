@@ -16,8 +16,6 @@ pub enum TreeEvent {
     CreateFileOrFolderBase(String),
     RenameFile(String),
     SearchFiles(String),
-    SelectTreeFiles(String),
-    SelectTreeFilesFull(String),
 }
 
 impl From<TreeEvent> for PopupMessage {

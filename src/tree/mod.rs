@@ -15,6 +15,7 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
+use tokio::task::JoinSet;
 use tree_paths::TreePath;
 
 const TICK: Duration = Duration::from_secs(1);
@@ -170,14 +171,13 @@ impl Tree {
         self.tree.shallow_copy().search_tree_paths(pattern)
     }
 
-    pub async fn search_select_files(&self, pattern: String) -> Vec<(PathBuf, String, usize)> {
+    pub fn join_set_files_selected_search(&self, pattern: String) -> JoinSet<Vec<(PathBuf, String, usize)>> {
         if let Some(tree_path) = self.get_selected() { tree_path.shallow_copy() } else { PathBuf::from("./").into() }
-            .search_tree_files(pattern)
-            .await
+            .search_files_join_set(pattern)
     }
 
-    pub async fn search_files(&self, pattern: String) -> Vec<(PathBuf, String, usize)> {
-        self.tree.shallow_copy().search_tree_files(pattern).await
+    pub fn join_set_files_search(&self, pattern: String) -> JoinSet<Vec<(PathBuf, String, usize)>> {
+        self.tree.shallow_copy().search_files_join_set(pattern)
     }
 
     pub fn select_by_path(&mut self, path: &PathBuf) {
