@@ -41,6 +41,7 @@ impl Footer {
         .split(screen);
         let footer_screen = layout[1];
         let editor_screen = layout[0];
+
         let message_p = self.get_message_widget().unwrap_or_default();
         let (stat_size, stat_p) = if let Some((len, sel, c)) = stats {
             let text = match sel {
@@ -54,8 +55,8 @@ impl Footer {
         let split = Layout::new(
             Direction::Horizontal,
             [
-                Constraint::Length(10),
-                Constraint::Length(footer_screen.width.checked_sub(10 + stat_size as u16).unwrap_or_default()),
+                Constraint::Length(12),
+                Constraint::Length(footer_screen.width.checked_sub(12 + stat_size as u16).unwrap_or_default()),
                 Constraint::Length(stat_size as u16),
             ],
         )

@@ -183,7 +183,7 @@ impl AutoComplete {
             filter,
             filtered: Vec::new(),
             completions,
-            matcher: SkimMatcherV2::default().score_config(SkimScoreConfig { score_match: 1000, ..Default::default() }),
+            matcher: SkimMatcherV2::default(),
         };
         modal.build_matches();
         modal
@@ -238,7 +238,11 @@ impl AutoComplete {
             .completions
             .iter()
             .filter_map(|item| {
-                self.matcher.fuzzy_match(&item.label, &self.filter).map(|score| (item.label.to_owned(), score))
+                self.matcher.fuzzy_match(&item.label, &self.filter).map(|score| {
+                    let divisor = item.label.len().abs_diff(self.filter.len()) as i64;
+                    let new_score = if divisor != 0 { score / divisor } else { score };
+                    (item.label.to_owned(), new_score)
+                })
             })
             .collect();
         self.filtered.sort_by(|(_, idx), (_, rhidx)| rhidx.cmp(idx));

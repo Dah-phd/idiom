@@ -15,7 +15,7 @@ pub use events::{FooterEvent, TreeEvent, WorkspaceEvent};
 
 use crossterm::event::KeyEvent;
 use ratatui::{
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     text::Span,
     Frame,
 };
@@ -65,11 +65,17 @@ impl GlobalState {
         match self.mode {
             Mode::Insert => {
                 let color = if self.popup.is_some() { Color::Gray } else { Color::Rgb(255, 0, 0) };
-                Span::styled("  INSERT  ", Style::default().fg(color))
+                Span::styled(
+                    " --INSERT-- ",
+                    Style { fg: Some(color), add_modifier: Modifier::BOLD, ..Default::default() },
+                )
             }
             Mode::Select => {
                 let color = if self.popup.is_some() { Color::Gray } else { Color::LightCyan };
-                Span::styled("  SELECT  ", Style::default().fg(color))
+                Span::styled(
+                    " --SELECT-- ",
+                    Style { fg: Some(color), add_modifier: Modifier::BOLD, ..Default::default() },
+                )
             }
         }
     }
