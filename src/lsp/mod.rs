@@ -2,9 +2,8 @@ mod client;
 mod lsp_stream;
 mod messages;
 mod notification;
-mod python;
 mod request;
-mod rust;
+mod servers;
 pub use client::LSPClient;
 use lsp_stream::LSPMessageStream;
 pub use messages::{Diagnostic, GeneralNotification, LSPMessage, Request, Response};
@@ -53,8 +52,8 @@ pub struct LSP {
 impl LSP {
     pub async fn from(file_type: &FileType) -> Result<Self> {
         match file_type {
-            FileType::Rust => Self::new(rust::start_lsp(), *file_type).await,
-            FileType::Python => Self::new(python::start_lsp(), *file_type).await,
+            FileType::Rust => Self::new(servers::rust_lsp(), *file_type).await,
+            FileType::Python => Self::new(servers::python_lsp(), *file_type).await,
             _ => Err(anyhow!("Not supported LSP!")),
         }
     }
