@@ -49,6 +49,7 @@ pub enum EditorAction {
     SelectLeft,
     SelectRight,
     SelectToken,
+    SelectAll,
     ScrollUp,
     ScrollDown,
     SwapUp,
@@ -93,6 +94,7 @@ pub struct EditorUserKeyMap {
     select_left: String,
     select_right: String,
     select_token: String,
+    select_all: String,
     scroll_up: String,
     scroll_down: String,
     swap_up: String,
@@ -137,6 +139,7 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
         insert_key_event(&mut hash, &val.select_left, EditorAction::SelectLeft);
         insert_key_event(&mut hash, &val.select_right, EditorAction::SelectRight);
         insert_key_event(&mut hash, &val.select_token, EditorAction::SelectToken);
+        insert_key_event(&mut hash, &val.select_all, EditorAction::SelectAll);
         insert_key_event(&mut hash, &val.scroll_up, EditorAction::ScrollUp);
         insert_key_event(&mut hash, &val.scroll_down, EditorAction::ScrollDown);
         insert_key_event(&mut hash, &val.swap_up, EditorAction::SwapUp);
@@ -183,6 +186,7 @@ impl Default for EditorUserKeyMap {
             select_left: format!("{} && {}", SHIFT, LEFT),
             select_right: format!("{} && {}", SHIFT, RIGHT),
             select_token: format!("{} && w", CTRL),
+            select_all: format!("{} && a", CTRL),
             scroll_up: format!("{} && {} || {}", CTRL, UP, PAGEUP),
             scroll_down: format!("{} && {} || {}", CTRL, DOWN, PAGEDOWN),
             swap_up: format!("{} && {}", ALT, UP),

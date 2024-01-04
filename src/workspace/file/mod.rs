@@ -198,6 +198,16 @@ impl Editor {
         }
     }
 
+    pub fn select_all(&mut self) {
+        self.cursor.select_set(
+            CursorPosition::default(),
+            CursorPosition {
+                line: self.content.len() - 1,
+                char: self.content.last().map(|line| line.len()).unwrap_or_default(),
+            },
+        );
+    }
+
     pub fn paste(&mut self, clip: String) {
         self.actions.paste(clip, &mut self.cursor, &mut self.content);
     }
