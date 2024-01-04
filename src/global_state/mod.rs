@@ -151,7 +151,13 @@ impl GlobalState {
                     }
                 }
                 TreeEvent::SearchFiles(pattern) => {
-                    self.popup = Some(ActiveFileSearch::new(pattern));
+                    if pattern.len() > 1 {
+                        let mut new_popup = ActiveFileSearch::new(pattern);
+                        new_popup.update_tree(tree);
+                        self.popup = Some(new_popup);
+                    } else {
+                        self.popup.replace(ActiveFileSearch::new(pattern));
+                    }
                 }
                 TreeEvent::Open(path) => {
                     tree.select_by_path(&path);
