@@ -181,6 +181,7 @@ impl PopupInterface for ActiveFileSearch {
 
     fn update_tree(&mut self, file_tree: &mut Tree) {
         if self.pattern.text.len() < 2 {
+            self.options.clear();
             return;
         };
         self.options.clear();

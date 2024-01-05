@@ -21,10 +21,6 @@ pub struct Legend {
 }
 
 impl Legend {
-    pub fn is_empty(&self) -> bool {
-        self.legend.is_empty()
-    }
-
     pub fn get_color(&self, token_type: usize, theme: &Theme) -> ColorResult {
         if let Some(color) = self.legend.get(token_type) {
             return *color;

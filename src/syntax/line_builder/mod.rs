@@ -3,6 +3,10 @@ mod diagnostics;
 mod internal;
 mod langs;
 mod legend;
+mod tokens;
+
+use tokens::Tokens;
+
 use super::modal::LSPResponseType;
 use crate::{
     lsp::LSPClient,
@@ -26,20 +30,18 @@ use ratatui::{
 };
 use std::{collections::HashMap, ops::Range, path::Path};
 
-#[derive(Debug)]
 pub struct LineBuilder {
     pub theme: Theme,
     pub lang: Lang,
     pub text_width: usize,
     select_range: Option<Range<usize>>,
     legend: Legend,
-    tokens: Vec<Vec<Token>>,
+    tokens: Tokens,
     cursor: CursorPosition,
     brackets: BracketColors,
     diagnostics: HashMap<usize, DiagnosticLines>,
     diagnostic_processor: fn(&mut Self, PublishDiagnosticsParams),
     file_was_saved: bool,
-    ignores: Vec<usize>,
 }
 
 impl LineBuilder {
@@ -50,13 +52,12 @@ impl LineBuilder {
             text_width: 0,
             select_range: None,
             legend: Legend::default(),
-            tokens: Vec::new(),
+            tokens: Tokens::default(),
             cursor: CursorPosition::default(),
             brackets: BracketColors::default(),
             diagnostics: HashMap::new(),
             diagnostic_processor: diagnostics_full,
             file_was_saved: true,
-            ignores: Vec::new(),
         }
     }
 
@@ -71,21 +72,10 @@ impl LineBuilder {
     }
 
     pub fn set_tokens(&mut self, tokens_res: SemanticTokensResult) -> bool {
-        let mut inner_token = Vec::new();
-        let mut from = 0;
-        self.tokens.clear();
-        if let SemanticTokensResult::Tokens(tkns) = tokens_res {
-            for tkn in tkns.data {
-                for _ in 0..tkn.delta_line {
-                    from = 0;
-                    self.tokens.push(std::mem::take(&mut inner_token));
-                }
-                from += tkn.delta_start as usize;
-                inner_token.push(Token { from, len: tkn.length, token_type: tkn.token_type as usize });
-            }
-            self.tokens.push(inner_token);
+        if let SemanticTokensResult::Tokens(tokens) = tokens_res {
+            self.tokens.tokens_reset(tokens.data);
         }
-        self.tokens.len() > 1
+        !self.tokens.is_empty()
     }
 
     pub fn set_tokens_partial(&mut self, tokens: SemanticTokensRangeResult) {
@@ -93,17 +83,7 @@ impl LineBuilder {
             SemanticTokensRangeResult::Partial(data) => data.data,
             SemanticTokensRangeResult::Tokens(data) => data.data,
         };
-        let mut line_idx = 0;
-        let mut from = 0;
-        for token in tokens {
-            if token.delta_line != 0 {
-                from = 0;
-                line_idx += token.delta_line as usize;
-            }
-            from += token.delta_start as usize;
-            self.tokens[line_idx].push(Token { from, len: token.length, token_type: token.token_type as usize });
-            self.ignores.clear();
-        }
+        self.tokens.tokens_set(tokens);
     }
 
     pub fn collect_changes(
@@ -122,7 +102,7 @@ impl LineBuilder {
                 data.drop_non_errs();
             }
         }
-        if self.tokens.len() <= 1 {
+        if self.tokens.is_empty() {
             // ensures that there is fully mapped tokens before doing normal processing
             client.file_did_change(path, version, events.drain(..).map(|(_, edit)| edit).collect()).ok()?;
             return client.request_full_tokens(path).map(LSPResponseType::Tokens);
@@ -131,15 +111,15 @@ impl LineBuilder {
             0 => None,
             1 => {
                 let (meta, edit) = events.remove(0);
-                meta.correct_tokens(&mut self.tokens, &mut self.ignores);
+                self.tokens.map_meta_data(meta);
                 client.file_did_change(path, version, vec![edit]).ok()?;
-                client.request_partial_tokens(path, meta.build_range(content)).map(LSPResponseType::TokensPartial)
+                client.request_partial_tokens(path, meta.build_range(content)?).map(LSPResponseType::TokensPartial)
             }
             _ => {
                 let edits = events
                     .drain(..)
                     .map(|(meta, edit)| {
-                        meta.correct_tokens(&mut self.tokens, &mut self.ignores);
+                        self.tokens.map_meta_data(meta);
                         edit
                     })
                     .collect::<Vec<_>>();
@@ -159,47 +139,56 @@ impl LineBuilder {
         idx: usize,
         select: Option<Range<usize>>,
         content: &'a str,
-        init: Vec<Span<'a>>,
+        mut init: Vec<Span<'a>>,
     ) -> ListItem<'a> {
+        if content.is_empty() {
+            if select.is_some() {
+                init.push(Span::styled(" ", Style { bg: Some(self.theme.selected), ..Default::default() }));
+            };
+            return self.format_with_info(idx, init.len(), None, init);
+        }
         self.select_range = select;
-        if self.ignores.contains(&idx) || self.legend.is_empty() || self.tokens.len() <= 1 {
-            generic_line(self, idx, content, init)
+        if let Some(line) = self.process_tokens(idx, content, init.clone()) {
+            line
         } else {
-            self.process_tokens(idx, content, init)
+            generic_line(self, idx, content, init)
         }
     }
 
-    pub fn process_tokens<'a>(&mut self, line_idx: usize, content: &'a str, mut spans: Vec<Span<'a>>) -> ListItem<'a> {
+    pub fn process_tokens<'a>(
+        &mut self,
+        line_idx: usize,
+        content: &'a str,
+        mut spans: Vec<Span<'a>>,
+    ) -> Option<ListItem<'a>> {
         let mut style = Style { fg: Some(Color::White), ..Default::default() };
         let mut len: u32 = 0;
         let mut token_num = 0;
         let offset = spans.len();
-        let token_line = self.tokens.get(line_idx);
+        let token_line = self.tokens.get(line_idx)?;
         let diagnostic = self.diagnostics.get(&line_idx);
         for (idx, ch) in content.char_indices() {
             len = len.saturating_sub(1);
             if len == 0 {
-                if let Some(syntax_line) = token_line {
-                    if let Some(t) = syntax_line.get(token_num) {
-                        if t.from == idx {
-                            len = t.len;
-                            style.fg = Some(match self.legend.get_color(t.token_type, &self.theme) {
-                                ColorResult::Final(color) => color,
-                                ColorResult::KeyWord => {
-                                    if content.len() > idx + (len as usize) {
-                                        self.handle_keywords(&content[idx..(idx + len as usize)])
-                                    } else {
-                                        self.theme.key_words
-                                    }
+                if let Some(t) = token_line.get(token_num) {
+                    if t.from == idx {
+                        len = t.len;
+                        style.fg = Some(match self.legend.get_color(t.token_type, &self.theme) {
+                            ColorResult::Final(color) => color,
+                            ColorResult::KeyWord => {
+                                if content.len() > idx + (len as usize) {
+                                    self.handle_keywords(&content[idx..(idx + len as usize)])
+                                } else {
+                                    self.theme.key_words
                                 }
-                            });
-                            token_num += 1;
-                        } else {
-                            style.fg.replace(Color::default());
-                        }
+                            }
+                        });
+                        token_num += 1;
                     } else {
                         style.fg.replace(Color::default());
                     }
+                } else {
+                    style.fg.replace(Color::default());
                 }
             }
             self.set_diagnostic_style(idx, &mut style, diagnostic);
@@ -209,7 +198,7 @@ impl LineBuilder {
             style.add_modifier = Modifier::empty();
             style.bg = None;
         }
-        self.format_with_info(line_idx, offset, diagnostic, spans)
+        Some(self.format_with_info(line_idx, offset, diagnostic, spans))
     }
 
     fn format_with_info<'a>(
@@ -276,7 +265,6 @@ impl LineBuilder {
     }
 }
 
-#[derive(Debug)]
 pub struct Token {
     from: usize,
     len: u32,

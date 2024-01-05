@@ -2,7 +2,7 @@
 
 ## Current version support basic file tree and navigation:
 ## TODO!
-- add configs to fuzzy-matcher
+- replace tokens vec with custom datastruct that always returns or removes - things will be simpler
 - work on autocomplete trigger
 - provide info on autocompletes if possible
 - (backlog) semantic token styles for diff lsp langs

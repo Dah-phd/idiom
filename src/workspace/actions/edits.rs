@@ -263,36 +263,12 @@ impl EditMetaData {
         Self { start_line, from: 1, to: 1 }
     }
 
-    pub fn correct_tokens<T>(&self, tokens: &mut Vec<Vec<T>>, ignores: &mut Vec<usize>) {
-        match self.from.cmp(&self.to) {
-            Ordering::Equal => {}
-            Ordering::Greater => {
-                let mut lines_to_remove = self.from - self.to;
-                while lines_to_remove != 0 {
-                    tokens.remove(self.start_line);
-                    lines_to_remove -= 1;
-                }
-            }
-            Ordering::Less => {
-                let mut lines_to_add = self.to - self.from;
-                while lines_to_add != 0 {
-                    tokens.insert(self.start_line, Vec::new());
-                    lines_to_add -= 1;
-                }
-            }
-        }
-        ignores.extend(tokens.iter_mut().enumerate().skip(self.start_line).take(self.to).map(|(idx, token_line)| {
-            token_line.clear();
-            idx
-        }));
-    }
-
-    pub fn build_range(&self, content: &[String]) -> Range {
+    pub fn build_range(&self, content: &[String]) -> Option<Range> {
         let end_line = self.start_line + self.to - 1;
-        Range::new(
+        Some(Range::new(
             Position::new(self.start_line as u32, 0),
-            Position::new(end_line as u32, content[end_line].len() as u32),
-        )
+            Position::new(end_line as u32, content.get(end_line)?.len() as u32),
+        ))
     }
 
     fn rev(&self) -> Self {
