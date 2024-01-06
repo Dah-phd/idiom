@@ -1,12 +1,14 @@
-use super::diagnostics::DiagnosticLines;
-use super::LineBuilder;
+use super::{diagnostics::DiagnosticLines, LineBuilder};
 use ratatui::{
     style::{Color, Style},
     text::Span,
     widgets::ListItem,
 };
 
+/// used to map markup lines based on info
+/// functionality as line number, wrap, cursor position, select are handled by the logic in LineBuilder
 pub fn mark_down_line<'a>(
+    // TODO enable
     _builder: &mut LineBuilder,
     _idx: usize,
     content: &str,
@@ -25,6 +27,8 @@ pub fn mark_down_line<'a>(
     buffer
 }
 
+/// build generic styled line based on info on lang and theme (calls LineBuilder functionality)
+/// functionality as line number, wrap, cursor position, select are handled by the logic in LineBuilder
 pub fn generic_line<'a>(
     builder: &mut LineBuilder,
     idx: usize,
@@ -32,13 +36,12 @@ pub fn generic_line<'a>(
     mut buffer: Vec<Span<'a>>,
 ) -> ListItem<'a> {
     if builder.lang.is_comment(content) {
-        let offset = buffer.len();
         buffer.extend(content.char_indices().map(|(idx, ch)| {
             let mut style = Style { fg: Some(builder.theme.comment), ..Default::default() };
             builder.set_select(&mut style, &idx);
             Span::styled(ch.to_string(), style)
         }));
-        return builder.format_with_info(idx, offset, None, buffer);
+        return builder.format_with_info(idx, None, buffer);
     }
     let mut buf = SpanBuffer::from(buffer);
     let mut chars = content.char_indices().peekable();
@@ -108,13 +111,12 @@ pub fn generic_line<'a>(
             }
         }
     }
-    builder.format_with_info(idx, buf.offset, diagnostic, buf.buffer)
+    builder.format_with_info(idx, diagnostic, buf.buffer)
 }
 
 #[derive(Default)]
 struct SpanBuffer<'a> {
     token_buffer: String,
-    offset: usize,
     last_reset: usize,
     last_char: char,
     str_open: bool,
@@ -219,7 +221,7 @@ impl<'a> SpanBuffer<'a> {
     }
 
     fn update_fg(&mut self, fg: Color) {
-        for s in self.buffer[self.offset + self.last_reset..].iter_mut() {
+        for s in self.buffer[self.last_reset..].iter_mut() {
             s.style.fg.replace(fg);
         }
     }
@@ -234,6 +236,6 @@ impl<'a> SpanBuffer<'a> {
 
 impl<'a> From<Vec<Span<'a>>> for SpanBuffer<'a> {
     fn from(buffer: Vec<Span<'a>>) -> Self {
-        Self { offset: buffer.len(), buffer, last_char: '\n', ..Default::default() }
+        Self { last_reset: buffer.len(), buffer, last_char: '\n', ..Default::default() }
     }
 }

@@ -14,8 +14,6 @@ use crate::workspace::CursorPosition;
 use crossterm::event::KeyEvent;
 use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent};
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::Span;
 use ratatui::{widgets::ListItem, Frame};
 use std::cmp::Ordering;
 use std::path::PathBuf;
@@ -23,14 +21,6 @@ use std::{fmt::Debug, path::Path};
 
 #[cfg(build = "debug")]
 use crate::utils::debug_to_file;
-
-const DIGIT_STYLE: Style = Style {
-    fg: Some(Color::Gray),
-    bg: None,
-    add_modifier: Modifier::empty(),
-    sub_modifier: Modifier::empty(),
-    underline_color: None,
-};
 
 pub struct Lexer {
     pub diagnostics: Option<PublishDiagnosticsParams>,
@@ -275,12 +265,7 @@ impl Lexer {
     }
 
     pub fn list_item<'a>(&mut self, idx: usize, content: &'a str) -> ListItem<'a> {
-        self.line_builder.build_line(
-            idx,
-            self.line_select(idx, content.len()),
-            content,
-            vec![Span::styled(format!("{: >1$} ", idx + 1, self.max_digits), DIGIT_STYLE)],
-        )
+        self.line_builder.build_line(idx, self.line_select(idx, content.len()), content, self.max_digits)
     }
 
     pub fn reload_theme(&mut self) {
