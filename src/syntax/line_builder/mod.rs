@@ -34,6 +34,7 @@ use std::{collections::HashMap, ops::Range, path::Path};
 /// !used by LineBuilder::format_with_info(..) -> ListItem - used to derive cursor and wrap
 const INIT_BUF_SIZE: usize = 1;
 
+/// ! generates start with line number -> based on the produced vec len is the definition of INIT_BUF_SIZE
 pub fn init_buffer_with_line_number(line_idx: usize, max_digits: usize) -> Vec<Span<'static>> {
     vec![Span::styled(format!("{: >1$} ", line_idx + 1, max_digits), DIGIT_STYLE)]
 }
