@@ -185,13 +185,15 @@ impl PopupInterface for ActiveFileSearch {
             return;
         };
         self.options.clear();
-        let mut join_set = match self.mode {
-            Mode::Full => file_tree.join_set_files_search(self.pattern.text.to_owned()),
-            Mode::Select => file_tree.join_set_files_selected_search(self.pattern.text.to_owned()),
+        let tree_path = match self.mode {
+            Mode::Full => file_tree.shallow_copy_root_tree_path(),
+            Mode::Select => file_tree.shallow_copy_selected_tree_path(),
         };
         let buffer = Arc::clone(&self.option_buffer);
+        let pattern = self.pattern.text.to_owned();
         if let Some(old_handle) = self.join_handle.replace(tokio::task::spawn(async move {
             buffer.lock().await.clear();
+            let mut join_set = tree_path.search_files_join_set(pattern);
             while let Some(task_result) = join_set.join_next().await {
                 if let Ok(result) = task_result {
                     buffer.lock().await.extend(result);
