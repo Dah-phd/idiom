@@ -50,20 +50,21 @@ impl Tree {
         if matches!(gs.mode, Mode::Insert) && !self.active {
             return screen;
         }
-        let areas = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(15), Constraint::Min(2)])
-            .split(screen);
+        let areas = Layout::new(Direction::Horizontal, [Constraint::Percentage(15), Constraint::Min(2)]).split(screen);
 
         self.sync();
 
-        let mut state = self.state.clone();
+        let list_items = self
+            .tree_ptrs
+            .iter()
+            .flat_map(|ptr| unsafe { ptr.as_ref() }.map(|tree_path| ListItem::new(tree_path.display())))
+            .collect::<Vec<ListItem<'_>>>();
 
-        let tree = List::new(self.get_list_items())
+        let tree = List::new(list_items)
             .block(Block::default().borders(Borders::ALL).title("Explorer"))
-            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+            .highlight_style(Style { add_modifier: Modifier::REVERSED, ..Default::default() });
 
-        frame.render_stateful_widget(tree, areas[0], &mut state);
+        frame.render_stateful_widget(tree, areas[0], &mut self.state);
         areas[1]
     }
 
@@ -206,16 +207,6 @@ impl Tree {
 
     pub fn toggle(&mut self) {
         self.active = !self.active;
-    }
-
-    fn get_list_items(&self) -> Vec<ListItem<'_>> {
-        let mut buffer = Vec::new();
-        for tree_ptr in self.tree_ptrs.iter() {
-            if let Some(tree_path) = unsafe { tree_ptr.as_ref() } {
-                buffer.push(ListItem::new(tree_path.display()))
-            }
-        }
-        buffer
     }
 
     pub fn get_selected(&self) -> Option<&mut TreePath> {

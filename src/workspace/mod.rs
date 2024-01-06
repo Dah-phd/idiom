@@ -62,8 +62,12 @@ impl Workspace {
                 titles.extend(titles_unordered);
 
                 let tabs = Tabs::new(titles)
-                    .style(Style::default().add_modifier(Modifier::UNDERLINED))
-                    .highlight_style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                    .style(Style { add_modifier: Modifier::UNDERLINED, ..Default::default() })
+                    .highlight_style(Style {
+                        fg: Some(Color::Yellow),
+                        add_modifier: Modifier::BOLD,
+                        ..Default::default()
+                    })
                     .select(0);
                 frame.render_widget(tabs, tab_area);
             }
