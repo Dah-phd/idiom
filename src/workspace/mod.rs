@@ -2,10 +2,13 @@ pub mod actions;
 pub mod cursor;
 pub mod file;
 pub mod utils;
-use crate::configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType};
-use crate::global_state::{GlobalState, Mode};
-use crate::lsp::LSP;
-use crate::widgests::WrappedState;
+use crate::{
+    configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
+    global_state::{GlobalState, Mode},
+    lsp::LSP,
+    utils::UNDERLINED,
+    widgests::WrappedState,
+};
 pub use cursor::CursorPosition;
 pub use file::{DocStats, Editor};
 
@@ -24,6 +27,7 @@ use std::{
     path::PathBuf,
 };
 
+const TAB_HIGHTLIGHT: Style = Style::new().fg(Color::Yellow).add_modifier(Modifier::UNDERLINED);
 const RECT_CONSTRAINT: [Constraint; 2] = [Constraint::Length(1), Constraint::Percentage(100)];
 
 pub struct Workspace {
@@ -61,14 +65,7 @@ impl Workspace {
                 let mut titles = titles_unordered.split_off(editor_id);
                 titles.extend(titles_unordered);
 
-                let tabs = Tabs::new(titles)
-                    .style(Style { add_modifier: Modifier::UNDERLINED, ..Default::default() })
-                    .highlight_style(Style {
-                        fg: Some(Color::Yellow),
-                        add_modifier: Modifier::BOLD,
-                        ..Default::default()
-                    })
-                    .select(0);
+                let tabs = Tabs::new(titles).style(UNDERLINED).highlight_style(TAB_HIGHTLIGHT).select(0);
                 frame.render_widget(tabs, tab_area);
             }
         }

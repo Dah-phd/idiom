@@ -1,6 +1,5 @@
-use std::{ops::Range, path::PathBuf, time::SystemTime};
-
 use crate::workspace::cursor::CursorPosition;
+use std::{ops::Range, path::PathBuf, time::SystemTime};
 
 pub fn insert_clip(clip: String, content: &mut Vec<String>, mut cursor: CursorPosition) -> CursorPosition {
     let mut lines: Vec<_> = clip.split('\n').collect();
