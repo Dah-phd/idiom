@@ -3,6 +3,7 @@ use crate::configs::FileType;
 #[derive(Debug, Clone)]
 pub struct Lang {
     pub file_type: FileType,
+    pub comment_start: Vec<&'static str>,
     pub declaration: Vec<&'static str>,
     pub key_words: Vec<&'static str>,
     pub frow_control: Vec<&'static str>,
@@ -12,6 +13,15 @@ pub struct Lang {
 impl Lang {
     pub fn is_keyword(&self, token: &str) -> bool {
         self.declaration.contains(&token) || self.key_words.contains(&token)
+    }
+
+    pub fn is_comment(&self, line: &str) -> bool {
+        for start in self.comment_start.iter() {
+            if line.trim_start().starts_with(start) {
+                return true;
+            }
+        }
+        false
     }
 
     pub fn completelable(&self, line: &str, idx: usize) -> bool {
@@ -39,6 +49,7 @@ impl From<FileType> for Lang {
         match file_type {
             FileType::Rust => Self {
                 file_type,
+                comment_start: vec!["//", "///"],
                 declaration: vec!["fn", "struct", "enum", "type", "const"],
                 key_words: vec![
                     "pub", "use", "mod", "let", "self", "mut", "crate", "async", "super", "impl", "Self",
@@ -49,6 +60,7 @@ impl From<FileType> for Lang {
                 mod_import: vec!["mod", "use", "pub mod", "pub use"],
             },
             FileType::Python => Self {
+                comment_start: vec!["#"],
                 file_type,
                 declaration: vec!["def", "class"],
                 key_words: vec![],
@@ -57,11 +69,17 @@ impl From<FileType> for Lang {
                 ],
                 mod_import: vec!["import", "from"],
             },
-            FileType::MarkDown => {
-                Self { file_type, declaration: vec![], key_words: vec![], frow_control: vec![], mod_import: vec![] }
-            }
+            FileType::MarkDown => Self {
+                file_type,
+                comment_start: vec![],
+                declaration: vec![],
+                key_words: vec![],
+                frow_control: vec![],
+                mod_import: vec![],
+            },
             _ => Self {
                 file_type,
+                comment_start: vec!["#", "//"],
                 declaration: vec![
                     "fn", "struct", "enum", "type", "const", "def", "class", "var", "function",
                 ],

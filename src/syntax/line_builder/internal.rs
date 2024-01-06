@@ -25,7 +25,21 @@ pub fn mark_down_line<'a>(
     buffer
 }
 
-pub fn generic_line<'a>(builder: &mut LineBuilder, idx: usize, content: &str, buffer: Vec<Span<'a>>) -> ListItem<'a> {
+pub fn generic_line<'a>(
+    builder: &mut LineBuilder,
+    idx: usize,
+    content: &str,
+    mut buffer: Vec<Span<'a>>,
+) -> ListItem<'a> {
+    if builder.lang.is_comment(content) {
+        let offset = buffer.len();
+        buffer.extend(content.char_indices().map(|(idx, ch)| {
+            let mut style = Style { fg: Some(builder.theme.comment), ..Default::default() };
+            builder.set_select(&mut style, &idx);
+            Span::styled(ch.to_string(), style)
+        }));
+        return builder.format_with_info(idx, offset, None, buffer);
+    }
     let mut buf = SpanBuffer::from(buffer);
     let mut chars = content.char_indices().peekable();
     let diagnostic = builder.diagnostics.get(&idx);
