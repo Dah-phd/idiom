@@ -164,36 +164,33 @@ impl LineBuilder {
     ) -> Option<ListItem<'a>> {
         let token_line = self.tokens.get(line_idx)?;
         let mut style = Style::default();
-        let mut len: u32 = 0;
+        let mut len: usize = 0;
         let mut token_num = 0;
         let offset = spans.len();
         let diagnostic = self.diagnostics.get(&line_idx);
-        for (idx, ch) in content.char_indices() {
+        for (char_idx, ch) in content.char_indices() {
             len = len.saturating_sub(1);
             if len == 0 {
-                if let Some(t) = token_line.get(token_num) {
-                    if t.from == idx {
-                        len = t.len;
-                        style.fg = Some(match self.legend.get_color(t.token_type, &self.theme) {
+                match token_line.get(token_num) {
+                    Some(token) if token.from == char_idx => {
+                        len = token.len;
+                        style.fg = Some(match self.legend.get_color(token.token_type, &self.theme) {
                             ColorResult::Final(color) => color,
                             ColorResult::KeyWord => {
-                                if content.len() > idx + (len as usize) {
-                                    self.handle_keywords(&content[idx..(idx + len as usize)])
+                                if content.len() > char_idx + len {
+                                    self.handle_keywords(&content[char_idx..(char_idx + len)])
                                 } else {
                                     self.theme.key_words
                                 }
                             }
                         });
                         token_num += 1;
-                    } else {
-                        style.fg.take();
                     }
-                } else {
-                    style.fg.take();
+                    _ => style.fg = None,
                 }
             }
-            self.set_diagnostic_style(idx, &mut style, diagnostic);
-            self.set_select(&mut style, &idx);
+            self.set_diagnostic_style(char_idx, &mut style, diagnostic);
+            self.set_select(&mut style, &char_idx);
             self.brackets.map_style(ch, &mut style);
             spans.push(Span::styled(ch.to_string(), style));
             style.add_modifier = Modifier::empty();
@@ -264,10 +261,4 @@ impl LineBuilder {
             self.legend.map_styles(&self.lang.file_type, &self.theme, capabilities)
         }
     }
-}
-
-pub struct Token {
-    from: usize,
-    len: u32,
-    token_type: usize,
 }

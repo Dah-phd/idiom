@@ -4,7 +4,11 @@ use lsp_types::SemanticToken;
 
 use crate::workspace::actions::EditMetaData;
 
-use super::Token;
+pub struct Token {
+    pub from: usize,
+    pub len: usize,
+    pub token_type: usize,
+}
 
 #[derive(Default)]
 pub struct Tokens {
@@ -93,7 +97,7 @@ impl Tokens {
                 idx += token.delta_line as usize;
             };
             from += token.delta_start as usize;
-            token_line.push(Token { from, len: token.length, token_type: token.token_type as usize });
+            token_line.push(Token { from, len: token.length as usize, token_type: token.token_type as usize });
         }
         if !token_line.is_empty() {
             self.insert_line(idx, token_line);
@@ -109,7 +113,7 @@ impl Tokens {
                 line_idx += token.delta_line as usize;
             }
             from += token.delta_start as usize;
-            self.insert(line_idx, Token { from, len: token.length, token_type: token.token_type as usize });
+            self.insert(line_idx, Token { from, len: token.length as usize, token_type: token.token_type as usize });
         }
     }
 }
