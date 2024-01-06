@@ -86,7 +86,10 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                         gs.popup(ReplacePopup::new());
                     }
                     GeneralAction::SelectOpenEditor => {
-                        gs.popup(selector_editors(workspace.tabs()));
+                        let tabs = workspace.tabs();
+                        if !tabs.is_empty() {
+                            gs.popup(selector_editors(workspace.tabs()));
+                        };
                     }
                     GeneralAction::NewFile => {
                         gs.popup(create_file_popup(file_tree.get_first_selected_folder_display()));

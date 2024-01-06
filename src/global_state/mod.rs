@@ -243,6 +243,7 @@ impl GlobalState {
                 WorkspaceEvent::ActivateEditor(idx) => {
                     workspace.state.set(idx);
                     self.popup = None;
+                    self.mode = Mode::Insert;
                 }
                 WorkspaceEvent::FindSelector(pattern) => {
                     if let Some(editor) = workspace.get_active() {

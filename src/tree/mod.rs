@@ -70,8 +70,10 @@ impl Tree {
 
     pub fn map(&mut self, key: &KeyEvent) -> bool {
         match key.code {
-            KeyCode::Up | KeyCode::Char('w' | 'W') => self.select_up(),
-            KeyCode::Down | KeyCode::Char('s' | 'S') => self.select_down(),
+            KeyCode::Up if !key.modifiers.contains(KeyModifiers::CONTROL) => self.select_up(),
+            KeyCode::Char('w' | 'W') => self.select_up(),
+            KeyCode::Down if !key.modifiers.contains(KeyModifiers::CONTROL) => self.select_down(),
+            KeyCode::Char('s' | 'S') => self.select_down(),
             KeyCode::Left => self.shrink(),
             KeyCode::Char('d' | 'D') if !key.modifiers.contains(KeyModifiers::CONTROL) => self.shrink(),
             KeyCode::Delete if key.modifiers == KeyModifiers::SHIFT => {
