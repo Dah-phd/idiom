@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::fmt::Debug;
 
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit};

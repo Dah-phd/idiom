@@ -142,10 +142,11 @@ impl LineBuilder {
         mut init: Vec<Span<'a>>,
     ) -> ListItem<'a> {
         if content.is_empty() {
+            let offset = init.len();
             if select.is_some() {
                 init.push(Span::styled(" ", Style { bg: Some(self.theme.selected), ..Default::default() }));
             };
-            return self.format_with_info(idx, init.len(), None, init);
+            return self.format_with_info(idx, offset, None, init);
         }
         self.select_range = select;
         if let Some(line) = self.process_tokens(idx, content, init.clone()) {
@@ -161,11 +162,11 @@ impl LineBuilder {
         content: &'a str,
         mut spans: Vec<Span<'a>>,
     ) -> Option<ListItem<'a>> {
-        let mut style = Style { fg: Some(Color::White), ..Default::default() };
+        let token_line = self.tokens.get(line_idx)?;
+        let mut style = Style::default();
         let mut len: u32 = 0;
         let mut token_num = 0;
         let offset = spans.len();
-        let token_line = self.tokens.get(line_idx)?;
         let diagnostic = self.diagnostics.get(&line_idx);
         for (idx, ch) in content.char_indices() {
             len = len.saturating_sub(1);
@@ -185,10 +186,10 @@ impl LineBuilder {
                         });
                         token_num += 1;
                     } else {
-                        style.fg.replace(Color::default());
+                        style.fg.take();
                     }
                 } else {
-                    style.fg.replace(Color::default());
+                    style.fg.take();
                 }
             }
             self.set_diagnostic_style(idx, &mut style, diagnostic);
