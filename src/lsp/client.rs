@@ -145,8 +145,8 @@ impl LSPClient {
         Ok(())
     }
 
-    pub fn get_diagnostics(&self, doctument: &Path) -> Option<PublishDiagnosticsParams> {
-        self.diagnostics.try_lock().ok()?.get_mut(doctument)?.take()
+    pub fn get_diagnostics(&self, path: &Path) -> Option<PublishDiagnosticsParams> {
+        self.diagnostics.try_lock().ok()?.get_mut(path)?.take()
     }
 
     fn next_id(&mut self) -> i64 {

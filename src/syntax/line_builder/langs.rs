@@ -25,20 +25,24 @@ impl Lang {
     }
 
     pub fn completelable(&self, line: &str, idx: usize) -> bool {
-        let mut last_char = ' ';
         let mut curr_token = String::new();
         let mut prev_token = String::new();
+        let mut trigger = false;
         for (char_idx, ch) in line.char_indices() {
             if ch.is_alphabetic() || ch == '_' {
                 if char_idx + 1 == idx {
-                    return " (.".contains(last_char) && !self.declaration.contains(&prev_token.as_str());
-                } else {
-                    curr_token.push(ch);
+                    return trigger
+                        || prev_token.is_empty()
+                            && curr_token.len() < 4
+                            && !self.declaration.contains(&prev_token.as_str());
                 }
+                curr_token.push(ch);
             } else {
-                prev_token.extend(curr_token.drain(..));
+                if " (.".contains(ch) {
+                    trigger = true;
+                }
+                prev_token = std::mem::take(&mut curr_token);
             }
-            last_char = ch;
         }
         false
     }
