@@ -36,8 +36,11 @@ const INIT_BUF_SIZE: usize = 1;
 const DIGIT_STYLE: Style = Style::new().fg(Color::Gray);
 
 /// ! generates start with line number -> based on the produced vec len is the definition of INIT_BUF_SIZE
-pub fn init_buffer_with_line_number(line_idx: usize, max_digits: usize) -> Vec<Span<'static>> {
-    vec![Span::styled(format!("{: >1$} ", line_idx + 1, max_digits), DIGIT_STYLE)]
+pub fn init_buffer_with_line_number(line_idx: usize, line_number_offset: usize) -> Vec<Span<'static>> {
+    vec![Span::styled(
+        format!("{: >1$} ", line_idx + 1, line_number_offset),
+        DIGIT_STYLE,
+    )]
 }
 
 /// Struct used to create styled maps
@@ -47,13 +50,13 @@ pub struct LineBuilder {
     pub text_width: usize,
     select: Option<(CursorPosition, CursorPosition)>,
     select_range: Option<Range<usize>>,
+    file_was_saved: bool,
     legend: Legend,
     tokens: Tokens,
     cursor: CursorPosition,
     brackets: BracketColors,
     diagnostics: HashMap<usize, DiagnosticLines>,
     diagnostic_processor: fn(&mut Self, PublishDiagnosticsParams),
-    file_was_saved: bool,
 }
 
 impl LineBuilder {
@@ -64,13 +67,13 @@ impl LineBuilder {
             text_width: 0,
             select: None,
             select_range: None,
+            file_was_saved: true,
             legend: Legend::default(),
             tokens: Tokens::default(),
             cursor: CursorPosition::default(),
             brackets: BracketColors::default(),
             diagnostics: HashMap::new(),
             diagnostic_processor: diagnostics_full,
-            file_was_saved: true,
         }
     }
 
@@ -148,19 +151,19 @@ impl LineBuilder {
         self.brackets.reset();
     }
 
-    pub fn build_line<'a>(&mut self, line_idx: usize, content: &'a str, max_digits: usize) -> ListItem<'a> {
+    pub fn build_line<'a>(&mut self, line_idx: usize, content: &'a str, line_number_offset: usize) -> ListItem<'a> {
         self.build_select_buffer(line_idx, content.len());
         if content.is_empty() {
-            let mut buffer = init_buffer_with_line_number(line_idx, max_digits);
+            let mut buffer = init_buffer_with_line_number(line_idx, line_number_offset);
             if self.select_range.is_some() {
                 buffer.push(Span::styled(" ", Style { bg: Some(self.theme.selected), ..Default::default() }));
             };
             return self.format_with_info(line_idx, None, buffer);
         }
-        if let Some(line) = self.process_tokens(line_idx, content, max_digits) {
+        if let Some(line) = self.process_tokens(line_idx, content, line_number_offset) {
             line
         } else {
-            generic_line(self, line_idx, content, init_buffer_with_line_number(line_idx, max_digits))
+            generic_line(self, line_idx, content, init_buffer_with_line_number(line_idx, line_number_offset))
         }
     }
 

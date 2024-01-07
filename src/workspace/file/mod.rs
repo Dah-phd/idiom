@@ -23,7 +23,6 @@ type SelectLen = usize;
 pub type DocStats<'a> = (DocLen, SelectLen, CursorPosition);
 
 #[allow(dead_code)]
-#[derive(Debug)]
 pub struct Editor {
     pub file_type: FileType,
     pub display: String,

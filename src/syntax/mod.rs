@@ -1,22 +1,17 @@
 mod line_builder;
 mod modal;
 mod theme;
-use self::line_builder::LineBuilder;
-use self::modal::{LSPModal, LSPResponseType, LSPResult, ModalMessage};
-pub use self::theme::Theme;
-use crate::configs::FileType;
-use crate::global_state::GlobalState;
-use crate::lsp::LSPClient;
-use crate::popups::popups_tree::refrence_selector;
-use crate::workspace::actions::EditMetaData;
-use crate::workspace::cursor::Cursor;
-use crate::workspace::CursorPosition;
+use crate::{
+    configs::FileType, global_state::GlobalState, lsp::LSPClient, popups::popups_tree::refrence_selector,
+    workspace::actions::EditMetaData, workspace::cursor::Cursor, workspace::CursorPosition,
+};
 use crossterm::event::KeyEvent;
+use line_builder::LineBuilder;
 use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent};
-use ratatui::layout::Rect;
-use ratatui::{widgets::ListItem, Frame};
-use std::path::PathBuf;
-use std::{fmt::Debug, path::Path};
+use modal::{LSPModal, LSPResponseType, LSPResult, ModalMessage};
+use ratatui::{layout::Rect, widgets::ListItem, Frame};
+use std::path::{Path, PathBuf};
+use theme::Theme;
 
 #[cfg(build = "debug")]
 use crate::utils::debug_to_file;
@@ -24,17 +19,11 @@ use crate::utils::debug_to_file;
 pub struct Lexer {
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub lsp_client: Option<LSPClient>,
-    pub max_digits: usize,
+    pub line_number_offset: usize,
     pub path: PathBuf,
     pub line_builder: LineBuilder,
     modal: Option<LSPModal>,
     requests: Vec<LSPResponseType>,
-}
-
-impl Debug for Lexer {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(format!("LEXER: {:?}", self.line_builder.lang.file_type).as_str())
-    }
 }
 
 impl Lexer {
@@ -44,7 +33,7 @@ impl Lexer {
             modal: None,
             path: path.into(),
             requests: Vec::new(),
-            max_digits: 0,
+            line_number_offset: 0,
             diagnostics: None,
             lsp_client: None,
         }
@@ -52,7 +41,7 @@ impl Lexer {
 
     pub fn context(&mut self, cursor: &Cursor, content: &[String], gs: &mut GlobalState) {
         self.line_builder.reset(cursor);
-        self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
+        self.line_number_offset = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
         if let Some(client) = self.lsp_client.as_mut() {
             // diagnostics
             if let Some(params) = client.get_diagnostics(&self.path) {
@@ -125,7 +114,7 @@ impl Lexer {
     }
 
     pub fn set_text_width(&mut self, width: usize) {
-        self.line_builder.text_width = width.checked_sub(self.max_digits).unwrap_or_default();
+        self.line_builder.text_width = width.checked_sub(self.line_number_offset).unwrap_or_default();
     }
 
     pub fn sync_lsp(
@@ -147,7 +136,7 @@ impl Lexer {
         if let Some(modal) = &mut self.modal {
             let cursor_x_offset = 1 + cursor.char;
             let cursor_y_offset = cursor.line - cursor.at_line;
-            let x = area.x + (cursor_x_offset + self.max_digits) as u16;
+            let x = area.x + (cursor_x_offset + self.line_number_offset) as u16;
             let y = area.y + cursor_y_offset as u16;
             modal.render_at(frame, x, y);
         }
@@ -261,7 +250,7 @@ impl Lexer {
     }
 
     pub fn list_item<'a>(&mut self, line_idx: usize, content: &'a str) -> ListItem<'a> {
-        self.line_builder.build_line(line_idx, content, self.max_digits)
+        self.line_builder.build_line(line_idx, content, self.line_number_offset)
     }
 
     pub fn reload_theme(&mut self) {
