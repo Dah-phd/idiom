@@ -15,7 +15,6 @@ use crossterm::event::KeyEvent;
 use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent};
 use ratatui::layout::Rect;
 use ratatui::{widgets::ListItem, Frame};
-use std::cmp::Ordering;
 use std::path::PathBuf;
 use std::{fmt::Debug, path::Path};
 
@@ -28,7 +27,6 @@ pub struct Lexer {
     pub max_digits: usize,
     pub path: PathBuf,
     pub line_builder: LineBuilder,
-    select: Option<(CursorPosition, CursorPosition)>,
     modal: Option<LSPModal>,
     requests: Vec<LSPResponseType>,
 }
@@ -43,7 +41,6 @@ impl Lexer {
     pub fn with_context(file_type: FileType, path: &Path) -> Self {
         Self {
             line_builder: LineBuilder::new(file_type.into()),
-            select: None,
             modal: None,
             path: path.into(),
             requests: Vec::new(),
@@ -54,8 +51,7 @@ impl Lexer {
     }
 
     pub fn context(&mut self, cursor: &Cursor, content: &[String], gs: &mut GlobalState) {
-        self.line_builder.reset(cursor.position());
-        self.select = cursor.select_get();
+        self.line_builder.reset(cursor);
         self.max_digits = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
         if let Some(client) = self.lsp_client.as_mut() {
             // diagnostics
@@ -128,8 +124,8 @@ impl Lexer {
         }
     }
 
-    pub fn set_text_width(&mut self, area_width: usize) {
-        self.line_builder.text_width = area_width.checked_sub(self.max_digits).unwrap_or_default();
+    pub fn set_text_width(&mut self, width: usize) {
+        self.line_builder.text_width = width.checked_sub(self.max_digits).unwrap_or_default();
     }
 
     pub fn sync_lsp(
@@ -264,8 +260,8 @@ impl Lexer {
         }
     }
 
-    pub fn list_item<'a>(&mut self, idx: usize, content: &'a str) -> ListItem<'a> {
-        self.line_builder.build_line(idx, self.line_select(idx, content.len()), content, self.max_digits)
+    pub fn list_item<'a>(&mut self, line_idx: usize, content: &'a str) -> ListItem<'a> {
+        self.line_builder.build_line(line_idx, content, self.max_digits)
     }
 
     pub fn reload_theme(&mut self) {
@@ -283,16 +279,5 @@ impl Lexer {
             }
         }
         self.line_builder.mark_saved();
-    }
-
-    fn line_select(&self, at_line: usize, max_len: usize) -> Option<std::ops::Range<usize>> {
-        let (from, to) = self.select?;
-        match (from.line.cmp(&at_line), at_line.cmp(&to.line)) {
-            (Ordering::Greater, ..) | (.., Ordering::Greater) => None,
-            (Ordering::Less, Ordering::Less) => Some(0..max_len),
-            (Ordering::Equal, Ordering::Equal) => Some(from.char..to.char),
-            (Ordering::Equal, ..) => Some(from.char..max_len),
-            (.., Ordering::Equal) => Some(0..to.char),
-        }
     }
 }

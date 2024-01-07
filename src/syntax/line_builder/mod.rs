@@ -11,7 +11,7 @@ use super::modal::LSPResponseType;
 use crate::{
     lsp::LSPClient,
     syntax::Theme,
-    workspace::{actions::EditMetaData, CursorPosition},
+    workspace::{actions::EditMetaData, cursor::Cursor, CursorPosition},
 };
 use brackets::BracketColors;
 use diagnostics::{diagnostics_error, diagnostics_full, DiagnosticLines};
@@ -28,7 +28,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::ListItem,
 };
-use std::{collections::HashMap, ops::Range, path::Path};
+use std::{cmp::Ordering, collections::HashMap, ops::Range, path::Path};
 
 /// !the initial len of the line produced by init_buffer_with_line_number
 /// !used by LineBuilder::format_with_info(..) -> ListItem - used to derive cursor and wrap
@@ -45,6 +45,7 @@ pub struct LineBuilder {
     pub theme: Theme,
     pub lang: Lang,
     pub text_width: usize,
+    select: Option<(CursorPosition, CursorPosition)>,
     select_range: Option<Range<usize>>,
     legend: Legend,
     tokens: Tokens,
@@ -61,6 +62,7 @@ impl LineBuilder {
             theme: Theme::new(),
             lang,
             text_width: 0,
+            select: None,
             select_range: None,
             legend: Legend::default(),
             tokens: Tokens::default(),
@@ -140,26 +142,21 @@ impl LineBuilder {
         }
     }
 
-    pub fn reset(&mut self, c: CursorPosition) {
-        self.cursor = c;
+    pub fn reset(&mut self, cursor: &Cursor) {
+        self.cursor = cursor.position();
+        self.select = cursor.select_get();
         self.brackets.reset();
     }
 
-    pub fn build_line<'a>(
-        &mut self,
-        line_idx: usize,
-        select: Option<Range<usize>>,
-        content: &'a str,
-        max_digits: usize,
-    ) -> ListItem<'a> {
+    pub fn build_line<'a>(&mut self, line_idx: usize, content: &'a str, max_digits: usize) -> ListItem<'a> {
+        self.build_select_buffer(line_idx, content.len());
         if content.is_empty() {
             let mut buffer = init_buffer_with_line_number(line_idx, max_digits);
-            if select.is_some() {
+            if self.select_range.is_some() {
                 buffer.push(Span::styled(" ", Style { bg: Some(self.theme.selected), ..Default::default() }));
             };
             return self.format_with_info(line_idx, None, buffer);
         }
-        self.select_range = select;
         if let Some(line) = self.process_tokens(line_idx, content, max_digits) {
             line
         } else {
@@ -236,6 +233,16 @@ impl LineBuilder {
             }
             ListItem::from(Line::from(buffer))
         }
+    }
+
+    fn build_select_buffer(&mut self, at_line: usize, max_len: usize) {
+        self.select_range = self.select.and_then(|(from, to)| match (from.line.cmp(&at_line), at_line.cmp(&to.line)) {
+            (Ordering::Greater, ..) | (.., Ordering::Greater) => None,
+            (Ordering::Less, Ordering::Less) => Some(0..max_len),
+            (Ordering::Equal, Ordering::Equal) => Some(from.char..to.char),
+            (Ordering::Equal, ..) => Some(from.char..max_len),
+            (.., Ordering::Equal) => Some(0..to.char),
+        });
     }
 
     fn set_diagnostic_style(&self, idx: usize, style: &mut Style, diagnostic: Option<&DiagnosticLines>) {

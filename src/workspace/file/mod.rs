@@ -65,7 +65,7 @@ impl Editor {
                 .enumerate()
                 .skip(self.cursor.at_line)
                 .take(self.max_rows)
-                .map(|(idx, code_line)| self.lexer.list_item(idx, code_line))
+                .map(|(line_idx, content)| self.lexer.list_item(line_idx, content))
                 .collect::<Vec<ListItem>>(),
         )
     }
