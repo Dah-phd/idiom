@@ -2,6 +2,7 @@ mod parser;
 
 use crate::{
     global_state::{GlobalState, WorkspaceEvent},
+    utils::REVERSED,
     widgests::{dynamic_cursor_rect_sized_height, TextField, WrappedState},
     workspace::CursorPosition,
 };
@@ -15,7 +16,7 @@ use ratatui::{
     prelude::Rect,
     style::{Modifier, Style},
     text::Line,
-    widgets::{Block, Borders, Clear, List, ListItem},
+    widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
     Frame,
 };
 
@@ -154,6 +155,7 @@ pub struct AutoComplete {
     // line: String,
     matcher: SkimMatcherV2,
     filtered: Vec<(String, i64)>,
+    active_doc: Option<Paragraph<'static>>,
     completions: Vec<CompletionItem>,
 }
 
@@ -169,11 +171,12 @@ impl AutoComplete {
         }
         let mut modal = Self {
             state: WrappedState::default(),
-            // line,
             filter,
-            filtered: Vec::new(),
-            completions,
+            // line,
             matcher: SkimMatcherV2::default(),
+            filtered: Vec::new(),
+            active_doc: None,
+            completions,
         };
         modal.build_matches();
         modal
@@ -181,6 +184,10 @@ impl AutoComplete {
 
     fn map_and_finish(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> ModalMessage {
         match key.code {
+            KeyCode::F(1) => {
+                self.active_doc = self.get_docs();
+                ModalMessage::Taken
+            }
             KeyCode::Enter | KeyCode::Tab => {
                 if let Some(idx) = self.state.selected() {
                     gs.workspace.push_back(WorkspaceEvent::AutoComplete(self.filtered.remove(idx).0));
@@ -189,10 +196,12 @@ impl AutoComplete {
             }
             KeyCode::Char(ch) => self.push_filter(ch),
             KeyCode::Down => {
+                self.active_doc = None;
                 self.state.next(&self.filtered);
                 ModalMessage::Taken
             }
             KeyCode::Up => {
+                self.active_doc = None;
                 self.state.prev(&self.filtered);
                 ModalMessage::Taken
             }
@@ -220,6 +229,16 @@ impl AutoComplete {
         }
     }
 
+    fn get_docs(&mut self) -> Option<Paragraph<'static>> {
+        let label = &self.filtered.get(self.state.selected()?)?.0;
+        self.completions.iter().find(|item| &item.label == label).and_then(|item| {
+            item.documentation.as_ref().map(|docs| match docs {
+                Documentation::String(value) => Paragraph::new(value.to_owned()),
+                Documentation::MarkupContent(content) => Paragraph::new(content.value.to_owned()),
+            })
+        })
+    }
+
     fn build_matches(&mut self) {
         self.filtered = self
             .completions
@@ -237,12 +256,14 @@ impl AutoComplete {
     }
 
     fn render_at(&mut self, frame: &mut Frame, area: Rect) {
-        let complitions =
-            self.filtered.iter().map(|(item, _)| ListItem::new(item.as_str())).collect::<Vec<ListItem<'_>>>();
+        let block = Block::default().borders(Borders::all());
+        if let Some(docs) = self.active_doc.as_ref() {
+            frame.render_widget(docs.clone().block(block), area);
+            return;
+        }
+        let complitions = self.filtered.iter().map(|(item, _)| ListItem::new(item.as_str())).collect::<Vec<_>>();
         frame.render_stateful_widget(
-            List::new(complitions)
-                .block(Block::default().borders(Borders::all()))
-                .highlight_style(Style::default().add_modifier(Modifier::REVERSED)),
+            List::new(complitions).block(block).highlight_style(REVERSED),
             area,
             self.state.get(),
         );
