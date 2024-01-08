@@ -14,7 +14,6 @@ use lsp_types::{
 pub use parser::{LSPResponseType, LSPResult};
 use ratatui::{
     prelude::Rect,
-    style::{Modifier, Style},
     text::Line,
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
     Frame,
