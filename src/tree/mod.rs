@@ -22,6 +22,7 @@ const TICK: Duration = Duration::from_secs(1);
 #[derive(Clone)]
 pub struct Tree {
     pub on_open_tabs: bool,
+    size: u16,
     active: bool,
     state: ListState,
     selected_path: PathBuf,
@@ -37,6 +38,7 @@ impl Tree {
         tree.sync_flat_ptrs(&mut tree_ptrs);
         Self {
             active,
+            size: 15,
             state: ListState::default(),
             selected_path: PathBuf::from("./"),
             tree,
@@ -50,7 +52,8 @@ impl Tree {
         if matches!(gs.mode, Mode::Insert) && !self.active {
             return screen;
         }
-        let areas = Layout::new(Direction::Horizontal, [Constraint::Percentage(15), Constraint::Min(2)]).split(screen);
+        let areas =
+            Layout::new(Direction::Horizontal, [Constraint::Percentage(self.size), Constraint::Min(2)]).split(screen);
 
         self.sync();
 
@@ -74,6 +77,8 @@ impl Tree {
             KeyCode::Char('w' | 'W') => self.select_up(),
             KeyCode::Down if !key.modifiers.contains(KeyModifiers::CONTROL) => self.select_down(),
             KeyCode::Char('s' | 'S') => self.select_down(),
+            KeyCode::Right if key.modifiers == KeyModifiers::CONTROL => self.size = std::cmp::min(75, self.size + 1),
+            KeyCode::Left if key.modifiers == KeyModifiers::CONTROL => self.size = std::cmp::max(15, self.size - 1),
             KeyCode::Left => self.shrink(),
             KeyCode::Char('d' | 'D') if !key.modifiers.contains(KeyModifiers::CONTROL) => self.shrink(),
             KeyCode::Delete if key.modifiers == KeyModifiers::SHIFT => {
