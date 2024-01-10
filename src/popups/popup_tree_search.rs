@@ -2,6 +2,7 @@ use super::PopupInterface;
 use crate::{
     global_state::{Clipboard, PopupMessage, TreeEvent},
     tree::Tree,
+    utils::REVERSED,
     widgests::centered_rect_static,
     widgests::{TextField, WrappedState},
 };
@@ -79,7 +80,7 @@ impl PopupInterface for ActivePathSearch {
         };
         let list = List::new(options)
             .block(Block::new().borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT))
-            .highlight_style(Style::new().add_modifier(Modifier::REVERSED));
+            .highlight_style(REVERSED);
         frame.render_stateful_widget(list, split_areas[1], self.state.get());
     }
 
@@ -175,7 +176,7 @@ impl PopupInterface for ActiveFileSearch {
         };
         let list = List::new(options)
             .block(Block::new().borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT))
-            .highlight_style(Style::new().add_modifier(Modifier::REVERSED));
+            .highlight_style(REVERSED);
         frame.render_stateful_widget(list, split_areas[1], self.state.get());
     }
 
@@ -207,10 +208,10 @@ impl PopupInterface for ActiveFileSearch {
     }
 }
 
-fn marked_pat_lines(option: &(PathBuf, String, usize), pat: &str) -> Vec<Line<'static>> {
-    let mut found_text_line = marked_pat_span(option.1.as_str(), pat);
-    found_text_line.spans.insert(0, Span::raw(format!("{}| ", option.2)));
-    vec![Line::from(format!("{}", option.0.display())), found_text_line]
+fn marked_pat_lines((path, line_txt, line_idx): &(PathBuf, String, usize), pat: &str) -> Vec<Line<'static>> {
+    let mut found_text_line = marked_pat_span(line_txt, pat);
+    found_text_line.spans.insert(0, Span::raw(format!("{}| ", line_idx)));
+    vec![Line::from(format!("{}", path.display())), found_text_line]
 }
 
 fn marked_pat_span(option: &str, pat: &str) -> Line<'static> {
