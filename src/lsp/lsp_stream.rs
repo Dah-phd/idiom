@@ -20,7 +20,7 @@ use crate::utils::debug_to_file;
 ///  * stream end
 ///  * bad bytes received from Codec
 ///  * failure to parse message len
-pub struct LSPMessageStream {
+pub struct JsonRCP {
     inner: FramedRead<ChildStdout, BytesCodec>,
     _stderr: JoinHandle<()>,
     errors: Arc<Mutex<Vec<String>>>,
@@ -30,7 +30,7 @@ pub struct LSPMessageStream {
     expected_len: usize,
 }
 
-impl LSPMessageStream {
+impl JsonRCP {
     pub fn new(child: &mut Child) -> Result<Self> {
         let inner = child.stdout.take().ok_or(anyhow!("LSP stdout"))?;
         let mut stderr = FramedRead::new(child.stderr.take().ok_or(anyhow!("LSP stderr"))?, BytesCodec::new());

@@ -5,7 +5,7 @@ mod notification;
 mod request;
 mod servers;
 pub use client::LSPClient;
-use lsp_stream::LSPMessageStream;
+use lsp_stream::JsonRCP;
 pub use messages::{Diagnostic, GeneralNotification, LSPMessage, Request, Response};
 pub use notification::LSPNotification;
 pub use request::LSPRequest;
@@ -62,7 +62,7 @@ impl LSP {
         let mut inner = server.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::piped()).spawn()?;
 
         // splitting subprocess
-        let mut json_rpc = LSPMessageStream::new(&mut inner)?;
+        let mut json_rpc = JsonRCP::new(&mut inner)?;
         let mut stdin = inner.stdin.take().ok_or(anyhow!("LSP stdin"))?;
 
         // setting up storage

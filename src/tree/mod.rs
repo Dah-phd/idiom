@@ -108,6 +108,7 @@ impl Tree {
     }
 
     fn select_up(&mut self) {
+        self.on_open_tabs = false;
         if self.tree_ptrs.is_empty() {
             return;
         }
@@ -122,6 +123,7 @@ impl Tree {
     }
 
     fn select_down(&mut self) {
+        self.on_open_tabs = false;
         if self.tree_ptrs.is_empty() {
             return;
         }
