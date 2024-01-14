@@ -259,17 +259,18 @@ impl Workspace {
         Ok(())
     }
 
-    pub async fn check_lsp(&mut self, ft: FileType, gs: &mut GlobalState) -> Option<String> {
-        let lsp = self.lsp_servers.get_mut(&ft)?;
-        match lsp.check_status().await {
-            Ok(data) => Some(match data {
-                None => "LSP function is normal".to_owned(),
-                Some(err) => {
-                    self.full_sync(&ft, gs).await;
-                    format!("LSP recoved after: {err}")
-                }
-            }),
-            Err(err) => Some(err.to_string()),
+    pub async fn check_lsp(&mut self, ft: FileType, gs: &mut GlobalState) {
+        if let Some(lsp) = self.lsp_servers.get_mut(&ft) {
+            match lsp.check_status().await {
+                Ok(data) => match data {
+                    None => gs.success("LSP function is normal".to_owned()),
+                    Some(err) => {
+                        self.full_sync(&ft, gs).await;
+                        gs.success(format!("LSP recoved after: {err}"));
+                    }
+                },
+                Err(err) => gs.error(err.to_string()),
+            }
         }
     }
 

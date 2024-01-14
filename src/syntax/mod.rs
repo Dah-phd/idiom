@@ -2,8 +2,13 @@ mod line_builder;
 mod modal;
 mod theme;
 use crate::{
-    configs::FileType, global_state::GlobalState, lsp::LSPClient, popups::popups_tree::refrence_selector,
-    workspace::actions::EditMetaData, workspace::cursor::Cursor, workspace::CursorPosition,
+    configs::FileType,
+    global_state::{GlobalState, WorkspaceEvent},
+    lsp::LSPClient,
+    popups::popups_tree::refrence_selector,
+    workspace::actions::EditMetaData,
+    workspace::cursor::Cursor,
+    workspace::CursorPosition,
 };
 use crossterm::event::KeyEvent;
 use line_builder::LineBuilder;
@@ -260,13 +265,18 @@ impl Lexer {
         }
     }
 
-    pub fn save(&mut self) {
+    pub fn save_and_check_lsp(&mut self, file_type: FileType, gs: &mut GlobalState) {
+        self.line_builder.mark_saved();
         if let Some(client) = self.lsp_client.as_mut() {
-            let _ = client.file_did_save(&self.path);
+            gs.message("Checking LSP status (on save) ...");
+            if client.file_did_save(&self.path).is_err() && client.is_closed() {
+                gs.workspace.push_back(WorkspaceEvent::CheckLSP(file_type));
+            } else {
+                gs.success("LSP running ...");
+            }
             if let Some(id) = client.request_full_tokens(&self.path) {
                 self.requests.push(LSPResponseType::Tokens(id));
             }
         }
-        self.line_builder.mark_saved();
     }
 }

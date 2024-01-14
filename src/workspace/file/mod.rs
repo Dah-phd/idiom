@@ -332,15 +332,15 @@ impl Editor {
         self.actions.unindent(&mut self.cursor, &mut self.content);
     }
 
-    pub fn save(&mut self, events: &mut GlobalState) {
-        if self.try_write_file(events) {
-            self.lexer.save();
+    pub fn save(&mut self, gs: &mut GlobalState) {
+        if self.try_write_file(gs) {
+            self.lexer.save_and_check_lsp(self.file_type, gs);
         }
     }
 
-    pub fn try_write_file(&self, events: &mut GlobalState) -> bool {
+    pub fn try_write_file(&self, gs: &mut GlobalState) -> bool {
         if let Err(error) = std::fs::write(&self.path, self.content.join("\n")) {
-            events.error(error.to_string());
+            gs.error(error.to_string());
             return false;
         }
         true

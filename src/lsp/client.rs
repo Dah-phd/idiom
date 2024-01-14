@@ -1,5 +1,5 @@
 use super::{Diagnostic, LSPNotification, LSPRequest, Response};
-use crate::{configs::FileType, workspace::CursorPosition, global_state::GlobalState};
+use crate::{configs::FileType, workspace::CursorPosition};
 
 use anyhow::Result;
 use lsp_types::{
@@ -45,7 +45,7 @@ impl LSPClient {
         Self { diagnostics, responses, channel, request_counter: Rc::default(), capabilities }
     }
 
-    pub fn request<T>(&mut self, mut request: LSPRequest<T>) -> Option<i64>
+    pub fn request<T>(&mut self, mut request: LSPRequest<T>) -> Result<i64>
     where
         T: lsp_types::request::Request,
         T::Params: serde::Serialize,
@@ -53,10 +53,8 @@ impl LSPClient {
     {
         let id = self.next_id();
         request.id = id;
-        if self.channel.send(request.stringify().ok()?).is_ok() {
-            return Some(id);
-        }
-        None
+        self.channel.send(request.stringify()?)?;
+        Ok(id)
     }
 
     pub fn notify<T>(&mut self, notification: LSPNotification<T>) -> Result<()>
@@ -77,48 +75,52 @@ impl LSPClient {
         self.diagnostics.try_lock().ok()?.get_mut(path)?.take()
     }
 
+    pub fn is_closed(&self) -> bool {
+        self.channel.is_closed()
+    }
+
     pub fn request_partial_tokens(&mut self, path: &Path, range: Range) -> Option<i64> {
         self.capabilities.semantic_tokens_provider.as_ref()?;
-        self.request(LSPRequest::<SemanticTokensRangeRequest>::semantics_range(path, range)?)
+        self.request(LSPRequest::<SemanticTokensRangeRequest>::semantics_range(path, range)?).ok()
     }
 
     pub fn request_full_tokens(&mut self, path: &Path) -> Option<i64> {
         self.capabilities.semantic_tokens_provider.as_ref()?;
-        self.request(LSPRequest::<SemanticTokensFullRequest>::semantics_full(path)?)
+        self.request(LSPRequest::<SemanticTokensFullRequest>::semantics_full(path)?).ok()
     }
 
     pub fn request_completions(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
-        self.request(LSPRequest::<Completion>::completion(path, c)?)
+        self.request(LSPRequest::<Completion>::completion(path, c)?).ok()
     }
 
     pub fn request_rename(&mut self, path: &Path, c: CursorPosition, new_name: String) -> Option<i64> {
-        self.request(LSPRequest::<Rename>::rename(path, c, new_name)?)
+        self.request(LSPRequest::<Rename>::rename(path, c, new_name)?).ok()
     }
 
     pub fn request_signitures(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
         self.capabilities.signature_help_provider.as_ref()?;
-        self.request(LSPRequest::<SignatureHelpRequest>::signature_help(path, c)?)
+        self.request(LSPRequest::<SignatureHelpRequest>::signature_help(path, c)?).ok()
     }
 
     pub fn request_hover(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
         self.capabilities.hover_provider.as_ref()?;
-        self.request(LSPRequest::<HoverRequest>::hover(path, c)?)
+        self.request(LSPRequest::<HoverRequest>::hover(path, c)?).ok()
     }
 
     pub fn request_references(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
         self.capabilities.references_provider.as_ref()?;
-        self.request(LSPRequest::<References>::references(path, c)?)
+        self.request(LSPRequest::<References>::references(path, c)?).ok()
     }
 
     pub fn request_declarations(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
         self.capabilities.declaration_provider.as_ref()?;
-        self.request(LSPRequest::<GotoDeclaration>::declaration(path, c)?)
+        self.request(LSPRequest::<GotoDeclaration>::declaration(path, c)?).ok()
     }
 
     #[allow(dead_code)]
     pub fn request_definitions(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
         self.capabilities.definition_provider.as_ref()?;
-        self.request(LSPRequest::<GotoDefinition>::definition(path, c)?)
+        self.request(LSPRequest::<GotoDefinition>::definition(path, c)?).ok()
     }
 
     pub fn file_did_open(&mut self, path: &Path, file_type: &FileType, content: String) -> Result<()> {
