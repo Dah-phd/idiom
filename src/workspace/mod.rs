@@ -6,7 +6,7 @@ use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
     global_state::{GlobalState, Mode},
     lsp::LSP,
-    utils::UNDERLINED,
+    utils::{REVERSED, UNDERLINED},
 };
 pub use cursor::CursorPosition;
 pub use file::{DocStats, Editor};
@@ -27,7 +27,6 @@ use std::{
 };
 
 const TAB_HIGHTLIGHT: Style = Style::new().fg(Color::Yellow).add_modifier(Modifier::UNDERLINED);
-const TAB_FOCUS: Style = UNDERLINED.add_modifier(Modifier::REVERSED);
 const RECT_CONSTRAINT: [Constraint; 2] = [Constraint::Length(1), Constraint::Percentage(100)];
 
 pub struct Workspace {
@@ -97,7 +96,7 @@ impl Workspace {
 
     pub fn toggle_tabs(&mut self) {
         self.map_callback = map_tabs;
-        self.tab_style = TAB_FOCUS;
+        self.tab_style = REVERSED;
     }
 
     pub fn toggle_editor(&mut self) {
@@ -414,11 +413,20 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
 }
 
 /// Handles keybinding while on tabs
-fn map_tabs(ws: &mut Workspace, key: &KeyEvent, _gs: &mut GlobalState) -> bool {
+fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
     if let Some(action) = ws.key_map.map(key) {
+        if ws.editors.is_empty() {
+            gs.mode = Mode::Select;
+            return false;
+        }
         match action {
-            EditorAction::NewLine | EditorAction::Down => {
+            EditorAction::NewLine => {
                 ws.toggle_editor();
+            }
+            EditorAction::Up | EditorAction::Down => {
+                ws.toggle_editor();
+                gs.mode = Mode::Select;
+                return false;
             }
             EditorAction::Right | EditorAction::Indent => {
                 let editor = ws.editors.remove(0);
