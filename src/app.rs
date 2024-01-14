@@ -88,7 +88,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                     GeneralAction::SelectOpenEditor => {
                         let tabs = workspace.tabs();
                         if !tabs.is_empty() {
-                            gs.popup(selector_editors(workspace.tabs()));
+                            gs.popup(selector_editors(tabs));
                         };
                     }
                     GeneralAction::NewFile => {

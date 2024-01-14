@@ -4,7 +4,7 @@ pub mod file;
 pub mod utils;
 use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
-    global_state::{GlobalState, Mode},
+    global_state::{GlobalState, Mode, TreeEvent},
     lsp::LSP,
     utils::{REVERSED, UNDERLINED},
 };
@@ -87,9 +87,12 @@ impl Workspace {
         self.editors.first_mut()
     }
 
-    pub fn activate_editor(&mut self, idx: usize) {
+    pub fn activate_editor(&mut self, idx: usize, gs: Option<&mut GlobalState>) {
         if idx < self.editors.len() {
             let editor = self.editors.remove(idx);
+            if let Some(state) = gs {
+                state.tree.push(TreeEvent::SelectPath(editor.path.clone()));
+            }
             self.editors.insert(0, editor);
         }
     }
@@ -431,9 +434,11 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
             EditorAction::Right | EditorAction::Indent => {
                 let editor = ws.editors.remove(0);
                 ws.editors.push(editor);
+                gs.tree.push(TreeEvent::SelectPath(ws.editors[0].path.clone()));
             }
             EditorAction::Left | EditorAction::Unintent => {
                 if let Some(editor) = ws.editors.pop() {
+                    gs.tree.push(TreeEvent::SelectPath(editor.path.clone()));
                     ws.editors.insert(0, editor);
                 }
             }

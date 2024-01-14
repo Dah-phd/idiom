@@ -174,6 +174,9 @@ impl GlobalState {
                     self.workspace.push_back(WorkspaceEvent::Open(path, 0));
                     self.workspace.push_back(WorkspaceEvent::GoToSelect { select, should_clear: true });
                 }
+                TreeEvent::SelectPath(path) => {
+                    tree.select_by_path(&path);
+                }
                 TreeEvent::CreateFileOrFolder(name) => {
                     if let Ok(new_path) = tree.create_file_or_folder(name) {
                         if !new_path.is_dir() {
@@ -241,7 +244,7 @@ impl GlobalState {
                     }
                 }
                 WorkspaceEvent::ActivateEditor(idx) => {
-                    workspace.activate_editor(idx);
+                    workspace.activate_editor(idx, Some(self));
                     self.popup = None;
                     self.mode = Mode::Insert;
                 }

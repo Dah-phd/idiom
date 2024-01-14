@@ -12,6 +12,7 @@ pub enum TreeEvent {
     Open(PathBuf),
     OpenAtLine(PathBuf, usize),
     OpenAtSelect(PathBuf, (CursorPosition, CursorPosition)),
+    SelectPath(PathBuf),
     CreateFileOrFolder(String),
     CreateFileOrFolderBase(String),
     RenameFile(String),
