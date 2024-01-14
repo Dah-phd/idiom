@@ -7,7 +7,6 @@ use crate::{
     global_state::{GlobalState, Mode},
     lsp::LSP,
     utils::UNDERLINED,
-    widgests::WrappedState,
 };
 pub use cursor::CursorPosition;
 pub use file::{DocStats, Editor};
@@ -28,46 +27,45 @@ use std::{
 };
 
 const TAB_HIGHTLIGHT: Style = Style::new().fg(Color::Yellow).add_modifier(Modifier::UNDERLINED);
+const TAB_FOCUS: Style = UNDERLINED.add_modifier(Modifier::REVERSED);
 const RECT_CONSTRAINT: [Constraint; 2] = [Constraint::Length(1), Constraint::Percentage(100)];
 
 pub struct Workspace {
     pub editors: Vec<Editor>,
-    pub state: WrappedState,
     base_config: EditorConfigs,
     key_map: EditorKeyMap,
     lsp_servers: HashMap<FileType, LSP>,
+    tab_style: Style,
+    map_callback: fn(&mut Self, &KeyEvent, &mut GlobalState) -> bool,
 }
 
 impl Workspace {
     pub fn new(key_map: EditorKeyMap) -> Self {
         Self {
             editors: Vec::default(),
-            state: WrappedState::default(),
             base_config: EditorConfigs::new(),
             key_map,
+            tab_style: UNDERLINED,
             lsp_servers: HashMap::new(),
+            map_callback: map_editor,
         }
     }
 
     pub fn render(&mut self, frame: &mut Frame, screen: Rect, gs: &mut GlobalState) {
-        if let Some(editor_id) = self.state.selected() {
-            if let Some(file) = self.editors.get_mut(editor_id) {
-                let layout = Layout::new(Direction::Vertical, RECT_CONSTRAINT).split(screen);
-                let area = layout[1];
-                let tab_area = layout[0];
+        if let Some(file) = self.editors.get_mut(0) {
+            let layout = Layout::new(Direction::Vertical, RECT_CONSTRAINT).split(screen);
+            let area = layout[1];
+            let tab_area = layout[0];
 
-                let editor_widget = file.collect_widget(&area, gs);
-                frame.render_widget(editor_widget, area);
+            let editor_widget = file.collect_widget(&area, gs);
+            frame.render_widget(editor_widget, area);
 
-                file.lexer.render_modal_if_exist(frame, area, &file.cursor);
+            file.lexer.render_modal_if_exist(frame, area, &file.cursor);
 
-                let mut titles_unordered: Vec<_> = self.editors.iter().map(|e| e.display.to_owned()).collect();
-                let mut titles = titles_unordered.split_off(editor_id);
-                titles.extend(titles_unordered);
+            let titles: Vec<_> = self.editors.iter().map(|e| e.display.to_owned()).collect();
 
-                let tabs = Tabs::new(titles).style(UNDERLINED).highlight_style(TAB_HIGHTLIGHT).select(0);
-                frame.render_widget(tabs, tab_area);
-            }
+            let tabs = Tabs::new(titles).style(self.tab_style).highlight_style(TAB_HIGHTLIGHT).select(0);
+            frame.render_widget(tabs, tab_area);
         }
     }
 
@@ -75,80 +73,11 @@ impl Workspace {
         if !matches!(gs.mode, Mode::Insert) {
             return false;
         }
-        let action = self.key_map.map(key);
-        if let Some(editor) = self.get_active() {
-            if editor.lexer.map_modal_if_exists(key, gs) {
-                return true;
-            };
-            if let Some(action) = action {
-                match action {
-                    EditorAction::Char(ch) => editor.push(ch),
-                    EditorAction::NewLine => editor.new_line(),
-                    EditorAction::Indent => editor.indent(),
-                    EditorAction::Backspace => editor.backspace(),
-                    EditorAction::Delete => editor.del(),
-                    EditorAction::IndentStart => editor.indent_start(),
-                    EditorAction::Unintent => editor.unindent(),
-                    EditorAction::Up => editor.up(),
-                    EditorAction::Down => editor.down(),
-                    EditorAction::Left => editor.left(),
-                    EditorAction::Right => editor.right(),
-                    EditorAction::SelectUp => editor.select_up(),
-                    EditorAction::SelectDown => editor.select_down(),
-                    EditorAction::SelectLeft => editor.select_left(),
-                    EditorAction::SelectRight => editor.select_right(),
-                    EditorAction::SelectToken => editor.select_token(),
-                    EditorAction::SelectAll => editor.select_all(),
-                    EditorAction::ScrollUp => editor.scroll_up(),
-                    EditorAction::ScrollDown => editor.scroll_down(),
-                    EditorAction::SwapUp => editor.swap_up(),
-                    EditorAction::SwapDown => editor.swap_down(),
-                    EditorAction::JumpLeft => editor.jump_left(),
-                    EditorAction::JumpLeftSelect => editor.jump_left_select(),
-                    EditorAction::JumpRight => editor.jump_right(),
-                    EditorAction::JumpRightSelect => editor.jump_right_select(),
-                    EditorAction::EndOfLine => editor.end_of_line(),
-                    EditorAction::EndOfFile => editor.end_of_file(),
-                    EditorAction::StartOfLine => editor.start_of_line(),
-                    EditorAction::StartOfFile => editor.start_of_file(),
-                    EditorAction::FindReferences => editor.references(),
-                    EditorAction::GoToDeclaration => editor.declarations(),
-                    EditorAction::Help => editor.help(),
-                    EditorAction::LSPRename => editor.start_renames(),
-                    EditorAction::Undo => editor.undo(),
-                    EditorAction::Redo => editor.redo(),
-                    EditorAction::Cancel => return editor.cursor.select_take().is_some(),
-                    EditorAction::Save => editor.save(gs),
-                    EditorAction::Paste => {
-                        if let Some(clip) = gs.clipboard.pull() {
-                            editor.paste(clip);
-                        }
-                    }
-                    EditorAction::Cut => {
-                        if let Some(clip) = editor.cut() {
-                            gs.clipboard.push(clip);
-                        }
-                    }
-                    EditorAction::Copy => {
-                        if let Some(clip) = editor.copy() {
-                            gs.clipboard.push(clip);
-                        }
-                    }
-                    EditorAction::Close => {
-                        self.close_active();
-                        if self.state.selected().is_none() {
-                            gs.mode = Mode::Select;
-                        }
-                    }
-                }
-                return true;
-            }
-        }
-        false
+        (self.map_callback)(self, key, gs)
     }
 
     pub fn get_stats(&self) -> Option<DocStats> {
-        self.editors.get(self.state.selected()?).map(|editor| editor.get_stats())
+        self.editors.first().map(|editor| editor.get_stats())
     }
 
     pub fn tabs(&self) -> Vec<String> {
@@ -156,7 +85,24 @@ impl Workspace {
     }
 
     pub fn get_active(&mut self) -> Option<&mut Editor> {
-        self.editors.get_mut(self.state.selected()?)
+        self.editors.first_mut()
+    }
+
+    pub fn activate_editor(&mut self, idx: usize) {
+        if idx < self.editors.len() {
+            let editor = self.editors.remove(idx);
+            self.editors.insert(0, editor);
+        }
+    }
+
+    pub fn toggle_tabs(&mut self) {
+        self.map_callback = map_tabs;
+        self.tab_style = TAB_FOCUS;
+    }
+
+    pub fn toggle_editor(&mut self) {
+        self.tab_style = UNDERLINED;
+        self.map_callback = map_editor;
     }
 
     pub fn apply_edits(&mut self, edits: WorkspaceEdit, events: &mut GlobalState) {
@@ -291,15 +237,15 @@ impl Workspace {
 
     pub async fn new_from(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> Result<()> {
         let file_path = file_path.canonicalize()?;
-        for (idx, file) in self.editors.iter().enumerate() {
-            if file.path == file_path {
-                self.state.set(idx);
-                return Ok(());
-            }
+        if let Some(idx) =
+            self.editors.iter().enumerate().find(|(_, editor)| editor.path == file_path).map(|(idx, _)| idx)
+        {
+            let editor = self.editors.remove(idx);
+            self.editors.insert(0, editor);
+            return Ok(());
         }
         let editor = self.build_editor(file_path, gs).await?;
-        self.state.set(self.editors.len());
-        self.editors.push(editor);
+        self.editors.insert(0, editor);
         Ok(())
     }
 
@@ -334,16 +280,12 @@ impl Workspace {
     }
 
     fn close_active(&mut self) {
-        if let Some(index) = self.state.selected() {
-            let editor = self.editors.remove(index);
-            if let Some(mut client) = editor.lexer.lsp_client {
-                let _ = client.file_did_close(&editor.path);
-            }
-            if self.editors.is_empty() {
-                self.state.drop();
-            } else if index >= self.editors.len() {
-                self.state.set(index - 1);
-            }
+        if self.editors.is_empty() {
+            return;
+        }
+        let editor = self.editors.remove(0);
+        if let Some(mut client) = editor.lexer.lsp_client {
+            let _ = client.file_did_close(&editor.path);
         }
     }
 
@@ -386,6 +328,119 @@ impl Workspace {
             let _ = lsp.graceful_exit().await;
         }
     }
+}
+
+/// handels keybindings for editor
+fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
+    let action = ws.key_map.map(key);
+    if let Some(editor) = ws.get_active() {
+        if editor.lexer.map_modal_if_exists(key, gs) {
+            return true;
+        };
+        if let Some(action) = action {
+            match action {
+                EditorAction::Char(ch) => editor.push(ch),
+                EditorAction::NewLine => editor.new_line(),
+                EditorAction::Indent => editor.indent(),
+                EditorAction::Backspace => editor.backspace(),
+                EditorAction::Delete => editor.del(),
+                EditorAction::IndentStart => editor.indent_start(),
+                EditorAction::Unintent => editor.unindent(),
+                EditorAction::Up => editor.up(),
+                EditorAction::Down => editor.down(),
+                EditorAction::Left => editor.left(),
+                EditorAction::Right => editor.right(),
+                EditorAction::SelectUp => editor.select_up(),
+                EditorAction::SelectDown => editor.select_down(),
+                EditorAction::SelectLeft => editor.select_left(),
+                EditorAction::SelectRight => editor.select_right(),
+                EditorAction::SelectToken => editor.select_token(),
+                EditorAction::SelectAll => editor.select_all(),
+                EditorAction::ScrollUp => editor.scroll_up(),
+                EditorAction::ScrollDown => editor.scroll_down(),
+                EditorAction::SwapUp => editor.swap_up(),
+                EditorAction::SwapDown => editor.swap_down(),
+                EditorAction::JumpLeft => editor.jump_left(),
+                EditorAction::JumpLeftSelect => editor.jump_left_select(),
+                EditorAction::JumpRight => editor.jump_right(),
+                EditorAction::JumpRightSelect => editor.jump_right_select(),
+                EditorAction::EndOfLine => editor.end_of_line(),
+                EditorAction::EndOfFile => editor.end_of_file(),
+                EditorAction::StartOfLine => editor.start_of_line(),
+                EditorAction::StartOfFile => editor.start_of_file(),
+                EditorAction::FindReferences => editor.references(),
+                EditorAction::GoToDeclaration => editor.declarations(),
+                EditorAction::Help => editor.help(),
+                EditorAction::LSPRename => editor.start_renames(),
+                EditorAction::Undo => editor.undo(),
+                EditorAction::Redo => editor.redo(),
+                EditorAction::Save => editor.save(gs),
+                EditorAction::Cancel => {
+                    if editor.cursor.select_take().is_some() {
+                        return true;
+                    }
+                    if ws.editors.len() > 1 {
+                        ws.toggle_tabs();
+                        return true;
+                    }
+                    return false;
+                }
+                EditorAction::Paste => {
+                    if let Some(clip) = gs.clipboard.pull() {
+                        editor.paste(clip);
+                    }
+                }
+                EditorAction::Cut => {
+                    if let Some(clip) = editor.cut() {
+                        gs.clipboard.push(clip);
+                    }
+                }
+                EditorAction::Copy => {
+                    if let Some(clip) = editor.copy() {
+                        gs.clipboard.push(clip);
+                    }
+                }
+                EditorAction::Close => {
+                    ws.close_active();
+                    if ws.editors.is_empty() {
+                        gs.mode = Mode::Select;
+                    }
+                }
+            }
+            return true;
+        }
+    }
+    false
+}
+
+/// Handles keybinding while on tabs
+fn map_tabs(ws: &mut Workspace, key: &KeyEvent, _gs: &mut GlobalState) -> bool {
+    if let Some(action) = ws.key_map.map(key) {
+        match action {
+            EditorAction::NewLine | EditorAction::Down => {
+                ws.toggle_editor();
+            }
+            EditorAction::Right | EditorAction::Indent => {
+                let editor = ws.editors.remove(0);
+                ws.editors.push(editor);
+            }
+            EditorAction::Left | EditorAction::Unintent => {
+                if let Some(editor) = ws.editors.pop() {
+                    ws.editors.insert(0, editor);
+                }
+            }
+            EditorAction::Cancel => {
+                ws.toggle_editor();
+                return false;
+            }
+            EditorAction::Close => {
+                ws.close_active();
+            }
+            _ => (),
+        }
+        return true;
+    }
+    false
 }
 
 #[cfg(test)]

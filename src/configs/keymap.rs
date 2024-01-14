@@ -79,7 +79,7 @@ pub enum EditorAction {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EditorUserKeyMap {
-    new_line: String,
+    new_line_or_select: String,
     indent: String,
     backspace: String,
     delete: String,
@@ -124,7 +124,7 @@ pub struct EditorUserKeyMap {
 impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
     fn from(val: EditorUserKeyMap) -> Self {
         let mut hash = HashMap::default();
-        insert_key_event(&mut hash, &val.new_line, EditorAction::NewLine);
+        insert_key_event(&mut hash, &val.new_line_or_select, EditorAction::NewLine);
         insert_key_event(&mut hash, &val.indent, EditorAction::Indent);
         insert_key_event(&mut hash, &val.backspace, EditorAction::Backspace);
         insert_key_event(&mut hash, &val.delete, EditorAction::Delete);
@@ -171,7 +171,7 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
 impl Default for EditorUserKeyMap {
     fn default() -> Self {
         Self {
-            new_line: String::from(ENTER),
+            new_line_or_select: String::from(ENTER),
             indent: String::from(TAB),
             backspace: String::from(BACKSPACE),
             delete: String::from(DELETE),
@@ -221,6 +221,7 @@ impl Default for EditorUserKeyMap {
 pub enum GeneralAction {
     Expand,
     PerformAction,
+    GoToTabs,
     SelectOpenEditor,
     SaveAll,
     FileTreeModeOrCancelInput,
@@ -230,8 +231,6 @@ pub enum GeneralAction {
     Replace,
     Exit,
     HideFileTree,
-    NextTab,
-    PreviousTab,
     RefreshSettings,
     GoToLinePopup,
     ToggleTerminal,
@@ -242,6 +241,7 @@ pub enum GeneralAction {
 pub struct GeneralUserKeyMap {
     expand_file_tree_or_open_file: String,
     perform_action: String,
+    go_to_editor_tabs: String,
     select_open_editor: String,
     save_all: String,
     file_tree_mod_or_cancel_input: String,
@@ -252,8 +252,6 @@ pub struct GeneralUserKeyMap {
     backspace_tree_input: String,
     exit: String,
     hide_file_tree: String,
-    next_tab: String,
-    previous_tab: String,
     refresh_settings: String,
     go_to_line: String,
     toggle_terminal: String,
@@ -263,6 +261,7 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
     fn from(val: GeneralUserKeyMap) -> Self {
         let mut hash = HashMap::default();
         insert_key_event(&mut hash, &val.expand_file_tree_or_open_file, GeneralAction::Expand);
+        insert_key_event(&mut hash, &val.go_to_editor_tabs, GeneralAction::GoToTabs);
         insert_key_event(&mut hash, &val.perform_action, GeneralAction::PerformAction);
         insert_key_event(&mut hash, &val.select_open_editor, GeneralAction::SelectOpenEditor);
         insert_key_event(&mut hash, &val.save_all, GeneralAction::SaveAll);
@@ -273,8 +272,6 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
         insert_key_event(&mut hash, &val.replace, GeneralAction::Replace);
         insert_key_event(&mut hash, &val.exit, GeneralAction::Exit);
         insert_key_event(&mut hash, &val.hide_file_tree, GeneralAction::HideFileTree);
-        insert_key_event(&mut hash, &val.next_tab, GeneralAction::NextTab);
-        insert_key_event(&mut hash, &val.previous_tab, GeneralAction::PreviousTab);
         insert_key_event(&mut hash, &val.refresh_settings, GeneralAction::RefreshSettings);
         insert_key_event(&mut hash, &val.go_to_line, GeneralAction::GoToLinePopup);
         insert_key_event(&mut hash, &val.toggle_terminal, GeneralAction::ToggleTerminal);
@@ -286,6 +283,7 @@ impl Default for GeneralUserKeyMap {
     fn default() -> Self {
         Self {
             expand_file_tree_or_open_file: format!("{RIGHT} || d || D"),
+            go_to_editor_tabs: String::from(TAB),
             perform_action: String::from(ENTER),
             select_open_editor: format!("{CTRL} && {UP} || {CTRL} && {DOWN}"),
             save_all: format!("{CTRL} && s"),
@@ -297,8 +295,6 @@ impl Default for GeneralUserKeyMap {
             backspace_tree_input: String::from(BACKSPACE),
             exit: format!("{} && {} || {} && {}", CTRL, 'd', CTRL, 'q'),
             hide_file_tree: format!("{} && {}", CTRL, 'e'),
-            next_tab: String::from(TAB),
-            previous_tab: format!("{} && {}", CTRL, TAB),
             refresh_settings: format!("{}5", F),
             go_to_line: format!("{} && {}", CTRL, 'g'),
             toggle_terminal: format!("{} && {}", CTRL, '`'),

@@ -27,7 +27,7 @@ fn init_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
         terminal.backend_mut(),
         crossterm::terminal::EnterAlternateScreen,
         crossterm::style::ResetColor,
-        crossterm::cursor::SetCursorStyle::BlinkingBlock,
+        // crossterm::event::EnableMouseCapture,
     )?;
 
     // loading panic
@@ -41,7 +41,12 @@ fn init_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
 }
 
 fn graceful_exit() -> Result<()> {
-    crossterm::execute!(std::io::stdout(), crossterm::style::ResetColor, crossterm::terminal::LeaveAlternateScreen,)?;
+    crossterm::execute!(
+        std::io::stdout(),
+        crossterm::terminal::LeaveAlternateScreen,
+        crossterm::style::ResetColor,
+        // crossterm::event::DisableMouseCapture,
+    )?;
     crossterm::terminal::disable_raw_mode()?;
     Ok(())
 }

@@ -241,7 +241,7 @@ impl GlobalState {
                     }
                 }
                 WorkspaceEvent::ActivateEditor(idx) => {
-                    workspace.state.set(idx);
+                    workspace.activate_editor(idx);
                     self.popup = None;
                     self.mode = Mode::Insert;
                 }

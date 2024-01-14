@@ -21,7 +21,6 @@ const TICK: Duration = Duration::from_secs(1);
 
 #[derive(Clone)]
 pub struct Tree {
-    pub on_open_tabs: bool,
     size: u16,
     active: bool,
     state: ListState,
@@ -44,7 +43,6 @@ impl Tree {
             tree,
             tree_ptrs,
             clock: Instant::now(),
-            on_open_tabs: false,
         }
     }
 
@@ -108,7 +106,6 @@ impl Tree {
     }
 
     fn select_up(&mut self) {
-        self.on_open_tabs = false;
         if self.tree_ptrs.is_empty() {
             return;
         }
@@ -123,7 +120,6 @@ impl Tree {
     }
 
     fn select_down(&mut self) {
-        self.on_open_tabs = false;
         if self.tree_ptrs.is_empty() {
             return;
         }

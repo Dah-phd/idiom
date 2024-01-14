@@ -107,13 +107,15 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                         }
                     }
                     GeneralAction::PerformAction => {
-                        if file_tree.on_open_tabs {
-                            gs.mode = Mode::Insert;
-                        } else if let Some(file_path) = file_tree.expand_dir_or_get_path() {
+                        if let Some(file_path) = file_tree.expand_dir_or_get_path() {
                             if !file_path.is_dir() && gs.try_new_editor(&mut workspace, file_path).await {
                                 gs.mode = Mode::Insert;
                             }
                         }
+                    }
+                    GeneralAction::GoToTabs if !workspace.editors.is_empty() => {
+                        workspace.toggle_tabs();
+                        gs.mode = Mode::Insert;
                     }
                     GeneralAction::Exit => {
                         if workspace.are_updates_saved() && gs.popup.is_none() {
@@ -125,26 +127,6 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                     GeneralAction::FileTreeModeOrCancelInput => gs.mode = Mode::Select,
                     GeneralAction::SaveAll => workspace.save(&mut gs),
                     GeneralAction::HideFileTree => file_tree.toggle(),
-                    GeneralAction::NextTab => {
-                        if let Some(editor_id) = workspace.state.selected() {
-                            file_tree.on_open_tabs = true;
-                            if editor_id >= workspace.editors.len() - 1 {
-                                workspace.state.set(0)
-                            } else {
-                                workspace.state.set(editor_id + 1)
-                            }
-                        }
-                    }
-                    GeneralAction::PreviousTab => {
-                        if let Some(editor_id) = workspace.state.selected() {
-                            file_tree.on_open_tabs = true;
-                            if editor_id == 0 {
-                                workspace.state.set(workspace.editors.len() - 1)
-                            } else {
-                                workspace.state.set(editor_id - 1)
-                            }
-                        }
-                    }
                     GeneralAction::RefreshSettings => {
                         let new_key_map = KeyMap::new();
                         general_key_map = new_key_map.general_key_map();
