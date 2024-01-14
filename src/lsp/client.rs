@@ -1,5 +1,5 @@
 use super::{Diagnostic, LSPNotification, LSPRequest, Response};
-use crate::{configs::FileType, workspace::CursorPosition};
+use crate::{configs::FileType, workspace::CursorPosition, global_state::GlobalState};
 
 use anyhow::Result;
 use lsp_types::{
@@ -73,6 +73,10 @@ impl LSPClient {
         que.remove(id)
     }
 
+    pub fn get_diagnostics(&self, path: &Path) -> Option<PublishDiagnosticsParams> {
+        self.diagnostics.try_lock().ok()?.get_mut(path)?.take()
+    }
+
     pub fn request_partial_tokens(&mut self, path: &Path, range: Range) -> Option<i64> {
         self.capabilities.semantic_tokens_provider.as_ref()?;
         self.request(LSPRequest::<SemanticTokensRangeRequest>::semantics_range(path, range)?)
@@ -111,6 +115,7 @@ impl LSPClient {
         self.request(LSPRequest::<GotoDeclaration>::declaration(path, c)?)
     }
 
+    #[allow(dead_code)]
     pub fn request_definitions(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
         self.capabilities.definition_provider.as_ref()?;
         self.request(LSPRequest::<GotoDefinition>::definition(path, c)?)
@@ -143,10 +148,6 @@ impl LSPClient {
         let notification = LSPNotification::<DidCloseTextDocument>::file_did_close(path)?;
         self.notify(notification)?;
         Ok(())
-    }
-
-    pub fn get_diagnostics(&self, path: &Path) -> Option<PublishDiagnosticsParams> {
-        self.diagnostics.try_lock().ok()?.get_mut(path)?.take()
     }
 
     fn next_id(&mut self) -> i64 {

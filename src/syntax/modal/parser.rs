@@ -13,6 +13,7 @@ pub enum LSPResponseType {
     Renames(i64),
     Tokens(i64),
     TokensPartial(i64),
+    #[allow(dead_code)]
     Definition(i64),
     Declaration(i64),
 }
