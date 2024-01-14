@@ -1,7 +1,6 @@
+use crate::configs::{load_or_create_config, THEME_FILE};
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
-
-use crate::configs::load_or_create_config;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -41,6 +40,6 @@ impl Default for Theme {
 
 impl Theme {
     pub fn new() -> Self {
-        load_or_create_config("theme.json")
+        load_or_create_config(THEME_FILE)
     }
 }

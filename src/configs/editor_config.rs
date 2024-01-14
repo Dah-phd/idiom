@@ -1,7 +1,7 @@
 use crate::utils::{trim_start_inplace, Offset};
 
-use super::load_or_create_config;
 use super::types::FileType;
+use super::{load_or_create_config, EDITOR_CFG_FILE};
 
 use serde::{Deserialize, Serialize};
 
@@ -29,7 +29,7 @@ impl Default for EditorConfigs {
 
 impl EditorConfigs {
     pub fn new() -> Self {
-        load_or_create_config(".editor")
+        load_or_create_config(EDITOR_CFG_FILE)
     }
 
     pub fn update_by_file_type(&mut self, file_type: &FileType) {

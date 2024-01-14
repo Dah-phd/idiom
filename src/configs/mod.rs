@@ -12,8 +12,10 @@ use dirs::config_dir;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::error::Category;
 
-const CONFIG_FOLDER: &str = "idiom";
-const KEY_MAP: &str = ".keys";
+pub const CONFIG_FOLDER: &str = "idiom";
+pub const EDITOR_CFG_FILE: &str = ".editor";
+pub const KEY_MAP: &str = ".keys";
+pub const THEME_FILE: &str = "theme.json";
 
 #[derive(Debug)]
 pub struct EditorKeyMap {

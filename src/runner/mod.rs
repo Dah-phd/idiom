@@ -1,6 +1,8 @@
 mod commands;
+use crate::configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE};
 use crate::global_state::GlobalState;
 use anyhow::Result;
+use commands::load_cfg;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::widgets::{Block, Borders, List, ListItem};
@@ -39,6 +41,7 @@ impl EditorTerminal {
                 "This is not a true terminal but command executor.".to_owned(),
                 "It holds only basic functionality but does not support continious processes (not a pty).".to_owned(),
                 "Main goal is to have easy acces to git and build tools (such as cargo/pybuilder/tsc).".to_owned(),
+                "idiom specific commands are triggered with prefix %i <cmd> use %i help to get more info.".to_owned(),
             ],
             ..Default::default()
         }
@@ -163,7 +166,7 @@ impl EditorTerminal {
     }
 
     async fn push_command(&mut self, gs: &mut GlobalState) -> Result<()> {
-        let command = self.cmd_histroy[self.at_history].to_owned();
+        let command = self.cmd_histroy[self.at_history].trim().to_owned();
         self.cmd_histroy.push(String::new());
         self.at_history = self.cmd_histroy.len() - 1;
         if let Some((stdin, child, handler)) = self.process.as_mut() {
@@ -187,6 +190,28 @@ impl EditorTerminal {
                 let mut new = Self::new();
                 new.active = true;
                 *self = new;
+            }
+            if arg.trim() == "help" {
+                self.logs.push("load => load config files, available options:".to_owned());
+                self.logs.push("    keymap => open keymap config file.".to_owned());
+                self.logs.push("    config => open editor config file.".to_owned());
+                self.logs.push("    theme => open theme config file.".to_owned());
+                self.logs.push("Example: &i load keymap".to_owned());
+            }
+            if let Some(cfg) = arg.trim().strip_prefix("load") {
+                if let Some(msg) = match cfg.trim() {
+                    "keymap" => load_cfg(KEY_MAP, gs),
+                    "config" => load_cfg(EDITOR_CFG_FILE, gs),
+                    "theme" => load_cfg(THEME_FILE, gs),
+                    _ => {
+                        self.logs.push("Invalid arg on %i load <cfg>".to_owned());
+                        self.logs.push(format!("Bad arg: {}", cfg));
+                        self.logs.push("Expected: keymap | config | theme!".to_owned());
+                        None
+                    }
+                } {
+                    self.logs.push(msg);
+                }
             }
             self.logs.push(format!("IDIOM CMD {arg}"));
             return Ok(());
