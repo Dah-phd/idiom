@@ -221,7 +221,7 @@ impl<'a> SpanBuffer<'a> {
     }
 
     fn update_fg(&mut self, fg: Color) {
-        for s in self.buffer[self.last_reset..].iter_mut() {
+        for s in self.buffer.iter_mut().skip(self.last_reset) {
             s.style.fg.replace(fg);
         }
     }

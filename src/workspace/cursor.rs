@@ -20,14 +20,40 @@ impl Cursor {
         self.phantm_char = position.char;
     }
 
-    pub fn add_char(&mut self, offset: usize) {
+    pub fn add_to_char(&mut self, offset: usize) {
         self.char += offset;
         self.phantm_char = self.char;
+    }
+
+    pub fn add_to_char_with_select(&mut self, offset: usize) {
+        self.char += offset;
+        self.phantm_char = self.char;
+        if let Some((from, to)) = self.select.as_mut() {
+            if from.line == self.line {
+                from.char += offset;
+            };
+            if to.line == self.line {
+                to.char += offset;
+            };
+        };
     }
 
     pub fn sub_char(&mut self, offset: usize) {
         self.char -= offset;
         self.phantm_char = self.char;
+    }
+
+    pub fn checked_sub_char_with_select(&mut self, offset: usize) {
+        self.char = self.char.checked_sub(offset).unwrap_or_default();
+        self.phantm_char = self.char;
+        if let Some((from, to)) = self.select.as_mut() {
+            if from.line == self.line {
+                from.char = from.char.checked_sub(offset).unwrap_or_default();
+            };
+            if to.line == self.line {
+                to.char = to.char.checked_sub(offset).unwrap_or_default();
+            };
+        };
     }
 
     pub fn set_char(&mut self, char: usize) {

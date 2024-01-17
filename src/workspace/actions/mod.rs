@@ -9,7 +9,7 @@ use crate::workspace::{
 };
 use action_buffer::ActionBuffer;
 pub use edits::{Edit, EditBuilder, EditMetaData};
-use lsp_types::{Position, TextDocumentContentChangeEvent, TextEdit};
+use lsp_types::{TextDocumentContentChangeEvent, TextEdit};
 
 #[derive(Debug, Default)]
 pub struct Actions {
@@ -106,36 +106,28 @@ impl Actions {
     }
 
     pub fn indent(&mut self, cursor: &mut Cursor, content: &mut Vec<String>) {
-        let builder = EditBuilder::init_alt(cursor, content);
-        self.indent_at(cursor.char, cursor, content);
-        self.push_done(builder.finish(cursor.into(), content));
+        self.push_buffer();
+        let edit = match cursor.select_take() {
+            Some((from, to)) => Edit::replace_select(from, to, self.cfg.indent.to_owned(), content),
+            None => Edit::insert_clip(cursor.into(), self.cfg.indent.to_owned(), content),
+        };
+        cursor.add_to_char(self.cfg.indent.len());
+        self.push_done(edit);
     }
 
     pub fn indent_start(&mut self, cursor: &mut Cursor, content: &mut Vec<String>) {
-        let builder = EditBuilder::empty_at(CursorPosition { line: cursor.line, char: 0 });
-        self.indent_at(0, cursor, content);
-        self.push_done(builder.raw_finish(
-            Position { line: cursor.line as u32, character: self.cfg.indent.len() as u32 },
-            self.cfg.indent.to_owned(),
-        ))
-    }
-
-    fn indent_at(&mut self, idx: usize, cursor: &mut Cursor, content: &mut Vec<String>) {
         self.push_buffer();
-        if let Some(line) = content.get_mut(cursor.line) {
-            line.insert_str(idx, &self.cfg.indent);
-            cursor.add_char(self.cfg.indent.len());
-        } else {
-            content.insert(cursor.line, self.cfg.indent.to_owned());
-            cursor.set_char(self.cfg.indent.len());
-        }
+        let start = CursorPosition { line: cursor.line, char: 0 };
+        let edit = Edit::insert_clip(start, self.cfg.indent.to_owned(), content);
+        cursor.add_to_char_with_select(self.cfg.indent.len());
+        self.push_done(edit);
     }
 
     pub fn unindent(&mut self, cursor: &mut Cursor, content: &mut [String]) {
         if let Some(line) = content.get_mut(cursor.line) {
             if line.starts_with(&self.cfg.indent) {
                 self.push_buffer();
-                cursor.set_char(cursor.char.checked_sub(self.cfg.indent.len()).unwrap_or_default());
+                cursor.checked_sub_char_with_select(self.cfg.indent.len());
                 self.push_done(Edit::extract_from_line(cursor.line, 0, self.cfg.indent.len(), line))
             }
         }
@@ -195,7 +187,7 @@ impl Actions {
                 }
                 line.insert(cursor.char, ch);
             }
-            cursor.add_char(1);
+            cursor.add_to_char(1);
         }
     }
 
@@ -221,23 +213,27 @@ impl Actions {
         if content.is_empty() || cursor.line == 0 && cursor.char == 0 {
             return;
         }
-        if let Some((from, to)) = cursor.select_take() {
-            self.push_buffer();
-            cursor.set_position(from);
-            self.push_done(Edit::remove_select(from, to, content));
-        } else if cursor.char == 0 {
-            self.push_buffer();
-            cursor.line -= 1;
-            let action = Edit::merge_next_line(cursor.line, content);
-            cursor.set_char(action.text_edit.range.start.character as usize);
-            self.push_done(action);
-        } else {
-            if let Some(action) =
-                self.buffer.backspace(cursor.line, cursor.char, &mut content[cursor.line], &self.cfg.indent)
-            {
+        match cursor.select_take() {
+            Some((from, to)) => {
+                self.push_buffer();
+                cursor.set_position(from);
+                self.push_done(Edit::remove_select(from, to, content));
+            }
+            None if cursor.char == 0 => {
+                self.push_buffer();
+                cursor.line -= 1;
+                let action = Edit::merge_next_line(cursor.line, content);
+                cursor.set_char(action.text_edit.range.start.character as usize);
                 self.push_done(action);
             }
-            cursor.set_char(self.buffer.last_char());
+            None => {
+                if let Some(action) =
+                    self.buffer.backspace(cursor.line, cursor.char, &mut content[cursor.line], &self.cfg.indent)
+                {
+                    self.push_done(action);
+                }
+                cursor.set_char(self.buffer.last_char());
+            }
         }
     }
 
@@ -261,10 +257,9 @@ impl Actions {
 
     pub fn paste(&mut self, clip: String, cursor: &mut Cursor, content: &mut Vec<String>) {
         self.push_buffer();
-        let action = if let Some((from, to)) = cursor.select_take() {
-            Edit::replace_select(from, to, clip, content)
-        } else {
-            Edit::insert_clip(cursor.into(), clip, content)
+        let action = match cursor.select_take() {
+            Some((from, to)) => Edit::replace_select(from, to, clip, content),
+            None => Edit::insert_clip(cursor.into(), clip, content),
         };
         cursor.set_position(action.end_position());
         self.push_done(action);
