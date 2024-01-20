@@ -25,19 +25,6 @@ impl Cursor {
         self.phantm_char = self.char;
     }
 
-    pub fn add_to_char_with_select(&mut self, offset: usize) {
-        self.char += offset;
-        self.phantm_char = self.char;
-        if let Some((from, to)) = self.select.as_mut() {
-            if from.line == self.line {
-                from.char += offset;
-            };
-            if to.line == self.line {
-                to.char += offset;
-            };
-        };
-    }
-
     pub fn sub_char(&mut self, offset: usize) {
         self.char -= offset;
         self.phantm_char = self.char;
@@ -295,6 +282,10 @@ impl Cursor {
     pub fn select_set(&mut self, from: CursorPosition, to: CursorPosition) {
         self.set_position(to);
         self.select.replace((from, to));
+    }
+
+    pub fn select_replace(&mut self, select: Option<(CursorPosition, CursorPosition)>) {
+        self.select = select;
     }
 
     pub fn select_take(&mut self) -> Option<(CursorPosition, CursorPosition)> {

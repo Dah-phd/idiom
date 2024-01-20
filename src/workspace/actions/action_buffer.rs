@@ -117,6 +117,8 @@ impl From<DelBuffer> for Edit {
                 String::new(),
             ),
             reverse_text_edit: TextEdit::new(Range::new(start, start), buf.text),
+            select: None,
+            new_select: None,
         }
     }
 }
@@ -171,6 +173,8 @@ impl From<BackspaceBuffer> for Edit {
             meta: EditMetaData { start_line: buf.line, from: 1, to: 1 },
             reverse_text_edit: TextEdit::new(Range::new(end, end), buf.text.chars().rev().collect()),
             text_edit: TextEdit::new(Range::new(end, Position::new(buf.line as u32, buf.char)), String::new()),
+            select: None,
+            new_select: None,
         }
     }
 }
@@ -210,6 +214,8 @@ impl From<TextBuffer> for Edit {
                 String::new(),
             ),
             text_edit: TextEdit::new(Range::new(start, start), buf.text),
+            select: None,
+            new_select: None,
         }
     }
 }

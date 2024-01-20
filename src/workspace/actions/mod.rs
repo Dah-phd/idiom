@@ -5,11 +5,11 @@ use crate::configs::EditorConfigs;
 use crate::syntax::Lexer;
 use crate::workspace::{
     cursor::{Cursor, CursorPosition},
-    utils::{get_closing_char, is_closing_repeat},
+    utils::get_closing_char,
 };
 use action_buffer::ActionBuffer;
 pub use edits::{Edit, EditBuilder, EditMetaData};
-use lsp_types::{TextDocumentContentChangeEvent, TextEdit};
+use lsp_types::{Position, TextDocumentContentChangeEvent, TextEdit};
 
 #[derive(Debug, Default)]
 pub struct Actions {
@@ -107,20 +107,63 @@ impl Actions {
 
     pub fn indent(&mut self, cursor: &mut Cursor, content: &mut Vec<String>) {
         self.push_buffer();
-        let edit = match cursor.select_take() {
-            Some((from, to)) => Edit::replace_select(from, to, self.cfg.indent.to_owned(), content),
-            None => Edit::insert_clip(cursor.into(), self.cfg.indent.to_owned(), content),
-        };
-        cursor.add_to_char(self.cfg.indent.len());
-        self.push_done(edit);
+        match cursor.select_take() {
+            Some((from, to)) => {
+                if from.line == to.line {
+                    self.push_done(Edit::replace_select(from, to, self.cfg.indent.to_owned(), content));
+                } else {
+                    let edits = self.indent_range(cursor, from, to, content);
+                    self.push_done(edits);
+                }
+            }
+            None => {
+                self.push_done(Edit::insert_clip(cursor.into(), self.cfg.indent.to_owned(), content));
+                cursor.add_to_char(self.cfg.indent.len());
+            }
+        }
     }
 
     pub fn indent_start(&mut self, cursor: &mut Cursor, content: &mut Vec<String>) {
         self.push_buffer();
-        let start = CursorPosition { line: cursor.line, char: 0 };
-        let edit = Edit::insert_clip(start, self.cfg.indent.to_owned(), content);
-        cursor.add_to_char_with_select(self.cfg.indent.len());
-        self.push_done(edit);
+        match cursor.select_take() {
+            Some((from, to)) => {
+                let edits = self.indent_range(cursor, from, to, content);
+                self.push_done(edits);
+            }
+            None => {
+                let start = CursorPosition { line: cursor.line, char: 0 };
+                let edit = Edit::insert_clip(start, self.cfg.indent.to_owned(), content);
+                cursor.add_to_char(self.cfg.indent.len());
+                self.push_done(edit);
+            }
+        }
+    }
+
+    fn indent_range(
+        &mut self,
+        cursor: &mut Cursor,
+        mut from: CursorPosition,
+        mut to: CursorPosition,
+        content: &mut [String],
+    ) -> Vec<Edit> {
+        from.char += self.cfg.indent.len();
+        let edit_lines = if to.char == 0 {
+            to.line - from.line
+        } else {
+            to.char += self.cfg.indent.len();
+            to.line - from.line + 1
+        };
+        cursor.select_set(from, to);
+        content
+            .iter_mut()
+            .enumerate()
+            .skip(from.line)
+            .take(edit_lines)
+            .map(|(line_idx, text)| {
+                text.insert_str(0, &self.cfg.indent);
+                Edit::record_single_line_insertion(Position::new(line_idx as u32, 0), self.cfg.indent.to_owned())
+            })
+            .collect()
     }
 
     pub fn unindent(&mut self, cursor: &mut Cursor, content: &mut [String]) {
@@ -128,7 +171,7 @@ impl Actions {
             if line.starts_with(&self.cfg.indent) {
                 self.push_buffer();
                 cursor.checked_sub_char_with_select(self.cfg.indent.len());
-                self.push_done(Edit::extract_from_line(cursor.line, 0, self.cfg.indent.len(), line))
+                self.push_done(Edit::extract_from_start(cursor.line, self.cfg.indent.len(), line))
             }
         }
     }
@@ -169,18 +212,43 @@ impl Actions {
     }
 
     pub fn push_char(&mut self, ch: char, cursor: &mut Cursor, content: &mut Vec<String>) {
-        if let Some((from, to)) = cursor.select_take() {
-            self.push_buffer();
-            cursor.set_position(from);
-            self.push_done(Edit::remove_select(from, to, content));
+        match cursor.select_take() {
+            Some((mut from, mut to)) => {
+                self.push_buffer();
+                match get_closing_char(ch) {
+                    Some(closing) => {
+                        content[to.line].insert(to.char, closing);
+                        content[from.line].insert(from.char, ch);
+                        let first_edit =
+                            Edit::record_single_line_insertion(to.into(), closing.to_string()).select(from, to);
+                        let second_edit = Edit::record_single_line_insertion(from.into(), ch.to_string());
+                        from.char += 1;
+                        if from.line == to.line {
+                            to.char += 1;
+                        }
+                        self.push_done(vec![first_edit, second_edit.new_select(from, to)]);
+                        cursor.set_position(to);
+                        cursor.select_set(from, to);
+                    }
+                    None => {
+                        self.push_buffer();
+                        cursor.set_position(from);
+                        self.push_done(Edit::remove_select(from, to, content));
+                        self.push_char_simple(ch, cursor, content);
+                    }
+                }
+            }
+            None => self.push_char_simple(ch, cursor, content),
         }
+    }
+
+    fn push_char_simple(&mut self, ch: char, cursor: &mut Cursor, content: &mut [String]) {
         if let Some(line) = content.get_mut(cursor.line) {
-            if is_closing_repeat(line.as_str(), ch, cursor.char) {
-            } else if let Some(closing) = get_closing_char(ch) {
+            if let Some(closing) = get_closing_char(ch) {
                 let new_text = format!("{ch}{closing}");
                 line.insert_str(cursor.char, &new_text);
                 self.push_buffer();
-                self.push_done(Edit::insertion(cursor.line as u32, cursor.char as u32, new_text));
+                self.push_done(Edit::record_single_line_insertion(cursor.position().into(), new_text));
             } else {
                 if let Some(action) = self.buffer.push(cursor.line, cursor.char, ch) {
                     self.push_done(action);
@@ -240,8 +308,9 @@ impl Actions {
     pub fn undo(&mut self, cursor: &mut Cursor, content: &mut Vec<String>) {
         self.push_buffer();
         if let Some(action) = self.done.pop() {
-            let position = action.apply_rev(content, &mut self.events);
+            let (position, select) = action.apply_rev(content, &mut self.events);
             cursor.set_position(position);
+            cursor.select_replace(select);
             self.undone.push(action);
         }
     }
@@ -249,8 +318,9 @@ impl Actions {
     pub fn redo(&mut self, cursor: &mut Cursor, content: &mut Vec<String>) {
         self.push_buffer();
         if let Some(action) = self.undone.pop() {
-            let position = action.apply(content, &mut self.events);
+            let (position, select) = action.apply(content, &mut self.events);
             cursor.set_position(position);
+            cursor.select_replace(select);
             self.done.push(action);
         }
     }
@@ -321,7 +391,7 @@ impl EditType {
         &self,
         content: &mut Vec<String>,
         events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
-    ) -> CursorPosition {
+    ) -> (CursorPosition, Option<(CursorPosition, CursorPosition)>) {
         match self {
             Self::Single(action) => action.apply_rev(content, events),
             Self::Multi(actions) => {
@@ -333,7 +403,7 @@ impl EditType {
         &self,
         content: &mut Vec<String>,
         events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
-    ) -> CursorPosition {
+    ) -> (CursorPosition, Option<(CursorPosition, CursorPosition)>) {
         match self {
             Self::Single(action) => action.apply(content, events),
             Self::Multi(actions) => actions.iter().map(|a| a.apply(content, events)).last().unwrap_or_default(),
