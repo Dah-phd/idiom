@@ -146,7 +146,10 @@ impl Actions {
         mut to: CursorPosition,
         content: &mut [String],
     ) -> Vec<Edit> {
-        from.char += self.cfg.indent.len();
+        let initial_select = (from, to);
+        if from.char != 0 {
+            from.char += self.cfg.indent.len();
+        }
         let mut edit_lines = to.line - from.line;
         if to.char != 0 {
             to.char += self.cfg.indent.len();
@@ -159,6 +162,12 @@ impl Actions {
             let position = Position::new(line_idx as u32, 0);
             edits.push(Edit::record_single_line_insertion(position, self.cfg.indent.to_owned()))
         }
+        if let Some(edit) = edits.first_mut() {
+            edit.select = Some(initial_select);
+        }
+        if let Some(edit) = edits.last_mut() {
+            edit.new_select = Some((from, to));
+        }
         edits
     }
 
@@ -166,6 +175,7 @@ impl Actions {
         self.push_buffer();
         match cursor.select_take() {
             Some((mut from, mut to)) => {
+                let initial_select = (from, to);
                 let mut edit_lines = to.line - from.line;
                 if to.char != 0 {
                     edit_lines += 1;
@@ -181,6 +191,12 @@ impl Actions {
                         }
                         edits.push(edit);
                     };
+                }
+                if let Some(edit) = edits.first_mut() {
+                    edit.select = Some(initial_select);
+                }
+                if let Some(edit) = edits.last_mut() {
+                    edit.new_select = Some((from, to));
                 }
                 cursor.select_set(from, to);
                 self.push_done(edits);
