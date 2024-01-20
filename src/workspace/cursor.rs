@@ -311,7 +311,7 @@ impl Cursor {
                     return to.char - from.char;
                 };
                 let mut iter = content[from.line..=to.line].iter().peekable();
-                let mut len = iter.next().map(|line| line[from.char..].len() + 1).unwrap_or_default();
+                let mut len = iter.next().map(|line| line.chars().skip(from.char).count()).unwrap_or_default() + 1;
                 while let Some(line) = iter.next() {
                     if iter.peek().is_none() {
                         len += to.char;
