@@ -10,7 +10,7 @@ pub const UNDERLINED: Style = Style::new().add_modifier(Modifier::UNDERLINED);
 pub const REVERSED: Style = Style::new().add_modifier(Modifier::REVERSED);
 
 pub fn trim_start_inplace(line: &mut String) -> usize {
-    if let Some(idx) = line.find(|c: char| !c.is_whitespace()) {
+    if let Some(idx) = line.find(|c: char| !c.is_whitespace() && c != '\t') {
         line.replace_range(..idx, "");
         return idx;
     };

@@ -66,6 +66,46 @@ impl Edit {
         }
     }
 
+    pub fn unindent(line: usize, text: &mut String, indent: &str) -> Option<(usize, Self)> {
+        let mut idx = 0;
+        while text[idx..].starts_with(indent) {
+            idx += indent.len();
+        }
+        if text[idx..].starts_with(' ') {
+            let mut removed = String::new();
+            while text[idx..].starts_with(' ') {
+                removed.push(text.remove(idx));
+            }
+            let start = Position::new(line as u32, idx as u32);
+            let end = Position::new(line as u32, (idx + removed.len()) as u32);
+            return Some((
+                removed.len(),
+                Self {
+                    meta: EditMetaData::line_changed(line),
+                    reverse_text_edit: TextEdit::new(Range::new(start, start), removed),
+                    text_edit: TextEdit::new(Range::new(start, end), String::new()),
+                    select: None,
+                    new_select: None,
+                },
+            ));
+        } else if idx != 0 {
+            text.replace_range(0..indent.len(), "");
+            let start = Position::new(line as u32, 0);
+            let end = Position::new(line as u32, indent.len() as u32);
+            return Some((
+                indent.len(),
+                Self {
+                    meta: EditMetaData::line_changed(line),
+                    reverse_text_edit: TextEdit::new(Range::new(start, start), indent.to_owned()),
+                    text_edit: TextEdit::new(Range::new(start, end), String::new()),
+                    select: None,
+                    new_select: None,
+                },
+            ));
+        }
+        None
+    }
+
     /// Creates Edit record without performing the action
     /// does not support multi line insertion
     pub fn record_single_line_insertion(position: Position, new_text: String) -> Self {

@@ -53,7 +53,7 @@ impl EditorConfigs {
     }
 
     pub fn derive_indent_from(&self, prev_line: &str) -> String {
-        let mut indent = prev_line.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
+        let mut indent = prev_line.chars().take_while(|&c| c.is_whitespace() || c == '\t').collect::<String>();
         if let Some(last) = prev_line.trim_end().chars().last() {
             if self.indent_after.contains(last) {
                 indent.insert_str(0, &self.indent);

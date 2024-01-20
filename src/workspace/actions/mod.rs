@@ -147,31 +147,51 @@ impl Actions {
         content: &mut [String],
     ) -> Vec<Edit> {
         from.char += self.cfg.indent.len();
-        let edit_lines = if to.char == 0 {
-            to.line - from.line
-        } else {
+        let mut edit_lines = to.line - from.line;
+        if to.char != 0 {
             to.char += self.cfg.indent.len();
-            to.line - from.line + 1
+            edit_lines += 1;
         };
         cursor.select_set(from, to);
-        content
-            .iter_mut()
-            .enumerate()
-            .skip(from.line)
-            .take(edit_lines)
-            .map(|(line_idx, text)| {
-                text.insert_str(0, &self.cfg.indent);
-                Edit::record_single_line_insertion(Position::new(line_idx as u32, 0), self.cfg.indent.to_owned())
-            })
-            .collect()
+        let mut edits = Vec::with_capacity(edit_lines);
+        for (line_idx, text) in content.iter_mut().enumerate().skip(from.line).take(edit_lines) {
+            text.insert_str(0, &self.cfg.indent);
+            let position = Position::new(line_idx as u32, 0);
+            edits.push(Edit::record_single_line_insertion(position, self.cfg.indent.to_owned()))
+        }
+        edits
     }
 
     pub fn unindent(&mut self, cursor: &mut Cursor, content: &mut [String]) {
-        if let Some(line) = content.get_mut(cursor.line) {
-            if line.starts_with(&self.cfg.indent) {
-                self.push_buffer();
-                cursor.checked_sub_char_with_select(self.cfg.indent.len());
-                self.push_done(Edit::extract_from_start(cursor.line, self.cfg.indent.len(), line))
+        self.push_buffer();
+        match cursor.select_take() {
+            Some((mut from, mut to)) => {
+                let mut edit_lines = to.line - from.line;
+                if to.char != 0 {
+                    edit_lines += 1;
+                }
+                let mut edits = Vec::new();
+                for (line_idx, text) in content.iter_mut().enumerate().skip(from.line).take(edit_lines) {
+                    if let Some((offset, edit)) = Edit::unindent(line_idx, text, &self.cfg.indent) {
+                        if from.line == line_idx {
+                            from.char = from.char.checked_sub(offset).unwrap_or_default();
+                        }
+                        if to.line == line_idx {
+                            to.char = to.char.checked_sub(offset).unwrap_or_default();
+                        }
+                        edits.push(edit);
+                    };
+                }
+                cursor.select_set(from, to);
+                self.push_done(edits);
+            }
+            None => {
+                if let Some((offset, edit)) =
+                    content.get_mut(cursor.line).and_then(|text| Edit::unindent(cursor.line, text, &self.cfg.indent))
+                {
+                    cursor.char = cursor.char.checked_sub(offset).unwrap_or_default();
+                    self.push_done(edit);
+                }
             }
         }
     }
