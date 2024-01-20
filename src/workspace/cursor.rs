@@ -310,16 +310,12 @@ impl Cursor {
                 if from.line == to.line {
                     return to.char - from.char;
                 };
-                let mut iter = content[from.line..=to.line].iter().peekable();
+                let mut iter = content.iter().skip(from.line).take(to.line - from.line);
                 let mut len = iter.next().map(|line| line.chars().skip(from.char).count()).unwrap_or_default() + 1;
-                while let Some(line) = iter.next() {
-                    if iter.peek().is_none() {
-                        len += to.char;
-                    } else {
-                        len += line.len() + 1;
-                    }
+                for line in iter {
+                    len += line.len() + 1;
                 }
-                len
+                len + to.char
             })
             .unwrap_or_default()
     }
