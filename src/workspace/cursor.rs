@@ -286,6 +286,9 @@ impl Cursor {
 
     pub fn select_replace(&mut self, select: Option<(CursorPosition, CursorPosition)>) {
         self.select = select;
+        if let Some((_, to)) = self.select {
+            self.set_position(to);
+        };
     }
 
     pub fn select_take(&mut self) -> Option<(CursorPosition, CursorPosition)> {
@@ -305,13 +308,13 @@ impl Cursor {
         self.select_get()
             .map(|(from, to)| {
                 if from.line == to.line {
-                    return content[from.line][from.char..to.char].len();
+                    return to.char - from.char;
                 };
                 let mut iter = content[from.line..=to.line].iter().peekable();
                 let mut len = iter.next().map(|line| line[from.char..].len() + 1).unwrap_or_default();
                 while let Some(line) = iter.next() {
                     if iter.peek().is_none() {
-                        len += line[..to.char].len();
+                        len += to.char;
                     } else {
                         len += line.len() + 1;
                     }
