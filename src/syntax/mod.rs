@@ -213,9 +213,7 @@ impl Lexer {
     pub fn help(&mut self, c: CursorPosition) {
         if let Some(client) = self.lsp_client.as_mut() {
             if let Some(actions) = self.line_builder.collect_actions(c.line) {
-                if !actions.is_empty() {
-                    // TODO create import selector;
-                }
+                // TODO create import selector;
             }
             if let Some(id) = client.request_signitures(&self.path, c).map(LSPResponseType::SignatureHelp) {
                 self.requests.push(id);
