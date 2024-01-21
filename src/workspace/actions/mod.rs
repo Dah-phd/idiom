@@ -4,12 +4,14 @@ mod edits;
 use crate::configs::EditorConfigs;
 use crate::syntax::Lexer;
 use crate::workspace::{
-    cursor::{Cursor, CursorPosition},
+    cursor::{Cursor, CursorPosition, Select},
     utils::get_closing_char,
 };
 use action_buffer::ActionBuffer;
 pub use edits::{Edit, EditBuilder, EditMetaData};
 use lsp_types::{Position, TextDocumentContentChangeEvent, TextEdit};
+
+pub type Events = Vec<(EditMetaData, TextDocumentContentChangeEvent)>;
 
 #[derive(Debug, Default)]
 pub struct Actions {
@@ -17,7 +19,7 @@ pub struct Actions {
     version: i32,
     done: Vec<EditType>,
     undone: Vec<EditType>,
-    events: Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
+    events: Events,
     buffer: ActionBuffer,
 }
 
@@ -75,7 +77,7 @@ impl Actions {
     pub fn mass_replace(
         &mut self,
         cursor: &mut Cursor,
-        mut ranges: Vec<(CursorPosition, CursorPosition)>,
+        mut ranges: Vec<Select>,
         clip: String,
         content: &mut Vec<String>,
     ) {
@@ -162,12 +164,7 @@ impl Actions {
             let position = Position::new(line_idx as u32, 0);
             edits.push(Edit::record_single_line_insertion(position, self.cfg.indent.to_owned()))
         }
-        if let Some(edit) = edits.first_mut() {
-            edit.select = Some(initial_select);
-        }
-        if let Some(edit) = edits.last_mut() {
-            edit.new_select = Some((from, to));
-        }
+        add_select(&mut edits, Some(initial_select), Some((from, to)));
         edits
     }
 
@@ -192,13 +189,7 @@ impl Actions {
                         edits.push(edit);
                     };
                 }
-                if let Some(edit) = edits.first_mut() {
-                    edit.select = Some(initial_select);
-                }
-                if let Some(edit) = edits.last_mut() {
-                    edit.new_select = Some((from, to));
-                }
-                cursor.select_set(from, to);
+                add_select(&mut edits, Some(initial_select), Some((from, to)));
                 self.push_done(edits);
             }
             None => {
@@ -423,11 +414,17 @@ pub enum EditType {
 }
 
 impl EditType {
-    pub fn apply_rev(
-        &self,
-        content: &mut Vec<String>,
-        events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
-    ) -> (CursorPosition, Option<(CursorPosition, CursorPosition)>) {
+    fn add_select(&mut self, old: Option<Select>, new: Option<Select>) {
+        match self {
+            Self::Multi(edits) => add_select(edits, old, new),
+            Self::Single(edit) => {
+                edit.select = old;
+                edit.new_select = new;
+            }
+        }
+    }
+
+    pub fn apply_rev(&self, content: &mut Vec<String>, events: &mut Events) -> (CursorPosition, Option<Select>) {
         match self {
             Self::Single(action) => action.apply_rev(content, events),
             Self::Multi(actions) => {
@@ -435,18 +432,15 @@ impl EditType {
             }
         }
     }
-    pub fn apply(
-        &self,
-        content: &mut Vec<String>,
-        events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
-    ) -> (CursorPosition, Option<(CursorPosition, CursorPosition)>) {
+
+    pub fn apply(&self, content: &mut Vec<String>, events: &mut Events) -> (CursorPosition, Option<Select>) {
         match self {
             Self::Single(action) => action.apply(content, events),
             Self::Multi(actions) => actions.iter().map(|a| a.apply(content, events)).last().unwrap_or_default(),
         }
     }
 
-    pub fn collect_events(&self, events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>) {
+    pub fn collect_events(&self, events: &mut Events) {
         match self {
             Self::Single(action) => events.push((action.meta, action.event())),
             Self::Multi(actions) => {
@@ -467,5 +461,14 @@ impl From<Edit> for EditType {
 impl From<Vec<Edit>> for EditType {
     fn from(value: Vec<Edit>) -> Self {
         Self::Multi(value)
+    }
+}
+
+fn add_select(edits: &mut [Edit], old: Option<Select>, new: Option<Select>) {
+    if let Some(edit) = edits.first_mut() {
+        edit.select = old;
+    }
+    if let Some(edit) = edits.last_mut() {
+        edit.select = new;
     }
 }

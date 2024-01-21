@@ -1,12 +1,14 @@
 use lsp_types::Position;
 
+pub type Select = (CursorPosition, CursorPosition);
+
 #[derive(Debug, Default)]
 pub struct Cursor {
     pub line: usize,
     pub char: usize,
     phantm_char: usize, // keeps record for up/down movement
     pub at_line: usize,
-    select: Option<(CursorPosition, CursorPosition)>,
+    select: Option<Select>,
 }
 
 impl Cursor {
@@ -262,7 +264,7 @@ impl Cursor {
         }
     }
 
-    pub fn select_get(&self) -> Option<(CursorPosition, CursorPosition)> {
+    pub fn select_get(&self) -> Option<Select> {
         match self.select.as_ref() {
             None => None,
             Some((from, to)) => {
@@ -284,14 +286,14 @@ impl Cursor {
         self.select.replace((from, to));
     }
 
-    pub fn select_replace(&mut self, select: Option<(CursorPosition, CursorPosition)>) {
+    pub fn select_replace(&mut self, select: Option<Select>) {
         self.select = select;
         if let Some((_, to)) = self.select {
             self.set_position(to);
         };
     }
 
-    pub fn select_take(&mut self) -> Option<(CursorPosition, CursorPosition)> {
+    pub fn select_take(&mut self) -> Option<Select> {
         match self.select.take() {
             None => None,
             Some((from, to)) => {
