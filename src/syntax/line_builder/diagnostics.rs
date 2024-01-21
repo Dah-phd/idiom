@@ -1,4 +1,4 @@
-use lsp_types::{Diagnostic, DiagnosticSeverity, PublishDiagnosticsParams};
+use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, PublishDiagnosticsParams};
 
 use super::LineBuilder;
 
@@ -8,23 +8,32 @@ use ratatui::{
 };
 use std::collections::hash_map::Entry;
 
+const ELS_COLOR: Color = Color::Gray;
 const ERR_COLOR: Color = Color::Red;
 const WAR_COLOR: Color = Color::LightYellow;
-const ELS_COLOR: Color = Color::Gray;
+const ERR_STYLE: Style = Style::new().fg(ERR_COLOR);
+const WAR_STYLE: Style = Style::new().fg(WAR_COLOR);
+const ELS_STYLE: Style = Style::new().fg(ELS_COLOR);
 
 #[derive(Debug)]
 pub struct DiagnosticData {
     pub start: usize,
     pub end: Option<usize>,
     pub span: Span<'static>,
+    pub actions: Option<Vec<String>>,
 }
 
 impl DiagnosticData {
-    fn new(range: lsp_types::Range, message: String, color: Color) -> Self {
+    fn new(range: lsp_types::Range, message: String, color: Style, actions: Option<Vec<String>>) -> Self {
+        let span = match actions {
+            None => Span::styled(format!("    {}", message), color),
+            Some(..) => Span::styled(format!("    💡 {}", message), color),
+        };
         Self {
             start: range.start.character as usize,
             end: if range.start.line == range.end.line { Some(range.end.character as usize) } else { None },
-            span: Span::styled(format!("    {}", message), Style { fg: Some(color), ..Default::default() }),
+            span,
+            actions,
         }
     }
 }
@@ -51,20 +60,21 @@ impl DiagnosticLines {
     }
 
     fn append(&mut self, d: Diagnostic) {
+        let actions = process_related_info(d.related_information);
         match d.severity {
             Some(DiagnosticSeverity::ERROR) => {
-                self.data.insert(0, DiagnosticData::new(d.range, d.message, ERR_COLOR));
+                self.data.insert(0, DiagnosticData::new(d.range, d.message, ERR_STYLE, actions));
             }
             Some(DiagnosticSeverity::WARNING) => match self.data[0].span.style.fg {
                 Some(ELS_COLOR) => {
-                    self.data.insert(0, DiagnosticData::new(d.range, d.message, WAR_COLOR));
+                    self.data.insert(0, DiagnosticData::new(d.range, d.message, WAR_STYLE, actions));
                 }
                 _ => {
-                    self.data.insert(0, DiagnosticData::new(d.range, d.message, WAR_COLOR));
+                    self.data.insert(0, DiagnosticData::new(d.range, d.message, WAR_STYLE, actions));
                 }
             },
             _ => {
-                self.data.push(DiagnosticData::new(d.range, d.message, ELS_COLOR));
+                self.data.push(DiagnosticData::new(d.range, d.message, ELS_STYLE, actions));
             }
         }
     }
@@ -73,11 +83,19 @@ impl DiagnosticLines {
 impl From<Diagnostic> for DiagnosticLines {
     fn from(diagnostic: Diagnostic) -> Self {
         let color = match diagnostic.severity {
-            Some(DiagnosticSeverity::ERROR) => ERR_COLOR,
-            Some(DiagnosticSeverity::WARNING) => WAR_COLOR,
-            _ => ELS_COLOR,
+            Some(DiagnosticSeverity::ERROR) => ERR_STYLE,
+            Some(DiagnosticSeverity::WARNING) => WAR_STYLE,
+            _ => ELS_STYLE,
         };
-        Self { data: vec![DiagnosticData::new(diagnostic.range, diagnostic.message, color)] }
+        let actions = process_related_info(diagnostic.related_information);
+        Self {
+            data: vec![DiagnosticData::new(
+                diagnostic.range,
+                diagnostic.message,
+                color,
+                actions,
+            )],
+        }
     }
 }
 
@@ -108,4 +126,39 @@ pub fn diagnostics_full(builder: &mut LineBuilder, params: PublishDiagnosticsPar
             }
         };
     }
+}
+
+fn process_related_info(related_info: Option<Vec<DiagnosticRelatedInformation>>) -> Option<Vec<String>> {
+    let mut buffer = Vec::new();
+    for info in related_info? {
+        if info.message.starts_with("consider importing") {
+            if let Some(mut imports) = derive_import(&info.message) {
+                buffer.append(&mut imports)
+            }
+        }
+    }
+    if !buffer.is_empty() {
+        return Some(buffer);
+    }
+    None
+}
+
+fn derive_import(message: &str) -> Option<Vec<String>> {
+    let matches: Vec<_> = message.match_indices("\n`").map(|(idx, _)| idx).collect();
+    let mut buffer = Vec::new();
+    let mut end_idx = 0;
+    for match_idx in matches {
+        let substr = &message[end_idx..match_idx + 1];
+        end_idx = match_idx + 2;
+        for (current_idx, c) in substr.char_indices().rev() {
+            if c == '`' {
+                buffer.push(String::from(&substr[current_idx + 1..]));
+                break;
+            }
+        }
+    }
+    if !buffer.is_empty() {
+        return Some(buffer);
+    }
+    None
 }

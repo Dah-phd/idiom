@@ -414,6 +414,7 @@ pub enum EditType {
 }
 
 impl EditType {
+    #[allow(dead_code)]
     fn add_select(&mut self, old: Option<Select>, new: Option<Select>) {
         match self {
             Self::Multi(edits) => add_select(edits, old, new),
