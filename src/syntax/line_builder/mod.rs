@@ -151,6 +151,10 @@ impl LineBuilder {
         self.brackets.reset();
     }
 
+    pub fn collect_actions(&self, line: usize) -> Option<Vec<String>> {
+        self.diagnostics.get(&line).and_then(|d_line| d_line.collect_actions())
+    }
+
     pub fn build_line<'a>(&mut self, line_idx: usize, content: &'a str, line_number_offset: usize) -> ListItem<'a> {
         self.build_select_buffer(line_idx, content.len());
         if content.is_empty() {

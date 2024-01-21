@@ -55,6 +55,21 @@ impl DiagnosticLines {
         None
     }
 
+    pub fn collect_actions(&self) -> Option<Vec<String>> {
+        let mut buffer = Vec::new();
+        for diagnostic in self.data.iter() {
+            if let Some(actions) = diagnostic.actions.as_ref() {
+                for action in actions {
+                    buffer.push(action.to_owned());
+                }
+            }
+        }
+        if buffer.is_empty() {
+            return None;
+        }
+        Some(buffer)
+    }
+
     pub fn drop_non_errs(&mut self) {
         self.data.retain(|d| d.span.style.fg == Some(ERR_COLOR));
     }
