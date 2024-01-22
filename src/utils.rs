@@ -1,5 +1,8 @@
 use anyhow::{anyhow, Result};
-use ratatui::style::{Modifier, Style};
+use ratatui::{
+    style::{Modifier, Style},
+    widgets::{Block, Borders},
+};
 use std::{
     ops::{Add, Sub},
     path::{Path, PathBuf},
@@ -8,6 +11,7 @@ use std::{
 
 pub const UNDERLINED: Style = Style::new().add_modifier(Modifier::UNDERLINED);
 pub const REVERSED: Style = Style::new().add_modifier(Modifier::REVERSED);
+pub const BORDERED_BLOCK: Block = Block::new().borders(Borders::all());
 
 pub fn trim_start_inplace(line: &mut String) -> usize {
     if let Some(idx) = line.find(|c: char| !c.is_whitespace() && c != '\t') {

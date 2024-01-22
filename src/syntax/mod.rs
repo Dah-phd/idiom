@@ -65,14 +65,14 @@ impl Lexer {
                                 if let Some(modal) = self.modal.as_mut() {
                                     modal.hover_map(hover);
                                 } else {
-                                    self.modal.replace(LSPModal::hover(hover));
+                                    self.modal.replace(hover.into());
                                 }
                             }
                             LSPResult::SignatureHelp(signature) => {
                                 if let Some(modal) = self.modal.as_mut() {
                                     modal.signature_map(signature);
                                 } else {
-                                    self.modal.replace(LSPModal::signature(signature));
+                                    self.modal.replace(signature.into());
                                 }
                             }
                             LSPResult::Renames(workspace_edit) => {
@@ -213,7 +213,7 @@ impl Lexer {
     pub fn help(&mut self, c: CursorPosition) {
         if let Some(client) = self.lsp_client.as_mut() {
             if let Some(actions) = self.line_builder.collect_actions(c.line) {
-                // TODO create import selector;
+                self.modal.replace(LSPModal::actions(actions));
             }
             if let Some(id) = client.request_signitures(&self.path, c).map(LSPResponseType::SignatureHelp) {
                 self.requests.push(id);

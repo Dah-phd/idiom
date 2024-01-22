@@ -5,7 +5,7 @@ use crate::configs::EditorConfigs;
 use crate::syntax::Lexer;
 use crate::workspace::{
     cursor::{Cursor, CursorPosition, Select},
-    utils::get_closing_char,
+    utils::{get_closing_char, is_closing_repeat},
 };
 use action_buffer::ActionBuffer;
 pub use edits::{Edit, EditBuilder, EditMetaData};
@@ -271,7 +271,8 @@ impl Actions {
 
     fn push_char_simple(&mut self, ch: char, cursor: &mut Cursor, content: &mut [String]) {
         if let Some(line) = content.get_mut(cursor.line) {
-            if let Some(closing) = get_closing_char(ch) {
+            if is_closing_repeat(line.as_str(), ch, cursor.char) {
+            } else if let Some(closing) = get_closing_char(ch) {
                 let new_text = format!("{ch}{closing}");
                 line.insert_str(cursor.char, &new_text);
                 self.push_buffer();

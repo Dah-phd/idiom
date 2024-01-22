@@ -107,6 +107,25 @@ pub fn get_closing_char(ch: char) -> Option<char> {
     }
 }
 
+pub fn get_opening_char(ch: char) -> Option<char> {
+    match ch {
+        '}' => Some('{'),
+        ')' => Some('('),
+        ']' => Some('['),
+        '"' => Some('"'),
+        '\'' => Some('\''),
+        _ => None,
+    }
+}
+
+pub fn is_closing_repeat(line: &str, ch: char, at: usize) -> bool {
+    if let Some(opening) = get_opening_char(ch) {
+        line[at..].starts_with(ch) && line[..at].contains(opening)
+    } else {
+        false
+    }
+}
+
 pub fn find_line_start(line: &str) -> usize {
     for (idx, ch) in line.char_indices() {
         if !ch.is_whitespace() {
