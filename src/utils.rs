@@ -48,7 +48,7 @@ pub fn into_guard<T>(mutex: &Mutex<T>) -> MutexGuard<T> {
 pub fn get_nested_paths(path: &PathBuf) -> impl Iterator<Item = PathBuf> {
     match std::fs::read_dir(path) {
         Ok(iter) => iter.flatten().map(|p| p.path()),
-        Err(_) => panic!(),
+        Err(_) => todo!(),
     }
 }
 

@@ -1,12 +1,8 @@
-use std::fmt::Debug;
-
-use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit};
-
-use crate::{configs::EditorConfigs, utils::Offset};
-
-use crate::workspace::utils::{clip_content, copy_content, insert_clip, remove_content, token_range_at};
-
 use super::{Cursor, CursorPosition};
+use crate::workspace::utils::{clip_content, copy_content, insert_clip, remove_content, token_range_at};
+use crate::{configs::EditorConfigs, utils::Offset};
+use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit};
+use std::fmt::Debug;
 
 #[derive(Debug)]
 pub struct Edit {
@@ -108,7 +104,7 @@ impl Edit {
 
     /// Creates Edit record without performing the action
     /// does not support multi line insertion
-    pub fn record_single_line_insertion(position: Position, new_text: String) -> Self {
+    pub fn record_in_line_insertion(position: Position, new_text: String) -> Self {
         Self {
             meta: EditMetaData::line_changed(position.line as usize),
             reverse_text_edit: TextEdit::new(

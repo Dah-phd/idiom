@@ -162,7 +162,7 @@ impl Actions {
         for (line_idx, text) in content.iter_mut().enumerate().skip(from.line).take(edit_lines) {
             text.insert_str(0, &self.cfg.indent);
             let position = Position::new(line_idx as u32, 0);
-            edits.push(Edit::record_single_line_insertion(position, self.cfg.indent.to_owned()))
+            edits.push(Edit::record_in_line_insertion(position, self.cfg.indent.to_owned()))
         }
         add_select(&mut edits, Some(initial_select), Some((from, to)));
         edits
@@ -189,6 +189,7 @@ impl Actions {
                         edits.push(edit);
                     };
                 }
+                cursor.select_set(from, to);
                 add_select(&mut edits, Some(initial_select), Some((from, to)));
                 self.push_done(edits);
             }
@@ -246,9 +247,8 @@ impl Actions {
                     Some(closing) => {
                         content[to.line].insert(to.char, closing);
                         content[from.line].insert(from.char, ch);
-                        let first_edit =
-                            Edit::record_single_line_insertion(to.into(), closing.to_string()).select(from, to);
-                        let second_edit = Edit::record_single_line_insertion(from.into(), ch.to_string());
+                        let first_edit = Edit::record_in_line_insertion(to.into(), closing.into()).select(from, to);
+                        let second_edit = Edit::record_in_line_insertion(from.into(), ch.to_string());
                         from.char += 1;
                         if from.line == to.line {
                             to.char += 1;
@@ -258,7 +258,6 @@ impl Actions {
                         cursor.select_set(from, to);
                     }
                     None => {
-                        self.push_buffer();
                         cursor.set_position(from);
                         self.push_done(Edit::remove_select(from, to, content));
                         self.push_char_simple(ch, cursor, content);
@@ -276,7 +275,7 @@ impl Actions {
                 let new_text = format!("{ch}{closing}");
                 line.insert_str(cursor.char, &new_text);
                 self.push_buffer();
-                self.push_done(Edit::record_single_line_insertion(cursor.position().into(), new_text));
+                self.push_done(Edit::record_in_line_insertion(cursor.position().into(), new_text));
             } else {
                 if let Some(action) = self.buffer.push(cursor.line, cursor.char, ch) {
                     self.push_done(action);

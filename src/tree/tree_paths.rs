@@ -107,7 +107,7 @@ impl TreePath {
         }
     }
 
-    pub fn sync(&mut self) {
+    fn sync(&mut self) {
         if let Self::Folder { path, tree: Some(tree), .. } = self {
             merge_trees(tree, get_nested_paths(path).collect());
         }

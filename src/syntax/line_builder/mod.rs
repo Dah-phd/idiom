@@ -77,16 +77,19 @@ impl LineBuilder {
         }
     }
 
+    /// alternate diagnostic representation on save
     pub fn mark_saved(&mut self) {
         self.file_was_saved = true;
         self.diagnostic_processor = diagnostics_full;
     }
 
+    /// Process Diagnostic notification from LSP
     pub fn set_diganostics(&mut self, params: PublishDiagnosticsParams) {
         self.diagnostics.clear();
         (self.diagnostic_processor)(self, params);
     }
 
+    /// Process SemanticTokensResultFull from LSP
     pub fn set_tokens(&mut self, tokens_res: SemanticTokensResult) -> bool {
         if let SemanticTokensResult::Tokens(tokens) = tokens_res {
             self.tokens.tokens_reset(tokens.data);
@@ -94,6 +97,7 @@ impl LineBuilder {
         !self.tokens.is_empty()
     }
 
+    /// Process SemanticTokenRangeResult from LSP
     pub fn set_tokens_partial(&mut self, tokens: SemanticTokensRangeResult) {
         let tokens = match tokens {
             SemanticTokensRangeResult::Partial(data) => data.data,
@@ -102,6 +106,7 @@ impl LineBuilder {
         self.tokens.tokens_set(tokens);
     }
 
+    /// Sync text edits with LSP
     pub fn collect_changes(
         &mut self,
         path: &Path,
@@ -145,16 +150,26 @@ impl LineBuilder {
         }
     }
 
+    /// reset linebuilder after processing whole frame done on context exchange with editro
     pub fn reset(&mut self, cursor: &Cursor) {
         self.cursor = cursor.position();
         self.select = cursor.select_get();
         self.brackets.reset();
     }
 
+    /// gets possible actions from diagnostic data
     pub fn collect_actions(&self, line: usize) -> Option<Vec<String>> {
         self.diagnostics.get(&line).and_then(|d_line| d_line.collect_actions())
     }
 
+    /// Maps token styles
+    pub fn map_styles(&mut self, tokens_res: &Option<SemanticTokensServerCapabilities>) {
+        if let Some(capabilities) = tokens_res {
+            self.legend.map_styles(&self.lang.file_type, &self.theme, capabilities)
+        }
+    }
+
+    /// build styled line with diagnostic - reverts to native builder if tokens are not available
     pub fn build_line<'a>(&mut self, line_idx: usize, content: &'a str, line_number_offset: usize) -> ListItem<'a> {
         self.build_select_buffer(line_idx, content.len());
         if content.is_empty() {
@@ -171,7 +186,7 @@ impl LineBuilder {
         }
     }
 
-    pub fn process_tokens<'a>(&mut self, line_idx: usize, content: &'a str, max_digits: usize) -> Option<ListItem<'a>> {
+    fn process_tokens<'a>(&mut self, line_idx: usize, content: &'a str, max_digits: usize) -> Option<ListItem<'a>> {
         let token_line = self.tokens.get(line_idx)?;
         let mut buffer = init_buffer_with_line_number(line_idx, max_digits);
         let mut style = Style::default();
@@ -270,11 +285,5 @@ impl LineBuilder {
             return self.theme.flow_control;
         }
         self.theme.key_words
-    }
-
-    pub fn map_styles(&mut self, tokens_res: &Option<SemanticTokensServerCapabilities>) {
-        if let Some(capabilities) = tokens_res {
-            self.legend.map_styles(&self.lang.file_type, &self.theme, capabilities)
-        }
     }
 }
