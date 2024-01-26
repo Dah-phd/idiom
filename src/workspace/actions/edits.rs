@@ -252,17 +252,17 @@ impl Edit {
 }
 
 #[derive(Debug)]
-pub struct EditBuilder {
+pub struct NewLineBuilder {
     pub reverse_edit_text: String,
     text_edit_range: (CursorPosition, CursorPosition),
     reverse_len: usize,
     select: Option<(CursorPosition, CursorPosition)>,
 }
 
-impl EditBuilder {
+impl NewLineBuilder {
     // OPENERS
     /// initialize builder collecting select if exists
-    pub fn init_alt(cursor: &mut Cursor, content: &mut Vec<String>) -> Self {
+    pub fn new(cursor: &mut Cursor, content: &mut Vec<String>) -> Self {
         if let Some((from, to)) = cursor.select_take() {
             cursor.set_position(from);
             return Self {

@@ -8,7 +8,7 @@ use crate::workspace::{
     utils::{get_closing_char, is_closing_repeat},
 };
 use action_buffer::ActionBuffer;
-pub use edits::{Edit, EditBuilder, EditMetaData};
+pub use edits::{Edit, EditMetaData, NewLineBuilder};
 use lsp_types::{Position, TextDocumentContentChangeEvent, TextEdit};
 
 pub type Events = Vec<(EditMetaData, TextDocumentContentChangeEvent)>;
@@ -74,37 +74,26 @@ impl Actions {
         self.push_done(action);
     }
 
-    pub fn mass_replace(
-        &mut self,
-        cursor: &mut Cursor,
-        mut ranges: Vec<Select>,
-        clip: String,
-        content: &mut Vec<String>,
-    ) {
+    pub fn mass_replace(&mut self, cursor: &mut Cursor, ranges: Vec<Select>, clip: String, content: &mut Vec<String>) {
         self.push_buffer();
         cursor.select_drop();
-        let actions: Vec<_> =
-            ranges.drain(..).map(|(from, to)| Edit::replace_select(from, to, clip.to_owned(), content)).collect();
+        let actions = ranges
+            .into_iter()
+            .map(|(from, to)| Edit::replace_select(from, to, clip.to_owned(), content))
+            .collect::<Vec<Edit>>();
         if let Some(last) = actions.last() {
             cursor.set_position(last.end_position());
         }
         self.push_done(actions);
     }
 
-    pub fn apply_edits(&mut self, mut edits: Vec<TextEdit>, content: &mut Vec<String>) {
+    pub fn apply_edits(&mut self, edits: Vec<TextEdit>, content: &mut Vec<String>) {
         self.push_buffer();
-        let actions: Vec<Edit> = edits
-            .drain(..)
+        let actions = edits
+            .into_iter()
             .map(|e| Edit::replace_select(e.range.start.into(), e.range.end.into(), e.new_text, content))
-            .collect();
+            .collect::<Vec<Edit>>();
         self.push_done(actions);
-    }
-
-    fn push_buffer(&mut self) {
-        if let Some(action) = self.buffer.collect() {
-            self.undone.clear();
-            self.push_done(action);
-        }
     }
 
     pub fn indent(&mut self, cursor: &mut Cursor, content: &mut Vec<String>) {
@@ -175,6 +164,7 @@ impl Actions {
                 let initial_select = (from, to);
                 let mut edit_lines = to.line - from.line;
                 if to.char != 0 {
+                    // include last line only if part of it is selected
                     edit_lines += 1;
                 }
                 let mut edits = Vec::new();
@@ -194,19 +184,20 @@ impl Actions {
                 self.push_done(edits);
             }
             None => {
-                if let Some((offset, edit)) =
-                    content.get_mut(cursor.line).and_then(|text| Edit::unindent(cursor.line, text, &self.cfg.indent))
-                {
-                    cursor.char = cursor.char.checked_sub(offset).unwrap_or_default();
-                    self.push_done(edit);
-                }
+                let _ = content
+                    .get_mut(cursor.line)
+                    .and_then(|text| Edit::unindent(cursor.line, text, &self.cfg.indent))
+                    .map(|(offset, edit)| {
+                        self.push_done(edit);
+                        cursor.char = cursor.char.checked_sub(offset).unwrap_or_default();
+                    });
             }
         }
     }
 
     pub fn new_line(&mut self, cursor: &mut Cursor, content: &mut Vec<String>) {
         self.push_buffer();
-        let mut builder = EditBuilder::init_alt(cursor, content);
+        let mut builder = NewLineBuilder::new(cursor, content);
         if content.is_empty() {
             content.push(String::new());
             cursor.line += 1;
@@ -220,9 +211,9 @@ impl Actions {
         cursor.line += 1;
         cursor.set_char(indent.len());
         // expand scope
-        if let Some(last) = prev_line.trim_end().chars().last() {
-            if let Some(first) = line.trim_start().chars().next() {
-                if [('{', '}'), ('(', ')'), ('[', ']')].contains(&(last, first)) {
+        if let Some(opening) = prev_line.trim_end().chars().last() {
+            if let Some(closing) = line.trim_start().chars().next() {
+                if [('{', '}'), ('(', ')'), ('[', ']')].contains(&(opening, closing)) {
                     self.cfg.unindent_if_before_base_pattern(&mut line);
                     let new_char = indent.len() - self.cfg.indent.len();
                     content.insert(cursor.line, line);
@@ -277,9 +268,7 @@ impl Actions {
                 self.push_buffer();
                 self.push_done(Edit::record_in_line_insertion(cursor.position().into(), new_text));
             } else {
-                if let Some(action) = self.buffer.push(cursor.line, cursor.char, ch) {
-                    self.push_done(action);
-                }
+                let _ = self.buffer.push(cursor.line, cursor.char, ch).map(|edit| self.push_done(edit));
                 line.insert(cursor.char, ch);
             }
             cursor.add_to_char(1);
@@ -322,11 +311,10 @@ impl Actions {
                 self.push_done(action);
             }
             None => {
-                if let Some(action) =
-                    self.buffer.backspace(cursor.line, cursor.char, &mut content[cursor.line], &self.cfg.indent)
-                {
-                    self.push_done(action);
-                }
+                let _ = self
+                    .buffer
+                    .backspace(cursor.line, cursor.char, &mut content[cursor.line], &self.cfg.indent)
+                    .map(|edit| self.push_done(edit));
                 cursor.set_char(self.buffer.last_char());
             }
         }
@@ -400,10 +388,17 @@ impl Actions {
         }
     }
 
-    pub fn push_done(&mut self, edit: impl Into<EditType>) {
+    fn push_done(&mut self, edit: impl Into<EditType>) {
         let action: EditType = edit.into();
         action.collect_events(&mut self.events);
         self.done.push(action);
+    }
+
+    fn push_buffer(&mut self) {
+        if let Some(action) = self.buffer.collect() {
+            self.undone.clear();
+            self.push_done(action);
+        }
     }
 }
 
