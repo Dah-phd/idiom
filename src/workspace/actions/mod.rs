@@ -364,11 +364,13 @@ impl Actions {
             Edit::remove_select(from, to, content)
         } else {
             let action = Edit::remove_line(cursor.line, content);
-            if cursor.line >= content.len() && content.len() > 1 {
+            if content.is_empty() {
+                content.push(String::new());
+                cursor.line = 0;
+            } else if cursor.line >= content.len() && content.len() > 1 {
                 cursor.line -= 1;
-            } else {
-                cursor.char = 0;
             }
+            cursor.char = 0;
             action
         };
         let clip = edit.get_removed_text().to_owned();

@@ -70,7 +70,7 @@ impl Tokens {
 
     fn insert(&mut self, index: usize, token: Token) {
         while index > self.inner.len() {
-            self.inner.insert(index, Vec::new());
+            self.inner.push(Vec::new());
         }
         match self.inner.get_mut(index) {
             Some(line) => line.push(token),
