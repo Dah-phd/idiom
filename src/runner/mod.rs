@@ -2,7 +2,7 @@ mod commands;
 use crate::configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE};
 use crate::global_state::GlobalState;
 use anyhow::Result;
-use commands::load_cfg;
+use commands::{build_command, load_cfg};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::widgets::{Block, Borders, List, ListItem};
@@ -11,14 +11,13 @@ use std::path::{PathBuf, MAIN_SEPARATOR};
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use tokio::io::AsyncWriteExt;
-use tokio::process::{Child, ChildStdin, Command};
+use tokio::process::{Child, ChildStdin};
 use tokio::task::JoinHandle;
-use tokio_stream::StreamExt;
-use tokio_util::codec::{FramedRead, LinesCodec};
 
 #[derive(Default)]
 pub struct EditorTerminal {
     pub active: bool,
+    git_branch: Option<String>,
     idiom_prefix: String,
     logs: Vec<String>,
     at_log: usize,
@@ -34,6 +33,7 @@ pub struct EditorTerminal {
 impl EditorTerminal {
     pub fn new() -> Self {
         Self {
+            git_branch: get_branch(),
             path: PathBuf::from("./").canonicalize().unwrap_or_default(),
             idiom_prefix: String::from("%i"),
             cmd_histroy: vec!["".to_owned()],
@@ -158,7 +158,7 @@ impl EditorTerminal {
     }
 
     fn build_prompt(&mut self) {
-        if let Some(branch) = get_branch() {
+        if let Some(branch) = self.git_branch.as_ref() {
             self.prompt = format!("[{}] {branch}$ {}", self.path.display(), self.cmd_histroy[self.at_history])
         } else {
             self.prompt = format!("[{}]$ {}", self.path.display(), self.cmd_histroy[self.at_history])
@@ -166,6 +166,7 @@ impl EditorTerminal {
     }
 
     async fn push_command(&mut self, gs: &mut GlobalState) -> Result<()> {
+        self.git_branch = get_branch();
         let command = self.cmd_histroy[self.at_history].trim().to_owned();
         self.cmd_histroy.push(String::new());
         self.at_history = self.cmd_histroy.len() - 1;
@@ -186,79 +187,69 @@ impl EditorTerminal {
         }
         self.logs.push(self.prompt.to_owned());
         if let Some(arg) = command.strip_prefix(&self.idiom_prefix) {
-            if arg.trim() == "clear" {
-                let mut new = Self::new();
-                new.active = true;
-                *self = new;
-            }
-            if arg.trim() == "help" {
-                self.logs.push("load => load config files, available options:".to_owned());
-                self.logs.push("    keymap => open keymap config file.".to_owned());
-                self.logs.push("    config => open editor config file.".to_owned());
-                self.logs.push("    theme => open theme config file.".to_owned());
-                self.logs.push("Example: &i load keymap".to_owned());
-            }
-            if let Some(cfg) = arg.trim().strip_prefix("load") {
-                if let Some(msg) = match cfg.trim() {
-                    "keymap" => load_cfg(KEY_MAP, gs),
-                    "config" => load_cfg(EDITOR_CFG_FILE, gs),
-                    "theme" => load_cfg(THEME_FILE, gs),
-                    _ => {
-                        self.logs.push("Invalid arg on %i load <cfg>".to_owned());
-                        self.logs.push(format!("Bad arg: {}", cfg));
-                        self.logs.push("Expected: keymap | config | theme!".to_owned());
-                        None
-                    }
-                } {
-                    self.logs.push(msg);
-                }
-            }
-            self.logs.push(format!("IDIOM CMD {arg}"));
-            return Ok(());
+            return self.idiom_command_handler(arg, gs);
         }
         if command == "clear" {
             self.at_log = self.logs.len();
             return Ok(());
         }
         if let Some(arg) = command.strip_prefix("cd ") {
-            if arg.starts_with("..") {
-                for _ in arg.split(MAIN_SEPARATOR) {
-                    if let Some(parent) = self.path.parent() {
-                        self.path = PathBuf::from(parent).canonicalize().unwrap_or_default();
-                    }
-                }
-            } else if arg.starts_with('/') {
-                if let Ok(path) = PathBuf::from(arg).canonicalize() {
-                    if path.is_dir() {
-                        self.path = path;
-                    }
-                }
-            }
+            self.cd(arg);
             return Ok(());
         }
-        let mut inner = Command::new("sh")
-            .current_dir(&self.path)
-            .arg("-c")
-            .arg(&command)
-            .stderr(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stdin(Stdio::piped())
-            .spawn()?;
-        let out_handler = Arc::clone(&self.out_buffer);
-        let stderr = FramedRead::new(inner.stderr.take().unwrap(), LinesCodec::new());
-        let stdout = FramedRead::new(inner.stdout.take().unwrap(), LinesCodec::new());
-        let stdin = inner.stdin.take().unwrap();
-        let mut stream = stdout.chain(stderr);
-        let join_handler = tokio::spawn(async move {
-            while let Some(Ok(line)) = stream.next().await {
-                match out_handler.lock() {
-                    Ok(mut guard) => guard,
-                    Err(poisoned) => poisoned.into_inner(),
+        self.process.replace(build_command(&command, &self.path, &self.out_buffer)?);
+        Ok(())
+    }
+
+    fn cd(&mut self, arg: &str) {
+        if arg.starts_with("..") {
+            for _ in arg.split(MAIN_SEPARATOR) {
+                if let Some(parent) = self.path.parent() {
+                    self.path = PathBuf::from(parent).canonicalize().unwrap_or_default();
                 }
-                .push(line)
             }
-        });
-        self.process.replace((stdin, inner, join_handler));
+        } else {
+            let mut buffer = self.path.to_owned();
+            buffer.push(arg);
+            if let Ok(path) = buffer.canonicalize() {
+                if path.is_dir() {
+                    self.path = path;
+                }
+            }
+        }
+    }
+
+    pub fn idiom_command_handler(&mut self, arg: &str, gs: &mut GlobalState) -> Result<()> {
+        if arg.trim() == "clear" {
+            let old = std::mem::replace(self, Self::new());
+            self.active = true;
+            let _ = old.process.map(|(_, _, process)| process.abort());
+        }
+        if arg.trim() == "help" {
+            self.logs.push("load => load config files, available options:".to_owned());
+            self.logs.push("    keymap => open keymap config file.".to_owned());
+            self.logs.push("    config => open editor config file.".to_owned());
+            self.logs.push("    theme => open theme config file.".to_owned());
+            self.logs.push("Example: &i load keymap".to_owned());
+        }
+        if arg.trim() == "loc" {
+            self.process.replace(build_command("git ls-files | xargs wc -l", &self.path, &self.out_buffer)?);
+        }
+        if let Some(cfg) = arg.trim().strip_prefix("load") {
+            if let Some(msg) = match cfg.trim() {
+                "keymap" => load_cfg(KEY_MAP, gs),
+                "config" => load_cfg(EDITOR_CFG_FILE, gs),
+                "theme" => load_cfg(THEME_FILE, gs),
+                _ => {
+                    self.logs.push("Invalid arg on %i load <cfg>".to_owned());
+                    self.logs.push(format!("Bad arg: {}", cfg));
+                    self.logs.push("Expected: keymap | config | theme!".to_owned());
+                    None
+                }
+            } {
+                self.logs.push(msg);
+            }
+        }
         Ok(())
     }
 }
