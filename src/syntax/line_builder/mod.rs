@@ -237,12 +237,15 @@ impl LineBuilder {
         };
 
         if buffer.len() > self.text_width {
-            let mut lines = Vec::new();
-            while buffer.len() > self.text_width {
-                let mut line = buffer.drain(..self.text_width).collect::<Vec<_>>();
-                line.push(Span::raw("\n"));
+            let padding = derive_wrap_digit_offset(buffer.first());
+            let mut lines = vec![Line::from(buffer.drain(..self.text_width).collect::<Vec<_>>())];
+            let expected_width = self.text_width - 1;
+            while buffer.len() > expected_width {
+                let mut line = vec![padding.clone()];
+                line.extend(buffer.drain(..expected_width));
                 lines.push(Line::from(line));
             }
+            buffer.insert(0, padding);
             if let Some(diagnostic) = diagnostic {
                 buffer.extend(diagnostic.data.iter().map(|d| d.span.clone()));
             }
@@ -285,4 +288,12 @@ impl LineBuilder {
         }
         self.theme.key_words
     }
+}
+
+fn derive_wrap_digit_offset(start_span: Option<&Span<'_>>) -> Span<'static> {
+    if let Some(span) = start_span {
+        let padding_len = span.content.len();
+        return Span::raw((0..padding_len).map(|_| ' ').collect::<String>());
+    }
+    Span::default()
 }

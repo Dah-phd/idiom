@@ -8,6 +8,7 @@ pub struct Cursor {
     pub char: usize,
     phantm_char: usize, // keeps record for up/down movement
     pub at_line: usize,
+    pub text_width: usize,
     select: Option<Select>,
 }
 
@@ -30,19 +31,6 @@ impl Cursor {
     pub fn sub_char(&mut self, offset: usize) {
         self.char -= offset;
         self.phantm_char = self.char;
-    }
-
-    pub fn checked_sub_char_with_select(&mut self, offset: usize) {
-        self.char = self.char.saturating_sub(offset);
-        self.phantm_char = self.char;
-        if let Some((from, to)) = self.select.as_mut() {
-            if from.line == self.line {
-                from.char = from.char.saturating_sub(offset);
-            };
-            if to.line == self.line {
-                to.char = to.char.saturating_sub(offset);
-            };
-        };
     }
 
     pub fn set_char(&mut self, char: usize) {
@@ -85,10 +73,15 @@ impl Cursor {
     }
 
     fn move_up(&mut self, content: &[String]) {
-        if self.line > 0 {
-            self.line -= 1;
-            self.adjust_char(content);
+        if self.char >= self.text_width {
+            self.set_char(self.char - self.text_width);
+            return;
         }
+        if self.line == 0 {
+            return;
+        }
+        self.line -= 1;
+        self.adjust_char(&content[self.line]);
     }
 
     pub fn scroll_up(&mut self, content: &[String]) {
@@ -110,11 +103,19 @@ impl Cursor {
     }
 
     fn move_down(&mut self, content: &[String]) {
-        if content.is_empty() || content.len() - 1 <= self.line {
+        if content.is_empty() {
             return;
         }
-        self.line += 1;
-        self.adjust_char(content);
+        let line_len = content[self.line].len();
+        if line_len > self.text_width && line_len.saturating_sub(self.char) > self.text_width {
+            self.set_char(self.char + self.text_width)
+        } else {
+            if content.len() - 1 <= self.line {
+                return;
+            }
+            self.line += 1;
+        }
+        self.adjust_char(&content[self.line]);
     }
 
     pub fn select_down(&mut self, content: &[String]) {
@@ -238,16 +239,14 @@ impl Cursor {
     pub fn adjust_max_line(&mut self, content: &[String]) {
         if self.line >= content.len() {
             self.line = content.len() - 1;
-            self.adjust_char(content);
+            self.adjust_char(&content[self.line]);
         }
     }
 
-    pub fn adjust_char(&mut self, content: &[String]) {
-        if let Some(line) = content.get(self.line) {
-            self.char = self.phantm_char;
-            if line.len() < self.char {
-                self.char = line.len()
-            }
+    pub fn adjust_char(&mut self, line: &str) {
+        self.char = self.phantm_char;
+        if line.len() < self.char {
+            self.char = line.len()
         }
     }
 
