@@ -179,10 +179,9 @@ impl LineBuilder {
             };
             return self.format_with_info(line_idx, None, buffer);
         }
-        if let Some(line) = self.process_tokens(line_idx, content, line_number_offset) {
-            line
-        } else {
-            generic_line(self, line_idx, content, init_buffer_with_line_number(line_idx, line_number_offset))
+        match self.process_tokens(line_idx, content, line_number_offset) {
+            Some(line) => line,
+            None => generic_line(self, line_idx, content, init_buffer_with_line_number(line_idx, line_number_offset)),
         }
     }
 

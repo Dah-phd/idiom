@@ -31,7 +31,7 @@ pub fn insert_clip(clip: String, content: &mut Vec<String>, mut cursor: CursorPo
     }
 }
 
-pub fn clip_content(from: &CursorPosition, to: &CursorPosition, content: &mut Vec<String>) -> String {
+pub fn clip_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<String>) -> String {
     if from.line == to.line {
         let line = &mut content[from.line];
         let clip = line[from.char..to.char].to_owned();

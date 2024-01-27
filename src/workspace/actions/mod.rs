@@ -171,10 +171,10 @@ impl Actions {
                 for (line_idx, text) in content.iter_mut().enumerate().skip(from.line).take(edit_lines) {
                     if let Some((offset, edit)) = Edit::unindent(line_idx, text, &self.cfg.indent) {
                         if from.line == line_idx {
-                            from.char = from.char.checked_sub(offset).unwrap_or_default();
+                            from.char = offset.offset(from.char);
                         }
                         if to.line == line_idx {
-                            to.char = to.char.checked_sub(offset).unwrap_or_default();
+                            to.char = offset.offset(to.char);
                         }
                         edits.push(edit);
                     };
@@ -189,7 +189,7 @@ impl Actions {
                     .and_then(|text| Edit::unindent(cursor.line, text, &self.cfg.indent))
                     .map(|(offset, edit)| {
                         self.push_done(edit);
-                        cursor.char = cursor.char.checked_sub(offset).unwrap_or_default();
+                        cursor.char = offset.offset(cursor.char);
                     });
             }
         }
@@ -279,17 +279,24 @@ impl Actions {
         if content.is_empty() {
             return;
         }
-        if let Some((from, to)) = cursor.select_take() {
-            self.push_buffer();
-            cursor.set_position(from);
-            self.push_done(Edit::remove_select(from, to, content));
-        } else if content[cursor.line].len() == cursor.char {
-            self.push_buffer();
-            if content.len() > cursor.line + 1 {
-                self.push_done(Edit::merge_next_line(cursor.line, content));
+        match cursor.select_take() {
+            Some((from, to)) => {
+                self.push_buffer();
+                cursor.set_position(from);
+                self.push_done(Edit::remove_select(from, to, content));
             }
-        } else if let Some(action) = self.buffer.del(cursor.line, cursor.char, &mut content[cursor.line]) {
-            self.push_done(action);
+            None if content[cursor.line].len() == cursor.char => {
+                self.push_buffer();
+                if content.len() > cursor.line + 1 {
+                    self.push_done(Edit::merge_next_line(cursor.line, content));
+                }
+            }
+            None => {
+                let _ = self
+                    .buffer
+                    .del(cursor.line, cursor.char, &mut content[cursor.line])
+                    .map(|edit| self.push_done(edit));
+            }
         }
     }
 
@@ -306,9 +313,9 @@ impl Actions {
             None if cursor.char == 0 => {
                 self.push_buffer();
                 cursor.line -= 1;
-                let action = Edit::merge_next_line(cursor.line, content);
-                cursor.set_char(action.text_edit.range.start.character as usize);
-                self.push_done(action);
+                let edit = Edit::merge_next_line(cursor.line, content);
+                cursor.set_char(edit.text_edit.range.start.character as usize);
+                self.push_done(edit);
             }
             None => {
                 let _ = self
@@ -342,17 +349,17 @@ impl Actions {
 
     pub fn paste(&mut self, clip: String, cursor: &mut Cursor, content: &mut Vec<String>) {
         self.push_buffer();
-        let action = match cursor.select_take() {
+        let edit = match cursor.select_take() {
             Some((from, to)) => Edit::replace_select(from, to, clip, content),
             None => Edit::insert_clip(cursor.into(), clip, content),
         };
-        cursor.set_position(action.end_position());
-        self.push_done(action);
+        cursor.set_position(edit.end_position());
+        self.push_done(edit);
     }
 
     pub fn cut(&mut self, cursor: &mut Cursor, content: &mut Vec<String>) -> String {
         self.push_buffer();
-        let action = if let Some((from, to)) = cursor.select_take() {
+        let edit = if let Some((from, to)) = cursor.select_take() {
             cursor.set_position(from);
             Edit::remove_select(from, to, content)
         } else {
@@ -364,8 +371,8 @@ impl Actions {
             }
             action
         };
-        let clip = action.reverse_text_edit.new_text.to_owned();
-        self.push_done(action);
+        let clip = edit.get_removed_text().to_owned();
+        self.push_done(edit);
         clip
     }
 

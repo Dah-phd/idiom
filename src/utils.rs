@@ -128,6 +128,7 @@ pub fn find_code_blocks(buffer: &mut Vec<(usize, String)>, content: &[String], p
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum Offset {
     Pos(usize),
     Neg(usize),
@@ -137,7 +138,7 @@ impl Offset {
     pub fn offset(self, val: usize) -> usize {
         match self {
             Self::Pos(numba) => val + numba,
-            Self::Neg(numba) => val.checked_sub(numba).unwrap_or_default(),
+            Self::Neg(numba) => val.saturating_sub(numba),
         }
     }
 }
