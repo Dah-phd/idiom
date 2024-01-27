@@ -33,7 +33,7 @@ impl PopupInterface for GoToLinePopup {
                     return PopupMessage::Clear;
                 }
                 if let Ok(idx) = self.line_idx.parse::<usize>() {
-                    return WorkspaceEvent::GoToLine(idx.checked_sub(1).unwrap_or_default()).into();
+                    return WorkspaceEvent::GoToLine(idx.saturating_sub(1)).into();
                 }
                 PopupMessage::Clear
             }
@@ -75,7 +75,7 @@ impl PopupInterface for GoToLinePopup {
     fn update_workspace(&mut self, workspace: &mut Workspace) {
         if let Some(editor) = workspace.get_active() {
             if let Ok(idx) = self.line_idx.parse::<usize>() {
-                editor.go_to(idx.checked_sub(1).unwrap_or_default());
+                editor.go_to(idx.saturating_sub(1));
             }
         }
     }
@@ -122,6 +122,6 @@ impl PopupInterface for FindPopup {
             self.options.clear();
             editor.find(self.pattern.text.as_str(), &mut self.options);
         }
-        self.state = self.options.len().checked_sub(1).unwrap_or_default();
+        self.state = self.options.len().saturating_sub(1);
     }
 }

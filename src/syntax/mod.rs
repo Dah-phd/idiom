@@ -119,7 +119,7 @@ impl Lexer {
     }
 
     pub fn set_text_width(&mut self, width: usize) {
-        self.line_builder.text_width = width.checked_sub(self.line_number_offset).unwrap_or_default();
+        self.line_builder.text_width = width.saturating_sub(self.line_number_offset);
     }
 
     pub fn sync_lsp(

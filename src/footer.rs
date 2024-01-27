@@ -34,7 +34,7 @@ impl Footer {
         let layout = Layout::new(
             Direction::Vertical,
             [
-                Constraint::Length(screen.height.checked_sub(2).unwrap_or_default()),
+                Constraint::Length(screen.height.saturating_sub(2)),
                 Constraint::Length(1),
             ],
         )
@@ -56,7 +56,7 @@ impl Footer {
             Direction::Horizontal,
             [
                 Constraint::Length(12),
-                Constraint::Length(footer_screen.width.checked_sub(12 + stat_size as u16).unwrap_or_default()),
+                Constraint::Length(footer_screen.width.saturating_sub(12 + stat_size as u16)),
                 Constraint::Length(stat_size as u16),
             ],
         )

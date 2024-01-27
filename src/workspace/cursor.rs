@@ -33,14 +33,14 @@ impl Cursor {
     }
 
     pub fn checked_sub_char_with_select(&mut self, offset: usize) {
-        self.char = self.char.checked_sub(offset).unwrap_or_default();
+        self.char = self.char.saturating_sub(offset);
         self.phantm_char = self.char;
         if let Some((from, to)) = self.select.as_mut() {
             if from.line == self.line {
-                from.char = from.char.checked_sub(offset).unwrap_or_default();
+                from.char = from.char.saturating_sub(offset);
             };
             if to.line == self.line {
-                to.char = to.char.checked_sub(offset).unwrap_or_default();
+                to.char = to.char.saturating_sub(offset);
             };
         };
     }

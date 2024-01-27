@@ -17,8 +17,8 @@ pub fn count_as_string(len: usize) -> String {
 }
 
 pub fn centered_rect_static(h: u16, v: u16, rect: Rect) -> Rect {
-    let h_diff = rect.width.checked_sub(h).unwrap_or_default() / 2;
-    let v_diff = rect.height.checked_sub(v).unwrap_or_default() / 2;
+    let h_diff = rect.width.saturating_sub(h) / 2;
+    let v_diff = rect.height.saturating_sub(v) / 2;
     let first_split = Layout::default()
         .constraints([
             Constraint::Length(v_diff),

@@ -144,7 +144,7 @@ impl Info {
                     _ => (),
                 }
             }
-            _ => self.at_line = self.at_line.checked_sub(1).unwrap_or_default(),
+            _ => self.at_line = self.at_line.saturating_sub(1),
         }
 
         ModalMessage::Taken
@@ -199,7 +199,7 @@ impl Info {
                 if let Some(hovers) = self.hover.as_ref() {
                     list.extend(hovers.iter().skip(self.at_line).cloned());
                     if list.is_empty() {
-                        skip = self.at_line.checked_sub(hovers.len()).unwrap_or_default();
+                        skip = self.at_line.saturating_sub(hovers.len());
                     }
                 }
                 if let Some(signitures) = self.signitures.as_ref() {

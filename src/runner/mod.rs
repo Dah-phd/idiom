@@ -79,8 +79,8 @@ impl EditorTerminal {
     }
 
     fn prompt_to_last_line(&mut self) {
-        if self.logs.len().checked_sub(self.max_rows).unwrap_or_default() > self.at_log {
-            self.at_log = (self.logs.len() + 2).checked_sub(self.max_rows).unwrap_or_default();
+        if self.logs.len().saturating_sub(self.max_rows) > self.at_log {
+            self.at_log = (self.logs.len() + 2).saturating_sub(self.max_rows);
         }
     }
 
@@ -112,14 +112,14 @@ impl EditorTerminal {
             }
             KeyEvent { code: KeyCode::PageUp, .. }
             | KeyEvent { code: KeyCode::Up, modifiers: KeyModifiers::CONTROL, .. } => {
-                self.at_log = self.at_log.checked_sub(1).unwrap_or_default();
+                self.at_log = self.at_log.saturating_sub(1);
             }
             KeyEvent { code: KeyCode::PageDown, .. }
             | KeyEvent { code: KeyCode::Down, modifiers: KeyModifiers::CONTROL, .. } => {
                 self.at_log = std::cmp::min(self.at_log + 1, self.logs.len());
             }
             KeyEvent { code: KeyCode::Up, .. } => {
-                self.at_history = self.at_history.checked_sub(1).unwrap_or_default();
+                self.at_history = self.at_history.saturating_sub(1);
             }
             KeyEvent { code: KeyCode::Down, .. } => {
                 self.at_history = std::cmp::min(self.at_history + 1, self.cmd_histroy.len() - 1)

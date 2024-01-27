@@ -144,12 +144,12 @@ impl Editor {
         if self.content.len() >= line {
             self.cursor.line = line;
             self.cursor.char = find_line_start(self.content[line].as_str());
-            self.cursor.at_line = line.checked_sub(self.max_rows / 2).unwrap_or_default();
+            self.cursor.at_line = line.saturating_sub(self.max_rows / 2);
         }
     }
 
     pub fn go_to_select(&mut self, from: CursorPosition, to: CursorPosition) {
-        self.cursor.at_line = to.line.checked_sub(self.max_rows / 2).unwrap_or_default();
+        self.cursor.at_line = to.line.saturating_sub(self.max_rows / 2);
         self.cursor.select_set(from, to);
     }
 

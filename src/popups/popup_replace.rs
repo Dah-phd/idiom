@@ -130,7 +130,7 @@ impl PopupInterface for ReplacePopup {
             self.options.clear();
             editor.find(&self.pattern, &mut self.options);
         }
-        self.state = self.options.len().checked_sub(1).unwrap_or_default();
+        self.state = self.options.len().saturating_sub(1);
     }
 
     fn update_tree(&mut self, _: &mut Tree) {}

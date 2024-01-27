@@ -57,7 +57,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
             gs.render_popup_if_exists(frame);
         })?;
 
-        let timeout = TICK.checked_sub(clock.elapsed()).unwrap_or_else(|| Duration::from_secs(0));
+        let timeout = TICK.saturating_sub(clock.elapsed());
 
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = crossterm::event::read()? {
