@@ -75,14 +75,20 @@ impl Tree {
         Layout::new(Direction::Horizontal, [Constraint::Percentage(self.size), Constraint::Min(2)]).split(screen)
     }
 
-    pub fn map(&mut self, key: &KeyEvent) -> bool {
+    pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         match key.code {
             KeyCode::Up if !key.modifiers.contains(KeyModifiers::CONTROL) => self.select_up(),
             KeyCode::Char('w' | 'W') => self.select_up(),
             KeyCode::Down if !key.modifiers.contains(KeyModifiers::CONTROL) => self.select_down(),
             KeyCode::Char('s' | 'S') => self.select_down(),
-            KeyCode::Right if key.modifiers == KeyModifiers::CONTROL => self.size = std::cmp::min(75, self.size + 1),
-            KeyCode::Left if key.modifiers == KeyModifiers::CONTROL => self.size = std::cmp::max(15, self.size - 1),
+            KeyCode::Right if key.modifiers == KeyModifiers::CONTROL => {
+                self.size = std::cmp::min(75, self.size + 1);
+                gs.recalc_editor_size(self);
+            }
+            KeyCode::Left if key.modifiers == KeyModifiers::CONTROL => {
+                self.size = std::cmp::max(15, self.size - 1);
+                gs.recalc_editor_size(self);
+            }
             KeyCode::Left => self.shrink(),
             KeyCode::Char('d' | 'D') if !key.modifiers.contains(KeyModifiers::CONTROL) => self.shrink(),
             KeyCode::Delete if key.modifiers == KeyModifiers::SHIFT => {

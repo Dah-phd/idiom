@@ -68,7 +68,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                     if gs.map_popup_if_exists(&key) // can be on top of all
                     || tmux.map(&key, &mut gs).await // can be on top of workspace | tree
                     || workspace.map(&key, &mut gs) // gs determines if should execute
-                    || file_tree.map(&key)
+                    || file_tree.map(&key, &mut gs)
                     {
                         continue;
                     }

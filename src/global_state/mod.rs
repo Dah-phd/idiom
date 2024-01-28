@@ -46,6 +46,7 @@ pub struct GlobalState {
     pub tree: Vec<TreeEvent>,
     pub clipboard: Clipboard,
     pub exit: bool,
+    pub screen_size: Rect,
     pub editor_height: usize,
     pub editor_width: usize,
 }
@@ -136,6 +137,16 @@ impl GlobalState {
         }
     }
 
+    pub fn recalc_editor_size(&mut self, tree: &Tree) {
+        let tree_layout = tree.render_layout(self.screen_size);
+        let remaining_screen = tree_layout[1];
+        let footer_layout = footer_render_area(remaining_screen);
+        let editor_screen = footer_layout[0];
+        self.editor_height = editor_screen.bottom() as usize;
+        self.editor_width = editor_screen.width as usize;
+        self.workspace.push_back(WorkspaceEvent::Resize)
+    }
+
     /// Attempts to create new editor if err logs it and returns false else true.
     pub async fn try_new_editor(&mut self, workspace: &mut Workspace, path: PathBuf) -> bool {
         if let Err(err) = workspace.new_from(path, self).await {
@@ -205,7 +216,8 @@ impl GlobalState {
                     self.popup = None;
                 }
                 TreeEvent::Resize { height, width } => {
-                    let tree_layout = tree.render_layout(Rect { height, width, ..Default::default() });
+                    self.screen_size = Rect { height, width, ..Default::default() };
+                    let tree_layout = tree.render_layout(self.screen_size);
                     let remaining_screen = tree_layout[1];
                     let footer_layout = footer_render_area(remaining_screen);
                     let editor_screen = footer_layout[0];
@@ -285,7 +297,6 @@ impl GlobalState {
                     }
                 }
                 WorkspaceEvent::Resize => {
-                    self.error(format!("width: {}, height: {}", self.editor_width, self.editor_height));
                     workspace.resize_render(self.editor_width, self.editor_height);
                 }
                 WorkspaceEvent::CheckLSP(ft) => {
