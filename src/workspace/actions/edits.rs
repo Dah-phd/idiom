@@ -216,7 +216,7 @@ impl Edit {
     }
 
     pub fn end_position(&self) -> CursorPosition {
-        self.reverse_text_edit.range.start.into()
+        self.reverse_text_edit.range.end.into()
     }
 
     /// apply reverse edit (goes into undone)

@@ -15,7 +15,7 @@ use crate::{
 };
 
 use anyhow::Result;
-use crossterm::event::{Event, MouseEventKind};
+use crossterm::event::Event;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{
     io::Stdout,
@@ -51,11 +51,10 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
 
     loop {
         terminal.draw(|frame| {
-            let mut screen = frame.size();
-            screen = file_tree.render_with_remainder(frame, screen, &mut gs);
-            screen = footer.render_with_remainder(frame, screen, gs.mode_span(), workspace.get_stats());
-            screen = tmux.render_with_remainder(frame, screen);
-            workspace.render(frame, screen, &mut gs);
+            file_tree.render_with_remainder(frame, &mut gs);
+            footer.render_with_remainder(frame, &mut gs, workspace.get_stats());
+            tmux.render_with_remainder(frame, gs.editor_area);
+            workspace.render(frame, &mut gs);
             gs.render_popup_if_exists(frame);
         })?;
 
@@ -150,11 +149,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                 Event::Resize(width, height) => {
                     gs.tree.push(TreeEvent::Resize { height, width });
                 }
-                Event::Mouse(mouse) => match mouse.kind {
-                    MouseEventKind::Up(button) => {}
-                    MouseEventKind::Drag(button) => {}
-                    _ => (),
-                },
+                Event::Mouse(event) => gs.mouse_handler(event),
                 _ => (),
             }
         }

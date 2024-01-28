@@ -3,17 +3,17 @@ mod events;
 mod mouse;
 
 use crate::{
-    footer::{footer_render_area, Footer},
+    footer::{layour_workspace_footer, Footer},
     popups::popup_replace::ReplacePopup,
     popups::PopupInterface,
     popups::{popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges},
     tree::Tree,
-    workspace::Workspace,
+    workspace::{layot_tabs_editor, Workspace},
 };
 pub use clipboard::Clipboard;
 pub use events::{FooterEvent, TreeEvent, WorkspaceEvent};
 
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -21,6 +21,8 @@ use ratatui::{
     Frame,
 };
 use std::path::PathBuf;
+
+use self::mouse::{is_in, solve_position};
 
 #[derive(Default, Clone)]
 pub enum PopupMessage {
@@ -47,9 +49,11 @@ pub struct GlobalState {
     pub tree: Vec<TreeEvent>,
     pub clipboard: Clipboard,
     pub exit: bool,
-    pub screen_size: Rect,
-    pub editor_height: usize,
-    pub editor_width: usize,
+    pub screen_rect: Rect,
+    pub tree_area: Rect,
+    pub tab_area: Rect,
+    pub editor_area: Rect,
+    pub footer_area: Rect,
 }
 
 impl GlobalState {
@@ -121,13 +125,14 @@ impl GlobalState {
     }
 
     pub fn recalc_editor_size(&mut self, tree: &Tree) {
-        let tree_layout = tree.render_layout(self.screen_size);
-        let remaining_screen = tree_layout[1];
-        let footer_layout = footer_render_area(remaining_screen);
-        let editor_screen = footer_layout[0];
-        self.editor_height = editor_screen.bottom() as usize;
-        self.editor_width = editor_screen.width as usize;
-        self.workspace.push(WorkspaceEvent::Resize)
+        let tree_layout = tree.render_layout(self.screen_rect);
+        let footer_layout = layour_workspace_footer(tree_layout[1]);
+        self.tree_area = tree_layout[0];
+        self.footer_area = footer_layout[1];
+        let workspace_layout = layot_tabs_editor(footer_layout[0]);
+        self.editor_area = workspace_layout[1];
+        self.tab_area = workspace_layout[0];
+        self.workspace.push(WorkspaceEvent::Resize);
     }
 
     /// Attempts to create new editor if err logs it and returns false else true.
@@ -204,13 +209,18 @@ impl GlobalState {
                     self.popup = None;
                 }
                 TreeEvent::Resize { height, width } => {
-                    self.screen_size = Rect { height, width, ..Default::default() };
+                    self.screen_rect = Rect { height, width, ..Default::default() };
                     self.recalc_editor_size(tree);
                 }
             }
         }
         for event in std::mem::take(&mut self.workspace) {
             match event {
+                WorkspaceEvent::MouseCursor(position) => {
+                    if let Some(editor) = workspace.get_active() {
+                        editor.mouse_cursor(position);
+                    }
+                }
                 WorkspaceEvent::GoToLine(idx) => {
                     if let Some(editor) = workspace.get_active() {
                         editor.go_to(idx);
@@ -276,7 +286,7 @@ impl GlobalState {
                     }
                 }
                 WorkspaceEvent::Resize => {
-                    workspace.resize_render(self.editor_width, self.editor_height);
+                    workspace.resize_render(self.editor_area.width as usize, self.editor_area.bottom() as usize);
                 }
                 WorkspaceEvent::CheckLSP(ft) => {
                     workspace.check_lsp(ft, self).await;
@@ -294,5 +304,31 @@ impl GlobalState {
             event.map(footer);
         }
         self.exit
+    }
+
+    pub fn mouse_handler(&mut self, event: MouseEvent) {
+        match event.kind {
+            MouseEventKind::Up(button) => {
+                if !matches!(button, MouseButton::Left) {
+                    return;
+                }
+                // TODO fix resolution window
+                if is_in(self.editor_area, event.row, event.column) {
+                    self.mode = Mode::Insert;
+                    self.workspace.push(WorkspaceEvent::MouseCursor(
+                        solve_position(self.editor_area, event.row, event.column).into(),
+                    ));
+                } else if is_in(self.tree_area, event.row, event.column) {
+                    self.mode = Mode::Select;
+                }
+            }
+            MouseEventKind::Drag(button) => {
+                if !matches!(button, MouseButton::Left) {
+                    #[allow(clippy::needless_return)] // TODO implement logic for selecting
+                    return;
+                }
+            }
+            _ => (),
+        }
     }
 }

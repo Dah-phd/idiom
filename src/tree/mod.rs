@@ -1,6 +1,6 @@
 mod tree_paths;
 use crate::{
-    global_state::{GlobalState, Mode},
+    global_state::GlobalState,
     utils::{build_file_or_folder, to_relative_path},
 };
 use anyhow::Result;
@@ -47,14 +47,7 @@ impl Tree {
         }
     }
 
-    pub fn render_with_remainder(&mut self, frame: &mut Frame, screen: Rect, gs: &mut GlobalState) -> Rect {
-        if matches!(gs.mode, Mode::Insert) && !self.active {
-            return screen;
-        }
-        let areas = self.render_layout(screen);
-        let editor_screen = areas[1];
-        let tree_area = areas[0];
-
+    pub fn render_with_remainder(&mut self, frame: &mut Frame, gs: &mut GlobalState) {
         self.sync();
 
         let list_items = self
@@ -63,12 +56,11 @@ impl Tree {
             .flat_map(|ptr| unsafe { ptr.as_ref() }.map(|tree_path| ListItem::new(tree_path.display())))
             .collect::<Vec<ListItem<'_>>>();
 
-        let tree = List::new(list_items)
+        let tree_widget = List::new(list_items)
             .block(Block::default().borders(Borders::ALL).title("Explorer"))
             .highlight_style(Style { add_modifier: Modifier::REVERSED, ..Default::default() });
 
-        frame.render_stateful_widget(tree, tree_area, &mut self.state);
-        editor_screen
+        frame.render_stateful_widget(tree_widget, gs.tree_area, &mut self.state);
     }
 
     pub fn render_layout(&self, screen: Rect) -> Rc<[Rect]> {

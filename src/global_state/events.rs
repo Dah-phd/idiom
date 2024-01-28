@@ -6,6 +6,7 @@ use crate::configs::FileType;
 use crate::footer::Footer;
 use std::path::PathBuf;
 
+#[allow(dead_code)] // TODO replace normal events
 #[derive(Debug, Clone)]
 pub enum StateEvent {
     PopupAccess,
@@ -117,6 +118,7 @@ pub enum WorkspaceEvent {
     FindToReplace(String, Vec<(CursorPosition, CursorPosition)>),
     Open(PathBuf, usize),
     CheckLSP(FileType),
+    MouseCursor(CursorPosition),
     WorkspaceEdit(WorkspaceEdit),
     Resize,
     Exit,

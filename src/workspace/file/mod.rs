@@ -218,6 +218,12 @@ impl Editor {
         self.actions.redo(&mut self.cursor, &mut self.content);
     }
 
+    pub fn mouse_cursor(&mut self, mut position: CursorPosition) {
+        position.line += self.cursor.at_line;
+        position.char = position.char.saturating_sub(self.lexer.line_number_offset + 1);
+        self.cursor.set_cursor_checked(position, &self.content);
+    }
+
     pub fn end_of_line(&mut self) {
         self.cursor.end_of_line(&self.content);
     }
@@ -356,7 +362,7 @@ impl Editor {
         text
     }
 
-    pub fn resize(&mut self, height: usize, width: usize) {
+    pub fn resize(&mut self, width: usize, height: usize) {
         self.max_rows = height;
         self.cursor.text_width = width.saturating_sub(self.lexer.line_number_offset + 1);
         self.lexer.set_text_width(width);

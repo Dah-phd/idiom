@@ -1,4 +1,4 @@
-use crate::workspace::DocStats;
+use crate::{global_state::GlobalState, workspace::DocStats};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
@@ -27,17 +27,7 @@ impl Default for Footer {
 }
 
 impl Footer {
-    pub fn render_with_remainder(
-        &mut self,
-        frame: &mut Frame,
-        screen: Rect,
-        mode: Span<'static>,
-        stats: Option<DocStats>,
-    ) -> Rect {
-        let layout = footer_render_area(screen);
-        let footer_screen = layout[1];
-        let editor_screen = layout[0];
-
+    pub fn render_with_remainder(&mut self, frame: &mut Frame, gs: &mut GlobalState, stats: Option<DocStats>) {
         let message_p = self.get_message_widget().unwrap_or_default();
         let (stat_size, stat_p) = if let Some((len, sel, c)) = stats {
             let text = match sel {
@@ -52,15 +42,14 @@ impl Footer {
             Direction::Horizontal,
             [
                 Constraint::Length(12),
-                Constraint::Length(footer_screen.width.saturating_sub(12 + stat_size as u16)),
+                Constraint::Length(gs.footer_area.width.saturating_sub(12 + stat_size as u16)),
                 Constraint::Length(stat_size as u16),
             ],
         )
-        .split(footer_screen);
-        frame.render_widget(Paragraph::new(mode).block(Block::new().borders(Borders::TOP)), split[0]);
+        .split(gs.footer_area);
+        frame.render_widget(Paragraph::new(gs.mode_span()).block(Block::new().borders(Borders::TOP)), split[0]);
         frame.render_widget(message_p.block(Block::new().borders(Borders::TOP)), split[1]);
         frame.render_widget(stat_p.block(Block::new().borders(Borders::TOP)), split[2]);
-        editor_screen
     }
 
     pub fn message(&mut self, message: String) {
@@ -155,7 +144,7 @@ impl Message {
     }
 }
 
-pub fn footer_render_area(screen: Rect) -> Rc<[Rect]> {
+pub fn layour_workspace_footer(screen: Rect) -> Rc<[Rect]> {
     Layout::new(
         Direction::Vertical,
         [

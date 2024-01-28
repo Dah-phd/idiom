@@ -24,6 +24,7 @@ use ratatui::{
 use std::{
     collections::{hash_map::Entry, HashMap},
     path::PathBuf,
+    rc::Rc,
 };
 
 const TAB_HIGHTLIGHT: Style = Style::new().fg(Color::Yellow).add_modifier(Modifier::UNDERLINED);
@@ -50,21 +51,17 @@ impl Workspace {
         }
     }
 
-    pub fn render(&mut self, frame: &mut Frame, screen: Rect, gs: &mut GlobalState) {
+    pub fn render(&mut self, frame: &mut Frame, gs: &mut GlobalState) {
         if let Some(file) = self.editors.get_mut(0) {
-            let layout = Layout::new(Direction::Vertical, RECT_CONSTRAINT).split(screen);
-            let area = layout[1];
-            let tab_area = layout[0];
-
             let editor_widget = file.collect_widget(gs);
-            frame.render_widget(editor_widget, area);
+            frame.render_widget(editor_widget, gs.editor_area);
 
-            file.lexer.render_modal_if_exist(frame, area, &file.cursor);
+            file.lexer.render_modal_if_exist(frame, gs.editor_area, &file.cursor);
 
             let titles: Vec<_> = self.editors.iter().map(|e| e.display.to_owned()).collect();
 
             let tabs = Tabs::new(titles).style(self.tab_style).highlight_style(TAB_HIGHTLIGHT).select(0);
-            frame.render_widget(tabs, tab_area);
+            frame.render_widget(tabs, gs.tab_area);
         }
     }
 
@@ -77,7 +74,7 @@ impl Workspace {
 
     pub fn resize_render(&mut self, width: usize, height: usize) {
         for editor in self.editors.iter_mut() {
-            editor.resize(height, width);
+            editor.resize(width, height);
         }
     }
 
@@ -240,7 +237,7 @@ impl Workspace {
                 new.lexer.set_lsp_client(entry.get().aquire_client(), &new.file_type, new.stringify(), gs);
             }
         }
-        new.resize(gs.editor_height, gs.editor_width);
+        new.resize(gs.editor_area.width as usize, gs.editor_area.bottom() as usize);
         Ok(new)
     }
 
@@ -463,6 +460,10 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         return true;
     }
     false
+}
+
+pub fn layot_tabs_editor(area: Rect) -> Rc<[Rect]> {
+    Layout::new(Direction::Vertical, RECT_CONSTRAINT).split(area)
 }
 
 #[cfg(test)]

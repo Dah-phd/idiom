@@ -17,6 +17,23 @@ impl Cursor {
         self.into()
     }
 
+    pub fn set_cursor_checked(&mut self, position: CursorPosition, content: &[String]) {
+        match content.get(position.line) {
+            Some(line) => {
+                if line.len() > position.char {
+                    self.set_char(position.char);
+                } else {
+                    self.set_char(line.len());
+                }
+                self.line = position.line;
+            }
+            None => {
+                self.line = content.len().saturating_sub(1);
+                self.set_char(content[self.line].len())
+            }
+        }
+    }
+
     pub fn set_position(&mut self, position: CursorPosition) {
         self.line = position.line;
         self.char = position.char;
