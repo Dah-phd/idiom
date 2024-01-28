@@ -76,7 +76,7 @@ impl Lexer {
                                 }
                             }
                             LSPResult::Renames(workspace_edit) => {
-                                gs.workspace.push_back(workspace_edit.into());
+                                gs.workspace.push(workspace_edit.into());
                             }
                             LSPResult::Tokens(tokens) => {
                                 if self.line_builder.set_tokens(tokens) {
@@ -273,7 +273,7 @@ impl Lexer {
         if let Some(client) = self.lsp_client.as_mut() {
             gs.message("Checking LSP status (on save) ...");
             if client.file_did_save(&self.path).is_err() && client.is_closed() {
-                gs.workspace.push_back(WorkspaceEvent::CheckLSP(file_type));
+                gs.workspace.push(WorkspaceEvent::CheckLSP(file_type));
             } else {
                 gs.success("LSP running ...");
             }

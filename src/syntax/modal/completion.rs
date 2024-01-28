@@ -54,7 +54,7 @@ impl AutoComplete {
             }
             KeyCode::Enter | KeyCode::Tab => {
                 if let Some(idx) = self.state.selected() {
-                    gs.workspace.push_back(WorkspaceEvent::AutoComplete(self.filtered.remove(idx).0));
+                    gs.workspace.push(WorkspaceEvent::AutoComplete(self.filtered.remove(idx).0));
                 }
                 ModalMessage::TakenDone
             }

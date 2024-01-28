@@ -19,7 +19,7 @@ use ratatui::{
     text::Span,
     Frame,
 };
-use std::{collections::LinkedList, path::PathBuf};
+use std::path::PathBuf;
 
 #[derive(Default, Clone)]
 pub enum PopupMessage {
@@ -42,7 +42,7 @@ pub struct GlobalState {
     pub mode: Mode,
     pub popup: Option<Box<dyn PopupInterface>>,
     pub footer: Vec<FooterEvent>,
-    pub workspace: LinkedList<WorkspaceEvent>,
+    pub workspace: Vec<WorkspaceEvent>,
     pub tree: Vec<TreeEvent>,
     pub clipboard: Clipboard,
     pub exit: bool,
@@ -52,18 +52,6 @@ pub struct GlobalState {
 }
 
 impl GlobalState {
-    pub async fn exchange_should_exit(
-        &mut self,
-        tree: &mut Tree,
-        workspace: &mut Workspace,
-        footer: &mut Footer,
-    ) -> bool {
-        self.exchange_tree(tree).await;
-        self.exchange_ws(workspace).await;
-        self.exchange_footer(footer);
-        self.exit
-    }
-
     pub fn mode_span(&self) -> Span<'static> {
         match self.mode {
             Mode::Insert => {
@@ -105,7 +93,7 @@ impl GlobalState {
                     self.tree.push(event);
                 }
                 PopupMessage::Workspace(event) => {
-                    self.workspace.push_back(event);
+                    self.workspace.push(event);
                 }
             }
             return true;
@@ -131,12 +119,6 @@ impl GlobalState {
         self.footer.push(FooterEvent::Success(msg.into()));
     }
 
-    pub fn exchange_footer(&mut self, footer: &mut Footer) {
-        for event in self.footer.drain(..) {
-            event.map(footer);
-        }
-    }
-
     pub fn recalc_editor_size(&mut self, tree: &Tree) {
         let tree_layout = tree.render_layout(self.screen_size);
         let remaining_screen = tree_layout[1];
@@ -144,7 +126,7 @@ impl GlobalState {
         let editor_screen = footer_layout[0];
         self.editor_height = editor_screen.bottom() as usize;
         self.editor_width = editor_screen.width as usize;
-        self.workspace.push_back(WorkspaceEvent::Resize)
+        self.workspace.push(WorkspaceEvent::Resize)
     }
 
     /// Attempts to create new editor if err logs it and returns false else true.
@@ -156,8 +138,13 @@ impl GlobalState {
         true
     }
 
-    pub async fn exchange_tree(&mut self, tree: &mut Tree) {
-        for event in self.tree.drain(..) {
+    pub async fn exchange_should_exit(
+        &mut self,
+        tree: &mut Tree,
+        workspace: &mut Workspace,
+        footer: &mut Footer,
+    ) -> bool {
+        for event in std::mem::take(&mut self.tree) {
             match event {
                 TreeEvent::PopupAccess => {
                     if let Some(popup) = self.popup.as_mut() {
@@ -176,17 +163,17 @@ impl GlobalState {
                 TreeEvent::Open(path) => {
                     tree.select_by_path(&path);
                     self.popup = None;
-                    self.workspace.push_back(WorkspaceEvent::Open(path, 0));
+                    self.workspace.push(WorkspaceEvent::Open(path, 0));
                 }
                 TreeEvent::OpenAtLine(path, line) => {
                     tree.select_by_path(&path);
                     self.popup = None;
-                    self.workspace.push_back(WorkspaceEvent::Open(path, line));
+                    self.workspace.push(WorkspaceEvent::Open(path, line));
                 }
                 TreeEvent::OpenAtSelect(path, select) => {
                     tree.select_by_path(&path);
-                    self.workspace.push_back(WorkspaceEvent::Open(path, 0));
-                    self.workspace.push_back(WorkspaceEvent::GoToSelect { select, should_clear: true });
+                    self.workspace.push(WorkspaceEvent::Open(path, 0));
+                    self.workspace.push(WorkspaceEvent::GoToSelect { select, should_clear: true });
                 }
                 TreeEvent::SelectPath(path) => {
                     tree.select_by_path(&path);
@@ -194,7 +181,7 @@ impl GlobalState {
                 TreeEvent::CreateFileOrFolder(name) => {
                     if let Ok(new_path) = tree.create_file_or_folder(name) {
                         if !new_path.is_dir() {
-                            self.workspace.push_back(WorkspaceEvent::Open(new_path, 0));
+                            self.workspace.push(WorkspaceEvent::Open(new_path, 0));
                             self.mode = Mode::Insert;
                         }
                     }
@@ -203,7 +190,7 @@ impl GlobalState {
                 TreeEvent::CreateFileOrFolderBase(name) => {
                     if let Ok(new_path) = tree.create_file_or_folder_base(name) {
                         if !new_path.is_dir() {
-                            self.workspace.push_back(WorkspaceEvent::Open(new_path, 0));
+                            self.workspace.push(WorkspaceEvent::Open(new_path, 0));
                             self.mode = Mode::Insert;
                         }
                     }
@@ -211,26 +198,17 @@ impl GlobalState {
                 }
                 TreeEvent::RenameFile(name) => {
                     if let Err(error) = tree.rename_file(name) {
-                        self.footer.push(FooterEvent::Error(error.to_string()));
+                        footer.error(error.to_string());
                     };
                     self.popup = None;
                 }
                 TreeEvent::Resize { height, width } => {
                     self.screen_size = Rect { height, width, ..Default::default() };
-                    let tree_layout = tree.render_layout(self.screen_size);
-                    let remaining_screen = tree_layout[1];
-                    let footer_layout = footer_render_area(remaining_screen);
-                    let editor_screen = footer_layout[0];
-                    self.editor_height = editor_screen.bottom() as usize;
-                    self.editor_width = editor_screen.width as usize;
-                    self.workspace.push_back(WorkspaceEvent::Resize)
+                    self.recalc_editor_size(tree);
                 }
             }
         }
-    }
-
-    pub async fn exchange_ws(&mut self, workspace: &mut Workspace) {
-        while let Some(event) = self.workspace.pop_front() {
+        for event in std::mem::take(&mut self.workspace) {
             match event {
                 WorkspaceEvent::GoToLine(idx) => {
                     if let Some(editor) = workspace.get_active() {
@@ -311,5 +289,9 @@ impl GlobalState {
                 }
             }
         }
+        for event in self.footer.drain(..) {
+            event.map(footer);
+        }
+        self.exit
     }
 }

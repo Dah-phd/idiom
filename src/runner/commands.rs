@@ -53,6 +53,6 @@ pub fn load_cfg(f: &str, gs: &mut GlobalState) -> Option<String> {
     };
     path.push(CONFIG_FOLDER);
     path.push(f);
-    gs.workspace.push_back(WorkspaceEvent::Open(path, 0));
+    gs.workspace.push(WorkspaceEvent::Open(path, 0));
     None
 }

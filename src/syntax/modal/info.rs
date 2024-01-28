@@ -86,7 +86,7 @@ impl Info {
                     if let Some(idx) = self.state.selected() {
                         return match i.len().cmp(&idx) {
                             Ordering::Greater => {
-                                gs.workspace.push_back(WorkspaceEvent::ReplaceNextSelect {
+                                gs.workspace.push(WorkspaceEvent::ReplaceNextSelect {
                                     new_text: i.remove(idx),
                                     select: (CursorPosition::default(), CursorPosition::default()),
                                     next_select: None,

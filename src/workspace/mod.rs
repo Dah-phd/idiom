@@ -412,8 +412,9 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
                 }
                 EditorAction::Close => {
                     ws.close_active();
-                    if ws.editors.is_empty() {
-                        gs.mode = Mode::Select;
+                    match ws.get_active() {
+                        Some(editor) => gs.tree.push(TreeEvent::SelectPath(editor.path.clone())),
+                        None => gs.mode = Mode::Select,
                     }
                 }
             }
