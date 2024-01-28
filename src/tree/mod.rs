@@ -13,6 +13,7 @@ use ratatui::{
 };
 use std::{
     path::PathBuf,
+    rc::Rc,
     time::{Duration, Instant},
 };
 use tree_paths::TreePath;
@@ -50,8 +51,9 @@ impl Tree {
         if matches!(gs.mode, Mode::Insert) && !self.active {
             return screen;
         }
-        let areas =
-            Layout::new(Direction::Horizontal, [Constraint::Percentage(self.size), Constraint::Min(2)]).split(screen);
+        let areas = self.render_layout(screen);
+        let editor_screen = areas[1];
+        let tree_area = areas[0];
 
         self.sync();
 
@@ -65,8 +67,12 @@ impl Tree {
             .block(Block::default().borders(Borders::ALL).title("Explorer"))
             .highlight_style(Style { add_modifier: Modifier::REVERSED, ..Default::default() });
 
-        frame.render_stateful_widget(tree, areas[0], &mut self.state);
-        areas[1]
+        frame.render_stateful_widget(tree, tree_area, &mut self.state);
+        editor_screen
+    }
+
+    pub fn render_layout(&self, screen: Rect) -> Rc<[Rect]> {
+        Layout::new(Direction::Horizontal, [Constraint::Percentage(self.size), Constraint::Min(2)]).split(screen)
     }
 
     pub fn map(&mut self, key: &KeyEvent) -> bool {

@@ -189,18 +189,18 @@ impl LineBuilder {
         let token_line = self.tokens.get(line_idx)?;
         let mut buffer = init_buffer_with_line_number(line_idx, max_digits);
         let mut style = Style::default();
-        let mut len: usize = 0;
+        let mut remaining_word_len: usize = 0;
         let mut token_num = 0;
         let diagnostic = self.diagnostics.get(&line_idx);
         for (char_idx, ch) in content.char_indices() {
-            len = len.saturating_sub(1);
-            if len == 0 {
+            remaining_word_len = remaining_word_len.saturating_sub(1);
+            if remaining_word_len == 0 {
                 match token_line.get(token_num) {
                     Some(token) if token.from == char_idx => {
-                        len = token.len;
+                        remaining_word_len = token.len;
                         style.fg = Some(match self.legend.get_color(token.token_type, &self.theme) {
                             ColorResult::Final(color) => color,
-                            ColorResult::KeyWord => match content.get(char_idx..(char_idx + len)) {
+                            ColorResult::KeyWord => match content.get(char_idx..(char_idx + remaining_word_len)) {
                                 Some(slice) => self.handle_keywords(slice),
                                 None => self.theme.key_words,
                             },

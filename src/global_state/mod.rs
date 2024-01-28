@@ -2,7 +2,7 @@ mod clipboard;
 mod events;
 
 use crate::{
-    footer::Footer,
+    footer::{footer_render_area, Footer},
     popups::popup_replace::ReplacePopup,
     popups::PopupInterface,
     popups::{popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges},
@@ -14,6 +14,7 @@ pub use events::{FooterEvent, TreeEvent, WorkspaceEvent};
 
 use crossterm::event::KeyEvent;
 use ratatui::{
+    layout::Rect,
     style::{Color, Modifier, Style},
     text::Span,
     Frame,
@@ -45,6 +46,8 @@ pub struct GlobalState {
     pub tree: Vec<TreeEvent>,
     pub clipboard: Clipboard,
     pub exit: bool,
+    pub editor_height: usize,
+    pub editor_width: usize,
 }
 
 impl GlobalState {
@@ -201,6 +204,15 @@ impl GlobalState {
                     };
                     self.popup = None;
                 }
+                TreeEvent::Resize { height, width } => {
+                    let tree_layout = tree.render_layout(Rect { height, width, ..Default::default() });
+                    let remaining_screen = tree_layout[1];
+                    let footer_layout = footer_render_area(remaining_screen);
+                    let editor_screen = footer_layout[0];
+                    self.editor_height = editor_screen.bottom() as usize;
+                    self.editor_width = editor_screen.width as usize;
+                    self.workspace.push_back(WorkspaceEvent::Resize)
+                }
             }
         }
     }
@@ -271,6 +283,10 @@ impl GlobalState {
                     } else {
                         self.mode = Mode::Select;
                     }
+                }
+                WorkspaceEvent::Resize => {
+                    self.error(format!("width: {}, height: {}", self.editor_width, self.editor_height));
+                    workspace.resize_render(self.editor_width, self.editor_height);
                 }
                 WorkspaceEvent::CheckLSP(ft) => {
                     workspace.check_lsp(ft, self).await;

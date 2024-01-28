@@ -6,7 +6,10 @@ use ratatui::{
     widgets::{Block, Borders, Padding, Paragraph},
     Frame,
 };
-use std::time::{Duration, Instant};
+use std::{
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
 const MSG_DURATION: Duration = Duration::from_secs(3);
 
@@ -31,14 +34,7 @@ impl Footer {
         mode: Span<'static>,
         stats: Option<DocStats>,
     ) -> Rect {
-        let layout = Layout::new(
-            Direction::Vertical,
-            [
-                Constraint::Length(screen.height.saturating_sub(2)),
-                Constraint::Length(1),
-            ],
-        )
-        .split(screen);
+        let layout = footer_render_area(screen);
         let footer_screen = layout[1];
         let editor_screen = layout[0];
 
@@ -157,4 +153,15 @@ impl Message {
                 .block(Block::default().borders(Borders::TOP).padding(Padding::horizontal(2))),
         )
     }
+}
+
+pub fn footer_render_area(screen: Rect) -> Rc<[Rect]> {
+    Layout::new(
+        Direction::Vertical,
+        [
+            Constraint::Length(screen.height.saturating_sub(2)),
+            Constraint::Length(1),
+        ],
+    )
+    .split(screen)
 }

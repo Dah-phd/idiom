@@ -17,6 +17,7 @@ pub enum TreeEvent {
     CreateFileOrFolderBase(String),
     RenameFile(String),
     SearchFiles(String),
+    Resize { height: u16, width: u16 },
 }
 
 impl From<TreeEvent> for PopupMessage {
@@ -78,6 +79,7 @@ pub enum WorkspaceEvent {
     Open(PathBuf, usize),
     CheckLSP(FileType),
     WorkspaceEdit(WorkspaceEdit),
+    Resize,
     Exit,
     SaveAndExit,
 }

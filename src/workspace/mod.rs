@@ -56,7 +56,7 @@ impl Workspace {
             let area = layout[1];
             let tab_area = layout[0];
 
-            let editor_widget = file.collect_widget(&area, gs);
+            let editor_widget = file.collect_widget(gs);
             frame.render_widget(editor_widget, area);
 
             file.lexer.render_modal_if_exist(frame, area, &file.cursor);
@@ -73,6 +73,12 @@ impl Workspace {
             return false;
         }
         (self.map_callback)(self, key, gs)
+    }
+
+    pub fn resize_render(&mut self, width: usize, height: usize) {
+        for editor in self.editors.iter_mut() {
+            editor.resize(height, width);
+        }
     }
 
     pub fn get_stats(&self) -> Option<DocStats> {
@@ -234,6 +240,7 @@ impl Workspace {
                 new.lexer.set_lsp_client(entry.get().aquire_client(), &new.file_type, new.stringify(), gs);
             }
         }
+        new.resize(gs.editor_height, gs.editor_width);
         Ok(new)
     }
 

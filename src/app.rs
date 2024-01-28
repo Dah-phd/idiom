@@ -1,7 +1,7 @@
 use crate::{
     configs::{GeneralAction, KeyMap},
     footer::Footer,
-    global_state::{GlobalState, Mode},
+    global_state::{GlobalState, Mode, TreeEvent},
     popups::{
         popup_find::{FindPopup, GoToLinePopup},
         popup_replace::ReplacePopup,
@@ -60,86 +60,92 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
         let timeout = TICK.saturating_sub(clock.elapsed());
 
         if crossterm::event::poll(timeout)? {
-            if let Event::Key(key) = crossterm::event::read()? {
-                // order matters
-                if gs.map_popup_if_exists(&key) // can be on top of all
+            match crossterm::event::read()? {
+                Event::Key(key) => {
+                    // order matters
+                    if gs.map_popup_if_exists(&key) // can be on top of all
                     || tmux.map(&key, &mut gs).await // can be on top of workspace | tree
                     || workspace.map(&key, &mut gs) // gs determines if should execute
                     || file_tree.map(&key)
-                {
-                    continue;
-                }
-                let action = if let Some(action) = general_key_map.map(&key) {
-                    action
-                } else {
-                    continue;
-                };
-                match action {
-                    GeneralAction::Find => {
-                        if matches!(gs.mode, Mode::Insert) {
-                            gs.popup(FindPopup::new());
-                        } else {
-                            gs.popup(ActivePathSearch::new());
-                        }
+                    {
+                        continue;
                     }
-                    GeneralAction::Replace if matches!(gs.mode, Mode::Insert) => {
-                        gs.popup(ReplacePopup::new());
-                    }
-                    GeneralAction::SelectOpenEditor => {
-                        let tabs = workspace.tabs();
-                        if !tabs.is_empty() {
-                            gs.popup(selector_editors(tabs));
-                        };
-                    }
-                    GeneralAction::NewFile => {
-                        gs.popup(create_file_popup(file_tree.get_first_selected_folder_display()));
-                    }
-                    GeneralAction::Rename => {
-                        if matches!(gs.mode, Mode::Select) {
-                            if let Some(tree_path) = file_tree.get_selected() {
-                                gs.popup(rename_file_popup(tree_path.path().display().to_string()));
+                    let action = if let Some(action) = general_key_map.map(&key) {
+                        action
+                    } else {
+                        continue;
+                    };
+                    match action {
+                        GeneralAction::Find => {
+                            if matches!(gs.mode, Mode::Insert) {
+                                gs.popup(FindPopup::new());
+                            } else {
+                                gs.popup(ActivePathSearch::new());
                             }
                         }
-                    }
-                    GeneralAction::Expand => {
-                        if let Some(file_path) = file_tree.expand_dir_or_get_path() {
-                            gs.try_new_editor(&mut workspace, file_path).await;
+                        GeneralAction::Replace if matches!(gs.mode, Mode::Insert) => {
+                            gs.popup(ReplacePopup::new());
                         }
-                    }
-                    GeneralAction::PerformAction => {
-                        if let Some(file_path) = file_tree.expand_dir_or_get_path() {
-                            if !file_path.is_dir() && gs.try_new_editor(&mut workspace, file_path).await {
-                                gs.mode = Mode::Insert;
+                        GeneralAction::SelectOpenEditor => {
+                            let tabs = workspace.tabs();
+                            if !tabs.is_empty() {
+                                gs.popup(selector_editors(tabs));
+                            };
+                        }
+                        GeneralAction::NewFile => {
+                            gs.popup(create_file_popup(file_tree.get_first_selected_folder_display()));
+                        }
+                        GeneralAction::Rename => {
+                            if matches!(gs.mode, Mode::Select) {
+                                if let Some(tree_path) = file_tree.get_selected() {
+                                    gs.popup(rename_file_popup(tree_path.path().display().to_string()));
+                                }
                             }
                         }
-                    }
-                    GeneralAction::GoToTabs if !workspace.editors.is_empty() => {
-                        workspace.toggle_tabs();
-                        gs.mode = Mode::Insert;
-                    }
-                    GeneralAction::Exit => {
-                        if workspace.are_updates_saved() && gs.popup.is_none() {
-                            gs.exit = true;
-                        } else {
-                            gs.popup(save_all_popup());
+                        GeneralAction::Expand => {
+                            if let Some(file_path) = file_tree.expand_dir_or_get_path() {
+                                gs.try_new_editor(&mut workspace, file_path).await;
+                            }
                         }
+                        GeneralAction::PerformAction => {
+                            if let Some(file_path) = file_tree.expand_dir_or_get_path() {
+                                if !file_path.is_dir() && gs.try_new_editor(&mut workspace, file_path).await {
+                                    gs.mode = Mode::Insert;
+                                }
+                            }
+                        }
+                        GeneralAction::GoToTabs if !workspace.editors.is_empty() => {
+                            workspace.toggle_tabs();
+                            gs.mode = Mode::Insert;
+                        }
+                        GeneralAction::Exit => {
+                            if workspace.are_updates_saved() && gs.popup.is_none() {
+                                gs.exit = true;
+                            } else {
+                                gs.popup(save_all_popup());
+                            }
+                        }
+                        GeneralAction::FileTreeModeOrCancelInput => gs.mode = Mode::Select,
+                        GeneralAction::SaveAll => workspace.save(&mut gs),
+                        GeneralAction::HideFileTree => file_tree.toggle(),
+                        GeneralAction::RefreshSettings => {
+                            let new_key_map = KeyMap::new();
+                            general_key_map = new_key_map.general_key_map();
+                            workspace.refresh_cfg(new_key_map.editor_key_map(), &mut gs).await;
+                        }
+                        GeneralAction::GoToLinePopup if matches!(gs.mode, Mode::Insert) => {
+                            gs.popup(GoToLinePopup::new());
+                        }
+                        GeneralAction::ToggleTerminal => {
+                            tmux.active = true;
+                        }
+                        _ => (),
                     }
-                    GeneralAction::FileTreeModeOrCancelInput => gs.mode = Mode::Select,
-                    GeneralAction::SaveAll => workspace.save(&mut gs),
-                    GeneralAction::HideFileTree => file_tree.toggle(),
-                    GeneralAction::RefreshSettings => {
-                        let new_key_map = KeyMap::new();
-                        general_key_map = new_key_map.general_key_map();
-                        workspace.refresh_cfg(new_key_map.editor_key_map(), &mut gs).await;
-                    }
-                    GeneralAction::GoToLinePopup if matches!(gs.mode, Mode::Insert) => {
-                        gs.popup(GoToLinePopup::new());
-                    }
-                    GeneralAction::ToggleTerminal => {
-                        tmux.active = true;
-                    }
-                    _ => (),
                 }
+                Event::Resize(width, height) => {
+                    gs.tree.push(TreeEvent::Resize { height, width });
+                }
+                _ => (),
             }
         }
 

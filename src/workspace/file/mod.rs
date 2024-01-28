@@ -1,6 +1,5 @@
 use super::cursor::{Cursor, CursorPosition};
 use lsp_types::TextEdit;
-use ratatui::layout::Rect;
 use ratatui::widgets::{List, ListItem};
 
 use crate::workspace::actions::Actions;
@@ -54,10 +53,9 @@ impl Editor {
         })
     }
 
-    pub fn collect_widget(&mut self, area: &Rect, gs: &mut GlobalState) -> List<'_> {
+    pub fn collect_widget(&mut self, gs: &mut GlobalState) -> List<'_> {
         self.actions.sync(&mut self.lexer, &self.content);
         self.lexer.context(&self.cursor, &self.content, gs);
-        self.set_render_size(area);
         List::new(
             self.content
                 .iter()
@@ -357,15 +355,14 @@ impl Editor {
         text
     }
 
-    pub fn set_render_size(&mut self, area: &Rect) {
-        self.max_rows = area.bottom() as usize;
+    pub fn resize(&mut self, height: usize, width: usize) {
+        self.max_rows = height;
         if self.cursor.line < self.cursor.at_line {
             self.cursor.at_line = self.cursor.line
         }
         if self.cursor.line > self.max_rows - 3 + self.cursor.at_line {
             self.cursor.at_line = self.cursor.line + 2 - self.max_rows
         }
-        let width = area.width as usize;
         self.cursor.text_width = width.saturating_sub(self.lexer.line_number_offset + 1);
         self.lexer.set_text_width(width);
     }
