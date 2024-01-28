@@ -109,6 +109,26 @@ impl Tree {
         }
     }
 
+    pub fn mouse_select(&mut self, idx: usize) -> Option<PathBuf> {
+        if self.tree_ptrs.len() >= idx {
+            self.state.select(Some(idx.saturating_sub(1)));
+            if let Some(selected) = self.get_selected() {
+                match selected {
+                    TreePath::Folder { tree: Some(..), .. } => {
+                        selected.take_tree();
+                    }
+                    TreePath::Folder { tree: None, .. } => selected.expand(),
+                    TreePath::File { path, .. } => {
+                        return Some(path.clone());
+                    }
+                }
+                self.selected_path = selected.path().clone();
+            };
+            self.force_sync();
+        }
+        None
+    }
+
     fn select_up(&mut self) {
         if self.tree_ptrs.is_empty() {
             return;

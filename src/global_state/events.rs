@@ -118,7 +118,6 @@ pub enum WorkspaceEvent {
     FindToReplace(String, Vec<(CursorPosition, CursorPosition)>),
     Open(PathBuf, usize),
     CheckLSP(FileType),
-    MouseCursor(CursorPosition),
     WorkspaceEdit(WorkspaceEdit),
     Resize,
     Exit,

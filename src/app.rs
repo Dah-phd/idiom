@@ -149,7 +149,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                 Event::Resize(width, height) => {
                     gs.tree.push(TreeEvent::Resize { height, width });
                 }
-                Event::Mouse(event) => gs.mouse_handler(event),
+                Event::Mouse(event) => gs.mouse_handler(event, &mut file_tree, &mut workspace),
                 _ => (),
             }
         }

@@ -22,7 +22,7 @@ use ratatui::{
 };
 use std::path::PathBuf;
 
-use self::mouse::{is_in, solve_position};
+use self::mouse::contained_position;
 
 #[derive(Default, Clone)]
 pub enum PopupMessage {
@@ -216,11 +216,6 @@ impl GlobalState {
         }
         for event in std::mem::take(&mut self.workspace) {
             match event {
-                WorkspaceEvent::MouseCursor(position) => {
-                    if let Some(editor) = workspace.get_active() {
-                        editor.mouse_cursor(position);
-                    }
-                }
                 WorkspaceEvent::GoToLine(idx) => {
                     if let Some(editor) = workspace.get_active() {
                         editor.go_to(idx);
@@ -306,25 +301,30 @@ impl GlobalState {
         self.exit
     }
 
-    pub fn mouse_handler(&mut self, event: MouseEvent) {
+    #[allow(clippy::needless_return)]
+    pub fn mouse_handler(&mut self, event: MouseEvent, tree: &mut Tree, workspace: &mut Workspace) {
         match event.kind {
             MouseEventKind::Up(button) => {
                 if !matches!(button, MouseButton::Left) {
                     return;
                 }
-                // TODO fix resolution window
-                if is_in(self.editor_area, event.row, event.column) {
-                    self.mode = Mode::Insert;
-                    self.workspace.push(WorkspaceEvent::MouseCursor(
-                        solve_position(self.editor_area, event.row, event.column).into(),
-                    ));
-                } else if is_in(self.tree_area, event.row, event.column) {
+                if let Some(position) = contained_position(self.editor_area, event.row, event.column) {
+                    if let Some(editor) = workspace.get_active() {
+                        editor.mouse_cursor(position.into());
+                        self.mode = Mode::Insert;
+                    }
+                    return;
+                }
+                if let Some((line_idx, _)) = contained_position(self.tree_area, event.row, event.column) {
+                    if let Some(path) = tree.mouse_select(line_idx) {
+                        self.tree.push(TreeEvent::Open(path));
+                    };
                     self.mode = Mode::Select;
                 }
             }
             MouseEventKind::Drag(button) => {
                 if !matches!(button, MouseButton::Left) {
-                    #[allow(clippy::needless_return)] // TODO implement logic for selecting
+                    // TODO implement logic for selecting
                     return;
                 }
             }
