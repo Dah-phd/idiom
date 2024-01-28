@@ -56,6 +56,7 @@ impl Editor {
     pub fn collect_widget(&mut self, gs: &mut GlobalState) -> List<'_> {
         self.actions.sync(&mut self.lexer, &self.content);
         self.lexer.context(&self.cursor, &self.content, gs);
+        self.cursor.correct_cursor_position(self.max_rows);
         List::new(
             self.content
                 .iter()
@@ -357,12 +358,6 @@ impl Editor {
 
     pub fn resize(&mut self, height: usize, width: usize) {
         self.max_rows = height;
-        if self.cursor.line < self.cursor.at_line {
-            self.cursor.at_line = self.cursor.line
-        }
-        if self.cursor.line > self.max_rows - 3 + self.cursor.at_line {
-            self.cursor.at_line = self.cursor.line + 2 - self.max_rows
-        }
         self.cursor.text_width = width.saturating_sub(self.lexer.line_number_offset + 1);
         self.lexer.set_text_width(width);
     }

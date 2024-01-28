@@ -250,6 +250,15 @@ impl Cursor {
         }
     }
 
+    pub fn correct_cursor_position(&mut self, max_rows: usize) {
+        if self.line < self.at_line {
+            self.at_line = self.line
+        }
+        if self.line > max_rows - 3 + self.at_line {
+            self.at_line = self.line + 2 - max_rows
+        }
+    }
+
     pub fn init_select(&mut self) {
         if self.select.is_none() {
             let position = self.into();

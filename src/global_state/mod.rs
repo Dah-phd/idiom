@@ -1,5 +1,6 @@
 mod clipboard;
 mod events;
+mod mouse;
 
 use crate::{
     footer::{footer_render_area, Footer},

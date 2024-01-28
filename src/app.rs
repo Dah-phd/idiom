@@ -15,7 +15,7 @@ use crate::{
 };
 
 use anyhow::Result;
-use crossterm::event::Event;
+use crossterm::event::{Event, MouseEventKind};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{
     io::Stdout,
@@ -129,7 +129,10 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                         }
                         GeneralAction::FileTreeModeOrCancelInput => gs.mode = Mode::Select,
                         GeneralAction::SaveAll => workspace.save(&mut gs),
-                        GeneralAction::HideFileTree => file_tree.toggle(),
+                        GeneralAction::HideFileTree => {
+                            file_tree.toggle();
+                            gs.recalc_editor_size(&file_tree);
+                        }
                         GeneralAction::RefreshSettings => {
                             let new_key_map = KeyMap::new();
                             general_key_map = new_key_map.general_key_map();
@@ -147,6 +150,11 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                 Event::Resize(width, height) => {
                     gs.tree.push(TreeEvent::Resize { height, width });
                 }
+                Event::Mouse(mouse) => match mouse.kind {
+                    MouseEventKind::Up(button) => {}
+                    MouseEventKind::Drag(button) => {}
+                    _ => (),
+                },
                 _ => (),
             }
         }
