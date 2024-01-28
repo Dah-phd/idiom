@@ -110,7 +110,7 @@ impl Cursor {
         if line_len > self.text_width && line_len.saturating_sub(self.char) > self.text_width {
             self.set_char(self.char + self.text_width)
         } else {
-            if content.len() - 1 <= self.line {
+            if content.len() <= self.line + 1 {
                 return;
             }
             self.line += 1;
@@ -125,7 +125,7 @@ impl Cursor {
     }
 
     pub fn scroll_down(&mut self, content: &[String]) {
-        if self.at_line < content.len() - 2 {
+        if self.at_line + 2 < content.len() {
             self.at_line += 1;
             self.down(content)
         }
@@ -238,7 +238,7 @@ impl Cursor {
 
     pub fn adjust_max_line(&mut self, content: &[String]) {
         if self.line >= content.len() {
-            self.line = content.len() - 1;
+            self.line = content.len().saturating_sub(1);
             self.adjust_char(&content[self.line]);
         }
     }

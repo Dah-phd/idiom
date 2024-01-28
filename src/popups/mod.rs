@@ -1,5 +1,4 @@
 mod generics;
-pub mod popup_file_search;
 pub mod popup_find;
 pub mod popup_replace;
 pub mod popup_tree_search;
