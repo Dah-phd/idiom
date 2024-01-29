@@ -106,8 +106,8 @@ impl Workspace {
     }
 
     pub fn toggle_editor(&mut self) {
-        self.tab_style = UNDERLINED;
         self.map_callback = map_editor;
+        self.tab_style = UNDERLINED;
     }
 
     pub fn apply_edits(&mut self, edits: WorkspaceEdit, events: &mut GlobalState) {
@@ -252,6 +252,7 @@ impl Workspace {
         }
         let editor = self.build_editor(file_path, gs).await?;
         self.editors.insert(0, editor);
+        self.toggle_editor();
         Ok(())
     }
 
@@ -261,6 +262,18 @@ impl Workspace {
             editor.go_to(line);
         }
         Ok(())
+    }
+
+    pub fn select_tab_mouse(&mut self, col_idx: usize) -> Option<usize> {
+        self.toggle_tabs();
+        let mut cols_len = 0;
+        for (editor_idx, editor) in self.editors.iter().enumerate() {
+            cols_len += editor.display.len() + 3;
+            if col_idx < cols_len {
+                return Some(editor_idx);
+            };
+        }
+        None
     }
 
     pub async fn check_lsp(&mut self, ft: FileType, gs: &mut GlobalState) {
@@ -286,7 +299,7 @@ impl Workspace {
         }
     }
 
-    fn close_active(&mut self) {
+    pub fn close_active(&mut self) {
         if self.editors.is_empty() {
             return;
         }

@@ -17,6 +17,12 @@ impl Cursor {
         self.into()
     }
 
+    pub fn set_cursor_checked_with_select(&mut self, position: CursorPosition, content: &[String]) {
+        self.set_cursor_checked(position, content);
+        self.init_select();
+        self.push_to_select();
+    }
+
     pub fn set_cursor_checked(&mut self, position: CursorPosition, content: &[String]) {
         match content.get(position.line) {
             Some(line) => {

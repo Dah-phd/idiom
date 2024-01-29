@@ -304,7 +304,33 @@ impl GlobalState {
     #[allow(clippy::needless_return)]
     pub fn mouse_handler(&mut self, event: MouseEvent, tree: &mut Tree, workspace: &mut Workspace) {
         match event.kind {
-            MouseEventKind::Up(button) => {
+            MouseEventKind::ScrollUp if matches!(self.mode, Mode::Insert) => {
+                if let Some(editor) = workspace.get_active() {
+                    editor.scroll_up();
+                    editor.scroll_up();
+                }
+            }
+            MouseEventKind::ScrollDown if matches!(self.mode, Mode::Insert) => {
+                if let Some(editor) = workspace.get_active() {
+                    editor.scroll_down();
+                    editor.scroll_down();
+                }
+            }
+            MouseEventKind::Up(_button) => {
+                //TODO figure out how to use
+            }
+            MouseEventKind::Down(button) => {
+                if matches!(button, MouseButton::Right) {
+                    if let Some((_, col_idx)) = contained_position(self.tab_area, event.row, event.column) {
+                        if !workspace.editors.is_empty() {
+                            self.mode = Mode::Insert;
+                            if let Some(idx) = workspace.select_tab_mouse(col_idx) {
+                                workspace.activate_editor(idx, None);
+                                workspace.close_active();
+                            }
+                        }
+                    }
+                }
                 if !matches!(button, MouseButton::Left) {
                     return;
                 }
@@ -312,6 +338,7 @@ impl GlobalState {
                     if let Some(editor) = workspace.get_active() {
                         editor.mouse_cursor(position.into());
                         self.mode = Mode::Insert;
+                        workspace.toggle_editor();
                     }
                     return;
                 }
@@ -321,10 +348,25 @@ impl GlobalState {
                     };
                     self.mode = Mode::Select;
                 }
+                if let Some((_, col_idx)) = contained_position(self.tab_area, event.row, event.column) {
+                    if !workspace.editors.is_empty() {
+                        self.mode = Mode::Insert;
+                        if let Some(idx) = workspace.select_tab_mouse(col_idx) {
+                            workspace.activate_editor(idx, Some(self));
+                        };
+                    }
+                }
             }
             MouseEventKind::Drag(button) => {
                 if !matches!(button, MouseButton::Left) {
-                    // TODO implement logic for selecting
+                    return;
+                }
+                if let Some(position) = contained_position(self.editor_area, event.row, event.column) {
+                    if let Some(editor) = workspace.get_active() {
+                        editor.mouse_select(position.into());
+                        self.mode = Mode::Insert;
+                        workspace.toggle_editor();
+                    }
                     return;
                 }
             }

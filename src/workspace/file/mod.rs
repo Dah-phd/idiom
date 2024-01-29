@@ -219,9 +219,16 @@ impl Editor {
     }
 
     pub fn mouse_cursor(&mut self, mut position: CursorPosition) {
+        self.cursor.select_drop();
         position.line += self.cursor.at_line;
         position.char = position.char.saturating_sub(self.lexer.line_number_offset + 1);
         self.cursor.set_cursor_checked(position, &self.content);
+    }
+
+    pub fn mouse_select(&mut self, mut position: CursorPosition) {
+        position.line += self.cursor.at_line;
+        position.char = position.char.saturating_sub(self.lexer.line_number_offset + 1);
+        self.cursor.set_cursor_checked_with_select(position, &self.content);
     }
 
     pub fn end_of_line(&mut self) {
