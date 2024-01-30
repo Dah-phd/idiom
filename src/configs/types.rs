@@ -18,21 +18,19 @@ pub enum FileType {
 impl FileType {
     #[allow(clippy::ptr_arg)]
     pub fn derive_type(path: &PathBuf) -> Self {
-        if let Some(extension_os_str) = path.extension() {
-            if let Some(extension) = extension_os_str.to_str() {
-                return match extension.to_lowercase().as_str() {
-                    "rs" => Self::Rust,
-                    "c" => Self::C,
-                    "cpp" => Self::Cpp,
-                    "py" | "pyw" => Self::Python,
-                    "md" => Self::MarkDown,
-                    "js" => Self::JavaScript,
-                    "ts" => Self::TypeScript,
-                    "yml" | "yaml" => Self::Yml,
-                    "toml" => Self::Toml,
-                    "html" => Self::Html,
-                    _ => Self::Unknown,
-                };
+        if let Some(extension) = path.extension().and_then(|e| e.to_str()) {
+            return match extension.to_lowercase().as_str() {
+                "rs" => Self::Rust,
+                "c" => Self::C,
+                "cpp" => Self::Cpp,
+                "py" | "pyw" => Self::Python,
+                "md" => Self::MarkDown,
+                "js" => Self::JavaScript,
+                "ts" => Self::TypeScript,
+                "yml" | "yaml" => Self::Yml,
+                "toml" => Self::Toml,
+                "html" => Self::Html,
+                _ => Self::Unknown,
             };
         };
         Self::Unknown

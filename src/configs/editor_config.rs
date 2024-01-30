@@ -14,6 +14,9 @@ pub struct EditorConfigs {
     #[serde(skip, default = "get_unident_before")]
     pub unindent_before: String,
     pub format_on_save: bool,
+    pub rust_lsp: String,
+    #[serde(skip, default = "get_python_lsp")]
+    pub python_lsp: String,
 }
 
 impl Default for EditorConfigs {
@@ -22,6 +25,8 @@ impl Default for EditorConfigs {
             indent: "    ".to_owned(),
             indent_after: get_indent_after(),
             unindent_before: get_unident_before(),
+            rust_lsp: get_rust_lsp(),
+            python_lsp: get_python_lsp(),
             format_on_save: true,
         }
     }
@@ -91,4 +96,12 @@ fn get_indent_after() -> String {
 
 fn get_unident_before() -> String {
     String::from("]})")
+}
+
+fn get_rust_lsp() -> String {
+    String::from("${cfg_dir}/rust-analyzer")
+}
+
+fn get_python_lsp() -> String {
+    String::from("pylsp")
 }

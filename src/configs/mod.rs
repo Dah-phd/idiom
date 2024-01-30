@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 mod editor_config;
 mod keymap;
 mod types;
@@ -83,6 +84,13 @@ pub fn load_or_create_config<T: Default + DeserializeOwned + Serialize>(path: &s
         write_config_file(path, &T::default());
         T::default()
     }
+}
+
+/// should not fail as config files/dirs are created on start
+pub fn get_config_dir() -> Option<PathBuf> {
+    let mut config_path = config_dir()?;
+    config_path.push(CONFIG_FOLDER);
+    Some(config_path)
 }
 
 fn read_config_file(path: &str) -> Option<Vec<u8>> {

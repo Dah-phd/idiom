@@ -5,7 +5,7 @@ use anyhow::Result;
 use commands::{build_command, load_cfg};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::widgets::{Block, Borders, List, ListItem};
+use ratatui::widgets::{Block, Borders, Clear, List, ListItem};
 use ratatui::Frame;
 use std::path::{PathBuf, MAIN_SEPARATOR};
 use std::process::Stdio;
@@ -58,6 +58,7 @@ impl EditorTerminal {
             .split(screen);
         let tmux_area = screen_areas[1];
         self.max_rows = tmux_area.height as usize;
+        frame.render_widget(Clear, tmux_area);
         frame.render_widget(
             List::new(self.get_list_widget()).block(Block::default().title("Runner").borders(Borders::TOP)),
             tmux_area,

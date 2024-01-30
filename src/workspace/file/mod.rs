@@ -347,6 +347,7 @@ impl Editor {
     pub fn save(&mut self, gs: &mut GlobalState) {
         if self.try_write_file(gs) {
             self.lexer.save_and_check_lsp(self.file_type, gs);
+            gs.success(format!("SAVED {}", self.path.display()));
         }
     }
 

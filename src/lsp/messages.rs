@@ -119,7 +119,8 @@ impl Diagnostic {
         for diagnostic in &params.diagnostics {
             match diagnostic.severity {
                 Some(DiagnosticSeverity::ERROR) => errors += 1,
-                _ => warnings += 1,
+                Some(DiagnosticSeverity::WARNING) => warnings += 1,
+                _ => (),
             }
         }
         Self { updated: true, errors, warnings, params }
