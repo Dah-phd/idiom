@@ -7,7 +7,6 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem};
 use ratatui::Frame;
-use std::path::PathBuf;
 
 #[derive(Default)]
 pub struct EditorTerminal {
@@ -27,7 +26,7 @@ impl EditorTerminal {
             idiom_prefix: String::from("%i"),
             cmd_histroy: vec!["".to_owned()],
             logs: Vec::default(),
-            terminal: Terminal::new(PathBuf::from("./").as_path()).ok(),
+            terminal: Terminal::new().ok(),
             ..Default::default()
         }
     }
@@ -45,19 +44,20 @@ impl EditorTerminal {
         self.max_rows = tmux_area.height as usize;
         frame.render_widget(Clear, tmux_area);
         frame.render_widget(
-            List::new(self.get_list_widget()).block(Block::default().title("Runner").borders(Borders::TOP)),
+            List::new(self.get_list_items()).block(Block::default().title("Runner").borders(Borders::TOP)),
             tmux_area,
         );
     }
 
-    fn get_list_widget(&mut self) -> Vec<ListItem> {
-        let list = self
+    pub fn get_list_items(&self) -> Vec<ListItem<'static>> {
+        let mut list = self
             .logs
             .iter()
             .skip(self.at_log)
             .take(self.max_rows)
             .map(|line| ListItem::new(line.to_owned()))
-            .collect::<Vec<ListItem>>();
+            .collect::<Vec<ListItem<'_>>>();
+        list.push(ListItem::new(format!("runner >>> {}", self.cmd_histroy[self.at_history])));
         list
     }
 
@@ -96,6 +96,9 @@ impl EditorTerminal {
             }
             KeyEvent { code: KeyCode::Char('c' | 'C'), modifiers: KeyModifiers::CONTROL, .. } => {
                 self.kill(gs);
+                if let Ok(terminal) = Terminal::new() {
+                    self.terminal.replace(terminal);
+                }
             }
             KeyEvent { code: KeyCode::Char(ch), .. } => {
                 self.cmd_histroy[self.at_history].push(*ch);
@@ -140,7 +143,7 @@ impl EditorTerminal {
             if let Some(terminal) = self.terminal.take() {
                 terminal.kill()?;
             }
-            self.terminal.replace(Terminal::new(PathBuf::from("./").as_path())?);
+            self.terminal.replace(Terminal::new()?);
         }
         if arg.trim() == "help" {
             self.logs.push("load => load config files, available options:".to_owned());

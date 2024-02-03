@@ -2,9 +2,9 @@ use anyhow::Result;
 use portable_pty::{native_pty_system, Child, CommandBuilder, PtySize};
 use std::{
     io::{BufRead, BufReader, Write},
-    path::Path,
     sync::{Arc, Mutex},
 };
+use strip_ansi_escapes::strip_str;
 use tokio::task::JoinHandle;
 
 #[cfg(unix)]
@@ -27,27 +27,30 @@ pub struct Terminal {
 }
 
 impl Terminal {
-    pub fn new(path: &Path) -> Result<Self> {
+    pub fn new() -> Result<Self> {
         let system = native_pty_system();
         let pair = system.openpty(PtySize { rows: 24, cols: 80, ..Default::default() })?;
         let mut cmd = CommandBuilder::new(SHELL);
-        cmd.cwd(path);
+        cmd.cwd("./");
         let child = pair.slave.spawn_command(cmd)?;
-        let writer = pair.master.take_writer()?;
+        let mut writer = pair.master.take_writer()?;
         let reader = pair.master.try_clone_reader()?;
         let output: Arc<Mutex<Vec<String>>> = Arc::default();
         let buffer = Arc::clone(&output);
+        writeln!(writer, "unset PROMPT_COMMAND")?;
         Ok(Self {
             output,
             child,
             writer,
             output_handler: tokio::spawn(async move {
-                let mut reader = BufReader::new(reader);
-                let mut line_buffer = String::new();
-                while let Ok(read_test) = reader.read_line(&mut line_buffer) {
-                    into_guard(&buffer).push(std::mem::take(&mut line_buffer));
-                    if read_test == 0 {
-                        return;
+                let reader = BufReader::new(reader);
+                for result in reader.lines() {
+                    match result {
+                        Ok(styled_line) => {
+                            let line = strip_str(styled_line); // strip color and effects
+                            into_guard(&buffer).push(line);
+                        }
+                        Err(_) => return,
                     }
                 }
             }),
