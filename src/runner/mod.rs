@@ -49,6 +49,24 @@ impl EditorTerminal {
         );
     }
 
+    pub fn activate(&mut self) {
+        match self.terminal.as_mut() {
+            Some(terminal) => {
+                if !terminal.is_running() {
+                    if let Ok(terminal) = Terminal::new() {
+                        self.terminal.replace(terminal).map(|t| t.kill());
+                    }
+                }
+            }
+            None => {
+                if let Ok(terminal) = Terminal::new() {
+                    self.terminal.replace(terminal);
+                }
+            }
+        }
+        self.active = true;
+    }
+
     pub fn get_list_items(&self) -> Vec<ListItem<'static>> {
         let mut list = self
             .logs

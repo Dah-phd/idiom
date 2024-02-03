@@ -135,7 +135,7 @@ impl GlobalState {
                 }
             }
         } else {
-            runner.active = true;
+            runner.activate();
             self.key_mapper = map_runner;
             self.mode_span.style = MUTED_STYLE;
         }
@@ -273,10 +273,6 @@ impl GlobalState {
                         footer.error(error.to_string());
                     };
                     self.clear_popup();
-                }
-                TreeEvent::Resize { height, width } => {
-                    self.screen_rect = Rect { height, width, ..Default::default() };
-                    self.recalc_editor_size(tree);
                 }
             }
         }

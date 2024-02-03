@@ -57,7 +57,6 @@ pub enum TreeEvent {
     CreateFileOrFolderBase(String),
     RenameFile(String),
     SearchFiles(String),
-    Resize { height: u16, width: u16 },
 }
 
 impl From<TreeEvent> for PopupMessage {
