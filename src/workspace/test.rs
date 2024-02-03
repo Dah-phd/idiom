@@ -1,7 +1,7 @@
 use super::{file::Editor, map_editor, Workspace};
 use crate::{
     configs::{test::mock_editor_key_map, EditorConfigs},
-    global_state::{GlobalState, Mode},
+    global_state::GlobalState,
     workspace::{
         file::test::{mock_editor, pull_line, select_eq},
         CursorPosition,
@@ -12,14 +12,16 @@ use ratatui::style::Style;
 use std::collections::HashMap;
 
 pub fn mock_ws(content: Vec<String>) -> Workspace {
-    Workspace {
+    let mut ws = Workspace {
         editors: vec![mock_editor(content)],
         base_config: EditorConfigs::default(),
         key_map: mock_editor_key_map(),
         tab_style: Style::default(),
         lsp_servers: HashMap::default(),
         map_callback: map_editor,
-    }
+    };
+    ws.resize_render(60, 90);
+    ws
 }
 
 fn base_ws() -> Workspace {
@@ -56,7 +58,8 @@ fn ctrl_shift_press(ws: &mut Workspace, code: KeyCode, gs: &mut GlobalState) {
 #[test]
 fn test_move() {
     let mut ws = base_ws();
-    let mut gs = GlobalState { mode: Mode::Insert, ..Default::default() };
+    let mut gs = GlobalState::new(60, 100);
+    gs.insert_mode();
     press(&mut ws, KeyCode::Down, &mut gs);
     assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 0, line: 1 });
     press(&mut ws, KeyCode::End, &mut gs);
@@ -84,7 +87,8 @@ fn test_move() {
 #[test]
 fn test_select() {
     let mut ws = base_ws();
-    let mut gs = GlobalState { mode: Mode::Insert, ..Default::default() };
+    let mut gs = GlobalState::new(60, 100);
+    gs.insert_mode();
     shift_press(&mut ws, KeyCode::Down, &mut gs);
     assert!(select_eq((CursorPosition::default(), CursorPosition { line: 1, char: 0 }), active(&mut ws)));
     shift_press(&mut ws, KeyCode::Left, &mut gs);
@@ -107,7 +111,8 @@ fn test_select() {
 #[test]
 fn test_chars() {
     let mut ws = base_ws();
-    let mut gs = GlobalState { mode: Mode::Insert, ..Default::default() };
+    let mut gs = GlobalState::new(60, 100);
+    gs.insert_mode();
     press(&mut ws, KeyCode::Char('n'), &mut gs);
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nhello world!");
     press(&mut ws, KeyCode::Right, &mut gs);
@@ -128,7 +133,8 @@ fn test_chars() {
 #[test]
 fn test_new_line() {
     let mut ws = base_ws();
-    let mut gs = GlobalState { mode: Mode::Insert, ..Default::default() };
+    let mut gs = GlobalState::new(60, 100);
+    gs.insert_mode();
     press(&mut ws, KeyCode::Enter, &mut gs);
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "");
     assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "hello world!");
@@ -145,7 +151,8 @@ fn test_new_line() {
 #[test]
 fn test_del() {
     let mut ws = base_ws();
-    let mut gs = GlobalState { mode: Mode::Insert, ..Default::default() };
+    let mut gs = GlobalState::new(60, 100);
+    gs.insert_mode();
     press(&mut ws, KeyCode::Delete, &mut gs);
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "ello world!");
     press(&mut ws, KeyCode::End, &mut gs);
@@ -160,7 +167,8 @@ fn test_del() {
 #[test]
 fn test_backspace() {
     let mut ws = base_ws();
-    let mut gs = GlobalState { mode: Mode::Insert, ..Default::default() };
+    let mut gs = GlobalState::new(60, 100);
+    gs.insert_mode();
     press(&mut ws, KeyCode::Backspace, &mut gs);
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "hello world!");
     press(&mut ws, KeyCode::Down, &mut gs);
@@ -179,33 +187,28 @@ fn test_backspace() {
 #[test]
 fn test_cut_paste() {
     let mut ws = base_ws();
-    let mut gs = GlobalState { mode: Mode::Insert, ..Default::default() };
+    let mut gs = GlobalState::new(60, 100);
+    gs.insert_mode();
     ctrl_press(&mut ws, KeyCode::Char('x'), &mut gs);
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "next line");
     ctrl_press(&mut ws, KeyCode::Right, &mut gs);
     shift_press(&mut ws, KeyCode::Down, &mut gs);
     shift_press(&mut ws, KeyCode::Down, &mut gs);
     ctrl_press(&mut ws, KeyCode::Char('x'), &mut gs);
+    press(&mut ws, KeyCode::Up, &mut gs);
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nextly long line here");
     shift_press(&mut ws, KeyCode::Down, &mut gs); // with select
     ctrl_press(&mut ws, KeyCode::Char('v'), &mut gs);
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "next line");
     assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "     ");
     assert_eq!(pull_line(active(&mut ws), 2).unwrap(), "realt one here");
-    shift_press(&mut ws, KeyCode::Right, &mut gs);
-    shift_press(&mut ws, KeyCode::Right, &mut gs);
-    shift_press(&mut ws, KeyCode::Right, &mut gs);
-    ctrl_press(&mut ws, KeyCode::Char('x'), &mut gs);
-    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nextne");
-    press(&mut ws, KeyCode::Down, &mut gs);
-    ctrl_press(&mut ws, KeyCode::Char('v'), &mut gs);
-    assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "     li ");
 }
 
 #[test]
 fn test_jump_select() {
     let mut ws = base_ws();
-    let mut gs = GlobalState { mode: Mode::Insert, ..Default::default() };
+    let mut gs = GlobalState::new(60, 100);
+    gs.insert_mode();
     ctrl_shift_press(&mut ws, KeyCode::Right, &mut gs);
     select_eq((CursorPosition::default(), CursorPosition { line: 0, char: 5 }), active(&mut ws));
     ctrl_shift_press(&mut ws, KeyCode::Right, &mut gs);

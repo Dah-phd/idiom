@@ -1,19 +1,20 @@
 mod clipboard;
+mod controls;
 mod events;
-mod mouse;
 
 use crate::{
     footer::{layour_workspace_footer, Footer},
     popups::popup_replace::ReplacePopup,
     popups::PopupInterface,
     popups::{popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges},
+    runner::EditorTerminal,
     tree::Tree,
     workspace::{layot_tabs_editor, Workspace},
 };
 pub use clipboard::Clipboard;
+pub use controls::{map_editor, map_popup, map_tree, mouse_handler};
+use crossterm::event::KeyEvent;
 pub use events::{FooterEvent, TreeEvent, WorkspaceEvent};
-
-use crossterm::event::{KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
@@ -22,7 +23,11 @@ use ratatui::{
 };
 use std::path::PathBuf;
 
-use self::mouse::contained_position;
+use self::controls::map_runner;
+
+const INSERT_STYLE: Style = Style::new().add_modifier(Modifier::BOLD).fg(Color::Rgb(255, 0, 0));
+const SELECT_STYLE: Style = Style::new().add_modifier(Modifier::BOLD).fg(Color::LightCyan);
+const MUTED_STYLE: Style = Style::new().add_modifier(Modifier::BOLD).fg(Color::DarkGray);
 
 #[derive(Default, Clone)]
 pub enum PopupMessage {
@@ -34,15 +39,16 @@ pub enum PopupMessage {
 }
 
 #[derive(Default)]
-pub enum Mode {
+enum Mode {
     #[default]
     Select,
     Insert,
 }
 
-#[derive(Default)]
 pub struct GlobalState {
-    pub mode: Mode,
+    mode: Mode,
+    pub key_mapper: fn(&KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal, &mut GlobalState) -> bool,
+    pub mode_span: Span<'static>,
     pub popup: Option<Box<dyn PopupInterface>>,
     pub footer: Vec<FooterEvent>,
     pub workspace: Vec<WorkspaceEvent>,
@@ -57,28 +63,82 @@ pub struct GlobalState {
 }
 
 impl GlobalState {
-    pub fn mode_span(&self) -> Span<'static> {
-        match self.mode {
-            Mode::Insert => {
-                let color = if self.popup.is_some() { Color::Gray } else { Color::Rgb(255, 0, 0) };
-                Span::styled(
-                    " --INSERT-- ",
-                    Style { fg: Some(color), add_modifier: Modifier::BOLD, ..Default::default() },
-                )
-            }
-            Mode::Select => {
-                let color = if self.popup.is_some() { Color::Gray } else { Color::LightCyan };
-                Span::styled(
-                    " --SELECT-- ",
-                    Style { fg: Some(color), add_modifier: Modifier::BOLD, ..Default::default() },
-                )
-            }
+    pub fn new(height: u16, width: u16) -> Self {
+        Self {
+            mode: Mode::default(),
+            key_mapper: map_tree,
+            mode_span: Span::styled(
+                " --SELECT-- ",
+                Style { fg: Some(Color::LightCyan), add_modifier: Modifier::BOLD, ..Default::default() },
+            ),
+            popup: Option::default(),
+            footer: Vec::default(),
+            workspace: Vec::default(),
+            tree: Vec::default(),
+            clipboard: Clipboard::default(),
+            exit: false,
+            screen_rect: Rect { height, width, ..Default::default() },
+            tree_area: Rect::default(),
+            tab_area: Rect::default(),
+            editor_area: Rect::default(),
+            footer_area: Rect::default(),
         }
     }
 
-    // POPUP HANDLERS
+    pub fn select_mode(&mut self) {
+        self.mode = Mode::Select;
+        self.key_mapper = map_tree;
+        self.mode_span = Span::styled(" --SELECT-- ", SELECT_STYLE);
+    }
+
+    pub fn insert_mode(&mut self) {
+        self.mode = Mode::Insert;
+        self.key_mapper = map_editor;
+        self.mode_span = Span::styled(" --INSERT-- ", INSERT_STYLE);
+    }
+
+    pub fn is_insert(&self) -> bool {
+        matches!(self.mode, Mode::Insert)
+    }
+
     pub fn popup(&mut self, popup: Box<dyn PopupInterface>) {
+        self.key_mapper = map_popup;
         self.popup.replace(popup);
+        self.mode_span.style = MUTED_STYLE;
+    }
+
+    pub fn clear_popup(&mut self) -> Option<Box<dyn PopupInterface>> {
+        match self.mode {
+            Mode::Select => {
+                self.key_mapper = map_tree;
+                self.mode_span.style = SELECT_STYLE;
+            }
+            Mode::Insert => {
+                self.key_mapper = map_editor;
+                self.mode_span.style = INSERT_STYLE;
+            }
+        }
+        self.popup.take()
+    }
+
+    pub fn toggle_terminal(&mut self, runner: &mut EditorTerminal) {
+        if runner.active {
+            runner.active = false;
+            match self.mode {
+                Mode::Select => {
+                    self.key_mapper = map_tree;
+                    self.mode_span.style = SELECT_STYLE;
+                }
+                Mode::Insert => {
+                    self.key_mapper = map_editor;
+                    self.mode_span.style = INSERT_STYLE;
+                }
+            }
+        } else {
+            runner.active = true;
+            self.key_mapper = map_runner;
+            self.mode_span.style = MUTED_STYLE;
+        }
     }
 
     pub fn render_popup_if_exists(&mut self, frame: &mut Frame<'_>) {
@@ -91,7 +151,7 @@ impl GlobalState {
         if let Some(popup) = self.popup.as_mut() {
             match popup.map(key, &mut self.clipboard) {
                 PopupMessage::Clear => {
-                    self.popup = None;
+                    self.clear_popup();
                 }
                 PopupMessage::None => {}
                 PopupMessage::Tree(event) => {
@@ -135,6 +195,12 @@ impl GlobalState {
         self.workspace.push(WorkspaceEvent::Resize);
     }
 
+    pub fn full_resize(&mut self, height: u16, width: u16, tree: &Tree, workspace: &mut Workspace) {
+        self.screen_rect = Rect { height, width, ..Default::default() };
+        self.recalc_editor_size(tree);
+        workspace.resize_render(self.editor_area.width as usize, self.editor_area.bottom() as usize);
+    }
+
     /// Attempts to create new editor if err logs it and returns false else true.
     pub async fn try_new_editor(&mut self, workspace: &mut Workspace, path: PathBuf) -> bool {
         if let Err(err) = workspace.new_from(path, self).await {
@@ -161,19 +227,19 @@ impl GlobalState {
                     if pattern.len() > 1 {
                         let mut new_popup = ActiveFileSearch::new(pattern);
                         new_popup.update_tree(tree);
-                        self.popup = Some(new_popup);
+                        self.popup(new_popup);
                     } else {
-                        self.popup.replace(ActiveFileSearch::new(pattern));
+                        self.popup(ActiveFileSearch::new(pattern));
                     }
                 }
                 TreeEvent::Open(path) => {
                     tree.select_by_path(&path);
-                    self.popup = None;
+                    self.clear_popup();
                     self.workspace.push(WorkspaceEvent::Open(path, 0));
                 }
                 TreeEvent::OpenAtLine(path, line) => {
                     tree.select_by_path(&path);
-                    self.popup = None;
+                    self.clear_popup();
                     self.workspace.push(WorkspaceEvent::Open(path, line));
                 }
                 TreeEvent::OpenAtSelect(path, select) => {
@@ -188,25 +254,25 @@ impl GlobalState {
                     if let Ok(new_path) = tree.create_file_or_folder(name) {
                         if !new_path.is_dir() {
                             self.workspace.push(WorkspaceEvent::Open(new_path, 0));
-                            self.mode = Mode::Insert;
+                            self.insert_mode();
                         }
                     }
-                    self.popup = None;
+                    self.clear_popup();
                 }
                 TreeEvent::CreateFileOrFolderBase(name) => {
                     if let Ok(new_path) = tree.create_file_or_folder_base(name) {
                         if !new_path.is_dir() {
                             self.workspace.push(WorkspaceEvent::Open(new_path, 0));
-                            self.mode = Mode::Insert;
+                            self.insert_mode();
                         }
                     }
-                    self.popup = None;
+                    self.clear_popup();
                 }
                 TreeEvent::RenameFile(name) => {
                     if let Err(error) = tree.rename_file(name) {
                         footer.error(error.to_string());
                     };
-                    self.popup = None;
+                    self.clear_popup();
                 }
                 TreeEvent::Resize { height, width } => {
                     self.screen_rect = Rect { height, width, ..Default::default() };
@@ -220,7 +286,7 @@ impl GlobalState {
                     if let Some(editor) = workspace.get_active() {
                         editor.go_to(idx);
                     }
-                    self.popup = None;
+                    self.clear_popup();
                 }
                 WorkspaceEvent::PopupAccess => {
                     if let Some(popup) = self.popup.as_mut() {
@@ -239,33 +305,33 @@ impl GlobalState {
                     if let Some(editor) = workspace.get_active() {
                         editor.mass_replace(ranges, clip);
                     }
-                    self.popup = None;
+                    self.clear_popup();
                 }
                 WorkspaceEvent::GoToSelect { select: (from, to), should_clear } => {
                     if let Some(editor) = workspace.get_active() {
                         editor.go_to_select(from, to);
                         if should_clear {
-                            self.popup = None;
+                            self.clear_popup();
                         }
                     } else {
-                        self.popup = None;
+                        self.clear_popup();
                     }
                 }
                 WorkspaceEvent::ActivateEditor(idx) => {
                     workspace.activate_editor(idx, Some(self));
-                    self.popup = None;
-                    self.mode = Mode::Insert;
+                    self.clear_popup();
+                    self.insert_mode();
                 }
                 WorkspaceEvent::FindSelector(pattern) => {
                     if let Some(editor) = workspace.get_active() {
-                        self.mode = Mode::Insert;
-                        self.popup = Some(selector_ranges(editor.find_with_line(&pattern)));
+                        self.insert_mode();
+                        self.popup(selector_ranges(editor.find_with_line(&pattern)));
                     } else {
-                        self.popup = None;
+                        self.clear_popup();
                     }
                 }
                 WorkspaceEvent::FindToReplace(pattern, options) => {
-                    self.popup.replace(ReplacePopup::from_search(pattern, options));
+                    self.popup(ReplacePopup::from_search(pattern, options));
                 }
                 WorkspaceEvent::AutoComplete(completion) => {
                     if let Some(editor) = workspace.get_active() {
@@ -275,9 +341,9 @@ impl GlobalState {
                 WorkspaceEvent::WorkspaceEdit(edits) => workspace.apply_edits(edits, self),
                 WorkspaceEvent::Open(path, line) => {
                     if !path.is_dir() && workspace.new_at_line(path, line, self).await.is_ok() {
-                        self.mode = Mode::Insert;
+                        self.insert_mode();
                     } else {
-                        self.mode = Mode::Select;
+                        self.select_mode();
                     }
                 }
                 WorkspaceEvent::Resize => {
@@ -299,78 +365,5 @@ impl GlobalState {
             event.map(footer);
         }
         self.exit
-    }
-
-    #[allow(clippy::needless_return)]
-    pub fn mouse_handler(&mut self, event: MouseEvent, tree: &mut Tree, workspace: &mut Workspace) {
-        match event.kind {
-            MouseEventKind::ScrollUp if matches!(self.mode, Mode::Insert) => {
-                if let Some(editor) = workspace.get_active() {
-                    editor.scroll_up();
-                    editor.scroll_up();
-                }
-            }
-            MouseEventKind::ScrollDown if matches!(self.mode, Mode::Insert) => {
-                if let Some(editor) = workspace.get_active() {
-                    editor.scroll_down();
-                    editor.scroll_down();
-                }
-            }
-            MouseEventKind::Up(_button) => {
-                //TODO figure out how to use
-            }
-            MouseEventKind::Down(button) => {
-                if matches!(button, MouseButton::Right) {
-                    if let Some((_, col_idx)) = contained_position(self.tab_area, event.row, event.column) {
-                        if !workspace.editors.is_empty() {
-                            self.mode = Mode::Insert;
-                            if let Some(idx) = workspace.select_tab_mouse(col_idx) {
-                                workspace.activate_editor(idx, None);
-                                workspace.close_active();
-                            }
-                        }
-                    }
-                }
-                if !matches!(button, MouseButton::Left) {
-                    return;
-                }
-                if let Some(position) = contained_position(self.editor_area, event.row, event.column) {
-                    if let Some(editor) = workspace.get_active() {
-                        editor.mouse_cursor(position.into());
-                        self.mode = Mode::Insert;
-                        workspace.toggle_editor();
-                    }
-                    return;
-                }
-                if let Some((line_idx, _)) = contained_position(self.tree_area, event.row, event.column) {
-                    if let Some(path) = tree.mouse_select(line_idx) {
-                        self.tree.push(TreeEvent::Open(path));
-                    };
-                    self.mode = Mode::Select;
-                }
-                if let Some((_, col_idx)) = contained_position(self.tab_area, event.row, event.column) {
-                    if !workspace.editors.is_empty() {
-                        self.mode = Mode::Insert;
-                        if let Some(idx) = workspace.select_tab_mouse(col_idx) {
-                            workspace.activate_editor(idx, Some(self));
-                        };
-                    }
-                }
-            }
-            MouseEventKind::Drag(button) => {
-                if !matches!(button, MouseButton::Left) {
-                    return;
-                }
-                if let Some(position) = contained_position(self.editor_area, event.row, event.column) {
-                    if let Some(editor) = workspace.get_active() {
-                        editor.mouse_select(position.into());
-                        self.mode = Mode::Insert;
-                        workspace.toggle_editor();
-                    }
-                    return;
-                }
-            }
-            _ => (),
-        }
     }
 }

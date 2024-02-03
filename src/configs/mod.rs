@@ -3,7 +3,7 @@ mod editor_config;
 mod keymap;
 mod types;
 pub use editor_config::EditorConfigs;
-pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap};
+pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap, TreeAction, TreeUserKeyMap};
 pub use types::FileType;
 
 use std::collections::HashMap;
@@ -44,11 +44,22 @@ impl GeneralKeyMap {
     }
 }
 
+pub struct TreeKeyMap {
+    key_map: HashMap<KeyEvent, TreeAction>,
+}
+
+impl TreeKeyMap {
+    pub fn map(&self, key: &KeyEvent) -> Option<TreeAction> {
+        self.key_map.get(key).copied()
+    }
+}
+
 #[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyMap {
     general_key_map: GeneralUserKeyMap,
     editor_key_map: EditorUserKeyMap,
+    tree_key_map: TreeUserKeyMap,
 }
 
 impl KeyMap {
@@ -62,6 +73,10 @@ impl KeyMap {
 
     pub fn general_key_map(&self) -> GeneralKeyMap {
         GeneralKeyMap { key_map: self.general_key_map.clone().into() }
+    }
+
+    pub fn tree_key_map(&self) -> TreeKeyMap {
+        TreeKeyMap { key_map: self.tree_key_map.clone().into() }
     }
 }
 

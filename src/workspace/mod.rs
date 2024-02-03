@@ -4,7 +4,7 @@ pub mod file;
 pub mod utils;
 use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
-    global_state::{GlobalState, Mode, TreeEvent},
+    global_state::{GlobalState, TreeEvent},
     lsp::LSP,
     utils::{REVERSED, UNDERLINED},
 };
@@ -66,10 +66,17 @@ impl Workspace {
     }
 
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
-        if !matches!(gs.mode, Mode::Insert) {
-            return false;
-        }
         (self.map_callback)(self, key, gs)
+    }
+
+    pub fn toggle_tabs(&mut self) {
+        self.map_callback = map_tabs;
+        self.tab_style = REVERSED;
+    }
+
+    pub fn toggle_editor(&mut self) {
+        self.map_callback = map_editor;
+        self.tab_style = UNDERLINED;
     }
 
     pub fn resize_render(&mut self, width: usize, height: usize) {
@@ -98,16 +105,6 @@ impl Workspace {
             }
             self.editors.insert(0, editor);
         }
-    }
-
-    pub fn toggle_tabs(&mut self) {
-        self.map_callback = map_tabs;
-        self.tab_style = REVERSED;
-    }
-
-    pub fn toggle_editor(&mut self) {
-        self.map_callback = map_editor;
-        self.tab_style = UNDERLINED;
     }
 
     pub fn apply_edits(&mut self, edits: WorkspaceEdit, events: &mut GlobalState) {
@@ -424,7 +421,7 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
                     ws.close_active();
                     match ws.get_active() {
                         Some(editor) => gs.tree.push(TreeEvent::SelectPath(editor.path.clone())),
-                        None => gs.mode = Mode::Select,
+                        None => gs.select_mode(),
                     }
                 }
             }
@@ -438,7 +435,7 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
 fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
     if let Some(action) = ws.key_map.map(key) {
         if ws.editors.is_empty() {
-            gs.mode = Mode::Select;
+            gs.select_mode();
             return false;
         }
         match action {
@@ -447,7 +444,7 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
             }
             EditorAction::Up | EditorAction::Down => {
                 ws.toggle_editor();
-                gs.mode = Mode::Select;
+                gs.select_mode();
                 return false;
             }
             EditorAction::Right | EditorAction::Indent => {

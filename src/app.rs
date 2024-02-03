@@ -1,13 +1,12 @@
 use crate::{
     configs::{GeneralAction, KeyMap},
     footer::Footer,
-    global_state::{GlobalState, Mode, TreeEvent},
+    global_state::{mouse_handler, GlobalState},
     popups::{
         popup_find::{FindPopup, GoToLinePopup},
         popup_replace::ReplacePopup,
         popup_tree_search::ActivePathSearch,
         popups_editor::{save_all_popup, selector_editors},
-        popups_tree::{create_file_popup, rename_file_popup},
     },
     runner::EditorTerminal,
     tree::Tree,
@@ -29,21 +28,21 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
     let configs = KeyMap::new();
     let mut clock = Instant::now();
     let mut general_key_map = configs.general_key_map();
-    let mut gs = GlobalState::default();
     let size = terminal.size()?;
-    gs.tree.push(TreeEvent::Resize { height: size.height, width: size.width });
+    let mut gs = GlobalState::new(size.height, size.width);
 
     // COMPONENTS
-    let mut file_tree = Tree::new(open_file.is_none());
+    let mut file_tree = Tree::new(configs.tree_key_map(), open_file.is_none());
     let mut workspace = Workspace::new(configs.editor_key_map());
     let mut tmux = EditorTerminal::new();
     let mut footer = Footer::default();
+    gs.recalc_editor_size(&file_tree);
 
     // CLI SETUP
     if let Some(path) = open_file {
         file_tree.select_by_path(&path);
         if gs.try_new_editor(&mut workspace, path).await {
-            gs.mode = Mode::Insert;
+            gs.insert_mode();
         };
     }
 
@@ -51,10 +50,10 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
 
     loop {
         terminal.draw(|frame| {
-            file_tree.render_with_remainder(frame, &mut gs);
-            footer.render_with_remainder(frame, &mut gs, workspace.get_stats());
-            tmux.render_with_remainder(frame, gs.editor_area);
+            file_tree.render(frame, &mut gs);
+            footer.render(frame, &mut gs, workspace.get_stats());
             workspace.render(frame, &mut gs);
+            tmux.render(frame, gs.editor_area);
             gs.render_popup_if_exists(frame);
         })?;
 
@@ -64,11 +63,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
             match crossterm::event::read()? {
                 Event::Key(key) => {
                     // order matters
-                    if gs.map_popup_if_exists(&key) // can be on top of all
-                    || tmux.map(&key, &mut gs).await // can be on top of workspace | tree
-                    || workspace.map(&key, &mut gs) // gs determines if should execute
-                    || file_tree.map(&key, &mut gs)
-                    {
+                    if (gs.key_mapper)(&key, &mut workspace, &mut file_tree, &mut tmux, &mut gs) {
                         continue;
                     }
                     let action = if let Some(action) = general_key_map.map(&key) {
@@ -78,14 +73,16 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                     };
                     match action {
                         GeneralAction::Find => {
-                            if matches!(gs.mode, Mode::Insert) {
+                            if gs.is_insert() {
                                 gs.popup(FindPopup::new());
                             } else {
                                 gs.popup(ActivePathSearch::new());
                             }
                         }
-                        GeneralAction::Replace if matches!(gs.mode, Mode::Insert) => {
-                            gs.popup(ReplacePopup::new());
+                        GeneralAction::Replace => {
+                            if gs.is_insert() {
+                                gs.popup(ReplacePopup::new());
+                            }
                         }
                         GeneralAction::SelectOpenEditor => {
                             let tabs = workspace.tabs();
@@ -93,31 +90,11 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                                 gs.popup(selector_editors(tabs));
                             };
                         }
-                        GeneralAction::NewFile => {
-                            gs.popup(create_file_popup(file_tree.get_first_selected_folder_display()));
-                        }
-                        GeneralAction::Rename => {
-                            if matches!(gs.mode, Mode::Select) {
-                                if let Some(tree_path) = file_tree.get_selected() {
-                                    gs.popup(rename_file_popup(tree_path.path().display().to_string()));
-                                }
+                        GeneralAction::GoToTabs => {
+                            if !workspace.editors.is_empty() {
+                                workspace.toggle_tabs();
+                                gs.insert_mode();
                             }
-                        }
-                        GeneralAction::Expand => {
-                            if let Some(file_path) = file_tree.expand_dir_or_get_path() {
-                                gs.try_new_editor(&mut workspace, file_path).await;
-                            }
-                        }
-                        GeneralAction::PerformAction => {
-                            if let Some(file_path) = file_tree.expand_dir_or_get_path() {
-                                if !file_path.is_dir() && gs.try_new_editor(&mut workspace, file_path).await {
-                                    gs.mode = Mode::Insert;
-                                }
-                            }
-                        }
-                        GeneralAction::GoToTabs if !workspace.editors.is_empty() => {
-                            workspace.toggle_tabs();
-                            gs.mode = Mode::Insert;
                         }
                         GeneralAction::Exit => {
                             if workspace.are_updates_saved() && gs.popup.is_none() {
@@ -126,7 +103,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                                 gs.popup(save_all_popup());
                             }
                         }
-                        GeneralAction::FileTreeModeOrCancelInput => gs.mode = Mode::Select,
+                        GeneralAction::FileTreeModeOrCancelInput => gs.select_mode(),
                         GeneralAction::SaveAll => workspace.save(&mut gs),
                         GeneralAction::HideFileTree => {
                             file_tree.toggle();
@@ -135,21 +112,23 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                         GeneralAction::RefreshSettings => {
                             let new_key_map = KeyMap::new();
                             general_key_map = new_key_map.general_key_map();
+                            file_tree.key_map = new_key_map.tree_key_map();
                             workspace.refresh_cfg(new_key_map.editor_key_map(), &mut gs).await;
                         }
-                        GeneralAction::GoToLinePopup if matches!(gs.mode, Mode::Insert) => {
-                            gs.popup(GoToLinePopup::new());
+                        GeneralAction::GoToLinePopup => {
+                            if gs.is_insert() {
+                                gs.popup(GoToLinePopup::new());
+                            }
                         }
                         GeneralAction::ToggleTerminal => {
-                            tmux.active = true;
+                            gs.toggle_terminal(&mut tmux);
                         }
-                        _ => (),
                     }
                 }
                 Event::Resize(width, height) => {
-                    gs.tree.push(TreeEvent::Resize { height, width });
+                    gs.full_resize(height, width, &file_tree, &mut workspace);
                 }
-                Event::Mouse(event) => gs.mouse_handler(event, &mut file_tree, &mut workspace),
+                Event::Mouse(event) => mouse_handler(&mut gs, event, &mut file_tree, &mut workspace),
                 _ => (),
             }
         }

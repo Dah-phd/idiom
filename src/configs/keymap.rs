@@ -30,7 +30,6 @@ const F: &str = "f";
 const ESC: &str = "esc";
 
 // EDITOR
-
 #[derive(Debug, Clone, Copy)]
 pub enum EditorAction {
     Char(char),
@@ -175,40 +174,40 @@ impl Default for EditorUserKeyMap {
             indent: String::from(TAB),
             backspace: String::from(BACKSPACE),
             delete: String::from(DELETE),
-            indent_start: format!("{} && {}", CTRL, ']'),
-            unindent: format!("{} && {}", SHIFT, TAB),
+            indent_start: format!("{CTRL} && ]"),
+            unindent: format!("{SHIFT} && {TAB}"),
             up: String::from(UP),
             down: String::from(DOWN),
             left: String::from(LEFT),
             right: String::from(RIGHT),
-            select_up: format!("{} && {}", SHIFT, UP),
-            select_down: format!("{} && {}", SHIFT, DOWN),
-            select_left: format!("{} && {}", SHIFT, LEFT),
-            select_right: format!("{} && {}", SHIFT, RIGHT),
-            select_token: format!("{} && w", CTRL),
-            select_all: format!("{} && a", CTRL),
-            scroll_up: format!("{} && {} || {}", CTRL, UP, PAGEUP),
-            scroll_down: format!("{} && {} || {}", CTRL, DOWN, PAGEDOWN),
-            swap_up: format!("{} && {}", ALT, UP),
-            swap_down: format!("{} && {}", ALT, DOWN),
-            jump_left: format!("{} && {}", CTRL, LEFT),
-            jump_left_select: format!("{} && {} && {}", CTRL, SHIFT, LEFT),
-            jump_right: format!("{} && {}", CTRL, RIGHT),
-            jump_right_select: format!("{} && {} && {}", CTRL, SHIFT, RIGHT),
+            select_up: format!("{SHIFT} && {UP}"),
+            select_down: format!("{SHIFT} && {DOWN}"),
+            select_left: format!("{SHIFT} && {LEFT}"),
+            select_right: format!("{SHIFT} && {RIGHT}"),
+            select_token: format!("{CTRL} && w"),
+            select_all: format!("{CTRL} && a"),
+            scroll_up: format!("{CTRL} && {UP} || {PAGEUP}"),
+            scroll_down: format!("{CTRL} && {DOWN} || {PAGEDOWN}"),
+            swap_up: format!("{ALT} && {UP}"),
+            swap_down: format!("{ALT} && {DOWN}"),
+            jump_left: format!("{CTRL} && {LEFT}"),
+            jump_left_select: format!("{CTRL} && {SHIFT} && {LEFT}"),
+            jump_right: format!("{CTRL} && {RIGHT}"),
+            jump_right_select: format!("{CTRL} && {SHIFT} && {RIGHT}"),
             end_of_line: String::from(END),
-            end_of_file: format!("{} && {}", CTRL, END),
+            end_of_file: format!("{CTRL} && {END}"),
             start_of_line: String::from(HOME),
-            start_of_file: format!("{} && {}", CTRL, HOME),
+            start_of_file: format!("{CTRL} && {HOME}"),
             find_references: format!("{F}9"),
             go_to_declaration: format!("{F}12"),
-            help: format!("{}1", F),
-            lsp_rename: format!("{}2", F),
-            cut: format!("{} && {}", CTRL, 'x'),
-            copy: format!("{} && {}", CTRL, 'c'),
-            paste: format!("{} && {}", CTRL, 'v'),
-            undo: format!("{} && {}", CTRL, 'z'),
-            redo: format!("{} && {}", CTRL, 'y'),
-            save: format!("{} && {}", CTRL, 's'),
+            help: format!("{F}1"),
+            lsp_rename: format!("{F}2"),
+            cut: format!("{CTRL} && x"),
+            copy: format!("{CTRL} && c"),
+            paste: format!("{CTRL} && v"),
+            undo: format!("{CTRL} && z"),
+            redo: format!("{CTRL} && y"),
+            save: format!("{CTRL} && s"),
             cancel: String::from(ESC),
             close: format!("{} && {} || {} && {}", CTRL, 'q', CTRL, 'd'),
         }
@@ -219,14 +218,10 @@ impl Default for EditorUserKeyMap {
 
 #[derive(Debug, Clone, Copy)]
 pub enum GeneralAction {
-    Expand,
-    PerformAction,
     GoToTabs,
     SelectOpenEditor,
     SaveAll,
     FileTreeModeOrCancelInput,
-    NewFile,
-    Rename,
     Find,
     Replace,
     Exit,
@@ -239,14 +234,10 @@ pub enum GeneralAction {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GeneralUserKeyMap {
-    expand_file_tree_or_open_file: String,
-    perform_action: String,
     go_to_editor_tabs: String,
     select_open_editor: String,
     save_all: String,
-    file_tree_mod_or_cancel_input: String,
-    new_file: String,
-    rename_file: String,
+    cancel: String,
     find: String,
     replace: String,
     backspace_tree_input: String,
@@ -260,14 +251,10 @@ pub struct GeneralUserKeyMap {
 impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
     fn from(val: GeneralUserKeyMap) -> Self {
         let mut hash = HashMap::default();
-        insert_key_event(&mut hash, &val.expand_file_tree_or_open_file, GeneralAction::Expand);
         insert_key_event(&mut hash, &val.go_to_editor_tabs, GeneralAction::GoToTabs);
-        insert_key_event(&mut hash, &val.perform_action, GeneralAction::PerformAction);
         insert_key_event(&mut hash, &val.select_open_editor, GeneralAction::SelectOpenEditor);
         insert_key_event(&mut hash, &val.save_all, GeneralAction::SaveAll);
-        insert_key_event(&mut hash, &val.file_tree_mod_or_cancel_input, GeneralAction::FileTreeModeOrCancelInput);
-        insert_key_event(&mut hash, &val.new_file, GeneralAction::NewFile);
-        insert_key_event(&mut hash, &val.rename_file, GeneralAction::Rename);
+        insert_key_event(&mut hash, &val.cancel, GeneralAction::FileTreeModeOrCancelInput);
         insert_key_event(&mut hash, &val.find, GeneralAction::Find);
         insert_key_event(&mut hash, &val.replace, GeneralAction::Replace);
         insert_key_event(&mut hash, &val.exit, GeneralAction::Exit);
@@ -282,28 +269,82 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
 impl Default for GeneralUserKeyMap {
     fn default() -> Self {
         Self {
-            expand_file_tree_or_open_file: format!("{RIGHT} || d || D"),
             go_to_editor_tabs: String::from(TAB),
-            perform_action: String::from(ENTER),
             select_open_editor: format!("{CTRL} && {UP} || {CTRL} && {DOWN}"),
             save_all: format!("{CTRL} && s"),
-            file_tree_mod_or_cancel_input: String::from(ESC),
-            new_file: format!("{CTRL} && n"),
-            rename_file: format!("{F}2"),
+            cancel: String::from(ESC),
             find: format!("{CTRL} && f"),
             replace: format!("{CTRL} && h"),
             backspace_tree_input: String::from(BACKSPACE),
-            exit: format!("{} && {} || {} && {}", CTRL, 'd', CTRL, 'q'),
-            hide_file_tree: format!("{} && {}", CTRL, 'e'),
-            refresh_settings: format!("{}5", F),
-            go_to_line: format!("{} && {}", CTRL, 'g'),
-            toggle_terminal: format!("{} && {}", CTRL, '`'),
+            exit: format!("{CTRL} && d || {CTRL} && q"),
+            hide_file_tree: format!("{CTRL} && e"),
+            refresh_settings: format!("{F}5"),
+            go_to_line: format!("{CTRL} && 'g"),
+            toggle_terminal: format!("{CTRL} && `"),
         }
     }
 }
 
-// SUPPORT functions
+#[derive(Debug, Clone, Copy)]
+pub enum TreeAction {
+    Up,
+    Down,
+    Expand,
+    Shrink,
+    Delete,
+    Rename,
+    NewFile,
+    IncreaseSize,
+    DecreaseSize,
+}
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TreeUserKeyMap {
+    select_up: String,
+    select_down: String,
+    expand: String,
+    shrink: String,
+    delete: String,
+    rename: String,
+    new_file: String,
+    increase_size: String,
+    decrease_size: String,
+}
+
+impl Default for TreeUserKeyMap {
+    fn default() -> Self {
+        Self {
+            select_up: format!("{UP} || w"),
+            select_down: format!("{DOWN} || d"),
+            expand: format!("{RIGHT} || d || {ENTER}"),
+            shrink: format!("{LEFT} || a"),
+            delete: format!("{SHIFT} && {DELETE}"),
+            rename: format!("{F}2"),
+            new_file: format!("{CTRL} && n"),
+            increase_size: format!("{CTRL} && {RIGHT}"),
+            decrease_size: format!("{CTRL} && {LEFT}"),
+        }
+    }
+}
+
+impl From<TreeUserKeyMap> for HashMap<KeyEvent, TreeAction> {
+    fn from(val: TreeUserKeyMap) -> Self {
+        let mut hash = HashMap::default();
+        insert_key_event(&mut hash, &val.select_up, TreeAction::Up);
+        insert_key_event(&mut hash, &val.select_down, TreeAction::Down);
+        insert_key_event(&mut hash, &val.expand, TreeAction::Expand);
+        insert_key_event(&mut hash, &val.shrink, TreeAction::Shrink);
+        insert_key_event(&mut hash, &val.delete, TreeAction::Delete);
+        insert_key_event(&mut hash, &val.rename, TreeAction::Rename);
+        insert_key_event(&mut hash, &val.new_file, TreeAction::NewFile);
+        insert_key_event(&mut hash, &val.increase_size, TreeAction::IncreaseSize);
+        insert_key_event(&mut hash, &val.decrease_size, TreeAction::DecreaseSize);
+        hash
+    }
+}
+
+// SUPPORT functions
 fn parse_key(keys: &str) -> KeyEvent {
     let mut modifier = KeyModifiers::NONE;
     let mut code = None;

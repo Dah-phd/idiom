@@ -1,10 +1,12 @@
 mod tree_paths;
 use crate::{
-    global_state::GlobalState,
+    configs::{TreeAction, TreeKeyMap},
+    global_state::{GlobalState, WorkspaceEvent},
+    popups::popups_tree::{create_file_popup, rename_file_popup},
     utils::{build_file_or_folder, to_relative_path},
 };
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
@@ -20,11 +22,11 @@ use tree_paths::TreePath;
 
 const TICK: Duration = Duration::from_secs(1);
 
-#[derive(Clone)]
 pub struct Tree {
     size: u16,
     active: bool,
     state: ListState,
+    pub key_map: TreeKeyMap,
     selected_path: PathBuf,
     tree: TreePath,
     tree_ptrs: Vec<*mut TreePath>,
@@ -32,7 +34,7 @@ pub struct Tree {
 }
 
 impl Tree {
-    pub fn new(active: bool) -> Self {
+    pub fn new(key_map: TreeKeyMap, active: bool) -> Self {
         let mut tree = TreePath::default();
         let mut tree_ptrs = Vec::new();
         tree.sync_flat_ptrs(&mut tree_ptrs);
@@ -40,6 +42,7 @@ impl Tree {
             active,
             size: 15,
             state: ListState::default(),
+            key_map,
             selected_path: PathBuf::from("./"),
             tree,
             tree_ptrs,
@@ -47,7 +50,7 @@ impl Tree {
         }
     }
 
-    pub fn render_with_remainder(&mut self, frame: &mut Frame, gs: &mut GlobalState) {
+    pub fn render(&mut self, frame: &mut Frame, gs: &mut GlobalState) {
         self.sync();
 
         let list_items = self
@@ -68,27 +71,37 @@ impl Tree {
     }
 
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
-        match key.code {
-            KeyCode::Up if !key.modifiers.contains(KeyModifiers::CONTROL) => self.select_up(),
-            KeyCode::Char('w' | 'W') => self.select_up(),
-            KeyCode::Down if !key.modifiers.contains(KeyModifiers::CONTROL) => self.select_down(),
-            KeyCode::Char('s' | 'S') => self.select_down(),
-            KeyCode::Right if key.modifiers == KeyModifiers::CONTROL => {
-                self.size = std::cmp::min(75, self.size + 1);
-                gs.recalc_editor_size(self);
+        if let Some(action) = self.key_map.map(key) {
+            match action {
+                TreeAction::Up => self.select_up(),
+                TreeAction::Down => self.select_down(),
+                TreeAction::Shrink => self.shrink(),
+                TreeAction::Expand => {
+                    if let Some(path) = self.expand_dir_or_get_path() {
+                        gs.workspace.push(WorkspaceEvent::Open(path, 0));
+                    }
+                }
+                TreeAction::Delete => {
+                    let _ = self.delete_file();
+                }
+                TreeAction::NewFile => gs.popup(create_file_popup(self.get_first_selected_folder_display())),
+                TreeAction::Rename => {
+                    if let Some(tree_path) = self.get_selected() {
+                        gs.popup(rename_file_popup(tree_path.path().display().to_string()));
+                    }
+                }
+                TreeAction::IncreaseSize => {
+                    self.size = std::cmp::min(75, self.size + 1);
+                    gs.recalc_editor_size(self);
+                }
+                TreeAction::DecreaseSize => {
+                    self.size = std::cmp::max(15, self.size - 1);
+                    gs.recalc_editor_size(self);
+                }
             }
-            KeyCode::Left if key.modifiers == KeyModifiers::CONTROL => {
-                self.size = std::cmp::max(15, self.size - 1);
-                gs.recalc_editor_size(self);
-            }
-            KeyCode::Left => self.shrink(),
-            KeyCode::Char('d' | 'D') if !key.modifiers.contains(KeyModifiers::CONTROL) => self.shrink(),
-            KeyCode::Delete if key.modifiers == KeyModifiers::SHIFT => {
-                let _ = self.delete_file();
-            }
-            _ => return false,
+            return true;
         }
-        true
+        false
     }
 
     pub fn expand_dir_or_get_path(&mut self) -> Option<PathBuf> {

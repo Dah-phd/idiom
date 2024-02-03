@@ -27,7 +27,7 @@ impl Default for Footer {
 }
 
 impl Footer {
-    pub fn render_with_remainder(&mut self, frame: &mut Frame, gs: &mut GlobalState, stats: Option<DocStats>) {
+    pub fn render(&mut self, frame: &mut Frame, gs: &mut GlobalState, stats: Option<DocStats>) {
         let message_p = self.get_message_widget().unwrap_or_default();
         let (stat_size, stat_p) = if let Some((len, sel, c)) = stats {
             let text = match sel {
@@ -47,7 +47,7 @@ impl Footer {
             ],
         )
         .split(gs.footer_area);
-        frame.render_widget(Paragraph::new(gs.mode_span()).block(Block::new().borders(Borders::TOP)), split[0]);
+        frame.render_widget(Paragraph::new(gs.mode_span.clone()).block(Block::new().borders(Borders::TOP)), split[0]);
         frame.render_widget(message_p.block(Block::new().borders(Borders::TOP)), split[1]);
         frame.render_widget(stat_p.block(Block::new().borders(Borders::TOP)), split[2]);
     }
@@ -149,7 +149,7 @@ pub fn layour_workspace_footer(screen: Rect) -> Rc<[Rect]> {
         Direction::Vertical,
         [
             Constraint::Length(screen.height.saturating_sub(2)),
-            Constraint::Length(1),
+            Constraint::Length(2),
         ],
     )
     .split(screen)
