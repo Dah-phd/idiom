@@ -14,7 +14,7 @@ use crate::{
     workspace::{actions::EditMetaData, cursor::Cursor, CursorPosition},
 };
 use brackets::BracketColors;
-use diagnostics::{diagnostics_error, diagnostics_full, DiagnosticLines};
+use diagnostics::{diagnostics_error, diagnostics_full, DiagnosticLine};
 use internal::generic_line;
 use langs::Lang;
 use legend::{ColorResult, Legend};
@@ -55,7 +55,7 @@ pub struct LineBuilder {
     tokens: Tokens,
     cursor: CursorPosition,
     brackets: BracketColors,
-    diagnostics: HashMap<usize, DiagnosticLines>,
+    diagnostics: HashMap<usize, DiagnosticLine>,
     diagnostic_processor: fn(&mut Self, PublishDiagnosticsParams),
 }
 
@@ -223,7 +223,7 @@ impl LineBuilder {
     fn format_with_info<'a>(
         &self,
         line_idx: usize,
-        diagnostic: Option<&DiagnosticLines>,
+        diagnostic: Option<&DiagnosticLine>,
         mut buffer: Vec<Span<'a>>,
     ) -> ListItem<'a> {
         // set cursor without the normal API
@@ -269,7 +269,7 @@ impl LineBuilder {
         });
     }
 
-    fn set_diagnostic_style(&self, idx: usize, style: &mut Style, diagnostic: Option<&DiagnosticLines>) {
+    fn set_diagnostic_style(&self, idx: usize, style: &mut Style, diagnostic: Option<&DiagnosticLine>) {
         if let Some(color) = diagnostic.and_then(|d| d.check_ranges(&idx)) {
             style.add_modifier = style.add_modifier.union(Modifier::UNDERLINED);
             style.underline_color.replace(color);

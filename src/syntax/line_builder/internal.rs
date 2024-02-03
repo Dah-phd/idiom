@@ -1,4 +1,4 @@
-use super::{diagnostics::DiagnosticLines, LineBuilder};
+use super::{diagnostics::DiagnosticLine, LineBuilder};
 use ratatui::{
     style::{Color, Style},
     text::Span,
@@ -127,14 +127,7 @@ struct SpanBuffer<'a> {
 }
 
 impl<'a> SpanBuffer<'a> {
-    fn push(
-        &mut self,
-        idx: usize,
-        ch: char,
-        color: Color,
-        diagnostic: Option<&DiagnosticLines>,
-        builder: &LineBuilder,
-    ) {
+    fn push(&mut self, idx: usize, ch: char, color: Color, diagnostic: Option<&DiagnosticLine>, builder: &LineBuilder) {
         self.buffer.push(Span::styled(ch.to_string(), SpanBuffer::build_style(idx, color, diagnostic, builder)));
         self.last_char = ch;
     }
@@ -144,7 +137,7 @@ impl<'a> SpanBuffer<'a> {
         idx: usize,
         ch: char,
         color: Color,
-        diagnostic: Option<&DiagnosticLines>,
+        diagnostic: Option<&DiagnosticLine>,
         builder: &LineBuilder,
     ) {
         self.push(idx, ch, color, diagnostic, builder);
@@ -157,7 +150,7 @@ impl<'a> SpanBuffer<'a> {
         idx: usize,
         ch: char,
         color: Color,
-        diagnostic: Option<&DiagnosticLines>,
+        diagnostic: Option<&DiagnosticLine>,
         builder: &LineBuilder,
     ) {
         self.push(idx, ch, color, diagnostic, builder);
@@ -168,7 +161,7 @@ impl<'a> SpanBuffer<'a> {
         &mut self,
         idx: usize,
         ch: char,
-        diagnostic: Option<&DiagnosticLines>,
+        diagnostic: Option<&DiagnosticLine>,
         builder: &LineBuilder,
     ) -> bool {
         if self.str_open {
@@ -209,7 +202,7 @@ impl<'a> SpanBuffer<'a> {
         idx: usize,
         ch: char,
         builder: &LineBuilder,
-        diagnostic: Option<&DiagnosticLines>,
+        diagnostic: Option<&DiagnosticLine>,
     ) {
         if self.last_char != '<' && self.last_char != '&' {
             self.chr_open = true;
@@ -226,7 +219,7 @@ impl<'a> SpanBuffer<'a> {
         }
     }
 
-    fn build_style(idx: usize, color: Color, diagnostic: Option<&DiagnosticLines>, builder: &LineBuilder) -> Style {
+    fn build_style(idx: usize, color: Color, diagnostic: Option<&DiagnosticLine>, builder: &LineBuilder) -> Style {
         let mut style = Style { fg: Some(color), ..Default::default() };
         builder.set_diagnostic_style(idx, &mut style, diagnostic);
         builder.set_select(&mut style, &idx);

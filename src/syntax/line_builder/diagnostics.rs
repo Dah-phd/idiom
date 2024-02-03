@@ -39,11 +39,11 @@ impl DiagnosticData {
 }
 
 #[derive(Debug)]
-pub struct DiagnosticLines {
+pub struct DiagnosticLine {
     pub data: Vec<DiagnosticData>,
 }
 
-impl DiagnosticLines {
+impl DiagnosticLine {
     pub fn check_ranges(&self, idx: &usize) -> Option<Color> {
         for data in self.data.iter() {
             match data.end {
@@ -95,7 +95,7 @@ impl DiagnosticLines {
     }
 }
 
-impl From<Diagnostic> for DiagnosticLines {
+impl From<Diagnostic> for DiagnosticLine {
     fn from(diagnostic: Diagnostic) -> Self {
         let color = match diagnostic.severity {
             Some(DiagnosticSeverity::ERROR) => ERR_STYLE,

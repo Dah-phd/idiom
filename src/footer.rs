@@ -11,6 +11,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+const TOP_BORDER: Block = Block::new().borders(Borders::TOP);
 const MSG_DURATION: Duration = Duration::from_secs(3);
 
 #[derive(Debug)]
@@ -47,9 +48,9 @@ impl Footer {
             ],
         )
         .split(gs.footer_area);
-        frame.render_widget(Paragraph::new(gs.mode_span.clone()).block(Block::new().borders(Borders::TOP)), split[0]);
-        frame.render_widget(message_p.block(Block::new().borders(Borders::TOP)), split[1]);
-        frame.render_widget(stat_p.block(Block::new().borders(Borders::TOP)), split[2]);
+        frame.render_widget(Paragraph::new(gs.mode_span.clone()).block(TOP_BORDER), split[0]);
+        frame.render_widget(message_p.block(TOP_BORDER), split[1]);
+        frame.render_widget(stat_p.block(TOP_BORDER), split[2]);
     }
 
     pub fn message(&mut self, message: String) {
