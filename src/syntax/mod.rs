@@ -11,6 +11,7 @@ use crate::{
     workspace::CursorPosition,
 };
 use crossterm::event::KeyEvent;
+pub use line_builder::DiagnosticLine;
 use line_builder::LineBuilder;
 use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent};
 use modal::{LSPModal, LSPResponseType, LSPResult, ModalMessage};
@@ -49,8 +50,8 @@ impl Lexer {
         self.line_number_offset = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
         if let Some(client) = self.lsp_client.as_mut() {
             // diagnostics
-            if let Some(params) = client.get_diagnostics(&self.path) {
-                self.line_builder.set_diganostics(params);
+            if let Some(diagnostics) = client.get_diagnostics(&self.path) {
+                self.line_builder.set_diganostics(diagnostics);
             }
             // responses
             let mut unresolved_requests = Vec::new();

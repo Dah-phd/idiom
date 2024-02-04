@@ -1,4 +1,4 @@
-use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, PublishDiagnosticsParams};
+use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
 
 use super::LineBuilder;
 
@@ -6,7 +6,6 @@ use ratatui::{
     style::{Color, Style},
     text::Span,
 };
-use std::collections::hash_map::Entry;
 
 const ELS_COLOR: Color = Color::Gray;
 const ERR_COLOR: Color = Color::Red;
@@ -74,7 +73,7 @@ impl DiagnosticLine {
         self.data.retain(|d| d.span.style.fg == Some(ERR_COLOR));
     }
 
-    fn append(&mut self, d: Diagnostic) {
+    pub fn append(&mut self, d: Diagnostic) {
         let actions = process_related_info(d.related_information);
         match d.severity {
             Some(DiagnosticSeverity::ERROR) => {
@@ -114,33 +113,15 @@ impl From<Diagnostic> for DiagnosticLine {
     }
 }
 
-pub fn diagnostics_error(builder: &mut LineBuilder, params: PublishDiagnosticsParams) {
-    for d in params.diagnostics {
-        if !matches!(d.severity, Some(DiagnosticSeverity::ERROR)) {
-            continue;
-        }
-        match builder.diagnostics.entry(d.range.start.line as usize) {
-            Entry::Occupied(mut e) => {
-                e.get_mut().append(d);
-            }
-            Entry::Vacant(e) => {
-                e.insert(d.into());
-            }
-        }
-    }
+pub fn diagnostics_error(builder: &mut LineBuilder, diagnostics: Vec<(usize, DiagnosticLine)>) {
+    builder.diagnostics.extend(diagnostics.into_iter().map(|(idx, mut line)| {
+        line.drop_non_errs();
+        (idx, line)
+    }));
 }
 
-pub fn diagnostics_full(builder: &mut LineBuilder, params: PublishDiagnosticsParams) {
-    for diagnostic in params.diagnostics {
-        match builder.diagnostics.entry(diagnostic.range.start.line as usize) {
-            Entry::Occupied(mut e) => {
-                e.get_mut().append(diagnostic);
-            }
-            Entry::Vacant(e) => {
-                e.insert(diagnostic.into());
-            }
-        };
-    }
+pub fn diagnostics_full(builder: &mut LineBuilder, diagnostics: Vec<(usize, DiagnosticLine)>) {
+    builder.diagnostics.extend(diagnostics);
 }
 
 fn process_related_info(related_info: Option<Vec<DiagnosticRelatedInformation>>) -> Option<Vec<String>> {

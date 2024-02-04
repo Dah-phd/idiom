@@ -1,5 +1,5 @@
 use super::{Diagnostic, LSPNotification, LSPRequest, Response};
-use crate::{configs::FileType, workspace::CursorPosition};
+use crate::{configs::FileType, syntax::DiagnosticLine, workspace::CursorPosition};
 
 use anyhow::Result;
 use lsp_types::{
@@ -8,7 +8,7 @@ use lsp_types::{
         Completion, GotoDeclaration, GotoDefinition, HoverRequest, References, Rename, SemanticTokensFullRequest,
         SemanticTokensRangeRequest, SignatureHelpRequest,
     },
-    PublishDiagnosticsParams, Range, ServerCapabilities, TextDocumentContentChangeEvent,
+    Range, ServerCapabilities, TextDocumentContentChangeEvent,
 };
 use std::{
     cell::RefCell,
@@ -71,8 +71,8 @@ impl LSPClient {
         que.remove(id)
     }
 
-    pub fn get_diagnostics(&self, path: &Path) -> Option<PublishDiagnosticsParams> {
-        self.diagnostics.try_lock().ok()?.get_mut(path)?.take()
+    pub fn get_diagnostics(&self, path: &Path) -> Option<Vec<(usize, DiagnosticLine)>> {
+        self.diagnostics.try_lock().ok()?.get_mut(path)?.lines.take()
     }
 
     pub fn is_closed(&self) -> bool {

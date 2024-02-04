@@ -14,14 +14,14 @@ use crate::{
     workspace::{actions::EditMetaData, cursor::Cursor, CursorPosition},
 };
 use brackets::BracketColors;
-use diagnostics::{diagnostics_error, diagnostics_full, DiagnosticLine};
+pub use diagnostics::DiagnosticLine;
+use diagnostics::{diagnostics_error, diagnostics_full};
 use internal::generic_line;
 use langs::Lang;
 use legend::{ColorResult, Legend};
 
 use lsp_types::{
-    PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
-    TextDocumentContentChangeEvent,
+    SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities, TextDocumentContentChangeEvent,
 };
 use ratatui::{
     style::{Color, Modifier, Style},
@@ -56,7 +56,7 @@ pub struct LineBuilder {
     cursor: CursorPosition,
     brackets: BracketColors,
     diagnostics: HashMap<usize, DiagnosticLine>,
-    diagnostic_processor: fn(&mut Self, PublishDiagnosticsParams),
+    diagnostic_processor: fn(&mut Self, Vec<(usize, DiagnosticLine)>),
 }
 
 impl LineBuilder {
@@ -84,9 +84,9 @@ impl LineBuilder {
     }
 
     /// Process Diagnostic notification from LSP
-    pub fn set_diganostics(&mut self, params: PublishDiagnosticsParams) {
+    pub fn set_diganostics(&mut self, diagnostics: Vec<(usize, DiagnosticLine)>) {
         self.diagnostics.clear();
-        (self.diagnostic_processor)(self, params);
+        (self.diagnostic_processor)(self, diagnostics);
     }
 
     /// Process SemanticTokensResultFull from LSP

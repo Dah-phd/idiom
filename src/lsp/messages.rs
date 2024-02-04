@@ -6,6 +6,8 @@ use lsp_types::{
 use serde_json::{from_value, Value};
 use std::path::PathBuf;
 
+use crate::syntax::DiagnosticLine;
+
 #[derive(Debug)]
 pub enum LSPMessage {
     Request(Request),
@@ -106,31 +108,29 @@ pub struct GeneralNotification {
 /// updated flag is used to ensure only updated diagnostics are sent.
 #[derive(Debug)]
 pub struct Diagnostic {
-    pub updated: bool,
     pub errors: usize,
     pub warnings: usize,
-    pub params: PublishDiagnosticsParams,
+    pub lines: Option<Vec<(usize, DiagnosticLine)>>,
 }
 
 impl Diagnostic {
     fn new(params: PublishDiagnosticsParams) -> Self {
+        let mut diagnostic_lines: Vec<(usize, DiagnosticLine)> = Vec::new();
         let mut errors = 0;
         let mut warnings = 0;
-        for diagnostic in &params.diagnostics {
-            match diagnostic.severity {
+        for d in params.diagnostics {
+            match d.severity {
                 Some(DiagnosticSeverity::ERROR) => errors += 1,
                 Some(DiagnosticSeverity::WARNING) => warnings += 1,
                 _ => (),
             }
+            let line_idx = d.range.start.line as usize;
+            if let Some((_, line)) = diagnostic_lines.iter_mut().find(|(idx, _)| idx == &line_idx) {
+                line.append(d);
+            } else {
+                diagnostic_lines.push((line_idx, d.into()));
+            }
         }
-        Self { updated: true, errors, warnings, params }
-    }
-
-    pub fn take(&mut self) -> Option<PublishDiagnosticsParams> {
-        if !self.updated {
-            return None;
-        }
-        self.updated = false;
-        Some(self.params.clone())
+        Self { errors, warnings, lines: Some(diagnostic_lines) }
     }
 }
