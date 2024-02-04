@@ -84,6 +84,12 @@ impl From<Value> for LSPMessage {
     }
 }
 
+impl From<anyhow::Error> for LSPMessage {
+    fn from(err: anyhow::Error) -> Self {
+        Self::Error(err)
+    }
+}
+
 #[derive(Debug)]
 pub struct Request {
     pub id: String,

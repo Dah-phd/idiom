@@ -1,9 +1,6 @@
-use super::LSPMessage;
-use crate::utils::{into_guard, split_arc_mutex};
-
 use anyhow::{anyhow, Result};
 use serde_json::{from_str, Value};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use tokio::{
     process::{Child, ChildStdout},
     task::JoinHandle,
@@ -34,7 +31,8 @@ impl JsonRCP {
     pub fn new(child: &mut Child) -> Result<Self> {
         let inner = child.stdout.take().ok_or(anyhow!("LSP stdout"))?;
         let mut stderr = FramedRead::new(child.stderr.take().ok_or(anyhow!("LSP stderr"))?, BytesCodec::new());
-        let (errors, errors_handler) = split_arc_mutex(Vec::new());
+        let errors = Arc::default();
+        let errors_handler = Arc::clone(&errors);
         Ok(Self {
             inner: FramedRead::new(inner, BytesCodec::new()),
             str_buffer: String::new(),
@@ -46,7 +44,7 @@ impl JsonRCP {
                 while let Some(Ok(err)) = stderr.next().await {
                     if let Ok(msg) = String::from_utf8(err.into()) {
                         #[cfg(build = "debug")]
-                        debug_to_file("test_data.err", &msg);
+                        debug_to_file("test_data.jsonrcp_errors", &msg);
                         into_guard(&errors_handler).push(msg);
                     }
                 }
@@ -54,15 +52,19 @@ impl JsonRCP {
         })
     }
 
-    pub async fn next(&mut self) -> Result<LSPMessage> {
+    pub async fn next<T>(&mut self) -> Result<T>
+    where
+        T: From<Value>,
+        T: From<anyhow::Error>,
+    {
         if let Some(err) = self.check_errors() {
-            return Ok(LSPMessage::Error(err));
+            return Ok(err.into());
         };
         if !self.parsed_que.is_empty() {
             return Ok(self.parsed_que.remove(0).into()); // ensure all objects are sent
         }
         while self.parsed_que.is_empty() {
-            let bytes = self.inner.next().await.ok_or(anyhow!("LSP CRASH: steam finished!!!"))??;
+            let bytes = self.inner.next().await.ok_or(anyhow!("LSP CRASH: stream finished!!!"))??;
             self.buffer.append(&mut bytes.to_vec());
             match std::str::from_utf8(&self.buffer) {
                 Ok(msg) => {
@@ -140,4 +142,11 @@ fn to_lines(mut a: String, b: String) -> String {
     a.push('\n');
     a.push_str(&b);
     a
+}
+
+fn into_guard<T>(mutex: &Mutex<T>) -> MutexGuard<T> {
+    match mutex.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    }
 }

@@ -74,7 +74,7 @@ impl LSP {
         // sending init requests
         stdin.write_all(LSPRequest::<Initialize>::init_request()?.stringify()?.as_bytes()).await?;
         stdin.flush().await?;
-        let capabilities = from_value::<InitializeResult>(json_rpc.next().await?.unwrap()?)?.capabilities;
+        let capabilities = from_value::<InitializeResult>(json_rpc.next::<LSPMessage>().await?.unwrap()?)?.capabilities;
 
         // starting response handler
         let lsp_json_handler = tokio::task::spawn(async move {
