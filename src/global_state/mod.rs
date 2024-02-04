@@ -216,6 +216,7 @@ impl GlobalState {
         workspace: &mut Workspace,
         footer: &mut Footer,
     ) -> bool {
+        tree.finish_sync(self).await;
         for event in std::mem::take(&mut self.tree) {
             match event {
                 TreeEvent::PopupAccess => {

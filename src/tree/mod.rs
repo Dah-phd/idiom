@@ -13,30 +13,33 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState},
     Frame,
 };
-use std::{
-    path::PathBuf,
-    rc::Rc,
-    time::{Duration, Instant},
-};
+use std::{path::PathBuf, rc::Rc, time::Duration};
+use tokio::task::JoinHandle;
 use tree_paths::TreePath;
 
 const TICK: Duration = Duration::from_secs(1);
 
 pub struct Tree {
+    pub key_map: TreeKeyMap,
     size: u16,
     active: bool,
     state: ListState,
-    pub key_map: TreeKeyMap,
     selected_path: PathBuf,
     tree: TreePath,
     tree_ptrs: Vec<*mut TreePath>,
-    clock: Instant,
+    sync_handler: JoinHandle<TreePath>,
 }
 
 impl Tree {
     pub fn new(key_map: TreeKeyMap, active: bool) -> Self {
         let mut tree = TreePath::default();
+        let mut sync_tree = tree.clone();
         let mut tree_ptrs = Vec::new();
+        let sync_handler = tokio::spawn(async move {
+            tokio::time::sleep(TICK).await;
+            sync_tree.sync_base();
+            sync_tree
+        });
         tree.sync_flat_ptrs(&mut tree_ptrs);
         Self {
             active,
@@ -46,13 +49,11 @@ impl Tree {
             selected_path: PathBuf::from("./"),
             tree,
             tree_ptrs,
-            clock: Instant::now(),
+            sync_handler,
         }
     }
 
     pub fn render(&mut self, frame: &mut Frame, gs: &mut GlobalState) {
-        self.sync();
-
         let list_items = self
             .tree_ptrs
             .iter()
@@ -255,17 +256,40 @@ impl Tree {
         unsafe { self.tree_ptrs.get(self.state.selected()?)?.as_mut() }
     }
 
-    fn sync(&mut self) {
-        if self.clock.elapsed() >= TICK {
-            self.force_sync();
+    pub async fn finish_sync(&mut self, gs: &mut GlobalState) {
+        if self.sync_handler.is_finished() {
+            let mut tree = self.tree.clone();
+            let old_handler = std::mem::replace(
+                &mut self.sync_handler,
+                tokio::spawn(async move {
+                    tokio::time::sleep(TICK).await;
+                    tree.sync_base();
+                    tree
+                }),
+            );
+            match old_handler.await {
+                Ok(tree) => {
+                    self.tree = tree;
+                    self.tree.sync_flat_ptrs(&mut self.tree_ptrs);
+                    self.fix_select_by_path();
+                }
+                Err(err) => {
+                    gs.error(format!("Tree sync error: {err}"));
+                }
+            }
         }
     }
 
     fn force_sync(&mut self) {
-        self.tree.sync_base();
-        self.tree.sync_flat_ptrs(&mut self.tree_ptrs);
-        self.fix_select_by_path();
-        self.clock = Instant::now();
+        let mut tree = self.tree.clone();
+        std::mem::replace(
+            &mut self.sync_handler,
+            tokio::spawn(async move {
+                tree.sync_base();
+                tree
+            }),
+        )
+        .abort();
     }
 
     fn fix_select_by_path(&mut self) {
