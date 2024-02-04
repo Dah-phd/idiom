@@ -71,6 +71,10 @@ impl LSPClient {
         que.remove(id)
     }
 
+    pub fn get_lsp_registration(&self) -> Arc<Mutex<HashMap<PathBuf, Diagnostic>>> {
+        Arc::clone(&self.diagnostics)
+    }
+
     pub fn get_diagnostics(&self, path: &Path) -> Option<Vec<(usize, DiagnosticLine)>> {
         self.diagnostics.try_lock().ok()?.get_mut(path)?.lines.take()
     }

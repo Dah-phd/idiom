@@ -1,10 +1,13 @@
 use super::PopupMessage;
+use crate::lsp::Diagnostic;
 use crate::workspace::CursorPosition;
 use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, WorkspaceEdit};
 
 use crate::configs::FileType;
 use crate::footer::Footer;
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 #[allow(dead_code)] // TODO replace normal events
 #[derive(Debug, Clone)]
@@ -57,6 +60,7 @@ pub enum TreeEvent {
     CreateFileOrFolderBase(String),
     RenameFile(String),
     SearchFiles(String),
+    RegisterLSP(Arc<Mutex<HashMap<PathBuf, Diagnostic>>>),
 }
 
 impl From<TreeEvent> for PopupMessage {

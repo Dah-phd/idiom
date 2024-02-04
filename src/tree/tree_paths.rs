@@ -1,10 +1,16 @@
 use ignore::gitignore::Gitignore;
 use ignore::Match;
+use ratatui::{
+    style::{Color, Style},
+    text::Span,
+};
 use tokio::task::JoinSet;
 
 const GIT: &str = "./.git";
+const ERR: Style = Style::new().fg(Color::Red);
+const WAR: Style = Style::new().fg(Color::LightYellow);
 
-use crate::utils::{get_nested_paths, trim_start};
+use crate::utils::{get_nested_paths, to_relative_path, trim_start};
 use std::{
     cmp::Ordering,
     collections::HashSet,
@@ -14,8 +20,8 @@ use std::{
 
 #[derive(Debug, Clone)]
 pub enum TreePath {
-    Folder { path: PathBuf, tree: Option<Vec<TreePath>>, display: String },
-    File { path: PathBuf, display: String },
+    Folder { path: PathBuf, tree: Option<Vec<TreePath>>, display: String, errors: usize, warnings: usize },
+    File { path: PathBuf, display: String, errors: usize, warnings: usize },
 }
 
 impl Default for TreePath {
@@ -28,9 +34,9 @@ impl From<PathBuf> for TreePath {
     fn from(value: PathBuf) -> Self {
         let display = get_path_display(&value);
         if value.is_dir() {
-            Self::Folder { path: value, tree: None, display }
+            Self::Folder { path: value, tree: None, display, errors: 0, warnings: 0 }
         } else {
-            Self::File { path: value, display }
+            Self::File { path: value, display, errors: 0, warnings: 0 }
         }
     }
 }
@@ -39,13 +45,13 @@ impl TreePath {
     pub fn clean_from(path: &str) -> Self {
         let path = PathBuf::from(path);
         if !path.is_dir() {
-            return Self::File { display: get_path_display(&path), path };
+            return Self::File { display: get_path_display(&path), path, errors: 0, warnings: 0 };
         }
         let mut tree_buffer = get_nested_paths(&path)
             .filter_map(|p| if p.starts_with(GIT) { None } else { Some(p.into()) })
             .collect::<Vec<Self>>();
         tree_buffer.sort_by(order_tree_paths);
-        Self::Folder { display: get_path_display(&path), path, tree: Some(tree_buffer) }
+        Self::Folder { display: get_path_display(&path), path, tree: Some(tree_buffer), errors: 0, warnings: 0 }
     }
 
     pub fn sync_flat_ptrs(&mut self, buffer: &mut Vec<*mut Self>) {
@@ -101,6 +107,59 @@ impl TreePath {
         false
     }
 
+    pub fn map_diagnostics_base(&mut self, path: PathBuf, d_errors: usize, d_warnings: usize) {
+        if d_errors == 0 && d_warnings == 0 {
+            return;
+        }
+        if let Ok(d_path) = to_relative_path(&path) {
+            if let Self::Folder { tree: Some(tree), .. } = self {
+                for tree_path in tree {
+                    tree_path.map_diagnostics(&d_path, d_errors, d_warnings);
+                }
+            }
+        };
+    }
+
+    fn map_diagnostics(&mut self, d_path: &PathBuf, d_errors: usize, d_warnings: usize) -> bool {
+        match self {
+            Self::Folder { path, tree, errors, warnings, .. } => {
+                if !d_path.starts_with(path) {
+                    return false;
+                }
+                if let Some(tree) = tree {
+                    for tree_path in tree.iter_mut() {
+                        if tree_path.map_diagnostics(d_path, d_errors, d_warnings) {
+                            return true;
+                        }
+                    }
+                }
+                *errors = d_errors;
+                *warnings = d_warnings;
+            }
+            Self::File { path, errors, warnings, .. } => {
+                if path == d_path {
+                    *errors = d_errors;
+                    *warnings = d_warnings;
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn reset_diagnostic(&mut self) {
+        match self {
+            Self::Folder { errors, warnings, .. } => {
+                *errors = 0;
+                *warnings = 0;
+            }
+            Self::File { errors, warnings, .. } => {
+                *errors = 0;
+                *warnings = 0;
+            }
+        }
+    }
+
     pub fn sync_base(&mut self) {
         if let Self::Folder { path, tree: Some(tree), .. } = self {
             merge_trees(tree, get_nested_paths(path).filter(|p| !p.starts_with(GIT)).collect());
@@ -108,15 +167,32 @@ impl TreePath {
     }
 
     fn sync(&mut self) {
+        self.reset_diagnostic();
         if let Self::Folder { path, tree: Some(tree), .. } = self {
             merge_trees(tree, get_nested_paths(path).collect());
         }
     }
 
-    pub fn display(&self) -> &str {
+    pub fn display(&self) -> Span<'static> {
         match self {
-            Self::Folder { display, .. } => display,
-            Self::File { display, .. } => display,
+            Self::Folder { display, errors, warnings, .. } => {
+                if errors != &0 {
+                    return Span::styled(display.to_owned(), ERR);
+                }
+                if warnings != &0 {
+                    return Span::styled(display.to_owned(), WAR);
+                }
+                return Span::raw(display.to_owned());
+            }
+            Self::File { display, errors, warnings, .. } => {
+                if errors != &0 {
+                    return Span::styled(display.to_owned(), ERR);
+                }
+                if warnings != &0 {
+                    return Span::styled(display.to_owned(), WAR);
+                }
+                return Span::raw(display.to_owned());
+            }
         }
     }
 
@@ -129,7 +205,7 @@ impl TreePath {
 
     pub fn update_path(&mut self, new_path: PathBuf) {
         match self {
-            Self::File { path, display } => {
+            Self::File { path, display, .. } => {
                 *display = get_path_display(&new_path);
                 *path = new_path;
             }
@@ -158,7 +234,7 @@ impl TreePath {
         match self {
             Self::File { .. } => self.clone(),
             Self::Folder { path, display, .. } => {
-                Self::Folder { path: path.clone(), tree: None, display: display.clone() }
+                Self::Folder { path: path.clone(), tree: None, display: display.clone(), errors: 0, warnings: 0 }
             }
         }
     }
@@ -222,12 +298,12 @@ impl TreePath {
         }
         self.expand();
         match self {
-            Self::File { path, display } => {
+            Self::File { path, display, .. } => {
                 if display.contains(pattern) {
                     buffer.push(path);
                 }
             }
-            Self::Folder { path, tree, display } => {
+            Self::Folder { path, tree, display, .. } => {
                 if display.contains(pattern) {
                     buffer.push(path);
                     if let Some(tree) = tree {

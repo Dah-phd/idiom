@@ -2,6 +2,7 @@ mod tree_paths;
 use crate::{
     configs::{TreeAction, TreeKeyMap},
     global_state::{GlobalState, WorkspaceEvent},
+    lsp::Diagnostic,
     popups::popups_tree::{create_file_popup, rename_file_popup},
     utils::{build_file_or_folder, to_relative_path},
 };
@@ -13,7 +14,13 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState},
     Frame,
 };
-use std::{path::PathBuf, rc::Rc, time::Duration};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    rc::Rc,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use tokio::task::JoinHandle;
 use tree_paths::TreePath;
 
@@ -28,6 +35,7 @@ pub struct Tree {
     tree: TreePath,
     tree_ptrs: Vec<*mut TreePath>,
     sync_handler: JoinHandle<TreePath>,
+    pub lsp_register: Vec<Arc<Mutex<HashMap<PathBuf, Diagnostic>>>>,
 }
 
 impl Tree {
@@ -50,6 +58,7 @@ impl Tree {
             tree,
             tree_ptrs,
             sync_handler,
+            lsp_register: Vec::new(),
         }
     }
 
@@ -259,11 +268,23 @@ impl Tree {
     pub async fn finish_sync(&mut self, gs: &mut GlobalState) {
         if self.sync_handler.is_finished() {
             let mut tree = self.tree.clone();
+            let lsp_register = self.lsp_register.clone();
             let old_handler = std::mem::replace(
                 &mut self.sync_handler,
                 tokio::spawn(async move {
                     tokio::time::sleep(TICK).await;
                     tree.sync_base();
+                    let mut buffer = Vec::new();
+                    for lsp in lsp_register.into_iter() {
+                        if let Ok(lock) = lsp.try_lock() {
+                            for (path, diagnostic) in lock.iter() {
+                                buffer.push((path.clone(), diagnostic.errors, diagnostic.warnings));
+                            }
+                        }
+                    }
+                    for (path, d_errors, d_warnings) in buffer {
+                        tree.map_diagnostics_base(path, d_errors, d_warnings);
+                    }
                     tree
                 }),
             );
@@ -278,6 +299,7 @@ impl Tree {
                 }
             }
         }
+        self.tree.sync_flat_ptrs(&mut self.tree_ptrs);
     }
 
     fn force_sync(&mut self) {
@@ -290,6 +312,7 @@ impl Tree {
             }),
         )
         .abort();
+        self.tree.sync_flat_ptrs(&mut self.tree_ptrs);
     }
 
     fn fix_select_by_path(&mut self) {

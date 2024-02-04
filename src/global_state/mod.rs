@@ -275,6 +275,9 @@ impl GlobalState {
                     };
                     self.clear_popup();
                 }
+                TreeEvent::RegisterLSP(lsp) => {
+                    tree.lsp_register.push(lsp);
+                }
             }
         }
         for event in std::mem::take(&mut self.workspace) {

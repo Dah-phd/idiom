@@ -223,7 +223,9 @@ impl Workspace {
         match self.lsp_servers.entry(new.file_type) {
             Entry::Vacant(entry) => {
                 if let Ok(lsp) = LSP::from(&new.file_type).await {
-                    new.lexer.set_lsp_client(lsp.aquire_client(), &new.file_type, new.stringify(), gs);
+                    let client = lsp.aquire_client();
+                    gs.tree.push(TreeEvent::RegisterLSP(client.get_lsp_registration()));
+                    new.lexer.set_lsp_client(client, &new.file_type, new.stringify(), gs);
                     for editor in self.editors.iter_mut().filter(|e| e.file_type == new.file_type) {
                         editor.lexer.set_lsp_client(lsp.aquire_client(), &editor.file_type, editor.stringify(), gs);
                     }
