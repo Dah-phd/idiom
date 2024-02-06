@@ -1,6 +1,9 @@
 mod commands;
+use std::sync::{Arc, Mutex};
+
 use crate::configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE};
 use crate::global_state::GlobalState;
+use crate::utils::into_guard;
 use anyhow::Result;
 use commands::{load_cfg, Terminal};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -11,24 +14,22 @@ use ratatui::Frame;
 #[derive(Default)]
 pub struct EditorTerminal {
     pub active: bool,
-    idiom_prefix: String,
+    // idiom_prefix: String,
     logs: Vec<String>,
     at_log: usize,
-    cmd_histroy: Vec<String>,
-    at_history: usize,
     terminal: Option<Terminal>,
+    prompt: Option<Arc<Mutex<String>>>,
     max_rows: usize,
 }
 
 impl EditorTerminal {
     pub fn new() -> Self {
-        Self {
-            idiom_prefix: String::from("%i"),
-            cmd_histroy: vec!["".to_owned()],
-            logs: Vec::default(),
-            terminal: Terminal::new().ok(),
-            ..Default::default()
+        let mut new = Self::default();
+        if let Ok((terminal, prompt)) = Terminal::new() {
+            new.terminal.replace(terminal);
+            new.prompt.replace(prompt);
         }
+        new
     }
 
     pub fn render(&mut self, frame: &mut Frame, screen: Rect) {
@@ -53,14 +54,16 @@ impl EditorTerminal {
         match self.terminal.as_mut() {
             Some(terminal) => {
                 if !terminal.is_running() {
-                    if let Ok(terminal) = Terminal::new() {
+                    if let Ok((terminal, prompt)) = Terminal::new() {
                         self.terminal.replace(terminal).map(|t| t.kill());
+                        self.prompt.replace(prompt);
                     }
                 }
             }
             None => {
-                if let Ok(terminal) = Terminal::new() {
+                if let Ok((terminal, prompt)) = Terminal::new() {
                     self.terminal.replace(terminal);
+                    self.prompt.replace(prompt);
                 }
             }
         }
@@ -75,14 +78,10 @@ impl EditorTerminal {
             .take(self.max_rows)
             .map(|line| ListItem::new(line.to_owned()))
             .collect::<Vec<ListItem<'_>>>();
-        list.push(ListItem::new(format!("runner >>> {}", self.cmd_histroy[self.at_history])));
+        list.push(ListItem::new(
+            self.prompt.as_ref().map(|p| into_guard(p).to_owned()).unwrap_or(String::from("Dead terminal")),
+        ));
         list
-    }
-
-    fn prompt_to_last_line(&mut self) {
-        if self.logs.len().saturating_sub(self.max_rows) > self.at_log {
-            self.at_log = (self.logs.len() + 2).saturating_sub(self.max_rows);
-        }
     }
 
     fn kill(&mut self, _gs: &mut GlobalState) {
@@ -95,7 +94,6 @@ impl EditorTerminal {
         match key {
             KeyEvent { code: KeyCode::Esc, .. }
             | KeyEvent { code: KeyCode::Char('d' | 'D' | 'q' | 'Q' | '`'), modifiers: KeyModifiers::CONTROL, .. } => {
-                self.prompt_to_last_line();
                 gs.toggle_terminal(self);
             }
             KeyEvent { code: KeyCode::PageUp, .. }
@@ -106,31 +104,18 @@ impl EditorTerminal {
             | KeyEvent { code: KeyCode::Down, modifiers: KeyModifiers::CONTROL, .. } => {
                 self.at_log = std::cmp::min(self.at_log + 1, self.logs.len());
             }
-            KeyEvent { code: KeyCode::Up, .. } => {
-                self.at_history = self.at_history.saturating_sub(1);
-            }
-            KeyEvent { code: KeyCode::Down, .. } => {
-                self.at_history = std::cmp::min(self.at_history + 1, self.cmd_histroy.len() - 1)
-            }
             KeyEvent { code: KeyCode::Char('c' | 'C'), modifiers: KeyModifiers::CONTROL, .. } => {
                 self.kill(gs);
-                if let Ok(terminal) = Terminal::new() {
-                    self.terminal.replace(terminal);
+                if let Ok((terminal, prompt)) = Terminal::new() {
+                    self.terminal.replace(terminal).map(|t| t.kill());
+                    self.prompt.replace(prompt);
                 }
             }
-            KeyEvent { code: KeyCode::Char(ch), .. } => {
-                self.cmd_histroy[self.at_history].push(*ch);
-                self.prompt_to_last_line();
+            _ => {
+                if let Some(terminal) = self.terminal.as_mut() {
+                    terminal.map(key);
+                }
             }
-            KeyEvent { code: KeyCode::Backspace, .. } => {
-                self.cmd_histroy[self.at_history].pop();
-                self.prompt_to_last_line();
-            }
-            KeyEvent { code: KeyCode::Enter, .. } => {
-                let _ = self.push_command(gs);
-                self.prompt_to_last_line();
-            }
-            _ => (),
         }
         true
     }
@@ -138,22 +123,7 @@ impl EditorTerminal {
     fn poll_results(&mut self) {
         if let Some(logs) = self.terminal.as_mut().and_then(|t| t.pull_logs()) {
             self.logs.extend(logs);
-            self.prompt_to_last_line();
         }
-    }
-
-    fn push_command(&mut self, gs: &mut GlobalState) -> Result<()> {
-        let cmd = self.cmd_histroy[self.at_history].trim().to_owned();
-        if let Some(arg) = cmd.strip_prefix(&self.idiom_prefix) {
-            return self.idiom_command_handler(arg, gs);
-        }
-        self.cmd_histroy.push(String::new());
-        self.at_history = self.cmd_histroy.len() - 1;
-        if let Some(terminal) = self.terminal.as_mut() {
-            assert!(terminal.is_running());
-            terminal.push_command(&cmd).unwrap();
-        }
-        Ok(())
     }
 
     pub fn idiom_command_handler(&mut self, arg: &str, gs: &mut GlobalState) -> Result<()> {
@@ -161,7 +131,9 @@ impl EditorTerminal {
             if let Some(terminal) = self.terminal.take() {
                 terminal.kill()?;
             }
-            self.terminal.replace(Terminal::new()?);
+            let (terminal, prompt) = Terminal::new()?;
+            self.terminal.replace(terminal).map(|t| t.kill());
+            self.prompt.replace(prompt);
         }
         if arg.trim() == "help" {
             self.logs.push("load => load config files, available options:".to_owned());

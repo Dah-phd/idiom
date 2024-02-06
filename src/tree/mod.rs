@@ -24,7 +24,7 @@ use std::{
 use tokio::task::JoinHandle;
 use tree_paths::TreePath;
 
-const TICK: Duration = Duration::from_secs(1);
+const TICK: Duration = Duration::from_millis(200);
 
 pub struct Tree {
     pub key_map: TreeKeyMap,
