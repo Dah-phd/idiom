@@ -108,8 +108,17 @@ impl Actions {
                 }
             }
             None => {
-                self.push_done(Edit::insert_clip(cursor.into(), self.cfg.indent.to_owned(), content));
-                cursor.add_to_char(self.cfg.indent.len());
+                let mut indent = if cursor.line > 0 {
+                    self.cfg.derive_indent_from(&content[cursor.line - 1])
+                } else {
+                    self.cfg.indent.to_owned()
+                };
+                if indent.is_empty() {
+                    indent = self.cfg.indent.to_owned();
+                };
+                let char_offset = indent.len();
+                self.push_done(Edit::insert_clip(cursor.into(), indent, content));
+                cursor.add_to_char(char_offset);
             }
         }
     }

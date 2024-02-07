@@ -126,6 +126,12 @@ impl EditorTerminal {
         }
     }
 
+    pub fn resize(&mut self, cols: u16) {
+        if let Some(terminal) = self.terminal.as_mut() {
+            let _ = terminal.resize(cols);
+        }
+    }
+
     pub fn idiom_command_handler(&mut self, arg: &str, gs: &mut GlobalState) -> Result<()> {
         if arg.trim() == "clear" {
             if let Some(terminal) = self.terminal.take() {

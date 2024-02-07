@@ -1,5 +1,6 @@
 use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use portable_pty::PtyPair;
 use portable_pty::{native_pty_system, Child, CommandBuilder, PtySize};
 use std::{
     io::{BufRead, BufReader, Read, Write},
@@ -21,6 +22,7 @@ use crate::{
 use dirs::config_dir;
 
 pub struct Terminal {
+    pair: PtyPair,
     child: Box<dyn Child + Send + Sync>,
     writer: Box<dyn Write + Send>,
     output_handler: JoinHandle<()>,
@@ -42,6 +44,7 @@ impl Terminal {
         let prompt_writer = Arc::clone(&prompt);
         Ok((
             Self {
+                pair,
                 output,
                 child,
                 writer,
@@ -129,6 +132,10 @@ impl Terminal {
 
     pub fn push_command(&mut self, cmd: &str) -> std::io::Result<()> {
         writeln!(self.writer, "{}", cmd)
+    }
+
+    pub fn resize(&mut self, cols: u16) -> Result<()> {
+        self.pair.master.resize(PtySize { rows: 24, cols, pixel_width: 0, pixel_height: 0 })
     }
 }
 
