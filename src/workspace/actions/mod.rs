@@ -40,7 +40,7 @@ impl Actions {
         self.push_done(action);
     }
 
-    pub fn swap_down(&mut self, cursor: &mut Cursor, content: &mut Vec<String>) {
+    pub fn swap_down(&mut self, cursor: &mut Cursor, content: &mut [String]) {
         if content.is_empty() || content.len() - 1 <= cursor.line {
             return;
         }
