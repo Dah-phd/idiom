@@ -124,7 +124,7 @@ pub fn map_popup(
     gs.map_popup_if_exists(key)
 }
 
-pub fn map_runner(
+pub fn map_term(
     key: &KeyEvent,
     _w: &mut Workspace,
     _t: &mut Tree,

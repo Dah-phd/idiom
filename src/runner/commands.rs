@@ -3,7 +3,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use portable_pty::PtyPair;
 use portable_pty::{native_pty_system, Child, CommandBuilder, PtySize};
 use std::{
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufReader, Read, Write},
     sync::{Arc, Mutex},
 };
 use strip_ansi_escapes::strip_str;

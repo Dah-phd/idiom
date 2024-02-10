@@ -13,7 +13,6 @@ use ratatui::Frame;
 
 #[derive(Default)]
 pub struct EditorTerminal {
-    pub active: bool,
     // idiom_prefix: String,
     logs: Vec<String>,
     at_log: usize,
@@ -33,9 +32,6 @@ impl EditorTerminal {
     }
 
     pub fn render(&mut self, frame: &mut Frame, screen: Rect) {
-        if !self.active {
-            return;
-        }
         self.poll_results();
         let screen_areas = Layout::default()
             .direction(Direction::Vertical)
@@ -67,7 +63,6 @@ impl EditorTerminal {
                 }
             }
         }
-        self.active = true;
     }
 
     pub fn get_list_items(&self) -> Vec<ListItem<'static>> {
@@ -113,7 +108,7 @@ impl EditorTerminal {
             }
             _ => {
                 if let Some(terminal) = self.terminal.as_mut() {
-                    terminal.map(key);
+                    let _ = terminal.map(key);
                 }
             }
         }

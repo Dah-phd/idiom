@@ -29,7 +29,6 @@ const TICK: Duration = Duration::from_millis(200);
 pub struct Tree {
     pub key_map: TreeKeyMap,
     size: u16,
-    active: bool,
     state: ListState,
     selected_path: PathBuf,
     tree: TreePath,
@@ -39,7 +38,7 @@ pub struct Tree {
 }
 
 impl Tree {
-    pub fn new(key_map: TreeKeyMap, active: bool) -> Self {
+    pub fn new(key_map: TreeKeyMap) -> Self {
         let mut tree = TreePath::default();
         let mut sync_tree = tree.clone();
         let mut tree_ptrs = Vec::new();
@@ -50,7 +49,6 @@ impl Tree {
         });
         tree.sync_flat_ptrs(&mut tree_ptrs);
         Self {
-            active,
             size: 15,
             state: ListState::default(),
             key_map,
@@ -255,10 +253,6 @@ impl Tree {
             }
         }
         "./".to_owned()
-    }
-
-    pub fn toggle(&mut self) {
-        self.active = !self.active;
     }
 
     pub fn get_selected(&self) -> Option<&mut TreePath> {

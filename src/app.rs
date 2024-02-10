@@ -32,7 +32,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
     let mut gs = GlobalState::new(size.height, size.width);
 
     // COMPONENTS
-    let mut file_tree = Tree::new(configs.tree_key_map(), open_file.is_none());
+    let mut file_tree = Tree::new(configs.tree_key_map());
     let mut workspace = Workspace::new(configs.editor_key_map());
     let mut tmux = EditorTerminal::new();
     let mut footer = Footer::default();
@@ -49,13 +49,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
     drop(configs);
 
     loop {
-        terminal.draw(|frame| {
-            file_tree.render(frame, &mut gs);
-            footer.render(frame, &mut gs, workspace.get_stats());
-            workspace.render(frame, &mut gs);
-            tmux.render(frame, gs.editor_area);
-            gs.render_popup_if_exists(frame);
-        })?;
+        terminal.draw(|frame| gs.draw(frame, &mut workspace, &mut file_tree, &mut footer, &mut tmux))?;
 
         let timeout = TICK.saturating_sub(clock.elapsed());
 
@@ -63,7 +57,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
             match crossterm::event::read()? {
                 Event::Key(key) => {
                     // order matters
-                    if (gs.key_mapper)(&key, &mut workspace, &mut file_tree, &mut tmux, &mut gs) {
+                    if gs.map_key(&key, &mut workspace, &mut file_tree, &mut tmux) {
                         continue;
                     }
                     let action = if let Some(action) = general_key_map.map(&key) {
@@ -106,7 +100,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                         GeneralAction::FileTreeModeOrCancelInput => gs.select_mode(),
                         GeneralAction::SaveAll => workspace.save(&mut gs),
                         GeneralAction::HideFileTree => {
-                            file_tree.toggle();
+                            gs.toggle_tree();
                             gs.recalc_editor_size(&file_tree);
                         }
                         GeneralAction::RefreshSettings => {
@@ -129,7 +123,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                     gs.full_resize(height, width, &file_tree, &mut workspace);
                     tmux.resize(gs.editor_area.width);
                 }
-                Event::Mouse(event) => (gs.mouse_mapper)(&mut gs, event, &mut file_tree, &mut workspace),
+                Event::Mouse(event) => gs.map_mouse(event, &mut file_tree, &mut workspace),
                 _ => (),
             }
         }

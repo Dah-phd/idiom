@@ -1,18 +1,20 @@
 mod clipboard;
 mod controls;
+mod draw;
 mod events;
 
 use crate::{
     footer::{layour_workspace_footer, Footer},
-    popups::popup_replace::ReplacePopup,
-    popups::PopupInterface,
-    popups::{popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges},
+    popups::{
+        popup_replace::ReplacePopup, popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges,
+        PopupInterface,
+    },
     runner::EditorTerminal,
     tree::Tree,
     workspace::{layot_tabs_editor, Workspace},
 };
 pub use clipboard::Clipboard;
-pub use controls::{disable_mouse, map_editor, map_popup, map_tree, mouse_handler};
+use controls::{disable_mouse, map_editor, map_popup, map_tree, mouse_handler};
 use crossterm::event::{KeyEvent, MouseEvent};
 pub use events::{FooterEvent, TreeEvent, WorkspaceEvent};
 use ratatui::{
@@ -23,7 +25,10 @@ use ratatui::{
 };
 use std::path::PathBuf;
 
-use self::controls::map_runner;
+use self::{
+    controls::map_term,
+    draw::{full_draw, inactive_tmux},
+};
 
 const INSERT_STYLE: Style = Style::new().add_modifier(Modifier::BOLD).fg(Color::Rgb(255, 0, 0));
 const SELECT_STYLE: Style = Style::new().add_modifier(Modifier::BOLD).fg(Color::LightCyan);
@@ -47,8 +52,11 @@ enum Mode {
 
 pub struct GlobalState {
     mode: Mode,
-    pub key_mapper: fn(&KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal, &mut GlobalState) -> bool,
-    pub mouse_mapper: fn(&mut Self, MouseEvent, &mut Tree, &mut Workspace),
+    hide_tree: bool,
+    term_active: bool,
+    key_mapper: fn(&KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal, &mut GlobalState) -> bool,
+    mouse_mapper: fn(&mut Self, MouseEvent, &mut Tree, &mut Workspace),
+    draw: fn(&mut Self, &mut Frame, &mut Workspace, &mut Tree, &mut Footer, &mut EditorTerminal),
     pub mode_span: Span<'static>,
     pub popup: Option<Box<dyn PopupInterface>>,
     pub footer: Vec<FooterEvent>,
@@ -67,6 +75,9 @@ impl GlobalState {
     pub fn new(height: u16, width: u16) -> Self {
         Self {
             mode: Mode::default(),
+            hide_tree: false,
+            term_active: false,
+            draw: inactive_tmux,
             key_mapper: map_tree,
             mouse_mapper: mouse_handler,
             mode_span: Span::styled(
@@ -85,6 +96,31 @@ impl GlobalState {
             editor_area: Rect::default(),
             footer_area: Rect::default(),
         }
+    }
+
+    pub fn draw(
+        &mut self,
+        frame: &mut Frame,
+        workspace: &mut Workspace,
+        file_tree: &mut Tree,
+        footer: &mut Footer,
+        tmux: &mut EditorTerminal,
+    ) {
+        (self.draw)(self, frame, workspace, file_tree, footer, tmux);
+    }
+
+    pub fn map_key(
+        &mut self,
+        event: &KeyEvent,
+        workspace: &mut Workspace,
+        file_tree: &mut Tree,
+        tmux: &mut EditorTerminal,
+    ) -> bool {
+        (self.key_mapper)(event, workspace, file_tree, tmux, self)
+    }
+
+    pub fn map_mouse(&mut self, event: MouseEvent, file_tree: &mut Tree, workspace: &mut Workspace) {
+        (self.mouse_mapper)(self, event, file_tree, workspace)
     }
 
     pub fn select_mode(&mut self) {
@@ -125,9 +161,18 @@ impl GlobalState {
         self.popup.take()
     }
 
+    pub fn toggle_tree(&mut self) {
+        if self.hide_tree {
+            self.hide_tree = false;
+        } else {
+            self.hide_tree = true;
+        }
+    }
+
     pub fn toggle_terminal(&mut self, runner: &mut EditorTerminal) {
-        if runner.active {
-            runner.active = false;
+        if self.term_active {
+            self.term_active = false;
+            self.draw = inactive_tmux;
             match self.mode {
                 Mode::Select => {
                     self.key_mapper = map_tree;
@@ -140,8 +185,10 @@ impl GlobalState {
             }
             self.mouse_mapper = mouse_handler;
         } else {
+            self.term_active = true;
+            self.draw = full_draw;
             runner.activate();
-            self.key_mapper = map_runner;
+            self.key_mapper = map_term;
             self.mouse_mapper = disable_mouse;
             self.mode_span.style = MUTED_STYLE;
         }
