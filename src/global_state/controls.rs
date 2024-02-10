@@ -11,6 +11,13 @@ use ratatui::prelude::Rect;
 type Line = usize;
 type Column = usize;
 
+pub fn contained_position(rect: Rect, row: u16, column: u16) -> Option<(Line, Column)> {
+    if rect.x <= column && column <= rect.width && rect.y <= row && row <= rect.height {
+        return Some(((row - rect.y) as usize, (column - rect.x) as usize));
+    }
+    None
+}
+
 #[allow(clippy::needless_return)]
 pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, workspace: &mut Workspace) {
     match event.kind {
@@ -85,12 +92,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
     }
 }
 
-pub fn contained_position(rect: Rect, row: u16, column: u16) -> Option<(Line, Column)> {
-    if rect.x <= column && column <= rect.width && rect.y <= row && row <= rect.height {
-        return Some(((row - rect.y) as usize, (column - rect.x) as usize));
-    }
-    None
-}
+pub fn disable_mouse(_gs: &mut GlobalState, _event: MouseEvent, _tree: &mut Tree, _workspace: &mut Workspace) {}
 
 pub fn map_editor(
     key: &KeyEvent,

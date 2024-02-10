@@ -12,8 +12,8 @@ use crate::{
     workspace::{layot_tabs_editor, Workspace},
 };
 pub use clipboard::Clipboard;
-pub use controls::{map_editor, map_popup, map_tree, mouse_handler};
-use crossterm::event::KeyEvent;
+pub use controls::{disable_mouse, map_editor, map_popup, map_tree, mouse_handler};
+use crossterm::event::{KeyEvent, MouseEvent};
 pub use events::{FooterEvent, TreeEvent, WorkspaceEvent};
 use ratatui::{
     layout::Rect,
@@ -48,6 +48,7 @@ enum Mode {
 pub struct GlobalState {
     mode: Mode,
     pub key_mapper: fn(&KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal, &mut GlobalState) -> bool,
+    pub mouse_mapper: fn(&mut Self, MouseEvent, &mut Tree, &mut Workspace),
     pub mode_span: Span<'static>,
     pub popup: Option<Box<dyn PopupInterface>>,
     pub footer: Vec<FooterEvent>,
@@ -67,6 +68,7 @@ impl GlobalState {
         Self {
             mode: Mode::default(),
             key_mapper: map_tree,
+            mouse_mapper: mouse_handler,
             mode_span: Span::styled(
                 " --SELECT-- ",
                 Style { fg: Some(Color::LightCyan), add_modifier: Modifier::BOLD, ..Default::default() },
@@ -103,6 +105,7 @@ impl GlobalState {
 
     pub fn popup(&mut self, popup: Box<dyn PopupInterface>) {
         self.key_mapper = map_popup;
+        self.mouse_mapper = disable_mouse;
         self.popup.replace(popup);
         self.mode_span.style = MUTED_STYLE;
     }
@@ -118,6 +121,7 @@ impl GlobalState {
                 self.mode_span.style = INSERT_STYLE;
             }
         }
+        self.mouse_mapper = mouse_handler;
         self.popup.take()
     }
 
@@ -134,9 +138,11 @@ impl GlobalState {
                     self.mode_span.style = INSERT_STYLE;
                 }
             }
+            self.mouse_mapper = mouse_handler;
         } else {
             runner.activate();
             self.key_mapper = map_runner;
+            self.mouse_mapper = disable_mouse;
             self.mode_span.style = MUTED_STYLE;
         }
     }

@@ -1,7 +1,7 @@
 use crate::{
     configs::{GeneralAction, KeyMap},
     footer::Footer,
-    global_state::{mouse_handler, GlobalState},
+    global_state::GlobalState,
     popups::{
         popup_find::{FindPopup, GoToLinePopup},
         popup_replace::ReplacePopup,
@@ -129,7 +129,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                     gs.full_resize(height, width, &file_tree, &mut workspace);
                     tmux.resize(gs.editor_area.width);
                 }
-                Event::Mouse(event) => mouse_handler(&mut gs, event, &mut file_tree, &mut workspace),
+                Event::Mouse(event) => (gs.mouse_mapper)(&mut gs, event, &mut file_tree, &mut workspace),
                 _ => (),
             }
         }

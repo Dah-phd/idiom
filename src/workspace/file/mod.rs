@@ -51,8 +51,7 @@ impl WidgetRef for &Editor {
             .take(self.max_rows.saturating_sub(1))
             .map(|(line_idx, text)| self.lexer.build_line(line_idx, text, &mut ctx))
         {
-            let line_area = Rect::new(x, y, area.width, 1);
-            line.render(line_area, buf);
+            line.render(Rect::new(x, y, area.width, 1), buf);
             y += 1;
         }
     }
