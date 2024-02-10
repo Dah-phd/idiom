@@ -5,11 +5,7 @@ mod langs;
 mod legend;
 mod tokens;
 use super::modal::LSPResponseType;
-use crate::{
-    lsp::LSPClient,
-    syntax::Theme,
-    workspace::{actions::EditMetaData, cursor::Cursor},
-};
+use crate::{lsp::LSPClient, syntax::Theme, workspace::actions::EditMetaData};
 pub use context::LineBuilderContext;
 pub use diagnostics::DiagnosticLine;
 use diagnostics::{diagnostics_error, diagnostics_full};
