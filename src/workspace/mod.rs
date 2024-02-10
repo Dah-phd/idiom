@@ -52,14 +52,12 @@ impl Workspace {
     }
 
     pub fn render(&mut self, frame: &mut Frame, gs: &mut GlobalState) {
-        if let Some(file) = self.editors.get_mut(0) {
-            let editor_widget = file.collect_widget(gs);
-            frame.render_widget(editor_widget, gs.editor_area);
-
-            file.lexer.render_modal_if_exist(frame, gs.editor_area, &file.cursor);
-
+        if let Some(editor) = self.editors.get_mut(0) {
+            editor.sync(gs);
+            let ref_widget: &Editor = editor;
+            frame.render_widget_ref(ref_widget, gs.editor_area);
+            editor.lexer.render_modal_if_exist(frame, gs.editor_area, &editor.cursor);
             let titles: Vec<_> = self.editors.iter().map(|e| e.display.to_owned()).collect();
-
             let tabs = Tabs::new(titles).style(self.tab_style).highlight_style(TAB_HIGHTLIGHT).select(0);
             frame.render_widget(tabs, gs.tab_area);
         }

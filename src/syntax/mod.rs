@@ -13,9 +13,10 @@ use crate::{
 use crossterm::event::KeyEvent;
 pub use line_builder::DiagnosticLine;
 use line_builder::LineBuilder;
+pub use line_builder::LineBuilderContext;
 use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent};
 use modal::{LSPModal, LSPResponseType, LSPResult, ModalMessage};
-use ratatui::{layout::Rect, widgets::ListItem, Frame};
+use ratatui::{layout::Rect, text::Line, Frame};
 use std::path::{Path, PathBuf};
 use theme::Theme;
 
@@ -45,8 +46,7 @@ impl Lexer {
         }
     }
 
-    pub fn context(&mut self, cursor: &Cursor, content: &[String], gs: &mut GlobalState) {
-        self.line_builder.reset(cursor);
+    pub fn context(&mut self, content: &[String], gs: &mut GlobalState) {
         self.line_number_offset = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
         if let Some(client) = self.lsp_client.as_mut() {
             // diagnostics
@@ -136,6 +136,10 @@ impl Lexer {
         } else {
             events.clear();
         }
+    }
+
+    pub fn build_line(&self, line_idx: usize, text: &str, ctx: &mut LineBuilderContext) -> Line<'static> {
+        self.line_builder.build_line(line_idx, text, self.line_number_offset, ctx)
     }
 
     pub fn render_modal_if_exist(&mut self, frame: &mut Frame, area: Rect, cursor: &Cursor) {
@@ -256,10 +260,6 @@ impl Lexer {
         {
             self.requests.push(id);
         }
-    }
-
-    pub fn list_item<'a>(&mut self, line_idx: usize, content: &'a str) -> ListItem<'a> {
-        self.line_builder.build_line(line_idx, content, self.line_number_offset)
     }
 
     pub fn reload_theme(&mut self) {

@@ -1,13 +1,17 @@
 use super::cursor::{Cursor, CursorPosition};
 use lsp_types::TextEdit;
-use ratatui::widgets::{List, ListItem};
+use ratatui::{
+    buffer::Buffer,
+    layout::Rect,
+    widgets::{Widget, WidgetRef},
+};
 
-use crate::workspace::actions::Actions;
 use crate::{
     configs::{EditorConfigs, FileType},
     global_state::GlobalState,
     syntax::Lexer,
 };
+use crate::{syntax::LineBuilderContext, workspace::actions::Actions};
 use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 use std::{
     cmp::Ordering,
@@ -34,6 +38,26 @@ pub struct Editor {
     content: Vec<String>,
 }
 
+impl WidgetRef for &Editor {
+    fn render_ref(&self, area: Rect, buf: &mut Buffer) {
+        let mut ctx = LineBuilderContext::from(&self.cursor);
+        let x = area.left();
+        let mut y = area.top();
+        for line in self
+            .content
+            .iter()
+            .enumerate()
+            .skip(self.cursor.at_line)
+            .take(self.max_rows.saturating_sub(1))
+            .map(|(line_idx, text)| self.lexer.build_line(line_idx, text, &mut ctx))
+        {
+            let line_area = Rect::new(x, y, area.width, 1);
+            line.render(line_area, buf);
+            y += 1;
+        }
+    }
+}
+
 impl Editor {
     pub fn from_path(path: PathBuf, mut cfg: EditorConfigs) -> std::io::Result<Self> {
         let content = std::fs::read_to_string(&path)?;
@@ -53,19 +77,10 @@ impl Editor {
         })
     }
 
-    pub fn collect_widget(&mut self, gs: &mut GlobalState) -> List<'_> {
+    pub fn sync(&mut self, gs: &mut GlobalState) {
         self.actions.sync(&mut self.lexer, &self.content);
-        self.lexer.context(&self.cursor, &self.content, gs);
+        self.lexer.context(&self.content, gs);
         self.cursor.correct_cursor_position(self.max_rows);
-        List::new(
-            self.content
-                .iter()
-                .enumerate()
-                .skip(self.cursor.at_line)
-                .take(self.max_rows)
-                .map(|(line_idx, content)| self.lexer.list_item(line_idx, content))
-                .collect::<Vec<ListItem>>(),
-        )
     }
 
     pub fn get_stats(&self) -> DocStats {

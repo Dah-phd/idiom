@@ -3,7 +3,7 @@ use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
 use super::LineBuilder;
 
 use ratatui::{
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     text::Span,
 };
 
@@ -43,11 +43,11 @@ pub struct DiagnosticLine {
 }
 
 impl DiagnosticLine {
-    pub fn check_ranges(&self, idx: &usize) -> Option<Color> {
+    pub fn check_ranges(&self, idx: usize) -> Option<Color> {
         for data in self.data.iter() {
             match data.end {
-                Some(end_idx) if (data.start..end_idx).contains(idx) => return data.span.style.fg,
-                None if idx >= &data.start => return data.span.style.fg,
+                Some(end_idx) if (data.start..end_idx).contains(&idx) => return data.span.style.fg,
+                None if idx >= data.start => return data.span.style.fg,
                 _ => {}
             }
         }
@@ -71,6 +71,13 @@ impl DiagnosticLine {
 
     pub fn drop_non_errs(&mut self) {
         self.data.retain(|d| d.span.style.fg == Some(ERR_COLOR));
+    }
+
+    pub fn set_diagnostic_style(&self, idx: usize, style: &mut Style) {
+        if let Some(color) = self.check_ranges(idx) {
+            style.add_modifier = style.add_modifier.union(Modifier::UNDERLINED);
+            style.underline_color.replace(color);
+        }
     }
 
     pub fn append(&mut self, d: Diagnostic) {
