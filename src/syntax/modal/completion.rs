@@ -128,7 +128,8 @@ impl AutoComplete {
                 self.matcher.fuzzy_match(item.filter_text.as_ref().unwrap_or(&item.label), &self.filter).map(|score| {
                     let divisor = item.label.len().abs_diff(self.filter.len()) as i64;
                     let new_score = if divisor != 0 { score / divisor } else { score };
-                    (item.label.to_owned(), new_score)
+                    let completion = item.insert_text.as_ref().map(|t| t.to_owned()).unwrap_or(item.label.to_owned());
+                    (completion, new_score)
                 })
             })
             .collect();

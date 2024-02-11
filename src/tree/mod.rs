@@ -9,7 +9,6 @@ use crate::{
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     widgets::{Block, Borders, List, ListItem, ListState},
     Frame,
@@ -17,7 +16,6 @@ use ratatui::{
 use std::{
     collections::HashMap,
     path::PathBuf,
-    rc::Rc,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -28,7 +26,6 @@ const TICK: Duration = Duration::from_millis(200);
 
 pub struct Tree {
     pub key_map: TreeKeyMap,
-    size: u16,
     state: ListState,
     selected_path: PathBuf,
     tree: TreePath,
@@ -49,7 +46,6 @@ impl Tree {
         });
         tree.sync_flat_ptrs(&mut tree_ptrs);
         Self {
-            size: 15,
             state: ListState::default(),
             key_map,
             selected_path: PathBuf::from("./"),
@@ -74,10 +70,6 @@ impl Tree {
         frame.render_stateful_widget(tree_widget, gs.tree_area, &mut self.state);
     }
 
-    pub fn render_layout(&self, screen: Rect) -> Rc<[Rect]> {
-        Layout::new(Direction::Horizontal, [Constraint::Percentage(self.size), Constraint::Min(2)]).split(screen)
-    }
-
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         if let Some(action) = self.key_map.map(key) {
             match action {
@@ -98,14 +90,8 @@ impl Tree {
                         gs.popup(rename_file_popup(tree_path.path().display().to_string()));
                     }
                 }
-                TreeAction::IncreaseSize => {
-                    self.size = std::cmp::min(75, self.size + 1);
-                    gs.recalc_editor_size(self);
-                }
-                TreeAction::DecreaseSize => {
-                    self.size = std::cmp::max(15, self.size - 1);
-                    gs.recalc_editor_size(self);
-                }
+                TreeAction::IncreaseSize => gs.expand_tree_size(),
+                TreeAction::DecreaseSize => gs.shrink_tree_size(),
             }
             return true;
         }

@@ -1,15 +1,12 @@
 use crate::{global_state::GlobalState, workspace::DocStats};
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout},
     style::{Color, Style},
     text::Span,
     widgets::{Block, Borders, Padding, Paragraph},
     Frame,
 };
-use std::{
-    rc::Rc,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 const TOP_BORDER: Block = Block::new().borders(Borders::TOP);
 const MSG_DURATION: Duration = Duration::from_secs(3);
@@ -143,15 +140,4 @@ impl Message {
                 .block(Block::default().borders(Borders::TOP).padding(Padding::horizontal(2))),
         )
     }
-}
-
-pub fn layour_workspace_footer(screen: Rect) -> Rc<[Rect]> {
-    Layout::new(
-        Direction::Vertical,
-        [
-            Constraint::Length(screen.height.saturating_sub(2)),
-            Constraint::Length(2),
-        ],
-    )
-    .split(screen)
 }

@@ -14,9 +14,7 @@ pub use file::{DocStats, Editor};
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
-use ratatui::layout::Direction;
 use ratatui::{
-    layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     widgets::Tabs,
     Frame,
@@ -24,11 +22,9 @@ use ratatui::{
 use std::{
     collections::{hash_map::Entry, HashMap},
     path::PathBuf,
-    rc::Rc,
 };
 
 const TAB_HIGHTLIGHT: Style = Style::new().fg(Color::Yellow).add_modifier(Modifier::UNDERLINED);
-const RECT_CONSTRAINT: [Constraint; 2] = [Constraint::Length(1), Constraint::Percentage(100)];
 
 pub struct Workspace {
     pub editors: Vec<Editor>,
@@ -470,10 +466,6 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         return true;
     }
     false
-}
-
-pub fn layot_tabs_editor(area: Rect) -> Rc<[Rect]> {
-    Layout::new(Direction::Vertical, RECT_CONSTRAINT).split(area)
 }
 
 #[cfg(test)]

@@ -30,17 +30,17 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
     let mut general_key_map = configs.general_key_map();
     let size = terminal.size()?;
     let mut gs = GlobalState::new(size.height, size.width);
+    gs.recalc_editor_size();
 
     // COMPONENTS
-    let mut file_tree = Tree::new(configs.tree_key_map());
+    let mut tree = Tree::new(configs.tree_key_map());
     let mut workspace = Workspace::new(configs.editor_key_map());
-    let mut tmux = EditorTerminal::new();
+    let mut term = EditorTerminal::new();
     let mut footer = Footer::default();
-    gs.recalc_editor_size(&file_tree);
 
     // CLI SETUP
     if let Some(path) = open_file {
-        file_tree.select_by_path(&path);
+        tree.select_by_path(&path);
         if gs.try_new_editor(&mut workspace, path).await {
             gs.insert_mode();
         };
@@ -49,7 +49,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
     drop(configs);
 
     loop {
-        terminal.draw(|frame| gs.draw(frame, &mut workspace, &mut file_tree, &mut footer, &mut tmux))?;
+        terminal.draw(|frame| gs.draw(frame, &mut workspace, &mut tree, &mut footer, &mut term))?;
 
         let timeout = TICK.saturating_sub(clock.elapsed());
 
@@ -57,7 +57,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
             match crossterm::event::read()? {
                 Event::Key(key) => {
                     // order matters
-                    if gs.map_key(&key, &mut workspace, &mut file_tree, &mut tmux) {
+                    if gs.map_key(&key, &mut workspace, &mut tree, &mut term) {
                         continue;
                     }
                     let action = if let Some(action) = general_key_map.map(&key) {
@@ -101,12 +101,11 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                         GeneralAction::SaveAll => workspace.save(&mut gs),
                         GeneralAction::HideFileTree => {
                             gs.toggle_tree();
-                            gs.recalc_editor_size(&file_tree);
                         }
                         GeneralAction::RefreshSettings => {
                             let new_key_map = KeyMap::new();
                             general_key_map = new_key_map.general_key_map();
-                            file_tree.key_map = new_key_map.tree_key_map();
+                            tree.key_map = new_key_map.tree_key_map();
                             workspace.refresh_cfg(new_key_map.editor_key_map(), &mut gs).await;
                         }
                         GeneralAction::GoToLinePopup => {
@@ -115,20 +114,20 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                             }
                         }
                         GeneralAction::ToggleTerminal => {
-                            gs.toggle_terminal(&mut tmux);
+                            gs.toggle_terminal(&mut term);
                         }
                     }
                 }
                 Event::Resize(width, height) => {
-                    gs.full_resize(height, width, &file_tree, &mut workspace);
-                    tmux.resize(gs.editor_area.width);
+                    gs.full_resize(height, width, &mut workspace);
+                    term.resize(gs.editor_area.width);
                 }
-                Event::Mouse(event) => gs.map_mouse(event, &mut file_tree, &mut workspace),
+                Event::Mouse(event) => gs.map_mouse(event, &mut tree, &mut workspace),
                 _ => (),
             }
         }
 
-        if gs.exchange_should_exit(&mut file_tree, &mut workspace, &mut footer).await {
+        if gs.exchange_should_exit(&mut tree, &mut workspace, &mut footer).await {
             workspace.graceful_exit().await;
             break;
         };

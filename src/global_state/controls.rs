@@ -95,41 +95,41 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
 pub fn disable_mouse(_gs: &mut GlobalState, _event: MouseEvent, _tree: &mut Tree, _workspace: &mut Workspace) {}
 
 pub fn map_editor(
+    gs: &mut GlobalState,
     key: &KeyEvent,
     workspace: &mut Workspace,
     _t: &mut Tree,
     _r: &mut EditorTerminal,
-    gs: &mut GlobalState,
 ) -> bool {
     workspace.map(key, gs)
 }
 
 pub fn map_tree(
+    gs: &mut GlobalState,
     key: &KeyEvent,
     _w: &mut Workspace,
     tree: &mut Tree,
     _r: &mut EditorTerminal,
-    gs: &mut GlobalState,
 ) -> bool {
     tree.map(key, gs)
 }
 
 pub fn map_popup(
+    gs: &mut GlobalState,
     key: &KeyEvent,
     _w: &mut Workspace,
     _t: &mut Tree,
     _r: &mut EditorTerminal,
-    gs: &mut GlobalState,
 ) -> bool {
     gs.map_popup_if_exists(key)
 }
 
 pub fn map_term(
+    gs: &mut GlobalState,
     key: &KeyEvent,
     _w: &mut Workspace,
     _t: &mut Tree,
     runner: &mut EditorTerminal,
-    gs: &mut GlobalState,
 ) -> bool {
     runner.map(key, gs)
 }
