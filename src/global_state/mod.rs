@@ -125,18 +125,22 @@ impl GlobalState {
 
     pub fn select_mode(&mut self) {
         self.mode = Mode::Select;
-        self.recalc_draw_size();
-        self.draw = self.find_draw_callback();
         self.key_mapper = controls::map_tree;
         self.mode_span = SELECT_SPAN;
+        if !self.components.contains(Components::TREE) {
+            self.recalc_draw_size();
+            self.draw = self.find_draw_callback();
+        }
     }
 
     pub fn insert_mode(&mut self) {
         self.mode = Mode::Insert;
-        self.recalc_draw_size();
-        self.draw = self.find_draw_callback();
         self.key_mapper = controls::map_editor;
         self.mode_span = INSERT_SPAN;
+        if !self.components.contains(Components::TREE) {
+            self.recalc_draw_size();
+            self.draw = self.find_draw_callback();
+        }
     }
 
     pub fn is_insert(&self) -> bool {
