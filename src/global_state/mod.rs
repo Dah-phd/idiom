@@ -49,12 +49,16 @@ enum Mode {
     Insert,
 }
 
+type DrawCallback = fn(&mut GlobalState, &mut Frame, &mut Workspace, &mut Tree, &mut Footer, &mut EditorTerminal);
+type KeyMapCallback = fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool;
+type MouseMapCallback = fn(&mut GlobalState, MouseEvent, &mut Tree, &mut Workspace);
+
 pub struct GlobalState {
     mode: Mode,
     tree_size: u16,
-    key_mapper: fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool,
-    mouse_mapper: fn(&mut Self, MouseEvent, &mut Tree, &mut Workspace),
-    draw: fn(&mut Self, &mut Frame, &mut Workspace, &mut Tree, &mut Footer, &mut EditorTerminal),
+    key_mapper: KeyMapCallback,
+    mouse_mapper: MouseMapCallback,
+    draw: DrawCallback,
     pub mode_span: Span<'static>,
     pub popup: Option<Box<dyn PopupInterface>>,
     pub footer: Vec<FooterEvent>,
@@ -75,7 +79,7 @@ impl GlobalState {
         Self {
             mode: Mode::default(),
             tree_size: 15,
-            draw: draw::inactive_tmux,
+            draw: draw::draw_with_tree,
             key_mapper: controls::map_tree,
             mouse_mapper: controls::mouse_handler,
             mode_span: SELECT_SPAN,
@@ -90,7 +94,7 @@ impl GlobalState {
             tab_area: Rect::default(),
             editor_area: Rect::default(),
             footer_area: Rect::default(),
-            components: Components::EDITOR | Components::TREE,
+            components: Components::default(),
         }
     }
 
@@ -121,12 +125,16 @@ impl GlobalState {
 
     pub fn select_mode(&mut self) {
         self.mode = Mode::Select;
+        self.recalc_draw_size();
+        self.draw = self.find_draw_callback();
         self.key_mapper = controls::map_tree;
         self.mode_span = SELECT_SPAN;
     }
 
     pub fn insert_mode(&mut self) {
         self.mode = Mode::Insert;
+        self.recalc_draw_size();
+        self.draw = self.find_draw_callback();
         self.key_mapper = controls::map_editor;
         self.mode_span = INSERT_SPAN;
     }
@@ -136,7 +144,9 @@ impl GlobalState {
     }
 
     pub fn popup(&mut self, popup: Box<dyn PopupInterface>) {
+        self.components.insert(Components::POPUP);
         self.key_mapper = controls::map_popup;
+        self.draw = self.find_draw_callback();
         self.mouse_mapper = controls::disable_mouse;
         self.popup.replace(popup);
         self.mode_span.style = MUTED_STYLE;
@@ -153,6 +163,8 @@ impl GlobalState {
                 self.mode_span.style = INSERT_STYLE;
             }
         }
+        self.draw = self.find_draw_callback();
+        self.components.remove(Components::POPUP);
         self.mouse_mapper = controls::mouse_handler;
         self.popup.take()
     }
@@ -160,34 +172,29 @@ impl GlobalState {
     pub fn toggle_tree(&mut self) {
         if self.components.contains(Components::TREE) {
             self.components.remove(Components::TREE);
-            self.draw = draw::inactive_tree_and_tmux;
-            let footer_layout = draw::layour_workspace_footer(self.screen_rect);
-            self.footer_area = footer_layout[1];
-            let workspace_layout = draw::layot_tabs_editor(footer_layout[0]);
-            self.editor_area = workspace_layout[1];
-            self.tab_area = workspace_layout[0];
-            self.workspace.push(WorkspaceEvent::Resize);
+            self.draw = self.find_draw_callback();
+            self.recalc_draw_size();
         } else {
             self.components.insert(Components::TREE);
-            self.draw = draw::inactive_tmux;
-            self.recalc_editor_size();
+            self.draw = self.find_draw_callback();
+            self.recalc_draw_size();
         }
     }
 
     pub fn expand_tree_size(&mut self) {
         self.tree_size = std::cmp::min(75, self.tree_size + 1);
-        self.recalc_editor_size();
+        self.recalc_draw_size();
     }
 
     pub fn shrink_tree_size(&mut self) {
         self.tree_size = std::cmp::max(15, self.tree_size - 1);
-        self.recalc_editor_size();
+        self.recalc_draw_size();
     }
 
     pub fn toggle_terminal(&mut self, runner: &mut EditorTerminal) {
         if self.components.contains(Components::TERM) {
             self.components.remove(Components::TERM);
-            self.draw = draw::inactive_tmux;
+            self.draw = self.find_draw_callback();
             match self.mode {
                 Mode::Select => {
                     self.key_mapper = controls::map_tree;
@@ -201,7 +208,7 @@ impl GlobalState {
             self.mouse_mapper = controls::mouse_handler;
         } else {
             self.components.insert(Components::TERM);
-            self.draw = draw::full_draw;
+            self.draw = self.find_draw_callback();
             runner.activate();
             self.key_mapper = map_term;
             self.mouse_mapper = controls::disable_mouse;
@@ -252,21 +259,61 @@ impl GlobalState {
         self.footer.push(FooterEvent::Success(msg.into()));
     }
 
-    pub fn recalc_editor_size(&mut self) {
-        let tree_layout = draw::layout_tree(self.screen_rect, self.tree_size);
-        let footer_layout = draw::layour_workspace_footer(tree_layout[1]);
-        self.tree_area = tree_layout[0];
-        self.footer_area = footer_layout[1];
-        let workspace_layout = draw::layot_tabs_editor(footer_layout[0]);
+    fn find_draw_callback(&self) -> DrawCallback {
+        let with_term = self.components.contains(Components::TERM);
+        let with_popup = self.components.contains(Components::POPUP);
+        if matches!(self.mode, Mode::Select) || self.components.contains(Components::TREE) {
+            if with_term && with_popup {
+                return draw::draw_full;
+            }
+            if self.components.contains(Components::TERM) {
+                return draw::draw_with_tree_and_term;
+            }
+            if self.components.contains(Components::POPUP) {
+                return draw::draw_with_tree_and_popup;
+            }
+            return draw::draw_with_tree;
+        }
+        if with_popup && with_term {
+            return draw::draw_with_term_and_popup;
+        }
+        if with_term {
+            return draw::draw_with_term;
+        }
+        if with_popup {
+            return draw::draw_with_popup;
+        }
+        draw::draw
+    }
+
+    pub fn full_resize(&mut self, height: u16, width: u16, workspace: &mut Workspace) {
+        self.screen_rect = Rect { height, width, ..Default::default() };
+        self.recalc_draw_size();
+        workspace.resize_render(self.editor_area.width as usize, self.editor_area.bottom() as usize);
+    }
+
+    pub fn recalc_draw_size(&mut self) {
+        let free_screen = self.tree_rect_with_remainder();
+        let free_screen = self.footer_rect_with_remainder(free_screen);
+        let workspace_layout = draw::layot_tabs_editor(free_screen);
         self.editor_area = workspace_layout[1];
         self.tab_area = workspace_layout[0];
         self.workspace.push(WorkspaceEvent::Resize);
     }
 
-    pub fn full_resize(&mut self, height: u16, width: u16, workspace: &mut Workspace) {
-        self.screen_rect = Rect { height, width, ..Default::default() };
-        self.recalc_editor_size();
-        workspace.resize_render(self.editor_area.width as usize, self.editor_area.bottom() as usize);
+    fn tree_rect_with_remainder(&mut self) -> Rect {
+        if matches!(self.mode, Mode::Select) || self.components.contains(Components::TREE) {
+            let tree_layout = draw::layout_tree(self.screen_rect, self.tree_size);
+            self.tree_area = tree_layout[0];
+            return tree_layout[1];
+        }
+        self.screen_rect
+    }
+
+    fn footer_rect_with_remainder(&mut self, free_screen: Rect) -> Rect {
+        let footer_layout = draw::layour_workspace_footer(free_screen);
+        self.footer_area = footer_layout[1];
+        footer_layout[0]
     }
 
     /// Attempts to create new editor if err logs it and returns false else true.

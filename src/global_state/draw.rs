@@ -12,38 +12,88 @@ const RECT_CONSTRAINT: [Constraint; 2] = [Constraint::Length(1), Constraint::Per
 use super::GlobalState;
 
 bitflags! {
+    /// Workspace and Footer are always drawn
+    #[derive(PartialEq, Eq)]
     pub struct Components: u8 {
-        const EDITOR = 0b0000_0001;
-        const TREE   = 0b0000_0010;
-        const TERM   = 0b0000_0100;
-        const POPUP  = 0b0000_1000;
+        const TREE  = 0b0000_0001;
+        const POPUP = 0b0000_0010;
+        const TERM  = 0b0000_0100;
     }
 }
 
 impl Default for Components {
     fn default() -> Self {
-        Components::EDITOR | Components::TREE
+        Components::TREE
     }
 }
 
 // DRAW callbacks
+pub fn draw(
+    gs: &mut GlobalState,
+    frame: &mut Frame,
+    workspace: &mut Workspace,
+    _ft: &mut Tree,
+    footer: &mut Footer,
+    _t: &mut EditorTerminal,
+) {
+    footer.render(frame, gs, workspace.get_stats());
+    workspace.render(frame, gs);
+}
 
-pub fn full_draw(
+pub fn draw_with_tree(
     gs: &mut GlobalState,
     frame: &mut Frame,
     workspace: &mut Workspace,
     tree: &mut Tree,
     footer: &mut Footer,
-    tmux: &mut EditorTerminal,
+    _t: &mut EditorTerminal,
 ) {
     tree.render(frame, gs);
     footer.render(frame, gs, workspace.get_stats());
     workspace.render(frame, gs);
-    tmux.render(frame, gs.editor_area);
+}
+
+pub fn draw_with_popup(
+    gs: &mut GlobalState,
+    frame: &mut Frame,
+    workspace: &mut Workspace,
+    _ft: &mut Tree,
+    footer: &mut Footer,
+    _t: &mut EditorTerminal,
+) {
+    footer.render(frame, gs, workspace.get_stats());
+    workspace.render(frame, gs);
     gs.render_popup_if_exists(frame);
 }
 
-pub fn inactive_tmux(
+pub fn draw_with_term(
+    gs: &mut GlobalState,
+    frame: &mut Frame,
+    workspace: &mut Workspace,
+    _ft: &mut Tree,
+    footer: &mut Footer,
+    term: &mut EditorTerminal,
+) {
+    footer.render(frame, gs, workspace.get_stats());
+    workspace.render(frame, gs);
+    term.render(frame, gs.editor_area);
+}
+
+pub fn draw_with_term_and_popup(
+    gs: &mut GlobalState,
+    frame: &mut Frame,
+    workspace: &mut Workspace,
+    _ft: &mut Tree,
+    footer: &mut Footer,
+    term: &mut EditorTerminal,
+) {
+    footer.render(frame, gs, workspace.get_stats());
+    workspace.render(frame, gs);
+    term.render(frame, gs.editor_area);
+    gs.render_popup_if_exists(frame);
+}
+
+pub fn draw_with_tree_and_popup(
     gs: &mut GlobalState,
     frame: &mut Frame,
     workspace: &mut Workspace,
@@ -57,30 +107,32 @@ pub fn inactive_tmux(
     gs.render_popup_if_exists(frame);
 }
 
-pub fn inactive_tree(
+pub fn draw_with_tree_and_term(
     gs: &mut GlobalState,
     frame: &mut Frame,
     workspace: &mut Workspace,
-    _ft: &mut Tree,
+    tree: &mut Tree,
     footer: &mut Footer,
-    tmux: &mut EditorTerminal,
+    term: &mut EditorTerminal,
 ) {
+    tree.render(frame, gs);
     footer.render(frame, gs, workspace.get_stats());
     workspace.render(frame, gs);
-    tmux.render(frame, gs.editor_area);
-    gs.render_popup_if_exists(frame);
+    term.render(frame, gs.editor_area);
 }
 
-pub fn inactive_tree_and_tmux(
+pub fn draw_full(
     gs: &mut GlobalState,
     frame: &mut Frame,
     workspace: &mut Workspace,
-    _ft: &mut Tree,
+    tree: &mut Tree,
     footer: &mut Footer,
-    _t: &mut EditorTerminal,
+    term: &mut EditorTerminal,
 ) {
+    tree.render(frame, gs);
     footer.render(frame, gs, workspace.get_stats());
     workspace.render(frame, gs);
+    term.render(frame, gs.editor_area);
     gs.render_popup_if_exists(frame);
 }
 
@@ -101,6 +153,6 @@ pub fn layout_tree(screen: Rect, size: u16) -> Rc<[Rect]> {
     Layout::new(Direction::Horizontal, [Constraint::Percentage(size), Constraint::Min(2)]).split(screen)
 }
 
-pub fn layot_tabs_editor(area: Rect) -> Rc<[Rect]> {
-    Layout::new(Direction::Vertical, RECT_CONSTRAINT).split(area)
+pub fn layot_tabs_editor(screen: Rect) -> Rc<[Rect]> {
+    Layout::new(Direction::Vertical, RECT_CONSTRAINT).split(screen)
 }
