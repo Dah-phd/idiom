@@ -43,16 +43,25 @@ impl WidgetRef for &Editor {
         let mut ctx = LineBuilderContext::from(&self.cursor);
         let x = area.left();
         let mut y = area.top();
-        for line in self
-            .content
-            .iter()
-            .enumerate()
-            .skip(self.cursor.at_line)
-            .take(self.max_rows.saturating_sub(1))
-            .map(|(line_idx, text)| self.lexer.build_line(line_idx, text, &mut ctx))
-        {
-            line.render(Rect::new(x, y, area.width, 1), buf);
-            y += 1;
+        let mut remining_lines = self.max_rows;
+        for (line_idx, text) in self.content.iter().enumerate().skip(self.cursor.at_line) {
+            remining_lines -= 1;
+            if remining_lines == 0 {
+                return;
+            }
+            if text.len() > self.cursor.text_width {
+                for split_line in self.lexer.split_line(line_idx, text, self.cursor.text_width + 1, &mut ctx) {
+                    remining_lines -= 1;
+                    if remining_lines == 0 {
+                        return;
+                    }
+                    split_line.render(Rect::new(x, y, area.width, 1), buf);
+                    y += 1;
+                }
+            } else {
+                self.lexer.build_line(line_idx, text, &mut ctx).render(Rect::new(x, y, area.width, 1), buf);
+                y += 1;
+            }
         }
     }
 }
@@ -386,8 +395,8 @@ impl Editor {
 
     pub fn resize(&mut self, width: usize, height: usize) {
         self.max_rows = height;
-        self.cursor.text_width = width.saturating_sub(self.lexer.line_number_offset + 1);
-        self.lexer.set_text_width(width);
+        let offset = if self.content.is_empty() { 0 } else { (self.content.len().ilog10() + 1) as usize } + 1;
+        self.cursor.text_width = width.saturating_sub(offset + 1);
     }
 }
 

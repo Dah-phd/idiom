@@ -119,10 +119,6 @@ impl Lexer {
         }
     }
 
-    pub fn set_text_width(&mut self, width: usize) {
-        self.line_builder.text_width = width.saturating_sub(self.line_number_offset);
-    }
-
     pub fn sync_lsp(
         &mut self,
         version: i32,
@@ -139,7 +135,17 @@ impl Lexer {
     }
 
     pub fn build_line(&self, line_idx: usize, text: &str, ctx: &mut LineBuilderContext) -> Line<'static> {
-        self.line_builder.build_line(line_idx, text, self.line_number_offset, ctx)
+        self.line_builder.build_line(line_idx, text, self.line_number_offset, ctx).into()
+    }
+
+    pub fn split_line(
+        &self,
+        line_idx: usize,
+        text: &str,
+        split_len: usize,
+        ctx: &mut LineBuilderContext,
+    ) -> Vec<Line<'static>> {
+        self.line_builder.split_line(line_idx, text, split_len, self.line_number_offset, ctx)
     }
 
     pub fn render_modal_if_exist(&mut self, frame: &mut Frame, area: Rect, cursor: &Cursor) {

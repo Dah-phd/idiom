@@ -30,7 +30,6 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
     let mut general_key_map = configs.general_key_map();
     let size = terminal.size()?;
     let mut gs = GlobalState::new(size.height, size.width);
-    gs.recalc_draw_size();
 
     // COMPONENTS
     let mut tree = Tree::new(configs.tree_key_map());

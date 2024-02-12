@@ -1,7 +1,7 @@
 use super::{context::LineBuilderContext, diagnostics::DiagnosticLine, LineBuilder};
 use ratatui::{
     style::{Color, Style},
-    text::{Line, Span},
+    text::Span,
 };
 
 /// used to map markup lines based on info
@@ -34,7 +34,7 @@ pub fn generic_line(
     content: &str,
     ctx: &mut LineBuilderContext,
     mut buffer: Vec<Span<'static>>,
-) -> Line<'static> {
+) -> Vec<Span<'static>> {
     if builder.lang.is_comment(content) {
         buffer.extend(content.char_indices().map(|(idx, ch)| {
             let mut style = Style { fg: Some(builder.theme.comment), ..Default::default() };

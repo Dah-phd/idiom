@@ -2,7 +2,7 @@ use std::{cmp::Ordering, ops::Range};
 
 use ratatui::{
     style::{Color, Modifier, Style},
-    text::{Line, Span},
+    text::Span,
 };
 
 use crate::workspace::{cursor::Cursor, CursorPosition};
@@ -34,7 +34,7 @@ impl LineBuilderContext {
         line_idx: usize,
         diagnostic: Option<&DiagnosticLine>,
         mut buffer: Vec<Span<'static>>,
-    ) -> Line<'static> {
+    ) -> Vec<Span<'static>> {
         // set cursor without the normal API
         if line_idx == self.cursor.line {
             let expected = self.cursor.char + INIT_BUF_SIZE;
@@ -44,27 +44,10 @@ impl LineBuilderContext {
                 buffer.push(Span::styled(" ", Style { add_modifier: Modifier::REVERSED, ..Default::default() }))
             }
         };
-
-        // if buffer.len() > self.text_width {
-        //     let padding = derive_wrap_digit_offset(buffer.first());
-        //     let mut lines = vec![Line::from(buffer.drain(..self.text_width).collect::<Vec<_>>())];
-        //     let expected_width = self.text_width - 1;
-        //     while buffer.len() > expected_width {
-        //         let mut line = vec![padding.clone()];
-        //         line.extend(buffer.drain(..expected_width));
-        //         lines.push(Line::from(line));
-        //     }
-        //     buffer.insert(0, padding);
-        //     if let Some(diagnostic) = diagnostic {
-        //         buffer.extend(diagnostic.data.iter().map(|d| d.span.clone()));
-        //     }
-        //     lines.push(Line::from(buffer));
-        //     ListItem::from(lines)
-        // } else {
         if let Some(diagnostic) = diagnostic {
             buffer.extend(diagnostic.data.iter().map(|d| d.span.clone()));
         }
-        Line::from(buffer)
+        buffer
     }
 
     pub fn set_select(&self, style: &mut Style, idx: &usize, color: Color) {
@@ -161,12 +144,4 @@ impl From<&Cursor> for LineBuilderContext {
             brackets: BracketColors::default(),
         }
     }
-}
-
-fn derive_wrap_digit_offset(start_span: Option<&Span<'_>>) -> Span<'static> {
-    if let Some(span) = start_span {
-        let padding_len = span.content.len();
-        return Span::raw((0..padding_len).map(|_| ' ').collect::<String>());
-    }
-    Span::default()
 }

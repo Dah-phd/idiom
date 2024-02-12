@@ -39,7 +39,6 @@ pub fn init_buffer_with_line_number(line_idx: usize, line_number_offset: usize) 
 pub struct LineBuilder {
     pub theme: Theme,
     pub lang: Lang,
-    pub text_width: usize,
     file_was_saved: bool,
     legend: Legend,
     tokens: Tokens,
@@ -52,7 +51,6 @@ impl LineBuilder {
         Self {
             theme: Theme::new(),
             lang,
-            text_width: 0,
             file_was_saved: true,
             legend: Legend::default(),
             tokens: Tokens::default(),
@@ -153,7 +151,7 @@ impl LineBuilder {
         content: &str,
         line_number_offset: usize,
         ctx: &mut LineBuilderContext,
-    ) -> Line<'static> {
+    ) -> Vec<Span<'static>> {
         ctx.build_select_buffer(line_idx, content.len());
         if content.is_empty() {
             let mut buffer = init_buffer_with_line_number(line_idx, line_number_offset);
@@ -170,13 +168,35 @@ impl LineBuilder {
         }
     }
 
+    pub fn split_line(
+        &self,
+        line_idx: usize,
+        content: &str,
+        split_len: usize,
+        line_number_offset: usize,
+        ctx: &mut LineBuilderContext,
+    ) -> Vec<Line<'static>> {
+        let mut buffer = self.build_line(line_idx, content, line_number_offset, ctx);
+        let padding = derive_wrap_digit_offset(buffer.first());
+        let mut lines = vec![Line::from(buffer.drain(..split_len).collect::<Vec<_>>())];
+        let expected_width = split_len - 1;
+        while buffer.len() > expected_width {
+            let mut line = vec![padding.clone()];
+            line.extend(buffer.drain(..expected_width));
+            lines.push(Line::from(line));
+        }
+        buffer.insert(0, padding);
+        lines.push(Line::from(buffer));
+        lines
+    }
+
     fn lsp_line(
         &self,
         line_idx: usize,
         content: &str,
         max_digits: usize,
         ctx: &mut LineBuilderContext,
-    ) -> Option<Line<'static>> {
+    ) -> Option<Vec<Span<'static>>> {
         let token_line = self.tokens.get(line_idx)?;
         let mut buffer = init_buffer_with_line_number(line_idx, max_digits);
         let mut style = Style::default();
@@ -221,4 +241,12 @@ impl LineBuilder {
         }
         self.theme.key_words
     }
+}
+
+fn derive_wrap_digit_offset(start_span: Option<&Span<'_>>) -> Span<'static> {
+    if let Some(span) = start_span {
+        let padding_len = span.content.len();
+        return Span::raw((0..padding_len).map(|_| ' ').collect::<String>());
+    }
+    Span::default()
 }

@@ -130,7 +130,7 @@ impl Cursor {
             return;
         }
         let line_len = content[self.line].len();
-        if line_len > self.text_width && line_len.saturating_sub(self.char) > self.text_width {
+        if line_len >= self.text_width && line_len.saturating_sub(self.char) > self.text_width {
             self.set_char(self.char + self.text_width)
         } else {
             if content.len() <= self.line + 1 {

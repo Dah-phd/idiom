@@ -76,7 +76,7 @@ pub struct GlobalState {
 
 impl GlobalState {
     pub fn new(height: u16, width: u16) -> Self {
-        Self {
+        let mut new = Self {
             mode: Mode::default(),
             tree_size: 15,
             draw: draw::draw_with_tree,
@@ -95,7 +95,10 @@ impl GlobalState {
             editor_area: Rect::default(),
             footer_area: Rect::default(),
             components: Components::default(),
-        }
+        };
+        new.recalc_draw_size();
+        // ! EDGECASE: initial frame size is slightly bigger than resized one
+        new
     }
 
     pub fn draw(
