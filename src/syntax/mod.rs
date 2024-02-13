@@ -142,10 +142,10 @@ impl Lexer {
         &self,
         line_idx: usize,
         text: &str,
-        split_len: usize,
+        text_width: usize,
         ctx: &mut LineBuilderContext,
     ) -> Vec<Line<'static>> {
-        self.line_builder.split_line(line_idx, text, split_len, self.line_number_offset, ctx)
+        self.line_builder.split_line(line_idx, text, text_width, self.line_number_offset, ctx)
     }
 
     pub fn render_modal_if_exist(&mut self, frame: &mut Frame, area: Rect, cursor: &Cursor) {

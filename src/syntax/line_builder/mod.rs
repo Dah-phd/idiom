@@ -178,11 +178,10 @@ impl LineBuilder {
     ) -> Vec<Line<'static>> {
         let mut buffer = self.build_line(line_idx, content, line_number_offset, ctx);
         let padding = derive_wrap_digit_offset(buffer.first());
-        let mut lines = vec![Line::from(buffer.drain(..split_len).collect::<Vec<_>>())];
-        let expected_width = split_len - 1;
-        while buffer.len() > expected_width {
+        let mut lines = vec![Line::from(buffer.drain(..split_len + 1).collect::<Vec<_>>())];
+        while buffer.len() > split_len {
             let mut line = vec![padding.clone()];
-            line.extend(buffer.drain(..expected_width));
+            line.extend(buffer.drain(..split_len));
             lines.push(Line::from(line));
         }
         buffer.insert(0, padding);

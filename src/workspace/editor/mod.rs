@@ -55,7 +55,7 @@ impl WidgetRef for &Editor {
                 if self.cursor.line != line_idx {
                     let mut line = self
                         .lexer
-                        .split_line(line_idx, text, self.cursor.text_width + 1, &mut ctx)
+                        .split_line(line_idx, text, self.cursor.text_width, &mut ctx)
                         .into_iter()
                         .next()
                         .unwrap();
@@ -64,7 +64,7 @@ impl WidgetRef for &Editor {
                     line.render(Rect::new(x, y, area.width, 1), buf);
                     y += 1;
                 } else {
-                    for split_line in self.lexer.split_line(line_idx, text, self.cursor.text_width + 1, &mut ctx) {
+                    for split_line in self.lexer.split_line(line_idx, text, self.cursor.text_width, &mut ctx) {
                         remining_lines -= 1;
                         if remining_lines == 0 {
                             return;
