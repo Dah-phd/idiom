@@ -246,7 +246,7 @@ impl LineBuilder {
 fn derive_wrap_digit_offset(start_span: Option<&Span<'_>>) -> Span<'static> {
     if let Some(span) = start_span {
         let padding_len = span.content.len();
-        return Span::raw((0..padding_len).map(|_| ' ').collect::<String>());
+        return Span::raw((0..padding_len).map(|_| '.').collect::<String>());
     }
     Span::default()
 }

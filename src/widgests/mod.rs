@@ -3,8 +3,16 @@ mod list_state;
 mod text_field;
 pub use button::Button;
 pub use list_state::WrappedState;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::{
+    layout::{Constraint, Direction, Layout, Rect},
+    style::{Modifier, Style},
+    text::Span,
+};
+use std::borrow::Cow;
 pub use text_field::TextField;
+
+pub const LINE_CONTINIUES: Span<'static> =
+    Span { content: Cow::Borrowed(">>"), style: Style::new().add_modifier(Modifier::REVERSED) };
 
 pub fn count_as_string(len: usize) -> String {
     if len < 10 {

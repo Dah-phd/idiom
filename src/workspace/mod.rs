@@ -1,6 +1,6 @@
 pub mod actions;
 pub mod cursor;
-pub mod file;
+pub mod editor;
 pub mod utils;
 use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
@@ -11,7 +11,7 @@ use crate::{
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 pub use cursor::CursorPosition;
-pub use file::{DocStats, Editor};
+pub use editor::{DocStats, Editor};
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
 use ratatui::{
     style::{Color, Modifier, Style},

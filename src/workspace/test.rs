@@ -1,9 +1,9 @@
-use super::{file::Editor, map_editor, Workspace};
+use super::{editor::Editor, map_editor, Workspace};
 use crate::{
     configs::{test::mock_editor_key_map, EditorConfigs},
     global_state::GlobalState,
     workspace::{
-        file::test::{mock_editor, pull_line, select_eq},
+        editor::test::{mock_editor, pull_line, select_eq},
         CursorPosition,
     },
 };

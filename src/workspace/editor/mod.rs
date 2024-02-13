@@ -3,6 +3,7 @@ use crate::{
     global_state::GlobalState,
     syntax::Lexer,
     syntax::LineBuilderContext,
+    widgests::LINE_CONTINIUES,
     workspace::{
         actions::Actions,
         cursor::{Cursor, CursorPosition},
@@ -51,13 +52,26 @@ impl WidgetRef for &Editor {
                 return;
             }
             if text.len() > self.cursor.text_width {
-                for split_line in self.lexer.split_line(line_idx, text, self.cursor.text_width + 1, &mut ctx) {
-                    remining_lines -= 1;
-                    if remining_lines == 0 {
-                        return;
-                    }
-                    split_line.render(Rect::new(x, y, area.width, 1), buf);
+                if self.cursor.line != line_idx {
+                    let mut line = self
+                        .lexer
+                        .split_line(line_idx, text, self.cursor.text_width + 1, &mut ctx)
+                        .into_iter()
+                        .next()
+                        .unwrap();
+                    line.spans.pop();
+                    line.spans.push(LINE_CONTINIUES);
+                    line.render(Rect::new(x, y, area.width, 1), buf);
                     y += 1;
+                } else {
+                    for split_line in self.lexer.split_line(line_idx, text, self.cursor.text_width + 1, &mut ctx) {
+                        remining_lines -= 1;
+                        if remining_lines == 0 {
+                            return;
+                        }
+                        split_line.render(Rect::new(x, y, area.width, 1), buf);
+                        y += 1;
+                    }
                 }
             } else {
                 self.lexer.build_line(line_idx, text, &mut ctx).render(Rect::new(x, y, area.width, 1), buf);
