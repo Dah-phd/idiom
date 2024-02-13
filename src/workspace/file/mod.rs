@@ -1,25 +1,26 @@
-use super::cursor::{Cursor, CursorPosition};
+use crate::{
+    configs::{EditorConfigs, FileType},
+    global_state::GlobalState,
+    syntax::Lexer,
+    syntax::LineBuilderContext,
+    workspace::{
+        actions::Actions,
+        cursor::{Cursor, CursorPosition},
+        utils::{copy_content, find_line_start, last_modified, token_range_at},
+    },
+};
 use lsp_types::TextEdit;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
     widgets::{Widget, WidgetRef},
 };
-
-use crate::{
-    configs::{EditorConfigs, FileType},
-    global_state::GlobalState,
-    syntax::Lexer,
-};
-use crate::{syntax::LineBuilderContext, workspace::actions::Actions};
 use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 use std::{
     cmp::Ordering,
     path::{Path, PathBuf},
     time::SystemTime,
 };
-
-use super::utils::{copy_content, find_line_start, last_modified, token_range_at};
 
 type DocLen = usize;
 type SelectLen = usize;

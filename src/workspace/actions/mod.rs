@@ -1,6 +1,5 @@
 mod action_buffer;
 mod edits;
-
 use crate::configs::EditorConfigs;
 use crate::syntax::Lexer;
 use crate::workspace::{

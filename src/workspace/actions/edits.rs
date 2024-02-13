@@ -1,6 +1,11 @@
-use super::{Cursor, CursorPosition};
-use crate::workspace::utils::{clip_content, copy_content, insert_clip, remove_content, token_range_at};
-use crate::{configs::EditorConfigs, utils::Offset};
+use crate::{
+    configs::EditorConfigs,
+    utils::Offset,
+    workspace::{
+        cursor::{Cursor, CursorPosition},
+        utils::{clip_content, copy_content, insert_clip, remove_content, token_range_at},
+    },
+};
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit};
 use std::fmt::Debug;
 

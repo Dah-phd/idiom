@@ -8,11 +8,10 @@ use crate::{
     lsp::LSP,
     utils::{REVERSED, UNDERLINED},
 };
-pub use cursor::CursorPosition;
-pub use file::{DocStats, Editor};
-
 use anyhow::Result;
 use crossterm::event::KeyEvent;
+pub use cursor::CursorPosition;
+pub use file::{DocStats, Editor};
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
 use ratatui::{
     style::{Color, Modifier, Style},

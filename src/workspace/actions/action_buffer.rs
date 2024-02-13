@@ -1,7 +1,6 @@
+use crate::workspace::actions::edits::{Edit, EditMetaData};
 use lsp_types::{Position, Range, TextEdit};
 use std::time::{Duration, Instant};
-
-use super::edits::{Edit, EditMetaData};
 
 const TICK: Duration = Duration::from_millis(200);
 
