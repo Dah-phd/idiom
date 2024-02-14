@@ -18,7 +18,6 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
         timestamp: None,
         cursor: Cursor::default(),
         actions: Actions::default(),
-        max_rows: 0,
         content,
     }
 }

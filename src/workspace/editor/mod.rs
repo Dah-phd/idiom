@@ -35,7 +35,6 @@ pub struct Editor {
     pub lexer: Lexer,
     pub cursor: Cursor,
     pub actions: Actions,
-    max_rows: usize,
     timestamp: Option<SystemTime>,
     content: Vec<String>,
 }
@@ -45,7 +44,7 @@ impl WidgetRef for &Editor {
         let mut ctx = LineBuilderContext::from(&self.cursor);
         let x = area.left();
         let mut y = area.top();
-        let mut remining_lines = self.max_rows;
+        let mut remining_lines = self.cursor.max_rows;
         for (line_idx, text) in self.content.iter().enumerate().skip(self.cursor.at_line) {
             remining_lines -= 1;
             if remining_lines == 0 {
@@ -64,12 +63,22 @@ impl WidgetRef for &Editor {
                     line.render(Rect::new(x, y, area.width, 1), buf);
                     y += 1;
                 } else {
-                    for split_line in self.lexer.split_line(line_idx, text, self.cursor.text_width, &mut ctx) {
+                    let mut wrapped_lines =
+                        self.lexer.split_line(line_idx, text, self.cursor.text_width, &mut ctx).into_iter();
+                    wrapped_lines.next().inspect(|l| l.render(Rect::new(x, y, area.width, 1), buf));
+                    remining_lines -= 1;
+                    if remining_lines == 0 {
+                        return;
+                    }
+                    y += 1;
+                    let rel_line_with_cursor = self.cursor.char / self.cursor.text_width;
+                    let skip_lines = rel_line_with_cursor.saturating_sub(remining_lines);
+                    for split_line in wrapped_lines.skip(skip_lines) {
+                        split_line.render(Rect::new(x, y, area.width, 1), buf);
                         remining_lines -= 1;
                         if remining_lines == 0 {
                             return;
                         }
-                        split_line.render(Rect::new(x, y, area.width, 1), buf);
                         y += 1;
                     }
                 }
@@ -91,7 +100,6 @@ impl Editor {
             lexer: Lexer::with_context(file_type, &path),
             cursor: Cursor::default(),
             actions: Actions::new(cfg),
-            max_rows: 0,
             content: content.split('\n').map(String::from).collect(),
             file_type,
             display,
@@ -103,7 +111,7 @@ impl Editor {
     pub fn sync(&mut self, gs: &mut GlobalState) {
         self.actions.sync(&mut self.lexer, &self.content);
         self.lexer.context(&self.content, gs);
-        self.cursor.correct_cursor_position(self.max_rows);
+        self.cursor.correct_cursor_position();
     }
 
     pub fn get_stats(&self) -> DocStats {
@@ -181,12 +189,12 @@ impl Editor {
         if self.content.len() >= line {
             self.cursor.line = line;
             self.cursor.char = find_line_start(self.content[line].as_str());
-            self.cursor.at_line = line.saturating_sub(self.max_rows / 2);
+            self.cursor.at_line = line.saturating_sub(self.cursor.max_rows / 2);
         }
     }
 
     pub fn go_to_select(&mut self, from: CursorPosition, to: CursorPosition) {
-        self.cursor.at_line = to.line.saturating_sub(self.max_rows / 2);
+        self.cursor.at_line = to.line.saturating_sub(self.cursor.max_rows / 2);
         self.cursor.select_set(from, to);
     }
 
@@ -409,7 +417,7 @@ impl Editor {
     }
 
     pub fn resize(&mut self, width: usize, height: usize) {
-        self.max_rows = height;
+        self.cursor.max_rows = height;
         let offset = if self.content.is_empty() { 0 } else { (self.content.len().ilog10() + 1) as usize } + 1;
         self.cursor.text_width = width.saturating_sub(offset + 1);
     }

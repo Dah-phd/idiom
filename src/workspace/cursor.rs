@@ -8,6 +8,7 @@ pub struct Cursor {
     pub char: usize,
     phantm_char: usize, // keeps record for up/down movement
     pub at_line: usize,
+    pub max_rows: usize,
     pub text_width: usize,
     select: Option<Select>,
 }
@@ -131,7 +132,8 @@ impl Cursor {
         }
         let line_len = content[self.line].len();
         if line_len >= self.text_width && line_len.saturating_sub(self.char) > self.text_width {
-            self.set_char(self.char + self.text_width)
+            self.set_char(self.char + self.text_width);
+            self.correct_cursor_wrapped_line();
         } else {
             if content.len() <= self.line + 1 {
                 return;
@@ -273,12 +275,22 @@ impl Cursor {
         }
     }
 
-    pub fn correct_cursor_position(&mut self, max_rows: usize) {
+    pub fn correct_cursor_position(&mut self) {
         if self.line < self.at_line {
             self.at_line = self.line
         }
-        if self.line > max_rows - 3 + self.at_line {
-            self.at_line = self.line + 2 - max_rows
+        if self.line > self.max_rows - 3 + self.at_line {
+            self.at_line = self.line + 2 - self.max_rows
+        }
+    }
+
+    fn correct_cursor_wrapped_line(&mut self) {
+        let pseudo_lines = self.char / self.text_width;
+        if self.line + pseudo_lines > self.max_rows - 3 + self.at_line {
+            let new_at_line = self.line + 3 - self.max_rows + pseudo_lines;
+            if self.line >= new_at_line {
+                self.at_line = new_at_line;
+            }
         }
     }
 
