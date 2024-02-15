@@ -279,18 +279,18 @@ impl Cursor {
         if self.line < self.at_line {
             self.at_line = self.line
         }
-        if self.line > self.max_rows - 3 + self.at_line {
-            self.at_line = self.line + 2 - self.max_rows
+        if self.line + 1 > self.max_rows + self.at_line {
+            self.at_line = self.line - self.max_rows + 1
         }
     }
 
     fn correct_cursor_wrapped_line(&mut self) {
-        let pseudo_lines = self.char / self.text_width;
-        if self.line + pseudo_lines > self.max_rows - 3 + self.at_line {
-            let new_at_line = self.line + 3 - self.max_rows + pseudo_lines;
-            if self.line >= new_at_line {
-                self.at_line = new_at_line;
-            }
+        if self.at_line == self.line {
+            return;
+        }
+        let pseudo_line = self.line + self.char / self.text_width;
+        if self.at_line + self.max_rows < pseudo_line + 1 {
+            self.at_line += 1;
         }
     }
 

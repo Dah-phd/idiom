@@ -229,7 +229,7 @@ impl Workspace {
                 new.lexer.set_lsp_client(entry.get().aquire_client(), &new.file_type, new.stringify(), gs);
             }
         }
-        new.resize(gs.editor_area.width as usize, gs.editor_area.bottom() as usize);
+        new.resize(gs.editor_area.width as usize, gs.editor_area.height as usize);
         Ok(new)
     }
 

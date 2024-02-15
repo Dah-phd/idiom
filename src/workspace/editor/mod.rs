@@ -46,7 +46,6 @@ impl WidgetRef for &Editor {
         let mut y = area.top();
         let mut remining_lines = self.cursor.max_rows;
         for (line_idx, text) in self.content.iter().enumerate().skip(self.cursor.at_line) {
-            remining_lines -= 1;
             if remining_lines == 0 {
                 return;
             }
@@ -86,6 +85,7 @@ impl WidgetRef for &Editor {
                 self.lexer.build_line(line_idx, text, &mut ctx).render(Rect::new(x, y, area.width, 1), buf);
                 y += 1;
             }
+            remining_lines -= 1;
         }
     }
 }

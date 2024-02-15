@@ -22,7 +22,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const TICK: Duration = Duration::from_millis(15);
+const TICK: Duration = Duration::from_millis(8);
 
 pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Option<PathBuf>) -> Result<()> {
     let configs = KeyMap::new();
