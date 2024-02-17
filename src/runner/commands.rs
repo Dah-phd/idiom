@@ -1,5 +1,4 @@
 use anyhow::Result;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use portable_pty::PtyPair;
 use portable_pty::{native_pty_system, Child, CommandBuilder, PtySize};
 use std::{
@@ -79,40 +78,6 @@ impl Terminal {
         ))
     }
 
-    pub fn map(&mut self, key: &KeyEvent) -> Result<()> {
-        let msg = match key.code {
-            KeyCode::Char(ch) => {
-                if key.modifiers == KeyModifiers::CONTROL && ch == 'l' {
-                    vec![27, 91, 50, 74]
-                } else {
-                    vec![ch as u8]
-                }
-            }
-            #[cfg(unix)]
-            KeyCode::Enter => vec![b'\n'],
-            #[cfg(windows)]
-            KeyCode::Enter => vec![b'\r', b'\n'],
-            KeyCode::Backspace => vec![8],
-            KeyCode::Left => vec![27, 91, 68],
-            KeyCode::Right => vec![27, 91, 67],
-            KeyCode::Up => vec![27, 91, 65],
-            KeyCode::Down => vec![27, 91, 66],
-            KeyCode::Tab => vec![9],
-            KeyCode::Home => vec![27, 91, 72],
-            KeyCode::End => vec![27, 91, 70],
-            KeyCode::PageUp => vec![27, 91, 53, 126],
-            KeyCode::PageDown => vec![27, 91, 54, 126],
-            KeyCode::BackTab => vec![27, 91, 90],
-            KeyCode::Delete => vec![27, 91, 51, 126],
-            KeyCode::Insert => vec![27, 91, 50, 126],
-            KeyCode::Esc => vec![27],
-            _ => vec![],
-        };
-        self.writer.write_all(&msg)?;
-        self.writer.flush()?;
-        Ok(())
-    }
-
     pub fn kill(mut self) -> Result<()> {
         self.output_handler.abort();
         self.child.kill()?;
@@ -133,9 +98,9 @@ impl Terminal {
     pub fn push_command(&mut self, cmd: String) -> std::io::Result<()> {
         self.writer.write_all(cmd.as_bytes())?;
         #[cfg(unix)]
-        self.writer.write_all(&vec![b'\n'])?;
+        self.writer.write_all(&[b'\n'])?;
         #[cfg(windows)]
-        self.writer.write_all(&vec![b'\r', b'\n'])?;
+        self.writer.write_all(&[b'\r', b'\n'])?;
         self.writer.flush()?;
         Ok(())
     }

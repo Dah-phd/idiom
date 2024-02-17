@@ -28,9 +28,7 @@ pub struct EditorTerminal {
 
 impl EditorTerminal {
     pub fn new(width: u16) -> Self {
-        let mut new = Self::default();
-        new.width = width;
-        new
+        Self { width, ..Default::default() }
     }
 
     pub fn render(&mut self, frame: &mut Frame, screen: Rect) {
