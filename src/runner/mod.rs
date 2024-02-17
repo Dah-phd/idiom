@@ -14,9 +14,10 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem};
 use ratatui::Frame;
 
+const IDIOM_PREFIX: &str = "%i";
+
 #[derive(Default)]
 pub struct EditorTerminal {
-    // idiom_prefix: String,
     cmd: TextField<()>,
     width: u16,
     logs: Vec<String>,
@@ -32,13 +33,13 @@ impl EditorTerminal {
     }
 
     pub fn render(&mut self, frame: &mut Frame, screen: Rect) {
-        self.poll_results();
         let screen_areas = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Percentage(50), Constraint::Min(2)])
             .split(screen);
         let tmux_area = screen_areas[1];
         self.max_rows = tmux_area.height as usize;
+        self.poll_results();
         frame.render_widget(Clear, tmux_area);
         frame.render_widget(
             List::new(self.get_list_items()).block(Block::default().title("Runner").borders(Borders::TOP)),
@@ -115,12 +116,16 @@ impl EditorTerminal {
                 }
             }
             KeyEvent { code: KeyCode::Enter, .. } => {
-                if let Some(t) = self.terminal.as_mut() {
-                    let _ = t.push_command(self.cmd.take_text());
+                let cmd = self.cmd.take_text();
+                if let Some(args) = cmd.strip_prefix(IDIOM_PREFIX) {
+                    let _ = self.idiom_command_handler(args, gs);
+                } else if let Some(t) = self.terminal.as_mut() {
+                    let _ = t.push_command(cmd);
                 }
             }
             _ => {
                 self.cmd.map(key, &mut gs.clipboard);
+                self.to_last_log();
             }
         }
         true
@@ -129,12 +134,19 @@ impl EditorTerminal {
     fn poll_results(&mut self) {
         if let Some(logs) = self.terminal.as_mut().and_then(|t| t.pull_logs()) {
             self.logs.extend(logs);
+            self.to_last_log();
         }
     }
 
     pub fn resize(&mut self, width: u16) {
         if let Some(terminal) = self.terminal.as_mut() {
             let _ = terminal.resize(width);
+        }
+    }
+
+    fn to_last_log(&mut self) {
+        if self.max_rows + self.at_log <= self.logs.len() + 1 {
+            self.at_log = (self.logs.len() + 2).saturating_sub(self.max_rows);
         }
     }
 

@@ -86,7 +86,9 @@ impl Terminal {
 
     pub fn pull_logs(&mut self) -> Option<Vec<String>> {
         if let Ok(mut guard) = self.output.try_lock() {
-            return Some(guard.drain(..).collect());
+            if !guard.is_empty() {
+                return Some(guard.drain(..).collect());
+            }
         }
         None
     }
