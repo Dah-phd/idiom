@@ -28,9 +28,9 @@ use std::{borrow::Cow, path::PathBuf};
 use self::draw::Components;
 
 const INSERT_STYLE: Style = Style::new().add_modifier(Modifier::BOLD).fg(Color::Rgb(255, 0, 0));
-const INSERT_SPAN: Span<'static> = Span { content: Cow::Borrowed(" --INSERT-- "), style: INSERT_STYLE };
+const INSERT_SPAN: Span<'static> = Span { content: Cow::Borrowed("  --INSERT--"), style: INSERT_STYLE };
 const SELECT_STYLE: Style = Style::new().add_modifier(Modifier::BOLD).fg(Color::LightCyan);
-const SELECT_SPAN: Span<'static> = Span { content: Cow::Borrowed(" --SELECT-- "), style: SELECT_STYLE };
+const SELECT_SPAN: Span<'static> = Span { content: Cow::Borrowed("  --SELECT--"), style: SELECT_STYLE };
 const MUTED_STYLE: Style = Style::new().add_modifier(Modifier::BOLD).fg(Color::DarkGray);
 
 #[derive(Default, Clone)]

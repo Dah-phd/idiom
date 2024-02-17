@@ -26,7 +26,8 @@ impl Default for Footer {
 
 impl Footer {
     pub fn render(&mut self, frame: &mut Frame, gs: &GlobalState, stats: Option<DocStats>) {
-        let message_p = self.get_message_widget().unwrap_or_default();
+        frame.render_widget(Block::default().bg(Color::Rgb(25, 25, 24)), gs.footer_area);
+
         let (stat_size, stat_p) = if let Some((len, sel, c)) = stats {
             let text = match sel {
                 0 => format!("    Doc Len {len}, Ln {}, Col {}", c.line + 1, c.char + 1),
@@ -37,19 +38,25 @@ impl Footer {
             (0, Span::default())
         };
 
-        frame.render_widget(Block::default().bg(Color::Rgb(25, 25, 24)), gs.footer_area);
-
         let split = Layout::new(
             Direction::Horizontal,
             [
-                Constraint::Length(14),
-                Constraint::Length(gs.footer_area.width.saturating_sub(14 + stat_size as u16)),
+                Constraint::Length(15),
+                Constraint::Length(gs.footer_area.width.saturating_sub(15 + stat_size as u16)),
                 Constraint::Length(stat_size as u16),
             ],
         )
         .split(gs.footer_area);
+
         frame.render_widget(gs.mode_span.clone(), split[0]);
-        frame.render_widget(message_p, split[1]);
+
+        if self.message.is_some() || !self.message_que.is_empty() {
+            self.que_pull_if_expaired();
+            if let Some(msg) = &self.message {
+                frame.render_widget_ref(msg, split[1]);
+            }
+        }
+
         frame.render_widget(stat_p, split[2]);
     }
 
@@ -75,14 +82,6 @@ impl Footer {
         if matches!(&self.message, Some(maybe_err) if !maybe_err.is_err()) {
             self.message = None;
         }
-    }
-
-    fn get_message_widget(&mut self) -> Option<Span<'static>> {
-        if self.message.is_none() && self.message_que.is_empty() {
-            return None;
-        }
-        self.que_pull_if_expaired();
-        self.message.as_ref().map(|m| m.widget())
     }
 
     fn que_pull_if_expaired(&mut self) {
@@ -122,15 +121,6 @@ impl WidgetRef for &Message {
 impl Message {
     fn is_err(&self) -> bool {
         matches!(self, Self::Error(..))
-    }
-
-    fn widget(&self) -> Span<'static> {
-        match self {
-            Self::Error(span) => span,
-            Self::Text(span) => span,
-            Self::Success(span) => span,
-        }
-        .clone()
     }
 
     fn msg(message: String) -> Self {

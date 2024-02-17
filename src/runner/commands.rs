@@ -30,9 +30,9 @@ pub struct Terminal {
 }
 
 impl Terminal {
-    pub fn new() -> Result<(Self, Arc<Mutex<String>>)> {
+    pub fn new(width: u16) -> Result<(Self, Arc<Mutex<String>>)> {
         let system = native_pty_system();
-        let pair = system.openpty(PtySize { rows: 24, cols: 80, ..Default::default() })?;
+        let pair = system.openpty(PtySize { rows: 24, cols: width, ..Default::default() })?;
         let mut cmd = CommandBuilder::new(SHELL);
         cmd.cwd("./");
         let child = pair.slave.spawn_command(cmd)?;
@@ -130,8 +130,14 @@ impl Terminal {
         self.output_handler.is_finished() || self.child.try_wait().is_ok()
     }
 
-    pub fn push_command(&mut self, cmd: &str) -> std::io::Result<()> {
-        writeln!(self.writer, "{}", cmd)
+    pub fn push_command(&mut self, cmd: String) -> std::io::Result<()> {
+        self.writer.write_all(cmd.as_bytes())?;
+        #[cfg(unix)]
+        self.writer.write_all(&vec![b'\n'])?;
+        #[cfg(windows)]
+        self.writer.write_all(&vec![b'\r', b'\n'])?;
+        self.writer.flush()?;
+        Ok(())
     }
 
     pub fn resize(&mut self, cols: u16) -> Result<()> {

@@ -22,7 +22,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const TICK: Duration = Duration::from_millis(8);
+const TICK: Duration = Duration::from_millis(4);
 
 pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Option<PathBuf>) -> Result<()> {
     let configs = KeyMap::new();
@@ -34,7 +34,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
     // COMPONENTS
     let mut tree = Tree::new(configs.tree_key_map());
     let mut workspace = Workspace::new(configs.editor_key_map());
-    let mut term = EditorTerminal::new();
+    let mut term = EditorTerminal::new(gs.editor_area.width);
     let mut footer = Footer::default();
 
     // CLI SETUP

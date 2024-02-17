@@ -1,3 +1,6 @@
+use crate::widgests::TextField;
+use ratatui::prelude::Span;
+use ratatui::text::Line;
 mod commands;
 use std::sync::{Arc, Mutex};
 
@@ -14,6 +17,8 @@ use ratatui::Frame;
 #[derive(Default)]
 pub struct EditorTerminal {
     // idiom_prefix: String,
+    cmd: TextField<()>,
+    width: u16,
     logs: Vec<String>,
     at_log: usize,
     terminal: Option<Terminal>,
@@ -22,12 +27,9 @@ pub struct EditorTerminal {
 }
 
 impl EditorTerminal {
-    pub fn new() -> Self {
+    pub fn new(width: u16) -> Self {
         let mut new = Self::default();
-        if let Ok((terminal, prompt)) = Terminal::new() {
-            new.terminal.replace(terminal);
-            new.prompt.replace(prompt);
-        }
+        new.width = width;
         new
     }
 
@@ -50,14 +52,14 @@ impl EditorTerminal {
         match self.terminal.as_mut() {
             Some(terminal) => {
                 if !terminal.is_running() {
-                    if let Ok((terminal, prompt)) = Terminal::new() {
+                    if let Ok((terminal, prompt)) = Terminal::new(self.width) {
                         self.terminal.replace(terminal).map(|t| t.kill());
                         self.prompt.replace(prompt);
                     }
                 }
             }
             None => {
-                if let Ok((terminal, prompt)) = Terminal::new() {
+                if let Ok((terminal, prompt)) = Terminal::new(self.width) {
                     self.terminal.replace(terminal);
                     self.prompt.replace(prompt);
                 }
@@ -73,9 +75,10 @@ impl EditorTerminal {
             .take(self.max_rows)
             .map(|line| ListItem::new(line.to_owned()))
             .collect::<Vec<ListItem<'_>>>();
-        list.push(ListItem::new(
-            self.prompt.as_ref().map(|p| into_guard(p).to_owned()).unwrap_or(String::from("Dead terminal")),
-        ));
+        let prompt = self.prompt.as_ref().map(|p| into_guard(p).to_owned()).unwrap_or(String::from("[Dead terminal]"));
+        let mut line = vec![Span::raw(prompt)];
+        self.cmd.insert_formatted_text(&mut line);
+        list.push(ListItem::new(Line::from(line)));
         list
     }
 
@@ -88,7 +91,14 @@ impl EditorTerminal {
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         match key {
             KeyEvent { code: KeyCode::Esc, .. }
-            | KeyEvent { code: KeyCode::Char('d' | 'D' | 'q' | 'Q' | '`'), modifiers: KeyModifiers::CONTROL, .. } => {
+            | KeyEvent { code: KeyCode::Char('q' | 'Q' | '`'), modifiers: KeyModifiers::CONTROL, .. } => {
+                gs.message("Term: PTY active in background ... (CTRL + d/q) can be used to kill the process!");
+                gs.toggle_terminal(self);
+            }
+            KeyEvent { code: KeyCode::Char('d' | 'D'), modifiers: KeyModifiers::CONTROL, .. } => {
+                self.terminal.take().map(|t| t.kill());
+                self.prompt.take();
+                gs.success("Term: Process killed!");
                 gs.toggle_terminal(self);
             }
             KeyEvent { code: KeyCode::PageUp, .. }
@@ -101,15 +111,18 @@ impl EditorTerminal {
             }
             KeyEvent { code: KeyCode::Char('c' | 'C'), modifiers: KeyModifiers::CONTROL, .. } => {
                 self.kill(gs);
-                if let Ok((terminal, prompt)) = Terminal::new() {
+                if let Ok((terminal, prompt)) = Terminal::new(self.width) {
                     self.terminal.replace(terminal).map(|t| t.kill());
                     self.prompt.replace(prompt);
                 }
             }
-            _ => {
-                if let Some(terminal) = self.terminal.as_mut() {
-                    let _ = terminal.map(key);
+            KeyEvent { code: KeyCode::Enter, .. } => {
+                if let Some(t) = self.terminal.as_mut() {
+                    let _ = t.push_command(self.cmd.take_text());
                 }
+            }
+            _ => {
+                self.cmd.map(key, &mut gs.clipboard);
             }
         }
         true
@@ -121,9 +134,9 @@ impl EditorTerminal {
         }
     }
 
-    pub fn resize(&mut self, cols: u16) {
+    pub fn resize(&mut self, width: u16) {
         if let Some(terminal) = self.terminal.as_mut() {
-            let _ = terminal.resize(cols);
+            let _ = terminal.resize(width);
         }
     }
 
@@ -132,7 +145,7 @@ impl EditorTerminal {
             if let Some(terminal) = self.terminal.take() {
                 terminal.kill()?;
             }
-            let (terminal, prompt) = Terminal::new()?;
+            let (terminal, prompt) = Terminal::new(self.width)?;
             self.terminal.replace(terminal).map(|t| t.kill());
             self.prompt.replace(prompt);
         }
@@ -145,7 +158,7 @@ impl EditorTerminal {
         }
         if arg.trim() == "loc" {
             if let Some(terminal) = self.terminal.as_mut() {
-                terminal.push_command("git ls-files | xargs wc -l")?;
+                terminal.push_command(String::from("git ls-files | xargs wc -l"))?;
             }
         }
         if let Some(cfg) = arg.trim().strip_prefix("load") {

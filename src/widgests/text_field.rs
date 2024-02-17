@@ -38,6 +38,12 @@ impl<T: Default + Clone> TextField<T> {
         Self { char: text.len(), text, select: None, on_text_update }
     }
 
+    pub fn take_text(&mut self) -> String {
+        self.char = 0;
+        self.select = None;
+        std::mem::take(&mut self.text)
+    }
+
     /// returns blockless paragraph widget " >> inner text"
     pub fn widget(&self) -> Paragraph<'static> {
         let mut buffer = vec![Span::raw(" >> ")];
@@ -52,7 +58,7 @@ impl<T: Default + Clone> TextField<T> {
         Paragraph::new(Line::from(buffer))
     }
 
-    fn insert_formatted_text(&self, buffer: &mut Vec<Span<'static>>) {
+    pub fn insert_formatted_text(&self, buffer: &mut Vec<Span<'static>>) {
         match self.select.as_ref().map(|(f, t)| if f > t { (*t, *f) } else { (*f, *t) }) {
             Some((from, to)) => self.text_cursor_select(from, to, buffer),
             None => self.text_cursor(buffer),
