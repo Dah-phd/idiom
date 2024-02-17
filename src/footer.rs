@@ -1,14 +1,14 @@
 use crate::{global_state::GlobalState, workspace::DocStats};
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
-    style::{Color, Style},
+    buffer::Buffer,
+    layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Style, Stylize},
     text::Span,
-    widgets::{Block, Borders, Padding, Paragraph},
+    widgets::{Block, WidgetRef},
     Frame,
 };
 use std::time::{Duration, Instant};
 
-const TOP_BORDER: Block = Block::new().borders(Borders::TOP);
 const MSG_DURATION: Duration = Duration::from_secs(3);
 
 #[derive(Debug)]
@@ -32,10 +32,13 @@ impl Footer {
                 0 => format!("    Doc Len {len}, Ln {}, Col {}", c.line + 1, c.char + 1),
                 _ => format!("    Doc Len {len}, Ln {}, Col {} ({sel} selected)", c.line + 1, c.char + 1),
             };
-            (text.len(), Paragraph::new(Span::raw(text)))
+            (text.len(), Span::raw(text))
         } else {
-            (0, Paragraph::default())
+            (0, Span::default())
         };
+
+        frame.render_widget(Block::default().bg(Color::Rgb(25, 25, 24)), gs.footer_area);
+
         let split = Layout::new(
             Direction::Horizontal,
             [
@@ -45,9 +48,9 @@ impl Footer {
             ],
         )
         .split(gs.footer_area);
-        frame.render_widget(Paragraph::new(gs.mode_span.clone()).block(TOP_BORDER), split[0]);
-        frame.render_widget(message_p.block(TOP_BORDER), split[1]);
-        frame.render_widget(stat_p.block(TOP_BORDER), split[2]);
+        frame.render_widget(gs.mode_span.clone(), split[0]);
+        frame.render_widget(message_p, split[1]);
+        frame.render_widget(stat_p, split[2]);
     }
 
     pub fn message(&mut self, message: String) {
@@ -74,7 +77,7 @@ impl Footer {
         }
     }
 
-    fn get_message_widget(&mut self) -> Option<Paragraph<'static>> {
+    fn get_message_widget(&mut self) -> Option<Span<'static>> {
         if self.message.is_none() && self.message_que.is_empty() {
             return None;
         }
@@ -101,9 +104,19 @@ impl Footer {
 
 #[derive(Debug)]
 enum Message {
-    Text(Paragraph<'static>),
-    Success(Paragraph<'static>),
-    Error(Paragraph<'static>),
+    Text(Span<'static>),
+    Success(Span<'static>),
+    Error(Span<'static>),
+}
+
+impl WidgetRef for &Message {
+    fn render_ref(&self, area: Rect, buf: &mut Buffer) {
+        match self {
+            Message::Text(w) => w.render_ref(area, buf),
+            Message::Error(w) => w.render_ref(area, buf),
+            Message::Success(w) => w.render_ref(area, buf),
+        }
+    }
 }
 
 impl Message {
@@ -111,7 +124,7 @@ impl Message {
         matches!(self, Self::Error(..))
     }
 
-    fn widget(&self) -> Paragraph<'static> {
+    fn widget(&self) -> Span<'static> {
         match self {
             Self::Error(span) => span,
             Self::Text(span) => span,
@@ -121,23 +134,14 @@ impl Message {
     }
 
     fn msg(message: String) -> Self {
-        Self::Text(
-            Paragraph::new(Span::raw(message))
-                .block(Block::default().borders(Borders::TOP).padding(Padding::horizontal(2))),
-        )
+        Self::Text(Span::raw(message))
     }
 
     fn success(message: String) -> Self {
-        Self::Success(
-            Paragraph::new(Span::styled(message, Style { fg: Some(Color::Blue), ..Default::default() }))
-                .block(Block::default().borders(Borders::TOP).padding(Padding::horizontal(2))),
-        )
+        Self::Success(Span::styled(message, Style { fg: Some(Color::Blue), ..Default::default() }))
     }
 
     fn err(message: String) -> Self {
-        Self::Error(
-            Paragraph::new(Span::styled(message, Style { fg: Some(Color::Red), ..Default::default() }))
-                .block(Block::default().borders(Borders::TOP).padding(Padding::horizontal(2))),
-        )
+        Self::Error(Span::styled(message, Style { fg: Some(Color::Red), ..Default::default() }))
     }
 }

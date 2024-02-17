@@ -142,8 +142,8 @@ pub fn layour_workspace_footer(screen: Rect) -> Rc<[Rect]> {
     Layout::new(
         Direction::Vertical,
         [
-            Constraint::Length(screen.height.saturating_sub(2)),
-            Constraint::Length(2),
+            Constraint::Length(screen.height.saturating_sub(1)),
+            Constraint::Length(1),
         ],
     )
     .split(screen)

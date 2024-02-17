@@ -64,7 +64,7 @@ impl Tree {
             .collect::<Vec<ListItem<'_>>>();
 
         let tree_widget = List::new(list_items)
-            .block(Block::default().borders(Borders::ALL).title("Explorer"))
+            .block(Block::default().borders(Borders::TOP | Borders::RIGHT).title("Explorer"))
             .highlight_style(Style { add_modifier: Modifier::REVERSED, ..Default::default() });
 
         frame.render_stateful_widget(tree_widget, gs.tree_area, &mut self.state);

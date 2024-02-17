@@ -97,14 +97,22 @@ impl Cursor {
     }
 
     fn move_up(&mut self, content: &[String]) {
-        if self.char >= self.text_width {
-            self.set_char(self.char - self.text_width);
-            return;
-        }
         if self.line == 0 {
             return;
         }
+        if self.char >= self.text_width {
+            self.char -= self.text_width;
+            return;
+        }
         self.line -= 1;
+        let line_len = content[self.line].len();
+        if line_len >= self.text_width {
+            while self.char < line_len {
+                self.char += self.text_width;
+            }
+            self.char -= self.text_width;
+            return;
+        };
         self.adjust_char(&content[self.line]);
     }
 
@@ -132,14 +140,14 @@ impl Cursor {
         }
         let line_len = content[self.line].len();
         if line_len >= self.text_width && line_len.saturating_sub(self.char) > self.text_width {
-            self.set_char(self.char + self.text_width);
+            self.char += self.text_width;
             self.correct_cursor_wrapped_line();
-        } else {
-            if content.len() <= self.line + 1 {
-                return;
-            }
-            self.line += 1;
+            return;
+        };
+        if content.len() <= self.line + 1 {
+            return;
         }
+        self.line += 1;
         self.adjust_char(&content[self.line]);
     }
 
