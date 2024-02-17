@@ -44,6 +44,9 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                         if let Some(idx) = workspace.select_tab_mouse(col_idx) {
                             workspace.activate_editor(idx, None);
                             workspace.close_active();
+                            if workspace.editors.is_empty() {
+                                gs.select_mode();
+                            }
                         }
                     }
                 }
@@ -63,6 +66,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
             if let Some((line_idx, _)) = contained_position(gs.tree_area, event.row, event.column) {
                 if let Some(path) = tree.mouse_select(line_idx) {
                     gs.tree.push(TreeEvent::Open(path));
+                    return;
                 };
                 gs.select_mode();
             }
