@@ -25,7 +25,7 @@ impl Default for Footer {
 }
 
 impl Footer {
-    pub fn render(&mut self, frame: &mut Frame, gs: &mut GlobalState, stats: Option<DocStats>) {
+    pub fn render(&mut self, frame: &mut Frame, gs: &GlobalState, stats: Option<DocStats>) {
         let message_p = self.get_message_widget().unwrap_or_default();
         let (stat_size, stat_p) = if let Some((len, sel, c)) = stats {
             let text = match sel {
@@ -42,8 +42,8 @@ impl Footer {
         let split = Layout::new(
             Direction::Horizontal,
             [
-                Constraint::Length(12),
-                Constraint::Length(gs.footer_area.width.saturating_sub(12 + stat_size as u16)),
+                Constraint::Length(14),
+                Constraint::Length(gs.footer_area.width.saturating_sub(14 + stat_size as u16)),
                 Constraint::Length(stat_size as u16),
             ],
         )

@@ -9,8 +9,8 @@ use crate::{
 use anyhow::Result;
 use crossterm::event::KeyEvent;
 use ratatui::{
-    style::{Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, ListState},
+    style::{Color, Modifier, Style},
+    widgets::{Block, BorderType, Borders, List, ListItem, ListState},
     Frame,
 };
 use std::{
@@ -30,6 +30,7 @@ pub struct Tree {
     selected_path: PathBuf,
     tree: TreePath,
     tree_ptrs: Vec<*mut TreePath>,
+    tree_block: Block<'static>,
     sync_handler: JoinHandle<TreePath>,
     pub lsp_register: Vec<Arc<Mutex<HashMap<PathBuf, Diagnostic>>>>,
 }
@@ -51,6 +52,11 @@ impl Tree {
             selected_path: PathBuf::from("./"),
             tree,
             tree_ptrs,
+            tree_block: Block::new()
+                .borders(Borders::TOP | Borders::RIGHT)
+                .border_style(Style::default().fg(Color::DarkGray))
+                .border_type(BorderType::Double)
+                .title("Explorer"),
             sync_handler,
             lsp_register: Vec::new(),
         }
@@ -64,7 +70,7 @@ impl Tree {
             .collect::<Vec<ListItem<'_>>>();
 
         let tree_widget = List::new(list_items)
-            .block(Block::default().borders(Borders::TOP | Borders::RIGHT).title("Explorer"))
+            .block(self.tree_block.clone())
             .highlight_style(Style { add_modifier: Modifier::REVERSED, ..Default::default() });
 
         frame.render_stateful_widget(tree_widget, gs.tree_area, &mut self.state);

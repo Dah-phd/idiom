@@ -25,7 +25,7 @@ use tokens::Tokens;
 /// !the initial len of the line produced by init_buffer_with_line_number
 /// !used by LineBuilder::format_with_info(..) -> ListItem - used to derive cursor and wrap
 const INIT_BUF_SIZE: usize = 1;
-const DIGIT_STYLE: Style = Style::new().fg(Color::Gray);
+const DIGIT_STYLE: Style = Style::new().fg(Color::DarkGray);
 
 /// ! generates start with line number -> based on the produced vec len is the definition of INIT_BUF_SIZE
 pub fn init_buffer_with_line_number(line_idx: usize, line_number_offset: usize) -> Vec<Span<'static>> {
