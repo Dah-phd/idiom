@@ -97,6 +97,7 @@ impl EditorTerminal {
             KeyEvent { code: KeyCode::Char('d' | 'D'), modifiers: KeyModifiers::CONTROL, .. } => {
                 self.terminal.take().map(|t| t.kill());
                 self.prompt.take();
+                self.at_log = self.logs.len();
                 gs.success("Term: Process killed!");
                 gs.toggle_terminal(self);
             }
@@ -110,6 +111,7 @@ impl EditorTerminal {
             }
             KeyEvent { code: KeyCode::Char('c' | 'C'), modifiers: KeyModifiers::CONTROL, .. } => {
                 self.kill(gs);
+                self.at_log = self.logs.len();
                 if let Ok((terminal, prompt)) = Terminal::new(self.width) {
                     self.terminal.replace(terminal).map(|t| t.kill());
                     self.prompt.replace(prompt);
@@ -119,6 +121,8 @@ impl EditorTerminal {
                 let cmd = self.cmd.take_text();
                 if let Some(args) = cmd.strip_prefix(IDIOM_PREFIX) {
                     let _ = self.idiom_command_handler(args, gs);
+                } else if cmd.trim() == "clear" {
+                    self.at_log = self.logs.len();
                 } else if let Some(t) = self.terminal.as_mut() {
                     let _ = t.push_command(cmd);
                 }
