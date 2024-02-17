@@ -112,6 +112,7 @@ impl EditorTerminal {
             KeyEvent { code: KeyCode::Char('c' | 'C'), modifiers: KeyModifiers::CONTROL, .. } => {
                 self.kill(gs);
                 self.at_log = self.logs.len();
+                self.logs.push("SIGKILL!".to_owned());
                 if let Ok((terminal, prompt)) = Terminal::new(self.width) {
                     self.terminal.replace(terminal).map(|t| t.kill());
                     self.prompt.replace(prompt);
@@ -149,20 +150,13 @@ impl EditorTerminal {
     }
 
     fn to_last_log(&mut self) {
-        if self.max_rows + self.at_log <= self.logs.len() + 1 {
-            self.at_log = (self.logs.len() + 2).saturating_sub(self.max_rows);
+        let logs_with_prompt = self.logs.len() + 2;
+        if self.max_rows + self.at_log < logs_with_prompt {
+            self.at_log = logs_with_prompt.saturating_sub(self.max_rows);
         }
     }
 
     pub fn idiom_command_handler(&mut self, arg: &str, gs: &mut GlobalState) -> Result<()> {
-        if arg.trim() == "clear" {
-            if let Some(terminal) = self.terminal.take() {
-                terminal.kill()?;
-            }
-            let (terminal, prompt) = Terminal::new(self.width)?;
-            self.terminal.replace(terminal).map(|t| t.kill());
-            self.prompt.replace(prompt);
-        }
         if arg.trim() == "help" {
             self.logs.push("load => load config files, available options:".to_owned());
             self.logs.push("    keymap => open keymap config file.".to_owned());

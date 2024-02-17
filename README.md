@@ -2,8 +2,10 @@
 
 ## Current version support basic file tree and navigation:
 ## TODO!
-- autoscrolling on multiline
-- rework line number offset calc
+- use configs for LSP
+- add comment out command
+- runner history
+- runner autocomplete on dirs
 - figure out how to autoimport
 - implement line building for popup/modals
 - make info on autocomplete easier to read
