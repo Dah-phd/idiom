@@ -4,12 +4,12 @@ mod messages;
 mod notification;
 mod request;
 mod servers;
+use crate::utils::{into_guard, split_arc_mutex, split_arc_mutex_async};
 pub use client::LSPClient;
 use lsp_stream::JsonRCP;
 pub use messages::{Diagnostic, GeneralNotification, LSPMessage, Request, Response};
 pub use notification::LSPNotification;
 pub use request::LSPRequest;
-use crate::utils::{into_guard, split_arc_mutex, split_arc_mutex_async};
 
 use anyhow::{anyhow, Error, Result};
 use lsp_types::{
@@ -24,12 +24,7 @@ use std::{
     process::Stdio,
     sync::{Arc, Mutex},
 };
-use tokio::{
-    io::AsyncWriteExt,
-    process::{Child},
-    sync::mpsc,
-    task::JoinHandle,
-};
+use tokio::{io::AsyncWriteExt, process::Child, sync::mpsc, task::JoinHandle};
 
 #[cfg(build = "debug")]
 use crate::utils::debug_to_file;

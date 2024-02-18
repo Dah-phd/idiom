@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use crate::utils::{trim_start_inplace, Offset};
+use std::path::PathBuf;
 
 use super::types::FileType;
 use super::{load_or_create_config, EDITOR_CFG_FILE};
@@ -56,7 +56,7 @@ impl EditorConfigs {
         match file_type {
             FileType::Rust => Some(self.rust_lsp.to_owned()),
             FileType::Python => Some(self.python_lsp.to_owned()),
-            _ => None
+            _ => None,
         }
     }
 

@@ -1,6 +1,7 @@
 use anyhow::Result;
 use portable_pty::PtyPair;
 use portable_pty::{native_pty_system, Child, CommandBuilder, PtySize};
+use std::path::PathBuf;
 use std::{
     io::{BufReader, Read, Write},
     sync::{Arc, Mutex},
@@ -116,6 +117,17 @@ impl Drop for Terminal {
     fn drop(&mut self) {
         self.output_handler.abort();
         let _ = self.child.kill();
+    }
+}
+
+pub fn load_file(f: &str, gs: &mut GlobalState) -> Option<String> {
+    let path = PathBuf::from(f);
+    match path.canonicalize() {
+        Ok(path) => {
+            gs.workspace.push(WorkspaceEvent::Open(path, 0));
+            None
+        }
+        Err(err) => Some(err.to_string()),
     }
 }
 

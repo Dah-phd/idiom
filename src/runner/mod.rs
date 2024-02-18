@@ -1,3 +1,4 @@
+use crate::runner::commands::load_file;
 use crate::widgests::TextField;
 use ratatui::prelude::Span;
 use ratatui::text::Line;
@@ -162,6 +163,7 @@ impl EditorTerminal {
             self.logs.push("    keymap => open keymap config file.".to_owned());
             self.logs.push("    config => open editor config file.".to_owned());
             self.logs.push("    theme => open theme config file.".to_owned());
+            self.logs.push("    ${file_path} => loads path into editor.".to_owned());
             self.logs.push("Example: &i load keymap".to_owned());
         }
         if arg.trim() == "loc" {
@@ -174,14 +176,11 @@ impl EditorTerminal {
                 "keymap" => load_cfg(KEY_MAP, gs),
                 "config" => load_cfg(EDITOR_CFG_FILE, gs),
                 "theme" => load_cfg(THEME_FILE, gs),
-                _ => {
-                    self.logs.push("Invalid arg on %i load <cfg>".to_owned());
-                    self.logs.push(format!("Bad arg: {}", cfg));
-                    self.logs.push("Expected: keymap | config | theme!".to_owned());
-                    None
-                }
+                any => load_file(any, gs),
             } {
                 self.logs.push(msg);
+            } else {
+                gs.toggle_terminal(self);
             }
         }
         Ok(())
