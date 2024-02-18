@@ -16,7 +16,6 @@ pub struct EditorConfigs {
     pub unindent_before: String,
     pub format_on_save: bool,
     pub rust_lsp: String,
-    #[serde(skip, default = "get_python_lsp")]
     pub python_lsp: String,
 }
 
