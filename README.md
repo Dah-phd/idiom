@@ -2,7 +2,6 @@
 
 ## Current version support basic file tree and navigation:
 ## TODO!
-- use configs for LSP
 - add comment out command
 - runner history
 - runner autocomplete on dirs

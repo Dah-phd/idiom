@@ -213,9 +213,14 @@ impl Workspace {
 
     async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> Result<Editor> {
         let mut new = Editor::from_path(file_path, self.base_config.clone())?;
+        new.resize(gs.editor_area.width as usize, gs.editor_area.height as usize);
+        let lsp_cmd = match self.base_config.derive_lsp(&new.file_type) {
+            None => return Ok(new),
+            Some(cmd) => cmd,
+        };
         match self.lsp_servers.entry(new.file_type) {
             Entry::Vacant(entry) => {
-                if let Ok(lsp) = LSP::from(&new.file_type).await {
+                if let Ok(lsp) = LSP::new(lsp_cmd).await {
                     let client = lsp.aquire_client();
                     gs.tree.push(TreeEvent::RegisterLSP(client.get_lsp_registration()));
                     new.lexer.set_lsp_client(client, &new.file_type, new.stringify(), gs);
@@ -229,7 +234,6 @@ impl Workspace {
                 new.lexer.set_lsp_client(entry.get().aquire_client(), &new.file_type, new.stringify(), gs);
             }
         }
-        new.resize(gs.editor_area.width as usize, gs.editor_area.height as usize);
         Ok(new)
     }
 

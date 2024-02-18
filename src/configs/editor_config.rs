@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use crate::utils::{trim_start_inplace, Offset};
 
 use super::types::FileType;
@@ -37,11 +38,25 @@ impl EditorConfigs {
         load_or_create_config(EDITOR_CFG_FILE)
     }
 
+    pub fn derive_file_type(&mut self, path: &PathBuf) -> FileType {
+        let ft = FileType::derive_type(path);
+        self.update_by_file_type(&ft);
+        ft
+    }
+
     pub fn update_by_file_type(&mut self, file_type: &FileType) {
         #[allow(clippy::single_match)]
         match file_type {
             FileType::Python => self.indent_after.push(':'),
             _ => (),
+        }
+    }
+
+    pub fn derive_lsp(&self, file_type: &FileType) -> Option<String> {
+        match file_type {
+            FileType::Rust => Some(self.rust_lsp.to_owned()),
+            FileType::Python => Some(self.python_lsp.to_owned()),
+            _ => None
         }
     }
 
@@ -103,5 +118,5 @@ fn get_rust_lsp() -> String {
 }
 
 fn get_python_lsp() -> String {
-    String::from("pylsp")
+    String::from("python3 -m pylsp")
 }

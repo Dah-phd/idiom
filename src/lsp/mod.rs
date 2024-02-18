@@ -9,8 +9,6 @@ use lsp_stream::JsonRCP;
 pub use messages::{Diagnostic, GeneralNotification, LSPMessage, Request, Response};
 pub use notification::LSPNotification;
 pub use request::LSPRequest;
-
-use crate::configs::FileType;
 use crate::utils::{into_guard, split_arc_mutex, split_arc_mutex_async};
 
 use anyhow::{anyhow, Error, Result};
@@ -28,7 +26,7 @@ use std::{
 };
 use tokio::{
     io::AsyncWriteExt,
-    process::{Child, Command},
+    process::{Child},
     sync::mpsc,
     task::JoinHandle,
 };
@@ -41,7 +39,7 @@ use crate::utils::debug_to_file;
 pub struct LSP {
     pub notifications: Arc<Mutex<Vec<GeneralNotification>>>,
     pub requests: Arc<tokio::sync::Mutex<Vec<Request>>>,
-    file_type: FileType,
+    lsp_cmd: String,
     inner: Child,
     client: LSPClient,
     lsp_json_handler: JoinHandle<Result<()>>,
@@ -50,15 +48,8 @@ pub struct LSP {
 }
 
 impl LSP {
-    pub async fn from(file_type: &FileType) -> Result<Self> {
-        match file_type {
-            FileType::Rust => Self::new(servers::rust_lsp(), *file_type).await,
-            FileType::Python => Self::new(servers::python_lsp(), *file_type).await,
-            _ => Err(anyhow!("Not supported LSP!")),
-        }
-    }
-
-    async fn new(mut server: Command, language: FileType) -> Result<Self> {
+    pub async fn new(lsp_cmd: String) -> Result<Self> {
+        let mut server = servers::server_cmd(&lsp_cmd)?;
         let mut inner = server.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::piped()).spawn()?;
 
         // splitting subprocess
@@ -123,7 +114,7 @@ impl LSP {
             notifications,
             requests,
             client: LSPClient::new(diagnostics, responses, channel, capabilities),
-            file_type: language,
+            lsp_cmd,
             inner,
             lsp_json_handler,
             lsp_send_handler,
@@ -140,7 +131,7 @@ impl LSP {
             if self.attempts == 0 {
                 return Err(anyhow!("Unable to recover!"));
             }
-            match Self::from(&self.file_type).await {
+            match Self::new(self.lsp_cmd.to_owned()).await {
                 Ok(lsp) => {
                     #[cfg(build = "debug")]
                     debug_to_file("test_data.restart", self.attempts);
