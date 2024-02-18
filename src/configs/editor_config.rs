@@ -25,8 +25,8 @@ impl Default for EditorConfigs {
             indent: "    ".to_owned(),
             indent_after: get_indent_after(),
             unindent_before: get_unident_before(),
-            rust_lsp: get_rust_lsp(),
-            python_lsp: get_python_lsp(),
+            rust_lsp: String::from("${cfg_dir}/rust-analyzer"),
+            python_lsp: String::from("python3 -m pylsp"),
             format_on_save: true,
         }
     }
@@ -110,12 +110,4 @@ fn get_indent_after() -> String {
 
 fn get_unident_before() -> String {
     String::from("]})")
-}
-
-fn get_rust_lsp() -> String {
-    String::from("${cfg_dir}/rust-analyzer")
-}
-
-fn get_python_lsp() -> String {
-    String::from("python3 -m pylsp")
 }
