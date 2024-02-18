@@ -388,6 +388,7 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
                 EditorAction::GoToDeclaration => editor.declarations(),
                 EditorAction::Help => editor.help(),
                 EditorAction::LSPRename => editor.start_renames(),
+                EditorAction::CommentOut => editor.comment_out(),
                 EditorAction::Undo => editor.undo(),
                 EditorAction::Redo => editor.redo(),
                 EditorAction::Save => editor.save(gs),

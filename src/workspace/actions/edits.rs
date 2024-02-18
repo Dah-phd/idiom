@@ -123,6 +123,19 @@ impl Edit {
         }
     }
 
+    pub fn remove_from_line(at_line: usize, from: usize, to: usize, line: &mut String) -> Self {
+        let start = Position::new(at_line as u32, from as u32);
+        let old = line[from..to].to_owned();
+        line.replace_range(from..to, "");
+        Self {
+            meta: EditMetaData::line_changed(at_line),
+            reverse_text_edit: TextEdit::new(Range::new(start, start), old),
+            text_edit: TextEdit::new(Range::new(start, Position::new(at_line as u32, to as u32)), String::new()),
+            select: None,
+            new_select: None,
+        }
+    }
+
     /// builds action from removed data
     pub fn extract_from_start(line: usize, len: usize, text: &mut String) -> Self {
         let position = Position::new(line as u32, 0);

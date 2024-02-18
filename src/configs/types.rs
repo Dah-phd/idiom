@@ -35,6 +35,13 @@ impl FileType {
         };
         Self::Unknown
     }
+
+    pub fn comment_start(&self) -> &str {
+        match self {
+            Self::Python => "#",
+            _ => "//",
+        }
+    }
 }
 
 impl From<&FileType> for &'static str {

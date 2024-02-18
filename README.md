@@ -2,7 +2,7 @@
 
 ## Current version support basic file tree and navigation:
 ## TODO!
-- add comment out command
+- add comment out command for select
 - runner history
 - runner autocomplete on dirs
 - figure out how to autoimport

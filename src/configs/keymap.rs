@@ -73,6 +73,7 @@ pub enum EditorAction {
     Save,
     Cancel,
     Close,
+    CommentOut,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,6 +119,7 @@ pub struct EditorUserKeyMap {
     save: String,
     cancel: String,
     close: String,
+    comment_out: String,
 }
 
 impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
@@ -163,6 +165,7 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
         insert_key_event(&mut hash, &val.save, EditorAction::Save);
         insert_key_event(&mut hash, &val.cancel, EditorAction::Cancel);
         insert_key_event(&mut hash, &val.close, EditorAction::Close);
+        insert_key_event(&mut hash, &val.comment_out, EditorAction::CommentOut);
         hash
     }
 }
@@ -209,7 +212,8 @@ impl Default for EditorUserKeyMap {
             redo: format!("{CTRL} && y"),
             save: format!("{CTRL} && s"),
             cancel: String::from(ESC),
-            close: format!("{} && {} || {} && {}", CTRL, 'q', CTRL, 'd'),
+            close: format!("{CTRL} && q || {CTRL} && d"),
+            comment_out: format!("{CTRL} && /"),
         }
     }
 }
@@ -279,7 +283,7 @@ impl Default for GeneralUserKeyMap {
             exit: format!("{CTRL} && d || {CTRL} && q"),
             hide_file_tree: format!("{CTRL} && e"),
             refresh_settings: format!("{F}5"),
-            go_to_line: format!("{CTRL} && 'g"),
+            go_to_line: format!("{CTRL} && g"),
             toggle_terminal: format!("{CTRL} && `"),
         }
     }
@@ -432,6 +436,7 @@ fn split_mod_char_key_event(key: KeyEvent) -> Vec<KeyEvent> {
     match (key.modifiers, key.code) {
         (KeyModifiers::CONTROL, KeyCode::Char(']')) => events.push(KeyEvent::new(KeyCode::Char('5'), key.modifiers)),
         (KeyModifiers::CONTROL, KeyCode::Char('`')) => events.push(KeyEvent::new(KeyCode::Char(' '), key.modifiers)),
+        (KeyModifiers::CONTROL, KeyCode::Char('/')) => events.push(KeyEvent::new(KeyCode::Char('7'), key.modifiers)),
         _ => (),
     }
     events

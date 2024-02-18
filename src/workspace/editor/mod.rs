@@ -390,6 +390,10 @@ impl Editor {
         self.actions.unindent(&mut self.cursor, &mut self.content);
     }
 
+    pub fn comment_out(&mut self) {
+        self.actions.comment_out(self.file_type.comment_start(), &mut self.cursor, &mut self.content);
+    }
+
     pub fn save(&mut self, gs: &mut GlobalState) {
         if self.try_write_file(gs) {
             self.lexer.save_and_check_lsp(self.file_type, gs);

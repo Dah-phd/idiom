@@ -107,17 +107,8 @@ impl Actions {
                 }
             }
             None => {
-                let mut indent = if cursor.line > 0 {
-                    self.cfg.derive_indent_from(&content[cursor.line - 1])
-                } else {
-                    self.cfg.indent.to_owned()
-                };
-                if indent.is_empty() {
-                    indent = self.cfg.indent.to_owned();
-                };
-                let char_offset = indent.len();
-                self.push_done(Edit::insert_clip(cursor.into(), indent, content));
-                cursor.add_to_char(char_offset);
+                self.push_done(Edit::insert_clip(cursor.into(), self.cfg.indent.to_owned(), content));
+                cursor.add_to_char(self.cfg.indent.len());
             }
         }
     }
@@ -236,6 +227,36 @@ impl Actions {
         }
         content.insert(cursor.line, line);
         self.push_done(builder.finish(cursor.into(), content));
+    }
+
+    pub fn comment_out(&mut self, pat: &str, cursor: &mut Cursor, content: &mut Vec<String>) {
+        let line = &mut content[cursor.line];
+        if line.trim().starts_with(pat) {
+            let edit = self.uncomment(pat, line, cursor);
+            self.push_done(edit);
+        } else if let Some(edit) = self.into_comment(pat, line, cursor) {
+            self.push_done(edit);
+        }
+    }
+
+    fn into_comment(&mut self, pat: &str, line: &mut String, cursor: &mut Cursor) -> Option<Edit> {
+        let idx = line.char_indices().flat_map(|(idx, c)| if c.is_whitespace() { None } else { Some(idx) }).next()?;
+        let comment_start = format!("{pat} ");
+        line.insert_str(idx, &comment_start);
+        if cursor.char >= idx {
+            cursor.add_to_char(comment_start.len());
+        }
+        Some(Edit::record_in_line_insertion(CursorPosition { line: cursor.line, char: idx }.into(), comment_start))
+    }
+
+    fn uncomment(&mut self, pat: &str, line: &mut String, cursor: &mut Cursor) -> Edit {
+        let idx = line.find(pat).unwrap();
+        let mut end_idx = idx + pat.len();
+        end_idx += line[idx + pat.len()..].chars().take_while(|c| c.is_whitespace()).count();
+        if cursor.char >= idx {
+            cursor.sub_char(end_idx - idx);
+        };
+        Edit::remove_from_line(cursor.line, idx, end_idx, line)
     }
 
     pub fn push_char(&mut self, ch: char, cursor: &mut Cursor, content: &mut Vec<String>) {
