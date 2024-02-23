@@ -232,7 +232,7 @@ impl Actions {
 
     pub fn comment_out(&mut self, pat: &str, cursor: &mut Cursor, content: &mut [String]) {
         match cursor.select_take() {
-            Some((from, to)) => {
+            Some((mut from, mut to)) => {
                 let selected = to.line - from.line + 1;
                 let should_uncomment = content
                     .iter()
@@ -240,97 +240,39 @@ impl Actions {
                     .take(selected)
                     .all(|l| l.trim().starts_with(pat) || l.chars().all(|c| c.is_whitespace()));
                 let select = content.iter_mut().enumerate().skip(from.line).take(selected);
-                if should_uncomment {
-                    let edits = select
-                        .flat_map(|(i, line)| {
-                            Self::uncomment(pat, line, CursorPosition { line: i, char: cursor.char }).map(
-                                |(offset, edit)| {
-                                    if cursor.line == i {
-                                        let mut f = from;
-                                        let mut t = to;
-                                        if to.line == i || from.line == i {
-                                            if to.line == i {
-                                                t = CursorPosition { line: i, char: offset.offset(to.char) };
-                                            }
-                                            if from.line == i {
-                                                f = CursorPosition { line: i, char: offset.offset(from.char) };
-                                            }
-                                        };
-                                        if cursor.position() == from {
-                                            cursor.select_set(t, f);
-                                        } else {
-                                            cursor.select_set(f, t);
-                                        }
-                                    };
-                                    edit
-                                },
-                            )
+                let map_f = if should_uncomment { uncomment } else { into_comment };
+                let edits = select
+                    .flat_map(|(i, line)| {
+                        (map_f)(pat, line, CursorPosition { line: i, char: cursor.char }).map(|(offset, edit)| {
+                            if to.line == i {
+                                to.char = offset.offset(to.char);
+                            }
+                            if from.line == i {
+                                from.char = offset.offset(from.char);
+                            }
+                            edit
                         })
-                        .collect::<Vec<Edit>>();
-                    self.push_done(edits);
+                    })
+                    .collect::<Vec<Edit>>();
+                if from.line == to.line {
+                } else if from.line == cursor.line {
+                    cursor.select_set(to, from);
                 } else {
-                    let edits = select
-                        .flat_map(|(i, line)| {
-                            Self::into_comment(pat, line, CursorPosition { line: i, char: cursor.char }).map(
-                                |(offset, edit)| {
-                                    if cursor.line == i {
-                                        let mut f = from;
-                                        let mut t = to;
-                                        if to.line == i || from.line == i {
-                                            if to.line == i {
-                                                t = CursorPosition { line: i, char: offset.offset(to.char) };
-                                            }
-                                            if from.line == i {
-                                                f = CursorPosition { line: i, char: offset.offset(from.char) };
-                                            }
-                                        };
-                                        if cursor.position() == from {
-                                            cursor.select_set(t, f);
-                                        } else {
-                                            cursor.select_set(f, t);
-                                        }
-                                    };
-                                    edit
-                                },
-                            )
-                        })
-                        .collect::<Vec<Edit>>();
-                    self.push_done(edits);
-                }
+                    cursor.select_set(from, to);
+                };
+                self.push_done(edits);
             }
             _ => {
                 let line = &mut content[cursor.line];
-                if let Some((offset, edit)) = Self::uncomment(pat, line, cursor.position()) {
+                if let Some((offset, edit)) = uncomment(pat, line, cursor.position()) {
                     self.push_done(edit);
                     cursor.char = offset.offset(cursor.char);
-                } else if let Some((offset, edit)) = Self::into_comment(pat, line, cursor.position()) {
+                } else if let Some((offset, edit)) = into_comment(pat, line, cursor.position()) {
                     self.push_done(edit);
                     cursor.char = offset.offset(cursor.char);
                 }
             }
         }
-    }
-
-    fn into_comment(pat: &str, line: &mut String, cursor: CursorPosition) -> Option<(Offset, Edit)> {
-        let idx = line.char_indices().flat_map(|(idx, c)| if c.is_whitespace() { None } else { Some(idx) }).next()?;
-        let comment_start = format!("{pat} ");
-        line.insert_str(idx, &comment_start);
-        let offset = if cursor.char >= idx { Offset::Pos(comment_start.len()) } else { Offset::Pos(0) };
-        Some((
-            offset,
-            Edit::record_in_line_insertion(CursorPosition { line: cursor.line, char: idx }.into(), comment_start),
-        ))
-    }
-
-    fn uncomment(pat: &str, line: &mut String, cursor: CursorPosition) -> Option<(Offset, Edit)> {
-        if !line.trim().starts_with(pat) {
-            return None;
-        }
-        let idx = line.find(pat)?;
-        let mut end_idx = idx + pat.len();
-        end_idx += line[idx + pat.len()..].chars().take_while(|c| c.is_whitespace()).count();
-        let offset = if cursor.char >= idx { Offset::Neg(end_idx - idx) } else { Offset::Neg(0) };
-        Some((offset, Edit::remove_from_line(cursor.line, idx, end_idx, line)))
     }
 
     pub fn push_char(&mut self, ch: char, cursor: &mut Cursor, content: &mut Vec<String>) {
@@ -579,4 +521,26 @@ fn add_select(edits: &mut [Edit], old: Option<Select>, new: Option<Select>) {
     if let Some(edit) = edits.last_mut() {
         edit.select = new;
     }
+}
+
+fn into_comment(pat: &str, line: &mut String, cursor: CursorPosition) -> Option<(Offset, Edit)> {
+    let idx = line.char_indices().flat_map(|(idx, c)| if c.is_whitespace() { None } else { Some(idx) }).next()?;
+    let comment_start = format!("{pat} ");
+    line.insert_str(idx, &comment_start);
+    let offset = if cursor.char >= idx { Offset::Pos(comment_start.len()) } else { Offset::Pos(0) };
+    Some((
+        offset,
+        Edit::record_in_line_insertion(CursorPosition { line: cursor.line, char: idx }.into(), comment_start),
+    ))
+}
+
+fn uncomment(pat: &str, line: &mut String, cursor: CursorPosition) -> Option<(Offset, Edit)> {
+    if !line.trim().starts_with(pat) {
+        return None;
+    }
+    let idx = line.find(pat)?;
+    let mut end_idx = idx + pat.len();
+    end_idx += line[idx + pat.len()..].chars().take_while(|c| c.is_whitespace()).count();
+    let offset = if cursor.char >= idx { Offset::Neg(end_idx - idx) } else { Offset::Neg(0) };
+    Some((offset, Edit::remove_from_line(cursor.line, idx, end_idx, line)))
 }
