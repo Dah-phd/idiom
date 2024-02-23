@@ -231,9 +231,10 @@ impl Actions {
     }
 
     pub fn comment_out(&mut self, pat: &str, cursor: &mut Cursor, content: &mut [String]) {
+        // TODO refactor
         match cursor.select_take() {
             Some((mut from, mut to)) => {
-                let from_base = from.clone();
+                let from_char = from.char;
                 let lines_n = to.line - from.line + 1;
                 let cb = if select_is_commented(from.line, lines_n, pat, content) { uncomment } else { into_comment };
                 let select = content.iter_mut().enumerate().skip(from.line).take(lines_n);
@@ -251,7 +252,7 @@ impl Actions {
                     })
                     .collect::<Vec<Edit>>();
                 if from.line == to.line {
-                    if from_base == cursor.position() {
+                    if from_char == cursor.char {
                         cursor.select_set(to, from);
                     } else {
                         cursor.select_set(from, to);
