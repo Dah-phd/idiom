@@ -9,7 +9,6 @@
 - implement line building for popup/modals
 - make info on autocomplete easier to read
 - check autocomplete on python
-- (backlog) semantic token styles for diff lsp langs
 
 
 ## Target langs:
