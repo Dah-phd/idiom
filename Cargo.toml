@@ -9,7 +9,11 @@ include = [
     "README.MD"
 ]
 license = "MIT"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Simple low config editor supporting LSP and syntax highlighting."
+repository = "https://github.com/Dah-phd/idiom"
+keywords = ["terminal", "editor", "lsp"]
+categories = ["editor"]
+authors = ["Daniel Nikolaev <toolsproed@gmail.com>"]
 
 [dependencies]
 crossterm = "0.27.0"
