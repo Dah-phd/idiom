@@ -6,6 +6,7 @@ use ratatui::{
 
 /// used to map markup lines based on info
 /// functionality as line number, wrap, cursor position, select are handled by the logic in LineBuilder
+#[allow(dead_code)]
 pub fn mark_down_line<'a>(
     // TODO enable
     _builder: &mut LineBuilder,
