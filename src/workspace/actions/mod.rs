@@ -233,21 +233,17 @@ impl Actions {
     pub fn comment_out(&mut self, pat: &str, cursor: &mut Cursor, content: &mut [String]) {
         match cursor.select_take() {
             Some((mut from, mut to)) => {
-                let selected = to.line - from.line + 1;
-                let should_uncomment = content
-                    .iter()
-                    .skip(from.line)
-                    .take(selected)
-                    .all(|l| l.trim().starts_with(pat) || l.chars().all(|c| c.is_whitespace()));
-                let select = content.iter_mut().enumerate().skip(from.line).take(selected);
-                let map_f = if should_uncomment { uncomment } else { into_comment };
+                let from_base = from.clone();
+                let lines_n = to.line - from.line + 1;
+                let cb = if select_is_commented(from.line, lines_n, pat, content) { uncomment } else { into_comment };
+                let select = content.iter_mut().enumerate().skip(from.line).take(lines_n);
                 let edits = select
-                    .flat_map(|(i, line)| {
-                        (map_f)(pat, line, CursorPosition { line: i, char: cursor.char }).map(|(offset, edit)| {
-                            if to.line == i {
+                    .flat_map(|(line_idx, line)| {
+                        (cb)(pat, line, CursorPosition { line: line_idx, char: cursor.char }).map(|(offset, edit)| {
+                            if to.line == line_idx {
                                 to.char = offset.offset(to.char);
                             }
-                            if from.line == i {
+                            if from.line == line_idx {
                                 from.char = offset.offset(from.char);
                             }
                             edit
@@ -255,6 +251,11 @@ impl Actions {
                     })
                     .collect::<Vec<Edit>>();
                 if from.line == to.line {
+                    if from_base == cursor.position() {
+                        cursor.select_set(to, from);
+                    } else {
+                        cursor.select_set(from, to);
+                    }
                 } else if from.line == cursor.line {
                     cursor.select_set(to, from);
                 } else {
@@ -521,6 +522,10 @@ fn add_select(edits: &mut [Edit], old: Option<Select>, new: Option<Select>) {
     if let Some(edit) = edits.last_mut() {
         edit.select = new;
     }
+}
+
+fn select_is_commented(from: usize, n: usize, pat: &str, content: &[String]) -> bool {
+    content.iter().skip(from).take(n).all(|l| l.trim().starts_with(pat) || l.chars().all(|c| c.is_whitespace()))
 }
 
 fn into_comment(pat: &str, line: &mut String, cursor: CursorPosition) -> Option<(Offset, Edit)> {
