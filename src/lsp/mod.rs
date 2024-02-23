@@ -15,7 +15,7 @@ use anyhow::{anyhow, Error, Result};
 use lsp_types::{
     notification::{Exit, Initialized},
     request::{Initialize, Shutdown},
-    {InitializeResult, InitializedParams, Url},
+    InitializeResult, InitializedParams, Url,
 };
 use serde_json::from_value;
 use std::{
@@ -130,7 +130,8 @@ impl LSP {
                 Ok(lsp) => {
                     #[cfg(build = "debug")]
                     debug_to_file("test_data.restart", self.attempts);
-                    let broken = std::mem::replace(self, lsp);
+                    let mut broken = std::mem::replace(self, lsp);
+                    let _ = broken.dash_nine().await; // ensure old lsp is dead!
                     return Ok(Some(match broken.lsp_json_handler.await {
                         Ok(_) => anyhow!("LSP handler crashed!"),
                         Err(join_err) => anyhow!("Failed to collect crash report! Join err: {join_err}"),
@@ -159,7 +160,7 @@ impl LSP {
         let shoutdown_request: LSPRequest<Shutdown> = LSPRequest::with(0, ());
         let _ = self.client.request(shoutdown_request);
         let notification: LSPNotification<Exit> = LSPNotification::with(());
-        self.client.notify(notification)?;
+        let _ = self.client.notify(notification);
         self.dash_nine().await?;
         Ok(())
     }

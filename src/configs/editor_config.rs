@@ -26,7 +26,7 @@ impl Default for EditorConfigs {
             indent_after: get_indent_after(),
             unindent_before: get_unident_before(),
             rust_lsp: String::from("${cfg_dir}/rust-analyzer"),
-            python_lsp: String::from("python3 -m pylsp"),
+            python_lsp: String::from("jedi-language-server"),
             format_on_save: true,
         }
     }

@@ -2,16 +2,15 @@ use super::as_url;
 use crate::workspace::CursorPosition;
 
 use anyhow::Result;
+use lsp_types as lsp;
 use lsp_types::{
     request::{
         Completion, GotoDeclaration, GotoDeclarationParams, GotoDefinition, HoverRequest, Initialize, References,
         Rename, SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
     },
-    ClientCapabilities, CompletionParams, GotoDefinitionParams, HoverClientCapabilities, HoverParams, InitializeParams,
-    MarkupKind, PartialResultParams, Range, ReferenceClientCapabilities, ReferenceContext, ReferenceParams,
-    RenameParams, SemanticTokensParams, SemanticTokensRangeParams, SignatureHelpClientCapabilities,
-    SignatureHelpParams, TextDocumentClientCapabilities, TextDocumentIdentifier, TextDocumentPositionParams,
-    TextDocumentSyncClientCapabilities, WorkDoneProgressParams, WorkspaceClientCapabilities, WorkspaceFolder,
+    CompletionItemKindCapability, CompletionParams, GotoDefinitionParams, HoverParams, Range, ReferenceContext,
+    ReferenceParams, RenameParams, SemanticTokensParams, SemanticTokensRangeParams, SignatureHelpParams,
+    TextDocumentIdentifier, TextDocumentPositionParams, TextDocumentSyncClientCapabilities, WorkspaceFolder,
 };
 use serde::Serialize;
 use serde_json::to_string;
@@ -55,8 +54,8 @@ where
                     position: c.into(),
                 },
                 context: ReferenceContext { include_declaration: false },
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: PartialResultParams::default(),
+                work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+                partial_result_params: lsp::PartialResultParams::default(),
             },
         ))
     }
@@ -70,7 +69,7 @@ where
                     position: c.into(),
                 },
                 new_name,
-                work_done_progress_params: WorkDoneProgressParams::default(),
+                work_done_progress_params: lsp::WorkDoneProgressParams::default(),
             },
         ))
     }
@@ -80,8 +79,8 @@ where
             0,
             SemanticTokensParams {
                 text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: PartialResultParams::default(),
+                work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+                partial_result_params: lsp::PartialResultParams::default(),
             },
         ))
     }
@@ -92,8 +91,8 @@ where
             SemanticTokensRangeParams {
                 text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
                 range,
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: PartialResultParams::default(),
+                work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+                partial_result_params: lsp::PartialResultParams::default(),
             },
         ))
     }
@@ -106,8 +105,8 @@ where
                     text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
                     position: c.into(),
                 },
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: PartialResultParams::default(),
+                work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+                partial_result_params: lsp::PartialResultParams::default(),
             },
         ))
     }
@@ -120,8 +119,8 @@ where
                     text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
                     position: c.into(),
                 },
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: PartialResultParams::default(),
+                work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+                partial_result_params: lsp::PartialResultParams::default(),
             },
         ))
     }
@@ -134,8 +133,8 @@ where
                     text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
                     position: c.into(),
                 },
-                work_done_progress_params: WorkDoneProgressParams::default(),
-                partial_result_params: PartialResultParams::default(),
+                work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+                partial_result_params: lsp::PartialResultParams::default(),
                 context: None,
             },
         ))
@@ -150,7 +149,7 @@ where
                     text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
                     position: c.into(),
                 },
-                work_done_progress_params: WorkDoneProgressParams::default(),
+                work_done_progress_params: lsp::WorkDoneProgressParams::default(),
             },
         ))
     }
@@ -163,7 +162,7 @@ where
                     text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
                     position: c.into(),
                 },
-                work_done_progress_params: WorkDoneProgressParams::default(),
+                work_done_progress_params: lsp::WorkDoneProgressParams::default(),
             },
         ))
     }
@@ -172,21 +171,37 @@ where
         let uri = as_url(std::env::current_dir()?.as_path())?;
         Ok(LSPRequest::with(
             0,
-            InitializeParams {
+            lsp::InitializeParams {
                 workspace_folders: Some(vec![WorkspaceFolder { uri, name: "root".to_owned() }]),
-                capabilities: ClientCapabilities {
-                    workspace: Some(WorkspaceClientCapabilities { ..Default::default() }),
-                    text_document: Some(TextDocumentClientCapabilities {
+                capabilities: lsp::ClientCapabilities {
+                    workspace: Some(lsp::WorkspaceClientCapabilities { ..Default::default() }),
+                    text_document: Some(lsp::TextDocumentClientCapabilities {
+                        completion: Some(lsp::CompletionClientCapabilities {
+                            completion_item: Some(lsp::CompletionItemCapability {
+                                resolve_support: Some(lsp::CompletionItemCapabilityResolveSupport {
+                                    properties: vec![
+                                        String::from("documentation"),
+                                        String::from("detail"),
+                                        String::from("additionalTextEdits"),
+                                    ],
+                                }),
+                                insert_replace_support: Some(true),
+                                ..Default::default()
+                            }),
+                            completion_item_kind: Some(CompletionItemKindCapability { ..Default::default() }),
+                            context_support: None, // additional context information Some(true)
+                            ..Default::default()
+                        }),
                         synchronization: Some(TextDocumentSyncClientCapabilities {
                             did_save: Some(true),
                             ..Default::default()
                         }),
-                        hover: Some(HoverClientCapabilities {
-                            content_format: Some(vec![MarkupKind::PlainText]),
+                        hover: Some(lsp::HoverClientCapabilities {
+                            content_format: Some(vec![lsp::MarkupKind::PlainText]),
                             ..Default::default()
                         }),
-                        references: Some(ReferenceClientCapabilities::default()),
-                        signature_help: Some(SignatureHelpClientCapabilities {
+                        references: Some(lsp::ReferenceClientCapabilities::default()),
+                        signature_help: Some(lsp::SignatureHelpClientCapabilities {
                             context_support: Some(true),
                             ..Default::default()
                         }),

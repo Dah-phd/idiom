@@ -1,9 +1,11 @@
 use std::path::PathBuf;
 mod editor_config;
 mod keymap;
+mod theme_ui;
 mod types;
 pub use editor_config::EditorConfigs;
 pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap, TreeAction, TreeUserKeyMap};
+pub use theme_ui::UITheme;
 pub use types::FileType;
 
 use std::collections::HashMap;
@@ -17,6 +19,7 @@ pub const CONFIG_FOLDER: &str = "idiom";
 pub const EDITOR_CFG_FILE: &str = ".editor";
 pub const KEY_MAP: &str = ".keys";
 pub const THEME_FILE: &str = "theme.json";
+pub const THEME_UI: &str = "theme_ui.json";
 
 #[derive(Debug)]
 pub struct EditorKeyMap {
