@@ -131,7 +131,7 @@ impl EditorTerminal {
             }
             _ => {
                 self.cmd.map(key, &mut gs.clipboard);
-                self.to_last_log();
+                self.go_to_last_log();
             }
         }
         true
@@ -140,7 +140,7 @@ impl EditorTerminal {
     fn poll_results(&mut self) {
         if let Some(logs) = self.terminal.as_mut().and_then(|t| t.pull_logs()) {
             self.logs.extend(logs);
-            self.to_last_log();
+            self.go_to_last_log();
         }
     }
 
@@ -150,7 +150,7 @@ impl EditorTerminal {
         }
     }
 
-    fn to_last_log(&mut self) {
+    fn go_to_last_log(&mut self) {
         let logs_with_prompt = self.logs.len() + 2;
         if self.max_rows + self.at_log < logs_with_prompt {
             self.at_log = logs_with_prompt.saturating_sub(self.max_rows);
