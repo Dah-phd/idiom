@@ -1,3 +1,4 @@
+use crate::utils::Offset;
 mod action_buffer;
 mod edits;
 use crate::configs::EditorConfigs;
@@ -229,34 +230,51 @@ impl Actions {
         self.push_done(builder.finish(cursor.into(), content));
     }
 
-    pub fn comment_out(&mut self, pat: &str, cursor: &mut Cursor, content: &mut Vec<String>) {
-        let line = &mut content[cursor.line];
-        if line.trim().starts_with(pat) {
-            let edit = self.uncomment(pat, line, cursor);
-            self.push_done(edit);
-        } else if let Some(edit) = self.into_comment(pat, line, cursor) {
-            self.push_done(edit);
+    pub fn comment_out(&mut self, pat: &str, cursor: &mut Cursor, content: &mut [String]) {
+        // TODO refactor
+        match cursor.select_take() {
+            Some((mut from, mut to)) => {
+                let from_char = from.char;
+                let lines_n = to.line - from.line + 1;
+                let cb = if select_is_commented(from.line, lines_n, pat, content) { uncomment } else { into_comment };
+                let select = content.iter_mut().enumerate().skip(from.line).take(lines_n);
+                let edits = select
+                    .flat_map(|(line_idx, line)| {
+                        (cb)(pat, line, CursorPosition { line: line_idx, char: cursor.char }).map(|(offset, edit)| {
+                            if to.line == line_idx {
+                                to.char = offset.offset(to.char);
+                            }
+                            if from.line == line_idx {
+                                from.char = offset.offset(from.char);
+                            }
+                            edit
+                        })
+                    })
+                    .collect::<Vec<Edit>>();
+                if from.line == to.line {
+                    if from_char == cursor.char {
+                        cursor.select_set(to, from);
+                    } else {
+                        cursor.select_set(from, to);
+                    }
+                } else if from.line == cursor.line {
+                    cursor.select_set(to, from);
+                } else {
+                    cursor.select_set(from, to);
+                };
+                self.push_done(edits);
+            }
+            _ => {
+                let line = &mut content[cursor.line];
+                if let Some((offset, edit)) = uncomment(pat, line, cursor.position()) {
+                    self.push_done(edit);
+                    cursor.char = offset.offset(cursor.char);
+                } else if let Some((offset, edit)) = into_comment(pat, line, cursor.position()) {
+                    self.push_done(edit);
+                    cursor.char = offset.offset(cursor.char);
+                }
+            }
         }
-    }
-
-    fn into_comment(&mut self, pat: &str, line: &mut String, cursor: &mut Cursor) -> Option<Edit> {
-        let idx = line.char_indices().flat_map(|(idx, c)| if c.is_whitespace() { None } else { Some(idx) }).next()?;
-        let comment_start = format!("{pat} ");
-        line.insert_str(idx, &comment_start);
-        if cursor.char >= idx {
-            cursor.add_to_char(comment_start.len());
-        }
-        Some(Edit::record_in_line_insertion(CursorPosition { line: cursor.line, char: idx }.into(), comment_start))
-    }
-
-    fn uncomment(&mut self, pat: &str, line: &mut String, cursor: &mut Cursor) -> Edit {
-        let idx = line.find(pat).unwrap();
-        let mut end_idx = idx + pat.len();
-        end_idx += line[idx + pat.len()..].chars().take_while(|c| c.is_whitespace()).count();
-        if cursor.char >= idx {
-            cursor.sub_char(end_idx - idx);
-        };
-        Edit::remove_from_line(cursor.line, idx, end_idx, line)
     }
 
     pub fn push_char(&mut self, ch: char, cursor: &mut Cursor, content: &mut Vec<String>) {
@@ -505,4 +523,30 @@ fn add_select(edits: &mut [Edit], old: Option<Select>, new: Option<Select>) {
     if let Some(edit) = edits.last_mut() {
         edit.select = new;
     }
+}
+
+fn select_is_commented(from: usize, n: usize, pat: &str, content: &[String]) -> bool {
+    content.iter().skip(from).take(n).all(|l| l.trim().starts_with(pat) || l.chars().all(|c| c.is_whitespace()))
+}
+
+fn into_comment(pat: &str, line: &mut String, cursor: CursorPosition) -> Option<(Offset, Edit)> {
+    let idx = line.char_indices().flat_map(|(idx, c)| if c.is_whitespace() { None } else { Some(idx) }).next()?;
+    let comment_start = format!("{pat} ");
+    line.insert_str(idx, &comment_start);
+    let offset = if cursor.char >= idx { Offset::Pos(comment_start.len()) } else { Offset::Pos(0) };
+    Some((
+        offset,
+        Edit::record_in_line_insertion(CursorPosition { line: cursor.line, char: idx }.into(), comment_start),
+    ))
+}
+
+fn uncomment(pat: &str, line: &mut String, cursor: CursorPosition) -> Option<(Offset, Edit)> {
+    if !line.trim().starts_with(pat) {
+        return None;
+    }
+    let idx = line.find(pat)?;
+    let mut end_idx = idx + pat.len();
+    end_idx += line[idx + pat.len()..].chars().take_while(|c| c.is_whitespace()).count();
+    let offset = if cursor.char >= idx { Offset::Neg(end_idx - idx) } else { Offset::Neg(0) };
+    Some((offset, Edit::remove_from_line(cursor.line, idx, end_idx, line)))
 }

@@ -1,6 +1,6 @@
 [package]
 name = "idiom"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 include = [
     "src/**/*",
@@ -9,7 +9,11 @@ include = [
     "README.MD"
 ]
 license = "MIT"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Simple low config editor supporting LSP and syntax highlighting."
+repository = "https://github.com/Dah-phd/idiom"
+keywords = ["terminal", "editor", "lsp"]
+categories = ["editor"]
+authors = ["Daniel Nikolaev <toolsproed@gmail.com>"]
 
 [dependencies]
 crossterm = "0.27.0"
@@ -23,10 +27,10 @@ ratatui = { version = "0.26.1", features = ["serde", "unstable-widget-ref"] }
 unicode-width = "0.1"
 anyhow = "1.0.71"
 dirs = "5.0.1"
-reqwest = "0.11.20"
+# reqwest = "0.11.20"  !TODO enable when autodownloading is created
 ignore = "0.4.20"
 fuzzy-matcher = "0.3.7"
-copypasta = "0.10"
+copypasta = "0.10.1"
 portable-pty = "0.8.1"
 strip-ansi-escapes = "0.2.0"
 bitflags = "2.4.2"

@@ -1,4 +1,4 @@
-use crate::{global_state::GlobalState, workspace::DocStats};
+use crate::{configs::UITheme, global_state::GlobalState, workspace::DocStats};
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Rect},
@@ -16,17 +16,19 @@ pub struct Footer {
     clock: Instant,
     message: Option<Message>,
     message_que: Vec<Message>,
+    color: Color,
 }
 
 impl Default for Footer {
     fn default() -> Self {
-        Self { clock: Instant::now(), message: None, message_que: Vec::new() }
+        let theme = UITheme::new();
+        Self { clock: Instant::now(), message: None, message_que: Vec::new(), color: theme.footer_background }
     }
 }
 
 impl Footer {
     pub fn render(&mut self, frame: &mut Frame, gs: &GlobalState, stats: Option<DocStats>) {
-        frame.render_widget(Block::default().bg(Color::Rgb(25, 25, 24)), gs.footer_area);
+        frame.render_widget(Block::default().bg(self.color), gs.footer_area);
 
         let (stat_size, stat_p) = if let Some((len, sel, c)) = stats {
             let text = match sel {
@@ -74,6 +76,11 @@ impl Footer {
 
     pub fn success(&mut self, message: String) {
         self.push_ahead(Message::success(message));
+    }
+
+    pub fn reset_cfg(&mut self) {
+        let new_theme = UITheme::new();
+        self.color = new_theme.footer_background;
     }
 
     fn push_ahead(&mut self, msg: Message) {

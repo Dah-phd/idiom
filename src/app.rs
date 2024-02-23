@@ -102,6 +102,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                             gs.toggle_tree();
                         }
                         GeneralAction::RefreshSettings => {
+                            footer.reset_cfg();
                             let new_key_map = KeyMap::new();
                             general_key_map = new_key_map.general_key_map();
                             tree.key_map = new_key_map.tree_key_map();

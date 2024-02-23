@@ -6,7 +6,7 @@ use crate::{
 };
 use crossterm::event::{KeyCode, KeyEvent};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
-use lsp_types::{CompletionItem, Documentation};
+use lsp_types::{CompletionItem, CompletionTextEdit, Documentation};
 use ratatui::{
     prelude::Rect,
     widgets::{List, ListItem, Paragraph},
@@ -16,9 +16,8 @@ use ratatui::{
 pub struct AutoComplete {
     state: WrappedState,
     filter: String,
-    // line: String,
     matcher: SkimMatcherV2,
-    filtered: Vec<(String, i64)>,
+    filtered: Vec<(String, String, i64)>,
     active_doc: Option<Paragraph<'static>>,
     completions: Vec<CompletionItem>,
 }
@@ -36,7 +35,6 @@ impl AutoComplete {
         let mut modal = Self {
             state: WrappedState::default(),
             filter,
-            // line,
             matcher: SkimMatcherV2::default(),
             filtered: Vec::new(),
             active_doc: None,
@@ -54,7 +52,7 @@ impl AutoComplete {
             }
             KeyCode::Enter | KeyCode::Tab => {
                 if let Some(idx) = self.state.selected() {
-                    gs.workspace.push(WorkspaceEvent::AutoComplete(self.filtered.remove(idx).0));
+                    gs.workspace.push(WorkspaceEvent::AutoComplete(self.filtered.remove(idx).1));
                 }
                 ModalMessage::TakenDone
             }
@@ -79,7 +77,7 @@ impl AutoComplete {
             frame.render_widget(docs.clone().block(BORDERED_BLOCK), area);
             return;
         }
-        let complitions = self.filtered.iter().map(|(item, _)| ListItem::new(item.as_str())).collect::<Vec<_>>();
+        let complitions = self.filtered.iter().map(|(item, ..)| ListItem::new(item.as_str())).collect::<Vec<_>>();
         frame.render_stateful_widget(
             List::new(complitions).block(BORDERED_BLOCK).highlight_style(REVERSED),
             area,
@@ -128,12 +126,29 @@ impl AutoComplete {
                 self.matcher.fuzzy_match(item.filter_text.as_ref().unwrap_or(&item.label), &self.filter).map(|score| {
                     let divisor = item.label.len().abs_diff(self.filter.len()) as i64;
                     let new_score = if divisor != 0 { score / divisor } else { score };
-                    let completion = item.insert_text.as_ref().map(|t| t.to_owned()).unwrap_or(item.label.to_owned());
-                    (completion, new_score)
+                    let completion = get_completion_text(item);
+                    (item.label.to_owned(), completion, new_score)
                 })
             })
             .collect();
-        self.filtered.sort_by(|(_, idx), (_, rhidx)| rhidx.cmp(idx));
+        self.filtered.sort_by(|(.., idx), (.., rhidx)| rhidx.cmp(idx));
         self.state.set(0);
     }
+}
+
+fn get_completion_text(item: &CompletionItem) -> String {
+    if let Some(text) = item.insert_text.as_ref() {
+        return text.to_owned();
+    }
+    if let Some(edit) = item.text_edit.as_ref() {
+        match edit {
+            CompletionTextEdit::Edit(edit) => {
+                return edit.new_text.to_owned();
+            }
+            CompletionTextEdit::InsertAndReplace(edit) => {
+                return edit.new_text.to_owned();
+            }
+        }
+    }
+    item.label.to_owned()
 }

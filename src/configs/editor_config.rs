@@ -9,25 +9,39 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EditorConfigs {
+    pub format_on_save_todo: bool,
     pub indent: String,
     #[serde(skip, default = "get_indent_after")]
     pub indent_after: String,
     #[serde(skip, default = "get_unident_before")]
     pub unindent_before: String,
-    pub format_on_save: bool,
-    pub rust_lsp: String,
-    pub python_lsp: String,
+    rust_lsp: Option<String>,
+    python_lsp: Option<String>,
+    c_lsp: Option<String>,
+    cpp_lsp: Option<String>,
+    type_script_lsp: Option<String>,
+    java_script_lsp: Option<String>,
+    html_lsp: Option<String>,
+    toml_lsp: Option<String>,
+    yaml_lsp: Option<String>,
 }
 
 impl Default for EditorConfigs {
     fn default() -> Self {
         Self {
+            format_on_save_todo: true,
             indent: "    ".to_owned(),
             indent_after: get_indent_after(),
             unindent_before: get_unident_before(),
-            rust_lsp: String::from("${cfg_dir}/rust-analyzer"),
-            python_lsp: String::from("python3 -m pylsp"),
-            format_on_save: true,
+            rust_lsp: Some(String::from("${cfg_dir}/rust-analyzer")),
+            python_lsp: Some(String::from("jedi-language-server")),
+            c_lsp: None,
+            cpp_lsp: None,
+            type_script_lsp: None,
+            java_script_lsp: None,
+            html_lsp: None,
+            toml_lsp: None,
+            yaml_lsp: None,
         }
     }
 }
@@ -53,9 +67,17 @@ impl EditorConfigs {
 
     pub fn derive_lsp(&self, file_type: &FileType) -> Option<String> {
         match file_type {
-            FileType::Rust => Some(self.rust_lsp.to_owned()),
-            FileType::Python => Some(self.python_lsp.to_owned()),
-            _ => None,
+            FileType::Rust => self.rust_lsp.to_owned(),
+            FileType::Python => self.python_lsp.to_owned(),
+            FileType::C => self.c_lsp.to_owned(),
+            FileType::Cpp => self.cpp_lsp.to_owned(),
+            FileType::JavaScript => self.java_script_lsp.to_owned(),
+            FileType::TypeScript => self.type_script_lsp.to_owned(),
+            FileType::Html => self.html_lsp.to_owned(),
+            FileType::Yml => self.yaml_lsp.to_owned(),
+            FileType::Toml => self.toml_lsp.to_owned(),
+            FileType::MarkDown => None,
+            FileType::Unknown => None,
         }
     }
 
