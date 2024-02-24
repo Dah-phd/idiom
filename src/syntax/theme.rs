@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Theme {
+    pub imports: Color,
     pub key_words: Color,
     pub flow_control: Color,
     pub class_or_struct: Color,
@@ -22,6 +23,7 @@ pub struct Theme {
 impl Default for Theme {
     fn default() -> Self {
         Self {
+            imports: Color::Rgb(112, 199, 176),
             key_words: Color::Rgb(79, 106, 214),
             numeric: Color::Rgb(153, 173, 142),
             flow_control: Color::LightMagenta,
