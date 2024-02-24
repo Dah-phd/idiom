@@ -1,4 +1,6 @@
 use super::{context::LineBuilderContext, diagnostics::DiagnosticLine, LineBuilder};
+use core::iter::Peekable;
+use core::str::CharIndices;
 use ratatui::{
     style::{Color, Style},
     text::Span,
@@ -52,21 +54,18 @@ pub fn generic_line(
             continue;
         }
         match ch {
-            ' ' => {
+            ' ' | '.' | '<' | '>' | '?' | '&' | '=' | '+' | '-' | ',' | ';' | '|' => {
                 if builder.lang.frow_control.contains(&buf.token_buffer.as_str()) {
                     buf.update_fg(builder.theme.flow_control);
                 } else if builder.lang.is_keyword(buf.token_buffer.as_str()) {
                     buf.update_fg(builder.theme.key_words);
-                }
-                buf.push_reset(idx, ch, Color::White, diagnostic, ctx);
-            }
-            '.' | '<' | '>' | '?' | '&' | '=' | '+' | '-' | ',' | ';' | '|' => {
-                if builder.lang.frow_control.contains(&buf.token_buffer.as_str()) {
-                    buf.update_fg(builder.theme.flow_control);
-                } else if builder.lang.is_keyword(buf.token_buffer.as_str()) {
+                } else if builder.lang.is_import(buf.token_buffer.as_str()) {
                     buf.update_fg(builder.theme.key_words);
+                    buf.push_reset(idx, ch, Color::Reset, diagnostic, ctx);
+                    import_handler(builder, &mut chars, &mut buf, diagnostic, ctx);
+                    break;
                 }
-                buf.push_reset(idx, ch, Color::White, diagnostic, ctx);
+                buf.push_reset(idx, ch, Color::Reset, diagnostic, ctx);
             }
             ':' => {
                 if matches!(chars.peek(), Some((.., next_ch)) if &':' == next_ch) {
@@ -74,7 +73,7 @@ pub fn generic_line(
                 } else if builder.lang.is_keyword(buf.token_buffer.as_str()) {
                     buf.update_fg(builder.theme.key_words);
                 }
-                buf.push_reset(idx, ch, Color::White, diagnostic, ctx);
+                buf.push_reset(idx, ch, Color::Reset, diagnostic, ctx);
             }
             '"' => {
                 buf.str_open = true;
@@ -83,7 +82,7 @@ pub fn generic_line(
             '\'' => buf.handle_lifetime_apostrophe(idx, ch, builder, ctx, diagnostic),
             '!' => {
                 buf.update_fg(builder.theme.key_words);
-                let color = if buf.token_buffer.is_empty() { Color::White } else { builder.theme.key_words };
+                let color = if buf.token_buffer.is_empty() { Color::Reset } else { builder.theme.key_words };
                 buf.push_reset(idx, ch, color, diagnostic, ctx);
             }
             '(' => {
@@ -113,6 +112,37 @@ pub fn generic_line(
         }
     }
     ctx.format_with_info(idx, diagnostic, buf.buffer)
+}
+
+fn import_handler(
+    builder: &LineBuilder,
+    content: &mut Peekable<CharIndices>,
+    buf: &mut SpanBuffer,
+    diagnostic: Option<&DiagnosticLine>,
+    ctx: &mut LineBuilderContext,
+) {
+    while let Some((idx, ch)) = content.next() {
+        match ch {
+            '(' => buf.push_reset(idx, ch, ctx.brackets.open_round(), diagnostic, ctx),
+            ')' => buf.push_reset(idx, ch, ctx.brackets.close_round(), diagnostic, ctx),
+            '{' => buf.push_reset(idx, ch, ctx.brackets.open_curly(), diagnostic, ctx),
+            '}' => buf.push_reset(idx, ch, ctx.brackets.close_curly(), diagnostic, ctx),
+            '[' => buf.push_reset(idx, ch, ctx.brackets.open_square(), diagnostic, ctx),
+            ']' => buf.push_reset(idx, ch, ctx.brackets.close_square(), diagnostic, ctx),
+            _ => {
+                if ch.is_alphabetic() || ch == '_' {
+                    buf.push_token(idx, ch, builder.theme.imports, diagnostic, ctx);
+                } else {
+                    if builder.lang.is_import(buf.token_buffer.as_str())
+                        || builder.lang.is_keyword(buf.token_buffer.as_str())
+                    {
+                        buf.update_fg(builder.theme.key_words);
+                    };
+                    buf.push_reset(idx, ch, Color::Reset, diagnostic, ctx);
+                }
+            }
+        }
+    }
 }
 
 #[derive(Default)]

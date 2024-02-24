@@ -15,6 +15,10 @@ impl Lang {
         self.declaration.contains(&token) || self.key_words.contains(&token)
     }
 
+    pub fn is_import(&self, token: &str) -> bool {
+        self.mod_import.contains(&token)
+    }
+
     pub fn is_comment(&self, line: &str) -> bool {
         for start in self.comment_start.iter() {
             if line.trim_start().starts_with(start) {
@@ -61,7 +65,7 @@ impl From<FileType> for Lang {
                 frow_control: vec![
                     "if", "loop", "for", "in", "while", "break", "continue", "await", "return", "match", "else",
                 ],
-                mod_import: vec!["mod", "use", "pub mod", "pub use"],
+                mod_import: vec!["mod", "use"],
             },
             FileType::Python => Self {
                 comment_start: vec!["#"],
@@ -69,9 +73,9 @@ impl From<FileType> for Lang {
                 declaration: vec!["def", "class"],
                 key_words: vec![],
                 frow_control: vec![
-                    "if", "else", "elif", "for", "while", "break", "continue", "try", "except", "raise",
+                    "if", "else", "elif", "for", "while", "break", "continue", "try", "except", "raise", "with",
                 ],
-                mod_import: vec!["import", "from"],
+                mod_import: vec!["import", "from", "as"],
             },
             FileType::MarkDown => Self {
                 file_type,
@@ -93,7 +97,7 @@ impl From<FileType> for Lang {
                 frow_control: vec![
                     "if", "loop", "for", "in", "while", "break", "continue", "await", "return", "match", "else",
                 ],
-                mod_import: vec!["mod", "use", "pub mod", "pub use", "from", "import"],
+                mod_import: vec!["mod", "use", "from", "import"],
             },
         }
     }

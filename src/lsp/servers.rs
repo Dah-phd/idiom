@@ -2,7 +2,11 @@ use crate::configs::get_config_dir;
 use anyhow::{anyhow, Result};
 use tokio::process::Command;
 
-const RUNNER: &str = "sh"; // TODO add configs for windows/macos
+#[cfg(unix)]
+const RUNNER: &str = "sh";
+#[cfg(windows)]
+const RUNNER: &str = "cmd";
+
 
 pub fn server_cmd(lsp: &str) -> Result<Command> {
     if lsp.contains("${cfg_dir}") {
