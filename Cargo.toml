@@ -1,6 +1,6 @@
 [package]
 name = "idiom"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 include = [
     "src/**/*",
@@ -11,7 +11,7 @@ include = [
 license = "MIT"
 description = "Simple low config editor supporting LSP and syntax highlighting."
 repository = "https://github.com/Dah-phd/idiom"
-keywords = ["terminal", "editor", "lsp"]
+keywords = ["terminal", "edit", "lsp", "text"]
 categories = ["editor"]
 authors = ["Daniel Nikolaev <toolsproed@gmail.com>"]
 

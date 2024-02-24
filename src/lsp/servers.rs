@@ -7,7 +7,6 @@ const RUNNER: &str = "sh";
 #[cfg(windows)]
 const RUNNER: &str = "cmd";
 
-
 pub fn server_cmd(lsp: &str) -> Result<Command> {
     if lsp.contains("${cfg_dir}") {
         let cfg_dir = get_config_dir().ok_or(anyhow!("Failed to parse config dir!"))?.display().to_string();
