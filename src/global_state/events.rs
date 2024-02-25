@@ -49,7 +49,7 @@ pub enum StateEvent {
     SaveAndExit,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum TreeEvent {
     PopupAccess,
     Open(PathBuf),
@@ -113,13 +113,14 @@ pub enum WorkspaceEvent {
     GoToLine(usize),
     GoToSelect {
         select: (CursorPosition, CursorPosition),
-        should_clear: bool,
+        clear_popup: bool,
     },
     AutoComplete(String),
     ActivateEditor(usize),
     FindSelector(String),
     FindToReplace(String, Vec<(CursorPosition, CursorPosition)>),
     Open(PathBuf, usize),
+    InsertText(String),
     CheckLSP(FileType),
     WorkspaceEdit(WorkspaceEdit),
     Resize,

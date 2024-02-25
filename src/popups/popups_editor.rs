@@ -32,7 +32,7 @@ pub fn selector_ranges(
     Box::new(PopupSelector {
         options,
         display: |((from, _), line)| format!("({}) {line}", from.line + 1),
-        command: |popup| WorkspaceEvent::GoToSelect { select: popup.options[popup.state].0, should_clear: true }.into(),
+        command: |popup| WorkspaceEvent::GoToSelect { select: popup.options[popup.state].0, clear_popup: true }.into(),
         state: 0,
         size: None,
     })

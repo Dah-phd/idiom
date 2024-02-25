@@ -11,6 +11,7 @@ use super::{DiagnosticLine, INIT_BUF_SIZE};
 
 pub const COLORS: [Color; 3] = [Color::LightMagenta, Color::LightYellow, Color::Blue];
 
+#[derive(Default)]
 pub struct LineBuilderContext {
     select: Option<(CursorPosition, CursorPosition)>,
     pub select_range: Option<Range<usize>>,

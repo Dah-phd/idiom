@@ -26,7 +26,7 @@ use tokio::sync::mpsc::UnboundedSender;
 /// Responses are received by ID - so every editor can receive its answere only to send Requests.
 /// Failure on broken LSP server.
 /// Diagnostics are received from Diagnostic objec stored in hashmap based on path.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct LSPClient {
     diagnostics: Arc<Mutex<HashMap<PathBuf, Diagnostic>>>,
     responses: Arc<Mutex<HashMap<i64, Response>>>,

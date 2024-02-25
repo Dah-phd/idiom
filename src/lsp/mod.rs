@@ -29,7 +29,6 @@ use tokio::{io::AsyncWriteExt, process::Child, sync::mpsc, task::JoinHandle};
 #[cfg(build = "debug")]
 use crate::utils::debug_to_file;
 
-#[derive(Debug)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct LSP {
     pub notifications: Arc<Mutex<Vec<GeneralNotification>>>,

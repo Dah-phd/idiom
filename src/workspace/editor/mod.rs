@@ -154,6 +154,10 @@ impl Editor {
         false
     }
 
+    pub fn insert_text_with_relative_offset(&mut self, insert: String) {
+        self.actions.insert_top_cursor_relative_offset(insert, &mut self.cursor, &mut self.content);
+    }
+
     pub fn replace_select(&mut self, from: CursorPosition, to: CursorPosition, new_clip: &str) {
         self.actions.replace_select(from, to, new_clip, &mut self.cursor, &mut self.content);
     }

@@ -8,7 +8,6 @@ use std::path::PathBuf;
 
 use crate::syntax::DiagnosticLine;
 
-#[derive(Debug)]
 pub enum LSPMessage {
     Request(Request),
     Response(Response),
@@ -112,7 +111,6 @@ pub struct GeneralNotification {
 
 /// Stores Diagnostics and metadata - to be used in editor to gain access to diagnostic params objects.
 /// updated flag is used to ensure only updated diagnostics are sent.
-#[derive(Debug)]
 pub struct Diagnostic {
     pub errors: usize,
     pub warnings: usize,

@@ -367,7 +367,7 @@ impl GlobalState {
                 TreeEvent::OpenAtSelect(path, select) => {
                     tree.select_by_path(&path);
                     self.workspace.push(WorkspaceEvent::Open(path, 0));
-                    self.workspace.push(WorkspaceEvent::GoToSelect { select, should_clear: true });
+                    self.workspace.push(WorkspaceEvent::GoToSelect { select, clear_popup: true });
                 }
                 TreeEvent::SelectPath(path) => {
                     tree.select_by_path(&path);
@@ -428,10 +428,10 @@ impl GlobalState {
                     }
                     self.clear_popup();
                 }
-                WorkspaceEvent::GoToSelect { select: (from, to), should_clear } => {
+                WorkspaceEvent::GoToSelect { select: (from, to), clear_popup } => {
                     if let Some(editor) = workspace.get_active() {
                         editor.go_to_select(from, to);
-                        if should_clear {
+                        if clear_popup {
                             self.clear_popup();
                         }
                     } else {
@@ -465,6 +465,11 @@ impl GlobalState {
                         self.insert_mode();
                     } else {
                         self.select_mode();
+                    }
+                }
+                WorkspaceEvent::InsertText(insert) => {
+                    if let Some(editor) = workspace.get_active() {
+                        editor.insert_text_with_relative_offset(insert);
                     }
                 }
                 WorkspaceEvent::Resize => {
