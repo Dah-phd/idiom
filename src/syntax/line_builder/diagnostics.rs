@@ -16,6 +16,14 @@ const ERR_STYLE: Style = Style::new().fg(ERR_COLOR);
 const WAR_STYLE: Style = Style::new().fg(WAR_COLOR);
 const ELS_STYLE: Style = Style::new().fg(ELS_COLOR);
 
+#[derive(Default)]
+pub struct DiagnosticInfo {
+    pub messages: Vec<Span<'static>>,
+    pub actions: Option<Vec<Action>>,
+}
+
+impl DiagnosticInfo {}
+
 #[derive(Clone)]
 pub enum Action {
     Import(String),
@@ -51,14 +59,10 @@ impl DiagnosticData {
         color: Style,
         info: Option<Vec<DiagnosticRelatedInformation>>,
     ) -> Self {
-        let span = match info {
-            None => Span::styled(format!("    {}", message), color),
-            Some(..) => Span::styled(format!("    💡 {}", message), color),
-        };
         Self {
             start: range.start.character as usize,
             end: if range.start.line == range.end.line { Some(range.end.character as usize) } else { None },
-            span,
+            span: Span::styled(format!("    {}", message), color),
             info,
         }
     }
@@ -80,19 +84,21 @@ impl DiagnosticLine {
         None
     }
 
-    pub fn collect_actions(&self, lang: &Lang) -> Option<Vec<Action>> {
+    pub fn collect_info(&self, lang: &Lang) -> DiagnosticInfo {
+        let mut info = DiagnosticInfo::default();
         let mut buffer = Vec::new();
         for diagnostic in self.data.iter() {
+            info.messages.push(diagnostic.span.clone());
             if let Some(actions) = lang.derive_diagnostic_actions(diagnostic.info.as_ref()) {
                 for action in actions {
                     buffer.push(action.clone());
                 }
             }
         }
-        if buffer.is_empty() {
-            return None;
+        if !buffer.is_empty() {
+            info.actions.replace(buffer);
         }
-        Some(buffer)
+        info
     }
 
     pub fn drop_non_errs(&mut self) {

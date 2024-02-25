@@ -1,7 +1,8 @@
 use super::ModalMessage;
-use crate::syntax::line_builder::Action;
-use crate::syntax::LineBuilder;
-use crate::syntax::LineBuilderContext;
+use crate::syntax::{
+    line_builder::{Action, DiagnosticInfo},
+    LineBuilder, LineBuilderContext,
+};
 use crate::{
     global_state::GlobalState,
     utils::{BORDERED_BLOCK, REVERSED},
@@ -37,8 +38,17 @@ pub struct Info {
 }
 
 impl Info {
-    pub fn from_actions(imports: Vec<Action>) -> Self {
-        Self { actions: Some(imports), mode: Mode::Select, ..Default::default() }
+    pub fn from_info(mut info: DiagnosticInfo) -> Self {
+        let actions = info.actions.take();
+        let mut lines = Vec::new();
+        for span in info.messages.into_iter() {
+            let s = span.style;
+            for line in span.content.trim_start().lines() {
+                lines.push(Line::from(line.to_owned()).style(s));
+            }
+        }
+        let mode = if actions.is_some() { Mode::Select } else { Mode::Full };
+        Self { actions, text: Text::from(lines), mode, ..Default::default() }
     }
 
     pub fn from_hover(hover: Hover, line_builder: &LineBuilder) -> Self {
@@ -175,9 +185,9 @@ impl Info {
     }
 }
 
-impl From<Vec<Action>> for Info {
-    fn from(actions: Vec<Action>) -> Self {
-        Self::from_actions(actions)
+impl From<DiagnosticInfo> for Info {
+    fn from(actions: DiagnosticInfo) -> Self {
+        Self::from_info(actions)
     }
 }
 

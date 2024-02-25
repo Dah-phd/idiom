@@ -1,5 +1,4 @@
-use crate::syntax::line_builder::Action;
-use crate::syntax::line_builder::Lang;
+use crate::syntax::line_builder::{DiagnosticInfo, Lang};
 use crate::syntax::LineBuilder;
 mod completion;
 mod info;
@@ -90,8 +89,8 @@ impl LSPModal {
         None
     }
 
-    pub fn actions(actions: Vec<Action>) -> Self {
-        Self::Info(Info::from_actions(actions))
+    pub fn actions(actions: DiagnosticInfo) -> Self {
+        Self::Info(Info::from_info(actions))
     }
 
     pub fn from_hover(hover: Hover, line_builder: &LineBuilder) -> Self {

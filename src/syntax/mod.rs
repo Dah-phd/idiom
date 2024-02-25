@@ -220,7 +220,7 @@ impl Lexer {
 
     pub fn help(&mut self, c: CursorPosition) {
         if let Some(client) = self.lsp_client.as_mut() {
-            if let Some(actions) = self.line_builder.collect_actions(c.line) {
+            if let Some(actions) = self.line_builder.collect_diagnostic_info(c.line) {
                 self.modal.replace(LSPModal::actions(actions));
             }
             if let Some(id) = client.request_signitures(&self.path, c).map(LSPResponseType::SignatureHelp) {

@@ -8,7 +8,7 @@ use super::modal::LSPResponseType;
 use crate::{lsp::LSPClient, syntax::Theme, workspace::actions::EditMetaData};
 pub use context::LineBuilderContext;
 use diagnostics::{diagnostics_error, diagnostics_full};
-pub use diagnostics::{Action, DiagnosticLine};
+pub use diagnostics::{Action, DiagnosticInfo, DiagnosticLine};
 use internal::generic_line;
 pub use langs::Lang;
 use legend::{ColorResult, Legend};
@@ -133,8 +133,8 @@ impl LineBuilder {
     }
 
     /// gets possible actions from diagnostic data
-    pub fn collect_actions(&self, line: usize) -> Option<Vec<Action>> {
-        self.diagnostics.get(&line).and_then(|d_line| d_line.collect_actions(&self.lang))
+    pub fn collect_diagnostic_info(&self, line: usize) -> Option<DiagnosticInfo> {
+        self.diagnostics.get(&line).map(|d_line| d_line.collect_info(&self.lang))
     }
 
     /// Maps token styles
