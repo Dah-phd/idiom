@@ -15,8 +15,6 @@ More documentation will not come very soon - current focus is developing basic f
 - multi-cursor support
 - runner history
 - runner autocomplete on dirs
-- figure out how to autoimport on autocomplete
-- implement line building (syntax) for popup/modals
 - make info on autocomplete easier to read
 - (backlog) semantic token styles for different lsp langs
 
