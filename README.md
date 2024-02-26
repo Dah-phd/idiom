@@ -11,6 +11,7 @@ More documentation will not come very soon - current focus is developing basic f
 - Linux Fedora derivate
 
 ## TODO!
+- check unindent on new_line when no scope is opened
 - !! more tests - till that point the goal has been to make the editor self-developing, so bugs can be easily found and structure crystalizes
 - multi-cursor support
 - runner history

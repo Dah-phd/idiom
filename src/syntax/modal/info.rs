@@ -192,9 +192,8 @@ impl From<DiagnosticInfo> for Info {
 }
 
 fn parse_sig_info(info: SignatureInformation, line_buidlder: &LineBuilder, lines: &mut Vec<Line<'static>>) {
-    let mut idx = 0;
     let mut ctx = LineBuilderContext::default();
-    lines.insert(idx, Line::from(line_buidlder.basic_line(&info.label, &mut ctx)));
+    lines.push(Line::from(line_buidlder.basic_line(&info.label, &mut ctx)));
     if let Some(text) = info.documentation {
         match text {
             Documentation::MarkupContent(c) => {
@@ -205,24 +204,21 @@ fn parse_sig_info(info: SignatureInformation, line_buidlder: &LineBuilder, lines
                             is_code = !is_code;
                             continue;
                         }
-                        idx += 1;
                         if is_code {
-                            lines.insert(idx, Line::from(line_buidlder.basic_line(line, &mut ctx)));
+                            lines.push(Line::from(line_buidlder.basic_line(line, &mut ctx)));
                         } else {
-                            lines.insert(idx, Line::from(String::from(line)));
+                            lines.push(Line::from(String::from(line)));
                         }
                     }
                 } else {
                     for line in c.value.lines() {
-                        idx += 1;
-                        lines.insert(idx, Line::from(String::from(line)));
+                        lines.push(Line::from(String::from(line)));
                     }
                 }
             }
             Documentation::String(s) => {
                 for line in s.lines() {
-                    idx += 1;
-                    lines.insert(idx, Line::from(line_buidlder.basic_line(line, &mut ctx)));
+                    lines.push(Line::from(line_buidlder.basic_line(line, &mut ctx)));
                 }
             }
         }
@@ -257,6 +253,7 @@ fn handle_markup(markup: lsp_types::MarkupContent, line_buidlder: &LineBuilder, 
         for line in markup.value.lines() {
             lines.push(Line::from(line_buidlder.basic_line(line, &mut ctx)));
         }
+        return;
     }
     let mut is_code = false;
     for line in markup.value.lines() {
