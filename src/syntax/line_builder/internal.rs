@@ -121,7 +121,7 @@ fn import_handler(
     diagnostic: Option<&DiagnosticLine>,
     ctx: &mut LineBuilderContext,
 ) {
-    while let Some((idx, ch)) = content.next() {
+    for (idx, ch) in content {
         match ch {
             '(' => buf.push_reset(idx, ch, ctx.brackets.open_round(), diagnostic, ctx),
             ')' => buf.push_reset(idx, ch, ctx.brackets.close_round(), diagnostic, ctx),

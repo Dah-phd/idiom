@@ -154,6 +154,10 @@ impl Editor {
         false
     }
 
+    pub fn insert_text_with_relative_offset(&mut self, insert: String) {
+        self.actions.insert_top_cursor_relative_offset(insert, &mut self.cursor, &mut self.content);
+    }
+
     pub fn replace_select(&mut self, from: CursorPosition, to: CursorPosition, new_clip: &str) {
         self.actions.replace_select(from, to, new_clip, &mut self.cursor, &mut self.content);
     }
@@ -275,6 +279,17 @@ impl Editor {
         position.line += self.cursor.at_line;
         position.char = position.char.saturating_sub(self.lexer.line_number_offset + 1);
         self.cursor.set_cursor_checked_with_select(position, &self.content);
+    }
+
+    pub fn mouse_copy_paste(&mut self, mut position: CursorPosition, clip: Option<String>) -> Option<String> {
+        if let Some((from, to)) = self.cursor.select_get() {
+            return Some(copy_content(from, to, &self.content));
+        };
+        position.line += self.cursor.at_line;
+        position.char = position.char.saturating_sub(self.lexer.line_number_offset + 1);
+        self.cursor.set_cursor_checked(position, &self.content);
+        self.paste(clip?);
+        None
     }
 
     pub fn end_of_line(&mut self) {

@@ -421,7 +421,7 @@ checksum = "bd5256b483761cd23699d0da46cc6fd2ee3be420bbe6d020ae4a091e70b7e9fd"
 
 [[package]]
 name = "idiom"
-version = "0.2.2"
+version = "0.2.4"
 dependencies = [
  "anyhow",
  "bitflags 2.4.2",

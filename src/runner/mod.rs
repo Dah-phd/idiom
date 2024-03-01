@@ -3,22 +3,24 @@ use crate::widgests::TextField;
 use ratatui::prelude::Span;
 use ratatui::text::Line;
 mod commands;
-use std::sync::{Arc, Mutex};
-
+mod components;
 use crate::configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE};
 use crate::global_state::GlobalState;
 use crate::utils::into_guard;
 use anyhow::Result;
 use commands::{load_cfg, Terminal};
+use components::CmdHistory;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem};
 use ratatui::Frame;
+use std::sync::{Arc, Mutex};
 
 const IDIOM_PREFIX: &str = "%i";
 
 #[derive(Default)]
 pub struct EditorTerminal {
+    cmd_history: CmdHistory,
     cmd: TextField<()>,
     width: u16,
     logs: Vec<String>,
@@ -91,11 +93,11 @@ impl EditorTerminal {
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         match key {
             KeyEvent { code: KeyCode::Esc, .. }
-            | KeyEvent { code: KeyCode::Char('q' | 'Q' | '`'), modifiers: KeyModifiers::CONTROL, .. } => {
+            | KeyEvent { code: KeyCode::Char('`'), modifiers: KeyModifiers::CONTROL, .. } => {
                 gs.message("Term: PTY active in background ... (CTRL + d/q) can be used to kill the process!");
                 gs.toggle_terminal(self);
             }
-            KeyEvent { code: KeyCode::Char('d' | 'D'), modifiers: KeyModifiers::CONTROL, .. } => {
+            KeyEvent { code: KeyCode::Char('d' | 'D' | 'q' | 'Q'), modifiers: KeyModifiers::CONTROL, .. } => {
                 self.terminal.take().map(|t| t.kill());
                 self.prompt.take();
                 self.at_log = self.logs.len();
@@ -110,6 +112,15 @@ impl EditorTerminal {
             | KeyEvent { code: KeyCode::Down, modifiers: KeyModifiers::CONTROL, .. } => {
                 self.at_log = std::cmp::min(self.at_log + 1, self.logs.len());
             }
+            KeyEvent { code: KeyCode::Up, .. } => {
+                if let Some(text) = self.cmd_history.get_prev() {
+                    self.cmd.text_set(text);
+                }
+            }
+            KeyEvent { code: KeyCode::Down, .. } => match self.cmd_history.get_next() {
+                Some(text) => self.cmd.text_set(text),
+                None => self.cmd.text_set(String::new()),
+            },
             KeyEvent { code: KeyCode::Char('c' | 'C'), modifiers: KeyModifiers::CONTROL, .. } => {
                 self.kill(gs);
                 self.at_log = self.logs.len();
@@ -120,7 +131,8 @@ impl EditorTerminal {
                 }
             }
             KeyEvent { code: KeyCode::Enter, .. } => {
-                let cmd = self.cmd.take_text();
+                let cmd = self.cmd.text_take();
+                self.cmd_history.push(&cmd);
                 if let Some(args) = cmd.strip_prefix(IDIOM_PREFIX) {
                     let _ = self.idiom_command_handler(args, gs);
                 } else if cmd.trim() == "clear" {

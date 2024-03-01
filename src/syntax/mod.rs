@@ -20,9 +20,6 @@ use ratatui::{layout::Rect, text::Line, Frame};
 use std::path::{Path, PathBuf};
 use theme::Theme;
 
-#[cfg(build = "debug")]
-use crate::utils::debug_to_file;
-
 pub struct Lexer {
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub lsp_client: Option<LSPClient>,
@@ -64,16 +61,16 @@ impl Lexer {
                             }
                             LSPResult::Hover(hover) => {
                                 if let Some(modal) = self.modal.as_mut() {
-                                    modal.hover_map(hover);
+                                    modal.hover_map(hover, &self.line_builder);
                                 } else {
-                                    self.modal.replace(hover.into());
+                                    self.modal.replace(LSPModal::from_hover(hover, &self.line_builder));
                                 }
                             }
                             LSPResult::SignatureHelp(signature) => {
                                 if let Some(modal) = self.modal.as_mut() {
-                                    modal.signature_map(signature);
+                                    modal.signature_map(signature, &self.line_builder);
                                 } else {
-                                    self.modal.replace(signature.into());
+                                    self.modal.replace(LSPModal::from_signature(signature, &self.line_builder));
                                 }
                             }
                             LSPResult::Renames(workspace_edit) => {
@@ -160,7 +157,7 @@ impl Lexer {
 
     pub fn map_modal_if_exists(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         if let Some(modal) = &mut self.modal {
-            match modal.map_and_finish(key, gs) {
+            match modal.map_and_finish(key, &self.line_builder.lang, gs) {
                 ModalMessage::Taken => return true,
                 ModalMessage::TakenDone => {
                     self.modal.take();
@@ -223,7 +220,7 @@ impl Lexer {
 
     pub fn help(&mut self, c: CursorPosition) {
         if let Some(client) = self.lsp_client.as_mut() {
-            if let Some(actions) = self.line_builder.collect_actions(c.line) {
+            if let Some(actions) = self.line_builder.collect_diagnostic_info(c.line) {
                 self.modal.replace(LSPModal::actions(actions));
             }
             if let Some(id) = client.request_signitures(&self.path, c).map(LSPResponseType::SignatureHelp) {

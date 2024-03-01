@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-#[derive(Debug, PartialEq, Hash, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Hash, Eq, Clone, Copy, Default)]
 pub enum FileType {
     Rust,
     Python,
@@ -12,6 +12,7 @@ pub enum FileType {
     Yml,
     Toml,
     MarkDown,
+    #[default]
     Unknown,
 }
 

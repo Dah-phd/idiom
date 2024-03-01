@@ -315,6 +315,13 @@ impl Cursor {
         }
     }
 
+    pub fn select_line_offset(&mut self, offset: usize) {
+        if let Some((from, to)) = self.select.as_mut() {
+            from.line += offset;
+            to.line += offset;
+        }
+    }
+
     pub fn select_get(&self) -> Option<Select> {
         match self.select.as_ref() {
             None => None,

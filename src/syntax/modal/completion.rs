@@ -1,4 +1,5 @@
 use super::ModalMessage;
+use crate::syntax::line_builder::Lang;
 use crate::{
     global_state::{GlobalState, WorkspaceEvent},
     utils::{BORDERED_BLOCK, REVERSED},
@@ -17,7 +18,7 @@ pub struct AutoComplete {
     state: WrappedState,
     filter: String,
     matcher: SkimMatcherV2,
-    filtered: Vec<(String, String, i64)>,
+    filtered: Vec<(String, i64, usize)>,
     active_doc: Option<Paragraph<'static>>,
     completions: Vec<CompletionItem>,
 }
@@ -44,7 +45,7 @@ impl AutoComplete {
         modal
     }
 
-    pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> ModalMessage {
+    pub fn map(&mut self, key: &KeyEvent, lang: &Lang, gs: &mut GlobalState) -> ModalMessage {
         match key.code {
             KeyCode::F(1) => {
                 self.active_doc = self.get_docs();
@@ -52,7 +53,11 @@ impl AutoComplete {
             }
             KeyCode::Enter | KeyCode::Tab => {
                 if let Some(idx) = self.state.selected() {
-                    gs.workspace.push(WorkspaceEvent::AutoComplete(self.filtered.remove(idx).1));
+                    let filtered_completion = self.completions.remove(self.filtered.remove(idx).2);
+                    gs.workspace.push(WorkspaceEvent::AutoComplete(get_completion_text(&filtered_completion)));
+                    if let Some(data) = filtered_completion.data {
+                        lang.handle_completion_data(data, gs);
+                    }
                 }
                 ModalMessage::TakenDone
             }
@@ -122,16 +127,16 @@ impl AutoComplete {
         self.filtered = self
             .completions
             .iter()
-            .filter_map(|item| {
+            .enumerate()
+            .filter_map(|(item_idx, item)| {
                 self.matcher.fuzzy_match(item.filter_text.as_ref().unwrap_or(&item.label), &self.filter).map(|score| {
                     let divisor = item.label.len().abs_diff(self.filter.len()) as i64;
                     let new_score = if divisor != 0 { score / divisor } else { score };
-                    let completion = get_completion_text(item);
-                    (item.label.to_owned(), completion, new_score)
+                    (item.label.to_owned(), new_score, item_idx)
                 })
             })
             .collect();
-        self.filtered.sort_by(|(.., idx), (.., rhidx)| rhidx.cmp(idx));
+        self.filtered.sort_by(|(_, idx, _), (_, rhidx, _)| rhidx.cmp(idx));
         self.state.set(0);
     }
 }

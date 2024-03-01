@@ -38,7 +38,13 @@ impl<T: Default + Clone> TextField<T> {
         Self { char: text.len(), text, select: None, on_text_update }
     }
 
-    pub fn take_text(&mut self) -> String {
+    pub fn text_set(&mut self, text: String) {
+        self.select = None;
+        self.text = text;
+        self.char = self.text.len();
+    }
+
+    pub fn text_take(&mut self) -> String {
         self.char = 0;
         self.select = None;
         std::mem::take(&mut self.text)

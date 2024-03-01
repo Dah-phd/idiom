@@ -1,3 +1,5 @@
+use crate::syntax::line_builder::{DiagnosticInfo, Lang};
+use crate::syntax::LineBuilder;
 mod completion;
 mod info;
 mod parser;
@@ -39,7 +41,7 @@ impl<T> From<&[T]> for ModalMessage {
 }
 
 impl LSPModal {
-    pub fn map_and_finish(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> ModalMessage {
+    pub fn map_and_finish(&mut self, key: &KeyEvent, lang: &Lang, gs: &mut GlobalState) -> ModalMessage {
         match key {
             KeyEvent { code: KeyCode::Esc, .. } => ModalMessage::TakenDone,
             KeyEvent { code: KeyCode::Char('q' | 'Q'), modifiers: KeyModifiers::CONTROL, .. } => {
@@ -49,7 +51,7 @@ impl LSPModal {
                 ModalMessage::TakenDone
             }
             _ => match self {
-                Self::AutoComplete(modal) => modal.map(key, gs),
+                Self::AutoComplete(modal) => modal.map(key, lang, gs),
                 Self::Info(modal) => modal.map(key, gs),
                 Self::RenameVar(modal) => modal.map(key, gs),
             },
@@ -87,37 +89,33 @@ impl LSPModal {
         None
     }
 
-    pub fn actions(actions: Vec<String>) -> Self {
-        Self::Info(Info::from_imports(actions))
+    pub fn actions(actions: DiagnosticInfo) -> Self {
+        Self::Info(Info::from_info(actions))
     }
 
-    pub fn hover_map(&mut self, hover: Hover) {
+    pub fn from_hover(hover: Hover, line_builder: &LineBuilder) -> Self {
+        Self::Info(Info::from_hover(hover, line_builder))
+    }
+
+    pub fn hover_map(&mut self, hover: Hover, line_builder: &LineBuilder) {
         match self {
-            Self::Info(modal) => modal.push_hover(hover),
-            _ => *self = hover.into(),
+            Self::Info(modal) => modal.push_hover(hover, line_builder),
+            _ => *self = Self::Info(Info::from_hover(hover, line_builder)),
         }
     }
 
-    pub fn signature_map(&mut self, signature: SignatureHelp) {
+    pub fn from_signature(signature: SignatureHelp, line_builder: &LineBuilder) -> Self {
+        Self::Info(Info::from_signature(signature, line_builder))
+    }
+
+    pub fn signature_map(&mut self, signature: SignatureHelp, line_builder: &LineBuilder) {
         match self {
-            Self::Info(modal) => modal.push_signature(signature),
-            _ => *self = signature.into(),
+            Self::Info(modal) => modal.push_signature(signature, line_builder),
+            _ => *self = Self::Info(Info::from_signature(signature, line_builder)),
         }
     }
 
     pub fn renames_at(c: CursorPosition, title: &str) -> Self {
         Self::RenameVar(RenameVariable::new(c, title))
-    }
-}
-
-impl From<Hover> for LSPModal {
-    fn from(hover: Hover) -> Self {
-        Self::Info(hover.into())
-    }
-}
-
-impl From<SignatureHelp> for LSPModal {
-    fn from(signature: SignatureHelp) -> Self {
-        Self::Info(signature.into())
     }
 }

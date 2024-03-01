@@ -52,6 +52,17 @@ impl Actions {
         self.push_done(action);
     }
 
+    /// Insert new text at the top of the file preserving cursor/select relative position
+    pub fn insert_top_cursor_relative_offset(&mut self, line: String, cursor: &mut Cursor, content: &mut Vec<String>) {
+        self.push_buffer();
+        let edit = Edit::replace_select(CursorPosition::default(), CursorPosition::default(), line, content);
+        let offset = edit.meta.to - edit.meta.from;
+        cursor.line += offset;
+        cursor.at_line += offset;
+        cursor.select_line_offset(offset);
+        self.push_done(edit);
+    }
+
     pub fn replace_token(&mut self, new: String, cursor: &mut Cursor, content: &mut [String]) {
         self.push_buffer();
         let action = Edit::replace_token(cursor.line, cursor.char, new, content);

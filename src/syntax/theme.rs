@@ -2,7 +2,7 @@ use crate::configs::{load_or_create_config, THEME_FILE};
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Theme {
     pub imports: Color,
