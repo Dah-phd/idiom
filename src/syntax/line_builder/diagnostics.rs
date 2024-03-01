@@ -1,5 +1,3 @@
-use std::path::Display;
-
 use super::Lang;
 use crate::global_state::WorkspaceEvent;
 use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
