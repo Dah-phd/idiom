@@ -1,3 +1,5 @@
+use std::path::Display;
+
 use super::Lang;
 use crate::global_state::WorkspaceEvent;
 use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
@@ -21,8 +23,6 @@ pub struct DiagnosticInfo {
     pub messages: Vec<Span<'static>>,
     pub actions: Option<Vec<Action>>,
 }
-
-impl DiagnosticInfo {}
 
 #[derive(Clone)]
 pub enum Action {

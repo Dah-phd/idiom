@@ -263,12 +263,10 @@ fn handle_markup(markup: lsp_types::MarkupContent, line_buidlder: &LineBuilder, 
         }
         if is_code {
             lines.push(Line::from(line_buidlder.basic_line(line, &mut ctx)));
+        } else if line.trim().starts_with('#') {
+            lines.push(Line::from(Span::raw(line.to_owned()).bold()));
         } else {
-            if line.trim().starts_with('#') {
-                lines.push(Line::from(Span::raw(line.to_owned()).bold()));
-            } else {
-                lines.push(Line::from(String::from(line)));
-            }
+            lines.push(Line::from(String::from(line)));
         }
     }
 }

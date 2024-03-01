@@ -50,6 +50,15 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                         }
                     }
                 }
+                if let Some(position) = contained_position(gs.editor_area, event.row, event.column) {
+                    if let Some(editor) = workspace.get_active() {
+                        if let Some(clip) = editor.mouse_copy_paste(position.into(), gs.clipboard.pull()) {
+                            gs.clipboard.push(clip);
+                            gs.success("Copied select!");
+                        };
+                        gs.insert_mode();
+                    }
+                }
             }
             if !matches!(button, MouseButton::Left) {
                 return;
