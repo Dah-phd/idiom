@@ -46,7 +46,7 @@ impl LineBuilderContext {
             }
         };
         if let Some(diagnostic) = diagnostic {
-            buffer.extend(diagnostic.data.iter().map(|d| d.span.clone()));
+            buffer.extend(diagnostic.data.iter().map(|d| d.inline_span.clone()));
         }
         buffer
     }

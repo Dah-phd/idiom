@@ -33,36 +33,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                 editor.scroll_down();
             }
         }
-        MouseEventKind::Up(_button) => {
-            //TODO figure out how to use
-        }
-        MouseEventKind::Down(button) => {
-            if matches!(button, MouseButton::Right) {
-                if let Some((_, col_idx)) = contained_position(gs.tab_area, event.row, event.column) {
-                    if !workspace.editors.is_empty() {
-                        gs.insert_mode();
-                        if let Some(idx) = workspace.select_tab_mouse(col_idx) {
-                            workspace.activate_editor(idx, None);
-                            workspace.close_active();
-                            if workspace.editors.is_empty() {
-                                gs.select_mode();
-                            }
-                        }
-                    }
-                }
-                if let Some(position) = contained_position(gs.editor_area, event.row, event.column) {
-                    if let Some(editor) = workspace.get_active() {
-                        if let Some(clip) = editor.mouse_copy_paste(position.into(), gs.clipboard.pull()) {
-                            gs.clipboard.push(clip);
-                            gs.success("Copied select!");
-                        };
-                        gs.insert_mode();
-                    }
-                }
-            }
-            if !matches!(button, MouseButton::Left) {
-                return;
-            }
+        MouseEventKind::Down(MouseButton::Left) => {
             if let Some(position) = contained_position(gs.editor_area, event.row, event.column) {
                 if let Some(editor) = workspace.get_active() {
                     editor.mouse_cursor(position.into());
@@ -88,17 +59,36 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                 }
             }
         }
-        MouseEventKind::Drag(button) => {
-            if !matches!(button, MouseButton::Left) {
-                return;
+        MouseEventKind::Down(MouseButton::Right) => {
+            if let Some((_, col_idx)) = contained_position(gs.tab_area, event.row, event.column) {
+                if !workspace.editors.is_empty() {
+                    gs.insert_mode();
+                    if let Some(idx) = workspace.select_tab_mouse(col_idx) {
+                        workspace.activate_editor(idx, None);
+                        workspace.close_active();
+                        if workspace.editors.is_empty() {
+                            gs.select_mode();
+                        }
+                    }
+                }
             }
+            if let Some(position) = contained_position(gs.editor_area, event.row, event.column) {
+                if let Some(editor) = workspace.get_active() {
+                    if let Some(clip) = editor.mouse_copy_paste(position.into(), gs.clipboard.pull()) {
+                        gs.clipboard.push(clip);
+                        gs.success("Copied select!");
+                    };
+                    gs.insert_mode();
+                }
+            }
+        }
+        MouseEventKind::Drag(MouseButton::Left) => {
             if let Some(position) = contained_position(gs.editor_area, event.row, event.column) {
                 if let Some(editor) = workspace.get_active() {
                     editor.mouse_select(position.into());
                     gs.insert_mode();
                     workspace.toggle_editor();
                 }
-                return;
             }
         }
         _ => (),
