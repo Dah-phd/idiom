@@ -27,7 +27,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
 
     // COMPONENTS
     let mut tree = Tree::new(configs.tree_key_map());
-    let mut workspace = Workspace::new(configs.editor_key_map());
+    let mut workspace = Workspace::new(configs.editor_key_map(), tree.get_base_file_paths()).await;
     let mut term = EditorTerminal::new(gs.editor_area.width);
     let mut footer = Footer::default();
 

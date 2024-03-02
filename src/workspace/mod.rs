@@ -35,13 +35,20 @@ pub struct Workspace {
 }
 
 impl Workspace {
-    pub fn new(key_map: EditorKeyMap) -> Self {
+    pub async fn new(key_map: EditorKeyMap, base_tree_paths: Vec<String>) -> Self {
+        let mut base_config = EditorConfigs::new();
+        let mut lsp_servers = HashMap::new();
+        for (ft, lsp_cmd) in base_config.derive_lsp_preloads(base_tree_paths) {
+            if let Ok(lsp) = LSP::new(lsp_cmd).await {
+                lsp_servers.insert(ft, lsp);
+            };
+        }
         Self {
             editors: Vec::default(),
-            base_config: EditorConfigs::new(),
+            base_config,
             key_map,
             tab_style: UNDERLINED,
-            lsp_servers: HashMap::new(),
+            lsp_servers,
             map_callback: map_editor,
         }
     }
@@ -208,11 +215,11 @@ impl Workspace {
     }
 
     fn build_basic_editor(&mut self, file_path: PathBuf) -> Result<Editor> {
-        Ok(Editor::from_path(file_path, self.base_config.clone())?)
+        Ok(Editor::from_path(file_path, &self.base_config)?)
     }
 
     async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> Result<Editor> {
-        let mut new = Editor::from_path(file_path, self.base_config.clone())?;
+        let mut new = Editor::from_path(file_path, &self.base_config)?;
         new.resize(gs.editor_area.width as usize, gs.editor_area.height as usize);
         let lsp_cmd = match self.base_config.derive_lsp(&new.file_type) {
             None => return Ok(new),

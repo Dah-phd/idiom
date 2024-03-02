@@ -1,7 +1,7 @@
+use crate::configs::IndentConfigs;
 use crate::utils::Offset;
 mod action_buffer;
 mod edits;
-use crate::configs::EditorConfigs;
 use crate::syntax::Lexer;
 use crate::workspace::{
     cursor::{Cursor, CursorPosition, Select},
@@ -13,9 +13,9 @@ use lsp_types::{Position, TextDocumentContentChangeEvent, TextEdit};
 
 pub type Events = Vec<(EditMetaData, TextDocumentContentChangeEvent)>;
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct Actions {
-    pub cfg: EditorConfigs,
+    pub cfg: IndentConfigs,
     version: i32,
     done: Vec<EditType>,
     undone: Vec<EditType>,
@@ -24,7 +24,7 @@ pub struct Actions {
 }
 
 impl Actions {
-    pub fn new(cfg: EditorConfigs) -> Self {
+    pub fn new(cfg: IndentConfigs) -> Self {
         Self { cfg, events: Vec::with_capacity(2), ..Default::default() }
     }
 
