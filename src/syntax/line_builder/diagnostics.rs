@@ -46,7 +46,8 @@ impl Action {
 pub struct DiagnosticData {
     pub start: usize,
     pub end: Option<usize>,
-    pub span: Span<'static>,
+    pub inline_span: Span<'static>,
+    pub message: Span<'static>,
     pub info: Option<Vec<DiagnosticRelatedInformation>>,
 }
 
@@ -57,10 +58,13 @@ impl DiagnosticData {
         color: Style,
         info: Option<Vec<DiagnosticRelatedInformation>>,
     ) -> Self {
+        let first_line_fmt = message.lines().next().map(|s| format!("    {s}")).unwrap_or_default();
+        let inline_span = Span::styled(first_line_fmt, color);
         Self {
             start: range.start.character as usize,
             end: if range.start.line == range.end.line { Some(range.end.character as usize) } else { None },
-            span: Span::styled(format!("    {}", message), color),
+            inline_span,
+            message: Span::styled(message, color),
             info,
         }
     }
@@ -74,8 +78,8 @@ impl DiagnosticLine {
     pub fn check_ranges(&self, idx: usize) -> Option<Color> {
         for data in self.data.iter() {
             match data.end {
-                Some(end_idx) if (data.start..end_idx).contains(&idx) => return data.span.style.fg,
-                None if idx >= data.start => return data.span.style.fg,
+                Some(end_idx) if (data.start..end_idx).contains(&idx) => return data.inline_span.style.fg,
+                None if idx >= data.start => return data.inline_span.style.fg,
                 _ => {}
             }
         }
@@ -86,7 +90,7 @@ impl DiagnosticLine {
         let mut info = DiagnosticInfo::default();
         let mut buffer = Vec::new();
         for diagnostic in self.data.iter() {
-            info.messages.push(diagnostic.span.clone());
+            info.messages.push(diagnostic.message.clone());
             if let Some(actions) = lang.derive_diagnostic_actions(diagnostic.info.as_ref()) {
                 for action in actions {
                     buffer.push(action.clone());
@@ -100,7 +104,7 @@ impl DiagnosticLine {
     }
 
     pub fn drop_non_errs(&mut self) {
-        self.data.retain(|d| d.span.style.fg == Some(ERR_COLOR));
+        self.data.retain(|d| d.inline_span.style.fg == Some(ERR_COLOR));
     }
 
     pub fn set_diagnostic_style(&self, idx: usize, style: &mut Style) {
@@ -115,7 +119,7 @@ impl DiagnosticLine {
             Some(DiagnosticSeverity::ERROR) => {
                 self.data.insert(0, DiagnosticData::new(d.range, d.message, ERR_STYLE, d.related_information));
             }
-            Some(DiagnosticSeverity::WARNING) => match self.data[0].span.style.fg {
+            Some(DiagnosticSeverity::WARNING) => match self.data[0].inline_span.style.fg {
                 Some(ELS_COLOR) => {
                     self.data.insert(0, DiagnosticData::new(d.range, d.message, WAR_STYLE, d.related_information));
                 }
