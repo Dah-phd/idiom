@@ -1,5 +1,5 @@
 use crate::{
-    configs::EditorConfigs,
+    configs::IndentConfigs,
     utils::Offset,
     workspace::{
         cursor::{Cursor, CursorPosition},
@@ -19,7 +19,7 @@ pub struct Edit {
 }
 
 impl Edit {
-    pub fn swap_down(up_line: usize, cfg: &EditorConfigs, content: &mut [String]) -> (Offset, Offset, Self) {
+    pub fn swap_down(up_line: usize, cfg: &IndentConfigs, content: &mut [String]) -> (Offset, Offset, Self) {
         let to = up_line + 1;
         let mut reverse_edit_text = content[up_line].to_owned();
         reverse_edit_text.push('\n');

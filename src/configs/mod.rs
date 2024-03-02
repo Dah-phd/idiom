@@ -3,7 +3,7 @@ mod editor_config;
 mod keymap;
 mod theme_ui;
 mod types;
-pub use editor_config::EditorConfigs;
+pub use editor_config::{EditorConfigs, IndentConfigs};
 pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap, TreeAction, TreeUserKeyMap};
 pub use theme_ui::UITheme;
 pub use types::FileType;

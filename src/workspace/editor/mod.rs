@@ -91,15 +91,14 @@ impl WidgetRef for &Editor {
 }
 
 impl Editor {
-    pub fn from_path(path: PathBuf, mut cfg: EditorConfigs) -> std::io::Result<Self> {
+    pub fn from_path(path: PathBuf, cfg: &EditorConfigs) -> std::io::Result<Self> {
         let content = std::fs::read_to_string(&path)?;
         let file_type = FileType::derive_type(&path);
         let display = build_display(&path);
-        cfg.update_by_file_type(&file_type);
         Ok(Self {
             lexer: Lexer::with_context(file_type, &path),
             cursor: Cursor::default(),
-            actions: Actions::new(cfg),
+            actions: Actions::new(cfg.get_indent_cfg(&file_type)),
             content: content.split('\n').map(String::from).collect(),
             file_type,
             display,
@@ -426,7 +425,7 @@ impl Editor {
 
     pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {
         self.lexer.reload_theme();
-        self.actions.cfg = new_cfg.clone();
+        self.actions.cfg = new_cfg.get_indent_cfg(&self.file_type);
     }
 
     pub fn stringify(&self) -> String {
