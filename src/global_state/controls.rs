@@ -65,10 +65,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                     gs.insert_mode();
                     if let Some(idx) = workspace.select_tab_mouse(col_idx) {
                         workspace.activate_editor(idx, None);
-                        workspace.close_active();
-                        if workspace.editors.is_empty() {
-                            gs.select_mode();
-                        }
+                        workspace.close_active(gs);
                     }
                 }
             }
