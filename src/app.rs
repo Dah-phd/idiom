@@ -16,17 +16,11 @@ use crate::{
 use anyhow::Result;
 use crossterm::event::Event;
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::{
-    io::Stdout,
-    path::PathBuf,
-    time::{Duration, Instant},
-};
-
-const TICK: Duration = Duration::from_millis(4);
+use std::{io::Stdout, path::PathBuf, time::Instant};
 
 pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Option<PathBuf>) -> Result<()> {
     let configs = KeyMap::new();
-    let mut clock = Instant::now();
+    let mut last_frame_start = Instant::now();
     let mut general_key_map = configs.general_key_map();
     let size = terminal.size()?;
     let mut gs = GlobalState::new(size.height, size.width);
@@ -50,12 +44,10 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
     loop {
         terminal.draw(|frame| gs.draw(frame, &mut workspace, &mut tree, &mut footer, &mut term))?;
 
-        let timeout = TICK.saturating_sub(clock.elapsed());
-
-        if crossterm::event::poll(timeout)? {
+        if crossterm::event::poll(last_frame_start.elapsed())? {
+            last_frame_start = Instant::now();
             match crossterm::event::read()? {
                 Event::Key(key) => {
-                    // order matters
                     if gs.map_key(&key, &mut workspace, &mut tree, &mut term) {
                         continue;
                     }
@@ -131,10 +123,6 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
             workspace.graceful_exit().await;
             break;
         };
-
-        if clock.elapsed() >= TICK {
-            clock = Instant::now();
-        }
     }
     Ok(())
 }

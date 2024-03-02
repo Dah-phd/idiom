@@ -295,13 +295,16 @@ impl Workspace {
         }
     }
 
-    pub fn close_active(&mut self) {
+    pub fn close_active(&mut self, gs: &mut GlobalState) {
         if self.editors.is_empty() {
             return;
         }
         let editor = self.editors.remove(0);
         if let Some(mut client) = editor.lexer.lsp_client {
             let _ = client.file_did_close(&editor.path);
+        }
+        if self.editors.is_empty() {
+            gs.select_mode();
         }
     }
 
@@ -392,6 +395,7 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
                 EditorAction::Undo => editor.undo(),
                 EditorAction::Redo => editor.redo(),
                 EditorAction::Save => editor.save(gs),
+                EditorAction::Close => ws.close_active(gs),
                 EditorAction::Cancel => {
                     if editor.cursor.select_take().is_some() {
                         return true;
@@ -415,13 +419,6 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
                 EditorAction::Copy => {
                     if let Some(clip) = editor.copy() {
                         gs.clipboard.push(clip);
-                    }
-                }
-                EditorAction::Close => {
-                    ws.close_active();
-                    match ws.get_active() {
-                        Some(editor) => gs.tree.push(TreeEvent::SelectPath(editor.path.clone())),
-                        None => gs.select_mode(),
                     }
                 }
             }
@@ -463,7 +460,7 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
                 return false;
             }
             EditorAction::Close => {
-                ws.close_active();
+                ws.close_active(gs);
             }
             _ => (),
         }
