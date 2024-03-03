@@ -182,7 +182,7 @@ impl TreePath {
                 if warnings != &0 {
                     return Span::styled(display.to_owned(), WAR);
                 }
-                return Span::raw(display.to_owned());
+                Span::raw(display.to_owned())
             }
             Self::File { display, errors, warnings, .. } => {
                 if errors != &0 {
@@ -191,7 +191,7 @@ impl TreePath {
                 if warnings != &0 {
                     return Span::styled(display.to_owned(), WAR);
                 }
-                return Span::raw(display.to_owned());
+                Span::raw(display.to_owned())
             }
         }
     }
@@ -200,6 +200,19 @@ impl TreePath {
         match self {
             Self::Folder { path, .. } => path,
             Self::File { path, .. } => path,
+        }
+    }
+
+    pub fn file_name(&self) -> Option<String> {
+        self.path().file_name()?.to_str().map(|s| s.to_string())
+    }
+
+    pub fn tree_file_names(&self) -> Vec<String> {
+        match self {
+            Self::File { .. } => self.file_name().into_iter().collect(),
+            Self::Folder { tree, .. } => {
+                tree.as_ref().map(|paths| paths.iter().flat_map(|p| p.file_name()).collect()).unwrap_or_default()
+            }
         }
     }
 

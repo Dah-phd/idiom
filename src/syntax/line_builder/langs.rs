@@ -95,9 +95,10 @@ impl From<FileType> for Lang {
                 comment_start: vec!["#"],
                 file_type,
                 declaration: vec!["def", "class"],
-                key_words: vec![],
+                key_words: vec!["self"],
                 frow_control: vec![
                     "if", "else", "elif", "for", "while", "break", "continue", "try", "except", "raise", "with",
+                    "match",
                 ],
                 mod_import: vec!["import", "from", "as"],
                 ..Default::default()

@@ -325,20 +325,7 @@ impl Tree {
         }
     }
 
-    pub fn get_base_file_paths(&self) -> Vec<String> {
-        match &self.tree {
-            TreePath::File { path, .. } => {
-                path.file_name().and_then(|s| s.to_str()).iter().map(|s| s.to_string()).collect()
-            }
-            TreePath::Folder { tree, .. } => tree
-                .as_ref()
-                .map(|paths| {
-                    paths
-                        .iter()
-                        .flat_map(|p| p.path().file_name().and_then(|s| s.to_str().map(|f| f.to_string())))
-                        .collect()
-                })
-                .unwrap_or_default(),
-        }
+    pub fn get_base_file_names(&self) -> Vec<String> {
+        self.tree.tree_file_names()
     }
 }
