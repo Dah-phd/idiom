@@ -5,6 +5,8 @@ use crate::syntax::WorkspaceEvent;
 use lsp_types::DiagnosticRelatedInformation;
 use serde_json::Value;
 
+type DiagnosticHandler = Option<fn(&Lang, &Vec<DiagnosticRelatedInformation>) -> Option<Vec<Action>>>;
+
 #[derive(Debug, Clone, Default)]
 pub struct Lang {
     pub file_type: FileType,
@@ -14,7 +16,7 @@ pub struct Lang {
     pub frow_control: Vec<&'static str>,
     pub mod_import: Vec<&'static str>,
     pub completion_data_handler: Option<fn(&Self, Value, gs: &mut GlobalState)>,
-    pub diagnostic_handler: Option<fn(&Self, &Vec<DiagnosticRelatedInformation>) -> Option<Vec<Action>>>,
+    pub diagnostic_handler: DiagnosticHandler,
 }
 
 impl Lang {
@@ -89,7 +91,6 @@ impl From<FileType> for Lang {
                     }
                 }),
                 diagnostic_handler: Some(rust_process_related_info),
-                ..Default::default()
             },
             FileType::Python => Self {
                 comment_start: vec!["#"],

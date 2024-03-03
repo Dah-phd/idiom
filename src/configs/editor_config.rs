@@ -1,7 +1,6 @@
 use super::types::FileType;
 use super::{load_or_create_config, EDITOR_CFG_FILE};
 use crate::utils::{trim_start_inplace, Offset};
-
 use serde::{Deserialize, Serialize};
 
 pub struct IndentConfigs {
@@ -185,7 +184,7 @@ fn get_unident_before() -> String {
     String::from("]})")
 }
 
-fn map_preload(base_tree_paths: &Vec<String>, expected: Option<Vec<String>>, cmd: Option<&String>) -> Option<String> {
+fn map_preload(base_tree_paths: &[String], expected: Option<Vec<String>>, cmd: Option<&String>) -> Option<String> {
     if let Some(cmd) = cmd {
         for expected_file in expected? {
             if base_tree_paths.contains(&expected_file) {
