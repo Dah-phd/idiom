@@ -156,43 +156,20 @@ impl EditorConfigs {
     }
 
     pub fn derive_lsp_preloads(&mut self, base_tree_paths: Vec<String>) -> Vec<(FileType, String)> {
-        let mut preload_lsps = Vec::new();
-        if let Some(cmd) =
-            map_preload(&base_tree_paths, self.rust_lsp_preload_if_present.take(), self.rust_lsp.as_ref())
-        {
-            preload_lsps.push((FileType::Rust, cmd));
-        };
-        if let Some(cmd) =
-            map_preload(&base_tree_paths, self.python_lsp_preload_if_present.take(), self.python_lsp.as_ref())
-        {
-            preload_lsps.push((FileType::Python, cmd));
-        };
-        if let Some(cmd) = map_preload(&base_tree_paths, self.c_lsp_preload_if_present.take(), self.c_lsp.as_ref()) {
-            preload_lsps.push((FileType::C, cmd));
-        };
-        if let Some(cmd) = map_preload(&base_tree_paths, self.cpp_preload_if_present.take(), self.cpp_lsp.as_ref()) {
-            preload_lsps.push((FileType::Cpp, cmd));
-        };
-        if let Some(cmd) =
-            map_preload(&base_tree_paths, self.java_script_preload_if_present.take(), self.java_script_lsp.as_ref())
-        {
-            preload_lsps.push((FileType::JavaScript, cmd));
-        };
-        if let Some(cmd) =
-            map_preload(&base_tree_paths, self.type_script_preload_if_present.take(), self.type_script_lsp.as_ref())
-        {
-            preload_lsps.push((FileType::TypeScript, cmd));
-        };
-        if let Some(cmd) = map_preload(&base_tree_paths, self.html_preload_if_present.take(), self.html_lsp.as_ref()) {
-            preload_lsps.push((FileType::Html, cmd));
-        };
-        if let Some(cmd) = map_preload(&base_tree_paths, self.yaml_preload_if_present.take(), self.yaml_lsp.as_ref()) {
-            preload_lsps.push((FileType::Yml, cmd));
-        };
-        if let Some(cmd) = map_preload(&base_tree_paths, self.toml_preload_if_present.take(), self.toml_lsp.as_ref()) {
-            preload_lsps.push((FileType::Toml, cmd));
-        };
-        preload_lsps
+        [
+            (FileType::Rust, self.rust_lsp_preload_if_present.take(), self.rust_lsp.as_ref()),
+            (FileType::Python, self.python_lsp_preload_if_present.take(), self.python_lsp.as_ref()),
+            (FileType::C, self.c_lsp_preload_if_present.take(), self.c_lsp.as_ref()),
+            (FileType::Cpp, self.cpp_preload_if_present.take(), self.cpp_lsp.as_ref()),
+            (FileType::JavaScript, self.java_script_preload_if_present.take(), self.java_script_lsp.as_ref()),
+            (FileType::TypeScript, self.type_script_preload_if_present.take(), self.type_script_lsp.as_ref()),
+            (FileType::Html, self.html_preload_if_present.take(), self.html_lsp.as_ref()),
+            (FileType::Yml, self.yaml_preload_if_present.take(), self.yaml_lsp.as_ref()),
+            (FileType::Toml, self.toml_preload_if_present.take(), self.toml_lsp.as_ref()),
+        ]
+        .into_iter()
+        .flat_map(|(ft, expected, cmd)| Some((ft, map_preload(&base_tree_paths, expected, cmd)?)))
+        .collect()
     }
 
     pub fn refresh(&mut self) {
