@@ -114,19 +114,19 @@ impl Editor {
     }
 
     pub fn get_stats(&self) -> DocStats {
-        (self.content.len(), self.cursor.select_len(&self.content), self.cursor.position())
+        (self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into())
     }
 
     pub fn help(&mut self) {
-        self.lexer.help(self.cursor.position());
+        self.lexer.help((&self.cursor).into());
     }
 
     pub fn references(&mut self) {
-        self.lexer.go_to_reference(self.cursor.position());
+        self.lexer.go_to_reference((&self.cursor).into());
     }
 
     pub fn declarations(&mut self) {
-        self.lexer.go_to_declaration(self.cursor.position());
+        self.lexer.go_to_declaration((&self.cursor).into());
     }
 
     pub fn select_token(&mut self) {
@@ -143,7 +143,7 @@ impl Editor {
     pub fn start_renames(&mut self) {
         let line = &self.content[self.cursor.line];
         let token_range = token_range_at(line, self.cursor.char);
-        self.lexer.start_rename(self.cursor.position(), &line[token_range]);
+        self.lexer.start_rename((&self.cursor).into(), &line[token_range]);
     }
 
     pub fn is_saved(&self) -> bool {
@@ -380,7 +380,7 @@ impl Editor {
         let line = &self.content[self.cursor.line];
         if self.lexer.should_autocomplete(self.cursor.char, line) {
             self.actions.force_sync(&mut self.lexer, &self.content);
-            self.lexer.get_autocomplete(self.cursor.position(), line);
+            self.lexer.get_autocomplete((&self.cursor).into(), line);
         }
     }
 

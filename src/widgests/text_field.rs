@@ -150,34 +150,57 @@ impl<T: Default + Clone> TextField<T> {
                 self.char = self.text.len().saturating_sub(1);
                 Some(T::default())
             }
-            KeyCode::Left if key.modifiers == KeyModifiers::SHIFT => {
-                self.init_select();
-                self.char = self.char.saturating_sub(1);
-                self.push_select();
-                Some(T::default())
-            }
-            KeyCode::Left => {
-                self.select = None;
-                self.char = self.char.saturating_sub(1);
-                Some(T::default())
-            }
-            KeyCode::Right if key.modifiers == KeyModifiers::SHIFT => {
-                self.init_select();
-                if self.text.len() > self.char {
-                    self.char += 1;
-                };
-                self.push_select();
-                Some(T::default())
-            }
-            KeyCode::Right => {
-                self.select = None;
-                if self.text.len() > self.char {
-                    self.char += 1;
-                };
-                Some(T::default())
-            }
+            KeyCode::Left => self.move_left(key.modifiers),
+            KeyCode::Right => self.move_right(key.modifiers),
             _ => None,
         }
+    }
+
+    fn move_left(&mut self, mods: KeyModifiers) -> Option<T> {
+        let should_select = mods.contains(KeyModifiers::SHIFT);
+        if should_select {
+            self.init_select();
+        } else {
+            self.select = None;
+        };
+        self.char = self.char.saturating_sub(1);
+        if mods.contains(KeyModifiers::CONTROL) {
+            // jump
+            while self.char > 0 {
+                let next_idx = self.char - 1;
+                if matches!(self.text.chars().nth(next_idx), Some(ch) if !ch.is_alphabetic()) {
+                    break;
+                };
+                self.char = next_idx;
+            }
+        };
+        if should_select {
+            self.push_select();
+        };
+        Some(T::default())
+    }
+
+    fn move_right(&mut self, mods: KeyModifiers) -> Option<T> {
+        let should_select = mods.contains(KeyModifiers::SHIFT);
+        if should_select {
+            self.init_select();
+        } else {
+            self.select = None;
+        };
+        self.char = std::cmp::min(self.text.len(), self.char + 1);
+        if mods.contains(KeyModifiers::CONTROL) {
+            // jump
+            while self.text.len() > self.char {
+                self.char += 1;
+                if matches!(self.text.chars().nth(self.char), Some(ch) if !ch.is_alphabetic()) {
+                    break;
+                }
+            }
+        };
+        if should_select {
+            self.push_select();
+        };
+        Some(T::default())
     }
 
     fn init_select(&mut self) {

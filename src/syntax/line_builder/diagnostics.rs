@@ -35,10 +35,10 @@ impl From<Action> for WorkspaceEvent {
     }
 }
 
-impl Action {
-    pub fn to_string(&self) -> String {
+impl std::fmt::Display for Action {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Import(text) => format!("import {text}"),
+            Self::Import(text) => write!(f, "import {text}"),
         }
     }
 }

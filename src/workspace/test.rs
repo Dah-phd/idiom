@@ -55,33 +55,38 @@ fn ctrl_shift_press(ws: &mut Workspace, code: KeyCode, gs: &mut GlobalState) {
     ws.map(&KeyEvent::new(code, KeyModifiers::CONTROL.union(KeyModifiers::SHIFT)), gs);
 }
 
+fn assert_position(ws: &mut Workspace, position: CursorPosition) {
+    let current: CursorPosition = (&active(ws).cursor).into();
+    assert_eq!(current, position);
+}
+
 #[test]
 fn test_move() {
     let mut ws = base_ws();
     let mut gs = GlobalState::new(60, 100);
     gs.insert_mode();
     press(&mut ws, KeyCode::Down, &mut gs);
-    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 0, line: 1 });
+    assert_position(&mut ws, CursorPosition { char: 0, line: 1 });
     press(&mut ws, KeyCode::End, &mut gs);
-    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 9, line: 1 });
+    assert_position(&mut ws, CursorPosition { char: 9, line: 1 });
     press(&mut ws, KeyCode::Right, &mut gs);
-    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 0, line: 2 });
+    assert_position(&mut ws, CursorPosition { char: 0, line: 2 });
     press(&mut ws, KeyCode::Left, &mut gs);
-    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 9, line: 1 });
+    assert_position(&mut ws, CursorPosition { char: 9, line: 1 });
     press(&mut ws, KeyCode::Down, &mut gs);
     press(&mut ws, KeyCode::Down, &mut gs);
     press(&mut ws, KeyCode::End, &mut gs);
-    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 21, line: 3 });
+    assert_position(&mut ws, CursorPosition { char: 21, line: 3 });
     press(&mut ws, KeyCode::Down, &mut gs);
-    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 14, line: 4 });
+    assert_position(&mut ws, CursorPosition { char: 14, line: 4 });
     press(&mut ws, KeyCode::Left, &mut gs);
-    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 13, line: 4 });
+    assert_position(&mut ws, CursorPosition { char: 13, line: 4 });
     press(&mut ws, KeyCode::Right, &mut gs);
-    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 14, line: 4 });
+    assert_position(&mut ws, CursorPosition { char: 14, line: 4 });
     press(&mut ws, KeyCode::Down, &mut gs);
-    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 8, line: 5 });
+    assert_position(&mut ws, CursorPosition { char: 8, line: 5 });
     press(&mut ws, KeyCode::Up, &mut gs);
-    assert_eq!(active(&mut ws).cursor.position(), CursorPosition { char: 14, line: 4 });
+    assert_position(&mut ws, CursorPosition { char: 14, line: 4 });
 }
 
 #[test]
