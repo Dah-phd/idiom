@@ -6,29 +6,6 @@ use ratatui::{
     text::Span,
 };
 
-/// used to map markup lines based on info
-/// functionality as line number, wrap, cursor position, select are handled by the logic in LineBuilder
-#[allow(dead_code)]
-pub fn mark_down_line<'a>(
-    // TODO enable
-    _builder: &mut LineBuilder,
-    _idx: usize,
-    content: &str,
-    mut buffer: Vec<Span<'a>>,
-) -> Vec<Span<'a>> {
-    for ch in content.chars() {
-        match ch {
-            '#' => buffer.push(Span::styled(ch.to_string(), Style { fg: Some(Color::Blue), ..Default::default() })),
-            '*' => buffer.push(Span::styled(ch.to_string(), Style { fg: Some(Color::Blue), ..Default::default() })),
-            '[' | ']' => {
-                buffer.push(Span::styled(ch.to_string(), Style { fg: Some(Color::Magenta), ..Default::default() }))
-            }
-            _ => buffer.push(Span::raw(ch.to_string())),
-        }
-    }
-    buffer
-}
-
 /// build generic styled line based on info on lang and theme (calls LineBuilder functionality)
 /// functionality as line number, wrap, cursor position, select are handled by the logic in LineBuilder
 pub fn generic_line(
