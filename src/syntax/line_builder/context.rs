@@ -141,7 +141,7 @@ impl From<&Cursor> for LineBuilderContext {
         Self {
             select: cursor.select_get(),
             select_range: None,
-            cursor: cursor.position(),
+            cursor: cursor.into(),
             brackets: BracketColors::default(),
         }
     }

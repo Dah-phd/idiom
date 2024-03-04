@@ -14,8 +14,9 @@ pub struct Cursor {
 }
 
 impl Cursor {
-    pub fn position(&self) -> CursorPosition {
-        self.into()
+    /// check if position is 0, 0 without select
+    pub fn is_at_zero_no_select(&self) -> bool {
+        self.char == 0 && self.line == 0 && self.select.is_none()
     }
 
     pub fn set_cursor_checked_with_select(&mut self, position: CursorPosition, content: &[String]) {

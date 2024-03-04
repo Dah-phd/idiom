@@ -1,6 +1,7 @@
 use crate::workspace::cursor::CursorPosition;
 use std::{ops::Range, path::PathBuf, time::SystemTime};
 
+#[inline(always)]
 pub fn insert_clip(clip: String, content: &mut Vec<String>, mut cursor: CursorPosition) -> CursorPosition {
     let mut lines: Vec<_> = clip.split('\n').collect();
     if lines.len() == 1 {
@@ -31,6 +32,7 @@ pub fn insert_clip(clip: String, content: &mut Vec<String>, mut cursor: CursorPo
     }
 }
 
+#[inline(always)]
 pub fn clip_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<String>) -> String {
     if from.line == to.line {
         let line = &mut content[from.line];
@@ -55,6 +57,7 @@ pub fn clip_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<
     }
 }
 
+#[inline]
 pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<String>) {
     if from.line == to.line {
         if let Some(line) = content.get_mut(from.line) {
@@ -77,6 +80,7 @@ pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Ve
     }
 }
 
+#[inline]
 pub fn copy_content(from: CursorPosition, to: CursorPosition, content: &[String]) -> String {
     if from.line == to.line {
         content[from.line][from.char..to.char].to_owned()
@@ -96,6 +100,7 @@ pub fn copy_content(from: CursorPosition, to: CursorPosition, content: &[String]
     }
 }
 
+#[inline(always)]
 pub fn get_closing_char(ch: char) -> Option<char> {
     match ch {
         '{' => Some('}'),
@@ -107,6 +112,7 @@ pub fn get_closing_char(ch: char) -> Option<char> {
     }
 }
 
+#[inline(always)]
 pub fn get_opening_char(ch: char) -> Option<char> {
     match ch {
         '}' => Some('{'),
@@ -118,6 +124,7 @@ pub fn get_opening_char(ch: char) -> Option<char> {
     }
 }
 
+#[inline(always)]
 pub fn is_closing_repeat(line: &str, ch: char, at: usize) -> bool {
     if let Some(opening) = get_opening_char(ch) {
         line[at..].starts_with(ch) && line[..at].contains(opening)
@@ -126,6 +133,7 @@ pub fn is_closing_repeat(line: &str, ch: char, at: usize) -> bool {
     }
 }
 
+#[inline(always)]
 pub fn find_line_start(line: &str) -> usize {
     for (idx, ch) in line.char_indices() {
         if !ch.is_whitespace() {
@@ -135,6 +143,7 @@ pub fn find_line_start(line: &str) -> usize {
     0
 }
 
+#[inline(always)]
 pub fn token_range_at(line: &str, idx: usize) -> Range<usize> {
     let mut token_start = 0;
     let mut last_not_in_token = false;
@@ -162,6 +171,7 @@ pub fn token_range_at(line: &str, idx: usize) -> Range<usize> {
     }
 }
 
+#[inline]
 pub fn last_modified(path: &PathBuf) -> Option<SystemTime> {
     let meta = std::fs::metadata(path).ok()?;
     meta.modified().ok()

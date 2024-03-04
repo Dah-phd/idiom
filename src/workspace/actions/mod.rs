@@ -277,10 +277,10 @@ impl Actions {
             }
             _ => {
                 let line = &mut content[cursor.line];
-                if let Some((offset, edit)) = uncomment(pat, line, cursor.position()) {
+                if let Some((offset, edit)) = uncomment(pat, line, cursor.into()) {
                     self.push_done(edit);
                     cursor.char = offset.offset(cursor.char);
-                } else if let Some((offset, edit)) = into_comment(pat, line, cursor.position()) {
+                } else if let Some((offset, edit)) = into_comment(pat, line, cursor.into()) {
                     self.push_done(edit);
                     cursor.char = offset.offset(cursor.char);
                 }
@@ -324,7 +324,7 @@ impl Actions {
                 let new_text = format!("{ch}{closing}");
                 line.insert_str(cursor.char, &new_text);
                 self.push_buffer();
-                self.push_done(Edit::record_in_line_insertion(cursor.position().into(), new_text));
+                self.push_done(Edit::record_in_line_insertion(cursor.into(), new_text));
             } else {
                 let _ = self.buffer.push(cursor.line, cursor.char, ch).map(|edit| self.push_done(edit));
                 line.insert(cursor.char, ch);
@@ -359,7 +359,7 @@ impl Actions {
     }
 
     pub fn backspace(&mut self, cursor: &mut Cursor, content: &mut Vec<String>) {
-        if content.is_empty() || cursor.line == 0 && cursor.char == 0 {
+        if content.is_empty() || cursor.is_at_zero_no_select() {
             return;
         }
         match cursor.select_take() {
