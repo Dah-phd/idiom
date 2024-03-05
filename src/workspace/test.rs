@@ -61,6 +61,19 @@ fn assert_position(ws: &mut Workspace, position: CursorPosition) {
 }
 
 #[test]
+fn test_open_scope() {
+    let mut ws = base_ws();
+    let mut gs = GlobalState::new(60, 100);
+    gs.insert_mode();
+    press(&mut ws, KeyCode::Char('{'), &mut gs);
+    press(&mut ws, KeyCode::Enter, &mut gs);
+    assert_position(&mut ws, CursorPosition { char: 4, line: 1 });
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "{");
+    assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "    ");
+    assert_eq!(pull_line(active(&mut ws), 2).unwrap(), "}hello world!");
+}
+
+#[test]
 fn test_move() {
     let mut ws = base_ws();
     let mut gs = GlobalState::new(60, 100);

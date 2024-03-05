@@ -39,3 +39,34 @@ impl WrappedState {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::WrappedState;
+
+    #[test]
+    fn test_setting() {
+        let mut ls = WrappedState::default();
+        ls.set(3);
+        assert_eq!(ls.inner.selected(), Some(3));
+        ls.set(2);
+        assert_eq!(ls.inner.selected(), Some(2));
+        ls.drop();
+        assert_eq!(ls.inner.selected(), None);
+    }
+
+    #[test]
+    fn test_movement() {
+        let mut ls = WrappedState::default();
+        let options = [1, 2, 3];
+        ls.next(&options);
+        assert_eq!(ls.selected(), Some(0));
+        ls.next(&options);
+        assert_eq!(ls.selected(), Some(1));
+        ls.next(&options);
+        ls.next(&options);
+        assert_eq!(ls.selected(), Some(0));
+        ls.prev(&options);
+        assert_eq!(ls.selected(), Some(2));
+    }
+}
