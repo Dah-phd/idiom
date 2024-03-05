@@ -16,6 +16,7 @@ categories = ["development-tools", "text-editors"]
 authors = ["Daniel Nikolaev <toolsproed@gmail.com>"]
 
 [dependencies]
+mio = "0.8.11" # fixed vulnerability on windows - version after 0.8.11 are patched
 crossterm = "0.27.0"
 lsp-types = "0.95.0"
 serde = { version = "1.0.163", features = ["derive"] }

@@ -1,3 +1,4 @@
 /target
 debug.log
 test_data.*
+Cargo.lock
