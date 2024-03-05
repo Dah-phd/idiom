@@ -57,7 +57,7 @@ pub fn dynamic_cursor_rect_sized_height(
 ) -> Option<Rect> {
     //  ______________
     // |y,x _____     |
-    // |   |     |    | base hight (y)
+    // |   |     |    | base.hight (y)
     // |   |     | h..|
     // |   |     |    |
     // |    -----     |
