@@ -168,7 +168,7 @@ impl<T: Default + Clone> TextField<T> {
             // jump
             while self.char > 0 {
                 let next_idx = self.char - 1;
-                if matches!(self.text.chars().nth(next_idx), Some(ch) if !ch.is_alphabetic()) {
+                if matches!(self.text.chars().nth(next_idx), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
                     break;
                 };
                 self.char = next_idx;
@@ -192,7 +192,7 @@ impl<T: Default + Clone> TextField<T> {
             // jump
             while self.text.len() > self.char {
                 self.char += 1;
-                if matches!(self.text.chars().nth(self.char), Some(ch) if !ch.is_alphabetic()) {
+                if matches!(self.text.chars().nth(self.char), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
                     break;
                 }
             }
@@ -248,5 +248,65 @@ impl TextField<PopupMessage> {
 impl TextField<()> {
     pub fn basic(text: String) -> Self {
         Self { char: text.len(), text, ..Default::default() }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::TextField;
+    use crate::global_state::Clipboard;
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    #[test]
+    fn test_setting() {
+        let mut field: TextField<()> = TextField::default();
+        field.text_set("12345".to_owned());
+        assert_eq!(&field.text, "12345");
+        assert_eq!(field.char, 5);
+        let mut clip = Clipboard::default();
+        field.map(&KeyEvent::new(KeyCode::Left, KeyModifiers::SHIFT), &mut clip);
+        assert!(field.select.is_some());
+        assert_eq!(field.char, 4);
+        assert_eq!(&field.text_take(), "12345");
+        assert_eq!(field.char, 0);
+        assert_eq!(&field.text, "");
+        assert!(field.select.is_none());
+    }
+
+    #[test]
+    fn test_move() {
+        let mut field: TextField<()> = TextField::default();
+        let mut clip = Clipboard::default();
+        field.map(&KeyEvent::new(KeyCode::Right, KeyModifiers::empty()), &mut clip);
+        assert!(field.char == 0);
+        field.text_set("12".to_owned());
+        field.map(&KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL), &mut clip);
+        assert_eq!(field.char, 2);
+        field.map(&KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL), &mut clip);
+        assert_eq!(field.char, 0);
+        field.map(&KeyEvent::new(KeyCode::Right, KeyModifiers::empty()), &mut clip);
+        assert_eq!(field.char, 1);
+        field.map(&KeyEvent::new(KeyCode::Left, KeyModifiers::empty()), &mut clip);
+        assert_eq!(field.char, 0);
+    }
+
+    #[test]
+    fn test_select() {
+        let mut field: TextField<()> = TextField::default();
+        let mut clip = Clipboard::default();
+        field.text_set("a3cde".to_owned());
+        field.char = 0;
+        field.map(&KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL | KeyModifiers::SHIFT), &mut clip);
+        assert_eq!(field.select, Some((0, 5)));
+        assert_eq!(field.char, 5);
+        field.map(&KeyEvent::new(KeyCode::Right, KeyModifiers::empty()), &mut clip);
+        assert!(field.select.is_none());
+        assert_eq!(field.char, 5);
+        field.map(&KeyEvent::new(KeyCode::Left, KeyModifiers::SHIFT), &mut clip);
+        assert_eq!(field.select, Some((5, 4)));
+        field.map(&KeyEvent::new(KeyCode::Left, KeyModifiers::SHIFT | KeyModifiers::CONTROL), &mut clip);
+        assert_eq!(field.select, Some((5, 0)));
+        field.map(&KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()), &mut clip);
+        assert_eq!(&field.text, "");
     }
 }
