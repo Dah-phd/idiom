@@ -382,6 +382,7 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
                 EditorAction::SelectLeft => editor.select_left(),
                 EditorAction::SelectRight => editor.select_right(),
                 EditorAction::SelectToken => editor.select_token(),
+                EditorAction::SelectLine => editor.select_line(),
                 EditorAction::SelectAll => editor.select_all(),
                 EditorAction::ScrollUp => editor.scroll_up(),
                 EditorAction::ScrollDown => editor.scroll_down(),
