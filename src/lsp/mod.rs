@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 mod client;
 mod lsp_stream;
 mod messages;
