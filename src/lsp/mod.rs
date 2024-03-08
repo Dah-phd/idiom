@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 mod client;
 mod lsp_stream;
 mod messages;
@@ -153,6 +154,10 @@ impl LSP {
 
     pub fn aquire_client(&self) -> LSPClient {
         self.client.clone()
+    }
+
+    pub fn borrow_client(&self) -> &LSPClient {
+        &self.client
     }
 
     pub async fn graceful_exit(&mut self) -> Result<()> {

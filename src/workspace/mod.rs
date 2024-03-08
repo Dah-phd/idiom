@@ -41,6 +41,7 @@ impl Workspace {
         for (ft, lsp_cmd) in base_config.derive_lsp_preloads(base_tree_paths) {
             gs.success(format!("Preloading {lsp_cmd}"));
             if let Ok(lsp) = LSP::new(lsp_cmd).await {
+                gs.tree.push(TreeEvent::RegisterLSP(lsp.borrow_client().get_lsp_registration()));
                 lsp_servers.insert(ft, lsp);
             };
         }
