@@ -132,12 +132,19 @@ impl Editor {
     pub fn select_token(&mut self) {
         let range = token_range_at(&self.content[self.cursor.line], self.cursor.char);
         if !range.is_empty() {
-            self.cursor.set_char(range.end);
             self.cursor.select_set(
                 CursorPosition { line: self.cursor.line, char: range.start },
                 CursorPosition { line: self.cursor.line, char: range.end },
             )
         }
+    }
+
+    pub fn select_line(&mut self) {
+        let start = CursorPosition { line: self.cursor.line, char: 0 };
+        let next_line = self.cursor.line + 1;
+        if self.content.len() > next_line {
+            self.cursor.select_set(start, CursorPosition { line: next_line, char: 0 });
+        };
     }
 
     pub fn start_renames(&mut self) {

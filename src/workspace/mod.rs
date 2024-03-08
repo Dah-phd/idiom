@@ -41,6 +41,7 @@ impl Workspace {
         for (ft, lsp_cmd) in base_config.derive_lsp_preloads(base_tree_paths) {
             gs.success(format!("Preloading {lsp_cmd}"));
             if let Ok(lsp) = LSP::new(lsp_cmd).await {
+                gs.tree.push(TreeEvent::RegisterLSP(lsp.borrow_client().get_lsp_registration()));
                 lsp_servers.insert(ft, lsp);
             };
         }
@@ -382,6 +383,7 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
                 EditorAction::SelectLeft => editor.select_left(),
                 EditorAction::SelectRight => editor.select_right(),
                 EditorAction::SelectToken => editor.select_token(),
+                EditorAction::SelectLine => editor.select_line(),
                 EditorAction::SelectAll => editor.select_all(),
                 EditorAction::ScrollUp => editor.scroll_up(),
                 EditorAction::ScrollDown => editor.scroll_down(),

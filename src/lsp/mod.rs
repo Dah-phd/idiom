@@ -155,6 +155,10 @@ impl LSP {
         self.client.clone()
     }
 
+    pub fn borrow_client(&self) -> &LSPClient {
+        &self.client
+    }
+
     pub async fn graceful_exit(&mut self) -> Result<()> {
         let shoutdown_request: LSPRequest<Shutdown> = LSPRequest::with(0, ());
         let _ = self.client.request(shoutdown_request);
