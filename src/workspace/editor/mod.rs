@@ -144,6 +144,19 @@ impl Editor {
         let next_line = self.cursor.line + 1;
         if self.content.len() > next_line {
             self.cursor.select_set(start, CursorPosition { line: next_line, char: 0 });
+        } else {
+            let char = self.content[start.line].len();
+            if char == 0 {
+                return;
+            };
+            self.cursor.select_set(start, CursorPosition { line: self.cursor.line, char });
+        };
+    }
+
+    pub fn remove_line(&mut self) {
+        self.select_line();
+        if !self.cursor.select_is_none() {
+            self.del();
         };
     }
 

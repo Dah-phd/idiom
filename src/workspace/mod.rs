@@ -372,6 +372,7 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
                 EditorAction::Indent => editor.indent(),
                 EditorAction::Backspace => editor.backspace(),
                 EditorAction::Delete => editor.del(),
+                EditorAction::RemoveLine => editor.remove_line(),
                 EditorAction::IndentStart => editor.indent_start(),
                 EditorAction::Unintent => editor.unindent(),
                 EditorAction::Up => editor.up(),

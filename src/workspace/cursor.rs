@@ -14,11 +14,6 @@ pub struct Cursor {
 }
 
 impl Cursor {
-    /// check if position is 0, 0 without select
-    pub fn is_at_zero_no_select(&self) -> bool {
-        self.char == 0 && self.line == 0 && self.select.is_none()
-    }
-
     pub fn set_cursor_checked_with_select(&mut self, position: CursorPosition, content: &[String]) {
         self.set_cursor_checked(position, content);
         self.init_select();
@@ -314,6 +309,10 @@ impl Cursor {
         if let Some((_, to)) = self.select.as_mut() {
             *to = CursorPosition { line: self.line, char: self.char };
         }
+    }
+
+    pub fn select_is_none(&self) -> bool {
+        self.select.is_none()
     }
 
     pub fn select_line_offset(&mut self, offset: usize) {
