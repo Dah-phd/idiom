@@ -1,7 +1,6 @@
-use std::collections::HashMap;
-
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 // MODS
 const SHIFT: &str = "shift";
@@ -37,6 +36,7 @@ pub enum EditorAction {
     Indent,
     Backspace,
     Delete,
+    RemoveLine,
     IndentStart,
     Unintent,
     Up,
@@ -84,6 +84,7 @@ pub struct EditorUserKeyMap {
     indent: String,
     backspace: String,
     delete: String,
+    remove_line: String,
     indent_start: String,
     unindent: String,
     up: String,
@@ -131,6 +132,7 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
         insert_key_event(&mut hash, &val.indent, EditorAction::Indent);
         insert_key_event(&mut hash, &val.backspace, EditorAction::Backspace);
         insert_key_event(&mut hash, &val.delete, EditorAction::Delete);
+        insert_key_event(&mut hash, &val.remove_line, EditorAction::RemoveLine);
         insert_key_event(&mut hash, &val.indent_start, EditorAction::IndentStart);
         insert_key_event(&mut hash, &val.unindent, EditorAction::Unintent);
         insert_key_event(&mut hash, &val.up, EditorAction::Up);
@@ -180,6 +182,7 @@ impl Default for EditorUserKeyMap {
             indent: String::from(TAB),
             backspace: String::from(BACKSPACE),
             delete: String::from(DELETE),
+            remove_line: format!("{CTRL} && {DELETE} || {CTRL} && h || {CTRL} && {BACKSPACE}"),
             indent_start: format!("{CTRL} && ]"),
             unindent: format!("{SHIFT} && {TAB}"),
             up: String::from(UP),

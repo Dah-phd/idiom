@@ -359,7 +359,7 @@ impl Actions {
     }
 
     pub fn backspace(&mut self, cursor: &mut Cursor, content: &mut Vec<String>) {
-        if content.is_empty() || cursor.is_at_zero_no_select() {
+        if content.is_empty() || cursor.line == 0 && cursor.char == 0 && cursor.select_is_none() {
             return;
         }
         match cursor.select_take() {
