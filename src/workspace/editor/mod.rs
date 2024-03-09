@@ -51,12 +51,7 @@ impl WidgetRef for &Editor {
             }
             if text.len() > self.cursor.text_width {
                 if self.cursor.line != line_idx {
-                    let mut line = self
-                        .lexer
-                        .split_line(line_idx, text, self.cursor.text_width, &mut ctx)
-                        .into_iter()
-                        .next()
-                        .unwrap();
+                    let mut line = self.lexer.split_line(line_idx, text, &mut ctx).into_iter().next().unwrap();
                     line.spans.pop();
                     line.spans.push(LINE_CONTINIUES);
                     line.render(Rect::new(x, y, area.width, 1), buf);
@@ -65,26 +60,25 @@ impl WidgetRef for &Editor {
                     remining_lines -= 1;
                     let rel_line_with_cursor = self.cursor.char / self.cursor.text_width;
                     let skip_lines = rel_line_with_cursor.saturating_sub(remining_lines);
-                    let mut wrapped_lines =
-                        self.lexer.split_line(line_idx, text, self.cursor.text_width, &mut ctx).into_iter();
-                    wrapped_lines.next().inspect(|l| l.render(Rect::new(x, y, area.width, 1), buf));
+                    let mut wrapped = self.lexer.split_line(line_idx, text, &mut ctx).into_iter();
+                    wrapped.next().inspect(|l| l.render(Rect::new(x, y, area.width, 1), buf));
                     if remining_lines == 0 {
                         return;
-                    }
+                    };
                     y += 1;
-                    for split_line in wrapped_lines.skip(skip_lines) {
+                    for split_line in wrapped.skip(skip_lines) {
                         split_line.render(Rect::new(x, y, area.width, 1), buf);
                         remining_lines -= 1;
                         if remining_lines == 0 {
                             return;
-                        }
+                        };
                         y += 1;
                     }
-                }
+                };
             } else {
                 self.lexer.build_line(line_idx, text, &mut ctx).render(Rect::new(x, y, area.width, 1), buf);
                 y += 1;
-            }
+            };
             remining_lines -= 1;
         }
     }
