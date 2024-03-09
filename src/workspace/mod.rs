@@ -246,26 +246,27 @@ impl Workspace {
         Ok(new)
     }
 
-    pub async fn new_from(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> Result<()> {
+    pub async fn new_from(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> Result<bool> {
         let file_path = file_path.canonicalize()?;
         if let Some(idx) =
             self.editors.iter().enumerate().find(|(_, editor)| editor.path == file_path).map(|(idx, _)| idx)
         {
             let editor = self.editors.remove(idx);
             self.editors.insert(0, editor);
-            return Ok(());
+            return Ok(false);
         }
         let editor = self.build_editor(file_path, gs).await?;
         self.editors.insert(0, editor);
         self.toggle_editor();
-        Ok(())
+        Ok(true)
     }
 
     pub async fn new_at_line(&mut self, file_path: PathBuf, line: usize, gs: &mut GlobalState) -> Result<()> {
-        self.new_from(file_path, gs).await?;
-        if let Some(editor) = self.get_active() {
-            editor.go_to(line);
-        }
+        if self.new_from(file_path, gs).await? {
+            if let Some(editor) = self.get_active() {
+                editor.go_to(line);
+            }
+        };
         Ok(())
     }
 
