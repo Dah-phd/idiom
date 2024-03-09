@@ -7,7 +7,7 @@ use crate::{
 };
 use crossterm::event::{KeyCode, KeyEvent};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
-use lsp_types::{CompletionItem, CompletionTextEdit, Documentation};
+use lsp_types::{CompletionItem, CompletionItemKind, CompletionTextEdit, Documentation};
 use ratatui::{
     prelude::Rect,
     widgets::{List, ListItem, Paragraph},
@@ -53,11 +53,11 @@ impl AutoComplete {
             }
             KeyCode::Enter | KeyCode::Tab => {
                 if let Some(idx) = self.state.selected() {
-                    let filtered_completion = self.completions.remove(self.filtered.remove(idx).2);
-                    gs.workspace.push(WorkspaceEvent::AutoComplete(get_completion_text(&filtered_completion)));
-                    if let Some(data) = filtered_completion.data {
+                    let mut filtered_completion = self.completions.remove(self.filtered.remove(idx).2);
+                    if let Some(data) = filtered_completion.data.take() {
                         lang.handle_completion_data(data, gs);
-                    }
+                    };
+                    gs.workspace.push(WorkspaceEvent::AutoComplete(get_completion_text(filtered_completion)));
                 }
                 ModalMessage::TakenDone
             }
@@ -141,19 +141,28 @@ impl AutoComplete {
     }
 }
 
-fn get_completion_text(item: &CompletionItem) -> String {
-    if let Some(text) = item.insert_text.as_ref() {
-        return text.to_owned();
+fn get_completion_text(item: CompletionItem) -> String {
+    let is_callable = matches!(item.kind, Some(CompletionItemKind::METHOD | CompletionItemKind::FUNCTION));
+    if let Some(text) = item.insert_text {
+        return completion_to_call(text, is_callable);
     }
-    if let Some(edit) = item.text_edit.as_ref() {
+    if let Some(edit) = item.text_edit {
         match edit {
             CompletionTextEdit::Edit(edit) => {
-                return edit.new_text.to_owned();
+                return completion_to_call(edit.new_text, is_callable);
             }
             CompletionTextEdit::InsertAndReplace(edit) => {
-                return edit.new_text.to_owned();
+                return completion_to_call(edit.new_text, is_callable);
             }
-        }
+        };
     }
-    item.label.to_owned()
+    completion_to_call(item.label, is_callable)
+}
+
+#[inline(always)]
+fn completion_to_call(mut text: String, is_callable: bool) -> String {
+    if is_callable && !text.ends_with(')') {
+        text.push_str("()");
+    }
+    text
 }
