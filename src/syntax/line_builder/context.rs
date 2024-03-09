@@ -13,10 +13,11 @@ pub const COLORS: [Color; 3] = [Color::LightMagenta, Color::LightYellow, Color::
 
 #[derive(Default)]
 pub struct LineBuilderContext {
-    select: Option<(CursorPosition, CursorPosition)>,
+    pub text_width: usize,
     pub select_range: Option<Range<usize>>,
-    cursor: CursorPosition,
     pub brackets: BracketColors,
+    select: Option<(CursorPosition, CursorPosition)>,
+    cursor: CursorPosition,
 }
 
 impl LineBuilderContext {
@@ -91,58 +92,61 @@ impl BracketColors {
     }
 
     pub fn open_round(&mut self) -> Color {
-        Self::open(&mut self.round)
+        open_bracket(&mut self.round)
     }
 
     pub fn close_round(&mut self) -> Color {
-        Self::close(&mut self.round)
+        close_bracket(&mut self.round)
     }
 
     pub fn open_curly(&mut self) -> Color {
-        Self::open(&mut self.curly)
+        open_bracket(&mut self.curly)
     }
 
     pub fn close_curly(&mut self) -> Color {
-        Self::close(&mut self.curly)
+        close_bracket(&mut self.curly)
     }
 
     pub fn open_square(&mut self) -> Color {
-        Self::open(&mut self.square)
+        open_bracket(&mut self.square)
     }
 
     pub fn close_square(&mut self) -> Color {
-        Self::close(&mut self.square)
-    }
-
-    fn close(bracket: &mut Option<usize>) -> Color {
-        match bracket.take() {
-            Some(idx) => {
-                if idx != 0 {
-                    bracket.replace(idx - 1);
-                }
-                COLORS[idx % COLORS.len()]
-            }
-            None => COLORS[COLORS.len() - 1],
-        }
-    }
-
-    fn open(bracket: &mut Option<usize>) -> Color {
-        let (color, idx) = match bracket.take() {
-            Some(idx) => (COLORS[(idx + 1) % COLORS.len()], idx + 1),
-            None => (COLORS[0 % COLORS.len()], 0),
-        };
-        bracket.replace(idx);
-        color
+        close_bracket(&mut self.square)
     }
 }
 
 impl From<&Cursor> for LineBuilderContext {
     fn from(cursor: &Cursor) -> Self {
         Self {
+            text_width: cursor.text_width,
             select: cursor.select_get(),
             select_range: None,
             cursor: cursor.into(),
             brackets: BracketColors::default(),
         }
+    }
+}
+
+#[inline]
+fn open_bracket(bracket: &mut Option<usize>) -> Color {
+    let (color, idx) = match bracket.take() {
+        Some(idx) => (COLORS[(idx + 1) % COLORS.len()], idx + 1),
+        None => (COLORS[0 % COLORS.len()], 0),
+    };
+    bracket.replace(idx);
+    color
+}
+
+#[inline]
+fn close_bracket(bracket: &mut Option<usize>) -> Color {
+    match bracket.take() {
+        Some(idx) => {
+            if idx != 0 {
+                bracket.replace(idx - 1);
+            }
+            COLORS[idx % COLORS.len()]
+        }
+        None => COLORS[COLORS.len() - 1],
     }
 }
