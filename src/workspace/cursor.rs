@@ -94,6 +94,9 @@ impl Cursor {
 
     fn move_up(&mut self, content: &[String]) {
         if self.line == 0 {
+            if self.char >= self.text_width {
+                self.char -= self.text_width;
+            };
             return;
         }
         if self.char >= self.text_width {
