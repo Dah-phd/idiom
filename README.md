@@ -1,4 +1,4 @@
-# No/Low config terminal IDE - designed for me
+# Low config terminal IDE - designed for me
 
 ## Info
 
@@ -10,19 +10,21 @@ More documentation will not come very soon - current focus is developing basic f
 
 ## Tested platform
 
-- Linux Fedora derivate
+- Linux Fedora derivate (Nobara)
 
 ## TODO
 
 - imporve indent function, especially on swaps
 - autocomplete brakets on methods / funcs
+- markdown rendering / editing
 - !! more tests - till that point the goal has been to make the editor self-developing, so bugs can be easily found and structure crystalizes
 - multi-cursor support
 - runner autocomplete on dirs
+- runner passing arrow presses while process is running
 - make info on autocomplete easier to read
 - (backlog) semantic token styles for different lsp langs
 
-## Target langs
+## Initial target langs
 
 - RUST
 - Python
