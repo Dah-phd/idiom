@@ -1,3 +1,4 @@
+use ratatui::text::Line;
 mod button;
 mod list_state;
 mod text_field;
@@ -13,6 +14,25 @@ pub use text_field::TextField;
 
 pub const LINE_CONTINIUES: Span<'static> =
     Span { content: Cow::Borrowed(">>"), style: Style::new().add_modifier(Modifier::REVERSED) };
+
+pub fn wrapped_line_start(skipped: usize, line: Option<Line<'static>>) -> Line<'static> {
+    let mut line = line.unwrap_or_default();
+    if skipped == 0 {
+        return line;
+    };
+    line.spans.truncate(1);
+    line.spans.push(Span {
+        content: format!("..{skipped} hidden wrapped lines").into(),
+        style: Style {
+            fg: None,
+            bg: None,
+            add_modifier: Modifier::REVERSED,
+            sub_modifier: Modifier::empty(),
+            underline_color: None,
+        },
+    });
+    line
+}
 
 pub fn count_as_string(len: usize) -> String {
     if len < 10 {

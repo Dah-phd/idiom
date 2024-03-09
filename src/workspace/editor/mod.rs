@@ -3,7 +3,7 @@ use crate::{
     global_state::GlobalState,
     syntax::Lexer,
     syntax::LineBuilderContext,
-    widgests::LINE_CONTINIUES,
+    widgests::{wrapped_line_start, LINE_CONTINIUES},
     workspace::{
         actions::Actions,
         cursor::{Cursor, CursorPosition},
@@ -48,8 +48,9 @@ impl WidgetRef for &Editor {
         for (line_idx, text) in self.content.iter().enumerate().skip(self.cursor.at_line) {
             if remining_lines == 0 {
                 return;
-            }
+            };
             if text.len() > self.cursor.text_width {
+                // handle wrapped lines
                 if self.cursor.line != line_idx {
                     let mut line = self.lexer.split_line(line_idx, text, &mut ctx).into_iter().next().unwrap();
                     line.spans.pop();
@@ -61,7 +62,7 @@ impl WidgetRef for &Editor {
                     let rel_line_with_cursor = self.cursor.char / self.cursor.text_width;
                     let skip_lines = rel_line_with_cursor.saturating_sub(remining_lines);
                     let mut wrapped = self.lexer.split_line(line_idx, text, &mut ctx).into_iter();
-                    wrapped.next().inspect(|l| l.render(Rect::new(x, y, area.width, 1), buf));
+                    wrapped_line_start(skip_lines, wrapped.next()).render(Rect::new(x, y, area.width, 1), buf);
                     if remining_lines == 0 {
                         return;
                     };
@@ -76,6 +77,7 @@ impl WidgetRef for &Editor {
                     }
                 };
             } else {
+                // handle normal lines
                 self.lexer.build_line(line_idx, text, &mut ctx).render(Rect::new(x, y, area.width, 1), buf);
                 y += 1;
             };
