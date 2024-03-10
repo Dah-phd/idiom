@@ -14,6 +14,7 @@ More documentation will not come very soon - current focus is developing basic f
 
 ## TODO
 
+- add CHANGELOG
 - optimize snippet insertion (current implementation is only functional)
 - improve warn/err on tree visualization
 - imporve indent function, especially on swaps
