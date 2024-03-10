@@ -1,13 +1,13 @@
 use super::ModalMessage;
 use crate::syntax::line_builder::Lang;
 use crate::{
-    global_state::{GlobalState, WorkspaceEvent},
+    global_state::GlobalState,
     utils::{BORDERED_BLOCK, REVERSED},
     widgests::WrappedState,
 };
 use crossterm::event::{KeyCode, KeyEvent};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
-use lsp_types::{CompletionItem, CompletionItemKind, CompletionTextEdit, Documentation};
+use lsp_types::{CompletionItem, Documentation};
 use ratatui::{
     prelude::Rect,
     widgets::{List, ListItem, Paragraph},
@@ -57,7 +57,7 @@ impl AutoComplete {
                     if let Some(data) = filtered_completion.data.take() {
                         lang.handle_completion_data(data, gs);
                     };
-                    gs.workspace.push(WorkspaceEvent::AutoComplete(get_completion_text(filtered_completion)));
+                    gs.workspace.push(filtered_completion.into());
                 }
                 ModalMessage::TakenDone
             }
@@ -139,30 +139,4 @@ impl AutoComplete {
         self.filtered.sort_by(|(_, idx, _), (_, rhidx, _)| rhidx.cmp(idx));
         self.state.set(0);
     }
-}
-
-fn get_completion_text(item: CompletionItem) -> String {
-    let is_callable = matches!(item.kind, Some(CompletionItemKind::METHOD | CompletionItemKind::FUNCTION));
-    if let Some(text) = item.insert_text {
-        return completion_to_call(text, is_callable);
-    }
-    if let Some(edit) = item.text_edit {
-        match edit {
-            CompletionTextEdit::Edit(edit) => {
-                return completion_to_call(edit.new_text, is_callable);
-            }
-            CompletionTextEdit::InsertAndReplace(edit) => {
-                return completion_to_call(edit.new_text, is_callable);
-            }
-        };
-    }
-    completion_to_call(item.label, is_callable)
-}
-
-#[inline(always)]
-fn completion_to_call(mut text: String, is_callable: bool) -> String {
-    if is_callable && !text.ends_with(')') {
-        text.push_str("()");
-    }
-    text
 }

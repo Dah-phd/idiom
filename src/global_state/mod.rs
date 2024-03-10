@@ -465,12 +465,17 @@ impl GlobalState {
                         self.insert_mode();
                     } else {
                         self.select_mode();
-                    }
+                    };
                 }
                 WorkspaceEvent::InsertText(insert) => {
                     if let Some(editor) = workspace.get_active() {
                         editor.insert_text_with_relative_offset(insert);
-                    }
+                    };
+                }
+                WorkspaceEvent::Snippet(snippet) => {
+                    if let Some(editor) = workspace.get_active() {
+                        editor.insert_snippet(snippet);
+                    };
                 }
                 WorkspaceEvent::Resize => {
                     workspace.resize_render(self.editor_area.width as usize, self.editor_area.height as usize);

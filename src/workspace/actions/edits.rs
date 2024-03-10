@@ -213,6 +213,31 @@ impl Edit {
         }
     }
 
+    pub fn insert_snippet(
+        c: &Cursor,
+        snippet: String,
+        cfg: &IndentConfigs,
+        content: &mut Vec<String>,
+    ) -> (CursorPosition, Self) {
+        let code_line = &mut content[c.line];
+        let range = token_range_at(code_line, c.char);
+        let from = CursorPosition { line: c.line, char: range.start };
+        let to = CursorPosition { line: c.line, char: range.end };
+        let indent = cfg.derive_indent_from(code_line);
+        let snippet = snippet.replace('\n', &format!("\n{}", &indent));
+        let mut new_cursor = CursorPosition { line: c.line, char: c.char };
+        for (line_offset, line) in snippet.lines().enumerate() {
+            if let Some(mut idx) = line.find("$0") {
+                new_cursor.line += line_offset;
+                if line_offset == 0 {
+                    idx += from.char;
+                };
+                new_cursor.char = idx;
+            };
+        }
+        (new_cursor, Self::replace_select(from, to, snippet.replace("$0", ""), content))
+    }
+
     /// UTILS
 
     pub fn get_new_text(&self) -> &str {
