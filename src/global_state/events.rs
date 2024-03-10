@@ -2,6 +2,7 @@ use super::PopupMessage;
 use crate::lsp::Diagnostic;
 use crate::workspace::CursorPosition;
 use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, WorkspaceEdit};
+use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat};
 
 use crate::configs::FileType;
 use crate::footer::Footer;
@@ -121,6 +122,7 @@ pub enum WorkspaceEvent {
     FindToReplace(String, Vec<(CursorPosition, CursorPosition)>),
     Open(PathBuf, usize),
     InsertText(String),
+    Snippet(String),
     CheckLSP(FileType),
     WorkspaceEdit(WorkspaceEdit),
     Resize,
@@ -137,6 +139,29 @@ impl From<WorkspaceEvent> for PopupMessage {
 impl From<WorkspaceEdit> for WorkspaceEvent {
     fn from(value: WorkspaceEdit) -> Self {
         Self::WorkspaceEdit(value)
+    }
+}
+
+impl From<CompletionItem> for WorkspaceEvent {
+    fn from(item: CompletionItem) -> Self {
+        let event_type = match item.insert_text_format {
+            Some(InsertTextFormat::SNIPPET) => WorkspaceEvent::Snippet,
+            _ => WorkspaceEvent::AutoComplete,
+        };
+        if let Some(text) = item.insert_text {
+            return event_type(text);
+        }
+        if let Some(edit) = item.text_edit {
+            match edit {
+                CompletionTextEdit::Edit(edit) => {
+                    return event_type(edit.new_text);
+                }
+                CompletionTextEdit::InsertAndReplace(edit) => {
+                    return event_type(edit.new_text);
+                }
+            };
+        }
+        event_type(item.label)
     }
 }
 

@@ -181,6 +181,10 @@ impl Editor {
         self.actions.replace_token(new, &mut self.cursor, &mut self.content);
     }
 
+    pub fn insert_snippet(&mut self, snippet: String) {
+        self.actions.insert_snippet(&mut self.cursor, snippet, &mut self.content);
+    }
+
     pub fn mass_replace(&mut self, mut ranges: Vec<(CursorPosition, CursorPosition)>, clip: String) {
         ranges.sort_by(|a, b| {
             let line_ord = b.0.line.cmp(&a.0.line);

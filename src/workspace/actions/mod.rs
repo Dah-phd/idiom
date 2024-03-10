@@ -63,10 +63,10 @@ impl Actions {
         self.push_done(edit);
     }
 
-    pub fn replace_token(&mut self, new: String, cursor: &mut Cursor, content: &mut [String]) {
+    pub fn replace_token(&mut self, new: String, cursor: &mut Cursor, content: &mut Vec<String>) {
         self.push_buffer();
         let action = Edit::replace_token(cursor.line, cursor.char, new, content);
-        cursor.char = action.reverse_text_edit.range.end.character as usize;
+        cursor.set_position(action.reverse_text_edit.range.end.into());
         self.push_done(action);
     }
 
@@ -82,6 +82,13 @@ impl Actions {
         cursor.select_drop();
         let action = Edit::replace_select(from, to, clip.into(), content);
         cursor.set_position(action.end_position());
+        self.push_done(action);
+    }
+
+    pub fn insert_snippet(&mut self, c: &mut Cursor, snippet: String, content: &mut Vec<String>) {
+        self.push_buffer();
+        let (position, action) = Edit::insert_snippet(c, snippet, &self.cfg, content);
+        c.set_position(position);
         self.push_done(action);
     }
 
