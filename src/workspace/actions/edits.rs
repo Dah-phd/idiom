@@ -216,6 +216,7 @@ impl Edit {
     pub fn insert_snippet(
         c: &Cursor,
         snippet: String,
+        cursor_offset: Option<(usize, usize)>,
         cfg: &IndentConfigs,
         content: &mut Vec<String>,
     ) -> (CursorPosition, Self) {
@@ -225,17 +226,12 @@ impl Edit {
         let to = CursorPosition { line: c.line, char: range.end };
         let indent = cfg.derive_indent_from(code_line);
         let snippet = snippet.replace('\n', &format!("\n{}", &indent));
-        let mut new_cursor = CursorPosition { line: c.line, char: c.char };
-        for (line_offset, line) in snippet.lines().enumerate() {
-            if let Some(mut idx) = line.find("$0") {
-                new_cursor.line += line_offset;
-                if line_offset == 0 {
-                    idx += from.char;
-                };
-                new_cursor.char = idx;
-            };
-        }
-        (new_cursor, Self::replace_select(from, to, snippet.replace("$0", ""), content))
+        let new_cursor = cursor_offset.map(|(line, char)| CursorPosition {
+            line: line + c.line,
+            char: if line == 0 { from.char + char } else { indent.len() + char },
+        });
+        let edit = Edit::replace_select(from, to, snippet, content);
+        (new_cursor.unwrap_or(edit.reverse_text_edit.range.end.into()), edit)
     }
 
     /// UTILS

@@ -1,16 +1,20 @@
 use super::ModalMessage;
-use crate::syntax::line_builder::Lang;
+#[cfg(build = "debug")]
+use crate::debug_to_file;
 use crate::{
     global_state::GlobalState,
+    syntax::line_builder::Lang,
     utils::{BORDERED_BLOCK, REVERSED},
     widgests::WrappedState,
 };
 use crossterm::event::{KeyCode, KeyEvent};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
-use lsp_types::{CompletionItem, Documentation};
+use lsp_types::CompletionItem;
 use ratatui::{
-    prelude::Rect,
-    widgets::{List, ListItem, Paragraph},
+    layout::Rect,
+    style::{Modifier, Style},
+    text::{Line, Span},
+    widgets::{List, ListItem},
     Frame,
 };
 
@@ -18,8 +22,7 @@ pub struct AutoComplete {
     state: WrappedState,
     filter: String,
     matcher: SkimMatcherV2,
-    filtered: Vec<(String, i64, usize)>,
-    active_doc: Option<Paragraph<'static>>,
+    filtered: Vec<(Line<'static>, i64, usize)>,
     completions: Vec<CompletionItem>,
 }
 
@@ -38,7 +41,6 @@ impl AutoComplete {
             filter,
             matcher: SkimMatcherV2::default(),
             filtered: Vec::new(),
-            active_doc: None,
             completions,
         };
         modal.build_matches();
@@ -47,13 +49,11 @@ impl AutoComplete {
 
     pub fn map(&mut self, key: &KeyEvent, lang: &Lang, gs: &mut GlobalState) -> ModalMessage {
         match key.code {
-            KeyCode::F(1) => {
-                self.active_doc = self.get_docs();
-                ModalMessage::Taken
-            }
             KeyCode::Enter | KeyCode::Tab => {
                 if let Some(idx) = self.state.selected() {
                     let mut filtered_completion = self.completions.remove(self.filtered.remove(idx).2);
+                    #[cfg(build = "debug")]
+                    debug_to_file("test_data.comp", filtered_completion);
                     if let Some(data) = filtered_completion.data.take() {
                         lang.handle_completion_data(data, gs);
                     };
@@ -63,12 +63,10 @@ impl AutoComplete {
             }
             KeyCode::Char(ch) => self.push_filter(ch),
             KeyCode::Down => {
-                self.active_doc = None;
                 self.state.next(&self.filtered);
                 ModalMessage::Taken
             }
             KeyCode::Up => {
-                self.active_doc = None;
                 self.state.prev(&self.filtered);
                 ModalMessage::Taken
             }
@@ -78,11 +76,7 @@ impl AutoComplete {
     }
 
     pub fn render_at(&mut self, frame: &mut Frame, area: Rect) {
-        if let Some(docs) = self.active_doc.as_ref() {
-            frame.render_widget(docs.clone().block(BORDERED_BLOCK), area);
-            return;
-        }
-        let complitions = self.filtered.iter().map(|(item, ..)| ListItem::new(item.as_str())).collect::<Vec<_>>();
+        let complitions = self.filtered.iter().map(|(line, ..)| ListItem::new(line.clone())).collect::<Vec<_>>();
         frame.render_stateful_widget(
             List::new(complitions).block(BORDERED_BLOCK).highlight_style(REVERSED),
             area,
@@ -113,16 +107,6 @@ impl AutoComplete {
         }
     }
 
-    fn get_docs(&mut self) -> Option<Paragraph<'static>> {
-        let label = &self.filtered.get(self.state.selected()?)?.0;
-        self.completions.iter().find(|item| &item.label == label).and_then(|item| {
-            item.documentation.as_ref().map(|docs| match docs {
-                Documentation::String(value) => Paragraph::new(value.to_owned()),
-                Documentation::MarkupContent(content) => Paragraph::new(content.value.to_owned()),
-            })
-        })
-    }
-
     fn build_matches(&mut self) {
         self.filtered = self
             .completions
@@ -132,7 +116,11 @@ impl AutoComplete {
                 self.matcher.fuzzy_match(item.filter_text.as_ref().unwrap_or(&item.label), &self.filter).map(|score| {
                     let divisor = item.label.len().abs_diff(self.filter.len()) as i64;
                     let new_score = if divisor != 0 { score / divisor } else { score };
-                    (item.label.to_owned(), new_score, item_idx)
+                    let mut line = vec![Span::from(item.label.to_owned())];
+                    if let Some(info) = item.detail.as_ref() {
+                        line.push(Span::styled(format!("  {info}"), Style::default().add_modifier(Modifier::DIM)));
+                    };
+                    (Line::from(line), new_score, item_idx)
                 })
             })
             .collect();
