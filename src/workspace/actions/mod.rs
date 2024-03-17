@@ -1,11 +1,13 @@
-use crate::configs::IndentConfigs;
-use crate::utils::Offset;
 mod action_buffer;
 mod edits;
-use crate::syntax::Lexer;
-use crate::workspace::{
-    cursor::{Cursor, CursorPosition, Select},
-    utils::{get_closing_char, is_closing_repeat},
+use crate::{
+    configs::IndentConfigs,
+    syntax::Lexer,
+    utils::Offset,
+    workspace::{
+        cursor::{Cursor, CursorPosition, Select},
+        utils::{get_closing_char, is_closing_repeat},
+    },
 };
 use action_buffer::ActionBuffer;
 pub use edits::{Edit, EditMetaData, NewLineBuilder};
@@ -63,7 +65,7 @@ impl Actions {
         self.push_done(edit);
     }
 
-    pub fn replace_token(&mut self, new: String, cursor: &mut Cursor, content: &mut Vec<String>) {
+    pub fn replace_token(&mut self, new: String, cursor: &mut Cursor, content: &mut [String]) {
         self.push_buffer();
         let action = Edit::replace_token(cursor.line, cursor.char, new, content);
         cursor.set_position(action.reverse_text_edit.range.end.into());
@@ -85,9 +87,15 @@ impl Actions {
         self.push_done(action);
     }
 
-    pub fn insert_snippet(&mut self, c: &mut Cursor, snippet: String, content: &mut Vec<String>) {
+    pub fn insert_snippet(
+        &mut self,
+        c: &mut Cursor,
+        snippet: String,
+        cursor_offset: Option<(usize, usize)>,
+        content: &mut Vec<String>,
+    ) {
         self.push_buffer();
-        let (position, action) = Edit::insert_snippet(c, snippet, &self.cfg, content);
+        let (position, action) = Edit::insert_snippet(c, snippet, cursor_offset, &self.cfg, content);
         c.set_position(position);
         self.push_done(action);
     }

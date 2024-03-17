@@ -472,9 +472,9 @@ impl GlobalState {
                         editor.insert_text_with_relative_offset(insert);
                     };
                 }
-                WorkspaceEvent::Snippet(snippet) => {
+                WorkspaceEvent::Snippet(snippet, cursor_offset) => {
                     if let Some(editor) = workspace.get_active() {
-                        editor.insert_snippet(snippet);
+                        editor.insert_snippet(snippet, cursor_offset);
                     };
                 }
                 WorkspaceEvent::Resize => {

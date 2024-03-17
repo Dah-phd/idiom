@@ -3,7 +3,7 @@ use std::{ops::Range, path::PathBuf, time::SystemTime};
 
 #[inline(always)]
 pub fn insert_clip(clip: String, content: &mut Vec<String>, mut cursor: CursorPosition) -> CursorPosition {
-    let mut lines: Vec<_> = clip.split('\n').collect();
+    let mut lines = clip.split('\n').collect::<Vec<_>>();
     if lines.len() == 1 {
         let text = lines[0];
         content[cursor.line].insert_str(cursor.char, lines[0]);

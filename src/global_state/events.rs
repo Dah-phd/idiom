@@ -1,54 +1,10 @@
 use super::PopupMessage;
-use crate::lsp::Diagnostic;
-use crate::workspace::CursorPosition;
+use crate::{configs::FileType, footer::Footer, lsp::Diagnostic, workspace::CursorPosition};
 use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, WorkspaceEdit};
 use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat};
-
-use crate::configs::FileType;
-use crate::footer::Footer;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-
-#[allow(dead_code)] // TODO replace normal events
-#[derive(Debug, Clone)]
-pub enum StateEvent {
-    PopupAccess,
-    Open(PathBuf),
-    OpenAtLine(PathBuf, usize),
-    OpenAtSelect(PathBuf, (CursorPosition, CursorPosition)),
-    SelectPath(PathBuf),
-    CreateFileOrFolder(String),
-    CreateFileOrFolderBase(String),
-    RenameFile(String),
-    SearchFiles(String),
-    Resize {
-        height: u16,
-        width: u16,
-    },
-    Message(String),
-    Error(String),
-    Success(String),
-    ReplaceNextSelect {
-        new_text: String,
-        select: (CursorPosition, CursorPosition),
-        next_select: Option<(CursorPosition, CursorPosition)>,
-    },
-    ReplaceAll(String, Vec<(CursorPosition, CursorPosition)>),
-    GoToLine(usize),
-    GoToSelect {
-        select: (CursorPosition, CursorPosition),
-        should_clear: bool,
-    },
-    AutoComplete(String),
-    ActivateEditor(usize),
-    FindSelector(String),
-    FindToReplace(String, Vec<(CursorPosition, CursorPosition)>),
-    CheckLSP(FileType),
-    WorkspaceEdit(WorkspaceEdit),
-    Exit,
-    SaveAndExit,
-}
 
 #[derive(Clone)]
 pub enum TreeEvent {
@@ -122,12 +78,57 @@ pub enum WorkspaceEvent {
     FindToReplace(String, Vec<(CursorPosition, CursorPosition)>),
     Open(PathBuf, usize),
     InsertText(String),
-    Snippet(String),
+    Snippet(String, Option<(usize, usize)>),
     CheckLSP(FileType),
     WorkspaceEdit(WorkspaceEdit),
     Resize,
     Exit,
     SaveAndExit,
+}
+
+fn parse_snippet(snippet: String) -> WorkspaceEvent {
+    let mut cursor_offset = None;
+    let mut named = false;
+    let mut text = String::default();
+    let mut is_expr = false;
+    let mut line_offset = 0;
+    let mut char_offset = 0;
+    for ch in snippet.chars() {
+        if ch == '\n' {
+            line_offset += 1;
+            char_offset = 0;
+            text.push(ch);
+        } else {
+            if named {
+                if ch == '}' {
+                    named = false;
+                    continue;
+                };
+                if ch == ':' || ch.is_numeric() {
+                    continue;
+                };
+            } else if is_expr {
+                if ch.is_numeric() {
+                    continue;
+                };
+                if ch == '{' {
+                    named = true;
+                    cursor_offset = None;
+                    continue;
+                };
+                is_expr = false;
+            } else if ch == '$' {
+                is_expr = true;
+                if cursor_offset.is_none() {
+                    cursor_offset.replace((line_offset, char_offset));
+                };
+                continue;
+            };
+            char_offset += 1;
+            text.push(ch);
+        };
+    }
+    WorkspaceEvent::Snippet(text, cursor_offset)
 }
 
 impl From<WorkspaceEvent> for PopupMessage {
@@ -144,24 +145,24 @@ impl From<WorkspaceEdit> for WorkspaceEvent {
 
 impl From<CompletionItem> for WorkspaceEvent {
     fn from(item: CompletionItem) -> Self {
-        let event_type = match item.insert_text_format {
-            Some(InsertTextFormat::SNIPPET) => WorkspaceEvent::Snippet,
+        let parser = match item.insert_text_format {
+            Some(InsertTextFormat::SNIPPET) => parse_snippet,
             _ => WorkspaceEvent::AutoComplete,
         };
         if let Some(text) = item.insert_text {
-            return event_type(text);
+            return (parser)(text);
         }
         if let Some(edit) = item.text_edit {
             match edit {
                 CompletionTextEdit::Edit(edit) => {
-                    return event_type(edit.new_text);
+                    return (parser)(edit.new_text);
                 }
                 CompletionTextEdit::InsertAndReplace(edit) => {
-                    return event_type(edit.new_text);
+                    return (parser)(edit.new_text);
                 }
             };
         }
-        event_type(item.label)
+        WorkspaceEvent::AutoComplete(item.label)
     }
 }
 

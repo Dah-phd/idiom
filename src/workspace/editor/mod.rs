@@ -181,8 +181,8 @@ impl Editor {
         self.actions.replace_token(new, &mut self.cursor, &mut self.content);
     }
 
-    pub fn insert_snippet(&mut self, snippet: String) {
-        self.actions.insert_snippet(&mut self.cursor, snippet, &mut self.content);
+    pub fn insert_snippet(&mut self, snippet: String, cursor_offset: Option<(usize, usize)>) {
+        self.actions.insert_snippet(&mut self.cursor, snippet, cursor_offset, &mut self.content);
     }
 
     pub fn mass_replace(&mut self, mut ranges: Vec<(CursorPosition, CursorPosition)>, clip: String) {
