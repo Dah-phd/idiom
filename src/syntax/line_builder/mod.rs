@@ -230,8 +230,7 @@ impl LineBuilder {
             if matches!(&ctx.select_range, Some(range) if range.contains(&char_idx)) {
                 style.bg.replace(self.theme.selected);
             }
-            ctx.brackets.map_style(ch, &mut style);
-            buffer.push(Span::styled(ch.to_string(), style));
+            buffer.push(Span::styled(ch.to_string(), ctx.brackets.map_style(ch, style)));
             style.add_modifier = Modifier::empty();
             style.bg = None;
         }
