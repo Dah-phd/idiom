@@ -11,6 +11,7 @@ pub enum FileType {
     Cpp,
     Yml,
     Toml,
+    Nim,
     MarkDown,
     #[default]
     Unknown,
@@ -23,6 +24,7 @@ impl FileType {
             return match extension.to_lowercase().as_str() {
                 "rs" => Self::Rust,
                 "c" => Self::C,
+                "nim" => Self::Nim,
                 "cpp" => Self::Cpp,
                 "py" | "pyw" => Self::Python,
                 "md" => Self::MarkDown,
@@ -53,6 +55,7 @@ impl From<&FileType> for &'static str {
             FileType::TypeScript => "typescript",
             FileType::JavaScript => "javascript",
             FileType::Html => "html",
+            FileType::Nim => "nim",
             FileType::C => "c",
             FileType::Cpp => "c++",
             FileType::Yml => "yaml",
