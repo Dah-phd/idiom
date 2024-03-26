@@ -1,6 +1,8 @@
 use super::types::FileType;
 use super::{load_or_create_config, EDITOR_CFG_FILE};
+use crate::global_state::GlobalState;
 use crate::utils::{trim_start_inplace, Offset};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 pub struct IndentConfigs {
@@ -114,13 +116,9 @@ impl Default for EditorConfigs {
             rust_lsp: Some(String::from("${cfg_dir}/rust-analyzer")),
             rust_lsp_preload_if_present: Some(vec!["Cargo.toml".to_owned(), "Cargo.lock".to_owned()]),
             python_lsp: Some(String::from("jedi-language-server")),
-            python_lsp_preload_if_present: Some(vec![
-                "pyproject.toml".to_owned(),
-                "pytest.init".to_owned(),
-                "*.py".to_owned(),
-            ]),
+            python_lsp_preload_if_present: Some(vec!["pyproject.toml".to_owned(), "pytest.init".to_owned()]),
             nim_lsp: Some(String::from("nimlsp")),
-            nim_lsp_preload_if_present: Some(vec!["*.nimble".to_owned()]),
+            nim_lsp_preload_if_present: Some(vec![r".*\.nimble".to_owned()]),
             c_lsp: None,
             c_lsp_preload_if_present: None,
             cpp_lsp: None,
@@ -170,7 +168,7 @@ impl EditorConfigs {
         }
     }
 
-    pub fn derive_lsp_preloads(&mut self, base_tree_paths: Vec<String>) -> Vec<(FileType, String)> {
+    pub fn derive_lsp_preloads(&mut self, base_tree: Vec<String>, gs: &mut GlobalState) -> Vec<(FileType, String)> {
         [
             (FileType::Rust, self.rust_lsp_preload_if_present.take(), self.rust_lsp.as_ref()),
             (FileType::Python, self.python_lsp_preload_if_present.take(), self.python_lsp.as_ref()),
@@ -181,9 +179,10 @@ impl EditorConfigs {
             (FileType::Html, self.html_preload_if_present.take(), self.html_lsp.as_ref()),
             (FileType::Yml, self.yaml_preload_if_present.take(), self.yaml_lsp.as_ref()),
             (FileType::Toml, self.toml_preload_if_present.take(), self.toml_lsp.as_ref()),
+            (FileType::Nim, self.nim_lsp_preload_if_present.take(), self.nim_lsp.as_ref()),
         ]
         .into_iter()
-        .flat_map(|(ft, expected, cmd)| Some((ft, map_preload(&base_tree_paths, expected, cmd)?)))
+        .flat_map(|(ft, expected, cmd)| Some((ft, map_preload(&base_tree, expected, cmd, gs)?)))
         .collect()
     }
 
@@ -200,11 +199,21 @@ fn get_unident_before() -> String {
     String::from("]})")
 }
 
-fn map_preload(base_tree_paths: &[String], expected: Option<Vec<String>>, cmd: Option<&String>) -> Option<String> {
+fn map_preload(
+    base_tree: &[String],
+    expected: Option<Vec<String>>,
+    cmd: Option<&String>,
+    gs: &mut GlobalState,
+) -> Option<String> {
     if let Some(cmd) = cmd {
-        for expected_file in expected? {
-            if base_tree_paths.contains(&expected_file) {
-                return Some(cmd.to_owned());
+        for try_re in expected?.iter().map(|re| Regex::new(re)) {
+            match try_re {
+                Ok(file_re) => {
+                    if base_tree.iter().any(|path| file_re.is_match(path)) {
+                        return Some(cmd.to_owned());
+                    }
+                }
+                Err(error) => gs.error(error.to_string()),
             }
         }
     }

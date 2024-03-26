@@ -14,12 +14,11 @@ More documentation will not come very soon - current focus is developing basic f
 
 ## TODO
 
+- add regex on lsp preloads
 - add CHANGELOG
 - optimize snippet insertion (current implementation is only functional)
 - improve warn/err on tree visualization
-- imporve indent function, especially on swaps
 - markdown rendering / editing
-- fix mouse behavior on wrapped lines
 - !! more tests - till that point the goal has been to make the editor self-developing, so bugs can be easily found and structure crystalizes
 - multi-cursor support
 - runner autocomplete on dirs

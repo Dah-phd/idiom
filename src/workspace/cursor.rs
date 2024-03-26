@@ -20,7 +20,19 @@ impl Cursor {
         self.push_to_select();
     }
 
-    pub fn set_cursor_checked(&mut self, position: CursorPosition, content: &[String]) {
+    pub fn set_cursor_checked(&mut self, mut position: CursorPosition, content: &[String]) {
+        if self.line < position.line {
+            let mut current_line_len = content[self.line].len();
+            let mut offset = 0;
+            while current_line_len > self.text_width && self.line < position.line.saturating_sub(offset) {
+                current_line_len = current_line_len.saturating_sub(self.text_width);
+                offset += 1;
+            }
+            position.line = position.line.saturating_sub(offset);
+            if position.line == self.line && offset != 0 {
+                position.char += offset * self.text_width;
+            };
+        };
         match content.get(position.line) {
             Some(line) => {
                 if line.len() > position.char {
