@@ -1,4 +1,5 @@
 use crate::global_state::{Clipboard, PopupMessage, TreeEvent, WorkspaceEvent};
+use core::ops::Range;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::style::{Color, Modifier};
 use ratatui::{
@@ -48,6 +49,18 @@ impl<T: Default + Clone> TextField<T> {
         self.char = 0;
         self.select = None;
         std::mem::take(&mut self.text)
+    }
+
+    pub fn text_get_token_at_cursor(&self) -> Option<&str> {
+        let token_range = arg_range_at(&self.text, self.char);
+        self.text.get(token_range)
+    }
+
+    pub fn text_replace_token(&mut self, new: &str) {
+        let token_range = arg_range_at(&self.text, self.char);
+        self.char = new.len() + token_range.start;
+        self.select = None;
+        self.text.replace_range(token_range, new);
     }
 
     /// returns blockless paragraph widget " >> inner text"
@@ -232,6 +245,33 @@ impl<T: Default + Clone> TextField<T> {
         self.text.replace_range(from..to, "");
         self.char = from;
         Some(clip)
+    }
+}
+
+pub fn arg_range_at(line: &str, idx: usize) -> Range<usize> {
+    let mut token_start = 0;
+    let mut last_not_in_token = false;
+    for (char_idx, ch) in line.char_indices() {
+        if !ch.is_whitespace() {
+            if last_not_in_token {
+                token_start = char_idx;
+            }
+            last_not_in_token = false;
+        } else if char_idx >= idx {
+            if last_not_in_token {
+                return idx..idx;
+            }
+            return token_start..char_idx;
+        } else {
+            last_not_in_token = true;
+        }
+    }
+    if idx < line.len() {
+        token_start..line.len()
+    } else if !last_not_in_token && token_start <= idx {
+        token_start..idx
+    } else {
+        idx..idx
     }
 }
 

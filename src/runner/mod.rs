@@ -1,7 +1,9 @@
+use self::autocomplete::try_autocomplete;
 use crate::runner::commands::load_file;
 use crate::widgests::TextField;
 use ratatui::prelude::Span;
 use ratatui::text::Line;
+mod autocomplete;
 mod commands;
 mod components;
 use crate::configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE};
@@ -121,6 +123,11 @@ impl EditorTerminal {
                 Some(text) => self.cmd.text_set(text),
                 None => self.cmd.text_set(String::new()),
             },
+            KeyEvent { code: KeyCode::Tab, .. } => {
+                if let Some(text) = self.cmd.text_get_token_at_cursor().and_then(|cmd| try_autocomplete(cmd)) {
+                    self.cmd.text_replace_token(&text);
+                };
+            }
             KeyEvent { code: KeyCode::Char('c' | 'C'), modifiers: KeyModifiers::CONTROL, .. } => {
                 self.kill(gs);
                 self.at_log = self.logs.len();
