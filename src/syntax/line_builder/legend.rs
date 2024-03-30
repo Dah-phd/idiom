@@ -77,6 +77,7 @@ impl Legend {
                         }
                     }
                 }
+                FileType::Nim => {}
                 FileType::Python => {}
                 FileType::C => {}
                 FileType::Cpp => {}

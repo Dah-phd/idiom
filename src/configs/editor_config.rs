@@ -1,6 +1,8 @@
 use super::types::FileType;
 use super::{load_or_create_config, EDITOR_CFG_FILE};
+use crate::global_state::GlobalState;
 use crate::utils::{trim_start_inplace, Offset};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 pub struct IndentConfigs {
@@ -19,7 +21,7 @@ impl IndentConfigs {
     pub fn update_by_file_type(mut self, file_type: &FileType) -> Self {
         #[allow(clippy::single_match)]
         match file_type {
-            FileType::Python => self.indent_after.push(':'),
+            FileType::Python | FileType::Nim => self.indent_after.push(':'),
             _ => (),
         }
         self
@@ -38,7 +40,7 @@ impl IndentConfigs {
     }
 
     pub fn derive_indent_from(&self, prev_line: &str) -> String {
-        let mut indent = prev_line.chars().take_while(|&c| c.is_whitespace() || c == '\t').collect::<String>();
+        let mut indent = prev_line.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
         if let Some(last) = prev_line.trim_end().chars().last() {
             if self.indent_after.contains(last) {
                 indent.insert_str(0, &self.indent);
@@ -47,15 +49,22 @@ impl IndentConfigs {
         indent
     }
 
+    pub fn derive_indent_from_lines(&self, prev_lines: &[String]) -> String {
+        for prev_line in prev_lines.iter().rev() {
+            if !prev_line.chars().all(|c| c.is_whitespace()) {
+                return self.derive_indent_from(prev_line);
+            }
+        }
+        "".to_owned()
+    }
+
     pub fn indent_line(&self, line_idx: usize, content: &mut [String]) -> Offset {
         if line_idx > 0 {
-            let (prev_split, current_split) = content.split_at_mut(line_idx);
-            let prev_line = &prev_split[line_idx - 1];
-            if prev_line.chars().all(|c| c.is_whitespace()) {
+            let indent = self.derive_indent_from_lines(&content[..line_idx]);
+            if indent.is_empty() {
                 return Offset::Pos(0);
             }
-            let line = &mut current_split[0];
-            let indent = self.derive_indent_from(prev_line);
+            let line = &mut content[line_idx];
             let offset = Offset::Pos(indent.len()) - trim_start_inplace(line);
             line.insert_str(0, &indent);
             offset - self.unindent_if_before_base_pattern(line)
@@ -70,7 +79,7 @@ impl IndentConfigs {
 #[serde(rename_all = "camelCase")]
 pub struct EditorConfigs {
     pub format_on_save: bool,
-    pub indent: String,
+    pub indent_spaces: usize,
     #[serde(skip, default = "get_indent_after")]
     pub indent_after: String,
     #[serde(skip, default = "get_unident_before")]
@@ -79,6 +88,8 @@ pub struct EditorConfigs {
     rust_lsp_preload_if_present: Option<Vec<String>>,
     python_lsp: Option<String>,
     python_lsp_preload_if_present: Option<Vec<String>>,
+    nim_lsp: Option<String>,
+    nim_lsp_preload_if_present: Option<Vec<String>>,
     c_lsp: Option<String>,
     c_lsp_preload_if_present: Option<Vec<String>>,
     cpp_lsp: Option<String>,
@@ -99,13 +110,15 @@ impl Default for EditorConfigs {
     fn default() -> Self {
         Self {
             format_on_save: true,
-            indent: "    ".to_owned(),
+            indent_spaces: 4,
             indent_after: get_indent_after(),
             unindent_before: get_unident_before(),
             rust_lsp: Some(String::from("${cfg_dir}/rust-analyzer")),
             rust_lsp_preload_if_present: Some(vec!["Cargo.toml".to_owned(), "Cargo.lock".to_owned()]),
             python_lsp: Some(String::from("jedi-language-server")),
             python_lsp_preload_if_present: Some(vec!["pyproject.toml".to_owned(), "pytest.init".to_owned()]),
+            nim_lsp: Some(String::from("nimlsp")),
+            nim_lsp_preload_if_present: Some(vec![r".*\.nimble".to_owned()]),
             c_lsp: None,
             c_lsp_preload_if_present: None,
             cpp_lsp: None,
@@ -131,7 +144,7 @@ impl EditorConfigs {
 
     pub fn get_indent_cfg(&self, file_type: &FileType) -> IndentConfigs {
         let indent_cfg = IndentConfigs {
-            indent: self.indent.to_owned(),
+            indent: (0..self.indent_spaces).map(|_| ' ').collect(),
             indent_after: self.indent_after.to_owned(),
             unindent_before: self.unindent_before.to_owned(),
         };
@@ -142,6 +155,7 @@ impl EditorConfigs {
         match file_type {
             FileType::Rust => self.rust_lsp.to_owned(),
             FileType::Python => self.python_lsp.to_owned(),
+            FileType::Nim => self.nim_lsp.to_owned(),
             FileType::C => self.c_lsp.to_owned(),
             FileType::Cpp => self.cpp_lsp.to_owned(),
             FileType::JavaScript => self.java_script_lsp.to_owned(),
@@ -154,7 +168,7 @@ impl EditorConfigs {
         }
     }
 
-    pub fn derive_lsp_preloads(&mut self, base_tree_paths: Vec<String>) -> Vec<(FileType, String)> {
+    pub fn derive_lsp_preloads(&mut self, base_tree: Vec<String>, gs: &mut GlobalState) -> Vec<(FileType, String)> {
         [
             (FileType::Rust, self.rust_lsp_preload_if_present.take(), self.rust_lsp.as_ref()),
             (FileType::Python, self.python_lsp_preload_if_present.take(), self.python_lsp.as_ref()),
@@ -165,9 +179,10 @@ impl EditorConfigs {
             (FileType::Html, self.html_preload_if_present.take(), self.html_lsp.as_ref()),
             (FileType::Yml, self.yaml_preload_if_present.take(), self.yaml_lsp.as_ref()),
             (FileType::Toml, self.toml_preload_if_present.take(), self.toml_lsp.as_ref()),
+            (FileType::Nim, self.nim_lsp_preload_if_present.take(), self.nim_lsp.as_ref()),
         ]
         .into_iter()
-        .flat_map(|(ft, expected, cmd)| Some((ft, map_preload(&base_tree_paths, expected, cmd)?)))
+        .flat_map(|(ft, expected, cmd)| Some((ft, map_preload(&base_tree, expected, cmd, gs)?)))
         .collect()
     }
 
@@ -184,11 +199,21 @@ fn get_unident_before() -> String {
     String::from("]})")
 }
 
-fn map_preload(base_tree_paths: &[String], expected: Option<Vec<String>>, cmd: Option<&String>) -> Option<String> {
+fn map_preload(
+    base_tree: &[String],
+    expected: Option<Vec<String>>,
+    cmd: Option<&String>,
+    gs: &mut GlobalState,
+) -> Option<String> {
     if let Some(cmd) = cmd {
-        for expected_file in expected? {
-            if base_tree_paths.contains(&expected_file) {
-                return Some(cmd.to_owned());
+        for try_re in expected?.iter().map(|re| Regex::new(re)) {
+            match try_re {
+                Ok(file_re) => {
+                    if base_tree.iter().any(|path| file_re.is_match(path)) {
+                        return Some(cmd.to_owned());
+                    }
+                }
+                Err(error) => gs.error(error.to_string()),
             }
         }
     }

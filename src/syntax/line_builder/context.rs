@@ -67,28 +67,16 @@ pub struct BracketColors {
 }
 
 impl BracketColors {
-    pub fn map_style(&mut self, ch: char, style: &mut Style) {
+    pub fn map_style(&mut self, ch: char, style: Style) -> Style {
         match ch {
-            '(' => {
-                style.fg.replace(self.open_round());
-            }
-            ')' => {
-                style.fg.replace(self.close_round());
-            }
-            '[' => {
-                style.fg.replace(self.open_square());
-            }
-            ']' => {
-                style.fg.replace(self.close_square());
-            }
-            '{' => {
-                style.fg.replace(self.open_curly());
-            }
-            '}' => {
-                style.fg.replace(self.close_curly());
-            }
-            _ => (),
-        };
+            '(' => style.fg(self.open_round()),
+            ')' => style.fg(self.close_round()),
+            '[' => style.fg(self.open_square()),
+            ']' => style.fg(self.close_square()),
+            '{' => style.fg(self.open_curly()),
+            '}' => style.fg(self.close_curly()),
+            _ => style,
+        }
     }
 
     pub fn open_round(&mut self) -> Color {
