@@ -16,7 +16,10 @@ fn path_finder(path_fragment: &str) -> Option<String> {
     if let Some(parent) = path_fragment_buf.parent() {
         for p in std::fs::read_dir(parent).ok()? {
             if let Ok(path) = p {
-                let derived_path_string = path.path().display().to_string();
+                let mut derived_path_string = path.path().display().to_string();
+                if path.path().is_dir() {
+                    derived_path_string.push(MAIN_SEPARATOR);
+                };
                 if derived_path_string.starts_with(&path_fragment) {
                     return Some(derived_path_string);
                 };
