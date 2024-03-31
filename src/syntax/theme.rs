@@ -1,8 +1,9 @@
-use crate::configs::{load_or_create_config, THEME_FILE};
+use crate::configs::{load_or_create_config, pull_color, THEME_FILE};
 use ratatui::style::Color;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+use serde_json::Value;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Theme {
     pub imports: Color,
@@ -18,6 +19,32 @@ pub struct Theme {
     pub string: Color,
     pub string_escape: Color,
     pub comment: Color,
+}
+
+impl<'de> serde::Deserialize<'de> for Theme {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match Value::deserialize(deserializer)? {
+            Value::Object(map) => Ok(Self {
+                imports: pull_color(&map, "imports").map_err(serde::de::Error::custom)?,
+                key_words: pull_color(&map, "keyWords").map_err(serde::de::Error::custom)?,
+                flow_control: pull_color(&map, "flowControl").map_err(serde::de::Error::custom)?,
+                class_or_struct: pull_color(&map, "classOrStruct").map_err(serde::de::Error::custom)?,
+                constant: pull_color(&map, "constant").map_err(serde::de::Error::custom)?,
+                blank: pull_color(&map, "blank").map_err(serde::de::Error::custom)?,
+                comment: pull_color(&map, "comment").map_err(serde::de::Error::custom)?,
+                default: pull_color(&map, "default").map_err(serde::de::Error::custom)?,
+                functions: pull_color(&map, "functions").map_err(serde::de::Error::custom)?,
+                numeric: pull_color(&map, "numeric").map_err(serde::de::Error::custom)?,
+                selected: pull_color(&map, "selected").map_err(serde::de::Error::custom)?,
+                string: pull_color(&map, "string").map_err(serde::de::Error::custom)?,
+                string_escape: pull_color(&map, "stringEscape").map_err(serde::de::Error::custom)?,
+            }),
+            _ => Err(anyhow::anyhow!("theme.json in not an Object!")).map_err(serde::de::Error::custom),
+        }
+    }
 }
 
 impl Default for Theme {
