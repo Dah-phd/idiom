@@ -21,7 +21,7 @@ pub struct Footer {
 
 impl Footer {
     pub fn new(gs: &mut GlobalState) -> Self {
-        let theme = gs.unwrap_default_result(UITheme::new(), ".theme_ui.josn: ");
+        let theme = gs.unwrap_default_result(UITheme::new(), "theme_ui.josn: ");
         Self { clock: Instant::now(), message: None, message_que: Vec::new(), color: theme.footer_background }
     }
 

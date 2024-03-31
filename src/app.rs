@@ -93,7 +93,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                             gs.toggle_tree();
                         }
                         GeneralAction::RefreshSettings => {
-                            gs.unwrap_default_result(footer.reset_cfg(), ".theme_ui.josn: ");
+                            gs.unwrap_default_result(footer.reset_cfg(), "theme_ui.josn: ");
                             let new_key_map = gs.unwrap_default_result(KeyMap::new(), ".keys: ");
                             general_key_map = new_key_map.general_key_map();
                             tree.key_map = new_key_map.tree_key_map();
