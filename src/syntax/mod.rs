@@ -1,6 +1,6 @@
 mod line_builder;
 mod modal;
-mod theme;
+pub mod theme;
 use crate::{
     configs::FileType,
     global_state::{GlobalState, WorkspaceEvent},
@@ -31,9 +31,9 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn with_context(file_type: FileType, path: &Path) -> Self {
+    pub fn with_context(file_type: FileType, path: &Path, gs: &mut GlobalState) -> Self {
         Self {
-            line_builder: LineBuilder::new(file_type.into()),
+            line_builder: LineBuilder::new(file_type.into(), gs),
             modal: None,
             path: path.into(),
             requests: Vec::new(),
@@ -259,11 +259,19 @@ impl Lexer {
         }
     }
 
-    pub fn reload_theme(&mut self) {
-        self.line_builder.theme = Theme::new();
+    pub fn reload_theme(&mut self, gs: &mut GlobalState) {
+        self.line_builder.theme = match Theme::new() {
+            Ok(theme) => theme,
+            Err(err) => {
+                let mut msg = "theme.json: ".to_owned();
+                msg.push_str(&err.to_string());
+                gs.error(msg);
+                return;
+            }
+        };
         if let Some(client) = self.lsp_client.as_mut() {
             self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
-        }
+        };
     }
 
     pub fn save_and_check_lsp(&mut self, file_type: FileType, gs: &mut GlobalState) {

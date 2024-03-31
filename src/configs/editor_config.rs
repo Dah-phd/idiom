@@ -138,7 +138,7 @@ impl Default for EditorConfigs {
 }
 
 impl EditorConfigs {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, serde_json::Error> {
         load_or_create_config(EDITOR_CFG_FILE)
     }
 
@@ -186,8 +186,9 @@ impl EditorConfigs {
         .collect()
     }
 
-    pub fn refresh(&mut self) {
-        (*self) = Self::new()
+    pub fn refresh(&mut self) -> Result<(), serde_json::Error> {
+        (*self) = Self::new()?;
+        Ok(())
     }
 }
 

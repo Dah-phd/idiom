@@ -1,6 +1,7 @@
 use anyhow::Result;
 use portable_pty::PtyPair;
 use portable_pty::{native_pty_system, Child, CommandBuilder, PtySize};
+use serde::Serialize;
 use std::path::PathBuf;
 use std::{
     io::{BufReader, Read, Write},
@@ -142,4 +143,17 @@ pub fn load_cfg(f: &str, gs: &mut GlobalState) -> Option<String> {
     path.push(f);
     gs.workspace.push(WorkspaceEvent::Open(path, 0));
     None
+}
+
+pub fn overwrite_cfg<T: Default + Serialize>(f: &str) -> Result<String> {
+    let mut path = match config_dir() {
+        Some(path) => path,
+        None => {
+            return Err(anyhow::anyhow!("Filed to derive config dir!"));
+        }
+    };
+    path.push(f);
+    let data = serde_json::to_string_pretty(&T::default())?;
+    std::fs::write(&path, data)?;
+    Ok(path.display().to_string())
 }

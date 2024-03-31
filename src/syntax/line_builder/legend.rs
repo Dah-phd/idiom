@@ -1,9 +1,8 @@
-use lsp_types::SemanticTokensServerCapabilities;
-use ratatui::style::Color;
-use crate::{configs::FileType, syntax::Theme};
 #[cfg(build = "debug")]
 use crate::utils::debug_to_file;
-
+use crate::{configs::FileType, syntax::Theme};
+use lsp_types::SemanticTokensServerCapabilities;
+use ratatui::style::Color;
 
 #[derive(Clone, Copy, Debug)]
 pub enum ColorResult {

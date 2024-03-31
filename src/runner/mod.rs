@@ -6,11 +6,11 @@ use ratatui::text::Line;
 mod autocomplete;
 mod commands;
 mod components;
-use crate::configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE};
+use crate::configs::{EditorConfigs, KeyMap, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE};
 use crate::global_state::GlobalState;
 use crate::utils::into_guard;
 use anyhow::Result;
-use commands::{load_cfg, Terminal};
+use commands::{load_cfg, overwrite_cfg, Terminal};
 use components::CmdHistory;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
@@ -184,6 +184,10 @@ impl EditorTerminal {
             self.logs.push("    theme => open theme config file.".to_owned());
             self.logs.push("    ${file_path} => loads path into editor.".to_owned());
             self.logs.push("Example: &i load keymap".to_owned());
+            self.logs.push("".to_owned());
+            self.logs.push("default => returns config file to default".to_owned());
+            self.logs.push("    possible files keymap, config".to_owned());
+            self.logs.push("Example: &i default keymap".to_owned());
         }
         if arg.trim() == "loc" {
             if let Some(terminal) = self.terminal.as_mut() {
@@ -201,6 +205,17 @@ impl EditorTerminal {
             } else {
                 gs.toggle_terminal(self);
             }
+        }
+        if let Some(cfg) = arg.trim().strip_prefix("default") {
+            match match cfg.trim() {
+                "keymap" => overwrite_cfg::<KeyMap>(KEY_MAP),
+                "config" => overwrite_cfg::<EditorConfigs>(EDITOR_CFG_FILE),
+                "theme" => overwrite_cfg::<crate::syntax::theme::Theme>(THEME_FILE),
+                _ => return Ok(()),
+            } {
+                Ok(msg) => gs.success(msg),
+                Err(err) => gs.error(err.to_string()),
+            };
         }
         Ok(())
     }

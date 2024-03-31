@@ -41,7 +41,7 @@ impl Default for Theme {
 }
 
 impl Theme {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, serde_json::Error> {
         load_or_create_config(THEME_FILE)
     }
 }

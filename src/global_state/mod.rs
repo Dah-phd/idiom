@@ -1,3 +1,4 @@
+use std::error::Error;
 mod clipboard;
 mod controls;
 mod draw;
@@ -320,6 +321,19 @@ impl GlobalState {
         let footer_layout = draw::layour_workspace_footer(self.screen_rect);
         self.footer_area = footer_layout[1];
         footer_layout[0]
+    }
+
+    /// unwrap or default with logged error
+    pub fn unwrap_default_result<T: Default, E: Error>(&mut self, result: Result<T, E>, prefix: &str) -> T {
+        match result {
+            Ok(value) => value,
+            Err(error) => {
+                let mut msg = prefix.to_owned();
+                msg.push_str(&error.to_string());
+                self.error(msg);
+                T::default()
+            }
+        }
     }
 
     /// Attempts to create new editor if err logs it and returns false else true.

@@ -3,17 +3,15 @@ mod editor_config;
 mod keymap;
 mod theme_ui;
 mod types;
-pub use editor_config::{EditorConfigs, IndentConfigs};
-pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap, TreeAction, TreeUserKeyMap};
-pub use theme_ui::UITheme;
-pub use types::FileType;
-
-use std::collections::HashMap;
-
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use dirs::config_dir;
+pub use editor_config::{EditorConfigs, IndentConfigs};
+pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap, TreeAction, TreeUserKeyMap};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::error::Category;
+use serde_json::Error;
+use std::collections::HashMap;
+pub use theme_ui::UITheme;
+pub use types::FileType;
 
 pub const CONFIG_FOLDER: &str = "idiom";
 pub const EDITOR_CFG_FILE: &str = ".editor";
@@ -66,7 +64,7 @@ pub struct KeyMap {
 }
 
 impl KeyMap {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, Error> {
         load_or_create_config(KEY_MAP)
     }
 
@@ -83,24 +81,12 @@ impl KeyMap {
     }
 }
 
-pub fn load_or_create_config<T: Default + DeserializeOwned + Serialize>(path: &str) -> T {
+pub fn load_or_create_config<T: Default + DeserializeOwned + Serialize>(path: &str) -> Result<T, Error> {
     if let Some(config_json) = read_config_file(path) {
-        match serde_json::from_slice::<T>(&config_json) {
-            Ok(configs) => configs,
-            Err(error) => {
-                match error.classify() {
-                    Category::Data => {}
-                    Category::Eof => {}
-                    Category::Io => {}
-                    Category::Syntax => {}
-                };
-                write_config_file(path, &T::default());
-                T::default()
-            }
-        }
+        Ok(serde_json::from_slice::<T>(&config_json)?)
     } else {
         write_config_file(path, &T::default());
-        T::default()
+        Ok(T::default())
     }
 }
 

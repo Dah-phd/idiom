@@ -19,14 +19,12 @@ pub struct Footer {
     color: Color,
 }
 
-impl Default for Footer {
-    fn default() -> Self {
-        let theme = UITheme::new();
+impl Footer {
+    pub fn new(gs: &mut GlobalState) -> Self {
+        let theme = gs.unwrap_default_result(UITheme::new(), ".theme_ui.josn: ");
         Self { clock: Instant::now(), message: None, message_que: Vec::new(), color: theme.footer_background }
     }
-}
 
-impl Footer {
     pub fn render(&mut self, frame: &mut Frame, gs: &GlobalState, stats: Option<DocStats>) {
         frame.render_widget(Block::default().bg(self.color), gs.footer_area);
 
@@ -78,9 +76,10 @@ impl Footer {
         self.push_ahead(Message::success(message));
     }
 
-    pub fn reset_cfg(&mut self) {
-        let new_theme = UITheme::new();
+    pub fn reset_cfg(&mut self) -> Result<(), serde_json::Error> {
+        let new_theme = UITheme::new()?;
         self.color = new_theme.footer_background;
+        Ok(())
     }
 
     fn push_ahead(&mut self, msg: Message) {

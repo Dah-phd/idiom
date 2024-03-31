@@ -18,17 +18,17 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{io::Stdout, path::PathBuf, time::Instant};
 
 pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Option<PathBuf>) -> Result<()> {
-    let configs = KeyMap::new();
-    let mut last_frame_start = Instant::now();
-    let mut general_key_map = configs.general_key_map();
     let size = terminal.size()?;
     let mut gs = GlobalState::new(size.height, size.width);
+    let configs = gs.unwrap_default_result(KeyMap::new(), ".keys: ");
+    let mut last_frame_start = Instant::now();
+    let mut general_key_map = configs.general_key_map();
 
     // COMPONENTS
     let mut tree = Tree::new(configs.tree_key_map());
     let mut workspace = Workspace::new(configs.editor_key_map(), tree.get_base_file_names(), &mut gs).await;
     let mut term = EditorTerminal::new(gs.editor_area.width);
-    let mut footer = Footer::default();
+    let mut footer = Footer::new(&mut gs);
 
     // CLI SETUP
     if let Some(path) = open_file {
@@ -93,8 +93,8 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                             gs.toggle_tree();
                         }
                         GeneralAction::RefreshSettings => {
-                            footer.reset_cfg();
-                            let new_key_map = KeyMap::new();
+                            gs.unwrap_default_result(footer.reset_cfg(), ".theme_ui.josn: ");
+                            let new_key_map = gs.unwrap_default_result(KeyMap::new(), ".keys: ");
                             general_key_map = new_key_map.general_key_map();
                             tree.key_map = new_key_map.tree_key_map();
                             workspace.refresh_cfg(new_key_map.editor_key_map(), &mut gs).await;

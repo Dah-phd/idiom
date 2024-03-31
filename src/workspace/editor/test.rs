@@ -3,6 +3,7 @@ use super::super::{
     Editor,
 };
 use crate::configs::FileType;
+use crate::global_state::GlobalState;
 use crate::syntax::Lexer;
 use crate::workspace::actions::Actions;
 use std::path::PathBuf;
@@ -10,8 +11,9 @@ use std::path::PathBuf;
 pub fn mock_editor(content: Vec<String>) -> Editor {
     let ft = FileType::Unknown;
     let path = PathBuf::from("");
+    let mut gs = GlobalState::new(80, 120);
     Editor {
-        lexer: Lexer::with_context(ft, &path),
+        lexer: Lexer::with_context(ft, &path, &mut gs),
         file_type: ft,
         display: "".to_string(),
         path,
