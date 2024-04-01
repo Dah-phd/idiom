@@ -16,10 +16,10 @@ impl<'de> serde::Deserialize<'de> for UITheme {
         D: serde::Deserializer<'de>,
     {
         match Value::deserialize(deserializer)? {
-            Value::Object(map) => {
-                Ok(Self { footer_background: pull_color(&map, "footerBackground").map_err(serde::de::Error::custom)? })
-            }
-            _ => Err(anyhow::anyhow!("theme.json in not an Object!")).map_err(serde::de::Error::custom),
+            Value::Object(mut map) => Ok(Self {
+                footer_background: pull_color(&mut map, "footerBackground").map_err(serde::de::Error::custom)?,
+            }),
+            _ => Err(anyhow::anyhow!("theme_ui.json in not an Object!")).map_err(serde::de::Error::custom),
         }
     }
 }
@@ -36,9 +36,9 @@ impl UITheme {
     }
 }
 
-pub fn pull_color(map: &Map<String, Value>, key: &str) -> Result<Color, String> {
-    match map.get(key) {
-        Some(obj) => parse_color(obj.clone()),
+pub fn pull_color(map: &mut Map<String, Value>, key: &str) -> Result<Color, String> {
+    match map.remove(key) {
+        Some(obj) => parse_color(obj),
         None => Err(format!("Key not in object {key}")),
     }
 }
