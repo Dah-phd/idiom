@@ -123,9 +123,9 @@ impl Default for EditorConfigs {
             c_lsp_preload_if_present: None,
             cpp_lsp: None,
             cpp_preload_if_present: None,
-            type_script_lsp: None,
+            type_script_lsp: Some(String::from("vtsls --stdio")),
             type_script_preload_if_present: None,
-            java_script_lsp: None,
+            java_script_lsp: Some(String::from("vtsls --stdio")),
             java_script_preload_if_present: None,
             html_lsp: None,
             html_preload_if_present: None,
@@ -138,7 +138,7 @@ impl Default for EditorConfigs {
 }
 
 impl EditorConfigs {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, serde_json::Error> {
         load_or_create_config(EDITOR_CFG_FILE)
     }
 
@@ -186,8 +186,9 @@ impl EditorConfigs {
         .collect()
     }
 
-    pub fn refresh(&mut self) {
-        (*self) = Self::new()
+    pub fn refresh(&mut self) -> Result<(), serde_json::Error> {
+        (*self) = Self::new()?;
+        Ok(())
     }
 }
 

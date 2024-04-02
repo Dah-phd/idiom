@@ -1,3 +1,4 @@
+use crate::global_state::GlobalState;
 mod context;
 mod diagnostics;
 mod internal;
@@ -47,9 +48,9 @@ pub struct LineBuilder {
 }
 
 impl LineBuilder {
-    pub fn new(lang: Lang) -> Self {
+    pub fn new(lang: Lang, gs: &mut GlobalState) -> Self {
         Self {
-            theme: Theme::new(),
+            theme: gs.unwrap_default_result(Theme::new(), "theme.json: "),
             lang,
             file_was_saved: true,
             legend: Legend::default(),

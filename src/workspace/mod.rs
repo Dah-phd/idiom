@@ -36,7 +36,7 @@ pub struct Workspace {
 
 impl Workspace {
     pub async fn new(key_map: EditorKeyMap, base_tree_paths: Vec<String>, gs: &mut GlobalState) -> Self {
-        let mut base_config = EditorConfigs::new();
+        let mut base_config = gs.unwrap_default_result(EditorConfigs::new(), ".config: ");
         let mut lsp_servers = HashMap::new();
         for (ft, lsp_cmd) in base_config.derive_lsp_preloads(base_tree_paths, gs) {
             gs.success(format!("Preloading {lsp_cmd}"));
@@ -109,16 +109,16 @@ impl Workspace {
         }
     }
 
-    pub fn apply_edits(&mut self, edits: WorkspaceEdit, events: &mut GlobalState) {
+    pub fn apply_edits(&mut self, edits: WorkspaceEdit, gs: &mut GlobalState) {
         if let Some(edits) = edits.changes {
             for (file_url, file_edits) in edits {
                 if let Some(editor) = self.get_editor(file_url.path()) {
                     editor.apply_file_edits(file_edits);
-                } else if let Ok(mut editor) = self.build_basic_editor(PathBuf::from(file_url.path())) {
+                } else if let Ok(mut editor) = self.build_basic_editor(PathBuf::from(file_url.path()), gs) {
                     editor.apply_file_edits(file_edits);
-                    editor.try_write_file(events);
+                    editor.try_write_file(gs);
                 } else {
-                    events.error(format!("Unable to build editor for {}", file_url.path()));
+                    gs.error(format!("Unable to build editor for {}", file_url.path()));
                 }
             }
         }
@@ -126,18 +126,18 @@ impl Workspace {
             match documet_edit {
                 DocumentChanges::Edits(edits) => {
                     for text_document_edit in edits {
-                        self.handle_text_document_edit(text_document_edit, events);
+                        self.handle_text_document_edit(text_document_edit, gs);
                     }
                 }
                 DocumentChanges::Operations(operations) => {
                     for operation in operations {
                         match operation {
                             DocumentChangeOperation::Edit(text_document_edit) => {
-                                self.handle_text_document_edit(text_document_edit, events);
+                                self.handle_text_document_edit(text_document_edit, gs);
                             }
                             DocumentChangeOperation::Op(operation) => {
                                 if let Err(err) = self.handle_tree_operations(operation) {
-                                    events.error(format!("Failed file tree operation: {err}"));
+                                    gs.error(format!("Failed file tree operation: {err}"));
                                 }
                             }
                         }
@@ -147,7 +147,7 @@ impl Workspace {
         }
     }
 
-    fn handle_text_document_edit(&mut self, mut text_document_edit: TextDocumentEdit, events: &mut GlobalState) {
+    fn handle_text_document_edit(&mut self, mut text_document_edit: TextDocumentEdit, gs: &mut GlobalState) {
         if let Some(editor) = self.get_editor(text_document_edit.text_document.uri.path()) {
             let edits = text_document_edit
                 .edits
@@ -159,7 +159,7 @@ impl Workspace {
                 .collect();
             editor.apply_file_edits(edits);
         } else if let Ok(mut editor) =
-            self.build_basic_editor(PathBuf::from(text_document_edit.text_document.uri.path()))
+            self.build_basic_editor(PathBuf::from(text_document_edit.text_document.uri.path()), gs)
         {
             let edits = text_document_edit
                 .edits
@@ -170,9 +170,9 @@ impl Workspace {
                 })
                 .collect();
             editor.apply_file_edits(edits);
-            editor.try_write_file(events);
+            editor.try_write_file(gs);
         } else {
-            events.error(format!("Unable to build editor for {}", text_document_edit.text_document.uri.path()));
+            gs.error(format!("Unable to build editor for {}", text_document_edit.text_document.uri.path()));
         };
     }
 
@@ -216,12 +216,12 @@ impl Workspace {
         self.editors.iter_mut().find(|editor| editor.path == path)
     }
 
-    fn build_basic_editor(&mut self, file_path: PathBuf) -> Result<Editor> {
-        Ok(Editor::from_path(file_path, &self.base_config)?)
+    fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> Result<Editor> {
+        Ok(Editor::from_path(file_path, &self.base_config, gs)?)
     }
 
     async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> Result<Editor> {
-        let mut new = Editor::from_path(file_path, &self.base_config)?;
+        let mut new = Editor::from_path(file_path, &self.base_config, gs)?;
         new.resize(gs.editor_area.width as usize, gs.editor_area.height as usize);
         let lsp_cmd = match self.base_config.derive_lsp(&new.file_type) {
             None => return Ok(new),
@@ -341,7 +341,7 @@ impl Workspace {
 
     pub async fn refresh_cfg(&mut self, new_key_map: EditorKeyMap, gs: &mut GlobalState) {
         self.key_map = new_key_map;
-        self.base_config.refresh();
+        gs.unwrap_default_result(self.base_config.refresh(), ".config: ");
         for editor in self.editors.iter_mut() {
             editor.refresh_cfg(&self.base_config);
             if let Some(lsp) = self.lsp_servers.get(&editor.file_type) {

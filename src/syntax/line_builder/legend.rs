@@ -1,7 +1,8 @@
+#[cfg(build = "debug")]
+use crate::utils::debug_to_file;
+use crate::{configs::FileType, syntax::Theme};
 use lsp_types::SemanticTokensServerCapabilities;
 use ratatui::style::Color;
-
-use crate::{configs::FileType, syntax::Theme};
 
 #[derive(Clone, Copy, Debug)]
 pub enum ColorResult {
@@ -29,6 +30,8 @@ impl Legend {
     }
 
     pub fn map_styles(&mut self, file_type: &FileType, theme: &Theme, tc: &SemanticTokensServerCapabilities) {
+        #[cfg(build = "debug")]
+        debug_to_file("test_data.init", tc);
         if let SemanticTokensServerCapabilities::SemanticTokensOptions(tokens) = tc {
             match file_type {
                 FileType::Rust => {
@@ -77,17 +80,12 @@ impl Legend {
                         }
                     }
                 }
-                FileType::Nim => {}
-                FileType::Python => {}
-                FileType::C => {}
-                FileType::Cpp => {}
-                FileType::Html => {}
-                FileType::MarkDown => {}
-                FileType::JavaScript => {}
-                FileType::TypeScript => {}
-                FileType::Yml => {}
-                FileType::Toml => {}
-                FileType::Unknown => {}
+                _ => {
+                    for token_type in tokens.legend.token_types.iter() {
+                        let token_type = token_type.as_str();
+                        self.generic_mapping(token_type, theme);
+                    }
+                }
             }
         }
     }
