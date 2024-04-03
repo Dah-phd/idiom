@@ -77,14 +77,14 @@ impl Lexer {
                                 gs.workspace.push(workspace_edit.into());
                             }
                             LSPResult::Tokens(tokens) => {
-                                if self.line_builder.set_tokens(tokens) {
+                                if self.line_builder.set_tokens(tokens, content) {
                                     gs.success("LSP tokens mapped!");
                                 } else if let Some(id) = client.request_full_tokens(&self.path) {
                                     unresolved_requests.push(LSPResponseType::Tokens(id));
                                 };
                             }
                             LSPResult::TokensPartial(tokens) => {
-                                self.line_builder.set_tokens_partial(tokens);
+                                self.line_builder.set_tokens_partial(tokens, content);
                             }
                             LSPResult::References(locations) => {
                                 if let Some(mut locations) = locations {

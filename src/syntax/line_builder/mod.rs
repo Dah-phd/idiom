@@ -12,7 +12,7 @@ use diagnostics::{diagnostics_error, diagnostics_full};
 pub use diagnostics::{Action, DiagnosticInfo, DiagnosticLine};
 use internal::generic_line;
 pub use langs::Lang;
-use legend::{ColorResult, Legend};
+use legend::Legend;
 use lsp_types::{
     SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities, TextDocumentContentChangeEvent,
 };
@@ -73,20 +73,20 @@ impl LineBuilder {
     }
 
     /// Process SemanticTokensResultFull from LSP
-    pub fn set_tokens(&mut self, tokens_res: SemanticTokensResult) -> bool {
+    pub fn set_tokens(&mut self, tokens_res: SemanticTokensResult, content: &[String]) -> bool {
         if let SemanticTokensResult::Tokens(tokens) = tokens_res {
-            self.tokens.tokens_reset(tokens.data);
+            self.tokens.tokens_reset(tokens.data, &self.legend, &self.lang, &self.theme, content);
         }
         !self.tokens.is_empty()
     }
 
     /// Process SemanticTokenRangeResult from LSP
-    pub fn set_tokens_partial(&mut self, tokens: SemanticTokensRangeResult) {
+    pub fn set_tokens_partial(&mut self, tokens: SemanticTokensRangeResult, content: &[String]) {
         let tokens = match tokens {
             SemanticTokensRangeResult::Partial(data) => data.data,
             SemanticTokensRangeResult::Tokens(data) => data.data,
         };
-        self.tokens.tokens_set(tokens);
+        self.tokens.tokens_set(tokens, &self.legend, &self.lang, &self.theme, content);
     }
 
     /// Sync text edits with LSP
@@ -213,13 +213,7 @@ impl LineBuilder {
                 match token_line.get(token_num) {
                     Some(token) if token.from == char_idx => {
                         remaining_word_len = token.len;
-                        style.fg = Some(match self.legend.get_color(token.token_type, &self.theme) {
-                            ColorResult::Final(color) => color,
-                            ColorResult::KeyWord => match content.get(char_idx..(char_idx + remaining_word_len)) {
-                                Some(slice) => self.handle_keywords(slice),
-                                None => self.theme.key_words,
-                            },
-                        });
+                        style.fg = Some(token.token_type);
                         token_num += 1;
                     }
                     _ => style.fg = None,
@@ -236,13 +230,6 @@ impl LineBuilder {
             style.bg = None;
         }
         Some(ctx.format_with_info(line_idx, diagnostic, buffer))
-    }
-
-    fn handle_keywords(&self, word: &str) -> Color {
-        if self.lang.frow_control.contains(&word) {
-            return self.theme.flow_control;
-        }
-        self.theme.key_words
     }
 }
 

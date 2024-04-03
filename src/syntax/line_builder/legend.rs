@@ -1,3 +1,4 @@
+use super::Lang;
 #[cfg(build = "debug")]
 use crate::utils::debug_to_file;
 use crate::{configs::FileType, syntax::Theme};
@@ -22,11 +23,17 @@ pub struct Legend {
 }
 
 impl Legend {
-    pub fn get_color(&self, token_type: usize, theme: &Theme) -> ColorResult {
-        if let Some(color) = self.legend.get(token_type) {
-            return *color;
+    pub fn parse_to_color(&self, token_type: usize, theme: &Theme, lang: &Lang, word: &str) -> Color {
+        match self.legend.get(token_type) {
+            Some(ColorResult::KeyWord) => {
+                if lang.frow_control.contains(&word) {
+                    return theme.flow_control;
+                }
+                theme.key_words
+            }
+            Some(ColorResult::Final(c)) => *c,
+            None => theme.default,
         }
-        ColorResult::Final(theme.default)
     }
 
     pub fn map_styles(&mut self, file_type: &FileType, theme: &Theme, tc: &SemanticTokensServerCapabilities) {
