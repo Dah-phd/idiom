@@ -13,6 +13,7 @@ pub struct Token {
 }
 
 impl Token {
+    /// create pseudo token from existing code, currently checking only for declarations
     fn try_token(lang: &Lang, theme: &Theme, word: &str) -> Option<Self> {
         for dec in lang.declaration.iter() {
             if let Some(from) = word.find(dec) {
@@ -110,6 +111,16 @@ impl Tokens {
         let mut idx = 0;
         let mut token_line = Vec::new();
         let mut from = 0;
+        if let Some(f_token) = tokens.first() {
+            if f_token.delta_line == 0 && f_token.delta_start != 0 {
+                if let Some(token) = content[idx]
+                    .get(..f_token.delta_start as usize)
+                    .and_then(|word| Token::try_token(lang, theme, word))
+                {
+                    token_line.push(token);
+                };
+            };
+        };
         for token in tokens {
             if token.delta_line != 0 {
                 from = 0;
@@ -147,6 +158,16 @@ impl Tokens {
     ) {
         let mut line_idx = 0;
         let mut from = 0;
+        if let Some(f_token) = tokens.first() {
+            if f_token.delta_line == 0 && f_token.delta_start != 0 {
+                if let Some(token) = content[line_idx]
+                    .get(..f_token.delta_start as usize)
+                    .and_then(|word| Token::try_token(lang, theme, word))
+                {
+                    self.insert(line_idx, token);
+                };
+            };
+        };
         for token in tokens {
             if token.delta_line != 0 {
                 from = 0;
