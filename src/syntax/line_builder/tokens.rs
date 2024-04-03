@@ -1,7 +1,5 @@
 use std::cmp::Ordering;
-
 use lsp_types::SemanticToken;
-
 use crate::workspace::actions::EditMetaData;
 
 pub struct Token {
