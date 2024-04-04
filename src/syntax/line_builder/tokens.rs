@@ -13,20 +13,6 @@ pub struct Token {
 }
 
 impl Token {
-    /// create pseudo token from existing code, currently checking only for declarations
-    fn try_token(lang: &Lang, theme: &Theme, word: &str) -> Option<Self> {
-        for dec in lang.declaration.iter() {
-            if let Some(from) = word.find(dec) {
-                return Some(Token { from, len: dec.len(), token_type: theme.key_words });
-            }
-        }
-        None
-    }
-
-    fn end(&self) -> usize {
-        self.from + self.len
-    }
-
     fn enrich(lang: &Lang, theme: &Theme, snippet: &str, buf: &mut Vec<Token>) {
         let mut token_start = 0;
         let mut last_word = String::new();
@@ -105,13 +91,6 @@ impl Tokens {
             self.inner.push(Vec::new());
         }
         self.inner.insert(idx, Vec::new());
-    }
-
-    fn insert(&mut self, idx: usize, token: Token) {
-        while idx + 1 > self.inner.len() {
-            self.inner.push(Vec::new());
-        }
-        self.inner[idx].push(token);
     }
 
     fn get_line(&mut self, idx: usize) -> &mut Vec<Token> {
