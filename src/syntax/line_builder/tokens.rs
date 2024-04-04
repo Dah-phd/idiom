@@ -22,6 +22,31 @@ impl Token {
         }
         None
     }
+
+    fn end(&self) -> usize {
+        self.from + self.len
+    }
+
+    fn enrich(lang: &Lang, theme: &Theme, snippet: &str, buf: &mut Vec<Token>) {
+        let mut token_start = 0;
+        let mut last_word = String::new();
+        for ch in snippet.chars() {
+            if ch.is_alphabetic() || ch == '_' {
+                last_word.push(ch);
+                continue;
+            };
+            if last_word.is_empty() {
+                token_start += 1;
+                continue;
+            }
+            let token_base = std::mem::take(&mut last_word);
+            let len = token_base.len();
+            if lang.declaration.contains(&token_base.as_str()) {
+                buf.push(Token { from: token_start, len, token_type: theme.key_words })
+            };
+            token_start += len;
+        }
+    }
 }
 
 #[derive(Default)]
@@ -75,28 +100,32 @@ impl Tokens {
         Some(tokens)
     }
 
-    fn insert_empty(&mut self, index: usize) {
-        while index > self.inner.len() {
+    fn insert_empty(&mut self, idx: usize) {
+        while idx > self.inner.len() {
             self.inner.push(Vec::new());
         }
-        self.inner.insert(index, Vec::new());
+        self.inner.insert(idx, Vec::new());
     }
 
-    fn insert(&mut self, index: usize, token: Token) {
-        while index > self.inner.len() {
+    fn insert(&mut self, idx: usize, token: Token) {
+        while idx + 1 > self.inner.len() {
             self.inner.push(Vec::new());
         }
-        match self.inner.get_mut(index) {
-            Some(line) => line.push(token),
-            None => self.inner.insert(index, vec![token]),
-        }
+        self.inner[idx].push(token);
     }
 
-    fn insert_line(&mut self, index: usize, tokens: Vec<Token>) {
-        while index > self.inner.len() {
+    fn get_line(&mut self, idx: usize) -> &mut Vec<Token> {
+        while idx + 1 > self.inner.len() {
             self.inner.push(Vec::new());
         }
-        self.inner.insert(index, tokens);
+        &mut self.inner[idx]
+    }
+
+    fn insert_line(&mut self, idx: usize, tokens: Vec<Token>) {
+        while idx > self.inner.len() {
+            self.inner.push(Vec::new());
+        }
+        self.inner.insert(idx, tokens);
     }
 
     pub fn tokens_reset(
@@ -110,38 +139,26 @@ impl Tokens {
         self.inner.clear();
         let mut idx = 0;
         let mut token_line = Vec::new();
-        let mut from = 0;
-        if let Some(f_token) = tokens.first() {
-            if f_token.delta_line == 0 && f_token.delta_start != 0 {
-                if let Some(token) = content[idx]
-                    .get(..f_token.delta_start as usize)
-                    .and_then(|word| Token::try_token(lang, theme, word))
-                {
-                    token_line.push(token);
-                };
-            };
-        };
+        let mut start_idx = 0;
         for token in tokens {
             if token.delta_line != 0 {
-                from = 0;
+                start_idx = 0;
                 self.insert_line(idx, std::mem::take(&mut token_line));
                 idx += token.delta_line as usize;
-                if token.delta_start > 0 {
-                    if let Some(token) = content[idx]
-                        .get(..token.delta_start as usize)
-                        .and_then(|word| Token::try_token(lang, theme, word))
-                    {
-                        token_line.push(token);
-                    };
-                };
             };
-            from += token.delta_start as usize;
+            let from = start_idx + token.delta_start as usize;
             let len = token.length as usize;
-            let token_type = match content[idx].get(from..from + len) {
+            let token_type = match content[idx].get(start_idx..start_idx + len) {
                 Some(word) => legend.parse_to_color(token.token_type as usize, theme, lang, word),
                 None => theme.default,
             };
+            if from.saturating_sub(start_idx) > 3 {
+                content.get(idx).and_then(|line| line.get(start_idx..from)).inspect(|snippet| {
+                    Token::enrich(lang, theme, snippet, &mut token_line);
+                });
+            };
             token_line.push(Token { from, len, token_type });
+            start_idx = from;
         }
         if !token_line.is_empty() {
             self.insert_line(idx, token_line);
@@ -156,38 +173,27 @@ impl Tokens {
         theme: &Theme,
         content: &[String],
     ) {
-        let mut line_idx = 0;
-        let mut from = 0;
-        if let Some(f_token) = tokens.first() {
-            if f_token.delta_line == 0 && f_token.delta_start != 0 {
-                if let Some(token) = content[line_idx]
-                    .get(..f_token.delta_start as usize)
-                    .and_then(|word| Token::try_token(lang, theme, word))
-                {
-                    self.insert(line_idx, token);
-                };
-            };
-        };
+        let mut idx = 0;
+        let mut start_idx = 0;
         for token in tokens {
             if token.delta_line != 0 {
-                from = 0;
-                line_idx += token.delta_line as usize;
-                if token.delta_start as usize > 0 {
-                    if let Some(token) = content[line_idx]
-                        .get(..token.delta_start as usize)
-                        .and_then(|word| Token::try_token(lang, theme, word))
-                    {
-                        self.insert(line_idx, token);
-                    };
-                };
+                start_idx = 0;
+                idx += token.delta_line as usize;
             };
-            from += token.delta_start as usize;
+            let from = start_idx + token.delta_start as usize;
             let len = token.length as usize;
-            let token_type = match content[line_idx].get(from..from + len) {
+            let token_type = match content[idx].get(start_idx..start_idx + len) {
                 Some(word) => legend.parse_to_color(token.token_type as usize, theme, lang, word),
                 None => theme.default,
             };
-            self.insert(line_idx, Token { from, len, token_type });
+            let mut token_line = self.get_line(idx);
+            if from.saturating_sub(start_idx) > 3 {
+                content.get(idx).and_then(|line| line.get(start_idx..from)).inspect(|snippet| {
+                    Token::enrich(lang, theme, snippet, &mut token_line);
+                });
+            };
+            token_line.push(Token { from, len, token_type });
+            start_idx = from;
         }
     }
 }
