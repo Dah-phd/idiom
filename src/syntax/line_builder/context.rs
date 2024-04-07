@@ -1,14 +1,11 @@
-use std::{cmp::Ordering, ops::Range};
-
+use super::diagnostics::DiagnosticData;
+use super::INIT_BUF_SIZE;
+use crate::workspace::{cursor::Cursor, CursorPosition};
 use ratatui::{
     style::{Color, Modifier, Style},
     text::Span,
 };
-
-use crate::workspace::{cursor::Cursor, CursorPosition};
-
-use super::{DiagnosticLine, INIT_BUF_SIZE};
-
+use std::{cmp::Ordering, ops::Range};
 pub const COLORS: [Color; 3] = [Color::LightMagenta, Color::LightYellow, Color::Blue];
 
 #[derive(Default)]
@@ -17,7 +14,7 @@ pub struct LineBuilderContext {
     pub select_range: Option<Range<usize>>,
     pub brackets: BracketColors,
     select: Option<(CursorPosition, CursorPosition)>,
-    cursor: CursorPosition,
+    pub cursor: CursorPosition,
 }
 
 impl LineBuilderContext {
@@ -34,7 +31,7 @@ impl LineBuilderContext {
     pub fn format_with_info(
         &self,
         line_idx: usize,
-        diagnostic: Option<&DiagnosticLine>,
+        diagnostic: Option<&[DiagnosticData]>,
         mut buffer: Vec<Span<'static>>,
     ) -> Vec<Span<'static>> {
         // set cursor without the normal API
@@ -43,11 +40,12 @@ impl LineBuilderContext {
             if buffer.len() > expected {
                 buffer[self.cursor.char + INIT_BUF_SIZE].style.add_modifier = Modifier::REVERSED;
             } else {
-                buffer.push(Span::styled(" ", Style { add_modifier: Modifier::REVERSED, ..Default::default() }))
-            }
+                buffer.push(Span::styled(" ", Style { add_modifier: Modifier::REVERSED, ..Default::default() }));
+            };
+            buffer[0].style.fg = Some(Color::White);
         };
-        if let Some(diagnostic) = diagnostic {
-            buffer.extend(diagnostic.data.iter().map(|d| d.inline_span.clone()));
+        if let Some(diagnostics) = diagnostic {
+            buffer.extend(diagnostics.iter().map(|d| d.inline_span.clone()));
         }
         buffer
     }

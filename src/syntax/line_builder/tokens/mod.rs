@@ -1,62 +1,44 @@
-use super::legend::Legend;
-use super::Lang;
+use super::DiagnosticInfo;
+use super::DiagnosticLine;
+use crate::syntax::line_builder::{Lang, Legend};
+use ratatui::buffer::Buffer;
+mod line;
+mod token;
 use crate::syntax::theme::Theme;
 use crate::workspace::actions::EditMetaData;
+use line::TokenLine;
 use lsp_types::SemanticToken;
-use ratatui::style::Color;
-use ratatui::text::Line;
-use ratatui::text::Span;
 use std::cmp::Ordering;
+use token::Token;
 
-pub struct TokenLine {
-    pub tokens: Vec<Token>,
-    pub cache: Line<'static>,
-}
-
-impl TokenLine {
-    fn new(line: &str, tokens: Vec<Token>) -> Self {
-        Self { tokens, cache: Line::from(line.to_owned()) }
-    }
-
-    fn rebuild(&self, line: &str) -> Line<'static> {
-        todo!()
-    }
-}
-
-pub struct Token {
-    pub from: usize,
-    pub len: usize,
-    pub token_type: Color,
-}
-
-impl Token {
-    fn enrich(mut char_idx: usize, lang: &Lang, theme: &Theme, snippet: &str, buf: &mut Vec<Token>) {
-        let mut last_word = String::new();
-        for ch in snippet.chars() {
-            if ch.is_alphabetic() || ch == '_' {
-                last_word.push(ch);
-                continue;
-            };
-            if last_word.is_empty() {
-                char_idx += 1;
-                continue;
-            }
-            let token_base = std::mem::take(&mut last_word);
-            let len = token_base.len();
-            if lang.declaration.contains(&token_base.as_str()) {
-                buf.push(Token { from: char_idx, len, token_type: theme.key_words });
-            };
-            char_idx += len;
-        }
-    }
+#[derive(Default)]
+enum TokensType {
+    LSP,
+    #[default]
+    Internal,
 }
 
 #[derive(Default)]
 pub struct Tokens {
-    inner: Vec<Vec<Token>>,
+    inner: Vec<TokenLine>,
+    producer: TokensType,
 }
 
 impl Tokens {
+    pub fn cached_render(
+        &mut self,
+        line_idx: usize,
+        max_digits: usize,
+        content: &str,
+        buf: &mut Buffer,
+        area: ratatui::prelude::Rect,
+    ) -> bool {
+        self.inner
+            .get_mut(line_idx)
+            .map(|token_line| token_line.render_ref(content, line_idx, max_digits, area, buf))
+            .is_some()
+    }
+
     /// set full token request
     pub fn tokens_reset(
         &mut self,
@@ -66,6 +48,10 @@ impl Tokens {
         theme: &Theme,
         content: &[String],
     ) {
+        if tokens.is_empty() {
+            return;
+        }
+        self.producer = TokensType::LSP;
         self.inner.clear();
         let mut line_idx = 0;
         let mut char_idx = 0;
@@ -75,11 +61,12 @@ impl Tokens {
             if token.delta_line != 0 {
                 char_idx = 0;
                 len = 0;
-                self.insert_line(line_idx, std::mem::take(&mut token_line));
+                self.insert_line(line_idx, std::mem::take(&mut token_line), &content[line_idx]);
                 line_idx += token.delta_line as usize;
             };
             let from = char_idx + token.delta_start as usize;
-            if from.saturating_sub(char_idx + len) > 3 {
+            let to = from + token.length as usize;
+            if from - to > 3 {
                 content.get(line_idx).and_then(|line| line.get(char_idx + len..from)).inspect(|snippet| {
                     Token::enrich(char_idx, lang, theme, snippet, &mut token_line);
                 });
@@ -89,11 +76,11 @@ impl Tokens {
                 Some(word) => legend.parse_to_color(token.token_type as usize, theme, lang, word),
                 None => theme.default,
             };
-            token_line.push(Token { from, len, token_type: color });
+            token_line.push(Token { from, to, len, token_type: color });
             char_idx = from;
         }
         if !token_line.is_empty() {
-            self.insert_line(line_idx, token_line);
+            self.insert_line(line_idx, token_line, &content[line_idx]);
         };
     }
 
@@ -115,12 +102,13 @@ impl Tokens {
                 char_idx = 0;
                 line_idx += token.delta_line as usize;
             };
-            let mut token_line = self.get_line(line_idx);
+            let token_line = self.get_or_create_line(line_idx);
             let from = char_idx + token.delta_start as usize;
+            let to = from + token.length as usize;
             // enriches the tokens with additinal highlights
             if from.saturating_sub(char_idx + len) > 3 {
-                content.get(line_idx).and_then(|line| line.get(char_idx + len..from)).inspect(|snippet| {
-                    Token::enrich(char_idx, lang, theme, snippet, &mut token_line);
+                content[line_idx].get(char_idx + len..from).inspect(|snippet| {
+                    Token::enrich(char_idx, lang, theme, snippet, &mut token_line.tokens);
                 });
             };
             len = token.length as usize;
@@ -128,9 +116,51 @@ impl Tokens {
                 Some(word) => legend.parse_to_color(token.token_type as usize, theme, lang, word),
                 None => theme.default,
             };
-            token_line.push(Token { from, len, token_type });
+            token_line.tokens.push(Token { from, to, len, token_type });
+            token_line.build_cache(&content[line_idx]);
             char_idx = from;
         }
+    }
+
+    pub fn set_diagnostics(&mut self, diagnostics: Vec<(usize, DiagnosticLine)>) {
+        for token_line in self.inner.iter_mut() {
+            token_line.diagnosics.clear();
+        }
+        for (line_idx, diagnostics) in diagnostics.into_iter() {
+            self.get_or_create_line(line_idx).diagnosics.extend(diagnostics.data.into_iter());
+        }
+    }
+
+    pub fn set_diagnositc_errors(&mut self, diagnostics: Vec<(usize, DiagnosticLine)>) {
+        for token_line in self.inner.iter_mut() {
+            token_line.diagnosics.clear();
+        }
+        for (line_idx, mut diagnostic) in diagnostics.into_iter() {
+            diagnostic.drop_non_errs();
+            if diagnostic.data.is_empty() {
+                continue;
+            }
+            self.get_or_create_line(line_idx).diagnosics.extend(diagnostic.data.into_iter());
+        }
+    }
+
+    pub fn diagnostic_info(&self, line_idx: usize, lang: &Lang) -> DiagnosticInfo {
+        let mut info = DiagnosticInfo::default();
+        if let Some(token_line) = self.get(line_idx) {
+            let mut buffer = Vec::new();
+            for diagnostic in token_line.diagnosics.iter() {
+                info.messages.push(diagnostic.message.clone());
+                if let Some(actions) = lang.derive_diagnostic_actions(diagnostic.info.as_ref()) {
+                    for action in actions {
+                        buffer.push(action.clone());
+                    }
+                }
+            }
+            if !buffer.is_empty() {
+                info.actions.replace(buffer);
+            }
+        }
+        info
     }
 
     pub fn is_empty(&self) -> bool {
@@ -172,33 +202,32 @@ impl Tokens {
         self.clear_lines(meta.start_line, meta.to);
     }
 
-    /// getter for lsp line (Vec)
-    pub fn get(&self, index: usize) -> Option<&Vec<Token>> {
+    pub fn get(&self, index: usize) -> Option<&TokenLine> {
         let tokens = self.inner.get(index)?;
         if tokens.is_empty() {
             return None;
         };
-        Some(tokens)
+        Some(&tokens)
     }
 
     fn insert_empty(&mut self, idx: usize) {
         while idx > self.inner.len() {
-            self.inner.push(Vec::new());
+            self.inner.push(TokenLine::default());
         }
-        self.inner.insert(idx, Vec::new());
+        self.inner.insert(idx, TokenLine::default());
     }
 
-    fn get_line(&mut self, idx: usize) -> &mut Vec<Token> {
+    fn get_or_create_line(&mut self, idx: usize) -> &mut TokenLine {
         while idx + 1 > self.inner.len() {
-            self.inner.push(Vec::new());
+            self.inner.push(TokenLine::default());
         }
         &mut self.inner[idx]
     }
 
-    fn insert_line(&mut self, idx: usize, tokens: Vec<Token>) {
+    fn insert_line(&mut self, idx: usize, tokens: Vec<Token>, content: &str) {
         while idx > self.inner.len() {
-            self.inner.push(Vec::new());
+            self.inner.push(TokenLine::default());
         }
-        self.inner.insert(idx, tokens);
+        self.inner.insert(idx, TokenLine::new(tokens, content));
     }
 }

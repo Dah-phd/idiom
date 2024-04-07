@@ -59,7 +59,11 @@ impl LSP {
         // sending init requests
         stdin.write_all(LSPRequest::<Initialize>::init_request()?.stringify()?.as_bytes()).await?;
         stdin.flush().await?;
-        let capabilities = from_value::<InitializeResult>(json_rpc.next::<LSPMessage>().await?.unwrap()?)?.capabilities;
+        let mut init_response = json_rpc.next::<LSPMessage>().await?;
+        while !matches!(init_response, LSPMessage::Response(..)) {
+            init_response = json_rpc.next().await?;
+        }
+        let capabilities = from_value::<InitializeResult>(init_response.unwrap()?)?.capabilities;
 
         // starting response handler
         let lsp_json_handler = tokio::task::spawn(async move {

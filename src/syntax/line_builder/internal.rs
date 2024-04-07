@@ -1,4 +1,4 @@
-use super::{context::LineBuilderContext, diagnostics::DiagnosticLine, LineBuilder};
+use super::{context::LineBuilderContext, LineBuilder};
 use core::iter::Peekable;
 use core::str::CharIndices;
 use ratatui::{
@@ -25,9 +25,8 @@ pub fn generic_line(
     }
     let mut buf = SpanBuffer::new(buffer, builder.theme.selected);
     let mut chars = content.char_indices().peekable();
-    let diagnostic = builder.diagnostics.get(&idx);
     while let Some((idx, ch)) = chars.next() {
-        if buf.handled_edgecases(idx, ch, diagnostic, builder, ctx) {
+        if buf.handled_edgecases(idx, ch, builder, ctx) {
             continue;
         }
         match ch {
@@ -38,11 +37,11 @@ pub fn generic_line(
                     buf.update_fg(builder.theme.key_words);
                 } else if builder.lang.is_import(buf.token_buffer.as_str()) {
                     buf.update_fg(builder.theme.key_words);
-                    buf.push_reset(idx, ch, Color::Reset, diagnostic, ctx);
-                    import_handler(builder, &mut chars, &mut buf, diagnostic, ctx);
+                    buf.push_reset(idx, ch, Color::Reset, ctx);
+                    import_handler(builder, &mut chars, &mut buf, ctx);
                     break;
                 }
-                buf.push_reset(idx, ch, Color::Reset, diagnostic, ctx);
+                buf.push_reset(idx, ch, Color::Reset, ctx);
             }
             ':' => {
                 if matches!(chars.peek(), Some((.., next_ch)) if &':' == next_ch) {
@@ -50,72 +49,71 @@ pub fn generic_line(
                 } else if builder.lang.is_keyword(buf.token_buffer.as_str()) {
                     buf.update_fg(builder.theme.key_words);
                 }
-                buf.push_reset(idx, ch, Color::Reset, diagnostic, ctx);
+                buf.push_reset(idx, ch, Color::Reset, ctx);
             }
             '"' => {
                 buf.str_open = true;
-                buf.push_reset(idx, ch, builder.theme.string, diagnostic, ctx);
+                buf.push_reset(idx, ch, builder.theme.string, ctx);
             }
-            '\'' => buf.handle_lifetime_apostrophe(idx, ch, builder, ctx, diagnostic),
+            '\'' => buf.handle_lifetime_apostrophe(idx, ch, builder, ctx),
             '!' => {
                 buf.update_fg(builder.theme.key_words);
                 let color = if buf.token_buffer.is_empty() { Color::Reset } else { builder.theme.key_words };
-                buf.push_reset(idx, ch, color, diagnostic, ctx);
+                buf.push_reset(idx, ch, color, ctx);
             }
             '(' => {
                 if let Some(first) = buf.token_buffer.chars().next() {
                     let tc = if first.is_uppercase() { builder.theme.key_words } else { builder.theme.functions };
                     buf.update_fg(tc);
                 }
-                buf.push(idx, ch, ctx.brackets.open_round(), diagnostic, ctx);
+                buf.push(idx, ch, ctx.brackets.open_round(), ctx);
                 buf.last_reset = idx + 1;
             }
-            ')' => buf.push_reset(idx, ch, ctx.brackets.close_round(), diagnostic, ctx),
-            '{' => buf.push_reset(idx, ch, ctx.brackets.open_curly(), diagnostic, ctx),
-            '}' => buf.push_reset(idx, ch, ctx.brackets.close_curly(), diagnostic, ctx),
-            '[' => buf.push_reset(idx, ch, ctx.brackets.open_square(), diagnostic, ctx),
-            ']' => buf.push_reset(idx, ch, ctx.brackets.close_square(), diagnostic, ctx),
+            ')' => buf.push_reset(idx, ch, ctx.brackets.close_round(), ctx),
+            '{' => buf.push_reset(idx, ch, ctx.brackets.open_curly(), ctx),
+            '}' => buf.push_reset(idx, ch, ctx.brackets.close_curly(), ctx),
+            '[' => buf.push_reset(idx, ch, ctx.brackets.open_square(), ctx),
+            ']' => buf.push_reset(idx, ch, ctx.brackets.close_square(), ctx),
             _ => {
                 if ch.is_numeric() {
-                    buf.push(idx, ch, builder.theme.numeric, diagnostic, ctx);
+                    buf.push(idx, ch, builder.theme.numeric, ctx);
                     buf.last_reset = idx + 1;
                 } else if ch.is_uppercase() && buf.token_buffer.is_empty() {
-                    buf.push(idx, ch, builder.theme.class_or_struct, diagnostic, ctx);
+                    buf.push(idx, ch, builder.theme.class_or_struct, ctx);
                     buf.is_class = true;
                 } else {
-                    buf.push_token(idx, ch, builder.theme.default, diagnostic, ctx);
+                    buf.push_token(idx, ch, builder.theme.default, ctx);
                 }
             }
         }
     }
-    ctx.format_with_info(idx, diagnostic, buf.buffer)
+    ctx.format_with_info(idx, None, buf.buffer)
 }
 
 fn import_handler(
     builder: &LineBuilder,
     content: &mut Peekable<CharIndices>,
     buf: &mut SpanBuffer,
-    diagnostic: Option<&DiagnosticLine>,
     ctx: &mut LineBuilderContext,
 ) {
     for (idx, ch) in content {
         match ch {
-            '(' => buf.push_reset(idx, ch, ctx.brackets.open_round(), diagnostic, ctx),
-            ')' => buf.push_reset(idx, ch, ctx.brackets.close_round(), diagnostic, ctx),
-            '{' => buf.push_reset(idx, ch, ctx.brackets.open_curly(), diagnostic, ctx),
-            '}' => buf.push_reset(idx, ch, ctx.brackets.close_curly(), diagnostic, ctx),
-            '[' => buf.push_reset(idx, ch, ctx.brackets.open_square(), diagnostic, ctx),
-            ']' => buf.push_reset(idx, ch, ctx.brackets.close_square(), diagnostic, ctx),
+            '(' => buf.push_reset(idx, ch, ctx.brackets.open_round(), ctx),
+            ')' => buf.push_reset(idx, ch, ctx.brackets.close_round(), ctx),
+            '{' => buf.push_reset(idx, ch, ctx.brackets.open_curly(), ctx),
+            '}' => buf.push_reset(idx, ch, ctx.brackets.close_curly(), ctx),
+            '[' => buf.push_reset(idx, ch, ctx.brackets.open_square(), ctx),
+            ']' => buf.push_reset(idx, ch, ctx.brackets.close_square(), ctx),
             _ => {
                 if ch.is_alphabetic() || ch == '_' {
-                    buf.push_token(idx, ch, builder.theme.imports, diagnostic, ctx);
+                    buf.push_token(idx, ch, builder.theme.imports, ctx);
                 } else {
                     if builder.lang.is_import(buf.token_buffer.as_str())
                         || builder.lang.is_keyword(buf.token_buffer.as_str())
                     {
                         buf.update_fg(builder.theme.key_words);
                     };
-                    buf.push_reset(idx, ch, Color::Reset, diagnostic, ctx);
+                    buf.push_reset(idx, ch, Color::Reset, ctx);
                 }
             }
         }
@@ -140,53 +138,25 @@ impl<'a> SpanBuffer<'a> {
         Self { last_reset: buffer.len(), buffer, last_char: '\n', select_color, ..Default::default() }
     }
 
-    fn push(
-        &mut self,
-        idx: usize,
-        ch: char,
-        color: Color,
-        diagnostic: Option<&DiagnosticLine>,
-        ctx: &LineBuilderContext,
-    ) {
-        self.buffer.push(Span::styled(ch.to_string(), self.build_style(idx, color, diagnostic, ctx)));
+    fn push(&mut self, idx: usize, ch: char, color: Color, ctx: &LineBuilderContext) {
+        self.buffer.push(Span::styled(ch.to_string(), self.build_style(idx, color, ctx)));
         self.last_char = ch;
     }
 
-    fn push_reset(
-        &mut self,
-        idx: usize,
-        ch: char,
-        color: Color,
-        diagnostic: Option<&DiagnosticLine>,
-        ctx: &LineBuilderContext,
-    ) {
-        self.push(idx, ch, color, diagnostic, ctx);
+    fn push_reset(&mut self, idx: usize, ch: char, color: Color, ctx: &LineBuilderContext) {
+        self.push(idx, ch, color, ctx);
         self.token_buffer.clear();
         self.last_reset = idx + 1;
     }
 
-    fn push_token(
-        &mut self,
-        idx: usize,
-        ch: char,
-        color: Color,
-        diagnostic: Option<&DiagnosticLine>,
-        ctx: &LineBuilderContext,
-    ) {
-        self.push(idx, ch, color, diagnostic, ctx);
+    fn push_token(&mut self, idx: usize, ch: char, color: Color, ctx: &LineBuilderContext) {
+        self.push(idx, ch, color, ctx);
         self.token_buffer.push(ch);
     }
 
-    fn handled_edgecases(
-        &mut self,
-        idx: usize,
-        ch: char,
-        diagnostic: Option<&DiagnosticLine>,
-        builder: &LineBuilder,
-        ctx: &LineBuilderContext,
-    ) -> bool {
+    fn handled_edgecases(&mut self, idx: usize, ch: char, builder: &LineBuilder, ctx: &LineBuilderContext) -> bool {
         if self.str_open {
-            self.push(idx, ch, builder.theme.string, diagnostic, ctx);
+            self.push(idx, ch, builder.theme.string, ctx);
             if ch == '"' {
                 self.str_open = false;
                 self.last_reset = idx + 1;
@@ -194,7 +164,7 @@ impl<'a> SpanBuffer<'a> {
             return true;
         }
         if self.chr_open {
-            self.push(idx, ch, builder.theme.string, diagnostic, ctx);
+            self.push(idx, ch, builder.theme.string, ctx);
             if ch == '\'' {
                 self.chr_open = false;
                 self.last_reset = idx + 1;
@@ -203,14 +173,14 @@ impl<'a> SpanBuffer<'a> {
         }
         if self.is_class {
             if ch.is_alphabetic() || ch == '_' || ch == '-' {
-                self.push(idx, ch, builder.theme.class_or_struct, diagnostic, ctx);
+                self.push(idx, ch, builder.theme.class_or_struct, ctx);
                 return true;
             }
             self.is_class = false;
         }
         if self.is_keyword {
             if ch.is_alphabetic() || ch == '_' {
-                self.push(idx, ch, builder.theme.key_words, diagnostic, ctx);
+                self.push(idx, ch, builder.theme.key_words, ctx);
                 return true;
             }
             self.is_keyword = false;
@@ -218,20 +188,13 @@ impl<'a> SpanBuffer<'a> {
         false
     }
 
-    fn handle_lifetime_apostrophe(
-        &mut self,
-        idx: usize,
-        ch: char,
-        builder: &LineBuilder,
-        ctx: &LineBuilderContext,
-        diagnostic: Option<&DiagnosticLine>,
-    ) {
+    fn handle_lifetime_apostrophe(&mut self, idx: usize, ch: char, builder: &LineBuilder, ctx: &LineBuilderContext) {
         if self.last_char != '<' && self.last_char != '&' {
             self.chr_open = true;
-            self.push_reset(idx, ch, builder.theme.string, diagnostic, ctx);
+            self.push_reset(idx, ch, builder.theme.string, ctx);
         } else {
             self.is_keyword = true;
-            self.push_reset(idx, ch, builder.theme.key_words, diagnostic, ctx);
+            self.push_reset(idx, ch, builder.theme.key_words, ctx);
         };
     }
 
@@ -241,17 +204,8 @@ impl<'a> SpanBuffer<'a> {
         }
     }
 
-    fn build_style(
-        &self,
-        idx: usize,
-        color: Color,
-        diagnostic: Option<&DiagnosticLine>,
-        ctx: &LineBuilderContext,
-    ) -> Style {
+    fn build_style(&self, idx: usize, color: Color, ctx: &LineBuilderContext) -> Style {
         let mut style = Style { fg: Some(color), ..Default::default() };
-        if let Some(diagnostic) = diagnostic {
-            diagnostic.set_diagnostic_style(idx, &mut style);
-        }
         if matches!(&ctx.select_range, Some(range) if range.contains(&idx)) {
             style.bg.replace(self.select_color);
         }

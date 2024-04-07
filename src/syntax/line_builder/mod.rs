@@ -1,4 +1,7 @@
 use crate::global_state::GlobalState;
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::widgets::WidgetRef;
 mod context;
 mod diagnostics;
 mod internal;
@@ -40,10 +43,8 @@ pub fn init_buffer_with_line_number(line_idx: usize, line_number_offset: usize) 
 pub struct LineBuilder {
     pub theme: Theme,
     pub lang: Lang,
-    file_was_saved: bool,
     legend: Legend,
     tokens: Tokens,
-    diagnostics: HashMap<usize, DiagnosticLine>,
     diagnostic_processor: fn(&mut Self, Vec<(usize, DiagnosticLine)>),
 }
 
@@ -52,23 +53,19 @@ impl LineBuilder {
         Self {
             theme: gs.unwrap_default_result(Theme::new(), "theme.json: "),
             lang,
-            file_was_saved: true,
             legend: Legend::default(),
             tokens: Tokens::default(),
-            diagnostics: HashMap::new(),
             diagnostic_processor: diagnostics_full,
         }
     }
 
     /// alternate diagnostic representation on save
     pub fn mark_saved(&mut self) {
-        self.file_was_saved = true;
         self.diagnostic_processor = diagnostics_full;
     }
 
     /// Process Diagnostic notification from LSP
     pub fn set_diganostics(&mut self, diagnostics: Vec<(usize, DiagnosticLine)>) {
-        self.diagnostics.clear();
         (self.diagnostic_processor)(self, diagnostics);
     }
 
@@ -98,14 +95,6 @@ impl LineBuilder {
         content: &[String],
         client: &mut LSPClient,
     ) -> Option<LSPResponseType> {
-        if self.file_was_saved {
-            // remove warnings on change after save
-            self.file_was_saved = false;
-            self.diagnostic_processor = diagnostics_error;
-            for (_, data) in self.diagnostics.iter_mut() {
-                data.drop_non_errs();
-            }
-        }
         if self.tokens.is_empty() {
             // ensures that there is fully mapped tokens before doing normal processing
             client.file_did_change(path, version, events.drain(..).map(|(_, edit)| edit).collect()).ok()?;
@@ -134,8 +123,8 @@ impl LineBuilder {
     }
 
     /// gets possible actions from diagnostic data
-    pub fn collect_diagnostic_info(&self, line: usize) -> Option<DiagnosticInfo> {
-        self.diagnostics.get(&line).map(|d_line| d_line.collect_info(&self.lang))
+    pub fn collect_diagnostic_info(&self, line_idx: usize) -> Option<DiagnosticInfo> {
+        Some(self.tokens.diagnostic_info(line_idx, &self.lang))
     }
 
     /// Maps token styles
@@ -147,25 +136,31 @@ impl LineBuilder {
 
     /// build styled line with diagnostic - reverts to native builder if tokens are not available
     pub fn build_line(
-        &self,
+        &mut self,
         line_idx: usize,
         content: &str,
         line_number_offset: usize,
+        buf: &mut Buffer,
+        area: ratatui::prelude::Rect,
         ctx: &mut LineBuilderContext,
-    ) -> Vec<Span<'static>> {
+    ) {
         ctx.build_select_buffer(line_idx, content.len());
         if content.is_empty() {
             let mut buffer = init_buffer_with_line_number(line_idx, line_number_offset);
             if ctx.select_range.is_some() {
                 buffer.push(Span::styled(" ", Style { bg: Some(self.theme.selected), ..Default::default() }));
             };
-            return ctx.format_with_info(line_idx, None, buffer);
+            return Line::from(ctx.format_with_info(line_idx, None, buffer)).render_ref(area, buf);
         }
-        match self.lsp_line(line_idx, content, line_number_offset, ctx) {
-            Some(line) => line,
-            None => {
-                generic_line(self, line_idx, content, ctx, init_buffer_with_line_number(line_idx, line_number_offset))
-            }
+        if !self.lsp_line(line_idx, line_number_offset, content, buf, area, ctx) {
+            Line::from(generic_line(
+                self,
+                line_idx,
+                content,
+                ctx,
+                init_buffer_with_line_number(line_idx, line_number_offset),
+            ))
+            .render_ref(area, buf);
         }
     }
 
@@ -175,61 +170,66 @@ impl LineBuilder {
     }
 
     pub fn split_line(
-        &self,
+        &mut self,
         line_idx: usize,
         content: &str,
         line_number_offset: usize,
         ctx: &mut LineBuilderContext,
     ) -> Vec<Line<'static>> {
-        let mut buffer = self.build_line(line_idx, content, line_number_offset, ctx);
-        let padding = derive_wrap_digit_offset(buffer.first());
-        let mut lines = vec![Line::from(buffer.drain(..ctx.text_width + 1).collect::<Vec<_>>())];
-        while buffer.len() > ctx.text_width {
-            let mut line = vec![padding.clone()];
-            line.extend(buffer.drain(..ctx.text_width));
-            lines.push(Line::from(line));
-        }
-        buffer.insert(0, padding);
-        lines.push(Line::from(buffer));
-        lines
+        todo!()
+        // let mut buffer = self.build_line(line_idx, content, line_number_offset, ctx);
+        // let padding = derive_wrap_digit_offset(buffer.first());
+        // let mut lines = vec![Line::from(buffer.drain(..ctx.text_width + 1).collect::<Vec<_>>())];
+        // while buffer.len() > ctx.text_width {
+        // let mut line = vec![padding.clone()];
+        // line.extend(buffer.drain(..ctx.text_width));
+        // lines.push(Line::from(line));
+        // }
+        // buffer.insert(0, padding);
+        // lines.push(Line::from(buffer));
+        // lines
     }
 
     fn lsp_line(
-        &self,
+        &mut self,
         line_idx: usize,
-        content: &str,
         max_digits: usize,
+        content: &str,
+        buf: &mut Buffer,
+        area: Rect,
         ctx: &mut LineBuilderContext,
-    ) -> Option<Vec<Span<'static>>> {
-        let token_line = self.tokens.get(line_idx)?;
-        let mut buffer = init_buffer_with_line_number(line_idx, max_digits);
-        let mut style = Style::default();
-        let mut remaining_word_len: usize = 0;
-        let mut token_num = 0;
-        let diagnostic = self.diagnostics.get(&line_idx);
-        for (char_idx, ch) in content.char_indices() {
-            remaining_word_len = remaining_word_len.saturating_sub(1);
-            if remaining_word_len == 0 {
-                match token_line.get(token_num) {
-                    Some(token) if token.from == char_idx => {
-                        remaining_word_len = token.len;
-                        style.fg = Some(token.token_type);
-                        token_num += 1;
+    ) -> bool {
+        if ctx.select_range.is_none() && ctx.cursor.line != line_idx {
+            return self.tokens.cached_render(line_idx, max_digits, content, buf, area);
+        };
+        if let Some(token_line) = self.tokens.get(line_idx) {
+            let mut buffer = init_buffer_with_line_number(line_idx, max_digits);
+            let mut style = Style::default();
+            let mut remaining_word_len: usize = 0;
+            let mut token_num = 0;
+            for (char_idx, ch) in content.char_indices() {
+                remaining_word_len = remaining_word_len.saturating_sub(1);
+                if remaining_word_len == 0 {
+                    match token_line.tokens.get(token_num) {
+                        Some(token) if token.from == char_idx => {
+                            remaining_word_len = token.len;
+                            style.fg = Some(token.token_type);
+                            token_num += 1;
+                        }
+                        _ => style.fg = None,
                     }
-                    _ => style.fg = None,
                 }
+                if matches!(&ctx.select_range, Some(range) if range.contains(&char_idx)) {
+                    style.bg.replace(self.theme.selected);
+                }
+                buffer.push(Span::styled(ch.to_string(), ctx.brackets.map_style(ch, style)));
+                style.add_modifier = Modifier::empty();
+                style.bg = None;
             }
-            if let Some(diagnostic) = diagnostic {
-                diagnostic.set_diagnostic_style(char_idx, &mut style);
-            }
-            if matches!(&ctx.select_range, Some(range) if range.contains(&char_idx)) {
-                style.bg.replace(self.theme.selected);
-            }
-            buffer.push(Span::styled(ch.to_string(), ctx.brackets.map_style(ch, style)));
-            style.add_modifier = Modifier::empty();
-            style.bg = None;
+            Line::from(ctx.format_with_info(line_idx, Some(&token_line.diagnosics), buffer)).render_ref(area, buf);
+            return true;
         }
-        Some(ctx.format_with_info(line_idx, diagnostic, buffer))
+        false
     }
 }
 

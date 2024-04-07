@@ -1,3 +1,4 @@
+use ratatui::buffer::Buffer;
 mod line_builder;
 mod modal;
 pub mod theme;
@@ -131,11 +132,18 @@ impl Lexer {
         }
     }
 
-    pub fn build_line(&self, line_idx: usize, text: &str, ctx: &mut LineBuilderContext) -> Line<'static> {
-        self.line_builder.build_line(line_idx, text, self.line_number_offset, ctx).into()
+    pub fn build_line(
+        &mut self,
+        line_idx: usize,
+        text: &str,
+        ctx: &mut LineBuilderContext,
+        buf: &mut Buffer,
+        area: Rect,
+    ) {
+        self.line_builder.build_line(line_idx, text, self.line_number_offset, buf, area, ctx);
     }
 
-    pub fn split_line(&self, line_idx: usize, text: &str, ctx: &mut LineBuilderContext) -> Vec<Line<'static>> {
+    pub fn split_line(&mut self, line_idx: usize, text: &str, ctx: &mut LineBuilderContext) -> Vec<Line<'static>> {
         self.line_builder.split_line(line_idx, text, self.line_number_offset, ctx)
     }
 
@@ -271,6 +279,9 @@ impl Lexer {
         };
         if let Some(client) = self.lsp_client.as_mut() {
             self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
+            if let Some(id) = client.request_full_tokens(&self.path) {
+                self.requests.push(LSPResponseType::Tokens(id));
+            }
         };
     }
 

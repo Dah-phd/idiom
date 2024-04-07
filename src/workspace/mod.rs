@@ -58,8 +58,7 @@ impl Workspace {
     pub fn render(&mut self, frame: &mut Frame, gs: &mut GlobalState) {
         if let Some(editor) = self.editors.get_mut(0) {
             editor.sync(gs);
-            let ref_widget: &Editor = editor;
-            frame.render_widget_ref(ref_widget, gs.editor_area);
+            editor.render_ref(gs.editor_area, frame.buffer_mut());
             editor.lexer.render_modal_if_exist(frame, gs.editor_area, &editor.cursor);
             let titles: Vec<_> = self.editors.iter().map(|e| e.display.to_owned()).collect();
             let tabs = Tabs::new(titles).style(self.tab_style).highlight_style(TAB_HIGHTLIGHT).select(0);

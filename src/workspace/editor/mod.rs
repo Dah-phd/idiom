@@ -11,11 +11,7 @@ use crate::{
     },
 };
 use lsp_types::TextEdit;
-use ratatui::{
-    buffer::Buffer,
-    layout::Rect,
-    widgets::{Widget, WidgetRef},
-};
+use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
 use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 use std::{
     cmp::Ordering,
@@ -39,8 +35,24 @@ pub struct Editor {
     content: Vec<String>,
 }
 
-impl WidgetRef for &Editor {
-    fn render_ref(&self, area: Rect, buf: &mut Buffer) {
+impl Editor {
+    pub fn from_path(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> std::io::Result<Self> {
+        let content = std::fs::read_to_string(&path)?;
+        let file_type = FileType::derive_type(&path);
+        let display = build_display(&path);
+        Ok(Self {
+            lexer: Lexer::with_context(file_type, &path, gs),
+            cursor: Cursor::default(),
+            actions: Actions::new(cfg.get_indent_cfg(&file_type)),
+            content: content.split('\n').map(String::from).collect(),
+            file_type,
+            display,
+            timestamp: last_modified(&path),
+            path,
+        })
+    }
+
+    pub fn render_ref(&mut self, area: Rect, buf: &mut Buffer) {
         let mut ctx = LineBuilderContext::from(&self.cursor);
         let x = area.left();
         let mut y = area.top();
@@ -78,29 +90,11 @@ impl WidgetRef for &Editor {
                 };
             } else {
                 // handle normal lines
-                self.lexer.build_line(line_idx, text, &mut ctx).render(Rect::new(x, y, area.width, 1), buf);
+                self.lexer.build_line(line_idx, text, &mut ctx, buf, Rect::new(x, y, area.width, 1));
                 y += 1;
             };
             remining_lines -= 1;
         }
-    }
-}
-
-impl Editor {
-    pub fn from_path(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> std::io::Result<Self> {
-        let content = std::fs::read_to_string(&path)?;
-        let file_type = FileType::derive_type(&path);
-        let display = build_display(&path);
-        Ok(Self {
-            lexer: Lexer::with_context(file_type, &path, gs),
-            cursor: Cursor::default(),
-            actions: Actions::new(cfg.get_indent_cfg(&file_type)),
-            content: content.split('\n').map(String::from).collect(),
-            file_type,
-            display,
-            timestamp: last_modified(&path),
-            path,
-        })
     }
 
     pub fn sync(&mut self, gs: &mut GlobalState) {

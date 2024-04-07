@@ -1,4 +1,3 @@
-use super::Lang;
 use crate::global_state::WorkspaceEvent;
 use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
 
@@ -86,23 +85,6 @@ impl DiagnosticLine {
         None
     }
 
-    pub fn collect_info(&self, lang: &Lang) -> DiagnosticInfo {
-        let mut info = DiagnosticInfo::default();
-        let mut buffer = Vec::new();
-        for diagnostic in self.data.iter() {
-            info.messages.push(diagnostic.message.clone());
-            if let Some(actions) = lang.derive_diagnostic_actions(diagnostic.info.as_ref()) {
-                for action in actions {
-                    buffer.push(action.clone());
-                }
-            }
-        }
-        if !buffer.is_empty() {
-            info.actions.replace(buffer);
-        }
-        info
-    }
-
     pub fn drop_non_errs(&mut self) {
         self.data.retain(|d| d.inline_span.style.fg == Some(ERR_COLOR));
     }
@@ -153,12 +135,10 @@ impl From<Diagnostic> for DiagnosticLine {
 }
 
 pub fn diagnostics_error(builder: &mut LineBuilder, diagnostics: Vec<(usize, DiagnosticLine)>) {
-    builder.diagnostics.extend(diagnostics.into_iter().map(|(idx, mut line)| {
-        line.drop_non_errs();
-        (idx, line)
-    }));
+    builder.tokens.set_diagnositc_errors(diagnostics);
 }
 
 pub fn diagnostics_full(builder: &mut LineBuilder, diagnostics: Vec<(usize, DiagnosticLine)>) {
-    builder.diagnostics.extend(diagnostics);
+    builder.tokens.set_diagnostics(diagnostics);
+    builder.diagnostic_processor = diagnostics_error;
 }
