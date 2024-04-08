@@ -25,6 +25,16 @@ pub struct Tokens {
 }
 
 impl Tokens {
+    pub fn new(content: &[String], lang: &Lang, theme: &Theme) -> Self {
+        let mut new = Self::default();
+        for snippet in content.iter() {
+            let mut token_buf = Vec::new();
+            Token::parse(lang, theme, snippet, &mut token_buf);
+            new.inner.push(TokenLine::new(token_buf, snippet));
+        }
+        new
+    }
+
     pub fn cached_render(
         &mut self,
         line_idx: usize,
@@ -76,7 +86,7 @@ impl Tokens {
                 Some(word) => legend.parse_to_color(token.token_type as usize, theme, lang, word),
                 None => theme.default,
             };
-            token_line.push(Token { from, to, len, token_type: color });
+            token_line.push(Token { from, to, len, color });
             char_idx = from;
         }
         if !token_line.is_empty() {
@@ -116,7 +126,7 @@ impl Tokens {
                 Some(word) => legend.parse_to_color(token.token_type as usize, theme, lang, word),
                 None => theme.default,
             };
-            token_line.tokens.push(Token { from, to, len, token_type });
+            token_line.tokens.push(Token { from, to, len, color: token_type });
             token_line.build_cache(&content[line_idx]);
             char_idx = from;
         }
@@ -163,23 +173,6 @@ impl Tokens {
         info
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.inner.is_empty()
-    }
-
-    /// drop tokens in range
-    pub fn clear_lines(&mut self, from: usize, count: usize) {
-        for token_line in self.inner.iter_mut().skip(from).take(count) {
-            token_line.clear();
-        }
-    }
-
-    pub fn remove(&mut self, index: usize) {
-        if index < self.inner.len() {
-            self.inner.remove(index);
-        }
-    }
-
     /// handle EditMetaData when using tokens from LSP
     pub fn map_meta_data(&mut self, meta: EditMetaData) {
         match meta.from.cmp(&meta.to) {
@@ -202,19 +195,16 @@ impl Tokens {
         self.clear_lines(meta.start_line, meta.to);
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
     pub fn get(&self, index: usize) -> Option<&TokenLine> {
         let tokens = self.inner.get(index)?;
         if tokens.is_empty() {
             return None;
         };
         Some(&tokens)
-    }
-
-    fn insert_empty(&mut self, idx: usize) {
-        while idx > self.inner.len() {
-            self.inner.push(TokenLine::default());
-        }
-        self.inner.insert(idx, TokenLine::default());
     }
 
     fn get_or_create_line(&mut self, idx: usize) -> &mut TokenLine {
@@ -224,10 +214,30 @@ impl Tokens {
         &mut self.inner[idx]
     }
 
-    fn insert_line(&mut self, idx: usize, tokens: Vec<Token>, content: &str) {
+    fn insert_empty(&mut self, idx: usize) {
         while idx > self.inner.len() {
             self.inner.push(TokenLine::default());
         }
-        self.inner.insert(idx, TokenLine::new(tokens, content));
+        self.inner.insert(idx, TokenLine::default());
+    }
+
+    fn insert_line(&mut self, line_idx: usize, tokens: Vec<Token>, content: &str) {
+        while line_idx > self.inner.len() {
+            self.inner.push(TokenLine::default());
+        }
+        self.inner.insert(line_idx, TokenLine::new(tokens, content));
+    }
+
+    /// drop tokens in range
+    pub fn clear_lines(&mut self, from: usize, count: usize) {
+        for token_line in self.inner.iter_mut().skip(from).take(count) {
+            token_line.clear();
+        }
+    }
+
+    pub fn remove(&mut self, line_idx: usize) {
+        if line_idx < self.inner.len() {
+            self.inner.remove(line_idx);
+        }
     }
 }

@@ -11,7 +11,7 @@ mod tokens;
 use super::modal::LSPResponseType;
 use crate::{lsp::LSPClient, syntax::Theme, workspace::actions::EditMetaData};
 pub use context::LineBuilderContext;
-use diagnostics::{diagnostics_error, diagnostics_full};
+use diagnostics::diagnostics_full;
 pub use diagnostics::{Action, DiagnosticInfo, DiagnosticLine};
 use internal::generic_line;
 pub use langs::Lang;
@@ -23,7 +23,7 @@ use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
 };
-use std::{collections::HashMap, path::Path};
+use std::path::Path;
 use tokens::Tokens;
 
 /// !the initial len of the line produced by init_buffer_with_line_number
@@ -49,12 +49,13 @@ pub struct LineBuilder {
 }
 
 impl LineBuilder {
-    pub fn new(lang: Lang, gs: &mut GlobalState) -> Self {
+    pub fn new(lang: Lang, content: &[String], gs: &mut GlobalState) -> Self {
+        let theme = gs.unwrap_default_result(Theme::new(), "theme.json: ");
         Self {
-            theme: gs.unwrap_default_result(Theme::new(), "theme.json: "),
+            tokens: Tokens::new(content, &lang, &theme),
+            theme,
             lang,
             legend: Legend::default(),
-            tokens: Tokens::default(),
             diagnostic_processor: diagnostics_full,
         }
     }
@@ -213,7 +214,7 @@ impl LineBuilder {
                     match token_line.tokens.get(token_num) {
                         Some(token) if token.from == char_idx => {
                             remaining_word_len = token.len;
-                            style.fg = Some(token.token_type);
+                            style.fg = Some(token.color);
                             token_num += 1;
                         }
                         _ => style.fg = None,

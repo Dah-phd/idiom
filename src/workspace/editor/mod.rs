@@ -37,14 +37,14 @@ pub struct Editor {
 
 impl Editor {
     pub fn from_path(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> std::io::Result<Self> {
-        let content = std::fs::read_to_string(&path)?;
+        let content: Vec<_> = std::fs::read_to_string(&path)?.split('\n').map(String::from).collect();
         let file_type = FileType::derive_type(&path);
         let display = build_display(&path);
         Ok(Self {
-            lexer: Lexer::with_context(file_type, &path, gs),
+            lexer: Lexer::with_context(file_type, &path, &content, gs),
+            content,
             cursor: Cursor::default(),
             actions: Actions::new(cfg.get_indent_cfg(&file_type)),
-            content: content.split('\n').map(String::from).collect(),
             file_type,
             display,
             timestamp: last_modified(&path),

@@ -32,9 +32,9 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn with_context(file_type: FileType, path: &Path, gs: &mut GlobalState) -> Self {
+    pub fn with_context(file_type: FileType, path: &Path, content: &[String], gs: &mut GlobalState) -> Self {
         Self {
-            line_builder: LineBuilder::new(file_type.into(), gs),
+            line_builder: LineBuilder::new(file_type.into(), content, gs),
             modal: None,
             path: path.into(),
             requests: Vec::new(),

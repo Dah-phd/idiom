@@ -13,7 +13,7 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
     let path = PathBuf::from("");
     let mut gs = GlobalState::new(80, 120);
     Editor {
-        lexer: Lexer::with_context(ft, &path, &mut gs),
+        lexer: Lexer::with_context(ft, &path, &content, &mut gs),
         file_type: ft,
         display: "".to_string(),
         path,

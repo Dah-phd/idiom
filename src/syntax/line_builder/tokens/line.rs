@@ -74,21 +74,3 @@ impl TokenLine {
         self.cache.clear();
     }
 }
-
-struct LineNumber {
-    idx: usize,
-    max_digits: usize,
-    span: Span<'static>,
-}
-
-impl LineNumber {
-    fn new(idx: usize, max_digits: usize) -> Self {
-        let span = Span::styled(format!("{: >1$} ", idx + 1, max_digits), DIGIT_STYLE);
-        Self { idx, max_digits, span }
-    }
-
-    fn span(&self, idx: usize, max_digits: usize) -> &Span<'static> {
-        if idx != self.idx && max_digits != self.max_digits {}
-        &self.span
-    }
-}
