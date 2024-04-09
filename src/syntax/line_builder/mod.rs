@@ -123,6 +123,24 @@ impl LineBuilder {
         }
     }
 
+    pub fn update_internals(
+        &mut self,
+        events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
+        content: &[String],
+    ) {
+        match events.len() {
+            0 => {}
+            1 => {
+                let (meta, _edit) = events.remove(0);
+                self.tokens.map_meta_internal(meta, content, &self.lang, &self.theme);
+            }
+            _ => {
+                self.tokens.rebuild_internals(content, &self.lang, &self.theme);
+                events.clear();
+            }
+        }
+    }
+
     /// gets possible actions from diagnostic data
     pub fn collect_diagnostic_info(&self, line_idx: usize) -> Option<DiagnosticInfo> {
         Some(self.tokens.diagnostic_info(line_idx, &self.lang))

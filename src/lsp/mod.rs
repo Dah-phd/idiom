@@ -43,7 +43,7 @@ pub struct LSP {
 
 impl LSP {
     pub async fn new(lsp_cmd: String) -> Result<Self> {
-        // return Err(anyhow!("disabled"));
+        return Err(anyhow!("disabled"));
         let mut server = servers::server_cmd(&lsp_cmd)?;
         let mut inner = server.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::piped()).spawn()?;
 

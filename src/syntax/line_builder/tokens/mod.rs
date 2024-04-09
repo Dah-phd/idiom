@@ -35,6 +35,15 @@ impl Tokens {
         new
     }
 
+    pub fn rebuild_internals(&mut self, content: &[String], lang: &Lang, theme: &Theme) {
+        self.inner.clear();
+        for snippet in content.iter() {
+            let mut token_buf = Vec::new();
+            Token::parse(lang, theme, snippet, &mut token_buf);
+            self.inner.push(TokenLine::new(token_buf, snippet));
+        }
+    }
+
     pub fn cached_render(
         &mut self,
         line_idx: usize,
@@ -195,6 +204,27 @@ impl Tokens {
         self.clear_lines(meta.start_line, meta.to);
     }
 
+    pub fn map_meta_internal(&mut self, meta: EditMetaData, content: &[String], lang: &Lang, theme: &Theme) {
+        match meta.from.cmp(&meta.to) {
+            Ordering::Equal => {}
+            Ordering::Greater => {
+                let mut lines_to_remove = meta.from - meta.to;
+                while lines_to_remove != 0 {
+                    self.remove(meta.start_line);
+                    lines_to_remove -= 1;
+                }
+            }
+            Ordering::Less => {
+                let mut lines_to_add = meta.to - meta.from;
+                while lines_to_add != 0 {
+                    self.insert_empty(meta.start_line);
+                    lines_to_add -= 1;
+                }
+            }
+        }
+        self.rebuild_lines(meta.start_line, meta.to, lang, theme, content);
+    }
+
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
@@ -232,6 +262,15 @@ impl Tokens {
     pub fn clear_lines(&mut self, from: usize, count: usize) {
         for token_line in self.inner.iter_mut().skip(from).take(count) {
             token_line.clear();
+        }
+    }
+
+    pub fn rebuild_lines(&mut self, from: usize, count: usize, lang: &Lang, theme: &Theme, content: &[String]) {
+        for (line_idx, token_line) in self.inner.iter_mut().enumerate().skip(from).take(count) {
+            token_line.clear();
+            let code_line = &content[line_idx];
+            Token::parse(lang, theme, code_line, &mut token_line.tokens);
+            token_line.build_cache(code_line);
         }
     }
 

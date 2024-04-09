@@ -123,13 +123,15 @@ impl Lexer {
         events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
         content: &[String],
     ) {
-        if let Some(client) = self.lsp_client.as_mut() {
-            if let Some(request) = self.line_builder.collect_changes(&self.path, version, events, content, client) {
-                self.requests.push(request);
-            }
+        if let Some(request) = self
+            .lsp_client
+            .as_mut()
+            .and_then(|client| self.line_builder.collect_changes(&self.path, version, events, content, client))
+        {
+            self.requests.push(request);
         } else {
-            events.clear();
-        }
+            self.line_builder.update_internals(events, content);
+        };
     }
 
     pub fn build_line(
