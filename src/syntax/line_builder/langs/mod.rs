@@ -15,14 +15,16 @@ type DiagnosticHandler = Option<fn(&Lang, &Vec<DiagnosticRelatedInformation>) ->
 #[derive(Debug, Clone, Default)]
 pub struct Lang {
     pub file_type: FileType,
-    pub comment_start: Vec<&'static str>,
-    pub declaration: Vec<&'static str>,
-    pub key_words: Vec<&'static str>,
-    pub flow_control: Vec<&'static str>,
-    pub mod_import: Vec<&'static str>,
-    pub completion_data_handler: Option<fn(&Self, Value, gs: &mut GlobalState)>,
-    pub diagnostic_handler: DiagnosticHandler,
-    pub lang_specific_handler: LangSpecificHandler,
+    comment_start: Vec<&'static str>,
+    declaration: Vec<&'static str>,
+    key_words: Vec<&'static str>,
+    flow_control: Vec<&'static str>,
+    mod_import: Vec<&'static str>,
+    string_markers: &'static str,
+    escape_chars: &'static str,
+    completion_data_handler: Option<fn(&Self, Value, gs: &mut GlobalState)>,
+    diagnostic_handler: DiagnosticHandler,
+    lang_specific_handler: LangSpecificHandler,
 }
 
 impl Lang {
@@ -38,8 +40,14 @@ impl Lang {
         self.mod_import.contains(&token)
     }
 
-    pub fn is_string(&self, token: &str) -> bool {
-        token.starts_with('"') && token.ends_with('"') || token.starts_with('\'') && token.ends_with('\'')
+    pub fn is_string_mark(&self, ch: char, prev_ch: Option<char>) -> bool {
+        if self.string_markers.contains(ch) {
+            if let Some(prev_ch) = prev_ch {
+                return !self.escape_chars.contains(prev_ch);
+            };
+            return true;
+        };
+        false
     }
 
     pub fn is_comment(&self, line: &str) -> bool {
@@ -110,6 +118,7 @@ impl From<FileType> for Lang {
                 }),
                 diagnostic_handler: Some(rust_process_related_info),
                 lang_specific_handler: Some(rust_specific_handler),
+                string_markers: "\"",
                 ..Default::default()
             },
             FileType::Python => Self {
@@ -122,6 +131,7 @@ impl From<FileType> for Lang {
                     "match",
                 ],
                 mod_import: vec!["import", "from", "as"],
+                string_markers: "\"'",
                 ..Default::default()
             },
             FileType::MarkDown => Self {

@@ -31,7 +31,7 @@ pub fn generic_line(
         }
         match ch {
             ' ' | '.' | '<' | '>' | '?' | '&' | '=' | '+' | '-' | ',' | ';' | '|' => {
-                if builder.lang.flow_control.contains(&buf.token_buffer.as_str()) {
+                if builder.lang.is_flow(&buf.token_buffer.as_str()) {
                     buf.update_fg(builder.theme.flow_control);
                 } else if builder.lang.is_keyword(buf.token_buffer.as_str()) {
                     buf.update_fg(builder.theme.key_words);

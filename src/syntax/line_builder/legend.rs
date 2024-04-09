@@ -26,7 +26,7 @@ impl Legend {
     pub fn parse_to_color(&self, token_type: usize, theme: &Theme, lang: &Lang, word: &str) -> Color {
         match self.legend.get(token_type) {
             Some(ColorResult::KeyWord) => {
-                if lang.flow_control.contains(&word) {
+                if lang.is_flow(word) {
                     return theme.flow_control;
                 }
                 theme.key_words

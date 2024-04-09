@@ -47,14 +47,14 @@ impl Token {
         let mut char_idx = 0;
         let mut is_import = false;
         for ch in snippet.chars() {
-            if ch.is_alphabetic() || "_\"'".contains(ch) {
+            if ch.is_alphabetic() || ch == '_' {
                 last_word.push(ch);
                 continue;
             };
             if last_word.is_empty() {
                 char_idx += 1;
                 continue;
-            }
+            };
             let token_base = std::mem::take(&mut last_word);
             let len = token_base.len();
             if is_import {
