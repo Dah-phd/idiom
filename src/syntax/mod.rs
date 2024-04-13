@@ -17,7 +17,7 @@ use line_builder::LineBuilder;
 pub use line_builder::LineBuilderContext;
 use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent};
 use modal::{LSPModal, LSPResponseType, LSPResult, ModalMessage};
-use ratatui::{layout::Rect, text::Line, Frame};
+use ratatui::{layout::Rect, Frame};
 use std::path::{Path, PathBuf};
 use theme::Theme;
 
@@ -145,8 +145,20 @@ impl Lexer {
         self.line_builder.build_line(line_idx, text, self.line_number_offset, buf, area, ctx);
     }
 
-    pub fn split_line(&mut self, line_idx: usize, text: &str, ctx: &mut LineBuilderContext) -> Vec<Line<'static>> {
-        self.line_builder.split_line(line_idx, text, self.line_number_offset, ctx)
+    pub fn build_long_line(&mut self, line_idx: usize, text: &str, buf: &mut Buffer, area: Rect) {
+        self.line_builder.long_line(line_idx, text, self.line_number_offset, buf, area);
+    }
+
+    pub fn wrap_line(
+        &mut self,
+        line_idx: usize,
+        text: &str,
+        ctx: &mut LineBuilderContext,
+        buf: &mut Buffer,
+        max_lines: usize,
+        x: u16,
+    ) -> (u16, usize) {
+        self.line_builder.wrap_line(line_idx, text, self.line_number_offset, buf, x, max_lines, ctx)
     }
 
     pub fn render_modal_if_exist(&mut self, frame: &mut Frame, area: Rect, cursor: &Cursor) {

@@ -2,6 +2,7 @@ use super::DiagnosticInfo;
 use super::DiagnosticLine;
 use crate::syntax::line_builder::{Lang, Legend};
 use ratatui::buffer::Buffer;
+use ratatui::style::Style;
 mod line;
 mod token;
 use crate::syntax::theme::Theme;
@@ -9,7 +10,7 @@ use crate::workspace::actions::EditMetaData;
 use line::TokenLine;
 use lsp_types::SemanticToken;
 use std::cmp::Ordering;
-use token::Token;
+pub use token::Token;
 
 #[derive(Default)]
 enum TokensType {
@@ -58,6 +59,33 @@ impl Tokens {
             .is_some()
     }
 
+    pub fn tokens_reset_(
+        &mut self,
+        tokens: Vec<SemanticToken>,
+        legend: &Legend,
+        lang: &Lang,
+        theme: &Theme,
+        content: &[String],
+    ) {
+        if tokens.is_empty() {
+            return;
+        };
+        let old_diagnostics: Vec<_> = std::mem::take(&mut self.inner)
+            .into_iter()
+            .enumerate()
+            .flat_map(|(idx, token_line)| {
+                if token_line.diagnosics.is_empty() {
+                    return None;
+                };
+                Some((idx, token_line.diagnosics))
+            })
+            .collect();
+        self.tokens_reset(tokens, legend, lang, theme, content);
+        for (idx, diagnostics) in old_diagnostics.into_iter() {
+            self.get_or_create_line(idx).set_diagnostics(diagnostics);
+        }
+    }
+
     /// set full token request
     pub fn tokens_reset(
         &mut self,
@@ -95,7 +123,7 @@ impl Tokens {
                 Some(word) => legend.parse_to_color(token.token_type as usize, theme, lang, word),
                 None => theme.default,
             };
-            token_line.push(Token { from, to, len, color });
+            token_line.push(Token { from, to, len, color: Style::new().fg(color) });
             char_idx = from;
         }
         if !token_line.is_empty() {
@@ -135,7 +163,7 @@ impl Tokens {
                 Some(word) => legend.parse_to_color(token.token_type as usize, theme, lang, word),
                 None => theme.default,
             };
-            token_line.tokens.push(Token { from, to, len, color: token_type });
+            token_line.tokens.push(Token { from, to, len, color: Style::new().fg(token_type) });
             token_line.build_cache(&content[line_idx]);
             char_idx = from;
         }
@@ -143,10 +171,10 @@ impl Tokens {
 
     pub fn set_diagnostics(&mut self, diagnostics: Vec<(usize, DiagnosticLine)>) {
         for token_line in self.inner.iter_mut() {
-            token_line.diagnosics.clear();
+            token_line.clear_diagnostic();
         }
         for (line_idx, diagnostics) in diagnostics.into_iter() {
-            self.get_or_create_line(line_idx).diagnosics.extend(diagnostics.data.into_iter());
+            self.get_or_create_line(line_idx).set_diagnostics(diagnostics.data);
         }
     }
 
@@ -225,8 +253,8 @@ impl Tokens {
         self.rebuild_lines(meta.start_line, meta.to, lang, theme, content);
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.inner.is_empty()
+    pub fn are_from_lsp(&self) -> bool {
+        matches!(self.producer, TokensType::LSP)
     }
 
     pub fn get(&self, index: usize) -> Option<&TokenLine> {
@@ -234,7 +262,15 @@ impl Tokens {
         if tokens.is_empty() {
             return None;
         };
-        Some(&tokens)
+        Some(tokens)
+    }
+
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut TokenLine> {
+        let tokens = self.inner.get_mut(index)?;
+        if tokens.is_empty() {
+            return None;
+        };
+        Some(tokens)
     }
 
     fn get_or_create_line(&mut self, idx: usize) -> &mut TokenLine {

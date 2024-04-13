@@ -73,9 +73,9 @@ impl LineBuilder {
     /// Process SemanticTokensResultFull from LSP
     pub fn set_tokens(&mut self, tokens_res: SemanticTokensResult, content: &[String]) -> bool {
         if let SemanticTokensResult::Tokens(tokens) = tokens_res {
-            self.tokens.tokens_reset(tokens.data, &self.legend, &self.lang, &self.theme, content);
+            self.tokens.tokens_reset_(tokens.data, &self.legend, &self.lang, &self.theme, content);
         }
-        !self.tokens.is_empty()
+        self.tokens.are_from_lsp()
     }
 
     /// Process SemanticTokenRangeResult from LSP
@@ -96,7 +96,7 @@ impl LineBuilder {
         content: &[String],
         client: &mut LSPClient,
     ) -> Option<LSPResponseType> {
-        if self.tokens.is_empty() {
+        if self.tokens.are_from_lsp() {
             // ensures that there is fully mapped tokens before doing normal processing
             client.file_did_change(path, version, events.drain(..).map(|(_, edit)| edit).collect()).ok()?;
             return client.request_full_tokens(path).map(LSPResponseType::Tokens);
@@ -160,7 +160,7 @@ impl LineBuilder {
         content: &str,
         line_number_offset: usize,
         buf: &mut Buffer,
-        area: ratatui::prelude::Rect,
+        area: Rect,
         ctx: &mut LineBuilderContext,
     ) {
         ctx.build_select_buffer(line_idx, content.len());
@@ -188,13 +188,50 @@ impl LineBuilder {
         generic_line(self, usize::MAX, content, ctx, buffer)
     }
 
-    pub fn split_line(
+    pub fn long_line(
         &mut self,
         line_idx: usize,
         content: &str,
         line_number_offset: usize,
+        buf: &mut Buffer,
+        area: Rect,
+    ) {
+        if let Some(token_line) = self.tokens.get_mut(line_idx) {
+            token_line.render_shrinked_ref(content, line_idx, line_number_offset, area, buf);
+        };
+    }
+
+    pub fn wrap_line(
+        &mut self,
+        line_idx: usize,
+        content: &str,
+        line_number_offset: usize,
+        buf: &mut Buffer,
+        x: u16,
+        mut max_lines: usize,
         ctx: &mut LineBuilderContext,
-    ) -> Vec<Line<'static>> {
+    ) -> (u16, usize) {
+        let token_line = match self.tokens.get_mut(line_idx) {
+            Some(token_line) => token_line,
+            None => return (x, max_lines),
+        };
+        max_lines -= 1;
+        let rel_line_with_cursor = ctx.cursor.char / ctx.text_width;
+        let mut wrapped = token_line.wrap(ctx, content);
+        // let wrapped_lines = rel_line_with_cursor.saturating_sub(max_lines);
+        // wrapped_line_start(skip_lines, wrapped.next()).render(Rect::new(x, y, area.width, 1), buf);
+        // if remining_lines == 0 {
+        // return;
+        // };
+        // y += 1;
+        // for split_line in wrapped.skip(skip_lines) {
+        // split_line.render(Rect::new(x, y, area.width, 1), buf);
+        // remining_lines -= 1;
+        // if remining_lines == 0 {
+        // return;
+        // };
+        // y += 1;
+        // }
         todo!()
         // let mut buffer = self.build_line(line_idx, content, line_number_offset, ctx);
         // let padding = derive_wrap_digit_offset(buffer.first());
@@ -223,7 +260,7 @@ impl LineBuilder {
         };
         if let Some(token_line) = self.tokens.get(line_idx) {
             let mut buffer = init_buffer_with_line_number(line_idx, max_digits);
-            let mut style = Style::default();
+            let mut style = Style::new();
             let mut remaining_word_len: usize = 0;
             let mut token_num = 0;
             for (char_idx, ch) in content.char_indices() {
@@ -232,7 +269,7 @@ impl LineBuilder {
                     match token_line.tokens.get(token_num) {
                         Some(token) if token.from == char_idx => {
                             remaining_word_len = token.len;
-                            style.fg = Some(token.color);
+                            style.fg = token.color.fg;
                             token_num += 1;
                         }
                         _ => style.fg = None,

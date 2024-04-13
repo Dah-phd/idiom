@@ -3,7 +3,6 @@ use crate::{
     global_state::GlobalState,
     syntax::Lexer,
     syntax::LineBuilderContext,
-    widgests::{wrapped_line_start, LINE_CONTINIUES},
     workspace::{
         actions::Actions,
         cursor::{Cursor, CursorPosition},
@@ -11,7 +10,7 @@ use crate::{
     },
 };
 use lsp_types::TextEdit;
-use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
+use ratatui::{buffer::Buffer, layout::Rect};
 use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 use std::{
     cmp::Ordering,
@@ -64,29 +63,27 @@ impl Editor {
             if text.len() > self.cursor.text_width {
                 // handle wrapped lines
                 if self.cursor.line != line_idx {
-                    let mut line = self.lexer.split_line(line_idx, text, &mut ctx).into_iter().next().unwrap();
-                    line.spans.pop();
-                    line.spans.push(LINE_CONTINIUES);
-                    line.render(Rect::new(x, y, area.width, 1), buf);
+                    self.lexer.build_long_line(line_idx, text, buf, Rect::new(x, y, area.width, 1));
                     y += 1;
                 } else {
-                    remining_lines -= 1;
-                    let rel_line_with_cursor = self.cursor.char / self.cursor.text_width;
-                    let skip_lines = rel_line_with_cursor.saturating_sub(remining_lines);
-                    let mut wrapped = self.lexer.split_line(line_idx, text, &mut ctx).into_iter();
-                    wrapped_line_start(skip_lines, wrapped.next()).render(Rect::new(x, y, area.width, 1), buf);
-                    if remining_lines == 0 {
-                        return;
-                    };
-                    y += 1;
-                    for split_line in wrapped.skip(skip_lines) {
-                        split_line.render(Rect::new(x, y, area.width, 1), buf);
-                        remining_lines -= 1;
-                        if remining_lines == 0 {
-                            return;
-                        };
-                        y += 1;
-                    }
+                    (y, remining_lines) = self.lexer.wrap_line(line_idx, text, &mut ctx, buf, remining_lines, x);
+                    // remining_lines -= 1;
+                    // let rel_line_with_cursor = self.cursor.char / self.cursor.text_width;
+                    // let skip_lines = rel_line_with_cursor.saturating_sub(remining_lines);
+                    // let mut wrapped = self.lexer.split_line(line_idx, text, &mut ctx).into_iter();
+                    // wrapped_line_start(skip_lines, wrapped.next()).render(Rect::new(x, y, area.width, 1), buf);
+                    // if remining_lines == 0 {
+                    // return;
+                    // };
+                    // y += 1;
+                    // for split_line in wrapped.skip(skip_lines) {
+                    // split_line.render(Rect::new(x, y, area.width, 1), buf);
+                    // remining_lines -= 1;
+                    // if remining_lines == 0 {
+                    // return;
+                    // };
+                    // y += 1;
+                    // }
                 };
             } else {
                 // handle normal lines

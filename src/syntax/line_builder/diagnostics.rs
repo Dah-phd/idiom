@@ -1,4 +1,5 @@
 use crate::global_state::WorkspaceEvent;
+use crate::syntax::line_builder::tokens::Token;
 use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
 
 use super::LineBuilder;
@@ -67,6 +68,22 @@ impl DiagnosticData {
             info,
         }
     }
+
+    pub fn check_token(&self, token: &mut Token) {
+        match self.end {
+            Some(end) => {
+                if self.start <= token.from && token.to <= end {
+                    token.color.underline_color = self.inline_span.style.fg;
+                    token.color.add_modifier = Modifier::UNDERLINED;
+                }
+            }
+            None if self.start <= token.from => {
+                token.color.underline_color = self.inline_span.style.fg;
+                token.color.add_modifier = Modifier::UNDERLINED;
+            }
+            _ => {}
+        }
+    }
 }
 
 pub struct DiagnosticLine {
@@ -74,26 +91,8 @@ pub struct DiagnosticLine {
 }
 
 impl DiagnosticLine {
-    pub fn check_ranges(&self, idx: usize) -> Option<Color> {
-        for data in self.data.iter() {
-            match data.end {
-                Some(end_idx) if (data.start..end_idx).contains(&idx) => return data.inline_span.style.fg,
-                None if idx >= data.start => return data.inline_span.style.fg,
-                _ => {}
-            }
-        }
-        None
-    }
-
     pub fn drop_non_errs(&mut self) {
         self.data.retain(|d| d.inline_span.style.fg == Some(ERR_COLOR));
-    }
-
-    pub fn set_diagnostic_style(&self, idx: usize, style: &mut Style) {
-        if let Some(color) = self.check_ranges(idx) {
-            style.add_modifier = style.add_modifier.union(Modifier::UNDERLINED);
-            style.underline_color.replace(color);
-        }
     }
 
     pub fn append(&mut self, d: Diagnostic) {
