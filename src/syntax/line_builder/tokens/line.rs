@@ -1,5 +1,5 @@
 use crate::syntax::line_builder::{diagnostics::DiagnosticData, tokens::Token};
-use crate::syntax::LineBuilderContext;
+use crate::syntax::{LineBuilderContext, Theme};
 use crate::widgests::LINE_CONTINIUES;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -15,20 +15,25 @@ pub struct TokenLine {
     pub tokens: Vec<Token>,
     pub cache: Vec<Span<'static>>,
     pub diagnosics: Vec<DiagnosticData>,
+    is_rend: bool,
 }
 
 impl TokenLine {
     pub fn new(tokens: Vec<Token>, content: &str) -> Self {
-        let mut line = Self { tokens, cache: Vec::new(), diagnosics: Vec::new() };
+        let mut line = Self { tokens, cache: Vec::new(), diagnosics: Vec::new(), is_rend: false };
         line.build_cache(content);
         line
     }
 
     pub fn render_ref(&mut self, content: &str, line_idx: usize, max_digits: usize, area: Rect, buf: &mut Buffer) {
+        if self.is_rend {
+            return;
+        }
         if self.cache.is_empty() {
             self.build_cache(content);
         }
         self.cached_render(area, buf, line_idx, max_digits);
+        self.is_rend = true;
     }
 
     pub fn render_shrinked_ref(
@@ -62,24 +67,6 @@ impl TokenLine {
             span.render_ref(span_area, buf);
             x = next_x;
         }
-    }
-
-    pub fn wrap(&mut self, ctx: &mut LineBuilderContext, content: &str) -> WrappedLine<'_> {
-        if self.cache.is_empty() {
-            self.build_cache(content);
-        }
-        let mut len = 1;
-        let mut current_width = 0;
-        let mut relative_cursor = 0;
-        let mut cursor_char = ctx.cursor.char;
-        for span in self.cache.iter() {
-            current_width += span.content.len();
-            if current_width > ctx.text_width {
-                current_width = 0;
-                len += 1;
-            };
-        }
-        WrappedLine { len, relative_cursor, cursor_char, width: ctx.text_width, at_wrap: 0, inner: &self.cache }
     }
 
     pub fn cached_render(&self, area: Rect, buf: &mut Buffer, line_idx: usize, max_digits: usize) {
@@ -119,6 +106,38 @@ impl TokenLine {
         };
     }
 
+    pub fn build_spans(
+        &self,
+        content: &str,
+        theme: &Theme,
+        mut buf: Vec<Span<'static>>,
+        ctx: &mut LineBuilderContext,
+    ) -> Vec<Span<'static>> {
+        let mut style = Style::new();
+        let mut remaining_word_len: usize = 0;
+        let mut token_num = 0;
+        for (char_idx, ch) in content.char_indices() {
+            remaining_word_len = remaining_word_len.saturating_sub(1);
+            if remaining_word_len == 0 {
+                match self.tokens.get(token_num) {
+                    Some(token) if token.from == char_idx => {
+                        remaining_word_len = token.len;
+                        style.fg = token.color.fg;
+                        token_num += 1;
+                    }
+                    _ => style.fg = None,
+                }
+            }
+            if matches!(&ctx.select_range, Some(range) if range.contains(&char_idx)) {
+                style.bg.replace(theme.selected);
+            }
+            buf.push(Span::styled(ch.to_string(), ctx.brackets.map_style(ch, style)));
+            style.add_modifier = Modifier::empty();
+            style.bg = None;
+        }
+        buf
+    }
+
     pub fn set_diagnostics(&mut self, diagnostics: Vec<DiagnosticData>) {
         self.diagnosics.extend(diagnostics.into_iter());
         for dianostic in self.diagnosics.iter().rev() {
@@ -148,13 +167,4 @@ impl TokenLine {
         self.tokens.clear();
         self.cache.clear();
     }
-}
-
-pub struct WrappedLine<'a> {
-    pub len: usize,
-    relative_cursor: usize,
-    cursor_char: usize,
-    width: usize,
-    at_wrap: usize,
-    inner: &'a [Span<'static>],
 }

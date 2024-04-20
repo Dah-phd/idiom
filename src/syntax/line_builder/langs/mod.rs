@@ -71,7 +71,7 @@ impl Lang {
         self.diagnostic_handler.as_ref().and_then(|cb| (cb)(self, info?))
     }
 
-    pub fn completelable(&self, line: &str, idx: usize) -> bool {
+    pub fn completable(&self, line: &str, idx: usize) -> bool {
         let mut curr_token = String::new();
         let mut prev_token = String::new();
         let mut trigger = false;
@@ -91,7 +91,7 @@ impl Lang {
                 prev_token = std::mem::take(&mut curr_token);
             }
         }
-        false
+        trigger
     }
 }
 

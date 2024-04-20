@@ -157,8 +157,10 @@ impl Lexer {
         buf: &mut Buffer,
         max_lines: usize,
         x: u16,
+        y: u16,
+        width: u16,
     ) -> (u16, usize) {
-        self.line_builder.wrap_line(line_idx, text, self.line_number_offset, buf, x, max_lines, ctx)
+        self.line_builder.wrap_line(line_idx, text, self.line_number_offset, buf, x, y, width, max_lines, ctx)
     }
 
     pub fn render_modal_if_exist(&mut self, frame: &mut Frame, area: Rect, cursor: &Cursor) {
@@ -215,8 +217,8 @@ impl Lexer {
 
     pub fn should_autocomplete(&mut self, char_idx: usize, line: &str) -> bool {
         self.lsp_client.is_some()
-            && self.line_builder.lang.completelable(line, char_idx)
             && !matches!(self.modal, Some(LSPModal::AutoComplete(..)))
+            && self.line_builder.lang.completable(line, char_idx)
     }
 
     pub fn get_autocomplete(&mut self, c: CursorPosition, line: &str) {

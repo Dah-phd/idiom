@@ -1,6 +1,6 @@
 use super::ModalMessage;
 use crate::syntax::{
-    line_builder::{Action, DiagnosticInfo},
+    line_builder::{generic_line, Action, DiagnosticInfo},
     LineBuilder, LineBuilderContext,
 };
 use crate::{
@@ -191,9 +191,9 @@ impl From<DiagnosticInfo> for Info {
     }
 }
 
-fn parse_sig_info(info: SignatureInformation, line_buidlder: &LineBuilder, lines: &mut Vec<Line<'static>>) {
+fn parse_sig_info(info: SignatureInformation, builder: &LineBuilder, lines: &mut Vec<Line<'static>>) {
     let mut ctx = LineBuilderContext::default();
-    lines.push(Line::from(line_buidlder.basic_line(&info.label, &mut ctx)));
+    lines.push(Line::from(generic_line(builder, usize::MAX, &info.label, &mut ctx, Vec::new())));
     if let Some(text) = info.documentation {
         match text {
             Documentation::MarkupContent(c) => {
@@ -205,7 +205,7 @@ fn parse_sig_info(info: SignatureInformation, line_buidlder: &LineBuilder, lines
                             continue;
                         }
                         if is_code {
-                            lines.push(Line::from(line_buidlder.basic_line(line, &mut ctx)));
+                            lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
                         } else {
                             lines.push(Line::from(String::from(line)));
                         }
@@ -218,40 +218,40 @@ fn parse_sig_info(info: SignatureInformation, line_buidlder: &LineBuilder, lines
             }
             Documentation::String(s) => {
                 for line in s.lines() {
-                    lines.push(Line::from(line_buidlder.basic_line(line, &mut ctx)));
+                    lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
                 }
             }
         }
     }
 }
 
-fn parse_hover(hover: Hover, line_buidlder: &LineBuilder, lines: &mut Vec<Line<'static>>) {
+fn parse_hover(hover: Hover, builder: &LineBuilder, lines: &mut Vec<Line<'static>>) {
     match hover.contents {
         HoverContents::Array(arr) => {
             let mut ctx = LineBuilderContext::default();
             for value in arr {
                 for line in parse_markedstr(value).lines() {
-                    lines.push(Line::from(line_buidlder.basic_line(line, &mut ctx)));
+                    lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
                 }
             }
         }
         HoverContents::Markup(markup) => {
-            handle_markup(markup, line_buidlder, lines);
+            handle_markup(markup, builder, lines);
         }
         HoverContents::Scalar(value) => {
             let mut ctx = LineBuilderContext::default();
             for line in parse_markedstr(value).lines() {
-                lines.push(Line::from(line_buidlder.basic_line(line, &mut ctx)));
+                lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
             }
         }
     }
 }
 
-fn handle_markup(markup: lsp_types::MarkupContent, line_buidlder: &LineBuilder, lines: &mut Vec<Line<'static>>) {
+fn handle_markup(markup: lsp_types::MarkupContent, builder: &LineBuilder, lines: &mut Vec<Line<'static>>) {
     let mut ctx = LineBuilderContext::default();
     if !matches!(markup.kind, lsp_types::MarkupKind::Markdown) {
         for line in markup.value.lines() {
-            lines.push(Line::from(line_buidlder.basic_line(line, &mut ctx)));
+            lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
         }
         return;
     }
@@ -262,7 +262,7 @@ fn handle_markup(markup: lsp_types::MarkupContent, line_buidlder: &LineBuilder, 
             continue;
         }
         if is_code {
-            lines.push(Line::from(line_buidlder.basic_line(line, &mut ctx)));
+            lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
         } else if line.trim().starts_with('#') {
             lines.push(Line::from(Span::raw(line.to_owned()).bold()));
         } else {

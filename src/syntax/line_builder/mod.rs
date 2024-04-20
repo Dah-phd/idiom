@@ -1,26 +1,28 @@
-use crate::global_state::GlobalState;
-use ratatui::buffer::Buffer;
-use ratatui::layout::Rect;
-use ratatui::widgets::WidgetRef;
 mod context;
 mod diagnostics;
 mod internal;
 mod langs;
 mod legend;
 mod tokens;
-use super::modal::LSPResponseType;
-use crate::{lsp::LSPClient, syntax::Theme, workspace::actions::EditMetaData};
+
+use crate::{
+    global_state::GlobalState, lsp::LSPClient, syntax::modal::LSPResponseType, syntax::Theme,
+    widgests::wrapped_line_start, workspace::actions::EditMetaData,
+};
 pub use context::LineBuilderContext;
 use diagnostics::diagnostics_full;
 pub use diagnostics::{Action, DiagnosticInfo, DiagnosticLine};
-use internal::generic_line;
+pub use internal::generic_line;
 pub use langs::Lang;
 use legend::Legend;
 use lsp_types::{
     SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities, TextDocumentContentChangeEvent,
 };
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::widgets::{Widget, WidgetRef};
 use ratatui::{
-    style::{Color, Modifier, Style},
+    style::{Color, Style},
     text::{Line, Span},
 };
 use std::path::Path;
@@ -167,25 +169,14 @@ impl LineBuilder {
         if content.is_empty() {
             let mut buffer = init_buffer_with_line_number(line_idx, line_number_offset);
             if ctx.select_range.is_some() {
-                buffer.push(Span::styled(" ", Style { bg: Some(self.theme.selected), ..Default::default() }));
+                buffer.push(Span::styled(" ", Style::new().bg(self.theme.selected)));
             };
-            return Line::from(ctx.format_with_info(line_idx, None, buffer)).render_ref(area, buf);
+            Line::from(ctx.format_with_info(line_idx, None, buffer)).render_ref(area, buf);
         }
         if !self.lsp_line(line_idx, line_number_offset, content, buf, area, ctx) {
-            Line::from(generic_line(
-                self,
-                line_idx,
-                content,
-                ctx,
-                init_buffer_with_line_number(line_idx, line_number_offset),
-            ))
-            .render_ref(area, buf);
+            let init_buf = init_buffer_with_line_number(line_idx, line_number_offset);
+            Line::from(generic_line(self, line_idx, content, ctx, init_buf)).render_ref(area, buf);
         }
-    }
-
-    pub fn basic_line(&self, content: &str, ctx: &mut LineBuilderContext) -> Vec<Span<'static>> {
-        let buffer = Vec::new();
-        generic_line(self, usize::MAX, content, ctx, buffer)
     }
 
     pub fn long_line(
@@ -208,42 +199,57 @@ impl LineBuilder {
         line_number_offset: usize,
         buf: &mut Buffer,
         x: u16,
+        mut y: u16,
+        width: u16,
         mut max_lines: usize,
         ctx: &mut LineBuilderContext,
     ) -> (u16, usize) {
-        let token_line = match self.tokens.get_mut(line_idx) {
-            Some(token_line) => token_line,
-            None => return (x, max_lines),
-        };
         max_lines -= 1;
         let rel_line_with_cursor = ctx.cursor.char / ctx.text_width;
-        let mut wrapped = token_line.wrap(ctx, content);
-        // let wrapped_lines = rel_line_with_cursor.saturating_sub(max_lines);
-        // wrapped_line_start(skip_lines, wrapped.next()).render(Rect::new(x, y, area.width, 1), buf);
-        // if remining_lines == 0 {
-        // return;
-        // };
-        // y += 1;
-        // for split_line in wrapped.skip(skip_lines) {
-        // split_line.render(Rect::new(x, y, area.width, 1), buf);
-        // remining_lines -= 1;
-        // if remining_lines == 0 {
-        // return;
-        // };
-        // y += 1;
-        // }
-        todo!()
-        // let mut buffer = self.build_line(line_idx, content, line_number_offset, ctx);
-        // let padding = derive_wrap_digit_offset(buffer.first());
-        // let mut lines = vec![Line::from(buffer.drain(..ctx.text_width + 1).collect::<Vec<_>>())];
-        // while buffer.len() > ctx.text_width {
-        // let mut line = vec![padding.clone()];
-        // line.extend(buffer.drain(..ctx.text_width));
-        // lines.push(Line::from(line));
-        // }
-        // buffer.insert(0, padding);
-        // lines.push(Line::from(buffer));
-        // lines
+        let skip_lines = rel_line_with_cursor.saturating_sub(max_lines);
+        let mut buffer = self
+            .tokens
+            .get(line_idx)
+            .map(|token_line| {
+                token_line.build_spans(
+                    content,
+                    &self.theme,
+                    init_buffer_with_line_number(line_idx, line_number_offset),
+                    ctx,
+                )
+            })
+            .unwrap_or(generic_line(
+                self,
+                line_idx,
+                content,
+                ctx,
+                init_buffer_with_line_number(line_idx, line_number_offset),
+            ));
+        buffer = ctx.format_with_info(line_idx, None, buffer);
+        let padding = derive_wrap_digit_offset(buffer.first());
+        let mut lines = vec![Line::from(buffer.drain(..ctx.text_width + 1).collect::<Vec<_>>())];
+        while buffer.len() > ctx.text_width {
+            let mut line = vec![padding.clone()];
+            line.extend(buffer.drain(..ctx.text_width));
+            lines.push(Line::from(line));
+        }
+        buffer.insert(0, padding);
+        lines.push(Line::from(buffer));
+        let mut wrapped = lines.into_iter();
+        wrapped_line_start(skip_lines, wrapped.next()).render(Rect::new(x, y, width, 1), buf);
+        if max_lines == 0 {
+            return (y, max_lines);
+        };
+        y += 1;
+        for split_line in wrapped.skip(skip_lines) {
+            split_line.render(Rect::new(x, y, width, 1), buf);
+            max_lines -= 1;
+            if max_lines == 0 {
+                return (y, max_lines);
+            };
+            y += 1;
+        }
+        (y, max_lines)
     }
 
     fn lsp_line(
@@ -259,29 +265,8 @@ impl LineBuilder {
             return self.tokens.cached_render(line_idx, max_digits, content, buf, area);
         };
         if let Some(token_line) = self.tokens.get(line_idx) {
-            let mut buffer = init_buffer_with_line_number(line_idx, max_digits);
-            let mut style = Style::new();
-            let mut remaining_word_len: usize = 0;
-            let mut token_num = 0;
-            for (char_idx, ch) in content.char_indices() {
-                remaining_word_len = remaining_word_len.saturating_sub(1);
-                if remaining_word_len == 0 {
-                    match token_line.tokens.get(token_num) {
-                        Some(token) if token.from == char_idx => {
-                            remaining_word_len = token.len;
-                            style.fg = token.color.fg;
-                            token_num += 1;
-                        }
-                        _ => style.fg = None,
-                    }
-                }
-                if matches!(&ctx.select_range, Some(range) if range.contains(&char_idx)) {
-                    style.bg.replace(self.theme.selected);
-                }
-                buffer.push(Span::styled(ch.to_string(), ctx.brackets.map_style(ch, style)));
-                style.add_modifier = Modifier::empty();
-                style.bg = None;
-            }
+            let init_buf = init_buffer_with_line_number(line_idx, max_digits);
+            let buffer = token_line.build_spans(content, &self.theme, init_buf, ctx);
             Line::from(ctx.format_with_info(line_idx, Some(&token_line.diagnosics), buffer)).render_ref(area, buf);
             return true;
         }

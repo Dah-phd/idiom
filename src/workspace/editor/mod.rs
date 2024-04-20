@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use lsp_types::TextEdit;
-use ratatui::{buffer::Buffer, layout::Rect};
+use ratatui::{backend::CrosstermBackend, buffer::Buffer, layout::Rect};
 use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 use std::{
     cmp::Ordering,
@@ -66,7 +66,8 @@ impl Editor {
                     self.lexer.build_long_line(line_idx, text, buf, Rect::new(x, y, area.width, 1));
                     y += 1;
                 } else {
-                    (y, remining_lines) = self.lexer.wrap_line(line_idx, text, &mut ctx, buf, remining_lines, x);
+                    (y, remining_lines) =
+                        self.lexer.wrap_line(line_idx, text, &mut ctx, buf, remining_lines, x, y, area.width);
                     // remining_lines -= 1;
                     // let rel_line_with_cursor = self.cursor.char / self.cursor.text_width;
                     // let skip_lines = rel_line_with_cursor.saturating_sub(remining_lines);
