@@ -15,25 +15,20 @@ pub struct TokenLine {
     pub tokens: Vec<Token>,
     pub cache: Vec<Span<'static>>,
     pub diagnosics: Vec<DiagnosticData>,
-    is_rend: bool,
 }
 
 impl TokenLine {
     pub fn new(tokens: Vec<Token>, content: &str) -> Self {
-        let mut line = Self { tokens, cache: Vec::new(), diagnosics: Vec::new(), is_rend: false };
+        let mut line = Self { tokens, cache: Vec::new(), diagnosics: Vec::new() };
         line.build_cache(content);
         line
     }
 
     pub fn render_ref(&mut self, content: &str, line_idx: usize, max_digits: usize, area: Rect, buf: &mut Buffer) {
-        if self.is_rend {
-            return;
-        }
         if self.cache.is_empty() {
             self.build_cache(content);
         }
         self.cached_render(area, buf, line_idx, max_digits);
-        self.is_rend = true;
     }
 
     pub fn render_shrinked_ref(
