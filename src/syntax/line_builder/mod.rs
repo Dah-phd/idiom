@@ -14,12 +14,13 @@ pub use context::LineBuilderContext;
 use diagnostics::diagnostics_full;
 pub use diagnostics::{Action, DiagnosticInfo, DiagnosticLine};
 pub use langs::Lang;
-use legend::Legend;
+pub use legend::Legend;
 use lsp_types::{
     SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities, TextDocumentContentChangeEvent,
 };
 use ratatui::layout::Rect;
 use std::{io::Stdout, path::Path};
+pub use tokens::TokensType;
 use tokens::{set_tokens, Tokens};
 
 /// Struct used to create styled maps
@@ -84,7 +85,7 @@ impl LineBuilder {
         content: &[impl Line],
         client: &mut LSPClient,
     ) -> Option<LSPResponseType> {
-        if self.tokens.are_from_lsp() {
+        if !self.tokens.are_from_lsp() {
             // ensures that there is fully mapped tokens before doing normal processing
             client.file_did_change(path, version, events.drain(..).map(|(_, edit)| edit).collect()).ok()?;
             return client.request_full_tokens(path).map(LSPResponseType::Tokens);

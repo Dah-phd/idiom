@@ -62,6 +62,7 @@ impl Editor {
                 break;
             };
         }
+        // self.lexer.render_modal_if_exist(frame, gs.editor_area, &editor.cursor);
         self.cursor.render(&mut gs.writer, gs.editor_area, self.lexer.line_number_offset + 1)
     }
 
@@ -76,9 +77,11 @@ impl Editor {
                 break;
             };
         }
+        // self.lexer.render_modal_if_exist(frame, gs.editor_area, &editor.cursor);
         self.cursor.render(&mut gs.writer, gs.editor_area, self.lexer.line_number_offset + 1)
     }
 
+    #[inline]
     pub fn sync(&mut self, gs: &mut GlobalState) {
         self.actions.sync(&mut self.lexer, &self.content);
         self.lexer.context(&mut self.content, gs);

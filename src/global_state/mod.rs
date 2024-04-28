@@ -21,11 +21,10 @@ use controls::map_term;
 use crossterm::{
     cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show},
     event::{KeyEvent, MouseEvent},
-    execute,
+    execute, queue,
     style::{Attribute, Color, ContentStyle, PrintStyledContent, StyledContent},
 };
 pub use events::{FooterEvent, TreeEvent, WorkspaceEvent};
-use ratatui::{layout::Rect as RRect, Frame};
 use std::path::PathBuf;
 
 use self::draw::Components;
@@ -49,7 +48,8 @@ enum Mode {
     Insert,
 }
 
-type KeyMapCallback = fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool;
+type KeyMapCallback =
+    fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> std::io::Result<bool>;
 type MouseMapCallback = fn(&mut GlobalState, MouseEvent, &mut Tree, &mut Workspace);
 
 pub struct GlobalState {
@@ -65,39 +65,40 @@ pub struct GlobalState {
     pub tree: Vec<TreeEvent>,
     pub clipboard: Clipboard,
     pub exit: bool,
-    pub screen_rect: RRect,
+    pub screen_rect: Rect,
     pub tree_area: Rect,
-    pub tab_area: RRect,
+    pub tab_area: Rect,
     pub editor_area: Rect,
-    pub footer_area: RRect,
+    pub footer_area: Rect,
     components: Components,
 }
 
 impl GlobalState {
-    pub fn new(area: RRect, writer: std::io::Stdout) -> Self {
+    pub fn new() -> std::io::Result<Self> {
+        let screen_rect = crossterm::terminal::size()?.into();
         let mut new = Self {
             mode: Mode::default(),
             tree_size: 15,
             key_mapper: controls::map_tree,
             mouse_mapper: controls::mouse_handler,
             theme: UITheme::new().unwrap_or_default(),
-            writer,
+            writer: std::io::stdout(),
             popup: None,
             footer: Vec::default(),
             workspace: Vec::default(),
             tree: Vec::default(),
             clipboard: Clipboard::default(),
             exit: false,
-            screen_rect: RRect { height: area.height, width: area.width, ..Default::default() },
+            screen_rect,
             tree_area: Rect::default(),
-            tab_area: RRect::default(),
+            tab_area: Rect::default(),
             editor_area: Rect::default(),
-            footer_area: RRect::default(),
+            footer_area: Rect::default(),
             components: Components::default(),
         };
         new.recalc_draw_size();
         new.select_mode();
-        new
+        Ok(new)
     }
 
     pub fn map_key(
@@ -106,7 +107,7 @@ impl GlobalState {
         workspace: &mut Workspace,
         tree: &mut Tree,
         tmux: &mut EditorTerminal,
-    ) -> bool {
+    ) -> std::io::Result<bool> {
         (self.key_mapper)(self, event, workspace, tree, tmux)
     }
 
@@ -120,7 +121,7 @@ impl GlobalState {
         if !self.components.contains(Components::TREE) {
             self.recalc_draw_size();
         };
-        let move_to = MoveTo(self.footer_area.x, self.footer_area.y);
+        let move_to = MoveTo(self.footer_area.col, self.footer_area.row);
         let mut s = ContentStyle::new();
         s.foreground_color = Some(Color::Cyan);
         s.background_color = Some(self.theme.footer_background.into());
@@ -134,7 +135,7 @@ impl GlobalState {
         if !self.components.contains(Components::TREE) {
             self.recalc_draw_size();
         };
-        let move_to = MoveTo(self.footer_area.x, self.footer_area.y);
+        let move_to = MoveTo(self.footer_area.col, self.footer_area.row);
         let mut s = ContentStyle::new();
         s.foreground_color = Some(Color::Rgb { r: 255, g: 0, b: 0 });
         s.background_color = Some(self.theme.footer_background.into());
@@ -147,6 +148,14 @@ impl GlobalState {
             RestorePosition,
             Show,
         );
+    }
+
+    pub fn store_cursor(&mut self) -> std::io::Result<()> {
+        queue!(&mut self.writer, Hide, SavePosition)
+    }
+
+    pub fn restore_cursor(&mut self) -> std::io::Result<()> {
+        execute!(&mut self.writer, Show, RestorePosition)
     }
 
     pub fn is_insert(&self) -> bool {
@@ -220,11 +229,11 @@ impl GlobalState {
         }
     }
 
-    pub fn render_popup_if_exists(&mut self, frame: &mut Frame<'_>) {
-        if let Some(popup) = self.popup.as_mut() {
-            popup.render(frame)
-        }
-    }
+    // pub fn render_popup_if_exists(&mut self, frame: &mut Frame<'_>) {
+    //     if let Some(popup) = self.popup.as_mut() {
+    //         popup.render(frame)
+    //     }
+    // }
 
     pub fn map_popup_if_exists(&mut self, key: &KeyEvent) -> bool {
         if let Some(popup) = self.popup.as_mut() {
@@ -264,38 +273,21 @@ impl GlobalState {
     }
 
     pub fn full_resize(&mut self, height: u16, width: u16, workspace: &mut Workspace) {
-        self.screen_rect = RRect { height, width, ..Default::default() };
+        self.screen_rect = (width, height).into();
         self.recalc_draw_size();
         workspace.resize_render(self.editor_area.width as usize, self.editor_area.height as usize);
     }
 
     pub fn recalc_draw_size(&mut self) {
-        let free_screen = self.footer_rect_with_remainder();
-        let free_screen = self.tree_rect_with_remainder(free_screen);
-        let workspace_layout = draw::layot_tabs_editor(free_screen);
-        self.editor_area = Rect::rataui(workspace_layout[1]);
-        self.tab_area = workspace_layout[0];
-        self.workspace.push(WorkspaceEvent::Resize);
-    }
-
-    fn tree_rect_with_remainder(&mut self, free_scree: RRect) -> RRect {
+        self.tree_area = self.screen_rect.clone();
+        self.footer_area = self.tree_area.splitoff_rows(1);
         if matches!(self.mode, Mode::Select) || self.components.contains(Components::TREE) {
-            let tree_layout = draw::layout_tree(free_scree, self.tree_size);
-            self.tree_area = Rect::rataui(tree_layout[0]);
+            self.tab_area = self.tree_area.keep_col(50);
             self.tree_area.top_border();
-            self.tree_area.bot_border();
-            self.tree_area.left_border();
             self.tree_area.right_border();
             let _ = self.tree_area.draw_borders(Some(DOUBLE_BORDERS), Color::DarkGrey, &mut self.writer);
-            return tree_layout[1];
-        }
-        free_scree
-    }
-
-    fn footer_rect_with_remainder(&mut self) -> RRect {
-        let footer_layout = draw::layour_workspace_footer(self.screen_rect);
-        self.footer_area = footer_layout[1];
-        footer_layout[0]
+        };
+        self.editor_area = self.tab_area.keep_rows(1);
     }
 
     /// unwrap or default with logged error

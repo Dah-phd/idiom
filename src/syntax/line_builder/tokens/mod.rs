@@ -1,18 +1,21 @@
 use super::DiagnosticInfo;
 use super::DiagnosticLine;
+use crate::lsp::LSPClient;
 use crate::syntax::line_builder::{Lang, Legend};
 mod line;
 mod token;
+use crate::syntax::modal::LSPResponseType;
 use crate::syntax::theme::Theme;
 use crate::workspace::actions::EditMetaData;
 use crate::workspace::line::Line;
 pub use line::TokenLine;
 use lsp_types::SemanticToken;
+use lsp_types::TextDocumentContentChangeEvent;
 use std::cmp::Ordering;
 pub use token::Token;
 
 #[derive(Default)]
-enum TokensType {
+pub enum TokensType {
     LSP,
     #[default]
     Internal,
@@ -335,4 +338,26 @@ pub fn set_tokens(
     if !token_line.is_empty() {
         content[line_idx].replace_tokens(token_line);
     };
+}
+
+pub fn collect_changes(
+    path: &std::path::Path,
+    version: i32,
+    events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
+    content: &[impl Line],
+    client: &mut LSPClient,
+) -> Option<LSPResponseType> {
+    match events.len() {
+        0 => None,
+        1 => {
+            let (meta, edit) = events.remove(0);
+            client.file_did_change(path, version, vec![edit]).ok()?;
+            client.request_partial_tokens(path, meta.build_range(content)?).map(LSPResponseType::TokensPartial)
+        }
+        _ => {
+            let edits = events.drain(..).map(|(meta, edit)| edit).collect::<Vec<_>>();
+            client.file_did_change(path, version, edits).ok()?;
+            client.request_full_tokens(path).map(LSPResponseType::Tokens)
+        }
+    }
 }

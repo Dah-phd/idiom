@@ -2,11 +2,12 @@ mod button;
 pub mod layout;
 mod list_state;
 mod text_field;
+use crate::render::layout::Rect;
 pub use button::Button;
 pub use list_state::WrappedState;
 use ratatui::text::Line;
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Rect as RRect},
     style::{Modifier, Style},
     text::Span,
 };
@@ -45,13 +46,13 @@ pub fn count_as_string(len: usize) -> String {
     }
 }
 
-pub fn centered_rect_static(h: u16, v: u16, rect: Rect) -> Rect {
-    let h_diff = rect.width.saturating_sub(h) / 2;
-    let v_diff = rect.height.saturating_sub(v) / 2;
+pub fn centered_rect_static(cols: u16, rows: u16, rect: RRect) -> RRect {
+    let h_diff = rect.width.saturating_sub(cols) / 2;
+    let v_diff = rect.height.saturating_sub(rows) / 2;
     let first_split = Layout::default()
         .constraints([
             Constraint::Length(v_diff),
-            Constraint::Min(v),
+            Constraint::Min(rows),
             Constraint::Length(v_diff),
         ])
         .split(rect);
@@ -59,54 +60,106 @@ pub fn centered_rect_static(h: u16, v: u16, rect: Rect) -> Rect {
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Length(h_diff),
-            Constraint::Min(h),
+            Constraint::Min(cols),
             Constraint::Length(h_diff),
         ])
         .split(first_split[1])[1]
 }
 
-pub fn right_corner_rect_static(h: u16, v: u16, rect: Rect) -> Rect {
-    Layout::new(Direction::Horizontal, [Constraint::Percentage(100), Constraint::Min(h)])
-        .split(Layout::new(Direction::Vertical, [Constraint::Min(v), Constraint::Percentage(100)]).split(rect)[0])[1]
+pub fn right_corner_rect_static(cols: u16, rows: u16, rect: RRect) -> RRect {
+    Layout::new(Direction::Horizontal, [Constraint::Percentage(100), Constraint::Min(cols)])
+        .split(Layout::new(Direction::Vertical, [Constraint::Min(rows), Constraint::Percentage(100)]).split(rect)[0])[1]
 }
 
 pub fn dynamic_cursor_rect_sized_height(
     lines: usize, // min 3
-    mut x: u16,
-    mut y: u16,
-    base: Rect,
-) -> Option<Rect> {
-    //  ______________
-    // |y,x _____     |
-    // |   |     |    | base.hight (y)
-    // |   |     | h..|
-    // |   |     |    |
-    // |    -----     |
-    // |    width(60) |
-    //  --------------
-    //   base.width (x)
-    //
+    mut col: u16,
+    mut row: u16,
+    base: RRect,
+) -> Option<RRect> {
     let mut height = (lines.min(5) + 2) as u16;
     let mut width = 60;
-    if base.height < height + y {
-        if base.height > 3 + y {
-            height = base.height - y;
-        } else if y > 3 && base.height > y {
+    if base.height < height + row {
+        if base.height > 3 + row {
+            height = base.height - row;
+        } else if row > 3 && base.height > row {
             // ensures overflowed y's are handled
-            let new_y = y.saturating_sub(height + 1);
-            height = y - (new_y + 1);
-            y = new_y;
+            let new_y = row.saturating_sub(height + 1);
+            height = row - (new_y + 1);
+            row = new_y;
         } else {
             return None;
         }
     };
-    if base.width < width + x {
-        if base.width < 30 + x {
-            x = base.width.checked_sub(30)?;
+    if base.width < width + col {
+        if base.width < 30 + col {
+            col = base.width.checked_sub(30)?;
             width = 30;
         } else {
-            width = base.width - x;
+            width = base.width - col;
         }
     };
-    Some(Rect { x, y, width, height })
+    Some(RRect { x: col, y: row, width, height })
+}
+
+pub fn dynamic_cursor_rect_sized_height_(
+    lines: usize, // min 3
+    mut col: u16,
+    mut row: u16,
+    base: Rect,
+) -> Option<Rect> {
+    let mut height = (lines.min(5) + 2) as u16;
+    let mut width = 60;
+    if base.height < height + row {
+        if base.height > 3 + row {
+            height = base.height - row;
+        } else if row > 3 && base.height > row {
+            // ensures overflowed y's are handled
+            let new_y = row.saturating_sub(height + 1);
+            height = row - (new_y + 1);
+            row = new_y;
+        } else {
+            return None;
+        }
+    };
+    if base.width < width + col as usize {
+        if base.width < 30 + col as usize {
+            col = base.width.checked_sub(30)? as u16;
+            width = 30;
+        } else {
+            width = base.width - col as usize;
+        }
+    };
+    Some(Rect::new(row, col, width, height))
+}
+
+pub fn dynamic_cursor_rect_bordered(
+    lines: usize, // min 3
+    mut col: u16,
+    mut row: u16,
+    base: Rect,
+) -> Option<Rect> {
+    let mut height = (lines.min(5) + 2) as u16;
+    let mut width = 60;
+    if base.height < height + row {
+        if base.height > 3 + row {
+            height = base.height - row;
+        } else if row > 3 && base.height > row {
+            // ensures overflowed y's are handled
+            let new_y = row.saturating_sub(height + 1);
+            height = row - (new_y + 1);
+            row = new_y;
+        } else {
+            return None;
+        }
+    };
+    if base.width < width + col as usize {
+        if base.width < 30 + col as usize {
+            col = base.width.checked_sub(30)? as u16;
+            width = 30;
+        } else {
+            width = base.width - col as usize;
+        }
+    };
+    Some(Rect::new_bordered(row, col, width, height))
 }

@@ -58,27 +58,34 @@ impl LSPModal {
         }
     }
 
-    pub fn render_at(&mut self, frame: &mut Frame, x: u16, y: u16) {
+    pub fn render_at(&mut self, frame: &mut Frame, col: u16, row: u16) -> Option<usize> {
         match self {
             Self::AutoComplete(modal) => {
-                if let Some(area) = dynamic_cursor_rect_sized_height(modal.len(), x, y + 1, frame.size()) {
+                if let Some(area) = dynamic_cursor_rect_sized_height(modal.len(), col, row + 1, frame.size()) {
+                    let len = area.height as usize + 2;
                     frame.render_widget(Clear, area);
                     modal.render_at(frame, area);
+                    return Some(len);
                 }
             }
             Self::RenameVar(modal) => {
-                if let Some(area) = dynamic_cursor_rect_sized_height(1, x, y + 1, frame.size()) {
+                if let Some(area) = dynamic_cursor_rect_sized_height(1, col, row + 1, frame.size()) {
+                    let len = area.height as usize + 2;
                     frame.render_widget(Clear, area);
                     modal.render_at(frame, area);
+                    return Some(len);
                 }
             }
             Self::Info(modal) => {
-                if let Some(area) = dynamic_cursor_rect_sized_height(modal.len(), x, y + 1, frame.size()) {
+                if let Some(area) = dynamic_cursor_rect_sized_height(modal.len(), col, row + 1, frame.size()) {
+                    let len = area.height as usize + 2;
                     frame.render_widget(Clear, area);
                     modal.render_at(frame, area);
+                    return Some(len);
                 }
             }
         }
+        None
     }
 
     pub fn auto_complete(completions: Vec<CompletionItem>, line: String, idx: usize) -> Option<Self> {

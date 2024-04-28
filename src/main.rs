@@ -14,17 +14,12 @@ mod workspace;
 use app::app;
 
 use anyhow::Result;
-use ratatui::{backend::CrosstermBackend, Terminal};
-use std::{
-    io::Stdout,
-    path::{PathBuf, MAIN_SEPARATOR},
-};
+use std::path::{PathBuf, MAIN_SEPARATOR};
 
-fn init_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
-    let mut terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
+fn init_terminal() -> Result<()> {
     crossterm::terminal::enable_raw_mode()?;
     crossterm::execute!(
-        terminal.backend_mut(),
+        std::io::stdout(),
         crossterm::terminal::EnterAlternateScreen,
         crossterm::style::ResetColor,
         crossterm::event::EnableMouseCapture,
@@ -36,8 +31,7 @@ fn init_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
         graceful_exit().unwrap();
         original_hook(panic);
     }));
-
-    Ok(terminal)
+    Ok(())
 }
 
 fn graceful_exit() -> Result<()> {
@@ -69,7 +63,7 @@ fn cli() -> Option<PathBuf> {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {
-    let terminal = init_terminal()?;
-    app(terminal, cli()).await?;
+    init_terminal()?;
+    app(cli()).await?;
     graceful_exit()
 }

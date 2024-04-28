@@ -63,6 +63,7 @@ impl Tree {
     }
 
     pub fn direct_render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+        gs.store_cursor()?;
         let mut line_iter = gs.tree_area.into_iter();
         let state = self.state.selected().unwrap_or_default();
         for (idx, text) in
@@ -79,7 +80,7 @@ impl Tree {
         for line in line_iter {
             line.render_empty(&mut gs.writer)?;
         }
-        gs.writer.flush()
+        gs.restore_cursor()
     }
 
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {

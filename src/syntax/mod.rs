@@ -12,18 +12,29 @@ use crossterm::event::KeyEvent;
 pub use line_builder::DiagnosticLine;
 use line_builder::LineBuilder;
 pub use line_builder::LineBuilderContext;
-use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent};
+use lsp_types::{
+    PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, TextDocumentContentChangeEvent,
+};
 use modal::{LSPModal, LSPResponseType, LSPResult, ModalMessage};
 use ratatui::{layout::Rect, Frame};
 use std::path::{Path, PathBuf};
 use theme::Theme;
 
+use self::line_builder::{
+    tokens::{self, collect_changes, set_tokens},
+    Lang, Legend, TokensType,
+};
+
 pub struct Lexer {
+    pub lang: Lang,
+    pub legend: Legend,
+    pub theme: Theme,
+    pub token_producer: TokensType,
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub lsp_client: Option<LSPClient>,
     pub line_number_offset: usize,
     pub path: PathBuf,
-    pub line_builder: LineBuilder,
+    // pub line_builder: LineBuilder,
     modal: Option<LSPModal>,
     requests: Vec<LSPResponseType>,
 }
@@ -31,7 +42,11 @@ pub struct Lexer {
 impl Lexer {
     pub fn with_context(file_type: FileType, path: &Path, content: &[impl Line], gs: &mut GlobalState) -> Self {
         Self {
-            line_builder: LineBuilder::new(file_type.into(), content, gs),
+            lang: Lang::default(),
+            legend: Legend::default(),
+            theme: gs.unwrap_default_result(Theme::new(), "theme.json: "),
+            token_producer: TokensType::Internal,
+            // line_builder: LineBuilder::new(file_type.into(), content, gs),
             modal: None,
             path: path.into(),
             requests: Vec::new(),
@@ -46,7 +61,7 @@ impl Lexer {
         if let Some(client) = self.lsp_client.as_mut() {
             // diagnostics
             if let Some(diagnostics) = client.get_diagnostics(&self.path) {
-                self.line_builder.set_diganostics(diagnostics);
+                // self.line_builder.set_diganostics(diagnostics);
             }
             // responses
             let mut unresolved_requests = Vec::new();
@@ -59,30 +74,38 @@ impl Lexer {
                             }
                             LSPResult::Hover(hover) => {
                                 if let Some(modal) = self.modal.as_mut() {
-                                    modal.hover_map(hover, &self.line_builder);
+                                    // modal.hover_map(hover, &self.line_builder);
                                 } else {
-                                    self.modal.replace(LSPModal::from_hover(hover, &self.line_builder));
+                                    // self.modal.replace(LSPModal::from_hover(hover, &self.line_builder));
                                 }
                             }
                             LSPResult::SignatureHelp(signature) => {
-                                if let Some(modal) = self.modal.as_mut() {
-                                    modal.signature_map(signature, &self.line_builder);
-                                } else {
-                                    self.modal.replace(LSPModal::from_signature(signature, &self.line_builder));
-                                }
+                                // if let Some(modal) = self.modal.as_mut() {
+                                //     modal.signature_map(signature, &self.line_builder);
+                                // } else {
+                                //     self.modal.replace(LSPModal::from_signature(signature, &self.line_builder));
+                                // }
                             }
                             LSPResult::Renames(workspace_edit) => {
                                 gs.workspace.push(workspace_edit.into());
                             }
                             LSPResult::Tokens(tokens) => {
-                                if self.line_builder.set_tokens(tokens, content) {
-                                    gs.success("LSP tokens mapped!");
-                                } else if let Some(id) = client.request_full_tokens(&self.path) {
-                                    unresolved_requests.push(LSPResponseType::Tokens(id));
-                                };
+                                if let SemanticTokensResult::Tokens(data) = tokens {
+                                    if !data.data.is_empty() {
+                                        set_tokens(data.data, &self.legend, &self.lang, &self.theme, content);
+                                        self.token_producer = TokensType::LSP;
+                                        gs.success("LSP tokens mapped!");
+                                    } else if let Some(id) = client.request_full_tokens(&self.path) {
+                                        unresolved_requests.push(LSPResponseType::Tokens(id));
+                                    };
+                                }
                             }
                             LSPResult::TokensPartial(tokens) => {
-                                self.line_builder.set_tokens_partial(tokens, content);
+                                let tokens = match tokens {
+                                    SemanticTokensRangeResult::Partial(data) => data.data,
+                                    SemanticTokensRangeResult::Tokens(data) => data.data,
+                                };
+                                set_tokens(tokens, &self.legend, &self.lang, &self.theme, content);
                             }
                             LSPResult::References(locations) => {
                                 if let Some(mut locations) = locations {
@@ -120,30 +143,29 @@ impl Lexer {
         events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
         content: &[impl Line],
     ) {
-        if let Some(request) = self
-            .lsp_client
-            .as_mut()
-            .and_then(|client| self.line_builder.collect_changes(&self.path, version, events, content, client))
-        {
-            self.requests.push(request);
+        if let Some(client) = self.lsp_client.as_mut() {
+            if let Some(request) = collect_changes(&self.path, version, events, content, client) {
+                self.requests.push(request);
+            };
         } else {
-            self.line_builder.update_internals(events, content);
+            events.clear();
         };
     }
 
-    pub fn render_modal_if_exist(&mut self, frame: &mut Frame, area: Rect, cursor: &Cursor) {
+    pub fn render_modal_if_exist(&mut self, frame: &mut Frame, area: Rect, cursor: &Cursor) -> Option<usize> {
         if let Some(modal) = &mut self.modal {
             let cursor_x_offset = 1 + cursor.char;
             let cursor_y_offset = cursor.line - cursor.at_line;
-            let x = area.x + (cursor_x_offset + self.line_number_offset) as u16;
-            let y = area.y + cursor_y_offset as u16;
-            modal.render_at(frame, x, y);
+            let col = area.x + (cursor_x_offset + self.line_number_offset) as u16;
+            let row = area.y + cursor_y_offset as u16;
+            return modal.render_at(frame, col, row);
         }
+        None
     }
 
     pub fn map_modal_if_exists(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         if let Some(modal) = &mut self.modal {
-            match modal.map_and_finish(key, &self.line_builder.lang, gs) {
+            match modal.map_and_finish(key, &self.lang, gs) {
                 ModalMessage::Taken => return true,
                 ModalMessage::TakenDone => {
                     self.modal.take();
@@ -174,7 +196,10 @@ impl Lexer {
         if client.file_did_open(&self.path, file_type, content).is_err() {
             return;
         }
-        self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
+        if let Some(capabilities) = &client.capabilities.semantic_tokens_provider {
+            self.legend.map_styles(&self.lang.file_type, &self.theme, capabilities);
+        }
+        // self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
         gs.success("LSP mapped!");
         if let Some(id) = client.request_full_tokens(&self.path) {
             self.requests.push(LSPResponseType::Tokens(id));
@@ -186,7 +211,7 @@ impl Lexer {
     pub fn should_autocomplete(&mut self, char_idx: usize, line: &str) -> bool {
         self.lsp_client.is_some()
             && !matches!(self.modal, Some(LSPModal::AutoComplete(..)))
-            && self.line_builder.lang.completable(line, char_idx)
+            && self.lang.completable(line, char_idx)
     }
 
     pub fn get_autocomplete(&mut self, c: CursorPosition, line: &str) {
@@ -206,9 +231,9 @@ impl Lexer {
 
     pub fn help(&mut self, c: CursorPosition) {
         if let Some(client) = self.lsp_client.as_mut() {
-            if let Some(actions) = self.line_builder.collect_diagnostic_info(c.line) {
-                self.modal.replace(LSPModal::actions(actions));
-            }
+            // if let Some(actions) = self.line_builder.collect_diagnostic_info(c.line) {
+            //     self.modal.replace(LSPModal::actions(actions));
+            // }
             if let Some(id) = client.request_signitures(&self.path, c).map(LSPResponseType::SignatureHelp) {
                 self.requests.push(id);
             }
@@ -252,7 +277,8 @@ impl Lexer {
     }
 
     pub fn reload_theme(&mut self, gs: &mut GlobalState) {
-        self.line_builder.theme = match Theme::new() {
+        // self.line_builder.theme = match Theme::new() {
+        self.theme = match Theme::new() {
             Ok(theme) => theme,
             Err(err) => {
                 let mut msg = "theme.json: ".to_owned();
@@ -262,7 +288,10 @@ impl Lexer {
             }
         };
         if let Some(client) = self.lsp_client.as_mut() {
-            self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
+            if let Some(capabilities) = &client.capabilities.semantic_tokens_provider {
+                self.legend.map_styles(&self.lang.file_type, &self.theme, capabilities);
+            }
+            // self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
             if let Some(id) = client.request_full_tokens(&self.path) {
                 self.requests.push(LSPResponseType::Tokens(id));
             }
@@ -270,7 +299,7 @@ impl Lexer {
     }
 
     pub fn save_and_check_lsp(&mut self, file_type: FileType, gs: &mut GlobalState) {
-        self.line_builder.mark_saved();
+        // self.line_builder.mark_saved();
         if let Some(client) = self.lsp_client.as_mut() {
             gs.message("Checking LSP status (on save) ...");
             if client.file_did_save(&self.path).is_err() && client.is_closed() {

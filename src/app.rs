@@ -13,12 +13,11 @@ use crate::{
     workspace::Workspace,
 };
 use anyhow::Result;
-use crossterm::{event::Event, terminal};
-use ratatui::{backend::CrosstermBackend, Terminal};
-use std::{io::Stdout, path::PathBuf, time::Instant};
+use crossterm::event::Event;
+use std::{path::PathBuf, time::Instant};
 
-pub async fn app(terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Option<PathBuf>) -> Result<()> {
-    let mut gs = GlobalState::new(terminal.size()?, std::io::stdout());
+pub async fn app(open_file: Option<PathBuf>) -> Result<()> {
+    let mut gs = GlobalState::new()?;
     let configs = gs.unwrap_default_result(KeyMap::new(), ".keys: ");
     let mut last_frame_start = Instant::now();
     let mut general_key_map = configs.general_key_map();
@@ -34,25 +33,28 @@ pub async fn app(terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Option
         tree.select_by_path(&path);
         if gs.try_new_editor(&mut workspace, path).await {
             gs.insert_mode();
+            workspace.render(&mut gs)?;
         };
     }
 
     drop(configs);
 
     loop {
+        if let Some(editor) = workspace.get_active() {
+            editor.render(&mut gs)?;
+        }
+
+        workspace.render(&mut gs)?;
+
         tree.direct_render(&mut gs)?;
 
-        footer.render(&mut gs, workspace.get_active().map(|e| e.get_stats()))?;
-
-        if let Some(editor) = workspace.get_active() {
-            editor.fast_render(&mut gs)?;
-        }
+        // footer.render(&mut gs, workspace.get_active().map(|e| e.get_stats()))?;
 
         if crossterm::event::poll(last_frame_start.elapsed())? {
             last_frame_start = Instant::now();
             match crossterm::event::read()? {
                 Event::Key(key) => {
-                    if gs.map_key(&key, &mut workspace, &mut tree, &mut term) {
+                    if gs.map_key(&key, &mut workspace, &mut tree, &mut term)? {
                         continue;
                     }
                     let action = if let Some(action) = general_key_map.map(&key) {

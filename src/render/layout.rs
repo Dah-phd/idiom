@@ -31,7 +31,7 @@ pub const DOUBLE_BORDERS: BorderSet = BorderSet {
 
 bitflags! {
     /// Bitflags that can be composed to set the visible borders essentially on the block widget.
-    #[derive(Default, Clone, Copy, Eq, PartialEq, Hash)]
+    #[derive(Default, Clone, Copy, Eq, PartialEq, Hash, Debug)]
     pub struct Borders: u8 {
         /// Show no border (default)
         const NONE   = 0b0000;
@@ -63,7 +63,7 @@ impl BorderSet {
     }
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, Debug)]
 pub struct Rect {
     pub row: u16,
     pub col: u16,
@@ -75,6 +75,99 @@ pub struct Rect {
 impl Rect {
     pub fn new(row: u16, col: u16, width: usize, height: u16) -> Self {
         Self { row, col, width, height, borders: Borders::NONE }
+    }
+
+    pub fn new_bordered(row: u16, col: u16, width: usize, height: u16) -> Self {
+        Self { row, col, width, height, borders: Borders::all() }
+    }
+
+    #[inline]
+    pub fn modal_relative(&self, row: u16, col: u16, width: usize, height: u16) -> Option<Self> {
+        self.modal_absolute(row + self.row, col + self.col, width, height)
+    }
+
+    pub fn modal_absolute(&self, mut row: u16, mut col: u16, mut width: usize, mut height: u16) -> Option<Self> {
+        if self.height < height + row {
+            if self.height > 3 + row {
+                height = self.height - row;
+            } else if row > 3 && self.height > row {
+                // ensures overflowed y's are handled
+                let new_y = row.saturating_sub(height + 1);
+                height = row - (new_y + 1);
+                row = new_y;
+            } else {
+                return None;
+            }
+        };
+        if self.width < width + col as usize {
+            if self.width < 30 + col as usize {
+                col = self.width.checked_sub(30)? as u16;
+                width = 30;
+            } else {
+                width = self.width - col as usize;
+            }
+        };
+        Some(Rect::new(row, col, width, height))
+    }
+
+    /// Splitoff rows into Rect from current Rect - mutating it in place
+    pub fn splitoff_rows(&mut self, rows: u16) -> Self {
+        let old_height = self.height;
+        self.height = self.height.saturating_sub(rows);
+        Self {
+            row: self.row + self.height,
+            col: self.col,
+            height: old_height - self.height,
+            width: self.width,
+            borders: self.borders,
+        }
+    }
+
+    /// Splitoff cols into Rect from current Rect - mutating it in place
+    pub fn splitoff_cols(&mut self, cols: usize) -> Self {
+        let old_width = self.width;
+        self.width = self.width.saturating_sub(cols);
+        Self {
+            row: self.row,
+            col: self.width as u16 + self.col,
+            height: self.height,
+            width: old_width - self.width,
+            borders: self.borders,
+        }
+    }
+
+    /// Keep rows splitting the remaining into Rect
+    pub fn keep_rows(&mut self, rows: u16) -> Self {
+        let remaining_height = self.height.saturating_sub(rows);
+        self.height -= remaining_height;
+        Self {
+            row: self.row + self.height,
+            col: self.col,
+            height: remaining_height,
+            width: self.width,
+            borders: self.borders,
+        }
+    }
+
+    /// Keep cols splitting the remaining into Rect
+    pub fn keep_col(&mut self, cols: usize) -> Self {
+        let remaining_width = self.width.saturating_sub(cols);
+        self.width -= remaining_width;
+        Self {
+            row: self.row,
+            col: self.col + self.width as u16,
+            height: self.height,
+            width: remaining_width,
+            borders: self.borders,
+        }
+    }
+
+    pub fn center(&self, rows: u16, cols: u16) -> Self {
+        todo!()
+    }
+
+    pub fn right_corner(&self, rows: u16, cols: usize) -> Self {
+        todo!()
     }
 
     pub fn rataui(rect: ratatui::layout::Rect) -> Self {
@@ -101,6 +194,10 @@ impl Rect {
         self.col += 1;
         self.width -= 1;
         self.borders.insert(Borders::LEFT);
+    }
+
+    pub fn absoute_diffs(&self) -> (u16, u16, usize) {
+        (self.row, self.col, self.height as usize)
     }
 
     pub fn draw_borders(&self, set: Option<BorderSet>, fg: Color, writer: &mut impl Write) -> std::io::Result<()> {
@@ -147,6 +244,12 @@ impl Rect {
     }
 }
 
+impl From<(u16, u16)> for Rect {
+    fn from((width, height): (u16, u16)) -> Self {
+        Self { row: 0, col: 0, width: width as usize, height, borders: Borders::empty() }
+    }
+}
+
 pub struct RectIter<'a> {
     rect: &'a Rect,
     row_range: RangeInclusive<u16>,
@@ -176,7 +279,7 @@ pub struct Line {
 impl Line {
     #[inline]
     pub fn render_empty(self, writer: &mut impl Write) -> std::io::Result<()> {
-        queue!(writer, MoveTo(self.col, self.row), Print(format!("{:width$}", "e", width = self.width)))
+        queue!(writer, MoveTo(self.col, self.row), Print(format!("{:width$}", "", width = self.width)))
     }
 
     #[inline]

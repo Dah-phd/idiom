@@ -60,7 +60,7 @@ impl Footer {
         // }
 
         // frame.render_widget(stat_p, split[2]);
-        let mv = MoveTo(gs.footer_area.x + 15, gs.footer_area.y);
+        let mv = MoveTo(gs.footer_area.col + 15, gs.footer_area.row);
         execute!(
             &mut gs.writer,
             mv,

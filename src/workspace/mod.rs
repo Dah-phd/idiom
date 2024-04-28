@@ -7,31 +7,29 @@ use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
     global_state::{GlobalState, TreeEvent},
     lsp::LSP,
-    utils::{REVERSED, UNDERLINED},
 };
 use anyhow::Result;
-use crossterm::event::KeyEvent;
+use crossterm::{
+    cursor::MoveTo,
+    event::KeyEvent,
+    queue,
+    style::{Color, PrintStyledContent, Stylize},
+};
 pub use cursor::CursorPosition;
 pub use editor::{DocStats, Editor};
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
-use ratatui::{
-    style::{Color, Modifier, Style},
-    widgets::Tabs,
-    Frame,
-};
 use std::{
     collections::{hash_map::Entry, HashMap},
     path::PathBuf,
 };
 
-const TAB_HIGHTLIGHT: Style = Style::new().fg(Color::Yellow).add_modifier(Modifier::UNDERLINED);
+// const TAB_HIGHTLIGHT: Style = Style::new().fg(Color::Yellow).add_modifier(Modifier::UNDERLINED);
 
 pub struct Workspace {
     pub editors: Vec<Editor>,
     base_config: EditorConfigs,
     key_map: EditorKeyMap,
     lsp_servers: HashMap<FileType, LSP>,
-    tab_style: Style,
     map_callback: fn(&mut Self, &KeyEvent, &mut GlobalState) -> bool,
 }
 
@@ -46,22 +44,26 @@ impl Workspace {
                 lsp_servers.insert(ft, lsp);
             };
         }
-        Self {
-            editors: Vec::default(),
-            base_config,
-            key_map,
-            tab_style: UNDERLINED,
-            lsp_servers,
-            map_callback: map_editor,
-        }
+        Self { editors: Vec::default(), base_config, key_map, lsp_servers, map_callback: map_editor }
     }
 
-    pub fn render(&mut self, frame: &mut Frame, gs: &mut GlobalState) {
+    pub fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
         if let Some(editor) = self.editors.get_mut(0) {
-            // editor.lexer.render_modal_if_exist(frame, gs.editor_area, &editor.cursor);
-            let titles: Vec<_> = self.editors.iter().map(|e| e.display.to_owned()).collect();
-            let tabs = Tabs::new(titles).style(self.tab_style).highlight_style(TAB_HIGHTLIGHT).select(0);
-            frame.render_widget(tabs, gs.tab_area);
+            gs.store_cursor()?;
+            let mut tabs = editor.display.to_owned();
+            for editor in self.editors.iter().skip(1) {
+                tabs.push_str(" | ");
+                tabs.push_str(&editor.display);
+            }
+            tabs.truncate(gs.tab_area.width);
+            queue!(
+                &mut gs.writer,
+                MoveTo(gs.tab_area.col, gs.tab_area.row),
+                PrintStyledContent(tabs.underline(Color::Reset)),
+            )?;
+            gs.restore_cursor()
+        } else {
+            Ok(())
         }
     }
 
@@ -71,12 +73,12 @@ impl Workspace {
 
     pub fn toggle_tabs(&mut self) {
         self.map_callback = map_tabs;
-        self.tab_style = REVERSED;
+        // self.tab_style = REVERSED;
     }
 
     pub fn toggle_editor(&mut self) {
         self.map_callback = map_editor;
-        self.tab_style = UNDERLINED;
+        // self.tab_style = UNDERLINED;
     }
 
     pub fn resize_render(&mut self, width: usize, height: usize) {
@@ -85,6 +87,7 @@ impl Workspace {
         }
     }
 
+    #[inline]
     pub fn get_stats(&self) -> Option<DocStats> {
         self.editors.first().map(|editor| editor.get_stats())
     }
@@ -93,6 +96,7 @@ impl Workspace {
         self.editors.iter().map(|editor| editor.display.to_owned()).collect()
     }
 
+    #[inline]
     pub fn get_active(&mut self) -> Option<&mut Editor> {
         self.editors.first_mut()
     }
@@ -474,6 +478,7 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
             }
             _ => (),
         }
+        let _ = ws.render(gs);
         return true;
     }
     false

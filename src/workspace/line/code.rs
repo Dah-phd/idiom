@@ -173,6 +173,9 @@ impl LineInterface for CodeLine {
         lexer: &mut Lexer,
         writer: &mut impl std::io::Write,
     ) -> std::io::Result<()> {
+        if self.tokens.is_empty() {
+            Token::parse(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
+        };
         self.rendered_at = idx + 1;
         let line_number = format!("{: >1$} ", self.rendered_at, lexer.line_number_offset);
         let mut end = 0;
