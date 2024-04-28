@@ -2,6 +2,7 @@ use super::types::FileType;
 use super::{load_or_create_config, EDITOR_CFG_FILE};
 use crate::global_state::GlobalState;
 use crate::utils::{trim_start_inplace, Offset};
+use crate::workspace::line::Line;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -49,8 +50,8 @@ impl IndentConfigs {
         indent
     }
 
-    pub fn derive_indent_from_lines(&self, prev_lines: &[String]) -> String {
-        for prev_line in prev_lines.iter().rev() {
+    pub fn derive_indent_from_lines(&self, prev_lines: &[impl Line]) -> String {
+        for prev_line in prev_lines.iter().rev().map(|line| line.as_str()) {
             if !prev_line.chars().all(|c| c.is_whitespace()) {
                 return self.derive_indent_from(prev_line);
             }
@@ -58,19 +59,19 @@ impl IndentConfigs {
         "".to_owned()
     }
 
-    pub fn indent_line(&self, line_idx: usize, content: &mut [String]) -> Offset {
+    pub fn indent_line(&self, line_idx: usize, content: &mut [impl Line]) -> Offset {
         if line_idx > 0 {
             let indent = self.derive_indent_from_lines(&content[..line_idx]);
             if indent.is_empty() {
                 return Offset::Pos(0);
             }
             let line = &mut content[line_idx];
-            let offset = Offset::Pos(indent.len()) - trim_start_inplace(line);
+            let offset = Offset::Pos(indent.len()) - trim_start_inplace(line.string_mut());
             line.insert_str(0, &indent);
-            offset - self.unindent_if_before_base_pattern(line)
+            offset - self.unindent_if_before_base_pattern(line.string_mut())
         } else {
             let line = &mut content[line_idx];
-            Offset::Neg(trim_start_inplace(line))
+            Offset::Neg(trim_start_inplace(line.string_mut()))
         }
     }
 }

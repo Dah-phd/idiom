@@ -1,157 +1,144 @@
 use crate::syntax::line_builder::{diagnostics::DiagnosticData, tokens::Token};
-use crate::syntax::{LineBuilderContext, Theme};
-use crate::widgests::LINE_CONTINIUES;
-use ratatui::buffer::Buffer;
+use crossterm::{
+    cursor::MoveTo,
+    queue,
+    style::{Attribute, Print, PrintStyledContent, Stylize},
+    terminal::{Clear, ClearType},
+};
 use ratatui::layout::Rect;
-use ratatui::style::Modifier;
-use ratatui::style::{Color, Style};
-use ratatui::text::Span;
-use ratatui::widgets::WidgetRef;
-
-const DIGIT_STYLE: Style = Style::new().fg(Color::DarkGray);
+use std::io::{Result, Write};
 
 #[derive(Default)]
 pub struct TokenLine {
     pub tokens: Vec<Token>,
-    pub cache: Vec<Span<'static>>,
     pub diagnosics: Vec<DiagnosticData>,
+    rendered_at: usize,
 }
 
 impl TokenLine {
-    pub fn new(tokens: Vec<Token>, content: &str) -> Self {
-        let mut line = Self { tokens, cache: Vec::new(), diagnosics: Vec::new() };
-        line.build_cache(content);
-        line
+    pub fn new(tokens: Vec<Token>) -> Self {
+        Self { tokens, diagnosics: Vec::new(), rendered_at: 0 }
     }
 
-    pub fn render_ref(&mut self, content: &str, line_idx: usize, max_digits: usize, area: Rect, buf: &mut Buffer) {
-        if self.cache.is_empty() {
-            self.build_cache(content);
-        }
-        self.cached_render(area, buf, line_idx, max_digits);
-    }
-
-    pub fn render_shrinked_ref(
+    pub fn render(
         &mut self,
-        content: &str,
-        line_idx: usize,
+        idx: usize,
         max_digits: usize,
+        content: &str,
         area: Rect,
-        buf: &mut Buffer,
-    ) {
-        if self.cache.is_empty() {
-            self.build_cache(content);
-        };
-        let area_right = area.right();
-        let mut x = area.left();
-        let line_num = Span::styled(format!("{: >1$} ", line_idx + 1, max_digits), DIGIT_STYLE);
-        let span_width = line_num.width() as u16;
-        let span_area = Rect { x, width: span_width.min(area_right - x), ..area };
-        line_num.render_ref(span_area, buf);
-        x = x.saturating_add(span_width);
-        for span in self.cache.iter() {
-            let span_width = span.width() as u16;
-            let next_x = x.saturating_add(span_width);
-            if next_x >= area_right {
-                let span_width = LINE_CONTINIUES.width() as u16;
-                let span_area = Rect { x, width: span_width.min(area_right - x), ..area };
-                LINE_CONTINIUES.render_ref(span_area, buf);
-                break;
-            };
-            let span_area = Rect { x, width: span_width.min(area_right - x), ..area };
-            span.render_ref(span_area, buf);
-            x = next_x;
-        }
-    }
-
-    pub fn cached_render(&self, area: Rect, buf: &mut Buffer, line_idx: usize, max_digits: usize) {
-        let mut x = area.left();
-        let area_right = area.right();
-        let line_num = Span::styled(format!("{: >1$} ", line_idx + 1, max_digits), DIGIT_STYLE);
-        let span_width = line_num.width() as u16;
-        let span_area = Rect { x, width: span_width.min(area_right - x), ..area };
-        line_num.render_ref(span_area, buf);
-        x = x.saturating_add(span_width);
-        for span in self.cache.iter().chain(self.diagnosics.iter().map(|data| &data.inline_span)) {
-            let span_width = span.width() as u16;
-            let span_area = Rect { x, width: span_width.min(area_right - x), ..area };
-            span.render_ref(span_area, buf);
-            x = x.saturating_add(span_width);
-            if x >= area_right {
-                break;
-            };
-        }
-    }
-
-    pub fn build_cache(&mut self, content: &str) {
-        self.cache.clear();
+        writer: &mut impl Write,
+    ) -> Result<()> {
+        self.rendered_at = 0;
+        let line_number = format!("{: >1$} ", idx + 1, max_digits);
         let mut end = 0;
+        queue!(writer, MoveTo(area.x, area.y), PrintStyledContent(line_number.dark_grey()))?;
+        queue!(writer, Clear(ClearType::UntilNewLine))?;
         for token in self.tokens.iter() {
             if token.from > end {
                 if let Some(text) = content.get(end..token.from) {
-                    self.cache.push(Span::raw(text.to_owned()));
+                    queue!(writer, Print(text))?;
                 }
             };
-            end = token.push_span(content, &mut self.cache);
+            if let Some(text) = content.get(token.from..token.to).or(content.get(token.from..)) {
+                queue!(writer, PrintStyledContent(token.color.apply(text)))?;
+            };
+            end = token.to;
         }
         if content.len() > end {
             if let Some(text) = content.get(end..) {
-                self.cache.push(Span::raw(text.to_owned()));
+                queue!(writer, Print(text))?;
             }
         };
+        writer.flush()
     }
 
-    pub fn build_spans(
-        &self,
+    pub fn render_select(
+        &mut self,
+        idx: usize,
+        max_digits: usize,
         content: &str,
-        theme: &Theme,
-        mut buf: Vec<Span<'static>>,
-        ctx: &mut LineBuilderContext,
-    ) -> Vec<Span<'static>> {
-        let mut style = Style::new();
-        let mut remaining_word_len: usize = 0;
-        let mut token_num = 0;
-        for (char_idx, ch) in content.char_indices() {
-            remaining_word_len = remaining_word_len.saturating_sub(1);
-            if remaining_word_len == 0 {
-                match self.tokens.get(token_num) {
-                    Some(token) if token.from == char_idx => {
-                        remaining_word_len = token.len;
-                        style.fg = token.color.fg;
-                        token_num += 1;
-                    }
-                    _ => style.fg = None,
+        area: Rect,
+        writer: &mut impl Write,
+    ) -> Result<()> {
+        self.rendered_at = 0;
+        let line_number = format!("{: >1$} ", idx + 1, max_digits);
+        let mut end = 0;
+        queue!(writer, MoveTo(area.x, area.y), PrintStyledContent(line_number.dark_grey()))?;
+        queue!(writer, Clear(ClearType::UntilNewLine))?;
+        for token in self.tokens.iter() {
+            if token.from > end {
+                if let Some(text) = content.get(end..token.from) {
+                    queue!(writer, Print(text))?;
                 }
+            };
+            if let Some(text) = content.get(token.from..token.to).or(content.get(token.from..)) {
+                queue!(writer, PrintStyledContent(token.color.apply(text)))?;
             }
-            if matches!(&ctx.select_range, Some(range) if range.contains(&char_idx)) {
-                style.bg.replace(theme.selected);
-            }
-            buf.push(Span::styled(ch.to_string(), ctx.brackets.map_style(ch, style)));
-            style.add_modifier = Modifier::empty();
-            style.bg = None;
+            end = token.to;
         }
-        buf
+        if content.len() > end {
+            if let Some(text) = content.get(end..) {
+                queue!(writer, Print(text))?;
+            }
+        };
+        writer.flush()
+    }
+
+    pub fn fast_render(
+        &mut self,
+        idx: usize,
+        max_digits: usize,
+        content: &str,
+        area: Rect,
+        writer: &mut impl Write,
+    ) -> Result<()> {
+        let line_idx = idx + 1; // transform to line number
+        if self.rendered_at == line_idx {
+            return Ok(());
+        };
+        self.rendered_at = line_idx;
+        let line_number = format!("{: >1$} ", line_idx, max_digits);
+        let mut end = 0;
+        queue!(writer, MoveTo(area.x, area.y), PrintStyledContent(line_number.dark_grey()))?;
+        queue!(writer, Clear(ClearType::UntilNewLine))?;
+        for token in self.tokens.iter() {
+            if token.from > end {
+                if let Some(text) = content.get(end..token.from) {
+                    queue!(writer, Print(text))?;
+                }
+            };
+            if let Some(text) = content.get(token.from..token.to).or(content.get(token.from..)) {
+                queue!(writer, PrintStyledContent(token.color.apply(text)))?;
+            }
+            end = token.to;
+        }
+        if content.len() > end {
+            if let Some(text) = content.get(end..) {
+                queue!(writer, Print(text))?;
+            }
+        };
+        writer.flush()
     }
 
     pub fn set_diagnostics(&mut self, diagnostics: Vec<DiagnosticData>) {
+        self.rendered_at = 0;
         self.diagnosics.extend(diagnostics.into_iter());
         for dianostic in self.diagnosics.iter().rev() {
             for token in self.tokens.iter_mut() {
                 dianostic.check_token(token);
             }
         }
-        self.cache.clear();
     }
 
     pub fn clear_diagnostic(&mut self) {
         if self.diagnosics.is_empty() {
             return;
         };
-        self.diagnosics.clear();
         for token in self.tokens.iter_mut() {
-            token.color.add_modifier = Modifier::empty();
+            token.color.attributes.unset(Attribute::Underlined);
         }
-        self.cache.clear();
+        self.diagnosics.clear();
+        self.rendered_at = 0;
     }
 
     pub fn is_empty(&self) -> bool {
@@ -160,6 +147,6 @@ impl TokenLine {
 
     pub fn clear(&mut self) {
         self.tokens.clear();
-        self.cache.clear();
+        self.rendered_at = 0;
     }
 }

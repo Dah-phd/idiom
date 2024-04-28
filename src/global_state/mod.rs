@@ -5,34 +5,33 @@ mod draw;
 mod events;
 
 use crate::{
+    configs::UITheme,
     footer::Footer,
     popups::{
         popup_replace::ReplacePopup, popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges,
         PopupInterface,
     },
+    render::layout::{Rect, DOUBLE_BORDERS},
     runner::EditorTerminal,
     tree::Tree,
     workspace::Workspace,
 };
 pub use clipboard::Clipboard;
 use controls::map_term;
-use crossterm::event::{KeyEvent, MouseEvent};
-pub use events::{FooterEvent, TreeEvent, WorkspaceEvent};
-use ratatui::{
-    layout::Rect,
-    style::{Color, Modifier, Style},
-    text::Span,
-    Frame,
+use crossterm::{
+    cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show},
+    event::{KeyEvent, MouseEvent},
+    execute,
+    style::{Attribute, Color, ContentStyle, PrintStyledContent, StyledContent},
 };
-use std::{borrow::Cow, path::PathBuf};
+pub use events::{FooterEvent, TreeEvent, WorkspaceEvent};
+use ratatui::{layout::Rect as RRect, Frame};
+use std::path::PathBuf;
 
 use self::draw::Components;
 
-const INSERT_STYLE: Style = Style::new().add_modifier(Modifier::BOLD).fg(Color::Rgb(255, 0, 0));
-const INSERT_SPAN: Span<'static> = Span { content: Cow::Borrowed("  --INSERT--"), style: INSERT_STYLE };
-const SELECT_STYLE: Style = Style::new().add_modifier(Modifier::BOLD).fg(Color::LightCyan);
-const SELECT_SPAN: Span<'static> = Span { content: Cow::Borrowed("  --SELECT--"), style: SELECT_STYLE };
-const MUTED_STYLE: Style = Style::new().add_modifier(Modifier::BOLD).fg(Color::DarkGray);
+const INSERT_SPAN: &'static str = "  --INSERT--   ";
+const SELECT_SPAN: &'static str = "  --SELECT--   ";
 
 #[derive(Default, Clone)]
 pub enum PopupMessage {
@@ -50,7 +49,6 @@ enum Mode {
     Insert,
 }
 
-type DrawCallback = fn(&mut GlobalState, &mut Frame, &mut Workspace, &mut Tree, &mut Footer, &mut EditorTerminal);
 type KeyMapCallback = fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool;
 type MouseMapCallback = fn(&mut GlobalState, MouseEvent, &mut Tree, &mut Workspace);
 
@@ -59,57 +57,47 @@ pub struct GlobalState {
     tree_size: u16,
     key_mapper: KeyMapCallback,
     mouse_mapper: MouseMapCallback,
-    draw: DrawCallback,
-    pub mode_span: Span<'static>,
+    theme: UITheme,
+    pub writer: std::io::Stdout,
     pub popup: Option<Box<dyn PopupInterface>>,
     pub footer: Vec<FooterEvent>,
     pub workspace: Vec<WorkspaceEvent>,
     pub tree: Vec<TreeEvent>,
     pub clipboard: Clipboard,
     pub exit: bool,
-    pub screen_rect: Rect,
+    pub screen_rect: RRect,
     pub tree_area: Rect,
-    pub tab_area: Rect,
+    pub tab_area: RRect,
     pub editor_area: Rect,
-    pub footer_area: Rect,
+    pub footer_area: RRect,
     components: Components,
 }
 
 impl GlobalState {
-    pub fn new(height: u16, width: u16) -> Self {
+    pub fn new(area: RRect, writer: std::io::Stdout) -> Self {
         let mut new = Self {
             mode: Mode::default(),
             tree_size: 15,
-            draw: draw::draw_with_tree,
             key_mapper: controls::map_tree,
             mouse_mapper: controls::mouse_handler,
-            mode_span: SELECT_SPAN,
+            theme: UITheme::new().unwrap_or_default(),
+            writer,
             popup: None,
             footer: Vec::default(),
             workspace: Vec::default(),
             tree: Vec::default(),
             clipboard: Clipboard::default(),
             exit: false,
-            screen_rect: Rect { height, width, ..Default::default() },
+            screen_rect: RRect { height: area.height, width: area.width, ..Default::default() },
             tree_area: Rect::default(),
-            tab_area: Rect::default(),
+            tab_area: RRect::default(),
             editor_area: Rect::default(),
-            footer_area: Rect::default(),
+            footer_area: RRect::default(),
             components: Components::default(),
         };
         new.recalc_draw_size();
+        new.select_mode();
         new
-    }
-
-    pub fn draw(
-        &mut self,
-        frame: &mut Frame,
-        workspace: &mut Workspace,
-        tree: &mut Tree,
-        footer: &mut Footer,
-        tmux: &mut EditorTerminal,
-    ) {
-        (self.draw)(self, frame, workspace, tree, footer, tmux);
     }
 
     pub fn map_key(
@@ -129,21 +117,36 @@ impl GlobalState {
     pub fn select_mode(&mut self) {
         self.mode = Mode::Select;
         self.key_mapper = controls::map_tree;
-        self.mode_span = SELECT_SPAN;
         if !self.components.contains(Components::TREE) {
             self.recalc_draw_size();
-            self.draw = self.find_draw_callback();
-        }
+        };
+        let move_to = MoveTo(self.footer_area.x, self.footer_area.y);
+        let mut s = ContentStyle::new();
+        s.foreground_color = Some(Color::Cyan);
+        s.background_color = Some(self.theme.footer_background.into());
+        s.attributes.set(Attribute::Bold);
+        let _ = execute!(&mut self.writer, move_to, PrintStyledContent(StyledContent::new(s, SELECT_SPAN)), Hide,);
     }
 
     pub fn insert_mode(&mut self) {
         self.mode = Mode::Insert;
         self.key_mapper = controls::map_editor;
-        self.mode_span = INSERT_SPAN;
         if !self.components.contains(Components::TREE) {
             self.recalc_draw_size();
-            self.draw = self.find_draw_callback();
-        }
+        };
+        let move_to = MoveTo(self.footer_area.x, self.footer_area.y);
+        let mut s = ContentStyle::new();
+        s.foreground_color = Some(Color::Rgb { r: 255, g: 0, b: 0 });
+        s.background_color = Some(self.theme.footer_background.into());
+        s.attributes.set(Attribute::Bold);
+        let _ = execute!(
+            &mut self.writer,
+            SavePosition,
+            move_to,
+            PrintStyledContent(StyledContent::new(s, INSERT_SPAN)),
+            RestorePosition,
+            Show,
+        );
     }
 
     pub fn is_insert(&self) -> bool {
@@ -153,24 +156,22 @@ impl GlobalState {
     pub fn popup(&mut self, popup: Box<dyn PopupInterface>) {
         self.components.insert(Components::POPUP);
         self.key_mapper = controls::map_popup;
-        self.draw = self.find_draw_callback();
         self.mouse_mapper = controls::disable_mouse;
         self.popup.replace(popup);
-        self.mode_span.style = MUTED_STYLE;
+        // self.mode_span.style = MUTED_STYLE;
     }
 
     pub fn clear_popup(&mut self) -> Option<Box<dyn PopupInterface>> {
         match self.mode {
             Mode::Select => {
                 self.key_mapper = controls::map_tree;
-                self.mode_span.style = SELECT_STYLE;
+                // self.mode_span.style = SELECT_STYLE;
             }
             Mode::Insert => {
                 self.key_mapper = controls::map_editor;
-                self.mode_span.style = INSERT_STYLE;
+                // self.mode_span.style = INSERT_STYLE;
             }
         }
-        self.draw = self.find_draw_callback();
         self.components.remove(Components::POPUP);
         self.mouse_mapper = controls::mouse_handler;
         self.popup.take()
@@ -179,11 +180,9 @@ impl GlobalState {
     pub fn toggle_tree(&mut self) {
         if self.components.contains(Components::TREE) {
             self.components.remove(Components::TREE);
-            self.draw = self.find_draw_callback();
             self.recalc_draw_size();
         } else {
             self.components.insert(Components::TREE);
-            self.draw = self.find_draw_callback();
             self.recalc_draw_size();
         }
     }
@@ -201,25 +200,23 @@ impl GlobalState {
     pub fn toggle_terminal(&mut self, runner: &mut EditorTerminal) {
         if self.components.contains(Components::TERM) {
             self.components.remove(Components::TERM);
-            self.draw = self.find_draw_callback();
             match self.mode {
                 Mode::Select => {
                     self.key_mapper = controls::map_tree;
-                    self.mode_span.style = SELECT_STYLE;
+                    // self.mode_span.style = SELECT_STYLE;
                 }
                 Mode::Insert => {
                     self.key_mapper = controls::map_editor;
-                    self.mode_span.style = INSERT_STYLE;
+                    // self.mode_span.style = INSERT_STYLE;
                 }
             }
             self.mouse_mapper = controls::mouse_handler;
         } else {
             self.components.insert(Components::TERM);
-            self.draw = self.find_draw_callback();
             runner.activate();
             self.key_mapper = map_term;
             self.mouse_mapper = controls::disable_mouse;
-            self.mode_span.style = MUTED_STYLE;
+            // self.mode_span.style = MUTED_STYLE;
         }
     }
 
@@ -266,35 +263,8 @@ impl GlobalState {
         self.footer.push(FooterEvent::Success(msg.into()));
     }
 
-    fn find_draw_callback(&self) -> DrawCallback {
-        let with_term = self.components.contains(Components::TERM);
-        let with_popup = self.components.contains(Components::POPUP);
-        if matches!(self.mode, Mode::Select) || self.components.contains(Components::TREE) {
-            if with_term && with_popup {
-                return draw::draw_full;
-            }
-            if self.components.contains(Components::TERM) {
-                return draw::draw_with_tree_and_term;
-            }
-            if self.components.contains(Components::POPUP) {
-                return draw::draw_with_tree_and_popup;
-            }
-            return draw::draw_with_tree;
-        }
-        if with_popup && with_term {
-            return draw::draw_with_term_and_popup;
-        }
-        if with_term {
-            return draw::draw_with_term;
-        }
-        if with_popup {
-            return draw::draw_with_popup;
-        }
-        draw::draw
-    }
-
     pub fn full_resize(&mut self, height: u16, width: u16, workspace: &mut Workspace) {
-        self.screen_rect = Rect { height, width, ..Default::default() };
+        self.screen_rect = RRect { height, width, ..Default::default() };
         self.recalc_draw_size();
         workspace.resize_render(self.editor_area.width as usize, self.editor_area.height as usize);
     }
@@ -303,21 +273,26 @@ impl GlobalState {
         let free_screen = self.footer_rect_with_remainder();
         let free_screen = self.tree_rect_with_remainder(free_screen);
         let workspace_layout = draw::layot_tabs_editor(free_screen);
-        self.editor_area = workspace_layout[1];
+        self.editor_area = Rect::rataui(workspace_layout[1]);
         self.tab_area = workspace_layout[0];
         self.workspace.push(WorkspaceEvent::Resize);
     }
 
-    fn tree_rect_with_remainder(&mut self, free_scree: Rect) -> Rect {
+    fn tree_rect_with_remainder(&mut self, free_scree: RRect) -> RRect {
         if matches!(self.mode, Mode::Select) || self.components.contains(Components::TREE) {
             let tree_layout = draw::layout_tree(free_scree, self.tree_size);
-            self.tree_area = tree_layout[0];
+            self.tree_area = Rect::rataui(tree_layout[0]);
+            self.tree_area.top_border();
+            self.tree_area.bot_border();
+            self.tree_area.left_border();
+            self.tree_area.right_border();
+            let _ = self.tree_area.draw_borders(Some(DOUBLE_BORDERS), Color::DarkGrey, &mut self.writer);
             return tree_layout[1];
         }
         free_scree
     }
 
-    fn footer_rect_with_remainder(&mut self) -> Rect {
+    fn footer_rect_with_remainder(&mut self) -> RRect {
         let footer_layout = draw::layour_workspace_footer(self.screen_rect);
         self.footer_area = footer_layout[1];
         footer_layout[0]

@@ -4,7 +4,7 @@ use super::{
 };
 use crate::{
     global_state::{Clipboard, PopupMessage, WorkspaceEvent},
-    widgests::{right_corner_rect_static, TextField},
+    render::{right_corner_rect_static, TextField},
     workspace::{CursorPosition, Workspace},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};

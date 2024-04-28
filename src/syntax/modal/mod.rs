@@ -5,7 +5,7 @@ mod info;
 mod parser;
 mod rename;
 
-use crate::{global_state::GlobalState, widgests::dynamic_cursor_rect_sized_height, workspace::CursorPosition};
+use crate::{global_state::GlobalState, render::dynamic_cursor_rect_sized_height, workspace::CursorPosition};
 use completion::AutoComplete;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use info::Info;

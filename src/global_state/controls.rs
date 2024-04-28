@@ -18,6 +18,13 @@ pub fn contained_position(rect: Rect, row: u16, column: u16) -> Option<(Line, Co
     None
 }
 
+pub fn contained_position_loc(rect: crate::render::layout::Rect, row: u16, column: u16) -> Option<(Line, Column)> {
+    if rect.row <= column && column <= rect.width as u16 && rect.col <= row && row <= rect.height {
+        return Some(((row - rect.col) as usize, (column - rect.row) as usize));
+    }
+    None
+}
+
 #[allow(clippy::needless_return)]
 pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, workspace: &mut Workspace) {
     match event.kind {
@@ -34,7 +41,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
             }
         }
         MouseEventKind::Down(MouseButton::Left) => {
-            if let Some(position) = contained_position(gs.editor_area, event.row, event.column) {
+            if let Some(position) = contained_position_loc(gs.editor_area, event.row, event.column) {
                 if let Some(editor) = workspace.get_active() {
                     editor.mouse_cursor(position.into());
                     gs.insert_mode();
@@ -43,7 +50,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                 }
                 return;
             }
-            if let Some((line_idx, _)) = contained_position(gs.tree_area, event.row, event.column) {
+            if let Some((line_idx, _)) = contained_position_loc(gs.tree_area, event.row, event.column) {
                 if let Some(path) = tree.mouse_select(line_idx) {
                     gs.tree.push(TreeEvent::Open(path));
                     return;
@@ -69,7 +76,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                     }
                 }
             }
-            if let Some(position) = contained_position(gs.editor_area, event.row, event.column) {
+            if let Some(position) = contained_position_loc(gs.editor_area, event.row, event.column) {
                 if let Some(editor) = workspace.get_active() {
                     if let Some(clip) = editor.mouse_copy_paste(position.into(), gs.clipboard.pull()) {
                         gs.clipboard.push(clip);
@@ -80,7 +87,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
             }
         }
         MouseEventKind::Drag(MouseButton::Left) => {
-            if let Some(position) = contained_position(gs.editor_area, event.row, event.column) {
+            if let Some(position) = contained_position_loc(gs.editor_area, event.row, event.column) {
                 if let Some(editor) = workspace.get_active() {
                     editor.mouse_select(position.into());
                     gs.insert_mode();

@@ -3,9 +3,9 @@ use super::ModalMessage;
 use crate::debug_to_file;
 use crate::{
     global_state::GlobalState,
+    render::WrappedState,
     syntax::line_builder::Lang,
     utils::{BORDERED_BLOCK, REVERSED},
-    widgests::WrappedState,
 };
 use crossterm::event::{KeyCode, KeyEvent};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};

@@ -1,7 +1,7 @@
 use super::{Popup, PopupSelector};
 use crate::{
     global_state::{PopupMessage, TreeEvent},
-    widgests::Button,
+    render::Button,
 };
 use lsp_types::{Location, Range};
 use std::path::PathBuf;

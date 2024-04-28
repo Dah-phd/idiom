@@ -8,7 +8,7 @@ use crate::{
     },
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::style::Style;
+use ratatui::{layout::Rect, style::Style};
 use std::collections::HashMap;
 
 pub fn mock_ws(content: Vec<String>) -> Workspace {
@@ -63,7 +63,7 @@ fn assert_position(ws: &mut Workspace, position: CursorPosition) {
 #[test]
 fn test_open_scope() {
     let mut ws = base_ws();
-    let mut gs = GlobalState::new(60, 100);
+    let mut gs = GlobalState::new(Rect::new(0, 0, 100, 60));
     gs.insert_mode();
     press(&mut ws, KeyCode::Char('{'), &mut gs);
     press(&mut ws, KeyCode::Enter, &mut gs);
@@ -76,7 +76,7 @@ fn test_open_scope() {
 #[test]
 fn test_move() {
     let mut ws = base_ws();
-    let mut gs = GlobalState::new(60, 100);
+    let mut gs = GlobalState::new(Rect::new(0, 0, 100, 60));
     gs.insert_mode();
     press(&mut ws, KeyCode::Down, &mut gs);
     assert_position(&mut ws, CursorPosition { char: 0, line: 1 });
@@ -105,7 +105,7 @@ fn test_move() {
 #[test]
 fn test_select() {
     let mut ws = base_ws();
-    let mut gs = GlobalState::new(60, 100);
+    let mut gs = GlobalState::new(Rect::new(0, 0, 100, 60));
     gs.insert_mode();
     shift_press(&mut ws, KeyCode::Down, &mut gs);
     assert!(select_eq((CursorPosition::default(), CursorPosition { line: 1, char: 0 }), active(&mut ws)));
@@ -129,7 +129,7 @@ fn test_select() {
 #[test]
 fn test_chars() {
     let mut ws = base_ws();
-    let mut gs = GlobalState::new(60, 100);
+    let mut gs = GlobalState::new(Rect::new(0, 0, 100, 60));
     gs.insert_mode();
     press(&mut ws, KeyCode::Char('n'), &mut gs);
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nhello world!");
@@ -151,7 +151,7 @@ fn test_chars() {
 #[test]
 fn test_new_line() {
     let mut ws = base_ws();
-    let mut gs = GlobalState::new(60, 100);
+    let mut gs = GlobalState::new(Rect::new(0, 0, 100, 60));
     gs.insert_mode();
     press(&mut ws, KeyCode::Enter, &mut gs);
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "");
@@ -169,7 +169,7 @@ fn test_new_line() {
 #[test]
 fn test_del() {
     let mut ws = base_ws();
-    let mut gs = GlobalState::new(60, 100);
+    let mut gs = GlobalState::new(Rect::new(0, 0, 100, 60));
     gs.insert_mode();
     press(&mut ws, KeyCode::Delete, &mut gs);
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "ello world!");
@@ -185,7 +185,7 @@ fn test_del() {
 #[test]
 fn test_backspace() {
     let mut ws = base_ws();
-    let mut gs = GlobalState::new(60, 100);
+    let mut gs = GlobalState::new(Rect::new(0, 0, 100, 60));
     gs.insert_mode();
     press(&mut ws, KeyCode::Backspace, &mut gs);
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "hello world!");
@@ -205,7 +205,7 @@ fn test_backspace() {
 #[test]
 fn test_cut_paste() {
     let mut ws = base_ws();
-    let mut gs = GlobalState::new(60, 100);
+    let mut gs = GlobalState::new(Rect::new(0, 0, 100, 60));
     gs.insert_mode();
     ctrl_press(&mut ws, KeyCode::Char('x'), &mut gs);
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "next line");
@@ -225,7 +225,7 @@ fn test_cut_paste() {
 #[test]
 fn test_jump_select() {
     let mut ws = base_ws();
-    let mut gs = GlobalState::new(60, 100);
+    let mut gs = GlobalState::new(Rect::new(0, 0, 100, 60));
     gs.insert_mode();
     ctrl_shift_press(&mut ws, KeyCode::Right, &mut gs);
     select_eq((CursorPosition::default(), CursorPosition { line: 0, char: 5 }), active(&mut ws));

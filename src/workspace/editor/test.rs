@@ -1,3 +1,5 @@
+use ratatui::layout::Rect;
+
 use super::super::{
     cursor::{Cursor, CursorPosition},
     Editor,
@@ -11,7 +13,7 @@ use std::path::PathBuf;
 pub fn mock_editor(content: Vec<String>) -> Editor {
     let ft = FileType::Unknown;
     let path = PathBuf::from("");
-    let mut gs = GlobalState::new(80, 120);
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 80));
     Editor {
         lexer: Lexer::with_context(ft, &path, &content, &mut gs),
         file_type: ft,

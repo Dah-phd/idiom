@@ -4,15 +4,16 @@ use crate::{
     global_state::{GlobalState, WorkspaceEvent},
     lsp::Diagnostic,
     popups::popups_tree::{create_file_popup, rename_file_popup},
+    render::layout::Rect,
     utils::{build_file_or_folder, to_relative_path},
 };
 use anyhow::Result;
-use crossterm::event::KeyEvent;
-use ratatui::{
-    style::{Color, Modifier, Style},
-    widgets::{Block, BorderType, Borders, List, ListItem, ListState},
-    Frame,
+use crossterm::{
+    event::KeyEvent,
+    style::{ContentStyle, Stylize},
 };
+use ratatui::widgets::ListState;
+use std::io::Write;
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -30,7 +31,6 @@ pub struct Tree {
     selected_path: PathBuf,
     tree: TreePath,
     tree_ptrs: Vec<*mut TreePath>,
-    tree_block: Block<'static>,
     sync_handler: JoinHandle<TreePath>,
     pub lsp_register: Vec<Arc<Mutex<HashMap<PathBuf, Diagnostic>>>>,
 }
@@ -52,28 +52,34 @@ impl Tree {
             selected_path: PathBuf::from("./"),
             tree,
             tree_ptrs,
-            tree_block: Block::new()
-                .borders(Borders::TOP | Borders::RIGHT)
-                .border_style(Style::default().fg(Color::DarkGray))
-                .border_type(BorderType::Double)
-                .title("Explorer"),
+            // tree_block: Block::new()
+            //     .borders(Borders::TOP | Borders::RIGHT)
+            //     .border_style(Style::default().fg(Color::DarkGray))
+            //     .border_type(BorderType::Double)
+            //     .title("Explorer"),
             sync_handler,
             lsp_register: Vec::new(),
         }
     }
 
-    pub fn render(&mut self, frame: &mut Frame, gs: &mut GlobalState) {
-        let list_items = self
-            .tree_ptrs
-            .iter()
-            .flat_map(|ptr| unsafe { ptr.as_ref() }.map(|tree_path| ListItem::new(tree_path.display())))
-            .collect::<Vec<ListItem<'_>>>();
-
-        let tree_widget = List::new(list_items)
-            .block(self.tree_block.clone())
-            .highlight_style(Style { add_modifier: Modifier::REVERSED, ..Default::default() });
-
-        frame.render_stateful_widget(tree_widget, gs.tree_area, &mut self.state);
+    pub fn direct_render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+        let mut line_iter = gs.tree_area.into_iter();
+        let state = self.state.selected().unwrap_or_default();
+        for (idx, text) in
+            self.tree_ptrs.iter().flat_map(|ptr| unsafe { ptr.as_ref() }.map(|tp| tp.direct_display())).enumerate()
+        {
+            if let Some(line) = line_iter.next() {
+                if idx == state {
+                    line.render_styled(text, ContentStyle::new().reverse(), &mut gs.writer)?;
+                } else {
+                    line.render(text, &mut gs.writer)?;
+                }
+            }
+        }
+        for line in line_iter {
+            line.render_empty(&mut gs.writer)?;
+        }
+        gs.writer.flush()
     }
 
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {

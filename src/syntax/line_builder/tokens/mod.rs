@@ -1,13 +1,12 @@
 use super::DiagnosticInfo;
 use super::DiagnosticLine;
 use crate::syntax::line_builder::{Lang, Legend};
-use ratatui::buffer::Buffer;
-use ratatui::style::Style;
 mod line;
 mod token;
 use crate::syntax::theme::Theme;
 use crate::workspace::actions::EditMetaData;
-use line::TokenLine;
+use crate::workspace::line::Line;
+pub use line::TokenLine;
 use lsp_types::SemanticToken;
 use std::cmp::Ordering;
 pub use token::Token;
@@ -26,37 +25,27 @@ pub struct Tokens {
 }
 
 impl Tokens {
-    pub fn new(content: &[String], lang: &Lang, theme: &Theme) -> Self {
+    pub fn new(content: &[impl Line], lang: &Lang, theme: &Theme) -> Self {
         let mut new = Self::default();
         for snippet in content.iter() {
             let mut token_buf = Vec::new();
-            Token::parse(lang, theme, snippet, &mut token_buf);
-            new.inner.push(TokenLine::new(token_buf, snippet));
+            Token::parse(lang, theme, snippet.as_str(), &mut token_buf);
+            new.inner.push(TokenLine::new(token_buf));
         }
         new
     }
 
-    pub fn rebuild_internals(&mut self, content: &[String], lang: &Lang, theme: &Theme) {
-        self.inner.clear();
-        for snippet in content.iter() {
-            let mut token_buf = Vec::new();
-            Token::parse(lang, theme, snippet, &mut token_buf);
-            self.inner.push(TokenLine::new(token_buf, snippet));
-        }
+    pub fn to_lsp(&mut self) {
+        self.producer = TokensType::LSP;
     }
 
-    pub fn cached_render(
-        &mut self,
-        line_idx: usize,
-        max_digits: usize,
-        content: &str,
-        buf: &mut Buffer,
-        area: ratatui::prelude::Rect,
-    ) -> bool {
-        self.inner
-            .get_mut(line_idx)
-            .map(|token_line| token_line.render_ref(content, line_idx, max_digits, area, buf))
-            .is_some()
+    pub fn rebuild_internals(&mut self, content: &[impl Line], lang: &Lang, theme: &Theme) {
+        self.inner.clear();
+        for snippet in content.iter().map(|line| line.as_str()) {
+            let mut token_buf = Vec::new();
+            Token::parse(lang, theme, snippet, &mut token_buf);
+            self.inner.push(TokenLine::new(token_buf));
+        }
     }
 
     pub fn tokens_reset_(
@@ -65,7 +54,7 @@ impl Tokens {
         legend: &Legend,
         lang: &Lang,
         theme: &Theme,
-        content: &[String],
+        content: &[impl Line],
     ) {
         if tokens.is_empty() {
             return;
@@ -81,8 +70,8 @@ impl Tokens {
             })
             .collect();
         self.tokens_reset(tokens, legend, lang, theme, content);
-        for (idx, diagnostics) in old_diagnostics.into_iter() {
-            self.get_or_create_line(idx).set_diagnostics(diagnostics);
+        for (idx, diagnostic) in old_diagnostics.into_iter() {
+            self.get_or_create_line(idx).set_diagnostics(diagnostic);
         }
     }
 
@@ -93,7 +82,7 @@ impl Tokens {
         legend: &Legend,
         lang: &Lang,
         theme: &Theme,
-        content: &[String],
+        content: &[impl Line],
     ) {
         if tokens.is_empty() {
             return;
@@ -108,7 +97,7 @@ impl Tokens {
             if token.delta_line != 0 {
                 char_idx = 0;
                 len = 0;
-                self.insert_line(line_idx, std::mem::take(&mut token_line), &content[line_idx]);
+                self.insert_line(line_idx, std::mem::take(&mut token_line));
                 line_idx += token.delta_line as usize;
             };
             let from = char_idx + token.delta_start as usize;
@@ -123,11 +112,11 @@ impl Tokens {
                 Some(word) => legend.parse_to_color(token.token_type as usize, theme, lang, word),
                 None => theme.default,
             };
-            token_line.push(Token { from, to, len, color: Style::new().fg(color) });
+            token_line.push(Token::new(from, to, len, color));
             char_idx = from;
         }
         if !token_line.is_empty() {
-            self.insert_line(line_idx, token_line, &content[line_idx]);
+            self.insert_line(line_idx, token_line);
         };
     }
 
@@ -138,7 +127,7 @@ impl Tokens {
         legend: &Legend,
         lang: &Lang,
         theme: &Theme,
-        content: &[String],
+        content: &[impl Line],
     ) {
         let mut line_idx = 0;
         let mut char_idx = 0;
@@ -163,8 +152,7 @@ impl Tokens {
                 Some(word) => legend.parse_to_color(token.token_type as usize, theme, lang, word),
                 None => theme.default,
             };
-            token_line.tokens.push(Token { from, to, len, color: Style::new().fg(token_type) });
-            token_line.build_cache(&content[line_idx]);
+            token_line.tokens.push(Token::new(from, to, len, token_type));
             char_idx = from;
         }
     }
@@ -232,7 +220,7 @@ impl Tokens {
         self.clear_lines(meta.start_line, meta.to);
     }
 
-    pub fn map_meta_internal(&mut self, meta: EditMetaData, content: &[String], lang: &Lang, theme: &Theme) {
+    pub fn map_meta_internal(&mut self, meta: EditMetaData, content: &[impl Line], lang: &Lang, theme: &Theme) {
         match meta.from.cmp(&meta.to) {
             Ordering::Equal => {}
             Ordering::Greater => {
@@ -265,15 +253,7 @@ impl Tokens {
         Some(tokens)
     }
 
-    pub fn get_mut(&mut self, index: usize) -> Option<&mut TokenLine> {
-        let tokens = self.inner.get_mut(index)?;
-        if tokens.is_empty() {
-            return None;
-        };
-        Some(tokens)
-    }
-
-    fn get_or_create_line(&mut self, idx: usize) -> &mut TokenLine {
+    pub fn get_or_create_line(&mut self, idx: usize) -> &mut TokenLine {
         while idx + 1 > self.inner.len() {
             self.inner.push(TokenLine::default());
         }
@@ -287,11 +267,11 @@ impl Tokens {
         self.inner.insert(idx, TokenLine::default());
     }
 
-    fn insert_line(&mut self, line_idx: usize, tokens: Vec<Token>, content: &str) {
+    fn insert_line(&mut self, line_idx: usize, tokens: Vec<Token>) {
         while line_idx > self.inner.len() {
             self.inner.push(TokenLine::default());
         }
-        self.inner.insert(line_idx, TokenLine::new(tokens, content));
+        self.inner.insert(line_idx, TokenLine::new(tokens));
     }
 
     /// drop tokens in range
@@ -301,12 +281,11 @@ impl Tokens {
         }
     }
 
-    pub fn rebuild_lines(&mut self, from: usize, count: usize, lang: &Lang, theme: &Theme, content: &[String]) {
+    pub fn rebuild_lines(&mut self, from: usize, count: usize, lang: &Lang, theme: &Theme, content: &[impl Line]) {
         for (line_idx, token_line) in self.inner.iter_mut().enumerate().skip(from).take(count) {
             token_line.clear();
-            let code_line = &content[line_idx];
+            let code_line = &content[line_idx].as_str();
             Token::parse(lang, theme, code_line, &mut token_line.tokens);
-            token_line.build_cache(code_line);
         }
     }
 
@@ -315,4 +294,45 @@ impl Tokens {
             self.inner.remove(line_idx);
         }
     }
+}
+
+pub fn set_tokens(
+    tokens: Vec<SemanticToken>,
+    legend: &Legend,
+    lang: &Lang,
+    theme: &Theme,
+    content: &mut Vec<impl Line>,
+) {
+    let mut line_idx = 0;
+    let mut char_idx = 0;
+    let mut len = 0;
+    let mut token_line = Vec::new();
+    for token in tokens {
+        if token.delta_line != 0 {
+            len = 0;
+            char_idx = 0;
+            if !token_line.is_empty() {
+                content[line_idx].replace_tokens(std::mem::take(&mut token_line));
+            };
+            line_idx += token.delta_line as usize;
+        };
+        let from = char_idx + token.delta_start as usize;
+        let to = from + token.length as usize;
+        // enriches the tokens with additinal highlights
+        if from.saturating_sub(char_idx + len) > 3 {
+            content[line_idx].get(char_idx + len..from).inspect(|snippet| {
+                Token::enrich(char_idx, lang, theme, snippet, &mut token_line);
+            });
+        };
+        len = token.length as usize;
+        let token_type = match content[line_idx].get(from..from + len) {
+            Some(word) => legend.parse_to_color(token.token_type as usize, theme, lang, word),
+            None => theme.default,
+        };
+        token_line.push(Token::new(from, to, len, token_type));
+        char_idx = from;
+    }
+    if !token_line.is_empty() {
+        content[line_idx].replace_tokens(token_line);
+    };
 }

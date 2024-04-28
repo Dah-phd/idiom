@@ -1,5 +1,5 @@
 use super::ModalMessage;
-use crate::{global_state::GlobalState, utils::BORDERED_BLOCK, widgests::TextField, workspace::CursorPosition};
+use crate::{global_state::GlobalState, render::TextField, utils::BORDERED_BLOCK, workspace::CursorPosition};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{prelude::Rect, Frame};
 

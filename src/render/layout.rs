@@ -1,0 +1,253 @@
+use bitflags::bitflags;
+use std::cmp::Ordering;
+use std::io::{Result, Write};
+use std::ops::RangeInclusive;
+
+use crossterm::cursor::{RestorePosition, SavePosition};
+use crossterm::style::{ResetColor, SetForegroundColor};
+use crossterm::{
+    cursor::MoveTo,
+    queue,
+    style::{Color, ContentStyle, Print, PrintStyledContent, StyledContent},
+};
+
+pub const BORDERS: BorderSet = BorderSet {
+    top_left_qorner: "┌",
+    top_right_qorner: "┐",
+    bot_left_qorner: "└",
+    bot_right_qorner: "┘",
+    vertical: "│",
+    horizontal: "─",
+};
+
+pub const DOUBLE_BORDERS: BorderSet = BorderSet {
+    top_left_qorner: "╔",
+    top_right_qorner: "╗",
+    bot_left_qorner: "╚",
+    bot_right_qorner: "╝",
+    vertical: "║",
+    horizontal: "═",
+};
+
+bitflags! {
+    /// Bitflags that can be composed to set the visible borders essentially on the block widget.
+    #[derive(Default, Clone, Copy, Eq, PartialEq, Hash)]
+    pub struct Borders: u8 {
+        /// Show no border (default)
+        const NONE   = 0b0000;
+        /// Show the top border
+        const TOP    = 0b0001;
+        /// Show the right border
+        const RIGHT  = 0b0010;
+        /// Show the bottom border
+        const BOTTOM = 0b0100;
+        /// Show the left border
+        const LEFT   = 0b1000;
+        /// Show all borders
+        const ALL = Self::TOP.bits() | Self::RIGHT.bits() | Self::BOTTOM.bits() | Self::LEFT.bits();
+    }
+}
+
+pub struct BorderSet {
+    pub top_left_qorner: &'static str,
+    pub top_right_qorner: &'static str,
+    pub bot_left_qorner: &'static str,
+    pub bot_right_qorner: &'static str,
+    pub vertical: &'static str,
+    pub horizontal: &'static str,
+}
+
+impl BorderSet {
+    pub const fn double() -> Self {
+        DOUBLE_BORDERS
+    }
+}
+
+#[derive(Default, Clone, Copy)]
+pub struct Rect {
+    pub row: u16,
+    pub col: u16,
+    pub width: usize,
+    pub height: u16,
+    borders: Borders,
+}
+
+impl Rect {
+    pub fn new(row: u16, col: u16, width: usize, height: u16) -> Self {
+        Self { row, col, width, height, borders: Borders::NONE }
+    }
+
+    pub fn rataui(rect: ratatui::layout::Rect) -> Self {
+        Self::new(rect.y, rect.x, rect.width as usize, rect.height)
+    }
+
+    pub fn top_border(&mut self) {
+        self.row += 1;
+        self.height -= 1;
+        self.borders.insert(Borders::TOP);
+    }
+
+    pub fn bot_border(&mut self) {
+        self.height -= 1;
+        self.borders.insert(Borders::BOTTOM);
+    }
+
+    pub fn right_border(&mut self) {
+        self.width -= 1;
+        self.borders.insert(Borders::RIGHT);
+    }
+
+    pub fn left_border(&mut self) {
+        self.col += 1;
+        self.width -= 1;
+        self.borders.insert(Borders::LEFT);
+    }
+
+    pub fn draw_borders(&self, set: Option<BorderSet>, fg: Color, writer: &mut impl Write) -> std::io::Result<()> {
+        let set = set.unwrap_or(BORDERS);
+        queue!(writer, SavePosition, SetForegroundColor(fg))?;
+        if self.borders.contains(Borders::TOP) {
+            let row = self.row - 1;
+            for col in self.col..=self.width as u16 {
+                queue!(writer, MoveTo(col, row), Print(set.horizontal))?;
+            }
+        }
+        if self.borders.contains(Borders::BOTTOM) {
+            let row = self.height + 1;
+            for col in self.col..=self.width as u16 {
+                queue!(writer, MoveTo(col, row), Print(set.horizontal))?;
+            }
+        }
+        if self.borders.contains(Borders::LEFT) {
+            let col = self.col - 1;
+            for row in self.row..=self.height {
+                queue!(writer, MoveTo(col, row), Print(set.vertical))?;
+            }
+        }
+        if self.borders.contains(Borders::RIGHT) {
+            let col = self.width as u16 + self.col;
+            for row in self.row..=self.height {
+                queue!(writer, MoveTo(col, row), Print(set.vertical))?;
+            }
+        }
+        if self.borders.contains(Borders::TOP | Borders::LEFT) {
+            queue!(writer, MoveTo(self.col - 1, self.row - 1), Print(set.top_left_qorner))?;
+        }
+        if self.borders.contains(Borders::TOP | Borders::RIGHT) {
+            queue!(writer, MoveTo(self.width as u16 + self.col, self.row - 1), Print(set.top_right_qorner))?;
+        }
+        if self.borders.contains(Borders::BOTTOM | Borders::LEFT) {
+            queue!(writer, MoveTo(self.col - 1, self.height + 1), Print(set.bot_left_qorner))?;
+        }
+        if self.borders.contains(Borders::BOTTOM | Borders::RIGHT) {
+            queue!(writer, MoveTo(self.width as u16 + self.col, self.height + 1), Print(set.bot_right_qorner))?;
+        }
+        queue!(writer, RestorePosition, ResetColor)?;
+        writer.flush()
+    }
+}
+
+pub struct RectIter<'a> {
+    rect: &'a Rect,
+    row_range: RangeInclusive<u16>,
+}
+
+impl<'a> Iterator for RectIter<'a> {
+    type Item = Line;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.row_range.next().map(|row| Line { col: self.rect.col, row, width: self.rect.width })
+    }
+}
+
+impl<'a> IntoIterator for &'a Rect {
+    type IntoIter = RectIter<'a>;
+    type Item = Line;
+    fn into_iter(self) -> Self::IntoIter {
+        RectIter { rect: self, row_range: self.row..=self.height }
+    }
+}
+
+pub struct Line {
+    pub row: u16,
+    pub col: u16,
+    pub width: usize,
+}
+
+impl Line {
+    #[inline]
+    pub fn render_empty(self, writer: &mut impl Write) -> std::io::Result<()> {
+        queue!(writer, MoveTo(self.col, self.row), Print(format!("{:width$}", "e", width = self.width)))
+    }
+
+    #[inline]
+    pub fn render(self, text: &str, writer: &mut impl Write) -> Result<()> {
+        match text.len().cmp(&self.width) {
+            Ordering::Greater => {
+                queue!(writer, MoveTo(self.col, self.row), Print(unsafe { text.get_unchecked(..self.width) }))
+            }
+            Ordering::Equal => {
+                queue!(writer, MoveTo(self.col, self.row), Print(text))
+            }
+            Ordering::Less => {
+                queue!(writer, MoveTo(self.col, self.row), Print(format!("{text:width$}", width = self.width)))
+            }
+        }
+    }
+
+    #[inline]
+    pub fn render_styled(self, text: &str, style: ContentStyle, writer: &mut impl Write) -> Result<()> {
+        match text.len().cmp(&self.width) {
+            Ordering::Greater => {
+                queue!(
+                    writer,
+                    MoveTo(self.col, self.row),
+                    PrintStyledContent(StyledContent::new(style, unsafe { text.get_unchecked(..self.width) }))
+                )
+            }
+            Ordering::Equal => {
+                queue!(writer, MoveTo(self.col, self.row), PrintStyledContent(StyledContent::new(style, text)))
+            }
+            Ordering::Less => {
+                queue!(
+                    writer,
+                    MoveTo(self.col, self.row),
+                    PrintStyledContent(StyledContent::new(style, format!("{text:width$}", width = self.width)))
+                )
+            }
+        }
+    }
+
+    pub fn builder(self, writer: &mut impl Write) -> std::io::Result<LineBuilder> {
+        queue!(writer, MoveTo(self.col, self.row)).map(|_| LineBuilder { remaining: self.width })
+    }
+}
+
+pub struct LineBuilder {
+    remaining: usize,
+}
+
+impl LineBuilder {
+    pub fn push(&mut self, text: &str, writer: &mut impl Write) -> std::io::Result<bool> {
+        if text.len() > self.remaining {
+            queue!(writer, Print(unsafe { text.get_unchecked(..self.remaining) }))?;
+            self.remaining = 0;
+            return Ok(false);
+        }
+        self.remaining -= text.len();
+        queue!(writer, Print(text))?;
+        Ok(true)
+    }
+    pub fn push_styled(&mut self, text: &str, style: ContentStyle, writer: &mut impl Write) -> std::io::Result<bool> {
+        if text.len() > self.remaining {
+            queue!(
+                writer,
+                PrintStyledContent(StyledContent::new(style, unsafe { text.get_unchecked(..self.remaining) }))
+            )?;
+            self.remaining = 0;
+            return Ok(false);
+        }
+        self.remaining -= text.len();
+        queue!(writer, PrintStyledContent(StyledContent::new(style, text)))?;
+        Ok(true)
+    }
+}

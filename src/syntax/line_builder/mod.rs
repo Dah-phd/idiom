@@ -1,45 +1,26 @@
 mod context;
 mod diagnostics;
-mod internal;
 mod langs;
 mod legend;
-mod tokens;
+pub mod tokens;
 
 use crate::{
-    global_state::GlobalState, lsp::LSPClient, syntax::modal::LSPResponseType, syntax::Theme,
-    widgests::wrapped_line_start, workspace::actions::EditMetaData,
+    global_state::GlobalState,
+    lsp::LSPClient,
+    syntax::{modal::LSPResponseType, Theme},
+    workspace::{actions::EditMetaData, line::Line},
 };
 pub use context::LineBuilderContext;
 use diagnostics::diagnostics_full;
 pub use diagnostics::{Action, DiagnosticInfo, DiagnosticLine};
-pub use internal::generic_line;
 pub use langs::Lang;
 use legend::Legend;
 use lsp_types::{
     SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities, TextDocumentContentChangeEvent,
 };
-use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::widgets::{Widget, WidgetRef};
-use ratatui::{
-    style::{Color, Style},
-    text::{Line, Span},
-};
-use std::path::Path;
-use tokens::Tokens;
-
-/// !the initial len of the line produced by init_buffer_with_line_number
-/// !used by LineBuilder::format_with_info(..) -> ListItem - used to derive cursor and wrap
-const INIT_BUF_SIZE: usize = 1;
-const DIGIT_STYLE: Style = Style::new().fg(Color::DarkGray);
-
-/// ! generates start with line number -> based on the produced vec len is the definition of INIT_BUF_SIZE
-pub fn init_buffer_with_line_number(line_idx: usize, line_number_offset: usize) -> Vec<Span<'static>> {
-    vec![Span::styled(
-        format!("{: >1$} ", line_idx + 1, line_number_offset),
-        DIGIT_STYLE,
-    )]
-}
+use std::{io::Stdout, path::Path};
+use tokens::{set_tokens, Tokens};
 
 /// Struct used to create styled maps
 pub struct LineBuilder {
@@ -51,7 +32,7 @@ pub struct LineBuilder {
 }
 
 impl LineBuilder {
-    pub fn new(lang: Lang, content: &[String], gs: &mut GlobalState) -> Self {
+    pub fn new(lang: Lang, content: &[impl Line], gs: &mut GlobalState) -> Self {
         let theme = gs.unwrap_default_result(Theme::new(), "theme.json: ");
         Self {
             tokens: Tokens::new(content, &lang, &theme),
@@ -73,15 +54,20 @@ impl LineBuilder {
     }
 
     /// Process SemanticTokensResultFull from LSP
-    pub fn set_tokens(&mut self, tokens_res: SemanticTokensResult, content: &[String]) -> bool {
+    pub fn set_tokens(&mut self, tokens_res: SemanticTokensResult, content: &mut Vec<impl Line>) -> bool {
         if let SemanticTokensResult::Tokens(tokens) = tokens_res {
-            self.tokens.tokens_reset_(tokens.data, &self.legend, &self.lang, &self.theme, content);
+            if tokens.data.is_empty() {
+                return false;
+            }
+            self.tokens.to_lsp();
+            set_tokens(tokens.data, &self.legend, &self.lang, &self.theme, content);
+            // self.tokens.tokens_reset_(tokens.data, &self.legend, &self.lang, &self.theme, content);
         }
         self.tokens.are_from_lsp()
     }
 
     /// Process SemanticTokenRangeResult from LSP
-    pub fn set_tokens_partial(&mut self, tokens: SemanticTokensRangeResult, content: &[String]) {
+    pub fn set_tokens_partial(&mut self, tokens: SemanticTokensRangeResult, content: &[impl Line]) {
         let tokens = match tokens {
             SemanticTokensRangeResult::Partial(data) => data.data,
             SemanticTokensRangeResult::Tokens(data) => data.data,
@@ -95,7 +81,7 @@ impl LineBuilder {
         path: &Path,
         version: i32,
         events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
-        content: &[String],
+        content: &[impl Line],
         client: &mut LSPClient,
     ) -> Option<LSPResponseType> {
         if self.tokens.are_from_lsp() {
@@ -128,7 +114,7 @@ impl LineBuilder {
     pub fn update_internals(
         &mut self,
         events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
-        content: &[String],
+        content: &[impl Line],
     ) {
         match events.len() {
             0 => {}
@@ -155,129 +141,22 @@ impl LineBuilder {
         }
     }
 
-    /// build styled line with diagnostic - reverts to native builder if tokens are not available
     pub fn build_line(
-        &mut self,
-        line_idx: usize,
-        content: &str,
-        line_number_offset: usize,
-        buf: &mut Buffer,
-        area: Rect,
-        ctx: &mut LineBuilderContext,
-    ) {
-        ctx.build_select_buffer(line_idx, content.len());
-        if content.is_empty() {
-            let mut buffer = init_buffer_with_line_number(line_idx, line_number_offset);
-            if ctx.select_range.is_some() {
-                buffer.push(Span::styled(" ", Style::new().bg(self.theme.selected)));
-            };
-            Line::from(ctx.format_with_info(line_idx, None, buffer)).render_ref(area, buf);
-        }
-        if !self.lsp_line(line_idx, line_number_offset, content, buf, area, ctx) {
-            let init_buf = init_buffer_with_line_number(line_idx, line_number_offset);
-            Line::from(generic_line(self, line_idx, content, ctx, init_buf)).render_ref(area, buf);
-        }
-    }
-
-    pub fn long_line(
-        &mut self,
-        line_idx: usize,
-        content: &str,
-        line_number_offset: usize,
-        buf: &mut Buffer,
-        area: Rect,
-    ) {
-        if let Some(token_line) = self.tokens.get_mut(line_idx) {
-            token_line.render_shrinked_ref(content, line_idx, line_number_offset, area, buf);
-        };
-    }
-
-    pub fn wrap_line(
-        &mut self,
-        line_idx: usize,
-        content: &str,
-        line_number_offset: usize,
-        buf: &mut Buffer,
-        x: u16,
-        mut y: u16,
-        width: u16,
-        mut max_lines: usize,
-        ctx: &mut LineBuilderContext,
-    ) -> (u16, usize) {
-        max_lines -= 1;
-        let rel_line_with_cursor = ctx.cursor.char / ctx.text_width;
-        let skip_lines = rel_line_with_cursor.saturating_sub(max_lines);
-        let mut buffer = self
-            .tokens
-            .get(line_idx)
-            .map(|token_line| {
-                token_line.build_spans(
-                    content,
-                    &self.theme,
-                    init_buffer_with_line_number(line_idx, line_number_offset),
-                    ctx,
-                )
-            })
-            .unwrap_or(generic_line(
-                self,
-                line_idx,
-                content,
-                ctx,
-                init_buffer_with_line_number(line_idx, line_number_offset),
-            ));
-        buffer = ctx.format_with_info(line_idx, None, buffer);
-        let padding = derive_wrap_digit_offset(buffer.first());
-        let mut lines = vec![Line::from(buffer.drain(..ctx.text_width + 1).collect::<Vec<_>>())];
-        while buffer.len() > ctx.text_width {
-            let mut line = vec![padding.clone()];
-            line.extend(buffer.drain(..ctx.text_width));
-            lines.push(Line::from(line));
-        }
-        buffer.insert(0, padding);
-        lines.push(Line::from(buffer));
-        let mut wrapped = lines.into_iter();
-        wrapped_line_start(skip_lines, wrapped.next()).render(Rect::new(x, y, width, 1), buf);
-        if max_lines == 0 {
-            return (y, max_lines);
-        };
-        y += 1;
-        for split_line in wrapped.skip(skip_lines) {
-            split_line.render(Rect::new(x, y, width, 1), buf);
-            max_lines -= 1;
-            if max_lines == 0 {
-                return (y, max_lines);
-            };
-            y += 1;
-        }
-        (y, max_lines)
-    }
-
-    fn lsp_line(
         &mut self,
         line_idx: usize,
         max_digits: usize,
         content: &str,
-        buf: &mut Buffer,
         area: Rect,
+        writer: &mut Stdout,
         ctx: &mut LineBuilderContext,
-    ) -> bool {
-        if ctx.select_range.is_none() && ctx.cursor.line != line_idx {
-            return self.tokens.cached_render(line_idx, max_digits, content, buf, area);
+    ) -> std::io::Result<()> {
+        ctx.build_select_buffer(line_idx, content.len());
+        if ctx.cursor.line == line_idx {
+            return self.tokens.get_or_create_line(line_idx).render(line_idx, max_digits, content, area, writer);
         };
-        if let Some(token_line) = self.tokens.get(line_idx) {
-            let init_buf = init_buffer_with_line_number(line_idx, max_digits);
-            let buffer = token_line.build_spans(content, &self.theme, init_buf, ctx);
-            Line::from(ctx.format_with_info(line_idx, Some(&token_line.diagnosics), buffer)).render_ref(area, buf);
-            return true;
-        }
-        false
+        if ctx.select_range.is_some() {
+            return self.tokens.get_or_create_line(line_idx).render_select(line_idx, max_digits, content, area, writer);
+        };
+        self.tokens.get_or_create_line(line_idx).fast_render(line_idx, max_digits, content, area, writer)
     }
-}
-
-fn derive_wrap_digit_offset(start_span: Option<&Span<'_>>) -> Span<'static> {
-    if let Some(span) = start_span {
-        let padding_len = span.content.len();
-        return Span::raw((0..padding_len).map(|_| '.').collect::<String>());
-    }
-    Span::default()
 }

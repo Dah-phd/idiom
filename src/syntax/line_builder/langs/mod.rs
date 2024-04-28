@@ -72,6 +72,7 @@ impl Lang {
     }
 
     pub fn completable(&self, line: &str, idx: usize) -> bool {
+        return false; // TODO remove
         let mut curr_token = String::new();
         let mut prev_token = String::new();
         let mut trigger = false;

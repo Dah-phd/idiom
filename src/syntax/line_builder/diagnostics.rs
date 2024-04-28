@@ -1,11 +1,12 @@
 use crate::global_state::WorkspaceEvent;
 use crate::syntax::line_builder::tokens::Token;
+use crossterm::style::{Attribute, Color as C};
 use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
 
 use super::LineBuilder;
 
 use ratatui::{
-    style::{Color, Modifier, Style},
+    style::{Color, Style},
     text::Span,
 };
 
@@ -73,13 +74,13 @@ impl DiagnosticData {
         match self.end {
             Some(end) => {
                 if self.start <= token.from && token.to <= end {
-                    token.color.underline_color = self.inline_span.style.fg;
-                    token.color.add_modifier = Modifier::UNDERLINED;
+                    token.color.underline_color = self.inline_span.style.fg.map(|c| C::from(c));
+                    token.color.attributes.set(Attribute::Undercurled);
                 }
             }
             None if self.start <= token.from => {
-                token.color.underline_color = self.inline_span.style.fg;
-                token.color.add_modifier = Modifier::UNDERLINED;
+                token.color.underline_color = self.inline_span.style.fg.map(|c| C::from(c));
+                token.color.attributes.set(Attribute::Undercurled);
             }
             _ => {}
         }

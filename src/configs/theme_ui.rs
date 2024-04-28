@@ -1,4 +1,5 @@
 use crate::configs::{load_or_create_config, THEME_UI};
+use crossterm::style::{Color as C, ContentStyle, StyledContent};
 use ratatui::style::Color;
 use serde::Serialize;
 use serde_json::{Map, Value};
@@ -33,6 +34,13 @@ impl Default for UITheme {
 impl UITheme {
     pub fn new() -> Result<Self, serde_json::Error> {
         load_or_create_config(THEME_UI)
+    }
+
+    pub fn footer_fg<'a>(&self, text: &'a str, fg: C) -> StyledContent<&'a str> {
+        let mut s = ContentStyle::new();
+        s.background_color = Some(self.footer_background.into());
+        s.foreground_color = Some(fg);
+        StyledContent::new(s, text)
     }
 }
 

@@ -13,13 +13,12 @@ use crate::{
     workspace::Workspace,
 };
 use anyhow::Result;
-use crossterm::event::Event;
+use crossterm::{event::Event, terminal};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{io::Stdout, path::PathBuf, time::Instant};
 
-pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Option<PathBuf>) -> Result<()> {
-    let size = terminal.size()?;
-    let mut gs = GlobalState::new(size.height, size.width);
+pub async fn app(terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Option<PathBuf>) -> Result<()> {
+    let mut gs = GlobalState::new(terminal.size()?, std::io::stdout());
     let configs = gs.unwrap_default_result(KeyMap::new(), ".keys: ");
     let mut last_frame_start = Instant::now();
     let mut general_key_map = configs.general_key_map();
@@ -27,7 +26,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
     // COMPONENTS
     let mut tree = Tree::new(configs.tree_key_map());
     let mut workspace = Workspace::new(configs.editor_key_map(), tree.get_base_file_names(), &mut gs).await;
-    let mut term = EditorTerminal::new(gs.editor_area.width);
+    let mut term = EditorTerminal::new(gs.editor_area.width as u16);
     let mut footer = Footer::new(&mut gs);
 
     // CLI SETUP
@@ -41,7 +40,13 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
     drop(configs);
 
     loop {
-        terminal.draw(|frame| gs.draw(frame, &mut workspace, &mut tree, &mut footer, &mut term))?;
+        tree.direct_render(&mut gs)?;
+
+        footer.render(&mut gs, workspace.get_active().map(|e| e.get_stats()))?;
+
+        if let Some(editor) = workspace.get_active() {
+            editor.fast_render(&mut gs)?;
+        }
 
         if crossterm::event::poll(last_frame_start.elapsed())? {
             last_frame_start = Instant::now();
@@ -61,12 +66,12 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                                 gs.popup(FindPopup::new());
                             } else {
                                 gs.popup(ActivePathSearch::new());
-                            }
+                            };
                         }
                         GeneralAction::Replace => {
                             if gs.is_insert() {
                                 gs.popup(ReplacePopup::new());
-                            }
+                            };
                         }
                         GeneralAction::SelectOpenEditor => {
                             let tabs = workspace.tabs();
@@ -78,14 +83,14 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                             if !workspace.editors.is_empty() {
                                 workspace.toggle_tabs();
                                 gs.insert_mode();
-                            }
+                            };
                         }
                         GeneralAction::Exit => {
                             if workspace.are_updates_saved() && gs.popup.is_none() {
                                 gs.exit = true;
                             } else {
                                 gs.popup(save_all_popup());
-                            }
+                            };
                         }
                         GeneralAction::FileTreeModeOrCancelInput => gs.select_mode(),
                         GeneralAction::SaveAll => workspace.save(&mut gs),
@@ -102,7 +107,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                         GeneralAction::GoToLinePopup => {
                             if gs.is_insert() {
                                 gs.popup(GoToLinePopup::new());
-                            }
+                            };
                         }
                         GeneralAction::ToggleTerminal => {
                             gs.toggle_terminal(&mut term);
@@ -111,7 +116,7 @@ pub async fn app(mut terminal: Terminal<CrosstermBackend<Stdout>>, open_file: Op
                 }
                 Event::Resize(width, height) => {
                     gs.full_resize(height, width, &mut workspace);
-                    term.resize(gs.editor_area.width);
+                    term.resize(gs.editor_area.width as u16);
                 }
                 Event::Mouse(event) => gs.map_mouse(event, &mut tree, &mut workspace),
                 _ => (),

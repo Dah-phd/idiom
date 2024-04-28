@@ -4,11 +4,11 @@ mod footer;
 mod global_state;
 mod lsp;
 mod popups;
+mod render;
 mod runner;
 mod syntax;
 mod tree;
 mod utils;
-mod widgests;
 mod workspace;
 
 use app::app;
@@ -46,6 +46,7 @@ fn graceful_exit() -> Result<()> {
         crossterm::terminal::LeaveAlternateScreen,
         crossterm::style::ResetColor,
         crossterm::event::DisableMouseCapture,
+        crossterm::cursor::Show,
     )?;
     crossterm::terminal::disable_raw_mode()?;
     Ok(())

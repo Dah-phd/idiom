@@ -1,4 +1,7 @@
-use crate::workspace::actions::edits::{Edit, EditMetaData};
+use crate::workspace::{
+    actions::edits::{Edit, EditMetaData},
+    line::Line,
+};
 use lsp_types::{Position, Range, TextEdit};
 use std::time::{Duration, Instant};
 
@@ -58,14 +61,14 @@ impl ActionBuffer {
         std::mem::replace(self, Self::Text(TextBuffer::new(line, char, ch.into()))).into()
     }
 
-    pub fn del(&mut self, line: usize, char: usize, text: &mut String) -> Option<Edit> {
+    pub fn del(&mut self, line: usize, char: usize, text: &mut impl Line) -> Option<Edit> {
         if let Self::Del(buf) = self {
             return buf.del(line, char, text);
         }
         std::mem::replace(self, Self::Del(DelBuffer::new(line, char, text))).into()
     }
 
-    pub fn backspace(&mut self, line: usize, char: usize, text: &mut String, indent: &str) -> Option<Edit> {
+    pub fn backspace(&mut self, line: usize, char: usize, text: &mut impl Line, indent: &str) -> Option<Edit> {
         if let Self::Backspace(buf) = self {
             return buf.backspace(line, char, text, indent);
         }
@@ -93,10 +96,10 @@ pub struct DelBuffer {
 }
 
 impl DelBuffer {
-    fn new(line: usize, char: usize, text: &mut String) -> Self {
+    fn new(line: usize, char: usize, text: &mut impl Line) -> Self {
         Self { line, char, text: text.remove(char).into(), clock: Instant::now() }
     }
-    fn del(&mut self, line: usize, char: usize, text: &mut String) -> Option<Edit> {
+    fn del(&mut self, line: usize, char: usize, text: &mut impl Line) -> Option<Edit> {
         if line == self.line && char == self.char && self.clock.elapsed() <= TICK {
             self.clock = Instant::now();
             self.text.push(text.remove(char));
@@ -132,13 +135,13 @@ pub struct BackspaceBuffer {
 }
 
 impl BackspaceBuffer {
-    fn new(line: usize, char: usize, text: &mut String, indent: &str) -> Self {
+    fn new(line: usize, char: usize, text: &mut impl Line, indent: &str) -> Self {
         let mut new = Self { line, last: char, char: char as u32, text: String::new(), clock: Instant::now() };
         new.backspace_indent_handler(char, text, indent);
         new
     }
 
-    fn backspace(&mut self, line: usize, char: usize, text: &mut String, indent: &str) -> Option<Edit> {
+    fn backspace(&mut self, line: usize, char: usize, text: &mut impl Line, indent: &str) -> Option<Edit> {
         if line == self.line && self.last == char && self.clock.elapsed() <= TICK {
             self.backspace_indent_handler(char, text, indent);
             return None;
@@ -146,7 +149,7 @@ impl BackspaceBuffer {
         Some(std::mem::replace(self, Self::new(line, char, text, indent)).into())
     }
 
-    fn backspace_indent_handler(&mut self, char: usize, text: &mut String, indent: &str) {
+    fn backspace_indent_handler(&mut self, char: usize, text: &mut impl Line, indent: &str) {
         let chars_after_indent = text[..char].trim_start_matches(indent);
         if chars_after_indent.is_empty() {
             self.text.push_str(indent);

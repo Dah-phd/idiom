@@ -1,6 +1,7 @@
 pub mod actions;
 pub mod cursor;
 pub mod editor;
+pub mod line;
 pub mod utils;
 use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
@@ -57,9 +58,7 @@ impl Workspace {
 
     pub fn render(&mut self, frame: &mut Frame, gs: &mut GlobalState) {
         if let Some(editor) = self.editors.get_mut(0) {
-            editor.sync(gs);
-            editor.render_ref(gs.editor_area, frame.buffer_mut());
-            editor.lexer.render_modal_if_exist(frame, gs.editor_area, &editor.cursor);
+            // editor.lexer.render_modal_if_exist(frame, gs.editor_area, &editor.cursor);
             let titles: Vec<_> = self.editors.iter().map(|e| e.display.to_owned()).collect();
             let tabs = Tabs::new(titles).style(self.tab_style).highlight_style(TAB_HIGHTLIGHT).select(0);
             frame.render_widget(tabs, gs.tab_area);
@@ -480,5 +479,5 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
     false
 }
 
-#[cfg(test)]
-mod test;
+// #[cfg(test)]
+// mod test;

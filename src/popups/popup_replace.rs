@@ -8,8 +8,8 @@ use ratatui::{
 
 use crate::{
     global_state::{Clipboard, PopupMessage, WorkspaceEvent},
+    render::right_corner_rect_static,
     tree::Tree,
-    widgests::right_corner_rect_static,
     workspace::{CursorPosition, Workspace},
 };
 

@@ -1,13 +1,15 @@
 use crate::{configs::UITheme, global_state::GlobalState, workspace::DocStats};
-use ratatui::{
-    buffer::Buffer,
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Style, Stylize},
-    text::Span,
-    widgets::{Block, WidgetRef},
-    Frame,
+use crossterm::{
+    cursor::MoveTo,
+    execute,
+    style::{Color, ContentStyle, PrintStyledContent, SetBackgroundColor, StyledContent},
+    terminal::{Clear, ClearType},
 };
-use std::time::{Duration, Instant};
+use ratatui::{buffer::Buffer, layout::Rect, text::Span, widgets::WidgetRef};
+use std::{
+    io::{Result, Write},
+    time::{Duration, Instant},
+};
 
 const MSG_DURATION: Duration = Duration::from_secs(3);
 
@@ -16,18 +18,18 @@ pub struct Footer {
     clock: Instant,
     message: Option<Message>,
     message_que: Vec<Message>,
-    color: Color,
+    color: ContentStyle,
 }
 
 impl Footer {
     pub fn new(gs: &mut GlobalState) -> Self {
         let theme = gs.unwrap_default_result(UITheme::new(), "theme_ui.josn: ");
-        Self { clock: Instant::now(), message: None, message_que: Vec::new(), color: theme.footer_background }
+        let mut color = ContentStyle::new();
+        color.background_color = Some(theme.footer_background.into());
+        Self { clock: Instant::now(), message: None, message_que: Vec::new(), color }
     }
 
-    pub fn render(&mut self, frame: &mut Frame, gs: &GlobalState, stats: Option<DocStats>) {
-        frame.render_widget(Block::default().bg(self.color), gs.footer_area);
-
+    pub fn render(&mut self, gs: &mut GlobalState, stats: Option<DocStats>) -> Result<()> {
         let (stat_size, stat_p) = if let Some((len, sel, c)) = stats {
             let text = match sel {
                 0 => format!("    Doc Len {len}, Ln {}, Col {}", c.line + 1, c.char + 1),
@@ -38,26 +40,34 @@ impl Footer {
             (0, Span::default())
         };
 
-        let split = Layout::new(
-            Direction::Horizontal,
-            [
-                Constraint::Length(15),
-                Constraint::Length(gs.footer_area.width.saturating_sub(15 + stat_size as u16)),
-                Constraint::Length(stat_size as u16),
-            ],
+        // let split = Layout::new(
+        //     Direction::Horizontal,
+        //     [
+        //         Constraint::Length(15),
+        //         Constraint::Length(gs.footer_area.width.saturating_sub(15 + stat_size as u16)),
+        //         Constraint::Length(stat_size as u16),
+        //     ],
+        // )
+        // .split(gs.footer_area);
+
+        // frame.render_widget(gs.mode_span.clone(), split[0]);
+
+        // if self.message.is_some() || !self.message_que.is_empty() {
+        //     self.que_pull_if_expaired();
+        //     if let Some(msg) = &self.message {
+        //         frame.render_widget_ref(msg, split[1]);
+        //     }
+        // }
+
+        // frame.render_widget(stat_p, split[2]);
+        let mv = MoveTo(gs.footer_area.x + 15, gs.footer_area.y);
+        execute!(
+            &mut gs.writer,
+            mv,
+            SetBackgroundColor(self.color.background_color.unwrap_or(Color::Reset)),
+            Clear(ClearType::UntilNewLine),
+            SetBackgroundColor(Color::Reset),
         )
-        .split(gs.footer_area);
-
-        frame.render_widget(gs.mode_span.clone(), split[0]);
-
-        if self.message.is_some() || !self.message_que.is_empty() {
-            self.que_pull_if_expaired();
-            if let Some(msg) = &self.message {
-                frame.render_widget_ref(msg, split[1]);
-            }
-        }
-
-        frame.render_widget(stat_p, split[2]);
     }
 
     pub fn message(&mut self, message: String) {
@@ -76,9 +86,9 @@ impl Footer {
         self.push_ahead(Message::success(message));
     }
 
-    pub fn reset_cfg(&mut self) -> Result<(), serde_json::Error> {
+    pub fn reset_cfg(&mut self) -> std::result::Result<(), serde_json::Error> {
         let new_theme = UITheme::new()?;
-        self.color = new_theme.footer_background;
+        self.color.background_color = Some(new_theme.footer_background.into());
         Ok(())
     }
 
@@ -109,18 +119,18 @@ impl Footer {
 
 #[derive(Debug)]
 enum Message {
-    Text(Span<'static>),
-    Success(Span<'static>),
-    Error(Span<'static>),
+    Text(String),
+    Success(String),
+    Error(String),
 }
 
 impl WidgetRef for &Message {
     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
-        match self {
-            Message::Text(w) => w.render_ref(area, buf),
-            Message::Error(w) => w.render_ref(area, buf),
-            Message::Success(w) => w.render_ref(area, buf),
-        }
+        // match self {
+        // Message::Text(w) => w.render_ref(area, buf),
+        // Message::Error(w) => w.render_ref(area, buf),
+        // Message::Success(w) => w.render_ref(area, buf),
+        // }
     }
 }
 
@@ -130,14 +140,14 @@ impl Message {
     }
 
     fn msg(message: String) -> Self {
-        Self::Text(Span::raw(message))
+        Self::Text(message)
     }
 
     fn success(message: String) -> Self {
-        Self::Success(Span::styled(message, Style { fg: Some(Color::Blue), ..Default::default() }))
+        Self::Success(message) //, Style { fg: Some(Color::Blue), ..Default::default() }))
     }
 
     fn err(message: String) -> Self {
-        Self::Error(Span::styled(message, Style { fg: Some(Color::Red), ..Default::default() }))
+        Self::Error(message) //, Style { fg: Some(Color::Red), ..Default::default() }))
     }
 }

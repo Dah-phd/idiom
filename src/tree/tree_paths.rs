@@ -173,6 +173,13 @@ impl TreePath {
         }
     }
 
+    pub fn direct_display<'a>(&'a self) -> &'a str {
+        match self {
+            Self::Folder { display, .. } => &display,
+            Self::File { display, .. } => &display,
+        }
+    }
+
     pub fn display(&self) -> Span<'static> {
         match self {
             Self::Folder { display, errors, warnings, .. } => {

@@ -1,4 +1,8 @@
+use crossterm::cursor::{MoveTo, Show};
+use crossterm::execute;
 use lsp_types::Position;
+
+use super::line::Line;
 
 pub type Select = (CursorPosition, CursorPosition);
 
@@ -14,13 +18,30 @@ pub struct Cursor {
 }
 
 impl Cursor {
-    pub fn set_cursor_checked_with_select(&mut self, position: CursorPosition, content: &[String]) {
+    pub fn render(
+        &self,
+        writer: &mut impl std::io::Write,
+        area: crate::render::layout::Rect,
+        offset: usize,
+    ) -> std::io::Result<()> {
+        execute!(
+            writer,
+            MoveTo(area.col + (self.char + offset) as u16, area.row + (self.line - self.at_line) as u16),
+            Show
+        )
+    }
+
+    pub fn terminal_cursor_pos(&self, area: ratatui::layout::Rect, offset: usize) -> (u16, u16) {
+        (area.x + (self.char + offset) as u16, area.y + (self.line - self.at_line) as u16)
+    }
+
+    pub fn set_cursor_checked_with_select(&mut self, position: CursorPosition, content: &[impl Line]) {
         self.set_cursor_checked(position, content);
         self.init_select();
         self.push_to_select();
     }
 
-    pub fn set_cursor_checked(&mut self, mut position: CursorPosition, content: &[String]) {
+    pub fn set_cursor_checked(&mut self, mut position: CursorPosition, content: &[impl Line]) {
         if self.line < position.line {
             let mut current_line_len = content[self.line].len();
             let mut offset = 0;
@@ -70,12 +91,12 @@ impl Cursor {
         self.phantm_char = char;
     }
 
-    pub fn end_of_line(&mut self, content: &[String]) {
+    pub fn end_of_line(&mut self, content: &[impl Line]) {
         self.char = content[self.line].len();
         self.phantm_char = self.char;
     }
 
-    pub fn end_of_file(&mut self, content: &[String]) {
+    pub fn end_of_file(&mut self, content: &[impl Line]) {
         if !content.is_empty() {
             self.line = content.len() - 1;
             self.char = content[self.line].len();
@@ -88,9 +109,9 @@ impl Cursor {
         self.line = 0;
     }
 
-    pub fn start_of_line(&mut self, content: &[String]) {
+    pub fn start_of_line(&mut self, content: &[impl Line]) {
         self.char = 0;
-        for ch in content[self.line].chars() {
+        for ch in content[self.line].as_str().chars() {
             if !ch.is_whitespace() {
                 self.phantm_char = self.char;
                 return;
@@ -99,12 +120,12 @@ impl Cursor {
         }
     }
 
-    pub fn up(&mut self, content: &[String]) {
+    pub fn up(&mut self, content: &[impl Line]) {
         self.select = None;
         self.move_up(content)
     }
 
-    fn move_up(&mut self, content: &[String]) {
+    fn move_up(&mut self, content: &[impl Line]) {
         if self.line == 0 {
             if self.char >= self.text_width {
                 self.char -= self.text_width;
@@ -124,28 +145,28 @@ impl Cursor {
             self.char -= self.text_width;
             return;
         };
-        self.adjust_char(&content[self.line]);
+        self.adjust_char(&content[self.line].as_str());
     }
 
-    pub fn scroll_up(&mut self, content: &[String]) {
+    pub fn scroll_up(&mut self, content: &[impl Line]) {
         if self.at_line != 0 {
             self.at_line -= 1;
             self.up(content)
         }
     }
 
-    pub fn select_up(&mut self, content: &[String]) {
+    pub fn select_up(&mut self, content: &[impl Line]) {
         self.init_select();
         self.move_up(content);
         self.push_to_select();
     }
 
-    pub fn down(&mut self, content: &[String]) {
+    pub fn down(&mut self, content: &[impl Line]) {
         self.select = None;
         self.move_down(content);
     }
 
-    fn move_down(&mut self, content: &[String]) {
+    fn move_down(&mut self, content: &[impl Line]) {
         if content.is_empty() {
             return;
         }
@@ -159,28 +180,28 @@ impl Cursor {
             return;
         }
         self.line += 1;
-        self.adjust_char(&content[self.line]);
+        self.adjust_char(&content[self.line].as_str());
     }
 
-    pub fn select_down(&mut self, content: &[String]) {
+    pub fn select_down(&mut self, content: &[impl Line]) {
         self.init_select();
         self.move_down(content);
         self.push_to_select();
     }
 
-    pub fn scroll_down(&mut self, content: &[String]) {
+    pub fn scroll_down(&mut self, content: &[impl Line]) {
         if self.at_line + 2 < content.len() {
             self.at_line += 1;
             self.down(content)
         }
     }
 
-    pub fn left(&mut self, content: &[String]) {
+    pub fn left(&mut self, content: &[impl Line]) {
         self.select = None;
         self.move_left(content);
     }
 
-    fn move_left(&mut self, content: &[String]) {
+    fn move_left(&mut self, content: &[impl Line]) {
         if self.char > 0 {
             self.char -= 1
         } else if self.line > 0 {
@@ -195,18 +216,18 @@ impl Cursor {
         self.phantm_char = self.char;
     }
 
-    pub fn jump_left(&mut self, content: &[String]) {
+    pub fn jump_left(&mut self, content: &[impl Line]) {
         self.select = None;
         self._jump_left(content);
     }
 
-    pub fn jump_left_select(&mut self, content: &[String]) {
+    pub fn jump_left_select(&mut self, content: &[impl Line]) {
         self.init_select();
         self._jump_left(content);
         self.push_to_select();
     }
 
-    fn _jump_left(&mut self, content: &[String]) {
+    fn _jump_left(&mut self, content: &[impl Line]) {
         let mut line = &content[self.line][..self.char];
         let mut last_was_char = false;
         if line.is_empty() && self.line > 0 {
@@ -223,18 +244,18 @@ impl Cursor {
         }
     }
 
-    pub fn select_left(&mut self, content: &[String]) {
+    pub fn select_left(&mut self, content: &[impl Line]) {
         self.init_select();
         self.move_left(content);
         self.push_to_select();
     }
 
-    pub fn right(&mut self, content: &[String]) {
+    pub fn right(&mut self, content: &[impl Line]) {
         self.select = None;
         self.move_right(content);
     }
 
-    fn move_right(&mut self, content: &[String]) {
+    fn move_right(&mut self, content: &[impl Line]) {
         if let Some(line) = content.get(self.line) {
             if line.len() > self.char {
                 self.char += 1
@@ -246,18 +267,18 @@ impl Cursor {
         self.phantm_char = self.char;
     }
 
-    pub fn jump_right(&mut self, content: &[String]) {
+    pub fn jump_right(&mut self, content: &[impl Line]) {
         self.select = None;
         self._jump_right(content);
     }
 
-    pub fn jump_right_select(&mut self, content: &[String]) {
+    pub fn jump_right_select(&mut self, content: &[impl Line]) {
         self.init_select();
         self._jump_right(content);
         self.push_to_select();
     }
 
-    pub fn _jump_right(&mut self, content: &[String]) {
+    pub fn _jump_right(&mut self, content: &[impl Line]) {
         let mut line = &content[self.line][self.char..];
         let mut last_was_char = false;
         if line.is_empty() && content.len() - 1 > self.line {
@@ -274,16 +295,16 @@ impl Cursor {
         }
     }
 
-    pub fn select_right(&mut self, content: &[String]) {
+    pub fn select_right(&mut self, content: &[impl Line]) {
         self.init_select();
         self.move_right(content);
         self.push_to_select();
     }
 
-    pub fn adjust_max_line(&mut self, content: &[String]) {
+    pub fn adjust_max_line(&mut self, content: &[impl Line]) {
         if self.line >= content.len() {
             self.line = content.len().saturating_sub(1);
-            self.adjust_char(&content[self.line]);
+            self.adjust_char(&content[self.line].as_str());
         }
     }
 
@@ -379,14 +400,15 @@ impl Cursor {
         }
     }
 
-    pub fn select_len(&self, content: &[String]) -> usize {
+    pub fn select_len(&self, content: &[impl Line]) -> usize {
         self.select_get()
             .map(|(from, to)| {
                 if from.line == to.line {
                     return to.char - from.char;
                 };
                 let mut iter = content.iter().skip(from.line).take(to.line - from.line);
-                let mut len = iter.next().map(|line| line.chars().skip(from.char).count()).unwrap_or_default() + 1;
+                let mut len =
+                    iter.next().map(|line| line.as_str().chars().skip(from.char).count()).unwrap_or_default() + 1;
                 for line in iter {
                     len += line.len() + 1;
                 }

@@ -1,5 +1,4 @@
-use ratatui::buffer::Buffer;
-mod line_builder;
+pub mod line_builder;
 mod modal;
 pub mod theme;
 use crate::{
@@ -7,9 +6,7 @@ use crate::{
     global_state::{GlobalState, WorkspaceEvent},
     lsp::LSPClient,
     popups::popups_tree::refrence_selector,
-    workspace::actions::EditMetaData,
-    workspace::cursor::Cursor,
-    workspace::CursorPosition,
+    workspace::{actions::EditMetaData, cursor::Cursor, line::Line, CursorPosition},
 };
 use crossterm::event::KeyEvent;
 pub use line_builder::DiagnosticLine;
@@ -32,19 +29,19 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn with_context(file_type: FileType, path: &Path, content: &[String], gs: &mut GlobalState) -> Self {
+    pub fn with_context(file_type: FileType, path: &Path, content: &[impl Line], gs: &mut GlobalState) -> Self {
         Self {
             line_builder: LineBuilder::new(file_type.into(), content, gs),
             modal: None,
             path: path.into(),
             requests: Vec::new(),
-            line_number_offset: 0,
+            line_number_offset: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
             diagnostics: None,
             lsp_client: None,
         }
     }
 
-    pub fn context(&mut self, content: &[String], gs: &mut GlobalState) {
+    pub fn context(&mut self, content: &mut Vec<impl Line>, gs: &mut GlobalState) {
         self.line_number_offset = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
         if let Some(client) = self.lsp_client.as_mut() {
             // diagnostics
@@ -121,7 +118,7 @@ impl Lexer {
         &mut self,
         version: i32,
         events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
-        content: &[String],
+        content: &[impl Line],
     ) {
         if let Some(request) = self
             .lsp_client
@@ -132,35 +129,6 @@ impl Lexer {
         } else {
             self.line_builder.update_internals(events, content);
         };
-    }
-
-    pub fn build_line(
-        &mut self,
-        line_idx: usize,
-        text: &str,
-        ctx: &mut LineBuilderContext,
-        buf: &mut Buffer,
-        area: Rect,
-    ) {
-        self.line_builder.build_line(line_idx, text, self.line_number_offset, buf, area, ctx);
-    }
-
-    pub fn build_long_line(&mut self, line_idx: usize, text: &str, buf: &mut Buffer, area: Rect) {
-        self.line_builder.long_line(line_idx, text, self.line_number_offset, buf, area);
-    }
-
-    pub fn wrap_line(
-        &mut self,
-        line_idx: usize,
-        text: &str,
-        ctx: &mut LineBuilderContext,
-        buf: &mut Buffer,
-        max_lines: usize,
-        x: u16,
-        y: u16,
-        width: u16,
-    ) -> (u16, usize) {
-        self.line_builder.wrap_line(line_idx, text, self.line_number_offset, buf, x, y, width, max_lines, ctx)
     }
 
     pub fn render_modal_if_exist(&mut self, frame: &mut Frame, area: Rect, cursor: &Cursor) {

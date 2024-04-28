@@ -1,10 +1,5 @@
-use super::diagnostics::DiagnosticData;
-use super::INIT_BUF_SIZE;
 use crate::workspace::{cursor::Cursor, CursorPosition};
-use ratatui::{
-    style::{Color, Modifier, Style},
-    text::Span,
-};
+use ratatui::style::{Color, Style};
 use std::{cmp::Ordering, ops::Range};
 pub const COLORS: [Color; 3] = [Color::LightMagenta, Color::LightYellow, Color::Blue];
 
@@ -26,28 +21,6 @@ impl LineBuilderContext {
             (Ordering::Equal, ..) => Some(from.char..max_len),
             (.., Ordering::Equal) => Some(0..to.char),
         });
-    }
-
-    pub fn format_with_info(
-        &self,
-        line_idx: usize,
-        diagnostic: Option<&[DiagnosticData]>,
-        mut buffer: Vec<Span<'static>>,
-    ) -> Vec<Span<'static>> {
-        // set cursor without the normal API
-        if line_idx == self.cursor.line {
-            let expected = self.cursor.char + INIT_BUF_SIZE;
-            if buffer.len() > expected {
-                buffer[self.cursor.char + INIT_BUF_SIZE].style.add_modifier = Modifier::REVERSED;
-            } else {
-                buffer.push(Span::styled(" ", Style { add_modifier: Modifier::REVERSED, ..Default::default() }));
-            };
-            buffer[0].style.fg = Some(Color::White);
-        };
-        if let Some(diagnostics) = diagnostic {
-            buffer.extend(diagnostics.iter().map(|d| d.inline_span.clone()));
-        }
-        buffer
     }
 
     pub fn set_select(&self, style: &mut Style, idx: &usize, color: Color) {

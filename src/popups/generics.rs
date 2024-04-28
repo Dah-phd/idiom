@@ -1,7 +1,7 @@
 use super::PopupInterface;
 use crate::{
     global_state::{Clipboard, PopupMessage},
-    widgests::{centered_rect_static, Button},
+    render::{centered_rect_static, Button},
 };
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{

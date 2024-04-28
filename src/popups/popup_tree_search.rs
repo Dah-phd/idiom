@@ -1,10 +1,10 @@
 use super::PopupInterface;
 use crate::{
     global_state::{Clipboard, PopupMessage, TreeEvent},
+    render::centered_rect_static,
+    render::{TextField, WrappedState},
     tree::Tree,
     utils::REVERSED,
-    widgests::centered_rect_static,
-    widgests::{TextField, WrappedState},
 };
 
 use crossterm::event::{KeyCode, KeyEvent};
