@@ -8,12 +8,12 @@ use crate::{
 use crossterm::event::KeyEvent;
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
-type Line = usize;
-type Column = usize;
+type Row = usize;
+type Col = usize;
 
-pub fn contained_position(rect: Rect, row: u16, column: u16) -> Option<(Line, Column)> {
-    if rect.row <= column && column <= rect.width as u16 && rect.col <= row && row <= rect.height {
-        return Some(((row - rect.col) as usize, (column - rect.row) as usize));
+pub fn contained_position(rect: Rect, row: u16, column: u16) -> Option<(Row, Col)> {
+    if rect.col <= column && column <= rect.width as u16 && rect.row <= row && row <= rect.height {
+        return Some(((row - rect.row) as usize, (column - rect.col) as usize));
     }
     None
 }
@@ -23,14 +23,14 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
     match event.kind {
         MouseEventKind::ScrollUp if matches!(gs.mode, Mode::Insert) => {
             if let Some(editor) = workspace.get_active() {
-                editor.scroll_up();
-                editor.scroll_up();
+                editor.scroll_up(gs);
+                editor.scroll_up(gs);
             }
         }
         MouseEventKind::ScrollDown if matches!(gs.mode, Mode::Insert) => {
             if let Some(editor) = workspace.get_active() {
-                editor.scroll_down();
-                editor.scroll_down();
+                editor.scroll_down(gs);
+                editor.scroll_down(gs);
             }
         }
         MouseEventKind::Down(MouseButton::Left) => {

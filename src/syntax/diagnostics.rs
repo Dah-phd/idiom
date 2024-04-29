@@ -1,9 +1,7 @@
-use crate::global_state::WorkspaceEvent;
-use crate::syntax::line_builder::tokens::Token;
+use crate::syntax::Token;
+use crate::{global_state::WorkspaceEvent, workspace::line::Line};
 use crossterm::style::{Attribute, Color as C};
 use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
-
-use super::LineBuilder;
 
 use ratatui::{
     style::{Color, Style},
@@ -72,11 +70,9 @@ impl DiagnosticData {
 
     pub fn check_token(&self, token: &mut Token) {
         match self.end {
-            Some(end) => {
-                if self.start <= token.from && token.to <= end {
-                    token.color.underline_color = self.inline_span.style.fg.map(|c| C::from(c));
-                    token.color.attributes.set(Attribute::Undercurled);
-                }
+            Some(end) if self.start <= token.from && token.to <= end => {
+                token.color.underline_color = self.inline_span.style.fg.map(|c| C::from(c));
+                token.color.attributes.set(Attribute::Undercurled);
             }
             None if self.start <= token.from => {
                 token.color.underline_color = self.inline_span.style.fg.map(|c| C::from(c));
@@ -134,11 +130,21 @@ impl From<Diagnostic> for DiagnosticLine {
     }
 }
 
-pub fn diagnostics_error(builder: &mut LineBuilder, diagnostics: Vec<(usize, DiagnosticLine)>) {
-    builder.tokens.set_diagnositc_errors(diagnostics);
+pub fn set_diganostics(content: &mut Vec<impl Line>, diagnostics: Vec<(usize, DiagnosticLine)>) {
+    for line in content.iter_mut() {
+        line.drop_diagnostics();
+    }
+    for (idx, diagnostics) in diagnostics {
+        content[idx].set_diagnostics(diagnostics);
+    }
 }
 
-pub fn diagnostics_full(builder: &mut LineBuilder, diagnostics: Vec<(usize, DiagnosticLine)>) {
-    builder.tokens.set_diagnostics(diagnostics);
-    builder.diagnostic_processor = diagnostics_error;
+pub fn set_diganostic_errors(content: &mut Vec<impl Line>, diagnostics: Vec<(usize, DiagnosticLine)>) {
+    for line in content.iter_mut() {
+        line.drop_diagnostics();
+    }
+    for (idx, mut diagnostics) in diagnostics {
+        diagnostics.drop_non_errs();
+        content[idx].set_diagnostics(diagnostics);
+    }
 }

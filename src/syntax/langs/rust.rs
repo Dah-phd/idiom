@@ -1,5 +1,5 @@
-use crate::syntax::line_builder::{Action, Lang};
 use crate::syntax::theme::Theme;
+use crate::syntax::{Action, Lang};
 use lsp_types::DiagnosticRelatedInformation;
 use ratatui::style::Color;
 

@@ -282,10 +282,12 @@ impl GlobalState {
         self.tree_area = self.screen_rect.clone();
         self.footer_area = self.tree_area.splitoff_rows(1);
         if matches!(self.mode, Mode::Select) || self.components.contains(Components::TREE) {
-            self.tab_area = self.tree_area.keep_col(50);
-            self.tree_area.top_border();
-            self.tree_area.right_border();
-            let _ = self.tree_area.draw_borders(Some(DOUBLE_BORDERS), Color::DarkGrey, &mut self.writer);
+            self.tab_area = self.tree_area.keep_col(35);
+            let _ = self.tree_area.top_border().right_border().draw_borders(
+                Some(DOUBLE_BORDERS),
+                Color::DarkGrey,
+                &mut self.writer,
+            );
         };
         self.editor_area = self.tab_area.keep_rows(1);
     }
@@ -479,3 +481,6 @@ impl GlobalState {
         self.exit
     }
 }
+
+// #[cfg(test)]
+// pub mod test;

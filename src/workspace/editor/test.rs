@@ -1,19 +1,18 @@
-use ratatui::layout::Rect;
-
 use super::super::{
     cursor::{Cursor, CursorPosition},
     Editor,
 };
-use crate::configs::FileType;
 use crate::global_state::GlobalState;
 use crate::syntax::Lexer;
-use crate::workspace::actions::Actions;
+use crate::workspace::{actions::Actions, line::CodeLine};
+use crate::{configs::FileType, workspace::line::Line};
 use std::path::PathBuf;
 
 pub fn mock_editor(content: Vec<String>) -> Editor {
     let ft = FileType::Unknown;
     let path = PathBuf::from("");
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 80));
+    let mut gs = GlobalState::new().unwrap();
+    let content: Vec<CodeLine> = content.into_iter().map(|line| CodeLine::from(line)).collect();
     Editor {
         lexer: Lexer::with_context(ft, &path, &content, &mut gs),
         file_type: ft,
@@ -33,6 +32,6 @@ pub fn select_eq(select: (CursorPosition, CursorPosition), editor: &Editor) -> b
     false
 }
 
-pub fn pull_line(editor: &Editor, idx: usize) -> Option<&String> {
-    editor.content.get(idx)
+pub fn pull_line(editor: &Editor, idx: usize) -> Option<&str> {
+    editor.content.get(idx).map(|line| line.as_str())
 }

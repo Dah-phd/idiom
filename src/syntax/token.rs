@@ -1,10 +1,13 @@
-use std::ops::Range;
-
-use crate::syntax::line_builder::Lang;
+use crate::lsp::LSPClient;
 use crate::syntax::theme::Theme;
 use crate::workspace::line::Line;
-use crossterm::style::ContentStyle;
+use crate::{syntax::Lang, workspace::actions::EditMetaData};
+use crossterm::style::{Attribute, ContentStyle};
+use lsp_types::{SemanticToken, TextDocumentContentChangeEvent};
 use ratatui::style::Color;
+
+use super::legend::Legend;
+use super::modal::LSPResponseType;
 
 pub struct Token {
     pub from: usize,
@@ -36,6 +39,10 @@ impl Token {
             };
             char_idx += len;
         }
+    }
+
+    pub fn drop_diagstic(&mut self) {
+        self.color.attributes.unset(Attribute::Undercurled);
     }
 
     pub fn parse(lang: &Lang, theme: &Theme, snippet: &str, buf: &mut Vec<Token>) {
@@ -98,4 +105,74 @@ fn from_color(c: Color) -> ContentStyle {
     let mut style = ContentStyle::new();
     style.foreground_color = Some(c.into());
     style
+}
+
+#[derive(Default)]
+pub enum TokensType {
+    LSP,
+    #[default]
+    Internal,
+}
+
+pub fn set_tokens(
+    tokens: Vec<SemanticToken>,
+    legend: &Legend,
+    lang: &Lang,
+    theme: &Theme,
+    content: &mut Vec<impl Line>,
+) {
+    let mut line_idx = 0;
+    let mut char_idx = 0;
+    let mut len = 0;
+    let mut token_line = Vec::new();
+    for token in tokens {
+        if token.delta_line != 0 {
+            len = 0;
+            char_idx = 0;
+            if !token_line.is_empty() {
+                content[line_idx].replace_tokens(std::mem::take(&mut token_line));
+            };
+            line_idx += token.delta_line as usize;
+        };
+        let from = char_idx + token.delta_start as usize;
+        let to = from + token.length as usize;
+        // enriches the tokens with additinal highlights
+        if from.saturating_sub(char_idx + len) > 3 {
+            content[line_idx].get(char_idx + len..from).inspect(|snippet| {
+                Token::enrich(char_idx, lang, theme, snippet, &mut token_line);
+            });
+        };
+        len = token.length as usize;
+        let token_type = match content[line_idx].get(from..from + len) {
+            Some(word) => legend.parse_to_color(token.token_type as usize, theme, lang, word),
+            None => theme.default,
+        };
+        token_line.push(Token::new(from, to, len, token_type));
+        char_idx = from;
+    }
+    if !token_line.is_empty() {
+        content[line_idx].replace_tokens(token_line);
+    };
+}
+
+pub fn collect_changes(
+    path: &std::path::Path,
+    version: i32,
+    events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
+    content: &[impl Line],
+    client: &mut LSPClient,
+) -> Option<LSPResponseType> {
+    match events.len() {
+        0 => None,
+        1 => {
+            let (meta, edit) = events.remove(0);
+            client.file_did_change(path, version, vec![edit]).ok()?;
+            client.request_partial_tokens(path, meta.build_range(content)?).map(LSPResponseType::TokensPartial)
+        }
+        _ => {
+            let edits = events.drain(..).map(|(_meta, edit)| edit).collect::<Vec<_>>();
+            client.file_did_change(path, version, edits).ok()?;
+            client.request_full_tokens(path).map(LSPResponseType::Tokens)
+        }
+    }
 }

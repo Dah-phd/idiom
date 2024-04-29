@@ -1,8 +1,5 @@
 use super::ModalMessage;
-use crate::syntax::{
-    line_builder::{Action, DiagnosticInfo},
-    LineBuilder, LineBuilderContext,
-};
+use crate::syntax::{Action, DiagnosticInfo, Lexer, LineBuilderContext};
 use crate::{
     global_state::GlobalState,
     utils::{BORDERED_BLOCK, REVERSED},
@@ -51,13 +48,13 @@ impl Info {
         Self { actions, text: Text::from(lines), mode, ..Default::default() }
     }
 
-    pub fn from_hover(hover: Hover, line_builder: &LineBuilder) -> Self {
+    pub fn from_hover(hover: Hover, line_builder: &Lexer) -> Self {
         let mut lines = Vec::new();
         parse_hover(hover, line_builder, &mut lines);
         Self { text: Text::from(lines), ..Default::default() }
     }
 
-    pub fn from_signature(signature: SignatureHelp, line_builder: &LineBuilder) -> Self {
+    pub fn from_signature(signature: SignatureHelp, line_builder: &Lexer) -> Self {
         let mut lines = Vec::new();
         for info in signature.signatures {
             parse_sig_info(info, line_builder, &mut lines);
@@ -145,12 +142,12 @@ impl Info {
         ModalMessage::Taken
     }
 
-    pub fn push_hover(&mut self, hover: Hover, line_builder: &LineBuilder) {
+    pub fn push_hover(&mut self, hover: Hover, line_builder: &Lexer) {
         parse_hover(hover, line_builder, &mut self.text.lines);
         self.state.select(None);
     }
 
-    pub fn push_signature(&mut self, signature: SignatureHelp, line_builder: &LineBuilder) {
+    pub fn push_signature(&mut self, signature: SignatureHelp, line_builder: &Lexer) {
         for info in signature.signatures {
             parse_sig_info(info, line_builder, &mut self.text.lines);
         }
@@ -191,7 +188,7 @@ impl From<DiagnosticInfo> for Info {
     }
 }
 
-fn parse_sig_info(info: SignatureInformation, builder: &LineBuilder, lines: &mut Vec<Line<'static>>) {
+fn parse_sig_info(info: SignatureInformation, builder: &Lexer, lines: &mut Vec<Line<'static>>) {
     let mut ctx = LineBuilderContext::default();
     // lines.push(Line::from(generic_line(builder, usize::MAX, &info.label, &mut ctx, Vec::new())));
     if let Some(text) = info.documentation {
@@ -225,7 +222,7 @@ fn parse_sig_info(info: SignatureInformation, builder: &LineBuilder, lines: &mut
     }
 }
 
-fn parse_hover(hover: Hover, builder: &LineBuilder, lines: &mut Vec<Line<'static>>) {
+fn parse_hover(hover: Hover, builder: &Lexer, lines: &mut Vec<Line<'static>>) {
     match hover.contents {
         HoverContents::Array(arr) => {
             let mut ctx = LineBuilderContext::default();
@@ -247,7 +244,7 @@ fn parse_hover(hover: Hover, builder: &LineBuilder, lines: &mut Vec<Line<'static
     }
 }
 
-fn handle_markup(markup: lsp_types::MarkupContent, builder: &LineBuilder, lines: &mut Vec<Line<'static>>) {
+fn handle_markup(markup: lsp_types::MarkupContent, builder: &Lexer, lines: &mut Vec<Line<'static>>) {
     let mut ctx = LineBuilderContext::default();
     if !matches!(markup.kind, lsp_types::MarkupKind::Markdown) {
         for line in markup.value.lines() {

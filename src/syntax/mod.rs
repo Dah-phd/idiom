@@ -1,6 +1,10 @@
-pub mod line_builder;
-mod modal;
+pub mod context;
+pub mod diagnostics;
+pub mod langs;
+pub mod legend;
+pub mod modal;
 pub mod theme;
+pub mod token;
 use crate::{
     configs::FileType,
     global_state::{GlobalState, WorkspaceEvent},
@@ -8,10 +12,11 @@ use crate::{
     popups::popups_tree::refrence_selector,
     workspace::{actions::EditMetaData, cursor::Cursor, line::Line, CursorPosition},
 };
+pub use context::LineBuilderContext;
 use crossterm::event::KeyEvent;
-pub use line_builder::DiagnosticLine;
-use line_builder::LineBuilder;
-pub use line_builder::LineBuilderContext;
+pub use diagnostics::{set_diganostics, Action, DiagnosticInfo, DiagnosticLine};
+use langs::Lang;
+use legend::Legend;
 use lsp_types::{
     PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, TextDocumentContentChangeEvent,
 };
@@ -19,11 +24,8 @@ use modal::{LSPModal, LSPResponseType, LSPResult, ModalMessage};
 use ratatui::{layout::Rect, Frame};
 use std::path::{Path, PathBuf};
 use theme::Theme;
-
-use self::line_builder::{
-    tokens::{self, collect_changes, set_tokens},
-    Lang, Legend, TokensType,
-};
+use token::{collect_changes, set_tokens};
+pub use token::{Token, TokensType};
 
 pub struct Lexer {
     pub lang: Lang,
@@ -42,11 +44,10 @@ pub struct Lexer {
 impl Lexer {
     pub fn with_context(file_type: FileType, path: &Path, content: &[impl Line], gs: &mut GlobalState) -> Self {
         Self {
-            lang: Lang::default(),
+            lang: Lang::from(file_type),
             legend: Legend::default(),
             theme: gs.unwrap_default_result(Theme::new(), "theme.json: "),
             token_producer: TokensType::Internal,
-            // line_builder: LineBuilder::new(file_type.into(), content, gs),
             modal: None,
             path: path.into(),
             requests: Vec::new(),
@@ -61,7 +62,7 @@ impl Lexer {
         if let Some(client) = self.lsp_client.as_mut() {
             // diagnostics
             if let Some(diagnostics) = client.get_diagnostics(&self.path) {
-                // self.line_builder.set_diganostics(diagnostics);
+                set_diganostics(content, diagnostics);
             }
             // responses
             let mut unresolved_requests = Vec::new();

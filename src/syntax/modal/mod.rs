@@ -1,5 +1,5 @@
-use crate::syntax::line_builder::{DiagnosticInfo, Lang};
-use crate::syntax::LineBuilder;
+use crate::syntax::Lexer;
+use crate::syntax::{DiagnosticInfo, Lang};
 mod completion;
 mod info;
 mod parser;
@@ -100,22 +100,22 @@ impl LSPModal {
         Self::Info(Info::from_info(actions))
     }
 
-    pub fn from_hover(hover: Hover, line_builder: &LineBuilder) -> Self {
+    pub fn from_hover(hover: Hover, line_builder: &Lexer) -> Self {
         Self::Info(Info::from_hover(hover, line_builder))
     }
 
-    pub fn hover_map(&mut self, hover: Hover, line_builder: &LineBuilder) {
+    pub fn hover_map(&mut self, hover: Hover, line_builder: &Lexer) {
         match self {
             Self::Info(modal) => modal.push_hover(hover, line_builder),
             _ => *self = Self::Info(Info::from_hover(hover, line_builder)),
         }
     }
 
-    pub fn from_signature(signature: SignatureHelp, line_builder: &LineBuilder) -> Self {
+    pub fn from_signature(signature: SignatureHelp, line_builder: &Lexer) -> Self {
         Self::Info(Info::from_signature(signature, line_builder))
     }
 
-    pub fn signature_map(&mut self, signature: SignatureHelp, line_builder: &LineBuilder) {
+    pub fn signature_map(&mut self, signature: SignatureHelp, line_builder: &Lexer) {
         match self {
             Self::Info(modal) => modal.push_signature(signature, line_builder),
             _ => *self = Self::Info(Info::from_signature(signature, line_builder)),

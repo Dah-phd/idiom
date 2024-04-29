@@ -55,9 +55,10 @@ impl Editor {
         self.sync(gs);
         let mut ctx = LineBuilderContext::from(&self.cursor);
         let mut area = gs.editor_area.into_iter();
+        Cursor::hide(&mut gs.writer)?;
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if let Some(line) = area.next() {
-                text.render(line_idx, line, &mut self.lexer, &mut gs.writer)?;
+                text.render(line_idx + 1, line, &mut self.lexer, &mut gs.writer)?;
             } else {
                 break;
             };
@@ -70,9 +71,10 @@ impl Editor {
         self.sync(gs);
         let mut ctx = LineBuilderContext::from(&self.cursor);
         let mut area = gs.editor_area.into_iter();
+        Cursor::hide(&mut gs.writer)?;
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if let Some(line) = area.next() {
-                text.fast_render(line_idx, line, &mut self.lexer, &mut gs.writer)?;
+                text.fast_render(line_idx + 1, line, &mut self.lexer, &mut gs.writer)?;
             } else {
                 break;
             };
@@ -318,8 +320,9 @@ impl Editor {
         self.cursor.select_up(&self.content);
     }
 
-    pub fn scroll_up(&mut self) {
+    pub fn scroll_up(&mut self, gs: &mut GlobalState) {
         self.cursor.scroll_up(&self.content);
+        self.render(gs);
     }
 
     pub fn swap_up(&mut self) {
@@ -334,8 +337,9 @@ impl Editor {
         self.cursor.select_down(&self.content);
     }
 
-    pub fn scroll_down(&mut self) {
+    pub fn scroll_down(&mut self, gs: &mut GlobalState) {
         self.cursor.scroll_down(&self.content);
+        self.render(gs);
     }
 
     pub fn swap_down(&mut self) {
@@ -459,5 +463,5 @@ fn build_display(path: &Path) -> String {
     buffer.join(MAIN_SEPARATOR_STR)
 }
 
-// #[cfg(test)]
-// pub mod test;
+#[cfg(test)]
+pub mod test;

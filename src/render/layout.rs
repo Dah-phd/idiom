@@ -73,11 +73,15 @@ pub struct Rect {
 }
 
 impl Rect {
-    pub fn new(row: u16, col: u16, width: usize, height: u16) -> Self {
+    pub const fn new(row: u16, col: u16, width: usize, height: u16) -> Self {
         Self { row, col, width, height, borders: Borders::NONE }
     }
 
-    pub fn new_bordered(row: u16, col: u16, width: usize, height: u16) -> Self {
+    pub const fn new_bordered(mut row: u16, mut col: u16, mut width: usize, mut height: u16) -> Self {
+        row -= 1;
+        col -= 1;
+        width -= 2;
+        height -= 2;
         Self { row, col, width, height, borders: Borders::all() }
     }
 
@@ -87,7 +91,7 @@ impl Rect {
     }
 
     pub fn modal_absolute(&self, mut row: u16, mut col: u16, mut width: usize, mut height: u16) -> Option<Self> {
-        if self.height < height + row {
+        if self.height + self.row < height + row {
             if self.height > 3 + row {
                 height = self.height - row;
             } else if row > 3 && self.height > row {
@@ -99,7 +103,7 @@ impl Rect {
                 return None;
             }
         };
-        if self.width < width + col as usize {
+        if (self.width + self.col as usize) < (width + col as usize) {
             if self.width < 30 + col as usize {
                 col = self.width.checked_sub(30)? as u16;
                 width = 30;
@@ -174,30 +178,49 @@ impl Rect {
         Self::new(rect.y, rect.x, rect.width as usize, rect.height)
     }
 
-    pub fn top_border(&mut self) {
+    pub fn bordered(&mut self) {
+        self.col += 1;
+        self.row += 1;
+        self.height -= 2;
+        self.width -= 2;
+        self.borders = Borders::all();
+    }
+
+    pub fn top_border(&mut self) -> &mut Self {
         self.row += 1;
         self.height -= 1;
         self.borders.insert(Borders::TOP);
+        self
     }
 
-    pub fn bot_border(&mut self) {
+    pub fn bot_border(&mut self) -> &mut Self {
         self.height -= 1;
         self.borders.insert(Borders::BOTTOM);
+        self
     }
 
-    pub fn right_border(&mut self) {
+    pub fn right_border(&mut self) -> &mut Self {
         self.width -= 1;
         self.borders.insert(Borders::RIGHT);
+        self
     }
 
-    pub fn left_border(&mut self) {
+    pub fn left_border(&mut self) -> &mut Self {
         self.col += 1;
         self.width -= 1;
         self.borders.insert(Borders::LEFT);
+        self
     }
 
     pub fn absoute_diffs(&self) -> (u16, u16, usize) {
         (self.row, self.col, self.height as usize)
+    }
+
+    pub fn clear(&self, writer: &mut impl Write) -> std::io::Result<()> {
+        for line in self.into_iter() {
+            line.render_empty(writer)?;
+        }
+        writer.flush()
     }
 
     pub fn draw_borders(&self, set: Option<BorderSet>, fg: Color, writer: &mut impl Write) -> std::io::Result<()> {

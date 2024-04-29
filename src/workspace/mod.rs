@@ -56,11 +56,7 @@ impl Workspace {
                 tabs.push_str(&editor.display);
             }
             tabs.truncate(gs.tab_area.width);
-            queue!(
-                &mut gs.writer,
-                MoveTo(gs.tab_area.col, gs.tab_area.row),
-                PrintStyledContent(tabs.underline(Color::Reset)),
-            )?;
+            queue!(&mut gs.writer, MoveTo(gs.tab_area.col, gs.tab_area.row), PrintStyledContent(tabs.underlined()),)?;
             gs.restore_cursor()
         } else {
             Ok(())
@@ -389,8 +385,8 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
                 EditorAction::SelectToken => editor.select_token(),
                 EditorAction::SelectLine => editor.select_line(),
                 EditorAction::SelectAll => editor.select_all(),
-                EditorAction::ScrollUp => editor.scroll_up(),
-                EditorAction::ScrollDown => editor.scroll_down(),
+                EditorAction::ScrollUp => editor.scroll_up(gs),
+                EditorAction::ScrollDown => editor.scroll_down(gs),
                 EditorAction::SwapUp => editor.swap_up(),
                 EditorAction::SwapDown => editor.swap_down(),
                 EditorAction::JumpLeft => editor.jump_left(),
@@ -484,5 +480,5 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
     false
 }
 
-// #[cfg(test)]
-// mod test;
+#[cfg(test)]
+mod test;

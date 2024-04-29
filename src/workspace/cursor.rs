@@ -1,5 +1,5 @@
-use crossterm::cursor::{MoveTo, Show};
-use crossterm::execute;
+use crossterm::cursor::{Hide, MoveTo, Show};
+use crossterm::{execute, queue};
 use lsp_types::Position;
 
 use super::line::Line;
@@ -18,6 +18,11 @@ pub struct Cursor {
 }
 
 impl Cursor {
+    pub fn hide(writer: &mut impl std::io::Write) -> std::io::Result<()> {
+        queue!(writer, Hide)
+    }
+
+    #[inline]
     pub fn render(
         &self,
         writer: &mut impl std::io::Write,

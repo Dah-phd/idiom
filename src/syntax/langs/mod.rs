@@ -1,7 +1,7 @@
 mod rust;
 use crate::configs::FileType;
-use crate::syntax::line_builder::Action;
 use crate::syntax::theme::Theme;
+use crate::syntax::Action;
 use crate::syntax::GlobalState;
 use crate::syntax::WorkspaceEvent;
 use lsp_types::DiagnosticRelatedInformation;

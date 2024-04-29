@@ -9,7 +9,6 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 
-pub const UNDERLINED: Style = Style::new().add_modifier(Modifier::UNDERLINED);
 pub const REVERSED: Style = Style::new().add_modifier(Modifier::REVERSED);
 pub const BORDERED_BLOCK: Block = Block::new().borders(Borders::all());
 

@@ -1,11 +1,12 @@
 mod code;
 use crate::{
     render::layout::Line as LineInfo,
-    syntax::{line_builder::tokens::Token, Lexer},
+    syntax::{DiagnosticLine, Lexer, Token},
 };
 pub use code::CodeLine;
 use std::{
     fmt::Display,
+    io::Write,
     ops::{Index, Range, RangeBounds, RangeFrom, RangeFull, RangeTo},
     slice::SliceIndex,
 };
@@ -36,23 +37,18 @@ pub trait Line:
     fn clear(&mut self);
     fn unwrap(self) -> String;
     fn get<I: SliceIndex<str>>(&self, i: I) -> Option<&I::Output>;
-    // fn set_diagnostics(&mut self, diagnostics);
-    // fn drop_diagnostics(&mut self, diagnostics);
+    fn set_diagnostics(&mut self, diagnostics: DiagnosticLine);
+    fn drop_diagnostics(&mut self);
     fn push_token(&mut self, token: Token);
     fn replace_tokens(&mut self, tokens: Vec<Token>);
-    fn render(
-        &mut self,
-        idx: usize,
-        line: LineInfo,
-        lexer: &mut Lexer,
-        writer: &mut impl std::io::Write,
-    ) -> std::io::Result<()>;
+    fn render(&mut self, idx: usize, line: LineInfo, lexer: &mut Lexer, writer: &mut impl Write)
+        -> std::io::Result<()>;
     fn fast_render(
         &mut self,
         idx: usize,
         line: LineInfo,
         lexer: &mut Lexer,
-        writer: &mut impl std::io::Write,
+        writer: &mut impl Write,
     ) -> std::io::Result<()>;
     unsafe fn get_unchecked<I: SliceIndex<str>>(&self, i: I) -> &I::Output;
 }

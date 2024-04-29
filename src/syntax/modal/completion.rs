@@ -4,7 +4,7 @@ use crate::debug_to_file;
 use crate::{
     global_state::GlobalState,
     render::WrappedState,
-    syntax::line_builder::Lang,
+    syntax::Lang,
     utils::{BORDERED_BLOCK, REVERSED},
 };
 use crossterm::event::{KeyCode, KeyEvent};
