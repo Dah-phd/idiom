@@ -240,6 +240,18 @@ impl LineInterface for CodeLine {
         };
         self.render(idx, line, lexer, writer)
     }
+
+    #[inline]
+    fn wrapped_render(
+        &mut self,
+        idx: usize,
+        line: LineInfo,
+        limit: usize,
+        lexer: &mut Lexer,
+        writer: &mut impl std::io::prelude::Write,
+    ) -> std::io::Result<usize> {
+        wrapped_line()
+    }
 }
 
 impl Into<String> for CodeLine {
@@ -296,4 +308,6 @@ fn shrank_line(content: &str, tokens: &[Token], writer: &mut impl std::io::Write
 }
 
 #[inline]
-fn wrapped_line() {}
+fn wrapped_line() -> std::io::Result<usize> {
+    todo!()
+}

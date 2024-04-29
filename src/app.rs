@@ -13,7 +13,7 @@ use crate::{
     workspace::Workspace,
 };
 use anyhow::Result;
-use crossterm::{event::Event, style::Color};
+use crossterm::{event::Event, execute, style::Color};
 use std::{path::PathBuf, time::Instant};
 
 pub async fn app(open_file: Option<PathBuf>) -> Result<()> {
@@ -47,15 +47,6 @@ pub async fn app(open_file: Option<PathBuf>) -> Result<()> {
         workspace.render(&mut gs)?;
 
         tree.direct_render(&mut gs)?;
-
-        // if let Some(mut modal) = gs.editor_area.modal_relative(3, 3, 50, 7) {
-        //     modal.clear(&mut gs.writer)?;
-        //     modal.top_border();
-        //     modal.bot_border();
-        //     modal.left_border();
-        //     modal.right_border();
-        //     modal.draw_borders(None, Color::Reset, &mut gs.writer)?;
-        // };
 
         // footer.render(&mut gs, workspace.get_active().map(|e| e.get_stats()))?;
 

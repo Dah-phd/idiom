@@ -1,7 +1,7 @@
 use bitflags::bitflags;
 use std::cmp::Ordering;
 use std::io::{Result, Write};
-use std::ops::RangeInclusive;
+use std::ops::Range;
 
 use crossterm::cursor::{RestorePosition, SavePosition};
 use crossterm::style::{ResetColor, SetForegroundColor};
@@ -224,43 +224,56 @@ impl Rect {
     }
 
     pub fn draw_borders(&self, set: Option<BorderSet>, fg: Color, writer: &mut impl Write) -> std::io::Result<()> {
+        let top = self.borders.contains(Borders::TOP);
+        let bot = self.borders.contains(Borders::BOTTOM);
+        let left = self.borders.contains(Borders::LEFT);
+        let right = self.borders.contains(Borders::RIGHT);
+
+        let mut row = self.row;
+        let mut col = self.col;
+        let last_row = self.row + self.height;
+        let last_col = self.col + self.width as u16;
+
+        if top {
+            row -= 1;
+        };
+        if left {
+            col -= 1;
+        };
+
         let set = set.unwrap_or(BORDERS);
         queue!(writer, SavePosition, SetForegroundColor(fg))?;
-        if self.borders.contains(Borders::TOP) {
-            let row = self.row - 1;
-            for col in self.col..=self.width as u16 {
-                queue!(writer, MoveTo(col, row), Print(set.horizontal))?;
+        if top {
+            for col_idx in col..last_col {
+                queue!(writer, MoveTo(col_idx, row), Print(set.horizontal))?;
             }
         }
-        if self.borders.contains(Borders::BOTTOM) {
-            let row = self.height + 1;
-            for col in self.col..=self.width as u16 {
-                queue!(writer, MoveTo(col, row), Print(set.horizontal))?;
+        if bot {
+            for col_idx in col..last_col {
+                queue!(writer, MoveTo(col_idx, last_row), Print(set.horizontal))?;
             }
         }
-        if self.borders.contains(Borders::LEFT) {
-            let col = self.col - 1;
-            for row in self.row..=self.height {
-                queue!(writer, MoveTo(col, row), Print(set.vertical))?;
+        if left {
+            for row_idx in row..last_row {
+                queue!(writer, MoveTo(col, row_idx), Print(set.vertical))?;
             }
         }
-        if self.borders.contains(Borders::RIGHT) {
-            let col = self.width as u16 + self.col;
-            for row in self.row..=self.height {
-                queue!(writer, MoveTo(col, row), Print(set.vertical))?;
+        if right {
+            for row_idx in row..last_row {
+                queue!(writer, MoveTo(last_col, row_idx), Print(set.vertical))?;
             }
         }
         if self.borders.contains(Borders::TOP | Borders::LEFT) {
-            queue!(writer, MoveTo(self.col - 1, self.row - 1), Print(set.top_left_qorner))?;
+            queue!(writer, MoveTo(col, row), Print(set.top_left_qorner))?;
         }
         if self.borders.contains(Borders::TOP | Borders::RIGHT) {
-            queue!(writer, MoveTo(self.width as u16 + self.col, self.row - 1), Print(set.top_right_qorner))?;
+            queue!(writer, MoveTo(last_col, row), Print(set.top_right_qorner))?;
         }
         if self.borders.contains(Borders::BOTTOM | Borders::LEFT) {
-            queue!(writer, MoveTo(self.col - 1, self.height + 1), Print(set.bot_left_qorner))?;
+            queue!(writer, MoveTo(col, last_row), Print(set.bot_left_qorner))?;
         }
         if self.borders.contains(Borders::BOTTOM | Borders::RIGHT) {
-            queue!(writer, MoveTo(self.width as u16 + self.col, self.height + 1), Print(set.bot_right_qorner))?;
+            queue!(writer, MoveTo(last_col, last_row), Print(set.bot_right_qorner))?;
         }
         queue!(writer, RestorePosition, ResetColor)?;
         writer.flush()
@@ -275,7 +288,7 @@ impl From<(u16, u16)> for Rect {
 
 pub struct RectIter<'a> {
     rect: &'a Rect,
-    row_range: RangeInclusive<u16>,
+    row_range: Range<u16>,
 }
 
 impl<'a> Iterator for RectIter<'a> {
@@ -289,10 +302,11 @@ impl<'a> IntoIterator for &'a Rect {
     type IntoIter = RectIter<'a>;
     type Item = Line;
     fn into_iter(self) -> Self::IntoIter {
-        RectIter { rect: self, row_range: self.row..=self.height }
+        RectIter { rect: self, row_range: self.row..self.row + self.height }
     }
 }
 
+#[derive(Debug)]
 pub struct Line {
     pub row: u16,
     pub col: u16,
