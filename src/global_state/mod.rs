@@ -22,7 +22,7 @@ use crossterm::{
     cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show},
     event::{KeyEvent, MouseEvent},
     execute, queue,
-    style::{Attribute, Color, ContentStyle, PrintStyledContent, StyledContent},
+    style::{Attribute, Color, PrintStyledContent, StyledContent},
 };
 pub use events::{FooterEvent, TreeEvent, WorkspaceEvent};
 use std::path::PathBuf;
@@ -57,7 +57,7 @@ pub struct GlobalState {
     tree_size: u16,
     key_mapper: KeyMapCallback,
     mouse_mapper: MouseMapCallback,
-    theme: UITheme,
+    pub theme: UITheme,
     pub writer: std::io::Stdout,
     pub popup: Option<Box<dyn PopupInterface>>,
     pub footer: Vec<FooterEvent>,
@@ -122,9 +122,8 @@ impl GlobalState {
             self.recalc_draw_size();
         };
         let move_to = MoveTo(self.footer_area.col, self.footer_area.row);
-        let mut s = ContentStyle::new();
+        let mut s = self.theme.accent_style;
         s.foreground_color = Some(Color::Cyan);
-        s.background_color = Some(self.theme.footer_background.into());
         s.attributes.set(Attribute::Bold);
         let _ = execute!(&mut self.writer, move_to, PrintStyledContent(StyledContent::new(s, SELECT_SPAN)), Hide,);
     }
@@ -136,9 +135,8 @@ impl GlobalState {
             self.recalc_draw_size();
         };
         let move_to = MoveTo(self.footer_area.col, self.footer_area.row);
-        let mut s = ContentStyle::new();
+        let mut s = self.theme.accent_style;
         s.foreground_color = Some(Color::Rgb { r: 255, g: 0, b: 0 });
-        s.background_color = Some(self.theme.footer_background.into());
         s.attributes.set(Attribute::Bold);
         let _ = execute!(
             &mut self.writer,

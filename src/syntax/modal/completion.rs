@@ -1,28 +1,16 @@
 use super::ModalMessage;
 #[cfg(build = "debug")]
 use crate::debug_to_file;
-use crate::{
-    global_state::GlobalState,
-    render::WrappedState,
-    syntax::Lang,
-    utils::{BORDERED_BLOCK, REVERSED},
-};
+use crate::{global_state::GlobalState, render::state::State, syntax::Lang};
 use crossterm::event::{KeyCode, KeyEvent};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use lsp_types::CompletionItem;
-use ratatui::{
-    layout::Rect,
-    style::{Modifier, Style},
-    text::{Line, Span},
-    widgets::{List, ListItem},
-    Frame,
-};
 
 pub struct AutoComplete {
-    state: WrappedState,
+    state: State,
     filter: String,
     matcher: SkimMatcherV2,
-    filtered: Vec<(Line<'static>, i64, usize)>,
+    filtered: Vec<(String, i64, usize)>,
     completions: Vec<CompletionItem>,
 }
 
@@ -34,15 +22,10 @@ impl AutoComplete {
                 filter.push(ch);
             } else {
                 filter.clear();
-            }
+            };
         }
-        let mut modal = Self {
-            state: WrappedState::default(),
-            filter,
-            matcher: SkimMatcherV2::default(),
-            filtered: Vec::new(),
-            completions,
-        };
+        let mut modal =
+            Self { state: State::new(), filter, matcher: SkimMatcherV2::default(), filtered: Vec::new(), completions };
         modal.build_matches();
         modal
     }
@@ -50,24 +33,22 @@ impl AutoComplete {
     pub fn map(&mut self, key: &KeyEvent, lang: &Lang, gs: &mut GlobalState) -> ModalMessage {
         match key.code {
             KeyCode::Enter | KeyCode::Tab => {
-                if let Some(idx) = self.state.selected() {
-                    let mut filtered_completion = self.completions.remove(self.filtered.remove(idx).2);
-                    #[cfg(build = "debug")]
-                    debug_to_file("test_data.comp", filtered_completion);
-                    if let Some(data) = filtered_completion.data.take() {
-                        lang.handle_completion_data(data, gs);
-                    };
-                    gs.workspace.push(filtered_completion.into());
-                }
+                let mut filtered_completion = self.completions.remove(self.filtered.remove(self.state.selected).2);
+                #[cfg(build = "debug")]
+                debug_to_file("test_data.comp", filtered_completion);
+                if let Some(data) = filtered_completion.data.take() {
+                    lang.handle_completion_data(data, gs);
+                };
+                gs.workspace.push(filtered_completion.into());
                 ModalMessage::TakenDone
             }
             KeyCode::Char(ch) => self.push_filter(ch),
             KeyCode::Down => {
-                self.state.next(&self.filtered);
+                self.state.next(self.filtered.len());
                 ModalMessage::Taken
             }
             KeyCode::Up => {
-                self.state.prev(&self.filtered);
+                self.state.prev(self.filtered.len());
                 ModalMessage::Taken
             }
             KeyCode::Backspace => self.filter_pop(),
@@ -75,13 +56,13 @@ impl AutoComplete {
         }
     }
 
-    pub fn render_at(&mut self, frame: &mut Frame, area: Rect) {
-        let complitions = self.filtered.iter().map(|(line, ..)| ListItem::new(line.clone())).collect::<Vec<_>>();
-        frame.render_stateful_widget(
-            List::new(complitions).block(BORDERED_BLOCK).highlight_style(REVERSED),
-            area,
-            self.state.get(),
-        );
+    #[inline]
+    pub fn render_at(
+        &mut self,
+        area: &crate::render::layout::Rect,
+        writer: &mut impl std::io::Write,
+    ) -> std::io::Result<()> {
+        self.state.render(&self.filtered, area, to_str, writer)
     }
 
     pub fn len(&self) -> usize {
@@ -116,15 +97,20 @@ impl AutoComplete {
                 self.matcher.fuzzy_match(item.filter_text.as_ref().unwrap_or(&item.label), &self.filter).map(|score| {
                     let divisor = item.label.len().abs_diff(self.filter.len()) as i64;
                     let new_score = if divisor != 0 { score / divisor } else { score };
-                    let mut line = vec![Span::from(item.label.to_owned())];
+                    let mut line = item.label.to_owned();
                     if let Some(info) = item.detail.as_ref() {
-                        line.push(Span::styled(format!("  {info}"), Style::default().add_modifier(Modifier::DIM)));
+                        line = format!("{line}  {info}");
                     };
-                    (Line::from(line), new_score, item_idx)
+                    (line, new_score, item_idx)
                 })
             })
             .collect();
         self.filtered.sort_by(|(_, idx, _), (_, rhidx, _)| rhidx.cmp(idx));
-        self.state.set(0);
+        self.state.select(0, self.filtered.len());
     }
+}
+
+#[inline]
+fn to_str<'a>((text, ..): &'a (String, i64, usize)) -> &'a str {
+    text
 }

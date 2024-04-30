@@ -13,7 +13,12 @@ use crate::{
     workspace::{actions::EditMetaData, cursor::Cursor, line::Line, CursorPosition},
 };
 pub use context::LineBuilderContext;
-use crossterm::event::KeyEvent;
+use crossterm::{
+    cursor::{RestorePosition, SavePosition},
+    event::KeyEvent,
+    execute, queue,
+    style::{ResetColor, SetBackgroundColor},
+};
 pub use diagnostics::{set_diganostics, Action, DiagnosticInfo, DiagnosticLine};
 use langs::Lang;
 use legend::Legend;
@@ -21,7 +26,6 @@ use lsp_types::{
     PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, TextDocumentContentChangeEvent,
 };
 use modal::{LSPModal, LSPResponseType, LSPResult, ModalMessage};
-use ratatui::{layout::Rect, Frame};
 use std::path::{Path, PathBuf};
 use theme::Theme;
 use token::{collect_changes, set_tokens};
@@ -153,15 +157,15 @@ impl Lexer {
         };
     }
 
-    pub fn render_modal_if_exist(&mut self, frame: &mut Frame, area: Rect, cursor: &Cursor) -> Option<usize> {
-        if let Some(modal) = &mut self.modal {
-            let cursor_x_offset = 1 + cursor.char;
-            let cursor_y_offset = cursor.line - cursor.at_line;
-            let col = area.x + (cursor_x_offset + self.line_number_offset) as u16;
-            let row = area.y + cursor_y_offset as u16;
-            return modal.render_at(frame, col, row);
-        }
-        None
+    #[inline]
+    pub fn render_modal_if_exist(
+        &mut self,
+        cursor: &Cursor,
+        gs: &mut GlobalState,
+    ) -> Option<crate::render::layout::Rect> {
+        let col = cursor.char + self.line_number_offset;
+        let row = cursor.line;
+        self.modal.as_mut().and_then(|modal| modal.render_at(col as u16, row as u16, gs))
     }
 
     pub fn map_modal_if_exists(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {

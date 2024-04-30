@@ -13,7 +13,7 @@ use crate::{
     workspace::Workspace,
 };
 use anyhow::Result;
-use crossterm::{event::Event, execute, style::Color};
+use crossterm::event::Event;
 use std::{path::PathBuf, time::Instant};
 
 pub async fn app(open_file: Option<PathBuf>) -> Result<()> {

@@ -2,9 +2,8 @@ use crate::lsp::LSPClient;
 use crate::syntax::theme::Theme;
 use crate::workspace::line::Line;
 use crate::{syntax::Lang, workspace::actions::EditMetaData};
-use crossterm::style::{Attribute, ContentStyle};
+use crossterm::style::{Attribute, Color, ContentStyle};
 use lsp_types::{SemanticToken, TextDocumentContentChangeEvent};
-use ratatui::style::Color;
 
 use super::legend::Legend;
 use super::modal::LSPResponseType;
@@ -103,7 +102,7 @@ impl Token {
 
 fn from_color(c: Color) -> ContentStyle {
     let mut style = ContentStyle::new();
-    style.foreground_color = Some(c.into());
+    style.foreground_color = Some(c);
     style
 }
 

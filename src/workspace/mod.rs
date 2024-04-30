@@ -13,7 +13,7 @@ use crossterm::{
     cursor::MoveTo,
     event::KeyEvent,
     queue,
-    style::{Color, PrintStyledContent, Stylize},
+    style::{PrintStyledContent, Stylize},
 };
 pub use cursor::CursorPosition;
 pub use editor::{DocStats, Editor};
@@ -385,8 +385,8 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
                 EditorAction::SelectToken => editor.select_token(),
                 EditorAction::SelectLine => editor.select_line(),
                 EditorAction::SelectAll => editor.select_all(),
-                EditorAction::ScrollUp => editor.scroll_up(gs),
-                EditorAction::ScrollDown => editor.scroll_down(gs),
+                EditorAction::ScrollUp => editor.scroll_up(),
+                EditorAction::ScrollDown => editor.scroll_down(),
                 EditorAction::SwapUp => editor.swap_up(),
                 EditorAction::SwapDown => editor.swap_down(),
                 EditorAction::JumpLeft => editor.jump_left(),

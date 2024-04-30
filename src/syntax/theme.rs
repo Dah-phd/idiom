@@ -1,10 +1,9 @@
 use crate::configs::{load_or_create_config, pull_color, THEME_FILE};
-use ratatui::style::Color;
+use crossterm::style::Color;
 use serde::Serialize;
 use serde_json::Value;
 
-#[derive(Debug, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone)]
 pub struct Theme {
     pub imports: Color,
     pub key_words: Color,
@@ -19,6 +18,15 @@ pub struct Theme {
     pub string: Color,
     pub string_escape: Color,
     pub comment: Color,
+}
+
+impl Serialize for Theme {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        todo!()
+    }
 }
 
 impl<'de> serde::Deserialize<'de> for Theme {
@@ -50,19 +58,19 @@ impl<'de> serde::Deserialize<'de> for Theme {
 impl Default for Theme {
     fn default() -> Self {
         Self {
-            imports: Color::Rgb(112, 199, 176),
-            key_words: Color::Rgb(79, 106, 214),
-            numeric: Color::Rgb(153, 173, 142),
-            flow_control: Color::LightMagenta,
-            class_or_struct: Color::Rgb(112, 199, 176),
-            constant: Color::Rgb(73, 162, 215),
-            default: Color::Rgb(157, 221, 254),
-            functions: Color::Rgb(218, 223, 170),
+            imports: Color::Rgb { r: 112, g: 199, b: 176 },
+            key_words: Color::Rgb { r: 79, g: 106, b: 214 },
+            numeric: Color::Rgb { r: 153, g: 173, b: 142 },
+            flow_control: Color::Magenta,
+            class_or_struct: Color::Rgb { r: 112, g: 199, b: 176 },
+            constant: Color::Rgb { r: 73, g: 162, b: 215 },
+            default: Color::Rgb { r: 157, g: 221, b: 254 },
+            functions: Color::Rgb { r: 218, g: 223, b: 170 },
             blank: Color::Reset,
-            selected: Color::Rgb(72, 72, 72),
+            selected: Color::Rgb { r: 72, g: 72, b: 72 },
             string: Color::Yellow,
-            string_escape: Color::LightYellow,
-            comment: Color::Rgb(82, 113, 67),
+            string_escape: Color::Yellow,
+            comment: Color::Rgb { r: 82, g: 113, b: 67 },
         }
     }
 }

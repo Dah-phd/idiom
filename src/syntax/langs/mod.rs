@@ -4,8 +4,8 @@ use crate::syntax::theme::Theme;
 use crate::syntax::Action;
 use crate::syntax::GlobalState;
 use crate::syntax::WorkspaceEvent;
+use crossterm::style::Color;
 use lsp_types::DiagnosticRelatedInformation;
-use ratatui::style::Color;
 use rust::{rust_derive_import, rust_process_related_info, rust_specific_handler};
 use serde_json::Value;
 
@@ -72,7 +72,30 @@ impl Lang {
     }
 
     pub fn completable(&self, line: &str, idx: usize) -> bool {
-        return false; // TODO remove
+        let mut curr_token = String::new();
+        let mut prev_token = String::new();
+        let mut trigger = false;
+        for (char_idx, ch) in line.char_indices() {
+            if ch.is_alphabetic() || ch == '_' {
+                if char_idx + 1 == idx {
+                    return trigger
+                        || prev_token.is_empty()
+                            && curr_token.len() < 4
+                            && !self.declaration.contains(&prev_token.as_str());
+                }
+                curr_token.push(ch);
+            } else {
+                if " (.".contains(ch) {
+                    trigger = true;
+                }
+                prev_token = std::mem::take(&mut curr_token);
+            }
+        }
+        false
+    }
+
+    #[allow(dead_code)]
+    pub fn completable_(&self, line: &str, idx: usize) -> bool {
         let mut curr_token = String::new();
         let mut prev_token = String::new();
         let mut trigger = false;

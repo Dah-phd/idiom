@@ -85,33 +85,39 @@ impl Rect {
         Self { row, col, width, height, borders: Borders::all() }
     }
 
+    /// Creates floating modal around position (the row within it);
+    /// Modal will float around the row (above or below - below is preffered) within Rect;
+    /// Minimum height is 3 otherwise the modal will appear above the location;
+    /// Minumum width is 40 otherwise the modal will appear before the location;
+    /// If there is not enough space the rect will be without space height/width = 0;
     #[inline]
-    pub fn modal_relative(&self, row: u16, col: u16, width: usize, height: u16) -> Option<Self> {
-        self.modal_absolute(row + self.row, col + self.col, width, height)
-    }
-
-    pub fn modal_absolute(&self, mut row: u16, mut col: u16, mut width: usize, mut height: u16) -> Option<Self> {
+    pub fn modal_relative(&self, row_offset: u16, col_offset: u16, mut width: usize, mut height: u16) -> Self {
+        let mut row = self.row + row_offset + 1; // goes to the row below it
+        let mut col = self.col + col_offset + 1; // goes behind col
         if self.height + self.row < height + row {
             if self.height > 3 + row {
                 height = self.height - row;
-            } else if row > 3 && self.height > row {
-                // ensures overflowed y's are handled
-                let new_y = row.saturating_sub(height + 1);
-                height = row - (new_y + 1);
-                row = new_y;
+            } else if row_offset > 3 {
+                // goes above and finishes before the row;
+                height = std::cmp::min(height, row_offset - 1);
+                row -= height + 1;
             } else {
-                return None;
-            }
+                width = 0;
+                height = 0;
+            };
         };
         if (self.width + self.col as usize) < (width + col as usize) {
-            if self.width < 30 + col as usize {
-                col = self.width.checked_sub(30)? as u16;
-                width = 30;
-            } else {
+            if self.width > 40 + col as usize {
                 width = self.width - col as usize;
-            }
+            } else if self.width > 40 {
+                col = (self.col + self.width as u16) - 40;
+                width = 40;
+            } else {
+                width = 0;
+                height = 0;
+            };
         };
-        Some(Rect::new(row, col, width, height))
+        Rect::new(row, col, width, height)
     }
 
     /// Splitoff rows into Rect from current Rect - mutating it in place

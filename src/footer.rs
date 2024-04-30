@@ -25,7 +25,7 @@ impl Footer {
     pub fn new(gs: &mut GlobalState) -> Self {
         let theme = gs.unwrap_default_result(UITheme::new(), "theme_ui.josn: ");
         let mut color = ContentStyle::new();
-        color.background_color = Some(theme.footer_background.into());
+        // color.background_color = Some(theme.accent.into());
         Self { clock: Instant::now(), message: None, message_que: Vec::new(), color }
     }
 
@@ -88,7 +88,7 @@ impl Footer {
 
     pub fn reset_cfg(&mut self) -> std::result::Result<(), serde_json::Error> {
         let new_theme = UITheme::new()?;
-        self.color.background_color = Some(new_theme.footer_background.into());
+        // self.color.background_color = Some(new_theme.accent_background.into());
         Ok(())
     }
 

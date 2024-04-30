@@ -14,6 +14,10 @@ impl RenameVariable {
         Self { new_name: TextField::basic(title.to_owned()), cursor, title: format!("Rename: {} ", title) }
     }
 
+    pub fn len(&self) -> usize {
+        1
+    }
+
     pub fn render_at(&mut self, frame: &mut Frame, area: Rect) {
         let block = BORDERED_BLOCK.title(self.title.as_str());
         frame.render_widget(self.new_name.widget().block(block), area);

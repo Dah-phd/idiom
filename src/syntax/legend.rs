@@ -2,8 +2,8 @@ use super::Lang;
 #[cfg(build = "debug")]
 use crate::utils::debug_to_file;
 use crate::{configs::FileType, syntax::Theme};
+use crossterm::style::Color;
 use lsp_types::SemanticTokensServerCapabilities;
-use ratatui::style::Color;
 
 #[derive(Clone, Copy, Debug)]
 pub enum ColorResult {
@@ -119,7 +119,7 @@ impl Legend {
             "comment" => self.legend.push(ColorResult::Final(theme.comment)),
             "string" => self.legend.push(ColorResult::Final(theme.string)),
             "number" => self.legend.push(ColorResult::Final(theme.numeric)),
-            "regexp" => self.legend.push(ColorResult::Final(Color::LightRed)),
+            "regexp" => self.legend.push(ColorResult::Final(Color::Red)),
             "operator" => self.legend.push(ColorResult::default()),
             "decorator" => self.legend.push(ColorResult::Final(theme.functions)),
             _ => return false,

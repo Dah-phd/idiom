@@ -63,7 +63,7 @@ impl Editor {
                 break;
             };
         }
-        // self.lexer.render_modal_if_exist(frame, gs.editor_area, &editor.cursor);
+        self.lexer.render_modal_if_exist(&self.cursor, gs);
         self.cursor.render(&mut gs.writer, gs.editor_area, self.lexer.line_number_offset + 1)
     }
 
@@ -79,7 +79,7 @@ impl Editor {
                 break;
             };
         }
-        // self.lexer.render_modal_if_exist(frame, gs.editor_area, &editor.cursor);
+        self.lexer.render_modal_if_exist(&self.cursor, gs);
         self.cursor.render(&mut gs.writer, gs.editor_area, self.lexer.line_number_offset + 1)
     }
 
@@ -320,9 +320,8 @@ impl Editor {
         self.cursor.select_up(&self.content);
     }
 
-    pub fn scroll_up(&mut self, gs: &mut GlobalState) {
+    pub fn scroll_up(&mut self) {
         self.cursor.scroll_up(&self.content);
-        self.render(gs);
     }
 
     pub fn swap_up(&mut self) {
@@ -337,9 +336,8 @@ impl Editor {
         self.cursor.select_down(&self.content);
     }
 
-    pub fn scroll_down(&mut self, gs: &mut GlobalState) {
+    pub fn scroll_down(&mut self) {
         self.cursor.scroll_down(&self.content);
-        self.render(gs);
     }
 
     pub fn swap_down(&mut self) {

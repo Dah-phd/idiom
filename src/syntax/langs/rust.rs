@@ -1,7 +1,7 @@
 use crate::syntax::theme::Theme;
 use crate::syntax::{Action, Lang};
+use crossterm::style::Color;
 use lsp_types::DiagnosticRelatedInformation;
-use ratatui::style::Color;
 
 pub fn rust_process_related_info(
     _lang: &Lang,

@@ -1,3 +1,4 @@
+use crate::render::layout::Rect;
 use crate::syntax::Lexer;
 use crate::syntax::{DiagnosticInfo, Lang};
 mod completion;
@@ -5,7 +6,7 @@ mod info;
 mod parser;
 mod rename;
 
-use crate::{global_state::GlobalState, render::dynamic_cursor_rect_sized_height, workspace::CursorPosition};
+use crate::{global_state::GlobalState, workspace::CursorPosition};
 use completion::AutoComplete;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use info::Info;
@@ -58,32 +59,32 @@ impl LSPModal {
         }
     }
 
-    pub fn render_at(&mut self, frame: &mut Frame, col: u16, row: u16) -> Option<usize> {
+    pub fn render_at(&mut self, col: u16, row: u16, gs: &mut GlobalState) -> Option<Rect> {
         match self {
             Self::AutoComplete(modal) => {
-                if let Some(area) = dynamic_cursor_rect_sized_height(modal.len(), col, row + 1, frame.size()) {
-                    let len = area.height as usize + 2;
-                    frame.render_widget(Clear, area);
-                    modal.render_at(frame, area);
-                    return Some(len);
-                }
+                let height = std::cmp::min(modal.len() as u16, 7);
+                let area = gs.editor_area.modal_relative(row, col, 60, height);
+                if area.height != 0 {
+                    modal.render_at(&area, &mut gs.writer).ok()?;
+                    return Some(area);
+                };
             }
-            Self::RenameVar(modal) => {
-                if let Some(area) = dynamic_cursor_rect_sized_height(1, col, row + 1, frame.size()) {
-                    let len = area.height as usize + 2;
-                    frame.render_widget(Clear, area);
-                    modal.render_at(frame, area);
-                    return Some(len);
-                }
-            }
-            Self::Info(modal) => {
-                if let Some(area) = dynamic_cursor_rect_sized_height(modal.len(), col, row + 1, frame.size()) {
-                    let len = area.height as usize + 2;
-                    frame.render_widget(Clear, area);
-                    modal.render_at(frame, area);
-                    return Some(len);
-                }
-            }
+            _ => {} // Self::RenameVar(modal) => {
+                    //     if let Some(area) = dynamic_cursor_rect_sized_height(modal.len(), col, row + 1, frame.size()) {
+                    //         let len = area.height as usize + 2;
+                    //         frame.render_widget(Clear, area);
+                    //         modal.render_at(frame, area);
+                    //         return Some(len);
+                    //     }
+                    // }
+                    // Self::Info(modal) => {
+                    //     if let Some(area) = dynamic_cursor_rect_sized_height(modal.len(), col, row + 1, frame.size()) {
+                    //         let len = area.height as usize + 2;
+                    //         frame.render_widget(Clear, area);
+                    //         modal.render_at(frame, area);
+                    //         return Some(len);
+                    //     }
+                    // }
         }
         None
     }
