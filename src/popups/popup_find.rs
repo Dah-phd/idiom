@@ -114,7 +114,7 @@ impl PopupInterface for FindPopup {
         let area = right_corner_rect_static(50, 3, frame.size());
         let block = Block::default().title("Find").borders(Borders::ALL);
         frame.render_widget(Clear, area);
-        frame.render_widget(self.pattern.widget_with_count(self.options.len()).block(block), area);
+        // frame.render_widget(self.pattern.widget_with_count(self.options.len()).block(block), area);
     }
 
     fn update_workspace(&mut self, workspace: &mut Workspace) {

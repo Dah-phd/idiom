@@ -12,7 +12,6 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use info::Info;
 use lsp_types::{CompletionItem, Hover, SignatureHelp};
 pub use parser::{LSPResponseType, LSPResult};
-use ratatui::{widgets::Clear, Frame};
 use rename::RenameVariable;
 
 pub enum LSPModal {
@@ -62,12 +61,25 @@ impl LSPModal {
     pub fn render_at(&mut self, col: u16, row: u16, gs: &mut GlobalState) -> Option<Rect> {
         match self {
             Self::AutoComplete(modal) => {
+                gs.writer.set_style(gs.theme.accent_style).ok()?;
                 let height = std::cmp::min(modal.len() as u16, 7);
                 let area = gs.editor_area.modal_relative(row, col, 60, height);
                 if area.height != 0 {
-                    modal.render_at(&area, &mut gs.writer).ok()?;
+                    modal.render(&area, gs).ok()?;
+                    gs.writer.reset_style().ok()?;
                     return Some(area);
                 };
+                gs.writer.reset_style().ok()?;
+            }
+            Self::RenameVar(modal) => {
+                gs.writer.set_style(gs.theme.accent_style).ok()?;
+                let area = gs.editor_area.modal_relative(row, col, 60, modal.len() as u16);
+                if area.height != 0 {
+                    modal.render(&area, gs).ok()?;
+                    gs.writer.reset_style().ok()?;
+                    return Some(area);
+                };
+                gs.writer.reset_style().ok()?;
             }
             _ => {} // Self::RenameVar(modal) => {
                     //     if let Some(area) = dynamic_cursor_rect_sized_height(modal.len(), col, row + 1, frame.size()) {

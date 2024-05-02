@@ -11,7 +11,10 @@ use crate::{
         popup_replace::ReplacePopup, popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges,
         PopupInterface,
     },
-    render::layout::{Rect, DOUBLE_BORDERS},
+    render::{
+        backend::Backend,
+        layout::{Rect, DOUBLE_BORDERS},
+    },
     runner::EditorTerminal,
     tree::Tree,
     workspace::Workspace,
@@ -58,7 +61,7 @@ pub struct GlobalState {
     key_mapper: KeyMapCallback,
     mouse_mapper: MouseMapCallback,
     pub theme: UITheme,
-    pub writer: std::io::Stdout,
+    pub writer: Backend,
     pub popup: Option<Box<dyn PopupInterface>>,
     pub footer: Vec<FooterEvent>,
     pub workspace: Vec<WorkspaceEvent>,
@@ -74,7 +77,7 @@ pub struct GlobalState {
 }
 
 impl GlobalState {
-    pub fn new() -> std::io::Result<Self> {
+    pub fn new(backend: Backend) -> std::io::Result<Self> {
         let screen_rect = crossterm::terminal::size()?.into();
         let mut new = Self {
             mode: Mode::default(),
@@ -82,7 +85,7 @@ impl GlobalState {
             key_mapper: controls::map_tree,
             mouse_mapper: controls::mouse_handler,
             theme: UITheme::new().unwrap_or_default(),
-            writer: std::io::stdout(),
+            writer: backend,
             popup: None,
             footer: Vec::default(),
             workspace: Vec::default(),

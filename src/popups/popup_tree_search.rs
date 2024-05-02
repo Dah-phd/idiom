@@ -60,15 +60,15 @@ impl PopupInterface for ActivePathSearch {
         let area = centered_rect_static(120, 20, frame.size());
         frame.render_widget(Clear, area);
         let split_areas = Layout::new(Direction::Vertical, SELECTOR_CONSTRAINTS).split(area);
-        frame.render_widget(
-            self.pattern.widget().block(
-                Block::new()
-                    .borders(Borders::ALL)
-                    .title(" Path search (Tab to switch to in File search) ")
-                    .title_style(Style { fg: Some(Color::LightBlue), ..Default::default() }),
-            ),
-            split_areas[0],
-        );
+        // frame.render_widget(
+        //     self.pattern.widget().block(
+        //         Block::new()
+        //             .borders(Borders::ALL)
+        //             .title(" Path search (Tab to switch to in File search) ")
+        //             .title_style(Style { fg: Some(Color::LightBlue), ..Default::default() }),
+        //     ),
+        //     split_areas[0],
+        // );
 
         let options = if self.options.is_empty() {
             vec![ListItem::new("No results found!")]
@@ -167,7 +167,7 @@ impl PopupInterface for ActiveFileSearch {
                 .title(" File search (Selected - Tab to switch to Full mode) ")
                 .title_style(Style { fg: Some(Color::LightYellow), ..Default::default() }),
         };
-        frame.render_widget(self.pattern.widget().block(block), split_areas[0]);
+        // frame.render_widget(self.pattern.widget().block(block), split_areas[0]);
 
         let options = if self.options.is_empty() {
             vec![ListItem::new("No results found!")]

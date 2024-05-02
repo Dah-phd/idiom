@@ -1,15 +1,10 @@
 use bitflags::bitflags;
 use std::cmp::Ordering;
 use std::io::{Result, Write};
-use std::ops::Range;
+use std::ops::{Index, Range};
 
-use crossterm::cursor::{RestorePosition, SavePosition};
-use crossterm::style::{ResetColor, SetForegroundColor};
-use crossterm::{
-    cursor::MoveTo,
-    queue,
-    style::{Color, ContentStyle, Print, PrintStyledContent, StyledContent},
-};
+use super::backend::Backend;
+use crossterm::style::{Color, ContentStyle};
 
 pub const BORDERS: BorderSet = BorderSet {
     top_left_qorner: "┌",
@@ -172,6 +167,13 @@ impl Rect {
         }
     }
 
+    pub fn get_line(&self, rel_idx: u16) -> Option<Line> {
+        if rel_idx >= self.height {
+            return None;
+        }
+        Some(Line { row: self.row + rel_idx, col: self.col, width: self.width })
+    }
+
     pub fn center(&self, rows: u16, cols: u16) -> Self {
         todo!()
     }
@@ -222,14 +224,14 @@ impl Rect {
         (self.row, self.col, self.height as usize)
     }
 
-    pub fn clear(&self, writer: &mut impl Write) -> std::io::Result<()> {
+    pub fn clear(&self, writer: &mut Backend) -> std::io::Result<()> {
         for line in self.into_iter() {
             line.render_empty(writer)?;
         }
         writer.flush()
     }
 
-    pub fn draw_borders(&self, set: Option<BorderSet>, fg: Color, writer: &mut impl Write) -> std::io::Result<()> {
+    pub fn draw_borders(&self, set: Option<BorderSet>, fg: Color, writer: &mut Backend) -> std::io::Result<()> {
         let top = self.borders.contains(Borders::TOP);
         let bot = self.borders.contains(Borders::BOTTOM);
         let left = self.borders.contains(Borders::LEFT);
@@ -248,40 +250,48 @@ impl Rect {
         };
 
         let set = set.unwrap_or(BORDERS);
-        queue!(writer, SavePosition, SetForegroundColor(fg))?;
+        writer.save_cursor()?;
         if top {
             for col_idx in col..last_col {
-                queue!(writer, MoveTo(col_idx, row), Print(set.horizontal))?;
+                writer.go_to(row, col_idx)?;
+                writer.print(set.horizontal)?;
             }
         }
         if bot {
             for col_idx in col..last_col {
-                queue!(writer, MoveTo(col_idx, last_row), Print(set.horizontal))?;
+                writer.go_to(last_row, col_idx)?;
+                writer.print(set.horizontal)?;
             }
         }
         if left {
             for row_idx in row..last_row {
-                queue!(writer, MoveTo(col, row_idx), Print(set.vertical))?;
+                writer.go_to(row_idx, col)?;
+                writer.print(set.vertical)?;
             }
         }
         if right {
             for row_idx in row..last_row {
-                queue!(writer, MoveTo(last_col, row_idx), Print(set.vertical))?;
+                writer.go_to(row_idx, last_col)?;
+                writer.print(set.vertical)?;
             }
         }
         if self.borders.contains(Borders::TOP | Borders::LEFT) {
-            queue!(writer, MoveTo(col, row), Print(set.top_left_qorner))?;
+            writer.go_to(row, col)?;
+            writer.print(set.top_left_qorner)?;
         }
         if self.borders.contains(Borders::TOP | Borders::RIGHT) {
-            queue!(writer, MoveTo(last_col, row), Print(set.top_right_qorner))?;
+            writer.go_to(row, last_col)?;
+            writer.print(set.top_right_qorner)?;
         }
         if self.borders.contains(Borders::BOTTOM | Borders::LEFT) {
-            queue!(writer, MoveTo(col, last_row), Print(set.bot_left_qorner))?;
+            writer.go_to(last_row, col)?;
+            writer.print(set.bot_left_qorner)?;
         }
         if self.borders.contains(Borders::BOTTOM | Borders::RIGHT) {
-            queue!(writer, MoveTo(last_col, last_row), Print(set.bot_right_qorner))?;
+            writer.go_to(last_row, last_col)?;
+            writer.print(set.bot_right_qorner)?;
         }
-        queue!(writer, RestorePosition, ResetColor)?;
+        writer.restore_cursor()?;
         writer.flush()
     }
 }
@@ -321,79 +331,71 @@ pub struct Line {
 
 impl Line {
     #[inline]
-    pub fn render_empty(self, writer: &mut impl Write) -> std::io::Result<()> {
-        queue!(writer, MoveTo(self.col, self.row), Print(format!("{:width$}", "", width = self.width)))
+    pub fn render_empty(self, writer: &mut Backend) -> std::io::Result<()> {
+        writer.print_at(self.row, self.col, format!("{:width$}", "", width = self.width))
     }
 
     #[inline]
-    pub fn render(self, text: &str, writer: &mut impl Write) -> Result<()> {
+    pub fn render(self, text: &str, writer: &mut Backend) -> Result<()> {
         match text.len().cmp(&self.width) {
-            Ordering::Greater => {
-                queue!(writer, MoveTo(self.col, self.row), Print(unsafe { text.get_unchecked(..self.width) }))
-            }
-            Ordering::Equal => {
-                queue!(writer, MoveTo(self.col, self.row), Print(text))
-            }
-            Ordering::Less => {
-                queue!(writer, MoveTo(self.col, self.row), Print(format!("{text:width$}", width = self.width)))
-            }
+            Ordering::Greater => writer.print_at(self.row, self.col, unsafe { text.get_unchecked(..self.width) }),
+            Ordering::Equal => writer.print_at(self.row, self.col, text),
+            Ordering::Less => writer.print_at(self.row, self.col, format!("{text:width$}", width = self.width)),
         }
     }
 
     #[inline]
-    pub fn render_styled(self, text: &str, style: ContentStyle, writer: &mut impl Write) -> Result<()> {
+    pub fn render_styled(self, text: &str, style: ContentStyle, writer: &mut Backend) -> Result<()> {
         match text.len().cmp(&self.width) {
             Ordering::Greater => {
-                queue!(
-                    writer,
-                    MoveTo(self.col, self.row),
-                    PrintStyledContent(StyledContent::new(style, unsafe { text.get_unchecked(..self.width) }))
-                )
+                writer.print_styled_at(self.row, self.col, unsafe { text.get_unchecked(..self.width) }, style)
             }
-            Ordering::Equal => {
-                queue!(writer, MoveTo(self.col, self.row), PrintStyledContent(StyledContent::new(style, text)))
-            }
+            Ordering::Equal => writer.print_styled_at(self.row, self.col, text, style),
             Ordering::Less => {
-                queue!(
-                    writer,
-                    MoveTo(self.col, self.row),
-                    PrintStyledContent(StyledContent::new(style, format!("{text:width$}", width = self.width)))
-                )
+                writer.print_styled_at(self.row, self.col, format!("{text:width$}", width = self.width), style)
             }
         }
     }
 
-    pub fn builder(self, writer: &mut impl Write) -> std::io::Result<LineBuilder> {
-        queue!(writer, MoveTo(self.col, self.row)).map(|_| LineBuilder { remaining: self.width })
+    pub fn builder<'a>(self, backend: &'a mut Backend) -> std::io::Result<LineBuilder<'a>> {
+        backend.go_to(self.row, self.col).map(|_| LineBuilder { remaining: self.width, backend })
     }
 }
 
-pub struct LineBuilder {
+pub struct LineBuilder<'a> {
     remaining: usize,
+    backend: &'a mut Backend,
 }
 
-impl LineBuilder {
-    pub fn push(&mut self, text: &str, writer: &mut impl Write) -> std::io::Result<bool> {
+impl<'a> LineBuilder<'a> {
+    pub fn push(&mut self, text: &str) -> std::io::Result<bool> {
         if text.len() > self.remaining {
-            queue!(writer, Print(unsafe { text.get_unchecked(..self.remaining) }))?;
+            self.backend.print(unsafe { text.get_unchecked(..self.remaining) })?;
             self.remaining = 0;
             return Ok(false);
         }
         self.remaining -= text.len();
-        queue!(writer, Print(text))?;
+        self.backend.print(text)?;
         Ok(true)
     }
-    pub fn push_styled(&mut self, text: &str, style: ContentStyle, writer: &mut impl Write) -> std::io::Result<bool> {
+    pub fn push_styled(&mut self, text: &str, style: ContentStyle) -> std::io::Result<bool> {
         if text.len() > self.remaining {
-            queue!(
-                writer,
-                PrintStyledContent(StyledContent::new(style, unsafe { text.get_unchecked(..self.remaining) }))
-            )?;
+            self.backend.print_styled(unsafe { text.get_unchecked(..self.remaining) }, style)?;
             self.remaining = 0;
             return Ok(false);
         }
         self.remaining -= text.len();
-        queue!(writer, PrintStyledContent(StyledContent::new(style, text)))?;
+        self.backend.print_styled(text, style)?;
         Ok(true)
+    }
+}
+
+impl Drop for LineBuilder<'_> {
+    /// ensure line is rendered and padded till end;
+    fn drop(&mut self) {
+        if self.remaining != 0 {
+            let _ = self.push(format!("{:width$}", "", width = self.remaining).as_str());
+        }
+        let _ = self.backend.flush();
     }
 }

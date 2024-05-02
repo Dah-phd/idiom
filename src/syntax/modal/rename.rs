@@ -15,12 +15,12 @@ impl RenameVariable {
     }
 
     pub fn len(&self) -> usize {
-        1
+        2
     }
 
-    pub fn render_at(&mut self, frame: &mut Frame, area: Rect) {
-        let block = BORDERED_BLOCK.title(self.title.as_str());
-        frame.render_widget(self.new_name.widget().block(block), area);
+    pub fn render(&mut self, area: &crate::render::layout::Rect, gs: &mut GlobalState) -> std::io::Result<()> {
+        area.get_line(0).unwrap().render(" Rename:", &mut gs.writer)?;
+        self.new_name.widget(area.get_line(1).unwrap(), &mut gs.writer)
     }
 
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> ModalMessage {

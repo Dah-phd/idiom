@@ -8,6 +8,7 @@ use crate::{
         popup_tree_search::ActivePathSearch,
         popups_editor::{save_all_popup, selector_editors},
     },
+    render::backend::Backend,
     runner::EditorTerminal,
     tree::Tree,
     workspace::Workspace,
@@ -16,8 +17,8 @@ use anyhow::Result;
 use crossterm::event::Event;
 use std::{path::PathBuf, time::Instant};
 
-pub async fn app(open_file: Option<PathBuf>) -> Result<()> {
-    let mut gs = GlobalState::new()?;
+pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> Result<()> {
+    let mut gs = GlobalState::new(backend)?;
     let configs = gs.unwrap_default_result(KeyMap::new(), ".keys: ");
     let mut last_frame_start = Instant::now();
     let mut general_key_map = configs.general_key_map();

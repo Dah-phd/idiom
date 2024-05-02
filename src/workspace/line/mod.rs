@@ -1,12 +1,11 @@
 mod code;
 use crate::{
-    render::layout::Line as LineInfo,
+    render::{backend::Backend, layout::Line as LineInfo},
     syntax::{DiagnosticLine, Lexer, Token},
 };
 pub use code::CodeLine;
 use std::{
     fmt::Display,
-    io::Write,
     ops::{Index, Range, RangeBounds, RangeFrom, RangeFull, RangeTo},
     slice::SliceIndex,
 };
@@ -47,16 +46,15 @@ pub trait Line:
         line: LineInfo,
         limit: usize,
         lexer: &mut Lexer,
-        writer: &mut impl Write,
+        writer: &mut Backend,
     ) -> std::io::Result<usize>;
-    fn render(&mut self, idx: usize, line: LineInfo, lexer: &mut Lexer, writer: &mut impl Write)
-        -> std::io::Result<()>;
+    fn render(&mut self, idx: usize, line: LineInfo, lexer: &mut Lexer, writer: &mut Backend) -> std::io::Result<()>;
     fn fast_render(
         &mut self,
         idx: usize,
         line: LineInfo,
         lexer: &mut Lexer,
-        writer: &mut impl Write,
+        writer: &mut Backend,
     ) -> std::io::Result<()>;
     unsafe fn get_unchecked<I: SliceIndex<str>>(&self, i: I) -> &I::Output;
 }

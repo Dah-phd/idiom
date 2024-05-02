@@ -81,7 +81,7 @@ impl EditorTerminal {
             .collect::<Vec<ListItem<'_>>>();
         let prompt = self.prompt.as_ref().map(|p| into_guard(p).to_owned()).unwrap_or(String::from("[Dead terminal]"));
         let mut line = vec![Span::raw(prompt)];
-        self.cmd.insert_formatted_text(&mut line);
+        // self.cmd.insert_formatted_text(&mut line);
         list.push(ListItem::new(Line::from(line)));
         list
     }

@@ -57,12 +57,8 @@ impl AutoComplete {
     }
 
     #[inline]
-    pub fn render_at(
-        &mut self,
-        area: &crate::render::layout::Rect,
-        writer: &mut impl std::io::Write,
-    ) -> std::io::Result<()> {
-        self.state.render(&self.filtered, area, to_str, writer)
+    pub fn render(&mut self, area: &crate::render::layout::Rect, gs: &mut GlobalState) -> std::io::Result<()> {
+        self.state.render(&self.filtered, area, to_str, &mut gs.writer)
     }
 
     pub fn len(&self) -> usize {
@@ -97,7 +93,7 @@ impl AutoComplete {
                 self.matcher.fuzzy_match(item.filter_text.as_ref().unwrap_or(&item.label), &self.filter).map(|score| {
                     let divisor = item.label.len().abs_diff(self.filter.len()) as i64;
                     let new_score = if divisor != 0 { score / divisor } else { score };
-                    let mut line = item.label.to_owned();
+                    let mut line = format!(" {}", item.label);
                     if let Some(info) = item.detail.as_ref() {
                         line = format!("{line}  {info}");
                     };

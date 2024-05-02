@@ -1,16 +1,13 @@
+use crossterm::style::{Attribute, Color, ContentStyle};
+
 use crate::{
-    render::layout::Line as LineInfo,
+    render::{backend::Backend, layout::Line as LineInfo},
     syntax::{DiagnosticLine, Lexer, Token},
     workspace::line::Line as LineInterface,
 };
-use crossterm::{
-    cursor::MoveTo,
-    queue,
-    style::{Print, PrintStyledContent, Stylize},
-    terminal::{Clear, ClearType},
-};
 use std::{
     fmt::Display,
+    io::Write,
     ops::{Index, Range, RangeBounds, RangeFrom, RangeFull, RangeTo},
     slice::SliceIndex,
 };
@@ -204,20 +201,16 @@ impl LineInterface for CodeLine {
     }
 
     #[inline]
-    fn render(
-        &mut self,
-        idx: usize,
-        line: LineInfo,
-        lexer: &mut Lexer,
-        writer: &mut impl std::io::Write,
-    ) -> std::io::Result<()> {
+    fn render(&mut self, idx: usize, line: LineInfo, lexer: &mut Lexer, writer: &mut Backend) -> std::io::Result<()> {
         if self.tokens.is_empty() {
             Token::parse(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
         };
         self.rendered_at = idx;
         let line_number = format!("{: >1$} ", self.rendered_at, lexer.line_number_offset);
-        queue!(writer, MoveTo(line.col, line.row), PrintStyledContent(line_number.dark_grey()))?;
-        queue!(writer, Clear(ClearType::UntilNewLine))?;
+        let mut style = ContentStyle::new();
+        style.foreground_color.replace(Color::DarkGrey);
+        writer.print_styled_at(line.row, line.col, line_number, style)?;
+        writer.clear_to_eol()?;
         if line.width <= self.content.len() + lexer.line_number_offset {
             let end_loc = line.width.saturating_sub(3 + lexer.line_number_offset);
             shrank_line(unsafe { self.content.get_unchecked(..end_loc) }, &self.tokens, writer)?;
@@ -233,7 +226,7 @@ impl LineInterface for CodeLine {
         idx: usize,
         line: LineInfo,
         lexer: &mut Lexer,
-        writer: &mut impl std::io::Write,
+        writer: &mut Backend,
     ) -> std::io::Result<()> {
         if self.rendered_at == idx {
             return Ok(());
@@ -248,7 +241,7 @@ impl LineInterface for CodeLine {
         line: LineInfo,
         limit: usize,
         lexer: &mut Lexer,
-        writer: &mut impl std::io::prelude::Write,
+        writer: &mut Backend,
     ) -> std::io::Result<usize> {
         wrapped_line()
     }
@@ -261,50 +254,52 @@ impl Into<String> for CodeLine {
 }
 
 #[inline]
-fn build_line(content: &str, tokens: &[Token], writer: &mut impl std::io::Write) -> std::io::Result<()> {
+fn build_line(content: &str, tokens: &[Token], writer: &mut Backend) -> std::io::Result<()> {
     let mut end = 0;
     for token in tokens.iter() {
         if token.from > end {
             if let Some(text) = content.get(end..token.from) {
-                queue!(writer, Print(text))?;
+                writer.print(text)?;
             } else if let Some(text) = content.get(end..) {
-                return queue!(writer, Print(text));
+                return writer.print(text);
             };
         };
         if let Some(text) = content.get(token.from..token.to) {
-            queue!(writer, PrintStyledContent(token.color.apply(text)))?;
+            writer.print_styled(text, token.color)?;
         } else if let Some(text) = content.get(token.from..) {
-            return queue!(writer, PrintStyledContent(token.color.apply(text)));
+            return writer.print_styled(text, token.color);
         };
         end = token.to;
     }
     if let Some(text) = content.get(end..) {
-        queue!(writer, Print(text))?;
+        writer.print(text)?;
     }
     Ok(())
 }
 
 #[inline]
-fn shrank_line(content: &str, tokens: &[Token], writer: &mut impl std::io::Write) -> std::io::Result<()> {
+fn shrank_line(content: &str, tokens: &[Token], writer: &mut Backend) -> std::io::Result<()> {
     let mut end = 0;
+    let mut rev = ContentStyle::new();
+    rev.attributes.set(Attribute::Reverse);
     for token in tokens.iter() {
         if token.from > end {
             if let Some(text) = content.get(end..token.from) {
-                queue!(writer, Print(text))?;
+                writer.print(text)?;
             } else if let Some(text) = content.get(end..) {
-                queue!(writer, Print(text))?;
-                return queue!(writer, PrintStyledContent(">>".reverse()));
+                writer.print(text)?;
+                return writer.print_styled(">>", rev);
             };
         };
         if let Some(text) = content.get(token.from..token.to) {
-            queue!(writer, PrintStyledContent(token.color.apply(text)))?;
+            writer.print_styled(text, token.color)?;
         } else if let Some(text) = content.get(token.from..) {
-            queue!(writer, PrintStyledContent(token.color.apply(text)))?;
-            return queue!(writer, PrintStyledContent(">>".reverse()));
+            writer.print_styled(text, token.color)?;
+            return writer.print_styled(">>", rev);
         };
         end = token.to;
     }
-    queue!(writer, PrintStyledContent(">>".reverse()))
+    writer.print_styled(">>", rev)
 }
 
 #[inline]

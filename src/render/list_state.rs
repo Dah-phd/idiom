@@ -9,6 +9,7 @@ impl WrappedState {
     pub fn set(&mut self, idx: usize) {
         self.inner.select(Some(idx));
     }
+
     pub fn drop(&mut self) {
         self.inner.select(None);
     }

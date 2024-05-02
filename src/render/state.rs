@@ -2,6 +2,8 @@ use crate::render::layout::Rect;
 use crossterm::style::{Attribute, ContentStyle};
 use std::io::Write;
 
+use super::backend::Backend;
+
 pub struct State {
     pub at_line: usize,
     pub selected: usize,
@@ -58,12 +60,39 @@ impl State {
         };
     }
 
+    #[inline]
+    pub fn render_styled<'a, D, F>(
+        &mut self,
+        options: &'a [D],
+        rect: &Rect,
+        to_str: F,
+        style: ContentStyle,
+        writer: &mut Backend,
+    ) -> std::io::Result<()>
+    where
+        F: Fn(&'a D) -> &'a str,
+    {
+        self.update_at_line(rect.height as usize, options.len());
+        writer.set_style(style)?;
+        for ((idx, text), area) in
+            options.iter().map(|d| (to_str)(d)).enumerate().skip(self.at_line).zip(rect.into_iter())
+        {
+            if idx == self.selected {
+                area.render_styled(text, self.highlight, writer)?;
+            } else {
+                area.render(text, writer)?;
+            };
+        }
+        writer.reset_style()?;
+        writer.flush()
+    }
+
     pub fn render<'a, D, F>(
         &mut self,
         options: &'a [D],
         rect: &Rect,
         to_str: F,
-        writer: &mut impl Write,
+        writer: &mut Backend,
     ) -> std::io::Result<()>
     where
         F: Fn(&'a D) -> &'a str,
@@ -81,7 +110,7 @@ impl State {
         writer.flush()
     }
 
-    pub fn render_strings(&mut self, options: &[String], rect: &Rect, writer: &mut impl Write) -> std::io::Result<()> {
+    pub fn render_strings(&mut self, options: &[String], rect: &Rect, writer: &mut Backend) -> std::io::Result<()> {
         self.update_at_line(rect.height as usize, options.len());
         for ((idx, text), area) in options.into_iter().enumerate().skip(self.at_line).zip(rect.into_iter()) {
             if idx == self.selected {
@@ -93,7 +122,7 @@ impl State {
         writer.flush()
     }
 
-    pub fn render_strs(&mut self, options: &[&str], rect: &Rect, writer: &mut impl Write) -> std::io::Result<()> {
+    pub fn render_strs(&mut self, options: &[&str], rect: &Rect, writer: &mut Backend) -> std::io::Result<()> {
         self.update_at_line(rect.height as usize, options.len());
         for ((idx, text), area) in options.into_iter().enumerate().skip(self.at_line).zip(rect.into_iter()) {
             if idx == self.selected {
