@@ -4,6 +4,7 @@ pub mod layout;
 mod list_state;
 pub mod state;
 mod text_field;
+pub mod widgets;
 pub use button::Button;
 pub use list_state::WrappedState;
 use ratatui::text::Line;
@@ -13,6 +14,8 @@ use ratatui::{
     text::Span,
 };
 pub use text_field::TextField;
+
+/// This can easily gorow to be a framework itself
 
 pub fn wrapped_line_start(skipped: usize, line: Option<Line<'static>>) -> Line<'static> {
     let mut line = line.unwrap_or_default();

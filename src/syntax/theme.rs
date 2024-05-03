@@ -1,5 +1,5 @@
 use crate::configs::{load_or_create_config, pull_color, THEME_FILE};
-use crossterm::style::Color;
+use crate::render::backend::{color, Color};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -58,19 +58,19 @@ impl<'de> serde::Deserialize<'de> for Theme {
 impl Default for Theme {
     fn default() -> Self {
         Self {
-            imports: Color::Rgb { r: 112, g: 199, b: 176 },
-            key_words: Color::Rgb { r: 79, g: 106, b: 214 },
-            numeric: Color::Rgb { r: 153, g: 173, b: 142 },
-            flow_control: Color::Magenta,
-            class_or_struct: Color::Rgb { r: 112, g: 199, b: 176 },
-            constant: Color::Rgb { r: 73, g: 162, b: 215 },
-            default: Color::Rgb { r: 157, g: 221, b: 254 },
-            functions: Color::Rgb { r: 218, g: 223, b: 170 },
-            blank: Color::Reset,
-            selected: Color::Rgb { r: 72, g: 72, b: 72 },
-            string: Color::Yellow,
-            string_escape: Color::Yellow,
-            comment: Color::Rgb { r: 82, g: 113, b: 67 },
+            imports: color::rgb(112, 199, 176),
+            key_words: color::rgb(79, 106, 214),
+            numeric: color::rgb(153, 173, 142),
+            flow_control: color::magenta(),
+            class_or_struct: color::rgb(112, 199, 176),
+            constant: color::rgb(73, 162, 215),
+            default: color::rgb(157, 221, 254),
+            functions: color::rgb(218, 223, 170),
+            blank: color::reset(),
+            selected: color::rgb(72, 72, 72),
+            string: color::yellow(),
+            string_escape: color::yellow(),
+            comment: color::rgb(82, 113, 67),
         }
     }
 }

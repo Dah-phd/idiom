@@ -1,35 +1,13 @@
 use crate::{
     global_state::{Clipboard, PopupMessage, TreeEvent, WorkspaceEvent},
-    render::backend::Backend,
+    render::backend::{color, Backend, Style},
 };
 use core::ops::Range;
-use crossterm::{
-    event::{KeyCode, KeyEvent, KeyModifiers},
-    style::{Attribute, Color, ContentStyle},
-};
-use ratatui::{backend, style::Modifier};
-use ratatui::{style::Style, text::Span};
-use std::io::Write;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::{
     count_as_string,
     layout::{Line, LineBuilder},
-};
-
-const CURSOR: Style = Style {
-    fg: None,
-    bg: None,
-    underline_color: None,
-    add_modifier: Modifier::REVERSED,
-    sub_modifier: Modifier::empty(),
-};
-
-const SELECT: Style = Style {
-    fg: None,
-    bg: Some(ratatui::style::Color::Rgb(72, 72, 72)),
-    underline_color: None,
-    add_modifier: Modifier::empty(),
-    sub_modifier: Modifier::empty(),
 };
 
 #[derive(Default)]
@@ -92,36 +70,30 @@ impl<T: Default + Clone> TextField<T> {
     }
 
     fn text_cursor(&self, mut builder: LineBuilder) -> std::io::Result<()> {
-        let mut style = ContentStyle::new();
-        style.attributes.set(Attribute::Reverse);
         if self.char == self.text.len() {
             builder.push(&self.text)?;
-            builder.push_styled(" ", style);
+            builder.push_styled(" ", Style::reversed())?;
         } else {
             builder.push(self.text[..self.char].as_ref())?;
-            builder.push_styled(self.text[self.char..=self.char].as_ref(), style)?;
-            builder.push(self.text[self.char + 1..].as_ref());
+            builder.push_styled(self.text[self.char..=self.char].as_ref(), Style::reversed())?;
+            builder.push(self.text[self.char + 1..].as_ref())?;
         };
         Ok(())
     }
 
     fn text_cursor_select(&self, from: usize, to: usize, mut builder: LineBuilder) -> std::io::Result<()> {
-        let mut cursor = ContentStyle::new();
-        cursor.attributes.set(Attribute::Reverse);
-        let mut select = ContentStyle::new();
-        select.background_color.replace(Color::Rgb { r: 72, g: 72, b: 72 });
         builder.push(self.text[..from].as_ref())?;
         if from == self.char {
-            builder.push_styled(self.text[self.char..=self.char].as_ref(), cursor)?;
-            builder.push_styled(self.text[from + 1..to].as_ref(), select)?;
+            builder.push_styled(self.text[self.char..=self.char].as_ref(), Style::reversed())?;
+            builder.push_styled(self.text[from + 1..to].as_ref(), Style::bg(color::rgb(72, 72, 72)))?;
             builder.push(self.text[to..].as_ref())?;
         } else if self.char == self.text.len() {
-            builder.push_styled(self.text[from..to].as_ref(), select)?;
+            builder.push_styled(self.text[from..to].as_ref(), Style::bg(color::rgb(72, 72, 72)))?;
             builder.push(self.text[to..].as_ref())?;
-            builder.push_styled(" ", cursor)?;
+            builder.push_styled(" ", Style::reversed())?;
         } else {
-            builder.push_styled(self.text[from..to].as_ref(), select)?;
-            builder.push_styled(self.text[to..=to].as_ref(), cursor)?;
+            builder.push_styled(self.text[from..to].as_ref(), Style::bg(color::rgb(72, 72, 72)))?;
+            builder.push_styled(self.text[to..=to].as_ref(), Style::reversed())?;
             builder.push(self.text[to + 1..].as_ref())?;
         }
         Ok(())

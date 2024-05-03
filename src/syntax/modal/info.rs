@@ -1,11 +1,15 @@
 use super::ModalMessage;
 use crate::{
     global_state::GlobalState,
-    render::{layout::Rect, state::State},
+    render::{
+        backend::{color, Color, Style},
+        layout::Rect,
+        state::State,
+        widgets::paragraph_styled,
+    },
     syntax::{Action, DiagnosticInfo},
 };
 use crossterm::event::{KeyCode, KeyEvent};
-use crossterm::style::{Color, ContentStyle};
 use lsp_types::{Documentation, Hover, HoverContents, MarkedString, SignatureHelp, SignatureInformation};
 use std::cmp::Ordering;
 
@@ -21,7 +25,7 @@ pub struct Info {
     actions: Option<Vec<Action>>,
     text: Vec<(String, Color)>,
     state: State,
-    text_state: State,
+    text_state: usize,
     mode: Mode,
 }
 
@@ -97,7 +101,9 @@ impl Info {
                 self.state.next(self.len());
             }
             Mode::Text => {
-                self.text_state.next(self.len());
+                if self.text_state < self.text.len() {
+                    self.text_state += 1;
+                }
             }
         }
         ModalMessage::Taken
@@ -109,7 +115,7 @@ impl Info {
                 self.state.prev(self.len());
             }
             Mode::Text => {
-                self.text_state.prev(self.len());
+                self.text_state = self.text_state.saturating_sub(1);
             }
         }
 
@@ -140,43 +146,16 @@ impl Info {
                 }
             }
             Mode::Text => {
-                self.text_state.update_at_line(area.height as usize, self.len());
-                for ((text, color), line) in self.text.iter().skip(self.text_state.at_line).zip(area.into_iter()) {
-                    let mut style = ContentStyle::new();
-                    style.foreground_color = Some(*color);
-                    line.render_styled(text, style, &mut gs.writer)?;
-                }
+                paragraph_styled(
+                    *area,
+                    self.text.iter().skip(self.text_state).map(|(d, c)| (d.as_str(), Style::fg(*c))),
+                    &mut gs.writer,
+                )?;
+                // paragraph(*area, self.text.iter().map(|(d, c)| d.as_str()).skip(self.text_state), &mut gs.writer)?;
             }
         }
         Ok(())
     }
-
-    // pub fn render_at(&mut self, frame: &mut Frame, area: Rect) {
-    // match self.mode {
-    //     Mode::Select => {
-    //         if let Some(actions) = self.actions.as_ref() {
-    //             let mut list = actions.iter().map(|a| a.to_string().into()).collect::<Vec<ListItem<'static>>>();
-    //             if !self.text.lines.is_empty() {
-    //                 list.push("Information".into());
-    //             }
-    //             frame.render_stateful_widget(
-    //                 List::new(list).block(BORDERED_BLOCK).highlight_style(REVERSED),
-    //                 area,
-    //                 &mut self.state,
-    //             );
-    //         }
-    //     }
-    //     Mode::Full => {
-    //         frame.render_widget(
-    //             Paragraph::new(self.text.clone())
-    //                 .block(BORDERED_BLOCK)
-    //                 .wrap(Wrap::default())
-    //                 .scroll((self.at_line, 0)),
-    //             area,
-    //         );
-    //     }
-    // }
-    // }
 }
 
 impl From<DiagnosticInfo> for Info {
@@ -186,7 +165,7 @@ impl From<DiagnosticInfo> for Info {
 }
 
 fn parse_sig_info(info: SignatureInformation, lines: &mut Vec<(String, Color)>) {
-    lines.push((info.label, Color::Reset));
+    lines.push((info.label, color::reset()));
     // lines.push(Line::from(generic_line(builder, usize::MAX, &info.label, &mut ctx, Vec::new())));
     if let Some(text) = info.documentation {
         match text {
@@ -199,21 +178,21 @@ fn parse_sig_info(info: SignatureInformation, lines: &mut Vec<(String, Color)>) 
                             continue;
                         }
                         if is_code {
-                            lines.push((String::from(line), Color::Reset));
+                            lines.push((String::from(line), color::reset()));
                             // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
                         } else {
-                            lines.push((String::from(line), Color::Reset));
+                            lines.push((String::from(line), color::reset()));
                         }
                     }
                 } else {
                     for line in c.value.lines() {
-                        lines.push((String::from(line), Color::Reset));
+                        lines.push((String::from(line), color::reset()));
                     }
                 }
             }
             Documentation::String(s) => {
                 for line in s.lines() {
-                    lines.push((String::from(line), Color::Reset));
+                    lines.push((String::from(line), color::reset()));
                     // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
                 }
             }
@@ -227,7 +206,7 @@ fn parse_hover(hover: Hover, lines: &mut Vec<(String, Color)>) {
             // let mut ctx = LineBuilderContext::default();
             for value in arr {
                 for line in parse_markedstr(value).lines() {
-                    lines.push((String::from(line), Color::Reset));
+                    lines.push((String::from(line), color::reset()));
                     // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
                 }
             }
@@ -238,7 +217,7 @@ fn parse_hover(hover: Hover, lines: &mut Vec<(String, Color)>) {
         HoverContents::Scalar(value) => {
             for line in parse_markedstr(value).lines() {
                 // TODO parse to tokens
-                lines.push((line.to_owned(), Color::Reset))
+                lines.push((line.to_owned(), color::reset()))
                 // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
             }
         }
@@ -248,7 +227,7 @@ fn parse_hover(hover: Hover, lines: &mut Vec<(String, Color)>) {
 fn handle_markup(markup: lsp_types::MarkupContent, lines: &mut Vec<(String, Color)>) {
     if !matches!(markup.kind, lsp_types::MarkupKind::Markdown) {
         for line in markup.value.lines() {
-            lines.push((line.to_owned(), Color::Reset));
+            lines.push((line.to_owned(), color::reset()));
             // TODO parse to tokens
             // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
         }
@@ -263,9 +242,9 @@ fn handle_markup(markup: lsp_types::MarkupContent, lines: &mut Vec<(String, Colo
         if is_code {
             // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
         } else if line.trim().starts_with('#') {
-            lines.push((line.to_owned(), Color::Reset));
+            lines.push((line.to_owned(), color::reset()));
         } else {
-            lines.push((line.to_owned(), Color::Reset))
+            lines.push((line.to_owned(), color::reset()))
         }
     }
 }

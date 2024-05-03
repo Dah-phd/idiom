@@ -1,11 +1,11 @@
+use crate::render::backend::{color, Color};
 use crate::syntax::{Lang, Token};
 use crate::{global_state::WorkspaceEvent, workspace::line::Line};
-use crossterm::style::{Attribute, Color};
 use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
 
-const ELS_COLOR: Color = Color::DarkGrey;
-const ERR_COLOR: Color = Color::Red;
-const WAR_COLOR: Color = Color::Yellow;
+const ELS_COLOR: Color = color::dark_grey();
+const ERR_COLOR: Color = color::red();
+const WAR_COLOR: Color = color::yellow();
 // const ERR_STYLE: Style = Style::new().fg(ERR_COLOR);
 // const WAR_STYLE: Style = Style::new().fg(WAR_COLOR);
 // const ELS_STYLE: Style = Style::new().fg(ELS_COLOR);
@@ -66,12 +66,10 @@ impl DiagnosticData {
     pub fn check_and_update(&self, token: &mut Token) {
         match self.end {
             Some(end) if self.start <= token.from && token.to <= end => {
-                token.color.underline_color = Some(self.inline_span.1);
-                token.color.attributes.set(Attribute::Undercurled);
+                token.style.undercurle(Some(self.inline_span.1));
             }
             None if self.start <= token.from => {
-                token.color.underline_color = Some(self.inline_span.1);
-                token.color.attributes.set(Attribute::Undercurled);
+                token.style.undercurle(Some(self.inline_span.1));
             }
             _ => {}
         }

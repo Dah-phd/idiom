@@ -1,7 +1,9 @@
-use crossterm::style::{Attribute, Color, ContentStyle};
-
 use crate::{
-    render::{backend::Backend, layout::Line as LineInfo},
+    render::{
+        backend::color,
+        backend::{Backend, Style},
+        layout::Line as LineInfo,
+    },
     syntax::{DiagnosticLine, Lang, Lexer, Token},
     workspace::line::Line as LineInterface,
 };
@@ -18,8 +20,8 @@ pub struct CodeLine {
     // syntax
     tokens: Vec<Token>,
     diagnostics: Option<DiagnosticLine>,
-    // used for caching
-    rendered_at: usize,
+    // used for caching - 0 is reseved for file tabs and can be used to reset line
+    rendered_at: u16,
 }
 
 impl Display for CodeLine {
@@ -210,11 +212,9 @@ impl LineInterface for CodeLine {
         if self.tokens.is_empty() {
             Token::parse(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
         };
-        self.rendered_at = idx;
-        let line_number = format!("{: >1$} ", self.rendered_at, lexer.line_number_offset);
-        let mut style = ContentStyle::new();
-        style.foreground_color.replace(Color::DarkGrey);
-        writer.print_styled_at(line.row, line.col, line_number, style)?;
+        self.rendered_at = line.row;
+        let line_number = format!("{: >1$} ", idx, lexer.line_number_offset);
+        writer.print_styled_at(line.row, line.col, line_number, Style::fg(color::dark_grey()))?;
         writer.clear_to_eol()?;
         if line.width <= self.content.len() + lexer.line_number_offset {
             let end_loc = line.width.saturating_sub(3 + lexer.line_number_offset);
@@ -233,7 +233,7 @@ impl LineInterface for CodeLine {
         lexer: &mut Lexer,
         writer: &mut Backend,
     ) -> std::io::Result<()> {
-        if self.rendered_at == idx {
+        if self.rendered_at != 1 && self.rendered_at == line.row {
             return Ok(());
         };
         self.render(idx, line, lexer, writer)
@@ -270,9 +270,9 @@ fn build_line(content: &str, tokens: &[Token], writer: &mut Backend) -> std::io:
             };
         };
         if let Some(text) = content.get(token.from..token.to) {
-            writer.print_styled(text, token.color)?;
+            writer.print_styled(text, token.style)?;
         } else if let Some(text) = content.get(token.from..) {
-            return writer.print_styled(text, token.color);
+            return writer.print_styled(text, token.style);
         };
         end = token.to;
     }
@@ -285,26 +285,24 @@ fn build_line(content: &str, tokens: &[Token], writer: &mut Backend) -> std::io:
 #[inline]
 fn shrank_line(content: &str, tokens: &[Token], writer: &mut Backend) -> std::io::Result<()> {
     let mut end = 0;
-    let mut rev = ContentStyle::new();
-    rev.attributes.set(Attribute::Reverse);
     for token in tokens.iter() {
         if token.from > end {
             if let Some(text) = content.get(end..token.from) {
                 writer.print(text)?;
             } else if let Some(text) = content.get(end..) {
                 writer.print(text)?;
-                return writer.print_styled(">>", rev);
+                return writer.print_styled(">>", Style::reversed());
             };
         };
         if let Some(text) = content.get(token.from..token.to) {
-            writer.print_styled(text, token.color)?;
+            writer.print_styled(text, token.style)?;
         } else if let Some(text) = content.get(token.from..) {
-            writer.print_styled(text, token.color)?;
-            return writer.print_styled(">>", rev);
+            writer.print_styled(text, token.style)?;
+            return writer.print_styled(">>", Style::reversed());
         };
         end = token.to;
     }
-    writer.print_styled(">>", rev)
+    writer.print_styled(">>", Style::reversed())
 }
 
 #[inline]

@@ -42,7 +42,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> Result<()> {
 
     loop {
         if let Some(editor) = workspace.get_active() {
-            editor.render(&mut gs)?;
+            editor.fast_render(&mut gs)?;
         }
 
         workspace.render(&mut gs)?;

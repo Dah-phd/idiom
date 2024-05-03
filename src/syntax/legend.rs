@@ -1,8 +1,8 @@
 use super::Lang;
+use crate::render::backend::{color, Color};
 #[cfg(build = "debug")]
 use crate::utils::debug_to_file;
 use crate::{configs::FileType, syntax::Theme};
-use crossterm::style::Color;
 use lsp_types::SemanticTokensServerCapabilities;
 
 #[derive(Clone, Copy, Debug)]
@@ -13,7 +13,7 @@ pub enum ColorResult {
 
 impl Default for ColorResult {
     fn default() -> Self {
-        Self::Final(Color::Reset)
+        Self::Final(color::reset())
     }
 }
 
@@ -62,7 +62,7 @@ impl Legend {
                             "derive" => self.legend.push(ColorResult::Final(theme.functions)),
                             "dot" => self.legend.push(ColorResult::default()),
                             "escapeSequence" => self.legend.push(ColorResult::Final(theme.string_escape)),
-                            "invalidEscapeSequence" => self.legend.push(ColorResult::Final(Color::Red)),
+                            "invalidEscapeSequence" => self.legend.push(ColorResult::Final(color::red())),
                             "lifetime" => self.legend.push(ColorResult::Final(theme.key_words)),
                             "macroBang" => self.legend.push(ColorResult::Final(theme.key_words)),
                             "selfKeyword" => self.legend.push(ColorResult::Final(theme.key_words)),
@@ -119,7 +119,7 @@ impl Legend {
             "comment" => self.legend.push(ColorResult::Final(theme.comment)),
             "string" => self.legend.push(ColorResult::Final(theme.string)),
             "number" => self.legend.push(ColorResult::Final(theme.numeric)),
-            "regexp" => self.legend.push(ColorResult::Final(Color::Red)),
+            "regexp" => self.legend.push(ColorResult::Final(color::red())),
             "operator" => self.legend.push(ColorResult::default()),
             "decorator" => self.legend.push(ColorResult::Final(theme.functions)),
             _ => return false,

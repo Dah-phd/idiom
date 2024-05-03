@@ -12,7 +12,7 @@ use crate::{
         PopupInterface,
     },
     render::{
-        backend::Backend,
+        backend::{color, Backend},
         layout::{Rect, DOUBLE_BORDERS},
     },
     runner::EditorTerminal,
@@ -21,12 +21,7 @@ use crate::{
 };
 pub use clipboard::Clipboard;
 use controls::map_term;
-use crossterm::{
-    cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show},
-    event::{KeyEvent, MouseEvent},
-    execute, queue,
-    style::{Attribute, Color, PrintStyledContent, StyledContent},
-};
+use crossterm::event::{KeyEvent, MouseEvent};
 pub use events::{FooterEvent, TreeEvent, WorkspaceEvent};
 use std::path::PathBuf;
 
@@ -124,11 +119,15 @@ impl GlobalState {
         if !self.components.contains(Components::TREE) {
             self.recalc_draw_size();
         };
-        let move_to = MoveTo(self.footer_area.col, self.footer_area.row);
-        let mut s = self.theme.accent_style;
-        s.foreground_color = Some(Color::Cyan);
-        s.attributes.set(Attribute::Bold);
-        let _ = execute!(&mut self.writer, move_to, PrintStyledContent(StyledContent::new(s, SELECT_SPAN)), Hide,);
+        if let Some(mut line) = self.footer_area.get_line(0) {
+            let _ = self.writer.save_cursor();
+            let mut style = self.theme.accent_style;
+            line.width = SELECT_SPAN.len();
+            style.add_fg(color::cyan());
+            style.add_bold();
+            let _ = line.render_styled(SELECT_SPAN, style, &mut self.writer);
+            let _ = self.writer.restore_cursor();
+        };
     }
 
     pub fn insert_mode(&mut self) {
@@ -137,26 +136,15 @@ impl GlobalState {
         if !self.components.contains(Components::TREE) {
             self.recalc_draw_size();
         };
-        let move_to = MoveTo(self.footer_area.col, self.footer_area.row);
-        let mut s = self.theme.accent_style;
-        s.foreground_color = Some(Color::Rgb { r: 255, g: 0, b: 0 });
-        s.attributes.set(Attribute::Bold);
-        let _ = execute!(
-            &mut self.writer,
-            SavePosition,
-            move_to,
-            PrintStyledContent(StyledContent::new(s, INSERT_SPAN)),
-            RestorePosition,
-            Show,
-        );
-    }
-
-    pub fn store_cursor(&mut self) -> std::io::Result<()> {
-        queue!(&mut self.writer, Hide, SavePosition)
-    }
-
-    pub fn restore_cursor(&mut self) -> std::io::Result<()> {
-        execute!(&mut self.writer, Show, RestorePosition)
+        if let Some(mut line) = self.footer_area.get_line(0) {
+            let _ = self.writer.save_cursor();
+            let mut style = self.theme.accent_style;
+            line.width = INSERT_SPAN.len();
+            style.add_fg(color::rgb(255, 0, 0));
+            style.add_bold();
+            let _ = line.render_styled(INSERT_SPAN, style, &mut self.writer);
+            let _ = self.writer.restore_cursor();
+        };
     }
 
     pub fn is_insert(&self) -> bool {
@@ -286,7 +274,7 @@ impl GlobalState {
             self.tab_area = self.tree_area.keep_col(35);
             let _ = self.tree_area.top_border().right_border().draw_borders(
                 Some(DOUBLE_BORDERS),
-                Color::DarkGrey,
+                color::dark_grey(),
                 &mut self.writer,
             );
         };

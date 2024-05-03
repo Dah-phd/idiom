@@ -49,7 +49,7 @@ impl Workspace {
 
     pub fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
         if let Some(editor) = self.editors.get_mut(0) {
-            gs.store_cursor()?;
+            gs.writer.save_cursor()?;
             let mut tabs = editor.display.to_owned();
             for editor in self.editors.iter().skip(1) {
                 tabs.push_str(" | ");
@@ -57,7 +57,7 @@ impl Workspace {
             }
             tabs.truncate(gs.tab_area.width);
             queue!(&mut gs.writer, MoveTo(gs.tab_area.col, gs.tab_area.row), PrintStyledContent(tabs.underlined()),)?;
-            gs.restore_cursor()
+            gs.writer.restore_cursor()
         } else {
             Ok(())
         }

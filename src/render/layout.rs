@@ -1,6 +1,5 @@
-use crate::render::backend::Backend;
+use crate::render::backend::{Backend, Color, Style};
 use bitflags::bitflags;
-use crossterm::style::{Color, ContentStyle};
 use std::{
     cmp::Ordering,
     io::{Result, Write},
@@ -348,7 +347,7 @@ impl Line {
     }
 
     #[inline]
-    pub fn render_styled(self, text: &str, style: ContentStyle, writer: &mut Backend) -> Result<()> {
+    pub fn render_styled(self, text: &str, style: Style, writer: &mut Backend) -> Result<()> {
         match text.len().cmp(&self.width) {
             Ordering::Greater => {
                 writer.print_styled_at(self.row, self.col, unsafe { text.get_unchecked(..self.width) }, style)
@@ -381,7 +380,7 @@ impl<'a> LineBuilder<'a> {
         self.backend.print(text)?;
         Ok(true)
     }
-    pub fn push_styled(&mut self, text: &str, style: ContentStyle) -> std::io::Result<bool> {
+    pub fn push_styled(&mut self, text: &str, style: Style) -> std::io::Result<bool> {
         if text.len() > self.remaining {
             self.backend.print_styled(unsafe { text.get_unchecked(..self.remaining) }, style)?;
             self.remaining = 0;

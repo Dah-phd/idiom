@@ -1,10 +1,6 @@
 mod rust;
-use crate::configs::FileType;
-use crate::syntax::theme::Theme;
-use crate::syntax::Action;
-use crate::syntax::GlobalState;
-use crate::syntax::WorkspaceEvent;
-use crossterm::style::Color;
+use crate::syntax::{theme::Theme, Action, GlobalState, WorkspaceEvent};
+use crate::{configs::FileType, render::backend::Color};
 use lsp_types::DiagnosticRelatedInformation;
 use rust::{rust_derive_import, rust_process_related_info, rust_specific_handler};
 use serde_json::Value;

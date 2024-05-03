@@ -1,28 +1,34 @@
+#[cfg(test)]
+use test::DummyOut;
+
+pub mod color;
+mod style;
+use crossterm::{
+    cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show},
+    execute, queue,
+    style::{Color as CTColor, Print, ResetColor, SetStyle},
+    terminal::{Clear, ClearType},
+};
 use std::{
     fmt::Display,
     io::{Result, Stdout, Write},
 };
 
-use crossterm::{
-    cursor::{MoveTo, RestorePosition, SavePosition},
-    queue,
-    style::{Color, ContentStyle, Print, ResetColor, SetStyle},
-    terminal::{Clear, ClearType},
-};
-
-type Style = ContentStyle;
+pub use style::Style;
+pub type Color = CTColor;
 
 /// Thin wrapper around rendering framework, allowing easy switching of backend
 /// Add cfg and new implementation of the wrapper to make the backend swichable
 /// Main reason is to clear out the issue with PrintStyled on CrossTerm
 /// TODO: add termios & wezterm
-#[cfg(not(test))]
 pub struct Backend {
+    #[cfg(not(test))]
     writer: Stdout,
+    #[cfg(test)]
+    writer: DummyOut,
     default_styled: Option<Style>,
 }
 
-#[cfg(not(test))]
 impl Write for Backend {
     #[inline]
     fn by_ref(&mut self) -> &mut Self
@@ -53,15 +59,20 @@ impl Write for Backend {
     }
 }
 
-#[cfg(not(test))]
 impl Backend {
     #[inline]
     pub fn init() -> Result<Self> {
+        #[cfg(test)]
+        return Ok(Self { writer: DummyOut {}, default_styled: None });
+        #[cfg(not(test))]
         init_terminal().map(|_| Self { writer: std::io::stdout(), default_styled: None })
     }
 
     #[inline]
     pub fn exit() -> Result<()> {
+        #[cfg(test)]
+        return Ok(());
+        #[cfg(not(test))]
         graceful_exit()
     }
 
@@ -82,26 +93,25 @@ impl Backend {
 
     #[inline]
     pub fn save_cursor(&mut self) -> std::io::Result<()> {
-        queue!(self, SavePosition)
+        execute!(self, SavePosition, Hide)
     }
 
     #[inline]
     pub fn restore_cursor(&mut self) -> std::io::Result<()> {
-        queue!(self, RestorePosition)
+        execute!(self, RestorePosition, Show)
     }
 
     #[inline]
     pub fn set_style(&mut self, style: Style) -> std::io::Result<()> {
         self.default_styled.replace(style);
-        queue!(self, SetStyle(style))
+        queue!(self, SetStyle(style.into()))
     }
 
     #[inline]
     pub fn set_fg(&mut self, color: Color) -> std::io::Result<()> {
-        let mut style = Style::new();
-        style.foreground_color = Some(color);
-        self.default_styled.replace(style);
-        queue!(self, SetStyle(style))
+        let style = Style::fg(color);
+        self.default_styled.replace(Style::fg(color));
+        queue!(self, SetStyle(style.into()))
     }
 
     #[inline]
@@ -128,18 +138,25 @@ impl Backend {
     #[inline]
     pub fn print_styled<D: Display>(&mut self, text: D, style: Style) -> Result<()> {
         if let Some(restore_style) = self.default_styled {
-            queue!(self, SetStyle(style), Print(text), ResetColor, SetStyle(restore_style),)
+            queue!(self, SetStyle(style.into()), Print(text), ResetColor, SetStyle(restore_style.into()),)
         } else {
-            queue!(self, SetStyle(style), Print(text), ResetColor,)
+            queue!(self, SetStyle(style.into()), Print(text), ResetColor,)
         }
     }
 
     #[inline]
     pub fn print_styled_at<D: Display>(&mut self, row: u16, col: u16, text: D, style: Style) -> Result<()> {
         if let Some(restore_style) = self.default_styled {
-            queue!(self, SetStyle(style), MoveTo(col, row), Print(text), ResetColor, SetStyle(restore_style),)
+            queue!(
+                self,
+                SetStyle(style.into()),
+                MoveTo(col, row),
+                Print(text),
+                ResetColor,
+                SetStyle(restore_style.into()),
+            )
         } else {
-            queue!(self, SetStyle(style), MoveTo(col, row), Print(text), ResetColor,)
+            queue!(self, SetStyle(style.into()), MoveTo(col, row), Print(text), ResetColor,)
         }
     }
 }
@@ -175,97 +192,36 @@ fn graceful_exit() -> Result<()> {
 }
 
 #[cfg(test)]
-pub struct Backend();
+mod test {
+    use std::io::{Result, Write};
+    pub struct DummyOut {}
 
-#[cfg(test)]
-impl Write for Backend {
-    fn by_ref(&mut self) -> &mut Self
-    where
-        Self: Sized,
-    {
-        self
-    }
+    impl Write for DummyOut {
+        fn by_ref(&mut self) -> &mut Self
+        where
+            Self: Sized,
+        {
+            self
+        }
 
-    fn flush(&mut self) -> Result<()> {
-        Ok(())
-    }
+        fn flush(&mut self) -> Result<()> {
+            Ok(())
+        }
 
-    fn write(&mut self, buf: &[u8]) -> Result<usize> {
-        Ok(buf.len())
-    }
+        fn write(&mut self, buf: &[u8]) -> Result<usize> {
+            Ok(buf.len())
+        }
 
-    fn write_all(&mut self, mut buf: &[u8]) -> Result<()> {
-        Ok(())
-    }
+        fn write_all(&mut self, _: &[u8]) -> Result<()> {
+            Ok(())
+        }
 
-    fn write_fmt(&mut self, fmt: std::fmt::Arguments<'_>) -> Result<()> {
-        Ok(())
-    }
+        fn write_fmt(&mut self, _: std::fmt::Arguments<'_>) -> Result<()> {
+            Ok(())
+        }
 
-    fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> Result<usize> {
-        Ok((bufs.len()))
-    }
-}
-
-#[cfg(test)]
-impl Backend {
-    pub fn init() -> Result<Self> {
-        Ok(Self())
-    }
-
-    pub fn exit() -> Result<()> {
-        Ok(())
-    }
-
-    pub fn clear_to_eol(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-
-    pub fn clear_line(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-
-    pub fn clear_all(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-
-    pub fn save_cursor(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-
-    pub fn restore_cursor(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-
-    pub fn set_style(&mut self, style: Style) -> std::io::Result<()> {
-        Ok(())
-    }
-
-    pub fn set_fg(&mut self, color: Color) -> std::io::Result<()> {
-        Ok(())
-    }
-
-    pub fn reset_style(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-
-    pub fn go_to(&mut self, row: u16, col: u16) -> Result<()> {
-        Ok(())
-    }
-
-    pub fn print<D: Display>(&mut self, text: D) -> Result<()> {
-        Ok(())
-    }
-
-    pub fn print_at<D: Display>(&mut self, row: u16, col: u16, text: D) -> Result<()> {
-        Ok(())
-    }
-
-    pub fn print_styled<D: Display>(&mut self, text: D, style: Style) -> Result<()> {
-        Ok(())
-    }
-
-    pub fn print_styled_at<D: Display>(&mut self, row: u16, col: u16, text: D, style: Style) -> Result<()> {
-        Ok(())
+        fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> Result<usize> {
+            Ok(bufs.iter().map(|b| b.len()).sum())
+        }
     }
 }

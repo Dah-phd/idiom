@@ -1,29 +1,28 @@
 use crate::render::layout::Rect;
-use crossterm::style::{Attribute, ContentStyle};
 use std::io::Write;
 
-use super::backend::Backend;
+use super::backend::{Backend, Style};
 
-#[derive(Default)]
 pub struct State {
     pub at_line: usize,
     pub selected: usize,
-    pub highlight: ContentStyle,
+    pub highlight: Style,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[allow(dead_code)]
 impl State {
     pub fn new() -> Self {
-        let highlight = ContentStyle {
-            foreground_color: None,
-            background_color: None,
-            underline_color: None,
-            attributes: Attribute::Reverse.into(),
-        };
+        let highlight = Style::reversed();
         Self { at_line: 0, selected: 0, highlight }
     }
 
-    pub fn with_highlight(highlight: ContentStyle) -> Self {
+    pub fn with_highlight(highlight: Style) -> Self {
         Self { at_line: 0, selected: 0, highlight }
     }
 
@@ -67,7 +66,7 @@ impl State {
         options: &'a [D],
         rect: &Rect,
         to_str: F,
-        style: ContentStyle,
+        style: Style,
         writer: &mut Backend,
     ) -> std::io::Result<()>
     where

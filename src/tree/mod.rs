@@ -4,13 +4,11 @@ use crate::{
     global_state::{GlobalState, WorkspaceEvent},
     lsp::Diagnostic,
     popups::popups_tree::{create_file_popup, rename_file_popup},
+    render::backend::Style,
     utils::{build_file_or_folder, to_relative_path},
 };
 use anyhow::Result;
-use crossterm::{
-    event::KeyEvent,
-    style::{ContentStyle, Stylize},
-};
+use crossterm::event::KeyEvent;
 use ratatui::widgets::ListState;
 use std::{
     collections::HashMap,
@@ -50,35 +48,30 @@ impl Tree {
             selected_path: PathBuf::from("./"),
             tree,
             tree_ptrs,
-            // tree_block: Block::new()
-            //     .borders(Borders::TOP | Borders::RIGHT)
-            //     .border_style(Style::default().fg(Color::DarkGray))
-            //     .border_type(BorderType::Double)
-            //     .title("Explorer"),
             sync_handler,
             lsp_register: Vec::new(),
         }
     }
 
     pub fn direct_render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
-        gs.store_cursor()?;
+        gs.writer.save_cursor()?;
         let mut line_iter = gs.tree_area.into_iter();
         let state = self.state.selected().unwrap_or_default();
-        for (idx, text) in
+        for (idx, (text, color)) in
             self.tree_ptrs.iter().flat_map(|ptr| unsafe { ptr.as_ref() }.map(|tp| tp.direct_display())).enumerate()
         {
             if let Some(line) = line_iter.next() {
+                let mut style = Style::fg(color);
                 if idx == state {
-                    line.render_styled(text, ContentStyle::new().reverse(), &mut gs.writer)?;
-                } else {
-                    line.render(text, &mut gs.writer)?;
-                }
+                    style.add_reverse();
+                };
+                line.render_styled(text, style, &mut gs.writer)?;
             }
         }
         for line in line_iter {
             line.render_empty(&mut gs.writer)?;
         }
-        gs.restore_cursor()
+        gs.writer.restore_cursor()
     }
 
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {

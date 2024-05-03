@@ -1,8 +1,9 @@
-use crate::lsp::LSPClient;
-use crate::syntax::theme::Theme;
-use crate::workspace::line::Line;
-use crate::{syntax::Lang, workspace::actions::EditMetaData};
-use crossterm::style::{Attribute, Color, ContentStyle};
+use crate::{
+    lsp::LSPClient,
+    render::backend::{Color, Style},
+    syntax::{theme::Theme, Lang},
+    workspace::{actions::EditMetaData, line::Line},
+};
 use lsp_types::{SemanticToken, TextDocumentContentChangeEvent};
 
 use super::legend::Legend;
@@ -12,12 +13,12 @@ pub struct Token {
     pub from: usize,
     pub to: usize,
     pub len: usize,
-    pub color: ContentStyle,
+    pub style: Style,
 }
 
 impl Token {
     pub fn new(from: usize, to: usize, len: usize, color: Color) -> Self {
-        Self { from, to, len, color: from_color(color) }
+        Self { from, to, len, style: Style::fg(color) }
     }
 
     pub fn enrich(mut char_idx: usize, lang: &Lang, theme: &Theme, snippet: &str, buf: &mut Vec<Token>) {
@@ -34,19 +35,19 @@ impl Token {
             let token_base = std::mem::take(&mut last_word);
             let len = token_base.len();
             if lang.is_keyword(token_base.as_str()) {
-                buf.push(Token { to: char_idx + len, from: char_idx, len, color: from_color(theme.key_words) });
+                buf.push(Token { to: char_idx + len, from: char_idx, len, style: Style::fg(theme.key_words) });
             };
             char_idx += len;
         }
     }
 
     pub fn drop_diagstic(&mut self) {
-        self.color.attributes.unset(Attribute::Undercurled);
+        self.style.reset_mods();
     }
 
     pub fn parse(lang: &Lang, theme: &Theme, snippet: &str, buf: &mut Vec<Token>) {
         if lang.is_comment(snippet) {
-            buf.push(Token { to: snippet.len(), from: 0, len: snippet.len(), color: from_color(theme.comment) });
+            buf.push(Token { to: snippet.len(), from: 0, len: snippet.len(), style: Style::fg(theme.comment) });
             return;
         };
         let mut last_word = String::new();
@@ -64,46 +65,40 @@ impl Token {
             let token_base = std::mem::take(&mut last_word);
             let len = token_base.len();
             if is_import {
-                buf.push(Token { to: from + len, from, len, color: from_color(theme.class_or_struct) });
+                buf.push(Token { to: from + len, from, len, style: Style::fg(theme.class_or_struct) });
             } else if lang.is_keyword(token_base.as_str()) {
-                buf.push(Token { to: from + len, from, len, color: from_color(theme.key_words) });
+                buf.push(Token { to: from + len, from, len, style: Style::fg(theme.key_words) });
             } else if lang.is_flow(token_base.as_str()) {
-                buf.push(Token { to: from + len, from, len, color: from_color(theme.flow_control) });
+                buf.push(Token { to: from + len, from, len, style: Style::fg(theme.flow_control) });
             } else if lang.is_import(token_base.as_str()) {
-                buf.push(Token { to: from + len, from, len, color: from_color(theme.key_words) });
+                buf.push(Token { to: from + len, from, len, style: Style::fg(theme.key_words) });
                 is_import = true;
             } else if let Some(color) = lang.lang_specific_handler(from, token_base.as_str(), snippet, theme) {
-                buf.push(Token { to: from + len, from, len, color: from_color(color) })
+                buf.push(Token { to: from + len, from, len, style: Style::fg(color) })
             } else {
                 if ch == '(' {
-                    buf.push(Token { to: from + len, from, len, color: from_color(theme.functions) });
+                    buf.push(Token { to: from + len, from, len, style: Style::fg(theme.functions) });
                 } else if matches!(token_base.chars().next(), Some(f) if f.is_uppercase()) {
-                    buf.push(Token { to: from + len, from, len, color: from_color(theme.class_or_struct) });
+                    buf.push(Token { to: from + len, from, len, style: Style::fg(theme.class_or_struct) });
                 } else {
-                    buf.push(Token { to: from + len, from, len, color: from_color(theme.default) });
+                    buf.push(Token { to: from + len, from, len, style: Style::fg(theme.default) });
                 }
             };
             from += len + 1;
         }
         let len = last_word.len();
         if is_import {
-            buf.push(Token { to: from + len, from, len, color: from_color(theme.class_or_struct) });
+            buf.push(Token { to: from + len, from, len, style: Style::fg(theme.class_or_struct) });
         } else if lang.is_keyword(last_word.as_str()) {
-            buf.push(Token { to: from + len, from, len, color: from_color(theme.key_words) });
+            buf.push(Token { to: from + len, from, len, style: Style::fg(theme.key_words) });
         } else if lang.is_flow(last_word.as_str()) {
-            buf.push(Token { to: from + len, from, len, color: from_color(theme.flow_control) });
+            buf.push(Token { to: from + len, from, len, style: Style::fg(theme.flow_control) });
         } else if let Some(color) = lang.lang_specific_handler(from, last_word.as_str(), snippet, theme) {
-            buf.push(Token { to: from + len, from, len, color: from_color(color) })
+            buf.push(Token { to: from + len, from, len, style: Style::fg(color) })
         } else {
-            buf.push(Token { to: from + len, from, len, color: from_color(theme.default) });
+            buf.push(Token { to: from + len, from, len, style: Style::fg(theme.default) });
         };
     }
-}
-
-fn from_color(c: Color) -> ContentStyle {
-    let mut style = ContentStyle::new();
-    style.foreground_color = Some(c);
-    style
 }
 
 #[derive(Default)]

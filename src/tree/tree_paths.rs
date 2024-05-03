@@ -1,22 +1,21 @@
 use ignore::gitignore::Gitignore;
 use ignore::Match;
-use ratatui::{
-    style::{Color, Style},
-    text::Span,
-};
 use tokio::task::JoinSet;
 
-const GIT: &str = "./.git";
-const ERR: Style = Style::new().fg(Color::Red);
-const WAR: Style = Style::new().fg(Color::LightYellow);
-
-use crate::utils::{get_nested_paths, to_relative_path, trim_start};
+use crate::{
+    render::backend::{color, Color},
+    utils::{get_nested_paths, to_relative_path, trim_start},
+};
 use std::{
     cmp::Ordering,
     collections::HashSet,
     path::{Path, PathBuf},
     sync::Arc,
 };
+
+const GIT: &str = "./.git";
+const ERR: Color = color::red();
+const WAR: Color = color::dark_yellow();
 
 #[derive(Debug, Clone)]
 pub enum TreePath {
@@ -173,32 +172,25 @@ impl TreePath {
         }
     }
 
-    pub fn direct_display<'a>(&'a self) -> &'a str {
-        match self {
-            Self::Folder { display, .. } => &display,
-            Self::File { display, .. } => &display,
-        }
-    }
-
-    pub fn display(&self) -> Span<'static> {
+    pub fn direct_display<'a>(&'a self) -> (&'a str, Color) {
         match self {
             Self::Folder { display, errors, warnings, .. } => {
                 if errors != &0 {
-                    return Span::styled(display.to_owned(), ERR);
+                    return (display, ERR);
                 }
                 if warnings != &0 {
-                    return Span::styled(display.to_owned(), WAR);
+                    return (display, WAR);
                 }
-                Span::raw(display.to_owned())
+                (display, color::reset())
             }
             Self::File { display, errors, warnings, .. } => {
                 if errors != &0 {
-                    return Span::styled(display.to_owned(), ERR);
+                    return (display, ERR);
                 }
                 if warnings != &0 {
-                    return Span::styled(display.to_owned(), WAR);
+                    return (display, WAR);
                 }
-                Span::raw(display.to_owned())
+                (display, color::reset())
             }
         }
     }
