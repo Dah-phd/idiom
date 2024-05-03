@@ -13,15 +13,10 @@ use crate::{
     workspace::{actions::EditMetaData, cursor::Cursor, line::Line, CursorPosition},
 };
 pub use context::LineBuilderContext;
-use crossterm::{
-    cursor::{RestorePosition, SavePosition},
-    event::KeyEvent,
-    execute, queue,
-    style::{ResetColor, SetBackgroundColor},
-};
+use crossterm::event::KeyEvent;
 pub use diagnostics::{set_diganostics, Action, DiagnosticInfo, DiagnosticLine};
-use langs::Lang;
-use legend::Legend;
+pub use langs::Lang;
+pub use legend::Legend;
 use lsp_types::{
     PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, TextDocumentContentChangeEvent,
 };
@@ -79,17 +74,17 @@ impl Lexer {
                             }
                             LSPResult::Hover(hover) => {
                                 if let Some(modal) = self.modal.as_mut() {
-                                    // modal.hover_map(hover, &self.line_builder);
+                                    modal.hover_map(hover);
                                 } else {
-                                    // self.modal.replace(LSPModal::from_hover(hover, &self.line_builder));
+                                    self.modal.replace(LSPModal::from_hover(hover));
                                 }
                             }
                             LSPResult::SignatureHelp(signature) => {
-                                // if let Some(modal) = self.modal.as_mut() {
-                                //     modal.signature_map(signature, &self.line_builder);
-                                // } else {
-                                //     self.modal.replace(LSPModal::from_signature(signature, &self.line_builder));
-                                // }
+                                if let Some(modal) = self.modal.as_mut() {
+                                    modal.signature_map(signature);
+                                } else {
+                                    self.modal.replace(LSPModal::from_signature(signature));
+                                }
                             }
                             LSPResult::Renames(workspace_edit) => {
                                 gs.workspace.push(workspace_edit.into());
@@ -234,11 +229,11 @@ impl Lexer {
         self.modal.replace(LSPModal::renames_at(c, title));
     }
 
-    pub fn help(&mut self, c: CursorPosition) {
+    pub fn help(&mut self, c: CursorPosition, content: &[impl Line]) {
         if let Some(client) = self.lsp_client.as_mut() {
-            // if let Some(actions) = self.line_builder.collect_diagnostic_info(c.line) {
-            //     self.modal.replace(LSPModal::actions(actions));
-            // }
+            if let Some(actions) = content[c.line].diagnostic_info(&self.lang) {
+                self.modal.replace(LSPModal::actions(actions));
+            }
             if let Some(id) = client.request_signitures(&self.path, c).map(LSPResponseType::SignatureHelp) {
                 self.requests.push(id);
             }

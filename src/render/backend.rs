@@ -6,7 +6,7 @@ use std::{
 use crossterm::{
     cursor::{MoveTo, RestorePosition, SavePosition},
     queue,
-    style::{ContentStyle, Print, ResetColor, SetStyle},
+    style::{Color, ContentStyle, Print, ResetColor, SetStyle},
     terminal::{Clear, ClearType},
 };
 
@@ -92,6 +92,14 @@ impl Backend {
 
     #[inline]
     pub fn set_style(&mut self, style: Style) -> std::io::Result<()> {
+        self.default_styled.replace(style);
+        queue!(self, SetStyle(style))
+    }
+
+    #[inline]
+    pub fn set_fg(&mut self, color: Color) -> std::io::Result<()> {
+        let mut style = Style::new();
+        style.foreground_color = Some(color);
         self.default_styled.replace(style);
         queue!(self, SetStyle(style))
     }
@@ -230,6 +238,10 @@ impl Backend {
     }
 
     pub fn set_style(&mut self, style: Style) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    pub fn set_fg(&mut self, color: Color) -> std::io::Result<()> {
         Ok(())
     }
 

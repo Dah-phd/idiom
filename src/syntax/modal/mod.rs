@@ -1,5 +1,4 @@
 use crate::render::layout::Rect;
-use crate::syntax::Lexer;
 use crate::syntax::{DiagnosticInfo, Lang};
 mod completion;
 mod info;
@@ -61,42 +60,34 @@ impl LSPModal {
     pub fn render_at(&mut self, col: u16, row: u16, gs: &mut GlobalState) -> Option<Rect> {
         match self {
             Self::AutoComplete(modal) => {
-                gs.writer.set_style(gs.theme.accent_style).ok()?;
                 let height = std::cmp::min(modal.len() as u16, 7);
                 let area = gs.editor_area.modal_relative(row, col, 60, height);
                 if area.height != 0 {
+                    gs.writer.set_style(gs.theme.accent_style).ok()?;
                     modal.render(&area, gs).ok()?;
                     gs.writer.reset_style().ok()?;
                     return Some(area);
                 };
-                gs.writer.reset_style().ok()?;
             }
             Self::RenameVar(modal) => {
-                gs.writer.set_style(gs.theme.accent_style).ok()?;
                 let area = gs.editor_area.modal_relative(row, col, 60, modal.len() as u16);
                 if area.height != 0 {
+                    gs.writer.set_style(gs.theme.accent_style).ok()?;
                     modal.render(&area, gs).ok()?;
                     gs.writer.reset_style().ok()?;
                     return Some(area);
                 };
-                gs.writer.reset_style().ok()?;
             }
-            _ => {} // Self::RenameVar(modal) => {
-                    //     if let Some(area) = dynamic_cursor_rect_sized_height(modal.len(), col, row + 1, frame.size()) {
-                    //         let len = area.height as usize + 2;
-                    //         frame.render_widget(Clear, area);
-                    //         modal.render_at(frame, area);
-                    //         return Some(len);
-                    //     }
-                    // }
-                    // Self::Info(modal) => {
-                    //     if let Some(area) = dynamic_cursor_rect_sized_height(modal.len(), col, row + 1, frame.size()) {
-                    //         let len = area.height as usize + 2;
-                    //         frame.render_widget(Clear, area);
-                    //         modal.render_at(frame, area);
-                    //         return Some(len);
-                    //     }
-                    // }
+            Self::Info(modal) => {
+                let height = std::cmp::min(modal.len() as u16, 7);
+                let area = gs.editor_area.modal_relative(row, col, 60, height);
+                if area.height != 0 {
+                    gs.writer.set_style(gs.theme.accent_style).ok()?;
+                    modal.render(&area, gs).ok()?;
+                    gs.writer.reset_style().ok()?;
+                    return Some(area);
+                };
+            }
         }
         None
     }
@@ -113,25 +104,25 @@ impl LSPModal {
         Self::Info(Info::from_info(actions))
     }
 
-    pub fn from_hover(hover: Hover, line_builder: &Lexer) -> Self {
-        Self::Info(Info::from_hover(hover, line_builder))
+    pub fn from_hover(hover: Hover) -> Self {
+        Self::Info(Info::from_hover(hover))
     }
 
-    pub fn hover_map(&mut self, hover: Hover, line_builder: &Lexer) {
+    pub fn hover_map(&mut self, hover: Hover) {
         match self {
-            Self::Info(modal) => modal.push_hover(hover, line_builder),
-            _ => *self = Self::Info(Info::from_hover(hover, line_builder)),
+            Self::Info(modal) => modal.push_hover(hover),
+            _ => *self = Self::Info(Info::from_hover(hover)),
         }
     }
 
-    pub fn from_signature(signature: SignatureHelp, line_builder: &Lexer) -> Self {
-        Self::Info(Info::from_signature(signature, line_builder))
+    pub fn from_signature(signature: SignatureHelp) -> Self {
+        Self::Info(Info::from_signature(signature))
     }
 
-    pub fn signature_map(&mut self, signature: SignatureHelp, line_builder: &Lexer) {
+    pub fn signature_map(&mut self, signature: SignatureHelp) {
         match self {
-            Self::Info(modal) => modal.push_signature(signature, line_builder),
-            _ => *self = Self::Info(Info::from_signature(signature, line_builder)),
+            Self::Info(modal) => modal.push_signature(signature),
+            _ => *self = Self::Info(Info::from_signature(signature)),
         }
     }
 

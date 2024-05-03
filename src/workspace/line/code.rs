@@ -2,7 +2,7 @@ use crossterm::style::{Attribute, Color, ContentStyle};
 
 use crate::{
     render::{backend::Backend, layout::Line as LineInfo},
-    syntax::{DiagnosticLine, Lexer, Token},
+    syntax::{DiagnosticLine, Lang, Lexer, Token},
     workspace::line::Line as LineInterface,
 };
 use std::{
@@ -173,7 +173,7 @@ impl LineInterface for CodeLine {
         if let Some(diagnostics) = self.diagnostics.as_ref() {
             for diagnostic in diagnostics.data.iter() {
                 for token in self.tokens.iter_mut() {
-                    diagnostic.check_token(token);
+                    diagnostic.check_and_update(token);
                 }
             }
         };
@@ -184,10 +184,15 @@ impl LineInterface for CodeLine {
         self.rendered_at = 0;
         for diagnostic in diagnostics.data.iter() {
             for token in self.tokens.iter_mut() {
-                diagnostic.check_token(token);
+                diagnostic.check_and_update(token);
             }
         }
         self.diagnostics.replace(diagnostics);
+    }
+
+    #[inline]
+    fn diagnostic_info(&self, lang: &Lang) -> Option<crate::syntax::DiagnosticInfo> {
+        self.diagnostics.as_ref().map(|d| d.collect_info(lang))
     }
 
     #[inline]

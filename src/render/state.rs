@@ -4,6 +4,7 @@ use std::io::Write;
 
 use super::backend::Backend;
 
+#[derive(Default)]
 pub struct State {
     pub at_line: usize,
     pub selected: usize,

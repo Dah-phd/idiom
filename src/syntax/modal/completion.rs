@@ -1,7 +1,11 @@
 use super::ModalMessage;
 #[cfg(build = "debug")]
 use crate::debug_to_file;
-use crate::{global_state::GlobalState, render::state::State, syntax::Lang};
+use crate::{
+    global_state::GlobalState,
+    render::{layout::Rect, state::State},
+    syntax::Lang,
+};
 use crossterm::event::{KeyCode, KeyEvent};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use lsp_types::CompletionItem;
@@ -57,7 +61,7 @@ impl AutoComplete {
     }
 
     #[inline]
-    pub fn render(&mut self, area: &crate::render::layout::Rect, gs: &mut GlobalState) -> std::io::Result<()> {
+    pub fn render(&mut self, area: &Rect, gs: &mut GlobalState) -> std::io::Result<()> {
         self.state.render(&self.filtered, area, to_str, &mut gs.writer)
     }
 

@@ -1,7 +1,7 @@
 mod code;
 use crate::{
     render::{backend::Backend, layout::Line as LineInfo},
-    syntax::{DiagnosticLine, Lexer, Token},
+    syntax::{DiagnosticInfo, DiagnosticLine, Lang, Lexer, Token},
 };
 pub use code::CodeLine;
 use std::{
@@ -37,6 +37,7 @@ pub trait Line:
     fn unwrap(self) -> String;
     fn get<I: SliceIndex<str>>(&self, i: I) -> Option<&I::Output>;
     fn set_diagnostics(&mut self, diagnostics: DiagnosticLine);
+    fn diagnostic_info(&self, lang: &Lang) -> Option<DiagnosticInfo>;
     fn drop_diagnostics(&mut self);
     fn push_token(&mut self, token: Token);
     fn replace_tokens(&mut self, tokens: Vec<Token>);

@@ -1,23 +1,18 @@
-use crate::syntax::Token;
+use crate::syntax::{Lang, Token};
 use crate::{global_state::WorkspaceEvent, workspace::line::Line};
-use crossterm::style::{Attribute, Color as C};
+use crossterm::style::{Attribute, Color};
 use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
 
-use ratatui::{
-    style::{Color, Style},
-    text::Span,
-};
-
-const ELS_COLOR: Color = Color::Gray;
+const ELS_COLOR: Color = Color::DarkGrey;
 const ERR_COLOR: Color = Color::Red;
-const WAR_COLOR: Color = Color::LightYellow;
-const ERR_STYLE: Style = Style::new().fg(ERR_COLOR);
-const WAR_STYLE: Style = Style::new().fg(WAR_COLOR);
-const ELS_STYLE: Style = Style::new().fg(ELS_COLOR);
+const WAR_COLOR: Color = Color::Yellow;
+// const ERR_STYLE: Style = Style::new().fg(ERR_COLOR);
+// const WAR_STYLE: Style = Style::new().fg(WAR_COLOR);
+// const ELS_STYLE: Style = Style::new().fg(ELS_COLOR);
 
 #[derive(Default)]
 pub struct DiagnosticInfo {
-    pub messages: Vec<Span<'static>>,
+    pub messages: Vec<(String, Color)>,
     pub actions: Option<Vec<Action>>,
 }
 
@@ -45,8 +40,8 @@ impl std::fmt::Display for Action {
 pub struct DiagnosticData {
     pub start: usize,
     pub end: Option<usize>,
-    pub inline_span: Span<'static>,
-    pub message: Span<'static>,
+    pub inline_span: (String, Color),
+    pub message: (String, Color),
     pub info: Option<Vec<DiagnosticRelatedInformation>>,
 }
 
@@ -54,28 +49,28 @@ impl DiagnosticData {
     fn new(
         range: lsp_types::Range,
         message: String,
-        color: Style,
+        color: Color,
         info: Option<Vec<DiagnosticRelatedInformation>>,
     ) -> Self {
         let first_line_fmt = message.lines().next().map(|s| format!("    {s}")).unwrap_or_default();
-        let inline_span = Span::styled(first_line_fmt, color);
+        let inline_span = (first_line_fmt, color);
         Self {
             start: range.start.character as usize,
             end: if range.start.line == range.end.line { Some(range.end.character as usize) } else { None },
             inline_span,
-            message: Span::styled(message, color),
+            message: (message, color),
             info,
         }
     }
 
-    pub fn check_token(&self, token: &mut Token) {
+    pub fn check_and_update(&self, token: &mut Token) {
         match self.end {
             Some(end) if self.start <= token.from && token.to <= end => {
-                token.color.underline_color = self.inline_span.style.fg.map(|c| C::from(c));
+                token.color.underline_color = Some(self.inline_span.1);
                 token.color.attributes.set(Attribute::Undercurled);
             }
             None if self.start <= token.from => {
-                token.color.underline_color = self.inline_span.style.fg.map(|c| C::from(c));
+                token.color.underline_color = Some(self.inline_span.1);
                 token.color.attributes.set(Attribute::Undercurled);
             }
             _ => {}
@@ -88,25 +83,42 @@ pub struct DiagnosticLine {
 }
 
 impl DiagnosticLine {
+    pub fn collect_info(&self, lang: &Lang) -> DiagnosticInfo {
+        let mut info = DiagnosticInfo::default();
+        let mut buffer = Vec::new();
+        for diagnostic in self.data.iter() {
+            info.messages.push(diagnostic.message.clone());
+            if let Some(actions) = lang.derive_diagnostic_actions(diagnostic.info.as_ref()) {
+                for action in actions {
+                    buffer.push(action.clone());
+                }
+            }
+        }
+        if !buffer.is_empty() {
+            info.actions.replace(buffer);
+        }
+        info
+    }
+
     pub fn drop_non_errs(&mut self) {
-        self.data.retain(|d| d.inline_span.style.fg == Some(ERR_COLOR));
+        self.data.retain(|d| d.inline_span.1 == ERR_COLOR);
     }
 
     pub fn append(&mut self, d: Diagnostic) {
         match d.severity {
             Some(DiagnosticSeverity::ERROR) => {
-                self.data.insert(0, DiagnosticData::new(d.range, d.message, ERR_STYLE, d.related_information));
+                self.data.insert(0, DiagnosticData::new(d.range, d.message, ERR_COLOR, d.related_information));
             }
-            Some(DiagnosticSeverity::WARNING) => match self.data[0].inline_span.style.fg {
-                Some(ELS_COLOR) => {
-                    self.data.insert(0, DiagnosticData::new(d.range, d.message, WAR_STYLE, d.related_information));
+            Some(DiagnosticSeverity::WARNING) => match self.data[0].inline_span.1 {
+                ELS_COLOR => {
+                    self.data.insert(0, DiagnosticData::new(d.range, d.message, WAR_COLOR, d.related_information));
                 }
                 _ => {
-                    self.data.insert(0, DiagnosticData::new(d.range, d.message, WAR_STYLE, d.related_information));
+                    self.data.insert(0, DiagnosticData::new(d.range, d.message, WAR_COLOR, d.related_information));
                 }
             },
             _ => {
-                self.data.push(DiagnosticData::new(d.range, d.message, ELS_STYLE, d.related_information));
+                self.data.push(DiagnosticData::new(d.range, d.message, ELS_COLOR, d.related_information));
             }
         }
     }
@@ -115,9 +127,9 @@ impl DiagnosticLine {
 impl From<Diagnostic> for DiagnosticLine {
     fn from(diagnostic: Diagnostic) -> Self {
         let color = match diagnostic.severity {
-            Some(DiagnosticSeverity::ERROR) => ERR_STYLE,
-            Some(DiagnosticSeverity::WARNING) => WAR_STYLE,
-            _ => ELS_STYLE,
+            Some(DiagnosticSeverity::ERROR) => ERR_COLOR,
+            Some(DiagnosticSeverity::WARNING) => WAR_COLOR,
+            _ => ELS_COLOR,
         };
         Self {
             data: vec![DiagnosticData::new(

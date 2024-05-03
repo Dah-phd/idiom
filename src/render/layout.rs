@@ -1,10 +1,11 @@
+use crate::render::backend::Backend;
 use bitflags::bitflags;
-use std::cmp::Ordering;
-use std::io::{Result, Write};
-use std::ops::{Index, Range};
-
-use super::backend::Backend;
 use crossterm::style::{Color, ContentStyle};
+use std::{
+    cmp::Ordering,
+    io::{Result, Write},
+    ops::Range,
+};
 
 pub const BORDERS: BorderSet = BorderSet {
     top_left_qorner: "┌",
@@ -251,6 +252,7 @@ impl Rect {
 
         let set = set.unwrap_or(BORDERS);
         writer.save_cursor()?;
+        writer.set_fg(fg)?;
         if top {
             for col_idx in col..last_col {
                 writer.go_to(row, col_idx)?;
@@ -291,6 +293,7 @@ impl Rect {
             writer.go_to(last_row, last_col)?;
             writer.print(set.bot_right_qorner)?;
         }
+        writer.reset_style()?;
         writer.restore_cursor()?;
         writer.flush()
     }

@@ -95,7 +95,7 @@ impl Editor {
     }
 
     pub fn help(&mut self) {
-        self.lexer.help((&self.cursor).into());
+        self.lexer.help((&self.cursor).into(), &self.content);
     }
 
     pub fn references(&mut self) {

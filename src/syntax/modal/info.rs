@@ -1,76 +1,65 @@
 use super::ModalMessage;
-use crate::syntax::{Action, DiagnosticInfo, Lexer, LineBuilderContext};
 use crate::{
     global_state::GlobalState,
-    utils::{BORDERED_BLOCK, REVERSED},
+    render::{layout::Rect, state::State},
+    syntax::{Action, DiagnosticInfo},
 };
 use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::style::{Color, ContentStyle};
 use lsp_types::{Documentation, Hover, HoverContents, MarkedString, SignatureHelp, SignatureInformation};
-use ratatui::prelude::Text;
-use ratatui::style::Stylize;
-use ratatui::text::Span;
-use ratatui::widgets::Wrap;
-use ratatui::{
-    prelude::Rect,
-    text::Line,
-    widgets::{List, ListItem, ListState, Paragraph},
-    Frame,
-};
 use std::cmp::Ordering;
 
 #[derive(Default)]
 enum Mode {
     #[default]
-    Full,
+    Text,
     Select,
 }
 
 #[derive(Default)]
 pub struct Info {
     actions: Option<Vec<Action>>,
-    text: Text<'static>,
-    state: ListState,
+    text: Vec<(String, Color)>,
+    state: State,
+    text_state: State,
     mode: Mode,
-    at_line: u16,
 }
 
 impl Info {
-    pub fn from_info(mut info: DiagnosticInfo) -> Self {
-        let actions = info.actions.take();
-        let mut lines = Vec::new();
-        for span in info.messages.into_iter() {
-            let s = span.style;
-            for line in span.content.trim_start().lines() {
-                lines.push(Line::from(line.to_owned()).style(s));
+    pub fn from_info(info: DiagnosticInfo) -> Self {
+        let mode = if info.actions.is_some() { Mode::Select } else { Mode::Text };
+        let mut text = Vec::new();
+        for (msg, color) in info.messages.into_iter() {
+            for line in msg.lines() {
+                text.push((String::from(line), color));
             }
         }
-        let mode = if actions.is_some() { Mode::Select } else { Mode::Full };
-        Self { actions, text: Text::from(lines), mode, ..Default::default() }
+        Self { actions: info.actions, text, mode, ..Default::default() }
     }
 
-    pub fn from_hover(hover: Hover, line_builder: &Lexer) -> Self {
+    pub fn from_hover(hover: Hover) -> Self {
         let mut lines = Vec::new();
-        parse_hover(hover, line_builder, &mut lines);
-        Self { text: Text::from(lines), ..Default::default() }
+        parse_hover(hover, &mut lines);
+        Self { text: lines, ..Default::default() }
     }
 
-    pub fn from_signature(signature: SignatureHelp, line_builder: &Lexer) -> Self {
+    pub fn from_signature(signature: SignatureHelp) -> Self {
         let mut lines = Vec::new();
         for info in signature.signatures {
-            parse_sig_info(info, line_builder, &mut lines);
+            parse_sig_info(info, &mut lines);
         }
-        Self { text: Text::from(lines), ..Default::default() }
+        Self { text: lines, ..Default::default() }
     }
 
     pub fn len(&self) -> usize {
         match self.mode {
-            Mode::Full => self.text.lines.len(),
-            Mode::Select => self.actions.as_ref().map(|i| i.len()).unwrap_or_default() + self.text.lines.len(),
+            Mode::Text => self.text.len(),
+            Mode::Select => self.actions.as_ref().map(|i| i.len()).unwrap_or_default() + self.text.len(),
         }
     }
 
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> ModalMessage {
-        if self.text.lines.is_empty() && self.actions.is_none() {
+        if self.text.is_empty() && self.actions.is_none() {
             return ModalMessage::Done;
         }
         match key.code {
@@ -79,18 +68,16 @@ impl Info {
                     return ModalMessage::Done;
                 }
                 if let Some(mut i) = self.actions.take() {
-                    if let Some(idx) = self.state.selected() {
-                        return match i.len().cmp(&idx) {
-                            Ordering::Greater => {
-                                gs.workspace.push(i.remove(idx).into());
-                                ModalMessage::TakenDone
-                            }
-                            _ => {
-                                self.mode = Mode::Full;
-                                ModalMessage::Taken
-                            }
-                        };
-                    }
+                    return match i.len().cmp(&self.state.selected) {
+                        Ordering::Greater => {
+                            gs.workspace.push(i.remove(self.state.selected).into());
+                            ModalMessage::TakenDone
+                        }
+                        _ => {
+                            self.mode = Mode::Text;
+                            ModalMessage::Taken
+                        }
+                    };
                 }
                 ModalMessage::Done
             }
@@ -107,18 +94,10 @@ impl Info {
     pub fn next(&mut self) -> ModalMessage {
         match self.mode {
             Mode::Select => {
-                let len = self.len();
-                match self.state.selected() {
-                    Some(idx) => {
-                        let idx = idx + 1;
-                        self.state.select(Some(if idx < len { idx } else { 0 }));
-                    }
-                    None if len != 0 => self.state.select(Some(0)),
-                    _ => (),
-                }
+                self.state.next(self.len());
             }
-            _ => {
-                self.at_line = self.at_line.saturating_add(1);
+            Mode::Text => {
+                self.text_state.next(self.len());
             }
         }
         ModalMessage::Taken
@@ -127,59 +106,77 @@ impl Info {
     pub fn prev(&mut self) -> ModalMessage {
         match self.mode {
             Mode::Select => {
-                let len = self.len();
-                match self.state.selected() {
-                    Some(idx) => self.state.select(Some(if idx == 0 { len - 1 } else { idx - 1 })),
-                    None if len > 0 => self.state.select(Some(len - 1)),
-                    _ => (),
-                }
+                self.state.prev(self.len());
             }
-            _ => {
-                self.at_line = self.at_line.saturating_sub(1);
+            Mode::Text => {
+                self.text_state.prev(self.len());
             }
         }
 
         ModalMessage::Taken
     }
 
-    pub fn push_hover(&mut self, hover: Hover, line_builder: &Lexer) {
-        parse_hover(hover, line_builder, &mut self.text.lines);
-        self.state.select(None);
+    pub fn push_hover(&mut self, hover: Hover) {
+        parse_hover(hover, &mut self.text);
+        self.state.selected = 0;
     }
 
-    pub fn push_signature(&mut self, signature: SignatureHelp, line_builder: &Lexer) {
+    pub fn push_signature(&mut self, signature: SignatureHelp) {
         for info in signature.signatures {
-            parse_sig_info(info, line_builder, &mut self.text.lines);
+            parse_sig_info(info, &mut self.text);
         }
-        self.state.select(None);
+        self.state.selected = 0;
     }
 
-    pub fn render_at(&mut self, frame: &mut Frame, area: Rect) {
+    pub fn render(&mut self, area: &Rect, gs: &mut GlobalState) -> std::io::Result<()> {
         match self.mode {
             Mode::Select => {
                 if let Some(actions) = self.actions.as_ref() {
-                    let mut list = actions.iter().map(|a| a.to_string().into()).collect::<Vec<ListItem<'static>>>();
-                    if !self.text.lines.is_empty() {
-                        list.push("Information".into());
-                    }
-                    frame.render_stateful_widget(
-                        List::new(list).block(BORDERED_BLOCK).highlight_style(REVERSED),
-                        area,
-                        &mut self.state,
-                    );
+                    let mut options = actions.iter().map(|a| a.to_string()).collect::<Vec<_>>();
+                    if !self.text.is_empty() {
+                        options.push("Information".into());
+                    };
+                    self.state.render_strings(&options, area, &mut gs.writer)?;
                 }
             }
-            Mode::Full => {
-                frame.render_widget(
-                    Paragraph::new(self.text.clone())
-                        .block(BORDERED_BLOCK)
-                        .wrap(Wrap::default())
-                        .scroll((self.at_line, 0)),
-                    area,
-                );
+            Mode::Text => {
+                self.text_state.update_at_line(area.height as usize, self.len());
+                for ((text, color), line) in self.text.iter().skip(self.text_state.at_line).zip(area.into_iter()) {
+                    let mut style = ContentStyle::new();
+                    style.foreground_color = Some(*color);
+                    line.render_styled(text, style, &mut gs.writer)?;
+                }
             }
         }
+        Ok(())
     }
+
+    // pub fn render_at(&mut self, frame: &mut Frame, area: Rect) {
+    // match self.mode {
+    //     Mode::Select => {
+    //         if let Some(actions) = self.actions.as_ref() {
+    //             let mut list = actions.iter().map(|a| a.to_string().into()).collect::<Vec<ListItem<'static>>>();
+    //             if !self.text.lines.is_empty() {
+    //                 list.push("Information".into());
+    //             }
+    //             frame.render_stateful_widget(
+    //                 List::new(list).block(BORDERED_BLOCK).highlight_style(REVERSED),
+    //                 area,
+    //                 &mut self.state,
+    //             );
+    //         }
+    //     }
+    //     Mode::Full => {
+    //         frame.render_widget(
+    //             Paragraph::new(self.text.clone())
+    //                 .block(BORDERED_BLOCK)
+    //                 .wrap(Wrap::default())
+    //                 .scroll((self.at_line, 0)),
+    //             area,
+    //         );
+    //     }
+    // }
+    // }
 }
 
 impl From<DiagnosticInfo> for Info {
@@ -188,8 +185,8 @@ impl From<DiagnosticInfo> for Info {
     }
 }
 
-fn parse_sig_info(info: SignatureInformation, builder: &Lexer, lines: &mut Vec<Line<'static>>) {
-    let mut ctx = LineBuilderContext::default();
+fn parse_sig_info(info: SignatureInformation, lines: &mut Vec<(String, Color)>) {
+    lines.push((info.label, Color::Reset));
     // lines.push(Line::from(generic_line(builder, usize::MAX, &info.label, &mut ctx, Vec::new())));
     if let Some(text) = info.documentation {
         match text {
@@ -202,19 +199,21 @@ fn parse_sig_info(info: SignatureInformation, builder: &Lexer, lines: &mut Vec<L
                             continue;
                         }
                         if is_code {
+                            lines.push((String::from(line), Color::Reset));
                             // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
                         } else {
-                            lines.push(Line::from(String::from(line)));
+                            lines.push((String::from(line), Color::Reset));
                         }
                     }
                 } else {
                     for line in c.value.lines() {
-                        lines.push(Line::from(String::from(line)));
+                        lines.push((String::from(line), Color::Reset));
                     }
                 }
             }
             Documentation::String(s) => {
                 for line in s.lines() {
+                    lines.push((String::from(line), Color::Reset));
                     // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
                 }
             }
@@ -222,32 +221,35 @@ fn parse_sig_info(info: SignatureInformation, builder: &Lexer, lines: &mut Vec<L
     }
 }
 
-fn parse_hover(hover: Hover, builder: &Lexer, lines: &mut Vec<Line<'static>>) {
+fn parse_hover(hover: Hover, lines: &mut Vec<(String, Color)>) {
     match hover.contents {
         HoverContents::Array(arr) => {
-            let mut ctx = LineBuilderContext::default();
+            // let mut ctx = LineBuilderContext::default();
             for value in arr {
                 for line in parse_markedstr(value).lines() {
+                    lines.push((String::from(line), Color::Reset));
                     // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
                 }
             }
         }
         HoverContents::Markup(markup) => {
-            handle_markup(markup, builder, lines);
+            handle_markup(markup, lines);
         }
         HoverContents::Scalar(value) => {
-            let mut ctx = LineBuilderContext::default();
             for line in parse_markedstr(value).lines() {
+                // TODO parse to tokens
+                lines.push((line.to_owned(), Color::Reset))
                 // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
             }
         }
     }
 }
 
-fn handle_markup(markup: lsp_types::MarkupContent, builder: &Lexer, lines: &mut Vec<Line<'static>>) {
-    let mut ctx = LineBuilderContext::default();
+fn handle_markup(markup: lsp_types::MarkupContent, lines: &mut Vec<(String, Color)>) {
     if !matches!(markup.kind, lsp_types::MarkupKind::Markdown) {
         for line in markup.value.lines() {
+            lines.push((line.to_owned(), Color::Reset));
+            // TODO parse to tokens
             // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
         }
         return;
@@ -261,9 +263,9 @@ fn handle_markup(markup: lsp_types::MarkupContent, builder: &Lexer, lines: &mut 
         if is_code {
             // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
         } else if line.trim().starts_with('#') {
-            lines.push(Line::from(Span::raw(line.to_owned()).bold()));
+            lines.push((line.to_owned(), Color::Reset));
         } else {
-            lines.push(Line::from(String::from(line)));
+            lines.push((line.to_owned(), Color::Reset))
         }
     }
 }

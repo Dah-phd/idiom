@@ -4,7 +4,6 @@ use crate::{
     global_state::{GlobalState, WorkspaceEvent},
     lsp::Diagnostic,
     popups::popups_tree::{create_file_popup, rename_file_popup},
-    render::layout::Rect,
     utils::{build_file_or_folder, to_relative_path},
 };
 use anyhow::Result;
@@ -13,7 +12,6 @@ use crossterm::{
     style::{ContentStyle, Stylize},
 };
 use ratatui::widgets::ListState;
-use std::io::Write;
 use std::{
     collections::HashMap,
     path::PathBuf,
