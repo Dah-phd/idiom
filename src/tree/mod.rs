@@ -4,12 +4,11 @@ use crate::{
     global_state::{GlobalState, WorkspaceEvent},
     lsp::Diagnostic,
     popups::popups_tree::{create_file_popup, rename_file_popup},
-    render::backend::Style,
+    render::{backend::Style, state::State, widgets::paragraph_styled},
     utils::{build_file_or_folder, to_relative_path},
 };
 use anyhow::Result;
 use crossterm::event::KeyEvent;
-use ratatui::widgets::ListState;
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -23,7 +22,7 @@ const TICK: Duration = Duration::from_millis(200);
 
 pub struct Tree {
     pub key_map: TreeKeyMap,
-    state: ListState,
+    state: State,
     selected_path: PathBuf,
     tree: TreePath,
     tree_ptrs: Vec<*mut TreePath>,
@@ -43,7 +42,7 @@ impl Tree {
         });
         tree.sync_flat_ptrs(&mut tree_ptrs);
         Self {
-            state: ListState::default(),
+            state: State::new(),
             key_map,
             selected_path: PathBuf::from("./"),
             tree,
@@ -55,22 +54,8 @@ impl Tree {
 
     pub fn direct_render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
         gs.writer.save_cursor()?;
-        let mut line_iter = gs.tree_area.into_iter();
-        let state = self.state.selected().unwrap_or_default();
-        for (idx, (text, color)) in
-            self.tree_ptrs.iter().flat_map(|ptr| unsafe { ptr.as_ref() }.map(|tp| tp.direct_display())).enumerate()
-        {
-            if let Some(line) = line_iter.next() {
-                let mut style = Style::fg(color);
-                if idx == state {
-                    style.add_reverse();
-                };
-                line.render_styled(text, style, &mut gs.writer)?;
-            }
-        }
-        for line in line_iter {
-            line.render_empty(&mut gs.writer)?;
-        }
+        let options = self.tree_ptrs.iter().flat_map(|ptr| unsafe { ptr.as_ref() }.map(|tp| tp.direct_display()));
+        self.state.render_list_styled(options, &gs.tree_area, &mut gs.writer)?;
         gs.writer.restore_cursor()
     }
 
@@ -122,7 +107,7 @@ impl Tree {
 
     pub fn mouse_select(&mut self, idx: usize) -> Option<PathBuf> {
         if self.tree_ptrs.len() >= idx {
-            self.state.select(Some(idx.saturating_sub(1)));
+            self.state.select(idx.saturating_sub(1), self.tree_ptrs.len());
             if let Some(selected) = self.get_selected() {
                 match selected {
                     TreePath::Folder { tree: Some(..), .. } => {
@@ -144,29 +129,16 @@ impl Tree {
         if self.tree_ptrs.is_empty() {
             return;
         }
-        if let Some(idx) = self.state.selected() {
-            if idx == 0 {
-                return;
-            }
-            self.unsafe_select(idx - 1);
-        } else {
-            self.unsafe_select(self.tree_ptrs.len() - 1);
-        }
+        self.state.prev(self.tree_ptrs.len());
+        self.unsafe_set_path();
     }
 
     fn select_down(&mut self) {
         if self.tree_ptrs.is_empty() {
             return;
         }
-        if let Some(idx) = self.state.selected() {
-            let new_idx = idx + 1;
-            if self.tree_ptrs.len() == new_idx {
-                return;
-            }
-            self.unsafe_select(new_idx);
-        } else {
-            self.unsafe_select(0);
-        }
+        self.state.next(self.tree_ptrs.len());
+        self.unsafe_set_path();
     }
 
     pub fn create_file_or_folder(&mut self, name: String) -> Result<PathBuf> {
@@ -225,9 +197,8 @@ impl Tree {
     pub fn select_by_path(&mut self, path: &PathBuf) {
         let rel_result = to_relative_path(path);
         let path = rel_result.as_ref().unwrap_or(path);
-        self.state.select(None);
         if self.tree.expand_contained(path) {
-            self.state.select(Some(0));
+            self.state.select(0, self.tree_ptrs.len());
             self.selected_path = path.clone();
             self.force_sync();
         }
@@ -246,7 +217,7 @@ impl Tree {
     }
 
     pub fn get_selected(&self) -> Option<&mut TreePath> {
-        unsafe { self.tree_ptrs.get(self.state.selected()?)?.as_mut() }
+        unsafe { self.tree_ptrs.get(self.state.selected)?.as_mut() }
     }
 
     pub async fn finish_sync(&mut self, gs: &mut GlobalState) {
@@ -302,22 +273,17 @@ impl Tree {
     fn fix_select_by_path(&mut self) {
         if let Some(selected) = self.get_selected() {
             if &self.selected_path != selected.path() {
-                self.state.select(None);
                 for (idx, tree_path) in self.tree_ptrs.iter_mut().flat_map(|ptr| unsafe { ptr.as_mut() }).enumerate() {
                     if tree_path.path() == &self.selected_path {
-                        self.state.select(Some(idx));
+                        self.state.select(idx, self.tree_ptrs.len());
                         break;
                     }
-                }
-                if self.state.selected().is_none() {
-                    self.selected_path = PathBuf::from("./");
                 }
             }
         }
     }
 
-    fn unsafe_select(&mut self, idx: usize) {
-        self.state.select(Some(idx));
+    fn unsafe_set_path(&mut self) {
         if let Some(selected) = self.get_selected() {
             self.selected_path = selected.path().clone();
         }

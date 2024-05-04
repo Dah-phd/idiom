@@ -58,7 +58,7 @@ impl State {
     }
 
     #[inline]
-    pub fn render_line_styled<'a, D, F>(
+    pub fn render_list_styled<'a>(
         &mut self,
         options: impl Iterator<Item = (&'a str, Style)>,
         rect: &Rect,

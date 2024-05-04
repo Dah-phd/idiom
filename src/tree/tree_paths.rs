@@ -3,7 +3,7 @@ use ignore::Match;
 use tokio::task::JoinSet;
 
 use crate::{
-    render::backend::{color, Color},
+    render::backend::{color, Color, Style},
     utils::{get_nested_paths, to_relative_path, trim_start},
 };
 use std::{
@@ -172,25 +172,25 @@ impl TreePath {
         }
     }
 
-    pub fn direct_display<'a>(&'a self) -> (&'a str, Color) {
+    pub fn direct_display<'a>(&'a self) -> (&'a str, Style) {
         match self {
             Self::Folder { display, errors, warnings, .. } => {
                 if errors != &0 {
-                    return (display, ERR);
+                    return (display, Style::fg(ERR));
                 }
                 if warnings != &0 {
-                    return (display, WAR);
+                    return (display, Style::fg(WAR));
                 }
-                (display, color::reset())
+                (display, Style::default())
             }
             Self::File { display, errors, warnings, .. } => {
                 if errors != &0 {
-                    return (display, ERR);
+                    return (display, Style::fg(ERR));
                 }
                 if warnings != &0 {
-                    return (display, WAR);
+                    return (display, Style::fg(WAR));
                 }
-                (display, color::reset())
+                (display, Style::default())
             }
         }
     }
