@@ -1,17 +1,11 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::{
-    style::{Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph},
-    Frame,
-};
-
 use crate::{
-    global_state::{Clipboard, PopupMessage, WorkspaceEvent},
-    render::right_corner_rect_static,
+    global_state::{Clipboard, GlobalState, PopupMessage, WorkspaceEvent},
+    render::backend::Style,
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use std::io::Write;
 
 use super::{
     utils::{count_as_string, into_message, next_option, prev_option},
@@ -104,25 +98,32 @@ impl PopupInterface for ReplacePopup {
         }
     }
 
-    fn render(&mut self, frame: &mut Frame) {
-        let area = right_corner_rect_static(50, 4, frame.size());
-        let block = Block::default().title("Replace").borders(Borders::ALL);
-        let mut find = vec![
-            Span::raw(count_as_string(&self.options)), // 3
-            Span::raw(" > "),                          // 3
-            Span::raw(self.pattern.to_owned()),
-        ];
-        let mut replace = vec![
-            Span::raw("Rep > "), // 6
-            Span::raw(self.new_text.to_owned()),
-        ];
-        if self.on_text {
-            replace.push(Span::styled("|", Style::default().add_modifier(Modifier::SLOW_BLINK)));
-        } else {
-            find.push(Span::styled("|", Style::default().add_modifier(Modifier::SLOW_BLINK)));
+    fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+        let area = gs.editor_area.right_top_corner(2, 50);
+        if area.height < 2 {
+            return Ok(());
         };
-        frame.render_widget(Clear, area);
-        frame.render_widget(Paragraph::new(vec![Line::from(find), Line::from(replace)]).block(block), area);
+        gs.writer.set_style(gs.theme.accent_style)?;
+        let mut lines = area.into_iter();
+        if let Some(line) = lines.next() {
+            let mut find_builder = line.builder(&mut gs.writer)?;
+            find_builder.push(count_as_string(&self.options).as_str())?;
+            find_builder.push(" > ")?;
+            find_builder.push(&self.pattern)?;
+            if !self.on_text {
+                find_builder.push_styled("|", Style::slowblink())?;
+            };
+        };
+        if let Some(line) = lines.next() {
+            let mut repl_builder = line.builder(&mut gs.writer)?;
+            repl_builder.push("Rep > ")?;
+            repl_builder.push(&self.new_text)?;
+            if self.on_text {
+                repl_builder.push_styled("|", Style::slowblink())?;
+            }
+        }
+        gs.writer.reset_style()?;
+        gs.writer.flush()
     }
 
     fn update_workspace(&mut self, workspace: &mut Workspace) {

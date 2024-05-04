@@ -62,7 +62,7 @@ impl AutoComplete {
 
     #[inline]
     pub fn render(&mut self, area: &Rect, gs: &mut GlobalState) -> std::io::Result<()> {
-        self.state.render(&self.filtered, area, to_str, &mut gs.writer)
+        self.state.render_list(self.filtered.iter().map(|(c, ..)| c.as_str()), area, &mut gs.writer)
     }
 
     pub fn len(&self) -> usize {
@@ -108,9 +108,4 @@ impl AutoComplete {
         self.filtered.sort_by(|(_, idx, _), (_, rhidx, _)| rhidx.cmp(idx));
         self.state.select(0, self.filtered.len());
     }
-}
-
-#[inline]
-fn to_str<'a>((text, ..): &'a (String, i64, usize)) -> &'a str {
-    text
 }

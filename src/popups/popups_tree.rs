@@ -1,7 +1,7 @@
 use super::{Popup, PopupSelector};
 use crate::{
     global_state::{PopupMessage, TreeEvent},
-    render::Button,
+    render::{state::State, Button},
 };
 use lsp_types::{Location, Range};
 use std::path::PathBuf;
@@ -24,7 +24,7 @@ pub fn create_file_popup(path: String) -> Box<Popup> {
         message_as_buffer_builder: Some(Some),
         title: Some(format!("New in {}", path)),
         buttons,
-        size: Some((40, 4)),
+        size: Some((4, 40)),
         state: 0,
     })
 }
@@ -39,7 +39,7 @@ pub fn rename_file_popup(path: String) -> Box<Popup> {
             name: "Rename",
             key: None,
         }],
-        size: Some((40, 4)),
+        size: Some((4, 40)),
         state: 0,
     })
 }
@@ -47,14 +47,15 @@ pub fn rename_file_popup(path: String) -> Box<Popup> {
 pub fn refrence_selector(mut options: Vec<Location>) -> Box<PopupSelector<(PathBuf, Range)>> {
     Box::new(PopupSelector {
         options: options.drain(..).map(|loc| (PathBuf::from(loc.uri.path()), loc.range)).collect(),
-        display: |(path, range)| format!("{} ({})", path.display(), range.start.line + 1),
+        // display: |(path, range)| format!("{} ({})", path.display(), range.start.line + 1),
+        display: |_| "asd",
         command: |popup| {
-            if let Some((path, range)) = popup.options.get(popup.state) {
+            if let Some((path, range)) = popup.options.get(popup.state.selected) {
                 return TreeEvent::OpenAtSelect(path.clone(), (range.start.into(), range.end.into())).into();
             }
             PopupMessage::Clear
         },
         size: None,
-        state: 0,
+        state: State::new(),
     })
 }

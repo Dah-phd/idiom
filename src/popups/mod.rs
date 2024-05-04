@@ -7,16 +7,15 @@ pub mod popups_tree;
 mod utils;
 
 use crate::{
-    global_state::{Clipboard, PopupMessage},
+    global_state::{Clipboard, GlobalState, PopupMessage},
     tree::Tree,
     workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 pub use generics::{Popup, PopupSelector};
-use ratatui::Frame;
 
 pub trait PopupInterface {
-    fn render(&mut self, frame: &mut Frame);
+    fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()>;
     fn map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {
         match key {
             KeyEvent { code: KeyCode::Char('d' | 'D'), modifiers: KeyModifiers::CONTROL, .. } => PopupMessage::Clear,

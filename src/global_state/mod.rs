@@ -218,11 +218,14 @@ impl GlobalState {
         }
     }
 
-    // pub fn render_popup_if_exists(&mut self, frame: &mut Frame<'_>) {
-    //     if let Some(popup) = self.popup.as_mut() {
-    //         popup.render(frame)
-    //     }
-    // }
+    pub fn render_popup_if_exists(&mut self) -> std::io::Result<()> {
+        let mut popup = self.popup.take();
+        if let Some(popup) = popup.as_mut() {
+            popup.render(self)?;
+        };
+        self.popup = popup;
+        Ok(())
+    }
 
     pub fn map_popup_if_exists(&mut self, key: &KeyEvent) -> bool {
         if let Some(popup) = self.popup.as_mut() {

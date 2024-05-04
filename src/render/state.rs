@@ -49,11 +49,8 @@ impl State {
     }
 
     #[inline]
-    pub fn update_at_line(&mut self, limit: usize, option_len: usize) {
-        if option_len <= self.selected {
-            self.selected = 0;
-            self.at_line = 0;
-        } else if self.at_line > self.selected {
+    pub fn update_at_line(&mut self, limit: usize) {
+        if self.at_line > self.selected {
             self.at_line = self.selected;
         } else if self.selected - self.at_line >= limit {
             self.at_line = self.selected - limit + 1;
@@ -61,75 +58,51 @@ impl State {
     }
 
     #[inline]
-    pub fn render_styled<'a, D, F>(
+    pub fn render_line_styled<'a, D, F>(
         &mut self,
-        options: &'a [D],
+        options: impl Iterator<Item = (&'a str, Style)>,
         rect: &Rect,
-        to_str: F,
-        style: Style,
         writer: &mut Backend,
-    ) -> std::io::Result<()>
-    where
-        F: Fn(&'a D) -> &'a str,
-    {
-        self.update_at_line(rect.height as usize, options.len());
-        writer.set_style(style)?;
-        for ((idx, text), area) in
-            options.iter().map(|d| (to_str)(d)).enumerate().skip(self.at_line).zip(rect.into_iter())
-        {
-            if idx == self.selected {
-                area.render_styled(text, self.highlight, writer)?;
-            } else {
-                area.render(text, writer)?;
+    ) -> std::io::Result<()> {
+        self.update_at_line(rect.height as usize);
+        let mut lines = rect.into_iter();
+        for (idx, (text, mut style)) in options.enumerate().skip(self.at_line) {
+            let line = match lines.next() {
+                Some(line) => line,
+                None => break,
             };
+            if idx == self.selected {
+                style.update(self.highlight);
+            }
+            line.render_styled(text, style, writer)?;
         }
-        writer.reset_style()?;
+        for line in lines {
+            line.render_empty(writer)?;
+        }
         writer.flush()
     }
 
-    pub fn render<'a, D, F>(
+    pub fn render_list<'a>(
         &mut self,
-        options: &'a [D],
+        options: impl Iterator<Item = &'a str>,
         rect: &Rect,
-        to_str: F,
         writer: &mut Backend,
-    ) -> std::io::Result<()>
-    where
-        F: Fn(&'a D) -> &'a str,
-    {
-        self.update_at_line(rect.height as usize, options.len());
-        for ((idx, text), area) in
-            options.iter().map(|d| (to_str)(d)).enumerate().skip(self.at_line).zip(rect.into_iter())
-        {
+    ) -> std::io::Result<()> {
+        self.update_at_line(rect.height as usize);
+        let mut lines = rect.into_iter();
+        for (idx, text) in options.enumerate().skip(self.at_line) {
+            let line = match lines.next() {
+                Some(line) => line,
+                None => break,
+            };
             if idx == self.selected {
-                area.render_styled(text, self.highlight, writer)?;
+                line.render_styled(text, self.highlight, writer)?;
             } else {
-                area.render(text, writer)?;
+                line.render(text, writer)?;
             };
         }
-        writer.flush()
-    }
-
-    pub fn render_strings(&mut self, options: &[String], rect: &Rect, writer: &mut Backend) -> std::io::Result<()> {
-        self.update_at_line(rect.height as usize, options.len());
-        for ((idx, text), area) in options.into_iter().enumerate().skip(self.at_line).zip(rect.into_iter()) {
-            if idx == self.selected {
-                area.render_styled(text, self.highlight, writer)?;
-            } else {
-                area.render(text, writer)?;
-            };
-        }
-        writer.flush()
-    }
-
-    pub fn render_strs(&mut self, options: &[&str], rect: &Rect, writer: &mut Backend) -> std::io::Result<()> {
-        self.update_at_line(rect.height as usize, options.len());
-        for ((idx, text), area) in options.into_iter().enumerate().skip(self.at_line).zip(rect.into_iter()) {
-            if idx == self.selected {
-                area.render_styled(text, self.highlight, writer)?;
-            } else {
-                area.render(text, writer)?;
-            };
+        for line in lines {
+            line.render_empty(writer)?;
         }
         writer.flush()
     }

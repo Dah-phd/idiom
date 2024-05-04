@@ -134,24 +134,25 @@ impl Info {
         self.state.selected = 0;
     }
 
-    pub fn render(&mut self, area: &Rect, gs: &mut GlobalState) -> std::io::Result<()> {
+    pub fn render(&mut self, rect: &Rect, gs: &mut GlobalState) -> std::io::Result<()> {
         match self.mode {
             Mode::Select => {
                 if let Some(actions) = self.actions.as_ref() {
-                    let mut options = actions.iter().map(|a| a.to_string()).collect::<Vec<_>>();
+                    let actions = actions.iter().map(|a| a.to_string()).collect::<Vec<_>>();
+                    let options = actions.iter().map(|s| s.as_str());
                     if !self.text.is_empty() {
-                        options.push("Information".into());
+                        self.state.render_list(options.chain(["Information"]), rect, &mut gs.writer)?;
+                    } else {
+                        self.state.render_list(options, rect, &mut gs.writer)?;
                     };
-                    self.state.render_strings(&options, area, &mut gs.writer)?;
                 }
             }
             Mode::Text => {
                 paragraph_styled(
-                    *area,
+                    *rect,
                     self.text.iter().skip(self.text_state).map(|(d, c)| (d.as_str(), Style::fg(*c))),
                     &mut gs.writer,
                 )?;
-                // paragraph(*area, self.text.iter().map(|(d, c)| d.as_str()).skip(self.text_state), &mut gs.writer)?;
             }
         }
         Ok(())

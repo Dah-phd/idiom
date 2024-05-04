@@ -174,12 +174,40 @@ impl Rect {
         Some(Line { row: self.row + rel_idx, col: self.col, width: self.width })
     }
 
-    pub fn center(&self, rows: u16, cols: u16) -> Self {
-        todo!()
+    pub fn center(&self, mut height: u16, mut width: usize) -> Self {
+        height = std::cmp::min(self.height, height);
+        let row = self.row + ((self.height - height) / 2);
+        width = std::cmp::min(self.width, width);
+        let col = self.col + ((self.width - width) / 2) as u16;
+        Self { row, col, width, height, ..Default::default() }
     }
 
-    pub fn right_corner(&self, rows: u16, cols: usize) -> Self {
-        todo!()
+    pub fn right_top_corner(&self, mut height: u16, mut width: usize) -> Self {
+        height = std::cmp::min(self.height, height);
+        width = std::cmp::min(self.width, width);
+        let col = self.col + (self.width - width) as u16;
+        Self { row: self.row, col, width, height, ..Default::default() }
+    }
+
+    pub fn left_top_corner(&self, mut height: u16, mut width: usize) -> Self {
+        height = std::cmp::min(self.height, height);
+        width = std::cmp::min(self.width, width);
+        Self { row: self.row, col: self.col, width, height, ..Default::default() }
+    }
+
+    pub fn right_bot_corner(&self, mut height: u16, mut width: usize) -> Self {
+        height = std::cmp::min(self.height, height);
+        width = std::cmp::min(self.width, width);
+        let row = self.row + (self.height - height);
+        let col = self.col + (self.width - width) as u16;
+        Self { row, col, width, height, ..Default::default() }
+    }
+
+    pub fn left_bot_corner(&self, mut height: u16, mut width: usize) -> Self {
+        height = std::cmp::min(self.height, height);
+        width = std::cmp::min(self.width, width);
+        let col = self.col + (self.width - width) as u16;
+        Self { row: self.row, col, width, height, ..Default::default() }
     }
 
     pub fn rataui(rect: ratatui::layout::Rect) -> Self {
@@ -333,32 +361,49 @@ pub struct Line {
 
 impl Line {
     #[inline]
-    pub fn render_empty(self, writer: &mut Backend) -> std::io::Result<()> {
-        writer.print_at(self.row, self.col, format!("{:width$}", "", width = self.width))
+    pub fn render_centered(self, mut text: &str, backend: &mut Backend) -> std::io::Result<()> {
+        if text.len() > self.width {
+            text = unsafe { text.get_unchecked(..self.width) };
+        }
+        backend.print_at(self.row, self.col, format!("{text:^width$}", width = self.width))
     }
 
     #[inline]
-    pub fn render(self, text: &str, writer: &mut Backend) -> Result<()> {
+    pub fn render_centered_styled(self, mut text: &str, style: Style, backend: &mut Backend) -> std::io::Result<()> {
+        if text.len() > self.width {
+            text = unsafe { text.get_unchecked(..self.width) };
+        }
+        backend.print_styled_at(self.row, self.col, format!("{text:^width$}", width = self.width), style)
+    }
+
+    #[inline]
+    pub fn render_empty(self, backend: &mut Backend) -> std::io::Result<()> {
+        backend.print_at(self.row, self.col, format!("{:width$}", "", width = self.width))
+    }
+
+    #[inline]
+    pub fn render(self, text: &str, backend: &mut Backend) -> Result<()> {
         match text.len().cmp(&self.width) {
-            Ordering::Greater => writer.print_at(self.row, self.col, unsafe { text.get_unchecked(..self.width) }),
-            Ordering::Equal => writer.print_at(self.row, self.col, text),
-            Ordering::Less => writer.print_at(self.row, self.col, format!("{text:width$}", width = self.width)),
+            Ordering::Greater => backend.print_at(self.row, self.col, unsafe { text.get_unchecked(..self.width) }),
+            Ordering::Equal => backend.print_at(self.row, self.col, text),
+            Ordering::Less => backend.print_at(self.row, self.col, format!("{text:width$}", width = self.width)),
         }
     }
 
     #[inline]
-    pub fn render_styled(self, text: &str, style: Style, writer: &mut Backend) -> Result<()> {
+    pub fn render_styled(self, text: &str, style: Style, backend: &mut Backend) -> Result<()> {
         match text.len().cmp(&self.width) {
             Ordering::Greater => {
-                writer.print_styled_at(self.row, self.col, unsafe { text.get_unchecked(..self.width) }, style)
+                backend.print_styled_at(self.row, self.col, unsafe { text.get_unchecked(..self.width) }, style)
             }
-            Ordering::Equal => writer.print_styled_at(self.row, self.col, text, style),
+            Ordering::Equal => backend.print_styled_at(self.row, self.col, text, style),
             Ordering::Less => {
-                writer.print_styled_at(self.row, self.col, format!("{text:width$}", width = self.width), style)
+                backend.print_styled_at(self.row, self.col, format!("{text:width$}", width = self.width), style)
             }
         }
     }
 
+    #[inline]
     pub fn builder<'a>(self, backend: &'a mut Backend) -> std::io::Result<LineBuilder<'a>> {
         backend.go_to(self.row, self.col).map(|_| LineBuilder { remaining: self.width, backend })
     }

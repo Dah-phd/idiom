@@ -42,12 +42,14 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> Result<()> {
 
     loop {
         if let Some(editor) = workspace.get_active() {
-            editor.fast_render(&mut gs)?;
+            editor.render(&mut gs)?;
         }
 
         workspace.render(&mut gs)?;
 
         tree.direct_render(&mut gs)?;
+
+        gs.render_popup_if_exists()?;
 
         // footer.render(&mut gs, workspace.get_active().map(|e| e.get_stats()))?;
 

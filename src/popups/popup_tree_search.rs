@@ -1,7 +1,6 @@
 use super::PopupInterface;
 use crate::{
-    global_state::{Clipboard, PopupMessage, TreeEvent},
-    render::centered_rect_static,
+    global_state::{Clipboard, GlobalState, PopupMessage, TreeEvent},
     render::{TextField, WrappedState},
     tree::Tree,
     utils::REVERSED,
@@ -9,13 +8,12 @@ use crate::{
 
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
+    layout::Constraint,
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem},
-    Frame,
+    widgets::{Block, Borders, List, ListItem},
 };
-use std::{path::PathBuf, sync::Arc};
+use std::{io::Write, path::PathBuf, sync::Arc};
 use tokio::{sync::Mutex, task::JoinHandle};
 
 const SELECTOR_CONSTRAINTS: [Constraint; 2] = [Constraint::Min(3), Constraint::Percentage(100)];
@@ -56,10 +54,10 @@ impl PopupInterface for ActivePathSearch {
         PopupMessage::None
     }
 
-    fn render(&mut self, frame: &mut Frame) {
-        let area = centered_rect_static(120, 20, frame.size());
-        frame.render_widget(Clear, area);
-        let split_areas = Layout::new(Direction::Vertical, SELECTOR_CONSTRAINTS).split(area);
+    fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+        // let area = centered_rect_static(120, 20, frame.size());
+        // frame.render_widget(Clear, area);
+        // let split_areas = Layout::new(Direction::Vertical, SELECTOR_CONSTRAINTS).split(area);
         // frame.render_widget(
         //     self.pattern.widget().block(
         //         Block::new()
@@ -81,7 +79,8 @@ impl PopupInterface for ActivePathSearch {
         let list = List::new(options)
             .block(Block::new().borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT))
             .highlight_style(REVERSED);
-        frame.render_stateful_widget(list, split_areas[1], self.state.get());
+        // frame.render_stateful_widget(list, split_areas[1], self.state.get());
+        gs.writer.flush()
     }
 
     fn update_tree(&mut self, file_tree: &mut Tree) {
@@ -150,13 +149,13 @@ impl PopupInterface for ActiveFileSearch {
         PopupMessage::None
     }
 
-    fn render(&mut self, frame: &mut Frame) {
+    fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
         if let Ok(mut buffer) = self.option_buffer.try_lock() {
             self.options.extend(buffer.drain(..));
         }
-        let area = centered_rect_static(120, 20, frame.size());
-        frame.render_widget(Clear, area);
-        let split_areas = Layout::new(Direction::Vertical, SELECTOR_CONSTRAINTS).split(area);
+        // let area = centered_rect_static(120, 20, frame.size());
+        // frame.render_widget(Clear, area);
+        // let split_areas = Layout::new(Direction::Vertical, SELECTOR_CONSTRAINTS).split(area);
         let block = match self.mode {
             Mode::Full => Block::new()
                 .borders(Borders::ALL)
@@ -177,7 +176,8 @@ impl PopupInterface for ActiveFileSearch {
         let list = List::new(options)
             .block(Block::new().borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT))
             .highlight_style(REVERSED);
-        frame.render_stateful_widget(list, split_areas[1], self.state.get());
+        // frame.render_stateful_widget(list, split_areas[1], self.state.get());
+        gs.writer.flush()
     }
 
     fn update_tree(&mut self, file_tree: &mut Tree) {

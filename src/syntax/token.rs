@@ -1,6 +1,11 @@
+use std::io::Write;
+
 use crate::{
     lsp::LSPClient,
-    render::backend::{Color, Style},
+    render::{
+        backend::{Backend, Color, Style},
+        layout::{Line as LineInfo, RectIter},
+    },
     syntax::{theme::Theme, Lang},
     workspace::{actions::EditMetaData, line::Line},
 };
@@ -98,6 +103,21 @@ impl Token {
         } else {
             buf.push(Token { to: from + len, from, len, style: Style::fg(theme.default) });
         };
+    }
+
+    pub fn render_code(
+        text: &str,
+        lang: &Lang,
+        theme: &Theme,
+        mut lines: RectIter,
+        backend: &mut Backend,
+    ) -> std::io::Result<()> {
+        if let Some(mut line) = lines.next() {
+            let mut tokens = Vec::new();
+            Self::parse(lang, theme, text, &mut tokens);
+            backend.flush()?;
+        }
+        Ok(())
     }
 }
 

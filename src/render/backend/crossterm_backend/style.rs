@@ -7,6 +7,20 @@ pub struct Style(ContentStyle);
 
 impl Style {
     #[inline]
+    pub fn update(&mut self, rhs: Self) {
+        if let Some(c) = rhs.0.foreground_color {
+            self.0.foreground_color.replace(c);
+        }
+        if let Some(c) = rhs.0.background_color {
+            self.0.background_color.replace(c);
+        }
+        if let Some(c) = rhs.0.underline_color {
+            self.0.underline_color.replace(c);
+        }
+        self.0.attributes = rhs.0.attributes;
+    }
+
+    #[inline]
     pub fn add_fg(&mut self, color: Color) {
         self.0.foreground_color.replace(color);
     }
@@ -32,6 +46,20 @@ impl Style {
             foreground_color: None,
             underline_color: None,
             attributes: Attributes::default(),
+        })
+    }
+
+    #[inline]
+    pub fn add_slowblink(&mut self) {
+        self.0.attributes.set(Attribute::SlowBlink);
+    }
+
+    pub fn slowblink() -> Self {
+        Self(ContentStyle {
+            background_color: None,
+            foreground_color: None,
+            underline_color: None,
+            attributes: Attribute::SlowBlink.into(),
         })
     }
 
