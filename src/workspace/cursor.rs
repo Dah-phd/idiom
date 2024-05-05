@@ -1,5 +1,3 @@
-use crossterm::cursor::{Hide, MoveTo, Show};
-use crossterm::{execute, queue};
 use lsp_types::Position;
 
 use super::line::EditorLine;
@@ -18,28 +16,6 @@ pub struct Cursor {
 }
 
 impl Cursor {
-    pub fn hide(writer: &mut impl std::io::Write) -> std::io::Result<()> {
-        queue!(writer, Hide)
-    }
-
-    #[inline]
-    pub fn render(
-        &self,
-        writer: &mut impl std::io::Write,
-        area: crate::render::layout::Rect,
-        offset: usize,
-    ) -> std::io::Result<()> {
-        let mut line = self.line;
-        let mut char = self.char;
-        while char >= self.text_width {
-            line += 1;
-            char -= self.text_width;
-        }
-        let row = area.row + (line - self.at_line) as u16;
-        let col = area.col + (char + offset) as u16;
-        execute!(writer, MoveTo(col, row), Show)
-    }
-
     pub fn terminal_cursor_pos(&self, area: ratatui::layout::Rect, offset: usize) -> (u16, u16) {
         (area.x + (self.char + offset) as u16, area.y + (self.line - self.at_line) as u16)
     }

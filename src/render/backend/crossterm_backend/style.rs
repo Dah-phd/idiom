@@ -21,8 +21,8 @@ impl Style {
     }
 
     #[inline]
-    pub fn add_fg(&mut self, color: Color) {
-        self.0.foreground_color.replace(color);
+    pub fn set_fg(&mut self, color: Option<Color>) {
+        self.0.foreground_color = color;
     }
 
     #[inline]
@@ -36,13 +36,8 @@ impl Style {
     }
 
     #[inline]
-    pub fn drop_fg(&mut self) {
-        self.0.foreground_color = None;
-    }
-
-    #[inline]
-    pub fn add_bg(&mut self, color: Color) {
-        self.0.background_color.replace(color);
+    pub fn set_bg(&mut self, color: Option<Color>) {
+        self.0.background_color = color;
     }
 
     #[inline]

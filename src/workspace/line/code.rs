@@ -1,7 +1,8 @@
 use crate::{
+    global_state::GlobalState,
     render::{
         backend::{color, Backend, Color, Style},
-        layout::{Line, RectIter},
+        layout::{Line, Rect, RectIter},
     },
     syntax::{DiagnosticLine, Lang, Lexer, Token},
     workspace::{cursor::Cursor, line::EditorLine, CursorPosition},
@@ -9,7 +10,6 @@ use crate::{
 use std::{
     cmp::Ordering,
     fmt::Display,
-    fs::write,
     io::Write,
     ops::{Index, Range, RangeBounds, RangeFrom, RangeFull, RangeTo},
     slice::SliceIndex,
@@ -215,19 +215,38 @@ impl EditorLine for CodeLine {
         if self.tokens.is_empty() {
             Token::parse(&ctx.lexer().lang, &ctx.lexer().theme, &self.content, &mut self.tokens);
         };
-        self.rendered_at = line.row;
         let line_width = ctx.setup_line(line, backend)?;
-        if line_width <= self.content.len() {
-            let end_loc = line_width.saturating_sub(2);
-            shrank_line(unsafe { self.content.get_unchecked(..end_loc) }, &self.tokens, backend)?;
-        } else {
-            match ctx.get_select() {
-                Some(select) => {
-                    build_line_select(&self.content, &self.tokens, select, ctx.lexer().theme.selected, backend)
+        match ctx.get_select() {
+            Some(select) => {
+                if line_width > self.content.len() {
+                    build_line_select(
+                        self.content.char_indices(),
+                        &self.tokens,
+                        select,
+                        ctx.lexer().theme.selected,
+                        backend,
+                    )
+                } else {
+                    let end_loc = line_width.saturating_sub(2);
+                    build_line_select(
+                        self.content.char_indices().take(end_loc),
+                        &self.tokens,
+                        select,
+                        ctx.lexer().theme.selected,
+                        backend,
+                    )?;
+                    backend.print_styled(">>", Style::reversed())
                 }
-                None => build_line(&self.content, &self.tokens, backend),
-            }?;
-        };
+            }
+            None => {
+                if line_width > self.content.len() {
+                    build_line(&self.content, &self.tokens, backend)
+                } else {
+                    let end_loc = line_width.saturating_sub(2);
+                    shrank_line(unsafe { self.content.get_unchecked(..end_loc) }, &self.tokens, backend)
+                }
+            }
+        }?;
         backend.flush()
     }
 
@@ -244,9 +263,14 @@ impl EditorLine for CodeLine {
         &mut self,
         ctx: &mut impl Context,
         lines: &mut RectIter,
-        writer: &mut Backend,
+        backend: &mut Backend,
     ) -> std::io::Result<()> {
-        wrapped_line(&self.content, &self.tokens, ctx, lines, writer)
+        match ctx.get_select() {
+            Some(select) => wrapped_line_select(&self.content, &self.tokens, ctx, lines, select, backend),
+            None => wrapped_line(&self.content, &self.tokens, ctx, lines, backend),
+        }?;
+        backend.reset_style()?;
+        backend.flush()
     }
 }
 
@@ -303,47 +327,44 @@ fn build_line(content: &str, tokens: &[Token], backend: &mut Backend) -> std::io
 
 #[inline]
 fn build_line_select(
-    content: &str,
+    content: impl Iterator<Item = (usize, char)>,
     tokens: &[Token],
     select: Range<usize>,
     select_color: Color,
-    writer: &mut Backend,
+    backend: &mut Backend,
 ) -> std::io::Result<()> {
     let mut iter_tokens = tokens.into_iter();
     let mut maybe_token = iter_tokens.next();
-    for (idx, text) in content.char_indices() {
+    let mut reset_style = Style::default();
+    for (idx, text) in content {
         if select.start == idx {
-            writer.add_bg(select_color)?;
+            backend.set_bg(Some(select_color))?;
+            reset_style.set_bg(Some(select_color));
         }
         if select.end == idx {
-            writer.drop_bg()?;
+            backend.set_bg(None)?;
+            reset_style.set_bg(None);
         }
         if let Some(token) = maybe_token {
             if token.from == idx {
-                writer.update_style(token.style)?;
+                backend.update_style(token.style)?;
             } else if token.to == idx {
                 if let Some(token) = iter_tokens.next() {
                     if token.from == idx {
-                        writer.update_style(token.style)?;
+                        backend.update_style(token.style)?;
                     } else {
-                        let mut reset_style = writer.get_style();
-                        reset_style.drop_fg();
-                        reset_style.reset_mods();
-                        writer.set_style(reset_style)?;
+                        backend.set_style(reset_style)?;
                     };
                     maybe_token.replace(token);
                 } else {
-                    let mut reset_style = writer.get_style();
-                    reset_style.drop_fg();
-                    reset_style.reset_mods();
-                    writer.set_style(reset_style)?;
+                    backend.set_style(reset_style)?;
                     maybe_token = None;
                 };
             };
         }
-        writer.print(text)?;
+        backend.print(text)?;
     }
-    writer.reset_style()
+    backend.reset_style()
 }
 
 #[inline]
@@ -370,26 +391,147 @@ fn shrank_line(content: &str, tokens: &[Token], writer: &mut Backend) -> std::io
 }
 
 #[inline]
-fn shrank_line_select(
-    content: &str,
-    tokens: &[Token],
-    select: Range<usize>,
-    select_color: Color,
-    writer: &mut Backend,
-) -> std::io::Result<()> {
-    Ok(())
-}
-
-#[inline]
 fn wrapped_line_select(
     content: &str,
     tokens: &[Token],
     ctx: &mut impl Context,
     lines: &mut RectIter,
     select: Range<usize>,
-    select_color: Color,
-    writer: &mut Backend,
+    backend: &mut Backend,
 ) -> std::io::Result<()> {
+    let wrap_len = lines.width() - (ctx.lexer().line_number_offset + 2);
+    let wrap_number = format!("{:.<1$} ", "", ctx.lexer().line_number_offset);
+    match lines.next() {
+        Some(line) => ctx.setup_line(line, backend)?,
+        None => return Ok(()),
+    };
+    let skip_lines = ctx.count_skipped_to_cursor(wrap_len, lines.len());
+    if skip_lines != 0 {
+        let mut wrap_text = format!("..{skip_lines} hidden wrapped lines");
+        wrap_text.truncate(wrap_len);
+        backend.print_styled(wrap_text, Style::reversed())?;
+        let line = match lines.skip(skip_lines).next() {
+            Some(line) => line,
+            None => return Ok(()),
+        };
+        backend.print_styled_at(line.row, line.col, &wrap_number, Style::fg(color::dark_grey()))?;
+        backend.clear_to_eol()?;
+        wrapping_loop_select(
+            content.char_indices().skip(skip_lines * wrap_len),
+            backend,
+            tokens,
+            &wrap_number,
+            wrap_len * (skip_lines + 1),
+            wrap_len,
+            select,
+            ctx.lexer().theme.selected,
+            lines,
+        )
+    } else {
+        wrapping_loop_select(
+            content.char_indices(),
+            backend,
+            tokens,
+            &wrap_number,
+            wrap_len,
+            wrap_len,
+            select,
+            ctx.lexer().theme.selected,
+            lines,
+        )
+    }
+}
+
+#[inline(always)]
+fn wrapping_loop_select(
+    content: impl Iterator<Item = (usize, char)>,
+    backend: &mut Backend,
+    tokens: &[Token],
+    wrap_number: &str,
+    mut line_end: usize,
+    wrap_len: usize,
+    select: Range<usize>,
+    select_color: Color,
+    lines: &mut RectIter,
+) -> std::io::Result<()> {
+    let mut iter_tokens = tokens.into_iter();
+    let mut maybe_token = iter_tokens.next();
+    let mut reset_style = Style::default();
+    for (idx, text) in content {
+        if select.start == idx {
+            reset_style.set_bg(Some(select_color));
+            backend.set_bg(Some(select_color))?;
+        }
+        if select.end == idx {
+            reset_style.set_bg(None);
+            backend.set_bg(None)?;
+        }
+        if line_end == idx {
+            let line = match lines.next() {
+                Some(line) => line,
+                None => return Ok(()),
+            };
+            backend.print_styled_at(line.row, line.col, wrap_number, Style::fg(color::dark_grey()))?;
+            backend.clear_to_eol()?;
+            line_end += wrap_len;
+        }
+        if let Some(token) = maybe_token {
+            if token.from == idx {
+                backend.update_style(token.style)?;
+            } else if token.to == idx {
+                if let Some(token) = iter_tokens.next() {
+                    if token.from == idx {
+                        backend.update_style(token.style)?;
+                    } else {
+                        backend.set_style(reset_style)?;
+                    };
+                    maybe_token.replace(token);
+                } else {
+                    backend.set_style(reset_style)?;
+                    maybe_token = None;
+                };
+            };
+        }
+        backend.print(text)?;
+    }
+    Ok(())
+}
+
+#[inline(always)]
+fn wrapping_loop(
+    content: impl Iterator<Item = (usize, char)>,
+    backend: &mut Backend,
+    tokens: &[Token],
+    wrap_number: &str,
+    mut line_end: usize,
+    wrap_len: usize,
+    lines: &mut RectIter,
+) -> std::io::Result<()> {
+    let mut iter_tokens = tokens.into_iter();
+    let mut maybe_token = iter_tokens.next();
+    for (idx, text) in content {
+        if line_end == idx {
+            let line = match lines.next() {
+                Some(line) => line,
+                None => return Ok(()),
+            };
+            backend.print_styled_at(line.row, line.col, &wrap_number, Style::fg(color::dark_grey()))?;
+            backend.clear_to_eol()?;
+            line_end += wrap_len;
+        }
+        if let Some(token) = maybe_token {
+            if token.to == idx {
+                backend.reset_style()?;
+                maybe_token = iter_tokens.next();
+            };
+        }
+        if let Some(token) = maybe_token {
+            if token.from == idx {
+                backend.set_style(token.style)?;
+            };
+        }
+        backend.print(text)?;
+    }
     Ok(())
 }
 
@@ -399,63 +541,66 @@ fn wrapped_line(
     tokens: &[Token],
     ctx: &mut impl Context,
     lines: &mut RectIter,
-    writer: &mut Backend,
+    backend: &mut Backend,
 ) -> std::io::Result<()> {
     let wrap_len = lines.width() - (ctx.lexer().line_number_offset + 1);
-    let wrapped_lines = content.len() / wrap_len;
     let wrap_number = format!("{:.<1$} ", "", ctx.lexer().line_number_offset);
-    let mut line_end = wrap_len;
-    if wrapped_lines > lines.len() {
-    } else {
-        match lines.next() {
-            Some(line) => ctx.setup_line(line, writer)?,
+    match lines.next() {
+        Some(line) => ctx.setup_line(line, backend)?,
+        None => return Ok(()),
+    };
+    let skip_lines = ctx.count_skipped_to_cursor(wrap_len, lines.len());
+    if skip_lines != 0 {
+        backend.print_styled(format!("..{skip_lines} hidden wrapped lines"), Style::reversed())?;
+        let line = match lines.skip(skip_lines).next() {
+            Some(line) => line,
             None => return Ok(()),
         };
-        let mut iter_tokens = tokens.iter();
-        let mut maybe_token = iter_tokens.next();
-        for (idx, text) in content.char_indices() {
-            if line_end == idx {
-                let line = lines.next().unwrap();
-                writer.print_styled_at(line.row, line.col, &wrap_number, Style::fg(color::dark_grey()))?;
-                writer.clear_to_eol()?;
-                line_end += wrap_len;
-            }
-            if let Some(token) = maybe_token {
-                if token.to == idx {
-                    writer.reset_style()?;
-                    maybe_token = iter_tokens.next();
-                };
-            }
-            if let Some(token) = maybe_token {
-                if token.from == idx {
-                    writer.set_style(token.style)?;
-                };
-            }
-            writer.print(text)?;
-        }
+        backend.print_styled_at(line.row, line.col, &wrap_number, Style::fg(color::dark_grey()))?;
+        backend.clear_to_eol()?;
+        wrapping_loop(
+            content.char_indices().take(skip_lines + wrap_len),
+            backend,
+            tokens,
+            &wrap_number,
+            wrap_len * skip_lines,
+            wrap_len,
+            lines,
+        )
+    } else {
+        wrapping_loop(
+            content.char_indices(),
+            backend,
+            tokens,
+            &wrap_number,
+            wrap_len, // postion char where line ends
+            wrap_len,
+            lines,
+        )
     }
-    Ok(())
 }
 
 pub struct CodeLineContext<'a> {
-    lexer: &'a Lexer,
+    lexer: &'a mut Lexer,
     line_number: usize,
+    line: usize,
+    char: usize,
     select: Option<(CursorPosition, CursorPosition)>,
     select_buffer: Option<Range<usize>>,
 }
 
 impl<'a> CodeLineContext<'a> {
-    pub fn new(cursor: &Cursor, lexer: &'a Lexer) -> Self {
+    pub fn new(cursor: &Cursor, lexer: &'a mut Lexer) -> Self {
         let line_number = cursor.at_line;
         let select = cursor.select_get();
-        Self { lexer, line_number, select, select_buffer: None }
+        Self { line: cursor.line - line_number, char: cursor.char, select, select_buffer: None, lexer, line_number }
     }
 }
 
 impl<'a> Context for CodeLineContext<'a> {
     #[inline]
-    fn lexer(&self) -> &'a Lexer {
-        self.lexer
+    fn lexer(&self) -> &Lexer {
+        &*self.lexer
     }
 
     #[inline]
@@ -475,8 +620,21 @@ impl<'a> Context for CodeLineContext<'a> {
     }
 
     #[inline]
-    fn render_cursor(&self) -> std::io::Result<()> {
-        Ok(())
+    fn count_skipped_to_cursor(&mut self, wrap_len: usize, remaining_lines: usize) -> usize {
+        let wraps = self.char / wrap_len;
+        let skip_lines = wraps.saturating_sub(remaining_lines);
+        self.char = self.char % wrap_len;
+        self.line += wraps.saturating_sub(skip_lines);
+        skip_lines
+    }
+
+    #[inline]
+    fn render_cursor(self, area: Rect, gs: &mut GlobalState, cursor: &Cursor) -> std::io::Result<()> {
+        // !TODO currently modal is being rendered by CTX this should not be the case, potential solution is to move modal in editor (double ref of Lexer)
+        self.lexer.render_modal_if_exist(cursor, gs);
+        let row = area.row + self.line as u16;
+        let col = area.col + (self.char + self.lexer.line_number_offset + 1) as u16;
+        gs.writer.render_cursor_at(row, col)
     }
 }
 

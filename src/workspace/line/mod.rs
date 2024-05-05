@@ -1,8 +1,9 @@
 mod code;
 use crate::{
+    global_state::GlobalState,
     render::{
         backend::Backend,
-        layout::{Line, RectIter},
+        layout::{Line, Rect, RectIter},
     },
     syntax::{DiagnosticInfo, DiagnosticLine, Lang, Lexer, Token},
 };
@@ -13,6 +14,8 @@ use std::{
     ops::{Index, Range, RangeBounds, RangeFrom, RangeFull, RangeTo},
     slice::SliceIndex,
 };
+
+use super::cursor::{self, Cursor};
 
 type LineWidth = usize;
 
@@ -57,5 +60,6 @@ pub trait Context {
     fn setup_line(&mut self, line: Line, backend: &mut Backend) -> Result<LineWidth>;
     fn get_select(&mut self) -> Option<Range<usize>>;
     fn lexer(&self) -> &Lexer;
-    fn render_cursor(&self) -> Result<()>;
+    fn count_skipped_to_cursor(&mut self, wrap_len: usize, remaining_lines: usize) -> usize;
+    fn render_cursor(self, area: Rect, gs: &mut GlobalState, cursor: &Cursor) -> Result<()>;
 }

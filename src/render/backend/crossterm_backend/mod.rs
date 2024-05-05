@@ -139,43 +139,31 @@ impl Backend {
 
     /// adds foreground to the already set style
     #[inline]
-    pub fn add_fg(&mut self, color: Color) -> std::io::Result<()> {
+    pub fn set_fg(&mut self, color: Option<Color>) -> std::io::Result<()> {
         if let Some(current) = self.default_styled.as_mut() {
-            current.add_fg(color);
-        } else {
+            current.set_fg(color);
+            self.to_set_style()
+        } else if let Some(color) = color {
             self.default_styled.replace(Style::fg(color));
-        };
-        self.to_set_style()
-    }
-
-    /// drops foreground to the already set style
-    #[inline]
-    pub fn drop_fg(&mut self) -> std::io::Result<()> {
-        if let Some(current) = self.default_styled.as_mut() {
-            current.drop_fg();
-        };
-        self.to_set_style()
+            self.to_set_style()
+        } else {
+            Ok(())
+        }
     }
 
     /// adds background to the already set style
     #[inline]
-    pub fn add_bg(&mut self, color: Color) -> std::io::Result<()> {
+    pub fn set_bg(&mut self, color: Option<Color>) -> std::io::Result<()> {
         if let Some(current) = self.default_styled.as_mut() {
-            current.add_bg(color);
-        } else {
+            current.set_bg(color);
+            self.to_set_style()
+        } else if let Some(color) = color {
             let style = Style::bg(color);
             self.default_styled.replace(style);
-        };
-        self.to_set_style()
-    }
-
-    /// drops background to the already set style
-    #[inline]
-    pub fn drop_bg(&mut self) -> std::io::Result<()> {
-        if let Some(style) = self.default_styled.as_mut() {
-            style.drop_bg();
-        };
-        self.to_set_style()
+            self.to_set_style()
+        } else {
+            Ok(())
+        }
     }
 
     /// restores the style of the writer to default
@@ -189,6 +177,24 @@ impl Backend {
     #[inline]
     pub fn go_to(&mut self, row: u16, col: u16) -> Result<()> {
         queue!(self, MoveTo(col, row))
+    }
+
+    /// direct adding cursor at location - no buffer queing
+    #[inline]
+    pub fn render_cursor_at(&mut self, row: u16, col: u16) -> Result<()> {
+        execute!(self, MoveTo(col, row))
+    }
+
+    /// direct showing cursor - no buffer queing
+    #[inline]
+    pub fn show_cursor(&mut self) -> Result<()> {
+        execute!(self, Show)
+    }
+
+    /// direct hiding cursor - no buffer queing
+    #[inline]
+    pub fn hide_cursor(&mut self) -> Result<()> {
+        execute!(self, Hide)
     }
 
     #[inline]

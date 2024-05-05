@@ -17,6 +17,8 @@ use std::{
     time::SystemTime,
 };
 
+use super::line::Context;
+
 type DocLen = usize;
 type SelectLen = usize;
 pub type DocStats<'a> = (DocLen, SelectLen, CursorPosition);
@@ -54,8 +56,8 @@ impl Editor {
     pub fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
         self.sync(gs);
         let mut area = gs.editor_area.into_iter();
-        let mut ctx = CodeLineContext::new(&self.cursor, &self.lexer);
-        Cursor::hide(&mut gs.writer)?;
+        let mut ctx = CodeLineContext::new(&self.cursor, &mut self.lexer);
+        gs.writer.hide_cursor()?;
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if self.cursor.line == line_idx && text.len() > self.cursor.text_width {
                 text.wrapped_render(&mut ctx, &mut area, &mut gs.writer)?;
@@ -65,15 +67,14 @@ impl Editor {
                 break;
             };
         }
-        self.lexer.render_modal_if_exist(&self.cursor, gs);
-        self.cursor.render(&mut gs.writer, gs.editor_area, self.lexer.line_number_offset + 1)
+        ctx.render_cursor(gs.editor_area, gs, &self.cursor)
     }
 
     pub fn fast_render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
         self.sync(gs);
         let mut area = gs.editor_area.into_iter();
-        let mut ctx = CodeLineContext::new(&self.cursor, &self.lexer);
-        Cursor::hide(&mut gs.writer)?;
+        let mut ctx = CodeLineContext::new(&self.cursor, &mut self.lexer);
+        gs.writer.hide_cursor()?;
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if self.cursor.line == line_idx && text.len() > self.cursor.text_width {
                 text.wrapped_render(&mut ctx, &mut area, &mut gs.writer)?;
@@ -83,8 +84,7 @@ impl Editor {
                 break;
             };
         }
-        self.lexer.render_modal_if_exist(&self.cursor, gs);
-        self.cursor.render(&mut gs.writer, gs.editor_area, self.lexer.line_number_offset + 1)
+        ctx.render_cursor(gs.editor_area, gs, &self.cursor)
     }
 
     #[inline]

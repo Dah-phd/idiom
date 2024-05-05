@@ -123,7 +123,7 @@ impl GlobalState {
             let _ = self.writer.save_cursor();
             let mut style = self.theme.accent_style;
             line.width = SELECT_SPAN.len();
-            style.add_fg(color::cyan());
+            style.set_fg(Some(color::cyan()));
             style.add_bold();
             let _ = line.render_styled(SELECT_SPAN, style, &mut self.writer);
             let _ = self.writer.restore_cursor();
@@ -140,7 +140,7 @@ impl GlobalState {
             let _ = self.writer.save_cursor();
             let mut style = self.theme.accent_style;
             line.width = INSERT_SPAN.len();
-            style.add_fg(color::rgb(255, 0, 0));
+            style.set_fg(Some(color::rgb(255, 0, 0)));
             style.add_bold();
             let _ = line.render_styled(INSERT_SPAN, style, &mut self.writer);
             let _ = self.writer.restore_cursor();
