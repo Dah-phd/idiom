@@ -1,8 +1,8 @@
-use crate::workspace::{cursor::CursorPosition, line::Line};
+use crate::workspace::{cursor::CursorPosition, line::EditorLine};
 use std::{ops::Range, path::PathBuf, time::SystemTime};
 
 #[inline(always)]
-pub fn insert_clip(clip: String, content: &mut Vec<impl Line>, mut cursor: CursorPosition) -> CursorPosition {
+pub fn insert_clip(clip: String, content: &mut Vec<impl EditorLine>, mut cursor: CursorPosition) -> CursorPosition {
     let mut lines = clip.split('\n').collect::<Vec<_>>();
     if lines.len() == 1 {
         let text = lines[0];
@@ -33,7 +33,7 @@ pub fn insert_clip(clip: String, content: &mut Vec<impl Line>, mut cursor: Curso
 }
 
 #[inline(always)]
-pub fn clip_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<impl Line>) -> String {
+pub fn clip_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<impl EditorLine>) -> String {
     if from.line == to.line {
         let line = &mut content[from.line];
         let clip = line[from.char..to.char].to_owned();
@@ -58,7 +58,7 @@ pub fn clip_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<
 }
 
 #[inline]
-pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<impl Line>) {
+pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<impl EditorLine>) {
     if from.line == to.line {
         if let Some(line) = content.get_mut(from.line) {
             line.replace_range(from.char..to.char, "")
@@ -81,7 +81,7 @@ pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Ve
 }
 
 #[inline]
-pub fn copy_content(from: CursorPosition, to: CursorPosition, content: &[impl Line]) -> String {
+pub fn copy_content(from: CursorPosition, to: CursorPosition, content: &[impl EditorLine]) -> String {
     if from.line == to.line {
         content[from.line][from.char..to.char].to_owned()
     } else {

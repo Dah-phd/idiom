@@ -1,16 +1,22 @@
 mod code;
 use crate::{
-    render::{backend::Backend, layout::Line as LineInfo},
+    render::{
+        backend::Backend,
+        layout::{Line, RectIter},
+    },
     syntax::{DiagnosticInfo, DiagnosticLine, Lang, Lexer, Token},
 };
-pub use code::CodeLine;
+pub use code::{CodeLine, CodeLineContext};
 use std::{
     fmt::Display,
+    io::Result,
     ops::{Index, Range, RangeBounds, RangeFrom, RangeFull, RangeTo},
     slice::SliceIndex,
 };
 
-pub trait Line:
+type LineWidth = usize;
+
+pub trait EditorLine:
     Into<String>
     + Default
     + Sized
@@ -41,21 +47,15 @@ pub trait Line:
     fn drop_diagnostics(&mut self);
     fn push_token(&mut self, token: Token);
     fn replace_tokens(&mut self, tokens: Vec<Token>);
-    fn wrapped_render(
-        &mut self,
-        idx: usize,
-        line: LineInfo,
-        limit: usize,
-        lexer: &mut Lexer,
-        writer: &mut Backend,
-    ) -> std::io::Result<usize>;
-    fn render(&mut self, idx: usize, line: LineInfo, lexer: &mut Lexer, writer: &mut Backend) -> std::io::Result<()>;
-    fn fast_render(
-        &mut self,
-        idx: usize,
-        line: LineInfo,
-        lexer: &mut Lexer,
-        writer: &mut Backend,
-    ) -> std::io::Result<()>;
+    fn wrapped_render(&mut self, ctx: &mut impl Context, lines: &mut RectIter, writer: &mut Backend) -> Result<()>;
+    fn render(&mut self, ctx: &mut impl Context, line: Line, writer: &mut Backend) -> Result<()>;
+    fn fast_render(&mut self, ctx: &mut impl Context, line: Line, writer: &mut Backend) -> Result<()>;
     unsafe fn get_unchecked<I: SliceIndex<str>>(&self, i: I) -> &I::Output;
+}
+
+pub trait Context {
+    fn setup_line(&mut self, line: Line, backend: &mut Backend) -> Result<LineWidth>;
+    fn get_select(&mut self) -> Option<Range<usize>>;
+    fn lexer(&self) -> &Lexer;
+    fn render_cursor(&self) -> Result<()>;
 }

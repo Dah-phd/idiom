@@ -10,9 +10,8 @@ use crate::{
     global_state::{GlobalState, WorkspaceEvent},
     lsp::LSPClient,
     popups::popups_tree::refrence_selector,
-    workspace::{actions::EditMetaData, cursor::Cursor, line::Line, CursorPosition},
+    workspace::{actions::EditMetaData, cursor::Cursor, line::EditorLine, CursorPosition},
 };
-pub use context::LineBuilderContext;
 use crossterm::event::KeyEvent;
 pub use diagnostics::{set_diganostics, Action, DiagnosticInfo, DiagnosticLine};
 pub use langs::Lang;
@@ -41,7 +40,7 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn with_context(file_type: FileType, path: &Path, content: &[impl Line], gs: &mut GlobalState) -> Self {
+    pub fn with_context(file_type: FileType, path: &Path, content: &[impl EditorLine], gs: &mut GlobalState) -> Self {
         Self {
             lang: Lang::from(file_type),
             legend: Legend::default(),
@@ -56,7 +55,7 @@ impl Lexer {
         }
     }
 
-    pub fn context(&mut self, content: &mut Vec<impl Line>, gs: &mut GlobalState) {
+    pub fn context(&mut self, content: &mut Vec<impl EditorLine>, gs: &mut GlobalState) {
         self.line_number_offset = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
         if let Some(client) = self.lsp_client.as_mut() {
             // diagnostics
@@ -141,7 +140,7 @@ impl Lexer {
         &mut self,
         version: i32,
         events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
-        content: &[impl Line],
+        content: &[impl EditorLine],
     ) {
         if let Some(client) = self.lsp_client.as_mut() {
             if let Some(request) = collect_changes(&self.path, version, events, content, client) {
@@ -229,7 +228,7 @@ impl Lexer {
         self.modal.replace(LSPModal::renames_at(c, title));
     }
 
-    pub fn help(&mut self, c: CursorPosition, content: &[impl Line]) {
+    pub fn help(&mut self, c: CursorPosition, content: &[impl EditorLine]) {
         if let Some(client) = self.lsp_client.as_mut() {
             if let Some(actions) = content[c.line].diagnostic_info(&self.lang) {
                 self.modal.replace(LSPModal::actions(actions));

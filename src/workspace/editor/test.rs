@@ -6,7 +6,7 @@ use crate::global_state::GlobalState;
 use crate::render::backend::Backend;
 use crate::syntax::Lexer;
 use crate::workspace::{actions::Actions, line::CodeLine};
-use crate::{configs::FileType, workspace::line::Line};
+use crate::{configs::FileType, workspace::line::EditorLine};
 use std::path::PathBuf;
 
 pub fn mock_editor(content: Vec<String>) -> Editor {

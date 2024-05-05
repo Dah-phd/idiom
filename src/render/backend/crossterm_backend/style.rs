@@ -35,6 +35,12 @@ impl Style {
         })
     }
 
+    #[inline]
+    pub fn drop_fg(&mut self) {
+        self.0.foreground_color = None;
+    }
+
+    #[inline]
     pub fn add_bg(&mut self, color: Color) {
         self.0.background_color.replace(color);
     }
@@ -50,10 +56,16 @@ impl Style {
     }
 
     #[inline]
+    pub fn drop_bg(&mut self) {
+        self.0.background_color = None;
+    }
+
+    #[inline]
     pub fn add_slowblink(&mut self) {
         self.0.attributes.set(Attribute::SlowBlink);
     }
 
+    #[inline]
     pub fn slowblink() -> Self {
         Self(ContentStyle {
             background_color: None,

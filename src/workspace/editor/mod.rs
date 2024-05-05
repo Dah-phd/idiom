@@ -1,11 +1,11 @@
 use crate::{
     configs::{EditorConfigs, FileType},
     global_state::GlobalState,
-    syntax::{Lexer, LineBuilderContext},
-    workspace::line::{CodeLine, Line},
+    syntax::Lexer,
     workspace::{
         actions::Actions,
         cursor::{Cursor, CursorPosition},
+        line::{CodeLine, CodeLineContext, EditorLine},
         utils::{copy_content, find_line_start, last_modified, token_range_at},
     },
 };
@@ -53,12 +53,14 @@ impl Editor {
 
     pub fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
         self.sync(gs);
-        let mut ctx = LineBuilderContext::from(&self.cursor);
         let mut area = gs.editor_area.into_iter();
+        let mut ctx = CodeLineContext::new(&self.cursor, &self.lexer);
         Cursor::hide(&mut gs.writer)?;
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
-            if let Some(line) = area.next() {
-                text.render(line_idx + 1, line, &mut self.lexer, &mut gs.writer)?;
+            if self.cursor.line == line_idx && text.len() > self.cursor.text_width {
+                text.wrapped_render(&mut ctx, &mut area, &mut gs.writer)?;
+            } else if let Some(line) = area.next() {
+                text.render(&mut ctx, line, &mut gs.writer)?;
             } else {
                 break;
             };
@@ -69,12 +71,14 @@ impl Editor {
 
     pub fn fast_render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
         self.sync(gs);
-        let mut ctx = LineBuilderContext::from(&self.cursor);
         let mut area = gs.editor_area.into_iter();
+        let mut ctx = CodeLineContext::new(&self.cursor, &self.lexer);
         Cursor::hide(&mut gs.writer)?;
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
-            if let Some(line) = area.next() {
-                text.fast_render(line_idx + 1, line, &mut self.lexer, &mut gs.writer)?;
+            if self.cursor.line == line_idx && text.len() > self.cursor.text_width {
+                text.wrapped_render(&mut ctx, &mut area, &mut gs.writer)?;
+            } else if let Some(line) = area.next() {
+                text.fast_render(&mut ctx, line, &mut gs.writer)?;
             } else {
                 break;
             };
@@ -442,7 +446,7 @@ impl Editor {
 
     pub fn resize(&mut self, width: usize, height: usize) {
         self.cursor.max_rows = height;
-        let offset = if self.content.is_empty() { 0 } else { (self.content.len().ilog10() + 1) as usize } + 1;
+        let offset = if self.content.is_empty() { 0 } else { (self.content.len().ilog10() + 1) as usize };
         self.cursor.text_width = width.saturating_sub(offset + 1);
     }
 }

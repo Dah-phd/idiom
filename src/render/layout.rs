@@ -279,7 +279,7 @@ impl Rect {
 
         let set = set.unwrap_or(BORDERS);
         writer.save_cursor()?;
-        writer.set_fg(fg)?;
+        writer.set_style(Style::fg(fg))?;
         if top {
             for col_idx in col..last_col {
                 writer.go_to(row, col_idx)?;
@@ -335,6 +335,18 @@ impl From<(u16, u16)> for Rect {
 pub struct RectIter<'a> {
     rect: &'a Rect,
     row_range: Range<u16>,
+}
+
+impl RectIter<'_> {
+    /// return the number of lines remaining
+    pub fn len(&self) -> usize {
+        self.row_range.len()
+    }
+
+    /// returns the text width within the lines
+    pub fn width(&self) -> usize {
+        self.rect.width
+    }
 }
 
 impl<'a> Iterator for RectIter<'a> {

@@ -1,6 +1,6 @@
 use crate::render::backend::{color, Color};
 use crate::syntax::{Lang, Token};
-use crate::{global_state::WorkspaceEvent, workspace::line::Line};
+use crate::{global_state::WorkspaceEvent, workspace::line::EditorLine};
 use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
 
 const ELS_COLOR: Color = color::dark_grey();
@@ -140,7 +140,7 @@ impl From<Diagnostic> for DiagnosticLine {
     }
 }
 
-pub fn set_diganostics(content: &mut Vec<impl Line>, diagnostics: Vec<(usize, DiagnosticLine)>) {
+pub fn set_diganostics(content: &mut Vec<impl EditorLine>, diagnostics: Vec<(usize, DiagnosticLine)>) {
     for line in content.iter_mut() {
         line.drop_diagnostics();
     }
@@ -149,7 +149,7 @@ pub fn set_diganostics(content: &mut Vec<impl Line>, diagnostics: Vec<(usize, Di
     }
 }
 
-pub fn set_diganostic_errors(content: &mut Vec<impl Line>, diagnostics: Vec<(usize, DiagnosticLine)>) {
+pub fn set_diganostic_errors(content: &mut Vec<impl EditorLine>, diagnostics: Vec<(usize, DiagnosticLine)>) {
     for line in content.iter_mut() {
         line.drop_diagnostics();
     }

@@ -2,7 +2,7 @@ use super::types::FileType;
 use super::{load_or_create_config, EDITOR_CFG_FILE};
 use crate::global_state::GlobalState;
 use crate::utils::{trim_start_inplace, Offset};
-use crate::workspace::line::Line;
+use crate::workspace::line::EditorLine;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -50,7 +50,7 @@ impl IndentConfigs {
         indent
     }
 
-    pub fn derive_indent_from_lines(&self, prev_lines: &[impl Line]) -> String {
+    pub fn derive_indent_from_lines(&self, prev_lines: &[impl EditorLine]) -> String {
         for prev_line in prev_lines.iter().rev().map(|line| line.as_str()) {
             if !prev_line.chars().all(|c| c.is_whitespace()) {
                 return self.derive_indent_from(prev_line);
@@ -59,7 +59,7 @@ impl IndentConfigs {
         "".to_owned()
     }
 
-    pub fn indent_line(&self, line_idx: usize, content: &mut [impl Line]) -> Offset {
+    pub fn indent_line(&self, line_idx: usize, content: &mut [impl EditorLine]) -> Offset {
         if line_idx > 0 {
             let indent = self.derive_indent_from_lines(&content[..line_idx]);
             if indent.is_empty() {

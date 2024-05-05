@@ -4,10 +4,10 @@ use crate::{
     lsp::LSPClient,
     render::{
         backend::{Backend, Color, Style},
-        layout::{Line as LineInfo, RectIter},
+        layout::RectIter,
     },
     syntax::{theme::Theme, Lang},
-    workspace::{actions::EditMetaData, line::Line},
+    workspace::{actions::EditMetaData, line::EditorLine},
 };
 use lsp_types::{SemanticToken, TextDocumentContentChangeEvent};
 
@@ -109,7 +109,7 @@ impl Token {
         text: &str,
         lang: &Lang,
         theme: &Theme,
-        mut lines: RectIter,
+        lines: &mut RectIter,
         backend: &mut Backend,
     ) -> std::io::Result<()> {
         if let Some(mut line) = lines.next() {
@@ -133,7 +133,7 @@ pub fn set_tokens(
     legend: &Legend,
     lang: &Lang,
     theme: &Theme,
-    content: &mut Vec<impl Line>,
+    content: &mut Vec<impl EditorLine>,
 ) {
     let mut line_idx = 0;
     let mut char_idx = 0;
@@ -173,7 +173,7 @@ pub fn collect_changes(
     path: &std::path::Path,
     version: i32,
     events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
-    content: &[impl Line],
+    content: &[impl EditorLine],
     client: &mut LSPClient,
 ) -> Option<LSPResponseType> {
     match events.len() {

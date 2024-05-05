@@ -3,7 +3,7 @@ use crate::{
     utils::Offset,
     workspace::{
         cursor::{Cursor, CursorPosition},
-        line::Line,
+        line::EditorLine,
         utils::{clip_content, copy_content, insert_clip, remove_content, token_range_at},
     },
 };
@@ -20,7 +20,7 @@ pub struct Edit {
 }
 
 impl Edit {
-    pub fn swap_down(up_line: usize, cfg: &IndentConfigs, content: &mut [impl Line]) -> (Offset, Offset, Self) {
+    pub fn swap_down(up_line: usize, cfg: &IndentConfigs, content: &mut [impl EditorLine]) -> (Offset, Offset, Self) {
         let to = up_line + 1;
         let mut reverse_edit_text = content[up_line].as_str().to_owned();
         reverse_edit_text.push('\n');
@@ -48,7 +48,7 @@ impl Edit {
         )
     }
 
-    pub fn merge_next_line(line: usize, content: &mut Vec<impl Line>) -> Self {
+    pub fn merge_next_line(line: usize, content: &mut Vec<impl EditorLine>) -> Self {
         let removed_line = content.remove(line + 1);
         let merged_to = &mut content[line];
         let position_of_new_line = Position::new(line as u32, merged_to.len() as u32);
@@ -68,7 +68,7 @@ impl Edit {
         }
     }
 
-    pub fn unindent(line: usize, text: &mut impl Line, indent: &str) -> Option<(Offset, Self)> {
+    pub fn unindent(line: usize, text: &mut impl EditorLine, indent: &str) -> Option<(Offset, Self)> {
         let mut idx = 0;
         while text[idx..].starts_with(indent) {
             idx += indent.len();
@@ -124,7 +124,7 @@ impl Edit {
         }
     }
 
-    pub fn remove_from_line(at_line: usize, from: usize, to: usize, line: &mut impl Line) -> Self {
+    pub fn remove_from_line(at_line: usize, from: usize, to: usize, line: &mut impl EditorLine) -> Self {
         let start = Position::new(at_line as u32, from as u32);
         let old = line[from..to].to_owned();
         line.replace_range(from..to, "");
@@ -151,7 +151,7 @@ impl Edit {
         }
     }
 
-    pub fn insert_clip(from: CursorPosition, clip: String, content: &mut Vec<impl Line>) -> Self {
+    pub fn insert_clip(from: CursorPosition, clip: String, content: &mut Vec<impl EditorLine>) -> Self {
         let end = insert_clip(clip.to_owned(), content, from);
         Self {
             meta: EditMetaData { start_line: from.line, from: 1, to: (end.line - from.line) + 1 },
@@ -162,7 +162,7 @@ impl Edit {
         }
     }
 
-    pub fn remove_line(line: usize, content: &mut Vec<impl Line>) -> Self {
+    pub fn remove_line(line: usize, content: &mut Vec<impl EditorLine>) -> Self {
         let mut removed_line = content.remove(line);
         removed_line.push('\n');
         let start = Position::new(line as u32, 0);
@@ -175,7 +175,7 @@ impl Edit {
         }
     }
 
-    pub fn remove_select(from: CursorPosition, to: CursorPosition, content: &mut Vec<impl Line>) -> Self {
+    pub fn remove_select(from: CursorPosition, to: CursorPosition, content: &mut Vec<impl EditorLine>) -> Self {
         Self {
             meta: EditMetaData { start_line: from.line, from: to.line - from.line + 1, to: 1 },
             reverse_text_edit: TextEdit::new(Range::new(from.into(), from.into()), clip_content(from, to, content)),
@@ -189,7 +189,7 @@ impl Edit {
         from: CursorPosition,
         to: CursorPosition,
         clip: String,
-        content: &mut Vec<impl Line>,
+        content: &mut Vec<impl EditorLine>,
     ) -> Self {
         let reverse_edit_text = clip_content(from, to, content);
         let end = if !clip.is_empty() { insert_clip(clip.clone(), content, from) } else { from };
@@ -202,7 +202,7 @@ impl Edit {
         }
     }
 
-    pub fn replace_token(line: usize, char: usize, new_text: String, content: &mut [impl Line]) -> Self {
+    pub fn replace_token(line: usize, char: usize, new_text: String, content: &mut [impl EditorLine]) -> Self {
         let code_line = &mut content[line];
         let range = token_range_at(code_line.as_str(), char);
         let start = Position::new(line as u32, range.start as u32);
@@ -224,7 +224,7 @@ impl Edit {
         snippet: String,
         cursor_offset: Option<(usize, usize)>,
         cfg: &IndentConfigs,
-        content: &mut Vec<impl Line>,
+        content: &mut Vec<impl EditorLine>,
     ) -> (CursorPosition, Self) {
         let code_line = &mut content[c.line];
         let range = token_range_at(code_line.as_str(), c.char);
@@ -267,7 +267,7 @@ impl Edit {
     /// apply reverse edit (goes into undone)
     pub fn apply_rev(
         &self,
-        content: &mut Vec<impl Line>,
+        content: &mut Vec<impl EditorLine>,
         events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
     ) -> (CursorPosition, Option<(CursorPosition, CursorPosition)>) {
         let from = self.reverse_text_edit.range.start.into();
@@ -279,7 +279,7 @@ impl Edit {
     /// apply edit (goes into done)
     pub fn apply(
         &self,
-        content: &mut Vec<impl Line>,
+        content: &mut Vec<impl EditorLine>,
         events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
     ) -> (CursorPosition, Option<(CursorPosition, CursorPosition)>) {
         let from = self.text_edit.range.start.into();
@@ -317,7 +317,7 @@ impl EditMetaData {
         Self { start_line, from: 1, to: 1 }
     }
 
-    pub fn build_range(&self, content: &[impl Line]) -> Option<Range> {
+    pub fn build_range(&self, content: &[impl EditorLine]) -> Option<Range> {
         let end_line = self.start_line + self.to - 1;
         Some(Range::new(
             Position::new(self.start_line as u32, 0),
@@ -346,7 +346,7 @@ pub struct NewLineBuilder {
 
 impl NewLineBuilder {
     /// initialize builder collecting select if exists
-    pub fn new(cursor: &mut Cursor, content: &mut Vec<impl Line>) -> Self {
+    pub fn new(cursor: &mut Cursor, content: &mut Vec<impl EditorLine>) -> Self {
         match cursor.select_take() {
             Some((from, to)) => {
                 cursor.set_position(from);
@@ -366,7 +366,7 @@ impl NewLineBuilder {
         }
     }
 
-    pub fn finish(self, cursor: CursorPosition, content: &[impl Line]) -> Edit {
+    pub fn finish(self, cursor: CursorPosition, content: &[impl EditorLine]) -> Edit {
         Edit {
             meta: EditMetaData {
                 start_line: self.text_edit_range.0.line,
@@ -387,7 +387,7 @@ impl NewLineBuilder {
     }
 
     // UTILS
-    pub fn and_clear_first_line(&mut self, line: &mut impl Line) {
+    pub fn and_clear_first_line(&mut self, line: &mut impl EditorLine) {
         self.text_edit_range.0.char = 0;
         self.reverse_edit_text.insert_str(0, line.as_str());
         line.clear();
