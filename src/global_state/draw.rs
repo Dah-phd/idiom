@@ -1,7 +1,5 @@
 use bitflags::bitflags;
 
-use super::GlobalState;
-
 bitflags! {
     /// Workspace and Footer are always drawn
     #[derive(PartialEq, Eq)]

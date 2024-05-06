@@ -364,7 +364,7 @@ impl<'a> IntoIterator for &'a Rect {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct Line {
     pub row: u16,
     pub col: u16,
@@ -436,7 +436,12 @@ impl Line {
     /// on drop pads the line to end
     #[inline]
     pub fn unsafe_builder<'a>(self, backend: &'a mut Backend) -> std::io::Result<LineBuilder<'a>> {
-        backend.go_to(self.row, self.col).map(|_| LineBuilder { remaining: self.width, backend })
+        backend.go_to(self.row, self.col).map(|_| LineBuilder {
+            row: self.row,
+            col: self.col,
+            remaining: self.width,
+            backend,
+        })
     }
 
     /// creates reverse builder from Line
@@ -485,6 +490,8 @@ impl SubAssign<u16> for Line {
 }
 
 pub struct LineBuilder<'a> {
+    row: u16,
+    col: u16,
     remaining: usize,
     backend: &'a mut Backend,
 }
@@ -512,6 +519,10 @@ impl<'a> LineBuilder<'a> {
         self.remaining -= text.len();
         self.backend.print_styled(text, style)?;
         Ok(true)
+    }
+
+    pub fn to_line(self) -> Line {
+        Line { row: self.row, col: self.col, width: self.remaining }
     }
 }
 
@@ -560,6 +571,10 @@ impl<'a> LineBuilderRev<'a> {
         self.remaining -= text.len();
         self.backend.print_styled_at(self.row, self.col + self.remaining as u16, text, style)?;
         Ok(true)
+    }
+
+    pub fn to_line(self) -> Line {
+        Line { row: self.row, col: self.col, width: self.remaining }
     }
 }
 

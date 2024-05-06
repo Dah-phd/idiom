@@ -1,73 +1,45 @@
-use crate::{configs::UITheme, global_state::GlobalState, workspace::DocStats};
-use crossterm::{
-    cursor::MoveTo,
-    execute,
-    style::{Color, ContentStyle, PrintStyledContent, SetBackgroundColor, StyledContent},
-    terminal::{Clear, ClearType},
+use crate::render::{
+    backend::{color, Backend, Style},
+    layout::Line,
 };
-use ratatui::{buffer::Buffer, layout::Rect, text::Span, widgets::WidgetRef};
 use std::{
-    io::{Result, Write},
+    io::Result,
     time::{Duration, Instant},
 };
 
 const MSG_DURATION: Duration = Duration::from_secs(3);
 
 #[derive(Debug)]
-pub struct Footer {
+pub struct Messages {
     clock: Instant,
     message: Option<Message>,
     message_que: Vec<Message>,
-    color: ContentStyle,
+    pub line: Line,
 }
 
-impl Footer {
-    pub fn new(gs: &mut GlobalState) -> Self {
-        let theme = gs.unwrap_default_result(UITheme::new(), "theme_ui.josn: ");
-        let mut color = ContentStyle::new();
-        // color.background_color = Some(theme.accent.into());
-        Self { clock: Instant::now(), message: None, message_que: Vec::new(), color }
+impl Messages {
+    pub fn new() -> Self {
+        Self { clock: Instant::now(), message: None, message_que: Vec::new(), line: Line::default() }
     }
 
-    pub fn render(&mut self, gs: &mut GlobalState, stats: Option<DocStats>) -> Result<()> {
-        let (stat_size, stat_p) = if let Some((len, sel, c)) = stats {
-            let text = match sel {
-                0 => format!("    Doc Len {len}, Ln {}, Col {}", c.line + 1, c.char + 1),
-                _ => format!("    Doc Len {len}, Ln {}, Col {} ({sel} selected)", c.line + 1, c.char + 1),
-            };
-            (text.len(), Span::raw(text))
-        } else {
-            (0, Span::default())
-        };
-
-        // let split = Layout::new(
-        //     Direction::Horizontal,
-        //     [
-        //         Constraint::Length(15),
-        //         Constraint::Length(gs.footer_area.width.saturating_sub(15 + stat_size as u16)),
-        //         Constraint::Length(stat_size as u16),
-        //     ],
-        // )
-        // .split(gs.footer_area);
-
-        // frame.render_widget(gs.mode_span.clone(), split[0]);
-
-        // if self.message.is_some() || !self.message_que.is_empty() {
-        //     self.que_pull_if_expaired();
-        //     if let Some(msg) = &self.message {
-        //         frame.render_widget_ref(msg, split[1]);
-        //     }
-        // }
-
-        // frame.render_widget(stat_p, split[2]);
-        let mv = MoveTo(gs.footer_area.col + 15, gs.footer_area.row);
-        execute!(
-            &mut gs.writer,
-            mv,
-            SetBackgroundColor(self.color.background_color.unwrap_or(Color::Reset)),
-            Clear(ClearType::UntilNewLine),
-            SetBackgroundColor(Color::Reset),
-        )
+    pub fn render(&mut self, mut accent_style: Style, backend: &mut Backend) -> Result<()> {
+        if self.message.is_some() || !self.message_que.is_empty() {
+            let line = self.line.clone();
+            self.que_pull_if_expaired();
+            match self.message.as_ref() {
+                Some(Message::Error(text)) => {
+                    accent_style.set_fg(Some(color::red()));
+                    line.render_styled(text, accent_style, backend)
+                }
+                Some(Message::Success(text)) => {
+                    accent_style.set_fg(Some(color::blue()));
+                    line.render_styled(text, accent_style, backend)
+                }
+                Some(Message::Text(text)) => line.render_styled(text, accent_style, backend),
+                None => return Ok(()),
+            }?;
+        }
+        Ok(())
     }
 
     pub fn message(&mut self, message: String) {
@@ -84,12 +56,6 @@ impl Footer {
 
     pub fn success(&mut self, message: String) {
         self.push_ahead(Message::success(message));
-    }
-
-    pub fn reset_cfg(&mut self) -> std::result::Result<(), serde_json::Error> {
-        let new_theme = UITheme::new()?;
-        // self.color.background_color = Some(new_theme.accent_background.into());
-        Ok(())
     }
 
     fn push_ahead(&mut self, msg: Message) {
@@ -122,16 +88,6 @@ enum Message {
     Text(String),
     Success(String),
     Error(String),
-}
-
-impl WidgetRef for &Message {
-    fn render_ref(&self, area: Rect, buf: &mut Buffer) {
-        // match self {
-        // Message::Text(w) => w.render_ref(area, buf),
-        // Message::Error(w) => w.render_ref(area, buf),
-        // Message::Success(w) => w.render_ref(area, buf),
-        // }
-    }
 }
 
 impl Message {

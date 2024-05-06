@@ -42,13 +42,6 @@ impl From<LocationLink> for TreeEvent {
 }
 
 #[derive(Debug, Clone)]
-pub enum FooterEvent {
-    Message(String),
-    Error(String),
-    Success(String),
-}
-
-#[derive(Debug, Clone)]
 pub enum WorkspaceEvent {
     PopupAccess,
     ReplaceNextSelect {

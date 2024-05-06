@@ -22,10 +22,10 @@ use crate::{
 pub use clipboard::Clipboard;
 use controls::map_term;
 use crossterm::event::{KeyEvent, MouseEvent};
-pub use events::{FooterEvent, TreeEvent, WorkspaceEvent};
+pub use events::{TreeEvent, WorkspaceEvent};
 use std::path::PathBuf;
 
-use self::draw::Components;
+use self::{draw::Components, message::Messages};
 
 const INSERT_SPAN: &'static str = "  --INSERT--   ";
 const SELECT_SPAN: &'static str = "  --SELECT--   ";
@@ -58,7 +58,6 @@ pub struct GlobalState {
     pub theme: UITheme,
     pub writer: Backend,
     pub popup: Option<Box<dyn PopupInterface>>,
-    pub footer: Vec<FooterEvent>,
     pub workspace: Vec<WorkspaceEvent>,
     pub tree: Vec<TreeEvent>,
     pub clipboard: Clipboard,
@@ -68,6 +67,7 @@ pub struct GlobalState {
     pub tab_area: Rect,
     pub editor_area: Rect,
     pub footer_area: Rect,
+    message: Messages,
     components: Components,
 }
 
@@ -82,7 +82,6 @@ impl GlobalState {
             theme: UITheme::new().unwrap_or_default(),
             writer: backend,
             popup: None,
-            footer: Vec::default(),
             workspace: Vec::default(),
             tree: Vec::default(),
             clipboard: Clipboard::default(),
@@ -92,6 +91,7 @@ impl GlobalState {
             tab_area: Rect::default(),
             editor_area: Rect::default(),
             footer_area: Rect::default(),
+            message: Messages::new(),
             components: Components::default(),
         };
         new.recalc_draw_size();
@@ -103,13 +103,13 @@ impl GlobalState {
         if let Some(mut line) = self.footer_area.get_line(0) {
             line += INSERT_SPAN.len();
             self.writer.set_style(self.theme.accent_style)?;
-            {
-                let mut rev_builder = line.unsafe_builder_rev(&mut self.writer)?;
-                if select_len != 0 {
-                    rev_builder.push(&format!(" ({select_len} selected)"))?;
-                }
-                rev_builder.push(&format!("Doc Len {len}, Ln {}, Col {}", cursor.line + 1, cursor.char + 1))?;
+            let mut rev_builder = line.unsafe_builder_rev(&mut self.writer)?;
+            if select_len != 0 {
+                rev_builder.push(&format!(" ({select_len} selected)"))?;
             }
+            rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {}", cursor.line + 1, cursor.char + 1))?;
+            self.message.line = rev_builder.to_line();
+            self.message.render(self.theme.accent_style, &mut self.writer)?;
             self.writer.reset_style()?;
         }
         Ok(())
@@ -260,16 +260,17 @@ impl GlobalState {
         }
     }
 
+    #[inline]
     pub fn message(&mut self, msg: impl Into<String>) {
-        self.footer.push(FooterEvent::Message(msg.into()));
+        self.message.message(msg.into());
     }
 
     pub fn error(&mut self, msg: impl Into<String>) {
-        self.footer.push(FooterEvent::Error(msg.into()));
+        self.message.error(msg.into());
     }
 
     pub fn success(&mut self, msg: impl Into<String>) {
-        self.footer.push(FooterEvent::Success(msg.into()));
+        self.message.success(msg.into());
     }
 
     pub fn full_resize(&mut self, height: u16, width: u16, workspace: &mut Workspace) {
@@ -281,6 +282,10 @@ impl GlobalState {
     pub fn recalc_draw_size(&mut self) {
         self.tree_area = self.screen_rect.clone();
         self.footer_area = self.tree_area.splitoff_rows(1);
+        if let Some(mut line) = self.footer_area.get_line(0) {
+            line += SELECT_SPAN.len();
+            self.message.line = line;
+        };
         if matches!(self.mode, Mode::Select) || self.components.contains(Components::TREE) {
             self.tab_area = self.tree_area.keep_col((self.tree_size * self.screen_rect.width) / 100);
             let _ = self.tree_area.top_border().right_border().draw_borders(
@@ -370,7 +375,7 @@ impl GlobalState {
                 }
                 TreeEvent::RenameFile(name) => {
                     if let Err(error) = tree.rename_file(name) {
-                        // footer.error(error.to_string());
+                        self.message.error(error.to_string())
                     };
                     self.clear_popup();
                 }
@@ -470,8 +475,8 @@ impl GlobalState {
                 }
             }
         }
-        for event in self.footer.drain(..) {
-            // event.map(footer);
+        if matches!(self.mode, Mode::Select) {
+            self.message.render(self.theme.accent_style, &mut self.writer).unwrap();
         }
         self.exit
     }
