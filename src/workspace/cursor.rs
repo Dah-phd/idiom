@@ -16,10 +16,6 @@ pub struct Cursor {
 }
 
 impl Cursor {
-    pub fn terminal_cursor_pos(&self, area: ratatui::layout::Rect, offset: usize) -> (u16, u16) {
-        (area.x + (self.char + offset) as u16, area.y + (self.line - self.at_line) as u16)
-    }
-
     pub fn set_cursor_checked_with_select(&mut self, position: CursorPosition, content: &[impl EditorLine]) {
         self.set_cursor_checked(position, content);
         self.init_select();

@@ -3,7 +3,7 @@ use bitflags::bitflags;
 use std::{
     cmp::Ordering,
     io::{Result, Write},
-    ops::Range,
+    ops::{AddAssign, Range, SubAssign},
 };
 
 pub const BORDERS: BorderSet = BorderSet {
@@ -385,6 +385,22 @@ impl Line {
         if text.len() > self.width {
             text = unsafe { text.get_unchecked(..self.width) };
         }
+        backend.print_styled_at(self.row, self.col, format!("{text:>width$}", width = self.width), style)
+    }
+
+    #[inline]
+    pub fn render_left(self, mut text: &str, backend: &mut Backend) -> std::io::Result<()> {
+        if text.len() > self.width {
+            text = unsafe { text.get_unchecked(..self.width) };
+        }
+        backend.print_at(self.row, self.col, format!("{text:>width$}", width = self.width))
+    }
+
+    #[inline]
+    pub fn render_left_styled(self, mut text: &str, style: Style, backend: &mut Backend) -> std::io::Result<()> {
+        if text.len() > self.width {
+            text = unsafe { text.get_unchecked(..self.width) };
+        }
         backend.print_styled_at(self.row, self.col, format!("{text:^width$}", width = self.width), style)
     }
 
@@ -415,11 +431,56 @@ impl Line {
         }
     }
 
-    /// creates line builder from Line push/push_styled can be used to add to line
+    /// creates line builder from Line
+    /// push/push_styled can be used to add to line
     /// on drop pads the line to end
     #[inline]
     pub fn unsafe_builder<'a>(self, backend: &'a mut Backend) -> std::io::Result<LineBuilder<'a>> {
         backend.go_to(self.row, self.col).map(|_| LineBuilder { remaining: self.width, backend })
+    }
+
+    /// creates reverse builder from Line
+    /// push/push_styled can be used to add to line
+    /// on drop pads the line to end
+    #[inline]
+    pub fn unsafe_builder_rev<'a>(self, backend: &'a mut Backend) -> std::io::Result<LineBuilderRev<'a>> {
+        let remaining = self.width;
+        let col = self.col;
+        let row = self.row;
+        self.render_empty(backend)?;
+        Ok(LineBuilderRev { remaining, backend, row, col })
+    }
+}
+
+impl AddAssign<usize> for Line {
+    fn add_assign(&mut self, rhs: usize) {
+        let offset = std::cmp::min(rhs, self.width);
+        self.width -= offset;
+        self.col += offset as u16;
+    }
+}
+
+impl AddAssign<u16> for Line {
+    fn add_assign(&mut self, rhs: u16) {
+        let offset = std::cmp::min(rhs, self.width as u16);
+        self.width -= offset as usize;
+        self.col += offset;
+    }
+}
+
+impl SubAssign<usize> for Line {
+    fn sub_assign(&mut self, rhs: usize) {
+        let offset = std::cmp::min(rhs, self.col as usize);
+        self.width += offset;
+        self.col -= offset as u16;
+    }
+}
+
+impl SubAssign<u16> for Line {
+    fn sub_assign(&mut self, rhs: u16) {
+        let offset = std::cmp::min(rhs, self.col);
+        self.width += offset as usize;
+        self.col -= offset;
     }
 }
 
@@ -455,6 +516,54 @@ impl<'a> LineBuilder<'a> {
 }
 
 impl Drop for LineBuilder<'_> {
+    /// ensure line is rendered and padded till end;
+    fn drop(&mut self) {
+        if self.remaining != 0 {
+            self.push(format!("{:width$}", "", width = self.remaining).as_str()).unwrap();
+        }
+        self.backend.flush().unwrap();
+    }
+}
+
+pub struct LineBuilderRev<'a> {
+    row: u16,
+    col: u16,
+    remaining: usize,
+    backend: &'a mut Backend,
+}
+
+impl<'a> LineBuilderRev<'a> {
+    /// returns Ok(bool) -> if true line is not full, false the line is finished
+    pub fn push(&mut self, text: &str) -> std::io::Result<bool> {
+        if text.len() > self.remaining {
+            self.backend.print_at(self.row, self.col, unsafe { text.get_unchecked(text.len() - self.remaining..) })?;
+            self.remaining = 0;
+            return Ok(false);
+        }
+        self.remaining -= text.len();
+        self.backend.print_at(self.row, self.col + self.remaining as u16, text)?;
+        Ok(true)
+    }
+
+    /// push with style
+    pub fn push_styled(&mut self, text: &str, style: Style) -> std::io::Result<bool> {
+        if text.len() > self.remaining {
+            self.backend.print_styled_at(
+                self.row,
+                self.col,
+                unsafe { text.get_unchecked(text.len() - self.remaining..) },
+                style,
+            )?;
+            self.remaining = 0;
+            return Ok(false);
+        }
+        self.remaining -= text.len();
+        self.backend.print_styled_at(self.row, self.col + self.remaining as u16, text, style)?;
+        Ok(true)
+    }
+}
+
+impl Drop for LineBuilderRev<'_> {
     /// ensure line is rendered and padded till end;
     fn drop(&mut self) {
         if self.remaining != 0 {

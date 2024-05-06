@@ -2,14 +2,10 @@ use crate::{
     global_state::GlobalState,
     render::{
         backend::{color, Backend, Color, Style},
-        layout::{Line, Rect, RectIter},
+        layout::{Line, RectIter},
     },
     syntax::{DiagnosticLine, Lang, Lexer, Token},
-    workspace::{
-        cursor::{self, Cursor},
-        line::EditorLine,
-        CursorPosition,
-    },
+    workspace::{cursor::Cursor, line::EditorLine, CursorPosition},
 };
 use std::{
     cmp::Ordering,

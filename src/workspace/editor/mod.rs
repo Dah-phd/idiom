@@ -70,6 +70,7 @@ impl Editor {
         for line in area {
             line.render_empty(&mut gs.writer)?;
         }
+        gs.render_stats(self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into())?;
         ctx.render_cursor(gs)
     }
 
@@ -90,6 +91,7 @@ impl Editor {
         for line in area {
             line.render_empty(&mut gs.writer)?;
         }
+        gs.render_stats(self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into())?;
         ctx.render_cursor(gs)
     }
 

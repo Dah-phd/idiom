@@ -17,7 +17,7 @@ use crate::{
     },
     runner::EditorTerminal,
     tree::Tree,
-    workspace::Workspace,
+    workspace::{CursorPosition, Workspace},
 };
 pub use clipboard::Clipboard;
 use controls::map_term;
@@ -99,6 +99,22 @@ impl GlobalState {
         Ok(new)
     }
 
+    pub fn render_stats(&mut self, len: usize, select_len: usize, cursor: CursorPosition) -> std::io::Result<()> {
+        if let Some(mut line) = self.footer_area.get_line(0) {
+            line += INSERT_SPAN.len();
+            self.writer.set_style(self.theme.accent_style)?;
+            {
+                let mut rev_builder = line.unsafe_builder_rev(&mut self.writer)?;
+                if select_len != 0 {
+                    rev_builder.push(&format!(" ({select_len} selected)"))?;
+                }
+                rev_builder.push(&format!("Doc Len {len}, Ln {}, Col {}", cursor.line + 1, cursor.char + 1))?;
+            }
+            self.writer.reset_style()?;
+        }
+        Ok(())
+    }
+
     pub fn map_key(
         &mut self,
         event: &KeyEvent,
@@ -119,14 +135,13 @@ impl GlobalState {
         if !self.components.contains(Components::TREE) {
             self.recalc_draw_size();
         };
-        if let Some(mut line) = self.footer_area.get_line(0) {
-            let _ = self.writer.save_cursor();
+        if let Some(line) = self.footer_area.get_line(0) {
+            self.writer.save_cursor().unwrap();
             let mut style = self.theme.accent_style;
-            line.width = SELECT_SPAN.len();
             style.set_fg(Some(color::cyan()));
             style.add_bold();
-            let _ = line.render_styled(SELECT_SPAN, style, &mut self.writer);
-            let _ = self.writer.restore_cursor();
+            line.render_styled(SELECT_SPAN, style, &mut self.writer).unwrap();
+            self.writer.restore_cursor().unwrap();
         };
     }
 
@@ -136,14 +151,13 @@ impl GlobalState {
         if !self.components.contains(Components::TREE) {
             self.recalc_draw_size();
         };
-        if let Some(mut line) = self.footer_area.get_line(0) {
-            let _ = self.writer.save_cursor();
+        if let Some(line) = self.footer_area.get_line(0) {
+            self.writer.save_cursor().unwrap();
             let mut style = self.theme.accent_style;
-            line.width = INSERT_SPAN.len();
             style.set_fg(Some(color::rgb(255, 0, 0)));
             style.add_bold();
-            let _ = line.render_styled(INSERT_SPAN, style, &mut self.writer);
-            let _ = self.writer.restore_cursor();
+            line.render_styled(INSERT_SPAN, style, &mut self.writer).unwrap();
+            self.writer.restore_cursor().unwrap();
         };
     }
 
@@ -198,11 +212,9 @@ impl GlobalState {
             match self.mode {
                 Mode::Select => {
                     self.key_mapper = controls::map_tree;
-                    // self.mode_span.style = SELECT_STYLE;
                 }
                 Mode::Insert => {
                     self.key_mapper = controls::map_editor;
-                    // self.mode_span.style = INSERT_STYLE;
                 }
             }
             self.mouse_mapper = controls::mouse_handler;
@@ -211,7 +223,6 @@ impl GlobalState {
             runner.activate();
             self.key_mapper = map_term;
             self.mouse_mapper = controls::disable_mouse;
-            // self.mode_span.style = MUTED_STYLE;
         }
     }
 

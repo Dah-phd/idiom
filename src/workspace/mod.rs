@@ -109,7 +109,7 @@ impl Workspace {
             let editor = self.editors.remove(idx);
             gs.tree.push(TreeEvent::SelectPath(editor.path.clone()));
             self.editors.insert(0, editor);
-            self.render(gs);
+            self.render(gs).expect("Failed to render on Editor tab activation");
         }
     }
 

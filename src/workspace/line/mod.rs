@@ -3,10 +3,9 @@ use crate::{
     global_state::GlobalState,
     render::{
         backend::Backend,
-        layout::{Line, Rect, RectIter},
+        layout::{Line, RectIter},
     },
     syntax::{DiagnosticInfo, DiagnosticLine, Lang, Lexer, Token},
-    workspace::cursor::Cursor,
 };
 pub use code::{CodeLine, CodeLineContext};
 use std::{
