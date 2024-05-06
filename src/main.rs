@@ -1,6 +1,5 @@
 mod app;
 mod configs;
-mod footer;
 mod global_state;
 mod lsp;
 mod popups;

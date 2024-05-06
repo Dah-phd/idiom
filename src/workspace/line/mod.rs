@@ -16,8 +16,6 @@ use std::{
     str::{CharIndices, Chars, MatchIndices},
 };
 
-use super::cursor::Cursor;
-
 type LineWidth = usize;
 
 pub trait EditorLine:
@@ -70,5 +68,5 @@ pub trait Context {
     fn get_select(&mut self) -> Option<Range<usize>>;
     fn lexer(&self) -> &Lexer;
     fn count_skipped_to_cursor(&mut self, wrap_len: usize, remaining_lines: usize) -> usize;
-    fn render_cursor(self, area: Rect, gs: &mut GlobalState, cursor: &Cursor) -> Result<()>;
+    fn render_cursor(self, area: Rect, gs: &mut GlobalState) -> Result<()>;
 }

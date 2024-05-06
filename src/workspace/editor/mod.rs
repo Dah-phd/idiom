@@ -67,7 +67,10 @@ impl Editor {
                 break;
             };
         }
-        ctx.render_cursor(gs.editor_area, gs, &self.cursor)
+        for line in area {
+            line.render_empty(&mut gs.writer)?;
+        }
+        ctx.render_cursor(gs.editor_area, gs)
     }
 
     pub fn fast_render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
@@ -84,7 +87,10 @@ impl Editor {
                 break;
             };
         }
-        ctx.render_cursor(gs.editor_area, gs, &self.cursor)
+        for line in area {
+            line.render_empty(&mut gs.writer)?;
+        }
+        ctx.render_cursor(gs.editor_area, gs)
     }
 
     #[inline]

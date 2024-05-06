@@ -7,14 +7,10 @@ use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
     global_state::{GlobalState, TreeEvent},
     lsp::LSP,
+    render::backend::{color, Style},
 };
 use anyhow::Result;
-use crossterm::{
-    cursor::MoveTo,
-    event::KeyEvent,
-    queue,
-    style::{PrintStyledContent, Stylize},
-};
+use crossterm::event::KeyEvent;
 pub use cursor::CursorPosition;
 pub use editor::{DocStats, Editor};
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
@@ -23,12 +19,11 @@ use std::{
     path::PathBuf,
 };
 
-// const TAB_HIGHTLIGHT: Style = Style::new().fg(Color::Yellow).add_modifier(Modifier::UNDERLINED);
-
 pub struct Workspace {
     pub editors: Vec<Editor>,
     base_config: EditorConfigs,
     key_map: EditorKeyMap,
+    tab_style: Style,
     lsp_servers: HashMap<FileType, LSP>,
     map_callback: fn(&mut Self, &KeyEvent, &mut GlobalState) -> bool,
 }
@@ -44,22 +39,34 @@ impl Workspace {
                 lsp_servers.insert(ft, lsp);
             };
         }
-        Self { editors: Vec::default(), base_config, key_map, lsp_servers, map_callback: map_editor }
+        let tab_style = Style::fg(color::dark_yellow());
+        Self { editors: Vec::default(), base_config, key_map, lsp_servers, map_callback: map_editor, tab_style }
     }
 
     pub fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
         if let Some(editor) = self.editors.get_mut(0) {
+            let line = match gs.tab_area.into_iter().next() {
+                Some(line) => line,
+                None => return Ok(()),
+            };
             gs.writer.save_cursor()?;
-            let mut tabs = editor.display.to_owned();
-            for editor in self.editors.iter().skip(1) {
-                tabs.push_str(" | ");
-                tabs.push_str(&editor.display);
+            gs.writer.set_style(Style::underlined(None))?;
+            {
+                let mut builder = line.unsafe_builder(&mut gs.writer)?;
+                builder.push_styled(&editor.display, self.tab_style)?;
+                for editor in self.editors.iter().skip(1) {
+                    if !builder.push(" | ")? || builder.push(&editor.display)? {
+                        break;
+                    };
+                }
             }
-            tabs.truncate(gs.tab_area.width);
-            queue!(&mut gs.writer, MoveTo(gs.tab_area.col, gs.tab_area.row), PrintStyledContent(tabs.underlined()),)?;
+            gs.writer.reset_style()?;
             gs.writer.restore_cursor()
         } else {
-            Ok(())
+            match gs.tab_area.into_iter().next() {
+                Some(line) => line.render_empty(&mut gs.writer),
+                None => Ok(()),
+            }
         }
     }
 
@@ -69,12 +76,12 @@ impl Workspace {
 
     pub fn toggle_tabs(&mut self) {
         self.map_callback = map_tabs;
-        // self.tab_style = REVERSED;
+        self.tab_style = Style::reversed();
     }
 
     pub fn toggle_editor(&mut self) {
         self.map_callback = map_editor;
-        // self.tab_style = UNDERLINED;
+        self.tab_style = Style::fg(color::dark_yellow());
     }
 
     pub fn resize_render(&mut self, width: usize, height: usize) {
@@ -97,13 +104,12 @@ impl Workspace {
         self.editors.first_mut()
     }
 
-    pub fn activate_editor(&mut self, idx: usize, gs: Option<&mut GlobalState>) {
+    pub fn activate_editor(&mut self, idx: usize, gs: &mut GlobalState) {
         if idx < self.editors.len() {
             let editor = self.editors.remove(idx);
-            if let Some(state) = gs {
-                state.tree.push(TreeEvent::SelectPath(editor.path.clone()));
-            }
+            gs.tree.push(TreeEvent::SelectPath(editor.path.clone()));
             self.editors.insert(0, editor);
+            self.render(gs);
         }
     }
 
@@ -312,6 +318,7 @@ impl Workspace {
             let _ = client.file_did_close(&editor.path);
         }
         if self.editors.is_empty() {
+            let _ = gs.editor_area.clear(&mut gs.writer);
             gs.select_mode();
         }
     }

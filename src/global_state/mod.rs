@@ -3,10 +3,10 @@ mod clipboard;
 mod controls;
 mod draw;
 mod events;
+mod message;
 
 use crate::{
     configs::UITheme,
-    footer::Footer,
     popups::{
         popup_replace::ReplacePopup, popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges,
         PopupInterface,
@@ -52,7 +52,7 @@ type MouseMapCallback = fn(&mut GlobalState, MouseEvent, &mut Tree, &mut Workspa
 
 pub struct GlobalState {
     mode: Mode,
-    tree_size: u16,
+    tree_size: usize,
     key_mapper: KeyMapCallback,
     mouse_mapper: MouseMapCallback,
     pub theme: UITheme,
@@ -156,18 +156,15 @@ impl GlobalState {
         self.key_mapper = controls::map_popup;
         self.mouse_mapper = controls::disable_mouse;
         self.popup.replace(popup);
-        // self.mode_span.style = MUTED_STYLE;
     }
 
     pub fn clear_popup(&mut self) -> Option<Box<dyn PopupInterface>> {
         match self.mode {
             Mode::Select => {
                 self.key_mapper = controls::map_tree;
-                // self.mode_span.style = SELECT_STYLE;
             }
             Mode::Insert => {
                 self.key_mapper = controls::map_editor;
-                // self.mode_span.style = INSERT_STYLE;
             }
         }
         self.components.remove(Components::POPUP);
@@ -274,7 +271,7 @@ impl GlobalState {
         self.tree_area = self.screen_rect.clone();
         self.footer_area = self.tree_area.splitoff_rows(1);
         if matches!(self.mode, Mode::Select) || self.components.contains(Components::TREE) {
-            self.tab_area = self.tree_area.keep_col(35);
+            self.tab_area = self.tree_area.keep_col((self.tree_size * self.screen_rect.width) / 100);
             let _ = self.tree_area.top_border().right_border().draw_borders(
                 Some(DOUBLE_BORDERS),
                 color::dark_grey(),
@@ -306,12 +303,7 @@ impl GlobalState {
         true
     }
 
-    pub async fn exchange_should_exit(
-        &mut self,
-        tree: &mut Tree,
-        workspace: &mut Workspace,
-        footer: &mut Footer,
-    ) -> bool {
+    pub async fn exchange_should_exit(&mut self, tree: &mut Tree, workspace: &mut Workspace) -> bool {
         tree.finish_sync(self).await;
         for event in std::mem::take(&mut self.tree) {
             match event {
@@ -367,7 +359,7 @@ impl GlobalState {
                 }
                 TreeEvent::RenameFile(name) => {
                     if let Err(error) = tree.rename_file(name) {
-                        footer.error(error.to_string());
+                        // footer.error(error.to_string());
                     };
                     self.clear_popup();
                 }
@@ -414,7 +406,7 @@ impl GlobalState {
                     }
                 }
                 WorkspaceEvent::ActivateEditor(idx) => {
-                    workspace.activate_editor(idx, Some(self));
+                    workspace.activate_editor(idx, self);
                     self.clear_popup();
                     self.insert_mode();
                 }
@@ -468,11 +460,8 @@ impl GlobalState {
             }
         }
         for event in self.footer.drain(..) {
-            event.map(footer);
+            // event.map(footer);
         }
         self.exit
     }
 }
-
-// #[cfg(test)]
-// pub mod test;

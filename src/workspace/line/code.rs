@@ -305,9 +305,13 @@ impl EditorLine for CodeLine {
         lines: &mut RectIter,
         backend: &mut Backend,
     ) -> std::io::Result<()> {
+        let wrap_len = match lines.next() {
+            Some(line) => ctx.setup_line(line, backend)?,
+            None => return Ok(()),
+        };
         match ctx.get_select() {
-            Some(select) => wrapped_line_select(&self.content, &self.tokens, ctx, lines, select, backend),
-            None => wrapped_line(&self.content, &self.tokens, ctx, lines, backend),
+            Some(select) => wrapped_line_select(&self.content, &self.tokens, ctx, wrap_len, lines, select, backend),
+            None => wrapped_line(&self.content, &self.tokens, ctx, wrap_len, lines, backend),
         }?;
         backend.reset_style()?;
         backend.flush()
@@ -435,62 +439,72 @@ fn wrapped_line_select(
     content: &str,
     tokens: &[Token],
     ctx: &mut impl Context,
+    wrap_len: usize,
     lines: &mut RectIter,
     select: Range<usize>,
     backend: &mut Backend,
 ) -> std::io::Result<()> {
-    let wrap_len = lines.width() - (ctx.lexer().line_number_offset + 2);
     let wrap_number = format!("{:.<1$} ", "", ctx.lexer().line_number_offset);
-    match lines.next() {
-        Some(line) => ctx.setup_line(line, backend)?,
-        None => return Ok(()),
-    };
     let skip_lines = ctx.count_skipped_to_cursor(wrap_len, lines.len());
     if skip_lines != 0 {
         let mut wrap_text = format!("..{skip_lines} hidden wrapped lines");
         wrap_text.truncate(wrap_len);
         backend.print_styled(wrap_text, Style::reversed())?;
+        let line_end = wrap_len * skip_lines;
+        let mut tokens = tokens.into_iter().skip_while(|token| token.to < line_end).peekable();
+        if let Some(token) = tokens.peek() {
+            if token.from < line_end {
+                backend.set_style(token.style)?;
+            }
+        };
+        let reset_style = if select.start < line_end && select.end > line_end {
+            backend.set_bg(Some(ctx.lexer().theme.selected))?;
+            Style::bg(ctx.lexer().theme.selected)
+        } else {
+            Style::default()
+        };
         wrapping_loop_select(
             content.char_indices().skip(skip_lines * wrap_len),
             backend,
             tokens,
             &wrap_number,
-            wrap_len * (skip_lines + 1),
+            line_end,
             wrap_len,
             select,
             ctx.lexer().theme.selected,
             lines,
+            reset_style,
         )
     } else {
         wrapping_loop_select(
             content.char_indices(),
             backend,
-            tokens,
+            tokens.into_iter(),
             &wrap_number,
             wrap_len,
             wrap_len,
             select,
             ctx.lexer().theme.selected,
             lines,
+            Style::default(),
         )
     }
 }
 
 #[inline(always)]
-fn wrapping_loop_select(
+fn wrapping_loop_select<'a>(
     content: impl Iterator<Item = (usize, char)>,
     backend: &mut Backend,
-    tokens: &[Token],
+    mut tokens: impl Iterator<Item = &'a Token>,
     wrap_number: &str,
     mut line_end: usize,
     wrap_len: usize,
     select: Range<usize>,
     select_color: Color,
     lines: &mut RectIter,
+    mut reset_style: Style,
 ) -> std::io::Result<()> {
-    let mut iter_tokens = tokens.into_iter();
-    let mut maybe_token = iter_tokens.next();
-    let mut reset_style = Style::default();
+    let mut maybe_token = tokens.next();
     for (idx, text) in content {
         if select.start == idx {
             reset_style.set_bg(Some(select_color));
@@ -513,7 +527,7 @@ fn wrapping_loop_select(
             if token.from == idx {
                 backend.update_style(token.style)?;
             } else if token.to == idx {
-                if let Some(token) = iter_tokens.next() {
+                if let Some(token) = tokens.next() {
                     if token.from == idx {
                         backend.update_style(token.style)?;
                     } else {
@@ -531,18 +545,61 @@ fn wrapping_loop_select(
     Ok(())
 }
 
+#[inline]
+fn wrapped_line(
+    content: &str,
+    tokens: &[Token],
+    ctx: &mut impl Context,
+    wrap_len: usize,
+    lines: &mut RectIter,
+    backend: &mut Backend,
+) -> std::io::Result<()> {
+    let wrap_number = format!("{:.<1$} ", "", ctx.lexer().line_number_offset);
+    let skip_lines = ctx.count_skipped_to_cursor(wrap_len, lines.len());
+    if skip_lines != 0 {
+        let mut wrap_text = format!("..{skip_lines} hidden wrapped lines");
+        wrap_text.truncate(wrap_len);
+        backend.print_styled(wrap_text, Style::reversed())?;
+        let line_end = wrap_len * skip_lines;
+        let mut tokens = tokens.into_iter().skip_while(|token| token.to < line_end).peekable();
+        if let Some(token) = tokens.peek() {
+            if token.from < line_end {
+                backend.set_style(token.style)?;
+            }
+        };
+        wrapping_loop(
+            content.char_indices().skip(skip_lines * wrap_len),
+            backend,
+            tokens,
+            &wrap_number,
+            line_end,
+            wrap_len,
+            lines,
+        )
+    } else {
+        wrapping_loop(
+            content.char_indices(),
+            backend,
+            tokens.into_iter(),
+            &wrap_number,
+            wrap_len, // postion char where line ends
+            wrap_len,
+            lines,
+        )
+    }
+}
+
 #[inline(always)]
-fn wrapping_loop(
+fn wrapping_loop<'a>(
     content: impl Iterator<Item = (usize, char)>,
     backend: &mut Backend,
-    tokens: &[Token],
+    mut tokens: impl Iterator<Item = &'a Token>,
     wrap_number: &str,
     mut line_end: usize,
     wrap_len: usize,
     lines: &mut RectIter,
 ) -> std::io::Result<()> {
-    let mut iter_tokens = tokens.into_iter();
-    let mut maybe_token = iter_tokens.next();
+    let mut maybe_token = tokens.next();
     for (idx, text) in content {
         if line_end == idx {
             let line = match lines.next() {
@@ -556,7 +613,7 @@ fn wrapping_loop(
         if let Some(token) = maybe_token {
             if token.to == idx {
                 backend.reset_style()?;
-                maybe_token = iter_tokens.next();
+                maybe_token = tokens.next();
             };
         }
         if let Some(token) = maybe_token {
@@ -567,45 +624,6 @@ fn wrapping_loop(
         backend.print(text)?;
     }
     Ok(())
-}
-
-#[inline]
-fn wrapped_line(
-    content: &str,
-    tokens: &[Token],
-    ctx: &mut impl Context,
-    lines: &mut RectIter,
-    backend: &mut Backend,
-) -> std::io::Result<()> {
-    let wrap_len = lines.width() - (ctx.lexer().line_number_offset + 1);
-    let wrap_number = format!("{:.<1$} ", "", ctx.lexer().line_number_offset);
-    match lines.next() {
-        Some(line) => ctx.setup_line(line, backend)?,
-        None => return Ok(()),
-    };
-    let skip_lines = ctx.count_skipped_to_cursor(wrap_len, lines.len());
-    if skip_lines != 0 {
-        backend.print_styled(format!("..{skip_lines} hidden wrapped lines"), Style::reversed())?;
-        wrapping_loop(
-            content.char_indices().take(skip_lines + wrap_len),
-            backend,
-            tokens,
-            &wrap_number,
-            wrap_len * skip_lines,
-            wrap_len,
-            lines,
-        )
-    } else {
-        wrapping_loop(
-            content.char_indices(),
-            backend,
-            tokens,
-            &wrap_number,
-            wrap_len, // postion char where line ends
-            wrap_len,
-            lines,
-        )
-    }
 }
 
 pub struct CodeLineContext<'a> {
@@ -657,11 +675,10 @@ impl<'a> Context for CodeLineContext<'a> {
     }
 
     #[inline]
-    fn render_cursor(self, area: Rect, gs: &mut GlobalState, cursor: &Cursor) -> std::io::Result<()> {
-        // !TODO currently modal is being rendered by CTX this should not be the case, potential solution is to move modal in editor (double ref of Lexer)
-        self.lexer.render_modal_if_exist(cursor, gs);
+    fn render_cursor(self, area: Rect, gs: &mut GlobalState) -> std::io::Result<()> {
         let row = area.row + self.line as u16;
         let col = area.col + (self.char + self.lexer.line_number_offset + 1) as u16;
+        self.lexer.render_modal_if_exist(row, col, gs);
         gs.writer.render_cursor_at(row, col)
     }
 }

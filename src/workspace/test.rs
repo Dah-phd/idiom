@@ -2,7 +2,7 @@ use super::{editor::Editor, map_editor, Workspace};
 use crate::{
     configs::{test::mock_editor_key_map, EditorConfigs},
     global_state::GlobalState,
-    render::backend::Backend,
+    render::backend::{Backend, Style},
     workspace::{
         editor::test::{mock_editor, pull_line, select_eq},
         CursorPosition,
@@ -18,6 +18,7 @@ pub fn mock_ws(content: Vec<String>) -> Workspace {
         key_map: mock_editor_key_map(),
         lsp_servers: HashMap::default(),
         map_callback: map_editor,
+        tab_style: Style::default(),
     };
     ws.resize_render(60, 90);
     ws

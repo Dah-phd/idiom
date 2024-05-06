@@ -134,7 +134,7 @@ impl Style {
             background_color: None,
             foreground_color: None,
             underline_color: color,
-            attributes: Attribute::Undercurled.into(),
+            attributes: Attribute::Underlined.into(),
         })
     }
 }

@@ -88,7 +88,7 @@ impl Rect {
     #[inline]
     pub fn modal_relative(&self, row_offset: u16, col_offset: u16, mut width: usize, mut height: u16) -> Self {
         let mut row = self.row + row_offset + 1; // goes to the row below it
-        let mut col = self.col + col_offset + 1; // goes behind col
+        let mut col = self.col + col_offset; // goes behind col
         if self.height + self.row < height + row {
             if self.height > 3 + row {
                 height = self.height - row;

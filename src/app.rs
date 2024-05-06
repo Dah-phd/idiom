@@ -1,6 +1,5 @@
 use crate::{
     configs::{GeneralAction, KeyMap},
-    footer::Footer,
     global_state::GlobalState,
     popups::{
         popup_find::{FindPopup, GoToLinePopup},
@@ -27,7 +26,6 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> Result<()> {
     let mut tree = Tree::new(configs.tree_key_map());
     let mut workspace = Workspace::new(configs.editor_key_map(), tree.get_base_file_names(), &mut gs).await;
     let mut term = EditorTerminal::new(gs.editor_area.width as u16);
-    let mut footer = Footer::new(&mut gs);
 
     // CLI SETUP
     if let Some(path) = open_file {
@@ -103,7 +101,6 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> Result<()> {
                             gs.toggle_tree();
                         }
                         GeneralAction::RefreshSettings => {
-                            gs.unwrap_default_result(footer.reset_cfg(), "theme_ui.josn: ");
                             let new_key_map = gs.unwrap_default_result(KeyMap::new(), ".keys: ");
                             general_key_map = new_key_map.general_key_map();
                             tree.key_map = new_key_map.tree_key_map();
@@ -128,7 +125,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> Result<()> {
             }
         }
 
-        if gs.exchange_should_exit(&mut tree, &mut workspace, &mut footer).await {
+        if gs.exchange_should_exit(&mut tree, &mut workspace).await {
             workspace.graceful_exit().await;
             break;
         };

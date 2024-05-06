@@ -10,7 +10,7 @@ use crate::{
     global_state::{GlobalState, WorkspaceEvent},
     lsp::LSPClient,
     popups::popups_tree::refrence_selector,
-    workspace::{actions::EditMetaData, cursor::Cursor, line::EditorLine, CursorPosition},
+    workspace::{actions::EditMetaData, line::EditorLine, CursorPosition},
 };
 use crossterm::event::KeyEvent;
 pub use diagnostics::{set_diganostics, Action, DiagnosticInfo, DiagnosticLine};
@@ -89,15 +89,20 @@ impl Lexer {
                                 gs.workspace.push(workspace_edit.into());
                             }
                             LSPResult::Tokens(tokens) => {
-                                if let SemanticTokensResult::Tokens(data) = tokens {
-                                    if !data.data.is_empty() {
+                                match tokens {
+                                    SemanticTokensResult::Partial(data) => {
                                         set_tokens(data.data, &self.legend, &self.lang, &self.theme, content);
-                                        self.token_producer = TokensType::LSP;
-                                        gs.success("LSP tokens mapped!");
-                                    } else if let Some(id) = client.request_full_tokens(&self.path) {
-                                        unresolved_requests.push(LSPResponseType::Tokens(id));
-                                    };
-                                }
+                                    }
+                                    SemanticTokensResult::Tokens(data) => {
+                                        if !data.data.is_empty() {
+                                            set_tokens(data.data, &self.legend, &self.lang, &self.theme, content);
+                                            self.token_producer = TokensType::LSP;
+                                            gs.success("LSP tokens mapped!");
+                                        } else if let Some(id) = client.request_full_tokens(&self.path) {
+                                            unresolved_requests.push(LSPResponseType::Tokens(id));
+                                        };
+                                    }
+                                };
                             }
                             LSPResult::TokensPartial(tokens) => {
                                 let tokens = match tokens {
@@ -154,11 +159,10 @@ impl Lexer {
     #[inline]
     pub fn render_modal_if_exist(
         &mut self,
-        cursor: &Cursor,
+        row: u16,
+        col: u16,
         gs: &mut GlobalState,
     ) -> Option<crate::render::layout::Rect> {
-        let col = cursor.char + self.line_number_offset;
-        let row = cursor.line;
         self.modal.as_mut().and_then(|modal| modal.render_at(col as u16, row as u16, gs))
     }
 
