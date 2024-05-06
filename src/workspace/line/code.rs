@@ -5,7 +5,11 @@ use crate::{
         layout::{Line, Rect, RectIter},
     },
     syntax::{DiagnosticLine, Lang, Lexer, Token},
-    workspace::{cursor::Cursor, line::EditorLine, CursorPosition},
+    workspace::{
+        cursor::{self, Cursor},
+        line::EditorLine,
+        CursorPosition,
+    },
 };
 use std::{
     cmp::Ordering,
@@ -322,27 +326,6 @@ impl Into<String> for CodeLine {
     fn into(self) -> String {
         self.content
     }
-}
-
-#[inline]
-fn build_line_(content: &str, tokens: &[Token], writer: &mut Backend) -> std::io::Result<()> {
-    let mut iter_toknes = tokens.into_iter();
-    let mut maybe_token = iter_toknes.next();
-    for (idx, text) in content.char_indices() {
-        if let Some(token) = maybe_token {
-            if idx == token.to {
-                writer.reset_style()?;
-                maybe_token = iter_toknes.next();
-            }
-        }
-        if let Some(token) = maybe_token {
-            if idx == token.from {
-                writer.set_style(token.style)?;
-            }
-        }
-        writer.print(text)?;
-    }
-    Ok(())
 }
 
 #[inline]
@@ -667,7 +650,7 @@ impl<'a> Context for CodeLineContext<'a> {
 
     #[inline]
     fn count_skipped_to_cursor(&mut self, wrap_len: usize, remaining_lines: usize) -> usize {
-        let wraps = self.char / wrap_len;
+        let wraps = self.char / wrap_len + 1;
         let skip_lines = wraps.saturating_sub(remaining_lines);
         self.char = self.char % wrap_len;
         self.line += wraps.saturating_sub(skip_lines);
@@ -675,9 +658,9 @@ impl<'a> Context for CodeLineContext<'a> {
     }
 
     #[inline]
-    fn render_cursor(self, area: Rect, gs: &mut GlobalState) -> std::io::Result<()> {
-        let row = area.row + self.line as u16;
-        let col = area.col + (self.char + self.lexer.line_number_offset + 1) as u16;
+    fn render_cursor(self, gs: &mut GlobalState) -> std::io::Result<()> {
+        let row = gs.editor_area.row + self.line as u16;
+        let col = gs.editor_area.col + (self.char + self.lexer.line_number_offset + 1) as u16;
         self.lexer.render_modal_if_exist(row, col, gs);
         gs.writer.render_cursor_at(row, col)
     }

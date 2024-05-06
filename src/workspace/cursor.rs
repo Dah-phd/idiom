@@ -300,12 +300,15 @@ impl Cursor {
         }
     }
 
-    pub fn correct_cursor_position(&mut self) {
+    pub fn correct_cursor_position(&mut self, content: &[impl EditorLine]) {
         if self.line < self.at_line {
             self.at_line = self.line
         }
-        if self.line + 1 > self.max_rows + self.at_line {
-            self.at_line = self.line - self.max_rows + 1
+        if self.line + 1 >= self.max_rows + self.at_line {
+            self.at_line = self.line - self.max_rows + 1;
+            if content[self.line].len() > self.text_width {
+                self.at_line += 1;
+            }
         }
     }
 

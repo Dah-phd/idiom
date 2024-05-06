@@ -6,6 +6,7 @@ use crate::{
         layout::{Line, Rect, RectIter},
     },
     syntax::{DiagnosticInfo, DiagnosticLine, Lang, Lexer, Token},
+    workspace::cursor::Cursor,
 };
 pub use code::{CodeLine, CodeLineContext};
 use std::{
@@ -68,5 +69,5 @@ pub trait Context {
     fn get_select(&mut self) -> Option<Range<usize>>;
     fn lexer(&self) -> &Lexer;
     fn count_skipped_to_cursor(&mut self, wrap_len: usize, remaining_lines: usize) -> usize;
-    fn render_cursor(self, area: Rect, gs: &mut GlobalState) -> Result<()>;
+    fn render_cursor(self, gs: &mut GlobalState) -> Result<()>;
 }

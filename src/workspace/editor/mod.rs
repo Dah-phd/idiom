@@ -70,7 +70,7 @@ impl Editor {
         for line in area {
             line.render_empty(&mut gs.writer)?;
         }
-        ctx.render_cursor(gs.editor_area, gs)
+        ctx.render_cursor(gs)
     }
 
     pub fn fast_render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
@@ -90,14 +90,14 @@ impl Editor {
         for line in area {
             line.render_empty(&mut gs.writer)?;
         }
-        ctx.render_cursor(gs.editor_area, gs)
+        ctx.render_cursor(gs)
     }
 
     #[inline]
     pub fn sync(&mut self, gs: &mut GlobalState) {
         self.actions.sync(&mut self.lexer, &self.content);
         self.lexer.context(&mut self.content, gs);
-        self.cursor.correct_cursor_position();
+        self.cursor.correct_cursor_position(&self.content);
     }
 
     pub fn get_stats(&self) -> DocStats {
