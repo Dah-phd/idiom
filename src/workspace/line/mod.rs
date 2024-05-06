@@ -13,9 +13,10 @@ use std::{
     io::Result,
     ops::{Index, Range, RangeBounds, RangeFrom, RangeFull, RangeTo},
     slice::SliceIndex,
+    str::{CharIndices, Chars, MatchIndices},
 };
 
-use super::cursor::{self, Cursor};
+use super::cursor::Cursor;
 
 type LineWidth = usize;
 
@@ -31,17 +32,25 @@ pub trait EditorLine:
     + Display
 {
     fn insert(&mut self, idx: usize, ch: char);
-    fn as_str(&self) -> &str;
     fn push(&mut self, ch: char);
     fn insert_str(&mut self, idx: usize, string: &str);
     fn push_str(&mut self, string: &str);
+    fn push_line(&mut self, line: Self);
     fn len(&self) -> usize;
     fn replace_range(&mut self, range: impl RangeBounds<usize>, string: &str);
-    fn string(&self) -> &String;
-    fn string_mut(&mut self) -> &mut String;
-    fn split_off(&mut self, at: usize) -> String;
+    fn split_off(&mut self, at: usize) -> Self;
     fn split_at(&self, mid: usize) -> (&str, &str);
     fn remove(&mut self, idx: usize) -> char;
+    fn trim_start(&self) -> &str;
+    fn trim_end(&self) -> &str;
+    fn chars(&self) -> Chars<'_>;
+    fn char_indices(&self) -> CharIndices<'_>;
+    fn match_indices<'a>(&self, pat: &'a str) -> MatchIndices<&'a str>;
+    fn starts_with(&self, pat: &str) -> bool;
+    fn ends_with(&self, pat: &str) -> bool;
+    fn find(&self, pat: &str) -> Option<usize>;
+    fn push_content_to_buffer(&self, buffer: &mut String);
+    fn insert_content_to_buffer(&self, at: usize, buffer: &mut String);
     fn clear(&mut self);
     fn unwrap(self) -> String;
     fn get<I: SliceIndex<str>>(&self, i: I) -> Option<&I::Output>;

@@ -415,8 +415,10 @@ impl Line {
         }
     }
 
+    /// creates line builder from Line push/push_styled can be used to add to line
+    /// on drop pads the line to end
     #[inline]
-    pub fn builder<'a>(self, backend: &'a mut Backend) -> std::io::Result<LineBuilder<'a>> {
+    pub fn unsafe_builder<'a>(self, backend: &'a mut Backend) -> std::io::Result<LineBuilder<'a>> {
         backend.go_to(self.row, self.col).map(|_| LineBuilder { remaining: self.width, backend })
     }
 }
@@ -427,6 +429,7 @@ pub struct LineBuilder<'a> {
 }
 
 impl<'a> LineBuilder<'a> {
+    /// returns Ok(bool) -> if true line is not full, false the line is finished
     pub fn push(&mut self, text: &str) -> std::io::Result<bool> {
         if text.len() > self.remaining {
             self.backend.print(unsafe { text.get_unchecked(..self.remaining) })?;
@@ -437,6 +440,8 @@ impl<'a> LineBuilder<'a> {
         self.backend.print(text)?;
         Ok(true)
     }
+
+    /// push with style
     pub fn push_styled(&mut self, text: &str, style: Style) -> std::io::Result<bool> {
         if text.len() > self.remaining {
             self.backend.print_styled(unsafe { text.get_unchecked(..self.remaining) }, style)?;
@@ -453,8 +458,8 @@ impl Drop for LineBuilder<'_> {
     /// ensure line is rendered and padded till end;
     fn drop(&mut self) {
         if self.remaining != 0 {
-            let _ = self.push(format!("{:width$}", "", width = self.remaining).as_str());
+            self.push(format!("{:width$}", "", width = self.remaining).as_str()).unwrap();
         }
-        let _ = self.backend.flush();
+        self.backend.flush().unwrap();
     }
 }

@@ -28,7 +28,7 @@ impl IndentConfigs {
         self
     }
 
-    pub fn unindent_if_before_base_pattern(&self, line: &mut String) -> usize {
+    pub fn unindent_if_before_base_pattern(&self, line: &mut impl EditorLine) -> usize {
         if line.starts_with(&self.indent) {
             if let Some(first) = line.trim_start().chars().next() {
                 if self.unindent_before.contains(first) {
@@ -40,7 +40,7 @@ impl IndentConfigs {
         0
     }
 
-    pub fn derive_indent_from(&self, prev_line: &str) -> String {
+    pub fn derive_indent_from(&self, prev_line: &impl EditorLine) -> String {
         let mut indent = prev_line.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
         if let Some(last) = prev_line.trim_end().chars().last() {
             if self.indent_after.contains(last) {
@@ -51,7 +51,7 @@ impl IndentConfigs {
     }
 
     pub fn derive_indent_from_lines(&self, prev_lines: &[impl EditorLine]) -> String {
-        for prev_line in prev_lines.iter().rev().map(|line| line.as_str()) {
+        for prev_line in prev_lines.iter().rev().map(|line| line) {
             if !prev_line.chars().all(|c| c.is_whitespace()) {
                 return self.derive_indent_from(prev_line);
             }
@@ -66,12 +66,12 @@ impl IndentConfigs {
                 return Offset::Pos(0);
             }
             let line = &mut content[line_idx];
-            let offset = Offset::Pos(indent.len()) - trim_start_inplace(line.string_mut());
+            let offset = Offset::Pos(indent.len()) - trim_start_inplace(line);
             line.insert_str(0, &indent);
-            offset - self.unindent_if_before_base_pattern(line.string_mut())
+            offset - self.unindent_if_before_base_pattern(line)
         } else {
             let line = &mut content[line_idx];
-            Offset::Neg(trim_start_inplace(line.string_mut()))
+            Offset::Neg(trim_start_inplace(line))
         }
     }
 }

@@ -244,29 +244,27 @@ impl Actions {
         }
         let prev_line = &mut content[cursor.line];
         let mut line = prev_line.split_off(cursor.char);
-        let indent = self.cfg.derive_indent_from(prev_line.as_str());
+        let indent = self.cfg.derive_indent_from(prev_line);
         line.insert_str(0, &indent);
         cursor.line += 1;
         cursor.set_char(indent.len());
         // expand scope
-        if let Some(opening) = prev_line.as_str().trim_end().chars().last() {
+        if let Some(opening) = prev_line.trim_end().chars().last() {
             if let Some(closing) = line.trim_start().chars().next() {
                 if [('{', '}'), ('(', ')'), ('[', ']')].contains(&(opening, closing)) {
                     self.cfg.unindent_if_before_base_pattern(&mut line);
                     let new_char = indent.len() - self.cfg.indent.len();
-                    content.insert(cursor.line, line.into());
+                    content.insert(cursor.line, line);
                     content.insert(cursor.line, indent.into());
                     self.push_done(builder.finish((cursor.line + 1, new_char).into(), content));
                     return;
                 }
             }
         }
-        if prev_line.as_str().chars().all(|c| c.is_whitespace())
-            && prev_line.len().rem_euclid(self.cfg.indent.len()) == 0
-        {
+        if prev_line.chars().all(|c| c.is_whitespace()) && prev_line.len().rem_euclid(self.cfg.indent.len()) == 0 {
             builder.and_clear_first_line(prev_line);
         }
-        content.insert(cursor.line, line.into());
+        content.insert(cursor.line, line);
         self.push_done(builder.finish(cursor.into(), content));
     }
 
@@ -348,7 +346,7 @@ impl Actions {
 
     fn push_char_simple(&mut self, ch: char, cursor: &mut Cursor, content: &mut [impl EditorLine]) {
         if let Some(line) = content.get_mut(cursor.line) {
-            if is_closing_repeat(line.as_str(), ch, cursor.char) {
+            if is_closing_repeat(line, ch, cursor.char) {
             } else if let Some(closing) = get_closing_char(ch) {
                 let new_text = format!("{ch}{closing}");
                 line.insert_str(cursor.char, &new_text);
@@ -570,16 +568,11 @@ fn add_select(edits: &mut [Edit], old: Option<Select>, new: Option<Select>) {
 }
 
 fn select_is_commented(from: usize, n: usize, pat: &str, content: &[impl EditorLine]) -> bool {
-    content
-        .iter()
-        .skip(from)
-        .take(n)
-        .all(|l| l.as_str().trim().starts_with(pat) || l.as_str().chars().all(|c| c.is_whitespace()))
+    content.iter().skip(from).take(n).all(|l| l.trim_start().starts_with(pat) || l.chars().all(|c| c.is_whitespace()))
 }
 
 fn into_comment(pat: &str, line: &mut impl EditorLine, cursor: CursorPosition) -> Option<(Offset, Edit)> {
-    let idx =
-        line.as_str().char_indices().flat_map(|(idx, c)| if c.is_whitespace() { None } else { Some(idx) }).next()?;
+    let idx = line.char_indices().flat_map(|(idx, c)| if c.is_whitespace() { None } else { Some(idx) }).next()?;
     let comment_start = format!("{pat} ");
     line.insert_str(idx, &comment_start);
     let offset = if cursor.char >= idx { Offset::Pos(comment_start.len()) } else { Offset::Pos(0) };
@@ -590,10 +583,10 @@ fn into_comment(pat: &str, line: &mut impl EditorLine, cursor: CursorPosition) -
 }
 
 fn uncomment(pat: &str, line: &mut impl EditorLine, cursor: CursorPosition) -> Option<(Offset, Edit)> {
-    if !line.as_str().trim().starts_with(pat) {
+    if !line.trim_start().starts_with(pat) {
         return None;
     }
-    let idx = line.as_str().find(pat)?;
+    let idx = line.find(pat)?;
     let mut end_idx = idx + pat.len();
     end_idx += line[idx + pat.len()..].chars().take_while(|c| c.is_whitespace()).count();
     let offset = if cursor.char >= idx { Offset::Neg(end_idx - idx) } else { Offset::Neg(0) };

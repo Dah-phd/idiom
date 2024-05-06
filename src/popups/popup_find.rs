@@ -44,7 +44,7 @@ impl PopupInterface for GoToLinePopup {
     fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
         if let Some(line) = gs.editor_area.right_top_corner(1, 50).into_iter().next() {
             gs.writer.set_style(gs.theme.accent_style)?;
-            let mut builder = line.builder(&mut gs.writer)?;
+            let mut builder = line.unsafe_builder(&mut gs.writer)?;
             builder.push(" Go to >> ")?;
             builder.push(&self.line_idx)?;
             builder.push_styled("|", Style::slowblink())?;
@@ -95,7 +95,7 @@ impl PopupInterface for FindPopup {
     fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
         if let Some(line) = gs.editor_area.right_top_corner(1, 50).into_iter().next() {
             gs.writer.set_style(gs.theme.accent_style)?;
-            let mut builder = line.builder(&mut gs.writer)?;
+            let mut builder = line.unsafe_builder(&mut gs.writer)?;
             builder.push(" Found(")?;
             builder.push(&count_as_string(self.options.len()))?;
             builder.push(") >> ")?;

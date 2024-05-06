@@ -33,6 +33,6 @@ pub fn select_eq(select: (CursorPosition, CursorPosition), editor: &Editor) -> b
     false
 }
 
-pub fn pull_line(editor: &Editor, idx: usize) -> Option<&str> {
-    editor.content.get(idx).map(|line| line.as_str())
+pub fn pull_line(editor: &Editor, idx: usize) -> Option<String> {
+    editor.content.get(idx).map(|line| line.to_string())
 }

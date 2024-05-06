@@ -4,7 +4,7 @@ use tokio::task::JoinSet;
 
 use crate::{
     render::backend::{color, Color, Style},
-    utils::{get_nested_paths, to_relative_path, trim_start},
+    utils::{get_nested_paths, to_relative_path},
 };
 use std::{
     cmp::Ordering,
@@ -277,7 +277,7 @@ impl TreePath {
                     if let Ok(content) = maybe_content {
                         for (idx, line) in content.lines().enumerate() {
                             if line.contains(&*pattern) {
-                                buffer.push((path.clone(), trim_start(line.to_owned()), idx))
+                                buffer.push((path.clone(), line.trim_start().to_owned(), idx))
                             }
                         }
                     }

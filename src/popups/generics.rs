@@ -84,7 +84,7 @@ impl Popup {
         if self.message_as_buffer_builder.is_none() {
             return line.render_centered(&self.message, backend);
         }
-        let mut builder = line.builder(backend)?;
+        let mut builder = line.unsafe_builder(backend)?;
         builder.push(" >> ")?;
         builder.push(&self.message)?;
         builder.push_styled("|", Style::slowblink())?;
@@ -102,7 +102,7 @@ impl Popup {
         let btn_count = self.buttons.len();
         let sum_btn_names_len: usize = self.buttons.iter().map(|b| b.name.len()).sum();
         let padding = line.width.saturating_sub(sum_btn_names_len) / btn_count;
-        let mut builder = line.builder(backend)?;
+        let mut builder = line.unsafe_builder(backend)?;
         for btn in self.buttons.iter() {
             if !builder.push(format!("{name:^width$}", name = btn.name, width = padding + btn.name.len()).as_str())? {
                 break;

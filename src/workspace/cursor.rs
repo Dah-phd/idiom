@@ -96,7 +96,7 @@ impl Cursor {
 
     pub fn start_of_line(&mut self, content: &[impl EditorLine]) {
         self.char = 0;
-        for ch in content[self.line].as_str().chars() {
+        for ch in content[self.line].chars() {
             if !ch.is_whitespace() {
                 self.phantm_char = self.char;
                 return;
@@ -130,7 +130,7 @@ impl Cursor {
             self.char -= self.text_width;
             return;
         };
-        self.adjust_char(&content[self.line].as_str());
+        self.adjust_char(&content[self.line]);
     }
 
     pub fn scroll_up(&mut self, content: &[impl EditorLine]) {
@@ -165,7 +165,7 @@ impl Cursor {
             return;
         }
         self.line += 1;
-        self.adjust_char(&content[self.line].as_str());
+        self.adjust_char(&content[self.line]);
     }
 
     pub fn select_down(&mut self, content: &[impl EditorLine]) {
@@ -289,11 +289,11 @@ impl Cursor {
     pub fn adjust_max_line(&mut self, content: &[impl EditorLine]) {
         if self.line >= content.len() {
             self.line = content.len().saturating_sub(1);
-            self.adjust_char(&content[self.line].as_str());
+            self.adjust_char(&content[self.line]);
         }
     }
 
-    pub fn adjust_char(&mut self, line: &str) {
+    pub fn adjust_char(&mut self, line: &impl EditorLine) {
         self.char = self.phantm_char;
         if line.len() < self.char {
             self.char = line.len()
@@ -392,8 +392,7 @@ impl Cursor {
                     return to.char - from.char;
                 };
                 let mut iter = content.iter().skip(from.line).take(to.line - from.line);
-                let mut len =
-                    iter.next().map(|line| line.as_str().chars().skip(from.char).count()).unwrap_or_default() + 1;
+                let mut len = iter.next().map(|line| line.chars().skip(from.char).count()).unwrap_or_default() + 1;
                 for line in iter {
                     len += line.len() + 1;
                 }

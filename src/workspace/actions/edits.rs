@@ -22,17 +22,17 @@ pub struct Edit {
 impl Edit {
     pub fn swap_down(up_line: usize, cfg: &IndentConfigs, content: &mut [impl EditorLine]) -> (Offset, Offset, Self) {
         let to = up_line + 1;
-        let mut reverse_edit_text = content[up_line].as_str().to_owned();
+        let mut reverse_edit_text = content[up_line].to_string();
         reverse_edit_text.push('\n');
-        reverse_edit_text.push_str(&content[up_line + 1].as_str());
+        content[up_line + 1].push_content_to_buffer(&mut reverse_edit_text);
         reverse_edit_text.push('\n');
         let text_edit_range: (CursorPosition, CursorPosition) = ((up_line, 0).into(), (up_line + 2, 0).into());
         content.swap(up_line, to);
         let offset = cfg.indent_line(up_line, content);
         let offset2 = cfg.indent_line(to, content);
-        let mut new_text = content[text_edit_range.0.line].as_str().to_owned();
+        let mut new_text = content[text_edit_range.0.line].to_string();
         new_text.push('\n');
-        new_text.push_str(&content[text_edit_range.0.line + 1].as_str());
+        content[text_edit_range.0.line + 1].push_content_to_buffer(&mut new_text);
         new_text.push('\n');
         let range = Range::new(Position::new(up_line as u32, 0), Position::new((up_line + 2) as u32, 0));
         (
@@ -52,7 +52,7 @@ impl Edit {
         let removed_line = content.remove(line + 1);
         let merged_to = &mut content[line];
         let position_of_new_line = Position::new(line as u32, merged_to.len() as u32);
-        merged_to.push_str(removed_line.as_str());
+        merged_to.push_line(removed_line);
         Self {
             meta: EditMetaData { start_line: line, from: 2, to: 1 },
             reverse_text_edit: TextEdit::new(
@@ -204,7 +204,7 @@ impl Edit {
 
     pub fn replace_token(line: usize, char: usize, new_text: String, content: &mut [impl EditorLine]) -> Self {
         let code_line = &mut content[line];
-        let range = token_range_at(code_line.as_str(), char);
+        let range = token_range_at(code_line, char);
         let start = Position::new(line as u32, range.start as u32);
         let text_edit_range = Range::new(start, Position::new(line as u32, range.end as u32));
         let reverse_edit_range = Range::new(start, Position::new(line as u32, (range.start + new_text.len()) as u32));
@@ -227,10 +227,10 @@ impl Edit {
         content: &mut Vec<impl EditorLine>,
     ) -> (CursorPosition, Self) {
         let code_line = &mut content[c.line];
-        let range = token_range_at(code_line.as_str(), c.char);
+        let range = token_range_at(code_line, c.char);
         let from = CursorPosition { line: c.line, char: range.start };
         let to = CursorPosition { line: c.line, char: range.end };
-        let indent = cfg.derive_indent_from(code_line.as_str());
+        let indent = cfg.derive_indent_from(code_line);
         let snippet = snippet.replace('\n', &format!("\n{}", &indent));
         let new_cursor = cursor_offset.map(|(line, char)| CursorPosition {
             line: line + c.line,
@@ -389,7 +389,7 @@ impl NewLineBuilder {
     // UTILS
     pub fn and_clear_first_line(&mut self, line: &mut impl EditorLine) {
         self.text_edit_range.0.char = 0;
-        self.reverse_edit_text.insert_str(0, line.as_str());
+        self.reverse_edit_text.insert_str(0, &line.to_string());
         line.clear();
     }
 }

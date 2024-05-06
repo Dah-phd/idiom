@@ -40,7 +40,7 @@ pub fn clip_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<
         line.replace_range(from.char..to.char, "");
         clip
     } else {
-        let mut clip_vec = vec![content[from.line].split_off(from.char)];
+        let mut clip_vec = vec![content[from.line].split_off(from.char).to_string()];
         let mut last_idx = to.line;
         while from.line < last_idx {
             last_idx -= 1;
@@ -91,7 +91,7 @@ pub fn copy_content(from: CursorPosition, to: CursorPosition, content: &[impl Ed
         while at_line < to.line {
             at_line += 1;
             if at_line != to.line {
-                clip_vec.push(content[at_line].string().to_owned())
+                clip_vec.push(content[at_line].to_string().to_owned())
             } else {
                 clip_vec.push(content[at_line][..to.char].to_owned())
             }
@@ -125,7 +125,7 @@ pub fn get_opening_char(ch: char) -> Option<char> {
 }
 
 #[inline(always)]
-pub fn is_closing_repeat(line: &str, ch: char, at: usize) -> bool {
+pub fn is_closing_repeat(line: &impl EditorLine, ch: char, at: usize) -> bool {
     if let Some(opening) = get_opening_char(ch) {
         line[at..].starts_with(ch) && line[..at].contains(opening)
     } else {
@@ -134,7 +134,7 @@ pub fn is_closing_repeat(line: &str, ch: char, at: usize) -> bool {
 }
 
 #[inline(always)]
-pub fn find_line_start(line: &str) -> usize {
+pub fn find_line_start(line: &impl EditorLine) -> usize {
     for (idx, ch) in line.char_indices() {
         if !ch.is_whitespace() {
             return idx;
@@ -144,7 +144,7 @@ pub fn find_line_start(line: &str) -> usize {
 }
 
 #[inline(always)]
-pub fn token_range_at(line: &str, idx: usize) -> Range<usize> {
+pub fn token_range_at(line: &impl EditorLine, idx: usize) -> Range<usize> {
     let mut token_start = 0;
     let mut last_not_in_token = false;
     for (char_idx, ch) in line.char_indices() {

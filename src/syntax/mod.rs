@@ -207,15 +207,15 @@ impl Lexer {
         self.lsp_client.replace(client);
     }
 
-    pub fn should_autocomplete(&mut self, char_idx: usize, line: &str) -> bool {
+    pub fn should_autocomplete(&mut self, char_idx: usize, line: &impl EditorLine) -> bool {
         self.lsp_client.is_some()
             && !matches!(self.modal, Some(LSPModal::AutoComplete(..)))
             && self.lang.completable(line, char_idx)
     }
 
-    pub fn get_autocomplete(&mut self, c: CursorPosition, line: &str) {
+    pub fn get_autocomplete(&mut self, c: CursorPosition, line: String) {
         if let Some(id) = self.lsp_client.as_mut().and_then(|client| client.request_completions(&self.path, c)) {
-            self.requests.push(LSPResponseType::Completion(id, line.to_owned(), c.char));
+            self.requests.push(LSPResponseType::Completion(id, line, c.char));
         }
     }
 

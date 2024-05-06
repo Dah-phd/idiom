@@ -111,7 +111,7 @@ impl Editor {
     }
 
     pub fn select_token(&mut self) {
-        let range = token_range_at(&self.content[self.cursor.line].as_str(), self.cursor.char);
+        let range = token_range_at(&self.content[self.cursor.line], self.cursor.char);
         if !range.is_empty() {
             self.cursor.select_set(
                 CursorPosition { line: self.cursor.line, char: range.start },
@@ -143,7 +143,7 @@ impl Editor {
 
     pub fn start_renames(&mut self) {
         let line = &self.content[self.cursor.line];
-        let token_range = token_range_at(line.as_str(), self.cursor.char);
+        let token_range = token_range_at(line, self.cursor.char);
         self.lexer.start_rename((&self.cursor).into(), &line[token_range]);
     }
 
@@ -152,8 +152,8 @@ impl Editor {
             return self
                 .content
                 .iter()
-                .map(|l| l.as_str())
-                .eq(&file_content.split('\n').map(String::from).collect::<Vec<_>>());
+                .map(|l| l.to_string())
+                .eq(file_content.split('\n').map(String::from).collect::<Vec<_>>());
         };
         false
     }
@@ -200,7 +200,7 @@ impl Editor {
         self.cursor.select_drop();
         if self.content.len() >= line {
             self.cursor.line = line;
-            self.cursor.char = find_line_start(self.content[line].as_str());
+            self.cursor.char = find_line_start(&self.content[line]);
             self.cursor.at_line = line.saturating_sub(self.cursor.max_rows / 2);
         }
     }
@@ -215,7 +215,7 @@ impl Editor {
             return;
         }
         for (line_idx, line_content) in self.content.iter().enumerate() {
-            for (char_idx, _) in line_content.as_str().match_indices(pat) {
+            for (char_idx, _) in line_content.match_indices(pat) {
                 buffer.push(((line_idx, char_idx).into(), (line_idx, char_idx + pat.len()).into()));
             }
         }
@@ -227,10 +227,10 @@ impl Editor {
             return buffer;
         }
         for (line_idx, line_content) in self.content.iter().enumerate() {
-            for (char_idx, _) in line_content.as_str().match_indices(pat) {
+            for (char_idx, _) in line_content.match_indices(pat) {
                 buffer.push((
                     ((line_idx, char_idx).into(), (line_idx, char_idx + pat.len()).into()),
-                    line_content.as_str().to_owned(),
+                    line_content.to_string(),
                 ));
             }
         }
@@ -387,9 +387,9 @@ impl Editor {
     pub fn push(&mut self, ch: char) {
         self.actions.push_char(ch, &mut self.cursor, &mut self.content);
         let line = &self.content[self.cursor.line];
-        if self.lexer.should_autocomplete(self.cursor.char, line.as_str()) {
+        if self.lexer.should_autocomplete(self.cursor.char, line) {
             self.actions.force_sync(&mut self.lexer, &self.content);
-            self.lexer.get_autocomplete((&self.cursor).into(), line.as_str());
+            self.lexer.get_autocomplete((&self.cursor).into(), line.to_string());
         }
     }
 
@@ -426,7 +426,7 @@ impl Editor {
 
     pub fn try_write_file(&self, gs: &mut GlobalState) -> bool {
         if let Err(error) =
-            std::fs::write(&self.path, self.content.iter().map(|l| l.as_str()).collect::<Vec<_>>().join("\n"))
+            std::fs::write(&self.path, self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n"))
         {
             gs.error(error.to_string());
             return false;
@@ -439,7 +439,7 @@ impl Editor {
     }
 
     pub fn stringify(&self) -> String {
-        let mut text = self.content.iter().map(|l| l.as_str()).collect::<Vec<_>>().join("\n");
+        let mut text = self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n");
         text.push('\n');
         text
     }

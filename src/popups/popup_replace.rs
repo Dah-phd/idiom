@@ -106,7 +106,7 @@ impl PopupInterface for ReplacePopup {
         gs.writer.set_style(gs.theme.accent_style)?;
         let mut lines = area.into_iter();
         if let Some(line) = lines.next() {
-            let mut find_builder = line.builder(&mut gs.writer)?;
+            let mut find_builder = line.unsafe_builder(&mut gs.writer)?;
             find_builder.push(count_as_string(&self.options).as_str())?;
             find_builder.push(" > ")?;
             find_builder.push(&self.pattern)?;
@@ -115,7 +115,7 @@ impl PopupInterface for ReplacePopup {
             };
         };
         if let Some(line) = lines.next() {
-            let mut repl_builder = line.builder(&mut gs.writer)?;
+            let mut repl_builder = line.unsafe_builder(&mut gs.writer)?;
             repl_builder.push("Rep > ")?;
             repl_builder.push(&self.new_text)?;
             if self.on_text {

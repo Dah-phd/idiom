@@ -49,14 +49,14 @@ impl<T: Default + Clone> TextField<T> {
 
     /// returns blockless paragraph widget " >> inner text"
     pub fn widget(&self, line: Line, backend: &mut Backend) -> std::io::Result<()> {
-        let mut builder = line.builder(backend)?;
+        let mut builder = line.unsafe_builder(backend)?;
         builder.push(" >> ")?;
         self.insert_formatted_text(builder)
     }
 
     /// returns blockless paragraph widget "99+ >> inner text"
     pub fn widget_with_count(&self, line: Line, count: usize, backend: &mut Backend) -> std::io::Result<()> {
-        let mut builder = line.builder(backend)?;
+        let mut builder = line.unsafe_builder(backend)?;
         builder.push(count_as_string(count).as_str())?;
         builder.push(" >> ")?;
         self.insert_formatted_text(builder)

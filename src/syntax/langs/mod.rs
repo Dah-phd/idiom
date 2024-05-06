@@ -1,5 +1,6 @@
 mod rust;
 use crate::syntax::{theme::Theme, Action, GlobalState, WorkspaceEvent};
+use crate::workspace::line::EditorLine;
 use crate::{configs::FileType, render::backend::Color};
 use lsp_types::DiagnosticRelatedInformation;
 use rust::{rust_derive_import, rust_process_related_info, rust_specific_handler};
@@ -67,7 +68,7 @@ impl Lang {
         self.diagnostic_handler.as_ref().and_then(|cb| (cb)(self, info?))
     }
 
-    pub fn completable(&self, line: &str, idx: usize) -> bool {
+    pub fn completable(&self, line: &impl EditorLine, idx: usize) -> bool {
         let mut curr_token = String::new();
         let mut prev_token = String::new();
         let mut trigger = false;

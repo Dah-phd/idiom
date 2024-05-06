@@ -85,16 +85,6 @@ impl EditorLine for CodeLine {
     }
 
     #[inline]
-    fn string(&self) -> &String {
-        &self.content
-    }
-
-    #[inline]
-    fn string_mut(&mut self) -> &mut String {
-        &mut self.content
-    }
-
-    #[inline]
     fn get<I: SliceIndex<str>>(&self, i: I) -> Option<&I::Output> {
         self.content.get(i)
     }
@@ -110,8 +100,18 @@ impl EditorLine for CodeLine {
     }
 
     #[inline]
-    fn as_str(&self) -> &str {
-        &self.content
+    fn starts_with(&self, pat: &str) -> bool {
+        self.content.starts_with(pat)
+    }
+
+    #[inline]
+    fn ends_with(&self, pat: &str) -> bool {
+        self.content.ends_with(pat)
+    }
+
+    #[inline]
+    fn find(&self, pat: &str) -> Option<usize> {
+        self.content.find(pat)
     }
 
     #[inline]
@@ -139,8 +139,48 @@ impl EditorLine for CodeLine {
     }
 
     #[inline]
+    fn push_line(&mut self, line: Self) {
+        self.content.push_str(&line.content)
+    }
+
+    #[inline]
+    fn insert_content_to_buffer(&self, idx: usize, buffer: &mut String) {
+        buffer.insert_str(idx, &self.content)
+    }
+
+    #[inline]
+    fn push_content_to_buffer(&self, buffer: &mut String) {
+        buffer.push_str(&self.content)
+    }
+
+    #[inline]
     fn remove(&mut self, idx: usize) -> char {
         self.content.remove(idx)
+    }
+
+    #[inline]
+    fn trim_start(&self) -> &str {
+        &self.content.trim_start()
+    }
+
+    #[inline]
+    fn trim_end(&self) -> &str {
+        &self.content.trim_end()
+    }
+
+    #[inline]
+    fn chars(&self) -> std::str::Chars<'_> {
+        self.content.chars()
+    }
+
+    #[inline]
+    fn char_indices(&self) -> std::str::CharIndices<'_> {
+        self.content.char_indices()
+    }
+
+    #[inline]
+    fn match_indices<'a>(&self, pat: &'a str) -> std::str::MatchIndices<&'a str> {
+        self.content.match_indices(pat)
     }
 
     #[inline]
@@ -151,8 +191,8 @@ impl EditorLine for CodeLine {
     }
 
     #[inline]
-    fn split_off(&mut self, at: usize) -> String {
-        self.content.split_off(at)
+    fn split_off(&mut self, at: usize) -> Self {
+        Self::from(self.content.split_off(at))
     }
 
     #[inline]
@@ -410,12 +450,6 @@ fn wrapped_line_select(
         let mut wrap_text = format!("..{skip_lines} hidden wrapped lines");
         wrap_text.truncate(wrap_len);
         backend.print_styled(wrap_text, Style::reversed())?;
-        let line = match lines.skip(skip_lines).next() {
-            Some(line) => line,
-            None => return Ok(()),
-        };
-        backend.print_styled_at(line.row, line.col, &wrap_number, Style::fg(color::dark_grey()))?;
-        backend.clear_to_eol()?;
         wrapping_loop_select(
             content.char_indices().skip(skip_lines * wrap_len),
             backend,
@@ -552,12 +586,6 @@ fn wrapped_line(
     let skip_lines = ctx.count_skipped_to_cursor(wrap_len, lines.len());
     if skip_lines != 0 {
         backend.print_styled(format!("..{skip_lines} hidden wrapped lines"), Style::reversed())?;
-        let line = match lines.skip(skip_lines).next() {
-            Some(line) => line,
-            None => return Ok(()),
-        };
-        backend.print_styled_at(line.row, line.col, &wrap_number, Style::fg(color::dark_grey()))?;
-        backend.clear_to_eol()?;
         wrapping_loop(
             content.char_indices().take(skip_lines + wrap_len),
             backend,

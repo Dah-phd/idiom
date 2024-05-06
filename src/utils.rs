@@ -6,19 +6,24 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 
+use crate::workspace::line::EditorLine;
+
 pub const REVERSED: Style = Style::new().add_modifier(Modifier::REVERSED);
 
-pub fn trim_start_inplace(line: &mut String) -> usize {
-    if let Some(idx) = line.find(|c: char| !c.is_whitespace() && c != '\t') {
+pub fn trim_start_inplace(line: &mut impl EditorLine) -> usize {
+    if let Some(idx) = line.to_string().find(|c: char| !c.is_whitespace() && c != '\t') {
         line.replace_range(..idx, "");
         return idx;
     };
     0
 }
 
-pub fn trim_start(mut line: String) -> String {
-    trim_start_inplace(&mut line);
-    line
+pub fn trim_string_start_inplace(line: &mut String) -> usize {
+    if let Some(idx) = line.find(|c: char| !c.is_whitespace() && c != '\t') {
+        line.replace_range(..idx, "");
+        return idx;
+    };
+    0
 }
 
 pub fn split_arc_mutex<T>(inner: T) -> (Arc<Mutex<T>>, Arc<Mutex<T>>) {
@@ -110,7 +115,7 @@ pub fn find_code_blocks(buffer: &mut Vec<(usize, String)>, content: &[String], p
             continue;
         }
         let mut line = line.to_owned();
-        let white_chars_len = trim_start_inplace(&mut line);
+        let white_chars_len = trim_string_start_inplace(&mut line);
         if let Some((_, next_line)) = content_iter.peek() {
             if let Some(first_non_white) = next_line.find(|c: char| !c.is_whitespace()) {
                 if first_non_white >= white_chars_len {
