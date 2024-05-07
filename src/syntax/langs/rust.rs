@@ -20,7 +20,7 @@ pub fn rust_process_related_info(
     None
 }
 
-pub fn rust_specific_handler(char_idx: usize, word: &str, full_line: &str, theme: &Theme) -> Option<Color> {
+pub fn rust_specific_handler(_char_idx: usize, word: &str, _full_line: &str, theme: &Theme) -> Option<Color> {
     if matches!(word.chars().next(), Some('\'')) {
         return Some(theme.key_words);
     };

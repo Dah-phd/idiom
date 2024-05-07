@@ -2,7 +2,6 @@ use crate::{
     render::backend::{color, Color, Style},
     workspace::{cursor::Cursor, CursorPosition},
 };
-use std::{cmp::Ordering, ops::Range};
 pub const COLORS: [Color; 3] = [color::magenta(), color::yellow(), color::blue()];
 
 #[derive(Default)]
