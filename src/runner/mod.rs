@@ -35,10 +35,12 @@ impl EditorTerminal {
     }
 
     pub fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
-        self.max_rows = gs.editor_area.height as usize / 2;
+        let max_rows = gs.editor_area.height / 2;
+        let area = gs.editor_area.bot(max_rows);
+        self.max_rows = max_rows as usize;
         self.poll_results();
         let mut logs = self.logs.iter().skip(self.at_log).take(self.max_rows);
-        let mut lines = gs.editor_area.into_iter().skip(self.max_rows);
+        let mut lines = area.into_iter();
         if let Some(line) = lines.next() {
             line.fill(BORDERS.horizontal, &mut gs.writer)?;
         }

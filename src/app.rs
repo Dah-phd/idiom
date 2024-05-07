@@ -39,15 +39,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> Result<()> {
     drop(configs);
 
     loop {
-        if let Some(editor) = workspace.get_active() {
-            editor.render(&mut gs)?;
-        }
-
-        workspace.render(&mut gs)?;
-
-        tree.render(&mut gs)?;
-
-        gs.render_popup_if_exists()?;
+        gs.draw(&mut workspace, &mut tree, &mut term)?;
 
         if crossterm::event::poll(last_frame_start.elapsed())? {
             last_frame_start = Instant::now();

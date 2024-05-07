@@ -27,7 +27,10 @@ impl PopupInterface for Popup {
         let mut area = gs.screen_rect.center(height, width);
         area.bordered();
         area.draw_borders(None, None, &mut gs.writer)?;
-        area.border_title(self.title(), &mut gs.writer)?;
+        match self.title.as_ref() {
+            Some(text) => area.border_title(&text, &mut gs.writer)?,
+            None => area.border_title("Prompt", &mut gs.writer)?,
+        }
         let mut lines = area.into_iter();
         if let Some(first_line) = lines.next() {
             self.p_from_message(first_line, &mut gs.writer)?;
@@ -90,13 +93,6 @@ impl Popup {
         builder.push(&self.message)?;
         builder.push_styled("|", Style::slowblink())?;
         Ok(())
-    }
-
-    fn title(&self) -> String {
-        if let Some(title) = &self.title {
-            return format!("{title} ");
-        }
-        "Prompt".to_owned()
     }
 
     fn spans_from_buttons(&self, line: Line, backend: &mut Backend) -> std::io::Result<()> {

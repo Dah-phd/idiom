@@ -128,28 +128,14 @@ impl GlobalState {
     }
 
     fn find_draw_callback(&self) -> DrawCallback {
-        let with_term = self.components.contains(Components::TERM);
-        let with_popup = self.components.contains(Components::POPUP);
-        if matches!(self.mode, Mode::Select) || self.components.contains(Components::TREE) {
-            if with_term && with_popup {
-                return draw::draw_full;
-            }
-            if self.components.contains(Components::TERM) {
-                return draw::draw_with_tree_and_term;
-            }
-            if self.components.contains(Components::POPUP) {
-                return draw::draw_with_tree_and_popup;
-            }
+        if self.components.contains(Components::POPUP) {
+            return draw::draw_popup;
+        }
+        if self.components.contains(Components::TERM) {
+            return draw::draw_term;
+        }
+        if self.components.contains(Components::TREE) || matches!(self.mode, Mode::Select) {
             return draw::draw_with_tree;
-        }
-        if with_popup && with_term {
-            return draw::draw_with_term_and_popup;
-        }
-        if with_term {
-            return draw::draw_with_term;
-        }
-        if with_popup {
-            return draw::draw_with_popup;
         }
         draw::draw
     }
@@ -173,6 +159,7 @@ impl GlobalState {
         self.key_mapper = controls::map_tree;
         if !self.components.contains(Components::TREE) {
             self.recalc_draw_size();
+            self.draw_callback = self.find_draw_callback();
         };
         if let Some(line) = self.footer_area.get_line(0) {
             self.writer.save_cursor().unwrap();
@@ -189,6 +176,7 @@ impl GlobalState {
         self.key_mapper = controls::map_editor;
         if !self.components.contains(Components::TREE) {
             self.recalc_draw_size();
+            self.draw_callback = self.find_draw_callback();
         };
         if let Some(line) = self.footer_area.get_line(0) {
             self.writer.save_cursor().unwrap();
@@ -207,6 +195,7 @@ impl GlobalState {
     pub fn popup(&mut self, popup: Box<dyn PopupInterface>) {
         self.components.insert(Components::POPUP);
         self.key_mapper = controls::map_popup;
+        self.draw_callback = self.find_draw_callback();
         self.mouse_mapper = controls::disable_mouse;
         self.popup.replace(popup);
     }
@@ -221,7 +210,10 @@ impl GlobalState {
             }
         }
         self.components.remove(Components::POPUP);
+        self.draw_callback = self.find_draw_callback();
         self.mouse_mapper = controls::mouse_handler;
+        self.editor_area.clear(&mut self.writer).unwrap();
+        self.tree_area.clear(&mut self.writer).unwrap();
         self.popup.take()
     }
 
@@ -229,9 +221,11 @@ impl GlobalState {
         if self.components.contains(Components::TREE) {
             self.components.remove(Components::TREE);
             self.recalc_draw_size();
+            self.draw_callback = self.find_draw_callback();
         } else {
             self.components.insert(Components::TREE);
             self.recalc_draw_size();
+            self.draw_callback = self.find_draw_callback();
         }
     }
 
@@ -248,6 +242,7 @@ impl GlobalState {
     pub fn toggle_terminal(&mut self, runner: &mut EditorTerminal) {
         if self.components.contains(Components::TERM) {
             self.components.remove(Components::TERM);
+            self.draw_callback = self.find_draw_callback();
             match self.mode {
                 Mode::Select => {
                     self.key_mapper = controls::map_tree;
@@ -259,6 +254,7 @@ impl GlobalState {
             self.mouse_mapper = controls::mouse_handler;
         } else {
             self.components.insert(Components::TERM);
+            self.draw_callback = self.find_draw_callback();
             runner.activate();
             self.key_mapper = map_term;
             self.mouse_mapper = controls::disable_mouse;
@@ -513,9 +509,6 @@ impl GlobalState {
                     self.exit = true;
                 }
             }
-        }
-        if matches!(self.mode, Mode::Select) {
-            self.message.render(self.theme.accent_style, &mut self.writer).unwrap();
         }
         self.exit
     }

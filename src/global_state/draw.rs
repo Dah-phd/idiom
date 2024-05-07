@@ -2,6 +2,8 @@ use crate::{global_state::GlobalState, runner::EditorTerminal, tree::Tree, works
 use bitflags::bitflags;
 use std::io::Result;
 
+use super::Mode;
+
 bitflags! {
     /// Workspace and Footer are always drawn
     #[derive(PartialEq, Eq)]
@@ -24,7 +26,7 @@ pub fn draw(gs: &mut GlobalState, workspace: &mut Workspace, _ft: &mut Tree, _t:
     if let Some(editor) = workspace.get_active() {
         editor.render(gs)?;
     }
-    Ok(())
+    gs.message.render(gs.theme.accent_style, &mut gs.writer)
 }
 
 pub fn draw_with_tree(
@@ -38,88 +40,25 @@ pub fn draw_with_tree(
     if let Some(editor) = workspace.get_active() {
         editor.render(gs)?;
     }
-    Ok(())
+    gs.message.render(gs.theme.accent_style, &mut gs.writer)
 }
 
-pub fn draw_with_popup(
+pub fn draw_popup(
     gs: &mut GlobalState,
     workspace: &mut Workspace,
     tree: &mut Tree,
     term: &mut EditorTerminal,
 ) -> Result<()> {
-    workspace.render(gs)?;
-    if let Some(editor) = workspace.get_active() {
-        editor.render(gs)?;
-    }
+    gs.message.render(gs.theme.accent_style, &mut gs.writer)?;
     gs.render_popup_if_exists()
 }
 
-pub fn draw_with_term(
+pub fn draw_term(
     gs: &mut GlobalState,
     workspace: &mut Workspace,
     tree: &mut Tree,
     term: &mut EditorTerminal,
 ) -> Result<()> {
-    workspace.render(gs)?;
-    if let Some(editor) = workspace.get_active() {
-        editor.render(gs)?;
-    }
+    gs.message.render(gs.theme.accent_style, &mut gs.writer)?;
     term.render(gs)
-}
-
-pub fn draw_with_term_and_popup(
-    gs: &mut GlobalState,
-    workspace: &mut Workspace,
-    tree: &mut Tree,
-    term: &mut EditorTerminal,
-) -> Result<()> {
-    workspace.render(gs)?;
-    if let Some(editor) = workspace.get_active() {
-        editor.render(gs)?;
-    }
-    term.render(gs)?;
-    gs.render_popup_if_exists()
-}
-
-pub fn draw_with_tree_and_popup(
-    gs: &mut GlobalState,
-    workspace: &mut Workspace,
-    tree: &mut Tree,
-    term: &mut EditorTerminal,
-) -> Result<()> {
-    tree.render(gs)?;
-    workspace.render(gs)?;
-    if let Some(editor) = workspace.get_active() {
-        editor.render(gs)?;
-    }
-    term.render(gs)
-}
-
-pub fn draw_with_tree_and_term(
-    gs: &mut GlobalState,
-    workspace: &mut Workspace,
-    tree: &mut Tree,
-    term: &mut EditorTerminal,
-) -> Result<()> {
-    tree.render(gs)?;
-    workspace.render(gs)?;
-    if let Some(editor) = workspace.get_active() {
-        editor.render(gs)?;
-    }
-    Ok(())
-}
-
-pub fn draw_full(
-    gs: &mut GlobalState,
-    workspace: &mut Workspace,
-    tree: &mut Tree,
-    term: &mut EditorTerminal,
-) -> Result<()> {
-    tree.render(gs)?;
-    workspace.render(gs)?;
-    if let Some(editor) = workspace.get_active() {
-        editor.render(gs)?;
-    }
-    term.render(gs)?;
-    gs.render_popup_if_exists()
 }
