@@ -3,6 +3,7 @@ use crate::{
     render::{
         backend::{color, Backend, Color, Style},
         layout::{Line, RectIter},
+        utils::truncate_str,
     },
     syntax::{DiagnosticLine, Lang, Lexer, Token},
     workspace::{cursor::Cursor, line::EditorLine, CursorPosition},
@@ -282,8 +283,8 @@ impl EditorLine for CodeLine {
                 if line_width > self.content.len() {
                     build_line(&self.content, &self.tokens, backend)
                 } else {
-                    let end_loc = line_width.saturating_sub(2);
-                    shrank_line(unsafe { self.content.get_unchecked(..end_loc) }, &self.tokens, backend)
+                    let max_len = line_width.saturating_sub(2);
+                    shrank_line(truncate_str(&self.content, max_len), &self.tokens, backend)
                 }
             }
         }?;

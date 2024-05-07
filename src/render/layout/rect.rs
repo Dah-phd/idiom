@@ -1,8 +1,9 @@
 use crate::render::{
     backend::{Backend, Color, Style},
     layout::{BorderSet, Borders, Line, BORDERS},
+    utils::truncate_str,
 };
-use std::{fmt::Display, io::Write, ops::Range};
+use std::{io::Write, ops::Range};
 
 #[derive(Default, Clone, Copy, Debug)]
 pub struct Rect {
@@ -229,7 +230,7 @@ impl Rect {
     #[inline]
     pub fn border_title(&self, text: &str, backend: &mut Backend) -> std::io::Result<()> {
         if self.borders.contains(Borders::TOP) {
-            return backend.print_at(self.row - 1, self.col, text);
+            return backend.print_at(self.row - 1, self.col, truncate_str(text, self.width));
         }
         Ok(())
     }
@@ -238,7 +239,7 @@ impl Rect {
     #[inline]
     pub fn border_title_styled(&self, text: &str, style: Style, backend: &mut Backend) -> std::io::Result<()> {
         if self.borders.contains(Borders::TOP) {
-            return backend.print_styled_at(self.row - 1, self.col, text, style);
+            return backend.print_styled_at(self.row - 1, self.col, truncate_str(text, self.width), style);
         }
         Ok(())
     }
@@ -248,7 +249,7 @@ impl Rect {
     #[inline]
     pub fn border_title_bot(&self, text: &str, backend: &mut Backend) -> std::io::Result<()> {
         if self.borders.contains(Borders::BOTTOM) {
-            return backend.print_at(self.row + self.height + 1, self.col, text);
+            return backend.print_at(self.row + self.height + 1, self.col, truncate_str(text, self.width));
         }
         Ok(())
     }
@@ -257,7 +258,12 @@ impl Rect {
     #[inline]
     pub fn border_title_bot_styled(&self, text: &str, style: Style, backend: &mut Backend) -> std::io::Result<()> {
         if self.borders.contains(Borders::BOTTOM) {
-            return backend.print_styled_at(self.row + self.height + 1, self.col, text, style);
+            return backend.print_styled_at(
+                self.row + self.height + 1,
+                self.col,
+                truncate_str(text, self.width),
+                style,
+            );
         }
         Ok(())
     }

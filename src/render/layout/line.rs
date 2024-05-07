@@ -1,4 +1,7 @@
-use crate::render::backend::{Backend, Style};
+use crate::render::{
+    backend::{Backend, Style},
+    utils::{truncate_str, truncate_str_start},
+};
 use std::{
     cmp::Ordering,
     io::{Result, Write},
@@ -26,34 +29,26 @@ impl Line {
     }
 
     #[inline]
-    pub fn render_centered(self, mut text: &str, backend: &mut Backend) -> std::io::Result<()> {
-        if text.len() > self.width {
-            text = unsafe { text.get_unchecked(..self.width) };
-        }
+    pub fn render_centered(self, text: &str, backend: &mut Backend) -> std::io::Result<()> {
+        let text = truncate_str(text, self.width);
         backend.print_at(self.row, self.col, format!("{text:^width$}", width = self.width))
     }
 
     #[inline]
-    pub fn render_centered_styled(self, mut text: &str, style: Style, backend: &mut Backend) -> std::io::Result<()> {
-        if text.len() > self.width {
-            text = unsafe { text.get_unchecked(..self.width) };
-        }
+    pub fn render_centered_styled(self, text: &str, style: Style, backend: &mut Backend) -> std::io::Result<()> {
+        let text = truncate_str(text, self.width);
         backend.print_styled_at(self.row, self.col, format!("{text:>width$}", width = self.width), style)
     }
 
     #[inline]
-    pub fn render_left(self, mut text: &str, backend: &mut Backend) -> std::io::Result<()> {
-        if text.len() > self.width {
-            text = unsafe { text.get_unchecked(..self.width) };
-        }
+    pub fn render_left(self, text: &str, backend: &mut Backend) -> std::io::Result<()> {
+        let text = truncate_str_start(text, self.width);
         backend.print_at(self.row, self.col, format!("{text:>width$}", width = self.width))
     }
 
     #[inline]
-    pub fn render_left_styled(self, mut text: &str, style: Style, backend: &mut Backend) -> std::io::Result<()> {
-        if text.len() > self.width {
-            text = unsafe { text.get_unchecked(..self.width) };
-        }
+    pub fn render_left_styled(self, text: &str, style: Style, backend: &mut Backend) -> std::io::Result<()> {
+        let text = truncate_str_start(text, self.width);
         backend.print_styled_at(self.row, self.col, format!("{text:^width$}", width = self.width), style)
     }
 
@@ -65,7 +60,7 @@ impl Line {
     #[inline]
     pub fn render(self, text: &str, backend: &mut Backend) -> Result<()> {
         match text.len().cmp(&self.width) {
-            Ordering::Greater => backend.print_at(self.row, self.col, unsafe { text.get_unchecked(..self.width) }),
+            Ordering::Greater => backend.print_at(self.row, self.col, truncate_str(text, self.width)),
             Ordering::Equal => backend.print_at(self.row, self.col, text),
             Ordering::Less => backend.print_at(self.row, self.col, format!("{text:width$}", width = self.width)),
         }
@@ -74,9 +69,7 @@ impl Line {
     #[inline]
     pub fn render_styled(self, text: &str, style: Style, backend: &mut Backend) -> Result<()> {
         match text.len().cmp(&self.width) {
-            Ordering::Greater => {
-                backend.print_styled_at(self.row, self.col, unsafe { text.get_unchecked(..self.width) }, style)
-            }
+            Ordering::Greater => backend.print_styled_at(self.row, self.col, truncate_str(text, self.width), style),
             Ordering::Equal => backend.print_styled_at(self.row, self.col, text, style),
             Ordering::Less => {
                 backend.print_styled_at(self.row, self.col, format!("{text:width$}", width = self.width), style)
@@ -153,7 +146,7 @@ impl<'a> LineBuilder<'a> {
     /// returns Ok(bool) -> if true line is not full, false the line is finished
     pub fn push(&mut self, text: &str) -> std::io::Result<bool> {
         if text.len() > self.remaining {
-            self.backend.print(unsafe { text.get_unchecked(..self.remaining) })?;
+            self.backend.print(truncate_str(text, self.remaining))?;
             self.remaining = 0;
             return Ok(false);
         }
@@ -165,7 +158,7 @@ impl<'a> LineBuilder<'a> {
     /// push with style
     pub fn push_styled(&mut self, text: &str, style: Style) -> std::io::Result<bool> {
         if text.len() > self.remaining {
-            self.backend.print_styled(unsafe { text.get_unchecked(..self.remaining) }, style)?;
+            self.backend.print_styled(truncate_str(text, self.remaining), style)?;
             self.remaining = 0;
             return Ok(false);
         }
@@ -200,7 +193,7 @@ impl<'a> LineBuilderRev<'a> {
     /// returns Ok(bool) -> if true line is not full, false the line is finished
     pub fn push(&mut self, text: &str) -> std::io::Result<bool> {
         if text.len() > self.remaining {
-            self.backend.print_at(self.row, self.col, unsafe { text.get_unchecked(text.len() - self.remaining..) })?;
+            self.backend.print_at(self.row, self.col, truncate_str_start(text, self.remaining))?;
             self.remaining = 0;
             return Ok(false);
         }
@@ -212,12 +205,7 @@ impl<'a> LineBuilderRev<'a> {
     /// push with style
     pub fn push_styled(&mut self, text: &str, style: Style) -> std::io::Result<bool> {
         if text.len() > self.remaining {
-            self.backend.print_styled_at(
-                self.row,
-                self.col,
-                unsafe { text.get_unchecked(text.len() - self.remaining..) },
-                style,
-            )?;
+            self.backend.print_styled_at(self.row, self.col, truncate_str_start(text, self.remaining), style)?;
             self.remaining = 0;
             return Ok(false);
         }
