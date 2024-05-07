@@ -4,7 +4,7 @@ use super::PopupInterface;
 use crate::{
     global_state::{Clipboard, GlobalState, PopupMessage},
     render::{
-        backend::{color, Backend, Style},
+        backend::{Backend, Style},
         layout::Line,
         state::State,
         Button,
@@ -26,7 +26,8 @@ impl PopupInterface for Popup {
         let (height, width) = self.size.unwrap_or((6, 40));
         let mut area = gs.screen_rect.center(height, width);
         area.bordered();
-        area.draw_borders(None, color::reset(), &mut gs.writer)?;
+        area.draw_borders(None, None, &mut gs.writer)?;
+        area.border_title(self.title(), &mut gs.writer)?;
         let mut lines = area.into_iter();
         if let Some(first_line) = lines.next() {
             self.p_from_message(first_line, &mut gs.writer)?;

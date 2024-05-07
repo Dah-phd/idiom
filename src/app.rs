@@ -45,7 +45,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> Result<()> {
 
         workspace.render(&mut gs)?;
 
-        tree.direct_render(&mut gs)?;
+        tree.render(&mut gs)?;
 
         gs.render_popup_if_exists()?;
 

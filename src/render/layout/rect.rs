@@ -2,7 +2,7 @@ use crate::render::{
     backend::{Backend, Color, Style},
     layout::{BorderSet, Borders, Line, BORDERS},
 };
-use std::{io::Write, ops::Range};
+use std::{fmt::Display, io::Write, ops::Range};
 
 #[derive(Default, Clone, Copy, Debug)]
 pub struct Rect {
@@ -128,6 +128,28 @@ impl Rect {
         Self { row, col, width, height, ..Default::default() }
     }
 
+    pub fn left(&self, cols: usize) -> Self {
+        let width = std::cmp::min(cols, self.width);
+        Rect { row: self.row, col: self.col, height: self.height, width, ..Default::default() }
+    }
+
+    pub fn right(&self, cols: usize) -> Self {
+        let width = std::cmp::min(cols, self.width);
+        let col = self.col + (self.width - width) as u16;
+        Rect { row: self.row, col, height: self.height, width, ..Default::default() }
+    }
+
+    pub fn top(&self, rows: u16) -> Self {
+        let height = std::cmp::min(rows, self.height);
+        Rect { row: self.row, col: self.col, height, width: self.width, ..Default::default() }
+    }
+
+    pub fn bot(&self, rows: u16) -> Self {
+        let height = std::cmp::min(rows, self.height);
+        let row = self.row + (self.height - height);
+        Rect { row, col: self.col, height, width: self.width, ..Default::default() }
+    }
+
     pub fn right_top_corner(&self, mut height: u16, mut width: usize) -> Self {
         height = std::cmp::min(self.height, height);
         width = std::cmp::min(self.width, width);
@@ -156,6 +178,7 @@ impl Rect {
         Self { row: self.row, col, width, height, ..Default::default() }
     }
 
+    #[inline]
     pub fn bordered(&mut self) {
         self.col += 1;
         self.row += 1;
@@ -164,6 +187,7 @@ impl Rect {
         self.borders = Borders::all();
     }
 
+    #[inline]
     pub fn top_border(&mut self) -> &mut Self {
         self.row += 1;
         self.height -= 1;
@@ -171,27 +195,26 @@ impl Rect {
         self
     }
 
+    #[inline]
     pub fn bot_border(&mut self) -> &mut Self {
         self.height -= 1;
         self.borders.insert(Borders::BOTTOM);
         self
     }
 
+    #[inline]
     pub fn right_border(&mut self) -> &mut Self {
         self.width -= 1;
         self.borders.insert(Borders::RIGHT);
         self
     }
 
+    #[inline]
     pub fn left_border(&mut self) -> &mut Self {
         self.col += 1;
         self.width -= 1;
         self.borders.insert(Borders::LEFT);
         self
-    }
-
-    pub fn absoute_diffs(&self) -> (u16, u16, usize) {
-        (self.row, self.col, self.height as usize)
     }
 
     pub fn clear(&self, writer: &mut Backend) -> std::io::Result<()> {
@@ -201,7 +224,49 @@ impl Rect {
         writer.flush()
     }
 
-    pub fn draw_borders(&self, set: Option<BorderSet>, fg: Color, writer: &mut Backend) -> std::io::Result<()> {
+    /// renders title if top border exists
+    /// !!! this needs to happen after border rendering
+    #[inline]
+    pub fn border_title(&self, text: impl Display, backend: &mut Backend) -> std::io::Result<()> {
+        if self.borders.contains(Borders::TOP) {
+            return backend.print_at(self.row - 1, self.col, text);
+        }
+        Ok(())
+    }
+
+    /// border_title with style
+    #[inline]
+    pub fn border_title_styled(&self, text: impl Display, style: Style, backend: &mut Backend) -> std::io::Result<()> {
+        if self.borders.contains(Borders::TOP) {
+            return backend.print_styled_at(self.row - 1, self.col, text, style);
+        }
+        Ok(())
+    }
+
+    /// renders title if bottom border exists
+    /// !!! this needs to happen after border rendering
+    #[inline]
+    pub fn border_title_bot(&self, text: impl Display, backend: &mut Backend) -> std::io::Result<()> {
+        if self.borders.contains(Borders::BOTTOM) {
+            return backend.print_at(self.row + self.height + 1, self.col, text);
+        }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn border_title_bot_styled(
+        &self,
+        text: impl Display,
+        style: Style,
+        backend: &mut Backend,
+    ) -> std::io::Result<()> {
+        if self.borders.contains(Borders::BOTTOM) {
+            return backend.print_styled_at(self.row + self.height + 1, self.col, text, style);
+        }
+        Ok(())
+    }
+
+    pub fn draw_borders(&self, set: Option<BorderSet>, fg: Option<Color>, writer: &mut Backend) -> std::io::Result<()> {
         let top = self.borders.contains(Borders::TOP);
         let bot = self.borders.contains(Borders::BOTTOM);
         let left = self.borders.contains(Borders::LEFT);
@@ -221,7 +286,9 @@ impl Rect {
 
         let set = set.unwrap_or(BORDERS);
         writer.save_cursor()?;
-        writer.set_style(Style::fg(fg))?;
+        if let Some(color) = fg {
+            writer.set_style(Style::fg(color))?;
+        };
         if top {
             for col_idx in col..last_col {
                 writer.go_to(row, col_idx)?;
@@ -262,7 +329,9 @@ impl Rect {
             writer.go_to(last_row, last_col)?;
             writer.print(set.bot_right_qorner)?;
         }
-        writer.reset_style()?;
+        if fg.is_some() {
+            writer.reset_style()?;
+        }
         writer.restore_cursor()?;
         writer.flush()
     }

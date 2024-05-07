@@ -49,12 +49,14 @@ enum Mode {
 type KeyMapCallback =
     fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> std::io::Result<bool>;
 type MouseMapCallback = fn(&mut GlobalState, MouseEvent, &mut Tree, &mut Workspace);
+type DrawCallback = fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal) -> std::io::Result<()>;
 
 pub struct GlobalState {
     mode: Mode,
     tree_size: usize,
     key_mapper: KeyMapCallback,
     mouse_mapper: MouseMapCallback,
+    draw_callback: DrawCallback,
     pub theme: UITheme,
     pub writer: Backend,
     pub popup: Option<Box<dyn PopupInterface>>,
@@ -73,12 +75,12 @@ pub struct GlobalState {
 
 impl GlobalState {
     pub fn new(backend: Backend) -> std::io::Result<Self> {
-        let screen_rect = crossterm::terminal::size()?.into();
         let mut new = Self {
             mode: Mode::default(),
             tree_size: 15,
             key_mapper: controls::map_tree,
             mouse_mapper: controls::mouse_handler,
+            draw_callback: draw::draw_with_tree,
             theme: UITheme::new().unwrap_or_default(),
             writer: backend,
             popup: None,
@@ -86,7 +88,7 @@ impl GlobalState {
             tree: Vec::default(),
             clipboard: Clipboard::default(),
             exit: false,
-            screen_rect,
+            screen_rect: Backend::screen()?,
             tree_area: Rect::default(),
             tab_area: Rect::default(),
             editor_area: Rect::default(),
@@ -97,6 +99,16 @@ impl GlobalState {
         new.recalc_draw_size();
         new.select_mode();
         Ok(new)
+    }
+
+    #[inline]
+    pub fn draw(
+        &mut self,
+        workspace: &mut Workspace,
+        tree: &mut Tree,
+        term: &mut EditorTerminal,
+    ) -> std::io::Result<()> {
+        (self.draw_callback)(self, workspace, tree, term)
     }
 
     pub fn render_stats(&mut self, len: usize, select_len: usize, cursor: CursorPosition) -> std::io::Result<()> {
@@ -113,6 +125,33 @@ impl GlobalState {
             self.writer.reset_style()?;
         }
         Ok(())
+    }
+
+    fn find_draw_callback(&self) -> DrawCallback {
+        let with_term = self.components.contains(Components::TERM);
+        let with_popup = self.components.contains(Components::POPUP);
+        if matches!(self.mode, Mode::Select) || self.components.contains(Components::TREE) {
+            if with_term && with_popup {
+                return draw::draw_full;
+            }
+            if self.components.contains(Components::TERM) {
+                return draw::draw_with_tree_and_term;
+            }
+            if self.components.contains(Components::POPUP) {
+                return draw::draw_with_tree_and_popup;
+            }
+            return draw::draw_with_tree;
+        }
+        if with_popup && with_term {
+            return draw::draw_with_term_and_popup;
+        }
+        if with_term {
+            return draw::draw_with_term;
+        }
+        if with_popup {
+            return draw::draw_with_popup;
+        }
+        draw::draw
     }
 
     pub fn map_key(
@@ -290,7 +329,7 @@ impl GlobalState {
             self.tab_area = self.tree_area.keep_col((self.tree_size * self.screen_rect.width) / 100);
             let _ = self.tree_area.top_border().right_border().draw_borders(
                 Some(DOUBLE_BORDERS),
-                color::dark_grey(),
+                Some(color::dark_grey()),
                 &mut self.writer,
             );
         };

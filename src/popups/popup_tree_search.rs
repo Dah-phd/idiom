@@ -2,7 +2,7 @@ use super::PopupInterface;
 use crate::{
     global_state::{Clipboard, GlobalState, PopupMessage, TreeEvent},
     render::{
-        backend::color,
+        backend::{color, Style},
         layout::{LineBuilder, BORDERS},
         state::State,
         TextField,
@@ -14,6 +14,10 @@ use std::{io::Write, path::PathBuf, sync::Arc};
 use tokio::{sync::Mutex, task::JoinHandle};
 
 type SearchResult = (PathBuf, String, usize);
+
+const PATH_SEARCH_TITLE: &str = " Path search (Tab to switch to in File search) ";
+const FILE_SEARCH_TITLE: &str = " File search (Selected - Tab to switch to Full mode) ";
+const FULL_SEARCH_TITLE: &str = " File search (Full) ";
 
 pub struct ActivePathSearch {
     options: Vec<PathBuf>,
@@ -54,7 +58,8 @@ impl PopupInterface for ActivePathSearch {
     fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
         let mut area = gs.screen_rect.center(20, 120);
         area.bordered();
-        area.draw_borders(None, color::reset(), &mut gs.writer)?;
+        area.draw_borders(None, None, &mut gs.writer)?;
+        area.border_title_styled(PATH_SEARCH_TITLE, Style::fg(color::blue()), &mut gs.writer)?;
         let mut lines = area.into_iter();
         if let Some(line) = lines.next() {
             self.pattern.widget(line, &mut gs.writer)?;
@@ -147,7 +152,11 @@ impl PopupInterface for ActiveFileSearch {
         }
         let mut area = gs.screen_rect.center(20, 120);
         area.bordered();
-        area.draw_borders(None, color::reset(), &mut gs.writer)?;
+        area.draw_borders(None, None, &mut gs.writer)?;
+        match self.mode {
+            Mode::Full => area.border_title_styled(FULL_SEARCH_TITLE, Style::fg(color::red()), &mut gs.writer)?,
+            Mode::Select => area.border_title_styled(FILE_SEARCH_TITLE, Style::fg(color::yellow()), &mut gs.writer)?,
+        }
         let mut lines = area.into_iter();
         if let Some(line) = lines.next() {
             self.pattern.widget(line, &mut gs.writer)?;

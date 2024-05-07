@@ -52,7 +52,7 @@ impl Tree {
         }
     }
 
-    pub fn direct_render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+    pub fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
         gs.writer.save_cursor()?;
         let options = self.tree_ptrs.iter().flat_map(|ptr| unsafe { ptr.as_ref() }.map(|tp| tp.direct_display()));
         self.state.render_list_styled(options, &gs.tree_area, &mut gs.writer)?;

@@ -7,7 +7,7 @@ use crossterm::{
     cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show},
     execute, queue,
     style::{Color as CTColor, Print, ResetColor, SetStyle},
-    terminal::{Clear, ClearType},
+    terminal::{size, Clear, ClearType},
 };
 use std::{
     fmt::Display,
@@ -15,6 +15,8 @@ use std::{
 };
 
 pub use style::Style;
+
+use crate::render::layout::Rect;
 pub type Color = CTColor;
 
 /// Thin wrapper around rendering framework, allowing easy switching of backend
@@ -74,6 +76,12 @@ impl Backend {
         return Ok(());
         #[cfg(not(test))]
         graceful_exit()
+    }
+
+    /// get whole screen as rect
+    #[inline]
+    pub fn screen() -> Result<Rect> {
+        size().map(|size| Rect::from(size))
     }
 
     /// clears from cursor until the End Of Line
