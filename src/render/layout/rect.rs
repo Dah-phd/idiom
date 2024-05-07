@@ -1,62 +1,8 @@
-use crate::render::backend::{Backend, Color, Style};
-use bitflags::bitflags;
-use std::{
-    cmp::Ordering,
-    io::{Result, Write},
-    ops::{AddAssign, Range, SubAssign},
+use crate::render::{
+    backend::{Backend, Color, Style},
+    layout::{BorderSet, Borders, Line, BORDERS},
 };
-
-pub const BORDERS: BorderSet = BorderSet {
-    top_left_qorner: "┌",
-    top_right_qorner: "┐",
-    bot_left_qorner: "└",
-    bot_right_qorner: "┘",
-    vertical: "│",
-    horizontal: "─",
-};
-
-pub const DOUBLE_BORDERS: BorderSet = BorderSet {
-    top_left_qorner: "╔",
-    top_right_qorner: "╗",
-    bot_left_qorner: "╚",
-    bot_right_qorner: "╝",
-    vertical: "║",
-    horizontal: "═",
-};
-
-bitflags! {
-    /// Bitflags that can be composed to set the visible borders essentially on the block widget.
-    #[derive(Default, Clone, Copy, Eq, PartialEq, Hash, Debug)]
-    pub struct Borders: u8 {
-        /// Show no border (default)
-        const NONE   = 0b0000;
-        /// Show the top border
-        const TOP    = 0b0001;
-        /// Show the right border
-        const RIGHT  = 0b0010;
-        /// Show the bottom border
-        const BOTTOM = 0b0100;
-        /// Show the left border
-        const LEFT   = 0b1000;
-        /// Show all borders
-        const ALL = Self::TOP.bits() | Self::RIGHT.bits() | Self::BOTTOM.bits() | Self::LEFT.bits();
-    }
-}
-
-pub struct BorderSet {
-    pub top_left_qorner: &'static str,
-    pub top_right_qorner: &'static str,
-    pub bot_left_qorner: &'static str,
-    pub bot_right_qorner: &'static str,
-    pub vertical: &'static str,
-    pub horizontal: &'static str,
-}
-
-impl BorderSet {
-    pub const fn double() -> Self {
-        DOUBLE_BORDERS
-    }
-}
+use std::{io::Write, ops::Range};
 
 #[derive(Default, Clone, Copy, Debug)]
 pub struct Rect {
@@ -347,6 +293,18 @@ impl RectIter<'_> {
     pub fn width(&self) -> usize {
         self.rect.width
     }
+
+    /// returns the remaining lines as rect (None if all lines are used)
+    pub fn to_rect(mut self) -> Option<Rect> {
+        let height = self.row_range.len() as u16;
+        self.row_range.next().map(|row| Rect {
+            row,
+            col: self.rect.col,
+            width: self.rect.width,
+            height,
+            ..Default::default()
+        })
+    }
 }
 
 impl<'a> Iterator for RectIter<'a> {
@@ -361,229 +319,5 @@ impl<'a> IntoIterator for &'a Rect {
     type Item = Line;
     fn into_iter(self) -> Self::IntoIter {
         RectIter { rect: self, row_range: self.row..self.row + self.height }
-    }
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct Line {
-    pub row: u16,
-    pub col: u16,
-    pub width: usize,
-}
-
-impl Line {
-    #[inline]
-    pub fn render_centered(self, mut text: &str, backend: &mut Backend) -> std::io::Result<()> {
-        if text.len() > self.width {
-            text = unsafe { text.get_unchecked(..self.width) };
-        }
-        backend.print_at(self.row, self.col, format!("{text:^width$}", width = self.width))
-    }
-
-    #[inline]
-    pub fn render_centered_styled(self, mut text: &str, style: Style, backend: &mut Backend) -> std::io::Result<()> {
-        if text.len() > self.width {
-            text = unsafe { text.get_unchecked(..self.width) };
-        }
-        backend.print_styled_at(self.row, self.col, format!("{text:>width$}", width = self.width), style)
-    }
-
-    #[inline]
-    pub fn render_left(self, mut text: &str, backend: &mut Backend) -> std::io::Result<()> {
-        if text.len() > self.width {
-            text = unsafe { text.get_unchecked(..self.width) };
-        }
-        backend.print_at(self.row, self.col, format!("{text:>width$}", width = self.width))
-    }
-
-    #[inline]
-    pub fn render_left_styled(self, mut text: &str, style: Style, backend: &mut Backend) -> std::io::Result<()> {
-        if text.len() > self.width {
-            text = unsafe { text.get_unchecked(..self.width) };
-        }
-        backend.print_styled_at(self.row, self.col, format!("{text:^width$}", width = self.width), style)
-    }
-
-    #[inline]
-    pub fn render_empty(self, backend: &mut Backend) -> std::io::Result<()> {
-        backend.print_at(self.row, self.col, format!("{:width$}", "", width = self.width))
-    }
-
-    #[inline]
-    pub fn render(self, text: &str, backend: &mut Backend) -> Result<()> {
-        match text.len().cmp(&self.width) {
-            Ordering::Greater => backend.print_at(self.row, self.col, unsafe { text.get_unchecked(..self.width) }),
-            Ordering::Equal => backend.print_at(self.row, self.col, text),
-            Ordering::Less => backend.print_at(self.row, self.col, format!("{text:width$}", width = self.width)),
-        }
-    }
-
-    #[inline]
-    pub fn render_styled(self, text: &str, style: Style, backend: &mut Backend) -> Result<()> {
-        match text.len().cmp(&self.width) {
-            Ordering::Greater => {
-                backend.print_styled_at(self.row, self.col, unsafe { text.get_unchecked(..self.width) }, style)
-            }
-            Ordering::Equal => backend.print_styled_at(self.row, self.col, text, style),
-            Ordering::Less => {
-                backend.print_styled_at(self.row, self.col, format!("{text:width$}", width = self.width), style)
-            }
-        }
-    }
-
-    /// creates line builder from Line
-    /// push/push_styled can be used to add to line
-    /// on drop pads the line to end
-    #[inline]
-    pub fn unsafe_builder<'a>(self, backend: &'a mut Backend) -> std::io::Result<LineBuilder<'a>> {
-        backend.go_to(self.row, self.col).map(|_| LineBuilder {
-            row: self.row,
-            col: self.col,
-            remaining: self.width,
-            backend,
-        })
-    }
-
-    /// creates reverse builder from Line
-    /// push/push_styled can be used to add to line
-    /// on drop pads the line to end
-    #[inline]
-    pub fn unsafe_builder_rev<'a>(self, backend: &'a mut Backend) -> std::io::Result<LineBuilderRev<'a>> {
-        let remaining = self.width;
-        let col = self.col;
-        let row = self.row;
-        self.render_empty(backend)?;
-        Ok(LineBuilderRev { remaining, backend, row, col })
-    }
-}
-
-impl AddAssign<usize> for Line {
-    fn add_assign(&mut self, rhs: usize) {
-        let offset = std::cmp::min(rhs, self.width);
-        self.width -= offset;
-        self.col += offset as u16;
-    }
-}
-
-impl AddAssign<u16> for Line {
-    fn add_assign(&mut self, rhs: u16) {
-        let offset = std::cmp::min(rhs, self.width as u16);
-        self.width -= offset as usize;
-        self.col += offset;
-    }
-}
-
-impl SubAssign<usize> for Line {
-    fn sub_assign(&mut self, rhs: usize) {
-        let offset = std::cmp::min(rhs, self.col as usize);
-        self.width += offset;
-        self.col -= offset as u16;
-    }
-}
-
-impl SubAssign<u16> for Line {
-    fn sub_assign(&mut self, rhs: u16) {
-        let offset = std::cmp::min(rhs, self.col);
-        self.width += offset as usize;
-        self.col -= offset;
-    }
-}
-
-pub struct LineBuilder<'a> {
-    row: u16,
-    col: u16,
-    remaining: usize,
-    backend: &'a mut Backend,
-}
-
-impl<'a> LineBuilder<'a> {
-    /// returns Ok(bool) -> if true line is not full, false the line is finished
-    pub fn push(&mut self, text: &str) -> std::io::Result<bool> {
-        if text.len() > self.remaining {
-            self.backend.print(unsafe { text.get_unchecked(..self.remaining) })?;
-            self.remaining = 0;
-            return Ok(false);
-        }
-        self.remaining -= text.len();
-        self.backend.print(text)?;
-        Ok(true)
-    }
-
-    /// push with style
-    pub fn push_styled(&mut self, text: &str, style: Style) -> std::io::Result<bool> {
-        if text.len() > self.remaining {
-            self.backend.print_styled(unsafe { text.get_unchecked(..self.remaining) }, style)?;
-            self.remaining = 0;
-            return Ok(false);
-        }
-        self.remaining -= text.len();
-        self.backend.print_styled(text, style)?;
-        Ok(true)
-    }
-
-    pub fn to_line(self) -> Line {
-        Line { row: self.row, col: self.col, width: self.remaining }
-    }
-}
-
-impl Drop for LineBuilder<'_> {
-    /// ensure line is rendered and padded till end;
-    fn drop(&mut self) {
-        if self.remaining != 0 {
-            self.push(format!("{:width$}", "", width = self.remaining).as_str()).unwrap();
-        }
-        self.backend.flush().unwrap();
-    }
-}
-
-pub struct LineBuilderRev<'a> {
-    row: u16,
-    col: u16,
-    remaining: usize,
-    backend: &'a mut Backend,
-}
-
-impl<'a> LineBuilderRev<'a> {
-    /// returns Ok(bool) -> if true line is not full, false the line is finished
-    pub fn push(&mut self, text: &str) -> std::io::Result<bool> {
-        if text.len() > self.remaining {
-            self.backend.print_at(self.row, self.col, unsafe { text.get_unchecked(text.len() - self.remaining..) })?;
-            self.remaining = 0;
-            return Ok(false);
-        }
-        self.remaining -= text.len();
-        self.backend.print_at(self.row, self.col + self.remaining as u16, text)?;
-        Ok(true)
-    }
-
-    /// push with style
-    pub fn push_styled(&mut self, text: &str, style: Style) -> std::io::Result<bool> {
-        if text.len() > self.remaining {
-            self.backend.print_styled_at(
-                self.row,
-                self.col,
-                unsafe { text.get_unchecked(text.len() - self.remaining..) },
-                style,
-            )?;
-            self.remaining = 0;
-            return Ok(false);
-        }
-        self.remaining -= text.len();
-        self.backend.print_styled_at(self.row, self.col + self.remaining as u16, text, style)?;
-        Ok(true)
-    }
-
-    pub fn to_line(self) -> Line {
-        Line { row: self.row, col: self.col, width: self.remaining }
-    }
-}
-
-impl Drop for LineBuilderRev<'_> {
-    /// ensure line is rendered and padded till end;
-    fn drop(&mut self) {
-        if self.remaining != 0 {
-            self.push(format!("{:width$}", "", width = self.remaining).as_str()).unwrap();
-        }
-        self.backend.flush().unwrap();
     }
 }

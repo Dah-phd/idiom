@@ -1,26 +1,23 @@
 use super::PopupInterface;
 use crate::{
     global_state::{Clipboard, GlobalState, PopupMessage, TreeEvent},
-    render::{TextField, WrappedState},
+    render::{
+        backend::color,
+        layout::{LineBuilder, BORDERS},
+        state::State,
+        TextField,
+    },
     tree::Tree,
-    utils::REVERSED,
 };
-
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::{
-    layout::Constraint,
-    style::{Color, Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem},
-};
 use std::{io::Write, path::PathBuf, sync::Arc};
 use tokio::{sync::Mutex, task::JoinHandle};
 
-const SELECTOR_CONSTRAINTS: [Constraint; 2] = [Constraint::Min(3), Constraint::Percentage(100)];
+type SearchResult = (PathBuf, String, usize);
 
 pub struct ActivePathSearch {
     options: Vec<PathBuf>,
-    state: WrappedState,
+    state: State,
     pattern: TextField<PopupMessage>,
 }
 
@@ -28,7 +25,7 @@ impl ActivePathSearch {
     pub fn new() -> Box<Self> {
         Box::new(Self {
             options: Vec::new(),
-            state: WrappedState::default(),
+            state: State::default(),
             pattern: TextField::with_tree_access(String::new()),
         })
     }
@@ -40,14 +37,14 @@ impl PopupInterface for ActivePathSearch {
             return msg;
         }
         match key.code {
-            KeyCode::Up => self.state.prev(&self.options),
-            KeyCode::Down => self.state.next(&self.options),
+            KeyCode::Up => self.state.prev(self.options.len()),
+            KeyCode::Down => self.state.next(self.options.len()),
             KeyCode::Tab => return PopupMessage::Tree(TreeEvent::SearchFiles(self.pattern.text.to_owned())),
             KeyCode::Enter => {
-                return match self.state.selected() {
-                    Some(idx) if !self.options.is_empty() => TreeEvent::Open(self.options.remove(idx)).into(),
-                    _ => PopupMessage::Clear,
+                if self.options.len() > self.state.selected {
+                    return TreeEvent::Open(self.options.remove(self.state.selected)).into();
                 }
+                return PopupMessage::Clear;
             }
             _ => {}
         }
@@ -55,31 +52,28 @@ impl PopupInterface for ActivePathSearch {
     }
 
     fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
-        // let area = centered_rect_static(120, 20, frame.size());
-        // frame.render_widget(Clear, area);
-        // let split_areas = Layout::new(Direction::Vertical, SELECTOR_CONSTRAINTS).split(area);
-        // frame.render_widget(
-        //     self.pattern.widget().block(
-        //         Block::new()
-        //             .borders(Borders::ALL)
-        //             .title(" Path search (Tab to switch to in File search) ")
-        //             .title_style(Style { fg: Some(Color::LightBlue), ..Default::default() }),
-        //     ),
-        //     split_areas[0],
-        // );
-
-        let options = if self.options.is_empty() {
-            vec![ListItem::new("No results found!")]
-        } else {
-            self.options
-                .iter()
-                .map(|el| ListItem::new(marked_pat_span(&el.display().to_string(), &self.pattern.text)))
-                .collect::<Vec<_>>()
-        };
-        let list = List::new(options)
-            .block(Block::new().borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT))
-            .highlight_style(REVERSED);
-        // frame.render_stateful_widget(list, split_areas[1], self.state.get());
+        let mut area = gs.screen_rect.center(20, 120);
+        area.bordered();
+        area.draw_borders(None, color::reset(), &mut gs.writer)?;
+        let mut lines = area.into_iter();
+        if let Some(line) = lines.next() {
+            self.pattern.widget(line, &mut gs.writer)?;
+        }
+        if let Some(line) = lines.next() {
+            line.fill(BORDERS.horizontal, &mut gs.writer)?;
+        }
+        if let Some(list_rect) = lines.to_rect() {
+            if self.options.is_empty() {
+                self.state.render_list(["No results found!"].into_iter(), &list_rect, &mut gs.writer)?;
+            } else {
+                self.state.render_list_complex(
+                    &self.options,
+                    &[|path, mut builder| builder.push(&format!("{}", path.display())).map(|_| ())],
+                    &list_rect,
+                    &mut gs.writer,
+                )?;
+            }
+        }
         gs.writer.flush()
     }
 
@@ -89,7 +83,7 @@ impl PopupInterface for ActivePathSearch {
         } else {
             self.options = file_tree.search_paths(&self.pattern.text);
         };
-        self.state.drop();
+        self.state.select(0, self.options.len());
     }
 }
 
@@ -100,9 +94,9 @@ enum Mode {
 
 pub struct ActiveFileSearch {
     join_handle: Option<JoinHandle<()>>,
-    options: Vec<(PathBuf, String, usize)>,
-    option_buffer: Arc<Mutex<Vec<(PathBuf, String, usize)>>>,
-    state: WrappedState,
+    options: Vec<SearchResult>,
+    option_buffer: Arc<Mutex<Vec<SearchResult>>>,
+    state: State,
     mode: Mode,
     pattern: TextField<PopupMessage>,
 }
@@ -114,7 +108,7 @@ impl ActiveFileSearch {
             join_handle: None,
             option_buffer: Arc::default(),
             options: Vec::default(),
-            state: WrappedState::default(),
+            state: State::default(),
             pattern: TextField::with_tree_access(pattern),
         })
     }
@@ -126,8 +120,8 @@ impl PopupInterface for ActiveFileSearch {
             return msg;
         }
         match key.code {
-            KeyCode::Up => self.state.prev(&self.options),
-            KeyCode::Down => self.state.next(&self.options),
+            KeyCode::Up => self.state.prev(self.options.len()),
+            KeyCode::Down => self.state.next(self.options.len()),
             KeyCode::Tab => {
                 if matches!(self.mode, Mode::Full) {
                     return PopupMessage::Clear;
@@ -136,13 +130,11 @@ impl PopupInterface for ActiveFileSearch {
                 return PopupMessage::Tree(TreeEvent::PopupAccess);
             }
             KeyCode::Enter => {
-                return match self.state.selected() {
-                    Some(idx) if !self.options.is_empty() => {
-                        let (path, _, line) = self.options.remove(idx);
-                        TreeEvent::OpenAtLine(path, line).into()
-                    }
-                    _ => PopupMessage::Clear,
+                if self.options.len() > self.state.selected {
+                    let (path, _, line) = self.options.remove(self.state.selected);
+                    return TreeEvent::OpenAtLine(path, line).into();
                 }
+                return PopupMessage::Clear;
             }
             _ => {}
         }
@@ -153,30 +145,28 @@ impl PopupInterface for ActiveFileSearch {
         if let Ok(mut buffer) = self.option_buffer.try_lock() {
             self.options.extend(buffer.drain(..));
         }
-        // let area = centered_rect_static(120, 20, frame.size());
-        // frame.render_widget(Clear, area);
-        // let split_areas = Layout::new(Direction::Vertical, SELECTOR_CONSTRAINTS).split(area);
-        let block = match self.mode {
-            Mode::Full => Block::new()
-                .borders(Borders::ALL)
-                .title(" File search (Full) ")
-                .title_style(Style { fg: Some(Color::Red), ..Default::default() }),
-            Mode::Select => Block::new()
-                .borders(Borders::ALL)
-                .title(" File search (Selected - Tab to switch to Full mode) ")
-                .title_style(Style { fg: Some(Color::LightYellow), ..Default::default() }),
-        };
-        // frame.render_widget(self.pattern.widget().block(block), split_areas[0]);
-
-        let options = if self.options.is_empty() {
-            vec![ListItem::new("No results found!")]
-        } else {
-            self.options.iter().map(|el| ListItem::new(marked_pat_lines(el, &self.pattern.text))).collect::<Vec<_>>()
-        };
-        let list = List::new(options)
-            .block(Block::new().borders(Borders::BOTTOM | Borders::LEFT | Borders::RIGHT))
-            .highlight_style(REVERSED);
-        // frame.render_stateful_widget(list, split_areas[1], self.state.get());
+        let mut area = gs.screen_rect.center(20, 120);
+        area.bordered();
+        area.draw_borders(None, color::reset(), &mut gs.writer)?;
+        let mut lines = area.into_iter();
+        if let Some(line) = lines.next() {
+            self.pattern.widget(line, &mut gs.writer)?;
+        }
+        if let Some(line) = lines.next() {
+            line.fill(BORDERS.horizontal, &mut gs.writer)?;
+        }
+        if let Some(list_rect) = lines.to_rect() {
+            if self.options.is_empty() {
+                self.state.render_list(["No results found!"].into_iter(), &list_rect, &mut gs.writer)?;
+            } else {
+                self.state.render_list_complex(
+                    &self.options,
+                    &[build_path_line, build_text_line],
+                    &list_rect,
+                    &mut gs.writer,
+                )?;
+            }
+        }
         gs.writer.flush()
     }
 
@@ -208,23 +198,11 @@ impl PopupInterface for ActiveFileSearch {
     }
 }
 
-fn marked_pat_lines((path, line_txt, line_idx): &(PathBuf, String, usize), pat: &str) -> Vec<Line<'static>> {
-    let mut found_text_line = marked_pat_span(line_txt, pat);
-    found_text_line.spans.insert(0, Span::raw(format!("{}| ", line_idx)));
-    vec![Line::from(format!("{}", path.display())), found_text_line]
+fn build_path_line((path, ..): &SearchResult, mut builder: LineBuilder) -> std::io::Result<()> {
+    builder.push(&format!("{}", path.display())).map(|_| ())
 }
 
-fn marked_pat_span(option: &str, pat: &str) -> Line<'static> {
-    let mut v = Vec::new();
-    let mut from = 0;
-    for (idx, _) in option.match_indices(pat) {
-        v.push(Span::styled(option[from..idx].to_owned(), Style { add_modifier: Modifier::DIM, ..Default::default() }));
-        from = idx + pat.len();
-        v.push(Span::styled(
-            option[idx..from].to_owned(),
-            Style { add_modifier: Modifier::BOLD, ..Default::default() },
-        ));
-    }
-    v.push(Span::styled(option[from..].to_owned(), Style { add_modifier: Modifier::DIM, ..Default::default() }));
-    Line::from(v)
+fn build_text_line((.., line_txt, line_idx): &SearchResult, mut builder: LineBuilder) -> std::io::Result<()> {
+    builder.push(&format!("{line_idx}| "))?;
+    builder.push(&line_txt).map(|_| ())
 }

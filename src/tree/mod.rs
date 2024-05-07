@@ -4,7 +4,7 @@ use crate::{
     global_state::{GlobalState, WorkspaceEvent},
     lsp::Diagnostic,
     popups::popups_tree::{create_file_popup, rename_file_popup},
-    render::{backend::Style, state::State, widgets::paragraph_styled},
+    render::state::State,
     utils::{build_file_or_folder, to_relative_path},
 };
 use anyhow::Result;
@@ -107,7 +107,7 @@ impl Tree {
 
     pub fn mouse_select(&mut self, idx: usize) -> Option<PathBuf> {
         if self.tree_ptrs.len() >= idx {
-            self.state.select(idx.saturating_sub(1), self.tree_ptrs.len());
+            self.state.selected = idx.saturating_sub(1);
             if let Some(selected) = self.get_selected() {
                 match selected {
                     TreePath::Folder { tree: Some(..), .. } => {
@@ -198,7 +198,7 @@ impl Tree {
         let rel_result = to_relative_path(path);
         let path = rel_result.as_ref().unwrap_or(path);
         if self.tree.expand_contained(path) {
-            self.state.select(0, self.tree_ptrs.len());
+            self.state.selected = 0;
             self.selected_path = path.clone();
             self.force_sync();
         }
@@ -275,7 +275,7 @@ impl Tree {
             if &self.selected_path != selected.path() {
                 for (idx, tree_path) in self.tree_ptrs.iter_mut().flat_map(|ptr| unsafe { ptr.as_mut() }).enumerate() {
                     if tree_path.path() == &self.selected_path {
-                        self.state.select(idx, self.tree_ptrs.len());
+                        self.state.selected = idx;
                         break;
                     }
                 }

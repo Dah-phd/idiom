@@ -1,7 +1,10 @@
 use crate::render::layout::Rect;
 use std::io::Write;
 
-use super::backend::{Backend, Style};
+use super::{
+    backend::{Backend, Style},
+    layout::LineBuilder,
+};
 
 pub struct State {
     pub at_line: usize,
@@ -55,6 +58,47 @@ impl State {
         } else if self.selected - self.at_line >= limit {
             self.at_line = self.selected - limit + 1;
         };
+    }
+
+    #[inline]
+    pub fn render_list_complex<T>(
+        &mut self,
+        options: &[T],
+        callbacks: &[fn(&T, builder: LineBuilder) -> std::io::Result<()>],
+        rect: &Rect,
+        backend: &mut Backend,
+    ) -> std::io::Result<()> {
+        let limit = rect.height as usize / callbacks.len();
+        self.update_at_line(limit);
+        let mut lines = rect.into_iter();
+        for (idx, option) in options.iter().enumerate().skip(self.at_line) {
+            if idx == self.selected {
+                backend.set_style(self.highlight)?;
+                for callback in callbacks {
+                    match lines.next() {
+                        Some(line) => {
+                            (callback)(option, line.unsafe_builder(backend)?)?;
+                        }
+                        None => break,
+                    };
+                }
+                backend.reset_style()?;
+                continue;
+            };
+            for callback in callbacks {
+                match lines.next() {
+                    Some(line) => {
+                        (callback)(option, line.unsafe_builder(backend)?)?;
+                    }
+                    None => break,
+                };
+            }
+        }
+        backend.reset_style()?;
+        for line in lines {
+            line.render_empty(backend)?;
+        }
+        Ok(())
     }
 
     #[inline]
