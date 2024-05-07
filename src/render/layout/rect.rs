@@ -156,10 +156,6 @@ impl Rect {
         Self { row: self.row, col, width, height, ..Default::default() }
     }
 
-    pub fn rataui(rect: ratatui::layout::Rect) -> Self {
-        Self::new(rect.y, rect.x, rect.width as usize, rect.height)
-    }
-
     pub fn bordered(&mut self) {
         self.col += 1;
         self.row += 1;

@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Result};
-use ratatui::style::{Modifier, Style};
 use std::{
     ops::{Add, Sub},
     path::{Path, PathBuf},
@@ -7,8 +6,6 @@ use std::{
 };
 
 use crate::workspace::line::EditorLine;
-
-pub const REVERSED: Style = Style::new().add_modifier(Modifier::REVERSED);
 
 pub fn trim_start_inplace(line: &mut impl EditorLine) -> usize {
     if let Some(idx) = line.to_string().find(|c: char| !c.is_whitespace() && c != '\t') {

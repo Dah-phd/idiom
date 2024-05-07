@@ -1,8 +1,6 @@
 use self::autocomplete::try_autocomplete;
 use crate::render::TextField;
 use crate::runner::commands::load_file;
-use ratatui::prelude::Span;
-use ratatui::text::Line;
 mod autocomplete;
 mod commands;
 mod components;
@@ -13,9 +11,6 @@ use anyhow::Result;
 use commands::{load_cfg, overwrite_cfg, Terminal};
 use components::CmdHistory;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::widgets::{Block, Borders, Clear, List, ListItem};
-use ratatui::Frame;
 use std::sync::{Arc, Mutex};
 
 const IDIOM_PREFIX: &str = "%i";
@@ -37,20 +32,20 @@ impl EditorTerminal {
         Self { width, ..Default::default() }
     }
 
-    pub fn render(&mut self, frame: &mut Frame, screen: Rect) {
-        let screen_areas = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Percentage(50), Constraint::Min(2)])
-            .split(screen);
-        let tmux_area = screen_areas[1];
-        self.max_rows = tmux_area.height as usize;
-        self.poll_results();
-        frame.render_widget(Clear, tmux_area);
-        frame.render_widget(
-            List::new(self.get_list_items()).block(Block::default().title("Runner").borders(Borders::TOP)),
-            tmux_area,
-        );
-    }
+    // pub fn render(&mut self, frame: &mut Frame, screen: Rect) {
+    //     let screen_areas = Layout::default()
+    //         .direction(Direction::Vertical)
+    //         .constraints([Constraint::Percentage(50), Constraint::Min(2)])
+    //         .split(screen);
+    //     let tmux_area = screen_areas[1];
+    //     self.max_rows = tmux_area.height as usize;
+    //     self.poll_results();
+    //     frame.render_widget(Clear, tmux_area);
+    //     frame.render_widget(
+    //         List::new(self.get_list_items()).block(Block::default().title("Runner").borders(Borders::TOP)),
+    //         tmux_area,
+    //     );
+    // }
 
     pub fn activate(&mut self) {
         match self.terminal.as_mut() {
@@ -71,20 +66,20 @@ impl EditorTerminal {
         }
     }
 
-    pub fn get_list_items(&self) -> Vec<ListItem<'static>> {
-        let mut list = self
-            .logs
-            .iter()
-            .skip(self.at_log)
-            .take(self.max_rows)
-            .map(|line| ListItem::new(line.to_owned()))
-            .collect::<Vec<ListItem<'_>>>();
-        let prompt = self.prompt.as_ref().map(|p| into_guard(p).to_owned()).unwrap_or(String::from("[Dead terminal]"));
-        let mut line = vec![Span::raw(prompt)];
-        // self.cmd.insert_formatted_text(&mut line);
-        list.push(ListItem::new(Line::from(line)));
-        list
-    }
+    // pub fn get_list_items(&self) -> Vec<ListItem<'static>> {
+    //     let mut list = self
+    //         .logs
+    //         .iter()
+    //         .skip(self.at_log)
+    //         .take(self.max_rows)
+    //         .map(|line| ListItem::new(line.to_owned()))
+    //         .collect::<Vec<ListItem<'_>>>();
+    //     let prompt = self.prompt.as_ref().map(|p| into_guard(p).to_owned()).unwrap_or(String::from("[Dead terminal]"));
+    //     let mut line = vec![Span::raw(prompt)];
+    //     // self.cmd.insert_formatted_text(&mut line);
+    //     list.push(ListItem::new(Line::from(line)));
+    //     list
+    // }
 
     fn kill(&mut self, _gs: &mut GlobalState) {
         if let Some(terminal) = self.terminal.take() {
