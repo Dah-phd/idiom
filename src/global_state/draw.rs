@@ -27,6 +27,9 @@ pub fn full_rebuild(
 ) -> Result<()> {
     gs.screen_rect.clear(&mut gs.writer)?;
     gs.recalc_draw_size();
+    if let Some(line) = gs.footer_area.get_line(0) {
+        gs.mode.render(line, gs.theme.accent_style, &mut gs.writer)?;
+    }
     workspace.render(gs)?;
     match workspace.get_active() {
         Some(editor) => editor.render(gs),

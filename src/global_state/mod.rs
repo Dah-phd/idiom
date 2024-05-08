@@ -12,8 +12,8 @@ use crate::{
         PopupInterface,
     },
     render::{
-        backend::{color, Backend},
-        layout::{Rect, DOUBLE_BORDERS},
+        backend::{color, Backend, Style},
+        layout::{Line, Rect, DOUBLE_BORDERS},
     },
     runner::EditorTerminal,
     tree::Tree,
@@ -44,6 +44,32 @@ enum Mode {
     #[default]
     Select,
     Insert,
+}
+
+impl Mode {
+    #[inline]
+    fn render(&self, line: Line, accent_style: Style, backend: &mut Backend) -> std::io::Result<()> {
+        match self {
+            Self::Insert => Self::render_insert_mode(line, accent_style, backend),
+            Self::Select => Self::render_select_mode(line, accent_style, backend),
+        }
+    }
+
+    #[inline]
+    fn render_select_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) -> std::io::Result<()> {
+        line.width = SELECT_SPAN.len();
+        accent_style.add_bold();
+        accent_style.set_fg(Some(color::cyan()));
+        line.render_styled(SELECT_SPAN, accent_style, backend)
+    }
+
+    #[inline]
+    fn render_insert_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) -> std::io::Result<()> {
+        line.width = SELECT_SPAN.len();
+        accent_style.add_bold();
+        accent_style.set_fg(Some(color::rgb(255, 0, 0)));
+        line.render_styled(INSERT_SPAN, accent_style, backend)
+    }
 }
 
 type KeyMapCallback =
@@ -149,12 +175,7 @@ impl GlobalState {
             self.draw_callback = draw::full_rebuild;
         };
         if let Some(line) = self.footer_area.get_line(0) {
-            self.writer.save_cursor().unwrap();
-            let mut style = self.theme.accent_style;
-            style.set_fg(Some(color::cyan()));
-            style.add_bold();
-            line.render_styled(SELECT_SPAN, style, &mut self.writer).unwrap();
-            self.writer.restore_cursor().unwrap();
+            Mode::render_select_mode(line, self.theme.accent_style, &mut self.writer).unwrap();
         };
     }
 
@@ -166,12 +187,7 @@ impl GlobalState {
             self.draw_callback = draw::full_rebuild;
         };
         if let Some(line) = self.footer_area.get_line(0) {
-            self.writer.save_cursor().unwrap();
-            let mut style = self.theme.accent_style;
-            style.set_fg(Some(color::rgb(255, 0, 0)));
-            style.add_bold();
-            line.render_styled(INSERT_SPAN, style, &mut self.writer).unwrap();
-            self.writer.restore_cursor().unwrap();
+            Mode::render_insert_mode(line, self.theme.accent_style, &mut self.writer).unwrap();
         };
     }
 
