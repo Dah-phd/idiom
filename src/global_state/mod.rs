@@ -322,11 +322,13 @@ impl GlobalState {
         };
         if matches!(self.mode, Mode::Select) || self.components.contains(Components::TREE) {
             self.tab_area = self.tree_area.keep_col((self.tree_size * self.screen_rect.width) / 100);
-            let _ = self.tree_area.top_border().right_border().draw_borders(
-                Some(DOUBLE_BORDERS),
-                Some(color::dark_grey()),
-                &mut self.writer,
-            );
+            self.tree_area
+                .top_border()
+                .right_border()
+                .draw_borders(Some(DOUBLE_BORDERS), Some(color::dark_grey()), &mut self.writer)
+                .unwrap();
+        } else {
+            self.tab_area = self.tree_area.keep_col(0);
         };
         self.editor_area = self.tab_area.keep_rows(1);
     }

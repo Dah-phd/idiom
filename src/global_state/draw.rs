@@ -53,12 +53,13 @@ pub fn full_rebuild(
 
 #[inline]
 pub fn draw(gs: &mut GlobalState, workspace: &mut Workspace, _ft: &mut Tree, _t: &mut EditorTerminal) -> Result<()> {
-    gs.message.fast_render(gs.theme.accent_style, &mut gs.writer)?;
+    gs.writer.hide_cursor()?;
     workspace.render(gs)?;
     if let Some(editor) = workspace.get_active() {
-        return editor.render(gs);
-    };
-    Ok(())
+        editor.render(gs)
+    } else {
+        gs.message.fast_render(gs.theme.accent_style, &mut gs.writer)
+    }
 }
 
 #[inline]

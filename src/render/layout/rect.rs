@@ -103,13 +103,13 @@ impl Rect {
 
     /// Keep cols splitting the remaining into Rect
     pub fn keep_col(&mut self, cols: usize) -> Self {
-        let remaining_width = self.width.saturating_sub(cols);
-        self.width -= remaining_width;
+        let taken_width = self.width.saturating_sub(cols);
+        self.width -= taken_width;
         Self {
             row: self.row,
             col: self.col + self.width as u16,
             height: self.height,
-            width: remaining_width,
+            width: taken_width,
             borders: self.borders,
         }
     }
