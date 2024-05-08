@@ -8,7 +8,7 @@ mod message;
 use crate::{
     configs::UITheme,
     popups::{
-        popup_replace::ReplacePopup, popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges,
+        placeholder, popup_replace::ReplacePopup, popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges,
         PopupInterface,
     },
     render::{
@@ -59,7 +59,7 @@ pub struct GlobalState {
     draw_callback: DrawCallback,
     pub theme: UITheme,
     pub writer: Backend,
-    pub popup: Option<Box<dyn PopupInterface>>,
+    pub popup: Box<dyn PopupInterface>,
     pub workspace: Vec<WorkspaceEvent>,
     pub tree: Vec<TreeEvent>,
     pub clipboard: Clipboard,
@@ -80,10 +80,10 @@ impl GlobalState {
             tree_size: 15,
             key_mapper: controls::map_tree,
             mouse_mapper: controls::mouse_handler,
-            draw_callback: draw::draw_with_tree,
+            draw_callback: draw::full_rebuild,
             theme: UITheme::new().unwrap_or_default(),
             writer: backend,
-            popup: None,
+            popup: placeholder(),
             workspace: Vec::default(),
             tree: Vec::default(),
             clipboard: Clipboard::default(),
@@ -127,19 +127,6 @@ impl GlobalState {
         Ok(())
     }
 
-    fn find_draw_callback(&self) -> DrawCallback {
-        if self.components.contains(Components::POPUP) {
-            return draw::draw_popup;
-        }
-        if self.components.contains(Components::TERM) {
-            return draw::draw_term;
-        }
-        if self.components.contains(Components::TREE) || matches!(self.mode, Mode::Select) {
-            return draw::draw_with_tree;
-        }
-        draw::draw
-    }
-
     pub fn map_key(
         &mut self,
         event: &KeyEvent,
@@ -159,7 +146,7 @@ impl GlobalState {
         self.key_mapper = controls::map_tree;
         if !self.components.contains(Components::TREE) {
             self.recalc_draw_size();
-            self.draw_callback = self.find_draw_callback();
+            self.draw_callback = draw::full_rebuild;
         };
         if let Some(line) = self.footer_area.get_line(0) {
             self.writer.save_cursor().unwrap();
@@ -176,7 +163,7 @@ impl GlobalState {
         self.key_mapper = controls::map_editor;
         if !self.components.contains(Components::TREE) {
             self.recalc_draw_size();
-            self.draw_callback = self.find_draw_callback();
+            self.draw_callback = draw::full_rebuild;
         };
         if let Some(line) = self.footer_area.get_line(0) {
             self.writer.save_cursor().unwrap();
@@ -188,19 +175,32 @@ impl GlobalState {
         };
     }
 
+    #[inline]
     pub fn is_insert(&self) -> bool {
         matches!(self.mode, Mode::Insert)
+    }
+
+    #[inline]
+    pub fn has_popup(&self) -> bool {
+        self.components.contains(Components::POPUP)
+    }
+
+    #[inline]
+    pub fn render_popup(&mut self) -> std::io::Result<()> {
+        // popups do not mutate during render
+        let gs = unsafe { &mut *(self as *mut GlobalState) };
+        self.popup.render(gs)
     }
 
     pub fn popup(&mut self, popup: Box<dyn PopupInterface>) {
         self.components.insert(Components::POPUP);
         self.key_mapper = controls::map_popup;
-        self.draw_callback = self.find_draw_callback();
+        self.draw_callback = draw::full_rebuild;
         self.mouse_mapper = controls::disable_mouse;
-        self.popup.replace(popup);
+        self.popup = popup;
     }
 
-    pub fn clear_popup(&mut self) -> Option<Box<dyn PopupInterface>> {
+    pub fn clear_popup(&mut self) {
         match self.mode {
             Mode::Select => {
                 self.key_mapper = controls::map_tree;
@@ -210,39 +210,35 @@ impl GlobalState {
             }
         }
         self.components.remove(Components::POPUP);
-        self.draw_callback = self.find_draw_callback();
+        self.draw_callback = draw::full_rebuild;
         self.mouse_mapper = controls::mouse_handler;
         self.editor_area.clear(&mut self.writer).unwrap();
         self.tree_area.clear(&mut self.writer).unwrap();
-        self.popup.take()
+        self.popup = placeholder();
     }
 
     pub fn toggle_tree(&mut self) {
-        if self.components.contains(Components::TREE) {
-            self.components.remove(Components::TREE);
-            self.recalc_draw_size();
-            self.draw_callback = self.find_draw_callback();
-        } else {
-            self.components.insert(Components::TREE);
-            self.recalc_draw_size();
-            self.draw_callback = self.find_draw_callback();
-        }
+        self.components.toggle(Components::TREE);
+        self.recalc_draw_size();
+        self.draw_callback = draw::full_rebuild;
     }
 
     pub fn expand_tree_size(&mut self) {
         self.tree_size = std::cmp::min(75, self.tree_size + 1);
+        self.draw_callback = draw::full_rebuild;
         self.recalc_draw_size();
     }
 
     pub fn shrink_tree_size(&mut self) {
         self.tree_size = std::cmp::max(15, self.tree_size - 1);
+        self.draw_callback = draw::full_rebuild;
         self.recalc_draw_size();
     }
 
     pub fn toggle_terminal(&mut self, runner: &mut EditorTerminal) {
+        self.draw_callback = draw::full_rebuild;
         if self.components.contains(Components::TERM) {
             self.components.remove(Components::TERM);
-            self.draw_callback = self.find_draw_callback();
             match self.mode {
                 Mode::Select => {
                     self.key_mapper = controls::map_tree;
@@ -254,39 +250,26 @@ impl GlobalState {
             self.mouse_mapper = controls::mouse_handler;
         } else {
             self.components.insert(Components::TERM);
-            self.draw_callback = self.find_draw_callback();
             runner.activate();
             self.key_mapper = map_term;
             self.mouse_mapper = controls::disable_mouse;
         }
     }
 
-    pub fn render_popup_if_exists(&mut self) -> std::io::Result<()> {
-        let mut popup = self.popup.take();
-        if let Some(popup) = popup.as_mut() {
-            popup.render(self)?;
-        };
-        self.popup = popup;
-        Ok(())
-    }
-
     pub fn map_popup_if_exists(&mut self, key: &KeyEvent) -> bool {
-        if let Some(popup) = self.popup.as_mut() {
-            match popup.map(key, &mut self.clipboard) {
-                PopupMessage::Clear => {
-                    self.clear_popup();
-                }
-                PopupMessage::None => {}
-                PopupMessage::Tree(event) => {
-                    self.tree.push(event);
-                }
-                PopupMessage::Workspace(event) => {
-                    self.workspace.push(event);
-                }
+        match self.popup.map(key, &mut self.clipboard) {
+            PopupMessage::Clear => {
+                self.clear_popup();
             }
-            return true;
+            PopupMessage::None => {}
+            PopupMessage::Tree(event) => {
+                self.tree.push(event);
+            }
+            PopupMessage::Workspace(event) => {
+                self.workspace.push(event);
+            }
         }
-        false
+        return true;
     }
 
     pub fn try_tree_event(&mut self, value: impl TryInto<TreeEvent>) {
@@ -359,9 +342,7 @@ impl GlobalState {
         for event in std::mem::take(&mut self.tree) {
             match event {
                 TreeEvent::PopupAccess => {
-                    if let Some(popup) = self.popup.as_mut() {
-                        popup.update_tree(tree);
-                    }
+                    self.popup.update_tree(tree);
                 }
                 TreeEvent::SearchFiles(pattern) => {
                     if pattern.len() > 1 {
@@ -428,9 +409,7 @@ impl GlobalState {
                     self.clear_popup();
                 }
                 WorkspaceEvent::PopupAccess => {
-                    if let Some(popup) = self.popup.as_mut() {
-                        popup.update_workspace(workspace);
-                    }
+                    self.popup.update_workspace(workspace);
                 }
                 WorkspaceEvent::ReplaceNextSelect { new_text, select: (from, to), next_select } => {
                     if let Some(editor) = workspace.get_active() {

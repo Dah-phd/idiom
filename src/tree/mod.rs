@@ -18,7 +18,7 @@ use std::{
 use tokio::task::JoinHandle;
 use tree_paths::TreePath;
 
-const TICK: Duration = Duration::from_millis(200);
+const TICK: Duration = Duration::from_millis(500);
 
 pub struct Tree {
     pub key_map: TreeKeyMap,
@@ -27,6 +27,7 @@ pub struct Tree {
     tree: TreePath,
     tree_ptrs: Vec<*mut TreePath>,
     sync_handler: JoinHandle<TreePath>,
+    rebuild: bool,
     pub lsp_register: Vec<Arc<Mutex<HashMap<PathBuf, Diagnostic>>>>,
 }
 
@@ -48,15 +49,23 @@ impl Tree {
             tree,
             tree_ptrs,
             sync_handler,
+            rebuild: true,
             lsp_register: Vec::new(),
         }
     }
 
     pub fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
-        gs.writer.save_cursor()?;
         let options = self.tree_ptrs.iter().flat_map(|ptr| unsafe { ptr.as_ref() }.map(|tp| tp.direct_display()));
-        self.state.render_list_styled(options, &gs.tree_area, &mut gs.writer)?;
-        gs.writer.restore_cursor()
+        self.state.render_list_styled(options, &gs.tree_area, &mut gs.writer)
+    }
+
+    #[inline]
+    pub fn fast_render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+        if self.rebuild {
+            self.rebuild = false;
+            self.render(gs)?;
+        }
+        Ok(())
     }
 
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
@@ -222,6 +231,7 @@ impl Tree {
 
     pub async fn finish_sync(&mut self, gs: &mut GlobalState) {
         if self.sync_handler.is_finished() {
+            self.rebuild = true;
             let mut tree = self.tree.clone();
             let lsp_register = self.lsp_register.clone();
             let old_handler = std::mem::replace(
@@ -258,6 +268,7 @@ impl Tree {
     }
 
     fn force_sync(&mut self) {
+        self.rebuild = true;
         let mut tree = self.tree.clone();
         std::mem::replace(
             &mut self.sync_handler,
@@ -284,6 +295,7 @@ impl Tree {
     }
 
     fn unsafe_set_path(&mut self) {
+        self.rebuild = true;
         if let Some(selected) = self.get_selected() {
             self.selected_path = selected.path().clone();
         }

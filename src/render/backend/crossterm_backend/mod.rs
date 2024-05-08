@@ -190,7 +190,7 @@ impl Backend {
     /// direct adding cursor at location - no buffer queing
     #[inline]
     pub fn render_cursor_at(&mut self, row: u16, col: u16) -> Result<()> {
-        execute!(self, MoveTo(col, row))
+        execute!(self, MoveTo(col, row), Show)
     }
 
     /// direct showing cursor - no buffer queing

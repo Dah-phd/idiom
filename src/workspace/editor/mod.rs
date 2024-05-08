@@ -57,7 +57,6 @@ impl Editor {
         self.sync(gs);
         let mut area = gs.editor_area.into_iter();
         let mut ctx = CodeLineContext::new(&self.cursor, &mut self.lexer);
-        gs.writer.hide_cursor()?;
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if self.cursor.line == line_idx && text.len() > self.cursor.text_width {
                 text.wrapped_render(&mut ctx, &mut area, &mut gs.writer)?;

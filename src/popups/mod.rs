@@ -14,6 +14,12 @@ use crate::{
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 pub use generics::{Popup, PopupSelector};
 
+pub const NULL_POPUP: PlaceHolderPopup = PlaceHolderPopup();
+
+pub fn placeholder() -> Box<PlaceHolderPopup> {
+    Box::new(NULL_POPUP)
+}
+
 pub trait PopupInterface {
     fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()>;
     fn map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {
@@ -27,4 +33,16 @@ pub trait PopupInterface {
     fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage;
     fn update_workspace(&mut self, _workspace: &mut Workspace) {}
     fn update_tree(&mut self, _file_tree: &mut Tree) {}
+}
+
+// syntactic sugar for popups used instead of Option<popup>
+pub struct PlaceHolderPopup();
+
+impl PopupInterface for PlaceHolderPopup {
+    fn key_map(&mut self, _key: &KeyEvent, _clipboard: &mut Clipboard) -> PopupMessage {
+        PopupMessage::Clear
+    }
+    fn render(&mut self, _gs: &mut GlobalState) -> std::io::Result<()> {
+        Ok(())
+    }
 }
