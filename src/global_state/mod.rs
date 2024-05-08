@@ -57,7 +57,7 @@ impl Mode {
 
     #[inline]
     fn render_select_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) -> std::io::Result<()> {
-        line.width = SELECT_SPAN.len();
+        line.width = std::cmp::min(SELECT_SPAN.len(), line.width);
         accent_style.add_bold();
         accent_style.set_fg(Some(color::cyan()));
         line.render_styled(SELECT_SPAN, accent_style, backend)
@@ -65,7 +65,7 @@ impl Mode {
 
     #[inline]
     fn render_insert_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) -> std::io::Result<()> {
-        line.width = SELECT_SPAN.len();
+        line.width = std::cmp::min(INSERT_SPAN.len(), line.width);
         accent_style.add_bold();
         accent_style.set_fg(Some(color::rgb(255, 0, 0)));
         line.render_styled(INSERT_SPAN, accent_style, backend)
@@ -146,8 +146,8 @@ impl GlobalState {
                 rev_builder.push(&format!(" ({select_len} selected)"))?;
             }
             rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {}", cursor.line + 1, cursor.char + 1))?;
-            self.message.line = rev_builder.to_line();
-            self.message.render(self.theme.accent_style, &mut self.writer)?;
+            self.message.set_line(rev_builder.to_line());
+            self.message.fast_render(self.theme.accent_style, &mut self.writer)?;
             self.writer.reset_style()?;
         }
         Ok(())
@@ -318,7 +318,7 @@ impl GlobalState {
         self.footer_area = self.tree_area.splitoff_rows(1);
         if let Some(mut line) = self.footer_area.get_line(0) {
             line += SELECT_SPAN.len();
-            self.message.line = line;
+            self.message.set_line(line);
         };
         if matches!(self.mode, Mode::Select) || self.components.contains(Components::TREE) {
             self.tab_area = self.tree_area.keep_col((self.tree_size * self.screen_rect.width) / 100);

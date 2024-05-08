@@ -29,19 +29,20 @@ pub fn full_rebuild(
     gs.recalc_draw_size();
     if let Some(line) = gs.footer_area.get_line(0) {
         gs.mode.render(line, gs.theme.accent_style, &mut gs.writer)?;
-    }
+    };
+    gs.message.render(gs.theme.accent_style, &mut gs.writer)?;
     workspace.render(gs)?;
-    match workspace.get_active() {
-        Some(editor) => editor.render(gs),
-        None => gs.editor_area.clear(&mut gs.writer),
-    }?;
+    if let Some(editor) = workspace.get_active() {
+        editor.render(gs)?;
+    }
     gs.draw_callback = draw;
     if gs.components.contains(Components::TREE) || !gs.is_insert() {
         gs.draw_callback = draw_with_tree;
         tree.render(gs)?;
     }
     if gs.components.contains(Components::TERM) {
-        gs.draw_callback = draw_term
+        gs.draw_callback = draw_term;
+        term.render(gs)?;
     }
     if gs.components.contains(Components::POPUP) {
         gs.draw_callback = draw_popup;
@@ -52,7 +53,7 @@ pub fn full_rebuild(
 
 #[inline]
 pub fn draw(gs: &mut GlobalState, workspace: &mut Workspace, _ft: &mut Tree, _t: &mut EditorTerminal) -> Result<()> {
-    gs.message.render(gs.theme.accent_style, &mut gs.writer)?;
+    gs.message.fast_render(gs.theme.accent_style, &mut gs.writer)?;
     workspace.render(gs)?;
     if let Some(editor) = workspace.get_active() {
         return editor.render(gs);
@@ -70,11 +71,11 @@ pub fn draw_with_tree(
     gs.writer.hide_cursor()?;
     tree.fast_render(gs)?;
     workspace.render(gs)?;
-    gs.message.render(gs.theme.accent_style, &mut gs.writer)?;
     if let Some(editor) = workspace.get_active() {
-        return editor.render(gs);
+        editor.render(gs)
+    } else {
+        gs.message.fast_render(gs.theme.accent_style, &mut gs.writer)
     }
-    Ok(())
 }
 
 #[inline]
@@ -85,7 +86,7 @@ pub fn draw_popup(
     term: &mut EditorTerminal,
 ) -> Result<()> {
     gs.writer.hide_cursor()?;
-    gs.message.render(gs.theme.accent_style, &mut gs.writer)?;
+    gs.message.fast_render(gs.theme.accent_style, &mut gs.writer)?;
     gs.render_popup()
 }
 
@@ -97,6 +98,6 @@ pub fn draw_term(
     term: &mut EditorTerminal,
 ) -> Result<()> {
     gs.writer.hide_cursor()?;
-    gs.message.render(gs.theme.accent_style, &mut gs.writer)?;
+    gs.message.fast_render(gs.theme.accent_style, &mut gs.writer)?;
     term.render(gs)
 }

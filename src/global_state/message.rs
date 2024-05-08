@@ -12,42 +12,60 @@ const MSG_DURATION: Duration = Duration::from_secs(3);
 #[derive(Debug)]
 pub struct Messages {
     clock: Instant,
-    message: Option<Message>,
-    message_que: Vec<Message>,
-    pub line: Line,
+    active: bool,
+    messages: Vec<Message>,
+    last_message: Message,
+    line: Line,
 }
 
 impl Messages {
     pub fn new() -> Self {
-        Self { clock: Instant::now(), message: None, message_que: Vec::new(), line: Line::default() }
+        Self {
+            clock: Instant::now() - MSG_DURATION,
+            active: false,
+            messages: Vec::new(),
+            last_message: Message::empty(),
+            line: Line::empty(),
+        }
     }
 
-    pub fn render(&mut self, mut accent_style: Style, backend: &mut Backend) -> Result<()> {
-        if self.message.is_some() || !self.message_que.is_empty() {
-            let line = self.line.clone();
-            self.que_pull_if_expaired();
-            match self.message.as_ref() {
-                Some(Message::Error(text)) => {
-                    accent_style.set_fg(Some(color::red()));
-                    line.render_styled(text, accent_style, backend)
+    pub fn render(&mut self, accent_style: Style, backend: &mut Backend) -> Result<()> {
+        if self.is_expaired() {
+            match self.messages.pop() {
+                Some(message) => {
+                    self.last_message = message;
+                    self.clock = Instant::now();
+                    self.last_message.render(self.line.clone(), accent_style, backend)
                 }
-                Some(Message::Success(text)) => {
-                    accent_style.set_fg(Some(color::blue()));
-                    line.render_styled(text, accent_style, backend)
+                None => {
+                    self.active = false;
+                    backend.set_style(accent_style)?;
+                    self.line.clone().render_empty(backend)?;
+                    backend.reset_style()
                 }
-                Some(Message::Text(text)) => line.render_styled(text, accent_style, backend),
-                None => return Ok(()),
-            }?;
+            }
+        } else {
+            self.last_message.render(self.line.clone(), accent_style, backend)
         }
-        Ok(())
+    }
+
+    pub fn fast_render(&mut self, accent_style: Style, backend: &mut Backend) -> Result<()> {
+        if !self.active {
+            return Ok(());
+        }
+        self.render(accent_style, backend)
+    }
+
+    pub fn set_line(&mut self, line: Line) {
+        if line.width != self.line.width || line.col != self.line.col {
+            self.active = true;
+            self.line = line;
+        }
     }
 
     pub fn message(&mut self, message: String) {
-        if self.message.is_none() && self.message_que.is_empty() {
-            self.message.replace(Message::msg(message));
-        } else {
-            self.message_que.push(Message::msg(message));
-        }
+        self.messages.insert(0, Message::msg(message));
+        self.active = true;
     }
 
     pub fn error(&mut self, message: String) {
@@ -58,28 +76,15 @@ impl Messages {
         self.push_ahead(Message::success(message));
     }
 
-    fn push_ahead(&mut self, msg: Message) {
-        self.message_que.retain(|m| m.is_err());
-        self.message_que.push(msg);
-        if matches!(&self.message, Some(maybe_err) if !maybe_err.is_err()) {
-            self.message = None;
-        }
+    fn push_ahead(&mut self, message: Message) {
+        self.messages.retain(|m| m.is_err());
+        self.messages.insert(0, message);
+        self.active = true;
     }
 
-    fn que_pull_if_expaired(&mut self) {
-        if self.message.is_some() && self.clock.elapsed() <= MSG_DURATION {
-            return;
-        }
-        match self.message_que.len() {
-            0 => self.message = None,
-            1..=3 => {
-                self.message.replace(self.message_que.remove(0));
-            }
-            _ => {
-                self.message_que = self.message_que.drain(..).rev().take(3).rev().collect();
-            }
-        }
-        self.clock = Instant::now();
+    #[inline]
+    fn is_expaired(&self) -> bool {
+        self.clock.elapsed() > MSG_DURATION
     }
 }
 
@@ -91,19 +96,38 @@ enum Message {
 }
 
 impl Message {
-    fn is_err(&self) -> bool {
+    #[inline]
+    fn render(&self, line: Line, mut accent_style: Style, backend: &mut Backend) -> std::io::Result<()> {
+        match self {
+            Message::Error(text) => {
+                accent_style.set_fg(Some(color::red()));
+                line.render_styled(text, accent_style, backend)
+            }
+            Message::Success(text) => {
+                accent_style.set_fg(Some(color::blue()));
+                line.render_styled(text, accent_style, backend)
+            }
+            Message::Text(text) => line.render_styled(text, accent_style, backend),
+        }
+    }
+
+    const fn is_err(&self) -> bool {
         matches!(self, Self::Error(..))
     }
 
-    fn msg(message: String) -> Self {
+    const fn empty() -> Self {
+        Self::msg(String::new())
+    }
+
+    const fn msg(message: String) -> Self {
         Self::Text(message)
     }
 
-    fn success(message: String) -> Self {
+    const fn success(message: String) -> Self {
         Self::Success(message) //, Style { fg: Some(Color::Blue), ..Default::default() }))
     }
 
-    fn err(message: String) -> Self {
+    const fn err(message: String) -> Self {
         Self::Error(message) //, Style { fg: Some(Color::Red), ..Default::default() }))
     }
 }

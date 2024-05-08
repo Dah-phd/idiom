@@ -16,6 +16,10 @@ pub struct Line {
 }
 
 impl Line {
+    pub const fn empty() -> Self {
+        Line { row: 0, col: 0, width: 0 }
+    }
+
     #[inline]
     pub fn fill(self, symbol: char, backend: &mut Backend) -> std::io::Result<()> {
         let text = (0..self.width).map(|_| symbol).collect::<String>();
