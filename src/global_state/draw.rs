@@ -52,11 +52,16 @@ pub fn full_rebuild(
 }
 
 #[inline]
-pub fn draw(gs: &mut GlobalState, workspace: &mut Workspace, _ft: &mut Tree, _t: &mut EditorTerminal) -> Result<()> {
+pub fn draw(
+    gs: &mut GlobalState,
+    workspace: &mut Workspace,
+    _tree: &mut Tree,
+    _term: &mut EditorTerminal,
+) -> Result<()> {
     gs.writer.hide_cursor()?;
     workspace.render(gs)?;
     if let Some(editor) = workspace.get_active() {
-        editor.render(gs)
+        editor.fast_render(gs)
     } else {
         gs.message.fast_render(gs.theme.accent_style, &mut gs.writer)
     }
@@ -67,13 +72,13 @@ pub fn draw_with_tree(
     gs: &mut GlobalState,
     workspace: &mut Workspace,
     tree: &mut Tree,
-    term: &mut EditorTerminal,
+    _term: &mut EditorTerminal,
 ) -> Result<()> {
     gs.writer.hide_cursor()?;
     tree.fast_render(gs)?;
     workspace.render(gs)?;
     if let Some(editor) = workspace.get_active() {
-        editor.render(gs)
+        editor.fast_render(gs)
     } else {
         gs.message.fast_render(gs.theme.accent_style, &mut gs.writer)
     }
@@ -82,9 +87,9 @@ pub fn draw_with_tree(
 #[inline]
 pub fn draw_popup(
     gs: &mut GlobalState,
-    workspace: &mut Workspace,
-    tree: &mut Tree,
-    term: &mut EditorTerminal,
+    _workspace: &mut Workspace,
+    _tree: &mut Tree,
+    _term: &mut EditorTerminal,
 ) -> Result<()> {
     gs.writer.hide_cursor()?;
     gs.message.fast_render(gs.theme.accent_style, &mut gs.writer)?;
@@ -94,8 +99,8 @@ pub fn draw_popup(
 #[inline]
 pub fn draw_term(
     gs: &mut GlobalState,
-    workspace: &mut Workspace,
-    tree: &mut Tree,
+    _workspace: &mut Workspace,
+    _tree: &mut Tree,
     term: &mut EditorTerminal,
 ) -> Result<()> {
     gs.writer.hide_cursor()?;

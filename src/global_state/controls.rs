@@ -51,7 +51,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                 gs.select_mode();
             }
             if let Some((_, col_idx)) = contained_position(gs.tab_area, event.row, event.column) {
-                if !workspace.editors.is_empty() {
+                if !workspace.is_empty() {
                     gs.insert_mode();
                     if let Some(idx) = workspace.select_tab_mouse(col_idx) {
                         workspace.activate_editor(idx, gs);
@@ -61,7 +61,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
         }
         MouseEventKind::Down(MouseButton::Right) => {
             if let Some((_, col_idx)) = contained_position(gs.tab_area, event.row, event.column) {
-                if !workspace.editors.is_empty() {
+                if !workspace.is_empty() {
                     gs.insert_mode();
                     if let Some(idx) = workspace.select_tab_mouse(col_idx) {
                         workspace.activate_editor(idx, gs);

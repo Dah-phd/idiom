@@ -20,7 +20,7 @@ use std::{
 };
 
 pub struct Workspace {
-    pub editors: Vec<Editor>,
+    editors: Vec<Editor>,
     base_config: EditorConfigs,
     key_map: EditorKeyMap,
     tab_style: Style,
@@ -88,6 +88,11 @@ impl Workspace {
         for editor in self.editors.iter_mut() {
             editor.resize(width, height);
         }
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.editors.is_empty()
     }
 
     #[inline]

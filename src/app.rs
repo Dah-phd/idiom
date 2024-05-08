@@ -73,7 +73,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> Result<()> {
                             };
                         }
                         GeneralAction::GoToTabs => {
-                            if !workspace.editors.is_empty() {
+                            if !workspace.is_empty() {
                                 workspace.toggle_tabs();
                                 gs.insert_mode();
                             };

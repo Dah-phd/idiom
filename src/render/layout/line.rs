@@ -171,6 +171,11 @@ impl<'a> LineBuilder<'a> {
         Ok(true)
     }
 
+    #[inline]
+    pub fn width(&self) -> usize {
+        self.remaining
+    }
+
     pub fn to_line(self) -> Line {
         Line { row: self.row, col: self.col, width: self.remaining }
     }
@@ -216,6 +221,11 @@ impl<'a> LineBuilderRev<'a> {
         self.remaining -= text.len();
         self.backend.print_styled_at(self.row, self.col + self.remaining as u16, text, style)?;
         Ok(true)
+    }
+
+    #[inline]
+    pub fn width(&self) -> usize {
+        self.remaining
     }
 
     pub fn to_line(self) -> Line {
