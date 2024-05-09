@@ -103,7 +103,7 @@ impl GlobalState {
     pub fn new(backend: Backend) -> std::io::Result<Self> {
         let mut messages = Messages::new();
         let theme = messages.unwrap_or_default(UITheme::new(), "Failed to load theme_ui.json");
-        let mut new = Self {
+        Backend::screen().map(|screen_rect| Self {
             mode: Mode::default(),
             tree_size: 15,
             key_mapper: controls::map_tree,
@@ -116,17 +116,14 @@ impl GlobalState {
             tree: Vec::default(),
             clipboard: Clipboard::default(),
             exit: false,
-            screen_rect: Backend::screen()?,
+            screen_rect,
             tree_area: Rect::default(),
             tab_area: Rect::default(),
             editor_area: Rect::default(),
             footer_area: Rect::default(),
             messages,
             components: Components::default(),
-        };
-        new.recalc_draw_size();
-        new.select_mode();
-        Ok(new)
+        })
     }
 
     #[inline]
@@ -175,7 +172,6 @@ impl GlobalState {
         self.mode = Mode::Select;
         self.key_mapper = controls::map_tree;
         if !self.components.contains(Components::TREE) {
-            self.recalc_draw_size();
             self.draw_callback = draw::full_rebuild;
         };
         if let Some(line) = self.footer_area.get_line(0) {
@@ -187,7 +183,6 @@ impl GlobalState {
         self.mode = Mode::Insert;
         self.key_mapper = controls::map_editor;
         if !self.components.contains(Components::TREE) {
-            self.recalc_draw_size();
             self.draw_callback = draw::full_rebuild;
         };
         if let Some(line) = self.footer_area.get_line(0) {
@@ -239,20 +234,17 @@ impl GlobalState {
 
     pub fn toggle_tree(&mut self) {
         self.components.toggle(Components::TREE);
-        self.recalc_draw_size();
         self.draw_callback = draw::full_rebuild;
     }
 
     pub fn expand_tree_size(&mut self) {
         self.tree_size = std::cmp::min(75, self.tree_size + 1);
         self.draw_callback = draw::full_rebuild;
-        self.recalc_draw_size();
     }
 
     pub fn shrink_tree_size(&mut self) {
         self.tree_size = std::cmp::max(15, self.tree_size - 1);
         self.draw_callback = draw::full_rebuild;
-        self.recalc_draw_size();
     }
 
     pub fn toggle_terminal(&mut self, runner: &mut EditorTerminal) {
@@ -316,7 +308,7 @@ impl GlobalState {
     #[inline]
     pub fn full_resize(&mut self, height: u16, width: u16, workspace: &mut Workspace) {
         self.screen_rect = (width, height).into();
-        self.recalc_draw_size();
+        self.draw_callback = draw::full_rebuild;
         workspace.resize_render(self.editor_area.width as usize, self.editor_area.height as usize);
     }
 
