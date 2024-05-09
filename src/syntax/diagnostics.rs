@@ -1,4 +1,4 @@
-use crate::render::backend::{color, Color};
+use crate::render::backend::{color, Color, Style};
 use crate::syntax::{Lang, Token};
 use crate::{global_state::WorkspaceEvent, workspace::line::EditorLine};
 use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
@@ -40,8 +40,9 @@ impl std::fmt::Display for Action {
 pub struct DiagnosticData {
     pub start: usize,
     pub end: Option<usize>,
-    pub inline_span: (String, Color),
-    pub message: (String, Color),
+    pub color: Color,
+    pub inline_text: String,
+    pub message: String,
     pub info: Option<Vec<DiagnosticRelatedInformation>>,
 }
 
@@ -52,24 +53,35 @@ impl DiagnosticData {
         color: Color,
         info: Option<Vec<DiagnosticRelatedInformation>>,
     ) -> Self {
-        let first_line_fmt = message.lines().next().map(|s| format!("    {s}")).unwrap_or_default();
-        let inline_span = (first_line_fmt, color);
+        let inline_text = message.lines().next().map(|s| format!("    {s}")).unwrap_or_default();
         Self {
             start: range.start.character as usize,
             end: if range.start.line == range.end.line { Some(range.end.character as usize) } else { None },
-            inline_span,
-            message: (message, color),
+            color,
+            inline_text,
+            message,
             info,
         }
     }
 
+    #[inline]
+    pub fn truncated_inline(&self, len: usize) -> &str {
+        unsafe { self.inline_text.as_str().get_unchecked(..std::cmp::min(self.inline_text.len(), len)) }
+    }
+
+    #[inline]
+    pub fn text_style(&self) -> Style {
+        Style::fg(self.color)
+    }
+
+    #[inline]
     pub fn check_and_update(&self, token: &mut Token) {
         match self.end {
             Some(end) if self.start <= token.from && token.to <= end => {
-                token.style.undercurle(Some(self.inline_span.1));
+                token.style.undercurle(Some(self.color));
             }
             None if self.start <= token.from => {
-                token.style.undercurle(Some(self.inline_span.1));
+                token.style.undercurle(Some(self.color));
             }
             _ => {}
         }
@@ -85,7 +97,7 @@ impl DiagnosticLine {
         let mut info = DiagnosticInfo::default();
         let mut buffer = Vec::new();
         for diagnostic in self.data.iter() {
-            info.messages.push(diagnostic.message.clone());
+            info.messages.push((diagnostic.message.clone(), diagnostic.color));
             if let Some(actions) = lang.derive_diagnostic_actions(diagnostic.info.as_ref()) {
                 for action in actions {
                     buffer.push(action.clone());
@@ -99,7 +111,7 @@ impl DiagnosticLine {
     }
 
     pub fn drop_non_errs(&mut self) {
-        self.data.retain(|d| d.inline_span.1 == ERR_COLOR);
+        self.data.retain(|d| d.color == ERR_COLOR);
     }
 
     pub fn append(&mut self, d: Diagnostic) {
@@ -107,7 +119,7 @@ impl DiagnosticLine {
             Some(DiagnosticSeverity::ERROR) => {
                 self.data.insert(0, DiagnosticData::new(d.range, d.message, ERR_COLOR, d.related_information));
             }
-            Some(DiagnosticSeverity::WARNING) => match self.data[0].inline_span.1 {
+            Some(DiagnosticSeverity::WARNING) => match self.data[0].color {
                 ELS_COLOR => {
                     self.data.insert(0, DiagnosticData::new(d.range, d.message, WAR_COLOR, d.related_information));
                 }

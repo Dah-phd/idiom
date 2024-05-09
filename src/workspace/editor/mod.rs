@@ -74,7 +74,6 @@ impl Editor {
     }
 
     pub fn fast_render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
-        return self.render(gs); // TODO implement
         self.sync(gs);
         let mut area = gs.editor_area.into_iter();
         let mut ctx = CodeLineContext::new(&self.cursor, &mut self.lexer);
