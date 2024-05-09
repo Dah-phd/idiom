@@ -1,7 +1,7 @@
 use crate::{
     global_state::GlobalState,
     render::{
-        backend::{color, Backend, Style},
+        backend::{color, Backend, BackendProtocol, Style},
         layout::{Line, RectIter},
         utils::truncate_str,
     },

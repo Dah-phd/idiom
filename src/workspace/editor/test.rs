@@ -4,7 +4,7 @@ use super::super::{
 };
 use crate::configs::FileType;
 use crate::global_state::GlobalState;
-use crate::render::backend::Backend;
+use crate::render::backend::{Backend, BackendProtocol};
 use crate::syntax::Lexer;
 use crate::workspace::{actions::Actions, line::CodeLine};
 use std::path::PathBuf;

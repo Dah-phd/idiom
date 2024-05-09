@@ -1,6 +1,7 @@
 use crate::{
     configs::{EditorConfigs, FileType},
     global_state::GlobalState,
+    render::backend::BackendProtocol,
     syntax::Lexer,
     workspace::{
         actions::Actions,

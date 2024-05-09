@@ -1,6 +1,6 @@
 use crate::{
     global_state::{Clipboard, GlobalState, PopupMessage, WorkspaceEvent},
-    render::backend::Style,
+    render::backend::{BackendProtocol, Style},
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };

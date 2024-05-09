@@ -44,7 +44,7 @@ impl Lexer {
         Self {
             lang: Lang::from(file_type),
             legend: Legend::default(),
-            theme: gs.unwrap_default_result(Theme::new(), "theme.json: "),
+            theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
             token_producer: TokensType::Internal,
             modal: None,
             path: path.into(),

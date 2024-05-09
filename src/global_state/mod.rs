@@ -12,7 +12,7 @@ use crate::{
         PopupInterface,
     },
     render::{
-        backend::{color, Backend, Style},
+        backend::{color, Backend, BackendProtocol, Style},
         layout::{Line, Rect, DOUBLE_BORDERS},
     },
     runner::EditorTerminal,
@@ -95,19 +95,21 @@ pub struct GlobalState {
     pub tab_area: Rect,
     pub editor_area: Rect,
     pub footer_area: Rect,
-    message: Messages,
+    messages: Messages,
     components: Components,
 }
 
 impl GlobalState {
     pub fn new(backend: Backend) -> std::io::Result<Self> {
+        let mut messages = Messages::new();
+        let theme = messages.unwrap_or_default(UITheme::new(), "Failed to load theme_ui.json");
         let mut new = Self {
             mode: Mode::default(),
             tree_size: 15,
             key_mapper: controls::map_tree,
             mouse_mapper: controls::mouse_handler,
             draw_callback: draw::full_rebuild,
-            theme: UITheme::new().unwrap_or_default(),
+            theme,
             writer: backend,
             popup: placeholder(),
             workspace: Vec::default(),
@@ -119,7 +121,7 @@ impl GlobalState {
             tab_area: Rect::default(),
             editor_area: Rect::default(),
             footer_area: Rect::default(),
-            message: Messages::new(),
+            messages,
             components: Components::default(),
         };
         new.recalc_draw_size();
@@ -146,13 +148,14 @@ impl GlobalState {
                 rev_builder.push(&format!(" ({select_len} selected)"))?;
             }
             rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {}", cursor.line + 1, cursor.char + 1))?;
-            self.message.set_line(rev_builder.to_line());
-            self.message.fast_render(self.theme.accent_style, &mut self.writer)?;
+            self.messages.set_line(rev_builder.to_line());
+            self.messages.fast_render(self.theme.accent_style, &mut self.writer)?;
             self.writer.reset_style()?;
         }
         Ok(())
     }
 
+    #[inline]
     pub fn map_key(
         &mut self,
         event: &KeyEvent,
@@ -163,6 +166,7 @@ impl GlobalState {
         (self.key_mapper)(self, event, workspace, tree, tmux)
     }
 
+    #[inline]
     pub fn map_mouse(&mut self, event: MouseEvent, tree: &mut Tree, workspace: &mut Workspace) {
         (self.mouse_mapper)(self, event, tree, workspace)
     }
@@ -296,17 +300,20 @@ impl GlobalState {
 
     #[inline]
     pub fn message(&mut self, msg: impl Into<String>) {
-        self.message.message(msg.into());
+        self.messages.message(msg.into());
     }
 
+    #[inline]
     pub fn error(&mut self, msg: impl Into<String>) {
-        self.message.error(msg.into());
+        self.messages.error(msg.into());
     }
 
+    #[inline]
     pub fn success(&mut self, msg: impl Into<String>) {
-        self.message.success(msg.into());
+        self.messages.success(msg.into());
     }
 
+    #[inline]
     pub fn full_resize(&mut self, height: u16, width: u16, workspace: &mut Workspace) {
         self.screen_rect = (width, height).into();
         self.recalc_draw_size();
@@ -318,7 +325,7 @@ impl GlobalState {
         self.footer_area = self.tree_area.splitoff_rows(1);
         if let Some(mut line) = self.footer_area.get_line(0) {
             line += SELECT_SPAN.len();
-            self.message.set_line(line);
+            self.messages.set_line(line);
         };
         if matches!(self.mode, Mode::Select) || self.components.contains(Components::TREE) {
             self.tab_area = self.tree_area.keep_col((self.tree_size * self.screen_rect.width) / 100);
@@ -334,16 +341,9 @@ impl GlobalState {
     }
 
     /// unwrap or default with logged error
-    pub fn unwrap_default_result<T: Default, E: Error>(&mut self, result: Result<T, E>, prefix: &str) -> T {
-        match result {
-            Ok(value) => value,
-            Err(error) => {
-                let mut msg = prefix.to_owned();
-                msg.push_str(&error.to_string());
-                self.error(msg);
-                T::default()
-            }
-        }
+    #[inline]
+    pub fn unwrap_or_default<T: Default, E: Error>(&mut self, result: Result<T, E>, prefix: &str) -> T {
+        self.messages.unwrap_or_default(result, prefix)
     }
 
     /// Attempts to create new editor if err logs it and returns false else true.
@@ -409,7 +409,7 @@ impl GlobalState {
                 }
                 TreeEvent::RenameFile(name) => {
                     if let Err(error) = tree.rename_file(name) {
-                        self.message.error(error.to_string())
+                        self.messages.error(error.to_string())
                     };
                     self.clear_popup();
                 }

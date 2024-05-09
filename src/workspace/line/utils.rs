@@ -1,6 +1,6 @@
 use crate::{
     render::{
-        backend::{color, Backend, Color, Style},
+        backend::{color, Backend, BackendProtocol, Color, Style},
         layout::RectIter,
     },
     syntax::{DiagnosticLine, Token},

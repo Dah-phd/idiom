@@ -1,5 +1,5 @@
 use crate::render::{
-    backend::{Backend, Color, Style},
+    backend::{Backend, BackendProtocol, Color, Style},
     layout::{BorderSet, Borders, Line, BORDERS},
     utils::truncate_str,
 };

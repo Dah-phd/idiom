@@ -1,4 +1,4 @@
-use crate::render::layout::Rect;
+use crate::render::{backend::BackendProtocol, layout::Rect};
 use crate::syntax::{DiagnosticInfo, Lang};
 mod completion;
 mod info;

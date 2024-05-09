@@ -1,5 +1,5 @@
 use crate::render::{
-    backend::{Backend, Style},
+    backend::{Backend, BackendProtocol, Style},
     utils::{truncate_str, truncate_str_start},
 };
 use std::{

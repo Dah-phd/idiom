@@ -1,8 +1,9 @@
 use crate::render::{
-    backend::{color, Backend, Style},
+    backend::{color, Backend, BackendProtocol, Style},
     layout::Line,
 };
 use std::{
+    error::Error,
     io::Result,
     time::{Duration, Instant},
 };
@@ -74,6 +75,17 @@ impl Messages {
 
     pub fn success(&mut self, message: String) {
         self.push_ahead(Message::success(message));
+    }
+
+    #[inline]
+    pub fn unwrap_or_default<T: Default, E: Error>(&mut self, result: std::result::Result<T, E>, prefix: &str) -> T {
+        match result {
+            Ok(value) => value,
+            Err(err) => {
+                self.error(format!("{prefix}: {err}"));
+                T::default()
+            }
+        }
     }
 
     fn push_ahead(&mut self, message: Message) {

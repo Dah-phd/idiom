@@ -12,7 +12,7 @@ mod workspace;
 
 use anyhow::Result;
 use app::app;
-use render::backend::Backend;
+use render::backend::{Backend, BackendProtocol};
 use std::path::{PathBuf, MAIN_SEPARATOR};
 
 fn cli() -> Option<PathBuf> {

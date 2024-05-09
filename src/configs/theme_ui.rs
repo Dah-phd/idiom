@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+
 use crate::configs::{load_or_create_config, THEME_UI};
 use crate::render::backend::{color, Color, Style};
-use serde::Serialize;
+use serde::ser::{Serialize, SerializeStruct};
 use serde_json::{Map, Value};
 
 #[derive(Debug)]
@@ -29,7 +31,9 @@ impl Serialize for UITheme {
     where
         S: serde::Serializer,
     {
-        todo!()
+        let mut s = serializer.serialize_struct("UITheme", 1)?;
+        s.serialize_field("accent", &serialize_rgb(25, 25, 24))?;
+        s.end()
     }
 }
 
@@ -44,6 +48,12 @@ impl UITheme {
     pub fn new() -> Result<Self, serde_json::Error> {
         load_or_create_config(THEME_UI)
     }
+}
+
+pub fn serialize_rgb(r: u8, g: u8, b: u8) -> HashMap<&'static str, [u8; 3]> {
+    let mut rgb = HashMap::new();
+    rgb.insert("rgb", [r, g, b]);
+    rgb
 }
 
 pub fn pull_color(map: &mut Map<String, Value>, key: &str) -> Result<Color, String> {

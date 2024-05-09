@@ -1,6 +1,6 @@
-use crate::configs::{load_or_create_config, pull_color, THEME_FILE};
+use crate::configs::{load_or_create_config, pull_color, serialize_rgb, THEME_FILE};
 use crate::render::backend::{color, Color};
-use serde::Serialize;
+use serde::ser::{Serialize, SerializeStruct};
 use serde_json::Value;
 
 #[derive(Debug, Clone)]
@@ -25,7 +25,21 @@ impl Serialize for Theme {
     where
         S: serde::Serializer,
     {
-        todo!()
+        let mut s = serializer.serialize_struct("Theme", 13)?;
+        s.serialize_field("imports", &serialize_rgb(112, 199, 176))?;
+        s.serialize_field("keyWords", &serialize_rgb(79, 106, 214))?;
+        s.serialize_field("flowControl", "lightmagenta")?;
+        s.serialize_field("classOrStruct", &serialize_rgb(112, 199, 176))?;
+        s.serialize_field("constant", &serialize_rgb(73, 162, 215))?;
+        s.serialize_field("blank", "reset")?;
+        s.serialize_field("comment", &serialize_rgb(82, 113, 67))?;
+        s.serialize_field("default", &serialize_rgb(157, 221, 254))?;
+        s.serialize_field("functions", &serialize_rgb(218, 223, 170))?;
+        s.serialize_field("numeric", &serialize_rgb(153, 173, 142))?;
+        s.serialize_field("selected", &serialize_rgb(72, 72, 72))?;
+        s.serialize_field("string", "yellow")?;
+        s.serialize_field("stringEscape", "lightyellow")?;
+        s.end()
     }
 }
 
@@ -60,17 +74,17 @@ impl Default for Theme {
         Self {
             imports: color::rgb(112, 199, 176),
             key_words: color::rgb(79, 106, 214),
-            numeric: color::rgb(153, 173, 142),
             flow_control: color::magenta(),
             class_or_struct: color::rgb(112, 199, 176),
             constant: color::rgb(73, 162, 215),
+            blank: color::reset(),
+            comment: color::rgb(82, 113, 67),
             default: color::rgb(157, 221, 254),
             functions: color::rgb(218, 223, 170),
-            blank: color::reset(),
+            numeric: color::rgb(153, 173, 142),
             selected: color::rgb(72, 72, 72),
-            string: color::yellow(),
+            string: color::dark_yellow(),
             string_escape: color::yellow(),
-            comment: color::rgb(82, 113, 67),
         }
     }
 }

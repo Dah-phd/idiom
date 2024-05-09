@@ -10,7 +10,7 @@ pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMa
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Error;
 use std::collections::HashMap;
-pub use theme_ui::{pull_color, UITheme};
+pub use theme_ui::{pull_color, serialize_rgb, UITheme};
 pub use types::FileType;
 
 pub const CONFIG_FOLDER: &str = "idiom";

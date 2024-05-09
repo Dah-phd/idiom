@@ -2,7 +2,7 @@ use crate::render::layout::Rect;
 use std::io::Write;
 
 use super::{
-    backend::{Backend, Style},
+    backend::{Backend, BackendProtocol, Style},
     layout::LineBuilder,
 };
 

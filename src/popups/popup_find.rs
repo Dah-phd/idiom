@@ -4,7 +4,10 @@ use super::{
 };
 use crate::{
     global_state::{Clipboard, GlobalState, PopupMessage, WorkspaceEvent},
-    render::{backend::Style, count_as_string, TextField},
+    render::{
+        backend::{BackendProtocol, Style},
+        count_as_string, TextField,
+    },
     workspace::{CursorPosition, Workspace},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};

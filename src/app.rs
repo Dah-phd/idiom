@@ -18,7 +18,7 @@ use std::{path::PathBuf, time::Instant};
 
 pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> Result<()> {
     let mut gs = GlobalState::new(backend)?;
-    let configs = gs.unwrap_default_result(KeyMap::new(), ".keys: ");
+    let configs = gs.unwrap_or_default(KeyMap::new(), ".keys: ");
     let mut last_frame_start = Instant::now();
     let mut general_key_map = configs.general_key_map();
 
@@ -91,7 +91,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> Result<()> {
                             gs.toggle_tree();
                         }
                         GeneralAction::RefreshSettings => {
-                            let new_key_map = gs.unwrap_default_result(KeyMap::new(), ".keys: ");
+                            let new_key_map = gs.unwrap_or_default(KeyMap::new(), ".keys: ");
                             general_key_map = new_key_map.general_key_map();
                             tree.key_map = new_key_map.tree_key_map();
                             workspace.refresh_cfg(new_key_map.editor_key_map(), &mut gs).await;

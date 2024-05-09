@@ -17,6 +17,8 @@ use std::{
 pub use style::Style;
 
 use crate::render::layout::Rect;
+
+use super::BackendProtocol;
 pub type Color = CTColor;
 
 /// Thin wrapper around rendering framework, allowing easy switching of backend
@@ -61,9 +63,9 @@ impl Write for Backend {
     }
 }
 
-impl Backend {
+impl BackendProtocol for Backend {
     #[inline]
-    pub fn init() -> Result<Self> {
+    fn init() -> Result<Self> {
         #[cfg(test)]
         return Ok(Self { writer: DummyOut {}, default_styled: None });
         #[cfg(not(test))]
@@ -71,7 +73,7 @@ impl Backend {
     }
 
     #[inline]
-    pub fn exit() -> Result<()> {
+    fn exit() -> Result<()> {
         #[cfg(test)]
         return Ok(());
         #[cfg(not(test))]
@@ -80,53 +82,53 @@ impl Backend {
 
     /// get whole screen as rect
     #[inline]
-    pub fn screen() -> Result<Rect> {
+    fn screen() -> Result<Rect> {
         size().map(|size| Rect::from(size))
     }
 
     /// clears from cursor until the End Of Line
     #[inline]
-    pub fn clear_to_eol(&mut self) -> std::io::Result<()> {
+    fn clear_to_eol(&mut self) -> std::io::Result<()> {
         queue!(self, Clear(ClearType::UntilNewLine))
     }
 
     /// clears current cursor line
     #[inline]
-    pub fn clear_line(&mut self) -> std::io::Result<()> {
+    fn clear_line(&mut self) -> std::io::Result<()> {
         queue!(self, Clear(ClearType::CurrentLine))
     }
 
     #[inline]
-    pub fn clear_all(&mut self) -> std::io::Result<()> {
+    fn clear_all(&mut self) -> std::io::Result<()> {
         queue!(self, Clear(ClearType::All))
     }
 
     /// stores the cursor and hides it
     #[inline]
-    pub fn save_cursor(&mut self) -> std::io::Result<()> {
+    fn save_cursor(&mut self) -> std::io::Result<()> {
         execute!(self, SavePosition, Hide)
     }
 
     /// restores cursor position and shows cursor
     #[inline]
-    pub fn restore_cursor(&mut self) -> std::io::Result<()> {
+    fn restore_cursor(&mut self) -> std::io::Result<()> {
         execute!(self, RestorePosition, Show)
     }
 
     /// sets the style for the print/print at
     #[inline]
-    pub fn set_style(&mut self, style: Style) -> std::io::Result<()> {
+    fn set_style(&mut self, style: Style) -> std::io::Result<()> {
         self.default_styled.replace(style);
         queue!(self, SetStyle(style.into()))
     }
 
     #[inline]
-    pub fn get_style(&mut self) -> Style {
+    fn get_style(&mut self) -> Style {
         self.default_styled.unwrap_or_default()
     }
 
     #[inline]
-    pub fn to_set_style(&mut self) -> std::io::Result<()> {
+    fn to_set_style(&mut self) -> std::io::Result<()> {
         match self.default_styled {
             Some(style) => queue!(self, ResetColor, SetStyle(style.into())),
             None => queue!(self, ResetColor),
@@ -136,7 +138,7 @@ impl Backend {
     /// update existing style if exists otherwise sets it to the new one
     /// mods will be taken from updating and will replace fg and bg if present
     #[inline]
-    pub fn update_style(&mut self, style: Style) -> std::io::Result<()> {
+    fn update_style(&mut self, style: Style) -> std::io::Result<()> {
         if let Some(current) = self.default_styled.as_mut() {
             current.update(style);
         } else {
@@ -147,7 +149,7 @@ impl Backend {
 
     /// adds foreground to the already set style
     #[inline]
-    pub fn set_fg(&mut self, color: Option<Color>) -> std::io::Result<()> {
+    fn set_fg(&mut self, color: Option<Color>) -> std::io::Result<()> {
         if let Some(current) = self.default_styled.as_mut() {
             current.set_fg(color);
             self.to_set_style()
@@ -161,7 +163,7 @@ impl Backend {
 
     /// adds background to the already set style
     #[inline]
-    pub fn set_bg(&mut self, color: Option<Color>) -> std::io::Result<()> {
+    fn set_bg(&mut self, color: Option<Color>) -> std::io::Result<()> {
         if let Some(current) = self.default_styled.as_mut() {
             current.set_bg(color);
             self.to_set_style()
@@ -176,49 +178,49 @@ impl Backend {
 
     /// restores the style of the writer to default
     #[inline]
-    pub fn reset_style(&mut self) -> std::io::Result<()> {
+    fn reset_style(&mut self) -> std::io::Result<()> {
         self.default_styled = None;
         queue!(self, ResetColor)
     }
 
     /// sends the cursor to location
     #[inline]
-    pub fn go_to(&mut self, row: u16, col: u16) -> Result<()> {
+    fn go_to(&mut self, row: u16, col: u16) -> Result<()> {
         queue!(self, MoveTo(col, row))
     }
 
     /// direct adding cursor at location - no buffer queing
     #[inline]
-    pub fn render_cursor_at(&mut self, row: u16, col: u16) -> Result<()> {
+    fn render_cursor_at(&mut self, row: u16, col: u16) -> Result<()> {
         execute!(self, MoveTo(col, row), Show)
     }
 
     /// direct showing cursor - no buffer queing
     #[inline]
-    pub fn show_cursor(&mut self) -> Result<()> {
+    fn show_cursor(&mut self) -> Result<()> {
         execute!(self, Show)
     }
 
     /// direct hiding cursor - no buffer queing
     #[inline]
-    pub fn hide_cursor(&mut self) -> Result<()> {
+    fn hide_cursor(&mut self) -> Result<()> {
         execute!(self, Hide)
     }
 
     #[inline]
-    pub fn print<D: Display>(&mut self, text: D) -> Result<()> {
+    fn print<D: Display>(&mut self, text: D) -> Result<()> {
         queue!(self, Print(text))
     }
 
     /// goes to location and prints text
     #[inline]
-    pub fn print_at<D: Display>(&mut self, row: u16, col: u16, text: D) -> Result<()> {
+    fn print_at<D: Display>(&mut self, row: u16, col: u16, text: D) -> Result<()> {
         queue!(self, MoveTo(col, row), Print(text))
     }
 
     /// prints styled text without affecting the writer set style
     #[inline]
-    pub fn print_styled<D: Display>(&mut self, text: D, style: Style) -> Result<()> {
+    fn print_styled<D: Display>(&mut self, text: D, style: Style) -> Result<()> {
         if let Some(restore_style) = self.default_styled {
             queue!(self, SetStyle(style.into()), Print(text), ResetColor, SetStyle(restore_style.into()),)
         } else {
@@ -228,7 +230,7 @@ impl Backend {
 
     /// goes to location and prints styled text without affecting the writer set style
     #[inline]
-    pub fn print_styled_at<D: Display>(&mut self, row: u16, col: u16, text: D, style: Style) -> Result<()> {
+    fn print_styled_at<D: Display>(&mut self, row: u16, col: u16, text: D, style: Style) -> Result<()> {
         if let Some(restore_style) = self.default_styled {
             queue!(
                 self,

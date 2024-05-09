@@ -112,7 +112,7 @@ impl Token {
         lines: &mut RectIter,
         backend: &mut Backend,
     ) -> std::io::Result<()> {
-        if let Some(mut line) = lines.next() {
+        if let Some(line) = lines.next() {
             let mut tokens = Vec::new();
             Self::parse(lang, theme, text, &mut tokens);
             backend.flush()?;
