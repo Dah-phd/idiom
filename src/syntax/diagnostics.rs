@@ -157,7 +157,9 @@ pub fn set_diganostics(content: &mut Vec<impl EditorLine>, diagnostics: Vec<(usi
         line.drop_diagnostics();
     }
     for (idx, diagnostics) in diagnostics {
-        content[idx].set_diagnostics(diagnostics);
+        if let Some(line) = content.get_mut(idx) {
+            line.set_diagnostics(diagnostics);
+        };
     }
 }
 
@@ -166,7 +168,9 @@ pub fn set_diganostic_errors(content: &mut Vec<impl EditorLine>, diagnostics: Ve
         line.drop_diagnostics();
     }
     for (idx, mut diagnostics) in diagnostics {
-        diagnostics.drop_non_errs();
-        content[idx].set_diagnostics(diagnostics);
+        if let Some(line) = content.get_mut(idx) {
+            diagnostics.drop_non_errs();
+            line.set_diagnostics(diagnostics);
+        };
     }
 }
