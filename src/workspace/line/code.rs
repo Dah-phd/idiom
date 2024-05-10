@@ -237,6 +237,13 @@ impl EditorLine for CodeLine {
     }
 
     #[inline]
+    fn rebuild_tokens(&mut self, lexer: &Lexer) {
+        self.rendered_at = 0;
+        self.tokens.clear();
+        Token::parse(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
+    }
+
+    #[inline]
     fn set_diagnostics(&mut self, diagnostics: DiagnosticLine) {
         self.rendered_at = 0;
         for diagnostic in diagnostics.data.iter() {

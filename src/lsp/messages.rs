@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Error, Result};
 use lsp_types::{
     notification::{Notification, PublishDiagnostics},
     DiagnosticSeverity, PublishDiagnosticsParams,
@@ -6,7 +5,12 @@ use lsp_types::{
 use serde_json::{from_value, Value};
 use std::path::PathBuf;
 
-use crate::syntax::DiagnosticLine;
+use crate::{
+    lsp::{LSPError, LSPResult},
+    syntax::DiagnosticLine,
+};
+
+use super::lsp_stream::StdErrMessage;
 
 pub enum LSPMessage {
     Request(Request),
@@ -14,11 +18,11 @@ pub enum LSPMessage {
     Notification(GeneralNotification),
     Diagnostic(PathBuf, Diagnostic),
     Unknown(Value),
-    Error(Error),
+    Error(String),
 }
 
 impl LSPMessage {
-    pub fn unwrap(self) -> Result<Value> {
+    pub fn unwrap(self) -> LSPResult<Value> {
         // gets value within if data is know at check time
         // errors on response error
         match self {
@@ -28,13 +32,13 @@ impl LSPMessage {
                 if resp.result.is_some() {
                     resp.result
                 } else {
-                    return Err(anyhow!("Rsponse err: {:?}", resp.error));
+                    return Err(LSPError::ResponseError(format!("{:?}", resp.error)));
                 }
             }
             Self::Request(request) => request.params,
             _ => None,
         }
-        .ok_or(anyhow!("Unexpected type!"))
+        .ok_or(LSPError::internal("Called unwrap on LSPMessage type not supporting the operand!"))
     }
 
     pub fn parse(mut obj: Value) -> LSPMessage {
@@ -83,9 +87,9 @@ impl From<Value> for LSPMessage {
     }
 }
 
-impl From<anyhow::Error> for LSPMessage {
-    fn from(err: anyhow::Error) -> Self {
-        Self::Error(err)
+impl From<StdErrMessage> for LSPMessage {
+    fn from(err: StdErrMessage) -> Self {
+        Self::Error(err.0)
     }
 }
 

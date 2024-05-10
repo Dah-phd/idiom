@@ -1,5 +1,6 @@
 mod app;
 mod configs;
+mod error;
 mod global_state;
 mod lsp;
 mod popups;
@@ -10,8 +11,8 @@ mod tree;
 mod utils;
 mod workspace;
 
-use anyhow::Result;
 use app::app;
+use error::IdiomResult;
 use render::backend::{Backend, BackendProtocol};
 use std::path::{PathBuf, MAIN_SEPARATOR};
 
@@ -31,7 +32,7 @@ fn cli() -> Option<PathBuf> {
 }
 
 #[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<()> {
+async fn main() -> IdiomResult<()> {
     let backend = Backend::init()?;
     app(cli(), backend).await?;
     Backend::exit()?;

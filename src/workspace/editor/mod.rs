@@ -97,7 +97,7 @@ impl Editor {
 
     #[inline]
     pub fn sync(&mut self, gs: &mut GlobalState) {
-        self.actions.sync(&mut self.lexer, &self.content);
+        self.actions.sync(&mut self.lexer, &mut self.content, gs);
         self.lexer.context(&mut self.content, gs);
         self.cursor.correct_cursor_position(&self.content);
     }
@@ -392,12 +392,13 @@ impl Editor {
         self.actions.new_line(&mut self.cursor, &mut self.content);
     }
 
-    pub fn push(&mut self, ch: char) {
+    pub fn push(&mut self, ch: char, gs: &mut GlobalState) {
         self.actions.push_char(ch, &mut self.cursor, &mut self.content);
         let line = &self.content[self.cursor.line];
         if self.lexer.should_autocomplete(self.cursor.char, line) {
-            self.actions.force_sync(&mut self.lexer, &self.content);
-            self.lexer.get_autocomplete((&self.cursor).into(), line.to_string());
+            let line = line.to_string();
+            self.actions.force_sync(&mut self.lexer, &mut self.content, gs);
+            self.lexer.get_autocomplete((&self.cursor).into(), line);
         }
     }
 

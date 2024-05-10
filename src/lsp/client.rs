@@ -1,7 +1,6 @@
 use super::{Diagnostic, LSPNotification, LSPRequest, Response};
-use crate::{configs::FileType, syntax::DiagnosticLine, workspace::CursorPosition};
+use crate::{configs::FileType, lsp::LSPError, syntax::DiagnosticLine, workspace::CursorPosition};
 
-use anyhow::Result;
 use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument},
     request::{
@@ -45,7 +44,7 @@ impl LSPClient {
         Self { diagnostics, responses, channel, request_counter: Rc::default(), capabilities }
     }
 
-    pub fn request<T>(&mut self, mut request: LSPRequest<T>) -> Result<i64>
+    pub fn request<T>(&mut self, mut request: LSPRequest<T>) -> Result<i64, LSPError>
     where
         T: lsp_types::request::Request,
         T::Params: serde::Serialize,
@@ -57,7 +56,7 @@ impl LSPClient {
         Ok(id)
     }
 
-    pub fn notify<T>(&mut self, notification: LSPNotification<T>) -> Result<()>
+    pub fn notify<T>(&mut self, notification: LSPNotification<T>) -> Result<(), LSPError>
     where
         T: lsp_types::notification::Notification,
         T::Params: serde::Serialize,
@@ -127,7 +126,7 @@ impl LSPClient {
         self.request(LSPRequest::<GotoDefinition>::definition(path, c)?).ok()
     }
 
-    pub fn file_did_open(&mut self, path: &Path, file_type: &FileType, content: String) -> Result<()> {
+    pub fn file_did_open(&mut self, path: &Path, file_type: &FileType, content: String) -> Result<(), LSPError> {
         let notification = LSPNotification::<DidOpenTextDocument>::file_did_open(path, file_type, content)?;
         self.notify(notification)?;
         Ok(())
@@ -137,20 +136,20 @@ impl LSPClient {
         &mut self,
         path: &Path,
         version: i32,
-        content_changes: Vec<TextDocumentContentChangeEvent>,
-    ) -> Result<()> {
-        let notification = LSPNotification::<DidChangeTextDocument>::file_did_change(path, version, content_changes)?;
+        change_events: Vec<TextDocumentContentChangeEvent>,
+    ) -> Result<(), LSPError> {
+        let notification = LSPNotification::<DidChangeTextDocument>::file_did_change(path, version, change_events)?;
         self.notify(notification)?;
         Ok(())
     }
 
-    pub fn file_did_save(&mut self, path: &Path) -> Result<()> {
+    pub fn file_did_save(&mut self, path: &Path) -> Result<(), LSPError> {
         let notification = LSPNotification::<DidSaveTextDocument>::file_did_save(path)?;
         self.notify(notification)?;
         Ok(())
     }
 
-    pub fn file_did_close(&mut self, path: &Path) -> Result<()> {
+    pub fn file_did_close(&mut self, path: &Path) -> Result<(), LSPError> {
         let notification = LSPNotification::<DidCloseTextDocument>::file_did_close(path)?;
         self.notify(notification)?;
         Ok(())

@@ -1,5 +1,6 @@
 use crate::{
     configs::IndentConfigs,
+    syntax::Lexer,
     utils::Offset,
     workspace::{
         cursor::{Cursor, CursorPosition},
@@ -8,7 +9,10 @@ use crate::{
     },
 };
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit};
-use std::fmt::Debug;
+use std::{
+    fmt::Debug,
+    ops::{Add, AddAssign},
+};
 
 #[derive(Debug)]
 pub struct Edit {
@@ -211,7 +215,7 @@ impl Edit {
         let replaced_text = code_line[range.clone()].to_owned();
         code_line.replace_range(range, &new_text);
         Self {
-            meta: EditMetaData { start_line: line, from: 1, to: 1 },
+            meta: EditMetaData::line_changed(line),
             text_edit: TextEdit::new(text_edit_range, new_text),
             reverse_text_edit: TextEdit::new(reverse_edit_range, replaced_text),
             select: None,
@@ -305,27 +309,76 @@ impl Edit {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct EditMetaData {
     pub start_line: usize,
-    pub from: usize,
+    pub from: usize, // ignored after Add - is set to 0;
     pub to: usize,
 }
 
+impl Add for EditMetaData {
+    type Output = Self;
+
+    fn add(mut self, other: Self) -> Self::Output {
+        let self_end_line = self.start_line + self.to;
+        let other_end_line = other.start_line + other.to;
+        self.start_line = std::cmp::min(self.start_line, other.start_line);
+        if self_end_line > other_end_line {
+            self.to = self_end_line - self.start_line;
+            if other.from > other.to {
+                self.to -= other.from - other.to;
+            } else {
+                self.to += other.to - other.from;
+            }
+        } else {
+            // previous offset does not matter because we need the info for the last changed line
+            self.to = other_end_line - self.start_line;
+        };
+        self.from = 0;
+        self
+    }
+}
+
+impl AddAssign for EditMetaData {
+    fn add_assign(&mut self, other: Self) {
+        let self_end_line = self.start_line + self.to;
+        let other_end_line = other.start_line + other.to;
+        self.start_line = std::cmp::min(self.start_line, other.start_line);
+        if self_end_line > other_end_line {
+            self.to = self_end_line - self.start_line;
+            if other.from > other.to {
+                self.to -= other.from - other.to;
+            } else {
+                self.to += other.to - other.from;
+            }
+        } else {
+            // previous offset does not matter because we need the info for the last changed line
+            self.to = other_end_line - self.start_line;
+        };
+        self.from = 0;
+    }
+}
+
 impl EditMetaData {
-    pub fn line_changed(start_line: usize) -> Self {
+    pub const fn line_changed(start_line: usize) -> Self {
         Self { start_line, from: 1, to: 1 }
     }
 
-    pub fn build_range(&self, content: &[impl EditorLine]) -> Option<Range> {
-        let end_line = self.start_line + self.to - 1;
-        Some(Range::new(
-            Position::new(self.start_line as u32, 0),
-            Position::new(end_line as u32, content.get(end_line)?.len() as u32),
-        ))
+    pub fn update_tokens(&self, content: &mut Vec<impl EditorLine>, lexer: &Lexer) {
+        for line in content.iter_mut().skip(self.start_line).take(self.to) {
+            line.rebuild_tokens(lexer);
+        }
     }
 
-    fn rev(&self) -> Self {
+    pub fn build_range(&self, content: &[impl EditorLine]) -> Range {
+        let end_line = self.start_line + self.to - 1;
+        Range::new(
+            Position::new(self.start_line as u32, 0),
+            Position::new(end_line as u32, content[end_line].len() as u32),
+        )
+    }
+
+    const fn rev(&self) -> Self {
         EditMetaData { start_line: self.start_line, from: self.to, to: self.from }
     }
 }
@@ -391,5 +444,60 @@ impl NewLineBuilder {
         self.text_edit_range.0.char = 0;
         self.reverse_edit_text.insert_str(0, &line.to_string());
         line.clear();
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::workspace::actions::EditMetaData;
+
+    #[test]
+    fn add_meta_data() {
+        assert_eq!(
+            EditMetaData::line_changed(1) + EditMetaData::line_changed(1),
+            EditMetaData { start_line: 1, from: 0, to: 1 }
+        );
+        assert_eq!(
+            EditMetaData::line_changed(1) + EditMetaData { start_line: 1, from: 1, to: 3 },
+            EditMetaData { start_line: 1, from: 0, to: 3 }
+        );
+        assert_eq!(
+            EditMetaData { start_line: 1, from: 2, to: 1 } + EditMetaData { start_line: 1, from: 1, to: 3 },
+            EditMetaData { start_line: 1, from: 0, to: 3 }
+        );
+        assert_eq!(
+            EditMetaData { start_line: 1, from: 1, to: 2 } + EditMetaData { start_line: 1, from: 1, to: 3 },
+            EditMetaData { start_line: 1, from: 0, to: 3 }
+        );
+        assert_eq!(
+            EditMetaData { start_line: 2, from: 1, to: 3 } + EditMetaData { start_line: 0, from: 3, to: 1 },
+            EditMetaData { start_line: 0, from: 0, to: 3 }
+        );
+        assert_eq!(
+            EditMetaData { start_line: 0, from: 1, to: 10 } + EditMetaData { start_line: 2, from: 2, to: 1 },
+            EditMetaData { start_line: 0, from: 0, to: 9 },
+        );
+    }
+
+    #[test]
+    fn add_assign_meta_data() {
+        let mut edit = EditMetaData::line_changed(1);
+        edit += EditMetaData::line_changed(1);
+        assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 1 });
+        let mut edit = EditMetaData::line_changed(1);
+        edit += EditMetaData { start_line: 1, from: 1, to: 3 };
+        assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 3 });
+        let mut edit = EditMetaData { start_line: 1, from: 2, to: 1 };
+        edit += EditMetaData { start_line: 1, from: 1, to: 3 };
+        assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 3 });
+        let mut edit = EditMetaData { start_line: 1, from: 1, to: 2 };
+        edit += EditMetaData { start_line: 1, from: 1, to: 3 };
+        assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 3 });
+        let mut edit = EditMetaData { start_line: 2, from: 1, to: 3 };
+        edit += EditMetaData { start_line: 0, from: 3, to: 1 };
+        assert_eq!(edit, EditMetaData { start_line: 0, from: 0, to: 3 });
+        let mut edit = EditMetaData { start_line: 0, from: 1, to: 10 };
+        edit += EditMetaData { start_line: 2, from: 2, to: 1 };
+        assert_eq!(edit, EditMetaData { start_line: 0, from: 0, to: 9 },);
     }
 }

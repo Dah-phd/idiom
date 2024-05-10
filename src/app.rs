@@ -1,5 +1,6 @@
 use crate::{
     configs::{GeneralAction, KeyMap},
+    error::IdiomResult,
     global_state::GlobalState,
     popups::{
         popup_find::{FindPopup, GoToLinePopup},
@@ -12,11 +13,10 @@ use crate::{
     tree::Tree,
     workspace::Workspace,
 };
-use anyhow::Result;
 use crossterm::event::Event;
 use std::{path::PathBuf, time::Instant};
 
-pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> Result<()> {
+pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()> {
     let mut gs = GlobalState::new(backend)?;
     let configs = gs.unwrap_or_default(KeyMap::new(), ".keys: ");
     let mut last_frame_start = Instant::now();

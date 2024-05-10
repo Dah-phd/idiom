@@ -1,7 +1,6 @@
 use super::as_url;
-use crate::workspace::CursorPosition;
+use crate::{lsp::LSPResult, workspace::CursorPosition};
 
-use anyhow::Result;
 use lsp_types as lsp;
 use lsp_types::{
     request::{
@@ -39,7 +38,7 @@ where
         Self { jsonrpc: String::from("2.0"), id, method: <T as lsp_types::request::Request>::METHOD, params }
     }
 
-    pub fn stringify(&self) -> Result<String> {
+    pub fn stringify(&self) -> LSPResult<String> {
         let request_msg = to_string(self)?;
         let ser_req = format!("Content-Length: {}\r\n\r\n{}", request_msg.len(), request_msg);
         Ok(ser_req)
@@ -167,7 +166,7 @@ where
         ))
     }
 
-    pub fn init_request() -> Result<LSPRequest<Initialize>> {
+    pub fn init_request() -> LSPResult<LSPRequest<Initialize>> {
         let uri = as_url(std::env::current_dir()?.as_path())?;
         Ok(LSPRequest::with(
             0,

@@ -2,6 +2,7 @@ mod action_buffer;
 mod edits;
 use crate::{
     configs::IndentConfigs,
+    global_state::GlobalState,
     syntax::Lexer,
     utils::Offset,
     workspace::{
@@ -463,23 +464,22 @@ impl Actions {
         clip
     }
 
-    pub fn sync(&mut self, lexer: &mut Lexer, content: &[impl EditorLine]) {
+    pub fn sync(&mut self, lexer: &mut Lexer, content: &mut Vec<impl EditorLine>, gs: &mut GlobalState) {
         if let Some(action) = self.buffer.timed_collect() {
             self.push_done(action);
         }
         if !self.events.is_empty() {
             self.version += 1;
-            lexer.sync_lsp(self.version, &mut self.events, content);
         }
-        self.version += 1;
+        lexer.sync_lsp(self.version, &mut self.events, content, gs);
     }
 
-    pub fn force_sync(&mut self, lexer: &mut Lexer, content: &[impl EditorLine]) {
+    pub fn force_sync(&mut self, lexer: &mut Lexer, content: &mut Vec<impl EditorLine>, gs: &mut GlobalState) {
         self.push_buffer();
         if !self.events.is_empty() {
             self.version += 1;
-            lexer.sync_lsp(self.version, &mut self.events, content);
         }
+        lexer.sync_lsp(self.version, &mut self.events, content, gs);
     }
 
     fn push_done(&mut self, edit: impl Into<EditType>) {

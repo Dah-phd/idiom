@@ -1,11 +1,13 @@
-use anyhow::{anyhow, Result};
 use std::{
     ops::{Add, Sub},
     path::{Path, PathBuf},
     sync::{Arc, Mutex, MutexGuard},
 };
 
-use crate::workspace::line::EditorLine;
+use crate::{
+    error::{IdiomError, IdiomResult},
+    workspace::line::EditorLine,
+};
 
 pub fn trim_start_inplace(line: &mut impl EditorLine) -> usize {
     if let Some(idx) = line.to_string().find(|c: char| !c.is_whitespace() && c != '\t') {
@@ -49,7 +51,7 @@ pub fn get_nested_paths(path: &PathBuf) -> impl Iterator<Item = PathBuf> {
     }
 }
 
-pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> Result<PathBuf> {
+pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> IdiomResult<PathBuf> {
     let mut path = if base_path.is_dir() {
         base_path
     } else if let Some(parent) = base_path.parent() {
@@ -70,7 +72,7 @@ pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> Result<PathBuf> {
         if let Some(file_name) = file_name {
             path.push(file_name);
             if path.exists() {
-                return Err(anyhow!("File already exists!"));
+                return Err(IdiomError::io_err("File already exists!"));
             }
         }
         std::fs::write(&path, "")?;
@@ -79,7 +81,7 @@ pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> Result<PathBuf> {
     Ok(path)
 }
 
-pub fn to_relative_path(target_dir: &Path) -> Result<PathBuf> {
+pub fn to_relative_path(target_dir: &Path) -> IdiomResult<PathBuf> {
     let cd = std::env::current_dir()?;
     if target_dir.is_relative() {
         return Ok(target_dir.into());
@@ -98,7 +100,7 @@ pub fn to_relative_path(target_dir: &Path) -> Result<PathBuf> {
         }
     }
     if result.to_string_lossy().is_empty() {
-        Err(anyhow!("Empty buffer!"))
+        Err(IdiomError::io_err("Empty buffer!"))
     } else {
         Ok(result)
     }

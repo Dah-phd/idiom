@@ -10,7 +10,7 @@ use completion::AutoComplete;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use info::Info;
 use lsp_types::{CompletionItem, Hover, SignatureHelp};
-pub use parser::{LSPResponseType, LSPResult};
+pub use parser::{LSPResponse, LSPResponseType};
 use rename::RenameVariable;
 
 pub enum LSPModal {

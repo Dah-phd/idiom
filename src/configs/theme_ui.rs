@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::configs::{load_or_create_config, THEME_UI};
+use crate::error::IdiomError;
 use crate::render::backend::{color, Color, Style};
 use serde::ser::{Serialize, SerializeStruct};
 use serde_json::{Map, Value};
@@ -21,7 +22,7 @@ impl<'de> serde::Deserialize<'de> for UITheme {
                 let accent_background = pull_color(&mut map, "accent").map_err(serde::de::Error::custom)?;
                 Ok(Self { accent_style: Style::bg(accent_background), accent_background })
             }
-            _ => Err(anyhow::anyhow!("theme_ui.json in not an Object!")).map_err(serde::de::Error::custom),
+            _ => Err(IdiomError::io_err("theme_ui.json in not an Object!")).map_err(serde::de::Error::custom),
         }
     }
 }

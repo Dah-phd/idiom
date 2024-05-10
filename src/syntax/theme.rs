@@ -1,4 +1,5 @@
 use crate::configs::{load_or_create_config, pull_color, serialize_rgb, THEME_FILE};
+use crate::error::IdiomError;
 use crate::render::backend::{color, Color};
 use serde::ser::{Serialize, SerializeStruct};
 use serde_json::Value;
@@ -64,7 +65,7 @@ impl<'de> serde::Deserialize<'de> for Theme {
                 string: pull_color(&mut map, "string").map_err(serde::de::Error::custom)?,
                 string_escape: pull_color(&mut map, "stringEscape").map_err(serde::de::Error::custom)?,
             }),
-            _ => Err(anyhow::anyhow!("theme.json in not an Object!")).map_err(serde::de::Error::custom),
+            _ => Err(IdiomError::io_err("theme.json in not an Object!")).map_err(serde::de::Error::custom),
         }
     }
 }

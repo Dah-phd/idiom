@@ -58,6 +58,7 @@ pub trait EditorLine:
     fn drop_diagnostics(&mut self);
     fn push_token(&mut self, token: Token);
     fn replace_tokens(&mut self, tokens: Vec<Token>);
+    fn rebuild_tokens(&mut self, lexer: &Lexer);
     fn wrapped_render(&mut self, ctx: &mut impl Context, lines: &mut RectIter, writer: &mut Backend) -> Result<()>;
     fn render(&mut self, ctx: &mut impl Context, line: Line, writer: &mut Backend) -> Result<()>;
     fn fast_render(&mut self, ctx: &mut impl Context, line: Line, writer: &mut Backend) -> Result<()>;

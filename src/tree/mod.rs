@@ -1,13 +1,13 @@
 mod tree_paths;
 use crate::{
     configs::{TreeAction, TreeKeyMap},
+    error::IdiomResult,
     global_state::{GlobalState, WorkspaceEvent},
     lsp::Diagnostic,
     popups::popups_tree::{create_file_popup, rename_file_popup},
     render::state::State,
     utils::{build_file_or_folder, to_relative_path},
 };
-use anyhow::Result;
 use crossterm::event::KeyEvent;
 use std::{
     collections::HashMap,
@@ -150,21 +150,21 @@ impl Tree {
         self.unsafe_set_path();
     }
 
-    pub fn create_file_or_folder(&mut self, name: String) -> Result<PathBuf> {
+    pub fn create_file_or_folder(&mut self, name: String) -> IdiomResult<PathBuf> {
         let path = build_file_or_folder(self.selected_path.clone(), &name)?;
         self.force_sync();
         self.select_by_path(&path);
         Ok(path)
     }
 
-    pub fn create_file_or_folder_base(&mut self, name: String) -> Result<PathBuf> {
+    pub fn create_file_or_folder_base(&mut self, name: String) -> IdiomResult<PathBuf> {
         let path = build_file_or_folder(PathBuf::from("./"), &name)?;
         self.force_sync();
         self.select_by_path(&path);
         Ok(path)
     }
 
-    fn delete_file(&mut self) -> Result<()> {
+    fn delete_file(&mut self) -> IdiomResult<()> {
         if self.selected_path.is_file() {
             std::fs::remove_file(&self.selected_path)?
         } else {
@@ -175,7 +175,7 @@ impl Tree {
         Ok(())
     }
 
-    pub fn rename_file(&mut self, name: String) -> Result<()> {
+    pub fn rename_file(&mut self, name: String) -> IdiomResult<()> {
         if let Some(selected) = self.get_selected() {
             let mut new_path = selected.path().clone();
             new_path.pop();

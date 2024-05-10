@@ -5,11 +5,11 @@ pub mod line;
 pub mod utils;
 use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
+    error::{IdiomError, IdiomResult},
     global_state::{GlobalState, TreeEvent},
     lsp::LSP,
     render::backend::{color, BackendProtocol, Style},
 };
-use anyhow::Result;
 use crossterm::event::KeyEvent;
 pub use cursor::CursorPosition;
 pub use editor::{DocStats, Editor};
@@ -185,7 +185,7 @@ impl Workspace {
         };
     }
 
-    fn handle_tree_operations(&mut self, operation: ResourceOp) -> Result<()> {
+    fn handle_tree_operations(&mut self, operation: ResourceOp) -> IdiomResult<()> {
         match operation {
             ResourceOp::Create(create) => {
                 let path = PathBuf::from(create.uri.path());
@@ -194,7 +194,7 @@ impl Workspace {
                         if matches!(options.overwrite, Some(overwrite) if !overwrite)
                             || matches!(options.ignore_if_exists, Some(ignore) if ignore)
                         {
-                            return Err(anyhow::anyhow!("File {path:?} already exists!"));
+                            return Err(IdiomError::io_err(format!("File {path:?} already exists!")));
                         }
                     }
                 };
@@ -225,11 +225,11 @@ impl Workspace {
         self.editors.iter_mut().find(|editor| editor.path == path)
     }
 
-    fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> Result<Editor> {
+    fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
         Ok(Editor::from_path(file_path, &self.base_config, gs)?)
     }
 
-    async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> Result<Editor> {
+    async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
         let mut new = Editor::from_path(file_path, &self.base_config, gs)?;
         new.resize(gs.editor_area.width as usize, gs.editor_area.height as usize);
         let lsp_cmd = match self.base_config.derive_lsp(&new.file_type) {
@@ -255,7 +255,7 @@ impl Workspace {
         Ok(new)
     }
 
-    pub async fn new_from(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> Result<bool> {
+    pub async fn new_from(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<bool> {
         let file_path = file_path.canonicalize()?;
         if let Some(idx) =
             self.editors.iter().enumerate().find(|(_, editor)| editor.path == file_path).map(|(idx, _)| idx)
@@ -270,7 +270,7 @@ impl Workspace {
         Ok(true)
     }
 
-    pub async fn new_at_line(&mut self, file_path: PathBuf, line: usize, gs: &mut GlobalState) -> Result<()> {
+    pub async fn new_at_line(&mut self, file_path: PathBuf, line: usize, gs: &mut GlobalState) -> IdiomResult<()> {
         if self.new_from(file_path, gs).await? {
             if let Some(editor) = self.get_active() {
                 editor.go_to(line);
@@ -378,7 +378,7 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
         };
         if let Some(action) = action {
             match action {
-                EditorAction::Char(ch) => editor.push(ch),
+                EditorAction::Char(ch) => editor.push(ch, gs),
                 EditorAction::NewLine => editor.new_line(),
                 EditorAction::Indent => editor.indent(),
                 EditorAction::Backspace => editor.backspace(),

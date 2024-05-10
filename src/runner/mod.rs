@@ -1,4 +1,5 @@
 use self::autocomplete::try_autocomplete;
+use crate::error::IdiomResult;
 use crate::render::layout::BORDERS;
 use crate::render::TextField;
 use crate::runner::commands::load_file;
@@ -8,7 +9,6 @@ mod components;
 use crate::configs::{EditorConfigs, KeyMap, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE};
 use crate::global_state::GlobalState;
 use crate::utils::into_guard;
-use anyhow::Result;
 use commands::{load_cfg, overwrite_cfg, Terminal};
 use components::CmdHistory;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -175,7 +175,7 @@ impl EditorTerminal {
         }
     }
 
-    pub fn idiom_command_handler(&mut self, arg: &str, gs: &mut GlobalState) -> Result<()> {
+    pub fn idiom_command_handler(&mut self, arg: &str, gs: &mut GlobalState) -> IdiomResult<()> {
         if arg.trim() == "help" {
             self.logs.push("load => load config files, available options:".to_owned());
             self.logs.push("    keymap => open keymap config file.".to_owned());

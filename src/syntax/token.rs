@@ -1,6 +1,8 @@
 use std::io::Write;
 
 use crate::{
+    configs::FileType,
+    global_state::GlobalState,
     lsp::LSPClient,
     render::{
         backend::{Backend, Color, Style},
@@ -114,7 +116,7 @@ impl Token {
     ) -> std::io::Result<()> {
         if let Some(line) = lines.next() {
             let mut tokens = Vec::new();
-            Self::parse(lang, theme, text, &mut tokens);
+            Token::parse(lang, theme, text, &mut tokens);
             backend.flush()?;
         }
         Ok(())
@@ -128,6 +130,7 @@ pub enum TokensType {
     Internal,
 }
 
+#[inline]
 pub fn set_tokens(
     tokens: Vec<SemanticToken>,
     legend: &Legend,
@@ -143,9 +146,7 @@ pub fn set_tokens(
         if token.delta_line != 0 {
             len = 0;
             char_idx = 0;
-            if !token_line.is_empty() {
-                content[line_idx].replace_tokens(std::mem::take(&mut token_line));
-            };
+            content[line_idx].replace_tokens(std::mem::take(&mut token_line));
             line_idx += token.delta_line as usize;
         };
         let from = char_idx + token.delta_start as usize;
@@ -169,24 +170,73 @@ pub fn set_tokens(
     };
 }
 
+#[inline]
+pub fn set_tokens_partial(
+    tokens: Vec<SemanticToken>,
+    max_lines: usize,
+    legend: &Legend,
+    lang: &Lang,
+    theme: &Theme,
+    content: &mut Vec<impl EditorLine>,
+) {
+    let mut line_idx = 0;
+    let mut char_idx = 0;
+    let mut len = 0;
+    let mut token_line = Vec::new();
+    for token in tokens {
+        if token.delta_line != 0 {
+            len = 0;
+            char_idx = 0;
+            content[line_idx].replace_tokens(std::mem::take(&mut token_line));
+            line_idx += token.delta_line as usize;
+            if line_idx > max_lines {
+                return;
+            }
+        };
+        let from = char_idx + token.delta_start as usize;
+        let to = from + token.length as usize;
+        // enriches the tokens with additinal highlights
+        if from.saturating_sub(char_idx + len) > 3 {
+            content[line_idx].get(char_idx + len..from).inspect(|snippet| {
+                Token::enrich(char_idx, lang, theme, snippet, &mut token_line);
+            });
+        };
+        len = token.length as usize;
+        let token_type = match content[line_idx].get(from..from + len) {
+            Some(word) => legend.parse_to_color(token.token_type as usize, theme, lang, word),
+            None => theme.default,
+        };
+        token_line.push(Token::new(from, to, len, token_type));
+        char_idx = from;
+    }
+    if !token_line.is_empty() {
+        content[line_idx].replace_tokens(token_line);
+    };
+}
+
+#[inline]
 pub fn collect_changes(
     path: &std::path::Path,
+    file_type: FileType,
     version: i32,
     events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
     content: &[impl EditorLine],
     client: &mut LSPClient,
+    gs: &mut GlobalState,
 ) -> Option<LSPResponseType> {
-    match events.len() {
-        0 => None,
-        1 => {
-            let (meta, edit) = events.remove(0);
-            client.file_did_change(path, version, vec![edit]).ok()?;
-            client.request_partial_tokens(path, meta.build_range(content)?).map(LSPResponseType::TokensPartial)
-        }
-        _ => {
-            let edits = events.drain(..).map(|(_meta, edit)| edit).collect::<Vec<_>>();
-            client.file_did_change(path, version, edits).ok()?;
-            client.request_full_tokens(path).map(LSPResponseType::Tokens)
-        }
+    if events.is_empty() {
+        return None;
     }
+    let mut change_events = Vec::new();
+    let meta = events
+        .drain(..)
+        .map(|(meta, edit)| {
+            change_events.push(edit);
+            meta
+        })
+        .reduce(|em1, em2| em1 + em2)?;
+    gs.unwrap_lsp_error(client.file_did_change(path, version, change_events), file_type);
+    let max_lines = meta.start_line + meta.to;
+    let range = meta.build_range(content);
+    client.request_partial_tokens(path, range).map(|id| LSPResponseType::TokensPartial { id, max_lines })
 }

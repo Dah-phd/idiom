@@ -19,11 +19,16 @@ pub use legend::Legend;
 use lsp_types::{
     PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, TextDocumentContentChangeEvent,
 };
-use modal::{LSPModal, LSPResponseType, LSPResult, ModalMessage};
-use std::path::{Path, PathBuf};
+use modal::{LSPModal, LSPResponse, LSPResponseType, ModalMessage};
+use std::{
+    path::{Path, PathBuf},
+    time::{Duration, Instant},
+};
 use theme::Theme;
-use token::{collect_changes, set_tokens};
+use token::{collect_changes, set_tokens, set_tokens_partial};
 pub use token::{Token, TokensType};
+
+const FULL_TOKENS: Duration = Duration::from_secs(10);
 
 pub struct Lexer {
     pub lang: Lang,
@@ -34,7 +39,7 @@ pub struct Lexer {
     pub lsp_client: Option<LSPClient>,
     pub line_number_offset: usize,
     pub path: PathBuf,
-    // pub line_builder: LineBuilder,
+    clock: Instant,
     modal: Option<LSPModal>,
     requests: Vec<LSPResponseType>,
 }
@@ -46,6 +51,7 @@ impl Lexer {
             legend: Legend::default(),
             theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
             token_producer: TokensType::Internal,
+            clock: Instant::now(),
             modal: None,
             path: path.into(),
             requests: Vec::new(),
@@ -68,27 +74,27 @@ impl Lexer {
                 if let Some(response) = client.get(request.id()) {
                     match request.parse(response.result) {
                         Some(result) => match result {
-                            LSPResult::Completion(completions, line, idx) => {
+                            LSPResponse::Completion(completions, line, idx) => {
                                 self.modal = LSPModal::auto_complete(completions, line, idx);
                             }
-                            LSPResult::Hover(hover) => {
+                            LSPResponse::Hover(hover) => {
                                 if let Some(modal) = self.modal.as_mut() {
                                     modal.hover_map(hover);
                                 } else {
                                     self.modal.replace(LSPModal::from_hover(hover));
                                 }
                             }
-                            LSPResult::SignatureHelp(signature) => {
+                            LSPResponse::SignatureHelp(signature) => {
                                 if let Some(modal) = self.modal.as_mut() {
                                     modal.signature_map(signature);
                                 } else {
                                     self.modal.replace(LSPModal::from_signature(signature));
                                 }
                             }
-                            LSPResult::Renames(workspace_edit) => {
+                            LSPResponse::Renames(workspace_edit) => {
                                 gs.workspace.push(workspace_edit.into());
                             }
-                            LSPResult::Tokens(tokens) => {
+                            LSPResponse::Tokens(tokens) => {
                                 match tokens {
                                     SemanticTokensResult::Partial(data) => {
                                         set_tokens(data.data, &self.legend, &self.lang, &self.theme, content);
@@ -104,14 +110,14 @@ impl Lexer {
                                     }
                                 };
                             }
-                            LSPResult::TokensPartial(tokens) => {
-                                let tokens = match tokens {
+                            LSPResponse::TokensPartial { result, max_lines: limit } => {
+                                let tokens = match result {
                                     SemanticTokensRangeResult::Partial(data) => data.data,
                                     SemanticTokensRangeResult::Tokens(data) => data.data,
                                 };
-                                set_tokens(tokens, &self.legend, &self.lang, &self.theme, content);
+                                set_tokens_partial(tokens, limit, &self.legend, &self.lang, &self.theme, content);
                             }
-                            LSPResult::References(locations) => {
+                            LSPResponse::References(locations) => {
                                 if let Some(mut locations) = locations {
                                     if locations.len() == 1 {
                                         gs.tree.push(locations.remove(0).into());
@@ -120,10 +126,10 @@ impl Lexer {
                                     }
                                 }
                             }
-                            LSPResult::Declaration(declaration) => {
+                            LSPResponse::Declaration(declaration) => {
                                 gs.try_tree_event(declaration);
                             }
-                            LSPResult::Definition(definition) => {
+                            LSPResponse::Definition(definition) => {
                                 gs.try_tree_event(definition);
                             }
                         },
@@ -145,14 +151,30 @@ impl Lexer {
         &mut self,
         version: i32,
         events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
-        content: &[impl EditorLine],
+        content: &mut Vec<impl EditorLine>,
+        gs: &mut GlobalState,
     ) {
         if let Some(client) = self.lsp_client.as_mut() {
-            if let Some(request) = collect_changes(&self.path, version, events, content, client) {
+            if self.clock.elapsed() > FULL_TOKENS {
+                // gs.unwrap_lsp_error(
+                let _ = client.file_did_change(&self.path, version, events.drain(..).map(|(_, edit)| edit).collect());
+                //     self.lang.file_type,
+                // );
+                if let Some(request) = client.request_full_tokens(&self.path).map(LSPResponseType::Tokens) {
+                    self.requests.push(request);
+                };
+                gs.success("Tokens refreshed!");
+                return;
+            };
+            if let Some(request) =
+                collect_changes(&self.path, self.lang.file_type, version, events, content, client, gs)
+            {
                 self.requests.push(request);
             };
-        } else {
-            events.clear();
+        } else if let Some(meta) = events.drain(..).map(|(meta, ..)| meta).reduce(|left, right| left + right) {
+            for line in content.iter_mut().skip(meta.start_line).take(meta.to) {
+                line.rebuild_tokens(&self);
+            }
         };
     }
 

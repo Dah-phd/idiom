@@ -6,7 +6,8 @@ mod events;
 mod message;
 
 use crate::{
-    configs::UITheme,
+    configs::{FileType, UITheme},
+    lsp::{LSPError, LSPResult},
     popups::{
         placeholder, popup_replace::ReplacePopup, popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges,
         PopupInterface,
@@ -336,6 +337,17 @@ impl GlobalState {
     #[inline]
     pub fn unwrap_or_default<T: Default, E: Error>(&mut self, result: Result<T, E>, prefix: &str) -> T {
         self.messages.unwrap_or_default(result, prefix)
+    }
+
+    /// unwrap LSP error and check status
+    #[inline]
+    pub fn unwrap_lsp_error<T>(&mut self, result: LSPResult<T>, file_type: FileType) {
+        if let Err(error) = result {
+            self.messages.error(error.to_string());
+            if let LSPError::InternalError(..) = error {
+                self.workspace.push(WorkspaceEvent::CheckLSP(file_type))
+            }
+        }
     }
 
     /// Attempts to create new editor if err logs it and returns false else true.
