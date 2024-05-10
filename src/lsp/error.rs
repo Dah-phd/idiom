@@ -14,17 +14,25 @@ pub enum LSPError {
     ServerCapability(String),
     IOError(#[from] std::io::Error),
     JsonRCPStderr(#[from] lsp_stream::RCPError),
+    Null,
 }
 
 impl LSPError {
+    #[inline]
     pub fn internal(message: impl Into<String>) -> Self {
         Self::InternalError(message.into())
+    }
+
+    #[inline]
+    pub fn missing_capability(message: impl Into<String>) -> Self {
+        Self::ServerCapability(message.into())
     }
 }
 
 impl Display for LSPError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Null => Ok(()),
             Self::InternalError(message) => f.write_fmt(format_args!("LSP Internal Error: {message}")),
             Self::ResponseError(message) => f.write_fmt(format_args!("LSP Responde with error: {message}")),
             Self::JsonRCPStderr(err) => {

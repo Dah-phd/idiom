@@ -106,8 +106,8 @@ impl Editor {
         (self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into())
     }
 
-    pub fn help(&mut self) {
-        self.lexer.help((&self.cursor).into(), &self.content);
+    pub fn help(&mut self, gs: &mut GlobalState) {
+        self.lexer.help((&self.cursor).into(), &self.content, gs);
     }
 
     pub fn references(&mut self) {
@@ -398,7 +398,7 @@ impl Editor {
         if self.lexer.should_autocomplete(self.cursor.char, line) {
             let line = line.to_string();
             self.actions.force_sync(&mut self.lexer, &mut self.content, gs);
-            self.lexer.get_autocomplete((&self.cursor).into(), line);
+            self.lexer.get_autocomplete((&self.cursor).into(), line, gs);
         }
     }
 

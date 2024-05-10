@@ -59,12 +59,12 @@ where
         ))
     }
 
-    pub fn rename(path: &Path, c: CursorPosition, new_name: String) -> Option<LSPRequest<Rename>> {
-        Some(LSPRequest::with(
+    pub fn rename(path: &Path, c: CursorPosition, new_name: String) -> LSPResult<LSPRequest<Rename>> {
+        Ok(LSPRequest::with(
             0,
             RenameParams {
                 text_document_position: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: c.into(),
                 },
                 new_name,
@@ -73,22 +73,22 @@ where
         ))
     }
 
-    pub fn semantics_full(path: &Path) -> Option<LSPRequest<SemanticTokensFullRequest>> {
-        Some(LSPRequest::with(
+    pub fn semantics_full(path: &Path) -> LSPResult<LSPRequest<SemanticTokensFullRequest>> {
+        Ok(LSPRequest::with(
             0,
             SemanticTokensParams {
-                text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                text_document: TextDocumentIdentifier::new(as_url(path)?),
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
                 partial_result_params: lsp::PartialResultParams::default(),
             },
         ))
     }
 
-    pub fn semantics_range(path: &Path, range: Range) -> Option<LSPRequest<SemanticTokensRangeRequest>> {
-        Some(LSPRequest::with(
+    pub fn semantics_range(path: &Path, range: Range) -> LSPResult<LSPRequest<SemanticTokensRangeRequest>> {
+        Ok(LSPRequest::with(
             0,
             SemanticTokensRangeParams {
-                text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                text_document: TextDocumentIdentifier::new(as_url(path)?),
                 range,
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
                 partial_result_params: lsp::PartialResultParams::default(),
@@ -124,12 +124,13 @@ where
         ))
     }
 
-    pub fn completion(path: &Path, c: CursorPosition) -> Option<LSPRequest<Completion>> {
-        Some(LSPRequest::with(
+    #[inline]
+    pub fn completion(path: &Path, c: CursorPosition) -> LSPResult<LSPRequest<Completion>> {
+        Ok(LSPRequest::with(
             0,
             CompletionParams {
                 text_document_position: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: c.into(),
                 },
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
@@ -139,13 +140,14 @@ where
         ))
     }
 
-    pub fn signature_help(path: &Path, c: CursorPosition) -> Option<LSPRequest<SignatureHelpRequest>> {
-        Some(LSPRequest::with(
+    #[inline]
+    pub fn signature_help(path: &Path, c: CursorPosition) -> LSPResult<LSPRequest<SignatureHelpRequest>> {
+        Ok(LSPRequest::with(
             0,
             SignatureHelpParams {
                 context: None,
                 text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: c.into(),
                 },
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
@@ -153,12 +155,13 @@ where
         ))
     }
 
-    pub fn hover(path: &Path, c: CursorPosition) -> Option<LSPRequest<HoverRequest>> {
-        Some(LSPRequest::with(
+    #[inline]
+    pub fn hover(path: &Path, c: CursorPosition) -> LSPResult<LSPRequest<HoverRequest>> {
+        Ok(LSPRequest::with(
             0,
             HoverParams {
                 text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: c.into(),
                 },
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),

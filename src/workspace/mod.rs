@@ -411,7 +411,7 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
                 EditorAction::StartOfFile => editor.start_of_file(),
                 EditorAction::FindReferences => editor.references(),
                 EditorAction::GoToDeclaration => editor.declarations(),
-                EditorAction::Help => editor.help(),
+                EditorAction::Help => editor.help(gs),
                 EditorAction::LSPRename => editor.start_renames(),
                 EditorAction::CommentOut => editor.comment_out(),
                 EditorAction::Undo => editor.undo(),

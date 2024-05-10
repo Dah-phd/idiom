@@ -341,12 +341,22 @@ impl GlobalState {
 
     /// unwrap LSP error and check status
     #[inline]
-    pub fn unwrap_lsp_error<T>(&mut self, result: LSPResult<T>, file_type: FileType) {
-        if let Err(error) = result {
-            self.messages.error(error.to_string());
-            if let LSPError::InternalError(..) = error {
-                self.workspace.push(WorkspaceEvent::CheckLSP(file_type))
+    pub fn unwrap_lsp_error(&mut self, result: LSPResult<()>, file_type: FileType) {
+        if let Err(err) = result {
+            self.send_error(err, file_type);
+        }
+    }
+
+    /// handle LSP error types
+    #[inline]
+    pub fn send_error(&mut self, err: LSPError, file_type: FileType) {
+        match err {
+            LSPError::Null => (),
+            LSPError::InternalError(message) => {
+                self.messages.error(message);
+                self.workspace.push(WorkspaceEvent::CheckLSP(file_type));
             }
+            _ => self.error(err.to_string()),
         }
     }
 

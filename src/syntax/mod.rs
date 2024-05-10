@@ -104,7 +104,7 @@ impl Lexer {
                                             set_tokens(data.data, &self.legend, &self.lang, &self.theme, content);
                                             self.token_producer = TokensType::LSP;
                                             gs.success("LSP tokens mapped!");
-                                        } else if let Some(id) = client.request_full_tokens(&self.path) {
+                                        } else if let Ok(id) = client.request_full_tokens(&self.path) {
                                             unresolved_requests.push(LSPResponseType::Tokens(id));
                                         };
                                     }
@@ -156,21 +156,24 @@ impl Lexer {
     ) {
         if let Some(client) = self.lsp_client.as_mut() {
             if self.clock.elapsed() > FULL_TOKENS {
-                // gs.unwrap_lsp_error(
-                let _ = client.file_did_change(&self.path, version, events.drain(..).map(|(_, edit)| edit).collect());
-                //     self.lang.file_type,
-                // );
-                if let Some(request) = client.request_full_tokens(&self.path).map(LSPResponseType::Tokens) {
-                    self.requests.push(request);
+                gs.unwrap_lsp_error(
+                    client.file_did_change(&self.path, version, events.drain(..).map(|(_, edit)| edit).collect()),
+                    self.lang.file_type,
+                );
+                return match client.request_full_tokens(&self.path).map(LSPResponseType::Tokens) {
+                    Ok(request) => {
+                        self.requests.push(request);
+                        gs.success("Tokens refreshed!");
+                    }
+                    Err(err) => {
+                        gs.send_error(err, self.lang.file_type);
+                    }
                 };
-                gs.success("Tokens refreshed!");
-                return;
             };
-            if let Some(request) =
-                collect_changes(&self.path, self.lang.file_type, version, events, content, client, gs)
-            {
-                self.requests.push(request);
-            };
+            match collect_changes(&self.path, version, events, content, client) {
+                Ok(request) => self.requests.push(request),
+                Err(err) => gs.send_error(err, self.lang.file_type),
+            }
         } else if let Some(meta) = events.drain(..).map(|(meta, ..)| meta).reduce(|left, right| left + right) {
             for line in content.iter_mut().skip(meta.start_line).take(meta.to) {
                 line.rebuild_tokens(&self);
@@ -200,7 +203,7 @@ impl Lexer {
                     self.modal.take();
                 }
                 ModalMessage::RenameVar(new_name, c) => {
-                    self.get_rename(c, new_name);
+                    self.get_rename(c, new_name, gs);
                     self.modal.take();
                     return true;
                 }
@@ -226,25 +229,34 @@ impl Lexer {
         }
         // self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
         gs.success("LSP mapped!");
-        if let Some(id) = client.request_full_tokens(&self.path) {
-            self.requests.push(LSPResponseType::Tokens(id));
-            gs.message("Getting LSP semantic tokents ...");
-        };
+        match client.request_full_tokens(&self.path).map(LSPResponseType::Tokens) {
+            Ok(request) => {
+                self.requests.push(request);
+                gs.message("Getting LSP semantic tokents ...");
+            }
+            Err(err) => gs.send_error(err, self.lang.file_type),
+        }
         self.lsp_client.replace(client);
     }
 
+    #[inline]
     pub fn should_autocomplete(&mut self, char_idx: usize, line: &impl EditorLine) -> bool {
         self.lsp_client.is_some()
             && !matches!(self.modal, Some(LSPModal::AutoComplete(..)))
             && self.lang.completable(line, char_idx)
     }
 
-    pub fn get_autocomplete(&mut self, c: CursorPosition, line: String) {
-        if let Some(id) = self.lsp_client.as_mut().and_then(|client| client.request_completions(&self.path, c)) {
-            self.requests.push(LSPResponseType::Completion(id, line, c.char));
+    #[inline]
+    pub fn get_autocomplete(&mut self, c: CursorPosition, line: String, gs: &mut GlobalState) {
+        if let Some(client) = self.lsp_client.as_mut() {
+            match client.request_completions(&self.path, c) {
+                Ok(id) => self.requests.push(LSPResponseType::Completion(id, line, c.char)),
+                Err(err) => gs.send_error(err, self.lang.file_type),
+            }
         }
     }
 
+    #[inline]
     pub fn start_rename(&mut self, c: CursorPosition, title: &str) {
         if let Some(client) = self.lsp_client.as_mut() {
             if client.capabilities.rename_provider.is_none() {
@@ -254,28 +266,30 @@ impl Lexer {
         self.modal.replace(LSPModal::renames_at(c, title));
     }
 
-    pub fn help(&mut self, c: CursorPosition, content: &[impl EditorLine]) {
+    #[inline]
+    pub fn help(&mut self, c: CursorPosition, content: &[impl EditorLine], gs: &mut GlobalState) {
         if let Some(client) = self.lsp_client.as_mut() {
             if let Some(actions) = content[c.line].diagnostic_info(&self.lang) {
                 self.modal.replace(LSPModal::actions(actions));
             }
-            if let Some(id) = client.request_signitures(&self.path, c).map(LSPResponseType::SignatureHelp) {
-                self.requests.push(id);
+            match client.request_signitures(&self.path, c).map(LSPResponseType::SignatureHelp) {
+                Ok(request) => self.requests.push(request),
+                Err(err) => gs.send_error(err, self.lang.file_type),
             }
-            if let Some(id) = client.request_hover(&self.path, c).map(LSPResponseType::Hover) {
-                self.requests.push(id);
+            match client.request_hover(&self.path, c).map(LSPResponseType::Hover) {
+                Ok(request) => self.requests.push(request),
+                Err(err) => gs.send_error(err, self.lang.file_type),
             }
         }
     }
 
-    pub fn get_rename(&mut self, c: CursorPosition, new_name: String) {
-        if let Some(id) = self
-            .lsp_client
-            .as_mut()
-            .and_then(|client| client.request_rename(&self.path, c, new_name))
-            .map(LSPResponseType::Renames)
-        {
-            self.requests.push(id);
+    #[inline]
+    pub fn get_rename(&mut self, c: CursorPosition, new_name: String, gs: &mut GlobalState) {
+        if let Some(client) = self.lsp_client.as_mut() {
+            match client.request_rename(&self.path, c, new_name).map(LSPResponseType::Renames) {
+                Ok(request) => self.requests.push(request),
+                Err(err) => gs.send_error(err, self.lang.file_type),
+            }
         }
     }
 
@@ -317,7 +331,7 @@ impl Lexer {
                 self.legend.map_styles(&self.lang.file_type, &self.theme, capabilities);
             }
             // self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
-            if let Some(id) = client.request_full_tokens(&self.path) {
+            if let Ok(id) = client.request_full_tokens(&self.path) {
                 self.requests.push(LSPResponseType::Tokens(id));
             }
         };
@@ -332,7 +346,7 @@ impl Lexer {
             } else {
                 gs.success("LSP running ...");
             }
-            if let Some(id) = client.request_full_tokens(&self.path) {
+            if let Ok(id) = client.request_full_tokens(&self.path) {
                 self.requests.push(LSPResponseType::Tokens(id));
             }
         }

@@ -1,9 +1,7 @@
 use std::io::Write;
 
 use crate::{
-    configs::FileType,
-    global_state::GlobalState,
-    lsp::LSPClient,
+    lsp::{LSPClient, LSPError, LSPResult},
     render::{
         backend::{Backend, Color, Style},
         layout::RectIter,
@@ -217,15 +215,13 @@ pub fn set_tokens_partial(
 #[inline]
 pub fn collect_changes(
     path: &std::path::Path,
-    file_type: FileType,
     version: i32,
     events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
     content: &[impl EditorLine],
     client: &mut LSPClient,
-    gs: &mut GlobalState,
-) -> Option<LSPResponseType> {
+) -> LSPResult<LSPResponseType> {
     if events.is_empty() {
-        return None;
+        return Err(LSPError::Null);
     }
     let mut change_events = Vec::new();
     let meta = events
@@ -234,8 +230,9 @@ pub fn collect_changes(
             change_events.push(edit);
             meta
         })
-        .reduce(|em1, em2| em1 + em2)?;
-    gs.unwrap_lsp_error(client.file_did_change(path, version, change_events), file_type);
+        .reduce(|em1, em2| em1 + em2)
+        .expect("Value is checked");
+    client.file_did_change(path, version, change_events)?;
     let max_lines = meta.start_line + meta.to;
     let range = meta.build_range(content);
     client.request_partial_tokens(path, range).map(|id| LSPResponseType::TokensPartial { id, max_lines })
