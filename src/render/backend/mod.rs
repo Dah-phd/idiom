@@ -6,7 +6,7 @@ use std::{
 
 pub use crossterm_backend::{color, Backend, Color, Style};
 
-use super::layout::Rect;
+use crate::render::layout::Rect;
 
 pub trait BackendProtocol: Write + Sized {
     fn init() -> Result<Self>;
@@ -17,21 +17,21 @@ pub trait BackendProtocol: Write + Sized {
     fn screen() -> Result<Rect>;
 
     /// clears from cursor until the End Of Line
-    fn clear_to_eol(&mut self) -> std::io::Result<()>;
+    fn clear_to_eol(&mut self) -> Result<()>;
 
     /// clears current cursor line
-    fn clear_line(&mut self) -> std::io::Result<()>;
+    fn clear_line(&mut self) -> Result<()>;
 
-    fn clear_all(&mut self) -> std::io::Result<()>;
+    fn clear_all(&mut self) -> Result<()>;
 
     /// stores the cursor and hides it
-    fn save_cursor(&mut self) -> std::io::Result<()>;
+    fn save_cursor(&mut self) -> Result<()>;
 
     /// restores cursor position and shows cursor
-    fn restore_cursor(&mut self) -> std::io::Result<()>;
+    fn restore_cursor(&mut self) -> Result<()>;
 
     /// sets the style for the print/print at
-    fn set_style(&mut self, style: Style) -> std::io::Result<()>;
+    fn set_style(&mut self, style: Style) -> Result<()>;
 
     fn get_style(&mut self) -> Style;
 
