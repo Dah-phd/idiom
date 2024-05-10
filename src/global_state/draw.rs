@@ -1,6 +1,6 @@
 use crate::{global_state::GlobalState, runner::EditorTerminal, tree::Tree, workspace::Workspace, BackendProtocol};
 use bitflags::bitflags;
-use std::io::Result;
+use std::io::{Result, Write};
 
 bitflags! {
     /// Workspace and Footer are always drawn
@@ -48,7 +48,7 @@ pub fn full_rebuild(
         gs.draw_callback = draw_popup;
         gs.render_popup()?;
     }
-    Ok(())
+    gs.writer.flush()
 }
 
 #[inline]
@@ -61,10 +61,11 @@ pub fn draw(
     gs.writer.hide_cursor()?;
     workspace.render(gs)?;
     if let Some(editor) = workspace.get_active() {
-        editor.fast_render(gs)
+        editor.fast_render(gs)?;
     } else {
-        gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer)
-    }
+        gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer)?;
+    };
+    gs.writer.flush()
 }
 
 #[inline]
@@ -78,10 +79,11 @@ pub fn draw_with_tree(
     tree.fast_render(gs)?;
     workspace.render(gs)?;
     if let Some(editor) = workspace.get_active() {
-        editor.fast_render(gs)
+        editor.fast_render(gs)?;
     } else {
-        gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer)
-    }
+        gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer)?;
+    };
+    gs.writer.flush()
 }
 
 #[inline]
@@ -93,7 +95,8 @@ pub fn draw_popup(
 ) -> Result<()> {
     gs.writer.hide_cursor()?;
     gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer)?;
-    gs.render_popup()
+    gs.render_popup()?;
+    gs.writer.flush()
 }
 
 #[inline]
@@ -105,5 +108,6 @@ pub fn draw_term(
 ) -> Result<()> {
     gs.writer.hide_cursor()?;
     gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer)?;
-    term.render(gs)
+    term.render(gs)?;
+    gs.writer.flush()
 }

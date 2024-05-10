@@ -112,7 +112,7 @@ impl BackendProtocol for Backend {
     /// restores cursor position and shows cursor
     #[inline]
     fn restore_cursor(&mut self) -> std::io::Result<()> {
-        execute!(self, RestorePosition, Show)
+        queue!(self, RestorePosition, Show)
     }
 
     /// sets the style for the print/print at
@@ -192,13 +192,13 @@ impl BackendProtocol for Backend {
     /// direct adding cursor at location - no buffer queing
     #[inline]
     fn render_cursor_at(&mut self, row: u16, col: u16) -> Result<()> {
-        execute!(self, MoveTo(col, row), Show)
+        queue!(self, MoveTo(col, row), Show)
     }
 
     /// direct showing cursor - no buffer queing
     #[inline]
     fn show_cursor(&mut self) -> Result<()> {
-        execute!(self, Show)
+        queue!(self, Show)
     }
 
     /// direct hiding cursor - no buffer queing

@@ -28,7 +28,7 @@ use theme::Theme;
 use token::{collect_changes, set_tokens, set_tokens_partial};
 pub use token::{Token, TokensType};
 
-const FULL_TOKENS: Duration = Duration::from_secs(10);
+const FULL_TOKENS: Duration = Duration::from_secs(2);
 
 pub struct Lexer {
     pub lang: Lang,
@@ -162,6 +162,7 @@ impl Lexer {
                 );
                 return match client.request_full_tokens(&self.path).map(LSPResponseType::Tokens) {
                     Ok(request) => {
+                        self.clock = Instant::now();
                         self.requests.push(request);
                         gs.success("Tokens refreshed!");
                     }
