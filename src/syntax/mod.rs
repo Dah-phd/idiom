@@ -10,6 +10,7 @@ use crate::{
     global_state::{GlobalState, WorkspaceEvent},
     lsp::LSPClient,
     popups::popups_tree::refrence_selector,
+    render::layout::Rect,
     workspace::{actions::EditMetaData, line::EditorLine, CursorPosition},
 };
 use crossterm::event::KeyEvent;
@@ -41,6 +42,7 @@ pub struct Lexer {
     pub path: PathBuf,
     clock: Instant,
     modal: Option<LSPModal>,
+    modal_rect: Option<Rect>,
     requests: Vec<LSPResponseType>,
 }
 
@@ -53,6 +55,7 @@ impl Lexer {
             token_producer: TokensType::Internal,
             clock: Instant::now(),
             modal: None,
+            modal_rect: None,
             path: path.into(),
             requests: Vec::new(),
             line_number_offset: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
@@ -183,35 +186,33 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn render_modal_if_exist(
-        &mut self,
-        row: u16,
-        col: u16,
-        gs: &mut GlobalState,
-    ) -> Option<crate::render::layout::Rect> {
-        self.modal.as_mut().and_then(|modal| modal.render_at(col as u16, row as u16, gs))
+    pub fn render_modal_if_exist(&mut self, row: u16, col: u16, gs: &mut GlobalState) {
+        self.modal_rect = self.modal.as_mut().and_then(|modal| modal.render_at(col as u16, row as u16, gs));
     }
 
-    pub fn map_modal_if_exists(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
+    pub fn map_modal_if_exists(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> (bool, Option<Rect>) {
         if let Some(modal) = &mut self.modal {
             match modal.map_and_finish(key, &self.lang, gs) {
-                ModalMessage::Taken => return true,
+                ModalMessage::Taken => return (true, self.modal_rect.take()),
                 ModalMessage::TakenDone => {
                     self.modal.take();
-                    return true;
+                    return (true, self.modal_rect.take());
                 }
                 ModalMessage::Done => {
                     self.modal.take();
+                    return (false, self.modal_rect.take());
                 }
                 ModalMessage::RenameVar(new_name, c) => {
                     self.get_rename(c, new_name, gs);
                     self.modal.take();
-                    return true;
+                    return (true, self.modal_rect.take());
                 }
-                _ => (),
+                ModalMessage::None => {
+                    return (false, self.modal_rect.take());
+                }
             }
         }
-        false
+        (false, None)
     }
 
     pub fn set_lsp_client(

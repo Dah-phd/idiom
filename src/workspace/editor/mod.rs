@@ -1,7 +1,7 @@
 use crate::{
     configs::{EditorConfigs, FileType},
     global_state::GlobalState,
-    render::backend::BackendProtocol,
+    render::{backend::BackendProtocol, layout::Rect},
     syntax::Lexer,
     workspace::{
         actions::Actions,
@@ -54,45 +54,61 @@ impl Editor {
         })
     }
 
+    #[inline]
     pub fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
         self.sync(gs);
-        let mut area = gs.editor_area.into_iter();
+        let mut lines = gs.editor_area.into_iter();
         let mut ctx = CodeLineContext::new(&self.cursor, &mut self.lexer);
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if self.cursor.line == line_idx && text.len() > self.cursor.text_width {
-                text.wrapped_render(&mut ctx, &mut area, &mut gs.writer)?;
-            } else if let Some(line) = area.next() {
+                text.wrapped_render(&mut ctx, &mut lines, &mut gs.writer)?;
+            } else if let Some(line) = lines.next() {
                 text.render(&mut ctx, line, &mut gs.writer)?;
             } else {
                 break;
             };
         }
-        for line in area {
+        for line in lines {
             line.render_empty(&mut gs.writer)?;
         }
         gs.render_stats(self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into())?;
         ctx.render_cursor(gs)
     }
 
+    #[inline]
     pub fn fast_render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
         self.sync(gs);
-        let mut area = gs.editor_area.into_iter();
+        let mut lines = gs.editor_area.into_iter();
         let mut ctx = CodeLineContext::new(&self.cursor, &mut self.lexer);
         gs.writer.hide_cursor()?;
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if self.cursor.line == line_idx && text.len() > self.cursor.text_width {
-                text.wrapped_render(&mut ctx, &mut area, &mut gs.writer)?;
-            } else if let Some(line) = area.next() {
+                if text.len() > self.cursor.text_width {
+                    text.wrapped_render(&mut ctx, &mut lines, &mut gs.writer)?;
+                } else if let Some(line) = lines.next() {
+                    text.render(&mut ctx, line, &mut gs.writer)?;
+                } else {
+                    break;
+                }
+            } else if let Some(line) = lines.next() {
                 text.fast_render(&mut ctx, line, &mut gs.writer)?;
             } else {
                 break;
             };
         }
-        for line in area {
+        for line in lines {
             line.render_empty(&mut gs.writer)?;
         }
         gs.render_stats(self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into())?;
         ctx.render_cursor(gs)
+    }
+
+    #[inline]
+    pub fn updated_rect(&mut self, rect: Rect, gs: &GlobalState) {
+        let skip_offset = rect.row.saturating_sub(gs.editor_area.row) as usize;
+        for line in self.content.iter_mut().skip(self.cursor.at_line + skip_offset).take(rect.width as usize) {
+            line.clear_cache();
+        }
     }
 
     #[inline]

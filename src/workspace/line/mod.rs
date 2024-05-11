@@ -62,11 +62,13 @@ pub trait EditorLine:
     fn wrapped_render(&mut self, ctx: &mut impl Context, lines: &mut RectIter, writer: &mut Backend) -> Result<()>;
     fn render(&mut self, ctx: &mut impl Context, line: Line, writer: &mut Backend) -> Result<()>;
     fn fast_render(&mut self, ctx: &mut impl Context, line: Line, writer: &mut Backend) -> Result<()>;
+    fn clear_cache(&mut self);
     unsafe fn get_unchecked<I: SliceIndex<str>>(&self, i: I) -> &I::Output;
 }
 
 pub trait Context {
     fn setup_line(&mut self, line: Line, backend: &mut Backend) -> Result<LineWidth>;
+    fn skip_line(&mut self);
     fn get_select(&mut self) -> Option<Range<usize>>;
     fn lexer(&self) -> &Lexer;
     fn count_skipped_to_cursor(&mut self, wrap_len: usize, remaining_lines: usize) -> usize;

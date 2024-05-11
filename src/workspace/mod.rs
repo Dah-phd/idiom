@@ -373,7 +373,11 @@ impl Workspace {
 fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
     let action = ws.key_map.map(key);
     if let Some(editor) = ws.get_active() {
-        if editor.lexer.map_modal_if_exists(key, gs) {
+        let (taken, render_update) = editor.lexer.map_modal_if_exists(key, gs);
+        if let Some(modal_rect) = render_update {
+            editor.updated_rect(modal_rect, gs);
+        }
+        if taken {
             return true;
         };
         if let Some(action) = action {

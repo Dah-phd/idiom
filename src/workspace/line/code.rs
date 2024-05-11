@@ -270,14 +270,35 @@ impl EditorLine for CodeLine {
     }
 
     #[inline]
+    fn wrapped_render(
+        &mut self,
+        ctx: &mut impl Context,
+        lines: &mut RectIter,
+        backend: &mut Backend,
+    ) -> std::io::Result<()> {
+        let wrap_len = match lines.next() {
+            Some(line) => ctx.setup_line(line, backend)?,
+            None => return Ok(()),
+        };
+        match ctx.get_select() {
+            Some(select) => wrapped_line_select(&self.content, &self.tokens, ctx, wrap_len, lines, select, backend),
+            None => wrapped_line(&self.content, &self.tokens, ctx, wrap_len, lines, backend),
+        }?;
+        backend.reset_style()?;
+        backend.flush()
+    }
+
+    #[inline]
     fn render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend) -> std::io::Result<()> {
         if self.tokens.is_empty() {
             Token::parse(&ctx.lexer().lang, &ctx.lexer().theme, &self.content, &mut self.tokens);
         };
+        self.rendered_at = line.row;
         let line_width = ctx.setup_line(line, backend)?;
         match ctx.get_select() {
             Some(select) => {
                 if line_width > self.content.len() {
+                    self.rendered_at = 0;
                     build_line_select(
                         self.content.char_indices(),
                         &self.tokens,
@@ -314,28 +335,15 @@ impl EditorLine for CodeLine {
     #[inline]
     fn fast_render(&mut self, ctx: &mut impl Context, line: Line, writer: &mut Backend) -> std::io::Result<()> {
         if self.rendered_at != 1 && self.rendered_at == line.row {
+            ctx.skip_line();
             return Ok(());
         };
         self.render(ctx, line, writer)
     }
 
     #[inline]
-    fn wrapped_render(
-        &mut self,
-        ctx: &mut impl Context,
-        lines: &mut RectIter,
-        backend: &mut Backend,
-    ) -> std::io::Result<()> {
-        let wrap_len = match lines.next() {
-            Some(line) => ctx.setup_line(line, backend)?,
-            None => return Ok(()),
-        };
-        match ctx.get_select() {
-            Some(select) => wrapped_line_select(&self.content, &self.tokens, ctx, wrap_len, lines, select, backend),
-            None => wrapped_line(&self.content, &self.tokens, ctx, wrap_len, lines, backend),
-        }?;
-        backend.reset_style()?;
-        backend.flush()
+    fn clear_cache(&mut self) {
+        self.rendered_at = 0;
     }
 }
 
@@ -382,6 +390,11 @@ impl<'a> Context for CodeLineContext<'a> {
         self.line_number = line_number;
         writer.print_styled_at(line.row, line.col, text, Style::fg(color::dark_grey()))?;
         writer.clear_to_eol().map(|_| remaining_width)
+    }
+
+    #[inline]
+    fn skip_line(&mut self) {
+        self.line_number += 1;
     }
 
     #[inline]
