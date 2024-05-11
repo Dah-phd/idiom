@@ -1,6 +1,6 @@
-use crate::configs::{load_or_create_config, pull_color, serialize_rgb, THEME_FILE};
+use crate::configs::{load_or_create_config, THEME_FILE};
 use crate::error::IdiomError;
-use crate::render::backend::{color, Color};
+use crate::render::backend::{color, pull_color, serialize_rgb, Color};
 use serde::ser::{Serialize, SerializeStruct};
 use serde_json::Value;
 

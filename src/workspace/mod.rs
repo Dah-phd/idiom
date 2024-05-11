@@ -70,6 +70,10 @@ impl Workspace {
         }
     }
 
+    pub fn fast_render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+        Ok(())
+    }
+
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         (self.map_callback)(self, key, gs)
     }
@@ -297,7 +301,7 @@ impl Workspace {
                 Ok(data) => match data {
                     None => gs.success("LSP function is normal".to_owned()),
                     Some(err) => {
-                        self.full_sync(&ft, gs).await;
+                        self.full_sync(&ft, gs);
                         gs.success(format!("LSP recoved after: {err}"));
                     }
                 },
@@ -306,7 +310,8 @@ impl Workspace {
         }
     }
 
-    pub async fn full_sync(&mut self, ft: &FileType, gs: &mut GlobalState) {
+    #[inline]
+    pub fn full_sync(&mut self, ft: &FileType, gs: &mut GlobalState) {
         if let Some(lsp) = self.lsp_servers.get(ft) {
             for editor in self.editors.iter_mut().filter(|e| &e.file_type == ft) {
                 editor.lexer.set_lsp_client(lsp.aquire_client(), ft, editor.stringify(), gs);
@@ -354,6 +359,7 @@ impl Workspace {
         gs.unwrap_or_default(self.base_config.refresh(), ".config: ");
         for editor in self.editors.iter_mut() {
             editor.refresh_cfg(&self.base_config);
+            editor.lexer.reload_theme(gs);
             if let Some(lsp) = self.lsp_servers.get(&editor.file_type) {
                 if editor.lexer.lsp_client.is_none() {
                     editor.lexer.set_lsp_client(lsp.aquire_client(), &editor.file_type, editor.stringify(), gs);

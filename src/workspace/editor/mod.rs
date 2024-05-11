@@ -75,6 +75,7 @@ impl Editor {
         ctx.render_cursor(gs)
     }
 
+    /// renders only updated lines
     #[inline]
     pub fn fast_render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
         self.sync(gs);

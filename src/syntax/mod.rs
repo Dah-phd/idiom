@@ -158,7 +158,7 @@ impl Lexer {
         gs: &mut GlobalState,
     ) {
         if let Some(client) = self.lsp_client.as_mut() {
-            if self.clock.elapsed() > FULL_TOKENS {
+            if self.clock.elapsed() > FULL_TOKENS && self.modal.is_none() {
                 gs.unwrap_lsp_error(
                     client.file_did_change(&self.path, version, events.drain(..).map(|(_, edit)| edit).collect()),
                     self.lang.file_type,
@@ -167,7 +167,6 @@ impl Lexer {
                     Ok(request) => {
                         self.clock = Instant::now();
                         self.requests.push(request);
-                        gs.success("Tokens refreshed!");
                     }
                     Err(err) => {
                         gs.send_error(err, self.lang.file_type);
@@ -187,7 +186,9 @@ impl Lexer {
 
     #[inline]
     pub fn render_modal_if_exist(&mut self, row: u16, col: u16, gs: &mut GlobalState) {
-        self.modal_rect = self.modal.as_mut().and_then(|modal| modal.render_at(col as u16, row as u16, gs));
+        if self.modal_rect.is_none() {
+            self.modal_rect = self.modal.as_mut().and_then(|modal| modal.render_at(col as u16, row as u16, gs));
+        };
     }
 
     pub fn map_modal_if_exists(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> (bool, Option<Rect>) {
@@ -295,6 +296,7 @@ impl Lexer {
         }
     }
 
+    #[inline]
     pub fn go_to_declaration(&mut self, c: CursorPosition) {
         if let Some(id) = self
             .lsp_client
@@ -306,6 +308,7 @@ impl Lexer {
         }
     }
 
+    #[inline]
     pub fn go_to_reference(&mut self, c: CursorPosition) {
         if let Some(id) = self
             .lsp_client
@@ -318,7 +321,6 @@ impl Lexer {
     }
 
     pub fn reload_theme(&mut self, gs: &mut GlobalState) {
-        // self.line_builder.theme = match Theme::new() {
         self.theme = match Theme::new() {
             Ok(theme) => theme,
             Err(err) => {
@@ -332,7 +334,6 @@ impl Lexer {
             if let Some(capabilities) = &client.capabilities.semantic_tokens_provider {
                 self.legend.map_styles(&self.lang.file_type, &self.theme, capabilities);
             }
-            // self.line_builder.map_styles(&client.capabilities.semantic_tokens_provider);
             if let Ok(id) = client.request_full_tokens(&self.path) {
                 self.requests.push(LSPResponseType::Tokens(id));
             }
