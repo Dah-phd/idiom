@@ -51,7 +51,7 @@ where
 
     pub fn file_did_open(
         path: &Path,
-        file_type: &FileType,
+        file_type: FileType,
         content: String,
     ) -> LSPResult<LSPNotification<DidOpenTextDocument>> {
         Ok(LSPNotification::with(DidOpenTextDocumentParams {

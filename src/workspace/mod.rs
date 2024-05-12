@@ -245,15 +245,15 @@ impl Workspace {
                 if let Ok(lsp) = LSP::new(lsp_cmd).await {
                     let client = lsp.aquire_client();
                     gs.tree.push(TreeEvent::RegisterLSP(client.get_lsp_registration()));
-                    new.lexer.set_lsp_client(client, &new.file_type, new.stringify(), gs);
+                    new.lexer.set_lsp_client(client, new.stringify(), gs);
                     for editor in self.editors.iter_mut().filter(|e| e.file_type == new.file_type) {
-                        editor.lexer.set_lsp_client(lsp.aquire_client(), &editor.file_type, editor.stringify(), gs);
+                        editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);
                     }
                     entry.insert(lsp);
                 }
             }
             Entry::Occupied(entry) => {
-                new.lexer.set_lsp_client(entry.get().aquire_client(), &new.file_type, new.stringify(), gs);
+                new.lexer.set_lsp_client(entry.get().aquire_client(), new.stringify(), gs);
             }
         }
         Ok(new)
@@ -295,6 +295,7 @@ impl Workspace {
         None
     }
 
+    #[inline]
     pub async fn check_lsp(&mut self, ft: FileType, gs: &mut GlobalState) {
         if let Some(lsp) = self.lsp_servers.get_mut(&ft) {
             match lsp.check_status().await {
@@ -314,7 +315,7 @@ impl Workspace {
     pub fn full_sync(&mut self, ft: &FileType, gs: &mut GlobalState) {
         if let Some(lsp) = self.lsp_servers.get(ft) {
             for editor in self.editors.iter_mut().filter(|e| &e.file_type == ft) {
-                editor.lexer.set_lsp_client(lsp.aquire_client(), ft, editor.stringify(), gs);
+                editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);
             }
         }
     }
@@ -323,10 +324,7 @@ impl Workspace {
         if self.editors.is_empty() {
             return;
         }
-        let editor = self.editors.remove(0);
-        if let Some(mut client) = editor.lexer.lsp_client {
-            let _ = client.file_did_close(&editor.path);
-        }
+        self.editors.remove(0);
         if self.editors.is_empty() {
             let _ = gs.editor_area.clear(&mut gs.writer);
             gs.select_mode();
@@ -361,8 +359,8 @@ impl Workspace {
             editor.refresh_cfg(&self.base_config);
             editor.lexer.reload_theme(gs);
             if let Some(lsp) = self.lsp_servers.get(&editor.file_type) {
-                if editor.lexer.lsp_client.is_none() {
-                    editor.lexer.set_lsp_client(lsp.aquire_client(), &editor.file_type, editor.stringify(), gs);
+                if !editor.lexer.lsp {
+                    editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);
                 }
             }
         }
@@ -419,8 +417,8 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
                 EditorAction::EndOfFile => editor.end_of_file(),
                 EditorAction::StartOfLine => editor.start_of_line(),
                 EditorAction::StartOfFile => editor.start_of_file(),
-                EditorAction::FindReferences => editor.references(),
-                EditorAction::GoToDeclaration => editor.declarations(),
+                EditorAction::FindReferences => editor.references(gs),
+                EditorAction::GoToDeclaration => editor.declarations(gs),
                 EditorAction::Help => editor.help(gs),
                 EditorAction::LSPRename => editor.start_renames(),
                 EditorAction::CommentOut => editor.comment_out(),

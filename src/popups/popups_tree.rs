@@ -44,13 +44,12 @@ pub fn rename_file_popup(path: String) -> Box<Popup> {
     })
 }
 
-pub fn refrence_selector(mut options: Vec<Location>) -> Box<PopupSelector<(PathBuf, Range)>> {
+pub fn refrence_selector(options: Vec<Location>) -> Box<PopupSelector<(String, PathBuf, Range)>> {
     Box::new(PopupSelector {
-        options: options.drain(..).map(|loc| (PathBuf::from(loc.uri.path()), loc.range)).collect(),
-        // display: |(path, range)| format!("{} ({})", path.display(), range.start.line + 1),
-        display: |_| "asd",
+        options: options.into_iter().map(location_with_display).collect(),
+        display: |(display, ..)| &display,
         command: |popup| {
-            if let Some((path, range)) = popup.options.get(popup.state.selected) {
+            if let Some((_, path, range)) = popup.options.get(popup.state.selected) {
                 return TreeEvent::OpenAtSelect(path.clone(), (range.start.into(), range.end.into())).into();
             }
             PopupMessage::Clear
@@ -58,4 +57,10 @@ pub fn refrence_selector(mut options: Vec<Location>) -> Box<PopupSelector<(PathB
         size: None,
         state: State::new(),
     })
+}
+
+fn location_with_display(loc: Location) -> (String, PathBuf, Range) {
+    let path = PathBuf::from(loc.uri.path());
+    let range = loc.range;
+    (format!("{} ({})", path.display(), range.start.line + 1), path, range)
 }

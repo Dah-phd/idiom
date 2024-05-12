@@ -120,8 +120,9 @@ pub struct PopupSelector<T> {
 impl<T> PopupInterface for PopupSelector<T> {
     fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
         let (height, width) = self.size.unwrap_or((20, 120));
-        let rect = gs.screen_rect.center(height, width);
-
+        let mut rect = gs.screen_rect.center(height, width);
+        rect.bordered();
+        rect.draw_borders(None, None, &mut gs.writer)?;
         if self.options.is_empty() {
             self.state.render_list(["No results found!"].into_iter(), &rect, &mut gs.writer)?;
         } else {

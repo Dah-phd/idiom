@@ -33,6 +33,7 @@ pub struct CodeLine {
     diagnostics: Option<DiagnosticLine>,
     // used for caching - 0 is reseved for file tabs and can be used to reset line
     rendered_at: u16,
+    select: Option<Range<usize>>,
 }
 
 impl Display for CodeLine {
@@ -50,7 +51,7 @@ impl From<String> for CodeLine {
 
 impl CodeLine {
     pub fn new(content: String) -> Self {
-        Self { content, tokens: Vec::new(), diagnostics: None, rendered_at: 0 }
+        Self { content, tokens: Vec::new(), diagnostics: None, rendered_at: 0, select: None }
     }
 }
 
@@ -276,11 +277,11 @@ impl EditorLine for CodeLine {
         lines: &mut RectIter,
         backend: &mut Backend,
     ) -> std::io::Result<()> {
-        let wrap_len = match lines.next() {
-            Some(line) => ctx.setup_line(line, backend)?,
+        let (wrap_len, select) = match lines.next() {
+            Some(line) => ctx.setup_with_select(line, backend)?,
             None => return Ok(()),
         };
-        match ctx.get_select() {
+        match select {
             Some(select) => wrapped_line_select(&self.content, &self.tokens, ctx, wrap_len, lines, select, backend),
             None => wrapped_line(&self.content, &self.tokens, ctx, wrap_len, lines, backend),
         }?;
@@ -294,8 +295,9 @@ impl EditorLine for CodeLine {
             Token::parse(&ctx.lexer().lang, &ctx.lexer().theme, &self.content, &mut self.tokens);
         };
         self.rendered_at = line.row;
-        let line_width = ctx.setup_line(line, backend)?;
-        match ctx.get_select() {
+        let (line_width, select) = ctx.setup_with_select(line, backend)?;
+        self.select = select;
+        match self.select.clone() {
             Some(select) => {
                 if line_width > self.content.len() {
                     self.rendered_at = 0;
@@ -333,12 +335,12 @@ impl EditorLine for CodeLine {
     }
 
     #[inline]
-    fn fast_render(&mut self, ctx: &mut impl Context, line: Line, writer: &mut Backend) -> std::io::Result<()> {
-        if self.rendered_at != 1 && self.rendered_at == line.row {
-            ctx.skip_line();
-            return Ok(());
-        };
-        self.render(ctx, line, writer)
+    fn fast_render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend) -> std::io::Result<()> {
+        if self.rendered_at == 1 || self.rendered_at != line.row || self.select != ctx.get_select(line.width) {
+            return self.render(ctx, line, backend);
+        }
+        ctx.skip_line();
+        Ok(())
     }
 
     #[inline]
@@ -359,14 +361,13 @@ pub struct CodeLineContext<'a> {
     line: usize,
     char: usize,
     select: Option<(CursorPosition, CursorPosition)>,
-    select_buffer: Option<Range<usize>>,
 }
 
 impl<'a> CodeLineContext<'a> {
     pub fn new(cursor: &Cursor, lexer: &'a mut Lexer) -> Self {
         let line_number = cursor.at_line;
         let select = cursor.select_get();
-        Self { line: cursor.line - line_number, char: cursor.char, select, select_buffer: None, lexer, line_number }
+        Self { line: cursor.line - line_number, char: cursor.char, select, lexer, line_number }
     }
 }
 
@@ -377,19 +378,33 @@ impl<'a> Context for CodeLineContext<'a> {
     }
 
     #[inline]
-    fn get_select(&mut self) -> Option<Range<usize>> {
-        self.select_buffer.take()
-    }
-
-    #[inline]
-    fn setup_line(&mut self, line: Line, writer: &mut Backend) -> std::io::Result<usize> {
+    fn setup_with_select(
+        &mut self,
+        line: Line,
+        backend: &mut Backend,
+    ) -> std::io::Result<(usize, Option<Range<usize>>)> {
         let line_number = self.line_number + 1;
         let text = format!("{: >1$} ", line_number, self.lexer.line_number_offset);
         let remaining_width = line.width - text.len();
-        self.select_buffer = build_select_buffer(self.select, self.line_number, remaining_width);
+        let select_buffer = build_select_buffer(self.select, self.line_number, remaining_width);
         self.line_number = line_number;
-        writer.print_styled_at(line.row, line.col, text, Style::fg(color::dark_grey()))?;
-        writer.clear_to_eol().map(|_| remaining_width)
+        backend.print_styled_at(line.row, line.col, text, Style::fg(color::dark_grey()))?;
+        backend.clear_to_eol().map(|_| (remaining_width, select_buffer))
+    }
+
+    #[inline]
+    fn setup_line(&mut self, line: Line, backend: &mut Backend) -> std::io::Result<usize> {
+        let line_number = self.line_number + 1;
+        let text = format!("{: >1$} ", line_number, self.lexer.line_number_offset);
+        let remaining_width = line.width - text.len();
+        self.line_number = line_number;
+        backend.print_styled_at(line.row, line.col, text, Style::fg(color::dark_grey()))?;
+        backend.clear_to_eol().map(|_| remaining_width)
+    }
+
+    #[inline]
+    fn get_select(&self, width: usize) -> Option<super::Select> {
+        build_select_buffer(self.select, self.line_number, width - (self.lexer.line_number_offset + 1))
     }
 
     #[inline]

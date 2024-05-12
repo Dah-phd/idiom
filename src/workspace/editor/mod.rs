@@ -6,7 +6,7 @@ use crate::{
     workspace::{
         actions::Actions,
         cursor::{Cursor, CursorPosition},
-        line::{CodeLine, CodeLineContext, EditorLine},
+        line::{CodeLine, CodeLineContext, Context, EditorLine},
         utils::{copy_content, find_line_start, last_modified, token_range_at},
     },
 };
@@ -17,8 +17,6 @@ use std::{
     path::{Path, PathBuf},
     time::SystemTime,
 };
-
-use super::line::Context;
 
 type DocLen = usize;
 type SelectLen = usize;
@@ -32,8 +30,8 @@ pub struct Editor {
     pub lexer: Lexer,
     pub cursor: Cursor,
     pub actions: Actions,
+    pub content: Vec<CodeLine>,
     timestamp: Option<SystemTime>,
-    content: Vec<CodeLine>,
 }
 
 impl Editor {
@@ -83,7 +81,7 @@ impl Editor {
         let mut ctx = CodeLineContext::new(&self.cursor, &mut self.lexer);
         gs.writer.hide_cursor()?;
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
-            if self.cursor.line == line_idx && text.len() > self.cursor.text_width {
+            if self.cursor.line == line_idx {
                 if text.len() > self.cursor.text_width {
                     text.wrapped_render(&mut ctx, &mut lines, &mut gs.writer)?;
                 } else if let Some(line) = lines.next() {
@@ -114,8 +112,7 @@ impl Editor {
 
     #[inline]
     pub fn sync(&mut self, gs: &mut GlobalState) {
-        self.actions.sync(&mut self.lexer, &mut self.content, gs);
-        self.lexer.context(&mut self.content, gs);
+        Lexer::context(self, gs);
         self.cursor.correct_cursor_position(&self.content);
     }
 
@@ -127,12 +124,12 @@ impl Editor {
         self.lexer.help((&self.cursor).into(), &self.content, gs);
     }
 
-    pub fn references(&mut self) {
-        self.lexer.go_to_reference((&self.cursor).into());
+    pub fn references(&mut self, gs: &mut GlobalState) {
+        self.lexer.go_to_reference((&self.cursor).into(), gs);
     }
 
-    pub fn declarations(&mut self) {
-        self.lexer.go_to_declaration((&self.cursor).into());
+    pub fn declarations(&mut self, gs: &mut GlobalState) {
+        self.lexer.go_to_declaration((&self.cursor).into(), gs);
     }
 
     pub fn select_token(&mut self) {
@@ -414,7 +411,8 @@ impl Editor {
         let line = &self.content[self.cursor.line];
         if self.lexer.should_autocomplete(self.cursor.char, line) {
             let line = line.to_string();
-            self.actions.force_sync(&mut self.lexer, &mut self.content, gs);
+            self.actions.push_buffer();
+            Lexer::sync(self, gs);
             self.lexer.get_autocomplete((&self.cursor).into(), line, gs);
         }
     }
@@ -445,7 +443,7 @@ impl Editor {
 
     pub fn save(&mut self, gs: &mut GlobalState) {
         if self.try_write_file(gs) {
-            self.lexer.save_and_check_lsp(self.file_type, gs);
+            self.lexer.save_and_check_lsp(gs);
             gs.success(format!("SAVED {}", self.path.display()));
         }
     }
@@ -464,6 +462,7 @@ impl Editor {
         self.actions.cfg = new_cfg.get_indent_cfg(&self.file_type);
     }
 
+    #[inline]
     pub fn stringify(&self) -> String {
         let mut text = self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n");
         text.push('\n');
@@ -489,6 +488,12 @@ fn build_display(path: &Path) -> String {
         buffer.insert(0, part);
     }
     buffer.join(MAIN_SEPARATOR_STR)
+}
+
+impl Drop for Editor {
+    fn drop(&mut self) {
+        self.lexer.close(&self.path);
+    }
 }
 
 #[cfg(test)]

@@ -1,18 +1,13 @@
-use std::io::Write;
-
 use crate::{
-    lsp::{LSPClient, LSPError, LSPResult},
     render::{
         backend::{Backend, Color, Style},
         layout::RectIter,
     },
-    syntax::{theme::Theme, Lang},
-    workspace::{actions::EditMetaData, line::EditorLine},
+    syntax::{theme::Theme, Lang, Legend},
+    workspace::line::EditorLine,
 };
-use lsp_types::{SemanticToken, TextDocumentContentChangeEvent};
-
-use super::legend::Legend;
-use super::modal::LSPResponseType;
+use lsp_types::SemanticToken;
+use std::io::Write;
 
 pub struct Token {
     pub from: usize,
@@ -210,30 +205,4 @@ pub fn set_tokens_partial(
     if !token_line.is_empty() {
         content[line_idx].replace_tokens(token_line);
     };
-}
-
-#[inline]
-pub fn collect_changes(
-    path: &std::path::Path,
-    version: i32,
-    events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
-    content: &[impl EditorLine],
-    client: &mut LSPClient,
-) -> LSPResult<LSPResponseType> {
-    if events.is_empty() {
-        return Err(LSPError::Null);
-    }
-    let mut change_events = Vec::new();
-    let meta = events
-        .drain(..)
-        .map(|(meta, edit)| {
-            change_events.push(edit);
-            meta
-        })
-        .reduce(|em1, em2| em1 + em2)
-        .expect("Value is checked");
-    client.file_did_change(path, version, change_events)?;
-    let max_lines = meta.start_line + meta.to;
-    let range = meta.build_range(content);
-    client.request_partial_tokens(path, range).map(|id| LSPResponseType::TokensPartial { id, max_lines })
 }

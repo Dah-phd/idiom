@@ -44,12 +44,12 @@ where
         Ok(ser_req)
     }
 
-    pub fn references(path: &Path, c: CursorPosition) -> Option<LSPRequest<References>> {
-        Some(LSPRequest::with(
+    pub fn references(path: &Path, c: CursorPosition) -> LSPResult<LSPRequest<References>> {
+        Ok(LSPRequest::with(
             0,
             ReferenceParams {
                 text_document_position: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: c.into(),
                 },
                 context: ReferenceContext { include_declaration: false },
@@ -96,12 +96,12 @@ where
         ))
     }
 
-    pub fn declaration(path: &Path, c: CursorPosition) -> Option<LSPRequest<GotoDeclaration>> {
-        Some(LSPRequest::with(
+    pub fn declaration(path: &Path, c: CursorPosition) -> LSPResult<LSPRequest<GotoDeclaration>> {
+        Ok(LSPRequest::with(
             0,
             GotoDeclarationParams {
                 text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: c.into(),
                 },
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
@@ -110,12 +110,12 @@ where
         ))
     }
 
-    pub fn definition(path: &Path, c: CursorPosition) -> Option<LSPRequest<GotoDefinition>> {
-        Some(LSPRequest::with(
+    pub fn definition(path: &Path, c: CursorPosition) -> LSPResult<LSPRequest<GotoDefinition>> {
+        Ok(LSPRequest::with(
             0,
             GotoDefinitionParams {
                 text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: c.into(),
                 },
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),

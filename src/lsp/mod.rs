@@ -9,7 +9,7 @@ use crate::utils::{into_guard, split_arc_mutex, split_arc_mutex_async};
 pub use client::LSPClient;
 pub use error::{LSPError, LSPResult};
 use lsp_stream::JsonRCP;
-pub use messages::{Diagnostic, GeneralNotification, LSPMessage, Request, Response};
+pub use messages::{Diagnostic, GeneralNotification, LSPMessage, LSPResponse, LSPResponseType, Request, Response};
 pub use notification::LSPNotification;
 pub use request::LSPRequest;
 use url::Url;

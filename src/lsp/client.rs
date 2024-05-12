@@ -44,6 +44,12 @@ impl LSPClient {
         Self { diagnostics, responses, channel, request_counter: Rc::default(), capabilities }
     }
 
+    pub fn placeholder() -> Self {
+        let (channel, _) = tokio::sync::mpsc::unbounded_channel::<String>();
+        Self::new(Arc::default(), Arc::default(), channel, ServerCapabilities::default())
+    }
+
+    #[inline]
     pub fn request<T>(&mut self, mut request: LSPRequest<T>) -> Result<i64, LSPError>
     where
         T: lsp_types::request::Request,
@@ -56,6 +62,7 @@ impl LSPClient {
         Ok(id)
     }
 
+    #[inline]
     pub fn notify<T>(&mut self, notification: LSPNotification<T>) -> Result<(), LSPError>
     where
         T: lsp_types::notification::Notification,
@@ -86,15 +93,15 @@ impl LSPClient {
 
     #[inline]
     pub fn request_partial_tokens(&mut self, path: &Path, range: Range) -> LSPResult<i64> {
-        self.capabilities.semantic_tokens_provider.as_ref().ok_or(LSPError::Null)?;
         self.request(LSPRequest::<SemanticTokensRangeRequest>::semantics_range(path, range)?)
     }
 
+    #[inline]
     pub fn request_full_tokens(&mut self, path: &Path) -> LSPResult<i64> {
-        self.capabilities.semantic_tokens_provider.as_ref().ok_or(LSPError::Null)?;
         self.request(LSPRequest::<SemanticTokensFullRequest>::semantics_full(path)?)
     }
 
+    #[inline]
     pub fn request_completions(&mut self, path: &Path, c: CursorPosition) -> LSPResult<i64> {
         self.request(LSPRequest::<Completion>::completion(path, c)?)
     }
@@ -104,37 +111,33 @@ impl LSPClient {
     }
 
     pub fn request_signitures(&mut self, path: &Path, c: CursorPosition) -> LSPResult<i64> {
-        self.capabilities.signature_help_provider.as_ref().ok_or(LSPError::Null)?;
         self.request(LSPRequest::<SignatureHelpRequest>::signature_help(path, c)?)
     }
 
     pub fn request_hover(&mut self, path: &Path, c: CursorPosition) -> LSPResult<i64> {
-        self.capabilities.hover_provider.as_ref().ok_or(LSPError::Null)?;
         self.request(LSPRequest::<HoverRequest>::hover(path, c)?)
     }
 
-    pub fn request_references(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
-        self.capabilities.references_provider.as_ref()?;
-        self.request(LSPRequest::<References>::references(path, c)?).ok()
+    pub fn request_references(&mut self, path: &Path, c: CursorPosition) -> LSPResult<i64> {
+        self.request(LSPRequest::<References>::references(path, c)?)
     }
 
-    pub fn request_declarations(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
-        self.capabilities.declaration_provider.as_ref()?;
-        self.request(LSPRequest::<GotoDeclaration>::declaration(path, c)?).ok()
+    pub fn request_declarations(&mut self, path: &Path, c: CursorPosition) -> LSPResult<i64> {
+        self.request(LSPRequest::<GotoDeclaration>::declaration(path, c)?)
     }
 
     #[allow(dead_code)]
-    pub fn request_definitions(&mut self, path: &Path, c: CursorPosition) -> Option<i64> {
-        self.capabilities.definition_provider.as_ref()?;
-        self.request(LSPRequest::<GotoDefinition>::definition(path, c)?).ok()
+    pub fn request_definitions(&mut self, path: &Path, c: CursorPosition) -> LSPResult<i64> {
+        self.request(LSPRequest::<GotoDefinition>::definition(path, c)?)
     }
 
-    pub fn file_did_open(&mut self, path: &Path, file_type: &FileType, content: String) -> Result<(), LSPError> {
+    pub fn file_did_open(&mut self, path: &Path, file_type: FileType, content: String) -> Result<(), LSPError> {
         let notification = LSPNotification::<DidOpenTextDocument>::file_did_open(path, file_type, content)?;
         self.notify(notification)?;
         Ok(())
     }
 
+    #[inline]
     pub fn file_did_change(
         &mut self,
         path: &Path,
@@ -142,22 +145,20 @@ impl LSPClient {
         change_events: Vec<TextDocumentContentChangeEvent>,
     ) -> Result<(), LSPError> {
         let notification = LSPNotification::<DidChangeTextDocument>::file_did_change(path, version, change_events)?;
-        self.notify(notification)?;
-        Ok(())
+        self.notify(notification)
     }
 
     pub fn file_did_save(&mut self, path: &Path) -> Result<(), LSPError> {
         let notification = LSPNotification::<DidSaveTextDocument>::file_did_save(path)?;
-        self.notify(notification)?;
-        Ok(())
+        self.notify(notification)
     }
 
     pub fn file_did_close(&mut self, path: &Path) -> Result<(), LSPError> {
         let notification = LSPNotification::<DidCloseTextDocument>::file_did_close(path)?;
-        self.notify(notification)?;
-        Ok(())
+        self.notify(notification)
     }
 
+    #[inline]
     fn next_id(&mut self) -> i64 {
         let mut id = self.request_counter.borrow_mut();
         *id += 1;

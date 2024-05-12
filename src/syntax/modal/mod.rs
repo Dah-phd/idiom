@@ -2,7 +2,6 @@ use crate::render::{backend::BackendProtocol, layout::Rect};
 use crate::syntax::{DiagnosticInfo, Lang};
 mod completion;
 mod info;
-mod parser;
 mod rename;
 
 use crate::{global_state::GlobalState, workspace::CursorPosition};
@@ -10,7 +9,6 @@ use completion::AutoComplete;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use info::Info;
 use lsp_types::{CompletionItem, Hover, SignatureHelp};
-pub use parser::{LSPResponse, LSPResponseType};
 use rename::RenameVariable;
 
 pub enum LSPModal {

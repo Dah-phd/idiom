@@ -2,8 +2,6 @@ mod action_buffer;
 mod edits;
 use crate::{
     configs::IndentConfigs,
-    global_state::GlobalState,
-    syntax::Lexer,
     utils::Offset,
     workspace::{
         cursor::{Cursor, CursorPosition, Select},
@@ -464,22 +462,33 @@ impl Actions {
         clip
     }
 
-    pub fn sync(&mut self, lexer: &mut Lexer, content: &mut Vec<impl EditorLine>, gs: &mut GlobalState) {
+    pub fn get_events(&mut self) -> Option<(i32, &mut Events)> {
         if let Some(action) = self.buffer.timed_collect() {
             self.push_done(action);
         }
-        if !self.events.is_empty() {
-            self.version += 1;
+        if self.events.is_empty() {
+            return None;
         }
-        lexer.sync_lsp(self.version, &mut self.events, content, gs);
+        self.version += 1;
+        Some((self.version, &mut self.events))
     }
 
-    pub fn force_sync(&mut self, lexer: &mut Lexer, content: &mut Vec<impl EditorLine>, gs: &mut GlobalState) {
+    pub fn get_events_versionless(&mut self) -> Option<&mut Events> {
+        if let Some(action) = self.buffer.timed_collect() {
+            self.push_done(action);
+        }
+        if self.events.is_empty() {
+            return None;
+        }
+        Some(&mut self.events)
+    }
+
+    pub fn get_events_forced(&mut self) -> (i32, &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>) {
         self.push_buffer();
         if !self.events.is_empty() {
             self.version += 1;
         }
-        lexer.sync_lsp(self.version, &mut self.events, content, gs);
+        (self.version, &mut self.events)
     }
 
     fn push_done(&mut self, edit: impl Into<EditType>) {
@@ -488,7 +497,7 @@ impl Actions {
         self.done.push(action);
     }
 
-    fn push_buffer(&mut self) {
+    pub fn push_buffer(&mut self) {
         if let Some(action) = self.buffer.collect() {
             self.undone.clear();
             self.push_done(action);
