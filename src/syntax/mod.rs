@@ -89,6 +89,7 @@ impl Lexer {
         }
     }
 
+    #[inline]
     pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
         (editor.lexer.sync)(editor, gs);
         (editor.lexer.context)(editor, gs);
@@ -97,6 +98,17 @@ impl Lexer {
     #[inline]
     pub fn sync(editor: &mut Editor, gs: &mut GlobalState) {
         (editor.lexer.sync)(editor, gs);
+    }
+
+    #[inline(always)]
+    pub fn map_line_number_offset(&mut self, content: &mut Vec<impl EditorLine>) {
+        let new_offset = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
+        if new_offset != self.line_number_offset {
+            self.line_number_offset = new_offset;
+            for line in content.iter_mut() {
+                line.clear_cache();
+            }
+        }
     }
 
     #[inline]

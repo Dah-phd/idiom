@@ -87,16 +87,15 @@ pub fn map(lexer: &mut Lexer, client: LSPClient) {
 
 pub fn context_local(editor: &mut Editor, _: &mut GlobalState) {
     let lexer = &mut editor.lexer;
-    let content = &editor.content;
-    lexer.line_number_offset = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
+    lexer.map_line_number_offset(&mut editor.content);
 }
 
 pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     let lexer = &mut editor.lexer;
-    let client = &mut lexer.client;
     let content = &mut editor.content;
+    lexer.map_line_number_offset(content);
 
-    lexer.line_number_offset = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
+    let client = &mut lexer.client;
     // diagnostics
     if let Some(diagnostics) = client.get_diagnostics(&editor.path) {
         set_diganostics(content, diagnostics);
