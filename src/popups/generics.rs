@@ -1,5 +1,3 @@
-use std::io::Write;
-
 use super::PopupInterface;
 use crate::{
     global_state::{Clipboard, GlobalState, PopupMessage},
@@ -22,23 +20,22 @@ pub struct Popup {
 }
 
 impl PopupInterface for Popup {
-    fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+    fn render(&mut self, gs: &mut GlobalState) {
         let (height, width) = self.size.unwrap_or((6, 40));
         let mut area = gs.screen_rect.center(height, width);
         area.bordered();
-        area.draw_borders(None, None, &mut gs.writer)?;
+        area.draw_borders(None, None, &mut gs.writer);
         match self.title.as_ref() {
-            Some(text) => area.border_title(&text, &mut gs.writer)?,
-            None => area.border_title("Prompt", &mut gs.writer)?,
+            Some(text) => area.border_title(&text, &mut gs.writer),
+            None => area.border_title("Prompt", &mut gs.writer),
         }
         let mut lines = area.into_iter();
         if let Some(first_line) = lines.next() {
-            self.p_from_message(first_line, &mut gs.writer)?;
+            self.p_from_message(first_line, &mut gs.writer);
         }
         if let Some(second_line) = lines.next() {
-            self.spans_from_buttons(second_line, &mut gs.writer)?;
+            self.spans_from_buttons(second_line, &mut gs.writer);
         }
-        gs.writer.flush()
     }
 
     fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard) -> PopupMessage {
@@ -84,28 +81,31 @@ impl PopupInterface for Popup {
 }
 
 impl Popup {
-    fn p_from_message(&self, line: Line, backend: &mut Backend) -> std::io::Result<()> {
+    fn p_from_message(&self, line: Line, backend: &mut Backend) {
         if self.message_as_buffer_builder.is_none() {
             return line.render_centered(&self.message, backend);
         }
-        let mut builder = line.unsafe_builder(backend)?;
-        builder.push(" >> ")?;
-        builder.push(&self.message)?;
-        builder.push_styled("|", Style::slowblink())?;
-        Ok(())
+        let mut builder = line.unsafe_builder(backend);
+        builder.push(" >> ");
+        builder.push(&self.message);
+        builder.push_styled("|", Style::slowblink());
     }
 
-    fn spans_from_buttons(&self, line: Line, backend: &mut Backend) -> std::io::Result<()> {
+    fn spans_from_buttons(&self, line: Line, backend: &mut Backend) {
         let btn_count = self.buttons.len();
         let sum_btn_names_len: usize = self.buttons.iter().map(|b| b.name.len()).sum();
         let padding = line.width.saturating_sub(sum_btn_names_len) / btn_count;
-        let mut builder = line.unsafe_builder(backend)?;
-        for btn in self.buttons.iter() {
-            if !builder.push(format!("{name:^width$}", name = btn.name, width = padding + btn.name.len()).as_str())? {
+        let mut builder = line.unsafe_builder(backend);
+        for (idx, btn) in self.buttons.iter().enumerate() {
+            let text = format!("{name:^width$}", name = btn.name, width = padding + btn.name.len());
+            if idx == self.state {
+                if !builder.push_styled(text.as_str(), Style::reversed()) {
+                    break;
+                }
+            } else if !builder.push(text.as_str()) {
                 break;
-            }
+            };
         }
-        Ok(())
     }
 }
 
@@ -118,17 +118,16 @@ pub struct PopupSelector<T> {
 }
 
 impl<T> PopupInterface for PopupSelector<T> {
-    fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+    fn render(&mut self, gs: &mut GlobalState) {
         let (height, width) = self.size.unwrap_or((20, 120));
         let mut rect = gs.screen_rect.center(height, width);
         rect.bordered();
-        rect.draw_borders(None, None, &mut gs.writer)?;
+        rect.draw_borders(None, None, &mut gs.writer);
         if self.options.is_empty() {
-            self.state.render_list(["No results found!"].into_iter(), &rect, &mut gs.writer)?;
+            self.state.render_list(["No results found!"].into_iter(), &rect, &mut gs.writer);
         } else {
-            self.state.render_list(self.options.iter().map(|opt| (self.display)(opt)), &rect, &mut gs.writer)?;
+            self.state.render_list(self.options.iter().map(|opt| (self.display)(opt)), &rect, &mut gs.writer);
         };
-        gs.writer.flush()
     }
 
     fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard) -> PopupMessage {

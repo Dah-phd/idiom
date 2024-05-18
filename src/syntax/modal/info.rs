@@ -134,16 +134,16 @@ impl Info {
         self.state.selected = 0;
     }
 
-    pub fn render(&mut self, rect: &Rect, gs: &mut GlobalState) -> std::io::Result<()> {
+    pub fn render(&mut self, rect: &Rect, gs: &mut GlobalState) {
         match self.mode {
             Mode::Select => {
                 if let Some(actions) = self.actions.as_ref() {
                     let actions = actions.iter().map(|a| a.to_string()).collect::<Vec<_>>();
                     let options = actions.iter().map(|s| s.as_str());
                     if !self.text.is_empty() {
-                        self.state.render_list(options.chain(["Information"]), rect, &mut gs.writer)?;
+                        self.state.render_list(options.chain(["Information"]), rect, &mut gs.writer);
                     } else {
-                        self.state.render_list(options, rect, &mut gs.writer)?;
+                        self.state.render_list(options, rect, &mut gs.writer);
                     };
                 }
             }
@@ -152,10 +152,9 @@ impl Info {
                     *rect,
                     self.text.iter().skip(self.text_state).map(|(d, c)| (d.as_str(), Style::fg(*c))),
                     &mut gs.writer,
-                )?;
+                );
             }
         }
-        Ok(())
     }
 }
 

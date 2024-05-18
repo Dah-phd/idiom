@@ -61,18 +61,18 @@ impl LSPModal {
                 let height = std::cmp::min(modal.len() as u16, 7);
                 let area = gs.screen_rect.modal_relative(row, col, 60, height);
                 if area.height != 0 {
-                    gs.writer.set_style(gs.theme.accent_style).ok()?;
-                    modal.render(&area, gs).ok()?;
-                    gs.writer.reset_style().ok()?;
+                    gs.writer.set_style(gs.theme.accent_style);
+                    modal.render(&area, gs);
+                    gs.writer.reset_style();
                     return Some(area);
                 };
             }
             Self::RenameVar(modal) => {
                 let area = gs.screen_rect.modal_relative(row, col, 60, modal.len() as u16);
                 if area.height != 0 {
-                    gs.writer.set_style(gs.theme.accent_style).ok()?;
-                    modal.render(&area, gs).ok()?;
-                    gs.writer.reset_style().ok()?;
+                    gs.writer.set_style(gs.theme.accent_style);
+                    modal.render(&area, gs);
+                    gs.writer.reset_style();
                     return Some(area);
                 };
             }
@@ -80,9 +80,9 @@ impl LSPModal {
                 let height = std::cmp::min(modal.len() as u16, 7);
                 let area = gs.screen_rect.modal_relative(row, col, 60, height);
                 if area.height != 0 {
-                    gs.writer.set_style(gs.theme.accent_style).ok()?;
-                    modal.render(&area, gs).ok()?;
-                    gs.writer.reset_style().ok()?;
+                    gs.writer.set_style(gs.theme.accent_style);
+                    modal.render(&area, gs);
+                    gs.writer.reset_style();
                     return Some(area);
                 };
             }

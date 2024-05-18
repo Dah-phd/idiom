@@ -11,7 +11,6 @@ use crate::{
 pub use code::{CodeLine, CodeLineContext};
 use std::{
     fmt::Display,
-    io::Result,
     ops::{Index, Range, RangeBounds, RangeFrom, RangeFull, RangeTo},
     slice::SliceIndex,
     str::{CharIndices, Chars, MatchIndices},
@@ -60,19 +59,19 @@ pub trait EditorLine:
     fn push_token(&mut self, token: Token);
     fn replace_tokens(&mut self, tokens: Vec<Token>);
     fn rebuild_tokens(&mut self, lexer: &Lexer);
-    fn wrapped_render(&mut self, ctx: &mut impl Context, lines: &mut RectIter, backend: &mut Backend) -> Result<()>;
-    fn render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend) -> Result<()>;
-    fn fast_render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend) -> Result<()>;
+    fn wrapped_render(&mut self, ctx: &mut impl Context, lines: &mut RectIter, backend: &mut Backend);
+    fn render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend);
+    fn fast_render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend);
     fn clear_cache(&mut self);
     unsafe fn get_unchecked<I: SliceIndex<str>>(&self, i: I) -> &I::Output;
 }
 
 pub trait Context {
-    fn setup_with_select(&mut self, line: Line, backend: &mut Backend) -> Result<(LineWidth, Option<Select>)>;
-    fn setup_line(&mut self, line: Line, backend: &mut Backend) -> Result<LineWidth>;
+    fn setup_with_select(&mut self, line: Line, backend: &mut Backend) -> (LineWidth, Option<Select>);
+    fn setup_line(&mut self, line: Line, backend: &mut Backend) -> LineWidth;
     fn skip_line(&mut self);
     fn lexer(&self) -> &Lexer;
     fn get_select(&self, width: usize) -> Option<Select>;
     fn count_skipped_to_cursor(&mut self, wrap_len: usize, remaining_lines: usize) -> usize;
-    fn render_cursor(self, gs: &mut GlobalState) -> Result<()>;
+    fn render_cursor(self, gs: &mut GlobalState);
 }

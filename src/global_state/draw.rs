@@ -25,28 +25,28 @@ pub fn full_rebuild(
     tree: &mut Tree,
     term: &mut EditorTerminal,
 ) -> Result<()> {
-    gs.screen_rect.clear(&mut gs.writer)?;
+    gs.screen_rect.clear(&mut gs.writer);
     gs.recalc_draw_size();
     if let Some(line) = gs.footer_area.get_line(0) {
-        gs.mode.render(line, gs.theme.accent_style, &mut gs.writer)?;
+        gs.mode.render(line, gs.theme.accent_style, &mut gs.writer);
     };
-    gs.messages.render(gs.theme.accent_style, &mut gs.writer)?;
-    workspace.render(gs)?;
+    gs.messages.render(gs.theme.accent_style, &mut gs.writer);
+    workspace.render(gs);
     if let Some(editor) = workspace.get_active() {
-        editor.render(gs)?;
+        editor.render(gs);
     }
     gs.draw_callback = draw;
     if gs.components.contains(Components::TREE) || !gs.is_insert() {
         gs.draw_callback = draw_with_tree;
-        tree.render(gs)?;
+        tree.render(gs);
     }
     if gs.components.contains(Components::TERM) {
         gs.draw_callback = draw_term;
-        term.render(gs)?;
+        term.render(gs);
     }
     if gs.components.contains(Components::POPUP) {
         gs.draw_callback = draw_popup;
-        gs.render_popup()?;
+        gs.render_popup();
     }
     gs.writer.flush()
 }
@@ -58,12 +58,12 @@ pub fn draw(
     _tree: &mut Tree,
     _term: &mut EditorTerminal,
 ) -> Result<()> {
-    gs.writer.hide_cursor()?;
-    workspace.render(gs)?;
+    gs.writer.hide_cursor();
+    workspace.render(gs);
     if let Some(editor) = workspace.get_active() {
-        editor.fast_render(gs)?;
+        editor.fast_render(gs);
     } else {
-        gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer)?;
+        gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
     };
     gs.writer.flush()
 }
@@ -75,13 +75,13 @@ pub fn draw_with_tree(
     tree: &mut Tree,
     _term: &mut EditorTerminal,
 ) -> Result<()> {
-    gs.writer.hide_cursor()?;
-    tree.fast_render(gs)?;
-    workspace.render(gs)?;
+    gs.writer.hide_cursor();
+    tree.fast_render(gs);
+    workspace.render(gs);
     if let Some(editor) = workspace.get_active() {
-        editor.fast_render(gs)?;
+        editor.fast_render(gs);
     } else {
-        gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer)?;
+        gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
     };
     gs.writer.flush()
 }
@@ -93,9 +93,9 @@ pub fn draw_popup(
     _tree: &mut Tree,
     _term: &mut EditorTerminal,
 ) -> Result<()> {
-    gs.writer.hide_cursor()?;
-    gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer)?;
-    gs.render_popup()?;
+    gs.writer.hide_cursor();
+    gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
+    gs.render_popup();
     gs.writer.flush()
 }
 
@@ -106,8 +106,8 @@ pub fn draw_term(
     _tree: &mut Tree,
     term: &mut EditorTerminal,
 ) -> Result<()> {
-    gs.writer.hide_cursor()?;
-    gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer)?;
-    term.render(gs)?;
+    gs.writer.hide_cursor();
+    gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
+    term.render(gs);
     gs.writer.flush()
 }

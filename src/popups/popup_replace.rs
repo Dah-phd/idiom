@@ -5,7 +5,6 @@ use crate::{
     workspace::{CursorPosition, Workspace},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use std::io::Write;
 
 use super::{
     utils::{count_as_string, into_message, next_option, prev_option},
@@ -98,32 +97,31 @@ impl PopupInterface for ReplacePopup {
         }
     }
 
-    fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+    fn render(&mut self, gs: &mut GlobalState) {
         let area = gs.editor_area.right_top_corner(2, 50);
         if area.height < 2 {
-            return Ok(());
+            return;
         };
-        gs.writer.set_style(gs.theme.accent_style)?;
+        gs.writer.set_style(gs.theme.accent_style);
         let mut lines = area.into_iter();
         if let Some(line) = lines.next() {
-            let mut find_builder = line.unsafe_builder(&mut gs.writer)?;
-            find_builder.push(count_as_string(&self.options).as_str())?;
-            find_builder.push(" > ")?;
-            find_builder.push(&self.pattern)?;
+            let mut find_builder = line.unsafe_builder(&mut gs.writer);
+            find_builder.push(count_as_string(&self.options).as_str());
+            find_builder.push(" > ");
+            find_builder.push(&self.pattern);
             if !self.on_text {
-                find_builder.push_styled("|", Style::slowblink())?;
+                find_builder.push_styled("|", Style::slowblink());
             };
         };
         if let Some(line) = lines.next() {
-            let mut repl_builder = line.unsafe_builder(&mut gs.writer)?;
-            repl_builder.push("Rep > ")?;
-            repl_builder.push(&self.new_text)?;
+            let mut repl_builder = line.unsafe_builder(&mut gs.writer);
+            repl_builder.push("Rep > ");
+            repl_builder.push(&self.new_text);
             if self.on_text {
-                repl_builder.push_styled("|", Style::slowblink())?;
+                repl_builder.push_styled("|", Style::slowblink());
             }
         }
-        gs.writer.reset_style()?;
-        gs.writer.flush()
+        gs.writer.reset_style();
     }
 
     fn update_workspace(&mut self, workspace: &mut Workspace) {

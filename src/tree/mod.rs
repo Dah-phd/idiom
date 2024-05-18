@@ -1,7 +1,7 @@
 mod tree_paths;
 use crate::{
     configs::{TreeAction, TreeKeyMap},
-    error::IdiomResult,
+    error::{IdiomError, IdiomResult},
     global_state::{GlobalState, WorkspaceEvent},
     lsp::Diagnostic,
     popups::popups_tree::{create_file_popup, rename_file_popup},
@@ -54,18 +54,17 @@ impl Tree {
         }
     }
 
-    pub fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+    pub fn render(&mut self, gs: &mut GlobalState) {
         let options = self.tree_ptrs.iter().flat_map(|ptr| unsafe { ptr.as_ref() }.map(|tp| tp.direct_display()));
-        self.state.render_list_styled(options, &gs.tree_area, &mut gs.writer)
+        self.state.render_list_styled(options, &gs.tree_area, &mut gs.writer);
     }
 
     #[inline]
-    pub fn fast_render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+    pub fn fast_render(&mut self, gs: &mut GlobalState) {
         if self.rebuild {
             self.rebuild = false;
-            self.render(gs)?;
-        }
-        Ok(())
+            self.render(gs);
+        };
     }
 
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
@@ -175,17 +174,29 @@ impl Tree {
         Ok(())
     }
 
-    pub fn rename_file(&mut self, name: String) -> IdiomResult<()> {
-        if let Some(selected) = self.get_selected() {
-            let mut new_path = selected.path().clone();
-            new_path.pop();
-            new_path.push(&name);
-            std::fs::rename(selected.path(), &new_path)?;
-            selected.update_path(new_path.clone());
-            self.selected_path = new_path;
+    pub fn rename_path(&mut self, name: String) -> Option<IdiomResult<(PathBuf, PathBuf)>> {
+        // not efficient but safe - calls should be rare enough
+        let selected = self.get_selected()?;
+        let mut rel_new_path = selected.path().clone();
+        if !rel_new_path.pop() {
+            return None;
+        };
+        let result = selected
+            .path()
+            .canonicalize()
+            .and_then(|old_path| {
+                let mut abs_new_path = old_path.clone();
+                abs_new_path.pop();
+                abs_new_path.push(&name);
+                std::fs::rename(&old_path, &abs_new_path).map(|_| (old_path, abs_new_path))
+            })
+            .map_err(IdiomError::from);
+        if result.is_ok() {
+            rel_new_path.push(name);
+            selected.update_path(rel_new_path);
             self.force_sync();
         }
-        Ok(())
+        Some(result)
     }
 
     pub fn search_paths(&self, pattern: &str) -> Vec<PathBuf> {
@@ -225,6 +236,7 @@ impl Tree {
         "./".to_owned()
     }
 
+    #[inline]
     pub fn get_selected(&self) -> Option<&mut TreePath> {
         unsafe { self.tree_ptrs.get(self.state.selected)?.as_mut() }
     }

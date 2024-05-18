@@ -18,7 +18,6 @@ use crate::{
 use std::{
     cmp::Ordering,
     fmt::Display,
-    io::Write,
     ops::{Index, Range, RangeBounds, RangeFrom, RangeFull, RangeTo},
     slice::SliceIndex,
 };
@@ -271,31 +270,25 @@ impl EditorLine for CodeLine {
     }
 
     #[inline]
-    fn wrapped_render(
-        &mut self,
-        ctx: &mut impl Context,
-        lines: &mut RectIter,
-        backend: &mut Backend,
-    ) -> std::io::Result<()> {
+    fn wrapped_render(&mut self, ctx: &mut impl Context, lines: &mut RectIter, backend: &mut Backend) {
         let (wrap_len, select) = match lines.next() {
-            Some(line) => ctx.setup_with_select(line, backend)?,
-            None => return Ok(()),
+            Some(line) => ctx.setup_with_select(line, backend),
+            None => return,
         };
         match select {
             Some(select) => wrapped_line_select(&self.content, &self.tokens, ctx, wrap_len, lines, select, backend),
             None => wrapped_line(&self.content, &self.tokens, ctx, wrap_len, lines, backend),
-        }?;
-        backend.reset_style()?;
-        backend.flush()
+        };
+        backend.reset_style();
     }
 
     #[inline]
-    fn render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend) -> std::io::Result<()> {
+    fn render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend) {
         if self.tokens.is_empty() {
             Token::parse(&ctx.lexer().lang, &ctx.lexer().theme, &self.content, &mut self.tokens);
         };
         self.rendered_at = line.row;
-        let (line_width, select) = ctx.setup_with_select(line, backend)?;
+        let (line_width, select) = ctx.setup_with_select(line, backend);
         self.select = select;
         match self.select.clone() {
             Some(select) => {
@@ -307,8 +300,8 @@ impl EditorLine for CodeLine {
                         select,
                         ctx.lexer().theme.selected,
                         backend,
-                    )?;
-                    inline_diagnostics(line_width - self.content.len(), &self.diagnostics, backend)
+                    );
+                    inline_diagnostics(line_width - self.content.len(), &self.diagnostics, backend);
                 } else {
                     let end_loc = line_width.saturating_sub(2);
                     build_line_select(
@@ -317,30 +310,28 @@ impl EditorLine for CodeLine {
                         select,
                         ctx.lexer().theme.selected,
                         backend,
-                    )?;
-                    backend.print_styled(">>", Style::reversed())
+                    );
+                    backend.print_styled(">>", Style::reversed());
                 }
             }
             None => {
                 if line_width > self.content.len() {
-                    build_line(&self.content, &self.tokens, backend)?;
-                    inline_diagnostics(line_width - self.content.len(), &self.diagnostics, backend)
+                    build_line(&self.content, &self.tokens, backend);
+                    inline_diagnostics(line_width - self.content.len(), &self.diagnostics, backend);
                 } else {
                     let max_len = line_width.saturating_sub(2);
-                    shrank_line(truncate_str(&self.content, max_len), &self.tokens, backend)
-                }
+                    shrank_line(truncate_str(&self.content, max_len), &self.tokens, backend);
+                };
             }
-        }?;
-        backend.flush()
+        }
     }
 
     #[inline]
-    fn fast_render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend) -> std::io::Result<()> {
+    fn fast_render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend) {
         if self.rendered_at == 1 || self.rendered_at != line.row || self.select != ctx.get_select(line.width) {
             return self.render(ctx, line, backend);
         }
         ctx.skip_line();
-        Ok(())
     }
 
     #[inline]
@@ -378,28 +369,26 @@ impl<'a> Context for CodeLineContext<'a> {
     }
 
     #[inline]
-    fn setup_with_select(
-        &mut self,
-        line: Line,
-        backend: &mut Backend,
-    ) -> std::io::Result<(usize, Option<Range<usize>>)> {
+    fn setup_with_select(&mut self, line: Line, backend: &mut Backend) -> (usize, Option<Range<usize>>) {
         let line_number = self.line_number + 1;
         let text = format!("{: >1$} ", line_number, self.lexer.line_number_offset);
         let remaining_width = line.width - text.len();
         let select_buffer = build_select_buffer(self.select, self.line_number, remaining_width);
         self.line_number = line_number;
-        backend.print_styled_at(line.row, line.col, text, Style::fg(color::dark_grey()))?;
-        backend.clear_to_eol().map(|_| (remaining_width, select_buffer))
+        backend.print_styled_at(line.row, line.col, text, Style::fg(color::dark_grey()));
+        backend.clear_to_eol();
+        (remaining_width, select_buffer)
     }
 
     #[inline]
-    fn setup_line(&mut self, line: Line, backend: &mut Backend) -> std::io::Result<usize> {
+    fn setup_line(&mut self, line: Line, backend: &mut Backend) -> usize {
         let line_number = self.line_number + 1;
         let text = format!("{: >1$} ", line_number, self.lexer.line_number_offset);
         let remaining_width = line.width - text.len();
         self.line_number = line_number;
-        backend.print_styled_at(line.row, line.col, text, Style::fg(color::dark_grey()))?;
-        backend.clear_to_eol().map(|_| remaining_width)
+        backend.print_styled_at(line.row, line.col, text, Style::fg(color::dark_grey()));
+        backend.clear_to_eol();
+        remaining_width
     }
 
     #[inline]
@@ -422,11 +411,11 @@ impl<'a> Context for CodeLineContext<'a> {
     }
 
     #[inline]
-    fn render_cursor(self, gs: &mut GlobalState) -> std::io::Result<()> {
+    fn render_cursor(self, gs: &mut GlobalState) {
         let row = gs.editor_area.row + self.line as u16;
         let col = gs.editor_area.col + (self.char + self.lexer.line_number_offset + 1) as u16;
         self.lexer.render_modal_if_exist(row, col, gs);
-        gs.writer.render_cursor_at(row, col)
+        gs.writer.render_cursor_at(row, col);
     }
 }
 

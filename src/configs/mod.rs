@@ -81,6 +81,8 @@ impl KeyMap {
     }
 }
 
+/// ensures creation of config files on first load
+/// if value is removed from a theme config the default value will be put in place
 pub fn load_or_create_config<T: Default + DeserializeOwned + Serialize>(path: &str) -> Result<T, Error> {
     if let Some(config_json) = read_config_file(path) {
         Ok(serde_json::from_slice::<T>(&config_json)?)

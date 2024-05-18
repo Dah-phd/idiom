@@ -3,7 +3,7 @@ use crate::render::{
     layout::{BorderSet, Borders, Line, BORDERS},
     utils::truncate_str,
 };
-use std::{io::Write, ops::Range};
+use std::ops::Range;
 
 #[derive(Default, Clone, Copy, Debug)]
 pub struct Rect {
@@ -218,45 +218,41 @@ impl Rect {
         self
     }
 
-    pub fn clear(&self, writer: &mut Backend) -> std::io::Result<()> {
+    pub fn clear(&self, writer: &mut Backend) {
         for line in self.into_iter() {
-            line.render_empty(writer)?;
+            line.render_empty(writer);
         }
-        writer.flush()
     }
 
     /// renders title if top border exists
     /// !!! this needs to happen after border rendering
     #[inline]
-    pub fn border_title(&self, text: &str, backend: &mut Backend) -> std::io::Result<()> {
+    pub fn border_title(&self, text: &str, backend: &mut Backend) {
         if self.borders.contains(Borders::TOP) {
-            return backend.print_at(self.row - 1, self.col, truncate_str(text, self.width));
-        }
-        Ok(())
+            backend.print_at(self.row - 1, self.col, truncate_str(text, self.width));
+        };
     }
 
     /// border_title with style
     #[inline]
-    pub fn border_title_styled(&self, text: &str, style: Style, backend: &mut Backend) -> std::io::Result<()> {
+    pub fn border_title_styled(&self, text: &str, style: Style, backend: &mut Backend) {
         if self.borders.contains(Borders::TOP) {
-            return backend.print_styled_at(self.row - 1, self.col, truncate_str(text, self.width), style);
-        }
-        Ok(())
+            backend.print_styled_at(self.row - 1, self.col, truncate_str(text, self.width), style);
+        };
     }
 
     /// renders title if bottom border exists
     /// !!! this needs to happen after border rendering
     #[inline]
-    pub fn border_title_bot(&self, text: &str, backend: &mut Backend) -> std::io::Result<()> {
+    pub fn border_title_bot(&self, text: &str, backend: &mut Backend) {
         if self.borders.contains(Borders::BOTTOM) {
-            return backend.print_at(self.row + self.height + 1, self.col, truncate_str(text, self.width));
-        }
-        Ok(())
+            backend.print_at(self.row + self.height + 1, self.col, truncate_str(text, self.width));
+        };
     }
 
     /// border_title_bot with style
     #[inline]
-    pub fn border_title_bot_styled(&self, text: &str, style: Style, backend: &mut Backend) -> std::io::Result<()> {
+    pub fn border_title_bot_styled(&self, text: &str, style: Style, backend: &mut Backend) {
         if self.borders.contains(Borders::BOTTOM) {
             return backend.print_styled_at(
                 self.row + self.height + 1,
@@ -265,10 +261,9 @@ impl Rect {
                 style,
             );
         }
-        Ok(())
     }
 
-    pub fn draw_borders(&self, set: Option<BorderSet>, fg: Option<Color>, writer: &mut Backend) -> std::io::Result<()> {
+    pub fn draw_borders(&self, set: Option<BorderSet>, fg: Option<Color>, writer: &mut Backend) {
         let top = self.borders.contains(Borders::TOP);
         let bot = self.borders.contains(Borders::BOTTOM);
         let left = self.borders.contains(Borders::LEFT);
@@ -287,55 +282,53 @@ impl Rect {
         };
 
         let set = set.unwrap_or(BORDERS);
-        writer.save_cursor()?;
+        writer.save_cursor();
         if let Some(color) = fg {
-            writer.set_style(Style::fg(color))?;
+            writer.set_style(Style::fg(color));
         };
         if top {
             for col_idx in col..last_col {
-                writer.go_to(row, col_idx)?;
-                writer.print(set.horizontal)?;
+                writer.go_to(row, col_idx);
+                writer.print(set.horizontal);
             }
         }
         if bot {
             for col_idx in col..last_col {
-                writer.go_to(last_row, col_idx)?;
-                writer.print(set.horizontal)?;
+                writer.go_to(last_row, col_idx);
+                writer.print(set.horizontal);
             }
         }
         if left {
             for row_idx in row..last_row {
-                writer.go_to(row_idx, col)?;
-                writer.print(set.vertical)?;
+                writer.go_to(row_idx, col);
+                writer.print(set.vertical);
             }
         }
         if right {
             for row_idx in row..last_row {
-                writer.go_to(row_idx, last_col)?;
-                writer.print(set.vertical)?;
+                writer.go_to(row_idx, last_col);
+                writer.print(set.vertical);
             }
         }
         if self.borders.contains(Borders::TOP | Borders::LEFT) {
-            writer.go_to(row, col)?;
-            writer.print(set.top_left_qorner)?;
+            writer.go_to(row, col);
+            writer.print(set.top_left_qorner);
         }
         if self.borders.contains(Borders::TOP | Borders::RIGHT) {
-            writer.go_to(row, last_col)?;
-            writer.print(set.top_right_qorner)?;
+            writer.go_to(row, last_col);
+            writer.print(set.top_right_qorner);
         }
         if self.borders.contains(Borders::BOTTOM | Borders::LEFT) {
-            writer.go_to(last_row, col)?;
-            writer.print(set.bot_left_qorner)?;
+            writer.go_to(last_row, col);
+            writer.print(set.bot_left_qorner);
         }
         if self.borders.contains(Borders::BOTTOM | Borders::RIGHT) {
-            writer.go_to(last_row, last_col)?;
-            writer.print(set.bot_right_qorner)?;
+            writer.go_to(last_row, last_col);
+            writer.print(set.bot_right_qorner);
         }
         if fg.is_some() {
-            writer.reset_style()?;
+            writer.reset_style();
         }
-        writer.restore_cursor()?;
-        writer.flush()
     }
 }
 

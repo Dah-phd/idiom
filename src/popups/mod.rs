@@ -21,7 +21,7 @@ pub fn placeholder() -> Box<PlaceHolderPopup> {
 }
 
 pub trait PopupInterface {
-    fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()>;
+    fn render(&mut self, gs: &mut GlobalState);
     fn map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {
         match key {
             KeyEvent { code: KeyCode::Char('d' | 'D'), modifiers: KeyModifiers::CONTROL, .. } => PopupMessage::Clear,
@@ -42,7 +42,5 @@ impl PopupInterface for PlaceHolderPopup {
     fn key_map(&mut self, _key: &KeyEvent, _clipboard: &mut Clipboard) -> PopupMessage {
         PopupMessage::Clear
     }
-    fn render(&mut self, _gs: &mut GlobalState) -> std::io::Result<()> {
-        Ok(())
-    }
+    fn render(&mut self, _gs: &mut GlobalState) {}
 }

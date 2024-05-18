@@ -1,5 +1,4 @@
 use crate::render::layout::Rect;
-use std::io::Write;
 
 use crate::render::{
     backend::{Backend, BackendProtocol, Style},
@@ -64,41 +63,40 @@ impl State {
     pub fn render_list_complex<T>(
         &mut self,
         options: &[T],
-        callbacks: &[fn(&T, builder: LineBuilder) -> std::io::Result<()>],
+        callbacks: &[fn(&T, builder: LineBuilder)],
         rect: &Rect,
         backend: &mut Backend,
-    ) -> std::io::Result<()> {
+    ) {
         let limit = rect.height as usize / callbacks.len();
         self.update_at_line(limit);
         let mut lines = rect.into_iter();
         for (idx, option) in options.iter().enumerate().skip(self.at_line) {
             if idx == self.selected {
-                backend.set_style(self.highlight)?;
+                backend.set_style(self.highlight);
                 for callback in callbacks {
                     match lines.next() {
                         Some(line) => {
-                            (callback)(option, line.unsafe_builder(backend)?)?;
+                            (callback)(option, line.unsafe_builder(backend));
                         }
                         None => break,
                     };
                 }
-                backend.reset_style()?;
+                backend.reset_style();
                 continue;
             };
             for callback in callbacks {
                 match lines.next() {
                     Some(line) => {
-                        (callback)(option, line.unsafe_builder(backend)?)?;
+                        (callback)(option, line.unsafe_builder(backend));
                     }
                     None => break,
                 };
             }
         }
-        backend.reset_style()?;
+        backend.reset_style();
         for line in lines {
-            line.render_empty(backend)?;
+            line.render_empty(backend);
         }
-        Ok(())
     }
 
     #[inline]
@@ -107,7 +105,7 @@ impl State {
         options: impl Iterator<Item = (&'a str, Style)>,
         rect: &Rect,
         writer: &mut Backend,
-    ) -> std::io::Result<()> {
+    ) {
         self.update_at_line(rect.height as usize);
         let mut lines = rect.into_iter();
         for (idx, (text, mut style)) in options.enumerate().skip(self.at_line) {
@@ -118,20 +116,14 @@ impl State {
             if idx == self.selected {
                 style.update(self.highlight);
             }
-            line.render_styled(text, style, writer)?;
+            line.render_styled(text, style, writer);
         }
         for line in lines {
-            line.render_empty(writer)?;
+            line.render_empty(writer);
         }
-        writer.flush()
     }
 
-    pub fn render_list<'a>(
-        &mut self,
-        options: impl Iterator<Item = &'a str>,
-        rect: &Rect,
-        writer: &mut Backend,
-    ) -> std::io::Result<()> {
+    pub fn render_list<'a>(&mut self, options: impl Iterator<Item = &'a str>, rect: &Rect, writer: &mut Backend) {
         self.update_at_line(rect.height as usize);
         let mut lines = rect.into_iter();
         for (idx, text) in options.enumerate().skip(self.at_line) {
@@ -140,14 +132,13 @@ impl State {
                 None => break,
             };
             if idx == self.selected {
-                line.render_styled(text, self.highlight, writer)?;
+                line.render_styled(text, self.highlight, writer);
             } else {
-                line.render(text, writer)?;
+                line.render(text, writer);
             };
         }
         for line in lines {
-            line.render_empty(writer)?;
+            line.render_empty(writer);
         }
-        writer.flush()
     }
 }

@@ -12,7 +12,6 @@ use crate::utils::into_guard;
 use commands::{load_cfg, overwrite_cfg, Terminal};
 use components::CmdHistory;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use std::io::Write;
 use std::sync::{Arc, Mutex};
 
 const IDIOM_PREFIX: &str = "%i";
@@ -34,7 +33,7 @@ impl EditorTerminal {
         Self { width, ..Default::default() }
     }
 
-    pub fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+    pub fn render(&mut self, gs: &mut GlobalState) {
         let max_rows = gs.editor_area.height / 2;
         let area = gs.editor_area.bot(max_rows);
         self.max_rows = max_rows as usize;
@@ -42,28 +41,27 @@ impl EditorTerminal {
         let mut logs = self.logs.iter().skip(self.at_log).take(self.max_rows);
         let mut lines = area.into_iter();
         if let Some(line) = lines.next() {
-            line.fill(BORDERS.horizontal, &mut gs.writer)?;
+            line.fill(BORDERS.horizontal, &mut gs.writer);
         }
         for line in &mut lines {
             match logs.next() {
-                Some(log) => line.render(&log, &mut gs.writer)?,
+                Some(log) => line.render(&log, &mut gs.writer),
                 None => {
                     let prompt = self
                         .prompt
                         .as_ref()
                         .map(|p| into_guard(p).to_owned())
                         .unwrap_or(String::from("[Dead terminal]"));
-                    let mut buider = line.unsafe_builder(&mut gs.writer)?;
-                    buider.push(&prompt)?;
-                    self.cmd.insert_formatted_text(buider)?;
+                    let mut buider = line.unsafe_builder(&mut gs.writer);
+                    buider.push(&prompt);
+                    self.cmd.insert_formatted_text(buider);
                     break;
                 }
             }
         }
         for line in lines {
-            line.render_empty(&mut gs.writer)?;
+            line.render_empty(&mut gs.writer);
         }
-        gs.writer.flush()
     }
 
     pub fn activate(&mut self) {

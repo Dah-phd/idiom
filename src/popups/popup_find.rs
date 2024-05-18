@@ -11,7 +11,6 @@ use crate::{
     workspace::{CursorPosition, Workspace},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use std::io::Write;
 
 #[derive(Default)]
 pub struct GoToLinePopup {
@@ -44,17 +43,16 @@ impl PopupInterface for GoToLinePopup {
         }
     }
 
-    fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+    fn render(&mut self, gs: &mut GlobalState) {
         if let Some(line) = gs.editor_area.right_top_corner(1, 50).into_iter().next() {
-            gs.writer.set_style(gs.theme.accent_style)?;
-            let mut builder = line.unsafe_builder(&mut gs.writer)?;
-            builder.push(" Go to >> ")?;
-            builder.push(&self.line_idx)?;
-            builder.push_styled("|", Style::slowblink())?;
+            gs.writer.set_style(gs.theme.accent_style);
+            let mut builder = line.unsafe_builder(&mut gs.writer);
+            builder.push(" Go to >> ");
+            builder.push(&self.line_idx);
+            builder.push_styled("|", Style::slowblink());
             drop(builder);
-            gs.writer.reset_style()?;
-        }
-        Ok(())
+            gs.writer.reset_style();
+        };
     }
 
     fn update_workspace(&mut self, workspace: &mut Workspace) {
@@ -95,18 +93,16 @@ impl PopupInterface for FindPopup {
         }
     }
 
-    fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+    fn render(&mut self, gs: &mut GlobalState) {
         if let Some(line) = gs.editor_area.right_top_corner(1, 50).into_iter().next() {
-            gs.writer.set_style(gs.theme.accent_style)?;
-            let mut builder = line.unsafe_builder(&mut gs.writer)?;
-            builder.push(" Found(")?;
-            builder.push(&count_as_string(self.options.len()))?;
-            builder.push(") >> ")?;
-            self.pattern.insert_formatted_text(builder)?;
-            gs.writer.reset_style()?;
-            return gs.writer.flush();
+            gs.writer.set_style(gs.theme.accent_style);
+            let mut builder = line.unsafe_builder(&mut gs.writer);
+            builder.push(" Found(");
+            builder.push(&count_as_string(self.options.len()));
+            builder.push(") >> ");
+            self.pattern.insert_formatted_text(builder);
+            gs.writer.reset_style();
         }
-        Ok(())
     }
 
     fn update_workspace(&mut self, workspace: &mut Workspace) {

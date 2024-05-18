@@ -3,7 +3,7 @@ use crate::syntax::{theme::Theme, Action, GlobalState, WorkspaceEvent};
 use crate::workspace::line::EditorLine;
 use crate::{configs::FileType, render::backend::Color};
 use lsp_types::DiagnosticRelatedInformation;
-use rust::{rust_derive_import, rust_process_related_info, rust_specific_handler};
+use rust::{rust_process_related_info, rust_specific_handler};
 use serde_json::Value;
 
 type LangSpecificHandler = Option<fn(char_idx: usize, word: &str, full_line: &str, theme: &Theme) -> Option<Color>>;

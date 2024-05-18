@@ -4,7 +4,6 @@ use crate::render::{
 };
 use std::{
     error::Error,
-    io::Result,
     time::{Duration, Instant},
 };
 
@@ -30,31 +29,31 @@ impl Messages {
         }
     }
 
-    pub fn render(&mut self, accent_style: Style, backend: &mut Backend) -> Result<()> {
+    pub fn render(&mut self, accent_style: Style, backend: &mut Backend) {
         if self.is_expaired() {
             match self.messages.pop() {
                 Some(message) => {
                     self.last_message = message;
                     self.clock = Instant::now();
-                    self.last_message.render(self.line.clone(), accent_style, backend)
+                    self.last_message.render(self.line.clone(), accent_style, backend);
                 }
                 None => {
                     self.active = false;
-                    backend.set_style(accent_style)?;
-                    self.line.clone().render_empty(backend)?;
+                    backend.set_style(accent_style);
+                    self.line.clone().render_empty(backend);
                     backend.reset_style()
                 }
             }
         } else {
-            self.last_message.render(self.line.clone(), accent_style, backend)
+            self.last_message.render(self.line.clone(), accent_style, backend);
         }
     }
 
-    pub fn fast_render(&mut self, accent_style: Style, backend: &mut Backend) -> Result<()> {
+    pub fn fast_render(&mut self, accent_style: Style, backend: &mut Backend) {
         if !self.active {
-            return Ok(());
+            return;
         }
-        self.render(accent_style, backend)
+        self.render(accent_style, backend);
     }
 
     pub fn set_line(&mut self, line: Line) {
@@ -109,7 +108,7 @@ enum Message {
 
 impl Message {
     #[inline]
-    fn render(&self, line: Line, mut accent_style: Style, backend: &mut Backend) -> std::io::Result<()> {
+    fn render(&self, line: Line, mut accent_style: Style, backend: &mut Backend) {
         match self {
             Message::Error(text) => {
                 accent_style.set_fg(Some(color::red()));
@@ -120,7 +119,7 @@ impl Message {
                 line.render_styled(text, accent_style, backend)
             }
             Message::Text(text) => line.render_styled(text, accent_style, backend),
-        }
+        };
     }
 
     const fn is_err(&self) -> bool {

@@ -127,6 +127,153 @@ pub fn find_code_blocks(buffer: &mut Vec<(usize, String)>, content: &[String], p
     }
 }
 
+pub struct TrackedList<T> {
+    inner: Vec<T>,
+    updated: bool,
+}
+
+impl<T> TrackedList<T> {
+    #[inline(always)]
+    pub fn from(inner: Vec<T>) -> Self {
+        Self { inner, updated: true }
+    }
+
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self { inner: Vec::new(), updated: true }
+    }
+
+    #[inline(always)]
+    pub fn first(&self) -> Option<&T> {
+        self.inner.first()
+    }
+
+    #[inline(always)]
+    pub fn first_mut(&mut self) -> Option<&mut T> {
+        self.updated = true;
+        self.inner.first_mut()
+    }
+
+    #[inline(always)]
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    #[inline(always)]
+    pub fn get_mut_no_update(&mut self, index: usize) -> Option<&mut T> {
+        self.inner.get_mut(index)
+    }
+
+    #[inline(always)]
+    pub fn updated(&mut self) -> bool {
+        std::mem::take(&mut self.updated)
+    }
+
+    #[inline(always)]
+    pub fn mark_updated(&mut self) {
+        self.updated = true;
+    }
+
+    #[inline(always)]
+    pub fn insert(&mut self, index: usize, element: T) {
+        self.updated = true;
+        self.inner.insert(index, element)
+    }
+
+    #[inline(always)]
+    pub fn get(&self, index: usize) -> Option<&T> {
+        self.inner.get(index)
+    }
+
+    #[inline(always)]
+    pub fn inner(&self) -> &Vec<T> {
+        &self.inner
+    }
+
+    #[inline(always)]
+    pub fn inner_mut(&mut self) -> &mut Vec<T> {
+        self.updated = true;
+        &mut self.inner
+    }
+
+    #[inline(always)]
+    pub fn inner_mut_no_update(&mut self) -> &mut Vec<T> {
+        &mut self.inner
+    }
+
+    #[inline(always)]
+    pub fn iter(&self) -> std::slice::Iter<'_, T> {
+        self.inner.iter()
+    }
+
+    #[inline(always)]
+    pub fn iter_if_updated(&mut self) -> Option<std::slice::Iter<'_, T>> {
+        if !self.updated() {
+            return None;
+        }
+        Some(self.iter())
+    }
+
+    #[inline(always)]
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, T> {
+        self.updated = true;
+        self.inner.iter_mut()
+    }
+
+    #[inline(always)]
+    pub fn find<P>(&mut self, mut predicate: P) -> Option<&mut T>
+    where
+        P: FnMut(&T) -> bool,
+    {
+        let mut iter = self.inner.iter_mut();
+        while let Some(element) = iter.next() {
+            if (predicate)(&element) {
+                self.updated = true;
+                return Some(element);
+            }
+        }
+        None
+    }
+
+    #[inline]
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
+        self.updated = true;
+        self.inner.get_mut(index)
+    }
+
+    #[inline(always)]
+    pub fn push(&mut self, element: T) {
+        self.updated = true;
+        self.inner.push(element);
+    }
+
+    #[inline(always)]
+    pub fn pop(&mut self) -> Option<T> {
+        let result = self.inner.pop();
+        if result.is_some() {
+            self.updated = true;
+        }
+        result
+    }
+
+    #[inline(always)]
+    pub fn remove(&mut self, index: usize) -> T {
+        self.updated = true;
+        self.inner.remove(index)
+    }
+}
+
+impl<T> From<Vec<T>> for TrackedList<T> {
+    fn from(value: Vec<T>) -> Self {
+        Self::from(value)
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum Offset {
     Pos(usize),

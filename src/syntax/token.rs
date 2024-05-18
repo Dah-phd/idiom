@@ -7,7 +7,6 @@ use crate::{
     workspace::line::EditorLine,
 };
 use lsp_types::SemanticToken;
-use std::io::Write;
 
 pub struct Token {
     pub from: usize,
@@ -110,7 +109,6 @@ impl Token {
         if let Some(line) = lines.next() {
             let mut tokens = Vec::new();
             Token::parse(lang, theme, text, &mut tokens);
-            backend.flush()?;
         }
         Ok(())
     }

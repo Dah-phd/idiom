@@ -19,6 +19,7 @@ pub const fn ansi(val: u8) -> Color {
     CTColor::AnsiValue(val)
 }
 
+#[allow(dead_code)]
 #[inline]
 pub fn parse_ansi(code: &str) -> Option<Color> {
     CTColor::parse_ansi(code)
@@ -110,11 +111,9 @@ pub fn serialize_rgb(r: u8, g: u8, b: u8) -> HashMap<&'static str, [u8; 3]> {
     rgb
 }
 
-pub fn pull_color(map: &mut Map<String, Value>, key: &str) -> Result<Color, String> {
-    match map.remove(key) {
-        Some(obj) => parse_color(obj),
-        None => Err(format!("Key not in object {key}")),
-    }
+#[inline]
+pub fn pull_color(map: &mut Map<String, Value>, key: &str) -> Option<Result<Color, String>> {
+    map.remove(key).map(|obj| parse_color(obj))
 }
 
 pub fn parse_color(obj: Value) -> Result<Color, String> {

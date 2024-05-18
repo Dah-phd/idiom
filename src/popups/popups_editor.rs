@@ -22,7 +22,7 @@ pub fn save_all_popup() -> Box<Popup> {
                 key: Some(vec![KeyCode::Char('n'), KeyCode::Char('N')]),
             },
         ],
-        size: Some((40, 4)),
+        size: Some((4, 40)),
         state: 0,
     })
 }

@@ -9,6 +9,7 @@ use crate::{
     global_state::{GlobalState, TreeEvent},
     lsp::LSP,
     render::backend::{color, BackendProtocol, Style},
+    utils::TrackedList,
 };
 use crossterm::event::KeyEvent;
 pub use cursor::CursorPosition;
@@ -19,8 +20,9 @@ use std::{
     path::PathBuf,
 };
 
+/// implement Drop to attempt keep state upon close/crash
 pub struct Workspace {
-    editors: Vec<Editor>,
+    editors: TrackedList<Editor>,
     base_config: EditorConfigs,
     key_map: EditorKeyMap,
     tab_style: Style,
@@ -40,38 +42,40 @@ impl Workspace {
             };
         }
         let tab_style = Style::fg(color::dark_yellow());
-        Self { editors: Vec::default(), base_config, key_map, lsp_servers, map_callback: map_editor, tab_style }
+        Self { editors: TrackedList::new(), base_config, key_map, lsp_servers, map_callback: map_editor, tab_style }
     }
 
-    pub fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+    pub fn render(&mut self, gs: &mut GlobalState) {
         if let Some(editor) = self.editors.get_mut(0) {
             let line = match gs.tab_area.into_iter().next() {
                 Some(line) => line,
-                None => return Ok(()),
+                None => return,
             };
-            gs.writer.save_cursor()?;
-            gs.writer.set_style(Style::underlined(None))?;
+            gs.writer.save_cursor();
+            gs.writer.set_style(Style::underlined(None));
             {
-                let mut builder = line.unsafe_builder(&mut gs.writer)?;
-                builder.push_styled(&editor.display, self.tab_style)?;
+                let mut builder = line.unsafe_builder(&mut gs.writer);
+                builder.push_styled(&editor.display, self.tab_style);
                 for editor in self.editors.iter().skip(1) {
-                    if !builder.push(" | ")? || builder.push(&editor.display)? {
+                    if !builder.push(" | ") || builder.push(&editor.display) {
                         break;
                     };
                 }
             }
-            gs.writer.reset_style()?;
-            gs.writer.restore_cursor()
+            gs.writer.reset_style();
+            gs.writer.restore_cursor();
         } else {
             match gs.tab_area.into_iter().next() {
                 Some(line) => line.render_empty(&mut gs.writer),
-                None => Ok(()),
+                None => (),
             }
         }
     }
 
-    pub fn fast_render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
-        Ok(())
+    pub fn fast_render(&mut self, gs: &mut GlobalState) {
+        if self.editors.updated() {
+            self.render(gs);
+        }
     }
 
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
@@ -79,16 +83,19 @@ impl Workspace {
     }
 
     pub fn toggle_tabs(&mut self) {
+        self.editors.mark_updated();
         self.map_callback = map_tabs;
         self.tab_style = Style::reversed();
     }
 
     pub fn toggle_editor(&mut self) {
+        self.editors.mark_updated();
         self.map_callback = map_editor;
         self.tab_style = Style::fg(color::dark_yellow());
     }
 
-    pub fn resize_render(&mut self, width: usize, height: usize) {
+    #[inline]
+    pub fn resize_all(&mut self, width: usize, height: usize) {
         for editor in self.editors.iter_mut() {
             editor.resize(width, height);
         }
@@ -108,9 +115,32 @@ impl Workspace {
         self.editors.iter().map(|editor| editor.display.to_owned()).collect()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn get_active(&mut self) -> Option<&mut Editor> {
-        self.editors.first_mut()
+        self.editors.get_mut_no_update(0)
+    }
+
+    #[inline]
+    pub fn rename_editors(&mut self, old: PathBuf, new_path: PathBuf) {
+        if old.is_dir() {
+            for editor in self.editors.iter_mut() {
+                if editor.path.starts_with(&old) {
+                    let mut updated_path = PathBuf::new();
+                    let mut old = editor.path.iter();
+                    for (new_part, ..) in new_path.iter().zip(&mut old) {
+                        updated_path.push(new_part);
+                    }
+                    for remaining_part in old {
+                        updated_path.push(remaining_part)
+                    }
+                    editor.update_path(updated_path);
+                }
+            }
+        } else {
+            if let Some(editor) = self.editors.find(|e| e.path == old) {
+                editor.update_path(new_path);
+            }
+        }
     }
 
     pub fn activate_editor(&mut self, idx: usize, gs: &mut GlobalState) {
@@ -118,7 +148,6 @@ impl Workspace {
             let editor = self.editors.remove(idx);
             gs.tree.push(TreeEvent::SelectPath(editor.path.clone()));
             self.editors.insert(0, editor);
-            self.render(gs).expect("Failed to render on Editor tab activation");
         }
     }
 
@@ -477,7 +506,7 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
             EditorAction::Right | EditorAction::Indent => {
                 let editor = ws.editors.remove(0);
                 ws.editors.push(editor);
-                gs.tree.push(TreeEvent::SelectPath(ws.editors[0].path.clone()));
+                gs.tree.push(TreeEvent::SelectPath(ws.editors.inner()[0].path.clone()));
             }
             EditorAction::Left | EditorAction::Unintent => {
                 if let Some(editor) = ws.editors.pop() {
@@ -494,7 +523,6 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
             }
             _ => (),
         }
-        let _ = ws.render(gs);
         return true;
     }
     false

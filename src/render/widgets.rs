@@ -4,7 +4,7 @@ use crate::render::{
 };
 
 #[allow(dead_code)]
-pub fn paragraph<'a>(area: Rect, text: impl Iterator<Item = &'a str>, backend: &mut Backend) -> std::io::Result<()> {
+pub fn paragraph<'a>(area: Rect, text: impl Iterator<Item = &'a str>, backend: &mut Backend) {
     let mut lines = area.into_iter();
     for text_line in text {
         match lines.next() {
@@ -15,9 +15,9 @@ pub fn paragraph<'a>(area: Rect, text: impl Iterator<Item = &'a str>, backend: &
                     while remaining != 0 {
                         let width = line.width;
                         if let Some(text_slice) = text_line.get(at_char..at_char + width) {
-                            line.render(text_slice, backend)?;
+                            line.render(text_slice, backend);
                         } else {
-                            line.render(text_line[at_char..].as_ref(), backend)?;
+                            line.render(text_line[at_char..].as_ref(), backend);
                             break;
                         }
                         if let Some(next_line) = lines.next() {
@@ -25,27 +25,22 @@ pub fn paragraph<'a>(area: Rect, text: impl Iterator<Item = &'a str>, backend: &
                             at_char += line.width;
                             remaining = remaining.saturating_sub(width);
                         } else {
-                            return Ok(());
+                            return;
                         }
                     }
                 } else {
-                    line.render(&text_line, backend)?;
+                    line.render(&text_line, backend);
                 };
             }
-            None => return Ok(()),
+            None => return,
         }
     }
     for remaining_line in lines {
-        remaining_line.render_empty(backend)?;
+        remaining_line.render_empty(backend);
     }
-    Ok(())
 }
 
-pub fn paragraph_styled<'a>(
-    area: Rect,
-    text: impl Iterator<Item = (&'a str, Style)>,
-    backend: &mut Backend,
-) -> std::io::Result<()> {
+pub fn paragraph_styled<'a>(area: Rect, text: impl Iterator<Item = (&'a str, Style)>, backend: &mut Backend) {
     let mut lines = area.into_iter();
     for (text_line, style) in text {
         match lines.next() {
@@ -56,9 +51,9 @@ pub fn paragraph_styled<'a>(
                     while remaining != 0 {
                         let width = line.width;
                         if let Some(text_slice) = text_line.get(at_char..at_char + width) {
-                            line.render_styled(text_slice, style, backend)?;
+                            line.render_styled(text_slice, style, backend);
                         } else {
-                            line.render_styled(text_line[at_char..].as_ref(), style, backend)?;
+                            line.render_styled(text_line[at_char..].as_ref(), style, backend);
                             break;
                         }
                         if let Some(next_line) = lines.next() {
@@ -66,18 +61,17 @@ pub fn paragraph_styled<'a>(
                             at_char += line.width;
                             remaining = remaining.saturating_sub(width);
                         } else {
-                            return Ok(());
+                            return;
                         }
                     }
                 } else {
-                    line.render_styled(&text_line, style, backend)?;
+                    line.render_styled(&text_line, style, backend);
                 };
             }
-            None => return Ok(()),
+            None => return,
         }
     }
     for remaining_line in lines {
-        remaining_line.render_empty(backend)?;
+        remaining_line.render_empty(backend);
     }
-    Ok(())
 }

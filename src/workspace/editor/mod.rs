@@ -1,7 +1,7 @@
 use crate::{
     configs::{EditorConfigs, FileType},
     global_state::GlobalState,
-    render::{backend::BackendProtocol, layout::Rect},
+    render::layout::Rect,
     syntax::Lexer,
     workspace::{
         actions::Actions,
@@ -53,53 +53,52 @@ impl Editor {
     }
 
     #[inline]
-    pub fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+    pub fn render(&mut self, gs: &mut GlobalState) {
         self.sync(gs);
         let mut lines = gs.editor_area.into_iter();
         let mut ctx = CodeLineContext::new(&self.cursor, &mut self.lexer);
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if self.cursor.line == line_idx && text.len() > self.cursor.text_width {
-                text.wrapped_render(&mut ctx, &mut lines, &mut gs.writer)?;
+                text.wrapped_render(&mut ctx, &mut lines, &mut gs.writer);
             } else if let Some(line) = lines.next() {
-                text.render(&mut ctx, line, &mut gs.writer)?;
+                text.render(&mut ctx, line, &mut gs.writer);
             } else {
                 break;
             };
         }
         for line in lines {
-            line.render_empty(&mut gs.writer)?;
+            line.render_empty(&mut gs.writer);
         }
-        gs.render_stats(self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into())?;
-        ctx.render_cursor(gs)
+        gs.render_stats(self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into());
+        ctx.render_cursor(gs);
     }
 
     /// renders only updated lines
     #[inline]
-    pub fn fast_render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+    pub fn fast_render(&mut self, gs: &mut GlobalState) {
         self.sync(gs);
         let mut lines = gs.editor_area.into_iter();
         let mut ctx = CodeLineContext::new(&self.cursor, &mut self.lexer);
-        gs.writer.hide_cursor()?;
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if self.cursor.line == line_idx {
                 if text.len() > self.cursor.text_width {
-                    text.wrapped_render(&mut ctx, &mut lines, &mut gs.writer)?;
+                    text.wrapped_render(&mut ctx, &mut lines, &mut gs.writer);
                 } else if let Some(line) = lines.next() {
-                    text.render(&mut ctx, line, &mut gs.writer)?;
+                    text.render(&mut ctx, line, &mut gs.writer);
                 } else {
                     break;
                 }
             } else if let Some(line) = lines.next() {
-                text.fast_render(&mut ctx, line, &mut gs.writer)?;
+                text.fast_render(&mut ctx, line, &mut gs.writer);
             } else {
                 break;
             };
         }
         for line in lines {
-            line.render_empty(&mut gs.writer)?;
+            line.render_empty(&mut gs.writer);
         }
-        gs.render_stats(self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into())?;
-        ctx.render_cursor(gs)
+        gs.render_stats(self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into());
+        ctx.render_cursor(gs);
     }
 
     #[inline]
@@ -118,6 +117,12 @@ impl Editor {
 
     pub fn get_stats(&self) -> DocStats {
         (self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into())
+    }
+
+    #[inline]
+    pub fn update_path(&mut self, new_path: PathBuf) {
+        self.display = build_display(&new_path);
+        self.path = new_path;
     }
 
     pub fn help(&mut self, gs: &mut GlobalState) {

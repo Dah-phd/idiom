@@ -10,7 +10,7 @@ use crate::{
     tree::Tree,
 };
 use crossterm::event::{KeyCode, KeyEvent};
-use std::{io::Write, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 use tokio::{sync::Mutex, task::JoinHandle};
 
 type SearchResult = (PathBuf, String, usize);
@@ -55,31 +55,32 @@ impl PopupInterface for ActivePathSearch {
         PopupMessage::None
     }
 
-    fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+    fn render(&mut self, gs: &mut GlobalState) {
         let mut area = gs.screen_rect.center(20, 120);
         area.bordered();
-        area.draw_borders(None, None, &mut gs.writer)?;
-        area.border_title_styled(PATH_SEARCH_TITLE, Style::fg(color::blue()), &mut gs.writer)?;
+        area.draw_borders(None, None, &mut gs.writer);
+        area.border_title_styled(PATH_SEARCH_TITLE, Style::fg(color::blue()), &mut gs.writer);
         let mut lines = area.into_iter();
         if let Some(line) = lines.next() {
-            self.pattern.widget(line, &mut gs.writer)?;
+            self.pattern.widget(line, &mut gs.writer);
         }
         if let Some(line) = lines.next() {
-            line.fill(BORDERS.horizontal, &mut gs.writer)?;
+            line.fill(BORDERS.horizontal, &mut gs.writer);
         }
         if let Some(list_rect) = lines.to_rect() {
             if self.options.is_empty() {
-                self.state.render_list(["No results found!"].into_iter(), &list_rect, &mut gs.writer)?;
+                self.state.render_list(["No results found!"].into_iter(), &list_rect, &mut gs.writer);
             } else {
                 self.state.render_list_complex(
                     &self.options,
-                    &[|path, mut builder| builder.push(&format!("{}", path.display())).map(|_| ())],
+                    &[|path, mut builder| {
+                        builder.push(&format!("{}", path.display()));
+                    }],
                     &list_rect,
                     &mut gs.writer,
-                )?;
-            }
-        }
-        gs.writer.flush()
+                );
+            };
+        };
     }
 
     fn update_tree(&mut self, file_tree: &mut Tree) {
@@ -146,37 +147,36 @@ impl PopupInterface for ActiveFileSearch {
         PopupMessage::None
     }
 
-    fn render(&mut self, gs: &mut GlobalState) -> std::io::Result<()> {
+    fn render(&mut self, gs: &mut GlobalState) {
         if let Ok(mut buffer) = self.option_buffer.try_lock() {
             self.options.extend(buffer.drain(..));
         }
         let mut area = gs.screen_rect.center(20, 120);
         area.bordered();
-        area.draw_borders(None, None, &mut gs.writer)?;
+        area.draw_borders(None, None, &mut gs.writer);
         match self.mode {
-            Mode::Full => area.border_title_styled(FULL_SEARCH_TITLE, Style::fg(color::red()), &mut gs.writer)?,
-            Mode::Select => area.border_title_styled(FILE_SEARCH_TITLE, Style::fg(color::yellow()), &mut gs.writer)?,
+            Mode::Full => area.border_title_styled(FULL_SEARCH_TITLE, Style::fg(color::red()), &mut gs.writer),
+            Mode::Select => area.border_title_styled(FILE_SEARCH_TITLE, Style::fg(color::yellow()), &mut gs.writer),
         }
         let mut lines = area.into_iter();
         if let Some(line) = lines.next() {
-            self.pattern.widget(line, &mut gs.writer)?;
+            self.pattern.widget(line, &mut gs.writer);
         }
         if let Some(line) = lines.next() {
-            line.fill(BORDERS.horizontal, &mut gs.writer)?;
+            line.fill(BORDERS.horizontal, &mut gs.writer);
         }
         if let Some(list_rect) = lines.to_rect() {
             if self.options.is_empty() {
-                self.state.render_list(["No results found!"].into_iter(), &list_rect, &mut gs.writer)?;
+                self.state.render_list(["No results found!"].into_iter(), &list_rect, &mut gs.writer);
             } else {
                 self.state.render_list_complex(
                     &self.options,
                     &[build_path_line, build_text_line],
                     &list_rect,
                     &mut gs.writer,
-                )?;
+                );
             }
-        }
-        gs.writer.flush()
+        };
     }
 
     fn update_tree(&mut self, file_tree: &mut Tree) {
@@ -207,11 +207,11 @@ impl PopupInterface for ActiveFileSearch {
     }
 }
 
-fn build_path_line((path, ..): &SearchResult, mut builder: LineBuilder) -> std::io::Result<()> {
-    builder.push(&format!("{}", path.display())).map(|_| ())
+fn build_path_line((path, ..): &SearchResult, mut builder: LineBuilder) {
+    builder.push(&format!("{}", path.display()));
 }
 
-fn build_text_line((.., line_txt, line_idx): &SearchResult, mut builder: LineBuilder) -> std::io::Result<()> {
-    builder.push(&format!("{line_idx}| "))?;
-    builder.push(&line_txt).map(|_| ())
+fn build_text_line((.., line_txt, line_idx): &SearchResult, mut builder: LineBuilder) {
+    builder.push(&format!("{line_idx}| "));
+    builder.push(&line_txt);
 }

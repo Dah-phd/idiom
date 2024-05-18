@@ -33,8 +33,7 @@ fn cli() -> Option<PathBuf> {
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> IdiomResult<()> {
-    let backend = Backend::init()?;
-    app(cli(), backend).await?;
+    app(cli(), Backend::init()).await?;
     Backend::exit()?;
     Ok(())
 }

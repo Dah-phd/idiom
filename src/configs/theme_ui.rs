@@ -4,6 +4,8 @@ use crate::render::backend::{color, pull_color, serialize_rgb, Color, Style};
 use serde::ser::{Serialize, SerializeStruct};
 use serde_json::Value;
 
+const ACCENT: Color = color::rgb(25, 25, 24);
+
 #[derive(Debug)]
 pub struct UITheme {
     pub accent_background: Color,
@@ -17,7 +19,8 @@ impl<'de> serde::Deserialize<'de> for UITheme {
     {
         match Value::deserialize(deserializer)? {
             Value::Object(mut map) => {
-                let accent_background = pull_color(&mut map, "accent").map_err(serde::de::Error::custom)?;
+                let accent_background =
+                    pull_color(&mut map, "accent").unwrap_or(Ok(ACCENT)).map_err(serde::de::Error::custom)?;
                 Ok(Self { accent_style: Style::bg(accent_background), accent_background })
             }
             _ => Err(IdiomError::io_err("theme_ui.json in not an Object!")).map_err(serde::de::Error::custom),

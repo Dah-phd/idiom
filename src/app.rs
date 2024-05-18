@@ -32,7 +32,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
         tree.select_by_path(&path);
         if gs.try_new_editor(&mut workspace, path).await {
             gs.insert_mode();
-            workspace.render(&mut gs)?;
+            workspace.render(&mut gs);
         };
     }
 

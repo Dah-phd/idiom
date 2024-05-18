@@ -48,55 +48,54 @@ impl<T: Default + Clone> TextField<T> {
     }
 
     /// returns blockless paragraph widget " >> inner text"
-    pub fn widget(&self, line: Line, backend: &mut Backend) -> std::io::Result<()> {
-        let mut builder = line.unsafe_builder(backend)?;
-        builder.push(" >> ")?;
-        self.insert_formatted_text(builder)
+    pub fn widget(&self, line: Line, backend: &mut Backend) {
+        let mut builder = line.unsafe_builder(backend);
+        builder.push(" >> ");
+        self.insert_formatted_text(builder);
     }
 
     /// returns blockless paragraph widget "99+ >> inner text"
-    pub fn widget_with_count(&self, line: Line, count: usize, backend: &mut Backend) -> std::io::Result<()> {
-        let mut builder = line.unsafe_builder(backend)?;
-        builder.push(count_as_string(count).as_str())?;
-        builder.push(" >> ")?;
-        self.insert_formatted_text(builder)
+    #[allow(dead_code)]
+    pub fn widget_with_count(&self, line: Line, count: usize, backend: &mut Backend) {
+        let mut builder = line.unsafe_builder(backend);
+        builder.push(count_as_string(count).as_str());
+        builder.push(" >> ");
+        self.insert_formatted_text(builder);
     }
 
-    pub fn insert_formatted_text(&self, line_builder: LineBuilder) -> std::io::Result<()> {
+    pub fn insert_formatted_text(&self, line_builder: LineBuilder) {
         match self.select.as_ref().map(|(f, t)| if f > t { (*t, *f) } else { (*f, *t) }) {
             Some((from, to)) => self.text_cursor_select(from, to, line_builder),
             None => self.text_cursor(line_builder),
-        }
-    }
-
-    fn text_cursor(&self, mut builder: LineBuilder) -> std::io::Result<()> {
-        if self.char == self.text.len() {
-            builder.push(&self.text)?;
-            builder.push_styled(" ", Style::reversed())?;
-        } else {
-            builder.push(self.text[..self.char].as_ref())?;
-            builder.push_styled(self.text[self.char..=self.char].as_ref(), Style::reversed())?;
-            builder.push(self.text[self.char + 1..].as_ref())?;
         };
-        Ok(())
     }
 
-    fn text_cursor_select(&self, from: usize, to: usize, mut builder: LineBuilder) -> std::io::Result<()> {
-        builder.push(self.text[..from].as_ref())?;
-        if from == self.char {
-            builder.push_styled(self.text[self.char..=self.char].as_ref(), Style::reversed())?;
-            builder.push_styled(self.text[from + 1..to].as_ref(), Style::bg(color::rgb(72, 72, 72)))?;
-            builder.push(self.text[to..].as_ref())?;
-        } else if self.char == self.text.len() {
-            builder.push_styled(self.text[from..to].as_ref(), Style::bg(color::rgb(72, 72, 72)))?;
-            builder.push(self.text[to..].as_ref())?;
-            builder.push_styled(" ", Style::reversed())?;
+    fn text_cursor(&self, mut builder: LineBuilder) {
+        if self.char == self.text.len() {
+            builder.push(&self.text);
+            builder.push_styled(" ", Style::reversed());
         } else {
-            builder.push_styled(self.text[from..to].as_ref(), Style::bg(color::rgb(72, 72, 72)))?;
-            builder.push_styled(self.text[to..=to].as_ref(), Style::reversed())?;
-            builder.push(self.text[to + 1..].as_ref())?;
+            builder.push(self.text[..self.char].as_ref());
+            builder.push_styled(self.text[self.char..=self.char].as_ref(), Style::reversed());
+            builder.push(self.text[self.char + 1..].as_ref());
+        };
+    }
+
+    fn text_cursor_select(&self, from: usize, to: usize, mut builder: LineBuilder) {
+        builder.push(self.text[..from].as_ref());
+        if from == self.char {
+            builder.push_styled(self.text[self.char..=self.char].as_ref(), Style::reversed());
+            builder.push_styled(self.text[from + 1..to].as_ref(), Style::bg(color::rgb(72, 72, 72)));
+            builder.push(self.text[to..].as_ref());
+        } else if self.char == self.text.len() {
+            builder.push_styled(self.text[from..to].as_ref(), Style::bg(color::rgb(72, 72, 72)));
+            builder.push(self.text[to..].as_ref());
+            builder.push_styled(" ", Style::reversed());
+        } else {
+            builder.push_styled(self.text[from..to].as_ref(), Style::bg(color::rgb(72, 72, 72)));
+            builder.push_styled(self.text[to..=to].as_ref(), Style::reversed());
+            builder.push(self.text[to + 1..].as_ref());
         }
-        Ok(())
     }
 
     pub fn map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> Option<T> {

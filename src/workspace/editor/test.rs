@@ -12,7 +12,7 @@ use std::path::PathBuf;
 pub fn mock_editor(content: Vec<String>) -> Editor {
     let ft = FileType::Unknown;
     let path = PathBuf::from("");
-    let mut gs = GlobalState::new(Backend::init().unwrap()).unwrap();
+    let mut gs = GlobalState::new(Backend::init()).unwrap();
     let content: Vec<CodeLine> = content.into_iter().map(|line| CodeLine::from(line)).collect();
     Editor {
         lexer: Lexer::with_context(ft, &path, &content, &mut gs),

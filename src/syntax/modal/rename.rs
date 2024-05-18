@@ -21,9 +21,9 @@ impl RenameVariable {
         2
     }
 
-    pub fn render(&mut self, area: &Rect, gs: &mut GlobalState) -> std::io::Result<()> {
-        area.get_line(0).unwrap().render(&self.title, &mut gs.writer)?;
-        self.new_name.widget(area.get_line(1).unwrap(), &mut gs.writer)
+    pub fn render(&mut self, area: &Rect, gs: &mut GlobalState) {
+        area.get_line(0).unwrap().render(&self.title, &mut gs.writer);
+        self.new_name.widget(area.get_line(1).unwrap(), &mut gs.writer);
     }
 
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> ModalMessage {

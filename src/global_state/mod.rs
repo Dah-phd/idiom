@@ -49,27 +49,27 @@ enum Mode {
 
 impl Mode {
     #[inline]
-    fn render(&self, line: Line, accent_style: Style, backend: &mut Backend) -> std::io::Result<()> {
+    fn render(&self, line: Line, accent_style: Style, backend: &mut Backend) {
         match self {
             Self::Insert => Self::render_insert_mode(line, accent_style, backend),
             Self::Select => Self::render_select_mode(line, accent_style, backend),
-        }
+        };
     }
 
     #[inline]
-    fn render_select_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) -> std::io::Result<()> {
+    fn render_select_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) {
         line.width = std::cmp::min(SELECT_SPAN.len(), line.width);
         accent_style.add_bold();
         accent_style.set_fg(Some(color::cyan()));
-        line.render_styled(SELECT_SPAN, accent_style, backend)
+        line.render_styled(SELECT_SPAN, accent_style, backend);
     }
 
     #[inline]
-    fn render_insert_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) -> std::io::Result<()> {
+    fn render_insert_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) {
         line.width = std::cmp::min(INSERT_SPAN.len(), line.width);
         accent_style.add_bold();
         accent_style.set_fg(Some(color::rgb(255, 0, 0)));
-        line.render_styled(INSERT_SPAN, accent_style, backend)
+        line.render_styled(INSERT_SPAN, accent_style, backend);
     }
 }
 
@@ -137,20 +137,19 @@ impl GlobalState {
         (self.draw_callback)(self, workspace, tree, term)
     }
 
-    pub fn render_stats(&mut self, len: usize, select_len: usize, cursor: CursorPosition) -> std::io::Result<()> {
+    pub fn render_stats(&mut self, len: usize, select_len: usize, cursor: CursorPosition) {
         if let Some(mut line) = self.footer_area.get_line(0) {
             line += INSERT_SPAN.len();
-            self.writer.set_style(self.theme.accent_style)?;
-            let mut rev_builder = line.unsafe_builder_rev(&mut self.writer)?;
+            self.writer.set_style(self.theme.accent_style);
+            let mut rev_builder = line.unsafe_builder_rev(&mut self.writer);
             if select_len != 0 {
-                rev_builder.push(&format!(" ({select_len} selected)"))?;
+                rev_builder.push(&format!(" ({select_len} selected)"));
             }
-            rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {}", cursor.line + 1, cursor.char + 1))?;
+            rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {}", cursor.line + 1, cursor.char + 1));
             self.messages.set_line(rev_builder.to_line());
-            self.messages.fast_render(self.theme.accent_style, &mut self.writer)?;
-            self.writer.reset_style()?;
+            self.messages.fast_render(self.theme.accent_style, &mut self.writer);
+            self.writer.reset_style();
         }
-        Ok(())
     }
 
     #[inline]
@@ -176,7 +175,7 @@ impl GlobalState {
             self.draw_callback = draw::full_rebuild;
         };
         if let Some(line) = self.footer_area.get_line(0) {
-            Mode::render_select_mode(line, self.theme.accent_style, &mut self.writer).unwrap();
+            Mode::render_select_mode(line, self.theme.accent_style, &mut self.writer);
         };
     }
 
@@ -187,7 +186,7 @@ impl GlobalState {
             self.draw_callback = draw::full_rebuild;
         };
         if let Some(line) = self.footer_area.get_line(0) {
-            Mode::render_insert_mode(line, self.theme.accent_style, &mut self.writer).unwrap();
+            Mode::render_insert_mode(line, self.theme.accent_style, &mut self.writer);
         };
     }
 
@@ -202,10 +201,10 @@ impl GlobalState {
     }
 
     #[inline]
-    pub fn render_popup(&mut self) -> std::io::Result<()> {
+    pub fn render_popup(&mut self) {
         // popups do not mutate during render
         let gs = unsafe { &mut *(self as *mut GlobalState) };
-        self.popup.render(gs)
+        self.popup.render(gs);
     }
 
     pub fn popup(&mut self, popup: Box<dyn PopupInterface>) {
@@ -228,8 +227,8 @@ impl GlobalState {
         self.components.remove(Components::POPUP);
         self.draw_callback = draw::full_rebuild;
         self.mouse_mapper = controls::mouse_handler;
-        self.editor_area.clear(&mut self.writer).unwrap();
-        self.tree_area.clear(&mut self.writer).unwrap();
+        self.editor_area.clear(&mut self.writer);
+        self.tree_area.clear(&mut self.writer);
         self.popup = placeholder();
     }
 
@@ -310,7 +309,7 @@ impl GlobalState {
     pub fn full_resize(&mut self, height: u16, width: u16, workspace: &mut Workspace) {
         self.screen_rect = (width, height).into();
         self.draw_callback = draw::full_rebuild;
-        workspace.resize_render(self.editor_area.width as usize, self.editor_area.height as usize);
+        workspace.resize_all(self.editor_area.width as usize, self.editor_area.height as usize);
     }
 
     pub fn recalc_draw_size(&mut self) {
@@ -322,11 +321,11 @@ impl GlobalState {
         };
         if matches!(self.mode, Mode::Select) || self.components.contains(Components::TREE) {
             self.tab_area = self.tree_area.keep_col((self.tree_size * self.screen_rect.width) / 100);
-            self.tree_area
-                .top_border()
-                .right_border()
-                .draw_borders(Some(DOUBLE_BORDERS), Some(color::dark_grey()), &mut self.writer)
-                .unwrap();
+            self.tree_area.top_border().right_border().draw_borders(
+                Some(DOUBLE_BORDERS),
+                Some(color::dark_grey()),
+                &mut self.writer,
+            );
         } else {
             self.tab_area = self.tree_area.keep_col(0);
         };
@@ -422,8 +421,11 @@ impl GlobalState {
                     self.clear_popup();
                 }
                 TreeEvent::RenameFile(name) => {
-                    if let Err(error) = tree.rename_file(name) {
-                        self.messages.error(error.to_string())
+                    if let Some(result) = tree.rename_path(name) {
+                        match result {
+                            Ok((old, new_path)) => workspace.rename_editors(old, new_path),
+                            Err(err) => self.messages.error(err.to_string()),
+                        }
                     };
                     self.clear_popup();
                 }
@@ -507,7 +509,7 @@ impl GlobalState {
                     };
                 }
                 WorkspaceEvent::Resize => {
-                    workspace.resize_render(self.editor_area.width as usize, self.editor_area.height as usize);
+                    workspace.resize_all(self.editor_area.width as usize, self.editor_area.height as usize);
                 }
                 WorkspaceEvent::CheckLSP(ft) => {
                     workspace.check_lsp(ft, self).await;
