@@ -13,16 +13,18 @@ More documentation will not come very soon - current focus is developing basic f
 - Linux Fedora derivate (Nobara)
 
 ## TODO
-
-- create logic to replace internal tokens that keeps diagnostics
-- add CHANGELOG
+- add state upone closing
+- cleanup workspace render
+- optimize the cache to reduce imput lag
+- migrate to lsp_types 0.96
+- implement proper len checks on info modals (currently some lines will be longer due to characters with greater width - non-breaking issue)
+- improve error handling
+- syntax on info modal
 - optimize snippet insertion (current implementation is only functional)
-- improve warn/err on tree visualization
 - markdown rendering / editing
 - !! more tests - till that point the goal has been to make the editor self-developing, so bugs can be easily found and structure crystalizes
 - multi-cursor support
 - runner passing arrow presses while process is running
-- make info on autocomplete easier to read
 - (backlog) semantic token styles for different lsp langs
 
 ## Initial target langs

@@ -162,15 +162,3 @@ pub fn set_diganostics(content: &mut Vec<impl EditorLine>, diagnostics: Vec<(usi
         };
     }
 }
-
-pub fn set_diganostic_errors(content: &mut Vec<impl EditorLine>, diagnostics: Vec<(usize, DiagnosticLine)>) {
-    for line in content.iter_mut() {
-        line.drop_diagnostics();
-    }
-    for (idx, mut diagnostics) in diagnostics {
-        if let Some(line) = content.get_mut(idx) {
-            diagnostics.drop_non_errs();
-            line.set_diagnostics(diagnostics);
-        };
-    }
-}

@@ -44,7 +44,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                 return;
             }
             if let Some((line_idx, _)) = contained_position(gs.tree_area, event.row, event.column) {
-                if let Some(path) = tree.mouse_select(line_idx) {
+                if let Some(path) = tree.mouse_select(line_idx + 1) {
                     gs.tree.push(TreeEvent::Open(path));
                     return;
                 };

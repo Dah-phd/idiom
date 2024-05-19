@@ -1,4 +1,3 @@
-pub mod context;
 pub mod diagnostics;
 pub mod langs;
 pub mod legend;

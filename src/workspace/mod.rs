@@ -57,7 +57,7 @@ impl Workspace {
                 let mut builder = line.unsafe_builder(&mut gs.writer);
                 builder.push_styled(&editor.display, self.tab_style);
                 for editor in self.editors.iter().skip(1) {
-                    if !builder.push(" | ") || builder.push(&editor.display) {
+                    if !builder.push(" | ") || !builder.push(&editor.display) {
                         break;
                     };
                 }
@@ -357,6 +357,8 @@ impl Workspace {
         if self.editors.is_empty() {
             let _ = gs.editor_area.clear(&mut gs.writer);
             gs.select_mode();
+        } else {
+            self.editors.inner_mut_no_update()[0].clear_screen_cache();
         }
     }
 
@@ -506,11 +508,13 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
             EditorAction::Right | EditorAction::Indent => {
                 let editor = ws.editors.remove(0);
                 ws.editors.push(editor);
+                ws.editors.inner_mut_no_update()[0].clear_screen_cache();
                 gs.tree.push(TreeEvent::SelectPath(ws.editors.inner()[0].path.clone()));
             }
             EditorAction::Left | EditorAction::Unintent => {
-                if let Some(editor) = ws.editors.pop() {
+                if let Some(mut editor) = ws.editors.pop() {
                     gs.tree.push(TreeEvent::SelectPath(editor.path.clone()));
+                    editor.clear_screen_cache();
                     ws.editors.insert(0, editor);
                 }
             }

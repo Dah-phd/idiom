@@ -1,8 +1,5 @@
 use crate::{
-    render::{
-        backend::{Backend, Color, Style},
-        layout::RectIter,
-    },
+    render::backend::{Color, Style},
     syntax::{theme::Theme, Lang, Legend},
     workspace::line::EditorLine,
 };
@@ -97,20 +94,6 @@ impl Token {
         } else {
             buf.push(Token { to: from + len, from, len, style: Style::fg(theme.default) });
         };
-    }
-
-    pub fn render_code(
-        text: &str,
-        lang: &Lang,
-        theme: &Theme,
-        lines: &mut RectIter,
-        backend: &mut Backend,
-    ) -> std::io::Result<()> {
-        if let Some(line) = lines.next() {
-            let mut tokens = Vec::new();
-            Token::parse(lang, theme, text, &mut tokens);
-        }
-        Ok(())
     }
 }
 
