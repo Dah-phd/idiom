@@ -58,7 +58,6 @@ impl Editor {
 
     #[inline]
     pub fn render(&mut self, gs: &mut GlobalState) {
-        gs.error("full");
         self.last_render_at_line.replace(self.cursor.at_line);
         self.sync(gs);
         let mut lines = gs.editor_area.into_iter();
