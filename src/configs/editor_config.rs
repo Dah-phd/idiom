@@ -2,6 +2,7 @@ use super::types::FileType;
 use super::{load_or_create_config, EDITOR_CFG_FILE};
 use crate::global_state::GlobalState;
 use crate::utils::{trim_start_inplace, Offset};
+use crate::workspace::line::EditorLine;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -27,7 +28,7 @@ impl IndentConfigs {
         self
     }
 
-    pub fn unindent_if_before_base_pattern(&self, line: &mut String) -> usize {
+    pub fn unindent_if_before_base_pattern(&self, line: &mut impl EditorLine) -> usize {
         if line.starts_with(&self.indent) {
             if let Some(first) = line.trim_start().chars().next() {
                 if self.unindent_before.contains(first) {
@@ -39,7 +40,7 @@ impl IndentConfigs {
         0
     }
 
-    pub fn derive_indent_from(&self, prev_line: &str) -> String {
+    pub fn derive_indent_from(&self, prev_line: &impl EditorLine) -> String {
         let mut indent = prev_line.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
         if let Some(last) = prev_line.trim_end().chars().last() {
             if self.indent_after.contains(last) {
@@ -49,8 +50,8 @@ impl IndentConfigs {
         indent
     }
 
-    pub fn derive_indent_from_lines(&self, prev_lines: &[String]) -> String {
-        for prev_line in prev_lines.iter().rev() {
+    pub fn derive_indent_from_lines(&self, prev_lines: &[impl EditorLine]) -> String {
+        for prev_line in prev_lines.iter().rev().map(|line| line) {
             if !prev_line.chars().all(|c| c.is_whitespace()) {
                 return self.derive_indent_from(prev_line);
             }
@@ -58,7 +59,7 @@ impl IndentConfigs {
         "".to_owned()
     }
 
-    pub fn indent_line(&self, line_idx: usize, content: &mut [String]) -> Offset {
+    pub fn indent_line(&self, line_idx: usize, content: &mut [impl EditorLine]) -> Offset {
         if line_idx > 0 {
             let indent = self.derive_indent_from_lines(&content[..line_idx]);
             if indent.is_empty() {

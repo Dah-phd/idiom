@@ -1,21 +1,17 @@
 use self::autocomplete::try_autocomplete;
+use crate::error::IdiomResult;
+use crate::render::layout::BORDERS;
+use crate::render::TextField;
 use crate::runner::commands::load_file;
-use crate::widgests::TextField;
-use ratatui::prelude::Span;
-use ratatui::text::Line;
 mod autocomplete;
 mod commands;
 mod components;
 use crate::configs::{EditorConfigs, KeyMap, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE};
 use crate::global_state::GlobalState;
 use crate::utils::into_guard;
-use anyhow::Result;
 use commands::{load_cfg, overwrite_cfg, Terminal};
 use components::CmdHistory;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
-use ratatui::widgets::{Block, Borders, Clear, List, ListItem};
-use ratatui::Frame;
 use std::sync::{Arc, Mutex};
 
 const IDIOM_PREFIX: &str = "%i";
@@ -37,19 +33,35 @@ impl EditorTerminal {
         Self { width, ..Default::default() }
     }
 
-    pub fn render(&mut self, frame: &mut Frame, screen: Rect) {
-        let screen_areas = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Percentage(50), Constraint::Min(2)])
-            .split(screen);
-        let tmux_area = screen_areas[1];
-        self.max_rows = tmux_area.height as usize;
+    pub fn render(&mut self, gs: &mut GlobalState) {
+        let max_rows = gs.editor_area.height / 2;
+        let area = gs.editor_area.bot(max_rows);
+        self.max_rows = max_rows as usize;
         self.poll_results();
-        frame.render_widget(Clear, tmux_area);
-        frame.render_widget(
-            List::new(self.get_list_items()).block(Block::default().title("Runner").borders(Borders::TOP)),
-            tmux_area,
-        );
+        let mut logs = self.logs.iter().skip(self.at_log).take(self.max_rows);
+        let mut lines = area.into_iter();
+        if let Some(line) = lines.next() {
+            line.fill(BORDERS.horizontal, &mut gs.writer);
+        }
+        for line in &mut lines {
+            match logs.next() {
+                Some(log) => line.render(&log, &mut gs.writer),
+                None => {
+                    let prompt = self
+                        .prompt
+                        .as_ref()
+                        .map(|p| into_guard(p).to_owned())
+                        .unwrap_or(String::from("[Dead terminal]"));
+                    let mut buider = line.unsafe_builder(&mut gs.writer);
+                    buider.push(&prompt);
+                    self.cmd.insert_formatted_text(buider);
+                    break;
+                }
+            }
+        }
+        for line in lines {
+            line.render_empty(&mut gs.writer);
+        }
     }
 
     pub fn activate(&mut self) {
@@ -69,21 +81,6 @@ impl EditorTerminal {
                 }
             }
         }
-    }
-
-    pub fn get_list_items(&self) -> Vec<ListItem<'static>> {
-        let mut list = self
-            .logs
-            .iter()
-            .skip(self.at_log)
-            .take(self.max_rows)
-            .map(|line| ListItem::new(line.to_owned()))
-            .collect::<Vec<ListItem<'_>>>();
-        let prompt = self.prompt.as_ref().map(|p| into_guard(p).to_owned()).unwrap_or(String::from("[Dead terminal]"));
-        let mut line = vec![Span::raw(prompt)];
-        self.cmd.insert_formatted_text(&mut line);
-        list.push(ListItem::new(Line::from(line)));
-        list
     }
 
     fn kill(&mut self, _gs: &mut GlobalState) {
@@ -176,7 +173,7 @@ impl EditorTerminal {
         }
     }
 
-    pub fn idiom_command_handler(&mut self, arg: &str, gs: &mut GlobalState) -> Result<()> {
+    pub fn idiom_command_handler(&mut self, arg: &str, gs: &mut GlobalState) -> IdiomResult<()> {
         if arg.trim() == "help" {
             self.logs.push("load => load config files, available options:".to_owned());
             self.logs.push("    keymap => open keymap config file.".to_owned());

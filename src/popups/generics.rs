@@ -1,42 +1,41 @@
 use super::PopupInterface;
 use crate::{
-    global_state::{Clipboard, PopupMessage},
-    widgests::{centered_rect_static, Button},
+    global_state::{Clipboard, GlobalState, PopupMessage},
+    render::{
+        backend::{Backend, Style},
+        layout::Line,
+        state::State,
+        Button,
+    },
 };
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::{
-    layout::{Alignment, Constraint, Layout},
-    style::{Modifier, Style},
-    text::{Line, Span},
-    widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
-    Frame,
-};
 
 pub struct Popup {
     pub message: String,
     pub title: Option<String>,
     pub message_as_buffer_builder: Option<fn(char) -> Option<char>>,
     pub buttons: Vec<Button>,
-    pub size: Option<(u16, u16)>,
+    pub size: Option<(u16, usize)>,
     pub state: usize,
 }
 
 impl PopupInterface for Popup {
-    fn render(&mut self, frame: &mut Frame) {
-        let block = Block::default().title(self.title()).borders(Borders::ALL);
-        let (h, v) = self.size.unwrap_or((40, 6));
-        let area = centered_rect_static(h, v, frame.size());
-        frame.render_widget(Clear, area);
-        frame.render_widget(block, area);
-
-        let chunks = Layout::default()
-            .constraints([Constraint::Percentage(60), Constraint::Percentage(40)])
-            .margin(1)
-            .split(area);
-
-        frame.render_widget(self.p_from_message(), chunks[0]);
-
-        frame.render_widget(self.spans_from_buttons(), chunks[1]);
+    fn render(&mut self, gs: &mut GlobalState) {
+        let (height, width) = self.size.unwrap_or((6, 40));
+        let mut area = gs.screen_rect.center(height, width);
+        area.bordered();
+        area.draw_borders(None, None, &mut gs.writer);
+        match self.title.as_ref() {
+            Some(text) => area.border_title(&text, &mut gs.writer),
+            None => area.border_title("Prompt", &mut gs.writer),
+        }
+        let mut lines = area.into_iter();
+        if let Some(first_line) = lines.next() {
+            self.p_from_message(first_line, &mut gs.writer);
+        }
+        if let Some(second_line) = lines.next() {
+            self.spans_from_buttons(second_line, &mut gs.writer);
+        }
     }
 
     fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard) -> PopupMessage {
@@ -82,68 +81,53 @@ impl PopupInterface for Popup {
 }
 
 impl Popup {
-    fn p_from_message(&self) -> Paragraph {
+    fn p_from_message(&self, line: Line, backend: &mut Backend) {
         if self.message_as_buffer_builder.is_none() {
-            return Paragraph::new(Span::from(self.message.to_owned())).alignment(Alignment::Center);
+            return line.render_centered(&self.message, backend);
         }
-        Paragraph::new(Line::from(vec![
-            Span::raw(" >> "),
-            Span::raw(self.message.to_owned()),
-            Span::styled("|", Style::default().add_modifier(Modifier::SLOW_BLINK)),
-        ]))
+        let mut builder = line.unsafe_builder(backend);
+        builder.push(" >> ");
+        builder.push(&self.message);
+        builder.push_styled("|", Style::slowblink());
     }
 
-    fn title(&self) -> String {
-        if let Some(title) = &self.title {
-            return format!("{title} ");
+    fn spans_from_buttons(&self, line: Line, backend: &mut Backend) {
+        let btn_count = self.buttons.len();
+        let sum_btn_names_len: usize = self.buttons.iter().map(|b| b.name.len()).sum();
+        let padding = line.width.saturating_sub(sum_btn_names_len) / btn_count;
+        let mut builder = line.unsafe_builder(backend);
+        for (idx, btn) in self.buttons.iter().enumerate() {
+            let text = format!("{name:^width$}", name = btn.name, width = padding + btn.name.len());
+            if idx == self.state {
+                if !builder.push_styled(text.as_str(), Style::reversed()) {
+                    break;
+                }
+            } else if !builder.push(text.as_str()) {
+                break;
+            };
         }
-        "Prompt".to_owned()
-    }
-
-    fn spans_from_buttons(&self) -> Paragraph<'_> {
-        Paragraph::new(Line::from(
-            self.buttons
-                .iter()
-                .enumerate()
-                .map(|(idx, button)| {
-                    let padded_name = format!("  {}  ", button.name);
-                    if self.state == idx {
-                        Span::styled(padded_name, Style::default().add_modifier(Modifier::REVERSED))
-                    } else {
-                        Span::raw(padded_name)
-                    }
-                })
-                .collect::<Vec<_>>(),
-        ))
-        .alignment(Alignment::Center)
     }
 }
 
 pub struct PopupSelector<T> {
     pub options: Vec<T>,
-    pub display: fn(&T) -> String,
+    pub display: fn(&T) -> &str,
     pub command: fn(&mut PopupSelector<T>) -> PopupMessage,
-    pub state: usize,
-    pub size: Option<(u16, u16)>,
+    pub state: State,
+    pub size: Option<(u16, usize)>,
 }
 
 impl<T> PopupInterface for PopupSelector<T> {
-    fn render(&mut self, frame: &mut Frame) {
-        let (h, v) = self.size.unwrap_or((120, 20));
-        let area = centered_rect_static(h, v, frame.size());
-        frame.render_widget(Clear, area);
-
-        let mut state = ListState::default();
-        state.select(Some(self.state));
-        let options = if self.options.is_empty() {
-            vec![ListItem::new("No results found!")]
+    fn render(&mut self, gs: &mut GlobalState) {
+        let (height, width) = self.size.unwrap_or((20, 120));
+        let mut rect = gs.screen_rect.center(height, width);
+        rect.bordered();
+        rect.draw_borders(None, None, &mut gs.writer);
+        if self.options.is_empty() {
+            self.state.render_list(["No results found!"].into_iter(), &rect, &mut gs.writer);
         } else {
-            self.options.iter().map(|el| ListItem::new((self.display)(el))).collect::<Vec<_>>()
+            self.state.render_list(self.options.iter().map(|opt| (self.display)(opt)), &rect, &mut gs.writer);
         };
-        let list = List::new(options)
-            .block(Block::default().borders(Borders::ALL).title("Select"))
-            .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
-        frame.render_stateful_widget(list, area, &mut state);
     }
 
     fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard) -> PopupMessage {
@@ -153,19 +137,11 @@ impl<T> PopupInterface for PopupSelector<T> {
         match key.code {
             KeyCode::Enter => (self.command)(self),
             KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
-                if self.state > 0 {
-                    self.state -= 1;
-                } else {
-                    self.state = self.options.len() - 1;
-                }
+                self.state.prev(self.options.len());
                 PopupMessage::None
             }
             KeyCode::Down | KeyCode::Char('d') | KeyCode::Char('D') => {
-                if self.state < self.options.len() - 1 {
-                    self.state += 1;
-                } else {
-                    self.state = 0;
-                }
+                self.state.next(self.options.len());
                 PopupMessage::None
             }
             KeyCode::Esc => PopupMessage::Clear,

@@ -1,29 +1,13 @@
-use crate::global_state::{Clipboard, PopupMessage, TreeEvent, WorkspaceEvent};
+use crate::{
+    global_state::{Clipboard, PopupMessage, TreeEvent, WorkspaceEvent},
+    render::backend::{color, Backend, Style},
+};
 use core::ops::Range;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::style::{Color, Modifier};
-use ratatui::{
-    style::Style,
-    text::{Line, Span},
-    widgets::Paragraph,
-};
 
-use super::count_as_string;
-
-const CURSOR: Style = Style {
-    fg: None,
-    bg: None,
-    underline_color: None,
-    add_modifier: Modifier::REVERSED,
-    sub_modifier: Modifier::empty(),
-};
-
-const SELECT: Style = Style {
-    fg: None,
-    bg: Some(Color::Rgb(72, 72, 72)),
-    underline_color: None,
-    add_modifier: Modifier::empty(),
-    sub_modifier: Modifier::empty(),
+use super::{
+    count_as_string,
+    layout::{Line, LineBuilder},
 };
 
 #[derive(Default)]
@@ -64,51 +48,53 @@ impl<T: Default + Clone> TextField<T> {
     }
 
     /// returns blockless paragraph widget " >> inner text"
-    pub fn widget(&self) -> Paragraph<'static> {
-        let mut buffer = vec![Span::raw(" >> ")];
-        self.insert_formatted_text(&mut buffer);
-        Paragraph::new(Line::from(buffer))
+    pub fn widget(&self, line: Line, backend: &mut Backend) {
+        let mut builder = line.unsafe_builder(backend);
+        builder.push(" >> ");
+        self.insert_formatted_text(builder);
     }
 
     /// returns blockless paragraph widget "99+ >> inner text"
-    pub fn widget_with_count(&self, count: usize) -> Paragraph<'static> {
-        let mut buffer = vec![Span::raw(count_as_string(count)), Span::raw(" >> ")];
-        self.insert_formatted_text(&mut buffer);
-        Paragraph::new(Line::from(buffer))
+    #[allow(dead_code)]
+    pub fn widget_with_count(&self, line: Line, count: usize, backend: &mut Backend) {
+        let mut builder = line.unsafe_builder(backend);
+        builder.push(count_as_string(count).as_str());
+        builder.push(" >> ");
+        self.insert_formatted_text(builder);
     }
 
-    pub fn insert_formatted_text(&self, buffer: &mut Vec<Span<'static>>) {
+    pub fn insert_formatted_text(&self, line_builder: LineBuilder) {
         match self.select.as_ref().map(|(f, t)| if f > t { (*t, *f) } else { (*f, *t) }) {
-            Some((from, to)) => self.text_cursor_select(from, to, buffer),
-            None => self.text_cursor(buffer),
-        }
+            Some((from, to)) => self.text_cursor_select(from, to, line_builder),
+            None => self.text_cursor(line_builder),
+        };
     }
 
-    fn text_cursor(&self, buffer: &mut Vec<Span<'static>>) {
+    fn text_cursor(&self, mut builder: LineBuilder) {
         if self.char == self.text.len() {
-            buffer.push(Span::raw(self.text.to_owned()));
-            buffer.push(Span::styled(" ", CURSOR));
+            builder.push(&self.text);
+            builder.push_styled(" ", Style::reversed());
         } else {
-            buffer.push(Span::raw(self.text[..self.char].to_owned()));
-            buffer.push(Span::styled(self.text[self.char..=self.char].to_owned(), CURSOR));
-            buffer.push(Span::raw(self.text[self.char + 1..].to_owned()));
-        }
+            builder.push(self.text[..self.char].as_ref());
+            builder.push_styled(self.text[self.char..=self.char].as_ref(), Style::reversed());
+            builder.push(self.text[self.char + 1..].as_ref());
+        };
     }
 
-    fn text_cursor_select(&self, from: usize, to: usize, buffer: &mut Vec<Span<'static>>) {
-        buffer.push(Span::raw(self.text[..from].to_owned()));
+    fn text_cursor_select(&self, from: usize, to: usize, mut builder: LineBuilder) {
+        builder.push(self.text[..from].as_ref());
         if from == self.char {
-            buffer.push(Span::styled(self.text[self.char..=self.char].to_owned(), CURSOR));
-            buffer.push(Span::styled(self.text[from + 1..to].to_owned(), SELECT));
-            buffer.push(Span::raw(self.text[to..].to_owned()));
+            builder.push_styled(self.text[self.char..=self.char].as_ref(), Style::reversed());
+            builder.push_styled(self.text[from + 1..to].as_ref(), Style::bg(color::rgb(72, 72, 72)));
+            builder.push(self.text[to..].as_ref());
         } else if self.char == self.text.len() {
-            buffer.push(Span::styled(self.text[from..to].to_owned(), SELECT));
-            buffer.push(Span::raw(self.text[to..].to_owned()));
-            buffer.push(Span::styled(" ", CURSOR));
+            builder.push_styled(self.text[from..to].as_ref(), Style::bg(color::rgb(72, 72, 72)));
+            builder.push(self.text[to..].as_ref());
+            builder.push_styled(" ", Style::reversed());
         } else {
-            buffer.push(Span::styled(self.text[from..to].to_owned(), SELECT));
-            buffer.push(Span::styled(self.text[to..=to].to_owned(), CURSOR));
-            buffer.push(Span::raw(self.text[to + 1..].to_owned()));
+            builder.push_styled(self.text[from..to].as_ref(), Style::bg(color::rgb(72, 72, 72)));
+            builder.push_styled(self.text[to..=to].as_ref(), Style::reversed());
+            builder.push(self.text[to + 1..].as_ref());
         }
     }
 

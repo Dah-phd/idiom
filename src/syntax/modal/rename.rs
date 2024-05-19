@@ -1,7 +1,10 @@
 use super::ModalMessage;
-use crate::{global_state::GlobalState, utils::BORDERED_BLOCK, widgests::TextField, workspace::CursorPosition};
+use crate::{
+    global_state::GlobalState,
+    render::{layout::Rect, TextField},
+    workspace::CursorPosition,
+};
 use crossterm::event::{KeyCode, KeyEvent};
-use ratatui::{prelude::Rect, Frame};
 
 pub struct RenameVariable {
     new_name: TextField<()>,
@@ -11,12 +14,18 @@ pub struct RenameVariable {
 
 impl RenameVariable {
     pub fn new(cursor: CursorPosition, title: &str) -> Self {
-        Self { new_name: TextField::basic(title.to_owned()), cursor, title: format!("Rename: {} ", title) }
+        Self { new_name: TextField::basic(title.to_owned()), cursor, title: format!(" Rename: {} ", title) }
     }
 
-    pub fn render_at(&mut self, frame: &mut Frame, area: Rect) {
-        let block = BORDERED_BLOCK.title(self.title.as_str());
-        frame.render_widget(self.new_name.widget().block(block), area);
+    #[inline]
+    pub fn len(&self) -> usize {
+        2
+    }
+
+    #[inline]
+    pub fn render(&mut self, area: &Rect, gs: &mut GlobalState) {
+        area.get_line(0).unwrap().render(&self.title, &mut gs.writer);
+        self.new_name.widget(area.get_line(1).unwrap(), &mut gs.writer);
     }
 
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> ModalMessage {

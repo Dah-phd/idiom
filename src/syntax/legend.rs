@@ -1,8 +1,9 @@
+use super::Lang;
+use crate::render::backend::{color, Color};
 #[cfg(build = "debug")]
 use crate::utils::debug_to_file;
 use crate::{configs::FileType, syntax::Theme};
 use lsp_types::SemanticTokensServerCapabilities;
-use ratatui::style::Color;
 
 #[derive(Clone, Copy, Debug)]
 pub enum ColorResult {
@@ -12,7 +13,7 @@ pub enum ColorResult {
 
 impl Default for ColorResult {
     fn default() -> Self {
-        Self::Final(Color::Reset)
+        Self::Final(color::reset())
     }
 }
 
@@ -22,11 +23,17 @@ pub struct Legend {
 }
 
 impl Legend {
-    pub fn get_color(&self, token_type: usize, theme: &Theme) -> ColorResult {
-        if let Some(color) = self.legend.get(token_type) {
-            return *color;
+    pub fn parse_to_color(&self, token_type: usize, theme: &Theme, lang: &Lang, word: &str) -> Color {
+        match self.legend.get(token_type) {
+            Some(ColorResult::KeyWord) => {
+                if lang.is_flow(word) {
+                    return theme.flow_control;
+                }
+                theme.key_words
+            }
+            Some(ColorResult::Final(c)) => *c,
+            None => theme.default,
         }
-        ColorResult::Final(theme.default)
     }
 
     pub fn map_styles(&mut self, file_type: &FileType, theme: &Theme, tc: &SemanticTokensServerCapabilities) {
@@ -55,7 +62,7 @@ impl Legend {
                             "derive" => self.legend.push(ColorResult::Final(theme.functions)),
                             "dot" => self.legend.push(ColorResult::default()),
                             "escapeSequence" => self.legend.push(ColorResult::Final(theme.string_escape)),
-                            "invalidEscapeSequence" => self.legend.push(ColorResult::Final(Color::Red)),
+                            "invalidEscapeSequence" => self.legend.push(ColorResult::Final(color::red())),
                             "lifetime" => self.legend.push(ColorResult::Final(theme.key_words)),
                             "macroBang" => self.legend.push(ColorResult::Final(theme.key_words)),
                             "selfKeyword" => self.legend.push(ColorResult::Final(theme.key_words)),
@@ -112,7 +119,7 @@ impl Legend {
             "comment" => self.legend.push(ColorResult::Final(theme.comment)),
             "string" => self.legend.push(ColorResult::Final(theme.string)),
             "number" => self.legend.push(ColorResult::Final(theme.numeric)),
-            "regexp" => self.legend.push(ColorResult::Final(Color::LightRed)),
+            "regexp" => self.legend.push(ColorResult::Final(color::red())),
             "operator" => self.legend.push(ColorResult::default()),
             "decorator" => self.legend.push(ColorResult::Final(theme.functions)),
             _ => return false,

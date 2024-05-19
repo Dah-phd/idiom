@@ -1,4 +1,5 @@
 mod client;
+mod error;
 mod lsp_stream;
 mod messages;
 mod notification;
@@ -6,16 +7,17 @@ mod request;
 mod servers;
 use crate::utils::{into_guard, split_arc_mutex, split_arc_mutex_async};
 pub use client::LSPClient;
+pub use error::{LSPError, LSPResult};
 use lsp_stream::JsonRCP;
-pub use messages::{Diagnostic, GeneralNotification, LSPMessage, Request, Response};
+pub use messages::{Diagnostic, GeneralNotification, LSPMessage, LSPResponse, LSPResponseType, Request, Response};
 pub use notification::LSPNotification;
 pub use request::LSPRequest;
+use url::Url;
 
-use anyhow::{anyhow, Error, Result};
 use lsp_types::{
     notification::{Exit, Initialized},
     request::{Initialize, Shutdown},
-    InitializeResult, InitializedParams, Url,
+    InitializeResult, InitializedParams,
 };
 use serde_json::from_value;
 use std::{
@@ -36,19 +38,20 @@ pub struct LSP {
     lsp_cmd: String,
     inner: Child,
     client: LSPClient,
-    lsp_json_handler: JoinHandle<Result<()>>,
-    lsp_send_handler: JoinHandle<Result<()>>,
+    lsp_json_handler: JoinHandle<LSPResult<()>>,
+    lsp_send_handler: JoinHandle<LSPResult<()>>,
     attempts: usize,
 }
 
 impl LSP {
-    pub async fn new(lsp_cmd: String) -> Result<Self> {
+    pub async fn new(lsp_cmd: String) -> LSPResult<Self> {
         let mut server = servers::server_cmd(&lsp_cmd)?;
         let mut inner = server.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::piped()).spawn()?;
 
         // splitting subprocess
         let mut json_rpc = JsonRCP::new(&mut inner)?;
-        let mut stdin = inner.stdin.take().ok_or(anyhow!("LSP stdin"))?;
+        let mut stdin =
+            inner.stdin.take().ok_or(LSPError::InternalError("Failed to take stdin of JsonRCP (LSP)".to_owned()))?;
 
         // setting up storage
         let (responses, responses_handler) = split_arc_mutex(HashMap::new());
@@ -59,7 +62,11 @@ impl LSP {
         // sending init requests
         stdin.write_all(LSPRequest::<Initialize>::init_request()?.stringify()?.as_bytes()).await?;
         stdin.flush().await?;
-        let capabilities = from_value::<InitializeResult>(json_rpc.next::<LSPMessage>().await?.unwrap()?)?.capabilities;
+        let mut init_response = json_rpc.next::<LSPMessage>().await?;
+        while !matches!(init_response, LSPMessage::Response(..)) {
+            init_response = json_rpc.next().await?;
+        }
+        let capabilities = from_value::<InitializeResult>(init_response.unwrap()?)?.capabilities;
 
         // starting response handler
         let lsp_json_handler = tokio::task::spawn(async move {
@@ -120,10 +127,10 @@ impl LSP {
         Ok(lsp)
     }
 
-    pub async fn check_status(&mut self) -> Result<Option<Error>> {
+    pub async fn check_status(&mut self) -> LSPResult<Option<LSPError>> {
         if self.lsp_json_handler.is_finished() || self.lsp_send_handler.is_finished() {
             if self.attempts == 0 {
-                return Err(anyhow!("Unable to recover!"));
+                return Err(LSPError::internal("Json RCP unable to recover after 5 attempts!"));
             }
             match Self::new(self.lsp_cmd.to_owned()).await {
                 Ok(lsp) => {
@@ -132,20 +139,21 @@ impl LSP {
                     let mut broken = std::mem::replace(self, lsp);
                     let _ = broken.dash_nine().await; // ensure old lsp is dead!
                     return Ok(Some(match broken.lsp_json_handler.await {
-                        Ok(_) => anyhow!("LSP handler crashed!"),
-                        Err(join_err) => anyhow!("Failed to collect crash report! Join err: {join_err}"),
+                        Ok(Err(err)) => err,
+                        Ok(Ok(..)) => LSPError::internal("Json RCP handler returned unexpectedly!"),
+                        Err(join_err) => LSPError::internal(format!("Json RCP handler join failed: {join_err}")),
                     }));
                 }
                 Err(err) => {
                     self.attempts -= 1;
-                    return Err(anyhow!("LSP creashed! Failed to rebuild LSP! {err}"));
+                    return Err(err);
                 }
             };
         }
         Ok(None)
     }
 
-    async fn initialized(&mut self) -> Result<()> {
+    async fn initialized(&mut self) -> LSPResult<()> {
         let notification: LSPNotification<Initialized> = LSPNotification::with(InitializedParams {});
         self.client.notify(notification)?;
         Ok(())
@@ -159,7 +167,7 @@ impl LSP {
         &self.client
     }
 
-    pub async fn graceful_exit(&mut self) -> Result<()> {
+    pub async fn graceful_exit(&mut self) -> LSPResult<()> {
         let shoutdown_request: LSPRequest<Shutdown> = LSPRequest::with(0, ());
         let _ = self.client.request(shoutdown_request);
         let notification: LSPNotification<Exit> = LSPNotification::with(());
@@ -168,7 +176,7 @@ impl LSP {
         Ok(())
     }
 
-    async fn dash_nine(&mut self) -> Result<()> {
+    async fn dash_nine(&mut self) -> LSPResult<()> {
         self.lsp_json_handler.abort();
         self.lsp_send_handler.abort();
         self.inner.kill().await?;
@@ -176,6 +184,7 @@ impl LSP {
     }
 }
 
-fn as_url(path: &Path) -> Result<Url> {
-    Ok(Url::parse(&format!("file:///{}", path.display()))?)
+#[inline(always)]
+fn as_url(path: &Path) -> Result<Url, url::ParseError> {
+    Url::parse(&format!("file:///{}", path.display()))
 }

@@ -3,20 +3,18 @@ use super::{
     PopupInterface,
 };
 use crate::{
-    global_state::{Clipboard, PopupMessage, WorkspaceEvent},
-    widgests::{right_corner_rect_static, TextField},
+    global_state::{Clipboard, GlobalState, PopupMessage, WorkspaceEvent},
+    render::{
+        backend::{BackendProtocol, Style},
+        count_as_string, TextField,
+    },
     workspace::{CursorPosition, Workspace},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::{
-    widgets::{Block, Borders, Clear, Paragraph},
-    Frame,
-};
 
 #[derive(Default)]
 pub struct GoToLinePopup {
     line_idx: String,
-    auto_jump: bool,
 }
 
 impl GoToLinePopup {
@@ -28,48 +26,33 @@ impl GoToLinePopup {
 impl PopupInterface for GoToLinePopup {
     fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard) -> PopupMessage {
         match key.code {
-            KeyCode::Enter => {
-                if self.auto_jump {
-                    return PopupMessage::Clear;
-                }
-                if let Ok(idx) = self.line_idx.parse::<usize>() {
-                    return WorkspaceEvent::GoToLine(idx.saturating_sub(1)).into();
-                }
-                PopupMessage::Clear
-            }
             KeyCode::Char(ch) => {
                 if ch.is_numeric() {
                     self.line_idx.push(ch);
-                    if self.auto_jump {
-                        return WorkspaceEvent::PopupAccess.into();
-                    };
-                };
-                PopupMessage::None
-            }
-            KeyCode::Backspace => {
-                if self.line_idx.pop().is_some() && self.auto_jump {
                     return WorkspaceEvent::PopupAccess.into();
                 };
                 PopupMessage::None
             }
-            KeyCode::Tab => {
-                self.auto_jump = !self.auto_jump;
+            KeyCode::Backspace => {
+                if self.line_idx.pop().is_some() {
+                    return WorkspaceEvent::PopupAccess.into();
+                };
                 PopupMessage::None
             }
             _ => PopupMessage::Clear,
         }
     }
 
-    fn render(&mut self, frame: &mut Frame) {
-        let area = right_corner_rect_static(50, 3, frame.size());
-        let block = if self.auto_jump {
-            Block::default().title("Autojump (Tab to switch back)")
-        } else {
-            Block::default().title("Go to line (Tab to switch mode)")
-        }
-        .borders(Borders::ALL);
-        frame.render_widget(Clear, area);
-        frame.render_widget(Paragraph::new(format!(" >> {}|", self.line_idx)).block(block), area);
+    fn render(&mut self, gs: &mut GlobalState) {
+        if let Some(line) = gs.editor_area.right_top_corner(1, 50).into_iter().next() {
+            gs.writer.set_style(gs.theme.accent_style);
+            let mut builder = line.unsafe_builder(&mut gs.writer);
+            builder.push(" Go to >> ");
+            builder.push(&self.line_idx);
+            builder.push_styled("|", Style::slowblink());
+            drop(builder);
+            gs.writer.reset_style();
+        };
     }
 
     fn update_workspace(&mut self, workspace: &mut Workspace) {
@@ -110,11 +93,16 @@ impl PopupInterface for FindPopup {
         }
     }
 
-    fn render(&mut self, frame: &mut Frame) {
-        let area = right_corner_rect_static(50, 3, frame.size());
-        let block = Block::default().title("Find").borders(Borders::ALL);
-        frame.render_widget(Clear, area);
-        frame.render_widget(self.pattern.widget_with_count(self.options.len()).block(block), area);
+    fn render(&mut self, gs: &mut GlobalState) {
+        if let Some(line) = gs.editor_area.right_top_corner(1, 50).into_iter().next() {
+            gs.writer.set_style(gs.theme.accent_style);
+            let mut builder = line.unsafe_builder(&mut gs.writer);
+            builder.push(" Found(");
+            builder.push(&count_as_string(self.options.len()));
+            builder.push(") >> ");
+            self.pattern.insert_formatted_text(builder);
+            gs.writer.reset_style();
+        }
     }
 
     fn update_workspace(&mut self, workspace: &mut Workspace) {

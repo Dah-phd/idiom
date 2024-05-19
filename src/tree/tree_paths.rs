@@ -1,22 +1,21 @@
 use ignore::gitignore::Gitignore;
 use ignore::Match;
-use ratatui::{
-    style::{Color, Style},
-    text::Span,
-};
 use tokio::task::JoinSet;
 
-const GIT: &str = "./.git";
-const ERR: Style = Style::new().fg(Color::Red);
-const WAR: Style = Style::new().fg(Color::LightYellow);
-
-use crate::utils::{get_nested_paths, to_relative_path, trim_start};
+use crate::{
+    render::backend::{color, Color, Style},
+    utils::{get_nested_paths, to_relative_path},
+};
 use std::{
     cmp::Ordering,
     collections::HashSet,
     path::{Path, PathBuf},
     sync::Arc,
 };
+
+const GIT: &str = "./.git";
+const ERR: Color = color::red();
+const WAR: Color = color::dark_yellow();
 
 #[derive(Debug, Clone)]
 pub enum TreePath {
@@ -173,25 +172,25 @@ impl TreePath {
         }
     }
 
-    pub fn display(&self) -> Span<'static> {
+    pub fn direct_display<'a>(&'a self) -> (&'a str, Style) {
         match self {
             Self::Folder { display, errors, warnings, .. } => {
                 if errors != &0 {
-                    return Span::styled(display.to_owned(), ERR);
+                    return (display, Style::fg(ERR));
                 }
                 if warnings != &0 {
-                    return Span::styled(display.to_owned(), WAR);
+                    return (display, Style::fg(WAR));
                 }
-                Span::raw(display.to_owned())
+                (display, Style::default())
             }
             Self::File { display, errors, warnings, .. } => {
                 if errors != &0 {
-                    return Span::styled(display.to_owned(), ERR);
+                    return (display, Style::fg(ERR));
                 }
                 if warnings != &0 {
-                    return Span::styled(display.to_owned(), WAR);
+                    return (display, Style::fg(WAR));
                 }
-                Span::raw(display.to_owned())
+                (display, Style::default())
             }
         }
     }
@@ -278,7 +277,7 @@ impl TreePath {
                     if let Ok(content) = maybe_content {
                         for (idx, line) in content.lines().enumerate() {
                             if line.contains(&*pattern) {
-                                buffer.push((path.clone(), trim_start(line.to_owned()), idx))
+                                buffer.push((path.clone(), line.trim_start().to_owned(), idx))
                             }
                         }
                     }

@@ -1,7 +1,6 @@
 use super::as_url;
-use crate::configs::FileType;
+use crate::{configs::FileType, lsp::LSPResult};
 
-use anyhow::Result;
 use lsp_types::{
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Notification,
@@ -33,7 +32,7 @@ where
         Self { jsonrpc: String::from("2.0"), method: <T as Notification>::METHOD, params }
     }
 
-    pub fn stringify(&self) -> Result<String> {
+    pub fn stringify(&self) -> LSPResult<String> {
         let request_msg = to_string(self)?;
         let ser_req = format!("Content-Length: {}\r\n\r\n{}", request_msg.len(), request_msg);
         Ok(ser_req)
@@ -43,7 +42,7 @@ where
         path: &Path,
         version: i32,
         content_changes: Vec<TextDocumentContentChangeEvent>,
-    ) -> Result<LSPNotification<DidChangeTextDocument>> {
+    ) -> LSPResult<LSPNotification<DidChangeTextDocument>> {
         Ok(LSPNotification::with(DidChangeTextDocumentParams {
             text_document: VersionedTextDocumentIdentifier::new(as_url(path)?, version),
             content_changes,
@@ -52,9 +51,9 @@ where
 
     pub fn file_did_open(
         path: &Path,
-        file_type: &FileType,
+        file_type: FileType,
         content: String,
-    ) -> Result<LSPNotification<DidOpenTextDocument>> {
+    ) -> LSPResult<LSPNotification<DidOpenTextDocument>> {
         Ok(LSPNotification::with(DidOpenTextDocumentParams {
             text_document: TextDocumentItem {
                 uri: as_url(path)?,
@@ -65,7 +64,7 @@ where
         }))
     }
 
-    pub fn file_did_save(path: &Path) -> Result<LSPNotification<DidSaveTextDocument>> {
+    pub fn file_did_save(path: &Path) -> LSPResult<LSPNotification<DidSaveTextDocument>> {
         let content = std::fs::read_to_string(path)?;
         Ok(LSPNotification::with(DidSaveTextDocumentParams {
             text_document: TextDocumentIdentifier { uri: as_url(path)? },
@@ -73,7 +72,7 @@ where
         }))
     }
 
-    pub fn file_did_close(path: &Path) -> Result<LSPNotification<DidCloseTextDocument>> {
+    pub fn file_did_close(path: &Path) -> LSPResult<LSPNotification<DidCloseTextDocument>> {
         Ok(LSPNotification::with(DidCloseTextDocumentParams {
             text_document: TextDocumentIdentifier { uri: as_url(path)? },
         }))

@@ -10,7 +10,7 @@ pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMa
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Error;
 use std::collections::HashMap;
-pub use theme_ui::{pull_color, UITheme};
+pub use theme_ui::UITheme;
 pub use types::FileType;
 
 pub const CONFIG_FOLDER: &str = "idiom";
@@ -81,6 +81,8 @@ impl KeyMap {
     }
 }
 
+/// ensures creation of config files on first load
+/// if value is removed from a theme config the default value will be put in place
 pub fn load_or_create_config<T: Default + DeserializeOwned + Serialize>(path: &str) -> Result<T, Error> {
     if let Some(config_json) = read_config_file(path) {
         Ok(serde_json::from_slice::<T>(&config_json)?)

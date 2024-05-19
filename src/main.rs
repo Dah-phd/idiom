@@ -1,55 +1,20 @@
 mod app;
 mod configs;
-mod footer;
+mod error;
 mod global_state;
 mod lsp;
 mod popups;
+mod render;
 mod runner;
 mod syntax;
 mod tree;
 mod utils;
-mod widgests;
 mod workspace;
 
 use app::app;
-
-use anyhow::Result;
-use ratatui::{backend::CrosstermBackend, Terminal};
-use std::{
-    io::Stdout,
-    path::{PathBuf, MAIN_SEPARATOR},
-};
-
-fn init_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
-    let mut terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
-    crossterm::terminal::enable_raw_mode()?;
-    crossterm::execute!(
-        terminal.backend_mut(),
-        crossterm::terminal::EnterAlternateScreen,
-        crossterm::style::ResetColor,
-        crossterm::event::EnableMouseCapture,
-    )?;
-
-    // loading panic
-    let original_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |panic| {
-        graceful_exit().unwrap();
-        original_hook(panic);
-    }));
-
-    Ok(terminal)
-}
-
-fn graceful_exit() -> Result<()> {
-    crossterm::execute!(
-        std::io::stdout(),
-        crossterm::terminal::LeaveAlternateScreen,
-        crossterm::style::ResetColor,
-        crossterm::event::DisableMouseCapture,
-    )?;
-    crossterm::terminal::disable_raw_mode()?;
-    Ok(())
-}
+use error::IdiomResult;
+use render::backend::{Backend, BackendProtocol};
+use std::path::{PathBuf, MAIN_SEPARATOR};
 
 fn cli() -> Option<PathBuf> {
     let argv: Vec<String> = std::env::args().collect();
@@ -67,8 +32,8 @@ fn cli() -> Option<PathBuf> {
 }
 
 #[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<()> {
-    let terminal = init_terminal()?;
-    app(terminal, cli()).await?;
-    graceful_exit()
+async fn main() -> IdiomResult<()> {
+    app(cli(), Backend::init()).await?;
+    Backend::exit()?;
+    Ok(())
 }

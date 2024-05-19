@@ -1,15 +1,6 @@
-use std::rc::Rc;
-
-use crate::{footer::Footer, runner::EditorTerminal, tree::Tree, workspace::Workspace};
+use crate::{global_state::GlobalState, runner::EditorTerminal, tree::Tree, workspace::Workspace, BackendProtocol};
 use bitflags::bitflags;
-use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
-    Frame,
-};
-
-const RECT_CONSTRAINT: [Constraint; 2] = [Constraint::Length(1), Constraint::Percentage(100)];
-
-use super::GlobalState;
+use std::io::{Result, Write};
 
 bitflags! {
     /// Workspace and Footer are always drawn
@@ -27,132 +18,96 @@ impl Default for Components {
     }
 }
 
-// DRAW callbacks
+// transition
+pub fn full_rebuild(
+    gs: &mut GlobalState,
+    workspace: &mut Workspace,
+    tree: &mut Tree,
+    term: &mut EditorTerminal,
+) -> Result<()> {
+    gs.screen_rect.clear(&mut gs.writer);
+    gs.recalc_draw_size();
+    if let Some(line) = gs.footer_area.get_line(0) {
+        gs.mode.render(line, gs.theme.accent_style, &mut gs.writer);
+    };
+    gs.messages.render(gs.theme.accent_style, &mut gs.writer);
+    workspace.render(gs);
+    if let Some(editor) = workspace.get_active() {
+        editor.render(gs);
+    }
+    gs.draw_callback = draw;
+    if gs.components.contains(Components::TREE) || !gs.is_insert() {
+        gs.draw_callback = draw_with_tree;
+        tree.render(gs);
+    }
+    if gs.components.contains(Components::TERM) {
+        gs.draw_callback = draw_term;
+        term.render(gs);
+    }
+    if gs.components.contains(Components::POPUP) {
+        gs.draw_callback = draw_popup;
+        gs.render_popup();
+    }
+    gs.writer.flush()
+}
+
+#[inline]
 pub fn draw(
     gs: &mut GlobalState,
-    frame: &mut Frame,
     workspace: &mut Workspace,
-    _ft: &mut Tree,
-    footer: &mut Footer,
-    _t: &mut EditorTerminal,
-) {
-    footer.render(frame, gs, workspace.get_stats());
-    workspace.render(frame, gs);
+    _tree: &mut Tree,
+    _term: &mut EditorTerminal,
+) -> Result<()> {
+    gs.writer.hide_cursor();
+    workspace.render(gs);
+    if let Some(editor) = workspace.get_active() {
+        editor.fast_render(gs);
+    } else {
+        gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
+    };
+    gs.writer.flush()
 }
 
+#[inline]
 pub fn draw_with_tree(
     gs: &mut GlobalState,
-    frame: &mut Frame,
     workspace: &mut Workspace,
     tree: &mut Tree,
-    footer: &mut Footer,
-    _t: &mut EditorTerminal,
-) {
-    tree.render(frame, gs);
-    footer.render(frame, gs, workspace.get_stats());
-    workspace.render(frame, gs);
+    _term: &mut EditorTerminal,
+) -> Result<()> {
+    gs.writer.hide_cursor();
+    tree.fast_render(gs);
+    workspace.render(gs);
+    if let Some(editor) = workspace.get_active() {
+        editor.fast_render(gs);
+    } else {
+        gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
+    };
+    gs.writer.flush()
 }
 
-pub fn draw_with_popup(
+#[inline]
+pub fn draw_popup(
     gs: &mut GlobalState,
-    frame: &mut Frame,
-    workspace: &mut Workspace,
-    _ft: &mut Tree,
-    footer: &mut Footer,
-    _t: &mut EditorTerminal,
-) {
-    footer.render(frame, gs, workspace.get_stats());
-    workspace.render(frame, gs);
-    gs.render_popup_if_exists(frame);
+    _workspace: &mut Workspace,
+    _tree: &mut Tree,
+    _term: &mut EditorTerminal,
+) -> Result<()> {
+    gs.writer.hide_cursor();
+    gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
+    gs.render_popup();
+    gs.writer.flush()
 }
 
-pub fn draw_with_term(
+#[inline]
+pub fn draw_term(
     gs: &mut GlobalState,
-    frame: &mut Frame,
-    workspace: &mut Workspace,
-    _ft: &mut Tree,
-    footer: &mut Footer,
+    _workspace: &mut Workspace,
+    _tree: &mut Tree,
     term: &mut EditorTerminal,
-) {
-    footer.render(frame, gs, workspace.get_stats());
-    workspace.render(frame, gs);
-    term.render(frame, gs.editor_area);
-}
-
-pub fn draw_with_term_and_popup(
-    gs: &mut GlobalState,
-    frame: &mut Frame,
-    workspace: &mut Workspace,
-    _ft: &mut Tree,
-    footer: &mut Footer,
-    term: &mut EditorTerminal,
-) {
-    footer.render(frame, gs, workspace.get_stats());
-    workspace.render(frame, gs);
-    term.render(frame, gs.editor_area);
-    gs.render_popup_if_exists(frame);
-}
-
-pub fn draw_with_tree_and_popup(
-    gs: &mut GlobalState,
-    frame: &mut Frame,
-    workspace: &mut Workspace,
-    tree: &mut Tree,
-    footer: &mut Footer,
-    _t: &mut EditorTerminal,
-) {
-    tree.render(frame, gs);
-    footer.render(frame, gs, workspace.get_stats());
-    workspace.render(frame, gs);
-    gs.render_popup_if_exists(frame);
-}
-
-pub fn draw_with_tree_and_term(
-    gs: &mut GlobalState,
-    frame: &mut Frame,
-    workspace: &mut Workspace,
-    tree: &mut Tree,
-    footer: &mut Footer,
-    term: &mut EditorTerminal,
-) {
-    tree.render(frame, gs);
-    footer.render(frame, gs, workspace.get_stats());
-    workspace.render(frame, gs);
-    term.render(frame, gs.editor_area);
-}
-
-pub fn draw_full(
-    gs: &mut GlobalState,
-    frame: &mut Frame,
-    workspace: &mut Workspace,
-    tree: &mut Tree,
-    footer: &mut Footer,
-    term: &mut EditorTerminal,
-) {
-    tree.render(frame, gs);
-    footer.render(frame, gs, workspace.get_stats());
-    workspace.render(frame, gs);
-    term.render(frame, gs.editor_area);
-    gs.render_popup_if_exists(frame);
-}
-
-// LAYOUTS
-
-pub fn layour_workspace_footer(screen: Rect) -> Rc<[Rect]> {
-    Layout::new(
-        Direction::Vertical,
-        [
-            Constraint::Length(screen.height.saturating_sub(1)),
-            Constraint::Length(1),
-        ],
-    )
-    .split(screen)
-}
-
-pub fn layout_tree(screen: Rect, size: u16) -> Rc<[Rect]> {
-    Layout::new(Direction::Horizontal, [Constraint::Percentage(size), Constraint::Min(2)]).split(screen)
-}
-
-pub fn layot_tabs_editor(screen: Rect) -> Rc<[Rect]> {
-    Layout::new(Direction::Vertical, RECT_CONSTRAINT).split(screen)
+) -> Result<()> {
+    gs.writer.hide_cursor();
+    gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
+    term.render(gs);
+    gs.writer.flush()
 }

@@ -1,12 +1,18 @@
-use anyhow::{anyhow, Error, Result};
 use lsp_types::{
     notification::{Notification, PublishDiagnostics},
-    DiagnosticSeverity, PublishDiagnosticsParams,
+    request::GotoDeclarationResponse,
+    CompletionItem, CompletionResponse, DiagnosticSeverity, GotoDefinitionResponse, Hover, Location,
+    PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, WorkspaceEdit,
 };
 use serde_json::{from_value, Value};
 use std::path::PathBuf;
 
-use crate::syntax::DiagnosticLine;
+use crate::{
+    lsp::{LSPError, LSPResult},
+    syntax::DiagnosticLine,
+};
+
+use super::lsp_stream::StdErrMessage;
 
 pub enum LSPMessage {
     Request(Request),
@@ -14,11 +20,11 @@ pub enum LSPMessage {
     Notification(GeneralNotification),
     Diagnostic(PathBuf, Diagnostic),
     Unknown(Value),
-    Error(Error),
+    Error(String),
 }
 
 impl LSPMessage {
-    pub fn unwrap(self) -> Result<Value> {
+    pub fn unwrap(self) -> LSPResult<Value> {
         // gets value within if data is know at check time
         // errors on response error
         match self {
@@ -28,13 +34,13 @@ impl LSPMessage {
                 if resp.result.is_some() {
                     resp.result
                 } else {
-                    return Err(anyhow!("Rsponse err: {:?}", resp.error));
+                    return Err(LSPError::ResponseError(format!("{:?}", resp.error)));
                 }
             }
             Self::Request(request) => request.params,
             _ => None,
         }
-        .ok_or(anyhow!("Unexpected type!"))
+        .ok_or(LSPError::internal("Called unwrap on LSPMessage type not supporting the operand!"))
     }
 
     pub fn parse(mut obj: Value) -> LSPMessage {
@@ -83,9 +89,9 @@ impl From<Value> for LSPMessage {
     }
 }
 
-impl From<anyhow::Error> for LSPMessage {
-    fn from(err: anyhow::Error) -> Self {
-        Self::Error(err)
+impl From<StdErrMessage> for LSPMessage {
+    fn from(err: StdErrMessage) -> Self {
+        Self::Error(err.0)
     }
 }
 
@@ -137,4 +143,68 @@ impl Diagnostic {
         }
         Self { errors, warnings, lines: Some(diagnostic_lines) }
     }
+}
+
+#[derive(Debug)]
+pub enum LSPResponseType {
+    Completion(i64, String, usize),
+    Hover(i64),
+    SignatureHelp(i64),
+    References(i64),
+    Renames(i64),
+    Tokens(i64),
+    TokensPartial {
+        id: i64,
+        max_lines: usize,
+    },
+    #[allow(dead_code)]
+    Definition(i64),
+    Declaration(i64),
+}
+
+impl LSPResponseType {
+    pub fn id(&self) -> &i64 {
+        match self {
+            Self::Completion(id, ..) => id,
+            Self::Hover(id) => id,
+            Self::SignatureHelp(id) => id,
+            Self::References(id) => id,
+            Self::Renames(id) => id,
+            Self::Tokens(id) => id,
+            Self::TokensPartial { id, .. } => id,
+            Self::Definition(id) => id,
+            Self::Declaration(id) => id,
+        }
+    }
+
+    pub fn parse(&self, value: Option<Value>) -> Option<LSPResponse> {
+        Some(match self {
+            Self::Completion(.., line, idx) => match from_value::<CompletionResponse>(value?).ok()? {
+                CompletionResponse::Array(arr) => LSPResponse::Completion(arr, line.to_owned(), *idx),
+                CompletionResponse::List(ls) => LSPResponse::Completion(ls.items, line.to_owned(), *idx),
+            },
+            Self::Hover(..) => LSPResponse::Hover(from_value(value?).ok()?),
+            Self::SignatureHelp(..) => LSPResponse::SignatureHelp(from_value(value?).ok()?),
+            Self::References(..) => LSPResponse::References(from_value(value?).ok()?),
+            Self::Renames(..) => LSPResponse::Renames(from_value(value?).ok()?),
+            Self::Tokens(..) => LSPResponse::Tokens(from_value(value?).ok()?),
+            Self::TokensPartial { max_lines, .. } => {
+                LSPResponse::TokensPartial { result: from_value(value?).ok()?, max_lines: *max_lines }
+            }
+            Self::Definition(..) => LSPResponse::Definition(from_value(value?).ok()?),
+            Self::Declaration(..) => LSPResponse::Declaration(from_value(value?).ok()?),
+        })
+    }
+}
+
+pub enum LSPResponse {
+    Completion(Vec<CompletionItem>, String, usize),
+    Hover(Hover),
+    SignatureHelp(SignatureHelp),
+    References(Option<Vec<Location>>),
+    Renames(WorkspaceEdit),
+    Tokens(SemanticTokensResult),
+    TokensPartial { result: SemanticTokensRangeResult, max_lines: usize },
+    Definition(GotoDefinitionResponse),
+    Declaration(GotoDeclarationResponse),
 }

@@ -1,13 +1,18 @@
 use crate::{
     configs::IndentConfigs,
+    syntax::Lexer,
     utils::Offset,
     workspace::{
         cursor::{Cursor, CursorPosition},
+        line::EditorLine,
         utils::{clip_content, copy_content, insert_clip, remove_content, token_range_at},
     },
 };
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit};
-use std::fmt::Debug;
+use std::{
+    fmt::Debug,
+    ops::{Add, AddAssign},
+};
 
 #[derive(Debug)]
 pub struct Edit {
@@ -19,19 +24,19 @@ pub struct Edit {
 }
 
 impl Edit {
-    pub fn swap_down(up_line: usize, cfg: &IndentConfigs, content: &mut [String]) -> (Offset, Offset, Self) {
+    pub fn swap_down(up_line: usize, cfg: &IndentConfigs, content: &mut [impl EditorLine]) -> (Offset, Offset, Self) {
         let to = up_line + 1;
-        let mut reverse_edit_text = content[up_line].to_owned();
+        let mut reverse_edit_text = content[up_line].to_string();
         reverse_edit_text.push('\n');
-        reverse_edit_text.push_str(&content[up_line + 1]);
+        content[up_line + 1].push_content_to_buffer(&mut reverse_edit_text);
         reverse_edit_text.push('\n');
         let text_edit_range: (CursorPosition, CursorPosition) = ((up_line, 0).into(), (up_line + 2, 0).into());
         content.swap(up_line, to);
         let offset = cfg.indent_line(up_line, content);
         let offset2 = cfg.indent_line(to, content);
-        let mut new_text = content[text_edit_range.0.line].to_owned();
+        let mut new_text = content[text_edit_range.0.line].to_string();
         new_text.push('\n');
-        new_text.push_str(&content[text_edit_range.0.line + 1]);
+        content[text_edit_range.0.line + 1].push_content_to_buffer(&mut new_text);
         new_text.push('\n');
         let range = Range::new(Position::new(up_line as u32, 0), Position::new((up_line + 2) as u32, 0));
         (
@@ -47,11 +52,11 @@ impl Edit {
         )
     }
 
-    pub fn merge_next_line(line: usize, content: &mut Vec<String>) -> Self {
+    pub fn merge_next_line(line: usize, content: &mut Vec<impl EditorLine>) -> Self {
         let removed_line = content.remove(line + 1);
         let merged_to = &mut content[line];
         let position_of_new_line = Position::new(line as u32, merged_to.len() as u32);
-        merged_to.push_str(removed_line.as_ref());
+        merged_to.push_line(removed_line);
         Self {
             meta: EditMetaData { start_line: line, from: 2, to: 1 },
             reverse_text_edit: TextEdit::new(
@@ -67,7 +72,7 @@ impl Edit {
         }
     }
 
-    pub fn unindent(line: usize, text: &mut String, indent: &str) -> Option<(Offset, Self)> {
+    pub fn unindent(line: usize, text: &mut impl EditorLine, indent: &str) -> Option<(Offset, Self)> {
         let mut idx = 0;
         while text[idx..].starts_with(indent) {
             idx += indent.len();
@@ -123,7 +128,7 @@ impl Edit {
         }
     }
 
-    pub fn remove_from_line(at_line: usize, from: usize, to: usize, line: &mut String) -> Self {
+    pub fn remove_from_line(at_line: usize, from: usize, to: usize, line: &mut impl EditorLine) -> Self {
         let start = Position::new(at_line as u32, from as u32);
         let old = line[from..to].to_owned();
         line.replace_range(from..to, "");
@@ -150,7 +155,7 @@ impl Edit {
         }
     }
 
-    pub fn insert_clip(from: CursorPosition, clip: String, content: &mut Vec<String>) -> Self {
+    pub fn insert_clip(from: CursorPosition, clip: String, content: &mut Vec<impl EditorLine>) -> Self {
         let end = insert_clip(clip.to_owned(), content, from);
         Self {
             meta: EditMetaData { start_line: from.line, from: 1, to: (end.line - from.line) + 1 },
@@ -161,20 +166,20 @@ impl Edit {
         }
     }
 
-    pub fn remove_line(line: usize, content: &mut Vec<String>) -> Self {
+    pub fn remove_line(line: usize, content: &mut Vec<impl EditorLine>) -> Self {
         let mut removed_line = content.remove(line);
         removed_line.push('\n');
         let start = Position::new(line as u32, 0);
         Self {
             meta: EditMetaData { start_line: line, from: 2, to: 1 },
-            reverse_text_edit: TextEdit::new(Range::new(start, start), removed_line),
+            reverse_text_edit: TextEdit::new(Range::new(start, start), removed_line.unwrap()),
             text_edit: TextEdit::new(Range::new(start, Position::new(line as u32 + 1, 0)), String::new()),
             select: None,
             new_select: None,
         }
     }
 
-    pub fn remove_select(from: CursorPosition, to: CursorPosition, content: &mut Vec<String>) -> Self {
+    pub fn remove_select(from: CursorPosition, to: CursorPosition, content: &mut Vec<impl EditorLine>) -> Self {
         Self {
             meta: EditMetaData { start_line: from.line, from: to.line - from.line + 1, to: 1 },
             reverse_text_edit: TextEdit::new(Range::new(from.into(), from.into()), clip_content(from, to, content)),
@@ -184,7 +189,12 @@ impl Edit {
         }
     }
 
-    pub fn replace_select(from: CursorPosition, to: CursorPosition, clip: String, content: &mut Vec<String>) -> Self {
+    pub fn replace_select(
+        from: CursorPosition,
+        to: CursorPosition,
+        clip: String,
+        content: &mut Vec<impl EditorLine>,
+    ) -> Self {
         let reverse_edit_text = clip_content(from, to, content);
         let end = if !clip.is_empty() { insert_clip(clip.clone(), content, from) } else { from };
         Self {
@@ -196,7 +206,7 @@ impl Edit {
         }
     }
 
-    pub fn replace_token(line: usize, char: usize, new_text: String, content: &mut [String]) -> Self {
+    pub fn replace_token(line: usize, char: usize, new_text: String, content: &mut [impl EditorLine]) -> Self {
         let code_line = &mut content[line];
         let range = token_range_at(code_line, char);
         let start = Position::new(line as u32, range.start as u32);
@@ -205,7 +215,7 @@ impl Edit {
         let replaced_text = code_line[range.clone()].to_owned();
         code_line.replace_range(range, &new_text);
         Self {
-            meta: EditMetaData { start_line: line, from: 1, to: 1 },
+            meta: EditMetaData::line_changed(line),
             text_edit: TextEdit::new(text_edit_range, new_text),
             reverse_text_edit: TextEdit::new(reverse_edit_range, replaced_text),
             select: None,
@@ -218,7 +228,7 @@ impl Edit {
         snippet: String,
         cursor_offset: Option<(usize, usize)>,
         cfg: &IndentConfigs,
-        content: &mut Vec<String>,
+        content: &mut Vec<impl EditorLine>,
     ) -> (CursorPosition, Self) {
         let code_line = &mut content[c.line];
         let range = token_range_at(code_line, c.char);
@@ -261,7 +271,7 @@ impl Edit {
     /// apply reverse edit (goes into undone)
     pub fn apply_rev(
         &self,
-        content: &mut Vec<String>,
+        content: &mut Vec<impl EditorLine>,
         events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
     ) -> (CursorPosition, Option<(CursorPosition, CursorPosition)>) {
         let from = self.reverse_text_edit.range.start.into();
@@ -273,7 +283,7 @@ impl Edit {
     /// apply edit (goes into done)
     pub fn apply(
         &self,
-        content: &mut Vec<String>,
+        content: &mut Vec<impl EditorLine>,
         events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
     ) -> (CursorPosition, Option<(CursorPosition, CursorPosition)>) {
         let from = self.text_edit.range.start.into();
@@ -299,27 +309,76 @@ impl Edit {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct EditMetaData {
     pub start_line: usize,
-    pub from: usize,
+    pub from: usize, // ignored after Add - is set to 0;
     pub to: usize,
 }
 
+impl Add for EditMetaData {
+    type Output = Self;
+
+    fn add(mut self, other: Self) -> Self::Output {
+        let self_end_line = self.start_line + self.to;
+        let other_end_line = other.start_line + other.to;
+        self.start_line = std::cmp::min(self.start_line, other.start_line);
+        if self_end_line > other_end_line {
+            self.to = self_end_line - self.start_line;
+            if other.from > other.to {
+                self.to -= other.from - other.to;
+            } else {
+                self.to += other.to - other.from;
+            }
+        } else {
+            // previous offset does not matter because we need the info for the last changed line
+            self.to = other_end_line - self.start_line;
+        };
+        self.from = 0;
+        self
+    }
+}
+
+impl AddAssign for EditMetaData {
+    fn add_assign(&mut self, other: Self) {
+        let self_end_line = self.start_line + self.to;
+        let other_end_line = other.start_line + other.to;
+        self.start_line = std::cmp::min(self.start_line, other.start_line);
+        if self_end_line > other_end_line {
+            self.to = self_end_line - self.start_line;
+            if other.from > other.to {
+                self.to -= other.from - other.to;
+            } else {
+                self.to += other.to - other.from;
+            }
+        } else {
+            // previous offset does not matter because we need the info for the last changed line
+            self.to = other_end_line - self.start_line;
+        };
+        self.from = 0;
+    }
+}
+
 impl EditMetaData {
-    pub fn line_changed(start_line: usize) -> Self {
+    pub const fn line_changed(start_line: usize) -> Self {
         Self { start_line, from: 1, to: 1 }
     }
 
-    pub fn build_range(&self, content: &[String]) -> Option<Range> {
-        let end_line = self.start_line + self.to - 1;
-        Some(Range::new(
-            Position::new(self.start_line as u32, 0),
-            Position::new(end_line as u32, content.get(end_line)?.len() as u32),
-        ))
+    pub fn update_tokens(&self, content: &mut Vec<impl EditorLine>, lexer: &Lexer) {
+        for line in content.iter_mut().skip(self.start_line).take(self.to) {
+            line.rebuild_tokens(lexer);
+        }
     }
 
-    fn rev(&self) -> Self {
+    pub fn build_range(&self, content: &[impl EditorLine]) -> Range {
+        let end_line = self.start_line + self.to - 1;
+        Range::new(
+            Position::new(self.start_line as u32, 0),
+            Position::new(end_line as u32, content[end_line].len() as u32),
+        )
+    }
+
+    const fn rev(&self) -> Self {
         EditMetaData { start_line: self.start_line, from: self.to, to: self.from }
     }
 }
@@ -340,7 +399,7 @@ pub struct NewLineBuilder {
 
 impl NewLineBuilder {
     /// initialize builder collecting select if exists
-    pub fn new(cursor: &mut Cursor, content: &mut Vec<String>) -> Self {
+    pub fn new(cursor: &mut Cursor, content: &mut Vec<impl EditorLine>) -> Self {
         match cursor.select_take() {
             Some((from, to)) => {
                 cursor.set_position(from);
@@ -360,7 +419,7 @@ impl NewLineBuilder {
         }
     }
 
-    pub fn finish(self, cursor: CursorPosition, content: &[String]) -> Edit {
+    pub fn finish(self, cursor: CursorPosition, content: &[impl EditorLine]) -> Edit {
         Edit {
             meta: EditMetaData {
                 start_line: self.text_edit_range.0.line,
@@ -381,9 +440,64 @@ impl NewLineBuilder {
     }
 
     // UTILS
-    pub fn and_clear_first_line(&mut self, line: &mut String) {
+    pub fn and_clear_first_line(&mut self, line: &mut impl EditorLine) {
         self.text_edit_range.0.char = 0;
-        self.reverse_edit_text.insert_str(0, line);
+        self.reverse_edit_text.insert_str(0, &line.to_string());
         line.clear();
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::workspace::actions::EditMetaData;
+
+    #[test]
+    fn add_meta_data() {
+        assert_eq!(
+            EditMetaData::line_changed(1) + EditMetaData::line_changed(1),
+            EditMetaData { start_line: 1, from: 0, to: 1 }
+        );
+        assert_eq!(
+            EditMetaData::line_changed(1) + EditMetaData { start_line: 1, from: 1, to: 3 },
+            EditMetaData { start_line: 1, from: 0, to: 3 }
+        );
+        assert_eq!(
+            EditMetaData { start_line: 1, from: 2, to: 1 } + EditMetaData { start_line: 1, from: 1, to: 3 },
+            EditMetaData { start_line: 1, from: 0, to: 3 }
+        );
+        assert_eq!(
+            EditMetaData { start_line: 1, from: 1, to: 2 } + EditMetaData { start_line: 1, from: 1, to: 3 },
+            EditMetaData { start_line: 1, from: 0, to: 3 }
+        );
+        assert_eq!(
+            EditMetaData { start_line: 2, from: 1, to: 3 } + EditMetaData { start_line: 0, from: 3, to: 1 },
+            EditMetaData { start_line: 0, from: 0, to: 3 }
+        );
+        assert_eq!(
+            EditMetaData { start_line: 0, from: 1, to: 10 } + EditMetaData { start_line: 2, from: 2, to: 1 },
+            EditMetaData { start_line: 0, from: 0, to: 9 },
+        );
+    }
+
+    #[test]
+    fn add_assign_meta_data() {
+        let mut edit = EditMetaData::line_changed(1);
+        edit += EditMetaData::line_changed(1);
+        assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 1 });
+        let mut edit = EditMetaData::line_changed(1);
+        edit += EditMetaData { start_line: 1, from: 1, to: 3 };
+        assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 3 });
+        let mut edit = EditMetaData { start_line: 1, from: 2, to: 1 };
+        edit += EditMetaData { start_line: 1, from: 1, to: 3 };
+        assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 3 });
+        let mut edit = EditMetaData { start_line: 1, from: 1, to: 2 };
+        edit += EditMetaData { start_line: 1, from: 1, to: 3 };
+        assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 3 });
+        let mut edit = EditMetaData { start_line: 2, from: 1, to: 3 };
+        edit += EditMetaData { start_line: 0, from: 3, to: 1 };
+        assert_eq!(edit, EditMetaData { start_line: 0, from: 0, to: 3 });
+        let mut edit = EditMetaData { start_line: 0, from: 1, to: 10 };
+        edit += EditMetaData { start_line: 2, from: 2, to: 1 };
+        assert_eq!(edit, EditMetaData { start_line: 0, from: 0, to: 9 },);
     }
 }

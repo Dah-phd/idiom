@@ -1,18 +1,14 @@
 mod tree_paths;
 use crate::{
     configs::{TreeAction, TreeKeyMap},
+    error::{IdiomError, IdiomResult},
     global_state::{GlobalState, WorkspaceEvent},
     lsp::Diagnostic,
     popups::popups_tree::{create_file_popup, rename_file_popup},
+    render::state::State,
     utils::{build_file_or_folder, to_relative_path},
 };
-use anyhow::Result;
 use crossterm::event::KeyEvent;
-use ratatui::{
-    style::{Color, Modifier, Style},
-    widgets::{Block, BorderType, Borders, List, ListItem, ListState},
-    Frame,
-};
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -22,16 +18,16 @@ use std::{
 use tokio::task::JoinHandle;
 use tree_paths::TreePath;
 
-const TICK: Duration = Duration::from_millis(200);
+const TICK: Duration = Duration::from_millis(500);
 
 pub struct Tree {
     pub key_map: TreeKeyMap,
-    state: ListState,
+    state: State,
     selected_path: PathBuf,
     tree: TreePath,
     tree_ptrs: Vec<*mut TreePath>,
-    tree_block: Block<'static>,
     sync_handler: JoinHandle<TreePath>,
+    rebuild: bool,
     pub lsp_register: Vec<Arc<Mutex<HashMap<PathBuf, Diagnostic>>>>,
 }
 
@@ -47,33 +43,28 @@ impl Tree {
         });
         tree.sync_flat_ptrs(&mut tree_ptrs);
         Self {
-            state: ListState::default(),
+            state: State::new(),
             key_map,
             selected_path: PathBuf::from("./"),
             tree,
             tree_ptrs,
-            tree_block: Block::new()
-                .borders(Borders::TOP | Borders::RIGHT)
-                .border_style(Style::default().fg(Color::DarkGray))
-                .border_type(BorderType::Double)
-                .title("Explorer"),
             sync_handler,
+            rebuild: true,
             lsp_register: Vec::new(),
         }
     }
 
-    pub fn render(&mut self, frame: &mut Frame, gs: &mut GlobalState) {
-        let list_items = self
-            .tree_ptrs
-            .iter()
-            .flat_map(|ptr| unsafe { ptr.as_ref() }.map(|tree_path| ListItem::new(tree_path.display())))
-            .collect::<Vec<ListItem<'_>>>();
+    pub fn render(&mut self, gs: &mut GlobalState) {
+        let options = self.tree_ptrs.iter().flat_map(|ptr| unsafe { ptr.as_ref() }.map(|tp| tp.direct_display()));
+        self.state.render_list_styled(options, &gs.tree_area, &mut gs.writer);
+    }
 
-        let tree_widget = List::new(list_items)
-            .block(self.tree_block.clone())
-            .highlight_style(Style { add_modifier: Modifier::REVERSED, ..Default::default() });
-
-        frame.render_stateful_widget(tree_widget, gs.tree_area, &mut self.state);
+    #[inline]
+    pub fn fast_render(&mut self, gs: &mut GlobalState) {
+        if self.rebuild {
+            self.rebuild = false;
+            self.render(gs);
+        };
     }
 
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
@@ -124,7 +115,7 @@ impl Tree {
 
     pub fn mouse_select(&mut self, idx: usize) -> Option<PathBuf> {
         if self.tree_ptrs.len() >= idx {
-            self.state.select(Some(idx.saturating_sub(1)));
+            self.state.selected = idx.saturating_sub(1);
             if let Some(selected) = self.get_selected() {
                 match selected {
                     TreePath::Folder { tree: Some(..), .. } => {
@@ -146,46 +137,33 @@ impl Tree {
         if self.tree_ptrs.is_empty() {
             return;
         }
-        if let Some(idx) = self.state.selected() {
-            if idx == 0 {
-                return;
-            }
-            self.unsafe_select(idx - 1);
-        } else {
-            self.unsafe_select(self.tree_ptrs.len() - 1);
-        }
+        self.state.prev(self.tree_ptrs.len());
+        self.unsafe_set_path();
     }
 
     fn select_down(&mut self) {
         if self.tree_ptrs.is_empty() {
             return;
         }
-        if let Some(idx) = self.state.selected() {
-            let new_idx = idx + 1;
-            if self.tree_ptrs.len() == new_idx {
-                return;
-            }
-            self.unsafe_select(new_idx);
-        } else {
-            self.unsafe_select(0);
-        }
+        self.state.next(self.tree_ptrs.len());
+        self.unsafe_set_path();
     }
 
-    pub fn create_file_or_folder(&mut self, name: String) -> Result<PathBuf> {
+    pub fn create_file_or_folder(&mut self, name: String) -> IdiomResult<PathBuf> {
         let path = build_file_or_folder(self.selected_path.clone(), &name)?;
         self.force_sync();
         self.select_by_path(&path);
         Ok(path)
     }
 
-    pub fn create_file_or_folder_base(&mut self, name: String) -> Result<PathBuf> {
+    pub fn create_file_or_folder_base(&mut self, name: String) -> IdiomResult<PathBuf> {
         let path = build_file_or_folder(PathBuf::from("./"), &name)?;
         self.force_sync();
         self.select_by_path(&path);
         Ok(path)
     }
 
-    fn delete_file(&mut self) -> Result<()> {
+    fn delete_file(&mut self) -> IdiomResult<()> {
         if self.selected_path.is_file() {
             std::fs::remove_file(&self.selected_path)?
         } else {
@@ -196,17 +174,29 @@ impl Tree {
         Ok(())
     }
 
-    pub fn rename_file(&mut self, name: String) -> Result<()> {
-        if let Some(selected) = self.get_selected() {
-            let mut new_path = selected.path().clone();
-            new_path.pop();
-            new_path.push(&name);
-            std::fs::rename(selected.path(), &new_path)?;
-            selected.update_path(new_path.clone());
-            self.selected_path = new_path;
+    pub fn rename_path(&mut self, name: String) -> Option<IdiomResult<(PathBuf, PathBuf)>> {
+        // not efficient but safe - calls should be rare enough
+        let selected = self.get_selected()?;
+        let mut rel_new_path = selected.path().clone();
+        if !rel_new_path.pop() {
+            return None;
+        };
+        let result = selected
+            .path()
+            .canonicalize()
+            .and_then(|old_path| {
+                let mut abs_new_path = old_path.clone();
+                abs_new_path.pop();
+                abs_new_path.push(&name);
+                std::fs::rename(&old_path, &abs_new_path).map(|_| (old_path, abs_new_path))
+            })
+            .map_err(IdiomError::from);
+        if result.is_ok() {
+            rel_new_path.push(name);
+            selected.update_path(rel_new_path);
             self.force_sync();
         }
-        Ok(())
+        Some(result)
     }
 
     pub fn search_paths(&self, pattern: &str) -> Vec<PathBuf> {
@@ -227,9 +217,8 @@ impl Tree {
     pub fn select_by_path(&mut self, path: &PathBuf) {
         let rel_result = to_relative_path(path);
         let path = rel_result.as_ref().unwrap_or(path);
-        self.state.select(None);
         if self.tree.expand_contained(path) {
-            self.state.select(Some(0));
+            self.state.selected = 0;
             self.selected_path = path.clone();
             self.force_sync();
         }
@@ -247,12 +236,14 @@ impl Tree {
         "./".to_owned()
     }
 
+    #[inline]
     pub fn get_selected(&self) -> Option<&mut TreePath> {
-        unsafe { self.tree_ptrs.get(self.state.selected()?)?.as_mut() }
+        unsafe { self.tree_ptrs.get(self.state.selected)?.as_mut() }
     }
 
     pub async fn finish_sync(&mut self, gs: &mut GlobalState) {
         if self.sync_handler.is_finished() {
+            self.rebuild = true;
             let mut tree = self.tree.clone();
             let lsp_register = self.lsp_register.clone();
             let old_handler = std::mem::replace(
@@ -289,6 +280,7 @@ impl Tree {
     }
 
     fn force_sync(&mut self) {
+        self.rebuild = true;
         let mut tree = self.tree.clone();
         std::mem::replace(
             &mut self.sync_handler,
@@ -304,22 +296,18 @@ impl Tree {
     fn fix_select_by_path(&mut self) {
         if let Some(selected) = self.get_selected() {
             if &self.selected_path != selected.path() {
-                self.state.select(None);
                 for (idx, tree_path) in self.tree_ptrs.iter_mut().flat_map(|ptr| unsafe { ptr.as_mut() }).enumerate() {
                     if tree_path.path() == &self.selected_path {
-                        self.state.select(Some(idx));
+                        self.state.selected = idx;
                         break;
                     }
-                }
-                if self.state.selected().is_none() {
-                    self.selected_path = PathBuf::from("./");
                 }
             }
         }
     }
 
-    fn unsafe_select(&mut self, idx: usize) {
-        self.state.select(Some(idx));
+    fn unsafe_set_path(&mut self) {
+        self.rebuild = true;
         if let Some(selected) = self.get_selected() {
             self.selected_path = selected.path().clone();
         }

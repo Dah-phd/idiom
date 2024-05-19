@@ -1,42 +1,38 @@
 pub mod actions;
 pub mod cursor;
 pub mod editor;
+pub mod line;
 pub mod utils;
 use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
+    error::{IdiomError, IdiomResult},
     global_state::{GlobalState, TreeEvent},
     lsp::LSP,
-    utils::{REVERSED, UNDERLINED},
+    render::backend::{color, BackendProtocol, Style},
+    utils::TrackedList,
 };
-use anyhow::Result;
 use crossterm::event::KeyEvent;
 pub use cursor::CursorPosition;
 pub use editor::{DocStats, Editor};
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
-use ratatui::{
-    style::{Color, Modifier, Style},
-    widgets::Tabs,
-    Frame,
-};
 use std::{
     collections::{hash_map::Entry, HashMap},
     path::PathBuf,
 };
 
-const TAB_HIGHTLIGHT: Style = Style::new().fg(Color::Yellow).add_modifier(Modifier::UNDERLINED);
-
+/// implement Drop to attempt keep state upon close/crash
 pub struct Workspace {
-    pub editors: Vec<Editor>,
+    editors: TrackedList<Editor>,
     base_config: EditorConfigs,
     key_map: EditorKeyMap,
-    lsp_servers: HashMap<FileType, LSP>,
     tab_style: Style,
+    lsp_servers: HashMap<FileType, LSP>,
     map_callback: fn(&mut Self, &KeyEvent, &mut GlobalState) -> bool,
 }
 
 impl Workspace {
     pub async fn new(key_map: EditorKeyMap, base_tree_paths: Vec<String>, gs: &mut GlobalState) -> Self {
-        let mut base_config = gs.unwrap_default_result(EditorConfigs::new(), ".config: ");
+        let mut base_config = gs.unwrap_or_default(EditorConfigs::new(), ".config: ");
         let mut lsp_servers = HashMap::new();
         for (ft, lsp_cmd) in base_config.derive_lsp_preloads(base_tree_paths, gs) {
             gs.success(format!("Preloading {lsp_cmd}"));
@@ -45,25 +41,40 @@ impl Workspace {
                 lsp_servers.insert(ft, lsp);
             };
         }
-        Self {
-            editors: Vec::default(),
-            base_config,
-            key_map,
-            tab_style: UNDERLINED,
-            lsp_servers,
-            map_callback: map_editor,
+        let tab_style = Style::fg(color::dark_yellow());
+        Self { editors: TrackedList::new(), base_config, key_map, lsp_servers, map_callback: map_editor, tab_style }
+    }
+
+    pub fn render(&mut self, gs: &mut GlobalState) {
+        if let Some(editor) = self.editors.get_mut(0) {
+            let line = match gs.tab_area.into_iter().next() {
+                Some(line) => line,
+                None => return,
+            };
+            gs.writer.save_cursor();
+            gs.writer.set_style(Style::underlined(None));
+            {
+                let mut builder = line.unsafe_builder(&mut gs.writer);
+                builder.push_styled(&editor.display, self.tab_style);
+                for editor in self.editors.iter().skip(1) {
+                    if !builder.push(" | ") || !builder.push(&editor.display) {
+                        break;
+                    };
+                }
+            }
+            gs.writer.reset_style();
+            gs.writer.restore_cursor();
+        } else {
+            match gs.tab_area.into_iter().next() {
+                Some(line) => line.render_empty(&mut gs.writer),
+                None => (),
+            }
         }
     }
 
-    pub fn render(&mut self, frame: &mut Frame, gs: &mut GlobalState) {
-        if let Some(editor) = self.editors.get_mut(0) {
-            editor.sync(gs);
-            let ref_widget: &Editor = editor;
-            frame.render_widget_ref(ref_widget, gs.editor_area);
-            editor.lexer.render_modal_if_exist(frame, gs.editor_area, &editor.cursor);
-            let titles: Vec<_> = self.editors.iter().map(|e| e.display.to_owned()).collect();
-            let tabs = Tabs::new(titles).style(self.tab_style).highlight_style(TAB_HIGHTLIGHT).select(0);
-            frame.render_widget(tabs, gs.tab_area);
+    pub fn fast_render(&mut self, gs: &mut GlobalState) {
+        if self.editors.updated() {
+            self.render(gs);
         }
     }
 
@@ -72,21 +83,30 @@ impl Workspace {
     }
 
     pub fn toggle_tabs(&mut self) {
+        self.editors.mark_updated();
         self.map_callback = map_tabs;
-        self.tab_style = REVERSED;
+        self.tab_style = Style::reversed();
     }
 
     pub fn toggle_editor(&mut self) {
+        self.editors.mark_updated();
         self.map_callback = map_editor;
-        self.tab_style = UNDERLINED;
+        self.tab_style = Style::fg(color::dark_yellow());
     }
 
-    pub fn resize_render(&mut self, width: usize, height: usize) {
+    #[inline]
+    pub fn resize_all(&mut self, width: usize, height: usize) {
         for editor in self.editors.iter_mut() {
             editor.resize(width, height);
         }
     }
 
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.editors.is_empty()
+    }
+
+    #[inline]
     pub fn get_stats(&self) -> Option<DocStats> {
         self.editors.first().map(|editor| editor.get_stats())
     }
@@ -95,16 +115,38 @@ impl Workspace {
         self.editors.iter().map(|editor| editor.display.to_owned()).collect()
     }
 
+    #[inline(always)]
     pub fn get_active(&mut self) -> Option<&mut Editor> {
-        self.editors.first_mut()
+        self.editors.get_mut_no_update(0)
     }
 
-    pub fn activate_editor(&mut self, idx: usize, gs: Option<&mut GlobalState>) {
+    #[inline]
+    pub fn rename_editors(&mut self, old: PathBuf, new_path: PathBuf) {
+        if new_path.is_dir() {
+            for editor in self.editors.iter_mut() {
+                if editor.path.starts_with(&old) {
+                    let mut updated_path = PathBuf::new();
+                    let mut old = editor.path.iter();
+                    for (new_part, ..) in new_path.iter().zip(&mut old) {
+                        updated_path.push(new_part);
+                    }
+                    for remaining_part in old {
+                        updated_path.push(remaining_part)
+                    }
+                    editor.update_path(updated_path);
+                }
+            }
+        } else {
+            if let Some(editor) = self.editors.find(|e| e.path == old) {
+                editor.update_path(new_path);
+            }
+        }
+    }
+
+    pub fn activate_editor(&mut self, idx: usize, gs: &mut GlobalState) {
         if idx < self.editors.len() {
             let editor = self.editors.remove(idx);
-            if let Some(state) = gs {
-                state.tree.push(TreeEvent::SelectPath(editor.path.clone()));
-            }
+            gs.tree.push(TreeEvent::SelectPath(editor.path.clone()));
             self.editors.insert(0, editor);
         }
     }
@@ -176,7 +218,7 @@ impl Workspace {
         };
     }
 
-    fn handle_tree_operations(&mut self, operation: ResourceOp) -> Result<()> {
+    fn handle_tree_operations(&mut self, operation: ResourceOp) -> IdiomResult<()> {
         match operation {
             ResourceOp::Create(create) => {
                 let path = PathBuf::from(create.uri.path());
@@ -185,7 +227,7 @@ impl Workspace {
                         if matches!(options.overwrite, Some(overwrite) if !overwrite)
                             || matches!(options.ignore_if_exists, Some(ignore) if ignore)
                         {
-                            return Err(anyhow::anyhow!("File {path:?} already exists!"));
+                            return Err(IdiomError::io_err(format!("File {path:?} already exists!")));
                         }
                     }
                 };
@@ -216,11 +258,11 @@ impl Workspace {
         self.editors.iter_mut().find(|editor| editor.path == path)
     }
 
-    fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> Result<Editor> {
+    fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
         Ok(Editor::from_path(file_path, &self.base_config, gs)?)
     }
 
-    async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> Result<Editor> {
+    async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
         let mut new = Editor::from_path(file_path, &self.base_config, gs)?;
         new.resize(gs.editor_area.width as usize, gs.editor_area.height as usize);
         let lsp_cmd = match self.base_config.derive_lsp(&new.file_type) {
@@ -232,21 +274,21 @@ impl Workspace {
                 if let Ok(lsp) = LSP::new(lsp_cmd).await {
                     let client = lsp.aquire_client();
                     gs.tree.push(TreeEvent::RegisterLSP(client.get_lsp_registration()));
-                    new.lexer.set_lsp_client(client, &new.file_type, new.stringify(), gs);
+                    new.lexer.set_lsp_client(client, new.stringify(), gs);
                     for editor in self.editors.iter_mut().filter(|e| e.file_type == new.file_type) {
-                        editor.lexer.set_lsp_client(lsp.aquire_client(), &editor.file_type, editor.stringify(), gs);
+                        editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);
                     }
                     entry.insert(lsp);
                 }
             }
             Entry::Occupied(entry) => {
-                new.lexer.set_lsp_client(entry.get().aquire_client(), &new.file_type, new.stringify(), gs);
+                new.lexer.set_lsp_client(entry.get().aquire_client(), new.stringify(), gs);
             }
         }
         Ok(new)
     }
 
-    pub async fn new_from(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> Result<bool> {
+    pub async fn new_from(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<bool> {
         let file_path = file_path.canonicalize()?;
         if let Some(idx) =
             self.editors.iter().enumerate().find(|(_, editor)| editor.path == file_path).map(|(idx, _)| idx)
@@ -261,7 +303,7 @@ impl Workspace {
         Ok(true)
     }
 
-    pub async fn new_at_line(&mut self, file_path: PathBuf, line: usize, gs: &mut GlobalState) -> Result<()> {
+    pub async fn new_at_line(&mut self, file_path: PathBuf, line: usize, gs: &mut GlobalState) -> IdiomResult<()> {
         if self.new_from(file_path, gs).await? {
             if let Some(editor) = self.get_active() {
                 editor.go_to(line);
@@ -282,13 +324,14 @@ impl Workspace {
         None
     }
 
+    #[inline]
     pub async fn check_lsp(&mut self, ft: FileType, gs: &mut GlobalState) {
         if let Some(lsp) = self.lsp_servers.get_mut(&ft) {
             match lsp.check_status().await {
                 Ok(data) => match data {
                     None => gs.success("LSP function is normal".to_owned()),
                     Some(err) => {
-                        self.full_sync(&ft, gs).await;
+                        self.full_sync(&ft, gs);
                         gs.success(format!("LSP recoved after: {err}"));
                     }
                 },
@@ -297,10 +340,11 @@ impl Workspace {
         }
     }
 
-    pub async fn full_sync(&mut self, ft: &FileType, gs: &mut GlobalState) {
+    #[inline]
+    pub fn full_sync(&mut self, ft: &FileType, gs: &mut GlobalState) {
         if let Some(lsp) = self.lsp_servers.get(ft) {
             for editor in self.editors.iter_mut().filter(|e| &e.file_type == ft) {
-                editor.lexer.set_lsp_client(lsp.aquire_client(), ft, editor.stringify(), gs);
+                editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);
             }
         }
     }
@@ -309,12 +353,12 @@ impl Workspace {
         if self.editors.is_empty() {
             return;
         }
-        let editor = self.editors.remove(0);
-        if let Some(mut client) = editor.lexer.lsp_client {
-            let _ = client.file_did_close(&editor.path);
-        }
+        self.editors.remove(0);
         if self.editors.is_empty() {
+            let _ = gs.editor_area.clear(&mut gs.writer);
             gs.select_mode();
+        } else {
+            self.editors.inner_mut_no_update()[0].clear_screen_cache();
         }
     }
 
@@ -341,12 +385,13 @@ impl Workspace {
 
     pub async fn refresh_cfg(&mut self, new_key_map: EditorKeyMap, gs: &mut GlobalState) {
         self.key_map = new_key_map;
-        gs.unwrap_default_result(self.base_config.refresh(), ".config: ");
+        gs.unwrap_or_default(self.base_config.refresh(), ".config: ");
         for editor in self.editors.iter_mut() {
             editor.refresh_cfg(&self.base_config);
+            editor.lexer.reload_theme(gs);
             if let Some(lsp) = self.lsp_servers.get(&editor.file_type) {
-                if editor.lexer.lsp_client.is_none() {
-                    editor.lexer.set_lsp_client(lsp.aquire_client(), &editor.file_type, editor.stringify(), gs);
+                if !editor.lexer.lsp {
+                    editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);
                 }
             }
         }
@@ -363,12 +408,16 @@ impl Workspace {
 fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
     let action = ws.key_map.map(key);
     if let Some(editor) = ws.get_active() {
-        if editor.lexer.map_modal_if_exists(key, gs) {
+        let (taken, render_update) = editor.lexer.map_modal_if_exists(key, gs);
+        if let Some(modal_rect) = render_update {
+            editor.updated_rect(modal_rect, gs);
+        }
+        if taken {
             return true;
         };
         if let Some(action) = action {
             match action {
-                EditorAction::Char(ch) => editor.push(ch),
+                EditorAction::Char(ch) => editor.push(ch, gs),
                 EditorAction::NewLine => editor.new_line(),
                 EditorAction::Indent => editor.indent(),
                 EditorAction::Backspace => editor.backspace(),
@@ -399,9 +448,9 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
                 EditorAction::EndOfFile => editor.end_of_file(),
                 EditorAction::StartOfLine => editor.start_of_line(),
                 EditorAction::StartOfFile => editor.start_of_file(),
-                EditorAction::FindReferences => editor.references(),
-                EditorAction::GoToDeclaration => editor.declarations(),
-                EditorAction::Help => editor.help(),
+                EditorAction::FindReferences => editor.references(gs),
+                EditorAction::GoToDeclaration => editor.declarations(gs),
+                EditorAction::Help => editor.help(gs),
                 EditorAction::LSPRename => editor.start_renames(),
                 EditorAction::CommentOut => editor.comment_out(),
                 EditorAction::Undo => editor.undo(),
@@ -459,11 +508,13 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
             EditorAction::Right | EditorAction::Indent => {
                 let editor = ws.editors.remove(0);
                 ws.editors.push(editor);
-                gs.tree.push(TreeEvent::SelectPath(ws.editors[0].path.clone()));
+                ws.editors.inner_mut_no_update()[0].clear_screen_cache();
+                gs.tree.push(TreeEvent::SelectPath(ws.editors.inner()[0].path.clone()));
             }
             EditorAction::Left | EditorAction::Unintent => {
-                if let Some(editor) = ws.editors.pop() {
+                if let Some(mut editor) = ws.editors.pop() {
                     gs.tree.push(TreeEvent::SelectPath(editor.path.clone()));
+                    editor.clear_screen_cache();
                     ws.editors.insert(0, editor);
                 }
             }

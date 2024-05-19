@@ -1,5 +1,5 @@
 use super::PopupMessage;
-use crate::{configs::FileType, footer::Footer, lsp::Diagnostic, workspace::CursorPosition};
+use crate::{configs::FileType, lsp::Diagnostic, workspace::CursorPosition};
 use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, WorkspaceEdit};
 use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat};
 use std::collections::HashMap;
@@ -38,23 +38,6 @@ impl From<LocationLink> for TreeEvent {
             PathBuf::from(loc.target_uri.path()),
             (loc.target_range.start.into(), loc.target_range.end.into()),
         )
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum FooterEvent {
-    Message(String),
-    Error(String),
-    Success(String),
-}
-
-impl FooterEvent {
-    pub fn map(self, footer: &mut Footer) {
-        match self {
-            Self::Message(message) => footer.message(message),
-            Self::Error(message) => footer.error(message),
-            Self::Success(message) => footer.success(message),
-        }
     }
 }
 

@@ -1,6 +1,7 @@
 use super::{Popup, PopupSelector};
 use crate::global_state::WorkspaceEvent;
-use crate::widgests::Button;
+use crate::render::state::State;
+use crate::render::Button;
 use crate::workspace::CursorPosition;
 use crossterm::event::KeyCode;
 
@@ -21,7 +22,7 @@ pub fn save_all_popup() -> Box<Popup> {
                 key: Some(vec![KeyCode::Char('n'), KeyCode::Char('N')]),
             },
         ],
-        size: Some((40, 4)),
+        size: Some((4, 40)),
         state: 0,
     })
 }
@@ -31,9 +32,12 @@ pub fn selector_ranges(
 ) -> Box<PopupSelector<((CursorPosition, CursorPosition), String)>> {
     Box::new(PopupSelector {
         options,
-        display: |((from, _), line)| format!("({}) {line}", from.line + 1),
-        command: |popup| WorkspaceEvent::GoToSelect { select: popup.options[popup.state].0, clear_popup: true }.into(),
-        state: 0,
+        // display: |((from, _), line)| format!("({}) {line}", from.line + 1),
+        display: |((..), line)| &line,
+        command: |popup| {
+            WorkspaceEvent::GoToSelect { select: popup.options[popup.state.selected].0, clear_popup: true }.into()
+        },
+        state: State::new(),
         size: None,
     })
 }
@@ -41,9 +45,9 @@ pub fn selector_ranges(
 pub fn selector_editors(options: Vec<String>) -> Box<PopupSelector<String>> {
     Box::new(PopupSelector {
         options,
-        display: |editor| editor.to_owned(),
-        command: |popup| WorkspaceEvent::ActivateEditor(popup.state).into(),
-        state: 0,
+        display: |editor| &editor,
+        command: |popup| WorkspaceEvent::ActivateEditor(popup.state.selected).into(),
+        state: State::new(),
         size: None,
     })
 }

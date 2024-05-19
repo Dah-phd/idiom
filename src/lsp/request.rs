@@ -1,7 +1,6 @@
 use super::as_url;
-use crate::workspace::CursorPosition;
+use crate::{lsp::LSPResult, workspace::CursorPosition};
 
-use anyhow::Result;
 use lsp_types as lsp;
 use lsp_types::{
     request::{
@@ -39,18 +38,18 @@ where
         Self { jsonrpc: String::from("2.0"), id, method: <T as lsp_types::request::Request>::METHOD, params }
     }
 
-    pub fn stringify(&self) -> Result<String> {
+    pub fn stringify(&self) -> LSPResult<String> {
         let request_msg = to_string(self)?;
         let ser_req = format!("Content-Length: {}\r\n\r\n{}", request_msg.len(), request_msg);
         Ok(ser_req)
     }
 
-    pub fn references(path: &Path, c: CursorPosition) -> Option<LSPRequest<References>> {
-        Some(LSPRequest::with(
+    pub fn references(path: &Path, c: CursorPosition) -> LSPResult<LSPRequest<References>> {
+        Ok(LSPRequest::with(
             0,
             ReferenceParams {
                 text_document_position: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: c.into(),
                 },
                 context: ReferenceContext { include_declaration: false },
@@ -60,12 +59,12 @@ where
         ))
     }
 
-    pub fn rename(path: &Path, c: CursorPosition, new_name: String) -> Option<LSPRequest<Rename>> {
-        Some(LSPRequest::with(
+    pub fn rename(path: &Path, c: CursorPosition, new_name: String) -> LSPResult<LSPRequest<Rename>> {
+        Ok(LSPRequest::with(
             0,
             RenameParams {
                 text_document_position: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: c.into(),
                 },
                 new_name,
@@ -74,22 +73,22 @@ where
         ))
     }
 
-    pub fn semantics_full(path: &Path) -> Option<LSPRequest<SemanticTokensFullRequest>> {
-        Some(LSPRequest::with(
+    pub fn semantics_full(path: &Path) -> LSPResult<LSPRequest<SemanticTokensFullRequest>> {
+        Ok(LSPRequest::with(
             0,
             SemanticTokensParams {
-                text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                text_document: TextDocumentIdentifier::new(as_url(path)?),
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
                 partial_result_params: lsp::PartialResultParams::default(),
             },
         ))
     }
 
-    pub fn semantics_range(path: &Path, range: Range) -> Option<LSPRequest<SemanticTokensRangeRequest>> {
-        Some(LSPRequest::with(
+    pub fn semantics_range(path: &Path, range: Range) -> LSPResult<LSPRequest<SemanticTokensRangeRequest>> {
+        Ok(LSPRequest::with(
             0,
             SemanticTokensRangeParams {
-                text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                text_document: TextDocumentIdentifier::new(as_url(path)?),
                 range,
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
                 partial_result_params: lsp::PartialResultParams::default(),
@@ -97,12 +96,12 @@ where
         ))
     }
 
-    pub fn declaration(path: &Path, c: CursorPosition) -> Option<LSPRequest<GotoDeclaration>> {
-        Some(LSPRequest::with(
+    pub fn declaration(path: &Path, c: CursorPosition) -> LSPResult<LSPRequest<GotoDeclaration>> {
+        Ok(LSPRequest::with(
             0,
             GotoDeclarationParams {
                 text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: c.into(),
                 },
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
@@ -111,12 +110,12 @@ where
         ))
     }
 
-    pub fn definition(path: &Path, c: CursorPosition) -> Option<LSPRequest<GotoDefinition>> {
-        Some(LSPRequest::with(
+    pub fn definition(path: &Path, c: CursorPosition) -> LSPResult<LSPRequest<GotoDefinition>> {
+        Ok(LSPRequest::with(
             0,
             GotoDefinitionParams {
                 text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: c.into(),
                 },
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
@@ -125,12 +124,13 @@ where
         ))
     }
 
-    pub fn completion(path: &Path, c: CursorPosition) -> Option<LSPRequest<Completion>> {
-        Some(LSPRequest::with(
+    #[inline]
+    pub fn completion(path: &Path, c: CursorPosition) -> LSPResult<LSPRequest<Completion>> {
+        Ok(LSPRequest::with(
             0,
             CompletionParams {
                 text_document_position: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: c.into(),
                 },
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
@@ -140,13 +140,14 @@ where
         ))
     }
 
-    pub fn signature_help(path: &Path, c: CursorPosition) -> Option<LSPRequest<SignatureHelpRequest>> {
-        Some(LSPRequest::with(
+    #[inline]
+    pub fn signature_help(path: &Path, c: CursorPosition) -> LSPResult<LSPRequest<SignatureHelpRequest>> {
+        Ok(LSPRequest::with(
             0,
             SignatureHelpParams {
                 context: None,
                 text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: c.into(),
                 },
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
@@ -154,12 +155,13 @@ where
         ))
     }
 
-    pub fn hover(path: &Path, c: CursorPosition) -> Option<LSPRequest<HoverRequest>> {
-        Some(LSPRequest::with(
+    #[inline]
+    pub fn hover(path: &Path, c: CursorPosition) -> LSPResult<LSPRequest<HoverRequest>> {
+        Ok(LSPRequest::with(
             0,
             HoverParams {
                 text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path).ok()?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)?),
                     position: c.into(),
                 },
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
@@ -167,7 +169,7 @@ where
         ))
     }
 
-    pub fn init_request() -> Result<LSPRequest<Initialize>> {
+    pub fn init_request() -> LSPResult<LSPRequest<Initialize>> {
         let uri = as_url(std::env::current_dir()?.as_path())?;
         Ok(LSPRequest::with(
             0,
