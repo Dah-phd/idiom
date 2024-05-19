@@ -17,10 +17,12 @@ impl RenameVariable {
         Self { new_name: TextField::basic(title.to_owned()), cursor, title: format!(" Rename: {} ", title) }
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         2
     }
 
+    #[inline]
     pub fn render(&mut self, area: &Rect, gs: &mut GlobalState) {
         area.get_line(0).unwrap().render(&self.title, &mut gs.writer);
         self.new_name.widget(area.get_line(1).unwrap(), &mut gs.writer);

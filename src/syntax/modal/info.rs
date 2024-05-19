@@ -55,6 +55,7 @@ impl Info {
         Self { text: lines, ..Default::default() }
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         match self.mode {
             Mode::Text => self.text.len(),
@@ -134,6 +135,7 @@ impl Info {
         self.state.selected = 0;
     }
 
+    #[inline]
     pub fn render(&mut self, rect: &Rect, gs: &mut GlobalState) {
         match self.mode {
             Mode::Select => {

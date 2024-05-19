@@ -113,7 +113,7 @@ pub fn wrapped_line_select(
     select: Range<usize>,
     backend: &mut Backend,
 ) {
-    let wrap_number = format!("{:.<1$} ", "", ctx.lexer().line_number_offset);
+    let wrap_number = ctx.setup_wrap();
     let skip_lines = ctx.count_skipped_to_cursor(wrap_len, lines.len());
     if skip_lines != 0 {
         let mut wrap_text = format!("..{skip_lines} hidden wrapped lines");
@@ -222,7 +222,7 @@ pub fn wrapped_line(
     lines: &mut RectIter,
     backend: &mut Backend,
 ) {
-    let wrap_number = format!("{:.<1$} ", "", ctx.lexer().line_number_offset);
+    let wrap_number = ctx.setup_wrap();
     let skip_lines = ctx.count_skipped_to_cursor(wrap_len, lines.len());
     if skip_lines != 0 {
         let mut wrap_text = format!("..{skip_lines} hidden wrapped lines");

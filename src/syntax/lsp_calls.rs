@@ -18,18 +18,10 @@ use super::{
     TokensType,
 };
 
+/// timeout before remapping all tokens
 const FULL_TOKENS: Duration = Duration::from_secs(10);
 
-#[inline]
-pub fn range_tokens_are_supported(provider: &SemanticTokensServerCapabilities) -> bool {
-    match provider {
-        SemanticTokensServerCapabilities::SemanticTokensOptions(opt) => opt.range.unwrap_or_default(),
-        SemanticTokensServerCapabilities::SemanticTokensRegistrationOptions(data) => {
-            data.semantic_tokens_options.range.unwrap_or_default()
-        }
-    }
-}
-
+/// mapps LSP state without runtime checks
 #[inline]
 pub fn map(lexer: &mut Lexer, client: LSPClient) {
     lexer.lsp = true;
@@ -85,17 +77,13 @@ pub fn map(lexer: &mut Lexer, client: LSPClient) {
     lexer.client = client;
 }
 
-pub fn context_local(editor: &mut Editor, _: &mut GlobalState) {
-    let lexer = &mut editor.lexer;
-    lexer.map_line_number_offset(&mut editor.content);
-}
+pub fn context_local(_: &mut Editor, _: &mut GlobalState) {}
 
 pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     let lexer = &mut editor.lexer;
-    let content = &mut editor.content;
-    lexer.map_line_number_offset(content);
-
     let client = &mut lexer.client;
+    let content = &mut editor.content;
+
     // diagnostics
     if let Some(diagnostics) = client.get_diagnostics(&editor.path) {
         set_diganostics(content, diagnostics);
@@ -329,5 +317,17 @@ pub fn renames(lexer: &mut Lexer, c: CursorPosition, new_name: String, gs: &mut 
     match lexer.client.request_rename(&lexer.path, c, new_name).map(LSPResponseType::Renames) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
+    }
+}
+
+// UTILS
+
+#[inline]
+fn range_tokens_are_supported(provider: &SemanticTokensServerCapabilities) -> bool {
+    match provider {
+        SemanticTokensServerCapabilities::SemanticTokensOptions(opt) => opt.range.unwrap_or_default(),
+        SemanticTokensServerCapabilities::SemanticTokensRegistrationOptions(data) => {
+            data.semantic_tokens_options.range.unwrap_or_default()
+        }
     }
 }

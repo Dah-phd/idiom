@@ -65,6 +65,7 @@ impl AutoComplete {
         self.state.render_list(self.filtered.iter().map(|(c, ..)| c.as_str()), area, &mut gs.writer);
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.filtered.len()
     }

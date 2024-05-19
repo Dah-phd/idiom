@@ -15,7 +15,8 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
     let mut gs = GlobalState::new(Backend::init()).unwrap();
     let content: Vec<CodeLine> = content.into_iter().map(|line| CodeLine::from(line)).collect();
     Editor {
-        lexer: Lexer::with_context(ft, &path, &content, &mut gs),
+        line_number_offset: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
+        lexer: Lexer::with_context(ft, &path, &mut gs),
         file_type: ft,
         display: "".to_string(),
         path,
@@ -23,6 +24,7 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
         cursor: Cursor::default(),
         actions: Actions::default(),
         content,
+        last_render_at_line: None,
     }
 }
 

@@ -32,6 +32,8 @@ pub struct Editor {
     pub actions: Actions,
     pub content: Vec<CodeLine>,
     timestamp: Option<SystemTime>,
+    pub line_number_offset: usize,
+    last_render_at_line: Option<usize>,
 }
 
 impl Editor {
@@ -41,7 +43,8 @@ impl Editor {
         let file_type = FileType::derive_type(&path);
         let display = build_display(&path);
         Ok(Self {
-            lexer: Lexer::with_context(file_type, &path, &content, gs),
+            line_number_offset: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
+            lexer: Lexer::with_context(file_type, &path, gs),
             content,
             cursor: Cursor::default(),
             actions: Actions::new(cfg.get_indent_cfg(&file_type)),
@@ -49,14 +52,17 @@ impl Editor {
             display,
             timestamp: last_modified(&path),
             path,
+            last_render_at_line: None,
         })
     }
 
     #[inline]
     pub fn render(&mut self, gs: &mut GlobalState) {
+        gs.error("full");
+        self.last_render_at_line.replace(self.cursor.at_line);
         self.sync(gs);
         let mut lines = gs.editor_area.into_iter();
-        let mut ctx = CodeLineContext::new(&self.cursor, &mut self.lexer);
+        let mut ctx = CodeLineContext::collect_context(&mut self.lexer, &self.cursor, self.line_number_offset);
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if self.cursor.line == line_idx && text.len() > self.cursor.text_width {
                 text.wrapped_render(&mut ctx, &mut lines, &mut gs.writer);
@@ -76,9 +82,14 @@ impl Editor {
     /// renders only updated lines
     #[inline]
     pub fn fast_render(&mut self, gs: &mut GlobalState) {
+        if self.last_render_at_line.is_none()
+            || matches!(self.last_render_at_line, Some(idx) if idx != self.cursor.at_line)
+        {
+            return self.render(gs);
+        }
         self.sync(gs);
         let mut lines = gs.editor_area.into_iter();
-        let mut ctx = CodeLineContext::new(&self.cursor, &mut self.lexer);
+        let mut ctx = CodeLineContext::collect_context(&mut self.lexer, &self.cursor, self.line_number_offset);
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if self.cursor.line == line_idx {
                 if text.len() > self.cursor.text_width {
@@ -102,6 +113,11 @@ impl Editor {
     }
 
     #[inline]
+    pub fn clear_screen_cache(&mut self) {
+        self.last_render_at_line = None;
+    }
+
+    #[inline]
     pub fn updated_rect(&mut self, rect: Rect, gs: &GlobalState) {
         let skip_offset = rect.row.saturating_sub(gs.editor_area.row) as usize;
         for line in self.content.iter_mut().skip(self.cursor.at_line + skip_offset).take(rect.width as usize) {
@@ -111,6 +127,12 @@ impl Editor {
 
     #[inline]
     pub fn sync(&mut self, gs: &mut GlobalState) {
+        let new_line_number_offset =
+            if self.content.is_empty() { 0 } else { (self.content.len().ilog10() + 1) as usize };
+        if new_line_number_offset != self.line_number_offset {
+            self.line_number_offset = new_line_number_offset;
+            self.last_render_at_line.take();
+        };
         Lexer::context(self, gs);
         self.cursor.correct_cursor_position(&self.content);
     }
@@ -306,13 +328,13 @@ impl Editor {
     pub fn mouse_cursor(&mut self, mut position: CursorPosition) {
         self.cursor.select_drop();
         position.line += self.cursor.at_line;
-        position.char = position.char.saturating_sub(self.lexer.line_number_offset + 1);
+        position.char = position.char.saturating_sub(self.line_number_offset + 1);
         self.cursor.set_cursor_checked(position, &self.content);
     }
 
     pub fn mouse_select(&mut self, mut position: CursorPosition) {
         position.line += self.cursor.at_line;
-        position.char = position.char.saturating_sub(self.lexer.line_number_offset + 1);
+        position.char = position.char.saturating_sub(self.line_number_offset + 1);
         self.cursor.set_cursor_checked_with_select(position, &self.content);
     }
 
@@ -321,7 +343,7 @@ impl Editor {
             return Some(copy_content(from, to, &self.content));
         };
         position.line += self.cursor.at_line;
-        position.char = position.char.saturating_sub(self.lexer.line_number_offset + 1);
+        position.char = position.char.saturating_sub(self.line_number_offset + 1);
         self.cursor.set_cursor_checked(position, &self.content);
         self.paste(clip?);
         None

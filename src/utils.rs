@@ -148,6 +148,7 @@ impl<T> TrackedList<T> {
         self.inner.first()
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     pub fn first_mut(&mut self) -> Option<&mut T> {
         self.updated = true;
@@ -185,6 +186,7 @@ impl<T> TrackedList<T> {
         self.inner.insert(index, element)
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     pub fn get(&self, index: usize) -> Option<&T> {
         self.inner.get(index)
@@ -195,12 +197,14 @@ impl<T> TrackedList<T> {
         &self.inner
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     pub fn inner_mut(&mut self) -> &mut Vec<T> {
         self.updated = true;
         &mut self.inner
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     pub fn inner_mut_no_update(&mut self) -> &mut Vec<T> {
         &mut self.inner
@@ -211,6 +215,7 @@ impl<T> TrackedList<T> {
         self.inner.iter()
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     pub fn iter_if_updated(&mut self) -> Option<std::slice::Iter<'_, T>> {
         if !self.updated() {

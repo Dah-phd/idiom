@@ -328,7 +328,7 @@ impl EditorLine for CodeLine {
 
     #[inline]
     fn fast_render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend) {
-        if self.rendered_at == 1 || self.rendered_at != line.row || self.select != ctx.get_select(line.width) {
+        if self.rendered_at != line.row || self.select != ctx.get_select(line.width) {
             return self.render(ctx, line, backend);
         }
         ctx.skip_line();
@@ -349,16 +349,17 @@ impl Into<String> for CodeLine {
 pub struct CodeLineContext<'a> {
     lexer: &'a mut Lexer,
     line_number: usize,
+    line_number_offset: usize,
     line: usize,
     char: usize,
     select: Option<(CursorPosition, CursorPosition)>,
 }
 
 impl<'a> CodeLineContext<'a> {
-    pub fn new(cursor: &Cursor, lexer: &'a mut Lexer) -> Self {
+    pub fn collect_context(lexer: &'a mut Lexer, cursor: &Cursor, line_number_offset: usize) -> Self {
         let line_number = cursor.at_line;
         let select = cursor.select_get();
-        Self { line: cursor.line - line_number, char: cursor.char, select, lexer, line_number }
+        Self { line: cursor.line - line_number, char: cursor.char, select, lexer, line_number, line_number_offset }
     }
 }
 
@@ -371,7 +372,7 @@ impl<'a> Context for CodeLineContext<'a> {
     #[inline]
     fn setup_with_select(&mut self, line: Line, backend: &mut Backend) -> (usize, Option<Range<usize>>) {
         let line_number = self.line_number + 1;
-        let text = format!("{: >1$} ", line_number, self.lexer.line_number_offset);
+        let text = format!("{: >1$} ", line_number, self.line_number_offset);
         let remaining_width = line.width - text.len();
         let select_buffer = build_select_buffer(self.select, self.line_number, remaining_width);
         self.line_number = line_number;
@@ -383,7 +384,7 @@ impl<'a> Context for CodeLineContext<'a> {
     #[inline]
     fn setup_line(&mut self, line: Line, backend: &mut Backend) -> usize {
         let line_number = self.line_number + 1;
-        let text = format!("{: >1$} ", line_number, self.lexer.line_number_offset);
+        let text = format!("{: >1$} ", line_number, self.line_number_offset);
         let remaining_width = line.width - text.len();
         self.line_number = line_number;
         backend.print_styled_at(line.row, line.col, text, Style::fg(color::dark_grey()));
@@ -392,8 +393,13 @@ impl<'a> Context for CodeLineContext<'a> {
     }
 
     #[inline]
+    fn setup_wrap(&self) -> String {
+        format!("{:.<1$} ", "", self.line_number_offset)
+    }
+
+    #[inline]
     fn get_select(&self, width: usize) -> Option<super::Select> {
-        build_select_buffer(self.select, self.line_number, width - (self.lexer.line_number_offset + 1))
+        build_select_buffer(self.select, self.line_number, width - (self.line_number_offset + 1))
     }
 
     #[inline]
@@ -413,7 +419,7 @@ impl<'a> Context for CodeLineContext<'a> {
     #[inline]
     fn render_cursor(self, gs: &mut GlobalState) {
         let row = gs.editor_area.row + self.line as u16;
-        let col = gs.editor_area.col + (self.char + self.lexer.line_number_offset + 1) as u16;
+        let col = gs.editor_area.col + (self.char + self.line_number_offset + 1) as u16;
         self.lexer.render_modal_if_exist(row, col, gs);
         gs.writer.render_cursor_at(row, col);
     }

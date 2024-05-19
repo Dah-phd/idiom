@@ -122,7 +122,7 @@ impl Workspace {
 
     #[inline]
     pub fn rename_editors(&mut self, old: PathBuf, new_path: PathBuf) {
-        if old.is_dir() {
+        if new_path.is_dir() {
             for editor in self.editors.iter_mut() {
                 if editor.path.starts_with(&old) {
                     let mut updated_path = PathBuf::new();

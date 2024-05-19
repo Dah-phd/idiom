@@ -69,6 +69,7 @@ pub trait EditorLine:
 pub trait Context {
     fn setup_with_select(&mut self, line: Line, backend: &mut Backend) -> (LineWidth, Option<Select>);
     fn setup_line(&mut self, line: Line, backend: &mut Backend) -> LineWidth;
+    fn setup_wrap(&self) -> String;
     fn skip_line(&mut self);
     fn lexer(&self) -> &Lexer;
     fn get_select(&self, width: usize) -> Option<Select>;

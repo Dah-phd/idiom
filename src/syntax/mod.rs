@@ -37,7 +37,6 @@ pub struct Lexer {
     pub token_producer: TokensType,
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub lsp: bool,
-    pub line_number_offset: usize,
     pub path: PathBuf,
     clock: Instant,
     modal: Option<LSPModal>,
@@ -59,7 +58,7 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn with_context(file_type: FileType, path: &Path, content: &[impl EditorLine], gs: &mut GlobalState) -> Self {
+    pub fn with_context(file_type: FileType, path: &Path, gs: &mut GlobalState) -> Self {
         Self {
             lang: Lang::from(file_type),
             legend: Legend::default(),
@@ -70,7 +69,6 @@ impl Lexer {
             modal_rect: None,
             path: path.into(),
             requests: Vec::new(),
-            line_number_offset: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
             diagnostics: None,
             lsp: false,
             client: LSPClient::placeholder(),
@@ -98,17 +96,6 @@ impl Lexer {
     #[inline]
     pub fn sync(editor: &mut Editor, gs: &mut GlobalState) {
         (editor.lexer.sync)(editor, gs);
-    }
-
-    #[inline(always)]
-    pub fn map_line_number_offset(&mut self, content: &mut Vec<impl EditorLine>) {
-        let new_offset = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
-        if new_offset != self.line_number_offset {
-            self.line_number_offset = new_offset;
-            for line in content.iter_mut() {
-                line.clear_cache();
-            }
-        }
     }
 
     #[inline]
