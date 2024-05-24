@@ -4,9 +4,11 @@ use std::{
     io::{Result, Write},
 };
 
+#[cfg(not(test))]
+pub use crossterm_backend::Backend;
 pub use crossterm_backend::{
     color::{self, pull_color, serialize_rgb},
-    Backend, Color, Style,
+    Color, Style,
 };
 
 use crate::render::layout::Rect;
@@ -77,3 +79,9 @@ pub trait BackendProtocol: Write + Sized {
     /// goes to location and prints styled text without affecting the writer set style
     fn print_styled_at<D: Display>(&mut self, row: u16, col: u16, text: D, style: Style);
 }
+
+#[cfg(test)]
+mod test;
+
+#[cfg(test)]
+pub use test::Backend;
