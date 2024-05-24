@@ -40,24 +40,24 @@ impl Line {
     #[inline]
     pub fn render_centered_styled(self, text: &str, style: Style, backend: &mut Backend) {
         let text = truncate_str(text, self.width);
-        backend.print_styled_at(self.row, self.col, format!("{text:>width$}", width = self.width), style)
+        backend.print_styled_at(self.row, self.col, format!("{text:>width$}", width = self.width), style);
     }
 
     #[inline]
     pub fn render_left(self, text: &str, backend: &mut Backend) {
         let text = truncate_str_start(text, self.width);
-        backend.print_at(self.row, self.col, format!("{text:>width$}", width = self.width))
+        backend.print_at(self.row, self.col, format!("{text:>width$}", width = self.width));
     }
 
     #[inline]
     pub fn render_left_styled(self, text: &str, style: Style, backend: &mut Backend) {
         let text = truncate_str_start(text, self.width);
-        backend.print_styled_at(self.row, self.col, format!("{text:^width$}", width = self.width), style)
+        backend.print_styled_at(self.row, self.col, format!("{text:^width$}", width = self.width), style);
     }
 
     #[inline]
     pub fn render_empty(self, backend: &mut Backend) {
-        backend.print_at(self.row, self.col, format!("{:width$}", "", width = self.width))
+        backend.print_at(self.row, self.col, format!("{:width$}", "", width = self.width));
     }
 
     #[inline]

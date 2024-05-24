@@ -1,7 +1,5 @@
 use super::Lang;
 use crate::render::backend::{color, Color};
-#[cfg(build = "debug")]
-use crate::utils::debug_to_file;
 use crate::{configs::FileType, syntax::Theme};
 use lsp_types::SemanticTokensServerCapabilities;
 
@@ -37,8 +35,6 @@ impl Legend {
     }
 
     pub fn map_styles(&mut self, file_type: &FileType, theme: &Theme, tc: &SemanticTokensServerCapabilities) {
-        #[cfg(build = "debug")]
-        debug_to_file("test_data.init", tc);
         if let SemanticTokensServerCapabilities::SemanticTokensOptions(tokens) = tc {
             match file_type {
                 FileType::Rust => {

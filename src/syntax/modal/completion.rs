@@ -1,6 +1,4 @@
 use super::ModalMessage;
-#[cfg(build = "debug")]
-use crate::debug_to_file;
 use crate::{
     global_state::GlobalState,
     render::{layout::Rect, state::State},
@@ -38,8 +36,6 @@ impl AutoComplete {
         match key.code {
             KeyCode::Enter | KeyCode::Tab => {
                 let mut filtered_completion = self.completions.remove(self.filtered.remove(self.state.selected).2);
-                #[cfg(build = "debug")]
-                debug_to_file("test_data.comp", filtered_completion);
                 if let Some(data) = filtered_completion.data.take() {
                     lang.handle_completion_data(data, gs);
                 };

@@ -81,9 +81,7 @@ impl Editor {
     /// renders only updated lines
     #[inline]
     pub fn fast_render(&mut self, gs: &mut GlobalState) {
-        if self.last_render_at_line.is_none()
-            || matches!(self.last_render_at_line, Some(idx) if idx != self.cursor.at_line)
-        {
+        if !matches!(self.last_render_at_line, Some(idx) if idx == self.cursor.at_line) {
             return self.render(gs);
         }
         self.sync(gs);
