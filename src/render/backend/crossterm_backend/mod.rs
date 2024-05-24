@@ -1,6 +1,3 @@
-#[cfg(test)]
-use test::DummyOut;
-
 pub mod color;
 mod style;
 use crossterm::{
@@ -30,10 +27,10 @@ pub type Color = CTColor;
 /// Main reason is to clear out the issue with PrintStyled on CrossTerm
 /// TODO: add termios & wezterm
 pub struct Backend {
-    #[cfg(not(test))]
+    // #[cfg(not(test))]
     writer: Stdout, // could be moved to locked state for performance but current frame generation is about 200 µs
-    #[cfg(test)]
-    writer: DummyOut,
+    // #[cfg(test)]
+    // writer: DummyOut,
     default_styled: Option<Style>,
 }
 
@@ -70,11 +67,11 @@ impl Write for Backend {
 impl BackendProtocol for Backend {
     #[inline]
     fn init() -> Self {
-        #[cfg(test)]
-        return Self { writer: DummyOut {}, default_styled: None };
-        #[cfg(not(test))]
+        // #[cfg(test)]
+        // return Self { writer: DummyOut {}, default_styled: None };
+        // #[cfg(not(test))]
         init_terminal().expect(ERR_MSG);
-        #[cfg(not(test))]
+        // #[cfg(not(test))]
         Self { writer: std::io::stdout(), default_styled: None }
     }
 
@@ -279,39 +276,4 @@ fn graceful_exit() -> std::io::Result<()> {
     )?;
     crossterm::terminal::disable_raw_mode()?;
     Ok(())
-}
-
-#[cfg(test)]
-mod test {
-    use std::io::{Result, Write};
-    pub struct DummyOut {}
-
-    impl Write for DummyOut {
-        fn by_ref(&mut self) -> &mut Self
-        where
-            Self: Sized,
-        {
-            self
-        }
-
-        fn flush(&mut self) -> Result<()> {
-            Ok(())
-        }
-
-        fn write(&mut self, buf: &[u8]) -> Result<usize> {
-            Ok(buf.len())
-        }
-
-        fn write_all(&mut self, _: &[u8]) -> Result<()> {
-            Ok(())
-        }
-
-        fn write_fmt(&mut self, _: std::fmt::Arguments<'_>) -> Result<()> {
-            Ok(())
-        }
-
-        fn write_vectored(&mut self, bufs: &[std::io::IoSlice<'_>]) -> Result<usize> {
-            Ok(bufs.iter().map(|b| b.len()).sum())
-        }
-    }
 }

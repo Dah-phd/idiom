@@ -23,6 +23,7 @@ More documentation will not come very soon - current focus is developing basic f
 - optimize snippet insertion (current implementation is only functional)
 - markdown rendering / editing
 - !! more tests - till that point the goal has been to make the editor self-developing, so bugs can be easily found and structure crystalizes
+- fix gihub actions (tests passing locally)
 - multi-cursor support
 - runner passing arrow presses while process is running
 - (backlog) semantic token styles for different lsp langs
