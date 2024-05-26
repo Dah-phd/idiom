@@ -1,7 +1,7 @@
 use crate::render::{
     backend::{Backend, BackendProtocol, Color, Style},
     layout::{BorderSet, Borders, Line, BORDERS},
-    utils::truncate_str,
+    utils::UTF8Safe,
 };
 use std::ops::Range;
 
@@ -229,7 +229,7 @@ impl Rect {
     #[inline]
     pub fn border_title(&self, text: &str, backend: &mut Backend) {
         if self.borders.contains(Borders::TOP) {
-            backend.print_at(self.row - 1, self.col, truncate_str(text, self.width));
+            backend.print_at(self.row - 1, self.col, text.truncate_width(self.width));
         };
     }
 
@@ -237,7 +237,7 @@ impl Rect {
     #[inline]
     pub fn border_title_styled(&self, text: &str, style: Style, backend: &mut Backend) {
         if self.borders.contains(Borders::TOP) {
-            backend.print_styled_at(self.row - 1, self.col, truncate_str(text, self.width), style);
+            backend.print_styled_at(self.row - 1, self.col, text.truncate_width(self.width), style);
         };
     }
 
@@ -246,7 +246,7 @@ impl Rect {
     #[inline]
     pub fn border_title_bot(&self, text: &str, backend: &mut Backend) {
         if self.borders.contains(Borders::BOTTOM) {
-            backend.print_at(self.row + self.height + 1, self.col, truncate_str(text, self.width));
+            backend.print_at(self.row + self.height + 1, self.col, text.truncate_width(self.width));
         };
     }
 
@@ -257,7 +257,7 @@ impl Rect {
             return backend.print_styled_at(
                 self.row + self.height + 1,
                 self.col,
-                truncate_str(text, self.width),
+                text.truncate_width(self.width),
                 style,
             );
         }

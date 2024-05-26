@@ -12,9 +12,6 @@ use tokio::{
 use tokio_stream::StreamExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
-#[cfg(build = "debug")]
-use crate::utils::debug_to_file;
-
 /// Streams LSPMessage every time next is called - it handles receiving, deserialization and objec parsing.
 /// LSPMessages are nothing more than wrapper around object determining type [Request, Notification, Response, Error, Unknown].
 /// Fail conditions:
@@ -47,8 +44,6 @@ impl JsonRCP {
             _stderr: tokio::task::spawn(async move {
                 while let Some(Ok(err)) = stderr.next().await {
                     if let Ok(msg) = String::from_utf8(err.into()) {
-                        #[cfg(build = "debug")]
-                        debug_to_file("test_data.jsonrcp_errors", &msg);
                         into_guard(&errors_handler).push(msg);
                     }
                 }

@@ -11,15 +11,7 @@ use crate::{
 
 pub fn trim_start_inplace(line: &mut impl EditorLine) -> usize {
     if let Some(idx) = line.to_string().find(|c: char| !c.is_whitespace() && c != '\t') {
-        line.replace_range(..idx, "");
-        return idx;
-    };
-    0
-}
-
-pub fn trim_string_start_inplace(line: &mut String) -> usize {
-    if let Some(idx) = line.find(|c: char| !c.is_whitespace() && c != '\t') {
-        line.replace_range(..idx, "");
+        line.replace_till(idx, "");
         return idx;
     };
     0
@@ -103,27 +95,6 @@ pub fn to_relative_path(target_dir: &Path) -> IdiomResult<PathBuf> {
         Err(IdiomError::io_err("Empty buffer!"))
     } else {
         Ok(result)
-    }
-}
-
-#[allow(dead_code)]
-pub fn find_code_blocks(buffer: &mut Vec<(usize, String)>, content: &[String], pattern: &str) {
-    let mut content_iter = content.iter().enumerate().peekable();
-    while let Some((idx, line)) = content_iter.next() {
-        if !line.contains(pattern) {
-            continue;
-        }
-        let mut line = line.to_owned();
-        let white_chars_len = trim_string_start_inplace(&mut line);
-        if let Some((_, next_line)) = content_iter.peek() {
-            if let Some(first_non_white) = next_line.find(|c: char| !c.is_whitespace()) {
-                if first_non_white >= white_chars_len {
-                    line.push('\n');
-                    line.push_str(&next_line[white_chars_len..]);
-                }
-            }
-        }
-        buffer.push((idx, line));
     }
 }
 
@@ -330,12 +301,4 @@ impl From<usize> for Offset {
     fn from(value: usize) -> Self {
         Self::Pos(value)
     }
-}
-
-#[cfg(build = "debug")]
-#[allow(unused_must_use)]
-pub fn debug_to_file(path: &str, obj: impl Debug) {
-    let mut data = std::fs::read_to_string(path).unwrap_or_default();
-    data.push_str(&format!("\n{obj:?}"));
-    std::fs::write(path, data);
 }

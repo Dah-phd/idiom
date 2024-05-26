@@ -66,7 +66,7 @@ pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Ve
             content.push(Default::default());
         }
     } else {
-        content[from.line].replace_range(from.char.., "");
+        content[from.line].replace_from(from.char, "");
         let mut last_idx = to.line;
         while from.line < last_idx {
             last_idx -= 1;

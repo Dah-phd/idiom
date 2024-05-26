@@ -99,6 +99,7 @@ impl DelBuffer {
     fn new(line: usize, char: usize, text: &mut impl EditorLine) -> Self {
         Self { line, char, text: text.remove(char).into(), clock: Instant::now() }
     }
+
     fn del(&mut self, line: usize, char: usize, text: &mut impl EditorLine) -> Option<Edit> {
         if line == self.line && char == self.char && self.clock.elapsed() <= TICK {
             self.clock = Instant::now();
@@ -153,7 +154,7 @@ impl BackspaceBuffer {
         let chars_after_indent = text[..char].trim_start_matches(indent);
         if chars_after_indent.is_empty() {
             self.text.push_str(indent);
-            text.replace_range(..indent.len(), "");
+            text.replace_till(indent.len(), "");
             self.last -= indent.len();
             return;
         }

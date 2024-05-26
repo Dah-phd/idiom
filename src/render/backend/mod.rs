@@ -14,6 +14,7 @@ pub use crossterm_backend::{
 use crate::render::layout::Rect;
 
 /// If stdout is returning errors the program should crash -> use expect
+#[allow(dead_code)] // impl all utilities although not all are used
 pub trait BackendProtocol: Write + Sized {
     fn init() -> Self;
 

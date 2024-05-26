@@ -13,6 +13,10 @@ More documentation will not come very soon - current focus is developing basic f
 - Linux Fedora derivate (Nobara)
 
 ## TODO
+- enforce rerender of info modal on update
+- add styling on info modal
+
+
 - add state upone closing
 - cleanup workspace render
 - optimize the cache to reduce imput lag

@@ -1,6 +1,6 @@
 use crate::render::{
     backend::{Backend, BackendProtocol, Style},
-    utils::{truncate_str, truncate_str_start},
+    utils::UTF8Safe,
 };
 use std::{
     cmp::Ordering,
@@ -33,25 +33,25 @@ impl Line {
 
     #[inline]
     pub fn render_centered(self, text: &str, backend: &mut Backend) {
-        let text = truncate_str(text, self.width);
+        let text = text.truncate_width(self.width);
         backend.print_at(self.row, self.col, format!("{text:^width$}", width = self.width))
     }
 
     #[inline]
     pub fn render_centered_styled(self, text: &str, style: Style, backend: &mut Backend) {
-        let text = truncate_str(text, self.width);
+        let text = text.truncate_width(self.width);
         backend.print_styled_at(self.row, self.col, format!("{text:>width$}", width = self.width), style);
     }
 
     #[inline]
     pub fn render_left(self, text: &str, backend: &mut Backend) {
-        let text = truncate_str_start(text, self.width);
+        let text = text.truncate_width_start(self.width);
         backend.print_at(self.row, self.col, format!("{text:>width$}", width = self.width));
     }
 
     #[inline]
     pub fn render_left_styled(self, text: &str, style: Style, backend: &mut Backend) {
-        let text = truncate_str_start(text, self.width);
+        let text = text.truncate_width_start(self.width);
         backend.print_styled_at(self.row, self.col, format!("{text:^width$}", width = self.width), style);
     }
 
@@ -63,7 +63,7 @@ impl Line {
     #[inline]
     pub fn render(self, text: &str, backend: &mut Backend) {
         match text.len().cmp(&self.width) {
-            Ordering::Greater => backend.print_at(self.row, self.col, truncate_str(text, self.width)),
+            Ordering::Greater => backend.print_at(self.row, self.col, text.truncate_width(self.width)),
             Ordering::Equal => backend.print_at(self.row, self.col, text),
             Ordering::Less => backend.print_at(self.row, self.col, format!("{text:width$}", width = self.width)),
         }
@@ -72,7 +72,7 @@ impl Line {
     #[inline]
     pub fn render_styled(self, text: &str, style: Style, backend: &mut Backend) {
         match text.len().cmp(&self.width) {
-            Ordering::Greater => backend.print_styled_at(self.row, self.col, truncate_str(text, self.width), style),
+            Ordering::Greater => backend.print_styled_at(self.row, self.col, text.truncate_width(self.width), style),
             Ordering::Equal => backend.print_styled_at(self.row, self.col, text, style),
             Ordering::Less => {
                 backend.print_styled_at(self.row, self.col, format!("{text:width$}", width = self.width), style)
@@ -145,7 +145,7 @@ impl<'a> LineBuilder<'a> {
     /// returns Ok(bool) -> if true line is not full, false the line is finished
     pub fn push(&mut self, text: &str) -> bool {
         if text.len() > self.remaining {
-            self.backend.print(truncate_str(text, self.remaining));
+            self.backend.print(text.truncate_width(self.remaining));
             self.remaining = 0;
             return false;
         }
@@ -157,7 +157,7 @@ impl<'a> LineBuilder<'a> {
     /// push with style
     pub fn push_styled(&mut self, text: &str, style: Style) -> bool {
         if text.len() > self.remaining {
-            self.backend.print_styled(truncate_str(text, self.remaining), style);
+            self.backend.print_styled(text.truncate_width(self.remaining), style);
             self.remaining = 0;
             return false;
         }
@@ -196,7 +196,7 @@ impl<'a> LineBuilderRev<'a> {
     /// returns Ok(bool) -> if true line is not full, false the line is finished
     pub fn push(&mut self, text: &str) -> bool {
         if text.len() > self.remaining {
-            self.backend.print_at(self.row, self.col, truncate_str_start(text, self.remaining));
+            self.backend.print_at(self.row, self.col, text.truncate_width_start(self.remaining));
             self.remaining = 0;
             return false;
         }
@@ -208,7 +208,7 @@ impl<'a> LineBuilderRev<'a> {
     /// push with style
     pub fn push_styled(&mut self, text: &str, style: Style) -> bool {
         if text.len() > self.remaining {
-            self.backend.print_styled_at(self.row, self.col, truncate_str_start(text, self.remaining), style);
+            self.backend.print_styled_at(self.row, self.col, text.truncate_width_start(self.remaining), style);
             self.remaining = 0;
             return false;
         }

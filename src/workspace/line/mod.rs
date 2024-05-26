@@ -11,7 +11,7 @@ use crate::{
 pub use code::{CodeLine, CodeLineContext};
 use std::{
     fmt::Display,
-    ops::{Index, Range, RangeBounds, RangeFrom, RangeFull, RangeTo},
+    ops::{Index, Range, RangeBounds, RangeFrom, RangeTo},
     slice::SliceIndex,
     str::{CharIndices, Chars, MatchIndices},
 };
@@ -26,17 +26,19 @@ pub trait EditorLine:
     + Index<Range<usize>, Output = str>
     + Index<RangeTo<usize>, Output = str>
     + Index<RangeFrom<usize>, Output = str>
-    + Index<RangeFull, Output = str>
     + From<String>
     + Display
 {
+    fn is_ascii(&self) -> bool;
     fn insert(&mut self, idx: usize, ch: char);
     fn push(&mut self, ch: char);
     fn insert_str(&mut self, idx: usize, string: &str);
     fn push_str(&mut self, string: &str);
     fn push_line(&mut self, line: Self);
     fn len(&self) -> usize;
-    fn replace_range(&mut self, range: impl RangeBounds<usize>, string: &str);
+    fn replace_till(&mut self, to: usize, string: &str);
+    fn replace_from(&mut self, from: usize, string: &str);
+    fn replace_range(&mut self, range: Range<usize>, string: &str);
     fn split_off(&mut self, at: usize) -> Self;
     fn split_at(&self, mid: usize) -> (&str, &str);
     fn remove(&mut self, idx: usize) -> char;

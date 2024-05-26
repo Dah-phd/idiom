@@ -28,9 +28,6 @@ use std::{
 };
 use tokio::{io::AsyncWriteExt, process::Child, sync::mpsc, task::JoinHandle};
 
-#[cfg(build = "debug")]
-use crate::utils::debug_to_file;
-
 #[allow(clippy::upper_case_acronyms)]
 pub struct LSP {
     pub notifications: Arc<Mutex<Vec<GeneralNotification>>>,
@@ -80,19 +77,11 @@ impl LSP {
                     LSPMessage::Diagnostic(uri, params) => {
                         into_guard(&diagnostics_handler).insert(uri, params);
                     }
-                    LSPMessage::Request(inner) => {
-                        #[cfg(build = "debug")]
-                        debug_to_file("test_data.lsp_request", inner.to_string());
-                        requests_handler.lock().await.push(inner)
-                    }
+                    LSPMessage::Request(inner) => requests_handler.lock().await.push(inner),
                     LSPMessage::Error(_err) => {
-                        #[cfg(build = "debug")]
-                        debug_to_file("test_data.lsp_err", _err.to_string());
                         // TODO: investigate handle
                     }
                     LSPMessage::Unknown(_obj) => {
-                        #[cfg(build = "debug")]
-                        debug_to_file("test_data.lsp_unknown", _obj.to_string());
                         // TODO: investigate handle
                     }
                 }
@@ -134,8 +123,6 @@ impl LSP {
             }
             match Self::new(self.lsp_cmd.to_owned()).await {
                 Ok(lsp) => {
-                    #[cfg(build = "debug")]
-                    debug_to_file("test_data.restart", self.attempts);
                     let mut broken = std::mem::replace(self, lsp);
                     let _ = broken.dash_nine().await; // ensure old lsp is dead!
                     return Ok(Some(match broken.lsp_json_handler.await {

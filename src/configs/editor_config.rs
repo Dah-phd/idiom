@@ -32,7 +32,7 @@ impl IndentConfigs {
         if line.starts_with(&self.indent) {
             if let Some(first) = line.trim_start().chars().next() {
                 if self.unindent_before.contains(first) {
-                    line.replace_range(..self.indent.len(), "");
+                    line.replace_till(self.indent.len(), "");
                     return self.indent.len();
                 }
             }
