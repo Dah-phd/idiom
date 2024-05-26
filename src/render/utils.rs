@@ -11,6 +11,8 @@ pub trait UTF8Safe {
     fn truncate_width_start<'a>(&'a self, width: usize) -> &'a str;
     /// returns display len of the str
     fn width(&self) -> usize;
+    /// calcs the width at position
+    fn width_at(&self, at: usize) -> usize;
     /// returns utf8 chars len
     fn utf8_len(&self) -> usize;
     /// return utf8 split at char idx
@@ -71,6 +73,11 @@ impl UTF8Safe for str {
     }
 
     #[inline]
+    fn width_at(&self, at: usize) -> usize {
+        self.chars().take(at).fold(0, |l, r| l + UnicodeWidthChar::width(r).unwrap_or(0))
+    }
+
+    #[inline]
     fn utf8_len(&self) -> usize {
         self.chars().count()
     }
@@ -118,6 +125,11 @@ impl UTF8Safe for String {
     #[inline(always)]
     fn width(&self) -> usize {
         UnicodeWidthStr::width(self.as_str())
+    }
+
+    #[inline(always)]
+    fn width_at(&self, at: usize) -> usize {
+        self.as_str().width_at(at)
     }
 
     #[inline(always)]

@@ -461,6 +461,12 @@ impl<'a> CodeLineContext<'a> {
         let select = cursor.select_get();
         Self { line: cursor.line - line_number, char: cursor.char, select, lexer, line_number, line_number_offset }
     }
+
+    pub fn correct_cursor(&mut self, code_line: &CodeLine) {
+        if !code_line.is_ascii() {
+            self.char = code_line.content.width_at(self.char);
+        }
+    }
 }
 
 impl<'a> Context for CodeLineContext<'a> {
