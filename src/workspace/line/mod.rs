@@ -78,3 +78,6 @@ pub trait Context {
     fn count_skipped_to_cursor(&mut self, wrap_len: usize, remaining_lines: usize) -> usize;
     fn render_cursor(self, gs: &mut GlobalState);
 }
+
+#[cfg(test)]
+mod test;
