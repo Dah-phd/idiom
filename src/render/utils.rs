@@ -84,7 +84,7 @@ impl UTF8Safe for str {
 
     #[inline]
     fn utf8_split_at<'a>(&'a self, mid: usize) -> (&'a str, &'a str) {
-        self.split_at(derive_byte_idx(self, mid))
+        self.split_at(prev_char_bytes_end(self, mid))
     }
 
     #[inline]
@@ -97,17 +97,17 @@ impl UTF8Safe for str {
 
     #[inline]
     fn utf8_get_till<'a>(&'a self, to: usize) -> &'a str {
-        unsafe { self.get_unchecked(..find_bytes_end_after(self, to)) }
+        unsafe { self.get_unchecked(..prev_char_bytes_end(self, to)) }
     }
 
     #[inline]
     fn utf8_get<'a>(&'a self, from: usize, to: usize) -> &'a str {
-        unsafe { self.get_unchecked(find_bytes_end_after(self, from)..find_bytes_end_after(self, to)) }
+        unsafe { self.get_unchecked(prev_char_bytes_end(self, from)..prev_char_bytes_end(self, to)) }
     }
 
     #[inline]
     fn utf8_get_unbound<'a>(&'a self, from: usize) -> &'a str {
-        unsafe { self.get_unchecked(find_bytes_end_after(self, from)..) }
+        unsafe { self.get_unchecked(prev_char_bytes_end(self, from)..) }
     }
 }
 
@@ -165,51 +165,67 @@ impl UTF8Safe for String {
 
 impl UTF8SafeStringExt for String {
     fn utf8_insert(&mut self, idx: usize, ch: char) {
-        self.insert(find_bytes_end_after(self, idx), ch);
+        self.insert(prev_char_bytes_end(self, idx), ch);
     }
 
     fn utf8_insert_str(&mut self, idx: usize, string: &str) {
-        self.insert_str(find_bytes_end_after(self, idx), string)
+        self.insert_str(prev_char_bytes_end(self, idx), string)
     }
 
     fn utf8_remove(&mut self, idx: usize) -> char {
-        self.remove(derive_byte_idx(&self, idx))
+        self.remove(prev_char_bytes_end(&self, idx))
     }
 
     fn utf8_replace_range(&mut self, range: Range<usize>, text: &str) {
-        let start = derive_byte_idx(self, range.start);
-        let end = derive_byte_idx(self, range.end);
+        let start = prev_char_bytes_end(self, range.start);
+        let end = prev_char_bytes_end(self, range.end);
         self.replace_range(start..end, text);
     }
 
     fn utf8_replace_from(&mut self, from: usize, string: &str) {
-        self.truncate(derive_byte_idx(self, from));
+        self.truncate(prev_char_bytes_end(self, from));
         self.push_str(string);
     }
 
     fn utf8_replace_till(&mut self, to: usize, string: &str) {
-        self.replace_range(..derive_byte_idx(self, to), string);
+        self.replace_range(..prev_char_bytes_end(self, to), string);
     }
 }
 
 #[inline(always)]
-fn derive_byte_idx(text: &str, idx: usize) -> usize {
-    if let Some(byte_idx) = text.char_indices().nth(idx).map(|(byte_idx, ..)| byte_idx) {
-        return byte_idx;
+fn prev_char_bytes_end(text: &str, idx: usize) -> usize {
+    if idx == 0 {
+        return idx;
     }
-    panic!("Index out of bound! Max len {} with index {}", text.utf8_len(), idx);
-}
-
-#[inline(always)]
-fn find_bytes_end_after(text: &str, after: usize) -> usize {
-    text.char_indices().take(after).last().map(|(byte_idx, ch)| byte_idx + ch.len_utf8()).unwrap_or(0)
+    if let Some((byte_idx, ch)) = text.char_indices().nth(idx - 1) {
+        return byte_idx + ch.len_utf8();
+    }
+    panic!("Index out of bound! Max len {} with index {}", text.utf8_len(), idx)
 }
 
 #[cfg(test)]
 mod test {
     use super::{UTF8Safe, UTF8SafeStringExt};
     const TEXT: &str = "123🚀13";
-    const ASCII_TEXT: &str = "123abc";
+
+    #[test]
+    fn test_utf8_insert_str() {
+        let mut s = String::new();
+        s.utf8_insert_str(0, TEXT);
+        assert!(&s == TEXT);
+        s.utf8_insert_str(4, TEXT);
+        assert!(&s == "123🚀123🚀1313");
+    }
+
+    #[test]
+    fn test_utf8_insert() {
+        let mut s = String::new();
+        s.utf8_insert(0, '🚀');
+        assert!(&s == "🚀");
+        s.utf8_insert(1, '🚀');
+        s.utf8_insert(2, 'r');
+        assert!(&s == "🚀🚀r");
+    }
 
     #[test]
     #[should_panic]
@@ -249,20 +265,43 @@ mod test {
         s.replace_range(4.., ""); // in char boundry
     }
 
-    /// ensures on ascii behavior is the same
     #[test]
-    fn test_utf8_to_std_cmp() {
-        let mut s = String::from(ASCII_TEXT);
-        let mut std_s = s.clone();
-        s.utf8_replace_range(0..1, "3");
-        std_s.replace_range(0..1, "3");
-        assert_eq!(s, std_s);
-        s.utf8_replace_from(4, "bumba");
-        std_s.replace_range(4.., "bumba");
-        assert_eq!(s, std_s);
-        s.utf8_replace_till(2, "");
-        std_s.replace_range(..2, "");
-        assert_eq!(s, std_s);
+    fn test_utf8_replace_range() {
+        let mut s = String::new();
+        s.replace_range(0..0, "asd");
+        assert!(&s == "asd");
+        s.clear();
+        s.utf8_replace_range(0..0, "🚀🚀");
+        assert_eq!(&s, "🚀🚀");
+        s.utf8_replace_range(1..2, "asd");
+        assert_eq!(&s, "🚀asd");
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_utf8_replace_range_panic() {
+        let mut s = String::new();
+        s.utf8_replace_range(0..1, "panic");
+    }
+
+    #[test]
+    fn test_replace_from() {
+        let mut s = String::from("text");
+        s.utf8_replace_from(0, "123");
+        assert!(&s == "123");
+        s.clear();
+        s.utf8_replace_from(0, "123");
+        assert!(&s == "123");
+    }
+
+    #[test]
+    fn test_replace_till() {
+        let mut s = String::from("🚀🚀");
+        s.utf8_replace_till(1, "asd");
+        assert!(&s == "asd🚀");
+        s.clear();
+        s.utf8_replace_till(0, "🚀");
+        assert_eq!(&s, "🚀");
     }
 
     #[test]
@@ -298,5 +337,12 @@ mod test {
         assert_eq!(s.utf8_remove(4), '1');
         assert_eq!(s.utf8_remove(3), '🚀');
         assert_eq!(&s, "1233");
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_utf8_remove_panic() {
+        let mut s = String::new();
+        s.utf8_remove(0);
     }
 }

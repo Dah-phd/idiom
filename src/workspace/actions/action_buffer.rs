@@ -1,6 +1,9 @@
-use crate::workspace::{
-    actions::edits::{Edit, EditMetaData},
-    line::EditorLine,
+use crate::{
+    render::UTF8Safe,
+    workspace::{
+        actions::edits::{Edit, EditMetaData},
+        line::EditorLine,
+    },
 };
 use lsp_types::{Position, Range, TextEdit};
 use std::time::{Duration, Instant};
@@ -116,7 +119,7 @@ impl From<DelBuffer> for Edit {
         Edit {
             meta: EditMetaData::line_changed(buf.line),
             text_edit: TextEdit::new(
-                Range::new(start, Position::new(buf.line as u32, (buf.char + buf.text.len()) as u32)),
+                Range::new(start, Position::new(buf.line as u32, (buf.char + buf.text.utf8_len()) as u32)),
                 String::new(),
             ),
             reverse_text_edit: TextEdit::new(Range::new(start, start), buf.text),

@@ -287,7 +287,7 @@ impl EditorLine for CodeLine {
                 select: None,
             };
         } else {
-            let (current, new) = self.content.split_at(at);
+            let (current, new) = self.content.utf8_split_at(at);
             let content = new.to_owned();
             self.content = current.to_owned();
             self.utf8_len = self.content.utf8_len();
