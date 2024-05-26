@@ -11,7 +11,7 @@ use crate::{
 pub use code::{CodeLine, CodeLineContext};
 use std::{
     fmt::Display,
-    ops::{Index, Range, RangeBounds, RangeFrom, RangeTo},
+    ops::{Index, Range, RangeFrom, RangeTo},
     slice::SliceIndex,
     str::{CharIndices, Chars, MatchIndices},
 };

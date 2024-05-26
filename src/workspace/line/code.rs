@@ -123,25 +123,27 @@ impl EditorLine for CodeLine {
 
     #[inline]
     fn replace_till(&mut self, to: usize, string: &str) {
+        self.rendered_at = 0;
         if self.content.len() == self.utf8_len {
             self.utf8_len += string.utf8_len();
             self.utf8_len -= to;
-            self.content.replace_range(..to, string);
-        } else {
-            todo!()
+            return self.content.replace_range(..to, string);
         }
+        self.utf8_len += string.utf8_len();
+        self.utf8_len -= to;
+        self.content.utf8_replace_till(to, string)
     }
 
     #[inline]
     fn replace_from(&mut self, from: usize, string: &str) {
+        self.rendered_at = 0;
         if self.content.len() == self.utf8_len {
-            self.utf8_len += string.utf8_len();
-            self.utf8_len -= from;
+            self.utf8_len = from + string.utf8_len();
             self.content.truncate(from);
-            self.content.push_str(string);
-        } else {
-            todo!()
+            return self.content.push_str(string);
         }
+        self.utf8_len = from + string.utf8_len();
+        self.content.utf8_replace_from(from, string)
     }
 
     #[inline]
@@ -150,10 +152,11 @@ impl EditorLine for CodeLine {
         if self.utf8_len == self.content.len() {
             self.utf8_len += string.utf8_len();
             self.utf8_len -= range.len();
-            self.content.replace_range(range, string);
-        } else {
-            self.content.utf8_replace_range(range, string);
+            return self.content.replace_range(range, string);
         }
+        self.utf8_len += string.utf8_len();
+        self.utf8_len -= range.len();
+        self.content.utf8_replace_range(range, string)
     }
 
     #[inline]
@@ -175,10 +178,10 @@ impl EditorLine for CodeLine {
     fn insert(&mut self, idx: usize, ch: char) {
         self.rendered_at = 0;
         if self.utf8_len == self.content.len() {
-            self.utf8_len += ch.len_utf8();
+            self.utf8_len += 1;
             self.content.insert(idx, ch);
         } else {
-            self.utf8_len += ch.len_utf8();
+            self.utf8_len += 1;
             self.content.utf8_insert(idx, ch);
         }
     }
@@ -186,7 +189,7 @@ impl EditorLine for CodeLine {
     #[inline]
     fn push(&mut self, ch: char) {
         self.rendered_at = 0;
-        self.utf8_len += ch.len_utf8();
+        self.utf8_len += 1;
         self.content.push(ch);
     }
 
@@ -197,7 +200,7 @@ impl EditorLine for CodeLine {
             self.utf8_len += string.utf8_len();
             self.content.insert_str(idx, string);
         } else {
-            self.utf8_len += string.len();
+            self.utf8_len += string.utf8_len();
             self.content.utf8_insert_str(idx, string);
         }
     }
@@ -233,9 +236,8 @@ impl EditorLine for CodeLine {
             self.utf8_len -= 1;
             return self.content.remove(idx);
         }
-        let ch = self.content.utf8_remove(idx);
-        self.utf8_len -= ch.len_utf8();
-        ch
+        self.utf8_len -= 1;
+        self.content.utf8_remove(idx)
     }
 
     #[inline]
