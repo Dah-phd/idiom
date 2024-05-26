@@ -99,3 +99,17 @@ fn test_replace_from() {
     assert!(line.len() == 5);
     assert!(&line.to_string() == "123🚀🚀");
 }
+
+#[test]
+fn test_remove() {
+    let mut line = CodeLine::new("text🚀123".to_owned());
+    assert!(!line.is_ascii());
+    assert!(line.len() == 8);
+    assert!('1' == line.remove(5));
+    assert!(line.len() == 7);
+    assert!(!line.is_ascii());
+    assert!('🚀' == line.remove(4));
+    assert!(line.is_ascii());
+    assert!(line.len() == 6);
+    assert!(&line.to_string() == "text23");
+}
