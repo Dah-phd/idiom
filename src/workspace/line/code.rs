@@ -20,7 +20,6 @@ use std::{
     cmp::Ordering,
     fmt::Display,
     ops::{Index, Range, RangeFrom, RangeTo},
-    slice::SliceIndex,
 };
 
 use super::utils::inline_diagnostics;
@@ -29,7 +28,7 @@ use super::utils::inline_diagnostics;
 pub struct CodeLine {
     content: String,
     // keeps trach of utf8 char len
-    utf8_len: usize,
+    char_len: usize,
     // syntax
     tokens: Vec<Token>,
     diagnostics: Option<DiagnosticLine>,
@@ -54,7 +53,7 @@ impl From<String> for CodeLine {
 impl CodeLine {
     pub fn new(content: String) -> Self {
         Self {
-            utf8_len: content.utf8_len(),
+            char_len: content.char_len(),
             content,
             tokens: Vec::new(),
             diagnostics: None,
@@ -68,7 +67,7 @@ impl Index<Range<usize>> for CodeLine {
     type Output = str;
     #[inline]
     fn index(&self, index: Range<usize>) -> &Self::Output {
-        if self.utf8_len == self.content.len() {
+        if self.char_len == self.content.len() {
             &self.content[index]
         } else {
             self.content.utf8_unsafe_get(index.start, index.end)
@@ -80,10 +79,10 @@ impl Index<RangeTo<usize>> for CodeLine {
     type Output = str;
     #[inline]
     fn index(&self, index: RangeTo<usize>) -> &Self::Output {
-        if self.utf8_len == self.content.len() {
+        if self.char_len == self.content.len() {
             &self.content[index]
         } else {
-            self.content.utf8_unsafe_get_till(index.end)
+            self.content.utf8_unsafe_get_to(index.end)
         }
     }
 }
@@ -92,7 +91,7 @@ impl Index<RangeFrom<usize>> for CodeLine {
     type Output = str;
     #[inline]
     fn index(&self, index: RangeFrom<usize>) -> &Self::Output {
-        if self.utf8_len == self.content.len() {
+        if self.char_len == self.content.len() {
             &self.content[index]
         } else {
             self.content.utf8_unsafe_get_from(index.start)
@@ -103,7 +102,7 @@ impl Index<RangeFrom<usize>> for CodeLine {
 impl EditorLine for CodeLine {
     #[inline]
     fn is_ascii(&self) -> bool {
-        self.content.len() == self.utf8_len
+        self.content.len() == self.char_len
     }
 
     #[inline]
@@ -112,48 +111,64 @@ impl EditorLine for CodeLine {
     }
 
     #[inline]
-    fn get<I: SliceIndex<str>>(&self, i: I) -> Option<&I::Output> {
-        if self.utf8_len == self.content.len() {
-            return self.content.get(i);
+    fn get(&self, from: usize, to: usize) -> Option<&str> {
+        if self.char_len == self.content.len() {
+            return self.content.get(from..to);
         }
-        None
+        self.content.utf8_get(from, to)
+    }
+
+    #[inline]
+    fn get_from(&self, from: usize) -> Option<&str> {
+        if self.char_len == self.content.len() {
+            return self.content.get(from..);
+        }
+        self.content.utf8_get_from(from)
+    }
+
+    #[inline]
+    fn get_to(&self, to: usize) -> Option<&str> {
+        if self.char_len == self.content.len() {
+            return self.content.get(..to);
+        }
+        self.content.utf8_get_to(to)
     }
 
     #[inline]
     fn replace_till(&mut self, to: usize, string: &str) {
         self.rendered_at = 0;
-        if self.content.len() == self.utf8_len {
-            self.utf8_len += string.utf8_len();
-            self.utf8_len -= to;
+        if self.content.len() == self.char_len {
+            self.char_len += string.char_len();
+            self.char_len -= to;
             return self.content.replace_range(..to, string);
         }
-        self.utf8_len += string.utf8_len();
-        self.utf8_len -= to;
+        self.char_len += string.char_len();
+        self.char_len -= to;
         self.content.utf8_replace_till(to, string)
     }
 
     #[inline]
     fn replace_from(&mut self, from: usize, string: &str) {
         self.rendered_at = 0;
-        if self.content.len() == self.utf8_len {
-            self.utf8_len = from + string.utf8_len();
+        if self.content.len() == self.char_len {
+            self.char_len = from + string.char_len();
             self.content.truncate(from);
             return self.content.push_str(string);
         }
-        self.utf8_len = from + string.utf8_len();
+        self.char_len = from + string.char_len();
         self.content.utf8_replace_from(from, string)
     }
 
     #[inline]
     fn replace_range(&mut self, range: Range<usize>, string: &str) {
         self.rendered_at = 0;
-        if self.utf8_len == self.content.len() {
-            self.utf8_len += string.utf8_len();
-            self.utf8_len -= range.len();
+        if self.char_len == self.content.len() {
+            self.char_len += string.char_len();
+            self.char_len -= range.len();
             return self.content.replace_range(range, string);
         }
-        self.utf8_len += string.utf8_len();
-        self.utf8_len -= range.len();
+        self.char_len += string.char_len();
+        self.char_len -= range.len();
         self.content.utf8_replace_range(range, string)
     }
 
@@ -175,11 +190,11 @@ impl EditorLine for CodeLine {
     #[inline]
     fn insert(&mut self, idx: usize, ch: char) {
         self.rendered_at = 0;
-        if self.utf8_len == self.content.len() {
-            self.utf8_len += 1;
+        if self.char_len == self.content.len() {
+            self.char_len += 1;
             self.content.insert(idx, ch);
         } else {
-            self.utf8_len += 1;
+            self.char_len += 1;
             self.content.utf8_insert(idx, ch);
         }
     }
@@ -187,18 +202,18 @@ impl EditorLine for CodeLine {
     #[inline]
     fn push(&mut self, ch: char) {
         self.rendered_at = 0;
-        self.utf8_len += 1;
+        self.char_len += 1;
         self.content.push(ch);
     }
 
     #[inline]
     fn insert_str(&mut self, idx: usize, string: &str) {
         self.rendered_at = 0;
-        if self.utf8_len == self.content.len() {
-            self.utf8_len += string.utf8_len();
+        if self.char_len == self.content.len() {
+            self.char_len += string.char_len();
             self.content.insert_str(idx, string);
         } else {
-            self.utf8_len += string.utf8_len();
+            self.char_len += string.char_len();
             self.content.utf8_insert_str(idx, string);
         }
     }
@@ -206,14 +221,14 @@ impl EditorLine for CodeLine {
     #[inline]
     fn push_str(&mut self, string: &str) {
         self.rendered_at = 0;
-        self.utf8_len += string.utf8_len();
+        self.char_len += string.char_len();
         self.content.push_str(string);
     }
 
     #[inline]
     fn push_line(&mut self, line: Self) {
         self.rendered_at = 0;
-        self.utf8_len += line.utf8_len;
+        self.char_len += line.char_len;
         self.content.push_str(&line.content)
     }
 
@@ -230,11 +245,11 @@ impl EditorLine for CodeLine {
     #[inline]
     fn remove(&mut self, idx: usize) -> char {
         self.rendered_at = 0;
-        if self.content.len() == self.utf8_len {
-            self.utf8_len -= 1;
+        if self.content.len() == self.char_len {
+            self.char_len -= 1;
             return self.content.remove(idx);
         }
-        self.utf8_len -= 1;
+        self.char_len -= 1;
         self.content.utf8_remove(idx)
     }
 
@@ -273,12 +288,12 @@ impl EditorLine for CodeLine {
     #[inline]
     fn split_off(&mut self, at: usize) -> Self {
         self.rendered_at = 0;
-        if self.content.len() == self.utf8_len {
-            let split_off_len = self.utf8_len - at;
+        if self.content.len() == self.char_len {
+            let split_off_len = self.char_len - at;
             self.tokens.clear();
             return Self {
                 content: self.content.split_off(at),
-                utf8_len: split_off_len,
+                char_len: split_off_len,
                 tokens: Vec::new(),
                 diagnostics: self.diagnostics.take(),
                 rendered_at: 0,
@@ -288,10 +303,10 @@ impl EditorLine for CodeLine {
             let (current, new) = self.content.utf8_split_at(at);
             let content = new.to_owned();
             self.content = current.to_owned();
-            self.utf8_len = self.content.utf8_len();
+            self.char_len = self.content.char_len();
             self.tokens.clear();
             Self {
-                utf8_len: content.utf8_len(),
+                char_len: content.char_len(),
                 content,
                 tokens: Vec::new(),
                 diagnostics: self.diagnostics.take(),
@@ -303,7 +318,7 @@ impl EditorLine for CodeLine {
 
     #[inline]
     fn split_at(&self, mid: usize) -> (&str, &str) {
-        if self.content.len() == self.utf8_len {
+        if self.content.len() == self.char_len {
             self.content.split_at(mid)
         } else {
             self.content.utf8_split_at(mid)
@@ -312,7 +327,7 @@ impl EditorLine for CodeLine {
 
     #[inline]
     fn char_len(&self) -> usize {
-        self.utf8_len
+        self.char_len
     }
 
     #[inline]
@@ -409,7 +424,7 @@ impl EditorLine for CodeLine {
                         ctx.lexer().theme.selected,
                         backend,
                     );
-                    inline_diagnostics(line_width - self.utf8_len, &self.diagnostics, backend);
+                    inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
                 } else {
                     let end_loc = line_width.saturating_sub(2);
                     build_line_select(
@@ -425,7 +440,7 @@ impl EditorLine for CodeLine {
             None => {
                 if line_width > self.content.len() {
                     build_line(&self.content, &self.tokens, backend);
-                    inline_diagnostics(line_width - self.utf8_len, &self.diagnostics, backend);
+                    inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
                 } else {
                     let max_len = line_width.saturating_sub(2);
                     shrank_line(&self.content.truncate_width(max_len), &self.tokens, backend);

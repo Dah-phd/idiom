@@ -119,7 +119,7 @@ impl From<DelBuffer> for Edit {
         Edit {
             meta: EditMetaData::line_changed(buf.line),
             text_edit: TextEdit::new(
-                Range::new(start, Position::new(buf.line as u32, (buf.char + buf.text.utf8_len()) as u32)),
+                Range::new(start, Position::new(buf.line as u32, (buf.char + buf.text.char_len()) as u32)),
                 String::new(),
             ),
             reverse_text_edit: TextEdit::new(Range::new(start, start), buf.text),

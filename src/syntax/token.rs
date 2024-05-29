@@ -127,12 +127,12 @@ pub fn set_tokens(
         let to = from + token.length as usize;
         // enriches the tokens with additinal highlights
         if from.saturating_sub(char_idx + len) > 3 {
-            content[line_idx].get(char_idx + len..from).inspect(|snippet| {
+            content[line_idx].get(char_idx + len, from).inspect(|snippet| {
                 Token::enrich(char_idx, lang, theme, snippet, &mut token_line);
             });
         };
         len = token.length as usize;
-        let token_type = match content[line_idx].get(from..from + len) {
+        let token_type = match content[line_idx].get(from, from + len) {
             Some(word) => legend.parse_to_color(token.token_type as usize, theme, lang, word),
             None => theme.default,
         };
@@ -171,12 +171,12 @@ pub fn set_tokens_partial(
         let to = from + token.length as usize;
         // enriches the tokens with additinal highlights
         if from.saturating_sub(char_idx + len) > 3 {
-            content[line_idx].get(char_idx + len..from).inspect(|snippet| {
+            content[line_idx].get(char_idx + len, from).inspect(|snippet| {
                 Token::enrich(char_idx, lang, theme, snippet, &mut token_line);
             });
         };
         len = token.length as usize;
-        let token_type = match content[line_idx].get(from..from + len) {
+        let token_type = match content[line_idx].get(from, from + len) {
             Some(word) => legend.parse_to_color(token.token_type as usize, theme, lang, word),
             None => theme.default,
         };

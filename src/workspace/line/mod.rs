@@ -12,7 +12,6 @@ pub use code::{CodeLine, CodeLineContext};
 use std::{
     fmt::Display,
     ops::{Index, Range, RangeFrom, RangeTo},
-    slice::SliceIndex,
     str::{CharIndices, Chars, MatchIndices},
 };
 
@@ -56,7 +55,9 @@ pub trait EditorLine:
     fn insert_content_to_buffer(&self, at: usize, buffer: &mut String);
     fn clear(&mut self);
     fn unwrap(self) -> String;
-    fn get<I: SliceIndex<str>>(&self, i: I) -> Option<&I::Output>;
+    fn get(&self, from: usize, to: usize) -> Option<&str>;
+    fn get_from(&self, from: usize) -> Option<&str>;
+    fn get_to(&self, to: usize) -> Option<&str>;
     fn set_diagnostics(&mut self, diagnostics: DiagnosticLine);
     fn diagnostic_info(&self, lang: &Lang) -> Option<DiagnosticInfo>;
     fn drop_diagnostics(&mut self);

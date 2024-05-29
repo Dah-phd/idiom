@@ -16,7 +16,7 @@ pub struct Text {
 impl Text {
     fn new(string: impl Into<String>) -> Self {
         let inner = string.into();
-        let utf8_len = inner.utf8_len();
+        let utf8_len = inner.char_len();
         let width = inner.width();
         Self { inner, utf8_len, width }
     }
@@ -29,7 +29,7 @@ impl Text {
     #[inline]
     fn replace_from(&mut self, from: usize, string: &str) {
         if self.utf8_len == self.inner.len() {
-            self.utf8_len += string.utf8_len();
+            self.utf8_len += string.char_len();
             self.width += string.width();
             self.inner.truncate(from);
             self.inner.push_str(string);
@@ -42,7 +42,7 @@ impl Text {
     #[inline]
     fn replace_till(&mut self, to: usize, string: &str) {
         if self.utf8_len == self.inner.len() {
-            self.utf8_len += string.utf8_len();
+            self.utf8_len += string.char_len();
             self.width += string.width();
             self.inner.replace_range(..to, string);
         } else {
@@ -54,7 +54,7 @@ impl Text {
     #[inline]
     fn replace_range(&mut self, range: Range<usize>, string: &str) {
         if self.utf8_len == self.inner.len() {
-            self.utf8_len += string.utf8_len();
+            self.utf8_len += string.char_len();
             self.width += string.width();
             self.inner.replace_range(range, string);
         } else {
@@ -91,7 +91,7 @@ impl Text {
 
     #[inline]
     fn recalc(&mut self) {
-        self.utf8_len = self.inner.utf8_len();
+        self.utf8_len = self.inner.char_len();
         self.width = self.inner.width();
     }
 }

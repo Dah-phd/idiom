@@ -13,19 +13,19 @@ pub enum Word {
 
 impl From<String> for Word {
     fn from(text: String) -> Self {
-        Self::Raw { utf8_len: text.utf8_len(), width: text.width(), text }
+        Self::Raw { utf8_len: text.char_len(), width: text.width(), text }
     }
 }
 
 impl From<(String, Style)> for Word {
     fn from((text, style): (String, Style)) -> Self {
-        Self::Styled { utf8_len: text.utf8_len(), width: text.width(), text, style }
+        Self::Styled { utf8_len: text.char_len(), width: text.width(), text, style }
     }
 }
 
 impl From<(Style, String)> for Word {
     fn from((style, text): (Style, String)) -> Self {
-        Self::Styled { utf8_len: text.utf8_len(), width: text.width(), text, style }
+        Self::Styled { utf8_len: text.char_len(), width: text.width(), text, style }
     }
 }
 
