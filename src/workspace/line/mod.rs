@@ -36,6 +36,8 @@ pub trait EditorLine:
     fn push_str(&mut self, string: &str);
     fn push_line(&mut self, line: Self);
     fn len(&self) -> usize;
+    fn utf16_len(&self) -> usize;
+    fn char_len(&self) -> usize;
     fn replace_till(&mut self, to: usize, string: &str);
     fn replace_from(&mut self, from: usize, string: &str);
     fn replace_range(&mut self, range: Range<usize>, string: &str);
@@ -65,7 +67,6 @@ pub trait EditorLine:
     fn render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend);
     fn fast_render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend);
     fn clear_cache(&mut self);
-    unsafe fn get_unchecked<I: SliceIndex<str>>(&self, i: I) -> &I::Output;
 }
 
 pub trait Context {

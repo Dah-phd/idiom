@@ -71,7 +71,7 @@ impl Index<Range<usize>> for CodeLine {
         if self.utf8_len == self.content.len() {
             &self.content[index]
         } else {
-            self.content.utf8_get(index.start, index.end)
+            self.content.utf8_unsafe_get(index.start, index.end)
         }
     }
 }
@@ -83,7 +83,7 @@ impl Index<RangeTo<usize>> for CodeLine {
         if self.utf8_len == self.content.len() {
             &self.content[index]
         } else {
-            self.content.utf8_get_till(index.end)
+            self.content.utf8_unsafe_get_till(index.end)
         }
     }
 }
@@ -95,7 +95,7 @@ impl Index<RangeFrom<usize>> for CodeLine {
         if self.utf8_len == self.content.len() {
             &self.content[index]
         } else {
-            self.content.utf8_get_unbound(index.start)
+            self.content.utf8_unsafe_get_from(index.start)
         }
     }
 }
@@ -113,12 +113,10 @@ impl EditorLine for CodeLine {
 
     #[inline]
     fn get<I: SliceIndex<str>>(&self, i: I) -> Option<&I::Output> {
-        self.content.get(i)
-    }
-
-    #[inline]
-    unsafe fn get_unchecked<I: SliceIndex<str>>(&self, i: I) -> &I::Output {
-        self.content.get_unchecked(i)
+        if self.utf8_len == self.content.len() {
+            return self.content.get(i);
+        }
+        None
     }
 
     #[inline]
@@ -313,8 +311,18 @@ impl EditorLine for CodeLine {
     }
 
     #[inline]
-    fn len(&self) -> usize {
+    fn char_len(&self) -> usize {
         self.utf8_len
+    }
+
+    #[inline]
+    fn len(&self) -> usize {
+        self.content.len()
+    }
+
+    #[inline]
+    fn utf16_len(&self) -> usize {
+        self.content.chars().fold(0, |sum, ch| sum + ch.len_utf16())
     }
 
     #[inline]

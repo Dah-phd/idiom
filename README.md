@@ -13,9 +13,10 @@ More documentation will not come very soon - current focus is developing basic f
 - Linux Fedora derivate (Nobara)
 
 ## TODO
-- fix issue when syncing utf8 values longer than byte on remove buffer
-- fix issue on undo
+- fix issue when syncing utf16 position longer than one
 - fix syntax highlighting on utf8 values longer than 1 byte
+ => you can try to sync buffers per line >> using clone of the original line
+ => so once different key from prev call is triggered it will convert the line to sync event
 - enforce rerender of info modal on update
 - add styling on info modal
 

@@ -65,7 +65,7 @@ impl Editor {
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if self.cursor.line == line_idx {
                 ctx.correct_cursor(text);
-                if text.len() > self.cursor.text_width {
+                if text.char_len() > self.cursor.text_width {
                     text.wrapped_render(&mut ctx, &mut lines, &mut gs.writer);
                 } else if let Some(line) = lines.next() {
                     text.render(&mut ctx, line, &mut gs.writer);
@@ -97,7 +97,7 @@ impl Editor {
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if self.cursor.line == line_idx {
                 ctx.correct_cursor(text);
-                if text.len() > self.cursor.text_width {
+                if text.char_len() > self.cursor.text_width {
                     text.wrapped_render(&mut ctx, &mut lines, &mut gs.writer);
                 } else if let Some(line) = lines.next() {
                     text.render(&mut ctx, line, &mut gs.writer);
@@ -180,7 +180,7 @@ impl Editor {
         if self.content.len() > next_line {
             self.cursor.select_set(start, CursorPosition { line: next_line, char: 0 });
         } else {
-            let char = self.content[start.line].len();
+            let char = self.content[start.line].char_len();
             if char == 0 {
                 return;
             };
@@ -313,7 +313,7 @@ impl Editor {
             CursorPosition::default(),
             CursorPosition {
                 line: self.content.len() - 1,
-                char: self.content.last().map(|line| line.len()).unwrap_or_default(),
+                char: self.content.last().map(|line| line.char_len()).unwrap_or_default(),
             },
         );
     }

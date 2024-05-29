@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{ops::Range, usize};
 
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
@@ -19,12 +19,18 @@ pub trait UTF8Safe {
     fn utf8_split_at<'a>(&'a self, mid: usize) -> (&'a str, &'a str);
     /// splits utf8 if not ascii (needs precalculated utf8 len)
     fn utf8_cached_split_at<'a>(&'a self, mid: usize, utf8_len: usize) -> (&'a str, &'a str);
-    /// limits str to char idx
-    fn utf8_get_till<'a>(&'a self, to: usize) -> &'a str;
     /// limits str within range based on utf char locations
-    fn utf8_get<'a>(&'a self, from: usize, to: usize) -> &'a str;
+    fn utf8_unsafe_get<'a>(&'a self, from: usize, to: usize) -> &'a str;
     /// removes "from" chars from the begining of the string
-    fn utf8_get_unbound<'a>(&'a self, from: usize) -> &'a str;
+    fn utf8_unsafe_get_from<'a>(&'a self, from: usize) -> &'a str;
+    /// limits str to char idx
+    fn utf8_unsafe_get_till<'a>(&'a self, to: usize) -> &'a str;
+    /// get checked utf8 slice
+    fn utf8_get<'a>(&'a self, from: usize, to: usize) -> Option<&'a str>;
+    /// get checked utf8 from
+    fn utf8_get_from<'a>(&'a self, from: usize) -> Option<&'a str>;
+    /// get checked utf8 to
+    fn utf8_get_till<'a>(&'a self, to: usize) -> Option<&'a str>;
 }
 
 /// String specific extension
@@ -96,18 +102,35 @@ impl UTF8Safe for str {
     }
 
     #[inline]
-    fn utf8_get_till<'a>(&'a self, to: usize) -> &'a str {
-        unsafe { self.get_unchecked(..prev_char_bytes_end(self, to)) }
+    fn utf8_get<'a>(&'a self, from: usize, to: usize) -> Option<&'a str> {
+        maybe_prev_char_bytes_end(self, from)
+            .and_then(|from_checked| Some(from_checked..maybe_prev_char_bytes_end(self, to)?))
+            .map(|range| unsafe { self.get_unchecked(range) })
     }
 
     #[inline]
-    fn utf8_get<'a>(&'a self, from: usize, to: usize) -> &'a str {
+    fn utf8_get_from<'a>(&'a self, from: usize) -> Option<&'a str> {
+        maybe_prev_char_bytes_end(self, from).map(|from_checked| unsafe { self.get_unchecked(from_checked..) })
+    }
+
+    #[inline]
+    fn utf8_get_till<'a>(&'a self, to: usize) -> Option<&'a str> {
+        maybe_prev_char_bytes_end(self, to).map(|to_checked| unsafe { self.get_unchecked(..to_checked) })
+    }
+
+    #[inline]
+    fn utf8_unsafe_get<'a>(&'a self, from: usize, to: usize) -> &'a str {
         unsafe { self.get_unchecked(prev_char_bytes_end(self, from)..prev_char_bytes_end(self, to)) }
     }
 
     #[inline]
-    fn utf8_get_unbound<'a>(&'a self, from: usize) -> &'a str {
+    fn utf8_unsafe_get_from<'a>(&'a self, from: usize) -> &'a str {
         unsafe { self.get_unchecked(prev_char_bytes_end(self, from)..) }
+    }
+
+    #[inline]
+    fn utf8_unsafe_get_till<'a>(&'a self, to: usize) -> &'a str {
+        unsafe { self.get_unchecked(..prev_char_bytes_end(self, to)) }
     }
 }
 
@@ -147,19 +170,34 @@ impl UTF8Safe for String {
         self.as_str().utf8_cached_split_at(mid, utf8_len)
     }
 
-    #[inline(always)]
-    fn utf8_get_till<'a>(&'a self, to: usize) -> &'a str {
-        self.as_str().utf8_get_till(to)
-    }
-
     #[inline]
-    fn utf8_get<'a>(&'a self, from: usize, to: usize) -> &'a str {
+    fn utf8_get<'a>(&'a self, from: usize, to: usize) -> Option<&'a str> {
         self.as_str().utf8_get(from, to)
     }
 
     #[inline]
-    fn utf8_get_unbound<'a>(&'a self, from: usize) -> &'a str {
-        self.as_str().utf8_get_unbound(from)
+    fn utf8_get_from<'a>(&'a self, from: usize) -> Option<&'a str> {
+        self.as_str().utf8_get_from(from)
+    }
+
+    #[inline]
+    fn utf8_get_till<'a>(&'a self, to: usize) -> Option<&'a str> {
+        self.as_str().utf8_get_till(to)
+    }
+
+    #[inline]
+    fn utf8_unsafe_get<'a>(&'a self, from: usize, to: usize) -> &'a str {
+        self.as_str().utf8_unsafe_get(from, to)
+    }
+
+    #[inline]
+    fn utf8_unsafe_get_from<'a>(&'a self, from: usize) -> &'a str {
+        self.as_str().utf8_unsafe_get_from(from)
+    }
+
+    #[inline(always)]
+    fn utf8_unsafe_get_till<'a>(&'a self, to: usize) -> &'a str {
+        self.as_str().utf8_unsafe_get_till(to)
     }
 }
 
@@ -201,6 +239,14 @@ fn prev_char_bytes_end(text: &str, idx: usize) -> usize {
         return byte_idx + ch.len_utf8();
     }
     panic!("Index out of bound! Max len {} with index {}", text.utf8_len(), idx)
+}
+
+#[inline(always)]
+fn maybe_prev_char_bytes_end(text: &str, idx: usize) -> Option<usize> {
+    if idx == 0 {
+        return Some(idx);
+    }
+    text.char_indices().nth(idx - 1).map(|(byte_idx, ch)| byte_idx + ch.len_utf8())
 }
 
 #[cfg(test)]
@@ -337,6 +383,28 @@ mod test {
         assert_eq!(s.utf8_remove(4), '1');
         assert_eq!(s.utf8_remove(3), '🚀');
         assert_eq!(&s, "1233");
+    }
+
+    #[test]
+    fn test_utf8_get() {
+        assert_eq!(TEXT.utf8_get(0, 10), None);
+        assert_eq!(TEXT.utf8_get(0, 3), Some("123"));
+        assert_eq!(TEXT.utf8_get(3, 4), Some("🚀"));
+    }
+
+    #[test]
+    fn test_utf8_get_from() {
+        assert_eq!(TEXT.utf8_get_from(10), None);
+        assert_eq!(TEXT.utf8_get_from(0), Some(TEXT));
+        assert_eq!(TEXT.utf8_get_from(3), Some("🚀13"));
+        assert_eq!(TEXT.utf8_get_from(4), Some("13"));
+    }
+
+    #[test]
+    fn test_utf8_get_till() {
+        assert_eq!(TEXT.utf8_get_till(10), None);
+        assert_eq!(TEXT.utf8_get_till(3), Some("123"));
+        assert_eq!(TEXT.utf8_get_till(4), Some("123🚀"));
     }
 
     #[test]

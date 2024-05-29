@@ -162,8 +162,8 @@ pub fn token_range_at(line: &impl EditorLine, idx: usize) -> Range<usize> {
             last_not_in_token = true;
         }
     }
-    if idx < line.len() {
-        token_start..line.len()
+    if idx < line.char_len() {
+        token_start..line.char_len()
     } else if !last_not_in_token && token_start <= idx {
         token_start..idx
     } else {

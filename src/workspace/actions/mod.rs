@@ -260,7 +260,7 @@ impl Actions {
                 }
             }
         }
-        if prev_line.chars().all(|c| c.is_whitespace()) && prev_line.len().rem_euclid(self.cfg.indent.len()) == 0 {
+        if prev_line.chars().all(|c| c.is_whitespace()) && prev_line.char_len().rem_euclid(self.cfg.indent.len()) == 0 {
             builder.and_clear_first_line(prev_line);
         }
         content.insert(cursor.line, line);
@@ -369,7 +369,7 @@ impl Actions {
                 cursor.set_position(from);
                 self.push_done(Edit::remove_select(from, to, content));
             }
-            None if content[cursor.line].len() == cursor.char => {
+            None if content[cursor.line].char_len() == cursor.char => {
                 self.push_buffer();
                 if content.len() > cursor.line + 1 {
                     self.push_done(Edit::merge_next_line(cursor.line, content));

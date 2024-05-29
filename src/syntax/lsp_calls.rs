@@ -6,8 +6,9 @@ use crate::{
     workspace::{line::EditorLine, CursorPosition, Editor},
 };
 use lsp_types::{
-    Range, SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
-    TextDocumentContentChangeEvent, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    Position, PositionEncodingKind, Range, SemanticTokensRangeResult, SemanticTokensResult,
+    SemanticTokensServerCapabilities, TextDocumentContentChangeEvent, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions,
 };
 use std::time::{Duration, Instant};
 
@@ -21,12 +22,14 @@ use super::{
 /// timeout before remapping all tokens
 const FULL_TOKENS: Duration = Duration::from_secs(10);
 
-/// mapps LSP state without runtime checks
+/// maps LSP state without runtime checks
 #[inline]
 pub fn map(lexer: &mut Lexer, client: LSPClient) {
     lexer.lsp = true;
     lexer.context = context;
     lexer.autocomplete = get_autocomplete;
+
+    // tokens
     if let Some(tc) = client.capabilities.semantic_tokens_provider.as_ref() {
         lexer.legend.map_styles(&lexer.lang.file_type, &lexer.theme, tc);
         lexer.tokens = tokens;
@@ -35,45 +38,70 @@ pub fn map(lexer: &mut Lexer, client: LSPClient) {
         } else {
             lexer.tokens_partial = tokens_partial_redirect;
         }
+    } else {
+        lexer.tokens = tokens_dead;
+        lexer.tokens_partial = tokens_partial_redirect;
     }
+
+    // definitions
     if client.capabilities.definition_provider.is_some() {
         lexer.definitions = definitions;
+    } else {
+        lexer.definitions = info_position_dead;
     }
+
+    // references
     if client.capabilities.references_provider.is_some() {
         lexer.references = references;
+    } else {
+        lexer.references = info_position_dead;
     }
+
+    // declarations
     if client.capabilities.declaration_provider.is_some() {
         lexer.declarations = declarations;
+    } else {
+        lexer.declarations = info_position_dead;
     }
+
+    // renames
     if client.capabilities.rename_provider.is_some() {
         lexer.start_renames = start_renames;
         lexer.renames = renames;
+    } else {
+        lexer.start_renames = start_renames_dead;
     }
+
+    // hover
     if client.capabilities.hover_provider.is_some() {
         lexer.hover = hover;
+    } else {
+        lexer.hover = info_position_dead;
     }
+
+    // sig help
     if client.capabilities.signature_help_provider.is_some() {
         lexer.signatures = signatures;
     }
-    if client.capabilities.text_document_sync.is_some() {
-        match client.capabilities.text_document_sync.as_ref() {
-            Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::INCREMENTAL))
-            | Some(TextDocumentSyncCapability::Options(TextDocumentSyncOptions {
+
+    // document syncing
+    if let Some(sync) = client.capabilities.text_document_sync.as_ref() {
+        match sync {
+            TextDocumentSyncCapability::Kind(TextDocumentSyncKind::INCREMENTAL)
+            | TextDocumentSyncCapability::Options(TextDocumentSyncOptions {
                 change: Some(TextDocumentSyncKind::INCREMENTAL),
                 ..
-            })) => {
+            }) => {
                 lexer.sync = sync_edits;
             }
-            Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL))
-            | Some(TextDocumentSyncCapability::Options(TextDocumentSyncOptions {
-                change: Some(TextDocumentSyncKind::FULL),
-                ..
-            })) => {
+            _ => {
                 lexer.sync = sync_edits_full;
             }
-            _ => (),
         }
+    } else {
+        lexer.sync = sync_edits_local;
     }
+
     lexer.client = client;
 }
 
@@ -189,7 +217,11 @@ pub fn sync_edits(editor: &mut Editor, gs: &mut GlobalState) {
         .expect("Value is checked");
     gs.unwrap_lsp_error(lexer.client.file_did_change(&editor.path, version, change_events), editor.file_type);
     let max_lines = meta.start_line + meta.to;
-    let range = meta.build_range(&editor.content);
+    let end_line = meta.end_line();
+    let range = Range::new(
+        Position::new(meta.start_line as u32, 0),
+        Position::new(end_line as u32, editor.content[end_line].char_len() as u32),
+    );
     (lexer.tokens_partial)(lexer, range, max_lines, gs);
 }
 
@@ -217,7 +249,11 @@ pub fn sync_edits_full(editor: &mut Editor, gs: &mut GlobalState) {
     };
     let meta = events.drain(..).map(|(meta, _)| meta).reduce(|em1, em2| em1 + em2).expect("Value is checked");
     let max_lines = meta.start_line + meta.to;
-    let range = meta.build_range(&editor.content);
+    let end_line = meta.end_line();
+    let range = Range::new(
+        Position::new(meta.start_line as u32, 0),
+        Position::new(end_line as u32, editor.content[end_line].char_len() as u32),
+    );
     (lexer.tokens_partial)(lexer, range, max_lines, gs)
 }
 

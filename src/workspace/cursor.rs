@@ -24,7 +24,7 @@ impl Cursor {
 
     pub fn set_cursor_checked(&mut self, mut position: CursorPosition, content: &[impl EditorLine]) {
         if self.line < position.line {
-            let mut current_line_len = content[self.line].len();
+            let mut current_line_len = content[self.line].char_len();
             let mut offset = 0;
             while current_line_len > self.text_width && self.line < position.line.saturating_sub(offset) {
                 current_line_len = current_line_len.saturating_sub(self.text_width);
@@ -37,16 +37,16 @@ impl Cursor {
         };
         match content.get(position.line) {
             Some(line) => {
-                if line.len() > position.char {
+                if line.char_len() > position.char {
                     self.set_char(position.char);
                 } else {
-                    self.set_char(line.len());
+                    self.set_char(line.char_len());
                 }
                 self.line = position.line;
             }
             None => {
                 self.line = content.len().saturating_sub(1);
-                self.set_char(content[self.line].len())
+                self.set_char(content[self.line].char_len())
             }
         }
     }
@@ -73,14 +73,14 @@ impl Cursor {
     }
 
     pub fn end_of_line(&mut self, content: &[impl EditorLine]) {
-        self.char = content[self.line].len();
+        self.char = content[self.line].char_len();
         self.phantm_char = self.char;
     }
 
     pub fn end_of_file(&mut self, content: &[impl EditorLine]) {
         if !content.is_empty() {
             self.line = content.len() - 1;
-            self.char = content[self.line].len();
+            self.char = content[self.line].char_len();
         }
     }
 
@@ -118,7 +118,7 @@ impl Cursor {
             return;
         }
         self.line -= 1;
-        let line_len = content[self.line].len();
+        let line_len = content[self.line].char_len();
         if line_len >= self.text_width {
             while self.char < line_len {
                 self.char += self.text_width;
@@ -151,7 +151,7 @@ impl Cursor {
         if content.is_empty() {
             return;
         }
-        let line_len = content[self.line].len();
+        let line_len = content[self.line].char_len();
         if line_len >= self.text_width && line_len.saturating_sub(self.char) > self.text_width {
             self.char += self.text_width;
             self.correct_cursor_wrapped_line();
@@ -188,7 +188,7 @@ impl Cursor {
         } else if self.line > 0 {
             self.line -= 1;
             if let Some(line) = content.get(self.line) {
-                self.char = line.len();
+                self.char = line.char_len();
             }
             if self.line < self.at_line {
                 self.at_line -= 1;
@@ -238,7 +238,7 @@ impl Cursor {
 
     fn move_right(&mut self, content: &[impl EditorLine]) {
         if let Some(line) = content.get(self.line) {
-            if line.len() > self.char {
+            if line.char_len() > self.char {
                 self.char += 1
             } else if content.len() - 1 > self.line {
                 self.line += 1;
@@ -291,8 +291,8 @@ impl Cursor {
 
     pub fn adjust_char(&mut self, line: &impl EditorLine) {
         self.char = self.phantm_char;
-        if line.len() < self.char {
-            self.char = line.len()
+        if line.char_len() < self.char {
+            self.char = line.char_len()
         }
     }
 
@@ -302,7 +302,7 @@ impl Cursor {
         }
         if self.line + 1 >= self.max_rows + self.at_line {
             self.at_line = self.line - self.max_rows + 1;
-            if content[self.line].len() > self.text_width {
+            if content[self.line].char_len() > self.text_width {
                 self.at_line += 1;
             }
         }
@@ -393,7 +393,7 @@ impl Cursor {
                 let mut iter = content.iter().skip(from.line).take(to.line - from.line);
                 let mut len = iter.next().map(|line| line.chars().skip(from.char).count()).unwrap_or_default() + 1;
                 for line in iter {
-                    len += line.len() + 1;
+                    len += line.char_len() + 1;
                 }
                 len + to.char
             })

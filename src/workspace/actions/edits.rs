@@ -55,7 +55,7 @@ impl Edit {
     pub fn merge_next_line(line: usize, content: &mut Vec<impl EditorLine>) -> Self {
         let removed_line = content.remove(line + 1);
         let merged_to = &mut content[line];
-        let position_of_new_line = Position::new(line as u32, merged_to.len() as u32);
+        let position_of_new_line = Position::new(line as u32, merged_to.char_len() as u32);
         merged_to.push_line(removed_line);
         Self {
             meta: EditMetaData { start_line: line, from: 2, to: 1 },
@@ -364,18 +364,16 @@ impl EditMetaData {
         Self { start_line, from: 1, to: 1 }
     }
 
+    #[inline]
     pub fn update_tokens(&self, content: &mut Vec<impl EditorLine>, lexer: &Lexer) {
         for line in content.iter_mut().skip(self.start_line).take(self.to) {
             line.rebuild_tokens(lexer);
         }
     }
 
-    pub fn build_range(&self, content: &[impl EditorLine]) -> Range {
-        let end_line = self.start_line + self.to - 1;
-        Range::new(
-            Position::new(self.start_line as u32, 0),
-            Position::new(end_line as u32, content[end_line].len() as u32),
-        )
+    #[inline]
+    pub fn end_line(&self) -> usize {
+        self.start_line + self.to - 1
     }
 
     const fn rev(&self) -> Self {
