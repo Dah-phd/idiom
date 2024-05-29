@@ -326,18 +326,38 @@ impl EditorLine for CodeLine {
     }
 
     #[inline]
-    fn char_len(&self) -> usize {
-        self.char_len
-    }
-
-    #[inline]
     fn len(&self) -> usize {
         self.content.len()
     }
 
     #[inline]
+    fn char_len(&self) -> usize {
+        self.char_len
+    }
+
+    #[inline]
+    fn utf8_reposition(&self, char_idx: usize) -> Option<usize> {
+        if char_idx < self.char_len {
+            return Some(if self.char_len == self.content.len() {
+                char_idx
+            } else {
+                self.content.chars().take(char_idx).fold(0, |sum, ch| sum + ch.len_utf8())
+            });
+        }
+        None
+    }
+
+    #[inline]
     fn utf16_len(&self) -> usize {
         self.content.chars().fold(0, |sum, ch| sum + ch.len_utf16())
+    }
+
+    #[inline]
+    fn utf16_reposition(&self, char_idx: usize) -> Option<usize> {
+        if char_idx < self.char_len {
+            return Some(self.content.chars().take(char_idx).fold(0, |sum, ch| sum + ch.len_utf16()));
+        }
+        None
     }
 
     #[inline]
