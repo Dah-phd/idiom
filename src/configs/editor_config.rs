@@ -56,7 +56,7 @@ impl IndentConfigs {
                 return self.derive_indent_from(prev_line);
             }
         }
-        "".to_owned()
+        String::new()
     }
 
     pub fn indent_line(&self, line_idx: usize, content: &mut [impl EditorLine]) -> Offset {

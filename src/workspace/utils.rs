@@ -2,7 +2,7 @@ use crate::workspace::{cursor::CursorPosition, line::EditorLine};
 use std::{ops::Range, path::PathBuf, time::SystemTime};
 
 #[inline(always)]
-pub fn insert_clip(clip: String, content: &mut Vec<impl EditorLine>, mut cursor: CursorPosition) -> CursorPosition {
+pub fn insert_clip(clip: &String, content: &mut Vec<impl EditorLine>, mut cursor: CursorPosition) -> CursorPosition {
     let mut lines = clip.split('\n').collect::<Vec<_>>();
     if lines.len() == 1 {
         let text = lines[0];
@@ -71,7 +71,7 @@ pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Ve
         while from.line < last_idx {
             last_idx -= 1;
             if from.line == last_idx {
-                let final_clip: String = content.remove(from.line + 1).into();
+                let final_clip = content.remove(from.line + 1);
                 content[from.line].push_str(&final_clip[to.char..]);
             } else {
                 content.remove(from.line + 1);

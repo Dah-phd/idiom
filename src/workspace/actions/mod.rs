@@ -1,5 +1,6 @@
 mod action_buffer;
 mod edits;
+mod edits_alt;
 use crate::{
     configs::IndentConfigs,
     utils::Offset,
@@ -601,3 +602,6 @@ fn uncomment(pat: &str, line: &mut impl EditorLine, cursor: CursorPosition) -> O
     let offset = if cursor.char >= idx { Offset::Neg(end_idx - idx) } else { Offset::Neg(0) };
     Some((offset, Edit::remove_from_line(cursor.line, idx, end_idx, line)))
 }
+
+#[cfg(test)]
+mod tests;

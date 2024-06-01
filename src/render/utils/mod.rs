@@ -22,10 +22,13 @@ pub trait UTF8Safe {
     /// splits utf8 if not ascii (needs precalculated utf8 len)
     fn utf8_cached_split_at<'a>(&'a self, mid: usize, utf8_len: usize) -> (&'a str, &'a str);
     /// limits str within range based on utf char locations
+    /// panics if out of bounds
     fn utf8_unsafe_get<'a>(&'a self, from: usize, to: usize) -> &'a str;
     /// removes "from" chars from the begining of the string
+    /// panics if out of bounds
     fn utf8_unsafe_get_from<'a>(&'a self, from: usize) -> &'a str;
     /// limits str to char idx
+    /// panics if out of bounds
     fn utf8_unsafe_get_to<'a>(&'a self, to: usize) -> &'a str;
     /// get checked utf8 slice
     fn utf8_get<'a>(&'a self, from: usize, to: usize) -> Option<&'a str>;

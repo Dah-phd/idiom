@@ -50,6 +50,12 @@ impl From<String> for CodeLine {
     }
 }
 
+impl From<&'static str> for CodeLine {
+    fn from(value: &'static str) -> Self {
+        value.to_owned().into()
+    }
+}
+
 impl CodeLine {
     pub fn new(content: String) -> Self {
         Self {

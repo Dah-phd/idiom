@@ -26,6 +26,7 @@ pub trait EditorLine:
     + Index<RangeTo<usize>, Output = str>
     + Index<RangeFrom<usize>, Output = str>
     + From<String>
+    + From<&'static str>
     + Display
 {
     fn is_ascii(&self) -> bool;
