@@ -533,4 +533,4 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
 }
 
 #[cfg(test)]
-mod test;
+mod tests;

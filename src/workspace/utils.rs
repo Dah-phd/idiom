@@ -5,102 +5,76 @@ use crate::{
 use std::{ops::Range, path::PathBuf, time::SystemTime};
 
 #[inline(always)]
-pub fn insert_clip(clip: &String, content: &mut Vec<impl EditorLine>, mut cursor: CursorPosition) -> CursorPosition {
+pub fn insert_clip(clip: &str, content: &mut Vec<impl EditorLine>, mut cursor: CursorPosition) -> CursorPosition {
     let mut lines = clip.split('\n').collect::<Vec<_>>();
     if lines.len() == 1 {
         let text = lines[0];
         content[cursor.line].insert_str(cursor.char, lines[0]);
         cursor.char += text.char_len();
-        cursor
-    } else {
-        let line = content.remove(cursor.line);
-        let (prefix, suffix) = line.split_at(cursor.char);
-        let mut first_line = prefix.to_owned();
-        first_line.push_str(lines.remove(0));
-        content.insert(cursor.line, first_line.into());
-        let last_idx = lines.len() - 1;
-        for (idx, select) in lines.iter().enumerate() {
-            let next_line = if idx == last_idx {
-                let mut last_line = select.to_string();
-                cursor.char = last_line.char_len();
-                last_line.push_str(suffix);
-                last_line
-            } else {
-                select.to_string()
-            };
-            content.insert(cursor.line + 1, next_line.into());
-            cursor.line += 1;
-        }
-        cursor
+        return cursor;
+    };
+
+    let first_line = &mut content[cursor.line];
+    let mut last_line = first_line.split_off(cursor.char);
+    first_line.push_str(lines.remove(0));
+
+    let prefix = lines.remove(lines.len() - 1); // len is already checked
+    cursor.line += 1;
+    cursor.char = prefix.char_len();
+
+    last_line.insert_str(0, prefix);
+    content.insert(cursor.line, last_line);
+
+    for new_line in lines {
+        content.insert(cursor.line, new_line.to_owned().into());
+        cursor.line += 1;
     }
+
+    cursor
 }
 
+/// panics if out of bounds
 #[inline(always)]
 pub fn clip_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<impl EditorLine>) -> String {
     if from.line == to.line {
         let line = &mut content[from.line];
         let clip = line[from.char..to.char].to_owned();
         line.replace_range(from.char..to.char, "");
-        clip
-    } else {
-        let mut clip_vec = vec![content[from.line].split_off(from.char).to_string()];
-        let mut last_idx = to.line;
-        while from.line < last_idx {
-            last_idx -= 1;
-            if from.line == last_idx {
-                let final_clip = content.remove(from.line + 1);
-                let (clipped, remaining) = final_clip.split_at(to.char);
-                content[from.line].push_str(remaining);
-                clip_vec.push(clipped.to_owned())
-            } else {
-                clip_vec.push(content.remove(from.line + 1).into())
-            }
-        }
-        clip_vec.join("\n")
-    }
+        return clip;
+    };
+    let next_line_idx = from.line + 1;
+    let clip_init = content[from.line].split_off(from.char).unwrap();
+    let clip = content
+        .drain(next_line_idx..to.line)
+        .fold(clip_init, |clip, next_line| push_on_newline(clip, &next_line.unwrap()));
+    let final_clip = content.remove(next_line_idx);
+    let (clipped, remaining) = final_clip.split_at(to.char);
+    content[from.line].push_str(remaining);
+    push_on_newline(clip, clipped)
 }
 
+/// panics if range is out of bounds
 #[inline]
 pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<impl EditorLine>) {
     if from.line == to.line {
-        if let Some(line) = content.get_mut(from.line) {
-            line.replace_range(from.char..to.char, "")
-        } else {
-            content.push(Default::default());
-        }
-    } else {
-        content[from.line].replace_from(from.char, "");
-        let mut last_idx = to.line;
-        while from.line < last_idx {
-            last_idx -= 1;
-            if from.line == last_idx {
-                let final_clip = content.remove(from.line + 1);
-                content[from.line].push_str(&final_clip[to.char..]);
-            } else {
-                content.remove(from.line + 1);
-            }
-        }
-    }
+        match content.get_mut(from.line) {
+            Some(line) => line.replace_range(from.char..to.char, ""),
+            None => content.push(Default::default()),
+        };
+        return;
+    };
+    let last_line = content.drain(from.line + 1..=to.line).last().expect("Checked above!");
+    content[from.line].replace_from(from.char, &last_line[to.char..]);
 }
 
 #[inline]
 pub fn copy_content(from: CursorPosition, to: CursorPosition, content: &[impl EditorLine]) -> String {
     if from.line == to.line {
-        content[from.line][from.char..to.char].to_owned()
-    } else {
-        let mut at_line = from.line;
-        let mut clip_vec = Vec::new();
-        clip_vec.push(content[from.line][from.char..].to_owned());
-        while at_line < to.line {
-            at_line += 1;
-            if at_line != to.line {
-                clip_vec.push(content[at_line].to_string())
-            } else {
-                clip_vec.push(content[at_line][..to.char].to_owned())
-            }
-        }
-        clip_vec.join("\n")
-    }
+        return content[from.line][from.char..to.char].to_owned();
+    };
+    let clip_init = content[from.line][from.char..].to_owned();
+    let clip = content[from.line + 1..to.line].iter().fold(clip_init, |clip, line| push_on_newline(clip, &line[..]));
+    push_on_newline(clip, &content[to.line][..to.char])
 }
 
 #[inline(always)]
@@ -178,4 +152,11 @@ pub fn token_range_at(line: &impl EditorLine, idx: usize) -> Range<usize> {
 pub fn last_modified(path: &PathBuf) -> Option<SystemTime> {
     let meta = std::fs::metadata(path).ok()?;
     meta.modified().ok()
+}
+
+#[inline(always)]
+fn push_on_newline(mut buf: String, string: &str) -> String {
+    buf.push('\n');
+    buf.push_str(string);
+    buf
 }

@@ -11,7 +11,7 @@ use crate::{
 pub use code::{CodeLine, CodeLineContext};
 use std::{
     fmt::Display,
-    ops::{Index, Range, RangeFrom, RangeTo},
+    ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
     str::{CharIndices, Chars, MatchIndices},
 };
 
@@ -25,6 +25,7 @@ pub trait EditorLine:
     + Index<Range<usize>, Output = str>
     + Index<RangeTo<usize>, Output = str>
     + Index<RangeFrom<usize>, Output = str>
+    + Index<RangeFull, Output = str>
     + From<String>
     + From<&'static str>
     + Display
@@ -85,4 +86,4 @@ pub trait Context {
 }
 
 #[cfg(test)]
-mod test;
+mod tests;

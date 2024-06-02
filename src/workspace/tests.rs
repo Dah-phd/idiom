@@ -74,16 +74,20 @@ fn test_insert_clip() {
     // ensure utf8 safety on critical func
     let mut content = vec![CodeLine::new("one🚀line".to_owned())];
     let cursor = CursorPosition { line: 0, char: 4 };
-    let clip = String::from("first\nsecond\nrocket🚀");
-    let cursor = insert_clip(&clip, &mut content, cursor);
+    let cursor = insert_clip("first\nsecond\nrocket🚀", &mut content, cursor);
     assert_eq!(&content[0].to_string(), "one🚀first");
     assert_eq!(&content[1].to_string(), "second");
     assert_eq!(&content[2].to_string(), "rocket🚀line");
     assert_eq!(cursor, CursorPosition { line: 2, char: 7 });
     // single line
-    let final_cursor = insert_clip(&"single".to_owned(), &mut content, cursor);
+    let cursor = insert_clip("single", &mut content, cursor);
     assert_eq!(&content[2].to_string(), "rocket🚀singleline");
-    assert_eq!(final_cursor, CursorPosition { line: 2, char: 13 });
+    assert_eq!(cursor, CursorPosition { line: 2, char: 13 });
+    // end on new line
+    let cursor = insert_clip("text\n", &mut content, CursorPosition { line: 0, char: 0 });
+    assert_eq!(&content[0].to_string(), "text");
+    assert_eq!(&content[1].to_string(), "one🚀first");
+    assert_eq!(cursor, CursorPosition { line: 1, char: 0 });
 }
 
 #[test]
@@ -96,6 +100,9 @@ fn test_remove_content() {
     // within line
     remove_content(from, CursorPosition { line: 4, char: 10 }, &mut content);
     assert_eq!(&content[4].to_string(), "🚀re in the end");
+    // end on new line
+    remove_content(from, CursorPosition { line: 5, char: 0 }, &mut content);
+    assert_eq!(&content[4].to_string(), "🚀i will have to have some scopes {");
 }
 
 #[test]
@@ -110,16 +117,23 @@ fn test_clip_content() {
     let clip2 = clip_content(from, CursorPosition { line: 4, char: 10 }, &mut content);
     assert_eq!(&content[4].to_string(), "🚀re in the end");
     assert_eq!(&clip2, " everywhe");
+    // end on new line
+    let clip3 = clip_content(CursorPosition { line: 0, char: 0 }, CursorPosition { line: 1, char: 0 }, &mut content);
+    assert_eq!(&content[0].to_string(), "more lines of code should be here but only text");
+    assert_eq!(&clip3, "here comes the text\n");
 }
 
 #[test]
 fn test_copy_content() {
-    let mut content = create_content();
-    let clip = copy_content(CursorPosition { line: 4, char: 1 }, CursorPosition { line: 5, char: 15 }, &mut content);
+    let content = create_content();
+    let clip = copy_content(CursorPosition { line: 4, char: 1 }, CursorPosition { line: 5, char: 15 }, &content);
     assert_eq!(&clip, " things will get really complicated especially with all the utf8 chars and utf16 pos encoding\nthere will be 🚀");
     // within line
-    let clip2 = copy_content(CursorPosition { line: 5, char: 14 }, CursorPosition { line: 5, char: 15 }, &mut content);
+    let clip2 = copy_content(CursorPosition { line: 5, char: 14 }, CursorPosition { line: 5, char: 15 }, &content);
     assert_eq!(&clip2, "🚀");
+    // end on new line
+    let clip3 = copy_content(CursorPosition { line: 0, char: 0 }, CursorPosition { line: 1, char: 0 }, &content);
+    assert_eq!(&clip3, "here comes the text\n");
 }
 
 /// ACTIONS

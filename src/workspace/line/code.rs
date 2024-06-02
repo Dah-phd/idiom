@@ -19,7 +19,7 @@ use crate::{
 use std::{
     cmp::Ordering,
     fmt::Display,
-    ops::{Index, Range, RangeFrom, RangeTo},
+    ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
 };
 
 use super::utils::inline_diagnostics;
@@ -102,6 +102,13 @@ impl Index<RangeFrom<usize>> for CodeLine {
         } else {
             self.content.utf8_unsafe_get_from(index.start)
         }
+    }
+}
+
+impl Index<RangeFull> for CodeLine {
+    type Output = str;
+    fn index(&self, _: RangeFull) -> &Self::Output {
+        &self.content
     }
 }
 
@@ -316,8 +323,8 @@ impl EditorLine for CodeLine {
                 content,
                 tokens: Vec::new(),
                 diagnostics: self.diagnostics.take(),
-                select: None,
                 rendered_at: 0,
+                select: None,
             }
         }
     }
