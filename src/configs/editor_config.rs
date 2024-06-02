@@ -111,7 +111,7 @@ impl Default for EditorConfigs {
     fn default() -> Self {
         Self {
             format_on_save: true,
-            indent_spaces: 4,
+            indent_spaces: 4, // only spaces are allowed as indent
             indent_after: get_indent_after(),
             unindent_before: get_unident_before(),
             rust_lsp: Some(String::from("${cfg_dir}/rust-analyzer")),

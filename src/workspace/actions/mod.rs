@@ -353,7 +353,9 @@ impl Actions {
                 self.push_buffer();
                 self.push_done(Edit::record_in_line_insertion(cursor.into(), new_text));
             } else {
-                let _ = self.buffer.push(cursor.line, cursor.char, ch).map(|edit| self.push_done(edit));
+                if let Some(edit) = self.buffer.push(cursor.line, cursor.char, ch) {
+                    self.push_done(edit);
+                }
                 line.insert(cursor.char, ch);
             }
             cursor.add_to_char(1);
@@ -513,17 +515,6 @@ pub enum EditType {
 }
 
 impl EditType {
-    #[allow(dead_code)]
-    fn add_select(&mut self, old: Option<Select>, new: Option<Select>) {
-        match self {
-            Self::Multi(edits) => add_select(edits, old, new),
-            Self::Single(edit) => {
-                edit.select = old;
-                edit.new_select = new;
-            }
-        }
-    }
-
     pub fn apply_rev(
         &self,
         content: &mut Vec<impl EditorLine>,
@@ -568,6 +559,7 @@ impl From<Vec<Edit>> for EditType {
     }
 }
 
+#[inline]
 fn add_select(edits: &mut [Edit], old: Option<Select>, new: Option<Select>) {
     if let Some(edit) = edits.first_mut() {
         edit.select = old;
@@ -577,10 +569,12 @@ fn add_select(edits: &mut [Edit], old: Option<Select>, new: Option<Select>) {
     }
 }
 
+#[inline]
 fn select_is_commented(from: usize, n: usize, pat: &str, content: &[impl EditorLine]) -> bool {
     content.iter().skip(from).take(n).all(|l| l.trim_start().starts_with(pat) || l.chars().all(|c| c.is_whitespace()))
 }
 
+#[inline]
 fn into_comment(pat: &str, line: &mut impl EditorLine, cursor: CursorPosition) -> Option<(Offset, Edit)> {
     let idx = line.char_indices().flat_map(|(idx, c)| if c.is_whitespace() { None } else { Some(idx) }).next()?;
     let comment_start = format!("{pat} ");
@@ -592,6 +586,7 @@ fn into_comment(pat: &str, line: &mut impl EditorLine, cursor: CursorPosition) -
     ))
 }
 
+#[inline]
 fn uncomment(pat: &str, line: &mut impl EditorLine, cursor: CursorPosition) -> Option<(Offset, Edit)> {
     if !line.trim_start().starts_with(pat) {
         return None;
@@ -604,4 +599,4 @@ fn uncomment(pat: &str, line: &mut impl EditorLine, cursor: CursorPosition) -> O
 }
 
 #[cfg(test)]
-mod tests;
+pub mod tests;

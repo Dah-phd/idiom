@@ -16,7 +16,32 @@ use std::{
     rc::Rc,
     sync::{Arc, Mutex},
 };
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::{
+    io::AsyncWriteExt,
+    process::ChildStdin,
+    sync::mpsc::{unbounded_channel, UnboundedSender},
+    task::JoinHandle,
+};
+
+pub enum Payload {
+    Direct(String),
+}
+
+impl Payload {
+    #[inline]
+    pub fn parse(self) -> String {
+        match self {
+            Self::Direct(message) => message,
+        }
+    }
+}
+
+impl From<String> for Payload {
+    #[inline]
+    fn from(value: String) -> Self {
+        Self::Direct(value)
+    }
+}
 
 /// LSPClient
 /// Receives and sends messages to the LSP server running.
@@ -29,24 +54,40 @@ use tokio::sync::mpsc::UnboundedSender;
 pub struct LSPClient {
     diagnostics: Arc<Mutex<HashMap<PathBuf, Diagnostic>>>,
     responses: Arc<Mutex<HashMap<i64, Response>>>,
-    channel: UnboundedSender<String>,
+    channel: UnboundedSender<Payload>,
     request_counter: Rc<RefCell<i64>>,
     pub capabilities: ServerCapabilities,
 }
 
 impl LSPClient {
     pub fn new(
+        mut stdin: ChildStdin,
         diagnostics: Arc<Mutex<HashMap<PathBuf, Diagnostic>>>,
         responses: Arc<Mutex<HashMap<i64, Response>>>,
-        channel: UnboundedSender<String>,
         capabilities: ServerCapabilities,
-    ) -> Self {
-        Self { diagnostics, responses, channel, request_counter: Rc::default(), capabilities }
+    ) -> (JoinHandle<LSPResult<()>>, Self) {
+        let (channel, mut rx) = unbounded_channel::<Payload>();
+
+        // starting send handler
+        let lsp_send_handler = tokio::task::spawn(async move {
+            while let Some(msg) = rx.recv().await {
+                stdin.write_all(msg.parse().as_bytes()).await?;
+                stdin.flush().await?;
+            }
+            Ok(())
+        });
+        (lsp_send_handler, Self { diagnostics, responses, channel, request_counter: Rc::default(), capabilities })
     }
 
     pub fn placeholder() -> Self {
-        let (channel, _) = tokio::sync::mpsc::unbounded_channel::<String>();
-        Self::new(Arc::default(), Arc::default(), channel, ServerCapabilities::default())
+        let (channel, _) = tokio::sync::mpsc::unbounded_channel::<Payload>();
+        Self {
+            diagnostics: Arc::default(),
+            responses: Arc::default(),
+            channel,
+            request_counter: Rc::default(),
+            capabilities: ServerCapabilities::default(),
+        }
     }
 
     #[inline]
@@ -58,7 +99,7 @@ impl LSPClient {
     {
         let id = self.next_id();
         request.id = id;
-        self.channel.send(request.stringify()?)?;
+        self.channel.send(request.stringify()?.into())?;
         Ok(id)
     }
 
@@ -68,7 +109,7 @@ impl LSPClient {
         T: lsp_types::notification::Notification,
         T::Params: serde::Serialize,
     {
-        self.channel.send(notification.stringify()?)?;
+        self.channel.send(notification.stringify()?.into())?;
         Ok(())
     }
 

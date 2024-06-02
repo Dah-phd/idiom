@@ -1,8 +1,8 @@
 use lsp_types::Position;
 
 use crate::workspace::actions::{
-    // edits::Edit,
-    edits_alt::Edit,
+    edits::Edit,
+    // edits_alt::Edit,
     EditMetaData,
 };
 use crate::workspace::cursor::Cursor;
@@ -10,7 +10,7 @@ use crate::workspace::line::EditorLine;
 use crate::workspace::CursorPosition;
 use crate::{configs::IndentConfigs, workspace::line::CodeLine};
 
-fn create_content() -> Vec<CodeLine> {
+pub fn create_content() -> Vec<CodeLine> {
     vec![
         "here comes the text".into(),                                                            // 0
         "more lines of code should be here but only text".into(),                                // 1

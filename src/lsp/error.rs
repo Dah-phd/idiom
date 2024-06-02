@@ -2,6 +2,8 @@ use std::fmt::Display;
 use thiserror::Error;
 
 use crate::lsp::lsp_stream;
+
+use super::client::Payload;
 pub type LSPResult<T> = Result<T, LSPError>;
 
 #[derive(Error, Debug)]
@@ -10,7 +12,7 @@ pub enum LSPError {
     ResponseError(String),
     InternalError(String),
     JsonError(#[from] serde_json::error::Error),
-    SendError(#[from] tokio::sync::mpsc::error::SendError<String>),
+    SendError(#[from] tokio::sync::mpsc::error::SendError<Payload>),
     ServerCapability(String),
     IOError(#[from] std::io::Error),
     JsonRCPStderr(#[from] lsp_stream::RCPError),

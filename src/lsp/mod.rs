@@ -26,7 +26,7 @@ use std::{
     process::Stdio,
     sync::{Arc, Mutex},
 };
-use tokio::{io::AsyncWriteExt, process::Child, sync::mpsc, task::JoinHandle};
+use tokio::{io::AsyncWriteExt, process::Child, task::JoinHandle};
 
 #[allow(clippy::upper_case_acronyms)]
 pub struct LSP {
@@ -88,28 +88,10 @@ impl LSP {
             }
         });
 
-        // starting sending channel
-        let (channel, mut rx) = mpsc::unbounded_channel::<String>();
+        let (lsp_send_handler, client) = LSPClient::new(stdin, diagnostics, responses, capabilities);
 
-        // starting send handler
-        let lsp_send_handler = tokio::task::spawn(async move {
-            while let Some(msg) = rx.recv().await {
-                stdin.write_all(msg.as_bytes()).await?;
-                stdin.flush().await?;
-            }
-            Ok(())
-        });
-
-        let mut lsp = Self {
-            notifications,
-            requests,
-            client: LSPClient::new(diagnostics, responses, channel, capabilities),
-            lsp_cmd,
-            inner,
-            lsp_json_handler,
-            lsp_send_handler,
-            attempts: 5,
-        };
+        let mut lsp =
+            Self { notifications, requests, client, lsp_cmd, inner, lsp_json_handler, lsp_send_handler, attempts: 5 };
 
         //initialized
         lsp.initialized().await?;

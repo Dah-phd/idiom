@@ -1,9 +1,16 @@
-use super::{editor::Editor, map_editor, Workspace};
+use super::{
+    editor::Editor,
+    line::CodeLine,
+    map_editor,
+    utils::{clip_content, copy_content, insert_clip, remove_content},
+    Workspace,
+};
 use crate::{
     configs::{test::mock_editor_key_map, EditorConfigs},
     global_state::GlobalState,
     render::backend::{Backend, BackendProtocol, Style},
     workspace::{
+        actions::tests::create_content,
         editor::test::{mock_editor, pull_line, select_eq},
         CursorPosition,
     },
@@ -59,6 +66,63 @@ fn assert_position(ws: &mut Workspace, position: CursorPosition) {
     let current: CursorPosition = (&active(ws).cursor).into();
     assert_eq!(current, position);
 }
+
+/// UTILS
+
+#[test]
+fn test_insert_clip() {
+    // ensure utf8 safety on critical func
+    let mut content = vec![CodeLine::new("one🚀line".to_owned())];
+    let cursor = CursorPosition { line: 0, char: 4 };
+    let clip = String::from("first\nsecond\nrocket🚀");
+    let cursor = insert_clip(&clip, &mut content, cursor);
+    assert_eq!(&content[0].to_string(), "one🚀first");
+    assert_eq!(&content[1].to_string(), "second");
+    assert_eq!(&content[2].to_string(), "rocket🚀line");
+    assert_eq!(cursor, CursorPosition { line: 2, char: 7 });
+    // single line
+    let final_cursor = insert_clip(&"single".to_owned(), &mut content, cursor);
+    assert_eq!(&content[2].to_string(), "rocket🚀singleline");
+    assert_eq!(final_cursor, CursorPosition { line: 2, char: 13 });
+}
+
+#[test]
+fn test_remove_content() {
+    // ensure utf8 safety on critical func
+    let mut content = create_content();
+    let from = CursorPosition { line: 4, char: 1 };
+    remove_content(from, CursorPosition { line: 5, char: 15 }, &mut content);
+    assert_eq!(&content[4].to_string(), "🚀 everywhere in the end");
+    // within line
+    remove_content(from, CursorPosition { line: 4, char: 10 }, &mut content);
+    assert_eq!(&content[4].to_string(), "🚀re in the end");
+}
+
+#[test]
+fn test_clip_content() {
+    // ensure utf8 safety on critical func
+    let mut content = create_content();
+    let from = CursorPosition { line: 4, char: 1 };
+    let clip = clip_content(from, CursorPosition { line: 5, char: 15 }, &mut content);
+    assert_eq!(&content[4].to_string(), "🚀 everywhere in the end");
+    assert_eq!(&clip, " things will get really complicated especially with all the utf8 chars and utf16 pos encoding\nthere will be 🚀");
+    // within line
+    let clip2 = clip_content(from, CursorPosition { line: 4, char: 10 }, &mut content);
+    assert_eq!(&content[4].to_string(), "🚀re in the end");
+    assert_eq!(&clip2, " everywhe");
+}
+
+#[test]
+fn test_copy_content() {
+    let mut content = create_content();
+    let clip = copy_content(CursorPosition { line: 4, char: 1 }, CursorPosition { line: 5, char: 15 }, &mut content);
+    assert_eq!(&clip, " things will get really complicated especially with all the utf8 chars and utf16 pos encoding\nthere will be 🚀");
+    // within line
+    let clip2 = copy_content(CursorPosition { line: 5, char: 14 }, CursorPosition { line: 5, char: 15 }, &mut content);
+    assert_eq!(&clip2, "🚀");
+}
+
+/// ACTIONS
 
 #[test]
 fn test_open_scope() {

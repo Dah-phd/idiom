@@ -1,4 +1,7 @@
-use crate::workspace::{cursor::CursorPosition, line::EditorLine};
+use crate::{
+    render::UTF8Safe,
+    workspace::{cursor::CursorPosition, line::EditorLine},
+};
 use std::{ops::Range, path::PathBuf, time::SystemTime};
 
 #[inline(always)]
@@ -7,7 +10,7 @@ pub fn insert_clip(clip: &String, content: &mut Vec<impl EditorLine>, mut cursor
     if lines.len() == 1 {
         let text = lines[0];
         content[cursor.line].insert_str(cursor.char, lines[0]);
-        cursor.char += text.len();
+        cursor.char += text.char_len();
         cursor
     } else {
         let line = content.remove(cursor.line);
@@ -19,7 +22,7 @@ pub fn insert_clip(clip: &String, content: &mut Vec<impl EditorLine>, mut cursor
         for (idx, select) in lines.iter().enumerate() {
             let next_line = if idx == last_idx {
                 let mut last_line = select.to_string();
-                cursor.char = last_line.len();
+                cursor.char = last_line.char_len();
                 last_line.push_str(suffix);
                 last_line
             } else {
@@ -91,7 +94,7 @@ pub fn copy_content(from: CursorPosition, to: CursorPosition, content: &[impl Ed
         while at_line < to.line {
             at_line += 1;
             if at_line != to.line {
-                clip_vec.push(content[at_line].to_string().to_owned())
+                clip_vec.push(content[at_line].to_string())
             } else {
                 clip_vec.push(content[at_line][..to.char].to_owned())
             }

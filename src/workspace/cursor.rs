@@ -1,13 +1,11 @@
+use crate::workspace::line::EditorLine;
 use lsp_types::Position;
-
-use super::line::EditorLine;
-
 pub type Select = (CursorPosition, CursorPosition);
 
 #[derive(Debug, Default)]
 pub struct Cursor {
     pub line: usize,
-    pub char: usize,
+    pub char: usize,    // this is a char position not byte index
     phantm_char: usize, // keeps record for up/down movement
     pub at_line: usize,
     pub max_rows: usize,
@@ -428,7 +426,7 @@ impl From<&mut Cursor> for Position {
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct CursorPosition {
     pub line: usize,
-    pub char: usize,
+    pub char: usize, // this is char position not byte index
 }
 
 impl From<&CursorPosition> for Position {
