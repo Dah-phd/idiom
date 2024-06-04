@@ -5,7 +5,7 @@ use crate::{
     workspace::{
         cursor::{Cursor, CursorPosition},
         line::EditorLine,
-        utils::{clip_content, copy_content, insert_clip, is_scope, remove_content, token_range_at},
+        utils::{clip_content, insert_clip, is_scope, remove_content, token_range_at},
     },
 };
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit};
