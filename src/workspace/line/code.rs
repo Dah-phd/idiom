@@ -349,28 +349,28 @@ impl EditorLine for CodeLine {
     }
 
     #[inline]
-    fn utf8_reposition(&self, char_idx: usize) -> Option<usize> {
-        if char_idx < self.char_len {
-            return Some(if self.char_len == self.content.len() {
-                char_idx
-            } else {
-                self.content.chars().take(char_idx).fold(0, |sum, ch| sum + ch.len_utf8())
-            });
+    fn unsafe_utf8_idx_at(&self, char_idx: usize) -> usize {
+        if char_idx > self.char_len {
+            panic!("Index out of bounds! Index {} where max is {}", char_idx, self.char_len);
         }
-        None
+        if self.char_len == self.content.len() {
+            char_idx
+        } else {
+            self.content.chars().take(char_idx).fold(0, |sum, ch| sum + ch.len_utf8())
+        }
+    }
+
+    #[inline]
+    fn unsafe_utf16_idx_at(&self, char_idx: usize) -> usize {
+        if char_idx > self.char_len {
+            panic!("Index out of bounds! Index {} where max is {}", char_idx, self.char_len);
+        }
+        self.content.chars().take(char_idx).fold(0, |sum, ch| sum + ch.len_utf16())
     }
 
     #[inline]
     fn utf16_len(&self) -> usize {
         self.content.chars().fold(0, |sum, ch| sum + ch.len_utf16())
-    }
-
-    #[inline]
-    fn utf16_reposition(&self, char_idx: usize) -> Option<usize> {
-        if char_idx < self.char_len {
-            return Some(self.content.chars().take(char_idx).fold(0, |sum, ch| sum + ch.len_utf16()));
-        }
-        None
     }
 
     #[inline]

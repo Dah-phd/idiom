@@ -1,4 +1,4 @@
-use lsp_types::Position;
+use lsp_types::{Position, Range, TextEdit};
 
 use crate::{
     configs::IndentConfigs,
@@ -7,7 +7,7 @@ use crate::{
     workspace::{
         cursor::Cursor,
         line::EditorLine,
-        utils::{clip_content, copy_content, insert_clip, is_scope, remove_content, token_range_at},
+        utils::{clip_content, insert_clip, is_scope, remove_content, token_range_at},
         CursorPosition,
     },
 };
@@ -284,40 +284,286 @@ impl Edit {
 
     pub fn reverse_event(&self) -> (EditMetaData, LSPEvent) {
         let meta = self.meta.rev();
-        (
-            meta,
-            LSPEvent {
-                from_char: self.cursor.char,
-                changed_lines: meta.from - 1,
-                text: self.reverse.to_owned(),
-                last_line: self.text.chars().rev().take_while(|ch| ch != &'\n').collect(),
-            },
-        )
+        (meta, LSPEvent::new(self.cursor, meta.from - 1, &self.reverse, &self.text))
     }
 
     pub fn event(&self) -> (EditMetaData, LSPEvent) {
-        (
-            self.meta,
-            LSPEvent {
-                from_char: self.cursor.char,
-                changed_lines: self.meta.from - 1,
-                text: self.text.to_owned(),
-                last_line: self.reverse.chars().rev().take_while(|ch| ch != &'\n').collect(),
-            },
-        )
+        (self.meta, LSPEvent::new(self.cursor, self.meta.from - 1, &self.text, &self.reverse))
     }
 }
 
 pub struct LSPEvent {
-    from_char: usize,
+    cursor: CursorPosition,
     changed_lines: usize,
     text: String,
     last_line: String,
 }
 
 impl LSPEvent {
-    pub fn encode_start(&mut self, content: &[impl EditorLine]) {}
-    pub fn utf8_text_change(&mut self) {}
-    pub fn utf16_text_change(&mut self) {}
-    pub fn utf32_text_change(&mut self) {}
+    #[inline]
+    pub fn new(cursor: CursorPosition, changed: usize, text: &str, rev_text: &str) -> Self {
+        Self {
+            cursor,
+            changed_lines: changed,
+            text: text.to_owned(),
+            last_line: rev_text.chars().rev().take_while(|ch| ch != &'\n').collect(),
+        }
+    }
+
+    #[inline]
+    pub fn utf8_encode_start(&mut self, content: &[impl EditorLine]) {
+        self.cursor.char = content[self.cursor.line].unsafe_utf8_idx_at(self.cursor.char);
+    }
+
+    #[inline]
+    pub fn utf16_encode_start(&mut self, content: &[impl EditorLine]) {
+        self.cursor.char = content[self.cursor.line].unsafe_utf16_idx_at(self.cursor.char);
+    }
+
+    #[inline]
+    pub fn utf8_text_change(self) -> TextEdit {
+        let mut char = self.last_line.len();
+        if self.changed_lines == 0 {
+            char += self.cursor.char;
+        }
+        let to = CursorPosition { line: self.cursor.line + self.changed_lines, char };
+        TextEdit { range: Range::new(self.cursor.into(), to.into()), new_text: self.text }
+    }
+
+    #[inline]
+    pub fn utf16_text_change(self) -> TextEdit {
+        let mut char = self.last_line.chars().fold(0, |sum, ch| sum + ch.len_utf16());
+        if self.changed_lines == 0 {
+            char += self.cursor.char;
+        }
+        let to = CursorPosition { line: self.cursor.line + self.changed_lines, char };
+        TextEdit { range: Range::new(self.cursor.into(), to.into()), new_text: self.text }
+    }
+
+    #[inline]
+    pub fn utf32_text_change(self) -> TextEdit {
+        let mut char = self.last_line.chars().count();
+        if self.changed_lines == 0 {
+            char += self.cursor.char;
+        }
+        let to = CursorPosition { line: self.cursor.line + self.changed_lines, char };
+        TextEdit { range: Range::new(self.cursor.into(), to.into()), new_text: self.text }
+    }
+}
+
+#[cfg(test)]
+mod lsp_event_tests {
+    use lsp_types::{Position, Range, TextEdit};
+
+    use crate::workspace::{line::CodeLine, CursorPosition};
+
+    use super::Edit;
+
+    #[test]
+    fn test_utf8_lsp_event() {
+        let mut content = vec![
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+        ];
+        let edit = Edit::insert_clip((0, 4).into(), "\ntest".to_owned(), &mut content);
+        let (.., mut event) = edit.event();
+        let (.., mut rev_event) = edit.reverse_event();
+        event.utf8_encode_start(&content);
+        rev_event.utf8_encode_start(&content);
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 4), Position::new(0, 4)), "\ntest".to_owned()),
+            event.utf8_text_change()
+        );
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 4), Position::new(1, 4)), "".to_owned()),
+            rev_event.utf8_text_change()
+        );
+        let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull".to_owned(), &mut content);
+        let (.., mut event) = edit.event();
+        let (.., mut rev_event) = edit.reverse_event();
+        event.utf8_encode_start(&content);
+        rev_event.utf8_encode_start(&content);
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 2), Position::new(4, 1)), "\nbambi\nbull".to_owned()),
+            event.utf8_text_change()
+        );
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 2), Position::new(2, 4)), "st\ntest\ntest\ntest\nt".to_owned()),
+            rev_event.utf8_text_change()
+        );
+    }
+
+    #[test]
+    fn test_utf8_lsp_event_emoji() {
+        let mut content = vec![
+            CodeLine::new("🚀est".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+        ];
+        let edit = Edit::insert_clip((0, 4).into(), "\ntest🚀".to_owned(), &mut content);
+        let (.., mut event) = edit.event();
+        let (.., mut rev_event) = edit.reverse_event();
+        event.utf8_encode_start(&content);
+        rev_event.utf8_encode_start(&content);
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 7), Position::new(0, 7)), "\ntest🚀".to_owned()),
+            event.utf8_text_change()
+        );
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 7), Position::new(1, 8)), "".to_owned()),
+            rev_event.utf8_text_change()
+        );
+        let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull🚀".to_owned(), &mut content);
+        let (.., mut event) = edit.event();
+        let (.., mut rev_event) = edit.reverse_event();
+        event.utf8_encode_start(&content);
+        rev_event.utf8_encode_start(&content);
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 5), Position::new(4, 1)), "\nbambi\nbull🚀".to_owned()),
+            event.utf8_text_change()
+        );
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 5), Position::new(2, 8)), "st\ntest🚀\ntest\ntest\nt".to_owned()),
+            rev_event.utf8_text_change()
+        );
+    }
+
+    #[test]
+    fn test_utf16_lsp_event() {
+        let mut content = vec![
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+        ];
+        let edit = Edit::insert_clip((0, 4).into(), "\ntest".to_owned(), &mut content);
+        let (.., mut event) = edit.event();
+        let (.., mut rev_event) = edit.reverse_event();
+        event.utf16_encode_start(&content);
+        rev_event.utf16_encode_start(&content);
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 4), Position::new(0, 4)), "\ntest".to_owned()),
+            event.utf16_text_change()
+        );
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 4), Position::new(1, 4)), "".to_owned()),
+            rev_event.utf16_text_change()
+        );
+        let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull".to_owned(), &mut content);
+        let (.., mut event) = edit.event();
+        let (.., mut rev_event) = edit.reverse_event();
+        event.utf16_encode_start(&content);
+        rev_event.utf16_encode_start(&content);
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 2), Position::new(4, 1)), "\nbambi\nbull".to_owned()),
+            event.utf16_text_change()
+        );
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 2), Position::new(2, 4)), "st\ntest\ntest\ntest\nt".to_owned()),
+            rev_event.utf16_text_change()
+        );
+    }
+
+    #[test]
+    fn test_utf16_lsp_event_emoji() {
+        let mut content = vec![
+            CodeLine::new("🚀est".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+        ];
+        let edit = Edit::insert_clip((0, 4).into(), "\ntest🚀".to_owned(), &mut content);
+        let (.., mut event) = edit.event();
+        let (.., mut rev_event) = edit.reverse_event();
+        event.utf16_encode_start(&content);
+        rev_event.utf16_encode_start(&content);
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 5), Position::new(0, 5)), "\ntest🚀".to_owned()),
+            event.utf16_text_change()
+        );
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 5), Position::new(1, 6)), "".to_owned()),
+            rev_event.utf16_text_change()
+        );
+        let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull🚀".to_owned(), &mut content);
+        let (.., mut event) = edit.event();
+        let (.., mut rev_event) = edit.reverse_event();
+        event.utf16_encode_start(&content);
+        rev_event.utf16_encode_start(&content);
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 3), Position::new(4, 1)), "\nbambi\nbull🚀".to_owned()),
+            event.utf16_text_change()
+        );
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 3), Position::new(2, 6)), "st\ntest🚀\ntest\ntest\nt".to_owned()),
+            rev_event.utf16_text_change()
+        );
+    }
+
+    #[test]
+    fn test_utf32_lsp_event() {
+        let mut content = vec![
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+        ];
+        let edit = Edit::insert_clip((0, 4).into(), "\ntest".to_owned(), &mut content);
+        let (.., event) = edit.event();
+        let (.., rev_event) = edit.reverse_event();
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 4), Position::new(0, 4)), "\ntest".to_owned()),
+            event.utf32_text_change()
+        );
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 4), Position::new(1, 4)), "".to_owned()),
+            rev_event.utf32_text_change()
+        );
+        let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull".to_owned(), &mut content);
+        let (.., event) = edit.event();
+        let (.., rev_event) = edit.reverse_event();
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 2), Position::new(4, 1)), "\nbambi\nbull".to_owned()),
+            event.utf32_text_change()
+        );
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 2), Position::new(2, 4)), "st\ntest\ntest\ntest\nt".to_owned()),
+            rev_event.utf32_text_change()
+        );
+    }
+
+    #[test]
+    fn test_utf32_lsp_event_emoji() {
+        let mut content = vec![
+            CodeLine::new("🚀est".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+        ];
+        let edit = Edit::insert_clip((0, 4).into(), "\ntest🚀".to_owned(), &mut content);
+        let (.., event) = edit.event();
+        let (.., rev_event) = edit.reverse_event();
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 4), Position::new(0, 4)), "\ntest🚀".to_owned()),
+            event.utf32_text_change()
+        );
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 4), Position::new(1, 5)), "".to_owned()),
+            rev_event.utf32_text_change()
+        );
+        let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull🚀".to_owned(), &mut content);
+        let (.., event) = edit.event();
+        let (.., rev_event) = edit.reverse_event();
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 2), Position::new(4, 1)), "\nbambi\nbull🚀".to_owned()),
+            event.utf32_text_change()
+        );
+        assert_eq!(
+            TextEdit::new(Range::new(Position::new(0, 2), Position::new(2, 5)), "st\ntest🚀\ntest\ntest\nt".to_owned()),
+            rev_event.utf32_text_change()
+        );
+    }
 }

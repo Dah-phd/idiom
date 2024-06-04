@@ -38,9 +38,11 @@ pub trait EditorLine:
     fn push_line(&mut self, line: Self);
     fn len(&self) -> usize;
     fn utf16_len(&self) -> usize;
-    fn utf16_reposition(&self, char_idx: usize) -> Option<usize>;
+    /// should panic if out of bounds
+    fn unsafe_utf8_idx_at(&self, char_idx: usize) -> usize;
+    /// should panic if out of bounds
+    fn unsafe_utf16_idx_at(&self, char_idx: usize) -> usize;
     fn char_len(&self) -> usize;
-    fn utf8_reposition(&self, char_idx: usize) -> Option<usize>;
     fn replace_till(&mut self, to: usize, string: &str);
     fn replace_from(&mut self, from: usize, string: &str);
     fn replace_range(&mut self, range: Range<usize>, string: &str);

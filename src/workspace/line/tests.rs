@@ -113,3 +113,37 @@ fn test_remove() {
     assert!(line.char_len() == 6);
     assert!(&line.to_string() == "text23");
 }
+
+#[test]
+fn test_utf8_idx_at() {
+    let line = CodeLine::new("text🚀123🚀".to_owned());
+    assert_eq!(4, line.unsafe_utf8_idx_at(4));
+    assert_eq!(2, line.unsafe_utf8_idx_at(2));
+    assert_eq!(8, line.unsafe_utf8_idx_at(5));
+    assert_eq!(10, line.unsafe_utf8_idx_at(7));
+    assert_eq!(15, line.unsafe_utf8_idx_at(9));
+}
+
+#[test]
+#[should_panic]
+fn test_utf8_idx_at_panic() {
+    let line = CodeLine::new("text🚀123🚀".to_owned());
+    line.unsafe_utf8_idx_at(10);
+}
+
+#[test]
+fn test_utf16_idx_at() {
+    let line = CodeLine::new("text🚀123🚀".to_owned());
+    assert_eq!(4, line.unsafe_utf16_idx_at(4));
+    assert_eq!(2, line.unsafe_utf16_idx_at(2));
+    assert_eq!(6, line.unsafe_utf16_idx_at(5));
+    assert_eq!(8, line.unsafe_utf16_idx_at(7));
+    assert_eq!(11, line.unsafe_utf16_idx_at(9));
+}
+
+#[test]
+#[should_panic]
+fn test_utf16_idx_at_panic() {
+    let line = CodeLine::new("text🚀123🚀".to_owned());
+    line.unsafe_utf16_idx_at(10);
+}
