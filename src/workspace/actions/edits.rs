@@ -5,7 +5,7 @@ use crate::{
     workspace::{
         cursor::{Cursor, CursorPosition},
         line::EditorLine,
-        utils::{clip_content, copy_content, insert_clip, remove_content, token_range_at},
+        utils::{clip_content, copy_content, insert_clip, is_scope, remove_content, token_range_at},
     },
 };
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit};
@@ -166,6 +166,64 @@ impl Edit {
             select: Some((from, to)),
             new_select: None,
         }
+    }
+
+    pub fn new_line(
+        mut cursor: CursorPosition,
+        cfg: &IndentConfigs,
+        content: &mut Vec<impl EditorLine>,
+    ) -> (CursorPosition, Self) {
+        let mut from_range = (cursor, cursor);
+        let mut reverse = String::new();
+        let mut text = String::from('\n');
+        let prev_line = &mut content[cursor.line];
+        let mut line = prev_line.split_off(cursor.char);
+        let indent = cfg.derive_indent_from(prev_line);
+        line.insert_str(0, &indent);
+        cursor.line += 1;
+        cursor.char = indent.len();
+        text.push_str(&indent);
+        // expand scope
+        if is_scope(&prev_line[..], &line[..]) {
+            text.push('\n');
+            let new_char = if indent.len() >= cfg.indent.len() && cfg.unindent_if_before_base_pattern(&mut line) != 0 {
+                let new_char = indent.len() - cfg.indent.len();
+                text.push_str(&indent[..new_char]);
+                new_char
+            } else {
+                0
+            };
+            content.insert(cursor.line, line);
+            content.insert(cursor.line, indent.into());
+            let edit = Self {
+                meta: EditMetaData { start_line: from_range.0.line, from: 1, to: 3 },
+                reverse_text_edit: TextEdit {
+                    new_text: reverse,
+                    range: Range::new(
+                        from_range.0.into(),
+                        CursorPosition { line: cursor.line + 1, char: new_char }.into(),
+                    ),
+                },
+                text_edit: TextEdit { new_text: text, range: Range::new(from_range.0.into(), from_range.1.into()) },
+                select: None,
+                new_select: None,
+            };
+            return (cursor, edit);
+        }
+        if prev_line.chars().all(|c| c.is_whitespace()) && prev_line.char_len().rem_euclid(cfg.indent.len()) == 0 {
+            from_range.0.char = 0;
+            prev_line.push_content_to_buffer(&mut reverse);
+            prev_line.clear();
+        }
+        content.insert(cursor.line, line);
+        let edit = Self {
+            meta: EditMetaData { start_line: from_range.0.line, from: 1, to: 2 },
+            text_edit: TextEdit { range: Range::new(from_range.0.into(), from_range.1.into()), new_text: text },
+            reverse_text_edit: TextEdit { range: Range::new(from_range.0.into(), cursor.into()), new_text: reverse },
+            select: None,
+            new_select: None,
+        };
+        return (cursor, edit);
     }
 
     pub fn replace_select(
@@ -352,6 +410,7 @@ impl AddAssign for EditMetaData {
 }
 
 impl EditMetaData {
+    #[inline]
     pub const fn line_changed(start_line: usize) -> Self {
         Self { start_line, from: 1, to: 1 }
     }
@@ -377,63 +436,5 @@ impl EditMetaData {
 impl Debug for EditMetaData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&format!("{} >> {}", self.from, self.to))
-    }
-}
-
-#[derive(Debug)]
-pub struct NewLineBuilder {
-    pub reverse_edit_text: String,
-    text_edit_range: (CursorPosition, CursorPosition),
-    reverse_len: usize,
-    select: Option<(CursorPosition, CursorPosition)>,
-}
-
-impl NewLineBuilder {
-    /// initialize builder collecting select if exists
-    pub fn new(cursor: &mut Cursor, content: &mut Vec<impl EditorLine>) -> Self {
-        match cursor.select_take() {
-            Some((from, to)) => {
-                cursor.set_position(from);
-                Self {
-                    reverse_edit_text: clip_content(from, to, content),
-                    reverse_len: to.line - from.line + 1,
-                    text_edit_range: (from, to),
-                    select: Some((from, to)),
-                }
-            }
-            None => Self {
-                text_edit_range: (cursor.into(), cursor.into()),
-                reverse_edit_text: String::new(),
-                reverse_len: 1,
-                select: None,
-            },
-        }
-    }
-
-    pub fn finish(self, cursor: CursorPosition, content: &[impl EditorLine]) -> Edit {
-        Edit {
-            meta: EditMetaData {
-                start_line: self.text_edit_range.0.line,
-                from: self.reverse_len,
-                to: cursor.line - self.text_edit_range.0.line + 1,
-            },
-            text_edit: TextEdit {
-                range: Range::new(self.text_edit_range.0.into(), self.text_edit_range.1.into()),
-                new_text: copy_content(self.text_edit_range.0, cursor, content),
-            },
-            reverse_text_edit: TextEdit {
-                range: Range::new(self.text_edit_range.0.into(), cursor.into()),
-                new_text: self.reverse_edit_text,
-            },
-            select: self.select,
-            new_select: None,
-        }
-    }
-
-    // UTILS
-    pub fn and_clear_first_line(&mut self, line: &mut impl EditorLine) {
-        self.text_edit_range.0.char = 0;
-        self.reverse_edit_text.insert_str(0, &line.to_string());
-        line.clear();
     }
 }

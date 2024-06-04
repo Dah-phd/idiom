@@ -11,7 +11,7 @@ use crate::{
     },
 };
 use action_buffer::ActionBuffer;
-pub use edits::{Edit, EditMetaData, NewLineBuilder};
+pub use edits::{Edit, EditMetaData};
 use lsp_types::{Position, TextDocumentContentChangeEvent, TextEdit};
 
 pub type Events = Vec<(EditMetaData, TextDocumentContentChangeEvent)>;
@@ -234,38 +234,25 @@ impl Actions {
     }
 
     pub fn new_line(&mut self, cursor: &mut Cursor, content: &mut Vec<impl EditorLine>) {
-        self.push_buffer();
-        let mut builder = NewLineBuilder::new(cursor, content);
         if content.is_empty() {
-            content.push(String::new().into());
-            cursor.line += 1;
-            self.push_done(builder.finish(cursor.into(), content));
+            cursor.set_position(CursorPosition { line: 0, char: 0 });
+            content.push(Default::default());
             return;
         }
-        let prev_line = &mut content[cursor.line];
-        let mut line = prev_line.split_off(cursor.char);
-        let indent = self.cfg.derive_indent_from(prev_line);
-        line.insert_str(0, &indent);
-        cursor.line += 1;
-        cursor.set_char(indent.len());
-        // expand scope
-        if let Some(opening) = prev_line.trim_end().chars().last() {
-            if let Some(closing) = line.trim_start().chars().next() {
-                if [('{', '}'), ('(', ')'), ('[', ']')].contains(&(opening, closing)) {
-                    self.cfg.unindent_if_before_base_pattern(&mut line);
-                    let new_char = indent.len() - self.cfg.indent.len();
-                    content.insert(cursor.line, line);
-                    content.insert(cursor.line, indent.into());
-                    self.push_done(builder.finish((cursor.line + 1, new_char).into(), content));
-                    return;
-                }
+        self.push_buffer();
+        match cursor.select_take() {
+            Some((from, to)) => {
+                let cut_edit = Edit::remove_select(from, to, content);
+                let (new_position, new_line_edit) = Edit::new_line(from, &self.cfg, content);
+                cursor.set_position(new_position);
+                self.push_done(vec![cut_edit, new_line_edit])
+            }
+            None => {
+                let (new_position, edit) = Edit::new_line(cursor.into(), &self.cfg, content);
+                cursor.set_position(new_position);
+                self.push_done(edit);
             }
         }
-        if prev_line.chars().all(|c| c.is_whitespace()) && prev_line.char_len().rem_euclid(self.cfg.indent.len()) == 0 {
-            builder.and_clear_first_line(prev_line);
-        }
-        content.insert(cursor.line, line);
-        self.push_done(builder.finish(cursor.into(), content));
     }
 
     pub fn comment_out(&mut self, pat: &str, cursor: &mut Cursor, content: &mut [impl EditorLine]) {

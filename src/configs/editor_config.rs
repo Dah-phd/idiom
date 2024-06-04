@@ -29,13 +29,11 @@ impl IndentConfigs {
     }
 
     pub fn unindent_if_before_base_pattern(&self, line: &mut impl EditorLine) -> usize {
-        if line.starts_with(&self.indent) {
-            if let Some(first) = line.trim_start().chars().next() {
-                if self.unindent_before.contains(first) {
-                    line.replace_till(self.indent.len(), "");
-                    return self.indent.len();
-                }
-            }
+        if line.starts_with(&self.indent)
+            && matches!(line.trim_start().chars().next(), Some(first) if self.unindent_before.contains(first))
+        {
+            line.replace_till(self.indent.len(), "");
+            return self.indent.len();
         }
         0
     }

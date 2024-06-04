@@ -242,6 +242,22 @@ fn test_new_line() {
     press(&mut ws, KeyCode::Enter, &mut gs);
     assert_eq!(pull_line(active(&mut ws), 2).unwrap(), "ello world!");
     assert_eq!(pull_line(active(&mut ws), 3).unwrap(), "");
+    // scopes
+    press(&mut ws, KeyCode::Down, &mut gs);
+    ctrl_press(&mut ws, KeyCode::Right, &mut gs);
+    press(&mut ws, KeyCode::Char('{'), &mut gs);
+    press(&mut ws, KeyCode::Enter, &mut gs);
+    assert_eq!(CursorPosition { line: 5, char: 4 }, (&ws.get_active().unwrap().cursor).into());
+    assert_eq!(pull_line(active(&mut ws), 4).unwrap(), "next{");
+    assert_eq!(pull_line(active(&mut ws), 5).unwrap(), "    ");
+    assert_eq!(pull_line(active(&mut ws), 6).unwrap(), "} line");
+    // scopes depth
+    press(&mut ws, KeyCode::Char('['), &mut gs);
+    press(&mut ws, KeyCode::Enter, &mut gs);
+    assert_eq!(CursorPosition { line: 6, char: 8 }, (&ws.get_active().unwrap().cursor).into());
+    assert_eq!(pull_line(active(&mut ws), 5).unwrap(), "    [");
+    assert_eq!(pull_line(active(&mut ws), 6).unwrap(), "        ");
+    assert_eq!(pull_line(active(&mut ws), 7).unwrap(), "    ]");
 }
 
 #[test]

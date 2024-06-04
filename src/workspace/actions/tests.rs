@@ -54,6 +54,49 @@ fn assert_edits_applicable(mut content: Vec<CodeLine>, edits: Vec<Edit>) {
 }
 
 #[test]
+fn test_new_line() {
+    let cfg = IndentConfigs::default();
+
+    let mut content = vec![CodeLine::new("        ".to_owned())];
+    let (cursor, edit) = Edit::new_line(CursorPosition { line: 0, char: 8 }, &cfg, &mut content);
+    assert_eq!(cursor, CursorPosition { line: 1, char: 8 });
+    assert_eq!(content.len(), 2);
+    assert_eq!(&content[0].to_string(), "");
+    assert_eq!(&content[1].to_string(), "        ");
+    edit.apply_rev(&mut content, &mut vec![]);
+    assert_eq!(content.len(), 1);
+    assert_eq!(&content[0].to_string(), "        ");
+
+    let mut content = create_content();
+
+    // simple new line
+    let (cursor, edit) = Edit::new_line(CursorPosition { line: 0, char: 4 }, &cfg, &mut content);
+    let mut edits = vec![edit];
+    assert_eq!(CursorPosition { line: 1, char: 0 }, cursor);
+
+    // scope
+    edits.push(Edit::insert_clip(cursor, "{}".to_owned(), &mut content));
+    let (cursor, edit) = Edit::new_line(CursorPosition { line: 1, char: 1 }, &cfg, &mut content);
+    edits.push(edit);
+    assert_eq!(CursorPosition { line: 2, char: 4 }, cursor);
+    assert_eq!(&content[1].to_string(), "{");
+    assert_eq!(&content[2].to_string(), "    ");
+    assert_eq!(&content[3].to_string(), "} comes the text");
+
+    // double scope
+    edits.push(Edit::insert_clip(cursor, "[]".to_owned(), &mut content));
+    let (cursor, edit) = Edit::new_line(CursorPosition { line: 2, char: 5 }, &cfg, &mut content);
+    edits.push(edit);
+    assert_eq!(CursorPosition { line: 3, char: 8 }, cursor);
+    assert_eq!(&content[1].to_string(), "{");
+    assert_eq!(&content[2].to_string(), "    [");
+    assert_eq!(&content[3].to_string(), "        ");
+    assert_eq!(&content[4].to_string(), "    ]");
+    assert_eq!(&content[5].to_string(), "} comes the text");
+    assert_edits_applicable(content, edits);
+}
+
+#[test]
 fn test_swap_lines() {
     let mut content = create_content();
     let cfg = IndentConfigs::default();
@@ -114,8 +157,7 @@ fn test_record_inline_insert() {
 #[test]
 fn test_remove_from_line() {
     let mut content = create_content();
-    let mut edits = vec![];
-    edits.push(Edit::remove_from_line(5, 2, 4, &mut content[5]));
+    let mut edits = vec![Edit::remove_from_line(5, 2, 4, &mut content[5])];
     match_line(&content[5], &"the will be 🚀 everywhere in the end");
     edits.push(Edit::remove_from_line(5, 13, 20, &mut content[5]));
     match_line(&content[5], &"the will be 🚀here in the end");

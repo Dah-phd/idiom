@@ -54,7 +54,7 @@ pub fn clip_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<
 }
 
 /// panics if range is out of bounds
-#[inline]
+#[inline(always)]
 pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<impl EditorLine>) {
     if from.line == to.line {
         match content.get_mut(from.line) {
@@ -67,7 +67,7 @@ pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Ve
     content[from.line].replace_from(from.char, &last_line[to.char..]);
 }
 
-#[inline]
+#[inline(always)]
 pub fn copy_content(from: CursorPosition, to: CursorPosition, content: &[impl EditorLine]) -> String {
     if from.line == to.line {
         return content[from.line][from.char..to.char].to_owned();
@@ -99,6 +99,20 @@ pub fn get_opening_char(ch: char) -> Option<char> {
         '\'' => Some('\''),
         _ => None,
     }
+}
+
+#[inline(always)]
+pub fn is_scope(first_line: &str, second_line: &str) -> bool {
+    if let Some(pair) = first_line
+        .trim_end()
+        .chars()
+        .rev()
+        .next()
+        .and_then(|opening| second_line.trim_start().chars().next().map(|closing| (opening, closing)))
+    {
+        return [('{', '}'), ('(', ')'), ('[', ']')].contains(&pair);
+    }
+    false
 }
 
 #[inline(always)]
@@ -148,7 +162,7 @@ pub fn token_range_at(line: &impl EditorLine, idx: usize) -> Range<usize> {
     }
 }
 
-#[inline]
+#[inline(always)]
 pub fn last_modified(path: &PathBuf) -> Option<SystemTime> {
     let meta = std::fs::metadata(path).ok()?;
     meta.modified().ok()
