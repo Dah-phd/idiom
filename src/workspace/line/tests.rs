@@ -151,7 +151,8 @@ fn test_utf16_idx_at_panic() {
 #[test]
 fn test_split_off() {
     let mut line = CodeLine::new("text🚀123🚀".to_owned());
-    let new = line.split_off(2);
-    assert_eq!(new.unwrap(), "te");
+    line = line.split_off(2);
     assert_eq!(line.to_string(), "xt🚀123🚀");
+    let new = line.split_off(4);
+    assert_eq!(new.unwrap(), "23🚀");
 }

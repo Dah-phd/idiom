@@ -313,9 +313,7 @@ impl EditorLine for CodeLine {
                 select: None,
             };
         }
-        let (current, new) = self.content.utf8_split_at(at);
-        let content = new.to_owned();
-        self.content = current.to_owned();
+        let content = self.content.utf8_split_off(at);
         self.char_len = self.content.char_len();
         self.tokens.clear();
         Self {
