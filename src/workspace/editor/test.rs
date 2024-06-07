@@ -13,7 +13,7 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
     let ft = FileType::Unknown;
     let path = PathBuf::from("");
     let mut gs = GlobalState::new(Backend::init()).unwrap();
-    let content: Vec<CodeLine> = content.into_iter().map(|line| CodeLine::from(line)).collect();
+    let content: Vec<CodeLine> = content.into_iter().map(CodeLine::from).collect();
     Editor {
         line_number_offset: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
         lexer: Lexer::with_context(ft, &path, &mut gs),

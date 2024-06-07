@@ -152,7 +152,7 @@ impl From<Diagnostic> for DiagnosticLine {
     }
 }
 
-pub fn set_diganostics(content: &mut Vec<impl EditorLine>, diagnostics: Vec<(usize, DiagnosticLine)>) {
+pub fn set_diganostics(content: &mut [impl EditorLine], diagnostics: Vec<(usize, DiagnosticLine)>) {
     for line in content.iter_mut() {
         line.drop_diagnostics();
     }

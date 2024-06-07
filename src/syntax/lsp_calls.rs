@@ -6,9 +6,8 @@ use crate::{
     workspace::{line::EditorLine, CursorPosition, Editor},
 };
 use lsp_types::{
-    Position, PositionEncodingKind, Range, SemanticTokensRangeResult, SemanticTokensResult,
-    SemanticTokensServerCapabilities, TextDocumentContentChangeEvent, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions,
+    Position, Range, SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
+    TextDocumentContentChangeEvent, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
 };
 use std::time::{Duration, Instant};
 

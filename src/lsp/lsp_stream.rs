@@ -79,7 +79,7 @@ impl JsonRCP {
 
     fn check_errors(&mut self) -> Option<StdErrMessage> {
         let mut errors = self.errors.try_lock().ok()?;
-        errors.drain(..).reduce(to_lines).map(|err| StdErrMessage(err))
+        errors.drain(..).reduce(to_lines).map(StdErrMessage)
     }
 
     fn parse(&mut self) -> Result<(), RCPError> {

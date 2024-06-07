@@ -5,7 +5,7 @@ const TEXT: &str = "123🚀13";
 fn test_utf8_insert_str() {
     let mut s = String::new();
     s.utf8_insert_str(0, TEXT);
-    assert!(&s == TEXT);
+    assert_eq!(s, TEXT);
     s.utf8_insert_str(4, TEXT);
     assert!(&s == "123🚀123🚀1313");
 }
@@ -48,6 +48,28 @@ fn test_split_std() {
 fn test_split_utf8() {
     assert_eq!(TEXT.split_at(3), TEXT.utf8_split_at(3));
     assert_eq!(("123🚀", "13"), TEXT.utf8_split_at(4));
+}
+
+/// example issue
+#[test]
+#[should_panic]
+fn test_utf8_split_off_panic() {
+    let mut s = String::from(TEXT);
+    let _ = s.split_off(4);
+}
+
+#[test]
+#[should_panic]
+fn test_utf8_split_off_out_of_bounds() {
+    let mut s = String::from(TEXT);
+    s.utf8_split_off(30);
+}
+
+#[test]
+fn test_utf8_split_off() {
+    let mut s = String::from(TEXT);
+    assert_eq!(s.utf8_split_off(4), String::from("13"));
+    assert_eq!(s, "123🚀");
 }
 
 /// example issue

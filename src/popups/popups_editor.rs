@@ -33,7 +33,7 @@ pub fn selector_ranges(
     Box::new(PopupSelector {
         options,
         // display: |((from, _), line)| format!("({}) {line}", from.line + 1),
-        display: |((..), line)| &line,
+        display: |((..), line)| line,
         command: |popup| {
             WorkspaceEvent::GoToSelect { select: popup.options[popup.state.selected].0, clear_popup: true }.into()
         },
@@ -45,7 +45,7 @@ pub fn selector_ranges(
 pub fn selector_editors(options: Vec<String>) -> Box<PopupSelector<String>> {
     Box::new(PopupSelector {
         options,
-        display: |editor| &editor,
+        display: |editor| editor,
         command: |popup| WorkspaceEvent::ActivateEditor(popup.state.selected).into(),
         state: State::new(),
         size: None,

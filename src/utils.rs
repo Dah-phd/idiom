@@ -206,9 +206,8 @@ impl<T> TrackedList<T> {
     where
         P: FnMut(&T) -> bool,
     {
-        let mut iter = self.inner.iter_mut();
-        while let Some(element) = iter.next() {
-            if (predicate)(&element) {
+        for element in self.inner.iter_mut() {
+            if (predicate)(element) {
                 self.updated = true;
                 return Some(element);
             }

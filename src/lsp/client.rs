@@ -1,6 +1,10 @@
 use super::{Diagnostic, LSPNotification, LSPRequest, LSPResult, Response};
-use crate::{configs::FileType, lsp::LSPError, syntax::DiagnosticLine, workspace::CursorPosition};
-
+use crate::{
+    configs::FileType,
+    lsp::LSPError,
+    syntax::DiagnosticLine,
+    workspace::{actions::LSPEvent, CursorPosition},
+};
 use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument},
     request::{
@@ -25,16 +29,10 @@ use tokio::{
 
 pub enum Payload {
     Direct(String),
+    Sync(PathBuf, i32, Vec<LSPEvent>),
 }
 
-impl Payload {
-    #[inline]
-    pub fn parse(self) -> String {
-        match self {
-            Self::Direct(message) => message,
-        }
-    }
-}
+impl Payload {}
 
 impl From<String> for Payload {
     #[inline]
@@ -68,10 +66,27 @@ impl LSPClient {
     ) -> (JoinHandle<LSPResult<()>>, Self) {
         let (channel, mut rx) = unbounded_channel::<Payload>();
 
+        let position_map = match capabilities.position_encoding.as_ref().map(|inner| inner.as_str()) {
+            Some("utf-8") => pos_utf8,
+            Some("utf-32") => pos_utf32,
+            _ => pos_utf16,
+        };
+
         // starting send handler
         let lsp_send_handler = tokio::task::spawn(async move {
             while let Some(msg) = rx.recv().await {
-                stdin.write_all(msg.parse().as_bytes()).await?;
+                match msg {
+                    Payload::Direct(msg) => stdin.write_all(msg.as_bytes()).await?,
+                    Payload::Sync(path, version, events) => {
+                        let msg = LSPNotification::<DidSaveTextDocument>::file_did_change(
+                            &path,
+                            version,
+                            events.into_iter().map(position_map).collect(),
+                        )
+                        .stringify()?;
+                        stdin.write_all(msg.as_bytes()).await?;
+                    }
+                }
                 stdin.flush().await?;
             }
             Ok(())
@@ -173,7 +188,7 @@ impl LSPClient {
     }
 
     pub fn file_did_open(&mut self, path: &Path, file_type: FileType, content: String) -> Result<(), LSPError> {
-        let notification = LSPNotification::<DidOpenTextDocument>::file_did_open(path, file_type, content)?;
+        let notification = LSPNotification::<DidOpenTextDocument>::file_did_open(path, file_type, content);
         self.notify(notification)?;
         Ok(())
     }
@@ -185,7 +200,7 @@ impl LSPClient {
         version: i32,
         change_events: Vec<TextDocumentContentChangeEvent>,
     ) -> Result<(), LSPError> {
-        let notification = LSPNotification::<DidChangeTextDocument>::file_did_change(path, version, change_events)?;
+        let notification = LSPNotification::<DidChangeTextDocument>::file_did_change(path, version, change_events);
         self.notify(notification)
     }
 
@@ -195,7 +210,7 @@ impl LSPClient {
     }
 
     pub fn file_did_close(&mut self, path: &Path) -> Result<(), LSPError> {
-        let notification = LSPNotification::<DidCloseTextDocument>::file_did_close(path)?;
+        let notification = LSPNotification::<DidCloseTextDocument>::file_did_close(path);
         self.notify(notification)
     }
 
@@ -205,6 +220,18 @@ impl LSPClient {
         *id += 1;
         *id
     }
+}
+
+fn pos_utf8(event: LSPEvent) -> TextDocumentContentChangeEvent {
+    event.utf8_text_change()
+}
+
+fn pos_utf16(event: LSPEvent) -> TextDocumentContentChangeEvent {
+    event.utf16_text_change()
+}
+
+fn pos_utf32(event: LSPEvent) -> TextDocumentContentChangeEvent {
+    event.utf32_text_change()
 }
 
 #[cfg(test)]

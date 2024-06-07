@@ -86,7 +86,7 @@ impl BackendProtocol for Backend {
     /// get whole screen as rect
     #[inline]
     fn screen() -> std::io::Result<Rect> {
-        size().map(|size| Rect::from(size))
+        size().map(Rect::from)
     }
 
     /// clears from cursor until the End Of Line

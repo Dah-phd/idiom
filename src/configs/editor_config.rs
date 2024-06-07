@@ -49,7 +49,7 @@ impl IndentConfigs {
     }
 
     pub fn derive_indent_from_lines(&self, prev_lines: &[impl EditorLine]) -> String {
-        for prev_line in prev_lines.iter().rev().map(|line| line) {
+        for prev_line in prev_lines.iter().rev() {
             if !prev_line.chars().all(|c| c.is_whitespace()) {
                 return self.derive_indent_from(prev_line);
             }

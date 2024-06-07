@@ -125,7 +125,7 @@ impl Editor {
     #[inline]
     pub fn updated_rect(&mut self, rect: Rect, gs: &GlobalState) {
         let skip_offset = rect.row.saturating_sub(gs.editor_area.row) as usize;
-        for line in self.content.iter_mut().skip(self.cursor.at_line + skip_offset).take(rect.width as usize) {
+        for line in self.content.iter_mut().skip(self.cursor.at_line + skip_offset).take(rect.width) {
             line.clear_cache();
         }
     }
@@ -512,7 +512,7 @@ fn build_display(path: &Path) -> String {
     let mut buffer = Vec::new();
     let mut text_path = path.display().to_string();
     if let Ok(base_path) = PathBuf::from("./").canonicalize().map(|p| p.display().to_string()) {
-        if let Some(rel) = text_path.strip_prefix(&base_path).to_owned() {
+        if let Some(rel) = text_path.strip_prefix(&base_path) {
             text_path = rel.to_owned();
         }
     }

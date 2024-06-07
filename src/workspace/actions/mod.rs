@@ -12,6 +12,7 @@ use crate::{
 };
 use action_buffer::ActionBuffer;
 pub use edits::{Edit, EditMetaData};
+pub use edits_alt::LSPEvent;
 use lsp_types::{Position, TextDocumentContentChangeEvent, TextEdit};
 
 pub type Events = Vec<(EditMetaData, TextDocumentContentChangeEvent)>;

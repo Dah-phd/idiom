@@ -147,3 +147,11 @@ fn test_utf16_idx_at_panic() {
     let line = CodeLine::new("text🚀123🚀".to_owned());
     line.unsafe_utf16_idx_at(10);
 }
+
+#[test]
+fn test_split_off() {
+    let mut line = CodeLine::new("text🚀123🚀".to_owned());
+    let new = line.split_off(2);
+    assert_eq!(new.unwrap(), "te");
+    assert_eq!(line.to_string(), "xt🚀123🚀");
+}

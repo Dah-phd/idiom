@@ -113,7 +113,7 @@ pub fn serialize_rgb(r: u8, g: u8, b: u8) -> HashMap<&'static str, [u8; 3]> {
 
 #[inline]
 pub fn pull_color(map: &mut Map<String, Value>, key: &str) -> Option<Result<Color, String>> {
-    map.remove(key).map(|obj| parse_color(obj))
+    map.remove(key).map(parse_color)
 }
 
 pub fn parse_color(obj: Value) -> Result<Color, String> {

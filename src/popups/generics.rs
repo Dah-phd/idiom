@@ -26,7 +26,7 @@ impl PopupInterface for Popup {
         area.bordered();
         area.draw_borders(None, None, &mut gs.writer);
         match self.title.as_ref() {
-            Some(text) => area.border_title(&text, &mut gs.writer),
+            Some(text) => area.border_title(text, &mut gs.writer),
             None => area.border_title("Prompt", &mut gs.writer),
         }
         let mut lines = area.into_iter();

@@ -28,14 +28,14 @@ impl From<TreeEvent> for PopupMessage {
 
 impl From<Location> for TreeEvent {
     fn from(loc: Location) -> Self {
-        Self::OpenAtSelect(PathBuf::from(loc.uri.path()), (loc.range.start.into(), loc.range.end.into()))
+        Self::OpenAtSelect(PathBuf::from(loc.uri.path().as_str()), (loc.range.start.into(), loc.range.end.into()))
     }
 }
 
 impl From<LocationLink> for TreeEvent {
     fn from(loc: LocationLink) -> Self {
         Self::OpenAtSelect(
-            PathBuf::from(loc.target_uri.path()),
+            PathBuf::from(loc.target_uri.path().as_str()),
             (loc.target_range.start.into(), loc.target_range.end.into()),
         )
     }
@@ -151,7 +151,7 @@ impl From<CompletionItem> for WorkspaceEvent {
 
 impl From<Location> for WorkspaceEvent {
     fn from(value: Location) -> Self {
-        Self::Open(PathBuf::from(value.uri.path()), value.range.start.line as usize)
+        Self::Open(PathBuf::from(value.uri.path().as_str()), value.range.start.line as usize)
     }
 }
 

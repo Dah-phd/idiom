@@ -223,7 +223,7 @@ impl Edit {
             select: None,
             new_select: None,
         };
-        return (cursor, edit);
+        (cursor, edit)
     }
 
     pub fn replace_select(
@@ -416,7 +416,7 @@ impl EditMetaData {
     }
 
     #[inline]
-    pub fn update_tokens(&self, content: &mut Vec<impl EditorLine>, lexer: &Lexer) {
+    pub fn update_tokens(&self, content: &mut [impl EditorLine], lexer: &Lexer) {
         for line in content.iter_mut().skip(self.start_line).take(self.to) {
             line.rebuild_tokens(lexer);
         }

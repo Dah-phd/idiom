@@ -28,8 +28,8 @@ use std::path::PathBuf;
 
 use self::{draw::Components, message::Messages};
 
-const INSERT_SPAN: &'static str = "  --INSERT--   ";
-const SELECT_SPAN: &'static str = "  --SELECT--   ";
+const INSERT_SPAN: &str = "  --INSERT--   ";
+const SELECT_SPAN: &str = "  --SELECT--   ";
 
 #[derive(Default, Clone)]
 pub enum PopupMessage {
@@ -146,7 +146,7 @@ impl GlobalState {
                 rev_builder.push(&format!(" ({select_len} selected)"));
             }
             rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {}", cursor.line + 1, cursor.char + 1));
-            self.messages.set_line(rev_builder.to_line());
+            self.messages.set_line(rev_builder.into_line());
             self.messages.fast_render(self.theme.accent_style, &mut self.writer);
             self.writer.reset_style();
         }
@@ -281,7 +281,7 @@ impl GlobalState {
                 self.workspace.push(event);
             }
         }
-        return true;
+        true
     }
 
     pub fn try_tree_event(&mut self, value: impl TryInto<TreeEvent>) {
@@ -313,7 +313,7 @@ impl GlobalState {
     }
 
     pub fn recalc_draw_size(&mut self) {
-        self.tree_area = self.screen_rect.clone();
+        self.tree_area = self.screen_rect;
         self.footer_area = self.tree_area.splitoff_rows(1);
         if let Some(mut line) = self.footer_area.get_line(0) {
             line += SELECT_SPAN.len();
@@ -509,7 +509,7 @@ impl GlobalState {
                     };
                 }
                 WorkspaceEvent::Resize => {
-                    workspace.resize_all(self.editor_area.width as usize, self.editor_area.height as usize);
+                    workspace.resize_all(self.editor_area.width, self.editor_area.height as usize);
                 }
                 WorkspaceEvent::CheckLSP(ft) => {
                     workspace.check_lsp(ft, self).await;

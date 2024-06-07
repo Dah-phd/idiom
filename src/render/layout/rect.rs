@@ -355,7 +355,7 @@ impl RectIter<'_> {
     }
 
     /// returns the remaining lines as rect (None if all lines are used)
-    pub fn to_rect(mut self) -> Option<Rect> {
+    pub fn into_rect(mut self) -> Option<Rect> {
         let height = self.row_range.len() as u16;
         self.row_range.next().map(|row| Rect {
             row,

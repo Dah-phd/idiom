@@ -172,7 +172,7 @@ impl TreePath {
         }
     }
 
-    pub fn direct_display<'a>(&'a self) -> (&'a str, Style) {
+    pub fn direct_display(&self) -> (&str, Style) {
         match self {
             Self::Folder { display, errors, warnings, .. } => {
                 if errors != &0 {

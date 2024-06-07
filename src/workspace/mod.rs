@@ -64,11 +64,8 @@ impl Workspace {
             }
             gs.writer.reset_style();
             gs.writer.restore_cursor();
-        } else {
-            match gs.tab_area.into_iter().next() {
-                Some(line) => line.render_empty(&mut gs.writer),
-                None => (),
-            }
+        } else if let Some(line) = gs.tab_area.into_iter().next() {
+            line.render_empty(&mut gs.writer);
         }
     }
 
@@ -136,10 +133,8 @@ impl Workspace {
                     editor.update_path(updated_path);
                 }
             }
-        } else {
-            if let Some(editor) = self.editors.find(|e| e.path == old) {
-                editor.update_path(new_path);
-            }
+        } else if let Some(editor) = self.editors.find(|e| e.path == old) {
+            editor.update_path(new_path);
         }
     }
 
@@ -154,9 +149,9 @@ impl Workspace {
     pub fn apply_edits(&mut self, edits: WorkspaceEdit, gs: &mut GlobalState) {
         if let Some(edits) = edits.changes {
             for (file_url, file_edits) in edits {
-                if let Some(editor) = self.get_editor(file_url.path()) {
+                if let Some(editor) = self.get_editor(file_url.path().as_str()) {
                     editor.apply_file_edits(file_edits);
-                } else if let Ok(mut editor) = self.build_basic_editor(PathBuf::from(file_url.path()), gs) {
+                } else if let Ok(mut editor) = self.build_basic_editor(PathBuf::from(file_url.path().as_str()), gs) {
                     editor.apply_file_edits(file_edits);
                     editor.try_write_file(gs);
                 } else {
@@ -190,7 +185,7 @@ impl Workspace {
     }
 
     fn handle_text_document_edit(&mut self, mut text_document_edit: TextDocumentEdit, gs: &mut GlobalState) {
-        if let Some(editor) = self.get_editor(text_document_edit.text_document.uri.path()) {
+        if let Some(editor) = self.get_editor(text_document_edit.text_document.uri.path().as_str()) {
             let edits = text_document_edit
                 .edits
                 .drain(..)
@@ -201,7 +196,7 @@ impl Workspace {
                 .collect();
             editor.apply_file_edits(edits);
         } else if let Ok(mut editor) =
-            self.build_basic_editor(PathBuf::from(text_document_edit.text_document.uri.path()), gs)
+            self.build_basic_editor(PathBuf::from(text_document_edit.text_document.uri.path().as_str()), gs)
         {
             let edits = text_document_edit
                 .edits
@@ -221,7 +216,7 @@ impl Workspace {
     fn handle_tree_operations(&mut self, operation: ResourceOp) -> IdiomResult<()> {
         match operation {
             ResourceOp::Create(create) => {
-                let path = PathBuf::from(create.uri.path());
+                let path = PathBuf::from(create.uri.path().as_str());
                 if path.exists() {
                     if let Some(options) = create.options {
                         if matches!(options.overwrite, Some(overwrite) if !overwrite)
@@ -234,7 +229,7 @@ impl Workspace {
                 std::fs::write(path, "")?;
             }
             ResourceOp::Delete(delete) => {
-                let search_path = PathBuf::from(delete.uri.path()).canonicalize()?;
+                let search_path = PathBuf::from(delete.uri.as_str()).canonicalize()?;
                 if search_path.is_file() {
                     std::fs::remove_file(search_path)?;
                 } else {
@@ -242,9 +237,9 @@ impl Workspace {
                 }
             }
             ResourceOp::Rename(rename) => {
-                std::fs::rename(rename.old_uri.path(), rename.new_uri.path())?;
-                if let Some(editor) = self.get_editor(rename.old_uri.path()) {
-                    let path = PathBuf::from(rename.new_uri.path());
+                std::fs::rename(rename.old_uri.path().as_str(), rename.new_uri.path().as_str())?;
+                if let Some(editor) = self.get_editor(rename.old_uri.path().as_str()) {
+                    let path = PathBuf::from(rename.new_uri.path().as_str());
                     editor.display = path.display().to_string();
                     editor.path = path;
                 }
@@ -264,7 +259,7 @@ impl Workspace {
 
     async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
         let mut new = Editor::from_path(file_path, &self.base_config, gs)?;
-        new.resize(gs.editor_area.width as usize, gs.editor_area.height as usize);
+        new.resize(gs.editor_area.width, gs.editor_area.height as usize);
         let lsp_cmd = match self.base_config.derive_lsp(&new.file_type) {
             None => return Ok(new),
             Some(cmd) => cmd,
@@ -355,7 +350,7 @@ impl Workspace {
         }
         self.editors.remove(0);
         if self.editors.is_empty() {
-            let _ = gs.editor_area.clear(&mut gs.writer);
+            gs.editor_area.clear(&mut gs.writer);
             gs.select_mode();
         } else {
             self.editors.inner_mut_no_update()[0].clear_screen_cache();

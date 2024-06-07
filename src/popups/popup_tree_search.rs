@@ -67,7 +67,7 @@ impl PopupInterface for ActivePathSearch {
         if let Some(line) = lines.next() {
             line.fill(BORDERS.horizontal, &mut gs.writer);
         }
-        if let Some(list_rect) = lines.to_rect() {
+        if let Some(list_rect) = lines.into_rect() {
             if self.options.is_empty() {
                 self.state.render_list(["No results found!"].into_iter(), &list_rect, &mut gs.writer);
             } else {
@@ -165,7 +165,7 @@ impl PopupInterface for ActiveFileSearch {
         if let Some(line) = lines.next() {
             line.fill(BORDERS.horizontal, &mut gs.writer);
         }
-        if let Some(list_rect) = lines.to_rect() {
+        if let Some(list_rect) = lines.into_rect() {
             if self.options.is_empty() {
                 self.state.render_list(["No results found!"].into_iter(), &list_rect, &mut gs.writer);
             } else {
@@ -213,5 +213,5 @@ fn build_path_line((path, ..): &SearchResult, mut builder: LineBuilder) {
 
 fn build_text_line((.., line_txt, line_idx): &SearchResult, mut builder: LineBuilder) {
     builder.push(&format!("{line_idx}| "));
-    builder.push(&line_txt);
+    builder.push(line_txt);
 }

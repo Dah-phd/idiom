@@ -12,18 +12,18 @@ use lsp_stream::JsonRCP;
 pub use messages::{Diagnostic, GeneralNotification, LSPMessage, LSPResponse, LSPResponseType, Request, Response};
 pub use notification::LSPNotification;
 pub use request::LSPRequest;
-use url::Url;
 
 use lsp_types::{
     notification::{Exit, Initialized},
     request::{Initialize, Shutdown},
-    InitializeResult, InitializedParams,
+    InitializeResult, InitializedParams, Uri,
 };
 use serde_json::from_value;
 use std::{
     collections::HashMap,
     path::Path,
     process::Stdio,
+    str::FromStr,
     sync::{Arc, Mutex},
 };
 use tokio::{io::AsyncWriteExt, process::Child, task::JoinHandle};
@@ -154,6 +154,6 @@ impl LSP {
 }
 
 #[inline(always)]
-fn as_url(path: &Path) -> Result<Url, url::ParseError> {
-    Url::parse(&format!("file:///{}", path.display()))
+fn as_url(path: &Path) -> Uri {
+    Uri::from_str(format!("file://{}", path.display()).as_str()).expect("Path should always be parsable!")
 }

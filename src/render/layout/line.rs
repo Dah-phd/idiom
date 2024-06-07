@@ -84,7 +84,7 @@ impl Line {
     /// push/push_styled can be used to add to line
     /// on drop pads the line to end
     #[inline]
-    pub fn unsafe_builder<'a>(self, backend: &'a mut Backend) -> LineBuilder<'a> {
+    pub fn unsafe_builder(self, backend: &mut Backend) -> LineBuilder {
         backend.go_to(self.row, self.col);
         LineBuilder { row: self.row, col: self.col, remaining: self.width, backend }
     }
@@ -93,7 +93,7 @@ impl Line {
     /// push/push_styled can be used to add to line
     /// on drop pads the line to end
     #[inline]
-    pub fn unsafe_builder_rev<'a>(self, backend: &'a mut Backend) -> LineBuilderRev<'a> {
+    pub fn unsafe_builder_rev(self, backend: &mut Backend) -> LineBuilderRev {
         let remaining = self.width;
         let col = self.col;
         let row = self.row;
@@ -171,7 +171,7 @@ impl<'a> LineBuilder<'a> {
         self.remaining
     }
 
-    pub fn to_line(self) -> Line {
+    pub fn into_line(self) -> Line {
         Line { row: self.row, col: self.col, width: self.remaining }
     }
 }
@@ -222,7 +222,7 @@ impl<'a> LineBuilderRev<'a> {
         self.remaining
     }
 
-    pub fn to_line(self) -> Line {
+    pub fn into_line(self) -> Line {
         Line { row: self.row, col: self.col, width: self.remaining }
     }
 }

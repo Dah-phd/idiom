@@ -38,10 +38,14 @@ pub trait EditorLine:
     fn push_line(&mut self, line: Self);
     fn len(&self) -> usize;
     fn utf16_len(&self) -> usize;
-    /// should panic if out of bounds
+    /// panics if out of bounds
     fn unsafe_utf8_idx_at(&self, char_idx: usize) -> usize;
-    /// should panic if out of bounds
+    /// panics if out of bounds
     fn unsafe_utf16_idx_at(&self, char_idx: usize) -> usize;
+    /// panics if out of bounds
+    fn unsafe_utf8_to_idx(&self, utf8_idx: usize) -> usize;
+    /// panics if out of bounds
+    fn unsafe_utf16_to_idx(&self, utf16_idx: usize) -> usize;
     fn char_len(&self) -> usize;
     fn replace_till(&mut self, to: usize, string: &str);
     fn replace_from(&mut self, from: usize, string: &str);

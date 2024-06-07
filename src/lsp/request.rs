@@ -49,7 +49,7 @@ where
             0,
             ReferenceParams {
                 text_document_position: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path)?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)),
                     position: c.into(),
                 },
                 context: ReferenceContext { include_declaration: false },
@@ -64,7 +64,7 @@ where
             0,
             RenameParams {
                 text_document_position: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path)?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)),
                     position: c.into(),
                 },
                 new_name,
@@ -77,7 +77,7 @@ where
         Ok(LSPRequest::with(
             0,
             SemanticTokensParams {
-                text_document: TextDocumentIdentifier::new(as_url(path)?),
+                text_document: TextDocumentIdentifier::new(as_url(path)),
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
                 partial_result_params: lsp::PartialResultParams::default(),
             },
@@ -88,7 +88,7 @@ where
         Ok(LSPRequest::with(
             0,
             SemanticTokensRangeParams {
-                text_document: TextDocumentIdentifier::new(as_url(path)?),
+                text_document: TextDocumentIdentifier::new(as_url(path)),
                 range,
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
                 partial_result_params: lsp::PartialResultParams::default(),
@@ -101,7 +101,7 @@ where
             0,
             GotoDeclarationParams {
                 text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path)?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)),
                     position: c.into(),
                 },
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
@@ -115,7 +115,7 @@ where
             0,
             GotoDefinitionParams {
                 text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path)?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)),
                     position: c.into(),
                 },
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
@@ -130,7 +130,7 @@ where
             0,
             CompletionParams {
                 text_document_position: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path)?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)),
                     position: c.into(),
                 },
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
@@ -147,7 +147,7 @@ where
             SignatureHelpParams {
                 context: None,
                 text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path)?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)),
                     position: c.into(),
                 },
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
@@ -161,7 +161,7 @@ where
             0,
             HoverParams {
                 text_document_position_params: TextDocumentPositionParams {
-                    text_document: TextDocumentIdentifier::new(as_url(path)?),
+                    text_document: TextDocumentIdentifier::new(as_url(path)),
                     position: c.into(),
                 },
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
@@ -170,7 +170,7 @@ where
     }
 
     pub fn init_request() -> LSPResult<LSPRequest<Initialize>> {
-        let uri = as_url(std::env::current_dir()?.as_path())?;
+        let uri = as_url(std::env::current_dir()?.as_path());
         Ok(LSPRequest::with(
             0,
             lsp::InitializeParams {

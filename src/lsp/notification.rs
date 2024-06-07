@@ -42,39 +42,35 @@ where
         path: &Path,
         version: i32,
         content_changes: Vec<TextDocumentContentChangeEvent>,
-    ) -> LSPResult<LSPNotification<DidChangeTextDocument>> {
-        Ok(LSPNotification::with(DidChangeTextDocumentParams {
-            text_document: VersionedTextDocumentIdentifier::new(as_url(path)?, version),
+    ) -> LSPNotification<DidChangeTextDocument> {
+        LSPNotification::with(DidChangeTextDocumentParams {
+            text_document: VersionedTextDocumentIdentifier::new(as_url(path), version),
             content_changes,
-        }))
+        })
     }
 
-    pub fn file_did_open(
-        path: &Path,
-        file_type: FileType,
-        content: String,
-    ) -> LSPResult<LSPNotification<DidOpenTextDocument>> {
-        Ok(LSPNotification::with(DidOpenTextDocumentParams {
+    pub fn file_did_open(path: &Path, file_type: FileType, content: String) -> LSPNotification<DidOpenTextDocument> {
+        LSPNotification::with(DidOpenTextDocumentParams {
             text_document: TextDocumentItem {
-                uri: as_url(path)?,
+                uri: as_url(path),
                 language_id: String::from(file_type),
                 version: 0,
                 text: content,
             },
-        }))
+        })
     }
 
     pub fn file_did_save(path: &Path) -> LSPResult<LSPNotification<DidSaveTextDocument>> {
         let content = std::fs::read_to_string(path)?;
         Ok(LSPNotification::with(DidSaveTextDocumentParams {
-            text_document: TextDocumentIdentifier { uri: as_url(path)? },
+            text_document: TextDocumentIdentifier { uri: as_url(path) },
             text: Some(content),
         }))
     }
 
-    pub fn file_did_close(path: &Path) -> LSPResult<LSPNotification<DidCloseTextDocument>> {
-        Ok(LSPNotification::with(DidCloseTextDocumentParams {
-            text_document: TextDocumentIdentifier { uri: as_url(path)? },
-        }))
+    pub fn file_did_close(path: &Path) -> LSPNotification<DidCloseTextDocument> {
+        LSPNotification::with(DidCloseTextDocumentParams {
+            text_document: TextDocumentIdentifier { uri: as_url(path) },
+        })
     }
 }

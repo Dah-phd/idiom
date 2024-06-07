@@ -1,4 +1,4 @@
-use lsp_types::{Position, Range, TextEdit};
+use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit};
 
 use crate::{
     configs::IndentConfigs,
@@ -321,39 +321,51 @@ impl LSPEvent {
     }
 
     #[inline]
-    pub fn utf8_text_change(self) -> TextEdit {
+    pub fn utf8_text_change(self) -> TextDocumentContentChangeEvent {
         let mut char = self.last_line.len();
         if self.changed_lines == 0 {
             char += self.cursor.char;
         }
         let to = CursorPosition { line: self.cursor.line + self.changed_lines, char };
-        TextEdit { range: Range::new(self.cursor.into(), to.into()), new_text: self.text }
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(self.cursor.into(), to.into())),
+            text: self.text,
+            range_length: None,
+        }
     }
 
     #[inline]
-    pub fn utf16_text_change(self) -> TextEdit {
+    pub fn utf16_text_change(self) -> TextDocumentContentChangeEvent {
         let mut char = self.last_line.chars().fold(0, |sum, ch| sum + ch.len_utf16());
         if self.changed_lines == 0 {
             char += self.cursor.char;
         }
         let to = CursorPosition { line: self.cursor.line + self.changed_lines, char };
-        TextEdit { range: Range::new(self.cursor.into(), to.into()), new_text: self.text }
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(self.cursor.into(), to.into())),
+            text: self.text,
+            range_length: None,
+        }
     }
 
     #[inline]
-    pub fn utf32_text_change(self) -> TextEdit {
+    pub fn utf32_text_change(self) -> TextDocumentContentChangeEvent {
         let mut char = self.last_line.chars().count();
         if self.changed_lines == 0 {
             char += self.cursor.char;
         }
         let to = CursorPosition { line: self.cursor.line + self.changed_lines, char };
-        TextEdit { range: Range::new(self.cursor.into(), to.into()), new_text: self.text }
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(self.cursor.into(), to.into())),
+            text: self.text,
+            range_length: None,
+        }
     }
 }
 
 #[cfg(test)]
 mod lsp_event_tests {
-    use lsp_types::{Position, Range, TextEdit};
+    use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit};
 
     use crate::workspace::{line::CodeLine, CursorPosition};
 
@@ -373,11 +385,19 @@ mod lsp_event_tests {
         event.utf8_encode_start(&content);
         rev_event.utf8_encode_start(&content);
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 4), Position::new(0, 4)), "\ntest".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 4), Position::new(0, 4))),
+                text: "\ntest".to_owned(),
+                range_length: None
+            },
             event.utf8_text_change()
         );
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 4), Position::new(1, 4)), "".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 4), Position::new(1, 4))),
+                text: "".to_owned(),
+                range_length: None
+            },
             rev_event.utf8_text_change()
         );
         let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull".to_owned(), &mut content);
@@ -386,11 +406,19 @@ mod lsp_event_tests {
         event.utf8_encode_start(&content);
         rev_event.utf8_encode_start(&content);
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 2), Position::new(4, 1)), "\nbambi\nbull".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 2), Position::new(4, 1))),
+                text: "\nbambi\nbull".to_owned(),
+                range_length: None
+            },
             event.utf8_text_change()
         );
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 2), Position::new(2, 4)), "st\ntest\ntest\ntest\nt".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 2), Position::new(2, 4))),
+                text: "st\ntest\ntest\ntest\nt".to_owned(),
+                range_length: None
+            },
             rev_event.utf8_text_change()
         );
     }
@@ -409,11 +437,19 @@ mod lsp_event_tests {
         event.utf8_encode_start(&content);
         rev_event.utf8_encode_start(&content);
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 7), Position::new(0, 7)), "\ntest🚀".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 7), Position::new(0, 7))),
+                text: "\ntest🚀".to_owned(),
+                range_length: None
+            },
             event.utf8_text_change()
         );
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 7), Position::new(1, 8)), "".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 7), Position::new(1, 8))),
+                text: "".to_owned(),
+                range_length: None
+            },
             rev_event.utf8_text_change()
         );
         let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull🚀".to_owned(), &mut content);
@@ -422,11 +458,19 @@ mod lsp_event_tests {
         event.utf8_encode_start(&content);
         rev_event.utf8_encode_start(&content);
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 5), Position::new(4, 1)), "\nbambi\nbull🚀".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 5), Position::new(4, 1))),
+                text: "\nbambi\nbull🚀".to_owned(),
+                range_length: None
+            },
             event.utf8_text_change()
         );
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 5), Position::new(2, 8)), "st\ntest🚀\ntest\ntest\nt".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 5), Position::new(2, 8))),
+                text: "st\ntest🚀\ntest\ntest\nt".to_owned(),
+                range_length: None
+            },
             rev_event.utf8_text_change()
         );
     }
@@ -445,11 +489,19 @@ mod lsp_event_tests {
         event.utf16_encode_start(&content);
         rev_event.utf16_encode_start(&content);
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 4), Position::new(0, 4)), "\ntest".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 4), Position::new(0, 4))),
+                text: "\ntest".to_owned(),
+                range_length: None
+            },
             event.utf16_text_change()
         );
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 4), Position::new(1, 4)), "".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 4), Position::new(1, 4))),
+                text: "".to_owned(),
+                range_length: None
+            },
             rev_event.utf16_text_change()
         );
         let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull".to_owned(), &mut content);
@@ -458,11 +510,19 @@ mod lsp_event_tests {
         event.utf16_encode_start(&content);
         rev_event.utf16_encode_start(&content);
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 2), Position::new(4, 1)), "\nbambi\nbull".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 2), Position::new(4, 1))),
+                text: "\nbambi\nbull".to_owned(),
+                range_length: None
+            },
             event.utf16_text_change()
         );
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 2), Position::new(2, 4)), "st\ntest\ntest\ntest\nt".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 2), Position::new(2, 4))),
+                text: "st\ntest\ntest\ntest\nt".to_owned(),
+                range_length: None
+            },
             rev_event.utf16_text_change()
         );
     }
@@ -481,11 +541,19 @@ mod lsp_event_tests {
         event.utf16_encode_start(&content);
         rev_event.utf16_encode_start(&content);
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 5), Position::new(0, 5)), "\ntest🚀".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 5), Position::new(0, 5))),
+                text: "\ntest🚀".to_owned(),
+                range_length: None
+            },
             event.utf16_text_change()
         );
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 5), Position::new(1, 6)), "".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 5), Position::new(1, 6))),
+                text: "".to_owned(),
+                range_length: None
+            },
             rev_event.utf16_text_change()
         );
         let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull🚀".to_owned(), &mut content);
@@ -494,11 +562,19 @@ mod lsp_event_tests {
         event.utf16_encode_start(&content);
         rev_event.utf16_encode_start(&content);
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 3), Position::new(4, 1)), "\nbambi\nbull🚀".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 3), Position::new(4, 1))),
+                text: "\nbambi\nbull🚀".to_owned(),
+                range_length: None
+            },
             event.utf16_text_change()
         );
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 3), Position::new(2, 6)), "st\ntest🚀\ntest\ntest\nt".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 3), Position::new(2, 6))),
+                text: "st\ntest🚀\ntest\ntest\nt".to_owned(),
+                range_length: None
+            },
             rev_event.utf16_text_change()
         );
     }
@@ -515,22 +591,38 @@ mod lsp_event_tests {
         let (.., event) = edit.event();
         let (.., rev_event) = edit.reverse_event();
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 4), Position::new(0, 4)), "\ntest".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 4), Position::new(0, 4))),
+                text: "\ntest".to_owned(),
+                range_length: None
+            },
             event.utf32_text_change()
         );
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 4), Position::new(1, 4)), "".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 4), Position::new(1, 4))),
+                text: "".to_owned(),
+                range_length: None
+            },
             rev_event.utf32_text_change()
         );
         let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull".to_owned(), &mut content);
         let (.., event) = edit.event();
         let (.., rev_event) = edit.reverse_event();
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 2), Position::new(4, 1)), "\nbambi\nbull".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 2), Position::new(4, 1))),
+                text: "\nbambi\nbull".to_owned(),
+                range_length: None
+            },
             event.utf32_text_change()
         );
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 2), Position::new(2, 4)), "st\ntest\ntest\ntest\nt".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 2), Position::new(2, 4))),
+                text: "st\ntest\ntest\ntest\nt".to_owned(),
+                range_length: None
+            },
             rev_event.utf32_text_change()
         );
     }
@@ -547,22 +639,38 @@ mod lsp_event_tests {
         let (.., event) = edit.event();
         let (.., rev_event) = edit.reverse_event();
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 4), Position::new(0, 4)), "\ntest🚀".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 4), Position::new(0, 4))),
+                text: "\ntest🚀".to_owned(),
+                range_length: None
+            },
             event.utf32_text_change()
         );
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 4), Position::new(1, 5)), "".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 4), Position::new(1, 5))),
+                text: "".to_owned(),
+                range_length: None
+            },
             rev_event.utf32_text_change()
         );
         let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull🚀".to_owned(), &mut content);
         let (.., event) = edit.event();
         let (.., rev_event) = edit.reverse_event();
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 2), Position::new(4, 1)), "\nbambi\nbull🚀".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 2), Position::new(4, 1))),
+                text: "\nbambi\nbull🚀".to_owned(),
+                range_length: None
+            },
             event.utf32_text_change()
         );
         assert_eq!(
-            TextEdit::new(Range::new(Position::new(0, 2), Position::new(2, 5)), "st\ntest🚀\ntest\ntest\nt".to_owned()),
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 2), Position::new(2, 5))),
+                text: "st\ntest🚀\ntest\ntest\nt".to_owned(),
+                range_length: None
+            },
             rev_event.utf32_text_change()
         );
     }

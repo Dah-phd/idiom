@@ -71,14 +71,12 @@ impl Token {
                 is_import = true;
             } else if let Some(color) = lang.lang_specific_handler(from, token_base.as_str(), snippet, theme) {
                 buf.push(Token { to: from + len, from, len, style: Style::fg(color) })
+            } else if ch == '(' {
+                buf.push(Token { to: from + len, from, len, style: Style::fg(theme.functions) });
+            } else if matches!(token_base.chars().next(), Some(f) if f.is_uppercase()) {
+                buf.push(Token { to: from + len, from, len, style: Style::fg(theme.class_or_struct) });
             } else {
-                if ch == '(' {
-                    buf.push(Token { to: from + len, from, len, style: Style::fg(theme.functions) });
-                } else if matches!(token_base.chars().next(), Some(f) if f.is_uppercase()) {
-                    buf.push(Token { to: from + len, from, len, style: Style::fg(theme.class_or_struct) });
-                } else {
-                    buf.push(Token { to: from + len, from, len, style: Style::fg(theme.default) });
-                }
+                buf.push(Token { to: from + len, from, len, style: Style::fg(theme.default) });
             };
             from += len + 1;
         }
@@ -98,6 +96,7 @@ impl Token {
 }
 
 #[derive(Default)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum TokensType {
     LSP,
     #[default]
@@ -110,7 +109,7 @@ pub fn set_tokens(
     legend: &Legend,
     lang: &Lang,
     theme: &Theme,
-    content: &mut Vec<impl EditorLine>,
+    content: &mut [impl EditorLine],
 ) {
     let mut line_idx = 0;
     let mut char_idx = 0;
@@ -151,7 +150,7 @@ pub fn set_tokens_partial(
     legend: &Legend,
     lang: &Lang,
     theme: &Theme,
-    content: &mut Vec<impl EditorLine>,
+    content: &mut [impl EditorLine],
 ) {
     let mut line_idx = 0;
     let mut char_idx = 0;

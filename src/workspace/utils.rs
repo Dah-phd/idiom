@@ -106,8 +106,7 @@ pub fn is_scope(first_line: &str, second_line: &str) -> bool {
     if let Some(pair) = first_line
         .trim_end()
         .chars()
-        .rev()
-        .next()
+        .next_back()
         .and_then(|opening| second_line.trim_start().chars().next().map(|closing| (opening, closing)))
     {
         return [('{', '}'), ('(', ')'), ('[', ']')].contains(&pair);

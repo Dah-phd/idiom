@@ -268,12 +268,12 @@ impl EditorLine for CodeLine {
 
     #[inline]
     fn trim_start(&self) -> &str {
-        &self.content.trim_start()
+        self.content.trim_start()
     }
 
     #[inline]
     fn trim_end(&self) -> &str {
-        &self.content.trim_end()
+        self.content.trim_end()
     }
 
     #[inline]
@@ -312,20 +312,19 @@ impl EditorLine for CodeLine {
                 rendered_at: 0,
                 select: None,
             };
-        } else {
-            let (current, new) = self.content.utf8_split_at(at);
-            let content = new.to_owned();
-            self.content = current.to_owned();
-            self.char_len = self.content.char_len();
-            self.tokens.clear();
-            Self {
-                char_len: content.char_len(),
-                content,
-                tokens: Vec::new(),
-                diagnostics: self.diagnostics.take(),
-                rendered_at: 0,
-                select: None,
-            }
+        }
+        let (current, new) = self.content.utf8_split_at(at);
+        let content = new.to_owned();
+        self.content = current.to_owned();
+        self.char_len = self.content.char_len();
+        self.tokens.clear();
+        Self {
+            char_len: content.char_len(),
+            content,
+            tokens: Vec::new(),
+            diagnostics: self.diagnostics.take(),
+            rendered_at: 0,
+            select: None,
         }
     }
 
@@ -354,10 +353,9 @@ impl EditorLine for CodeLine {
             panic!("Index out of bounds! Index {} where max is {}", char_idx, self.char_len);
         }
         if self.char_len == self.content.len() {
-            char_idx
-        } else {
-            self.content.chars().take(char_idx).fold(0, |sum, ch| sum + ch.len_utf8())
-        }
+            return char_idx;
+        };
+        self.content.chars().take(char_idx).fold(0, |sum, ch| sum + ch.len_utf8())
     }
 
     #[inline]
@@ -365,7 +363,32 @@ impl EditorLine for CodeLine {
         if char_idx > self.char_len {
             panic!("Index out of bounds! Index {} where max is {}", char_idx, self.char_len);
         }
+        if self.is_ascii() {
+            return char_idx;
+        }
         self.content.chars().take(char_idx).fold(0, |sum, ch| sum + ch.len_utf16())
+    }
+
+    #[inline]
+    fn unsafe_utf8_to_idx(&self, utf8_idx: usize) -> usize {
+        for (idx, (byte_idx, ..)) in self.content.char_indices().enumerate() {
+            if byte_idx == utf8_idx {
+                return idx;
+            }
+        }
+        panic!("Index out of bounds! Index {} where max is {}", utf8_idx, self.content.len());
+    }
+
+    #[inline]
+    fn unsafe_utf16_to_idx(&self, utf16_idx: usize) -> usize {
+        let mut sum = 0;
+        for (pos, ch) in self.content.chars().enumerate() {
+            if sum == utf16_idx {
+                return pos;
+            }
+            sum += ch.len_utf16();
+        }
+        panic!("Index out of bounds! Index {} where max is {}", utf16_idx, sum)
     }
 
     #[inline]
@@ -476,7 +499,7 @@ impl EditorLine for CodeLine {
                     inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
                 } else {
                     let max_len = line_width.saturating_sub(2);
-                    shrank_line(&self.content.truncate_width(max_len), &self.tokens, backend);
+                    shrank_line(self.content.truncate_width(max_len), &self.tokens, backend);
                 };
             }
         }
@@ -496,9 +519,9 @@ impl EditorLine for CodeLine {
     }
 }
 
-impl Into<String> for CodeLine {
-    fn into(self) -> String {
-        self.content
+impl From<CodeLine> for String {
+    fn from(val: CodeLine) -> Self {
+        val.content
     }
 }
 
@@ -573,7 +596,7 @@ impl<'a> Context for CodeLineContext<'a> {
     fn count_skipped_to_cursor(&mut self, wrap_len: usize, remaining_lines: usize) -> usize {
         let wraps = self.char / wrap_len + 1;
         let skip_lines = wraps.saturating_sub(remaining_lines);
-        self.char = self.char % wrap_len;
+        self.char %= wrap_len;
         self.line += wraps.saturating_sub(skip_lines);
         skip_lines
     }

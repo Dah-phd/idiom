@@ -126,7 +126,7 @@ impl Tree {
                         return Some(path.clone());
                     }
                 }
-                self.selected_path = selected.path().clone();
+                self.selected_path = selected.path().to_owned()
             };
             self.force_sync();
         }
@@ -219,7 +219,7 @@ impl Tree {
         let path = rel_result.as_ref().unwrap_or(path);
         if self.tree.expand_contained(path) {
             self.state.selected = 0;
-            self.selected_path = path.clone();
+            self.selected_path.clone_from(path);
             self.force_sync();
         }
     }

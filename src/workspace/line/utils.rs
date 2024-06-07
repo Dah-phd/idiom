@@ -46,7 +46,7 @@ pub fn build_line_select(
     select_color: Color,
     backend: &mut Backend,
 ) {
-    let mut iter_tokens = tokens.into_iter();
+    let mut iter_tokens = tokens.iter();
     let mut maybe_token = iter_tokens.next();
     let mut reset_style = Style::default();
     for (idx, text) in content {
@@ -120,7 +120,7 @@ pub fn wrapped_line_select(
         wrap_text.truncate(wrap_len);
         backend.print_styled(wrap_text, Style::reversed());
         let line_end = wrap_len * skip_lines;
-        let mut tokens = tokens.into_iter().skip_while(|token| token.to < line_end).peekable();
+        let mut tokens = tokens.iter().skip_while(|token| token.to < line_end).peekable();
         if let Some(token) = tokens.peek() {
             if token.from < line_end {
                 backend.set_style(token.style);
@@ -148,7 +148,7 @@ pub fn wrapped_line_select(
         wrapping_loop_select(
             content.char_indices(),
             backend,
-            tokens.into_iter(),
+            tokens.iter(),
             &wrap_number,
             wrap_len,
             wrap_len,
@@ -229,7 +229,7 @@ pub fn wrapped_line(
         wrap_text.truncate(wrap_len);
         backend.print_styled(wrap_text, Style::reversed());
         let line_end = wrap_len * skip_lines;
-        let mut tokens = tokens.into_iter().skip_while(|token| token.to < line_end).peekable();
+        let mut tokens = tokens.iter().skip_while(|token| token.to < line_end).peekable();
         if let Some(token) = tokens.peek() {
             if token.from < line_end {
                 backend.set_style(token.style);
@@ -248,7 +248,7 @@ pub fn wrapped_line(
         wrapping_loop(
             content.char_indices(),
             backend,
-            tokens.into_iter(),
+            tokens.iter(),
             &wrap_number,
             wrap_len, // postion char where line ends
             wrap_len,
@@ -274,7 +274,7 @@ fn wrapping_loop<'a>(
                 Some(line) => line,
                 None => return,
             };
-            backend.print_styled_at(line.row, line.col, &wrap_number, Style::fg(color::dark_grey()));
+            backend.print_styled_at(line.row, line.col, wrap_number, Style::fg(color::dark_grey()));
             backend.clear_to_eol();
             line_end += wrap_len;
         }

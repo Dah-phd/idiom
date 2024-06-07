@@ -6,6 +6,7 @@ use thiserror::Error;
 pub type IdiomResult<T> = Result<T, IdiomError>;
 
 #[derive(Error, Debug)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum IdiomError {
     LSP(#[from] LSPError),
     RenderError(#[from] std::io::Error),
@@ -35,7 +36,7 @@ impl Display for IdiomError {
                 Display::fmt(err, f)
             }
             Self::IOError(message) => f.write_fmt(format_args!("IO Err: {message}")),
-            Self::GeneralError(message) => f.write_str(&message),
+            Self::GeneralError(message) => f.write_str(message),
         }
     }
 }
