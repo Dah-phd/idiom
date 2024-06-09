@@ -302,11 +302,12 @@ impl EditorLine for CodeLine {
     fn split_off(&mut self, at: usize) -> Self {
         self.rendered_at = 0;
         if self.content.len() == self.char_len {
-            let split_off_len = self.char_len - at;
+            let content = self.content.split_off(at);
+            self.char_len = self.content.len();
             self.tokens.clear();
             return Self {
-                content: self.content.split_off(at),
-                char_len: split_off_len,
+                char_len: content.len(),
+                content,
                 tokens: Vec::new(),
                 diagnostics: self.diagnostics.take(),
                 rendered_at: 0,

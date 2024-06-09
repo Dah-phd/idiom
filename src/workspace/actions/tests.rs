@@ -1,10 +1,6 @@
 use lsp_types::Position;
 
-use crate::workspace::actions::{
-    // edits::Edit,
-    edits_alt::Edit,
-    EditMetaData,
-};
+use crate::workspace::actions::{Edit, EditMetaData};
 use crate::workspace::cursor::Cursor;
 use crate::workspace::line::EditorLine;
 use crate::workspace::CursorPosition;

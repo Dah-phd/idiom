@@ -91,7 +91,7 @@ pub fn map(lexer: &mut Lexer, client: LSPClient) {
                 change: Some(TextDocumentSyncKind::INCREMENTAL),
                 ..
             }) => {
-                lexer.sync = sync_edits;
+                lexer.sync = sync_edits_alt;
             }
             _ => {
                 lexer.sync = sync_edits_full;
@@ -99,6 +99,21 @@ pub fn map(lexer: &mut Lexer, client: LSPClient) {
         }
     } else {
         lexer.sync = sync_edits_local;
+    }
+
+    match client.capabilities.position_encoding.as_ref().map(|encode| encode.as_str()) {
+        Some("utf-8") => {
+            lexer.encode_position = encode_pos_utf8;
+            lexer.decode_position = decode_pos_utf8;
+        }
+        Some("utf-32") => {
+            lexer.encode_position = encode_pos_utf32;
+            lexer.decode_position = decode_pos_utf32;
+        }
+        _ => {
+            lexer.encode_position = encode_pos_utf16;
+            lexer.decode_position = decode_pos_utf16;
+        }
     }
 
     lexer.client = client;
@@ -192,15 +207,61 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     }
 }
 
-pub fn sync_edits(editor: &mut Editor, gs: &mut GlobalState) {
+// pub fn sync_edits(editor: &mut Editor, gs: &mut GlobalState) {
+//     let (version, events) = match editor.actions.get_events() {
+//         Some(data) => data,
+//         None => return,
+//     };
+//     let lexer = &mut editor.lexer;
+//     if lexer.clock.elapsed() > FULL_TOKENS && lexer.modal.is_none() {
+//         let change_events = events.drain(..).map(|(_, edit)| edit).collect();
+//         gs.unwrap_lsp_error(lexer.client.file_did_change(&editor.path, version, change_events), editor.file_type);
+//         (lexer.tokens)(lexer, gs);
+//         lexer.clock = Instant::now();
+//         return;
+//     }
+//     let mut change_events = Vec::new();
+//     let meta = events
+//         .drain(..)
+//         .map(|(meta, edit)| {
+//             change_events.push(edit);
+//             meta
+//         })
+//         .reduce(|em1, em2| em1 + em2)
+//         .expect("Value is checked");
+//     gs.unwrap_lsp_error(lexer.client.file_did_change(&editor.path, version, change_events), editor.file_type);
+//     let max_lines = meta.start_line + meta.to;
+//     let end_line = meta.end_line();
+//     let range = Range::new(
+//         Position::new(meta.start_line as u32, 0),
+//         Position::new(end_line as u32, editor.content[end_line].char_len() as u32),
+//     );
+//     (lexer.tokens_partial)(lexer, range, max_lines, gs);
+// }
+
+pub fn sync_edits_alt(editor: &mut Editor, gs: &mut GlobalState) {
     let (version, events) = match editor.actions.get_events() {
         Some(data) => data,
         None => return,
     };
     let lexer = &mut editor.lexer;
+    let content = &editor.content;
     if lexer.clock.elapsed() > FULL_TOKENS && lexer.modal.is_none() {
-        let change_events = events.drain(..).map(|(_, edit)| edit).collect();
-        gs.unwrap_lsp_error(lexer.client.file_did_change(&editor.path, version, change_events), editor.file_type);
+        let result = lexer.client.sync(
+            editor.path.clone(),
+            version,
+            events
+                .drain(..)
+                .map(|(_, mut edit)| {
+                    let editor_line = &content[edit.cursor.line];
+                    if !editor_line.is_ascii() {
+                        edit.cursor.char = (lexer.encode_position)(edit.cursor.char, &editor_line[..]);
+                    }
+                    edit
+                })
+                .collect(),
+        );
+        gs.unwrap_lsp_error(result, editor.file_type);
         (lexer.tokens)(lexer, gs);
         lexer.clock = Instant::now();
         return;
@@ -208,13 +269,17 @@ pub fn sync_edits(editor: &mut Editor, gs: &mut GlobalState) {
     let mut change_events = Vec::new();
     let meta = events
         .drain(..)
-        .map(|(meta, edit)| {
+        .map(|(meta, mut edit)| {
+            let editor_line = &content[edit.cursor.line];
+            if !editor_line.is_ascii() {
+                edit.cursor.char = (lexer.encode_position)(edit.cursor.char, &editor_line[..]);
+            }
             change_events.push(edit);
             meta
         })
         .reduce(|em1, em2| em1 + em2)
         .expect("Value is checked");
-    gs.unwrap_lsp_error(lexer.client.file_did_change(&editor.path, version, change_events), editor.file_type);
+    gs.unwrap_lsp_error(lexer.client.sync(editor.path.clone(), version, change_events), editor.file_type);
     let max_lines = meta.start_line + meta.to;
     let end_line = meta.end_line();
     let range = Range::new(
@@ -229,7 +294,11 @@ pub fn sync_edits_full(editor: &mut Editor, gs: &mut GlobalState) {
         Some(data) => data,
         None => return,
     };
-    let mut text = editor.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n");
+    let mut text = String::new();
+    for editor_line in editor.content.iter() {
+        editor_line.push_content_to_buffer(&mut text);
+        text.push('\n');
+    }
     text.push('\n');
     let lexer = &mut editor.lexer;
     gs.unwrap_lsp_error(
@@ -365,4 +434,46 @@ fn range_tokens_are_supported(provider: &SemanticTokensServerCapabilities) -> bo
             data.semantic_tokens_options.range.unwrap_or_default()
         }
     }
+}
+
+#[inline]
+pub fn encode_pos_utf8(char_idx: usize, from_str: &str) -> usize {
+    from_str.char_indices().take(char_idx).last().map(|(idx, _)| idx).unwrap_or_default()
+}
+
+#[inline]
+pub fn decode_pos_utf8(utf8_idx: usize, from_str: &str) -> usize {
+    for (char_idx, (byte_idx, ..)) in from_str.char_indices().enumerate() {
+        if byte_idx == utf8_idx {
+            return char_idx;
+        }
+    }
+    0
+}
+
+#[inline]
+pub fn encode_pos_utf16(char_idx: usize, from_str: &str) -> usize {
+    from_str.chars().take(char_idx).fold(0, |sum, ch| sum + ch.len_utf16())
+}
+
+#[inline]
+pub fn decode_pos_utf16(utf16_idx: usize, from_str: &str) -> usize {
+    let mut sum = 0;
+    for (char_idx, ch) in from_str.chars().enumerate() {
+        if sum == utf16_idx {
+            return char_idx;
+        }
+        sum += ch.len_utf16();
+    }
+    0
+}
+
+#[inline]
+pub fn encode_pos_utf32(char_idx: usize, _: &str) -> usize {
+    char_idx
+}
+
+#[inline]
+pub fn decode_pos_utf32(utf32_idx: usize, _: &str) -> usize {
+    utf32_idx
 }

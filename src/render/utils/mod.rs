@@ -3,7 +3,6 @@ use std::ops::Range;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 /// Trait allowing UTF8 safe operations on str/String
-#[allow(dead_code)]
 pub trait UTF8Safe {
     /// returns str that will fit into width of columns, removing chars at the end that will not fit
     fn truncate_width(&self, width: usize) -> &str;
@@ -39,7 +38,6 @@ pub trait UTF8Safe {
 }
 
 /// String specific extension
-#[allow(dead_code)]
 pub trait UTF8SafeStringExt {
     fn utf8_insert(&mut self, idx: usize, ch: char);
     fn utf8_insert_str(&mut self, idx: usize, string: &str);
@@ -51,7 +49,7 @@ pub trait UTF8SafeStringExt {
 }
 
 impl UTF8Safe for str {
-    #[inline]
+    #[inline(always)]
     fn truncate_width(&self, mut width: usize) -> &str {
         let mut end = 0;
         for char in self.chars() {
@@ -65,7 +63,7 @@ impl UTF8Safe for str {
         self
     }
 
-    #[inline]
+    #[inline(always)]
     fn truncate_width_start(&self, mut width: usize) -> &str {
         let mut start = 0;
         for char in self.chars().rev() {
@@ -79,32 +77,32 @@ impl UTF8Safe for str {
         self
     }
 
-    #[inline]
+    #[inline(always)]
     fn width(&self) -> usize {
         UnicodeWidthStr::width(self)
     }
 
-    #[inline]
+    #[inline(always)]
     fn width_at(&self, at: usize) -> usize {
         self.chars().take(at).fold(0, |l, r| l + UnicodeWidthChar::width(r).unwrap_or(0))
     }
 
-    #[inline]
+    #[inline(always)]
     fn char_len(&self) -> usize {
         self.chars().count()
     }
 
-    #[inline]
+    #[inline(always)]
     fn utf16_len(&self) -> usize {
         self.chars().fold(0, |sum, ch| sum + ch.len_utf16())
     }
 
-    #[inline]
+    #[inline(always)]
     fn utf8_split_at(&self, mid: usize) -> (&str, &str) {
         self.split_at(prev_char_bytes_end(self, mid))
     }
 
-    #[inline]
+    #[inline(always)]
     fn utf8_cached_split_at(&self, mid: usize, utf8_len: usize) -> (&str, &str) {
         if self.len() == utf8_len {
             return self.split_at(mid);
@@ -112,46 +110,46 @@ impl UTF8Safe for str {
         self.utf8_split_at(mid)
     }
 
-    #[inline]
+    #[inline(always)]
     fn utf8_get(&self, from: usize, to: usize) -> Option<&str> {
         maybe_prev_char_bytes_end(self, from)
             .and_then(|from_checked| Some(from_checked..maybe_prev_char_bytes_end(self, to)?))
             .map(|range| unsafe { self.get_unchecked(range) })
     }
 
-    #[inline]
+    #[inline(always)]
     fn utf8_get_from(&self, from: usize) -> Option<&str> {
         maybe_prev_char_bytes_end(self, from).map(|from_checked| unsafe { self.get_unchecked(from_checked..) })
     }
 
-    #[inline]
+    #[inline(always)]
     fn utf8_get_to(&self, to: usize) -> Option<&str> {
         maybe_prev_char_bytes_end(self, to).map(|to_checked| unsafe { self.get_unchecked(..to_checked) })
     }
 
-    #[inline]
+    #[inline(always)]
     fn utf8_unsafe_get(&self, from: usize, to: usize) -> &str {
         unsafe { self.get_unchecked(prev_char_bytes_end(self, from)..prev_char_bytes_end(self, to)) }
     }
 
-    #[inline]
+    #[inline(always)]
     fn utf8_unsafe_get_from(&self, from: usize) -> &str {
         unsafe { self.get_unchecked(prev_char_bytes_end(self, from)..) }
     }
 
-    #[inline]
+    #[inline(always)]
     fn utf8_unsafe_get_to(&self, to: usize) -> &str {
         unsafe { self.get_unchecked(..prev_char_bytes_end(self, to)) }
     }
 }
 
 impl UTF8Safe for String {
-    #[inline]
+    #[inline(always)]
     fn truncate_width(&self, width: usize) -> &str {
         self.as_str().truncate_width(width)
     }
 
-    #[inline]
+    #[inline(always)]
     fn truncate_width_start(&self, width: usize) -> &str {
         self.as_str().truncate_width_start(width)
     }
@@ -186,27 +184,27 @@ impl UTF8Safe for String {
         self.as_str().utf8_cached_split_at(mid, utf8_len)
     }
 
-    #[inline]
+    #[inline(always)]
     fn utf8_get(&self, from: usize, to: usize) -> Option<&str> {
         self.as_str().utf8_get(from, to)
     }
 
-    #[inline]
+    #[inline(always)]
     fn utf8_get_from(&self, from: usize) -> Option<&str> {
         self.as_str().utf8_get_from(from)
     }
 
-    #[inline]
+    #[inline(always)]
     fn utf8_get_to(&self, to: usize) -> Option<&str> {
         self.as_str().utf8_get_to(to)
     }
 
-    #[inline]
+    #[inline(always)]
     fn utf8_unsafe_get(&self, from: usize, to: usize) -> &str {
         self.as_str().utf8_unsafe_get(from, to)
     }
 
-    #[inline]
+    #[inline(always)]
     fn utf8_unsafe_get_from(&self, from: usize) -> &str {
         self.as_str().utf8_unsafe_get_from(from)
     }

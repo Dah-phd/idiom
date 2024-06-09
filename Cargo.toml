@@ -34,7 +34,6 @@ strip-ansi-escapes = "0.2.0"
 bitflags = "2.4.2"
 regex = "1.10.4"
 thiserror = "1.0.60"
-url = {version = "2.5.0", features = ["serde"]}
 unicode-width = "0.1.12"
 
 [profile.dev]

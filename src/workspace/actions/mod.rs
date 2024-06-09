@@ -1,6 +1,5 @@
 mod action_buffer;
 mod edits;
-mod edits_alt;
 use crate::{
     configs::IndentConfigs,
     utils::Offset,
@@ -11,11 +10,10 @@ use crate::{
     },
 };
 use action_buffer::ActionBuffer;
-pub use edits::{Edit, EditMetaData};
-pub use edits_alt::LSPEvent;
-use lsp_types::{Position, TextDocumentContentChangeEvent, TextEdit};
+pub use edits::{Edit, EditMetaData, LSPEvent};
+use lsp_types::{Position, TextEdit};
 
-pub type Events = Vec<(EditMetaData, TextDocumentContentChangeEvent)>;
+pub type Events = Vec<(EditMetaData, LSPEvent)>;
 
 #[derive(Default)]
 pub struct Actions {
@@ -75,7 +73,7 @@ impl Actions {
     pub fn replace_token(&mut self, new: String, cursor: &mut Cursor, content: &mut [impl EditorLine]) {
         self.push_buffer();
         let action = Edit::replace_token(cursor.line, cursor.char, new, content);
-        cursor.set_position(action.reverse_text_edit.range.end.into());
+        cursor.set_position(action.end_position());
         self.push_done(action);
     }
 
@@ -389,7 +387,7 @@ impl Actions {
                 self.push_buffer();
                 cursor.line -= 1;
                 let edit = Edit::merge_next_line(cursor.line, content);
-                cursor.set_char(edit.text_edit.range.start.character as usize);
+                cursor.set_char(edit.cursor.char);
                 self.push_done(edit);
             }
             None => {
@@ -474,14 +472,6 @@ impl Actions {
         Some(&mut self.events)
     }
 
-    pub fn get_events_forced(&mut self) -> (i32, &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>) {
-        self.push_buffer();
-        if !self.events.is_empty() {
-            self.version += 1;
-        }
-        (self.version, &mut self.events)
-    }
-
     fn push_done(&mut self, edit: impl Into<EditType>) {
         let action: EditType = edit.into();
         action.collect_events(&mut self.events);
@@ -525,10 +515,10 @@ impl EditType {
 
     pub fn collect_events(&self, events: &mut Events) {
         match self {
-            Self::Single(action) => events.push((action.meta, action.event())),
+            Self::Single(action) => events.push(action.event()),
             Self::Multi(actions) => {
                 for action in actions {
-                    events.push((action.meta, action.event()));
+                    events.push(action.event());
                 }
             }
         }

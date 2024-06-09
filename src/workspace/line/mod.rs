@@ -30,6 +30,7 @@ pub trait EditorLine:
     + From<&'static str>
     + Display
 {
+    /// assumption is that control chars will not be present in file
     fn is_ascii(&self) -> bool;
     fn insert(&mut self, idx: usize, ch: char);
     fn push(&mut self, ch: char);

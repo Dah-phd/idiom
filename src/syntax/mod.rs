@@ -17,8 +17,8 @@ pub use diagnostics::{set_diganostics, Action, DiagnosticInfo, DiagnosticLine};
 pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
-    context_local, get_autocomplete_dead, info_position_dead, map, renames_dead, start_renames_dead, sync_edits_local,
-    tokens_dead, tokens_partial_dead,
+    context_local, decode_pos_utf32, encode_pos_utf32, get_autocomplete_dead, info_position_dead, map, renames_dead,
+    start_renames_dead, sync_edits_local, tokens_dead, tokens_partial_dead,
 };
 use lsp_types::{PublishDiagnosticsParams, Range};
 use modal::{LSPModal, ModalMessage};
@@ -54,6 +54,8 @@ pub struct Lexer {
     start_renames: fn(&mut Lexer, CursorPosition, &str),
     renames: fn(&mut Lexer, CursorPosition, String, &mut GlobalState),
     sync: fn(&mut Editor, &mut GlobalState),
+    encode_position: fn(usize, &str) -> usize,
+    decode_position: fn(usize, &str) -> usize,
 }
 
 impl Lexer {
@@ -83,6 +85,8 @@ impl Lexer {
             start_renames: start_renames_dead,
             renames: renames_dead,
             sync: sync_edits_local,
+            encode_position: encode_pos_utf32,
+            decode_position: decode_pos_utf32,
         }
     }
 

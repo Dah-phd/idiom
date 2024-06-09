@@ -8,7 +8,6 @@ pub type LSPResult<T> = Result<T, LSPError>;
 
 #[derive(Error, Debug)]
 pub enum LSPError {
-    UrlPathError(#[from] url::ParseError),
     ResponseError(String),
     InternalError(String),
     JsonError(#[from] serde_json::error::Error),
@@ -39,10 +38,6 @@ impl Display for LSPError {
             Self::ResponseError(message) => f.write_fmt(format_args!("LSP Responde with error: {message}")),
             Self::JsonRCPStderr(err) => {
                 f.write_str("LSP ERR message: ")?;
-                Display::fmt(err, f)
-            }
-            Self::UrlPathError(err) => {
-                f.write_str("LSP Error - failed to parse file url: ")?;
                 Display::fmt(err, f)
             }
             Self::JsonError(err) => {

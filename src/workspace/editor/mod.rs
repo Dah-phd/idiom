@@ -152,14 +152,17 @@ impl Editor {
         self.path = new_path;
     }
 
+    #[inline]
     pub fn help(&mut self, gs: &mut GlobalState) {
         self.lexer.help((&self.cursor).into(), &self.content, gs);
     }
 
+    #[inline]
     pub fn references(&mut self, gs: &mut GlobalState) {
         self.lexer.go_to_reference((&self.cursor).into(), gs);
     }
 
+    #[inline]
     pub fn declarations(&mut self, gs: &mut GlobalState) {
         self.lexer.go_to_declaration((&self.cursor).into(), gs);
     }

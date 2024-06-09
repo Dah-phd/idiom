@@ -153,6 +153,23 @@ fn test_split_off() {
     let mut line = CodeLine::new("text🚀123🚀".to_owned());
     line = line.split_off(2);
     assert_eq!(line.to_string(), "xt🚀123🚀");
+    assert_eq!(line.char_len(), 7);
+    assert_eq!(line.len(), 13);
     let new = line.split_off(4);
+    assert_eq!(new.char_len(), 3);
+    assert_eq!(new.len(), 6);
     assert_eq!(new.unwrap(), "23🚀");
+}
+
+#[test]
+fn test_split_off_ascii() {
+    let mut line = CodeLine::new("texttext".to_owned());
+    let remaining = line.split_off(4);
+    assert_eq!(remaining.char_len(), 4);
+    assert_eq!(remaining.len(), 4);
+    assert_eq!(remaining.to_string(), "text");
+    assert_eq!(line.char_len(), 4);
+    assert_eq!(line.len(), 4);
+    assert_eq!(line.to_string(), "text");
+    assert_eq!(line.to_string(), "text");
 }

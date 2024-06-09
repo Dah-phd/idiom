@@ -193,6 +193,11 @@ impl LSPClient {
         Ok(())
     }
 
+    pub fn sync(&mut self, path: PathBuf, version: i32, events: Vec<LSPEvent>) -> Result<(), LSPError> {
+        self.channel.send(Payload::Sync(path, version, events))?;
+        Ok(())
+    }
+
     #[inline]
     pub fn file_did_change(
         &mut self,

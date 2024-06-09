@@ -1,15 +1,15 @@
 use super::as_url;
 use crate::{lsp::LSPResult, workspace::CursorPosition};
 
-use lsp_types as lsp;
+use lsp_types::{self as lsp};
 use lsp_types::{
     request::{
         Completion, GotoDeclaration, GotoDeclarationParams, GotoDefinition, HoverRequest, Initialize, References,
         Rename, SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
     },
-    CompletionItemKindCapability, CompletionParams, GotoDefinitionParams, HoverParams, Range, ReferenceContext,
-    ReferenceParams, RenameParams, SemanticTokensParams, SemanticTokensRangeParams, SignatureHelpParams,
-    TextDocumentIdentifier, TextDocumentPositionParams, TextDocumentSyncClientCapabilities, WorkspaceFolder,
+    CompletionParams, GotoDefinitionParams, HoverParams, Range, ReferenceContext, ReferenceParams, RenameParams,
+    SemanticTokensParams, SemanticTokensRangeParams, SignatureHelpParams, TextDocumentIdentifier,
+    TextDocumentPositionParams, WorkspaceFolder,
 };
 use serde::Serialize;
 use serde_json::to_string;
@@ -191,11 +191,11 @@ where
                                 snippet_support: Some(true),
                                 ..Default::default()
                             }),
-                            completion_item_kind: Some(CompletionItemKindCapability { ..Default::default() }),
+                            completion_item_kind: Some(lsp::CompletionItemKindCapability { ..Default::default() }),
                             context_support: None, // additional context information Some(true)
                             ..Default::default()
                         }),
-                        synchronization: Some(TextDocumentSyncClientCapabilities {
+                        synchronization: Some(lsp::TextDocumentSyncClientCapabilities {
                             did_save: Some(true),
                             ..Default::default()
                         }),
@@ -208,6 +208,14 @@ where
                             context_support: Some(true),
                             ..Default::default()
                         }),
+                        ..Default::default()
+                    }),
+                    general: Some(lsp::GeneralClientCapabilities {
+                        position_encodings: Some(vec![
+                            lsp::PositionEncodingKind::UTF32, // preffered - but all are supported
+                            lsp::PositionEncodingKind::UTF16,
+                            lsp::PositionEncodingKind::UTF8,
+                        ]),
                         ..Default::default()
                     }),
                     ..Default::default()

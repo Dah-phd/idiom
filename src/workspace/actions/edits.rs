@@ -1,68 +1,62 @@
-use crate::{
-    configs::IndentConfigs,
-    syntax::Lexer,
-    utils::Offset,
-    workspace::{
-        cursor::{Cursor, CursorPosition},
-        line::EditorLine,
-        utils::{clip_content, insert_clip, is_scope, remove_content, token_range_at},
-    },
-};
-use lsp_types::{Position, Range, TextDocumentContentChangeEvent, TextEdit};
 use std::{
     fmt::Debug,
     ops::{Add, AddAssign},
 };
 
+use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
+
+use crate::{
+    configs::IndentConfigs,
+    render::UTF8Safe,
+    syntax::Lexer,
+    utils::Offset,
+    workspace::{
+        cursor::Cursor,
+        line::EditorLine,
+        utils::{clip_content, insert_clip, is_scope, remove_content, token_range_at},
+        CursorPosition,
+    },
+};
+
 #[derive(Debug)]
 pub struct Edit {
     pub meta: EditMetaData,
-    pub reverse_text_edit: TextEdit,
-    pub text_edit: TextEdit,
+    pub cursor: CursorPosition,
+    pub reverse: String,
+    pub text: String,
     pub select: Option<(CursorPosition, CursorPosition)>,
     pub new_select: Option<(CursorPosition, CursorPosition)>,
 }
 
 impl Edit {
+    #[inline(always)]
+    const fn without_select(cursor: CursorPosition, from: usize, to: usize, text: String, reverse: String) -> Self {
+        let meta = EditMetaData { start_line: cursor.line, from, to };
+        Self { meta, cursor, reverse, text, select: None, new_select: None }
+    }
+
+    #[inline(always)]
+    pub const fn single_line(cursor: CursorPosition, text: String, reverse: String) -> Self {
+        Self { meta: EditMetaData::line_changed(cursor.line), cursor, reverse, text, select: None, new_select: None }
+    }
+
     pub fn swap_down(up_line: usize, cfg: &IndentConfigs, content: &mut [impl EditorLine]) -> (Offset, Offset, Self) {
         let to = up_line + 1;
-        let reverse_edit_text = format!("{}\n{}\n", content[up_line], content[to]);
+        let reverse = format!("{}\n{}\n", content[up_line], content[to]);
         content.swap(up_line, to);
-        let offset = cfg.indent_line(up_line, content);
-        let offset2 = cfg.indent_line(to, content);
-        let new_text = format!("{}\n{}\n", content[up_line], content[to]);
-        let range = Range::new(Position::new(up_line as u32, 0), Position::new((to + 1) as u32, 0));
-        (
-            offset,
-            offset2,
-            Self {
-                meta: EditMetaData { start_line: up_line, from: 2, to: 2 },
-                reverse_text_edit: TextEdit::new(range, reverse_edit_text),
-                text_edit: TextEdit::new(range, new_text),
-                select: None,
-                new_select: None,
-            },
-        )
+        let up_offset = cfg.indent_line(up_line, content);
+        let down_offset = cfg.indent_line(to, content);
+        let text = format!("{}\n{}\n", content[up_line], content[to]);
+        let cursor = CursorPosition { line: up_line, char: 0 };
+        (up_offset, down_offset, Self::without_select(cursor, 2, 2, text, reverse))
     }
 
     pub fn merge_next_line(line: usize, content: &mut Vec<impl EditorLine>) -> Self {
         let removed_line = content.remove(line + 1);
         let merged_to = &mut content[line];
-        let position_of_new_line = Position::new(line as u32, merged_to.char_len() as u32);
+        let cursor = CursorPosition { line, char: merged_to.char_len() };
         merged_to.push_line(removed_line);
-        Self {
-            meta: EditMetaData { start_line: line, from: 2, to: 1 },
-            reverse_text_edit: TextEdit::new(
-                Range::new(position_of_new_line, position_of_new_line),
-                String::from("\n"),
-            ),
-            text_edit: TextEdit::new(
-                Range::new(position_of_new_line, Position::new((line + 1) as u32, 0)),
-                String::new(),
-            ),
-            select: None,
-            new_select: None,
-        }
+        Self::without_select(cursor, 2, 1, String::new(), "\n".to_owned())
     }
 
     pub fn unindent(line: usize, text: &mut impl EditorLine, indent: &str) -> Option<(Offset, Self)> {
@@ -71,36 +65,20 @@ impl Edit {
             idx += indent.len();
         }
         if text[idx..].starts_with(' ') {
-            let mut removed = String::new();
+            let mut reverse = String::new();
             while text[idx..].starts_with(' ') {
-                removed.push(text.remove(idx));
+                reverse.push(text.remove(idx));
             }
-            let start = Position::new(line as u32, idx as u32);
-            let end = Position::new(line as u32, (idx + removed.len()) as u32);
             return Some((
-                Offset::Neg(removed.len()),
-                Self {
-                    meta: EditMetaData::line_changed(line),
-                    reverse_text_edit: TextEdit::new(Range::new(start, start), removed),
-                    text_edit: TextEdit::new(Range::new(start, end), String::new()),
-                    select: None,
-                    new_select: None,
-                },
+                Offset::Neg(reverse.len()),
+                Self::single_line(CursorPosition { line, char: idx }, String::new(), reverse),
             ));
         };
         if idx != 0 {
             text.replace_range(0..indent.len(), "");
-            let start = Position::new(line as u32, 0);
-            let end = Position::new(line as u32, indent.len() as u32);
             return Some((
                 Offset::Neg(indent.len()),
-                Self {
-                    meta: EditMetaData::line_changed(line),
-                    reverse_text_edit: TextEdit::new(Range::new(start, start), indent.to_owned()),
-                    text_edit: TextEdit::new(Range::new(start, end), String::new()),
-                    select: None,
-                    new_select: None,
-                },
+                Self::single_line(CursorPosition { line, char: 0 }, String::new(), indent.to_owned()),
             ));
         }
         None
@@ -108,72 +86,83 @@ impl Edit {
 
     /// Creates Edit record without performing the action
     /// does not support multi line insertion
+    #[inline]
     pub fn record_in_line_insertion(position: Position, new_text: String) -> Self {
-        Self {
-            meta: EditMetaData::line_changed(position.line as usize),
-            reverse_text_edit: TextEdit::new(
-                Range::new(position, Position::new(position.line, position.character + new_text.len() as u32)),
-                String::new(),
-            ),
-            text_edit: TextEdit::new(Range::new(position, position), new_text),
-            select: None,
-            new_select: None,
-        }
+        Self::single_line(position.into(), new_text, String::new())
     }
 
-    pub fn remove_from_line(at_line: usize, from: usize, to: usize, line: &mut impl EditorLine) -> Self {
-        let start = Position::new(at_line as u32, from as u32);
-        let old = line[from..to].to_owned();
-        line.replace_range(from..to, "");
-        Self {
-            meta: EditMetaData::line_changed(at_line),
-            reverse_text_edit: TextEdit::new(Range::new(start, start), old),
-            text_edit: TextEdit::new(Range::new(start, Position::new(at_line as u32, to as u32)), String::new()),
-            select: None,
-            new_select: None,
-        }
+    #[inline]
+    pub fn remove_from_line(line: usize, from: usize, to: usize, text: &mut impl EditorLine) -> Self {
+        let reverse = text[from..to].to_owned();
+        text.replace_range(from..to, "");
+        Self::single_line(CursorPosition { line, char: from }, String::new(), reverse)
     }
 
-    pub fn insert_clip(from: CursorPosition, clip: String, content: &mut Vec<impl EditorLine>) -> Self {
-        let end = insert_clip(&clip, content, from);
-        Self {
-            meta: EditMetaData { start_line: from.line, from: 1, to: (end.line - from.line) + 1 },
-            reverse_text_edit: TextEdit::new(Range::new(from.into(), end.into()), String::new()),
-            text_edit: TextEdit::new(Range::new(from.into(), from.into()), clip),
-            select: None,
-            new_select: None,
-        }
+    /// builds action from removed data
+    #[inline]
+    pub fn extract_from_start(line: usize, len: usize, text: &mut String) -> Self {
+        let mut reverse = text.split_off(len);
+        std::mem::swap(text, &mut reverse);
+        Self::single_line(CursorPosition { line, char: 0 }, String::new(), reverse)
     }
 
+    #[inline]
+    pub fn insert_clip(cursor: CursorPosition, clip: String, content: &mut Vec<impl EditorLine>) -> Self {
+        let end = insert_clip(&clip, content, cursor);
+        let to = (end.line - cursor.line) + 1;
+        Self::without_select(cursor, 1, to, clip, String::new())
+    }
+
+    #[inline]
     pub fn remove_line(line: usize, content: &mut Vec<impl EditorLine>) -> Self {
-        let mut removed_line = content.remove(line);
-        removed_line.push('\n');
-        let start = Position::new(line as u32, 0);
-        Self {
-            meta: EditMetaData { start_line: line, from: 2, to: 1 },
-            reverse_text_edit: TextEdit::new(Range::new(start, start), removed_line.unwrap()),
-            text_edit: TextEdit::new(Range::new(start, Position::new(line as u32 + 1, 0)), String::new()),
-            select: None,
-            new_select: None,
-        }
+        let mut reverse = content.remove(line).unwrap();
+        reverse.push('\n');
+        Self::without_select(CursorPosition { line, char: 0 }, 2, 1, String::new(), reverse)
     }
 
+    #[inline]
     pub fn remove_select(from: CursorPosition, to: CursorPosition, content: &mut Vec<impl EditorLine>) -> Self {
         Self {
+            cursor: from,
             meta: EditMetaData { start_line: from.line, from: to.line - from.line + 1, to: 1 },
-            reverse_text_edit: TextEdit::new(Range::new(from.into(), from.into()), clip_content(from, to, content)),
-            text_edit: TextEdit::new(Range::new(from.into(), to.into()), String::new()),
+            reverse: clip_content(from, to, content),
             select: Some((from, to)),
+            text: String::new(),
             new_select: None,
         }
     }
 
+    #[inline]
+    pub fn replace_select(
+        from: CursorPosition,
+        to: CursorPosition,
+        clip: String,
+        content: &mut Vec<impl EditorLine>,
+    ) -> Self {
+        let reverse_text_edit = clip_content(from, to, content);
+        let end = if !clip.is_empty() { insert_clip(&clip, content, from) } else { from };
+        let meta =
+            EditMetaData { start_line: from.line, from: (to.line - from.line) + 1, to: (end.line - from.line) + 1 };
+        Self { cursor: from, meta, reverse: reverse_text_edit, text: clip, select: Some((from, to)), new_select: None }
+    }
+
+    #[inline]
+    pub fn replace_token(line: usize, char: usize, new_text: String, content: &mut [impl EditorLine]) -> Self {
+        let code_line = &mut content[line];
+        let range = token_range_at(code_line, char);
+        let char = range.start;
+        let reverse = code_line[range.clone()].to_owned();
+        code_line.replace_range(range, &new_text);
+        Self::single_line(CursorPosition { line, char }, new_text, reverse)
+    }
+
+    #[inline]
     pub fn new_line(
         mut cursor: CursorPosition,
         cfg: &IndentConfigs,
         content: &mut Vec<impl EditorLine>,
     ) -> (CursorPosition, Self) {
-        let mut from_range = (cursor, cursor);
+        let mut from_cursor = cursor;
         let mut reverse = String::new();
         let mut text = String::from('\n');
         let prev_line = &mut content[cursor.line];
@@ -186,80 +175,23 @@ impl Edit {
         // expand scope
         if is_scope(&prev_line[..], &line[..]) {
             text.push('\n');
-            let new_char = if indent.len() >= cfg.indent.len() && cfg.unindent_if_before_base_pattern(&mut line) != 0 {
-                let new_char = indent.len() - cfg.indent.len();
-                text.push_str(&indent[..new_char]);
-                new_char
-            } else {
-                0
-            };
+            if indent.len() >= cfg.indent.len() && cfg.unindent_if_before_base_pattern(&mut line) != 0 {
+                text.push_str(&indent[..indent.len() - cfg.indent.len()]);
+            }
             content.insert(cursor.line, line);
             content.insert(cursor.line, indent.into());
-            let edit = Self {
-                meta: EditMetaData { start_line: from_range.0.line, from: 1, to: 3 },
-                reverse_text_edit: TextEdit {
-                    new_text: reverse,
-                    range: Range::new(
-                        from_range.0.into(),
-                        CursorPosition { line: cursor.line + 1, char: new_char }.into(),
-                    ),
-                },
-                text_edit: TextEdit { new_text: text, range: Range::new(from_range.0.into(), from_range.1.into()) },
-                select: None,
-                new_select: None,
-            };
-            return (cursor, edit);
+            return (cursor, Self::without_select(from_cursor, 1, 3, text, reverse));
         }
         if prev_line.chars().all(|c| c.is_whitespace()) && prev_line.char_len().rem_euclid(cfg.indent.len()) == 0 {
-            from_range.0.char = 0;
+            from_cursor.char = 0;
             prev_line.push_content_to_buffer(&mut reverse);
             prev_line.clear();
         }
         content.insert(cursor.line, line);
-        let edit = Self {
-            meta: EditMetaData { start_line: from_range.0.line, from: 1, to: 2 },
-            text_edit: TextEdit { range: Range::new(from_range.0.into(), from_range.1.into()), new_text: text },
-            reverse_text_edit: TextEdit { range: Range::new(from_range.0.into(), cursor.into()), new_text: reverse },
-            select: None,
-            new_select: None,
-        };
-        (cursor, edit)
+        (cursor, Self::without_select(from_cursor, 1, 2, text, reverse))
     }
 
-    pub fn replace_select(
-        from: CursorPosition,
-        to: CursorPosition,
-        clip: String,
-        content: &mut Vec<impl EditorLine>,
-    ) -> Self {
-        let reverse_edit_text = clip_content(from, to, content);
-        let end = if !clip.is_empty() { insert_clip(&clip, content, from) } else { from };
-        Self {
-            meta: EditMetaData { start_line: from.line, from: to.line - from.line + 1, to: (end.line - from.line) + 1 },
-            reverse_text_edit: TextEdit::new(Range::new(from.into(), end.into()), reverse_edit_text),
-            text_edit: TextEdit { range: Range::new(from.into(), to.into()), new_text: clip },
-            select: Some((from, to)),
-            new_select: None,
-        }
-    }
-
-    pub fn replace_token(line: usize, char: usize, new_text: String, content: &mut [impl EditorLine]) -> Self {
-        let code_line = &mut content[line];
-        let range = token_range_at(code_line, char);
-        let start = Position::new(line as u32, range.start as u32);
-        let text_edit_range = Range::new(start, Position::new(line as u32, range.end as u32));
-        let reverse_edit_range = Range::new(start, Position::new(line as u32, (range.start + new_text.len()) as u32));
-        let replaced_text = code_line[range.clone()].to_owned();
-        code_line.replace_range(range, &new_text);
-        Self {
-            meta: EditMetaData::line_changed(line),
-            text_edit: TextEdit::new(text_edit_range, new_text),
-            reverse_text_edit: TextEdit::new(reverse_edit_range, replaced_text),
-            select: None,
-            new_select: None,
-        }
-    }
-
+    #[inline]
     pub fn insert_snippet(
         c: &Cursor,
         snippet: String,
@@ -278,17 +210,19 @@ impl Edit {
             char: if line == 0 { from.char + char } else { indent.len() + char },
         });
         let edit = Edit::replace_select(from, to, snippet, content);
-        (new_cursor.unwrap_or(edit.reverse_text_edit.range.end.into()), edit)
+        (new_cursor.unwrap_or(edit.end_position()), edit)
     }
 
     /// UTILS
 
+    #[inline]
     pub fn get_new_text(&self) -> &str {
-        &self.text_edit.new_text
+        &self.text
     }
 
+    #[inline]
     pub fn get_removed_text(&self) -> &str {
-        &self.reverse_text_edit.new_text
+        &self.reverse
     }
 
     pub fn select(mut self, from: CursorPosition, to: CursorPosition) -> Self {
@@ -303,58 +237,132 @@ impl Edit {
 
     #[inline]
     pub fn start_position(&self) -> CursorPosition {
-        self.reverse_text_edit.range.start.into()
+        self.cursor
     }
 
     #[inline]
     pub fn end_position(&self) -> CursorPosition {
-        self.reverse_text_edit.range.end.into()
+        let line = self.meta.end_line();
+        let mut char = self.text.split('\n').last().unwrap().char_len();
+        if line == self.meta.start_line {
+            char += self.cursor.char;
+        };
+        CursorPosition { line, char }
     }
 
     #[inline]
     pub fn end_position_rev(&self) -> CursorPosition {
-        self.text_edit.range.end.into()
+        let line = self.meta.start_line + self.meta.from - 1;
+        let mut char = self.reverse.split('\n').last().unwrap().char_len();
+        if line == self.meta.start_line {
+            char += self.cursor.char;
+        };
+        CursorPosition { line, char }
     }
 
     /// apply reverse edit (goes into undone)
     pub fn apply_rev(
         &self,
         content: &mut Vec<impl EditorLine>,
-        events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
+        events: &mut Vec<(EditMetaData, LSPEvent)>,
     ) -> (CursorPosition, Option<(CursorPosition, CursorPosition)>) {
         let from = self.start_position();
         let to = self.end_position();
         remove_content(from, to, content);
-        events.push((self.meta.rev(), self.reverse_event()));
-        (insert_clip(&self.reverse_text_edit.new_text, content, from), self.select)
+        events.push(self.reverse_event());
+        (insert_clip(&self.reverse, content, from), self.select)
     }
 
     /// apply edit (goes into done)
     pub fn apply(
         &self,
         content: &mut Vec<impl EditorLine>,
-        events: &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>,
+        events: &mut Vec<(EditMetaData, LSPEvent)>,
     ) -> (CursorPosition, Option<(CursorPosition, CursorPosition)>) {
         let from = self.start_position();
         let to = self.end_position_rev();
         remove_content(from, to, content);
-        events.push((self.meta, self.event()));
-        (insert_clip(&self.text_edit.new_text, content, from), self.new_select)
+        events.push(self.event());
+        (insert_clip(&self.text, content, from), self.new_select)
     }
 
-    pub fn reverse_event(&self) -> TextDocumentContentChangeEvent {
-        TextDocumentContentChangeEvent {
-            range: Some(self.reverse_text_edit.range),
-            range_length: None,
-            text: self.reverse_text_edit.new_text.to_owned(),
+    pub fn reverse_event(&self) -> (EditMetaData, LSPEvent) {
+        let meta = self.meta.rev();
+        (meta, LSPEvent::new(self.cursor, meta.from - 1, &self.reverse, &self.text))
+    }
+
+    pub fn event(&self) -> (EditMetaData, LSPEvent) {
+        (self.meta, LSPEvent::new(self.cursor, self.meta.from - 1, &self.text, &self.reverse))
+    }
+}
+
+pub struct LSPEvent {
+    pub cursor: CursorPosition,
+    pub changed_lines: usize,
+    pub text: String,
+    pub last_line: String,
+}
+
+impl LSPEvent {
+    #[inline]
+    pub fn new(cursor: CursorPosition, changed: usize, text: &str, rev_text: &str) -> Self {
+        Self {
+            cursor,
+            changed_lines: changed,
+            text: text.to_owned(),
+            last_line: rev_text.chars().rev().take_while(|ch| ch != &'\n').collect(),
         }
     }
 
-    pub fn event(&self) -> TextDocumentContentChangeEvent {
+    #[inline]
+    pub fn utf8_encode_start(&mut self, content: &[impl EditorLine]) {
+        self.cursor.char = content[self.cursor.line].unsafe_utf8_idx_at(self.cursor.char);
+    }
+
+    #[inline]
+    pub fn utf16_encode_start(&mut self, content: &[impl EditorLine]) {
+        self.cursor.char = content[self.cursor.line].unsafe_utf16_idx_at(self.cursor.char);
+    }
+
+    #[inline]
+    pub fn utf8_text_change(self) -> TextDocumentContentChangeEvent {
+        let mut char = self.last_line.len();
+        if self.changed_lines == 0 {
+            char += self.cursor.char;
+        }
+        let to = CursorPosition { line: self.cursor.line + self.changed_lines, char };
         TextDocumentContentChangeEvent {
-            range: Some(self.text_edit.range),
+            range: Some(Range::new(self.cursor.into(), to.into())),
+            text: self.text,
             range_length: None,
-            text: self.text_edit.new_text.to_owned(),
+        }
+    }
+
+    #[inline]
+    pub fn utf16_text_change(self) -> TextDocumentContentChangeEvent {
+        let mut char = self.last_line.chars().fold(0, |sum, ch| sum + ch.len_utf16());
+        if self.changed_lines == 0 {
+            char += self.cursor.char;
+        }
+        let to = CursorPosition { line: self.cursor.line + self.changed_lines, char };
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(self.cursor.into(), to.into())),
+            text: self.text,
+            range_length: None,
+        }
+    }
+
+    #[inline]
+    pub fn utf32_text_change(self) -> TextDocumentContentChangeEvent {
+        let mut char = self.last_line.chars().count();
+        if self.changed_lines == 0 {
+            char += self.cursor.char;
+        }
+        let to = CursorPosition { line: self.cursor.line + self.changed_lines, char };
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(self.cursor.into(), to.into())),
+            text: self.text,
+            range_length: None,
         }
     }
 }
@@ -436,5 +444,318 @@ impl EditMetaData {
 impl Debug for EditMetaData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&format!("{} >> {}", self.from, self.to))
+    }
+}
+
+#[cfg(test)]
+mod lsp_event_tests {
+    use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
+
+    use crate::workspace::line::CodeLine;
+
+    use super::Edit;
+
+    #[test]
+    fn test_utf8_lsp_event() {
+        let mut content = vec![
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+        ];
+        let edit = Edit::insert_clip((0, 4).into(), "\ntest".to_owned(), &mut content);
+        let (.., mut event) = edit.event();
+        let (.., mut rev_event) = edit.reverse_event();
+        event.utf8_encode_start(&content);
+        rev_event.utf8_encode_start(&content);
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 4), Position::new(0, 4))),
+                text: "\ntest".to_owned(),
+                range_length: None
+            },
+            event.utf8_text_change()
+        );
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 4), Position::new(1, 4))),
+                text: "".to_owned(),
+                range_length: None
+            },
+            rev_event.utf8_text_change()
+        );
+        let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull".to_owned(), &mut content);
+        let (.., mut event) = edit.event();
+        let (.., mut rev_event) = edit.reverse_event();
+        event.utf8_encode_start(&content);
+        rev_event.utf8_encode_start(&content);
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 2), Position::new(4, 1))),
+                text: "\nbambi\nbull".to_owned(),
+                range_length: None
+            },
+            event.utf8_text_change()
+        );
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 2), Position::new(2, 4))),
+                text: "st\ntest\ntest\ntest\nt".to_owned(),
+                range_length: None
+            },
+            rev_event.utf8_text_change()
+        );
+    }
+
+    #[test]
+    fn test_utf8_lsp_event_emoji() {
+        let mut content = vec![
+            CodeLine::new("🚀est".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+        ];
+        let edit = Edit::insert_clip((0, 4).into(), "\ntest🚀".to_owned(), &mut content);
+        let (.., mut event) = edit.event();
+        let (.., mut rev_event) = edit.reverse_event();
+        event.utf8_encode_start(&content);
+        rev_event.utf8_encode_start(&content);
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 7), Position::new(0, 7))),
+                text: "\ntest🚀".to_owned(),
+                range_length: None
+            },
+            event.utf8_text_change()
+        );
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 7), Position::new(1, 8))),
+                text: "".to_owned(),
+                range_length: None
+            },
+            rev_event.utf8_text_change()
+        );
+        let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull🚀".to_owned(), &mut content);
+        let (.., mut event) = edit.event();
+        let (.., mut rev_event) = edit.reverse_event();
+        event.utf8_encode_start(&content);
+        rev_event.utf8_encode_start(&content);
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 5), Position::new(4, 1))),
+                text: "\nbambi\nbull🚀".to_owned(),
+                range_length: None
+            },
+            event.utf8_text_change()
+        );
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 5), Position::new(2, 8))),
+                text: "st\ntest🚀\ntest\ntest\nt".to_owned(),
+                range_length: None
+            },
+            rev_event.utf8_text_change()
+        );
+    }
+
+    #[test]
+    fn test_utf16_lsp_event() {
+        let mut content = vec![
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+        ];
+        let edit = Edit::insert_clip((0, 4).into(), "\ntest".to_owned(), &mut content);
+        let (.., mut event) = edit.event();
+        let (.., mut rev_event) = edit.reverse_event();
+        event.utf16_encode_start(&content);
+        rev_event.utf16_encode_start(&content);
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 4), Position::new(0, 4))),
+                text: "\ntest".to_owned(),
+                range_length: None
+            },
+            event.utf16_text_change()
+        );
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 4), Position::new(1, 4))),
+                text: "".to_owned(),
+                range_length: None
+            },
+            rev_event.utf16_text_change()
+        );
+        let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull".to_owned(), &mut content);
+        let (.., mut event) = edit.event();
+        let (.., mut rev_event) = edit.reverse_event();
+        event.utf16_encode_start(&content);
+        rev_event.utf16_encode_start(&content);
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 2), Position::new(4, 1))),
+                text: "\nbambi\nbull".to_owned(),
+                range_length: None
+            },
+            event.utf16_text_change()
+        );
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 2), Position::new(2, 4))),
+                text: "st\ntest\ntest\ntest\nt".to_owned(),
+                range_length: None
+            },
+            rev_event.utf16_text_change()
+        );
+    }
+
+    #[test]
+    fn test_utf16_lsp_event_emoji() {
+        let mut content = vec![
+            CodeLine::new("🚀est".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+        ];
+        let edit = Edit::insert_clip((0, 4).into(), "\ntest🚀".to_owned(), &mut content);
+        let (.., mut event) = edit.event();
+        let (.., mut rev_event) = edit.reverse_event();
+        event.utf16_encode_start(&content);
+        rev_event.utf16_encode_start(&content);
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 5), Position::new(0, 5))),
+                text: "\ntest🚀".to_owned(),
+                range_length: None
+            },
+            event.utf16_text_change()
+        );
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 5), Position::new(1, 6))),
+                text: "".to_owned(),
+                range_length: None
+            },
+            rev_event.utf16_text_change()
+        );
+        let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull🚀".to_owned(), &mut content);
+        let (.., mut event) = edit.event();
+        let (.., mut rev_event) = edit.reverse_event();
+        event.utf16_encode_start(&content);
+        rev_event.utf16_encode_start(&content);
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 3), Position::new(4, 1))),
+                text: "\nbambi\nbull🚀".to_owned(),
+                range_length: None
+            },
+            event.utf16_text_change()
+        );
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 3), Position::new(2, 6))),
+                text: "st\ntest🚀\ntest\ntest\nt".to_owned(),
+                range_length: None
+            },
+            rev_event.utf16_text_change()
+        );
+    }
+
+    #[test]
+    fn test_utf32_lsp_event() {
+        let mut content = vec![
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+        ];
+        let edit = Edit::insert_clip((0, 4).into(), "\ntest".to_owned(), &mut content);
+        let (.., event) = edit.event();
+        let (.., rev_event) = edit.reverse_event();
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 4), Position::new(0, 4))),
+                text: "\ntest".to_owned(),
+                range_length: None
+            },
+            event.utf32_text_change()
+        );
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 4), Position::new(1, 4))),
+                text: "".to_owned(),
+                range_length: None
+            },
+            rev_event.utf32_text_change()
+        );
+        let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull".to_owned(), &mut content);
+        let (.., event) = edit.event();
+        let (.., rev_event) = edit.reverse_event();
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 2), Position::new(4, 1))),
+                text: "\nbambi\nbull".to_owned(),
+                range_length: None
+            },
+            event.utf32_text_change()
+        );
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 2), Position::new(2, 4))),
+                text: "st\ntest\ntest\ntest\nt".to_owned(),
+                range_length: None
+            },
+            rev_event.utf32_text_change()
+        );
+    }
+
+    #[test]
+    fn test_utf32_lsp_event_emoji() {
+        let mut content = vec![
+            CodeLine::new("🚀est".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+            CodeLine::new("test".into()),
+        ];
+        let edit = Edit::insert_clip((0, 4).into(), "\ntest🚀".to_owned(), &mut content);
+        let (.., event) = edit.event();
+        let (.., rev_event) = edit.reverse_event();
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 4), Position::new(0, 4))),
+                text: "\ntest🚀".to_owned(),
+                range_length: None
+            },
+            event.utf32_text_change()
+        );
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 4), Position::new(1, 5))),
+                text: "".to_owned(),
+                range_length: None
+            },
+            rev_event.utf32_text_change()
+        );
+        let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull🚀".to_owned(), &mut content);
+        let (.., event) = edit.event();
+        let (.., rev_event) = edit.reverse_event();
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 2), Position::new(4, 1))),
+                text: "\nbambi\nbull🚀".to_owned(),
+                range_length: None
+            },
+            event.utf32_text_change()
+        );
+        assert_eq!(
+            TextDocumentContentChangeEvent {
+                range: Some(Range::new(Position::new(0, 2), Position::new(2, 5))),
+                text: "st\ntest🚀\ntest\ntest\nt".to_owned(),
+                range_length: None
+            },
+            rev_event.utf32_text_change()
+        );
     }
 }
