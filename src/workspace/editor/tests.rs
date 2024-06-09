@@ -2,11 +2,11 @@ use super::super::{
     cursor::{Cursor, CursorPosition},
     Editor,
 };
-use crate::configs::FileType;
 use crate::global_state::GlobalState;
 use crate::render::backend::{Backend, BackendProtocol};
 use crate::syntax::Lexer;
 use crate::workspace::{actions::Actions, line::CodeLine};
+use crate::{configs::FileType, workspace::editor::build_display};
 use std::path::PathBuf;
 
 pub fn mock_editor(content: Vec<String>) -> Editor {
@@ -37,4 +37,19 @@ pub fn select_eq(select: (CursorPosition, CursorPosition), editor: &Editor) -> b
 
 pub fn pull_line(editor: &Editor, idx: usize) -> Option<String> {
     editor.content.get(idx).map(|line| line.to_string())
+}
+
+#[test]
+fn test_update_path() {
+    let mut editor = mock_editor(vec![]);
+    editor.path = PathBuf::from("./src/workspace/editor/mod.rs");
+    editor.update_path(PathBuf::from("./src/workspace/editor/test.rs"));
+    assert_eq!(editor.display, "editor/test.rs");
+}
+
+#[test]
+fn test_display() {
+    let buf = PathBuf::from("./src/workspace/editor/mod.rs").canonicalize().unwrap();
+    assert_eq!(build_display(buf.as_path()), "editor/mod.rs");
+    assert_eq!(build_display(PathBuf::from("bumba").as_path()), "bumba");
 }

@@ -91,7 +91,7 @@ pub fn map(lexer: &mut Lexer, client: LSPClient) {
                 change: Some(TextDocumentSyncKind::INCREMENTAL),
                 ..
             }) => {
-                lexer.sync = sync_edits_alt;
+                lexer.sync = sync_edits;
             }
             _ => {
                 lexer.sync = sync_edits_full;
@@ -207,39 +207,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     }
 }
 
-// pub fn sync_edits(editor: &mut Editor, gs: &mut GlobalState) {
-//     let (version, events) = match editor.actions.get_events() {
-//         Some(data) => data,
-//         None => return,
-//     };
-//     let lexer = &mut editor.lexer;
-//     if lexer.clock.elapsed() > FULL_TOKENS && lexer.modal.is_none() {
-//         let change_events = events.drain(..).map(|(_, edit)| edit).collect();
-//         gs.unwrap_lsp_error(lexer.client.file_did_change(&editor.path, version, change_events), editor.file_type);
-//         (lexer.tokens)(lexer, gs);
-//         lexer.clock = Instant::now();
-//         return;
-//     }
-//     let mut change_events = Vec::new();
-//     let meta = events
-//         .drain(..)
-//         .map(|(meta, edit)| {
-//             change_events.push(edit);
-//             meta
-//         })
-//         .reduce(|em1, em2| em1 + em2)
-//         .expect("Value is checked");
-//     gs.unwrap_lsp_error(lexer.client.file_did_change(&editor.path, version, change_events), editor.file_type);
-//     let max_lines = meta.start_line + meta.to;
-//     let end_line = meta.end_line();
-//     let range = Range::new(
-//         Position::new(meta.start_line as u32, 0),
-//         Position::new(end_line as u32, editor.content[end_line].char_len() as u32),
-//     );
-//     (lexer.tokens_partial)(lexer, range, max_lines, gs);
-// }
-
-pub fn sync_edits_alt(editor: &mut Editor, gs: &mut GlobalState) {
+pub fn sync_edits(editor: &mut Editor, gs: &mut GlobalState) {
     let (version, events) = match editor.actions.get_events() {
         Some(data) => data,
         None => return,

@@ -11,7 +11,7 @@ use crate::{
     render::backend::{Backend, BackendProtocol, Style},
     workspace::{
         actions::tests::create_content,
-        editor::test::{mock_editor, pull_line, select_eq},
+        editor::tests::{mock_editor, pull_line, select_eq},
         CursorPosition,
     },
 };

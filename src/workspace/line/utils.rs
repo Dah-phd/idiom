@@ -16,7 +16,20 @@ pub fn inline_diagnostics(max_len: usize, diagnostics: &Option<DiagnosticLine>, 
 }
 
 #[inline]
-pub fn build_line(content: &str, tokens: &[Token], backend: &mut Backend) {
+pub fn complex_line(content: &str, tokens: &[Token], backend: &mut Backend) {}
+
+#[inline]
+pub fn complex_line_with_select(
+    content: impl Iterator<Item = (usize, char)>,
+    tokens: &[Token],
+    select: Range<usize>,
+    select_color: Color,
+    backend: &mut Backend,
+) {
+}
+
+#[inline]
+pub fn ascii_line(content: &str, tokens: &[Token], backend: &mut Backend) {
     let mut end = 0;
     for token in tokens.iter() {
         if token.from > end {
@@ -39,7 +52,7 @@ pub fn build_line(content: &str, tokens: &[Token], backend: &mut Backend) {
 }
 
 #[inline]
-pub fn build_line_select(
+pub fn ascii_line_with_select(
     content: impl Iterator<Item = (usize, char)>,
     tokens: &[Token],
     select: Range<usize>,

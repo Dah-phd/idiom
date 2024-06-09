@@ -10,7 +10,7 @@ use crate::{
     workspace::{
         cursor::Cursor,
         line::{
-            utils::{build_line, build_line_select, shrank_line, wrapped_line, wrapped_line_select},
+            utils::{ascii_line, ascii_line_with_select, shrank_line, wrapped_line, wrapped_line_select},
             Context, EditorLine,
         },
         CursorPosition,
@@ -470,9 +470,9 @@ impl EditorLine for CodeLine {
         self.select = select;
         match self.select.clone() {
             Some(select) => {
-                if line_width > self.content.len() {
+                if line_width > self.char_len() {
                     self.rendered_at = 0;
-                    build_line_select(
+                    ascii_line_with_select(
                         self.content.char_indices(),
                         &self.tokens,
                         select,
@@ -482,7 +482,7 @@ impl EditorLine for CodeLine {
                     inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
                 } else {
                     let end_loc = line_width.saturating_sub(2);
-                    build_line_select(
+                    ascii_line_with_select(
                         self.content.char_indices().take(end_loc), // utf8 safe
                         &self.tokens,
                         select,
@@ -494,7 +494,7 @@ impl EditorLine for CodeLine {
             }
             None => {
                 if line_width > self.content.len() {
-                    build_line(&self.content, &self.tokens, backend);
+                    ascii_line(&self.content, &self.tokens, backend);
                     inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
                 } else {
                     let max_len = line_width.saturating_sub(2);

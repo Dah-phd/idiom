@@ -38,8 +38,10 @@ pub struct Editor {
 
 impl Editor {
     pub fn from_path(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> std::io::Result<Self> {
-        let content: Vec<_> =
-            std::fs::read_to_string(&path)?.split('\n').map(|line| CodeLine::new(line.to_owned())).collect();
+        let content = std::fs::read_to_string(&path)?
+            .split('\n')
+            .map(|line| CodeLine::new(line.to_owned()))
+            .collect::<Vec<CodeLine>>();
         let file_type = FileType::derive_type(&path);
         let display = build_display(&path);
         Ok(Self {
@@ -117,7 +119,7 @@ impl Editor {
         ctx.render_cursor(gs);
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn clear_screen_cache(&mut self) {
         self.last_render_at_line = None;
     }
@@ -130,7 +132,7 @@ impl Editor {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn sync(&mut self, gs: &mut GlobalState) {
         let new_line_number_offset =
             if self.content.is_empty() { 0 } else { (self.content.len().ilog10() + 1) as usize };
@@ -142,31 +144,33 @@ impl Editor {
         self.cursor.correct_cursor_position(&self.content);
     }
 
+    #[inline(always)]
     pub fn get_stats(&self) -> DocStats {
         (self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into())
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn update_path(&mut self, new_path: PathBuf) {
         self.display = build_display(&new_path);
         self.path = new_path;
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn help(&mut self, gs: &mut GlobalState) {
         self.lexer.help((&self.cursor).into(), &self.content, gs);
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn references(&mut self, gs: &mut GlobalState) {
         self.lexer.go_to_reference((&self.cursor).into(), gs);
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn declarations(&mut self, gs: &mut GlobalState) {
         self.lexer.go_to_declaration((&self.cursor).into(), gs);
     }
 
+    #[inline(always)]
     pub fn select_token(&mut self) {
         let range = token_range_at(&self.content[self.cursor.line], self.cursor.char);
         if !range.is_empty() {
@@ -177,6 +181,7 @@ impl Editor {
         }
     }
 
+    #[inline(always)]
     pub fn select_line(&mut self) {
         let start = CursorPosition { line: self.cursor.line, char: 0 };
         let next_line = self.cursor.line + 1;
@@ -191,6 +196,7 @@ impl Editor {
         };
     }
 
+    #[inline(always)]
     pub fn remove_line(&mut self) {
         self.select_line();
         if !self.cursor.select_is_none() {
@@ -215,18 +221,22 @@ impl Editor {
         false
     }
 
+    #[inline(always)]
     pub fn insert_text_with_relative_offset(&mut self, insert: String) {
         self.actions.insert_top_cursor_relative_offset(insert, &mut self.cursor, &mut self.content);
     }
 
+    #[inline(always)]
     pub fn replace_select(&mut self, from: CursorPosition, to: CursorPosition, new_clip: &str) {
         self.actions.replace_select(from, to, new_clip, &mut self.cursor, &mut self.content);
     }
 
+    #[inline(always)]
     pub fn replace_token(&mut self, new: String) {
         self.actions.replace_token(new, &mut self.cursor, &mut self.content);
     }
 
+    #[inline(always)]
     pub fn insert_snippet(&mut self, snippet: String, cursor_offset: Option<(usize, usize)>) {
         self.actions.insert_snippet(&mut self.cursor, snippet, cursor_offset, &mut self.content);
     }
@@ -253,6 +263,7 @@ impl Editor {
         self.actions.apply_edits(edits, &mut self.content);
     }
 
+    #[inline(always)]
     pub fn go_to(&mut self, line: usize) {
         self.cursor.select_drop();
         if self.content.len() >= line {
@@ -262,6 +273,7 @@ impl Editor {
         }
     }
 
+    #[inline(always)]
     pub fn go_to_select(&mut self, from: CursorPosition, to: CursorPosition) {
         self.cursor.at_line = to.line.saturating_sub(self.cursor.max_rows / 2);
         self.cursor.select_set(from, to);
@@ -294,6 +306,7 @@ impl Editor {
         buffer
     }
 
+    #[inline(always)]
     pub fn cut(&mut self) -> Option<String> {
         if self.content.is_empty() {
             return None;
@@ -301,6 +314,7 @@ impl Editor {
         Some(self.actions.cut(&mut self.cursor, &mut self.content))
     }
 
+    #[inline(always)]
     pub fn copy(&mut self) -> Option<String> {
         if self.content.is_empty() {
             None
@@ -311,6 +325,7 @@ impl Editor {
         }
     }
 
+    #[inline(always)]
     pub fn select_all(&mut self) {
         self.cursor.select_set(
             CursorPosition::default(),
@@ -321,14 +336,17 @@ impl Editor {
         );
     }
 
+    #[inline(always)]
     pub fn paste(&mut self, clip: String) {
         self.actions.paste(clip, &mut self.cursor, &mut self.content);
     }
 
+    #[inline(always)]
     pub fn undo(&mut self) {
         self.actions.undo(&mut self.cursor, &mut self.content);
     }
 
+    #[inline(always)]
     pub fn redo(&mut self) {
         self.actions.redo(&mut self.cursor, &mut self.content);
     }
@@ -357,90 +375,112 @@ impl Editor {
         None
     }
 
+    #[inline(always)]
     pub fn end_of_line(&mut self) {
         self.cursor.end_of_line(&self.content);
     }
 
+    #[inline(always)]
     pub fn end_of_file(&mut self) {
         self.cursor.end_of_file(&self.content);
     }
 
+    #[inline(always)]
     pub fn start_of_file(&mut self) {
         self.cursor.start_of_file();
     }
 
+    #[inline(always)]
     pub fn start_of_line(&mut self) {
         self.cursor.start_of_line(&self.content);
     }
 
+    #[inline(always)]
     pub fn up(&mut self) {
         self.cursor.up(&self.content);
     }
 
+    #[inline(always)]
     pub fn select_up(&mut self) {
         self.cursor.select_up(&self.content);
     }
 
+    #[inline(always)]
     pub fn scroll_up(&mut self) {
         self.cursor.scroll_up(&self.content);
     }
 
+    #[inline(always)]
     pub fn swap_up(&mut self) {
         self.actions.swap_up(&mut self.cursor, &mut self.content);
     }
 
+    #[inline(always)]
     pub fn down(&mut self) {
         self.cursor.down(&self.content);
     }
 
+    #[inline(always)]
     pub fn select_down(&mut self) {
         self.cursor.select_down(&self.content);
     }
 
+    #[inline(always)]
     pub fn scroll_down(&mut self) {
         self.cursor.scroll_down(&self.content);
     }
 
+    #[inline(always)]
     pub fn swap_down(&mut self) {
         self.actions.swap_down(&mut self.cursor, &mut self.content);
     }
 
+    #[inline(always)]
     pub fn left(&mut self) {
         self.cursor.left(&self.content);
     }
 
+    #[inline(always)]
     pub fn jump_left(&mut self) {
         self.cursor.jump_left(&self.content);
     }
 
+    #[inline(always)]
     pub fn jump_left_select(&mut self) {
         self.cursor.jump_left_select(&self.content);
     }
 
+    #[inline(always)]
     pub fn select_left(&mut self) {
         self.cursor.select_left(&self.content);
     }
 
+    #[inline(always)]
     pub fn right(&mut self) {
         self.cursor.right(&self.content);
     }
 
+    #[inline(always)]
     pub fn jump_right(&mut self) {
         self.cursor.jump_right(&self.content);
     }
 
+    #[inline(always)]
     pub fn jump_right_select(&mut self) {
         self.cursor.jump_right_select(&self.content);
     }
 
+    #[inline(always)]
     pub fn select_right(&mut self) {
         self.cursor.select_right(&self.content);
     }
 
+    #[inline(always)]
     pub fn new_line(&mut self) {
         self.actions.new_line(&mut self.cursor, &mut self.content);
     }
 
+    #[inline(always)]
     pub fn push(&mut self, ch: char, gs: &mut GlobalState) {
         self.actions.push_char(ch, &mut self.cursor, &mut self.content);
         let line = &self.content[self.cursor.line];
@@ -452,26 +492,32 @@ impl Editor {
         }
     }
 
+    #[inline(always)]
     pub fn backspace(&mut self) {
         self.actions.backspace(&mut self.cursor, &mut self.content);
     }
 
+    #[inline(always)]
     pub fn del(&mut self) {
         self.actions.del(&mut self.cursor, &mut self.content);
     }
 
+    #[inline(always)]
     pub fn indent(&mut self) {
         self.actions.indent(&mut self.cursor, &mut self.content);
     }
 
+    #[inline(always)]
     pub fn indent_start(&mut self) {
         self.actions.indent_start(&mut self.cursor, &mut self.content);
     }
 
+    #[inline(always)]
     pub fn unindent(&mut self) {
         self.actions.unindent(&mut self.cursor, &mut self.content);
     }
 
+    #[inline(always)]
     pub fn comment_out(&mut self) {
         self.actions.comment_out(self.file_type.comment_start(), &mut self.cursor, &mut self.content);
     }
@@ -511,12 +557,12 @@ impl Editor {
     }
 }
 
-fn build_display(path: &Path) -> String {
+pub fn build_display(path: &Path) -> String {
     let mut buffer = Vec::new();
     let mut text_path = path.display().to_string();
     if let Ok(base_path) = PathBuf::from("./").canonicalize().map(|p| p.display().to_string()) {
-        if let Some(rel) = text_path.strip_prefix(&base_path) {
-            text_path = rel.to_owned();
+        if text_path.starts_with(&base_path) {
+            text_path.replace_range(..base_path.len(), "");
         }
     }
     for part in text_path.split(MAIN_SEPARATOR).rev().take(2) {
@@ -532,4 +578,4 @@ impl Drop for Editor {
 }
 
 #[cfg(test)]
-pub mod test;
+pub mod tests;
