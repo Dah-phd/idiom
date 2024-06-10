@@ -3,7 +3,7 @@ use crate::{
         backend::{color, Backend, BackendProtocol, Color, Style},
         layout::RectIter,
     },
-    syntax::{DiagnosticLine, Token},
+    syntax::{DiagnosticLine, Lexer, Token},
     workspace::line::Context,
 };
 use std::ops::Range;
@@ -16,16 +16,78 @@ pub fn inline_diagnostics(max_len: usize, diagnostics: &Option<DiagnosticLine>, 
 }
 
 #[inline]
-pub fn complex_line(content: &str, tokens: &[Token], backend: &mut Backend) {}
+pub fn complex_line(content: impl Iterator<Item = char>, tokens: &[Token], backend: &mut Backend, lexer: &Lexer) {
+    let mut iter_tokens = tokens.iter();
+    let mut maybe_token = iter_tokens.next();
+    let reset_style = Style::default();
+    let mut idx = 0;
+    for text in content {
+        if let Some(token) = maybe_token {
+            if token.from == idx {
+                backend.update_style(token.style);
+            } else if token.to == idx {
+                if let Some(token) = iter_tokens.next() {
+                    if token.from == idx {
+                        backend.update_style(token.style);
+                    } else {
+                        backend.set_style(reset_style);
+                    };
+                    maybe_token.replace(token);
+                } else {
+                    backend.set_style(reset_style);
+                    maybe_token = None;
+                };
+            };
+        }
+        backend.print(text);
+        idx += (lexer.char_lsp_pos)(text);
+    }
+    backend.reset_style();
+}
 
 #[inline]
 pub fn complex_line_with_select(
-    content: impl Iterator<Item = (usize, char)>,
+    content: impl Iterator<Item = char>,
     tokens: &[Token],
     select: Range<usize>,
-    select_color: Color,
+    lexer: &Lexer,
     backend: &mut Backend,
 ) {
+    let mut iter_tokens = tokens.iter();
+    let mut maybe_token = iter_tokens.next();
+    let mut reset_style = Style::default();
+    let select_color = lexer.theme.selected;
+    let mut idx = 0;
+    for text in content {
+        if select.start == idx {
+            backend.set_bg(Some(select_color));
+            reset_style.set_bg(Some(select_color));
+        }
+        if select.end == idx {
+            backend.set_bg(None);
+            reset_style.set_bg(None);
+        }
+        if let Some(token) = maybe_token {
+            if token.from == idx {
+                backend.update_style(token.style);
+            } else if token.to == idx {
+                if let Some(token) = iter_tokens.next() {
+                    if token.from == idx {
+                        backend.update_style(token.style);
+                    } else {
+                        backend.set_style(reset_style);
+                    };
+                    maybe_token.replace(token);
+                } else {
+                    backend.set_style(reset_style);
+                    maybe_token = None;
+                };
+            };
+        }
+        backend.print(text);
+        idx += (lexer.char_lsp_pos)(text);
+    }
+    backend.reset_style();
 }
 
 #[inline]

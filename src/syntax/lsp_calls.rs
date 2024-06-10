@@ -105,14 +105,17 @@ pub fn map(lexer: &mut Lexer, client: LSPClient) {
         Some("utf-8") => {
             lexer.encode_position = encode_pos_utf8;
             lexer.decode_position = decode_pos_utf8;
+            lexer.char_lsp_pos = char_lsp_utf8;
         }
         Some("utf-32") => {
             lexer.encode_position = encode_pos_utf32;
             lexer.decode_position = decode_pos_utf32;
+            lexer.char_lsp_pos = char_lsp_pos;
         }
         _ => {
             lexer.encode_position = encode_pos_utf16;
             lexer.decode_position = decode_pos_utf16;
+            lexer.char_lsp_pos = char_lsp_utf16;
         }
     }
 
@@ -444,4 +447,19 @@ pub fn encode_pos_utf32(char_idx: usize, _: &str) -> usize {
 #[inline]
 pub fn decode_pos_utf32(utf32_idx: usize, _: &str) -> usize {
     utf32_idx
+}
+
+#[inline]
+pub fn char_lsp_pos(_: char) -> usize {
+    1
+}
+
+#[inline]
+pub fn char_lsp_utf8(ch: char) -> usize {
+    ch.len_utf8()
+}
+
+#[inline]
+pub fn char_lsp_utf16(ch: char) -> usize {
+    ch.len_utf16()
 }
