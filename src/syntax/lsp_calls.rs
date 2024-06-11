@@ -104,17 +104,14 @@ pub fn map(lexer: &mut Lexer, client: LSPClient) {
     match client.capabilities.position_encoding.as_ref().map(|encode| encode.as_str()) {
         Some("utf-8") => {
             lexer.encode_position = encode_pos_utf8;
-            lexer.decode_position = decode_pos_utf8;
             lexer.char_lsp_pos = char_lsp_utf8;
         }
         Some("utf-32") => {
             lexer.encode_position = encode_pos_utf32;
-            lexer.decode_position = decode_pos_utf32;
             lexer.char_lsp_pos = char_lsp_pos;
         }
         _ => {
             lexer.encode_position = encode_pos_utf16;
-            lexer.decode_position = decode_pos_utf16;
             lexer.char_lsp_pos = char_lsp_utf16;
         }
     }
@@ -413,40 +410,13 @@ pub fn encode_pos_utf8(char_idx: usize, from_str: &str) -> usize {
 }
 
 #[inline]
-pub fn decode_pos_utf8(utf8_idx: usize, from_str: &str) -> usize {
-    for (char_idx, (byte_idx, ..)) in from_str.char_indices().enumerate() {
-        if byte_idx == utf8_idx {
-            return char_idx;
-        }
-    }
-    0
-}
-
-#[inline]
 pub fn encode_pos_utf16(char_idx: usize, from_str: &str) -> usize {
     from_str.chars().take(char_idx).fold(0, |sum, ch| sum + ch.len_utf16())
 }
 
 #[inline]
-pub fn decode_pos_utf16(utf16_idx: usize, from_str: &str) -> usize {
-    let mut sum = 0;
-    for (char_idx, ch) in from_str.chars().enumerate() {
-        if sum == utf16_idx {
-            return char_idx;
-        }
-        sum += ch.len_utf16();
-    }
-    0
-}
-
-#[inline]
 pub fn encode_pos_utf32(char_idx: usize, _: &str) -> usize {
     char_idx
-}
-
-#[inline]
-pub fn decode_pos_utf32(utf32_idx: usize, _: &str) -> usize {
-    utf32_idx
 }
 
 #[inline]
