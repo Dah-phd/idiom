@@ -1,4 +1,4 @@
-use lsp_types::Position;
+use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 
 use crate::workspace::actions::{Edit, EditMetaData};
 use crate::workspace::cursor::Cursor;
@@ -48,6 +48,8 @@ fn assert_edits_applicable(mut content: Vec<CodeLine>, edits: Vec<Edit>) {
         match_line(reserved, reupdated);
     }
 }
+
+/// Edits
 
 #[test]
 fn test_new_line() {
@@ -255,6 +257,313 @@ fn test_insert_snippet() {
     assert_eq!(pos, CursorPosition { line: 2, char: 1 });
     assert_edits_applicable(content, edits);
 }
+
+#[test]
+fn test_utf8_lsp_event() {
+    let mut content = vec![
+        CodeLine::new("test".into()),
+        CodeLine::new("test".into()),
+        CodeLine::new("test".into()),
+        CodeLine::new("test".into()),
+    ];
+    let edit = Edit::insert_clip((0, 4).into(), "\ntest".to_owned(), &mut content);
+    let (.., mut event) = edit.event();
+    let (.., mut rev_event) = edit.reverse_event();
+    event.utf8_encode_start(&content);
+    rev_event.utf8_encode_start(&content);
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 4), Position::new(0, 4))),
+            text: "\ntest".to_owned(),
+            range_length: None
+        },
+        event.utf8_text_change()
+    );
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 4), Position::new(1, 4))),
+            text: "".to_owned(),
+            range_length: None
+        },
+        rev_event.utf8_text_change()
+    );
+    let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull".to_owned(), &mut content);
+    let (.., mut event) = edit.event();
+    let (.., mut rev_event) = edit.reverse_event();
+    event.utf8_encode_start(&content);
+    rev_event.utf8_encode_start(&content);
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 2), Position::new(4, 1))),
+            text: "\nbambi\nbull".to_owned(),
+            range_length: None
+        },
+        event.utf8_text_change()
+    );
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 2), Position::new(2, 4))),
+            text: "st\ntest\ntest\ntest\nt".to_owned(),
+            range_length: None
+        },
+        rev_event.utf8_text_change()
+    );
+}
+
+// LSP events
+#[test]
+fn test_utf8_lsp_event_emoji() {
+    let mut content = vec![
+        CodeLine::new("🚀est".into()),
+        CodeLine::new("test".into()),
+        CodeLine::new("test".into()),
+        CodeLine::new("test".into()),
+    ];
+    let edit = Edit::insert_clip((0, 4).into(), "\ntest🚀".to_owned(), &mut content);
+    let (.., mut event) = edit.event();
+    let (.., mut rev_event) = edit.reverse_event();
+    event.utf8_encode_start(&content);
+    rev_event.utf8_encode_start(&content);
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 7), Position::new(0, 7))),
+            text: "\ntest🚀".to_owned(),
+            range_length: None
+        },
+        event.utf8_text_change()
+    );
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 7), Position::new(1, 8))),
+            text: "".to_owned(),
+            range_length: None
+        },
+        rev_event.utf8_text_change()
+    );
+    let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull🚀".to_owned(), &mut content);
+    let (.., mut event) = edit.event();
+    let (.., mut rev_event) = edit.reverse_event();
+    event.utf8_encode_start(&content);
+    rev_event.utf8_encode_start(&content);
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 5), Position::new(4, 1))),
+            text: "\nbambi\nbull🚀".to_owned(),
+            range_length: None
+        },
+        event.utf8_text_change()
+    );
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 5), Position::new(2, 8))),
+            text: "st\ntest🚀\ntest\ntest\nt".to_owned(),
+            range_length: None
+        },
+        rev_event.utf8_text_change()
+    );
+}
+
+#[test]
+fn test_utf16_lsp_event() {
+    let mut content = vec![
+        CodeLine::new("test".into()),
+        CodeLine::new("test".into()),
+        CodeLine::new("test".into()),
+        CodeLine::new("test".into()),
+    ];
+    let edit = Edit::insert_clip((0, 4).into(), "\ntest".to_owned(), &mut content);
+    let (.., mut event) = edit.event();
+    let (.., mut rev_event) = edit.reverse_event();
+    event.utf16_encode_start(&content);
+    rev_event.utf16_encode_start(&content);
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 4), Position::new(0, 4))),
+            text: "\ntest".to_owned(),
+            range_length: None
+        },
+        event.utf16_text_change()
+    );
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 4), Position::new(1, 4))),
+            text: "".to_owned(),
+            range_length: None
+        },
+        rev_event.utf16_text_change()
+    );
+    let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull".to_owned(), &mut content);
+    let (.., mut event) = edit.event();
+    let (.., mut rev_event) = edit.reverse_event();
+    event.utf16_encode_start(&content);
+    rev_event.utf16_encode_start(&content);
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 2), Position::new(4, 1))),
+            text: "\nbambi\nbull".to_owned(),
+            range_length: None
+        },
+        event.utf16_text_change()
+    );
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 2), Position::new(2, 4))),
+            text: "st\ntest\ntest\ntest\nt".to_owned(),
+            range_length: None
+        },
+        rev_event.utf16_text_change()
+    );
+}
+
+#[test]
+fn test_utf16_lsp_event_emoji() {
+    let mut content = vec![
+        CodeLine::new("🚀est".into()),
+        CodeLine::new("test".into()),
+        CodeLine::new("test".into()),
+        CodeLine::new("test".into()),
+    ];
+    let edit = Edit::insert_clip((0, 4).into(), "\ntest🚀".to_owned(), &mut content);
+    let (.., mut event) = edit.event();
+    let (.., mut rev_event) = edit.reverse_event();
+    event.utf16_encode_start(&content);
+    rev_event.utf16_encode_start(&content);
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 5), Position::new(0, 5))),
+            text: "\ntest🚀".to_owned(),
+            range_length: None
+        },
+        event.utf16_text_change()
+    );
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 5), Position::new(1, 6))),
+            text: "".to_owned(),
+            range_length: None
+        },
+        rev_event.utf16_text_change()
+    );
+    let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull🚀".to_owned(), &mut content);
+    let (.., mut event) = edit.event();
+    let (.., mut rev_event) = edit.reverse_event();
+    event.utf16_encode_start(&content);
+    rev_event.utf16_encode_start(&content);
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 3), Position::new(4, 1))),
+            text: "\nbambi\nbull🚀".to_owned(),
+            range_length: None
+        },
+        event.utf16_text_change()
+    );
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 3), Position::new(2, 6))),
+            text: "st\ntest🚀\ntest\ntest\nt".to_owned(),
+            range_length: None
+        },
+        rev_event.utf16_text_change()
+    );
+}
+
+#[test]
+fn test_utf32_lsp_event() {
+    let mut content = vec![
+        CodeLine::new("test".into()),
+        CodeLine::new("test".into()),
+        CodeLine::new("test".into()),
+        CodeLine::new("test".into()),
+    ];
+    let edit = Edit::insert_clip((0, 4).into(), "\ntest".to_owned(), &mut content);
+    let (.., event) = edit.event();
+    let (.., rev_event) = edit.reverse_event();
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 4), Position::new(0, 4))),
+            text: "\ntest".to_owned(),
+            range_length: None
+        },
+        event.utf32_text_change()
+    );
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 4), Position::new(1, 4))),
+            text: "".to_owned(),
+            range_length: None
+        },
+        rev_event.utf32_text_change()
+    );
+    let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull".to_owned(), &mut content);
+    let (.., event) = edit.event();
+    let (.., rev_event) = edit.reverse_event();
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 2), Position::new(4, 1))),
+            text: "\nbambi\nbull".to_owned(),
+            range_length: None
+        },
+        event.utf32_text_change()
+    );
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 2), Position::new(2, 4))),
+            text: "st\ntest\ntest\ntest\nt".to_owned(),
+            range_length: None
+        },
+        rev_event.utf32_text_change()
+    );
+}
+
+#[test]
+fn test_utf32_lsp_event_emoji() {
+    let mut content = vec![
+        CodeLine::new("🚀est".into()),
+        CodeLine::new("test".into()),
+        CodeLine::new("test".into()),
+        CodeLine::new("test".into()),
+    ];
+    let edit = Edit::insert_clip((0, 4).into(), "\ntest🚀".to_owned(), &mut content);
+    let (.., event) = edit.event();
+    let (.., rev_event) = edit.reverse_event();
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 4), Position::new(0, 4))),
+            text: "\ntest🚀".to_owned(),
+            range_length: None
+        },
+        event.utf32_text_change()
+    );
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 4), Position::new(1, 5))),
+            text: "".to_owned(),
+            range_length: None
+        },
+        rev_event.utf32_text_change()
+    );
+    let edit = Edit::replace_select((0, 2).into(), (4, 1).into(), "\nbambi\nbull🚀".to_owned(), &mut content);
+    let (.., event) = edit.event();
+    let (.., rev_event) = edit.reverse_event();
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 2), Position::new(4, 1))),
+            text: "\nbambi\nbull🚀".to_owned(),
+            range_length: None
+        },
+        event.utf32_text_change()
+    );
+    assert_eq!(
+        TextDocumentContentChangeEvent {
+            range: Some(Range::new(Position::new(0, 2), Position::new(2, 5))),
+            text: "st\ntest🚀\ntest\ntest\nt".to_owned(),
+            range_length: None
+        },
+        rev_event.utf32_text_change()
+    );
+}
+
+/// MetaData
 
 #[test]
 fn add_meta_data() {
