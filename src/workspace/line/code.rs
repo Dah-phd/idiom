@@ -524,6 +524,13 @@ impl From<CodeLine> for String {
     }
 }
 
+impl CodeLine {
+    #[inline]
+    pub fn tokens(&self) -> &Vec<Token> {
+        &self.tokens
+    }
+}
+
 pub struct CodeLineContext<'a> {
     lexer: &'a mut Lexer,
     line_number: usize,

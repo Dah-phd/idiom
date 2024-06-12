@@ -219,3 +219,6 @@ impl Lexer {
         let _ = self.client.file_did_close(path);
     }
 }
+
+#[cfg(test)]
+pub mod tests;
