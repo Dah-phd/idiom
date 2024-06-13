@@ -22,7 +22,7 @@ use std::{
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
 };
 
-use super::utils::inline_diagnostics;
+use super::utils::{complex_line, complex_line_with_select, inline_diagnostics};
 
 #[derive(Default)]
 pub struct CodeLine {
@@ -472,29 +472,47 @@ impl EditorLine for CodeLine {
             Some(select) => {
                 if line_width > self.char_len() {
                     self.rendered_at = 0;
-                    ascii_line_with_select(
-                        self.content.char_indices(),
-                        &self.tokens,
-                        select,
-                        ctx.lexer().theme.selected,
-                        backend,
-                    );
+                    if self.is_ascii() {
+                        ascii_line_with_select(
+                            self.content.char_indices(),
+                            &self.tokens,
+                            select,
+                            ctx.lexer().theme.selected,
+                            backend,
+                        );
+                    } else {
+                        complex_line_with_select(self.content.chars(), &self.tokens, select, ctx.lexer(), backend)
+                    }
                     inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
                 } else {
                     let end_loc = line_width.saturating_sub(2);
-                    ascii_line_with_select(
-                        self.content.char_indices().take(end_loc), // utf8 safe
-                        &self.tokens,
-                        select,
-                        ctx.lexer().theme.selected,
-                        backend,
-                    );
+                    if self.is_ascii() {
+                        ascii_line_with_select(
+                            self.content.char_indices().take(end_loc), // utf8 safe
+                            &self.tokens,
+                            select,
+                            ctx.lexer().theme.selected,
+                            backend,
+                        );
+                    } else {
+                        complex_line_with_select(
+                            self.content.chars().take(end_loc),
+                            &self.tokens,
+                            select,
+                            ctx.lexer(),
+                            backend,
+                        );
+                    }
                     backend.print_styled(">>", Style::reversed());
                 }
             }
             None => {
                 if line_width > self.content.len() {
-                    ascii_line(&self.content, &self.tokens, backend);
+                    if self.is_ascii() {
+                        ascii_line(&self.content, &self.tokens, backend);
+                    } else {
+                        complex_line(self.content.chars(), &self.tokens, backend, ctx.lexer());
+                    }
                     inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
                 } else {
                     let max_len = line_width.saturating_sub(2);
@@ -521,13 +539,6 @@ impl EditorLine for CodeLine {
 impl From<CodeLine> for String {
     fn from(val: CodeLine) -> Self {
         val.content
-    }
-}
-
-impl CodeLine {
-    #[inline]
-    pub fn tokens(&self) -> &Vec<Token> {
-        &self.tokens
     }
 }
 

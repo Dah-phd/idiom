@@ -2,17 +2,14 @@ use super::code::CodeLine;
 use super::EditorLine;
 use crate::configs::FileType;
 use crate::global_state::GlobalState;
-use crate::render::backend::{Backend, BackendProtocol};
+use crate::render::backend::{Backend, BackendProtocol, Style};
+use crate::render::layout::Line;
 use crate::syntax::tests::{
     create_token_pairs_utf16, create_token_pairs_utf32, create_token_pairs_utf8, mock_utf16_lexer, mock_utf32_lexer,
     mock_utf8_lexer, zip_text_tokens,
 };
 use crate::workspace::cursor::Cursor;
-use crate::workspace::line::utils::{ascii_line, complex_line};
 use crate::workspace::line::CodeLineContext;
-use crate::workspace::CursorPosition;
-
-const IGNORE: &str = "<<>>";
 
 #[test]
 fn test_insert() {
@@ -189,88 +186,23 @@ fn test_split_off_ascii() {
 
 /// LINE RENDER
 
-fn assert_render(writer: &mut Backend, expected: Vec<&str>) {
-    let drained = writer.drain();
-    assert_eq!(drained.len(), expected.len());
-    for (actual, expected) in drained.into_iter().map(|(_, text)| text).zip(expected) {
-        if expected != IGNORE {
-            assert_eq!(actual, expected);
-        }
-    }
-}
-
-fn assert_complex_render(writer: &mut Backend, expected: Vec<&str>) {
-    let mut expected = expected.into_iter();
-    let mut actual = String::new();
-    for part in writer.drain().into_iter().map(|(_, t)| t) {
-        if part.starts_with("<<") {
-            assert_eq!(std::mem::take(&mut actual), expected.next().unwrap());
-        } else {
-            actual.push_str(&part);
-        }
-    }
-    if !actual.is_empty() {
-        assert_eq!(actual, expected.next().unwrap());
-    }
-    assert!(!matches!(expected.next(), Some(txt) if !txt.is_empty()))
-}
-
 #[test]
 fn test_line_render_utils_utf8() {
     let mut gs = GlobalState::new(Backend::init()).unwrap();
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
 
-    let mut cursor = Cursor::default();
+    let cursor = Cursor::default();
 
     let (tokens, text) = create_token_pairs_utf8();
     let mut content = zip_text_tokens(text, tokens);
-    assert_eq!(content.len(), 16);
 
-    let code_line = &content[0];
-    ascii_line(&code_line[..], code_line.tokens(), &mut gs.writer);
-    assert_render(&mut gs.writer, vec!["use", " ", "super", "::", "code", "::", "CodeLine", ";"]);
+    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
 
-    let code_line = &content[1];
-    ascii_line(&code_line[..], code_line.tokens(), &mut gs.writer);
-    assert_render(&mut gs.writer, vec!["use", " ", "super", "::", "EditorLine", ";"]);
+    for (idx, code_line) in content.iter_mut().enumerate() {
+        code_line.render(&mut ctx, Line { row: idx as u16, col: 0, width: 100 }, &mut gs.writer);
+    }
 
-    let code_line = &content[2];
-    ascii_line(&code_line[..], code_line.tokens(), &mut gs.writer);
-    assert_render(&mut gs.writer, vec![""]);
-
-    let code_line = &content[3];
-    ascii_line(&code_line[..], code_line.tokens(), &mut gs.writer);
-    assert_render(&mut gs.writer, vec!["#", "[", "test", "]", ""]);
-
-    let code_line = &content[4];
-    ascii_line(&code_line[..], code_line.tokens(), &mut gs.writer);
-    assert_render(&mut gs.writer, vec!["fn", " ", "test_insert", "() {"]);
-
-    let code_line = &content[9];
-    complex_line(code_line.chars(), code_line.tokens(), &mut gs.writer, &lexer);
-    assert_complex_render(&mut gs.writer, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'🚀'", ");"]);
-
-    let code_line = &content[14];
-    complex_line(code_line.chars(), code_line.tokens(), &mut gs.writer, &lexer);
-    assert_complex_render(
-        &mut gs.writer,
-        vec![
-            "    ",
-            "assert",
-            "!",
-            "(",
-            "&",
-            "line",
-            ".",
-            "to_string",
-            "() ",
-            "=",
-            "=",
-            " ",
-            "\"te🚀xext\"",
-            ");",
-        ],
-    );
+    test_content(gs.writer.drain());
 }
 
 #[test]
@@ -278,98 +210,127 @@ fn test_line_render_utils_utf16() {
     let mut gs = GlobalState::new(Backend::init()).unwrap();
     let mut lexer = mock_utf16_lexer(&mut gs, FileType::Rust);
 
-    let mut cursor = Cursor::default();
+    let cursor = Cursor::default();
 
     let (tokens, text) = create_token_pairs_utf16();
     let mut content = zip_text_tokens(text, tokens);
-    assert_eq!(content.len(), 16);
 
-    let code_line = &content[0];
-    ascii_line(&code_line[..], code_line.tokens(), &mut gs.writer);
-    assert_render(&mut gs.writer, vec!["use", " ", "super", "::", "code", "::", "CodeLine", ";"]);
+    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
 
-    let code_line = &content[1];
-    ascii_line(&code_line[..], code_line.tokens(), &mut gs.writer);
-    assert_render(&mut gs.writer, vec!["use", " ", "super", "::", "EditorLine", ";"]);
+    for (idx, code_line) in content.iter_mut().enumerate() {
+        code_line.render(&mut ctx, Line { row: idx as u16, col: 0, width: 100 }, &mut gs.writer);
+    }
 
-    let code_line = &content[2];
-    ascii_line(&code_line[..], code_line.tokens(), &mut gs.writer);
-    assert_render(&mut gs.writer, vec![""]);
-
-    let code_line = &content[3];
-    ascii_line(&code_line[..], code_line.tokens(), &mut gs.writer);
-    assert_render(&mut gs.writer, vec!["#", "[", "test", "]", ""]);
-
-    let code_line = &content[4];
-    ascii_line(&code_line[..], code_line.tokens(), &mut gs.writer);
-    assert_render(&mut gs.writer, vec!["fn", " ", "test_insert", "() {"]);
-
-    let code_line = &content[9];
-    complex_line(code_line.chars(), code_line.tokens(), &mut gs.writer, &lexer);
-    assert_complex_render(&mut gs.writer, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'🚀'", ");"]);
-
-    let code_line = &content[14];
-    complex_line(code_line.chars(), code_line.tokens(), &mut gs.writer, &lexer);
-    assert_complex_render(
-        &mut gs.writer,
-        vec![
-            "    ",
-            "assert",
-            "!",
-            "(",
-            "&",
-            "line",
-            ".",
-            "to_string",
-            "() ",
-            "=",
-            "=",
-            " ",
-            "\"te🚀xext\"",
-            ");",
-        ],
-    );
+    test_content(gs.writer.drain());
 }
 
 #[test]
-fn test_line_render_utils_utf32() {
+fn test_line_render_full_utf32() {
     let mut gs = GlobalState::new(Backend::init()).unwrap();
     let mut lexer = mock_utf32_lexer(&mut gs, FileType::Rust);
 
-    let mut cursor = Cursor::default();
+    let cursor = Cursor::default();
 
     let (tokens, text) = create_token_pairs_utf32();
     let mut content = zip_text_tokens(text, tokens);
-    assert_eq!(content.len(), 16);
 
-    let code_line = &content[0];
-    ascii_line(&code_line[..], code_line.tokens(), &mut gs.writer);
-    assert_render(&mut gs.writer, vec!["use", " ", "super", "::", "code", "::", "CodeLine", ";"]);
+    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
 
-    let code_line = &content[1];
-    ascii_line(&code_line[..], code_line.tokens(), &mut gs.writer);
-    assert_render(&mut gs.writer, vec!["use", " ", "super", "::", "EditorLine", ";"]);
+    for (idx, code_line) in content.iter_mut().enumerate() {
+        code_line.render(&mut ctx, Line { row: idx as u16, col: 0, width: 100 }, &mut gs.writer);
+    }
 
-    let code_line = &content[2];
-    ascii_line(&code_line[..], code_line.tokens(), &mut gs.writer);
-    assert_render(&mut gs.writer, vec![""]);
+    test_content(gs.writer.drain());
+}
 
-    let code_line = &content[3];
-    ascii_line(&code_line[..], code_line.tokens(), &mut gs.writer);
-    assert_render(&mut gs.writer, vec!["#", "[", "test", "]", ""]);
+fn parse_simple_line(rendered: &mut Vec<(Style, String)>) -> (usize, Vec<String>) {
+    let mut line_idx = 0;
+    for (idx, (_, txt)) in rendered.iter().enumerate() {
+        if !txt.starts_with("<<go to row") {
+            line_idx = txt.trim().parse().unwrap();
+            rendered.drain(..idx + 2);
+            break;
+        }
+    }
+    for (idx, (_, t)) in rendered.iter().enumerate() {
+        if t.starts_with("<<go to row") {
+            return (line_idx, rendered.drain(..idx).map(|(_, t)| t).collect());
+        }
+    }
+    (line_idx, rendered.drain(..).map(|(_, t)| t).collect())
+}
 
-    let code_line = &content[4];
-    ascii_line(&code_line[..], code_line.tokens(), &mut gs.writer);
-    assert_render(&mut gs.writer, vec!["fn", " ", "test_insert", "() {"]);
+fn parse_complex_line(rendered: &mut Vec<(Style, String)>) -> (usize, Vec<String>) {
+    let (line_idx, raw_data) = parse_simple_line(rendered);
+    let mut parsed = vec![];
+    let mut current = String::new();
+    for part in raw_data {
+        if part.starts_with("<<") {
+            parsed.push(std::mem::take(&mut current));
+        } else {
+            current.push_str(&part);
+        }
+    }
+    if !current.is_empty() {
+        parsed.push(current);
+    }
+    (line_idx, parsed)
+}
 
-    let code_line = &content[9];
-    complex_line(code_line.chars(), code_line.tokens(), &mut gs.writer, &lexer);
-    assert_complex_render(&mut gs.writer, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'🚀'", ");"]);
-
-    let code_line = &content[14];
-    complex_line(code_line.chars(), code_line.tokens(), &mut gs.writer, &lexer);
-    assert_complex_render(
-        &mut gs.writer,
+#[inline]
+fn test_content(mut render_data: Vec<(Style, String)>) {
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, 1);
+    assert_eq!(line, vec!["use", " ", "super", "::", "code", "::", "CodeLine", ";"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, 2);
+    assert_eq!(line, vec!["use", " ", "super", "::", "EditorLine", ";"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, 3);
+    assert_eq!(line, vec!["", ""]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, 4);
+    assert_eq!(line, vec!["#", "[", "test", "]", ""]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, 5);
+    assert_eq!(line, vec!["fn", " ", "test_insert", "() {"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, 6);
+    assert_eq!(
+        line,
+        vec![
+            "    ", "let", " ", "mut", " ", "line", " ", "=", " ", "CodeLine", "::", "new", "(", "\"text\"", ".",
+            "to_owned", "());"
+        ]
+    );
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, 7);
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "4", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, 8);
+    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'e'", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, 9);
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "is_ascii", "());"]);
+    let (line_num, line) = parse_complex_line(&mut render_data);
+    assert_eq!(line_num, 10);
+    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'🚀'", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, 11);
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "6", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, 12);
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "!", "line", ".", "is_ascii", "());"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, 13);
+    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "3", ", ", "'x'", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, 14);
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "7", ");"]);
+    let (line_num, line) = parse_complex_line(&mut render_data);
+    assert_eq!(line_num, 15);
+    assert_eq!(
+        line,
         vec![
             "    ",
             "assert",
@@ -385,6 +346,9 @@ fn test_line_render_utils_utf32() {
             " ",
             "\"te🚀xext\"",
             ");",
-        ],
+        ]
     );
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, 16);
+    assert_eq!(line, vec!["}", "", ""]);
 }
