@@ -121,9 +121,10 @@ pub fn ascii_line_with_select(
     content: impl Iterator<Item = (usize, char)>,
     tokens: &[Token],
     select: Range<usize>,
-    select_color: Color,
+    lexer: &Lexer,
     backend: &mut Backend,
 ) {
+    let select_color = lexer.theme.selected;
     let mut iter_tokens = tokens.iter();
     let mut maybe_token = iter_tokens.next();
     let mut reset_style = Style::default();
@@ -167,14 +168,14 @@ pub fn shrank_line(content: &str, tokens: &[Token], writer: &mut Backend) {
                 writer.print(text);
             } else if let Some(text) = content.get(end..) {
                 writer.print(text);
-                return writer.print_styled(">>", Style::reversed());
+                break;
             };
         };
         if let Some(text) = content.get(token.from..token.to) {
             writer.print_styled(text, token.style);
         } else if let Some(text) = content.get(token.from..) {
             writer.print_styled(text, token.style);
-            return writer.print_styled(">>", Style::reversed());
+            break;
         };
         end = token.to;
     }

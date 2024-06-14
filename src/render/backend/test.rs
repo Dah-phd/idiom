@@ -47,7 +47,7 @@ impl BackendProtocol for Backend {
         self.print(text)
     }
     fn print_styled<D: std::fmt::Display>(&mut self, text: D, style: Style) {
-        self.data.push((style, text.to_string()))
+        self.data.push((style, text.to_string()));
     }
 
     fn print_styled_at<D: std::fmt::Display>(&mut self, row: u16, col: u16, text: D, style: Style) {

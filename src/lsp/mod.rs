@@ -68,8 +68,7 @@ impl LSP {
         // starting response handler
         let lsp_json_handler = tokio::task::spawn(async move {
             loop {
-                let msg = json_rpc.next().await?;
-                match msg {
+                match json_rpc.next().await? {
                     LSPMessage::Response(inner) => {
                         into_guard(&responses_handler).insert(inner.id, inner);
                     }

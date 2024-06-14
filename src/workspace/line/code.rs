@@ -463,7 +463,8 @@ impl EditorLine for CodeLine {
     #[inline]
     fn render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend) {
         if self.tokens.is_empty() {
-            Token::parse(&ctx.lexer().lang, &ctx.lexer().theme, &self.content, &mut self.tokens);
+            let lexer = ctx.lexer();
+            Token::parse(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
         };
         self.rendered_at = line.row;
         let (line_width, select) = ctx.setup_with_select(line, backend);
@@ -504,13 +505,7 @@ impl CodeLine {
         if line_width > self.char_len() {
             self.rendered_at = 0;
             if self.is_ascii() {
-                ascii_line_with_select(
-                    self.content.char_indices(),
-                    &self.tokens,
-                    select,
-                    ctx.lexer().theme.selected,
-                    backend,
-                );
+                ascii_line_with_select(self.content.char_indices(), &self.tokens, select, ctx.lexer(), backend);
             } else {
                 complex_line_with_select(self.content.chars(), &self.tokens, select, ctx.lexer(), backend)
             }
@@ -519,15 +514,15 @@ impl CodeLine {
             let end_loc = line_width.saturating_sub(2);
             if self.is_ascii() {
                 ascii_line_with_select(
-                    self.content.char_indices().take(end_loc), // utf8 safe
+                    self.content.char_indices().take(end_loc),
                     &self.tokens,
                     select,
-                    ctx.lexer().theme.selected,
+                    ctx.lexer(),
                     backend,
                 );
             } else {
                 complex_line_with_select(
-                    self.content.chars().take(end_loc),
+                    self.content.truncate_width(end_loc).chars(),
                     &self.tokens,
                     select,
                     ctx.lexer(),
@@ -550,7 +545,7 @@ impl CodeLine {
         } else {
             let max_len = line_width.saturating_sub(2);
             if self.is_ascii() {
-                shrank_line(self.content.truncate_width(max_len), &self.tokens, backend);
+                shrank_line(&self.content[..max_len], &self.tokens, backend);
             } else {
                 complex_line(self.content.chars().take(max_len), &self.tokens, ctx.lexer(), backend);
                 backend.print_styled(">>", Style::reversed());
