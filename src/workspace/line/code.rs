@@ -547,7 +547,7 @@ impl CodeLine {
             if self.is_ascii() {
                 shrank_line(&self.content[..max_len], &self.tokens, backend);
             } else {
-                complex_line(self.content.chars().take(max_len), &self.tokens, ctx.lexer(), backend);
+                complex_line(self.content.truncate_width(max_len).chars(), &self.tokens, ctx.lexer(), backend);
                 backend.print_styled(">>", Style::reversed());
             }
         };

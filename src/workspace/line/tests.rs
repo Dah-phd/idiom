@@ -624,7 +624,7 @@ fn test_content_schrunk(mut render_data: Vec<(Style, String)>) {
             "=",
             "=",
             " ",
-            "\"te🚀>>", // test version of print_styled does not set style, so persing merges text
+            "\"te>>", // test version of print_styled does not set style, so persing merges text
         ]
     );
     let (line_num, line) = parse_simple_line(&mut render_data);
