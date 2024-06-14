@@ -16,7 +16,7 @@ pub fn inline_diagnostics(max_len: usize, diagnostics: &Option<DiagnosticLine>, 
 }
 
 #[inline]
-pub fn complex_line(content: impl Iterator<Item = char>, tokens: &[Token], backend: &mut Backend, lexer: &Lexer) {
+pub fn complex_line(content: impl Iterator<Item = char>, tokens: &[Token], lexer: &Lexer, backend: &mut Backend) {
     let mut iter_tokens = tokens.iter();
     let mut maybe_token = iter_tokens.next();
     let reset_style = Style::default();
@@ -108,9 +108,12 @@ pub fn ascii_line(content: &str, tokens: &[Token], backend: &mut Backend) {
         };
         end = token.to;
     }
-    if let Some(text) = content.get(end..) {
-        backend.print(text);
-    };
+    match content.get(end..) {
+        Some(text) if !text.is_empty() => {
+            backend.print(text);
+        }
+        _ => (),
+    }
 }
 
 #[inline]

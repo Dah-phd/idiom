@@ -469,56 +469,8 @@ impl EditorLine for CodeLine {
         let (line_width, select) = ctx.setup_with_select(line, backend);
         self.select = select;
         match self.select.clone() {
-            Some(select) => {
-                if line_width > self.char_len() {
-                    self.rendered_at = 0;
-                    if self.is_ascii() {
-                        ascii_line_with_select(
-                            self.content.char_indices(),
-                            &self.tokens,
-                            select,
-                            ctx.lexer().theme.selected,
-                            backend,
-                        );
-                    } else {
-                        complex_line_with_select(self.content.chars(), &self.tokens, select, ctx.lexer(), backend)
-                    }
-                    inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
-                } else {
-                    let end_loc = line_width.saturating_sub(2);
-                    if self.is_ascii() {
-                        ascii_line_with_select(
-                            self.content.char_indices().take(end_loc), // utf8 safe
-                            &self.tokens,
-                            select,
-                            ctx.lexer().theme.selected,
-                            backend,
-                        );
-                    } else {
-                        complex_line_with_select(
-                            self.content.chars().take(end_loc),
-                            &self.tokens,
-                            select,
-                            ctx.lexer(),
-                            backend,
-                        );
-                    }
-                    backend.print_styled(">>", Style::reversed());
-                }
-            }
-            None => {
-                if line_width > self.content.len() {
-                    if self.is_ascii() {
-                        ascii_line(&self.content, &self.tokens, backend);
-                    } else {
-                        complex_line(self.content.chars(), &self.tokens, backend, ctx.lexer());
-                    }
-                    inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
-                } else {
-                    let max_len = line_width.saturating_sub(2);
-                    shrank_line(self.content.truncate_width(max_len), &self.tokens, backend);
-                };
-            }
+            Some(select) => self.render_select(line_width, select, ctx, backend),
+            None => self.render_no_select(line_width, ctx, backend),
         }
     }
 
@@ -533,6 +485,77 @@ impl EditorLine for CodeLine {
     #[inline]
     fn clear_cache(&mut self) {
         self.rendered_at = 0;
+    }
+}
+
+impl CodeLine {
+    #[inline(always)]
+    fn render_select(
+        &mut self,
+        line_width: usize,
+        select: Range<usize>,
+        ctx: &mut impl Context,
+        backend: &mut Backend,
+    ) {
+        if self.char_len == 0 && select.end != 0 {
+            backend.print_styled(" ", Style::bg(ctx.lexer().theme.selected));
+            return;
+        }
+        if line_width > self.char_len() {
+            self.rendered_at = 0;
+            if self.is_ascii() {
+                ascii_line_with_select(
+                    self.content.char_indices(),
+                    &self.tokens,
+                    select,
+                    ctx.lexer().theme.selected,
+                    backend,
+                );
+            } else {
+                complex_line_with_select(self.content.chars(), &self.tokens, select, ctx.lexer(), backend)
+            }
+            inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
+        } else {
+            let end_loc = line_width.saturating_sub(2);
+            if self.is_ascii() {
+                ascii_line_with_select(
+                    self.content.char_indices().take(end_loc), // utf8 safe
+                    &self.tokens,
+                    select,
+                    ctx.lexer().theme.selected,
+                    backend,
+                );
+            } else {
+                complex_line_with_select(
+                    self.content.chars().take(end_loc),
+                    &self.tokens,
+                    select,
+                    ctx.lexer(),
+                    backend,
+                );
+            }
+            backend.print_styled(">>", Style::reversed());
+        }
+    }
+
+    #[inline(always)]
+    fn render_no_select(&mut self, line_width: usize, ctx: &mut impl Context, backend: &mut Backend) {
+        if line_width > self.content.len() {
+            if self.is_ascii() {
+                ascii_line(&self.content, &self.tokens, backend);
+            } else {
+                complex_line(self.content.chars(), &self.tokens, ctx.lexer(), backend);
+            }
+            inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
+        } else {
+            let max_len = line_width.saturating_sub(2);
+            if self.is_ascii() {
+                shrank_line(self.content.truncate_width(max_len), &self.tokens, backend);
+            } else {
+                complex_line(self.content.chars().take(max_len), &self.tokens, ctx.lexer(), backend);
+                backend.print_styled(">>", Style::reversed());
+            }
+        };
     }
 }
 
