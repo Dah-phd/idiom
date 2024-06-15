@@ -182,6 +182,8 @@ pub fn shrank_line(content: &str, tokens: &[Token], writer: &mut Backend) {
     writer.print_styled(">>", Style::reversed());
 }
 
+/// WRAP
+
 #[inline]
 pub fn wrapped_line_select(
     content: &str,

@@ -9,7 +9,7 @@ use crate::syntax::tests::{
     longline_token_pair_utf32, longline_token_pair_utf8, mock_utf16_lexer, mock_utf32_lexer, mock_utf8_lexer,
     zip_text_tokens,
 };
-use crate::workspace::cursor::{self, Cursor};
+use crate::workspace::cursor::Cursor;
 use crate::workspace::line::CodeLineContext;
 use crate::workspace::CursorPosition;
 
@@ -698,5 +698,6 @@ fn test_line_wrap(mut render_data: Vec<(Style, String)>) {
     assert_eq!(line_num, 1);
     assert_eq!(line, vec!["fn", " ", "get_long_line", "() ", "->", " ", "String", " {"]);
     let (line_num, line) = parse_complex_line(&mut render_data);
+    assert_eq!(line_num, 2);
     panic!("{line:?}");
 }

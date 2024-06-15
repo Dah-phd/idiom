@@ -8,6 +8,10 @@ pub trait UTF8Safe {
     fn truncate_width(&self, width: usize) -> &str;
     /// returns str that will fit into width of columns, removing chars from the start that will not fit
     fn truncate_width_start(&self, width: usize) -> &str;
+    /// return Some(&str) if wider than allowed width
+    fn truncate_if_wider(&self, width: usize) -> Option<&str>;
+    /// return Some(&str) truncated from start if wider than allowed width
+    fn truncate_if_wider_start(&self, width: usize) -> Option<&str>;
     /// returns display len of the str
     fn width(&self) -> usize;
     /// calcs the width at position
@@ -75,6 +79,34 @@ impl UTF8Safe for str {
             start += char.len_utf8();
         }
         self
+    }
+
+    #[inline(always)]
+    fn truncate_if_wider(&self, mut width: usize) -> Option<&str> {
+        let mut end = 0;
+        for char in self.chars() {
+            let char_width = UnicodeWidthChar::width(char).unwrap_or(0);
+            if char_width > width {
+                return Some(unsafe { self.get_unchecked(..end) });
+            };
+            width -= char_width;
+            end += char.len_utf8();
+        }
+        None
+    }
+
+    #[inline(always)]
+    fn truncate_if_wider_start(&self, mut width: usize) -> Option<&str> {
+        let mut start = 0;
+        for char in self.chars().rev() {
+            let char_width = UnicodeWidthChar::width(char).unwrap_or(0);
+            if char_width > width {
+                return Some(unsafe { self.get_unchecked(self.len() - start..) });
+            }
+            width -= char_width;
+            start += char.len_utf8();
+        }
+        None
     }
 
     #[inline(always)]
@@ -152,6 +184,16 @@ impl UTF8Safe for String {
     #[inline(always)]
     fn truncate_width_start(&self, width: usize) -> &str {
         self.as_str().truncate_width_start(width)
+    }
+
+    #[inline(always)]
+    fn truncate_if_wider(&self, width: usize) -> Option<&str> {
+        self.as_str().truncate_if_wider(width)
+    }
+
+    #[inline(always)]
+    fn truncate_if_wider_start(&self, width: usize) -> Option<&str> {
+        self.as_str().truncate_if_wider_start(width)
     }
 
     #[inline(always)]

@@ -1,3 +1,5 @@
+use unicode_width::UnicodeWidthChar;
+
 use crate::{
     global_state::GlobalState,
     render::{
@@ -20,6 +22,7 @@ use std::{
     cmp::Ordering,
     fmt::Display,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
+    str::Chars,
 };
 
 use super::utils::{complex_line, complex_line_with_select, inline_diagnostics};
@@ -468,8 +471,8 @@ impl EditorLine for CodeLine {
         };
         self.rendered_at = line.row;
         let (line_width, select) = ctx.setup_with_select(line, backend);
-        self.select = select;
-        match self.select.clone() {
+        self.select.clone_from(&select);
+        match select {
             Some(select) => self.render_select(line_width, select, ctx, backend),
             None => self.render_no_select(line_width, ctx, backend),
         }
@@ -535,22 +538,26 @@ impl CodeLine {
 
     #[inline(always)]
     fn render_no_select(&mut self, line_width: usize, ctx: &mut impl Context, backend: &mut Backend) {
-        if line_width > self.content.len() {
-            if self.is_ascii() {
+        if self.is_ascii() {
+            if line_width > self.content.len() {
                 ascii_line(&self.content, &self.tokens, backend);
+                inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
             } else {
-                complex_line(self.content.chars(), &self.tokens, ctx.lexer(), backend);
+                shrank_line(&self.content[..line_width.saturating_sub(2)], &self.tokens, backend);
             }
-            inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
+        } else if let Some(truncated) = self.content.truncate_if_wider(line_width) {
+            let mut content = truncated.chars();
+            if let Some(ch) = content.next_back() {
+                if UnicodeWidthChar::width(ch).unwrap_or_default() <= 1 {
+                    content.next_back();
+                }
+            };
+            complex_line(content, &self.tokens, ctx.lexer(), backend);
+            backend.print_styled(">>", Style::reversed());
         } else {
-            let max_len = line_width.saturating_sub(2);
-            if self.is_ascii() {
-                shrank_line(&self.content[..max_len], &self.tokens, backend);
-            } else {
-                complex_line(self.content.truncate_width(max_len).chars(), &self.tokens, ctx.lexer(), backend);
-                backend.print_styled(">>", Style::reversed());
-            }
-        };
+            complex_line(self.content.chars(), &self.tokens, ctx.lexer(), backend);
+            inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
+        }
     }
 }
 
