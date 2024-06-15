@@ -3,12 +3,13 @@ use super::EditorLine;
 use crate::configs::FileType;
 use crate::global_state::GlobalState;
 use crate::render::backend::{Backend, BackendProtocol, Style};
-use crate::render::layout::Line;
+use crate::render::layout::{Line, Rect};
 use crate::syntax::tests::{
-    create_token_pairs_utf16, create_token_pairs_utf32, create_token_pairs_utf8, mock_utf16_lexer, mock_utf32_lexer,
-    mock_utf8_lexer, zip_text_tokens,
+    create_token_pairs_utf16, create_token_pairs_utf32, create_token_pairs_utf8, longline_token_pair_utf16,
+    longline_token_pair_utf32, longline_token_pair_utf8, mock_utf16_lexer, mock_utf32_lexer, mock_utf8_lexer,
+    zip_text_tokens,
 };
-use crate::workspace::cursor::Cursor;
+use crate::workspace::cursor::{self, Cursor};
 use crate::workspace::line::CodeLineContext;
 use crate::workspace::CursorPosition;
 
@@ -367,6 +368,66 @@ fn test_line_render_select_utf32() {
     test_content_select(gs.writer.drain());
 }
 
+#[test]
+fn test_line_wrapping_utf8() {
+    let rect = Rect::new(0, 0, 50, 5);
+    let mut lines = rect.into_iter();
+
+    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+
+    let cursor = Cursor::default();
+
+    let (tokens, text) = longline_token_pair_utf8();
+    let mut content = zip_text_tokens(text, tokens);
+
+    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 1);
+    content[0].render(&mut ctx, lines.next().unwrap(), &mut gs.writer);
+    content[1].wrapped_render(&mut ctx, &mut lines, &mut gs.writer);
+
+    test_line_wrap(gs.writer.drain());
+}
+
+#[test]
+fn test_line_wrapping_utf16() {
+    let rect = Rect::new(0, 0, 50, 5);
+    let mut lines = rect.into_iter();
+
+    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut lexer = mock_utf16_lexer(&mut gs, FileType::Rust);
+
+    let cursor = Cursor::default();
+
+    let (tokens, text) = longline_token_pair_utf16();
+    let mut content = zip_text_tokens(text, tokens);
+
+    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 1);
+    content[0].render(&mut ctx, lines.next().unwrap(), &mut gs.writer);
+    content[1].wrapped_render(&mut ctx, &mut lines, &mut gs.writer);
+
+    test_line_wrap(gs.writer.drain());
+}
+
+#[test]
+fn test_line_wrapping_utf32() {
+    let rect = Rect::new(0, 0, 50, 5);
+    let mut lines = rect.into_iter();
+
+    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut lexer = mock_utf32_lexer(&mut gs, FileType::Rust);
+
+    let cursor = Cursor::default();
+
+    let (tokens, text) = longline_token_pair_utf32();
+    let mut content = zip_text_tokens(text, tokens);
+
+    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 1);
+    content[0].render(&mut ctx, lines.next().unwrap(), &mut gs.writer);
+    content[1].wrapped_render(&mut ctx, &mut lines, &mut gs.writer);
+
+    test_line_wrap(gs.writer.drain());
+}
+
 fn parse_simple_line(rendered: &mut Vec<(Style, String)>) -> (usize, Vec<String>) {
     let mut line_idx = 0;
     for (idx, (_, txt)) in rendered.iter().enumerate() {
@@ -630,4 +691,12 @@ fn test_content_schrunk(mut render_data: Vec<(Style, String)>) {
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, 16);
     assert_eq!(line, vec!["}", ""]);
+}
+
+fn test_line_wrap(mut render_data: Vec<(Style, String)>) {
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, 1);
+    assert_eq!(line, vec!["fn", " ", "get_long_line", "() ", "->", " ", "String", " {"]);
+    let (line_num, line) = parse_complex_line(&mut render_data);
+    panic!("{line:?}");
 }

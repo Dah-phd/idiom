@@ -11,7 +11,7 @@ use super::{
     Lang, Legend, Lexer,
 };
 
-fn create_txt() -> Vec<String> {
+fn get_text() -> Vec<String> {
     vec![
         "use super::code::CodeLine;".to_owned(),
         "use super::EditorLine;".to_owned(),
@@ -30,6 +30,134 @@ fn create_txt() -> Vec<String> {
         "    assert!(&line.to_string() == \"te🚀xext\");".to_owned(),
         "}".to_owned(),
     ]
+}
+
+fn get_long_line() -> Vec<String> {
+    vec![
+        "fn get_long_line() -> String {".to_owned(),
+        "    let b = \"text🚀text🚀text🚀text🚀text🚀text🚀text🚀text🚀\"\
+        .split('🚀').map(|text| text.to_uppercase().to_owned())\
+        .map(|mut string| string.push_str(\"text🚀\")).collect::<Vec<_>>();"
+            .to_owned(),
+        "}".to_owned(),
+    ]
+}
+
+pub fn longline_token_pair_utf8() -> (Vec<SemanticToken>, Vec<String>) {
+    (
+        vec![
+            SemanticToken { delta_line: 0, delta_start: 0, length: 2, token_type: 6, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 3, length: 13, token_type: 4, token_modifiers_bitset: 2 },
+            SemanticToken { delta_line: 0, delta_start: 16, length: 2, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 3, length: 6, token_type: 15, token_modifiers_bitset: 8200 },
+            SemanticToken { delta_line: 1, delta_start: 4, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 4, length: 1, token_type: 17, token_modifiers_bitset: 2 },
+            SemanticToken { delta_line: 0, delta_start: 2, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 2, length: 66, token_type: 14, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 66, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 5, token_type: 8, token_modifiers_bitset: 139272 },
+            SemanticToken { delta_line: 0, delta_start: 6, length: 6, token_type: 28, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 7, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 3, token_type: 8, token_modifiers_bitset: 270600 },
+            SemanticToken { delta_line: 0, delta_start: 5, length: 4, token_type: 12, token_modifiers_bitset: 131074 },
+            SemanticToken { delta_line: 0, delta_start: 6, length: 4, token_type: 12, token_modifiers_bitset: 131072 },
+            SemanticToken { delta_line: 0, delta_start: 4, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 12, token_type: 8, token_modifiers_bitset: 139272 },
+            SemanticToken { delta_line: 0, delta_start: 14, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 8, token_type: 8, token_modifiers_bitset: 401416 },
+            SemanticToken { delta_line: 0, delta_start: 11, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 3, token_type: 8, token_modifiers_bitset: 270600 },
+            SemanticToken { delta_line: 0, delta_start: 5, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 4, length: 6, token_type: 12, token_modifiers_bitset: 32770 },
+            SemanticToken { delta_line: 0, delta_start: 8, length: 6, token_type: 12, token_modifiers_bitset: 32768 },
+            SemanticToken { delta_line: 0, delta_start: 6, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 8, token_type: 8, token_modifiers_bitset: 172040 },
+            SemanticToken { delta_line: 0, delta_start: 9, length: 10, token_type: 14, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 12, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 7, token_type: 8, token_modifiers_bitset: 270600 },
+            SemanticToken { delta_line: 0, delta_start: 7, length: 2, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 3, length: 3, token_type: 15, token_modifiers_bitset: 8200 },
+        ],
+        get_long_line(),
+    )
+}
+
+pub fn longline_token_pair_utf16() -> (Vec<SemanticToken>, Vec<String>) {
+    (
+        vec![
+            SemanticToken { delta_line: 0, delta_start: 0, length: 2, token_type: 6, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 3, length: 13, token_type: 4, token_modifiers_bitset: 2 },
+            SemanticToken { delta_line: 0, delta_start: 16, length: 2, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 3, length: 6, token_type: 15, token_modifiers_bitset: 8200 },
+            SemanticToken { delta_line: 1, delta_start: 4, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 4, length: 1, token_type: 17, token_modifiers_bitset: 2 },
+            SemanticToken { delta_line: 0, delta_start: 2, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 2, length: 66, token_type: 14, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 66, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 5, token_type: 8, token_modifiers_bitset: 139272 },
+            SemanticToken { delta_line: 0, delta_start: 6, length: 6, token_type: 28, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 7, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 3, token_type: 8, token_modifiers_bitset: 270600 },
+            SemanticToken { delta_line: 0, delta_start: 5, length: 4, token_type: 12, token_modifiers_bitset: 131074 },
+            SemanticToken { delta_line: 0, delta_start: 6, length: 4, token_type: 12, token_modifiers_bitset: 131072 },
+            SemanticToken { delta_line: 0, delta_start: 4, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 12, token_type: 8, token_modifiers_bitset: 139272 },
+            SemanticToken { delta_line: 0, delta_start: 14, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 8, token_type: 8, token_modifiers_bitset: 401416 },
+            SemanticToken { delta_line: 0, delta_start: 11, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 3, token_type: 8, token_modifiers_bitset: 270600 },
+            SemanticToken { delta_line: 0, delta_start: 5, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 4, length: 6, token_type: 12, token_modifiers_bitset: 32770 },
+            SemanticToken { delta_line: 0, delta_start: 8, length: 6, token_type: 12, token_modifiers_bitset: 32768 },
+            SemanticToken { delta_line: 0, delta_start: 6, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 8, token_type: 8, token_modifiers_bitset: 172040 },
+            SemanticToken { delta_line: 0, delta_start: 9, length: 10, token_type: 14, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 12, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 7, token_type: 8, token_modifiers_bitset: 270600 },
+            SemanticToken { delta_line: 0, delta_start: 7, length: 2, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 3, length: 3, token_type: 15, token_modifiers_bitset: 8200 },
+        ],
+        get_long_line(),
+    )
+}
+
+pub fn longline_token_pair_utf32() -> (Vec<SemanticToken>, Vec<String>) {
+    (
+        vec![
+            SemanticToken { delta_line: 0, delta_start: 0, length: 2, token_type: 6, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 3, length: 13, token_type: 4, token_modifiers_bitset: 2 },
+            SemanticToken { delta_line: 0, delta_start: 16, length: 2, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 3, length: 6, token_type: 15, token_modifiers_bitset: 8200 },
+            SemanticToken { delta_line: 1, delta_start: 4, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 4, length: 1, token_type: 17, token_modifiers_bitset: 2 },
+            SemanticToken { delta_line: 0, delta_start: 2, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 2, length: 42, token_type: 14, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 42, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 5, token_type: 8, token_modifiers_bitset: 139272 },
+            SemanticToken { delta_line: 0, delta_start: 6, length: 3, token_type: 28, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 4, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 3, token_type: 8, token_modifiers_bitset: 270600 },
+            SemanticToken { delta_line: 0, delta_start: 5, length: 4, token_type: 12, token_modifiers_bitset: 131074 },
+            SemanticToken { delta_line: 0, delta_start: 6, length: 4, token_type: 12, token_modifiers_bitset: 131072 },
+            SemanticToken { delta_line: 0, delta_start: 4, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 12, token_type: 8, token_modifiers_bitset: 139272 },
+            SemanticToken { delta_line: 0, delta_start: 14, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 8, token_type: 8, token_modifiers_bitset: 401416 },
+            SemanticToken { delta_line: 0, delta_start: 11, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 3, token_type: 8, token_modifiers_bitset: 270600 },
+            SemanticToken { delta_line: 0, delta_start: 5, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 4, length: 6, token_type: 12, token_modifiers_bitset: 32770 },
+            SemanticToken { delta_line: 0, delta_start: 8, length: 6, token_type: 12, token_modifiers_bitset: 32768 },
+            SemanticToken { delta_line: 0, delta_start: 6, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 8, token_type: 8, token_modifiers_bitset: 172040 },
+            SemanticToken { delta_line: 0, delta_start: 9, length: 7, token_type: 14, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 9, length: 1, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 7, token_type: 8, token_modifiers_bitset: 270600 },
+            SemanticToken { delta_line: 0, delta_start: 7, length: 2, token_type: 11, token_modifiers_bitset: 0 },
+            SemanticToken { delta_line: 0, delta_start: 3, length: 3, token_type: 15, token_modifiers_bitset: 8200 },
+        ],
+        get_long_line(),
+    )
 }
 
 pub fn create_token_pairs_utf8() -> (Vec<SemanticToken>, Vec<String>) {
@@ -121,7 +249,7 @@ pub fn create_token_pairs_utf8() -> (Vec<SemanticToken>, Vec<String>) {
             SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 11, token_modifiers_bitset: 16384 },
             SemanticToken { delta_line: 0, delta_start: 2, length: 12, token_type: 14, token_modifiers_bitset: 16384 },
         ],
-        create_txt(),
+        get_text(),
     )
 }
 
@@ -214,7 +342,7 @@ pub fn create_token_pairs_utf16() -> (Vec<SemanticToken>, Vec<String>) {
             SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 11, token_modifiers_bitset: 16384 },
             SemanticToken { delta_line: 0, delta_start: 2, length: 10, token_type: 14, token_modifiers_bitset: 16384 },
         ],
-        create_txt(),
+        get_text(),
     )
 }
 
@@ -307,7 +435,7 @@ pub fn create_token_pairs_utf32() -> (Vec<SemanticToken>, Vec<String>) {
             SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 11, token_modifiers_bitset: 16384 },
             SemanticToken { delta_line: 0, delta_start: 2, length: 9, token_type: 14, token_modifiers_bitset: 16384 },
         ],
-        create_txt(),
+        get_text(),
     )
 }
 

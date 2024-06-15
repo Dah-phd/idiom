@@ -287,6 +287,7 @@ impl Cursor {
         }
     }
 
+    #[inline(always)]
     pub fn adjust_char(&mut self, line: &impl EditorLine) {
         self.char = self.phantm_char;
         if line.char_len() < self.char {
