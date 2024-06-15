@@ -1,3 +1,5 @@
+use unicode_width::UnicodeWidthChar;
+
 use crate::{
     render::{
         backend::{color, Backend, BackendProtocol, Color, Style},
@@ -316,7 +318,7 @@ pub fn wrapped_line(
                 backend.set_style(token.style);
             }
         };
-        wrapping_loop(
+        wrapping_loop_ascii(
             content.char_indices().skip(skip_lines * wrap_len),
             backend,
             tokens,
@@ -326,7 +328,7 @@ pub fn wrapped_line(
             lines,
         )
     } else {
-        wrapping_loop(
+        wrapping_loop_ascii(
             content.char_indices(),
             backend,
             tokens.iter(),
@@ -339,7 +341,7 @@ pub fn wrapped_line(
 }
 
 #[inline(always)]
-fn wrapping_loop<'a>(
+fn wrapping_loop_ascii<'a>(
     content: impl Iterator<Item = (usize, char)>,
     backend: &mut Backend,
     mut tokens: impl Iterator<Item = &'a Token>,
@@ -358,6 +360,83 @@ fn wrapping_loop<'a>(
             backend.print_styled_at(line.row, line.col, wrap_number, Style::fg(color::dark_grey()));
             backend.clear_to_eol();
             line_end += wrap_len;
+        }
+        if let Some(token) = maybe_token {
+            if token.to == idx {
+                backend.reset_style();
+                maybe_token = tokens.next();
+            };
+        }
+        if let Some(token) = maybe_token {
+            if token.from == idx {
+                backend.set_style(token.style);
+            };
+        }
+        backend.print(text);
+    }
+}
+
+#[inline]
+pub fn wrapped_complex_line(
+    content: &str,
+    tokens: &[Token],
+    ctx: &mut impl Context,
+    wrap_len: usize,
+    lines: &mut RectIter,
+    backend: &mut Backend,
+) {
+    let wrap_number = ctx.setup_wrap();
+    let skip_lines = ctx.count_skipped_to_cursor(wrap_len, lines.len());
+    if skip_lines != 0 {
+        let mut wrap_text = format!("..{skip_lines} hidden wrapped lines");
+        wrap_text.truncate(wrap_len);
+        backend.print_styled(wrap_text, Style::reversed());
+        let line_end = wrap_len * skip_lines;
+        let mut tokens = tokens.iter().skip_while(|token| token.to < line_end).peekable();
+        if let Some(token) = tokens.peek() {
+            if token.from < line_end {
+                backend.set_style(token.style);
+            }
+        };
+        wrapping_loop_complex(
+            content.char_indices().skip(skip_lines * wrap_len),
+            backend,
+            tokens,
+            &wrap_number,
+            wrap_len,
+            lines,
+        )
+    } else {
+        wrapping_loop_complex(content.char_indices(), backend, tokens.iter(), &wrap_number, wrap_len, lines)
+    };
+}
+
+#[inline(always)]
+fn wrapping_loop_complex<'a>(
+    content: impl Iterator<Item = (usize, char)>,
+    backend: &mut Backend,
+    mut tokens: impl Iterator<Item = &'a Token>,
+    wrap_number: &str,
+    wrap_len: usize,
+    lines: &mut RectIter,
+) {
+    let mut remaining = wrap_len;
+    let mut maybe_token = tokens.next();
+    for (idx, text) in content {
+        let text_width = match UnicodeWidthChar::width(text) {
+            Some(ch_width) => ch_width,
+            None => continue,
+        };
+        if text_width > remaining {
+            let line = match lines.next() {
+                Some(line) => line,
+                None => return,
+            };
+            backend.print_styled_at(line.row, line.col, wrap_number, Style::fg(color::dark_grey()));
+            backend.clear_to_eol();
+            remaining = wrap_len.saturating_sub(text_width);
+        } else {
+            remaining -= text_width;
         }
         if let Some(token) = maybe_token {
             if token.to == idx {

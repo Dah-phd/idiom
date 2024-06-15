@@ -12,7 +12,10 @@ use crate::{
     workspace::{
         cursor::Cursor,
         line::{
-            utils::{ascii_line, ascii_line_with_select, shrank_line, wrapped_line, wrapped_line_select},
+            utils::{
+                ascii_line, ascii_line_with_select, shrank_line, wrapped_complex_line, wrapped_line,
+                wrapped_line_select,
+            },
             Context, EditorLine,
         },
         CursorPosition,
@@ -22,7 +25,6 @@ use std::{
     cmp::Ordering,
     fmt::Display,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
-    str::Chars,
 };
 
 use super::utils::{complex_line, complex_line_with_select, inline_diagnostics};
@@ -505,34 +507,27 @@ impl CodeLine {
             backend.print_styled(" ", Style::bg(ctx.lexer().theme.selected));
             return;
         }
-        if line_width > self.char_len() {
-            self.rendered_at = 0;
-            if self.is_ascii() {
+        if self.is_ascii() {
+            if line_width > self.char_len() {
                 ascii_line_with_select(self.content.char_indices(), &self.tokens, select, ctx.lexer(), backend);
+                inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
             } else {
-                complex_line_with_select(self.content.chars(), &self.tokens, select, ctx.lexer(), backend)
+                let content = self.content.char_indices().take(line_width.saturating_sub(2));
+                ascii_line_with_select(content, &self.tokens, select, ctx.lexer(), backend);
+                backend.print_styled(">>", Style::reversed());
             }
-            inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
-        } else {
-            let end_loc = line_width.saturating_sub(2);
-            if self.is_ascii() {
-                ascii_line_with_select(
-                    self.content.char_indices().take(end_loc),
-                    &self.tokens,
-                    select,
-                    ctx.lexer(),
-                    backend,
-                );
-            } else {
-                complex_line_with_select(
-                    self.content.truncate_width(end_loc).chars(),
-                    &self.tokens,
-                    select,
-                    ctx.lexer(),
-                    backend,
-                );
-            }
+        } else if let Some(truncated) = self.content.truncate_if_wider(line_width) {
+            let mut content = truncated.chars();
+            if let Some(ch) = content.next_back() {
+                if UnicodeWidthChar::width(ch).unwrap_or_default() <= 1 {
+                    content.next_back();
+                }
+            };
+            complex_line_with_select(content, &self.tokens, select, ctx.lexer(), backend);
             backend.print_styled(">>", Style::reversed());
+        } else {
+            complex_line_with_select(self.content.chars(), &self.tokens, select, ctx.lexer(), backend);
+            inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
         }
     }
 
@@ -545,6 +540,7 @@ impl CodeLine {
             } else {
                 shrank_line(&self.content[..line_width.saturating_sub(2)], &self.tokens, backend);
             }
+        // handles non ascii shrunk lines
         } else if let Some(truncated) = self.content.truncate_if_wider(line_width) {
             let mut content = truncated.chars();
             if let Some(ch) = content.next_back() {
