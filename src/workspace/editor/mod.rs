@@ -67,13 +67,7 @@ impl Editor {
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if self.cursor.line == line_idx {
                 ctx.correct_cursor(text);
-                if text.char_len() > self.cursor.text_width {
-                    text.wrapped_render(&mut ctx, &mut lines, &mut gs.writer);
-                } else if let Some(line) = lines.next() {
-                    text.render(&mut ctx, line, &mut gs.writer);
-                } else {
-                    break;
-                }
+                text.full_render(&mut ctx, &mut lines, &mut gs.writer);
             } else if let Some(line) = lines.next() {
                 text.render(&mut ctx, line, &mut gs.writer);
             } else {
@@ -99,13 +93,7 @@ impl Editor {
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if self.cursor.line == line_idx {
                 ctx.correct_cursor(text);
-                if text.char_len() > self.cursor.text_width {
-                    text.wrapped_render(&mut ctx, &mut lines, &mut gs.writer);
-                } else if let Some(line) = lines.next() {
-                    text.render(&mut ctx, line, &mut gs.writer);
-                } else {
-                    break;
-                }
+                text.full_render(&mut ctx, &mut lines, &mut gs.writer);
             } else if let Some(line) = lines.next() {
                 text.fast_render(&mut ctx, line, &mut gs.writer);
             } else {

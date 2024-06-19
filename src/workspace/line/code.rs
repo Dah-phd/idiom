@@ -14,7 +14,7 @@ use crate::{
         line::{
             utils::{
                 ascii_line, ascii_line_with_select, shrank_line, wrapped_complex_line, wrapped_line,
-                wrapped_line_select,
+                wrapped_line_select, wrapped_line_select_complex,
             },
             Context, EditorLine,
         },
@@ -453,15 +453,27 @@ impl EditorLine for CodeLine {
     }
 
     #[inline]
-    fn wrapped_render(&mut self, ctx: &mut impl Context, lines: &mut RectIter, backend: &mut Backend) {
-        let (wrap_len, select) = match lines.next() {
+    fn full_render(&mut self, ctx: &mut impl Context, lines: &mut RectIter, backend: &mut Backend) {
+        let (line_width, select) = match lines.next() {
             Some(line) => ctx.setup_with_select(line, backend),
             None => return,
         };
-        match select {
-            Some(select) => wrapped_line_select(&self.content, &self.tokens, ctx, wrap_len, lines, select, backend),
-            None => wrapped_line(&self.content, &self.tokens, ctx, wrap_len, lines, backend),
-        };
+        match (self.is_ascii(), select) {
+            (true, None) if line_width > self.char_len => self.render_no_select(line_width, ctx, backend),
+            (false, None) if line_width > self.content.width() => self.render_no_select(line_width, ctx, backend),
+            (true, Some(select)) if line_width > self.char_len => self.render_select(line_width, select, ctx, backend),
+            (false, Some(select)) if line_width > self.content.width() => {
+                self.render_select(line_width, select, ctx, backend)
+            }
+            (true, None) => wrapped_line(&self.content, &self.tokens, ctx, line_width, lines, backend),
+            (true, Some(select)) => {
+                wrapped_line_select(&self.content, &self.tokens, ctx, line_width, lines, select, backend)
+            }
+            (false, None) => wrapped_complex_line(&self.content, &self.tokens, ctx, line_width, lines, backend),
+            (false, Some(select)) => {
+                wrapped_line_select_complex(&self.content, &self.tokens, ctx, line_width, lines, select, backend)
+            }
+        }
         backend.reset_style();
     }
 
@@ -516,6 +528,7 @@ impl CodeLine {
                 ascii_line_with_select(content, &self.tokens, select, ctx.lexer(), backend);
                 backend.print_styled(">>", Style::reversed());
             }
+        // handles non ascii shrunk lines
         } else if let Some(truncated) = self.content.truncate_if_wider(line_width) {
             let mut content = truncated.chars();
             if let Some(ch) = content.next_back() {
@@ -539,6 +552,7 @@ impl CodeLine {
                 inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
             } else {
                 shrank_line(&self.content[..line_width.saturating_sub(2)], &self.tokens, backend);
+                backend.print_styled(">>", Style::reversed());
             }
         // handles non ascii shrunk lines
         } else if let Some(truncated) = self.content.truncate_if_wider(line_width) {

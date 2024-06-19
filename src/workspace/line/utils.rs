@@ -42,7 +42,7 @@ pub fn complex_line(content: impl Iterator<Item = char>, tokens: &[Token], lexer
             };
         }
         backend.print(text);
-        idx += (lexer.char_lsp_pos)(text);
+        idx += lexer.char_lsp_pos(text);
     }
     backend.reset_style();
 }
@@ -87,7 +87,7 @@ pub fn complex_line_with_select(
             };
         }
         backend.print(text);
-        idx += (lexer.char_lsp_pos)(text);
+        idx += lexer.char_lsp_pos(text);
     }
     backend.reset_style();
 }
@@ -111,9 +111,7 @@ pub fn ascii_line(content: &str, tokens: &[Token], backend: &mut Backend) {
         end = token.to;
     }
     match content.get(end..) {
-        Some(text) if !text.is_empty() => {
-            backend.print(text);
-        }
+        Some(text) if !text.is_empty() => backend.print(text),
         _ => (),
     }
 }
@@ -170,18 +168,21 @@ pub fn shrank_line(content: &str, tokens: &[Token], writer: &mut Backend) {
                 writer.print(text);
             } else if let Some(text) = content.get(end..) {
                 writer.print(text);
-                break;
+                return;
             };
         };
         if let Some(text) = content.get(token.from..token.to) {
             writer.print_styled(text, token.style);
         } else if let Some(text) = content.get(token.from..) {
             writer.print_styled(text, token.style);
-            break;
+            return;
         };
         end = token.to;
     }
-    writer.print_styled(">>", Style::reversed());
+    match content.get(end..) {
+        Some(text) if !text.is_empty() => writer.print(text),
+        _ => (),
+    }
 }
 
 /// WRAP
@@ -216,14 +217,11 @@ pub fn wrapped_line_select(
             Style::default()
         };
         wrapping_loop_select(
-            content.char_indices().skip(skip_lines * wrap_len),
+            content.char_indices().skip(line_end),
             backend,
             tokens,
-            &wrap_number,
-            line_end,
-            wrap_len,
-            select,
-            ctx.lexer().theme.selected,
+            (&wrap_number, wrap_len),
+            (select, ctx.lexer().theme.selected),
             lines,
             reset_style,
         )
@@ -232,11 +230,8 @@ pub fn wrapped_line_select(
             content.char_indices(),
             backend,
             tokens.iter(),
-            &wrap_number,
-            wrap_len,
-            wrap_len,
-            select,
-            ctx.lexer().theme.selected,
+            (&wrap_number, wrap_len),
+            (select, ctx.lexer().theme.selected),
             lines,
             Style::default(),
         )
@@ -248,15 +243,13 @@ fn wrapping_loop_select<'a>(
     content: impl Iterator<Item = (usize, char)>,
     backend: &mut Backend,
     mut tokens: impl Iterator<Item = &'a Token>,
-    wrap_number: &str,
-    mut line_end: usize,
-    wrap_len: usize,
-    select: Range<usize>,
-    select_color: Color,
+    (wrap_number, wrap_len): (&str, usize),
+    (select, select_color): (Range<usize>, Color),
     lines: &mut RectIter,
     mut reset_style: Style,
 ) {
     let mut maybe_token = tokens.next();
+    let mut remaining = wrap_len;
     for (idx, text) in content {
         if select.start == idx {
             reset_style.set_bg(Some(select_color));
@@ -266,14 +259,14 @@ fn wrapping_loop_select<'a>(
             reset_style.set_bg(None);
             backend.set_bg(None);
         }
-        if line_end == idx {
+        if remaining == 0 {
             let line = match lines.next() {
                 Some(line) => line,
                 None => return,
             };
             backend.print_styled_at(line.row, line.col, wrap_number, Style::fg(color::dark_grey()));
             backend.clear_to_eol();
-            line_end += wrap_len;
+            remaining += wrap_len;
         }
         if let Some(token) = maybe_token {
             if token.from == idx {
@@ -293,6 +286,7 @@ fn wrapping_loop_select<'a>(
             };
         }
         backend.print(text);
+        remaining -= 1;
     }
 }
 
@@ -319,7 +313,7 @@ pub fn wrapped_line(
             }
         };
         wrapping_loop_ascii(
-            content.char_indices().skip(skip_lines * wrap_len),
+            content.char_indices().skip(line_end),
             backend,
             tokens,
             &wrap_number,
@@ -362,27 +356,97 @@ fn wrapping_loop_ascii<'a>(
             line_end += wrap_len;
         }
         if let Some(token) = maybe_token {
-            if token.to == idx {
-                backend.reset_style();
-                maybe_token = tokens.next();
-            };
-        }
-        if let Some(token) = maybe_token {
             if token.from == idx {
                 backend.set_style(token.style);
+            } else if token.to == idx {
+                backend.reset_style();
+                maybe_token = tokens.next();
             };
         }
         backend.print(text);
     }
 }
 
-#[inline]
+#[inline(always)]
 pub fn wrapped_complex_line(
     content: &str,
     tokens: &[Token],
     ctx: &mut impl Context,
     wrap_len: usize,
     lines: &mut RectIter,
+    backend: &mut Backend,
+) {
+    let skip_lines = ctx.count_skipped_to_cursor(wrap_len, lines.len());
+    if skip_lines != 0 {
+        let mut wrap_text = format!("..{skip_lines} hidden wrapped lines");
+        wrap_text.truncate(wrap_len);
+        backend.print_styled(wrap_text, Style::reversed());
+        let line_end = wrap_len * skip_lines;
+        let mut tokens = tokens.iter().skip_while(|token| token.to < line_end).peekable();
+        if let Some(token) = tokens.peek() {
+            if token.from < line_end {
+                backend.set_style(token.style);
+            }
+        };
+        wrapping_loop_complex(content.chars().skip(line_end), tokens, wrap_len, lines, line_end, ctx, backend)
+    } else {
+        wrapping_loop_complex(content.chars(), tokens.iter(), wrap_len, lines, 0, ctx, backend)
+    };
+}
+
+#[inline(always)]
+fn wrapping_loop_complex<'a>(
+    content: impl Iterator<Item = char>,
+    mut tokens: impl Iterator<Item = &'a Token>,
+    wrap_len: usize,
+    lines: &mut RectIter,
+    offset: usize,
+    ctx: &impl Context,
+    backend: &mut Backend,
+) {
+    let lexer = ctx.lexer();
+    let wrap_number = ctx.setup_wrap();
+    let mut remaining = wrap_len;
+    let mut maybe_token = tokens.next();
+    let mut idx = offset;
+    for text in content {
+        let text_width = match UnicodeWidthChar::width(text) {
+            Some(ch_width) => ch_width,
+            None => continue,
+        };
+        if text_width > remaining {
+            let line = match lines.next() {
+                Some(line) => line,
+                None => return,
+            };
+            backend.print_styled_at(line.row, line.col, &wrap_number, Style::fg(color::dark_grey()));
+            backend.clear_to_eol();
+            remaining = wrap_len.saturating_sub(text_width);
+        } else {
+            remaining -= text_width;
+        }
+        if let Some(token) = maybe_token {
+            if token.from == idx {
+                backend.set_style(token.style);
+            };
+            if token.to == idx {
+                backend.reset_style();
+                maybe_token = tokens.next();
+            };
+        }
+        idx += lexer.char_lsp_pos(text);
+        backend.print(text);
+    }
+}
+
+#[inline]
+pub fn wrapped_line_select_complex(
+    content: &str,
+    tokens: &[Token],
+    ctx: &mut impl Context,
+    wrap_len: usize,
+    lines: &mut RectIter,
+    select: Range<usize>,
     backend: &mut Backend,
 ) {
     let wrap_number = ctx.setup_wrap();
@@ -398,31 +462,61 @@ pub fn wrapped_complex_line(
                 backend.set_style(token.style);
             }
         };
-        wrapping_loop_complex(
-            content.char_indices().skip(skip_lines * wrap_len),
-            backend,
+        let reset_style = if select.start < line_end && select.end > line_end {
+            backend.set_bg(Some(ctx.lexer().theme.selected));
+            Style::bg(ctx.lexer().theme.selected)
+        } else {
+            Style::default()
+        };
+        wrapping_loop_complex_select(
+            content.chars().skip(line_end),
             tokens,
-            &wrap_number,
-            wrap_len,
+            (&wrap_number, wrap_len),
+            (select, ctx.lexer()),
             lines,
+            reset_style,
+            line_end,
+            backend,
         )
     } else {
-        wrapping_loop_complex(content.char_indices(), backend, tokens.iter(), &wrap_number, wrap_len, lines)
+        wrapping_loop_complex_select(
+            content.chars(),
+            tokens.iter(),
+            (&wrap_number, wrap_len),
+            (select, ctx.lexer()),
+            lines,
+            Style::default(),
+            0,
+            backend,
+        )
     };
 }
 
+#[allow(clippy::too_many_arguments)]
 #[inline(always)]
-fn wrapping_loop_complex<'a>(
-    content: impl Iterator<Item = (usize, char)>,
-    backend: &mut Backend,
+fn wrapping_loop_complex_select<'a>(
+    content: impl Iterator<Item = char>,
     mut tokens: impl Iterator<Item = &'a Token>,
-    wrap_number: &str,
-    wrap_len: usize,
+    (wrap_number, wrap_len): (&str, usize),
+    (select, lexer): (Range<usize>, &Lexer),
     lines: &mut RectIter,
+    mut reset_style: Style,
+    offset: usize,
+    backend: &mut Backend,
 ) {
+    let select_color = lexer.theme.selected;
     let mut remaining = wrap_len;
     let mut maybe_token = tokens.next();
-    for (idx, text) in content {
+    let mut idx = offset;
+    for text in content {
+        if select.start == idx {
+            reset_style.set_bg(Some(select_color));
+            backend.set_bg(Some(select_color));
+        }
+        if select.end == idx {
+            reset_style.set_bg(None);
+            backend.set_bg(None);
+        }
         let text_width = match UnicodeWidthChar::width(text) {
             Some(ch_width) => ch_width,
             None => continue,
@@ -439,16 +533,23 @@ fn wrapping_loop_complex<'a>(
             remaining -= text_width;
         }
         if let Some(token) = maybe_token {
-            if token.to == idx {
-                backend.reset_style();
-                maybe_token = tokens.next();
-            };
-        }
-        if let Some(token) = maybe_token {
             if token.from == idx {
-                backend.set_style(token.style);
+                backend.update_style(token.style);
+            } else if token.to == idx {
+                if let Some(token) = tokens.next() {
+                    if token.from == idx {
+                        backend.update_style(token.style);
+                    } else {
+                        backend.set_style(reset_style);
+                    };
+                    maybe_token.replace(token);
+                } else {
+                    backend.set_style(reset_style);
+                    maybe_token = None;
+                };
             };
         }
+        idx += lexer.char_lsp_pos(text);
         backend.print(text);
     }
 }

@@ -61,6 +61,7 @@ impl BackendProtocol for Backend {
 
     fn reset_style(&mut self) {
         self.default_style = Style::default();
+        self.data.push((self.default_style, String::from("<<reset style>>")));
     }
 
     fn restore_cursor(&mut self) {

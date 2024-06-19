@@ -55,7 +55,7 @@ pub struct Lexer {
     renames: fn(&mut Lexer, CursorPosition, String, &mut GlobalState),
     sync: fn(&mut Editor, &mut GlobalState),
     pub encode_position: fn(usize, &str) -> usize,
-    pub char_lsp_pos: fn(char) -> usize,
+    char_lsp_pos: fn(char) -> usize,
 }
 
 impl Lexer {
@@ -140,6 +140,11 @@ impl Lexer {
         map(self, client);
         gs.success("LSP mapped!");
         (self.tokens)(self, gs);
+    }
+
+    #[inline(always)]
+    pub fn char_lsp_pos(&self, ch: char) -> usize {
+        (self.char_lsp_pos)(ch)
     }
 
     #[inline]

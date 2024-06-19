@@ -75,7 +75,7 @@ pub trait EditorLine:
     fn push_token(&mut self, token: Token);
     fn replace_tokens(&mut self, tokens: Vec<Token>);
     fn rebuild_tokens(&mut self, lexer: &Lexer);
-    fn wrapped_render(&mut self, ctx: &mut impl Context, lines: &mut RectIter, backend: &mut Backend);
+    fn full_render(&mut self, ctx: &mut impl Context, lines: &mut RectIter, backend: &mut Backend);
     fn render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend);
     fn fast_render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend);
     fn clear_cache(&mut self);

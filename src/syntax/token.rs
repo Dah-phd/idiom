@@ -5,6 +5,7 @@ use crate::{
 };
 use lsp_types::SemanticToken;
 
+#[derive(Debug)]
 pub struct Token {
     pub from: usize,
     pub to: usize,
