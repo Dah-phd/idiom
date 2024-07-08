@@ -66,7 +66,6 @@ impl Editor {
         let mut ctx = CodeLineContext::collect_context(&mut self.lexer, &self.cursor, self.line_number_offset);
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if self.cursor.line == line_idx {
-                ctx.correct_cursor(text);
                 text.full_render(&mut ctx, &mut lines, &mut gs.writer);
             } else if let Some(line) = lines.next() {
                 text.render(&mut ctx, line, &mut gs.writer);
@@ -92,7 +91,6 @@ impl Editor {
         let mut ctx = CodeLineContext::collect_context(&mut self.lexer, &self.cursor, self.line_number_offset);
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if self.cursor.line == line_idx {
-                ctx.correct_cursor(text);
                 text.full_render(&mut ctx, &mut lines, &mut gs.writer);
             } else if let Some(line) = lines.next() {
                 text.fast_render(&mut ctx, line, &mut gs.writer);

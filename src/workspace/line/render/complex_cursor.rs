@@ -118,14 +118,14 @@ pub fn wrap(
                 backend.set_style(token.style);
             }
         };
-        wrapping_loop_complex(line.chars(), tokens, wrap_len, lines, (wrap_cursor, offset), ctx, backend)
+        wrapping_loop(line.chars(), tokens, wrap_len, lines, (wrap_cursor, offset), ctx, backend)
     } else {
-        wrapping_loop_complex(line.chars(), line.iter_tokens(), wrap_len, lines, (wrap_cursor, offset), ctx, backend)
+        wrapping_loop(line.chars(), line.iter_tokens(), wrap_len, lines, (wrap_cursor, offset), ctx, backend)
     };
 }
 
 #[inline(always)]
-fn wrapping_loop_complex<'a>(
+fn wrapping_loop<'a>(
     content: impl Iterator<Item = char>,
     mut tokens: impl Iterator<Item = &'a Token>,
     wrap_len: usize,
@@ -205,7 +205,7 @@ pub fn wrap_select(
         } else {
             Style::default()
         };
-        wrapping_loop_complex_select(
+        wrapping_loop_select(
             line.chars(),
             tokens,
             wrap_len,
@@ -216,7 +216,7 @@ pub fn wrap_select(
             backend,
         )
     } else {
-        wrapping_loop_complex_select(
+        wrapping_loop_select(
             line.chars(),
             line.iter_tokens(),
             wrap_len,
@@ -230,7 +230,7 @@ pub fn wrap_select(
 }
 
 #[inline(always)]
-fn wrapping_loop_complex_select<'a>(
+fn wrapping_loop_select<'a>(
     content: impl Iterator<Item = char>,
     mut tokens: impl Iterator<Item = &'a Token>,
     wrap_len: usize,

@@ -16,7 +16,6 @@ use std::{
 };
 
 type LineWidth = usize;
-type Select = Range<usize>;
 
 pub trait EditorLine:
     Into<String>
@@ -83,18 +82,18 @@ pub trait EditorLine:
 }
 
 pub trait Context {
-    fn setup_with_select(&mut self, line: Line, backend: &mut Backend) -> (LineWidth, Option<Select>);
+    fn setup_with_select(&mut self, line: Line, backend: &mut Backend) -> (LineWidth, Option<Range<usize>>);
     fn setup_line(&mut self, line: Line, backend: &mut Backend) -> LineWidth;
     fn setup_wrap(&self) -> String;
     fn cursor_char(&self) -> usize;
     fn skip_line(&mut self);
     fn lexer(&self) -> &Lexer;
-    fn get_select(&self, width: usize) -> Option<Select>;
-    fn count_skipped_to_cursor(&mut self, wrap_len: usize, remaining_lines: usize) -> WrappedCursor;
+    fn get_select(&self, width: usize) -> Option<Range<usize>>;
+    fn count_skipped_to_cursor(&mut self, line_width: usize, remaining_lines: usize) -> WrappedCursor;
     fn count_skipped_to_cursor_complex(
         &mut self,
         line: &impl EditorLine,
-        wrap_len: usize,
+        line_width: usize,
         remaining_lines: usize,
     ) -> (WrappedCursor, usize);
     fn render_cursor(self, gs: &mut GlobalState);
