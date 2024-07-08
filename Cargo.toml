@@ -28,13 +28,13 @@ dirs = "5.0.1"
 # reqwest = "0.11.20"  !TODO enable when autodownloading is created
 ignore = "0.4.20"
 fuzzy-matcher = "0.3.7"
-copypasta = "0.10.1"
 portable-pty = "0.8.1"
 strip-ansi-escapes = "0.2.0"
 bitflags = "2.4.2"
 regex = "1.10.4"
 thiserror = "1.0.60"
 unicode-width = "0.1.12"
+copypasta = "0.10.1"
 
 [profile.dev]
 debug = true

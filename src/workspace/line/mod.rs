@@ -1,5 +1,5 @@
 mod code;
-mod utils;
+mod render;
 use crate::{
     global_state::GlobalState,
     render::{
@@ -72,6 +72,7 @@ pub trait EditorLine:
     fn set_diagnostics(&mut self, diagnostics: DiagnosticLine);
     fn diagnostic_info(&self, lang: &Lang) -> Option<DiagnosticInfo>;
     fn drop_diagnostics(&mut self);
+    fn iter_tokens(&self) -> impl Iterator<Item = &Token>;
     fn push_token(&mut self, token: Token);
     fn replace_tokens(&mut self, tokens: Vec<Token>);
     fn rebuild_tokens(&mut self, lexer: &Lexer);
@@ -85,11 +86,24 @@ pub trait Context {
     fn setup_with_select(&mut self, line: Line, backend: &mut Backend) -> (LineWidth, Option<Select>);
     fn setup_line(&mut self, line: Line, backend: &mut Backend) -> LineWidth;
     fn setup_wrap(&self) -> String;
+    fn cursor_char(&self) -> usize;
     fn skip_line(&mut self);
     fn lexer(&self) -> &Lexer;
     fn get_select(&self, width: usize) -> Option<Select>;
-    fn count_skipped_to_cursor(&mut self, wrap_len: usize, remaining_lines: usize) -> usize;
+    fn count_skipped_to_cursor(&mut self, wrap_len: usize, remaining_lines: usize) -> WrappedCursor;
+    fn count_skipped_to_cursor_complex(
+        &mut self,
+        line: &impl EditorLine,
+        wrap_len: usize,
+        remaining_lines: usize,
+    ) -> (WrappedCursor, usize);
     fn render_cursor(self, gs: &mut GlobalState);
+}
+
+pub struct WrappedCursor {
+    pub flat_char_idx: usize,
+    pub skip_lines: usize,
+    pub skip_chars: usize,
 }
 
 #[cfg(test)]

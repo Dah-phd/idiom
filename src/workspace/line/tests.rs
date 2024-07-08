@@ -376,7 +376,8 @@ fn test_line_wrapping_utf8() {
     let mut gs = GlobalState::new(Backend::init()).unwrap();
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
 
-    let cursor = Cursor::default();
+    let mut cursor = Cursor::default();
+    cursor.set_position(CursorPosition { line: 1, char: 0 });
 
     let (tokens, text) = longline_token_pair_utf8();
     let mut content = zip_text_tokens(text, tokens);
@@ -396,7 +397,8 @@ fn test_line_wrapping_utf16() {
     let mut gs = GlobalState::new(Backend::init()).unwrap();
     let mut lexer = mock_utf16_lexer(&mut gs, FileType::Rust);
 
-    let cursor = Cursor::default();
+    let mut cursor = Cursor::default();
+    cursor.set_position(CursorPosition { line: 1, char: 0 });
 
     let (tokens, text) = longline_token_pair_utf16();
     let mut content = zip_text_tokens(text, tokens);
@@ -416,7 +418,8 @@ fn test_line_wrapping_utf32() {
     let mut gs = GlobalState::new(Backend::init()).unwrap();
     let mut lexer = mock_utf32_lexer(&mut gs, FileType::Rust);
 
-    let cursor = Cursor::default();
+    let mut cursor = Cursor::default();
+    cursor.set_position(CursorPosition { line: 1, char: 0 });
 
     let (tokens, text) = longline_token_pair_utf32();
     let mut content = zip_text_tokens(text, tokens);

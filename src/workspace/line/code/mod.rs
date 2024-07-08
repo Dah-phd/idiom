@@ -12,11 +12,8 @@ use crate::{
     workspace::{
         cursor::Cursor,
         line::{
-            utils::{
-                ascii_line, ascii_line_with_select, shrank_line, wrapped_complex_line, wrapped_line,
-                wrapped_line_select, wrapped_line_select_complex,
-            },
-            Context, EditorLine,
+            render::{ascii_cursor, ascii_line, complex_cursor, complex_line, inline_diagnostics, is_wider_complex},
+            Context, EditorLine, WrappedCursor,
         },
         CursorPosition,
     },
@@ -26,8 +23,6 @@ use std::{
     fmt::Display,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
 };
-
-use super::utils::{complex_line, complex_line_with_select, inline_diagnostics};
 
 #[derive(Default)]
 pub struct CodeLine {
@@ -401,6 +396,11 @@ impl EditorLine for CodeLine {
     }
 
     #[inline]
+    fn iter_tokens(&self) -> impl Iterator<Item = &Token> {
+        self.tokens.iter()
+    }
+
+    #[inline]
     fn push_token(&mut self, token: Token) {
         self.rendered_at = 0;
         self.tokens.push(token);
@@ -454,24 +454,33 @@ impl EditorLine for CodeLine {
 
     #[inline]
     fn full_render(&mut self, ctx: &mut impl Context, lines: &mut RectIter, backend: &mut Backend) {
+        self.rendered_at = 0;
         let (line_width, select) = match lines.next() {
             Some(line) => ctx.setup_with_select(line, backend),
             None => return,
         };
-        match (self.is_ascii(), select) {
-            (true, None) if line_width > self.char_len => self.render_no_select(line_width, ctx, backend),
-            (false, None) if line_width > self.content.width() => self.render_no_select(line_width, ctx, backend),
-            (true, Some(select)) if line_width > self.char_len => self.render_select(line_width, select, ctx, backend),
-            (false, Some(select)) if line_width > self.content.width() => {
-                self.render_select(line_width, select, ctx, backend)
+        // new logic
+        if self.is_ascii() {
+            if line_width > self.char_len {
+                match select {
+                    Some(select) => ascii_cursor::with_select(self, ctx, select, backend),
+                    None => ascii_cursor::basic(self, ctx, backend),
+                }
+            } else {
+                match select {
+                    Some(select) => ascii_cursor::wrap_select(self, ctx, line_width, lines, select, backend),
+                    None => ascii_cursor::wrap(self, ctx, line_width, lines, backend),
+                }
             }
-            (true, None) => wrapped_line(&self.content, &self.tokens, ctx, line_width, lines, backend),
-            (true, Some(select)) => {
-                wrapped_line_select(&self.content, &self.tokens, ctx, line_width, lines, select, backend)
+        } else if !is_wider_complex(self, line_width) {
+            match select {
+                Some(select) => complex_cursor::with_select(self, ctx, select, backend),
+                None => complex_cursor::basic(self, ctx, backend),
             }
-            (false, None) => wrapped_complex_line(&self.content, &self.tokens, ctx, line_width, lines, backend),
-            (false, Some(select)) => {
-                wrapped_line_select_complex(&self.content, &self.tokens, ctx, line_width, lines, select, backend)
+        } else {
+            match select {
+                Some(select) => complex_cursor::wrap_select(self, ctx, line_width, lines, select, backend),
+                None => complex_cursor::wrap(self, ctx, line_width, lines, backend),
             }
         }
         backend.reset_style();
@@ -487,7 +496,7 @@ impl EditorLine for CodeLine {
         let (line_width, select) = ctx.setup_with_select(line, backend);
         self.select.clone_from(&select);
         match select {
-            Some(select) => self.render_select(line_width, select, ctx, backend),
+            Some(select) => self.render_with_select(line_width, select, ctx, backend),
             None => self.render_no_select(line_width, ctx, backend),
         }
     }
@@ -508,7 +517,7 @@ impl EditorLine for CodeLine {
 
 impl CodeLine {
     #[inline(always)]
-    fn render_select(
+    fn render_with_select(
         &mut self,
         line_width: usize,
         select: Range<usize>,
@@ -521,11 +530,17 @@ impl CodeLine {
         }
         if self.is_ascii() {
             if line_width > self.char_len() {
-                ascii_line_with_select(self.content.char_indices(), &self.tokens, select, ctx.lexer(), backend);
+                ascii_line::ascii_line_with_select(
+                    self.content.char_indices(),
+                    &self.tokens,
+                    select,
+                    ctx.lexer(),
+                    backend,
+                );
                 inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
             } else {
                 let content = self.content.char_indices().take(line_width.saturating_sub(2));
-                ascii_line_with_select(content, &self.tokens, select, ctx.lexer(), backend);
+                ascii_line::ascii_line_with_select(content, &self.tokens, select, ctx.lexer(), backend);
                 backend.print_styled(">>", Style::reversed());
             }
         // handles non ascii shrunk lines
@@ -536,10 +551,10 @@ impl CodeLine {
                     content.next_back();
                 }
             };
-            complex_line_with_select(content, &self.tokens, select, ctx.lexer(), backend);
+            complex_line::complex_line_with_select(content, &self.tokens, select, ctx.lexer(), backend);
             backend.print_styled(">>", Style::reversed());
         } else {
-            complex_line_with_select(self.content.chars(), &self.tokens, select, ctx.lexer(), backend);
+            complex_line::complex_line_with_select(self.content.chars(), &self.tokens, select, ctx.lexer(), backend);
             inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
         }
     }
@@ -548,10 +563,10 @@ impl CodeLine {
     fn render_no_select(&mut self, line_width: usize, ctx: &mut impl Context, backend: &mut Backend) {
         if self.is_ascii() {
             if line_width > self.content.len() {
-                ascii_line(&self.content, &self.tokens, backend);
+                ascii_line::ascii_line(&self.content, &self.tokens, backend);
                 inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
             } else {
-                shrank_line(&self.content[..line_width.saturating_sub(2)], &self.tokens, backend);
+                ascii_line::ascii_line(&self.content[..line_width.saturating_sub(2)], &self.tokens, backend);
                 backend.print_styled(">>", Style::reversed());
             }
         // handles non ascii shrunk lines
@@ -562,10 +577,10 @@ impl CodeLine {
                     content.next_back();
                 }
             };
-            complex_line(content, &self.tokens, ctx.lexer(), backend);
+            complex_line::complex_line(content, &self.tokens, ctx.lexer(), backend);
             backend.print_styled(">>", Style::reversed());
         } else {
-            complex_line(self.content.chars(), &self.tokens, ctx.lexer(), backend);
+            complex_line::complex_line(self.content.chars(), &self.tokens, ctx.lexer(), backend);
             inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
         }
     }
@@ -607,6 +622,11 @@ impl<'a> Context for CodeLineContext<'a> {
     }
 
     #[inline]
+    fn cursor_char(&self) -> usize {
+        self.char
+    }
+
+    #[inline]
     fn setup_with_select(&mut self, line: Line, backend: &mut Backend) -> (usize, Option<Range<usize>>) {
         let line_number = self.line_number + 1;
         let text = format!("{: >1$} ", line_number, self.line_number_offset);
@@ -645,12 +665,46 @@ impl<'a> Context for CodeLineContext<'a> {
     }
 
     #[inline]
-    fn count_skipped_to_cursor(&mut self, wrap_len: usize, remaining_lines: usize) -> usize {
+    fn count_skipped_to_cursor(&mut self, wrap_len: usize, remaining_lines: usize) -> WrappedCursor {
         let wraps = self.char / wrap_len + 1;
         let skip_lines = wraps.saturating_sub(remaining_lines);
+        let flat_char_idx = self.char;
         self.char %= wrap_len;
         self.line += wraps.saturating_sub(skip_lines);
-        skip_lines
+        let skip_chars = skip_lines * wrap_len;
+        WrappedCursor { skip_chars, flat_char_idx, skip_lines }
+    }
+
+    /// operation is complex due to variability in position encoding and variable char width
+    #[inline]
+    fn count_skipped_to_cursor_complex(
+        &mut self,
+        content: &impl EditorLine,
+        width: usize,
+        remaining_lines: usize,
+    ) -> (WrappedCursor, usize) {
+        let mut wraps: usize = 0;
+        let mut remaining_width = width;
+        let mut lsp_enc = 0;
+        let mut chars_per_line = Vec::new();
+        for ch in content.chars().take(self.char) {
+            let ch_w = UnicodeWidthChar::width(ch).unwrap_or(0);
+            if remaining_width < ch_w {
+                wraps += 1;
+                chars_per_line.push(width - remaining_width);
+                remaining_width = width;
+            }
+            lsp_enc += self.lexer.char_lsp_pos(ch);
+            remaining_width -= ch_w;
+        }
+        let skip_lines = wraps.saturating_sub(remaining_lines);
+        let flat_char_idx = self.char;
+        if skip_lines == 0 {
+            return (WrappedCursor { skip_chars: 0, skip_lines, flat_char_idx }, 0);
+        }
+        self.line += wraps.saturating_sub(skip_lines);
+        self.char = width - remaining_width;
+        (WrappedCursor { skip_chars: chars_per_line.iter().take(skip_lines).sum(), flat_char_idx, skip_lines }, lsp_enc)
     }
 
     #[inline]
@@ -658,7 +712,6 @@ impl<'a> Context for CodeLineContext<'a> {
         let row = gs.editor_area.row + self.line as u16;
         let col = gs.editor_area.col + (self.char + self.line_number_offset + 1) as u16;
         self.lexer.render_modal_if_exist(row, col, gs);
-        gs.writer.render_cursor_at(row, col);
     }
 }
 
