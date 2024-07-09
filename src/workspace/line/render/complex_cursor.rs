@@ -204,39 +204,23 @@ pub fn wrap_select(
         } else {
             Style::default()
         };
-        wrapping_loop_select(
-            line.chars(),
-            tokens,
-            wrap_len,
-            (select, reset_style),
-            lines,
-            ctx,
-            (wrap_cursor, offset, 0),
-            backend,
-        )
+        let style_data = (tokens, select, reset_style);
+        let position_data = (wrap_cursor, offset, 0, wrap_len);
+        wrapping_loop_select(line.chars(), style_data, lines, ctx, position_data, backend)
     } else {
-        wrapping_loop_select(
-            line.chars(),
-            line.iter_tokens(),
-            wrap_len,
-            (select, Style::default()),
-            lines,
-            ctx,
-            (wrap_cursor, offset, wrap_len),
-            backend,
-        )
+        let style_data = (line.iter_tokens(), select, Style::default());
+        let position_data = (wrap_cursor, offset, wrap_len, wrap_len);
+        wrapping_loop_select(line.chars(), style_data, lines, ctx, position_data, backend)
     };
 }
 
 #[inline(always)]
 fn wrapping_loop_select<'a>(
     content: impl Iterator<Item = char>,
-    mut tokens: impl Iterator<Item = &'a Token>,
-    wrap_len: usize,
-    (select, mut reset_style): (Range<usize>, Style),
+    (mut tokens, select, mut reset_style): (impl Iterator<Item = &'a Token>, Range<usize>, Style),
     lines: &mut RectIter,
     ctx: &impl Context,
-    (wrap_cursor, mut lsp_idx, mut remaining): (WrappedCursor, usize, usize),
+    (wrap_cursor, mut lsp_idx, mut remaining, wrap_len): (WrappedCursor, usize, usize, usize),
     backend: &mut Backend,
 ) {
     let cursor_idx = wrap_cursor.flat_char_idx;
