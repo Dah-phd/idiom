@@ -88,8 +88,11 @@ impl<'a> Context for CodeLineContext<'a> {
         let flat_char_idx = self.char;
         self.char %= line_width;
         self.line += wraps.saturating_sub(skip_lines);
-        let skip_chars = skip_lines * line_width;
-        WrappedCursor { skip_chars, flat_char_idx, skip_lines }
+        if skip_lines > 1 {
+            let skip_chars = skip_lines * line_width;
+            return WrappedCursor { skip_chars, flat_char_idx, skip_lines: skip_lines - 1 };
+        }
+        WrappedCursor { skip_chars: 0, flat_char_idx, skip_lines: 0 }
     }
 
     /// operation is complex due to variability in position encoding and variable char width
@@ -114,11 +117,12 @@ impl<'a> Context for CodeLineContext<'a> {
             lsp_enc += self.lexer.char_lsp_pos(ch);
             remaining_width -= ch_w;
         }
-        let skip_lines = wraps.saturating_sub(remaining_lines);
+        let mut skip_lines = wraps.saturating_sub(remaining_lines);
         let flat_char_idx = self.char;
         if skip_lines == 0 {
             return (WrappedCursor { skip_chars: 0, skip_lines, flat_char_idx }, 0);
         }
+        skip_lines += 1;
         self.line += wraps.saturating_sub(skip_lines);
         self.char = line_width - remaining_width;
         (WrappedCursor { skip_chars: chars_per_line.iter().take(skip_lines).sum(), flat_char_idx, skip_lines }, lsp_enc)

@@ -118,9 +118,9 @@ pub fn wrap(
                 backend.set_style(token.style);
             }
         };
-        wrapping_loop(line.chars(), tokens, wrap_len, lines, (wrap_cursor, offset), ctx, backend)
+        wrapping_loop(line.chars(), tokens, wrap_len, lines, (wrap_cursor, offset, 0), ctx, backend)
     } else {
-        wrapping_loop(line.chars(), line.iter_tokens(), wrap_len, lines, (wrap_cursor, offset), ctx, backend)
+        wrapping_loop(line.chars(), line.iter_tokens(), wrap_len, lines, (wrap_cursor, offset, wrap_len), ctx, backend)
     };
 }
 
@@ -130,14 +130,13 @@ fn wrapping_loop<'a>(
     mut tokens: impl Iterator<Item = &'a Token>,
     wrap_len: usize,
     lines: &mut RectIter,
-    (wrap_cursor, mut lsp_idx): (WrappedCursor, usize),
+    (wrap_cursor, mut lsp_idx, mut remaining): (WrappedCursor, usize, usize),
     ctx: &impl Context,
     backend: &mut Backend,
 ) {
     let cursor_idx = wrap_cursor.flat_char_idx;
     let lexer = ctx.lexer();
     let wrap_number = ctx.setup_wrap();
-    let mut remaining = wrap_len;
     let mut maybe_token = tokens.next();
     let mut idx = wrap_cursor.skip_chars;
     for text in content.skip(idx) {
@@ -212,7 +211,7 @@ pub fn wrap_select(
             (select, reset_style),
             lines,
             ctx,
-            (wrap_cursor, offset),
+            (wrap_cursor, offset, 0),
             backend,
         )
     } else {
@@ -223,7 +222,7 @@ pub fn wrap_select(
             (select, Style::default()),
             lines,
             ctx,
-            (wrap_cursor, offset),
+            (wrap_cursor, offset, wrap_len),
             backend,
         )
     };
@@ -237,13 +236,12 @@ fn wrapping_loop_select<'a>(
     (select, mut reset_style): (Range<usize>, Style),
     lines: &mut RectIter,
     ctx: &impl Context,
-    (wrap_cursor, mut lsp_idx): (WrappedCursor, usize),
+    (wrap_cursor, mut lsp_idx, mut remaining): (WrappedCursor, usize, usize),
     backend: &mut Backend,
 ) {
     let cursor_idx = wrap_cursor.flat_char_idx;
     let lexer = ctx.lexer();
     let select_color = lexer.theme.selected;
-    let mut remaining = wrap_len;
     let mut maybe_token = tokens.next();
     let mut idx = wrap_cursor.skip_chars;
     let wrap_number = ctx.setup_wrap();
