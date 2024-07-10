@@ -47,7 +47,7 @@ pub fn basic(line: &impl EditorLine, ctx: &impl Context, backend: &mut Backend) 
 }
 
 #[inline]
-pub fn with_select(line: &impl EditorLine, ctx: &impl Context, select: Range<usize>, backend: &mut Backend) {
+pub fn select(line: &impl EditorLine, ctx: &impl Context, select: Range<usize>, backend: &mut Backend) {
     let mut reset_style = Style::default();
     let mut iter_tokens = line.iter_tokens();
     let mut maybe_token = iter_tokens.next();

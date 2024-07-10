@@ -222,7 +222,7 @@ pub fn sync_edits(editor: &mut Editor, gs: &mut GlobalState) {
                 .drain(..)
                 .map(|(_, mut edit)| {
                     let editor_line = &content[edit.cursor.line];
-                    if !editor_line.is_ascii() {
+                    if !editor_line.is_simple() {
                         edit.cursor.char = (lexer.encode_position)(edit.cursor.char, &editor_line[..]);
                     }
                     edit
@@ -239,7 +239,7 @@ pub fn sync_edits(editor: &mut Editor, gs: &mut GlobalState) {
         .drain(..)
         .map(|(meta, mut edit)| {
             let editor_line = &content[edit.cursor.line];
-            if !editor_line.is_ascii() {
+            if !editor_line.is_simple() {
                 edit.cursor.char = (lexer.encode_position)(edit.cursor.char, &editor_line[..]);
             }
             change_events.push(edit);

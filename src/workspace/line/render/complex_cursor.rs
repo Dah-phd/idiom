@@ -50,7 +50,7 @@ pub fn basic(line: &impl EditorLine, ctx: &impl Context, backend: &mut Backend) 
 }
 
 #[inline]
-pub fn with_select(line: &impl EditorLine, ctx: &impl Context, select: Range<usize>, backend: &mut Backend) {
+pub fn select(line: &impl EditorLine, ctx: &impl Context, select: Range<usize>, backend: &mut Backend) {
     let lexer = ctx.lexer();
     let cursor_idx = ctx.cursor_char();
     let select_color = lexer.theme.selected;

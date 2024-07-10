@@ -111,7 +111,7 @@ impl Index<RangeFull> for CodeLine {
 
 impl EditorLine for CodeLine {
     #[inline]
-    fn is_ascii(&self) -> bool {
+    fn is_simple(&self) -> bool {
         self.content.len() == self.char_len
     }
 
@@ -359,7 +359,7 @@ impl EditorLine for CodeLine {
         if char_idx > self.char_len {
             panic!("Index out of bounds! Index {} where max is {}", char_idx, self.char_len);
         }
-        if self.is_ascii() {
+        if self.is_simple() {
             return char_idx;
         }
         self.content.chars().take(char_idx).fold(0, |sum, ch| sum + ch.len_utf16())
@@ -452,15 +452,18 @@ impl EditorLine for CodeLine {
     #[inline]
     fn full_render(&mut self, ctx: &mut impl Context, lines: &mut RectIter, backend: &mut Backend) {
         self.rendered_at = 0;
+        if self.tokens.is_empty() {
+            let lexer = ctx.lexer();
+            Token::parse(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
+        };
         let (line_width, select) = match lines.next() {
             Some(line) => ctx.setup_with_select(line, backend),
             None => return,
         };
-        // new logic
-        if self.is_ascii() {
+        if self.is_simple() {
             if line_width > self.char_len {
                 match select {
-                    Some(select) => ascii_cursor::with_select(self, ctx, select, backend),
+                    Some(select) => ascii_cursor::select(self, ctx, select, backend),
                     None => ascii_cursor::basic(self, ctx, backend),
                 }
             } else {
@@ -471,7 +474,7 @@ impl EditorLine for CodeLine {
             }
         } else if !is_wider_complex(self, line_width) {
             match select {
-                Some(select) => complex_cursor::with_select(self, ctx, select, backend),
+                Some(select) => complex_cursor::select(self, ctx, select, backend),
                 None => complex_cursor::basic(self, ctx, backend),
             }
         } else {
@@ -525,7 +528,7 @@ impl CodeLine {
             backend.print_styled(" ", Style::bg(ctx.lexer().theme.selected));
             return;
         }
-        if self.is_ascii() {
+        if self.is_simple() {
             if line_width > self.char_len() {
                 ascii_line::ascii_line_with_select(
                     self.content.char_indices(),
@@ -558,7 +561,7 @@ impl CodeLine {
 
     #[inline(always)]
     fn render_no_select(&mut self, line_width: usize, ctx: &mut impl Context, backend: &mut Backend) {
-        if self.is_ascii() {
+        if self.is_simple() {
             if line_width > self.content.len() {
                 ascii_line::ascii_line(&self.content, &self.tokens, backend);
                 inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
