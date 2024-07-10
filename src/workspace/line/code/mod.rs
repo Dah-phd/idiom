@@ -420,7 +420,7 @@ impl EditorLine for CodeLine {
     fn rebuild_tokens(&mut self, lexer: &Lexer) {
         self.rendered_at = 0;
         self.tokens.clear();
-        Token::parse(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
+        Token::parse_to_buf(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
     }
 
     #[inline]
@@ -454,7 +454,7 @@ impl EditorLine for CodeLine {
         self.rendered_at = 0;
         if self.tokens.is_empty() {
             let lexer = ctx.lexer();
-            Token::parse(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
+            Token::parse_to_buf(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
         };
         let (line_width, select) = match lines.next() {
             Some(line) => ctx.setup_with_select(line, backend),
@@ -490,7 +490,7 @@ impl EditorLine for CodeLine {
     fn render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend) {
         if self.tokens.is_empty() {
             let lexer = ctx.lexer();
-            Token::parse(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
+            Token::parse_to_buf(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
         };
         self.rendered_at = line.row;
         let (line_width, select) = ctx.setup_with_select(line, backend);

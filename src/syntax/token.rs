@@ -42,7 +42,10 @@ impl Token {
         self.style.reset_mods();
     }
 
-    pub fn parse(lang: &Lang, theme: &Theme, snippet: &str, buf: &mut Vec<Token>) {
+    pub fn parse_to_buf(lang: &Lang, theme: &Theme, snippet: &str, buf: &mut Vec<Token>) {
+        if !lang.is_code() {
+            return;
+        };
         if lang.is_comment(snippet) {
             buf.push(Token { to: snippet.len(), from: 0, len: snippet.len(), style: Style::fg(theme.comment) });
             return;

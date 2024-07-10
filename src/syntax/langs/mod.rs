@@ -25,6 +25,10 @@ pub struct Lang {
 }
 
 impl Lang {
+    pub fn is_code(&self) -> bool {
+        !matches!(self.file_type, FileType::Unknown)
+    }
+
     pub fn is_keyword(&self, token: &str) -> bool {
         self.declaration.contains(&token) || self.key_words.contains(&token)
     }
