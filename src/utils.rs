@@ -29,7 +29,7 @@ pub fn split_arc_mutex_async<T>(inner: T) -> (Arc<tokio::sync::Mutex<T>>, Arc<to
     (arc, clone)
 }
 
-pub fn into_guard<T>(mutex: &Mutex<T>) -> MutexGuard<T> {
+pub fn force_lock<T>(mutex: &Mutex<T>) -> MutexGuard<T> {
     match mutex.lock() {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),

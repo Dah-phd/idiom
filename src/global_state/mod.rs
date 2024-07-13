@@ -340,7 +340,7 @@ impl GlobalState {
 
     /// unwrap LSP error and check status
     #[inline]
-    pub fn unwrap_lsp_error(&mut self, result: LSPResult<()>, file_type: FileType) {
+    pub fn log_if_lsp_error(&mut self, result: LSPResult<()>, file_type: FileType) {
         if let Err(err) = result {
             self.send_error(err, file_type);
         }
@@ -423,7 +423,7 @@ impl GlobalState {
                 TreeEvent::RenameFile(name) => {
                     if let Some(result) = tree.rename_path(name) {
                         match result {
-                            Ok((old, new_path)) => workspace.rename_editors(old, new_path),
+                            Ok((old, new_path)) => workspace.rename_editors(old, new_path, self),
                             Err(err) => self.messages.error(err.to_string()),
                         }
                     };

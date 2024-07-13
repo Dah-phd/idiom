@@ -5,7 +5,7 @@ mod messages;
 mod notification;
 mod request;
 mod servers;
-use crate::utils::{into_guard, split_arc_mutex, split_arc_mutex_async};
+use crate::utils::{force_lock, split_arc_mutex, split_arc_mutex_async};
 pub use client::LSPClient;
 pub use error::{LSPError, LSPResult};
 use lsp_stream::JsonRCP;
@@ -13,11 +13,7 @@ pub use messages::{Diagnostic, GeneralNotification, LSPMessage, LSPResponse, LSP
 pub use notification::LSPNotification;
 pub use request::LSPRequest;
 
-use lsp_types::{
-    notification::{Exit, Initialized},
-    request::{Initialize, Shutdown},
-    InitializeResult, InitializedParams, Uri,
-};
+use lsp_types::{request::Initialize, InitializeResult, Uri};
 use serde_json::from_value;
 use std::{
     collections::HashMap,
@@ -70,11 +66,11 @@ impl LSP {
             loop {
                 match json_rpc.next().await? {
                     LSPMessage::Response(inner) => {
-                        into_guard(&responses_handler).insert(inner.id, inner);
+                        force_lock(&responses_handler).insert(inner.id, inner);
                     }
-                    LSPMessage::Notification(inner) => into_guard(&notifications_handler).push(inner),
+                    LSPMessage::Notification(inner) => force_lock(&notifications_handler).push(inner),
                     LSPMessage::Diagnostic(uri, params) => {
-                        into_guard(&diagnostics_handler).insert(uri, params);
+                        force_lock(&diagnostics_handler).insert(uri, params);
                     }
                     LSPMessage::Request(inner) => requests_handler.lock().await.push(inner),
                     LSPMessage::Error(_err) => {
@@ -87,14 +83,9 @@ impl LSP {
             }
         });
 
-        let (lsp_send_handler, client) = LSPClient::new(stdin, diagnostics, responses, capabilities);
+        let (lsp_send_handler, client) = LSPClient::new(stdin, diagnostics, responses, capabilities)?;
 
-        let mut lsp =
-            Self { notifications, requests, client, lsp_cmd, inner, lsp_json_handler, lsp_send_handler, attempts: 5 };
-
-        //initialized
-        lsp.initialized().await?;
-        Ok(lsp)
+        Ok(Self { notifications, requests, client, lsp_cmd, inner, lsp_json_handler, lsp_send_handler, attempts: 5 })
     }
 
     pub async fn check_status(&mut self) -> LSPResult<Option<LSPError>> {
@@ -121,12 +112,6 @@ impl LSP {
         Ok(None)
     }
 
-    async fn initialized(&mut self) -> LSPResult<()> {
-        let notification: LSPNotification<Initialized> = LSPNotification::with(InitializedParams {});
-        self.client.notify(notification)?;
-        Ok(())
-    }
-
     pub fn aquire_client(&self) -> LSPClient {
         self.client.clone()
     }
@@ -136,10 +121,7 @@ impl LSP {
     }
 
     pub async fn graceful_exit(&mut self) -> LSPResult<()> {
-        let shoutdown_request: LSPRequest<Shutdown> = LSPRequest::with(0, ());
-        let _ = self.client.request(shoutdown_request);
-        let notification: LSPNotification<Exit> = LSPNotification::with(());
-        let _ = self.client.notify(notification);
+        self.client.stop();
         self.dash_nine().await?;
         Ok(())
     }
@@ -153,6 +135,6 @@ impl LSP {
 }
 
 #[inline(always)]
-fn as_url(path: &Path) -> Uri {
+pub fn as_url(path: &Path) -> Uri {
     Uri::from_str(format!("file://{}", path.display()).as_str()).expect("Path should always be parsable!")
 }

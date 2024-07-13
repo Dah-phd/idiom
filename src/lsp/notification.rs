@@ -1,16 +1,16 @@
-use super::as_url;
 use crate::{configs::FileType, lsp::LSPResult};
 
 use lsp_types::{
     notification::{
-        DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument, Notification,
+        DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidRenameFiles, DidSaveTextDocument,
+        Notification,
     },
     DidChangeTextDocumentParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem, VersionedTextDocumentIdentifier,
+    FileRename, RenameFilesParams, TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem, Uri,
+    VersionedTextDocumentIdentifier,
 };
 use serde::Serialize;
 use serde_json::to_string;
-use std::path::Path;
 
 #[derive(Serialize)]
 pub struct LSPNotification<T>
@@ -38,39 +38,37 @@ where
         Ok(ser_req)
     }
 
+    pub fn rename_file(old_uri: Uri, new_uri: Uri) -> LSPResult<LSPNotification<DidRenameFiles>> {
+        Ok(LSPNotification::with(RenameFilesParams {
+            files: vec![FileRename { old_uri: to_string(&old_uri)?, new_uri: to_string(&new_uri)? }],
+        }))
+    }
+
     pub fn file_did_change(
-        path: &Path,
+        uri: Uri,
         version: i32,
         content_changes: Vec<TextDocumentContentChangeEvent>,
     ) -> LSPNotification<DidChangeTextDocument> {
         LSPNotification::with(DidChangeTextDocumentParams {
-            text_document: VersionedTextDocumentIdentifier::new(as_url(path), version),
+            text_document: VersionedTextDocumentIdentifier::new(uri, version),
             content_changes,
         })
     }
 
-    pub fn file_did_open(path: &Path, file_type: FileType, content: String) -> LSPNotification<DidOpenTextDocument> {
+    pub fn file_did_open(uri: Uri, file_type: FileType, content: String) -> LSPNotification<DidOpenTextDocument> {
         LSPNotification::with(DidOpenTextDocumentParams {
-            text_document: TextDocumentItem {
-                uri: as_url(path),
-                language_id: String::from(file_type),
-                version: 0,
-                text: content,
-            },
+            text_document: TextDocumentItem { uri, language_id: String::from(file_type), version: 0, text: content },
         })
     }
 
-    pub fn file_did_save(path: &Path) -> LSPResult<LSPNotification<DidSaveTextDocument>> {
-        let content = std::fs::read_to_string(path)?;
-        Ok(LSPNotification::with(DidSaveTextDocumentParams {
-            text_document: TextDocumentIdentifier { uri: as_url(path) },
+    pub fn file_did_save(uri: Uri, content: String) -> LSPNotification<DidSaveTextDocument> {
+        LSPNotification::with(DidSaveTextDocumentParams {
+            text_document: TextDocumentIdentifier { uri },
             text: Some(content),
-        }))
+        })
     }
 
-    pub fn file_did_close(path: &Path) -> LSPNotification<DidCloseTextDocument> {
-        LSPNotification::with(DidCloseTextDocumentParams {
-            text_document: TextDocumentIdentifier { uri: as_url(path) },
-        })
+    pub fn file_did_close(uri: Uri) -> LSPNotification<DidCloseTextDocument> {
+        LSPNotification::with(DidCloseTextDocumentParams { text_document: TextDocumentIdentifier { uri } })
     }
 }

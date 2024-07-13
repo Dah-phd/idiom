@@ -43,7 +43,7 @@ pub fn pull_line(editor: &Editor, idx: usize) -> Option<String> {
 fn test_update_path() {
     let mut editor = mock_editor(vec![]);
     editor.path = PathBuf::from("./src/workspace/editor/mod.rs");
-    editor.update_path(PathBuf::from("./src/workspace/editor/test.rs"));
+    assert!(editor.update_path(PathBuf::from("./src/workspace/editor/test.rs")).is_ok());
     assert_eq!(editor.display, "editor/test.rs");
 }
 

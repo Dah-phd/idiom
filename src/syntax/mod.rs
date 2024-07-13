@@ -8,7 +8,7 @@ pub mod token;
 use crate::{
     configs::FileType,
     global_state::{GlobalState, WorkspaceEvent},
-    lsp::{LSPClient, LSPResponseType},
+    lsp::{LSPClient, LSPError, LSPResponseType},
     render::layout::Rect,
     workspace::{line::EditorLine, CursorPosition, Editor},
 };
@@ -17,10 +17,10 @@ pub use diagnostics::{set_diganostics, Action, DiagnosticInfo, DiagnosticLine};
 pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
-    char_lsp_pos, context_local, encode_pos_utf32, get_autocomplete_dead, info_position_dead, map, renames_dead,
-    start_renames_dead, sync_edits_local, tokens_dead, tokens_partial_dead,
+    as_url, char_lsp_pos, context_local, encode_pos_utf32, get_autocomplete_dead, info_position_dead, map,
+    renames_dead, start_renames_dead, sync_edits_local, tokens_dead, tokens_partial_dead,
 };
-use lsp_types::{PublishDiagnosticsParams, Range};
+use lsp_types::{PublishDiagnosticsParams, Range, Uri};
 use modal::{LSPModal, ModalMessage};
 use std::{
     path::{Path, PathBuf},
@@ -36,6 +36,7 @@ pub struct Lexer {
     pub token_producer: TokensType,
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub lsp: bool,
+    pub uri: Uri,
     pub path: PathBuf,
     clock: Instant,
     modal: Option<LSPModal>,
@@ -68,6 +69,7 @@ impl Lexer {
             clock: Instant::now(),
             modal: None,
             modal_rect: None,
+            uri: as_url(path),
             path: path.into(),
             requests: Vec::new(),
             diagnostics: None,
@@ -134,12 +136,21 @@ impl Lexer {
     }
 
     pub fn set_lsp_client(&mut self, mut client: LSPClient, content: String, gs: &mut GlobalState) {
-        if client.file_did_open(&self.path, self.lang.file_type, content).is_err() {
+        if client.file_did_open(self.uri.clone(), self.lang.file_type, content).is_err() {
             return;
         }
         map(self, client);
         gs.success("LSP mapped!");
         (self.tokens)(self, gs);
+    }
+
+    pub fn update_path(&mut self, path: &Path) -> Result<(), LSPError> {
+        self.path = path.into();
+        let old_uri = std::mem::replace(&mut self.uri, as_url(path));
+        if self.lsp {
+            return self.client.update_path(old_uri, self.uri.clone());
+        }
+        Ok(())
     }
 
     #[inline(always)]
@@ -204,11 +215,11 @@ impl Lexer {
         };
     }
 
-    pub fn save_and_check_lsp(&mut self, gs: &mut GlobalState) {
+    pub fn save_and_check_lsp(&mut self, content: String, gs: &mut GlobalState) {
         // self.line_builder.mark_saved();
         if self.lsp {
             gs.message("Checking LSP status (on save) ...");
-            if self.client.file_did_save(&self.path).is_err() && self.client.is_closed() {
+            if self.client.file_did_save(self.uri.clone(), content).is_err() && self.client.is_closed() {
                 gs.workspace.push(WorkspaceEvent::CheckLSP(self.lang.file_type));
             } else {
                 gs.success("LSP running ...");
@@ -217,11 +228,11 @@ impl Lexer {
         }
     }
 
-    pub fn close(&mut self, path: &Path) {
+    pub fn close(&mut self) {
         if !self.lsp {
             return;
         }
-        let _ = self.client.file_did_close(path);
+        let _ = self.client.file_did_close(self.uri.clone());
     }
 }
 

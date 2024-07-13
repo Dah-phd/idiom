@@ -1,6 +1,7 @@
 use crate::{
     configs::{EditorConfigs, FileType},
     global_state::GlobalState,
+    lsp::LSPError,
     render::layout::Rect,
     syntax::Lexer,
     workspace::{
@@ -136,9 +137,10 @@ impl Editor {
     }
 
     #[inline(always)]
-    pub fn update_path(&mut self, new_path: PathBuf) {
+    pub fn update_path(&mut self, new_path: PathBuf) -> Result<(), LSPError> {
         self.display = build_display(&new_path);
         self.path = new_path;
+        self.lexer.update_path(&self.path)
     }
 
     #[inline(always)]
@@ -509,20 +511,19 @@ impl Editor {
     }
 
     pub fn save(&mut self, gs: &mut GlobalState) {
-        if self.try_write_file(gs) {
-            self.lexer.save_and_check_lsp(gs);
+        if let Some(content) = self.try_write_file(gs) {
+            self.lexer.save_and_check_lsp(content, gs);
             gs.success(format!("SAVED {}", self.path.display()));
         }
     }
 
-    pub fn try_write_file(&self, gs: &mut GlobalState) -> bool {
-        if let Err(error) =
-            std::fs::write(&self.path, self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n"))
-        {
+    pub fn try_write_file(&self, gs: &mut GlobalState) -> Option<String> {
+        let content = self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n");
+        if let Err(error) = std::fs::write(&self.path, &content) {
             gs.error(error.to_string());
-            return false;
+            return None;
         }
-        true
+        Some(content)
     }
 
     pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {
@@ -559,7 +560,7 @@ pub fn build_display(path: &Path) -> String {
 
 impl Drop for Editor {
     fn drop(&mut self) {
-        self.lexer.close(&self.path);
+        self.lexer.close();
     }
 }
 

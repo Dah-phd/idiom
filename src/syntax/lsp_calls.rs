@@ -5,11 +5,15 @@ use crate::{
     syntax::Lexer,
     workspace::{line::EditorLine, CursorPosition, Editor},
 };
+use core::str::FromStr;
 use lsp_types::{
     Position, Range, SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
-    TextDocumentContentChangeEvent, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions, Uri,
 };
-use std::time::{Duration, Instant};
+use std::{
+    path::Path,
+    time::{Duration, Instant},
+};
 
 use super::{
     modal::LSPModal,
@@ -166,7 +170,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
                                     set_tokens(data.data, &lexer.legend, &lexer.lang, &lexer.theme, content);
                                     lexer.token_producer = TokensType::LSP;
                                     gs.success("LSP tokens mapped!");
-                                } else if let Ok(id) = client.request_full_tokens(&editor.path) {
+                                } else if let Ok(id) = client.request_full_tokens(lexer.uri.clone()) {
                                     unresolved_requests.push(LSPResponseType::Tokens(id));
                                 };
                             }
@@ -216,7 +220,7 @@ pub fn sync_edits(editor: &mut Editor, gs: &mut GlobalState) {
     let content = &editor.content;
     if lexer.clock.elapsed() > FULL_TOKENS && lexer.modal.is_none() {
         let result = lexer.client.sync(
-            editor.path.clone(),
+            lexer.uri.clone(),
             version,
             events
                 .drain(..)
@@ -229,7 +233,7 @@ pub fn sync_edits(editor: &mut Editor, gs: &mut GlobalState) {
                 })
                 .collect(),
         );
-        gs.unwrap_lsp_error(result, editor.file_type);
+        gs.log_if_lsp_error(result, editor.file_type);
         (lexer.tokens)(lexer, gs);
         lexer.clock = Instant::now();
         return;
@@ -247,7 +251,7 @@ pub fn sync_edits(editor: &mut Editor, gs: &mut GlobalState) {
         })
         .reduce(|em1, em2| em1 + em2)
         .expect("Value is checked");
-    gs.unwrap_lsp_error(lexer.client.sync(editor.path.clone(), version, change_events), editor.file_type);
+    gs.log_if_lsp_error(lexer.client.sync(lexer.uri.clone(), version, change_events), editor.file_type);
     let max_lines = meta.start_line + meta.to;
     let end_line = meta.end_line();
     let range = Range::new(
@@ -269,14 +273,7 @@ pub fn sync_edits_full(editor: &mut Editor, gs: &mut GlobalState) {
     }
     text.push('\n');
     let lexer = &mut editor.lexer;
-    gs.unwrap_lsp_error(
-        lexer.client.file_did_change(
-            &editor.path,
-            version,
-            vec![TextDocumentContentChangeEvent { range: None, range_length: None, text }],
-        ),
-        editor.file_type,
-    );
+    gs.log_if_lsp_error(lexer.client.full_sync(lexer.uri.clone(), version, text), editor.file_type);
     if lexer.clock.elapsed() > FULL_TOKENS && lexer.modal.is_none() {
         events.clear();
         (lexer.tokens)(lexer, gs);
@@ -306,7 +303,8 @@ pub fn sync_edits_local(editor: &mut Editor, _: &mut GlobalState) {
 }
 
 pub fn get_autocomplete(lexer: &mut Lexer, c: CursorPosition, line: String, gs: &mut GlobalState) {
-    match lexer.client.request_completions(&lexer.path, c).map(|id| LSPResponseType::Completion(id, line, c.char)) {
+    match lexer.client.request_completions(lexer.uri.clone(), c).map(|id| LSPResponseType::Completion(id, line, c.char))
+    {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }
@@ -315,7 +313,7 @@ pub fn get_autocomplete(lexer: &mut Lexer, c: CursorPosition, line: String, gs: 
 pub fn get_autocomplete_dead(_: &mut Lexer, _: CursorPosition, _: String, _: &mut GlobalState) {}
 
 pub fn tokens(lexer: &mut Lexer, gs: &mut GlobalState) {
-    match lexer.client.request_full_tokens(&lexer.path).map(LSPResponseType::Tokens) {
+    match lexer.client.request_full_tokens(lexer.uri.clone()).map(LSPResponseType::Tokens) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }
@@ -326,7 +324,7 @@ pub fn tokens_dead(_: &mut Lexer, _: &mut GlobalState) {}
 pub fn tokens_partial(lexer: &mut Lexer, range: Range, max_lines: usize, gs: &mut GlobalState) {
     match lexer
         .client
-        .request_partial_tokens(&lexer.path, range)
+        .request_partial_tokens(lexer.uri.clone(), range)
         .map(|id| LSPResponseType::TokensPartial { id, max_lines })
     {
         Ok(request) => lexer.requests.push(request),
@@ -343,35 +341,35 @@ pub fn tokens_partial_dead(_: &mut Lexer, _: Range, _: usize, _: &mut GlobalStat
 pub fn info_position_dead(_: &mut Lexer, _: CursorPosition, _: &mut GlobalState) {}
 
 pub fn references(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalState) {
-    match lexer.client.request_references(&lexer.path, c).map(LSPResponseType::References) {
+    match lexer.client.request_references(lexer.uri.clone(), c).map(LSPResponseType::References) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }
 }
 
 pub fn definitions(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalState) {
-    match lexer.client.request_definitions(&lexer.path, c).map(LSPResponseType::Definition) {
+    match lexer.client.request_definitions(lexer.uri.clone(), c).map(LSPResponseType::Definition) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }
 }
 
 pub fn declarations(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalState) {
-    match lexer.client.request_declarations(&lexer.path, c).map(LSPResponseType::Declaration) {
+    match lexer.client.request_declarations(lexer.uri.clone(), c).map(LSPResponseType::Declaration) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }
 }
 
 pub fn hover(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalState) {
-    match lexer.client.request_hover(&lexer.path, c).map(LSPResponseType::Hover) {
+    match lexer.client.request_hover(lexer.uri.clone(), c).map(LSPResponseType::Hover) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }
 }
 
 pub fn signatures(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalState) {
-    match lexer.client.request_signitures(&lexer.path, c).map(LSPResponseType::SignatureHelp) {
+    match lexer.client.request_signitures(lexer.uri.clone(), c).map(LSPResponseType::SignatureHelp) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }
@@ -386,7 +384,7 @@ pub fn start_renames(lexer: &mut Lexer, c: CursorPosition, title: &str) {
 pub fn renames_dead(_: &mut Lexer, _: CursorPosition, _: String, _: &mut GlobalState) {}
 
 pub fn renames(lexer: &mut Lexer, c: CursorPosition, new_name: String, gs: &mut GlobalState) {
-    match lexer.client.request_rename(&lexer.path, c, new_name).map(LSPResponseType::Renames) {
+    match lexer.client.request_rename(lexer.uri.clone(), c, new_name).map(LSPResponseType::Renames) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }
@@ -432,4 +430,9 @@ pub fn char_lsp_utf8(ch: char) -> usize {
 #[inline]
 pub fn char_lsp_utf16(ch: char) -> usize {
     ch.len_utf16()
+}
+
+#[inline(always)]
+pub fn as_url(path: &Path) -> Uri {
+    Uri::from_str(format!("file://{}", path.display()).as_str()).expect("Path should always be parsable!")
 }

@@ -6,12 +6,15 @@ use crate::{
     workspace::{actions::LSPEvent, CursorPosition},
 };
 use lsp_types::{
-    notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidSaveTextDocument},
+    notification::{
+        DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidRenameFiles, DidSaveTextDocument, Exit,
+        Initialized,
+    },
     request::{
         Completion, GotoDeclaration, GotoDefinition, HoverRequest, References, Rename, SemanticTokensFullRequest,
-        SemanticTokensRangeRequest, SignatureHelpRequest,
+        SemanticTokensRangeRequest, Shutdown, SignatureHelpRequest,
     },
-    Range, ServerCapabilities, TextDocumentContentChangeEvent,
+    InitializedParams, Range, ServerCapabilities, TextDocumentContentChangeEvent, Uri,
 };
 use std::{
     cell::RefCell,
@@ -28,11 +31,54 @@ use tokio::{
 };
 
 pub enum Payload {
+    /// Notifications
+    Sync(Uri, i32, Vec<LSPEvent>),
+    FullSync(Uri, i32, String),
+    /// Requests
+    Tokens(Uri, i64),
+    PartialTokens(Uri, Range, i64),
+    Completion(Uri, CursorPosition, i64),
+    Rename(Uri, CursorPosition, String, i64),
+    References(Uri, CursorPosition, i64),
+    Definition(Uri, CursorPosition, i64),
+    Declaration(Uri, CursorPosition, i64),
+    Hover(Uri, CursorPosition, i64),
+    SignatureHelp(Uri, CursorPosition, i64),
+    /// Send serialized
     Direct(String),
-    Sync(PathBuf, i32, Vec<LSPEvent>),
 }
 
-impl Payload {}
+impl Payload {
+    fn try_stringify(self, position_map: fn(LSPEvent) -> TextDocumentContentChangeEvent) -> Result<String, LSPError> {
+        match self {
+            // Direct sending of serialized message
+            Payload::Direct(msg) => Ok(msg),
+            // Create and stringify notification
+            Payload::Sync(uri, version, events) => {
+                let changes = events.into_iter().map(position_map).collect();
+                LSPNotification::<DidChangeTextDocument>::file_did_change(uri, version, changes).stringify()
+            }
+            Payload::FullSync(uri, version, text) => {
+                let full_changes = vec![TextDocumentContentChangeEvent { range: None, range_length: None, text }];
+                LSPNotification::<DidChangeTextDocument>::file_did_change(uri, version, full_changes).stringify()
+            }
+            // Create and send request
+            Payload::References(uri, c, id) => LSPRequest::<References>::references(uri, c, id).stringify(),
+            Payload::Definition(uri, c, id) => LSPRequest::<GotoDefinition>::definition(uri, c, id).stringify(),
+            Payload::Declaration(uri, c, id) => LSPRequest::<GotoDeclaration>::declaration(uri, c, id).stringify(),
+            Payload::Completion(uri, c, id) => LSPRequest::<Completion>::completion(uri, c, id).stringify(),
+            Payload::Tokens(uri, id) => LSPRequest::<SemanticTokensFullRequest>::semantics_full(uri, id).stringify(),
+            Payload::PartialTokens(uri, range, id) => {
+                LSPRequest::<SemanticTokensRangeRequest>::semantics_range(uri, range, id).stringify()
+            }
+            Payload::Rename(uri, c, new_name, id) => LSPRequest::<Rename>::rename(uri, c, new_name, id).stringify(),
+            Payload::Hover(uri, c, id) => LSPRequest::<HoverRequest>::hover(uri, c, id).stringify(),
+            Payload::SignatureHelp(uri, c, id) => {
+                LSPRequest::<SignatureHelpRequest>::signature_help(uri, c, id).stringify()
+            }
+        }
+    }
+}
 
 impl From<String> for Payload {
     #[inline]
@@ -53,7 +99,7 @@ pub struct LSPClient {
     diagnostics: Arc<Mutex<HashMap<PathBuf, Diagnostic>>>,
     responses: Arc<Mutex<HashMap<i64, Response>>>,
     channel: UnboundedSender<Payload>,
-    request_counter: Rc<RefCell<i64>>,
+    id_gen: MonoID,
     pub capabilities: ServerCapabilities,
 }
 
@@ -63,7 +109,7 @@ impl LSPClient {
         diagnostics: Arc<Mutex<HashMap<PathBuf, Diagnostic>>>,
         responses: Arc<Mutex<HashMap<i64, Response>>>,
         capabilities: ServerCapabilities,
-    ) -> (JoinHandle<LSPResult<()>>, Self) {
+    ) -> LSPResult<(JoinHandle<LSPResult<()>>, Self)> {
         let (channel, mut rx) = unbounded_channel::<Payload>();
 
         let position_map = match capabilities.position_encoding.as_ref().map(|inner| inner.as_str()) {
@@ -75,23 +121,17 @@ impl LSPClient {
         // starting send handler
         let lsp_send_handler = tokio::task::spawn(async move {
             while let Some(msg) = rx.recv().await {
-                match msg {
-                    Payload::Direct(msg) => stdin.write_all(msg.as_bytes()).await?,
-                    Payload::Sync(path, version, events) => {
-                        let msg = LSPNotification::<DidSaveTextDocument>::file_did_change(
-                            &path,
-                            version,
-                            events.into_iter().map(position_map).collect(),
-                        )
-                        .stringify()?;
-                        stdin.write_all(msg.as_bytes()).await?;
-                    }
+                if let Ok(lsp_msg_text) = msg.try_stringify(position_map) {
+                    stdin.write_all(lsp_msg_text.as_bytes()).await?;
+                    stdin.flush().await?;
                 }
-                stdin.flush().await?;
             }
             Ok(())
         });
-        (lsp_send_handler, Self { diagnostics, responses, channel, request_counter: Rc::default(), capabilities })
+
+        let notification: LSPNotification<Initialized> = LSPNotification::with(InitializedParams {});
+        channel.send(notification.stringify()?.into())?;
+        Ok((lsp_send_handler, Self { diagnostics, responses, channel, id_gen: MonoID::default(), capabilities }))
     }
 
     pub fn placeholder() -> Self {
@@ -100,32 +140,9 @@ impl LSPClient {
             diagnostics: Arc::default(),
             responses: Arc::default(),
             channel,
-            request_counter: Rc::default(),
+            id_gen: MonoID::default(),
             capabilities: ServerCapabilities::default(),
         }
-    }
-
-    #[inline]
-    pub fn request<T>(&mut self, mut request: LSPRequest<T>) -> Result<i64, LSPError>
-    where
-        T: lsp_types::request::Request,
-        T::Params: serde::Serialize,
-        T::Result: serde::de::DeserializeOwned,
-    {
-        let id = self.next_id();
-        request.id = id;
-        self.channel.send(request.stringify()?.into())?;
-        Ok(id)
-    }
-
-    #[inline]
-    pub fn notify<T>(&mut self, notification: LSPNotification<T>) -> Result<(), LSPError>
-    where
-        T: lsp_types::notification::Notification,
-        T::Params: serde::Serialize,
-    {
-        self.channel.send(notification.stringify()?.into())?;
-        Ok(())
     }
 
     pub fn get(&self, id: &i64) -> Option<Response> {
@@ -148,80 +165,116 @@ impl LSPClient {
     }
 
     #[inline]
-    pub fn request_partial_tokens(&mut self, path: &Path, range: Range) -> LSPResult<i64> {
-        self.request(LSPRequest::<SemanticTokensRangeRequest>::semantics_range(path, range)?)
+    pub fn request_partial_tokens(&mut self, uri: Uri, range: Range) -> LSPResult<i64> {
+        let id = self.id_gen.next_id();
+        self.channel.send(Payload::PartialTokens(uri, range, id))?;
+        Ok(id)
     }
 
     #[inline]
-    pub fn request_full_tokens(&mut self, path: &Path) -> LSPResult<i64> {
-        self.request(LSPRequest::<SemanticTokensFullRequest>::semantics_full(path)?)
+    pub fn request_full_tokens(&mut self, uri: Uri) -> LSPResult<i64> {
+        let id = self.id_gen.next_id();
+        self.channel.send(Payload::Tokens(uri, id))?;
+        Ok(id)
     }
 
     #[inline]
-    pub fn request_completions(&mut self, path: &Path, c: CursorPosition) -> LSPResult<i64> {
-        self.request(LSPRequest::<Completion>::completion(path, c)?)
+    pub fn request_completions(&mut self, uri: Uri, c: CursorPosition) -> LSPResult<i64> {
+        let id = self.id_gen.next_id();
+        self.channel.send(Payload::Completion(uri, c, id))?;
+        Ok(id)
     }
 
-    pub fn request_rename(&mut self, path: &Path, c: CursorPosition, new_name: String) -> LSPResult<i64> {
-        self.request(LSPRequest::<Rename>::rename(path, c, new_name)?)
+    pub fn request_rename(&mut self, uri: Uri, c: CursorPosition, new_name: String) -> LSPResult<i64> {
+        let id = self.id_gen.next_id();
+        self.channel.send(Payload::Rename(uri, c, new_name, id))?;
+        Ok(id)
     }
 
-    pub fn request_signitures(&mut self, path: &Path, c: CursorPosition) -> LSPResult<i64> {
-        self.request(LSPRequest::<SignatureHelpRequest>::signature_help(path, c)?)
+    pub fn request_signitures(&mut self, uri: Uri, c: CursorPosition) -> LSPResult<i64> {
+        let id = self.id_gen.next_id();
+        self.channel.send(Payload::SignatureHelp(uri, c, id))?;
+        Ok(id)
     }
 
-    pub fn request_hover(&mut self, path: &Path, c: CursorPosition) -> LSPResult<i64> {
-        self.request(LSPRequest::<HoverRequest>::hover(path, c)?)
+    pub fn request_hover(&mut self, uri: Uri, c: CursorPosition) -> LSPResult<i64> {
+        let id = self.id_gen.next_id();
+        self.channel.send(Payload::Hover(uri, c, id))?;
+        Ok(id)
     }
 
-    pub fn request_references(&mut self, path: &Path, c: CursorPosition) -> LSPResult<i64> {
-        self.request(LSPRequest::<References>::references(path, c)?)
+    pub fn request_references(&mut self, uri: Uri, c: CursorPosition) -> LSPResult<i64> {
+        let id = self.id_gen.next_id();
+        self.channel.send(Payload::References(uri, c, id))?;
+        Ok(id)
     }
 
-    pub fn request_declarations(&mut self, path: &Path, c: CursorPosition) -> LSPResult<i64> {
-        self.request(LSPRequest::<GotoDeclaration>::declaration(path, c)?)
+    pub fn request_declarations(&mut self, uri: Uri, c: CursorPosition) -> LSPResult<i64> {
+        let id = self.id_gen.next_id();
+        self.channel.send(Payload::Declaration(uri, c, id))?;
+        Ok(id)
     }
 
     #[allow(dead_code)]
-    pub fn request_definitions(&mut self, path: &Path, c: CursorPosition) -> LSPResult<i64> {
-        self.request(LSPRequest::<GotoDefinition>::definition(path, c)?)
+    pub fn request_definitions(&mut self, uri: Uri, c: CursorPosition) -> LSPResult<i64> {
+        let id = self.id_gen.next_id();
+        self.channel.send(Payload::Definition(uri, c, id))?;
+        Ok(id)
     }
 
-    pub fn file_did_open(&mut self, path: &Path, file_type: FileType, content: String) -> Result<(), LSPError> {
-        let notification = LSPNotification::<DidOpenTextDocument>::file_did_open(path, file_type, content);
-        self.notify(notification)?;
-        Ok(())
+    pub fn update_path(&mut self, old_uri: Uri, new_uri: Uri) -> Result<(), LSPError> {
+        let notification = LSPNotification::<DidRenameFiles>::rename_file(old_uri, new_uri)?;
+        self.channel.send(notification.stringify()?.into()).map_err(LSPError::from)
     }
 
-    pub fn sync(&mut self, path: PathBuf, version: i32, events: Vec<LSPEvent>) -> Result<(), LSPError> {
-        self.channel.send(Payload::Sync(path, version, events))?;
-        Ok(())
+    pub fn file_did_open(&mut self, uri: Uri, file_type: FileType, content: String) -> Result<(), LSPError> {
+        let notification = LSPNotification::<DidOpenTextDocument>::file_did_open(uri, file_type, content);
+        self.channel.send(notification.stringify()?.into()).map_err(LSPError::from)
     }
 
-    #[inline]
-    pub fn file_did_change(
-        &mut self,
-        path: &Path,
-        version: i32,
-        change_events: Vec<TextDocumentContentChangeEvent>,
-    ) -> Result<(), LSPError> {
-        let notification = LSPNotification::<DidChangeTextDocument>::file_did_change(path, version, change_events);
-        self.notify(notification)
+    pub fn full_sync(&mut self, uri: Uri, version: i32, text: String) -> Result<(), LSPError> {
+        self.channel.send(Payload::FullSync(uri, version, text)).map_err(LSPError::from)
     }
 
-    pub fn file_did_save(&mut self, path: &Path) -> Result<(), LSPError> {
-        let notification = LSPNotification::<DidSaveTextDocument>::file_did_save(path)?;
-        self.notify(notification)
+    pub fn sync(&mut self, uri: Uri, version: i32, events: Vec<LSPEvent>) -> Result<(), LSPError> {
+        self.channel.send(Payload::Sync(uri, version, events)).map_err(LSPError::from)
     }
 
-    pub fn file_did_close(&mut self, path: &Path) -> Result<(), LSPError> {
-        let notification = LSPNotification::<DidCloseTextDocument>::file_did_close(path);
-        self.notify(notification)
+    pub fn file_did_save(&mut self, uri: Uri, content: String) -> Result<(), LSPError> {
+        let notification = LSPNotification::<DidSaveTextDocument>::file_did_save(uri, content);
+        self.channel.send(notification.stringify()?.into()).map_err(LSPError::from)
     }
 
-    #[inline]
+    pub fn file_did_close(&mut self, uri: Uri) -> Result<(), LSPError> {
+        let notification = LSPNotification::<DidCloseTextDocument>::file_did_close(uri);
+        self.channel.send(notification.stringify()?.into()).map_err(LSPError::from)
+    }
+
+    pub fn init(&mut self) -> Result<(), LSPError> {
+        let notification: LSPNotification<Initialized> = LSPNotification::with(InitializedParams {});
+        self.channel.send(notification.stringify()?.into()).map_err(LSPError::from)
+    }
+
+    pub fn stop(&mut self) {
+        let id = self.id_gen.next_id();
+        if let Ok(text) = LSPRequest::<Shutdown>::with(id, ()).stringify() {
+            let _ = self.channel.send(Payload::Direct(text));
+        }
+        if let Ok(text) = LSPNotification::<Exit>::with(()).stringify() {
+            let _ = self.channel.send(Payload::Direct(text));
+        }
+        *self = Self::placeholder();
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct MonoID {
+    inner: Rc<RefCell<i64>>,
+}
+
+impl MonoID {
     fn next_id(&mut self) -> i64 {
-        let mut id = self.request_counter.borrow_mut();
+        let mut id = self.inner.borrow_mut();
         *id += 1;
         *id
     }
@@ -241,28 +294,12 @@ fn pos_utf32(event: LSPEvent) -> TextDocumentContentChangeEvent {
 
 #[cfg(test)]
 mod test {
-    use std::{
-        cell::RefCell,
-        collections::HashMap,
-        rc::Rc,
-        sync::{Arc, Mutex},
-    };
-
-    use lsp_types::ServerCapabilities;
-
-    use super::LSPClient;
+    use super::MonoID;
 
     #[test]
-    fn test_counter() {
-        let (rx, _tx) = tokio::sync::mpsc::unbounded_channel();
-        let mut mock = LSPClient {
-            diagnostics: Arc::new(Mutex::new(HashMap::new())),
-            responses: Arc::new(Mutex::new(HashMap::new())),
-            channel: rx,
-            request_counter: Rc::new(RefCell::new(0)),
-            capabilities: ServerCapabilities::default(),
-        };
-        assert_eq!(1, mock.next_id());
-        assert_eq!(2, mock.next_id());
+    fn test_gen_id() {
+        let mut gen = MonoID::default();
+        assert_eq!(1, gen.next_id());
+        assert_eq!(2, gen.next_id());
     }
 }

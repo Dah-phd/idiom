@@ -8,7 +8,7 @@ mod commands;
 mod components;
 use crate::configs::{EditorConfigs, KeyMap, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE};
 use crate::global_state::GlobalState;
-use crate::utils::into_guard;
+use crate::utils::force_lock;
 use commands::{load_cfg, overwrite_cfg, Terminal};
 use components::CmdHistory;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -50,7 +50,7 @@ impl EditorTerminal {
                     let prompt = self
                         .prompt
                         .as_ref()
-                        .map(|p| into_guard(p).to_owned())
+                        .map(|p| force_lock(p).to_owned())
                         .unwrap_or(String::from("[Dead terminal]"));
                     let mut buider = line.unsafe_builder(&mut gs.writer);
                     buider.push(&prompt);

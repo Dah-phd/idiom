@@ -118,7 +118,7 @@ impl Workspace {
     }
 
     #[inline]
-    pub fn rename_editors(&mut self, old: PathBuf, new_path: PathBuf) {
+    pub fn rename_editors(&mut self, old: PathBuf, new_path: PathBuf, gs: &mut GlobalState) {
         if new_path.is_dir() {
             for editor in self.editors.iter_mut() {
                 if editor.path.starts_with(&old) {
@@ -130,11 +130,11 @@ impl Workspace {
                     for remaining_part in old {
                         updated_path.push(remaining_part)
                     }
-                    editor.update_path(updated_path);
+                    gs.log_if_lsp_error(editor.update_path(updated_path), editor.file_type);
                 }
             }
         } else if let Some(editor) = self.editors.find(|e| e.path == old) {
-            editor.update_path(new_path);
+            gs.log_if_lsp_error(editor.update_path(new_path), editor.file_type);
         }
     }
 

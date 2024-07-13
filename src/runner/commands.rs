@@ -18,7 +18,7 @@ use crate::error::{IdiomError, IdiomResult};
 use crate::{
     configs::CONFIG_FOLDER,
     global_state::{GlobalState, WorkspaceEvent},
-    utils::into_guard,
+    utils::force_lock,
 };
 use dirs::config_dir;
 
@@ -63,10 +63,10 @@ impl Terminal {
                                         l.push_str(data);
                                         let cleaned = strip_str(&l);
                                         if cleaned.ends_with('\n') {
-                                            into_guard(&buffer).push(cleaned);
+                                            force_lock(&buffer).push(cleaned);
                                             l.clear();
                                         } else {
-                                            *into_guard(&prompt_writer) = cleaned;
+                                            *force_lock(&prompt_writer) = cleaned;
                                         }
                                         bytes.clear();
                                     }
