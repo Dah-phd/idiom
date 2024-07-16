@@ -314,6 +314,20 @@ impl LSPEvent {
         }
     }
 
+    #[inline(always)]
+    pub fn lsp_encode(&mut self, encoding: fn(usize, &str) -> usize, content: &[impl EditorLine]) {
+        match content.get(self.cursor.line) {
+            Some(editor_line) => {
+                if editor_line.is_simple() {
+                    self.cursor.char = (encoding)(self.cursor.char, &editor_line[..]);
+                }
+            }
+            None => {
+                self.cursor.char = (encoding)(self.cursor.char, &self.last_line);
+            }
+        }
+    }
+
     #[inline]
     pub fn utf8_encode_start(&mut self, content: &[impl EditorLine]) {
         self.cursor.char = content[self.cursor.line].unsafe_utf8_idx_at(self.cursor.char);

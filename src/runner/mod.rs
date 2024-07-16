@@ -45,7 +45,7 @@ impl EditorTerminal {
         }
         for line in &mut lines {
             match logs.next() {
-                Some(log) => line.render(&log, &mut gs.writer),
+                Some(log) => line.render(log, &mut gs.writer),
                 None => {
                     let prompt = self
                         .prompt
@@ -121,7 +121,7 @@ impl EditorTerminal {
                 None => self.cmd.text_set(String::new()),
             },
             KeyEvent { code: KeyCode::Tab, .. } => {
-                if let Some(text) = self.cmd.text_get_token_at_cursor().and_then(|cmd| try_autocomplete(cmd)) {
+                if let Some(text) = self.cmd.text_get_token_at_cursor().and_then(try_autocomplete) {
                     self.cmd.text_replace_token(&text);
                 };
             }

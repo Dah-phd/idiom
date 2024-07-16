@@ -225,10 +225,7 @@ pub fn sync_edits(editor: &mut Editor, gs: &mut GlobalState) {
             events
                 .drain(..)
                 .map(|(_, mut edit)| {
-                    let editor_line = &content[edit.cursor.line];
-                    if !editor_line.is_simple() {
-                        edit.cursor.char = (lexer.encode_position)(edit.cursor.char, &editor_line[..]);
-                    }
+                    edit.lsp_encode(lexer.encode_position, content);
                     edit
                 })
                 .collect(),
@@ -242,10 +239,7 @@ pub fn sync_edits(editor: &mut Editor, gs: &mut GlobalState) {
     let meta = events
         .drain(..)
         .map(|(meta, mut edit)| {
-            let editor_line = &content[edit.cursor.line];
-            if !editor_line.is_simple() {
-                edit.cursor.char = (lexer.encode_position)(edit.cursor.char, &editor_line[..]);
-            }
+            edit.lsp_encode(lexer.encode_position, content);
             change_events.push(edit);
             meta
         })
@@ -256,7 +250,7 @@ pub fn sync_edits(editor: &mut Editor, gs: &mut GlobalState) {
     let end_line = meta.end_line();
     let range = Range::new(
         Position::new(meta.start_line as u32, 0),
-        Position::new(end_line as u32, editor.content[end_line].char_len() as u32),
+        Position::new(end_line as u32, editor.content.get(end_line).map(|l| l.char_len()).unwrap_or_default() as u32),
     );
     (lexer.tokens_partial)(lexer, range, max_lines, gs);
 }
