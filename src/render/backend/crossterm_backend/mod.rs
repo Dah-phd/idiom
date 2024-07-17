@@ -122,7 +122,7 @@ impl BackendProtocol for Backend {
     #[inline]
     fn set_style(&mut self, style: Style) {
         self.default_styled.replace(style);
-        queue!(self, SetStyle(style.into())).expect(ERR_MSG);
+        queue!(self, ResetColor, SetStyle(style.into())).expect(ERR_MSG);
     }
 
     #[inline]

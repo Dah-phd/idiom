@@ -9,7 +9,6 @@ use crate::{
 pub fn complex_line(content: impl Iterator<Item = char>, tokens: &[Token], lexer: &Lexer, backend: &mut Backend) {
     let mut iter_tokens = tokens.iter();
     let mut maybe_token = iter_tokens.next();
-    let reset_style = Style::default();
     let mut idx = 0;
     for text in content {
         if let Some(token) = maybe_token {
@@ -20,11 +19,11 @@ pub fn complex_line(content: impl Iterator<Item = char>, tokens: &[Token], lexer
                     if token.from == idx {
                         backend.update_style(token.style);
                     } else {
-                        backend.set_style(reset_style);
+                        backend.reset_style();
                     };
                     maybe_token.replace(token);
                 } else {
-                    backend.set_style(reset_style);
+                    backend.reset_style();
                     maybe_token = None;
                 };
             };
