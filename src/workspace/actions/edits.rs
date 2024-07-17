@@ -316,16 +316,14 @@ impl LSPEvent {
 
     #[inline(always)]
     pub fn lsp_encode(&mut self, encoding: fn(usize, &str) -> usize, content: &[impl EditorLine]) {
-        match content.get(self.cursor.line) {
-            Some(editor_line) => {
-                if editor_line.is_simple() {
-                    self.cursor.char = (encoding)(self.cursor.char, &editor_line[..]);
-                }
-            }
-            None => {
-                self.cursor.char = (encoding)(self.cursor.char, &self.last_line);
-            }
+        if self.cursor.char == 0 {
+            return;
         }
+        let editor_line = &content[self.cursor.line];
+        if editor_line.is_simple() {
+            return;
+        }
+        self.cursor.char = (encoding)(self.cursor.char, &editor_line[..]);
     }
 
     #[inline]

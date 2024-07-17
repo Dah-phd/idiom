@@ -3,11 +3,11 @@ use crate::{
     lsp::{LSPClient, LSPResponse, LSPResponseType},
     popups::popups_tree::refrence_selector,
     syntax::Lexer,
-    workspace::{line::EditorLine, CursorPosition, Editor},
+    workspace::{actions::EditMetaData, line::EditorLine, CursorPosition, Editor},
 };
 use core::str::FromStr;
 use lsp_types::{
-    Position, Range, SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
+    Range, SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions, Uri,
 };
 use std::{
@@ -247,12 +247,7 @@ pub fn sync_edits(editor: &mut Editor, gs: &mut GlobalState) {
         .expect("Value is checked");
     gs.log_if_lsp_error(lexer.client.sync(lexer.uri.clone(), version, change_events), editor.file_type);
     let max_lines = meta.start_line + meta.to;
-    let end_line = meta.end_line();
-    let range = Range::new(
-        Position::new(meta.start_line as u32, 0),
-        Position::new(end_line as u32, editor.content.get(end_line).map(|l| l.char_len()).unwrap_or_default() as u32),
-    );
-    (lexer.tokens_partial)(lexer, range, max_lines, gs);
+    (lexer.tokens_partial)(lexer, meta.range(content), max_lines, gs);
 }
 
 pub fn sync_edits_full(editor: &mut Editor, gs: &mut GlobalState) {
@@ -260,13 +255,14 @@ pub fn sync_edits_full(editor: &mut Editor, gs: &mut GlobalState) {
         Some(data) => data,
         None => return,
     };
+    let lexer = &mut editor.lexer;
+    let content = &editor.content;
     let mut text = String::new();
-    for editor_line in editor.content.iter() {
+    for editor_line in content.iter() {
         editor_line.push_content_to_buffer(&mut text);
         text.push('\n');
     }
     text.push('\n');
-    let lexer = &mut editor.lexer;
     gs.log_if_lsp_error(lexer.client.full_sync(lexer.uri.clone(), version, text), editor.file_type);
     if lexer.clock.elapsed() > FULL_TOKENS && lexer.modal.is_none() {
         events.clear();
@@ -276,12 +272,7 @@ pub fn sync_edits_full(editor: &mut Editor, gs: &mut GlobalState) {
     };
     let meta = events.drain(..).map(|(meta, _)| meta).reduce(|em1, em2| em1 + em2).expect("Value is checked");
     let max_lines = meta.start_line + meta.to;
-    let end_line = meta.end_line();
-    let range = Range::new(
-        Position::new(meta.start_line as u32, 0),
-        Position::new(end_line as u32, editor.content[end_line].char_len() as u32),
-    );
-    (lexer.tokens_partial)(lexer, range, max_lines, gs)
+    (lexer.tokens_partial)(lexer, meta.range(content), max_lines, gs)
 }
 
 pub fn sync_edits_local(editor: &mut Editor, _: &mut GlobalState) {
@@ -429,4 +420,16 @@ pub fn char_lsp_utf16(ch: char) -> usize {
 #[inline(always)]
 pub fn as_url(path: &Path) -> Uri {
     Uri::from_str(format!("file://{}", path.display()).as_str()).expect("Path should always be parsable!")
+}
+
+impl EditMetaData {
+    #[inline]
+    pub fn range(self, content: &[impl EditorLine]) -> lsp_types::Range {
+        let end_line = self.end_line();
+        let end_character = content.get(end_line).map(|l| l.char_len()).unwrap_or_default() as u32;
+        lsp_types::Range::new(
+            lsp_types::Position::new(self.start_line as u32, 0),
+            lsp_types::Position::new(end_line as u32, end_character),
+        )
+    }
 }
