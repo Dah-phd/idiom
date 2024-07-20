@@ -112,7 +112,7 @@ impl Default for EditorConfigs {
             indent_spaces: 4, // only spaces are allowed as indent
             indent_after: get_indent_after(),
             unindent_before: get_unident_before(),
-            rust_lsp: Some(String::from("${cfg_dir}/rust-analyzer")),
+            rust_lsp: Some(String::from("rust-analyzer")),
             rust_lsp_preload_if_present: Some(vec!["Cargo.toml".to_owned(), "Cargo.lock".to_owned()]),
             python_lsp: Some(String::from("jedi-language-server")),
             python_lsp_preload_if_present: Some(vec!["pyproject.toml".to_owned(), "pytest.init".to_owned()]),
