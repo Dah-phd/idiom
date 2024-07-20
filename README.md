@@ -15,7 +15,7 @@ More documentation will not come very soon - current focus is developing basic f
 - Linux Fedora derivate (Nobara)
 
 ## TODO
-- remove default cursor and render it in code
+- check correctness on cursor during wrap
 - enforce rerender of info modal on update
 - add styling on info modal
 
