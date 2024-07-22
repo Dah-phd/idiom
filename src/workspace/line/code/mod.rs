@@ -1,4 +1,6 @@
 mod context;
+mod render;
+use render::{ascii_line, complex_line, RenderCache};
 use unicode_width::UnicodeWidthChar;
 
 use crate::{
@@ -9,18 +11,15 @@ use crate::{
         UTF8Safe,
     },
     syntax::{DiagnosticLine, Lang, Lexer, Token},
-    workspace::line::{
-        render::{ascii_cursor, ascii_line, complex_cursor, complex_line, inline_diagnostics, is_wider_complex},
-        Context, EditorLine,
-    },
+    workspace::line::EditorLine,
 };
+pub use context::CodeLineContext;
 use std::{
     fmt::Display,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
 };
 
-pub use context::CodeLineContext;
-
+/// Used to represent code, has simpler wrapping as cpde lines shoud be shorter than 120 chars in most cases
 #[derive(Default)]
 pub struct CodeLine {
     content: String,
@@ -30,8 +29,7 @@ pub struct CodeLine {
     tokens: Vec<Token>,
     diagnostics: Option<DiagnosticLine>,
     // used for caching - 0 is reseved for file tabs and can be used to reset line
-    rendered_at: u16,
-    select: Option<Range<usize>>,
+    pub cached: RenderCache,
 }
 
 impl Display for CodeLine {
@@ -55,14 +53,7 @@ impl From<&'static str> for CodeLine {
 
 impl CodeLine {
     pub fn new(content: String) -> Self {
-        Self {
-            char_len: content.char_len(),
-            content,
-            tokens: Vec::new(),
-            diagnostics: None,
-            rendered_at: 0,
-            select: None,
-        }
+        Self { char_len: content.char_len(), content, ..Default::default() }
     }
 }
 
@@ -110,6 +101,8 @@ impl Index<RangeFull> for CodeLine {
 }
 
 impl EditorLine for CodeLine {
+    type Context<'a> = CodeLineContext<'a>;
+
     #[inline]
     fn is_simple(&self) -> bool {
         self.content.len() == self.char_len
@@ -146,7 +139,7 @@ impl EditorLine for CodeLine {
 
     #[inline]
     fn replace_till(&mut self, to: usize, string: &str) {
-        self.rendered_at = 0;
+        self.cached.reset();
         if self.content.len() == self.char_len {
             self.char_len += string.char_len();
             self.char_len -= to;
@@ -159,7 +152,7 @@ impl EditorLine for CodeLine {
 
     #[inline]
     fn replace_from(&mut self, from: usize, string: &str) {
-        self.rendered_at = 0;
+        self.cached.reset();
         if self.content.len() == self.char_len {
             self.char_len = from + string.char_len();
             self.content.truncate(from);
@@ -171,7 +164,7 @@ impl EditorLine for CodeLine {
 
     #[inline]
     fn replace_range(&mut self, range: Range<usize>, string: &str) {
-        self.rendered_at = 0;
+        self.cached.reset();
         if self.char_len == self.content.len() {
             self.char_len += string.char_len();
             self.char_len -= range.len();
@@ -199,7 +192,7 @@ impl EditorLine for CodeLine {
 
     #[inline]
     fn insert(&mut self, idx: usize, ch: char) {
-        self.rendered_at = 0;
+        self.cached.reset();
         if self.char_len == self.content.len() {
             self.char_len += 1;
             self.content.insert(idx, ch);
@@ -211,14 +204,14 @@ impl EditorLine for CodeLine {
 
     #[inline]
     fn push(&mut self, ch: char) {
-        self.rendered_at = 0;
+        self.cached.reset();
         self.char_len += 1;
         self.content.push(ch);
     }
 
     #[inline]
     fn insert_str(&mut self, idx: usize, string: &str) {
-        self.rendered_at = 0;
+        self.cached.reset();
         if self.char_len == self.content.len() {
             self.char_len += string.char_len();
             self.content.insert_str(idx, string);
@@ -230,14 +223,14 @@ impl EditorLine for CodeLine {
 
     #[inline]
     fn push_str(&mut self, string: &str) {
-        self.rendered_at = 0;
+        self.cached.reset();
         self.char_len += string.char_len();
         self.content.push_str(string);
     }
 
     #[inline]
     fn push_line(&mut self, line: Self) {
-        self.rendered_at = 0;
+        self.cached.reset();
         self.char_len += line.char_len;
         self.content.push_str(&line.content)
     }
@@ -254,7 +247,7 @@ impl EditorLine for CodeLine {
 
     #[inline]
     fn remove(&mut self, idx: usize) -> char {
-        self.rendered_at = 0;
+        self.cached.reset();
         if self.content.len() == self.char_len {
             self.char_len -= 1;
             return self.content.remove(idx);
@@ -292,12 +285,12 @@ impl EditorLine for CodeLine {
     fn clear(&mut self) {
         self.tokens.clear();
         self.content.clear();
-        self.rendered_at = 0;
+        self.cached.reset();
     }
 
     #[inline]
     fn split_off(&mut self, at: usize) -> Self {
-        self.rendered_at = 0;
+        self.cached.reset();
         if self.content.len() == self.char_len {
             let content = self.content.split_off(at);
             self.char_len = self.content.len();
@@ -305,23 +298,14 @@ impl EditorLine for CodeLine {
             return Self {
                 char_len: content.len(),
                 content,
-                tokens: Vec::new(),
                 diagnostics: self.diagnostics.take(),
-                rendered_at: 0,
-                select: None,
+                ..Default::default()
             };
         }
         let content = self.content.utf8_split_off(at);
         self.char_len = self.content.char_len();
         self.tokens.clear();
-        Self {
-            char_len: content.char_len(),
-            content,
-            tokens: Vec::new(),
-            diagnostics: self.diagnostics.take(),
-            rendered_at: 0,
-            select: None,
-        }
+        Self { char_len: content.char_len(), content, diagnostics: self.diagnostics.take(), ..Default::default() }
     }
 
     #[inline]
@@ -338,7 +322,7 @@ impl EditorLine for CodeLine {
         self.content.len()
     }
 
-    #[inline]
+    #[inline(always)]
     fn char_len(&self) -> usize {
         self.char_len
     }
@@ -399,13 +383,13 @@ impl EditorLine for CodeLine {
 
     #[inline]
     fn push_token(&mut self, token: Token) {
-        self.rendered_at = 0;
+        self.cached.reset();
         self.tokens.push(token);
     }
 
     #[inline]
     fn replace_tokens(&mut self, tokens: Vec<Token>) {
-        self.rendered_at = 0;
+        self.cached.reset();
         self.tokens = tokens;
         if let Some(diagnostics) = self.diagnostics.as_ref() {
             for diagnostic in diagnostics.data.iter() {
@@ -418,14 +402,14 @@ impl EditorLine for CodeLine {
 
     #[inline]
     fn rebuild_tokens(&mut self, lexer: &Lexer) {
-        self.rendered_at = 0;
+        self.cached.reset();
         self.tokens.clear();
         Token::parse_to_buf(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
     }
 
     #[inline]
     fn set_diagnostics(&mut self, diagnostics: DiagnosticLine) {
-        self.rendered_at = 0;
+        self.cached.reset();
         for diagnostic in diagnostics.data.iter() {
             for token in self.tokens.iter_mut() {
                 diagnostic.check_and_update(token);
@@ -445,56 +429,37 @@ impl EditorLine for CodeLine {
             for token in self.tokens.iter_mut() {
                 token.drop_diagstic();
             }
-            self.rendered_at = 0;
+            self.cached.reset();
         };
     }
 
     #[inline]
-    fn full_render(&mut self, ctx: &mut impl Context, lines: &mut RectIter, backend: &mut Backend) {
-        self.rendered_at = 0;
+    fn cursor(&mut self, ctx: &mut CodeLineContext<'_>, lines: &mut RectIter, backend: &mut Backend) {
         if self.tokens.is_empty() {
-            let lexer = ctx.lexer();
-            Token::parse_to_buf(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
+            Token::parse_to_buf(&ctx.lexer.lang, &ctx.lexer.theme, &self.content, &mut self.tokens);
         };
-        let (line_width, select) = match lines.next() {
-            Some(line) => ctx.setup_with_select(line, backend),
-            None => return,
-        };
-        if self.is_simple() {
-            if line_width > self.char_len {
-                match select {
-                    Some(select) => ascii_cursor::select(self, ctx, select, backend),
-                    None => ascii_cursor::basic(self, ctx, backend),
-                }
-            } else {
-                match select {
-                    Some(select) => ascii_cursor::wrap_select(self, ctx, line_width, lines, select, backend),
-                    None => ascii_cursor::wrap(self, ctx, line_width, lines, backend),
-                }
-            }
-        } else if !is_wider_complex(self, line_width) {
-            match select {
-                Some(select) => complex_cursor::select(self, ctx, select, backend),
-                None => complex_cursor::basic(self, ctx, backend),
-            }
-        } else {
-            match select {
-                Some(select) => complex_cursor::wrap_select(self, ctx, line_width, lines, select, backend),
-                None => complex_cursor::wrap(self, ctx, line_width, lines, backend),
-            }
-        }
-        backend.reset_style();
+        render::cursor(self, ctx, lines, backend);
     }
 
     #[inline]
-    fn render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend) {
+    fn cursor_fast(&mut self, ctx: &mut CodeLineContext<'_>, lines: &mut RectIter, backend: &mut Backend) {
         if self.tokens.is_empty() {
-            let lexer = ctx.lexer();
-            Token::parse_to_buf(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
+            Token::parse_to_buf(&ctx.lexer.lang, &ctx.lexer.theme, &self.content, &mut self.tokens);
+            if !self.tokens.is_empty() {
+                self.cached.reset();
+            }
         };
-        self.rendered_at = line.row;
-        let (line_width, select) = ctx.setup_with_select(line, backend);
-        self.select.clone_from(&select);
+        render::cursor_fast(self, ctx, lines, backend);
+    }
+
+    #[inline]
+    fn render(&mut self, ctx: &mut CodeLineContext<'_>, line: Line, backend: &mut Backend) {
+        if self.tokens.is_empty() {
+            Token::parse_to_buf(&ctx.lexer.lang, &ctx.lexer.theme, &self.content, &mut self.tokens);
+        };
+        let cache_line = line.row;
+        let (line_width, select) = ctx.setup_line(line, backend);
+        self.cached.line(cache_line, select.clone());
         match select {
             Some(select) => self.render_with_select(line_width, select, ctx, backend),
             None => self.render_no_select(line_width, ctx, backend),
@@ -502,16 +467,17 @@ impl EditorLine for CodeLine {
     }
 
     #[inline]
-    fn fast_render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend) {
-        if self.rendered_at != line.row || self.select != ctx.get_select(line.width) {
-            return self.render(ctx, line, backend);
+    fn fast_render(&mut self, ctx: &mut CodeLineContext, line: Line, backend: &mut Backend) {
+        if self.cached.should_render_line(line.row, &ctx.get_select(line.width)) {
+            self.render(ctx, line, backend);
+        } else {
+            ctx.skip_line();
         }
-        ctx.skip_line();
     }
 
     #[inline]
     fn clear_cache(&mut self) {
-        self.rendered_at = 0;
+        self.cached.reset();
     }
 }
 
@@ -521,26 +487,23 @@ impl CodeLine {
         &mut self,
         line_width: usize,
         select: Range<usize>,
-        ctx: &mut impl Context,
-        backend: &mut Backend,
+        ctx: &mut CodeLineContext,
+        backend: &mut impl BackendProtocol,
     ) {
         if self.char_len == 0 && select.end != 0 {
-            backend.print_styled(" ", Style::bg(ctx.lexer().theme.selected));
+            backend.print_styled(" ", Style::bg(ctx.lexer.theme.selected));
             return;
         }
         if self.is_simple() {
             if line_width > self.char_len() {
-                ascii_line::ascii_line_with_select(
-                    self.content.char_indices(),
-                    &self.tokens,
-                    select,
-                    ctx.lexer(),
-                    backend,
-                );
-                inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
+                let content = self.content.char_indices();
+                ascii_line::ascii_line_with_select(content, &self.tokens, select, ctx.lexer, backend);
+                if let Some(diagnostic) = self.diagnostics.as_ref() {
+                    diagnostic.inline_render(line_width - self.char_len, backend)
+                }
             } else {
                 let content = self.content.char_indices().take(line_width.saturating_sub(2));
-                ascii_line::ascii_line_with_select(content, &self.tokens, select, ctx.lexer(), backend);
+                ascii_line::ascii_line_with_select(content, &self.tokens, select, ctx.lexer, backend);
                 backend.print_styled(">>", Style::reversed());
             }
         // handles non ascii shrunk lines
@@ -551,20 +514,24 @@ impl CodeLine {
                     content.next_back();
                 }
             };
-            complex_line::complex_line_with_select(content, &self.tokens, select, ctx.lexer(), backend);
+            complex_line::complex_line_with_select(content, &self.tokens, select, ctx.lexer, backend);
             backend.print_styled(">>", Style::reversed());
         } else {
-            complex_line::complex_line_with_select(self.content.chars(), &self.tokens, select, ctx.lexer(), backend);
-            inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
+            complex_line::complex_line_with_select(self.content.chars(), &self.tokens, select, ctx.lexer, backend);
+            if let Some(diagnostic) = self.diagnostics.as_ref() {
+                diagnostic.inline_render(line_width - self.content.width(), backend)
+            }
         }
     }
 
     #[inline(always)]
-    fn render_no_select(&mut self, line_width: usize, ctx: &mut impl Context, backend: &mut Backend) {
+    fn render_no_select(&mut self, line_width: usize, ctx: &mut CodeLineContext, backend: &mut impl BackendProtocol) {
         if self.is_simple() {
             if line_width > self.content.len() {
                 ascii_line::ascii_line(&self.content, &self.tokens, backend);
-                inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
+                if let Some(diagnostic) = self.diagnostics.as_ref() {
+                    diagnostic.inline_render(line_width - self.char_len, backend)
+                }
             } else {
                 ascii_line::ascii_line(&self.content[..line_width.saturating_sub(2)], &self.tokens, backend);
                 backend.print_styled(">>", Style::reversed());
@@ -577,11 +544,13 @@ impl CodeLine {
                     content.next_back();
                 }
             };
-            complex_line::complex_line(content, &self.tokens, ctx.lexer(), backend);
+            complex_line::complex_line(content, &self.tokens, ctx.lexer, backend);
             backend.print_styled(">>", Style::reversed());
         } else {
-            complex_line::complex_line(self.content.chars(), &self.tokens, ctx.lexer(), backend);
-            inline_diagnostics(line_width - self.char_len, &self.diagnostics, backend);
+            complex_line::complex_line(self.content.chars(), &self.tokens, ctx.lexer, backend);
+            if let Some(diagnostic) = self.diagnostics.as_ref() {
+                diagnostic.inline_render(line_width - self.content.width(), backend)
+            }
         }
     }
 }

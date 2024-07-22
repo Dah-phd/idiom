@@ -7,7 +7,7 @@ use crate::{
     workspace::{
         actions::Actions,
         cursor::{Cursor, CursorPosition},
-        line::{CodeLine, CodeLineContext, Context, EditorLine},
+        line::{CodeLine, CodeLineContext, EditorLine},
         utils::{copy_content, find_line_start, last_modified, token_range_at},
     },
 };
@@ -67,7 +67,7 @@ impl Editor {
         let mut ctx = CodeLineContext::collect_context(&mut self.lexer, &self.cursor, self.line_number_offset);
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if self.cursor.line == line_idx {
-                text.full_render(&mut ctx, &mut lines, &mut gs.writer);
+                text.cursor(&mut ctx, &mut lines, &mut gs.writer);
             } else if let Some(line) = lines.next() {
                 text.render(&mut ctx, line, &mut gs.writer);
             } else {
@@ -92,7 +92,7 @@ impl Editor {
         let mut ctx = CodeLineContext::collect_context(&mut self.lexer, &self.cursor, self.line_number_offset);
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
             if self.cursor.line == line_idx {
-                text.full_render(&mut ctx, &mut lines, &mut gs.writer);
+                text.cursor_fast(&mut ctx, &mut lines, &mut gs.writer);
             } else if let Some(line) = lines.next() {
                 text.fast_render(&mut ctx, line, &mut gs.writer);
             } else {

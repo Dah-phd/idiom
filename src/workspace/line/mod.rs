@@ -1,7 +1,8 @@
 mod code;
-mod render;
+mod markdown;
+mod palin_text;
+
 use crate::{
-    global_state::GlobalState,
     render::{
         backend::Backend,
         layout::{Line, RectIter},
@@ -14,8 +15,6 @@ use std::{
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
     str::{CharIndices, Chars, MatchIndices},
 };
-
-type LineWidth = usize;
 
 /// The trait can be used in future to add rope version for non code text
 pub trait EditorLine:
@@ -30,6 +29,8 @@ pub trait EditorLine:
     + From<&'static str>
     + Display
 {
+    type Context<'a>;
+
     /// assumption is that control chars will not be present in file -> confirms utf8 idx is always 1 byte
     fn is_simple(&self) -> bool;
     fn insert(&mut self, idx: usize, ch: char);
@@ -89,30 +90,11 @@ pub trait EditorLine:
 
     /// render
 
-    fn full_render(&mut self, ctx: &mut impl Context, lines: &mut RectIter, backend: &mut Backend);
-    fn render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend);
-    fn fast_render(&mut self, ctx: &mut impl Context, line: Line, backend: &mut Backend);
+    fn cursor(&mut self, ctx: &mut Self::Context<'_>, lines: &mut RectIter, backend: &mut Backend);
+    fn cursor_fast(&mut self, ctx: &mut Self::Context<'_>, lines: &mut RectIter, backend: &mut Backend);
+    fn render(&mut self, ctx: &mut Self::Context<'_>, line: Line, backend: &mut Backend);
+    fn fast_render(&mut self, ctx: &mut Self::Context<'_>, line: Line, backend: &mut Backend);
     fn clear_cache(&mut self);
-}
-
-/// Context that can be used to translate state to editor line during render
-/// needs to be made more sensible
-pub trait Context {
-    fn setup_with_select(&mut self, line: Line, backend: &mut Backend) -> (LineWidth, Option<Range<usize>>);
-    fn setup_line(&mut self, line: Line, backend: &mut Backend) -> LineWidth;
-    fn setup_wrap(&self) -> String;
-    fn cursor_char(&self) -> usize;
-    fn skip_line(&mut self);
-    fn lexer(&self) -> &Lexer;
-    fn get_select(&self, width: usize) -> Option<Range<usize>>;
-    fn count_skipped_to_cursor(&mut self, line_width: usize, remaining_lines: usize) -> WrappedCursor;
-    fn count_skipped_to_cursor_complex(
-        &mut self,
-        line: &impl EditorLine,
-        line_width: usize,
-        remaining_lines: usize,
-    ) -> (WrappedCursor, usize);
-    fn render_cursor(self, gs: &mut GlobalState);
 }
 
 pub struct WrappedCursor {

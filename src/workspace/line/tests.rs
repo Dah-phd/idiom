@@ -384,7 +384,7 @@ fn test_line_wrapping_utf8() {
 
     let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 1);
     content[0].render(&mut ctx, lines.next().unwrap(), &mut gs.writer);
-    content[1].full_render(&mut ctx, &mut lines, &mut gs.writer);
+    content[1].cursor(&mut ctx, &mut lines, &mut gs.writer);
 
     test_line_wrap(gs.writer.drain());
 }
@@ -405,7 +405,7 @@ fn test_line_wrapping_utf16() {
 
     let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 1);
     content[0].render(&mut ctx, lines.next().unwrap(), &mut gs.writer);
-    content[1].full_render(&mut ctx, &mut lines, &mut gs.writer);
+    content[1].cursor(&mut ctx, &mut lines, &mut gs.writer);
 
     test_line_wrap(gs.writer.drain());
 }
@@ -426,7 +426,7 @@ fn test_line_wrapping_utf32() {
 
     let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 1);
     content[0].render(&mut ctx, lines.next().unwrap(), &mut gs.writer);
-    content[1].full_render(&mut ctx, &mut lines, &mut gs.writer);
+    content[1].cursor(&mut ctx, &mut lines, &mut gs.writer);
 
     test_line_wrap(gs.writer.drain());
 }

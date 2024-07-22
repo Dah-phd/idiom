@@ -1,22 +1,46 @@
 use crate::{
     render::{
-        backend::{color, Backend, BackendProtocol, Style},
+        backend::{color, BackendProtocol, Style},
         layout::RectIter,
     },
     syntax::Token,
-    workspace::line::{Context, EditorLine, WrappedCursor},
+    workspace::line::{CodeLineContext, EditorLine, WrappedCursor},
 };
 use std::ops::Range;
 use unicode_width::UnicodeWidthChar;
 
+use super::is_wider_complex;
+
+#[inline(always)]
+pub fn render(
+    line: &impl EditorLine,
+    ctx: &mut CodeLineContext,
+    line_width: usize,
+    select: Option<Range<usize>>,
+    lines: &mut RectIter,
+    backend: &mut impl BackendProtocol,
+) {
+    if is_wider_complex(line, line_width) {
+        match select {
+            Some(select) => wrap_select(line, ctx, line_width, lines, select, backend),
+            None => wrap(line, ctx, line_width, lines, backend),
+        }
+    } else {
+        match select {
+            Some(select) => self::select(line, ctx, select, backend),
+            None => self::basic(line, ctx, backend),
+        }
+    }
+}
+
 #[inline]
-pub fn basic(line: &impl EditorLine, ctx: &impl Context, backend: &mut Backend) {
+pub fn basic(line: &impl EditorLine, ctx: &CodeLineContext, backend: &mut impl BackendProtocol) {
     let mut tokens = line.iter_tokens();
     let mut maybe_token = tokens.next();
     let mut idx = 0;
     let mut lsp_idx = 0;
     let cursor_idx = ctx.cursor_char();
-    let lexer = ctx.lexer();
+    let lexer = &ctx.lexer;
     for text in line.chars() {
         if let Some(token) = maybe_token {
             if token.from == lsp_idx {
@@ -50,8 +74,8 @@ pub fn basic(line: &impl EditorLine, ctx: &impl Context, backend: &mut Backend) 
 }
 
 #[inline]
-pub fn select(line: &impl EditorLine, ctx: &impl Context, select: Range<usize>, backend: &mut Backend) {
-    let lexer = ctx.lexer();
+pub fn select(line: &impl EditorLine, ctx: &CodeLineContext, select: Range<usize>, backend: &mut impl BackendProtocol) {
+    let lexer = &ctx.lexer;
     let cursor_idx = ctx.cursor_char();
     let select_color = lexer.theme.selected;
     let mut reset_style = Style::default();
@@ -102,10 +126,10 @@ pub fn select(line: &impl EditorLine, ctx: &impl Context, select: Range<usize>, 
 #[inline(always)]
 pub fn wrap(
     line: &impl EditorLine,
-    ctx: &mut impl Context,
+    ctx: &mut CodeLineContext,
     wrap_len: usize,
     lines: &mut RectIter,
-    backend: &mut Backend,
+    backend: &mut impl BackendProtocol,
 ) {
     let (wrap_cursor, offset) = ctx.count_skipped_to_cursor_complex(line, wrap_len, lines.len());
     if wrap_cursor.skip_lines != 0 {
@@ -131,11 +155,11 @@ fn wrapping_loop<'a>(
     wrap_len: usize,
     lines: &mut RectIter,
     (wrap_cursor, mut lsp_idx, mut remaining): (WrappedCursor, usize, usize),
-    ctx: &impl Context,
-    backend: &mut Backend,
+    ctx: &CodeLineContext,
+    backend: &mut impl BackendProtocol,
 ) {
     let cursor_idx = wrap_cursor.flat_char_idx;
-    let lexer = ctx.lexer();
+    let lexer = &ctx.lexer;
     let wrap_number = ctx.setup_wrap();
     let mut maybe_token = tokens.next();
     let mut idx = wrap_cursor.skip_chars;
@@ -180,11 +204,11 @@ fn wrapping_loop<'a>(
 #[inline]
 pub fn wrap_select(
     line: &impl EditorLine,
-    ctx: &mut impl Context,
+    ctx: &mut CodeLineContext,
     wrap_len: usize,
     lines: &mut RectIter,
     select: Range<usize>,
-    backend: &mut Backend,
+    backend: &mut impl BackendProtocol,
 ) {
     let (wrap_cursor, offset) = ctx.count_skipped_to_cursor_complex(line, wrap_len, lines.len());
     if wrap_cursor.skip_lines != 0 {
@@ -199,8 +223,8 @@ pub fn wrap_select(
             }
         };
         let reset_style = if select.start < offset && select.end > offset {
-            backend.set_bg(Some(ctx.lexer().theme.selected));
-            Style::bg(ctx.lexer().theme.selected)
+            backend.set_bg(Some(ctx.lexer.theme.selected));
+            Style::bg(ctx.lexer.theme.selected)
         } else {
             Style::default()
         };
@@ -219,12 +243,12 @@ fn wrapping_loop_select<'a>(
     content: impl Iterator<Item = char>,
     (mut tokens, select, mut reset_style): (impl Iterator<Item = &'a Token>, Range<usize>, Style),
     lines: &mut RectIter,
-    ctx: &impl Context,
+    ctx: &CodeLineContext,
     (wrap_cursor, mut lsp_idx, mut remaining, wrap_len): (WrappedCursor, usize, usize, usize),
-    backend: &mut Backend,
+    backend: &mut impl BackendProtocol,
 ) {
     let cursor_idx = wrap_cursor.flat_char_idx;
-    let lexer = ctx.lexer();
+    let lexer = &ctx.lexer;
     let select_color = lexer.theme.selected;
     let mut maybe_token = tokens.next();
     let mut idx = wrap_cursor.skip_chars;

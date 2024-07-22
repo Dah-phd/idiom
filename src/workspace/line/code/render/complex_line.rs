@@ -1,12 +1,17 @@
 use std::ops::Range;
 
 use crate::{
-    render::backend::{Backend, BackendProtocol, Style},
+    render::backend::{BackendProtocol, Style},
     syntax::{Lexer, Token},
 };
 
 #[inline]
-pub fn complex_line(content: impl Iterator<Item = char>, tokens: &[Token], lexer: &Lexer, backend: &mut Backend) {
+pub fn complex_line(
+    content: impl Iterator<Item = char>,
+    tokens: &[Token],
+    lexer: &Lexer,
+    backend: &mut impl BackendProtocol,
+) {
     let mut iter_tokens = tokens.iter();
     let mut maybe_token = iter_tokens.next();
     let mut idx = 0;
@@ -40,7 +45,7 @@ pub fn complex_line_with_select(
     tokens: &[Token],
     select: Range<usize>,
     lexer: &Lexer,
-    backend: &mut Backend,
+    backend: &mut impl BackendProtocol,
 ) {
     let mut iter_tokens = tokens.iter();
     let mut maybe_token = iter_tokens.next();

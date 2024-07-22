@@ -1,13 +1,13 @@
 use std::ops::Range;
 
 use crate::{
-    render::backend::{Backend, Style},
+    render::backend::Style,
     syntax::{Lexer, Token},
     BackendProtocol,
 };
 
 #[inline]
-pub fn ascii_line(content: &str, tokens: &[Token], backend: &mut Backend) {
+pub fn ascii_line(content: &str, tokens: &[Token], backend: &mut impl BackendProtocol) {
     let mut end = 0;
     for token in tokens.iter() {
         if token.from > end {
@@ -36,7 +36,7 @@ pub fn ascii_line_with_select(
     tokens: &[Token],
     select: Range<usize>,
     lexer: &Lexer,
-    backend: &mut Backend,
+    backend: &mut impl BackendProtocol,
 ) {
     let select_color = lexer.theme.selected;
     let mut iter_tokens = tokens.iter();

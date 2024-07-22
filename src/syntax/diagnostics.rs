@@ -1,4 +1,5 @@
-use crate::render::backend::{color, Color, Style};
+use crate::render::backend::{color, BackendProtocol, Color, Style};
+use crate::render::UTF8Safe;
 use crate::syntax::{Lang, Token};
 use crate::{global_state::WorkspaceEvent, workspace::line::EditorLine};
 use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
@@ -108,6 +109,16 @@ impl DiagnosticLine {
             info.actions.replace(buffer);
         }
         info
+    }
+
+    /// Prints truncated text based on info from diagnostics
+    #[inline(always)]
+    pub fn inline_render(&self, max_width: usize, backend: &mut impl BackendProtocol) {
+        if let Some(first_diagnostic) = self.data.first() {
+            let style = first_diagnostic.text_style();
+            let text = first_diagnostic.inline_text.truncate_width(max_width);
+            backend.print_styled(text, style);
+        }
     }
 
     pub fn drop_non_errs(&mut self) {
