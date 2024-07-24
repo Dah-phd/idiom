@@ -106,24 +106,24 @@ impl Cursor {
 
     fn move_up(&mut self, content: &[impl EditorLine]) {
         if self.line == 0 {
-            if self.char >= self.text_width {
-                self.char -= self.text_width;
-            };
+            // if self.char >= self.text_width {
+            //     self.char -= self.text_width;
+            // };
             return;
         }
-        if self.char >= self.text_width {
-            self.char -= self.text_width;
-            return;
-        }
+        // if self.char >= self.text_width {
+        //     self.char -= self.text_width;
+        //     return;
+        // }
         self.line -= 1;
-        let line_len = content[self.line].char_len();
-        if line_len >= self.text_width {
-            while self.char < line_len {
-                self.char += self.text_width;
-            }
-            self.char -= self.text_width;
-            return;
-        };
+        // let line_len = content[self.line].char_len();
+        // if line_len >= self.text_width {
+        //     while self.char < line_len {
+        //         self.char += self.text_width;
+        //     }
+        //     self.char -= self.text_width;
+        //     return;
+        // };
         self.adjust_char(&content[self.line]);
     }
 
@@ -149,12 +149,12 @@ impl Cursor {
         if content.is_empty() {
             return;
         }
-        let line_len = content[self.line].char_len();
-        if line_len >= self.text_width && line_len.saturating_sub(self.char) > self.text_width {
-            self.char += self.text_width;
-            self.correct_cursor_wrapped_line();
-            return;
-        };
+        // let line_len = content[self.line].char_len();
+        // if line_len >= self.text_width && line_len.saturating_sub(self.char) > self.text_width {
+        //     self.char += self.text_width;
+        //     self.correct_cursor_wrapped_line();
+        //     return;
+        // };
         if content.len() <= self.line + 1 {
             return;
         }
