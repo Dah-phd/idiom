@@ -1,12 +1,9 @@
-use std::ops::Range;
-
+use super::{WRAP_CLOSE, WRAP_OPEN};
 use crate::{
     render::backend::{Backend, BackendProtocol, Style},
     workspace::line::{CodeLine, CodeLineContext, EditorLine},
 };
-
-const WRAP_OPEN: &str = "<<";
-const WRAP_CLOSE: &str = ">>";
+use std::ops::Range;
 
 #[inline]
 pub fn render(
@@ -128,7 +125,8 @@ pub fn partial(line: &mut CodeLine, ctx: &CodeLineContext, line_width: usize, ba
         }
     };
     let mut maybe_token = tokens.next();
-    for text in line.chars().skip(idx).take(line_width.saturating_sub(reduction)) {
+    let content = unsafe { line.content.get_unchecked(idx..) };
+    for text in content.chars().take(line_width.saturating_sub(reduction)) {
         if let Some(token) = maybe_token {
             if token.from == idx {
                 backend.set_style(token.style);
@@ -188,7 +186,8 @@ pub fn partial_select(
         reset_style.set_bg(Some(select_color));
         backend.set_bg(Some(select_color));
     }
-    for text in line.chars().skip(idx).take(line_width.saturating_sub(reduction)) {
+    let content = unsafe { line.content.get_unchecked(idx..) };
+    for text in content.chars().take(line_width.saturating_sub(reduction)) {
         if select.start == idx {
             reset_style.set_bg(Some(select_color));
             backend.set_bg(Some(select_color));

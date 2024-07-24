@@ -713,53 +713,8 @@ fn test_line_wrap(mut render_data: Vec<(Style, String)>) {
             " ",
             "=",
             " ",
-            "\"text🚀text🚀text🚀text🚀text🚀text"
-        ]
-    );
-    let (line_num, line) = parse_complex_line(&mut render_data);
-    assert_eq!(line_num, None);
-    assert_eq!(
-        line,
-        vec![
-            "🚀text🚀text🚀\"",
-            ".",
-            "split",
-            "(",
-            "'🚀'",
-            ")",
-            ".",
-            "map",
-            "(|",
-            "text",
-            "| ",
-            "text",
-            ".",
-            "to_u"
-        ]
-    );
-    let (line_num, line) = parse_complex_line(&mut render_data);
-    assert_eq!(line_num, None);
-    assert_eq!(
-        line,
-        vec![
-            "ppercase", "()", ".", "to_owned", "())", ".", "map", "(|", "mut", " ", "string", "| ", "string", ".", "p"
-        ]
-    );
-    let (line_num, line) = parse_complex_line(&mut render_data);
-    assert_eq!(line_num, None);
-    assert_eq!(
-        line,
-        vec![
-            "ush_str",
-            "(",
-            "\"text🚀\"",
-            "))",
-            ".",
-            "collect",
-            "::",
-            "<",
-            "Vec",
-            "<_>>();"
+            "\"text🚀text🚀text🚀text🚀text🚀tex",
+            ">>"
         ]
     );
     assert!(render_data.is_empty());

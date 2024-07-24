@@ -1,29 +1,25 @@
-use crate::{
-    render::{
-        backend::{color, BackendProtocol, Style},
-        layout::RectIter,
-    },
-    syntax::Token,
-    workspace::line::{CodeLineContext, EditorLine, WrappedCursor},
-};
-use std::ops::Range;
 use unicode_width::UnicodeWidthChar;
 
-use super::is_wider_complex;
+use crate::{
+    render::backend::{color, BackendProtocol, Style},
+    workspace::line::{CodeLine, CodeLineContext, EditorLine},
+};
+use std::ops::Range;
+
+use super::{is_wider_complex, WRAP_CLOSE, WRAP_OPEN};
 
 #[inline(always)]
 pub fn render(
-    line: &impl EditorLine,
+    line: &mut CodeLine,
     ctx: &mut CodeLineContext,
     line_width: usize,
     select: Option<Range<usize>>,
-    lines: &mut RectIter,
     backend: &mut impl BackendProtocol,
 ) {
     if is_wider_complex(line, line_width) {
         match select {
-            Some(select) => wrap_select(line, ctx, line_width, lines, select, backend),
-            None => wrap(line, ctx, line_width, lines, backend),
+            Some(select) => partial_select(line, ctx, select, line_width, backend),
+            None => partial(line, ctx, line_width, backend),
         }
     } else {
         match select {
@@ -124,136 +120,125 @@ pub fn select(line: &impl EditorLine, ctx: &CodeLineContext, select: Range<usize
 }
 
 #[inline(always)]
-pub fn wrap(
-    line: &impl EditorLine,
+pub fn partial(
+    line: &mut CodeLine,
     ctx: &mut CodeLineContext,
-    wrap_len: usize,
-    lines: &mut RectIter,
+    mut line_width: usize,
     backend: &mut impl BackendProtocol,
 ) {
-    let (wrap_cursor, offset) = ctx.count_skipped_to_cursor_complex(line, wrap_len, lines.len());
-    if wrap_cursor.skip_lines != 0 {
-        let mut wrap_text = format!("..{} hidden wrapped lines", wrap_cursor.skip_lines);
-        wrap_text.truncate(wrap_len);
-        backend.print_styled(wrap_text, Style::reversed());
-        let mut tokens = line.iter_tokens().skip_while(|token| token.to < offset).peekable();
-        if let Some(token) = tokens.peek() {
-            if token.from < wrap_cursor.skip_chars {
-                backend.set_style(token.style);
-            }
-        };
-        wrapping_loop(line.chars(), tokens, wrap_len, lines, (wrap_cursor, offset, 0), ctx, backend)
-    } else {
-        wrapping_loop(line.chars(), line.iter_tokens(), wrap_len, lines, (wrap_cursor, offset, wrap_len), ctx, backend)
-    };
-}
-
-#[inline(always)]
-fn wrapping_loop<'a>(
-    content: impl Iterator<Item = char>,
-    mut tokens: impl Iterator<Item = &'a Token>,
-    wrap_len: usize,
-    lines: &mut RectIter,
-    (wrap_cursor, mut lsp_idx, mut remaining): (WrappedCursor, usize, usize),
-    ctx: &CodeLineContext,
-    backend: &mut impl BackendProtocol,
-) {
-    let cursor_idx = wrap_cursor.flat_char_idx;
+    line_width -= 2;
+    let cursor_idx = ctx.cursor_char();
     let lexer = &ctx.lexer;
-    let wrap_number = ctx.setup_wrap();
-    let mut maybe_token = tokens.next();
-    let mut idx = wrap_cursor.skip_chars;
-    for text in content.skip(idx) {
-        let text_width = match UnicodeWidthChar::width(text) {
-            Some(ch_width) => ch_width,
-            None => continue,
-        };
-        if text_width > remaining {
-            let line = match lines.next() {
-                Some(line) => line,
-                None => return,
-            };
-            backend.print_styled_at(line.row, line.col, &wrap_number, Style::fg(color::dark_grey()));
-            backend.clear_to_eol();
-            remaining = wrap_len.saturating_sub(text_width);
-        } else {
-            remaining -= text_width;
+    let mut idx = line.cached.generate_skipped_chars_complex(cursor_idx, line_width, line.content.chars());
+    let mut content = line.chars();
+    let mut counter_to_idx = idx;
+    let mut lsp_idx = 0;
+    while counter_to_idx != 0 {
+        lsp_idx += content.next().map(|ch| lexer.char_lsp_pos(ch)).unwrap_or_default();
+        counter_to_idx -= 1;
+    }
+    let expected_token_end = lsp_idx;
+    let mut tokens = line.iter_tokens().skip_while(|token| token.to < expected_token_end).peekable();
+    if let Some(token) = tokens.peek() {
+        if token.from < expected_token_end {
+            backend.set_style(token.style);
         }
+    };
+    let mut maybe_token = tokens.next();
+    if idx != 0 {
+        backend.print_styled(WRAP_OPEN, Style::reversed());
+        line_width -= 2;
+    }
+    for text in content {
         if let Some(token) = maybe_token {
             if token.from == lsp_idx {
                 backend.set_style(token.style);
-            };
-            if token.to == lsp_idx {
-                backend.reset_style();
-                maybe_token = tokens.next();
+            } else if token.to == lsp_idx {
+                if let Some(token) = tokens.next() {
+                    if token.from == lsp_idx {
+                        backend.set_style(token.style);
+                    } else {
+                        backend.reset_style();
+                    };
+                    maybe_token.replace(token);
+                } else {
+                    backend.reset_style();
+                    maybe_token = None;
+                };
             };
         }
+        // handle width
+        let char_width = match UnicodeWidthChar::width(text) {
+            Some(w) => w,
+            None => {
+                if idx == cursor_idx {
+                    backend.print_styled("?", Style::reversed());
+                } else {
+                    backend.print_styled("?", Style::fg(color::red()));
+                }
+                idx += 1;
+                lsp_idx += lexer.char_lsp_pos(text);
+                continue;
+            }
+        };
+        if char_width > line_width {
+            break;
+        } else {
+            line_width -= char_width;
+        }
+
         if cursor_idx == idx {
             backend.print_styled(text, Style::reversed());
         } else {
             backend.print(text);
         }
+
         idx += 1;
         lsp_idx += lexer.char_lsp_pos(text);
     }
     if idx <= cursor_idx {
         backend.print_styled(" ", Style::reversed());
+    } else if line.char_len() > idx {
+        backend.reset_style();
+        backend.print_styled(WRAP_CLOSE, Style::reversed());
     }
 }
 
-#[inline]
-pub fn wrap_select(
-    line: &impl EditorLine,
-    ctx: &mut CodeLineContext,
-    wrap_len: usize,
-    lines: &mut RectIter,
-    select: Range<usize>,
-    backend: &mut impl BackendProtocol,
-) {
-    let (wrap_cursor, offset) = ctx.count_skipped_to_cursor_complex(line, wrap_len, lines.len());
-    if wrap_cursor.skip_lines != 0 {
-        let mut wrap_text = format!("..{} hidden wrapped lines", wrap_cursor.skip_lines);
-        wrap_text.truncate(wrap_len);
-        backend.print_styled(wrap_text, Style::reversed());
-        let line_end = wrap_cursor.skip_chars;
-        let mut tokens = line.iter_tokens().skip_while(|token| token.to < line_end).peekable();
-        if let Some(token) = tokens.peek() {
-            if token.from < line_end {
-                backend.set_style(token.style);
-            }
-        };
-        let reset_style = if select.start < offset && select.end > offset {
-            backend.set_bg(Some(ctx.lexer.theme.selected));
-            Style::bg(ctx.lexer.theme.selected)
-        } else {
-            Style::default()
-        };
-        let style_data = (tokens, select, reset_style);
-        let position_data = (wrap_cursor, offset, 0, wrap_len);
-        wrapping_loop_select(line.chars(), style_data, lines, ctx, position_data, backend)
-    } else {
-        let style_data = (line.iter_tokens(), select, Style::default());
-        let position_data = (wrap_cursor, offset, wrap_len, wrap_len);
-        wrapping_loop_select(line.chars(), style_data, lines, ctx, position_data, backend)
-    };
-}
-
 #[inline(always)]
-fn wrapping_loop_select<'a>(
-    content: impl Iterator<Item = char>,
-    (mut tokens, select, mut reset_style): (impl Iterator<Item = &'a Token>, Range<usize>, Style),
-    lines: &mut RectIter,
-    ctx: &CodeLineContext,
-    (wrap_cursor, mut lsp_idx, mut remaining, wrap_len): (WrappedCursor, usize, usize, usize),
+pub fn partial_select(
+    line: &mut CodeLine,
+    ctx: &mut CodeLineContext,
+    select: Range<usize>,
+    mut line_width: usize,
     backend: &mut impl BackendProtocol,
 ) {
-    let cursor_idx = wrap_cursor.flat_char_idx;
+    line_width -= 2;
+    let cursor_idx = ctx.cursor_char();
     let lexer = &ctx.lexer;
+    let mut idx = line.cached.generate_skipped_chars_complex(cursor_idx, line_width, line.content.chars());
+    let mut content = line.chars();
+    let mut counter_to_idx = idx;
+    let mut lsp_idx = 0;
+    while counter_to_idx != 0 {
+        lsp_idx += content.next().map(|ch| lexer.char_lsp_pos(ch)).unwrap_or_default();
+        counter_to_idx -= 1;
+    }
+
+    let expected_token_end = lsp_idx;
     let select_color = lexer.theme.selected;
+    let mut reset_style = Style::default();
+    let mut tokens = line.iter_tokens().skip_while(|token| token.to < expected_token_end).peekable();
+    if let Some(token) = tokens.peek() {
+        if token.from < expected_token_end {
+            backend.update_style(token.style);
+        }
+    };
     let mut maybe_token = tokens.next();
-    let mut idx = wrap_cursor.skip_chars;
-    let wrap_number = ctx.setup_wrap();
-    for text in content.skip(idx) {
+    if idx != 0 {
+        backend.print_styled(WRAP_OPEN, Style::reversed());
+        line_width -= 2;
+    };
+    for text in content {
         if select.start == idx {
             reset_style.set_bg(Some(select_color));
             backend.set_bg(Some(select_color));
@@ -261,21 +246,6 @@ fn wrapping_loop_select<'a>(
         if select.end == idx {
             reset_style.set_bg(None);
             backend.set_bg(None);
-        }
-        let text_width = match UnicodeWidthChar::width(text) {
-            Some(ch_width) => ch_width,
-            None => continue,
-        };
-        if text_width > remaining {
-            let line = match lines.next() {
-                Some(line) => line,
-                None => return,
-            };
-            backend.print_styled_at(line.row, line.col, &wrap_number, Style::fg(color::dark_grey()));
-            backend.clear_to_eol();
-            remaining = wrap_len.saturating_sub(text_width);
-        } else {
-            remaining -= text_width;
         }
         if let Some(token) = maybe_token {
             if token.from == lsp_idx {
@@ -294,6 +264,27 @@ fn wrapping_loop_select<'a>(
                 };
             };
         }
+
+        // handle width
+        let char_width = match UnicodeWidthChar::width(text) {
+            Some(w) => w,
+            None => {
+                if idx == cursor_idx {
+                    backend.print_styled("?", Style::reversed());
+                } else {
+                    backend.print_styled("?", Style::fg(color::red()));
+                }
+                idx += 1;
+                lsp_idx += lexer.char_lsp_pos(text);
+                continue;
+            }
+        };
+        if char_width > line_width {
+            break;
+        } else {
+            line_width -= char_width;
+        }
+
         if cursor_idx == idx {
             backend.print_styled(text, Style::reversed());
         } else {
@@ -304,5 +295,8 @@ fn wrapping_loop_select<'a>(
     }
     if idx <= cursor_idx {
         backend.print_styled(" ", Style::reversed());
+    } else if line.char_len() > idx {
+        backend.reset_style();
+        backend.print_styled(WRAP_CLOSE, Style::reversed());
     }
 }

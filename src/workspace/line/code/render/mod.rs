@@ -8,8 +8,11 @@ use crate::render::{
     backend::{Backend, BackendProtocol},
     layout::RectIter,
 };
-use std::ops::Range;
+use std::{ops::Range, str::Chars};
 use unicode_width::UnicodeWidthChar;
+
+const WRAP_OPEN: &str = "<<";
+const WRAP_CLOSE: &str = ">>";
 
 #[derive(Default)]
 pub enum RenderCache {
@@ -107,6 +110,43 @@ impl RenderCache {
         (idx, reduction)
     }
 
+    pub fn generate_skipped_chars_complex(
+        &mut self,
+        cursor_idx: usize,
+        mut line_width: usize,
+        content: Chars<'_>,
+    ) -> usize {
+        line_width -= 3;
+        let mut idx = self.skipped_chars();
+        if idx == cursor_idx {
+            return idx;
+        }
+        if idx > cursor_idx {
+            if cursor_idx < 3 {
+                self.set_skipped_chars(0);
+                return 0;
+            };
+            self.set_skipped_chars(cursor_idx);
+            return cursor_idx;
+        }
+        let widths =
+            content.take(cursor_idx).skip(idx).map(|ch| UnicodeWidthChar::width(ch).unwrap_or(1)).collect::<Vec<_>>();
+        for ch_width in widths.into_iter().rev() {
+            if ch_width > line_width {
+                idx += 1;
+                line_width = 0;
+            } else {
+                line_width -= ch_width;
+            }
+        }
+        if idx < 3 {
+            self.set_skipped_chars(0);
+            return 0;
+        }
+        self.set_skipped_chars(idx);
+        idx
+    }
+
     #[inline(always)]
     pub fn set_skipped_chars(&mut self, skipped: usize) {
         if let Self::Cursor { line: _, char: _, skipped_chars, .. } = self {
@@ -152,7 +192,7 @@ pub fn cursor(line: &mut CodeLine, ctx: &mut CodeLineContext, lines: &mut RectIt
     if line.is_simple() {
         ascii_cursor::render(line, ctx, line_width, select, backend);
     } else {
-        complex_cursor::render(line, ctx, line_width, select, lines, backend);
+        complex_cursor::render(line, ctx, line_width, select, backend);
     }
     backend.reset_style();
 }
@@ -177,7 +217,7 @@ pub fn cursor_fast(line: &mut CodeLine, ctx: &mut CodeLineContext, lines: &mut R
     if line.is_simple() {
         ascii_cursor::render(line, ctx, line_width, select, backend);
     } else {
-        complex_cursor::render(line, ctx, line_width, select, lines, backend);
+        complex_cursor::render(line, ctx, line_width, select, backend);
     }
     backend.reset_style();
 }
