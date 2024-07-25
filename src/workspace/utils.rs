@@ -137,7 +137,7 @@ pub fn find_line_start(line: &impl EditorLine) -> usize {
 pub fn token_range_at(line: &impl EditorLine, idx: usize) -> Range<usize> {
     let mut token_start = 0;
     let mut last_not_in_token = false;
-    for (char_idx, ch) in line.char_indices() {
+    for (char_idx, ch) in line.chars().enumerate() {
         if ch.is_alphabetic() || ch == '_' {
             if last_not_in_token {
                 token_start = char_idx;
