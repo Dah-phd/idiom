@@ -97,11 +97,5 @@ pub trait EditorLine:
     fn clear_cache(&mut self);
 }
 
-pub struct WrappedCursor {
-    pub flat_char_idx: usize,
-    pub skip_lines: usize,
-    pub skip_chars: usize,
-}
-
 #[cfg(test)]
 mod tests;

@@ -1,5 +1,3 @@
-use unicode_width::UnicodeWidthChar;
-
 use crate::{
     global_state::GlobalState,
     render::{
@@ -7,11 +5,7 @@ use crate::{
         layout::Line,
     },
     syntax::Lexer,
-    workspace::{
-        cursor::Cursor,
-        line::{EditorLine, WrappedCursor},
-        CursorPosition,
-    },
+    workspace::{cursor::Cursor, CursorPosition},
 };
 use std::{cmp::Ordering, ops::Range};
 
@@ -49,65 +43,12 @@ impl<'a> CodeLineContext<'a> {
     }
 
     #[inline]
-    pub fn setup_wrap(&self) -> String {
-        format!("{:.<1$} ", "", self.line_number_offset)
-    }
-
-    #[inline]
     pub fn get_select(&self, width: usize) -> Option<Range<usize>> {
         build_select_buffer(self.select, self.line_number, width - (self.line_number_offset + 1))
     }
 
-    #[inline]
     pub fn skip_line(&mut self) {
         self.line_number += 1;
-    }
-
-    #[inline]
-    pub fn count_skipped_to_cursor(&mut self, line_width: usize, remaining_lines: usize) -> WrappedCursor {
-        let wraps = self.char / line_width + 1;
-        let skip_lines = wraps.saturating_sub(remaining_lines);
-        let flat_char_idx = self.char;
-        self.char %= line_width;
-        self.line += wraps.saturating_sub(skip_lines);
-        if skip_lines > 1 {
-            let skip_chars = skip_lines * line_width;
-            return WrappedCursor { skip_chars, flat_char_idx, skip_lines: skip_lines - 1 };
-        }
-        WrappedCursor { skip_chars: 0, flat_char_idx, skip_lines: 0 }
-    }
-
-    /// operation is complex due to variability in position encoding and variable char width
-    #[inline]
-    pub fn count_skipped_to_cursor_complex(
-        &mut self,
-        content: &impl EditorLine,
-        line_width: usize,
-        remaining_lines: usize,
-    ) -> (WrappedCursor, usize) {
-        let mut wraps: usize = 0;
-        let mut remaining_width = line_width;
-        let mut lsp_enc = 0;
-        let mut chars_per_line = Vec::new();
-        for ch in content.chars().take(self.char) {
-            let ch_w = UnicodeWidthChar::width(ch).unwrap_or(0);
-            if remaining_width < ch_w {
-                wraps += 1;
-                chars_per_line.push(line_width - remaining_width);
-                remaining_width = line_width;
-            }
-            lsp_enc += self.lexer.char_lsp_pos(ch);
-            remaining_width -= ch_w;
-        }
-        let mut skip_lines = wraps.saturating_sub(remaining_lines);
-        let flat_char_idx = self.char;
-        if skip_lines == 0 {
-            return (WrappedCursor { skip_chars: 0, skip_lines, flat_char_idx }, 0);
-        }
-        skip_lines += 1;
-        self.line += wraps.saturating_sub(skip_lines);
-        self.char = line_width - remaining_width;
-        (WrappedCursor { skip_chars: chars_per_line.iter().take(skip_lines).sum(), flat_char_idx, skip_lines }, lsp_enc)
     }
 
     #[inline]
