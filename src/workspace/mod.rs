@@ -380,6 +380,8 @@ impl Workspace {
         gs.tree.push(TreeEvent::SelectPath(editor.path.clone()));
         editor.clear_screen_cache();
         self.editors.insert(0, editor);
+        self.toggle_editor();
+        gs.insert_mode();
     }
 
     pub fn save(&mut self, gs: &mut GlobalState) {
