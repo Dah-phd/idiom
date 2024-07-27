@@ -45,7 +45,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
             last_frame_start = Instant::now();
             match crossterm::event::read()? {
                 Event::Key(key) => {
-                    if gs.map_key(&key, &mut workspace, &mut tree, &mut term)? {
+                    if gs.map_key(&key, &mut workspace, &mut tree, &mut term) {
                         continue;
                     }
                     let action = if let Some(action) = general_key_map.map(&key) {

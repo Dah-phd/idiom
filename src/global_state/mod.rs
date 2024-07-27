@@ -73,8 +73,7 @@ impl Mode {
     }
 }
 
-type KeyMapCallback =
-    fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> std::io::Result<bool>;
+type KeyMapCallback = fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool;
 type MouseMapCallback = fn(&mut GlobalState, MouseEvent, &mut Tree, &mut Workspace);
 type DrawCallback = fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal) -> std::io::Result<()>;
 
@@ -159,7 +158,7 @@ impl GlobalState {
         workspace: &mut Workspace,
         tree: &mut Tree,
         tmux: &mut EditorTerminal,
-    ) -> std::io::Result<bool> {
+    ) -> bool {
         (self.key_mapper)(self, event, workspace, tree, tmux)
     }
 

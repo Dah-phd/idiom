@@ -100,8 +100,8 @@ pub fn map_editor(
     workspace: &mut Workspace,
     _t: &mut Tree,
     _r: &mut EditorTerminal,
-) -> std::io::Result<bool> {
-    Ok(workspace.map(key, gs))
+) -> bool {
+    workspace.map(key, gs)
 }
 
 pub fn map_tree(
@@ -110,8 +110,8 @@ pub fn map_tree(
     _w: &mut Workspace,
     tree: &mut Tree,
     _r: &mut EditorTerminal,
-) -> std::io::Result<bool> {
-    Ok(tree.map(key, gs))
+) -> bool {
+    tree.map(key, gs)
 }
 
 pub fn map_popup(
@@ -120,8 +120,8 @@ pub fn map_popup(
     _w: &mut Workspace,
     _t: &mut Tree,
     _r: &mut EditorTerminal,
-) -> std::io::Result<bool> {
-    Ok(gs.map_popup_if_exists(key))
+) -> bool {
+    gs.map_popup_if_exists(key)
 }
 
 pub fn map_term(
@@ -130,6 +130,6 @@ pub fn map_term(
     _w: &mut Workspace,
     _t: &mut Tree,
     runner: &mut EditorTerminal,
-) -> std::io::Result<bool> {
-    Ok(runner.map(key, gs))
+) -> bool {
+    runner.map(key, gs)
 }
