@@ -366,6 +366,22 @@ impl Workspace {
         true
     }
 
+    pub fn go_to_tab(&mut self, idx: usize, gs: &mut GlobalState) {
+        if self.editors.is_empty() {
+            return;
+        }
+        if idx == 0 || self.editors.len() == 1 {
+            self.toggle_editor();
+            gs.insert_mode();
+            return;
+        }
+        let mut editor =
+            if idx >= self.editors.len() { self.editors.pop().expect("garded") } else { self.editors.remove(idx) };
+        gs.tree.push(TreeEvent::SelectPath(editor.path.clone()));
+        editor.clear_screen_cache();
+        self.editors.insert(0, editor);
+    }
+
     pub fn save(&mut self, gs: &mut GlobalState) {
         if let Some(editor) = self.get_active() {
             editor.save(gs);

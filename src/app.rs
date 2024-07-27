@@ -104,6 +104,15 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
                         GeneralAction::ToggleTerminal => {
                             gs.toggle_terminal(&mut term);
                         }
+                        GeneralAction::GoToTab1 => workspace.go_to_tab(0, &mut gs),
+                        GeneralAction::GoToTab2 => workspace.go_to_tab(1, &mut gs),
+                        GeneralAction::GoToTab3 => workspace.go_to_tab(2, &mut gs),
+                        GeneralAction::GoToTab4 => workspace.go_to_tab(3, &mut gs),
+                        GeneralAction::GoToTab5 => workspace.go_to_tab(4, &mut gs),
+                        GeneralAction::GoToTab6 => workspace.go_to_tab(5, &mut gs),
+                        GeneralAction::GoToTab7 => workspace.go_to_tab(6, &mut gs),
+                        GeneralAction::GoToTab8 => workspace.go_to_tab(7, &mut gs),
+                        GeneralAction::GoToTab9 => workspace.go_to_tab(8, &mut gs),
                     }
                 }
                 Event::Resize(width, height) => {
