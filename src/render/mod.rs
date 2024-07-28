@@ -2,7 +2,6 @@ pub mod backend;
 mod button;
 pub mod layout;
 pub mod state;
-pub mod text;
 mod text_field;
 pub mod utils;
 pub mod widgets;

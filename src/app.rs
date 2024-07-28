@@ -8,7 +8,7 @@ use crate::{
         popup_tree_search::ActivePathSearch,
         popups_editor::{save_all_popup, selector_editors},
     },
-    render::backend::Backend,
+    render::backend::{Backend, BackendProtocol},
     runner::EditorTerminal,
     tree::Tree,
     workspace::Workspace,
@@ -16,7 +16,10 @@ use crate::{
 use crossterm::event::Event;
 use std::{path::PathBuf, time::Instant};
 
-pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()> {
+pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResult<()> {
+    // builtin cursor is not used - cursor is positioned during render
+    backend.hide_cursor();
+
     let mut gs = GlobalState::new(backend)?;
     let configs = gs.unwrap_or_default(KeyMap::new(), ".keys: ");
     let mut last_frame_start = Instant::now();

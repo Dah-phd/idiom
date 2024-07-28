@@ -1,8 +1,6 @@
-use std::fmt::Display;
-
 use crate::lsp::LSPError;
+use std::fmt::Display;
 use thiserror::Error;
-
 pub type IdiomResult<T> = Result<T, IdiomError>;
 
 #[derive(Error, Debug)]

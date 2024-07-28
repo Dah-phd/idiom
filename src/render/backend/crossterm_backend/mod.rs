@@ -106,16 +106,16 @@ impl BackendProtocol for Backend {
         queue!(self, Clear(ClearType::All)).expect(ERR_MSG);
     }
 
-    /// stores the cursor and hides it
+    /// stores the cursor
     #[inline]
     fn save_cursor(&mut self) {
-        execute!(self, SavePosition, Hide).expect(ERR_MSG);
+        execute!(self, SavePosition).expect(ERR_MSG);
     }
 
-    /// restores cursor position and shows cursor
+    /// restores cursor position
     #[inline]
     fn restore_cursor(&mut self) {
-        queue!(self, RestorePosition, Show).expect(ERR_MSG);
+        queue!(self, RestorePosition).expect(ERR_MSG);
     }
 
     /// sets the style for the print/print at

@@ -1,36 +1,70 @@
+use super::{backend::BackendProtocol, layout::RectIter};
 use crate::render::{
     backend::{Backend, Style},
     layout::{Line, Rect},
     UTF8Safe,
 };
 
-use super::{backend::BackendProtocol, layout::RectIter};
-
-pub enum Word {
-    Raw { text: String, utf8_len: usize, width: usize },
-    Styled { text: String, utf8_len: usize, width: usize, style: Style },
+pub trait Widget {
+    fn width(&self) -> usize;
+    fn char_len(&self) -> usize;
+    fn len(&self) -> usize;
+    fn print(&self, backend: &mut Backend);
+    fn print_at(&self, line: Line, backend: &mut Backend);
+    fn wrap(&self, lines: RectIter, backend: &mut Backend);
 }
 
-impl From<String> for Word {
+pub struct Text {
+    text: String,
+    char_len: usize,
+    width: usize,
+    style: Option<Style>,
+}
+
+impl Widget for Text {
+    fn char_len(&self) -> usize {
+        self.char_len
+    }
+
+    fn width(&self) -> usize {
+        self.width
+    }
+
+    fn len(&self) -> usize {
+        self.text.len()
+    }
+
+    fn print(&self, backend: &mut Backend) {
+        backend.print(&self.text);
+    }
+
+    fn print_at(&self, line: Line, backend: &mut Backend) {
+        backend.print_at(line.row, line.col, &self.text);
+    }
+
+    fn wrap(&self, lines: RectIter, backend: &mut Backend) {}
+}
+
+impl From<String> for Text {
     fn from(text: String) -> Self {
-        Self::Raw { utf8_len: text.char_len(), width: text.width(), text }
+        Self { char_len: text.char_len(), width: text.width(), text, style: None }
     }
 }
 
-impl From<(String, Style)> for Word {
+impl From<(String, Style)> for Text {
     fn from((text, style): (String, Style)) -> Self {
-        Self::Styled { utf8_len: text.char_len(), width: text.width(), text, style }
+        Self { char_len: text.char_len(), width: text.width(), text, style: Some(style) }
     }
 }
 
-impl From<(Style, String)> for Word {
+impl From<(Style, String)> for Text {
     fn from((style, text): (Style, String)) -> Self {
-        Self::Styled { utf8_len: text.char_len(), width: text.width(), text, style }
+        Self { char_len: text.char_len(), width: text.width(), text, style: Some(style) }
     }
 }
 
 pub struct StyledLine {
-    inner: Vec<Word>,
+    inner: Vec<Text>,
 }
 
 impl StyledLine {
@@ -42,68 +76,7 @@ impl StyledLine {
         let mut remaining = current_line.width;
         backend.go_to(current_line.row, current_line.col);
         for word in self.inner.iter() {
-            match word {
-                Word::Raw { text, utf8_len, width } => {
-                    if text.len() > remaining {
-                        let mut end_loc = text.len() - remaining;
-                        let (current, mut text_snip) = text.split_at(end_loc);
-                        backend.print(current);
-                        current_line = match lines.next() {
-                            Some(line) => line,
-                            None => return false,
-                        };
-                        remaining = current_line.width;
-                        backend.go_to(current_line.row, current_line.col);
-                        while text_snip.len() > remaining {
-                            end_loc = text_snip.len() - remaining;
-                            let (current, next) = text_snip.split_at(end_loc);
-                            backend.print(current);
-                            text_snip = next;
-                            current_line = match lines.next() {
-                                Some(line) => line,
-                                None => return false,
-                            };
-                            remaining = current_line.width;
-                            backend.go_to(current_line.row, current_line.col);
-                        }
-                        remaining -= text_snip.width();
-                        backend.print(text_snip);
-                    } else {
-                        remaining -= text.len();
-                        backend.print(text);
-                    }
-                }
-                Word::Styled { text, utf8_len, style, width } => {
-                    if text.len() > remaining {
-                        let mut end_loc = text.len() - remaining;
-                        let (current, mut text_snip) = text.split_at(end_loc);
-                        backend.print_styled(current, *style);
-                        current_line = match lines.next() {
-                            Some(line) => line,
-                            None => return false,
-                        };
-                        remaining = current_line.width;
-                        backend.go_to(current_line.row, current_line.col);
-                        while text_snip.len() > remaining {
-                            end_loc = text_snip.len() - remaining;
-                            let (current, next) = text_snip.split_at(end_loc);
-                            backend.print_styled(current, *style);
-                            text_snip = next;
-                            current_line = match lines.next() {
-                                Some(line) => line,
-                                None => return false,
-                            };
-                            remaining = current_line.width;
-                            backend.go_to(current_line.row, current_line.col);
-                        }
-                        remaining -= text_snip.len();
-                        backend.print_styled(text_snip, *style);
-                    } else {
-                        remaining -= text.len();
-                        backend.print_styled(text, *style);
-                    }
-                }
-            }
+            todo!()
         }
         true
     }
@@ -111,9 +84,9 @@ impl StyledLine {
     fn render(&self, line: Line, backend: &mut Backend) {
         let mut builder = line.unsafe_builder(backend);
         for word in self.inner.iter() {
-            if !match word {
-                Word::Raw { text, utf8_len, width } => builder.push(text),
-                Word::Styled { text, utf8_len, style, width } => builder.push_styled(text, *style),
+            if !match word.style {
+                Some(style) => builder.push_styled(&word.text, style),
+                None => builder.push(&word.text),
             } {
                 return;
             }
@@ -123,9 +96,9 @@ impl StyledLine {
     fn render_rev(&self, line: Line, backend: &mut Backend) {
         let mut builder = line.unsafe_builder_rev(backend);
         for word in self.inner.iter() {
-            if !match word {
-                Word::Raw { text, utf8_len, width } => builder.push(text),
-                Word::Styled { text, utf8_len, style, width } => builder.push_styled(text, *style),
+            if !match word.style {
+                Some(style) => builder.push_styled(&word.text, style),
+                None => builder.push(&word.text),
             } {
                 return;
             }
@@ -133,8 +106,8 @@ impl StyledLine {
     }
 }
 
-impl From<Vec<Word>> for StyledLine {
-    fn from(inner: Vec<Word>) -> Self {
+impl From<Vec<Text>> for StyledLine {
+    fn from(inner: Vec<Text>) -> Self {
         Self { inner }
     }
 }
@@ -145,7 +118,7 @@ pub fn paragraph<'a>(area: Rect, text: impl Iterator<Item = &'a str>, backend: &
     for text_line in text {
         match lines.next() {
             Some(mut line) => {
-                if text_line.len() > line.width {
+                if text_line.width() > line.width {
                     let mut at_char = 0;
                     let mut remaining = text_line.len();
                     while remaining != 0 {
@@ -165,7 +138,7 @@ pub fn paragraph<'a>(area: Rect, text: impl Iterator<Item = &'a str>, backend: &
                         }
                     }
                 } else {
-                    line.render(&text_line, backend);
+                    line.render(text_line, backend);
                 };
             }
             None => return,
@@ -193,7 +166,7 @@ pub fn paragraph_styled<'a>(area: Rect, text: impl Iterator<Item = (&'a str, Sty
     for (text_line, style) in text {
         match lines.next() {
             Some(mut line) => {
-                if text_line.len() > line.width {
+                if text_line.width() > line.width {
                     let mut at_char = 0;
                     let mut remaining = text_line.len();
                     while remaining != 0 {
@@ -213,7 +186,7 @@ pub fn paragraph_styled<'a>(area: Rect, text: impl Iterator<Item = (&'a str, Sty
                         }
                     }
                 } else {
-                    line.render_styled(&text_line, style, backend);
+                    line.render_styled(text_line, style, backend);
                 };
             }
             None => return,

@@ -31,10 +31,10 @@ pub trait BackendProtocol: Write + Sized {
 
     fn clear_all(&mut self);
 
-    /// stores the cursor and hides it
+    /// stores the cursor
     fn save_cursor(&mut self);
 
-    /// restores cursor position and shows cursor
+    /// restores cursor position
     fn restore_cursor(&mut self);
 
     /// sets the style for the print/print at

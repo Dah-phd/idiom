@@ -1,4 +1,4 @@
-use crate::{global_state::GlobalState, runner::EditorTerminal, tree::Tree, workspace::Workspace, BackendProtocol};
+use crate::{global_state::GlobalState, runner::EditorTerminal, tree::Tree, workspace::Workspace};
 use bitflags::bitflags;
 use std::io::{Result, Write};
 
@@ -58,7 +58,6 @@ pub fn draw(
     _tree: &mut Tree,
     _term: &mut EditorTerminal,
 ) -> Result<()> {
-    gs.writer.hide_cursor();
     workspace.render(gs);
     if let Some(editor) = workspace.get_active() {
         editor.fast_render(gs);
@@ -75,7 +74,6 @@ pub fn draw_with_tree(
     tree: &mut Tree,
     _term: &mut EditorTerminal,
 ) -> Result<()> {
-    gs.writer.hide_cursor();
     tree.fast_render(gs);
     workspace.render(gs);
     if let Some(editor) = workspace.get_active() {
@@ -93,7 +91,6 @@ pub fn draw_popup(
     _tree: &mut Tree,
     _term: &mut EditorTerminal,
 ) -> Result<()> {
-    gs.writer.hide_cursor();
     gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
     gs.render_popup();
     gs.writer.flush()
@@ -106,7 +103,6 @@ pub fn draw_term(
     _tree: &mut Tree,
     term: &mut EditorTerminal,
 ) -> Result<()> {
-    gs.writer.hide_cursor();
     gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
     term.render(gs);
     gs.writer.flush()

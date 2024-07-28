@@ -19,7 +19,7 @@ pub struct AutoComplete {
 impl AutoComplete {
     pub fn new(completions: Vec<CompletionItem>, line: String, idx: usize) -> Self {
         let mut filter = String::new();
-        for ch in line[..idx].chars() {
+        for ch in line.chars().take(idx) {
             if ch.is_alphabetic() || ch == '_' {
                 filter.push(ch);
             } else {

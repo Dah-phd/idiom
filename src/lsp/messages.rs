@@ -44,25 +44,18 @@ impl LSPMessage {
     }
 
     pub fn parse(mut obj: Value) -> LSPMessage {
-        if let Some(id) = obj.get_mut("id") {
-            let id = id.take();
-            if let Some(result) = &mut obj.get_mut("result") {
-                return LSPMessage::Response(Response {
-                    id: id.as_i64().unwrap(),
-                    result: Some(result.take()),
-                    error: None,
-                });
-            }
-            if let Some(error) = obj.get_mut("error") {
-                return LSPMessage::Response(Response {
-                    id: id.as_i64().unwrap(),
-                    result: None,
-                    error: Some(error.take()),
-                });
+        if let Some(raw_id) = obj.get("id").cloned() {
+            if let Some(id) = raw_id.as_i64() {
+                if let Some(result) = &mut obj.get_mut("result") {
+                    return LSPMessage::Response(Response { id, result: Some(result.take()), error: None });
+                }
+                if let Some(error) = obj.get_mut("error") {
+                    return LSPMessage::Response(Response { id, result: None, error: Some(error.take()) });
+                }
             }
             if let Some(method) = obj.get_mut("method") {
                 return LSPMessage::Request(Request {
-                    id: id.to_string(),
+                    id: raw_id.to_string(),
                     method: method.to_string(),
                     params: obj.get_mut("params").map(|p| p.take()),
                 });
