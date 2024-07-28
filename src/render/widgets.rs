@@ -11,7 +11,7 @@ pub trait Widget {
     fn len(&self) -> usize;
     fn print(&self, backend: &mut Backend);
     fn print_at(&self, line: Line, backend: &mut Backend);
-    fn wrap(&self, lines: RectIter, backend: &mut Backend);
+    // fn wrap(&self, lines: RectIter, backend: &mut Backend);
 }
 
 pub struct Text {
@@ -41,8 +41,6 @@ impl Widget for Text {
     fn print_at(&self, line: Line, backend: &mut Backend) {
         backend.print_at(line.row, line.col, &self.text);
     }
-
-    fn wrap(&self, lines: RectIter, backend: &mut Backend) {}
 }
 
 impl From<String> for Text {

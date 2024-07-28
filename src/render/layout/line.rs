@@ -71,8 +71,7 @@ impl Line {
 
     #[inline]
     pub fn render_styled(self, text: &str, style: Style, backend: &mut Backend) {
-        let text_width = text.width();
-        match text_width.cmp(&self.width) {
+        match text.len().cmp(&self.width) {
             Ordering::Greater => backend.print_styled_at(self.row, self.col, text.truncate_width(self.width), style),
             Ordering::Equal => backend.print_styled_at(self.row, self.col, text, style),
             Ordering::Less => {
