@@ -1,11 +1,10 @@
+use unicode_width::UnicodeWidthChar;
+
 use crate::render::{
     backend::{Backend, BackendProtocol, Style},
     utils::UTF8Safe,
 };
-use std::{
-    cmp::Ordering,
-    ops::{AddAssign, SubAssign},
-};
+use std::ops::{AddAssign, SubAssign};
 
 #[derive(Debug, Default, Clone)]
 pub struct Line {
@@ -62,22 +61,48 @@ impl Line {
 
     #[inline]
     pub fn render(self, text: &str, backend: &mut Backend) {
-        match text.len().cmp(&self.width) {
-            Ordering::Greater => backend.print_at(self.row, self.col, text.truncate_width(self.width)),
-            Ordering::Equal => backend.print_at(self.row, self.col, text),
-            Ordering::Less => backend.print_at(self.row, self.col, format!("{text:width$}", width = self.width)),
+        let Line { mut width, row, col } = self;
+        backend.go_to(row, col);
+        for ch in text.chars() {
+            match UnicodeWidthChar::width(ch) {
+                Some(w) => {
+                    if w > width {
+                        return;
+                    }
+                    width -= w;
+                }
+                None => continue,
+            }
+            backend.print(ch);
+        }
+        if width != 0 {
+            backend.print(format!("{:width$}", ""))
         }
     }
 
     #[inline]
     pub fn render_styled(self, text: &str, style: Style, backend: &mut Backend) {
-        match text.len().cmp(&self.width) {
-            Ordering::Greater => backend.print_styled_at(self.row, self.col, text.truncate_width(self.width), style),
-            Ordering::Equal => backend.print_styled_at(self.row, self.col, text, style),
-            Ordering::Less => {
-                backend.print_styled_at(self.row, self.col, format!("{text:width$}", width = self.width), style)
+        let Line { mut width, row, col } = self;
+        let reset_style = backend.get_style();
+        backend.go_to(row, col);
+        backend.update_style(style);
+        for ch in text.chars() {
+            match UnicodeWidthChar::width(ch) {
+                Some(w) => {
+                    if w > width {
+                        backend.set_style(reset_style);
+                        return;
+                    }
+                    width -= w;
+                }
+                None => continue,
             }
+            backend.print(ch);
         }
+        if width != 0 {
+            backend.print(format!("{:width$}", ""))
+        }
+        backend.set_style(reset_style);
     }
 
     /// creates line builder from Line
