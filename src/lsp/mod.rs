@@ -5,11 +5,11 @@ mod messages;
 mod notification;
 mod request;
 mod servers;
-use crate::utils::{force_lock, split_arc_mutex, split_arc_mutex_async};
+use crate::utils::{force_lock, split_arc_mutex};
 pub use client::LSPClient;
 pub use error::{LSPError, LSPResult};
 use lsp_stream::JsonRCP;
-pub use messages::{Diagnostic, GeneralNotification, LSPMessage, LSPResponse, LSPResponseType, Request, Response};
+pub use messages::{Diagnostic, LSPMessage, LSPResponse, LSPResponseType, Response};
 pub use notification::LSPNotification;
 pub use request::LSPRequest;
 
@@ -20,14 +20,14 @@ use std::{
     path::Path,
     process::Stdio,
     str::FromStr,
-    sync::{Arc, Mutex},
+    // sync::{Arc, Mutex},
 };
 use tokio::{io::AsyncWriteExt, process::Child, task::JoinHandle};
 
 #[allow(clippy::upper_case_acronyms)]
 pub struct LSP {
-    pub notifications: Arc<Mutex<Vec<GeneralNotification>>>,
-    pub requests: Arc<tokio::sync::Mutex<Vec<Request>>>,
+    // pub notifications: Arc<Mutex<Vec<GeneralNotification>>>,
+    // pub requests: Arc<tokio::sync::Mutex<Vec<Request>>>,
     lsp_cmd: String,
     inner: Child,
     client: LSPClient,
@@ -48,8 +48,8 @@ impl LSP {
 
         // setting up storage
         let (responses, responses_handler) = split_arc_mutex(HashMap::new());
-        let (notifications, notifications_handler) = split_arc_mutex(Vec::new());
-        let (requests, requests_handler) = split_arc_mutex_async(Vec::new());
+        // let (notifications, notifications_handler) = split_arc_mutex(Vec::new());
+        // let (requests, requests_handler) = split_arc_mutex_async(Vec::new());
         let (diagnostics, diagnostics_handler) = split_arc_mutex(HashMap::new());
 
         // sending init requests
@@ -68,11 +68,13 @@ impl LSP {
                     LSPMessage::Response(inner) => {
                         force_lock(&responses_handler).insert(inner.id, inner);
                     }
-                    LSPMessage::Notification(inner) => force_lock(&notifications_handler).push(inner),
                     LSPMessage::Diagnostic(uri, params) => {
                         force_lock(&diagnostics_handler).insert(uri, params);
                     }
-                    LSPMessage::Request(inner) => requests_handler.lock().await.push(inner),
+                    LSPMessage::Request(_inner) => {
+                        // TODO: investigate handle
+                        // requests_handler.lock().await.push(inner)
+                    }
                     LSPMessage::Error(_err) => {
                         // TODO: investigate handle
                     }
@@ -85,7 +87,7 @@ impl LSP {
 
         let (lsp_send_handler, client) = LSPClient::new(stdin, diagnostics, responses, capabilities)?;
 
-        Ok(Self { notifications, requests, client, lsp_cmd, inner, lsp_json_handler, lsp_send_handler, attempts: 5 })
+        Ok(Self { client, lsp_cmd, inner, lsp_json_handler, lsp_send_handler, attempts: 5 })
     }
 
     pub async fn check_status(&mut self) -> LSPResult<Option<LSPError>> {

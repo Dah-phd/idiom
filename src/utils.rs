@@ -23,12 +23,6 @@ pub fn split_arc_mutex<T>(inner: T) -> (Arc<Mutex<T>>, Arc<Mutex<T>>) {
     (arc, clone)
 }
 
-pub fn split_arc_mutex_async<T>(inner: T) -> (Arc<tokio::sync::Mutex<T>>, Arc<tokio::sync::Mutex<T>>) {
-    let arc = Arc::new(tokio::sync::Mutex::new(inner));
-    let clone = Arc::clone(&arc);
-    (arc, clone)
-}
-
 pub fn force_lock<T>(mutex: &Mutex<T>) -> MutexGuard<T> {
     match mutex.lock() {
         Ok(guard) => guard,
