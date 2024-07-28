@@ -507,7 +507,7 @@ impl CodeLine {
                 backend.print_styled(">>", Style::reversed());
             }
         // handles non ascii shrunk lines
-        } else if let Some(truncated) = self.content.truncate_if_wider(line_width) {
+        } else if let Ok(truncated) = self.content.truncate_if_wider(line_width) {
             let mut content = truncated.chars();
             if let Some(ch) = content.next_back() {
                 if UnicodeWidthChar::width(ch).unwrap_or_default() <= 1 {
@@ -537,7 +537,7 @@ impl CodeLine {
                 backend.print_styled(">>", Style::reversed());
             }
         // handles non ascii shrunk lines
-        } else if let Some(truncated) = self.content.truncate_if_wider(line_width) {
+        } else if let Ok(truncated) = self.content.truncate_if_wider(line_width) {
             let mut content = truncated.chars();
             if let Some(ch) = content.next_back() {
                 if UnicodeWidthChar::width(ch).unwrap_or_default() <= 1 {

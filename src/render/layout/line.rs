@@ -169,26 +169,33 @@ pub struct LineBuilder<'a> {
 impl<'a> LineBuilder<'a> {
     /// returns Ok(bool) -> if true line is not full, false the line is finished
     pub fn push(&mut self, text: &str) -> bool {
-        if text.len() > self.remaining {
-            self.backend.print(text.truncate_width(self.remaining));
-            self.remaining = 0;
-            return false;
+        match text.truncate_if_wider(self.remaining) {
+            Ok(truncated_text) => {
+                self.backend.print(truncated_text);
+                self.remaining = 0;
+                false
+            }
+            Err(width) => {
+                self.remaining -= width;
+                self.backend.print(text);
+                true
+            }
         }
-        self.remaining -= text.len();
-        self.backend.print(text);
-        true
     }
 
     /// push with style
     pub fn push_styled(&mut self, text: &str, style: Style) -> bool {
-        if text.len() > self.remaining {
-            self.backend.print_styled(text.truncate_width(self.remaining), style);
-            self.remaining = 0;
-            return false;
+        match text.truncate_if_wider(self.remaining) {
+            Ok(truncated_text) => {
+                self.backend.print_styled(truncated_text, style);
+                false
+            }
+            Err(width) => {
+                self.remaining -= width;
+                self.backend.print_styled(text, style);
+                true
+            }
         }
-        self.remaining -= text.len();
-        self.backend.print_styled(text, style);
-        true
     }
 
     #[inline]
@@ -220,26 +227,34 @@ pub struct LineBuilderRev<'a> {
 impl<'a> LineBuilderRev<'a> {
     /// returns Ok(bool) -> if true line is not full, false the line is finished
     pub fn push(&mut self, text: &str) -> bool {
-        if text.len() > self.remaining {
-            self.backend.print_at(self.row, self.col, text.truncate_width_start(self.remaining));
-            self.remaining = 0;
-            return false;
+        match text.truncate_if_wider_start(self.remaining) {
+            Ok(truncated_text) => {
+                self.remaining = 0;
+                self.backend.print_at(self.row, self.col, truncated_text);
+                false
+            }
+            Err(width) => {
+                self.remaining -= width;
+                self.backend.print_at(self.row, self.col + self.remaining as u16, text);
+                true
+            }
         }
-        self.remaining -= text.len();
-        self.backend.print_at(self.row, self.col + self.remaining as u16, text);
-        true
     }
 
     /// push with style
     pub fn push_styled(&mut self, text: &str, style: Style) -> bool {
-        if text.len() > self.remaining {
-            self.backend.print_styled_at(self.row, self.col, text.truncate_width_start(self.remaining), style);
-            self.remaining = 0;
-            return false;
+        match text.truncate_if_wider_start(self.remaining) {
+            Ok(truncated_text) => {
+                self.remaining = 0;
+                self.backend.print_styled_at(self.row, self.col, truncated_text, style);
+                false
+            }
+            Err(width) => {
+                self.remaining -= width;
+                self.backend.print_styled_at(self.row, self.col + self.remaining as u16, text, style);
+                true
+            }
         }
-        self.remaining -= text.len();
-        self.backend.print_styled_at(self.row, self.col + self.remaining as u16, text, style);
-        true
     }
 
     #[inline]
