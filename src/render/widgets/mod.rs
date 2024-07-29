@@ -1,17 +1,23 @@
-use super::{backend::BackendProtocol, layout::RectIter};
+use crossterm::style;
+
+use super::{backend::BackendProtocol, layout::RectIter, utils::WriteChunks};
 use crate::render::{
     backend::{Backend, Style},
     layout::{Line, Rect},
     UTF8Safe,
 };
 
-pub trait Widget {
+pub trait Writable {
+    fn is_simple(&self) -> bool;
     fn width(&self) -> usize;
     fn char_len(&self) -> usize;
     fn len(&self) -> usize;
+    /// directly render no checks or bounds
     fn print(&self, backend: &mut Backend);
+    /// prints bounded by line
     fn print_at(&self, line: Line, backend: &mut Backend);
-    // fn wrap(&self, lines: RectIter, backend: &mut Backend);
+    /// wraps within rect
+    fn wrap(&self, lines: &mut RectIter, backend: &mut Backend);
 }
 
 pub struct Text {
@@ -21,15 +27,29 @@ pub struct Text {
     style: Option<Style>,
 }
 
-impl Widget for Text {
+impl Text {
+    pub fn new(text: String, style: Option<Style>) -> Self {
+        Self { char_len: text.char_len(), width: text.width(), style, text }
+    }
+}
+
+impl Writable for Text {
+    #[inline(always)]
+    fn is_simple(&self) -> bool {
+        self.char_len == self.text.len()
+    }
+
+    #[inline(always)]
     fn char_len(&self) -> usize {
         self.char_len
     }
 
+    #[inline(always)]
     fn width(&self) -> usize {
         self.width
     }
 
+    #[inline(always)]
     fn len(&self) -> usize {
         self.text.len()
     }
@@ -39,7 +59,22 @@ impl Widget for Text {
     }
 
     fn print_at(&self, line: Line, backend: &mut Backend) {
-        backend.print_at(line.row, line.col, &self.text);
+        let Line { width, row, col } = line;
+        let text = if self.width > width { self.text.truncate_width(width) } else { &self.text };
+
+        match self.style {
+            Some(style) => backend.print_styled_at(row, col, text, style),
+            None => backend.print_at(row, col, text),
+        }
+    }
+
+    fn wrap(&self, lines: &mut RectIter, backend: &mut Backend) {
+        for (width, text_chunk) in WriteChunks::new(&self.text, lines.width()) {
+            match lines.next() {
+                Some(line) => backend.print_at(line.row, line.col, text_chunk),
+                None => return,
+            }
+        }
     }
 }
 
@@ -65,43 +100,49 @@ pub struct StyledLine {
     inner: Vec<Text>,
 }
 
-impl StyledLine {
-    fn wrap(&self, lines: &mut RectIter, backend: &mut Backend) -> bool {
-        let mut current_line = match lines.next() {
-            Some(line) => line,
-            None => return false,
-        };
-        let mut remaining = current_line.width;
-        backend.go_to(current_line.row, current_line.col);
-        for word in self.inner.iter() {
-            todo!()
-        }
-        true
+impl Writable for StyledLine {
+    fn is_simple(&self) -> bool {
+        self.inner.iter().all(|text| text.is_simple())
     }
 
-    fn render(&self, line: Line, backend: &mut Backend) {
-        let mut builder = line.unsafe_builder(backend);
-        for word in self.inner.iter() {
-            if !match word.style {
-                Some(style) => builder.push_styled(&word.text, style),
-                None => builder.push(&word.text),
-            } {
-                return;
-            }
+    #[inline(always)]
+    fn char_len(&self) -> usize {
+        self.inner.iter().fold(0, |sum, text| sum + text.char_len)
+    }
+
+    #[inline(always)]
+    fn len(&self) -> usize {
+        self.inner.iter().fold(0, |sum, text| sum + text.len())
+    }
+
+    fn width(&self) -> usize {
+        self.inner.iter().fold(0, |sum, text| sum + text.width)
+    }
+
+    fn print(&self, backend: &mut Backend) {
+        for text in self.inner.iter() {
+            text.print(backend)
         }
     }
 
-    fn render_rev(&self, line: Line, backend: &mut Backend) {
-        let mut builder = line.unsafe_builder_rev(backend);
-        for word in self.inner.iter() {
-            if !match word.style {
-                Some(style) => builder.push_styled(&word.text, style),
-                None => builder.push(&word.text),
-            } {
+    fn print_at(&self, line: Line, backend: &mut Backend) {
+        let Line { row, col, mut width } = line;
+        backend.go_to(row, col);
+        for text in self.inner.iter() {
+            if width < text.width {
+                let truncated_text = text.text.truncate_width(width);
+                match text.style {
+                    Some(style) => backend.print_styled(truncated_text, style),
+                    None => backend.print(truncated_text),
+                };
                 return;
             }
+            width -= text.width;
+            text.print(backend);
         }
     }
+
+    fn wrap(&self, lines: &mut RectIter, backend: &mut Backend) {}
 }
 
 impl From<Vec<Text>> for StyledLine {
@@ -147,18 +188,6 @@ pub fn paragraph<'a>(area: Rect, text: impl Iterator<Item = &'a str>, backend: &
     }
 }
 
-pub fn alt_paragraph_styled<'a>(area: Rect, text: impl Iterator<Item = &'a StyledLine>, backend: &mut Backend) {
-    let mut lines = area.into_iter();
-    for line_text in text {
-        if !line_text.wrap(&mut lines, backend) {
-            return;
-        }
-    }
-    for remaining_line in lines {
-        remaining_line.render_empty(backend);
-    }
-}
-
 pub fn paragraph_styled<'a>(area: Rect, text: impl Iterator<Item = (&'a str, Style)>, backend: &mut Backend) {
     let mut lines = area.into_iter();
     for (text_line, style) in text {
@@ -194,3 +223,6 @@ pub fn paragraph_styled<'a>(area: Rect, text: impl Iterator<Item = (&'a str, Sty
         remaining_line.render_empty(backend);
     }
 }
+
+#[cfg(test)]
+mod tests;

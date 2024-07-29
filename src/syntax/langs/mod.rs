@@ -1,4 +1,6 @@
 mod rust;
+use crate::render::backend::Style;
+use crate::render::widgets::{StyledLine, Text};
 use crate::syntax::{theme::Theme, Action, GlobalState, WorkspaceEvent};
 use crate::workspace::line::EditorLine;
 use crate::{configs::FileType, render::backend::Color};
@@ -95,28 +97,42 @@ impl Lang {
         false
     }
 
-    #[allow(dead_code)]
-    pub fn completable_(&self, line: &str, idx: usize) -> bool {
-        let mut curr_token = String::new();
-        let mut prev_token = String::new();
-        let mut trigger = false;
-        for (char_idx, ch) in line.char_indices() {
-            if ch.is_alphabetic() || ch == '_' {
-                if char_idx + 1 == idx {
-                    return trigger
-                        || prev_token.is_empty()
-                            && curr_token.len() < 4
-                            && !self.declaration.contains(&prev_token.as_str());
+    pub fn stylize(&self, text_line: String, theme: &Theme) -> StyledLine {
+        if self.is_comment(&text_line) {
+            return vec![Text::new(text_line, Some(Style::fg(theme.comment)))].into();
+        }
+        let mut buffer = vec![];
+        let mut word = String::new();
+        for ch in text_line.chars() {
+            if ' ' == ch {
+                if word.is_empty() {
+                    buffer.push(Text::new(ch.to_string(), None));
+                } else if self.is_import(&word) {
+                    word.push(ch);
+                    buffer.push(Text::new(word, Some(Style::fg(theme.imports))));
+                    break;
+                } else if self.is_flow(&word) {
+                    word.push(ch);
+                    buffer.push(Text::new(std::mem::take(&mut word), Some(Style::fg(theme.flow_control))));
+                } else if self.is_keyword(&word) {
+                    word.push(ch);
+                    buffer.push(Text::new(std::mem::take(&mut word), Some(Style::fg(theme.key_words))));
+                };
+                continue;
+            } else if ':' == ch {
+                if word.is_empty() {
+                    buffer.push(Text::new(ch.to_string(), None));
+                    continue;
                 }
-                curr_token.push(ch);
+                continue;
+            } else if '(' == ch {
+                buffer.push(Text::new(std::mem::take(&mut word), Some(Style::fg(theme.functions))));
+                buffer.push(Text::new(ch.to_string(), None));
             } else {
-                if " (.".contains(ch) {
-                    trigger = true;
-                }
-                prev_token = std::mem::take(&mut curr_token);
+                word.push(ch);
             }
         }
-        trigger
+        buffer.into()
     }
 }
 

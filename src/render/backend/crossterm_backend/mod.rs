@@ -244,6 +244,11 @@ impl BackendProtocol for Backend {
         }
         .expect(ERR_MSG);
     }
+
+    #[inline]
+    fn pad(&mut self, width: usize) {
+        queue!(self, Print(format!("{:width$}", ""))).expect(ERR_MSG);
+    }
 }
 
 #[allow(dead_code)]

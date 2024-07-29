@@ -1,4 +1,4 @@
-use super::{UTF8Safe, UTF8SafeStringExt};
+use super::{UTF8Safe, UTF8SafeStringExt, WriteChunks};
 const TEXT: &str = "123🚀13";
 
 #[test]
@@ -181,4 +181,19 @@ fn test_utf8_get_till() {
 fn test_utf8_remove_panic() {
     let mut s = String::new();
     s.utf8_remove(0);
+}
+
+#[test]
+fn test_chunks() {
+    let text = "123🚀asdas123123123afsadasras";
+    let mut chunks = WriteChunks::new(text, 4);
+    assert_eq!(chunks.next(), Some((3, "123")));
+    assert_eq!(chunks.next(), Some((4, "🚀as")));
+    assert_eq!(chunks.next(), Some((4, "das1")));
+    assert_eq!(chunks.next(), Some((4, "2312")));
+    assert_eq!(chunks.next(), Some((4, "3123")));
+    assert_eq!(chunks.next(), Some((4, "afsa")));
+    assert_eq!(chunks.next(), Some((4, "dasr")));
+    assert_eq!(chunks.next(), Some((2, "as")));
+    assert_eq!(chunks.next(), None);
 }

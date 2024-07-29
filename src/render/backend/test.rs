@@ -103,6 +103,10 @@ impl BackendProtocol for Backend {
         self.default_style.update(style);
         self.data.push((self.default_style, String::from("<<updated style>>")))
     }
+
+    fn pad(&mut self, width: usize) {
+        self.data.push((self.default_style, format!("<<padding: {:?}>>", width)))
+    }
 }
 
 impl Write for Backend {

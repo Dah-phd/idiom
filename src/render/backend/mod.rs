@@ -79,6 +79,9 @@ pub trait BackendProtocol: Write + Sized {
 
     /// goes to location and prints styled text without affecting the writer set style
     fn print_styled_at<D: Display>(&mut self, row: u16, col: u16, text: D, style: Style);
+
+    /// padding with empty space
+    fn pad(&mut self, width: usize);
 }
 
 #[cfg(test)]

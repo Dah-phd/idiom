@@ -56,7 +56,8 @@ impl Line {
 
     #[inline]
     pub fn render_empty(self, backend: &mut Backend) {
-        backend.print_at(self.row, self.col, format!("{:width$}", "", width = self.width));
+        backend.go_to(self.row, self.col);
+        backend.pad(self.width);
     }
 
     #[inline]
@@ -76,7 +77,7 @@ impl Line {
             backend.print(ch);
         }
         if width != 0 {
-            backend.print(format!("{:width$}", ""))
+            backend.pad(width)
         }
     }
 
@@ -100,7 +101,7 @@ impl Line {
             backend.print(ch);
         }
         if width != 0 {
-            backend.print(format!("{:width$}", ""))
+            backend.pad(width)
         }
         backend.set_style(reset_style);
     }
