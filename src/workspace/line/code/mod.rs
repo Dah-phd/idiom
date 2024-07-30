@@ -17,6 +17,7 @@ pub use context::CodeLineContext;
 use std::{
     fmt::Display,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
+    path::Path,
 };
 
 /// Used to represent code, has simpler wrapping as cpde lines shoud be shorter than 120 chars in most cases
@@ -102,6 +103,16 @@ impl Index<RangeFull> for CodeLine {
 
 impl EditorLine for CodeLine {
     type Context<'a> = CodeLineContext<'a>;
+    type Error = String;
+
+    #[inline]
+    fn parse_lines<P: AsRef<Path>>(path: P) -> Result<Vec<Self>, Self::Error> {
+        Ok(std::fs::read_to_string(path)
+            .map_err(|err| err.to_string())?
+            .split('\n')
+            .map(|line| CodeLine::new(line.to_owned()))
+            .collect())
+    }
 
     #[inline]
     fn is_simple(&self) -> bool {

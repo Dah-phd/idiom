@@ -13,6 +13,7 @@ pub use code::{CodeLine, CodeLineContext};
 use std::{
     fmt::Display,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
+    path::Path,
     str::{CharIndices, Chars, MatchIndices},
 };
 
@@ -30,6 +31,10 @@ pub trait EditorLine:
     + Display
 {
     type Context<'a>;
+    type Error;
+
+    /// init
+    fn parse_lines<P: AsRef<Path>>(path: P) -> Result<Vec<Self>, Self::Error>;
 
     /// assumption is that control chars will not be present in file -> confirms utf8 idx is always 1 byte
     fn is_simple(&self) -> bool;
@@ -39,8 +44,7 @@ pub trait EditorLine:
     fn push_str(&mut self, string: &str);
     fn push_line(&mut self, line: Self);
 
-    /// utf encodings
-
+    /// UTF ENOCODING
     fn len(&self) -> usize;
     fn char_len(&self) -> usize;
     fn utf16_len(&self) -> usize;
@@ -61,7 +65,6 @@ pub trait EditorLine:
     fn split_off(&mut self, at: usize) -> Self;
     fn split_at(&self, mid: usize) -> (&str, &str);
     fn remove(&mut self, idx: usize) -> char;
-
     fn trim_start(&self) -> &str;
     fn trim_end(&self) -> &str;
     fn chars(&self) -> Chars<'_>;
@@ -75,21 +78,18 @@ pub trait EditorLine:
     fn clear(&mut self);
     fn unwrap(self) -> String;
 
-    /// diagnostics
-
+    /// DIAGNOSTICS
     fn set_diagnostics(&mut self, diagnostics: DiagnosticLine);
     fn diagnostic_info(&self, lang: &Lang) -> Option<DiagnosticInfo>;
     fn drop_diagnostics(&mut self);
 
-    /// style
-
+    /// STYLE
     fn iter_tokens(&self) -> impl Iterator<Item = &Token>;
     fn push_token(&mut self, token: Token);
     fn replace_tokens(&mut self, tokens: Vec<Token>);
     fn rebuild_tokens(&mut self, lexer: &Lexer);
 
     /// render
-
     fn cursor(&mut self, ctx: &mut Self::Context<'_>, lines: &mut RectIter, backend: &mut Backend);
     fn cursor_fast(&mut self, ctx: &mut Self::Context<'_>, lines: &mut RectIter, backend: &mut Backend);
     fn render(&mut self, ctx: &mut Self::Context<'_>, line: Line, backend: &mut Backend);

@@ -3,6 +3,7 @@ use unicode_width::UnicodeWidthChar;
 use crate::render::{
     backend::{Backend, BackendProtocol, Style},
     utils::UTF8Safe,
+    widgets::Writable,
 };
 use std::ops::{AddAssign, SubAssign};
 
@@ -189,6 +190,7 @@ impl<'a> LineBuilder<'a> {
         match text.truncate_if_wider(self.remaining) {
             Ok(truncated_text) => {
                 self.backend.print_styled(truncated_text, style);
+                self.remaining = 0;
                 false
             }
             Err(width) => {
@@ -213,7 +215,7 @@ impl Drop for LineBuilder<'_> {
     /// ensure line is rendered and padded till end;
     fn drop(&mut self) {
         if self.remaining != 0 {
-            self.push(format!("{:width$}", "", width = self.remaining).as_str());
+            self.backend.pad(self.remaining);
         }
     }
 }
@@ -258,6 +260,22 @@ impl<'a> LineBuilderRev<'a> {
         }
     }
 
+    pub fn push_text(&mut self, text: impl Writable) -> Option<usize> {
+        if self.remaining >= text.width() {
+            self.remaining -= text.width();
+            self.backend.go_to(self.row, self.col + self.remaining as u16);
+            text.print(self.backend);
+            None
+        } else {
+            // checked that truncated pring is safe
+            self.backend.go_to(self.row, self.col);
+            unsafe { text.print_truncated_start(self.remaining, self.backend) }
+            let skipped = text.width() - self.remaining;
+            self.remaining = 0;
+            Some(skipped)
+        }
+    }
+
     #[inline]
     pub fn width(&self) -> usize {
         self.remaining
@@ -272,7 +290,8 @@ impl Drop for LineBuilderRev<'_> {
     /// ensure line is rendered and padded till end;
     fn drop(&mut self) {
         if self.remaining != 0 {
-            self.push(format!("{:width$}", "", width = self.remaining).as_str());
+            self.backend.go_to(self.row, self.col);
+            self.backend.pad(self.remaining);
         }
     }
 }

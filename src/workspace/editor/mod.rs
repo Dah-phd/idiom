@@ -1,5 +1,6 @@
 use crate::{
     configs::{EditorConfigs, FileType},
+    error::{IdiomError, IdiomResult},
     global_state::GlobalState,
     lsp::LSPError,
     render::layout::Rect,
@@ -38,11 +39,8 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn from_path(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> std::io::Result<Self> {
-        let content = std::fs::read_to_string(&path)?
-            .split('\n')
-            .map(|line| CodeLine::new(line.to_owned()))
-            .collect::<Vec<CodeLine>>();
+    pub fn from_path(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
+        let content = CodeLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let file_type = FileType::derive_type(&path);
         let display = build_display(&path);
         Ok(Self {

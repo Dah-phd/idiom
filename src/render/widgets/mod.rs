@@ -7,13 +7,20 @@ use crate::render::{
     UTF8Safe,
 };
 
+/// Trait that allows faster rendering without checks and can reduce complexity
 pub trait Writable {
+    /// check if the line can be rendered as ascii - no control chars should be included
     fn is_simple(&self) -> bool;
+    /// width when rendered
     fn width(&self) -> usize;
     fn char_len(&self) -> usize;
     fn len(&self) -> usize;
     /// directly render no checks or bounds
     fn print(&self, backend: &mut Backend);
+    /// print truncated
+    unsafe fn print_truncated(&self, width: usize, backend: &mut Backend);
+    /// print truncated start
+    unsafe fn print_truncated_start(&self, width: usize, backend: &mut Backend);
     /// prints bounded by line
     fn print_at(&self, line: Line, backend: &mut Backend);
     /// wraps within rect
@@ -56,6 +63,22 @@ impl Writable for Text {
 
     fn print(&self, backend: &mut Backend) {
         backend.print(&self.text);
+    }
+
+    unsafe fn print_truncated(&self, width: usize, backend: &mut Backend) {
+        let text = if self.is_simple() { self.text.get_unchecked(..width) } else { self.text.truncate_width(width) };
+        match self.style {
+            Some(style) => backend.print_styled(text, style),
+            None => backend.print(text),
+        }
+    }
+
+    unsafe fn print_truncated_start(&self, width: usize, backend: &mut Backend) {
+        let text = if self.is_simple() { self.text.get_unchecked(width..) } else { self.text.truncate_width(width) };
+        match self.style {
+            Some(style) => backend.print_styled(text, style),
+            None => backend.print(text),
+        }
     }
 
     fn print_at(&self, line: Line, backend: &mut Backend) {
@@ -122,6 +145,33 @@ impl Writable for StyledLine {
     fn print(&self, backend: &mut Backend) {
         for text in self.inner.iter() {
             text.print(backend)
+        }
+    }
+
+    unsafe fn print_truncated(&self, mut width: usize, backend: &mut Backend) {
+        for text in self.inner.iter() {
+            if text.width > width {
+                text.print_truncated(width, backend);
+                return;
+            }
+            width -= text.width;
+            text.print(backend);
+        }
+    }
+
+    unsafe fn print_truncated_start(&self, width: usize, backend: &mut Backend) {
+        let mut skipped = self.width() - width;
+        let mut iter = self.inner.iter();
+        for text in iter.by_ref() {
+            if text.width > skipped {
+                text.print_truncated_start(skipped, backend);
+                break;
+            }
+            skipped -= text.width;
+        }
+
+        for text in iter {
+            text.print(backend);
         }
     }
 
