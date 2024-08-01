@@ -1,4 +1,6 @@
-use crossterm::style;
+use std::fmt::{Display, Pointer};
+
+use unicode_width::UnicodeWidthChar;
 
 use super::{backend::BackendProtocol, layout::RectIter, utils::WriteChunks};
 use crate::render::{
@@ -8,7 +10,7 @@ use crate::render::{
 };
 
 /// Trait that allows faster rendering without checks and can reduce complexity
-pub trait Writable {
+pub trait Writable: Display {
     /// check if the line can be rendered as ascii - no control chars should be included
     fn is_simple(&self) -> bool;
     /// width when rendered
@@ -35,8 +37,20 @@ pub struct Text {
 }
 
 impl Text {
+    #[inline]
     pub fn new(text: String, style: Option<Style>) -> Self {
         Self { char_len: text.char_len(), width: text.width(), style, text }
+    }
+
+    #[inline]
+    pub fn raw(text: String) -> Self {
+        Self { char_len: text.char_len(), width: text.width(), style: None, text }
+    }
+}
+
+impl Display for Text {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.text)
     }
 }
 
@@ -107,13 +121,27 @@ impl From<String> for Text {
     }
 }
 
+impl From<char> for Text {
+    #[inline]
+    fn from(value: char) -> Self {
+        Self {
+            char_len: 1,
+            width: UnicodeWidthChar::width(value).unwrap_or_default(),
+            text: value.to_string(),
+            style: None,
+        }
+    }
+}
+
 impl From<(String, Style)> for Text {
+    #[inline]
     fn from((text, style): (String, Style)) -> Self {
         Self { char_len: text.char_len(), width: text.width(), text, style: Some(style) }
     }
 }
 
 impl From<(Style, String)> for Text {
+    #[inline]
     fn from((style, text): (Style, String)) -> Self {
         Self { char_len: text.char_len(), width: text.width(), text, style: Some(style) }
     }
@@ -121,6 +149,15 @@ impl From<(Style, String)> for Text {
 
 pub struct StyledLine {
     inner: Vec<Text>,
+}
+
+impl Display for StyledLine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for text in self.inner.iter() {
+            text.fmt(f)?;
+        }
+        Ok(())
+    }
 }
 
 impl Writable for StyledLine {

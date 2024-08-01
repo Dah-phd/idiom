@@ -53,13 +53,14 @@ impl Lang {
         false
     }
 
+    pub fn is_import_start(&self, line: &str) -> bool {
+        let trimmed = line.trim_start();
+        self.mod_import.iter().any(|pat| trimmed.starts_with(pat))
+    }
+
     pub fn is_comment(&self, line: &str) -> bool {
-        for start in self.comment_start.iter() {
-            if line.trim_start().starts_with(start) {
-                return true;
-            }
-        }
-        false
+        let trimmed = line.trim_start();
+        self.comment_start.iter().any(|pat| trimmed.starts_with(pat))
     }
 
     pub fn lang_specific_handler(&self, char_idx: usize, word: &str, full_line: &str, theme: &Theme) -> Option<Color> {
@@ -101,38 +102,71 @@ impl Lang {
         if self.is_comment(&text_line) {
             return vec![Text::new(text_line, Some(Style::fg(theme.comment)))].into();
         }
+        if self.is_import_start(&text_line) {
+            return vec![Text::new(text_line, Some(Style::fg(theme.imports)))].into();
+        }
         let mut buffer = vec![];
         let mut word = String::new();
-        for ch in text_line.chars() {
-            if ' ' == ch {
-                if word.is_empty() {
-                    buffer.push(Text::new(ch.to_string(), None));
-                } else if self.is_import(&word) {
-                    word.push(ch);
-                    buffer.push(Text::new(word, Some(Style::fg(theme.imports))));
-                    break;
-                } else if self.is_flow(&word) {
-                    word.push(ch);
-                    buffer.push(Text::new(std::mem::take(&mut word), Some(Style::fg(theme.flow_control))));
-                } else if self.is_keyword(&word) {
-                    word.push(ch);
-                    buffer.push(Text::new(std::mem::take(&mut word), Some(Style::fg(theme.key_words))));
-                };
-                continue;
-            } else if ':' == ch {
-                if word.is_empty() {
-                    buffer.push(Text::new(ch.to_string(), None));
-                    continue;
+        let mut iter = text_line.chars();
+        for ch in iter.by_ref() {
+            match ch {
+                ' ' | ':' => {
+                    if let Some(text) = self.format(&mut word, theme) {
+                        buffer.push(text);
+                    }
+                    buffer.push(ch.into());
                 }
-                continue;
-            } else if '(' == ch {
-                buffer.push(Text::new(std::mem::take(&mut word), Some(Style::fg(theme.functions))));
-                buffer.push(Text::new(ch.to_string(), None));
-            } else {
-                word.push(ch);
+                '(' => {
+                    if !word.is_empty() {
+                        buffer.push(Text::new(std::mem::take(&mut word), Some(Style::fg(theme.functions))));
+                    }
+                    buffer.push(Text::new(ch.to_string(), None));
+                }
+                '.' => {
+                    if !word.is_empty() {
+                        buffer.push(Text::new(std::mem::take(&mut word), Some(Style::fg(theme.default))));
+                    }
+                    buffer.push(ch.into());
+                }
+                ',' => {
+                    if let Some(text) = self.format(&mut word, theme) {
+                        buffer.push(text);
+                    }
+                    buffer.push(ch.into());
+                }
+                _ => {
+                    word.push(ch);
+                }
             }
         }
+        if !word.is_empty() {
+            let style = self.map_style(&word, theme);
+            buffer.push(Text::new(word, Some(style)));
+        }
         buffer.into()
+    }
+
+    #[inline(always)]
+    fn format(&self, word_buf: &mut String, theme: &Theme) -> Option<Text> {
+        if word_buf.is_empty() {
+            return None;
+        }
+        let text = std::mem::take(word_buf);
+        let style = Some(self.map_style(&text, theme));
+        Some(Text::new(text, style))
+    }
+
+    #[inline(always)]
+    fn map_style(&self, token: &str, theme: &Theme) -> Style {
+        if self.is_flow(token) {
+            Style::fg(theme.flow_control)
+        } else if self.is_keyword(token) {
+            Style::fg(theme.key_words)
+        } else if token.chars().next().map(|f| f.is_uppercase()).unwrap_or_default() {
+            Style::fg(theme.class_or_struct)
+        } else {
+            Style::fg(theme.default)
+        }
     }
 }
 
@@ -202,3 +236,6 @@ impl From<FileType> for Lang {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
