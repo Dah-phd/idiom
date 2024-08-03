@@ -80,7 +80,9 @@ impl Text {
                         start += max_width;
                     } else {
                         backend.print_styled(&self.text[start..], style);
-                        backend.pad(max_width - remaining);
+                        if max_width != remaining {
+                            backend.pad(max_width - remaining);
+                        }
                         return;
                     }
                     if lines.move_cursor(backend).is_none() {
@@ -90,7 +92,9 @@ impl Text {
                 None => loop {
                     if remaining < max_width {
                         backend.print(&self.text[start..]);
-                        backend.pad(max_width - remaining);
+                        if max_width != remaining {
+                            backend.pad(max_width - remaining);
+                        }
                     } else {
                         backend.print(&self.text[start..start + max_width]);
                         remaining -= max_width;
