@@ -267,7 +267,7 @@ impl Writable for StyledLine {
         let mut iter = self.inner.iter();
         for text in iter.by_ref() {
             if text.width > skipped {
-                text.print_truncated_start(skipped, backend);
+                text.print_truncated_start(text.width - skipped, backend);
                 break;
             }
             skipped -= text.width;
@@ -283,15 +283,14 @@ impl Writable for StyledLine {
         backend.go_to(row, col);
         for text in self.inner.iter() {
             if width < text.width {
-                let truncated_text = text.text.truncate_width(width).1;
-                match text.style {
-                    Some(style) => backend.print_styled(truncated_text, style),
-                    None => backend.print(truncated_text),
-                };
+                unsafe { text.print_truncated(width, backend) };
                 return;
             }
             width -= text.width;
             text.print(backend);
+        }
+        if width != 0 {
+            backend.pad(width);
         }
     }
 

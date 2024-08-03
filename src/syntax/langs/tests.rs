@@ -3,7 +3,7 @@ use crate::{
     render::{
         backend::{Backend, BackendProtocol},
         layout::Rect,
-        widgets::{StyledLine, Text, Writable},
+        widgets::Writable,
         UTF8Safe,
     },
     syntax::theme::Theme,
@@ -51,5 +51,5 @@ fn test_stylize() {
         assert_eq!(sline.width(), inputs[idx].width());
         sline.wrap(&mut lines, &mut backend);
     }
-    panic!("{:?}", backend.drain());
+    todo!()
 }

@@ -4,7 +4,7 @@ use crate::render::{
     widgets::Writable,
 };
 
-use super::Text;
+use super::{StyledLine, Text};
 
 #[test]
 fn test_basic_text() {
@@ -111,4 +111,87 @@ fn test_text_wrap() {
             (Style::fg(color::black()), "d123".to_owned()),
         ]
     );
+}
+
+/// StyledLine
+#[test]
+fn test_line() {
+    let line: StyledLine = vec![
+        Text::new("def".to_owned(), Some(Style::fg(color::blue()))),
+        Text::from(" ".to_string()),
+        Text::new("test".to_owned(), Some(Style::fg(color::yellow()))),
+        Text::from("(".to_string()),
+        Text::new("arg".to_owned(), Some(Style::fg(color::blue()))),
+        Text::from(")".to_string()),
+        Text::from(":".to_string()),
+    ]
+    .into();
+    assert_eq!(line.len(), 14);
+    assert_eq!(line.width(), 14);
+    assert_eq!(line.char_len(), 14);
+}
+
+#[test]
+fn test_line_print() {
+    let mut backend = Backend::init();
+    let line: StyledLine = vec![
+        Text::new("def".to_owned(), Some(Style::fg(color::blue()))),
+        Text::from(" ".to_string()),
+        Text::new("test".to_owned(), Some(Style::fg(color::yellow()))),
+        Text::from("(".to_string()),
+        Text::new("arg".to_owned(), Some(Style::fg(color::blue()))),
+        Text::from(" ".to_string()),
+        Text::from("=".to_string()),
+        Text::from(" ".to_string()),
+        Text::from("\"🚀🚀\"".to_string()),
+        Text::from(")".to_string()),
+        Text::from(":".to_string()),
+    ]
+    .into();
+    unsafe { line.print_truncated(17, &mut backend) }
+    let mut expected = vec![
+        (Style::fg(color::blue()), "def".to_owned()),
+        (Style::default(), " ".to_owned()),
+        (Style::fg(color::yellow()), "test".to_owned()),
+        (Style::default(), "(".to_owned()),
+        (Style::fg(color::blue()), "arg".to_owned()),
+        (Style::default(), " ".to_owned()),
+        (Style::default(), "=".to_owned()),
+        (Style::default(), " ".to_owned()),
+        (Style::default(), "\"".to_owned()),
+        (Style::default(), "<<padding: 1>>".to_owned()),
+    ];
+    assert_eq!(backend.drain(), expected);
+    unsafe { line.print_truncated_start(6, &mut backend) }
+    assert_eq!(
+        backend.drain(),
+        vec![
+            (Style::default(), "<<padding: 1>>".to_owned()),
+            (Style::default(), "🚀\"".to_owned()),
+            (Style::default(), ")".to_owned()),
+            (Style::default(), ":".to_owned()),
+        ]
+    );
+
+    let small_line = Line { row: 1, col: 1, width: 17 };
+    expected.insert(0, (Style::default(), "<<go to row: 1 col: 1>>".to_owned()));
+    line.print_at(small_line, &mut backend);
+    assert_eq!(backend.drain(), expected);
+
+    let bigger_line = Line { row: 1, col: 1, width: 40 };
+    expected.pop();
+    expected.pop();
+    expected.extend([
+        (Style::default(), "\"🚀🚀\"".to_owned()),
+        (Style::default(), ")".to_owned()),
+        (Style::default(), ":".to_owned()),
+        (Style::default(), "<<padding: 17>>".to_owned()),
+    ]);
+    line.print_at(bigger_line, &mut backend);
+    assert_eq!(backend.drain(), expected);
+}
+
+#[test]
+fn test_line_wrap() {
+    todo!()
 }
