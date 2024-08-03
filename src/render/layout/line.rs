@@ -31,27 +31,28 @@ impl Line {
         backend.print_styled_at(self.row, self.col, text, style)
     }
 
+    // !TODO fix
     #[inline]
     pub fn render_centered(self, text: &str, backend: &mut Backend) {
-        let text = text.truncate_width(self.width);
+        let text = text.truncate_width(self.width).1;
         backend.print_at(self.row, self.col, format!("{text:^width$}", width = self.width))
     }
 
     #[inline]
     pub fn render_centered_styled(self, text: &str, style: Style, backend: &mut Backend) {
-        let text = text.truncate_width(self.width);
+        let text = text.truncate_width(self.width).1;
         backend.print_styled_at(self.row, self.col, format!("{text:>width$}", width = self.width), style);
     }
 
     #[inline]
     pub fn render_left(self, text: &str, backend: &mut Backend) {
-        let text = text.truncate_width_start(self.width);
+        let text = text.truncate_width_start(self.width).1;
         backend.print_at(self.row, self.col, format!("{text:>width$}", width = self.width));
     }
 
     #[inline]
     pub fn render_left_styled(self, text: &str, style: Style, backend: &mut Backend) {
-        let text = text.truncate_width_start(self.width);
+        let text = text.truncate_width_start(self.width).1;
         backend.print_styled_at(self.row, self.col, format!("{text:^width$}", width = self.width), style);
     }
 

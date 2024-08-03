@@ -116,7 +116,7 @@ impl DiagnosticLine {
     pub fn inline_render(&self, max_width: usize, backend: &mut impl BackendProtocol) {
         if let Some(first_diagnostic) = self.data.first() {
             let style = first_diagnostic.text_style();
-            let text = first_diagnostic.inline_text.truncate_width(max_width);
+            let text = first_diagnostic.inline_text.truncate_width(max_width).1;
             backend.print_styled(text, style);
         }
     }

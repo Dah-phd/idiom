@@ -1,13 +1,11 @@
-use std::fmt::{Display, Pointer};
-
-use unicode_width::UnicodeWidthChar;
-
 use super::{backend::BackendProtocol, layout::RectIter, utils::WriteChunks};
 use crate::render::{
     backend::{Backend, Style},
     layout::{Line, Rect},
     UTF8Safe,
 };
+use std::fmt::Display;
+use unicode_width::UnicodeWidthChar;
 
 /// Trait that allows faster rendering without checks and can reduce complexity
 pub trait Writable: Display {
@@ -19,16 +17,18 @@ pub trait Writable: Display {
     fn len(&self) -> usize;
     /// directly render no checks or bounds
     fn print(&self, backend: &mut Backend);
-    /// print truncated
-    unsafe fn print_truncated(&self, width: usize, backend: &mut Backend);
-    /// print truncated start
-    unsafe fn print_truncated_start(&self, width: usize, backend: &mut Backend);
     /// prints bounded by line
     fn print_at(&self, line: Line, backend: &mut Backend);
     /// wraps within rect
     fn wrap(&self, lines: &mut RectIter, backend: &mut Backend);
+    /// print truncated
+    unsafe fn print_truncated(&self, width: usize, backend: &mut Backend);
+    /// print truncated start
+    unsafe fn print_truncated_start(&self, width: usize, backend: &mut Backend);
 }
 
+/// Represents word with additional meta data such as width, style and number of chars, useful when rendering multiple times the same string
+#[derive(Clone, PartialEq)]
 pub struct Text {
     text: String,
     char_len: usize,
@@ -46,11 +46,62 @@ impl Text {
     pub fn raw(text: String) -> Self {
         Self { char_len: text.char_len(), width: text.width(), style: None, text }
     }
-}
 
-impl Display for Text {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.text)
+    #[inline]
+    pub fn style(&self) -> Option<Style> {
+        self.style
+    }
+
+    #[inline]
+    pub fn set_style(&mut self, style: Option<Style>) {
+        self.style = style;
+    }
+
+    #[inline]
+    pub fn simple_wrap(&self, lines: &mut RectIter, backend: &mut Backend) {
+        let max_width = match lines.move_cursor(backend) {
+            Some(width) => width,
+            None => return,
+        };
+        if max_width > self.width {
+            match self.style {
+                Some(style) => backend.print_styled(&self.text, style),
+                None => backend.print(&self.text),
+            };
+            backend.pad(max_width - self.width);
+        } else {
+            let mut remaining = self.width;
+            let mut start = 0;
+            match self.style {
+                Some(style) => loop {
+                    if remaining > max_width {
+                        backend.print_styled(&self.text[start..start + max_width], style);
+                        remaining -= max_width;
+                        start += max_width;
+                    } else {
+                        backend.print_styled(&self.text[start..], style);
+                        backend.pad(max_width - remaining);
+                        return;
+                    }
+                    if lines.move_cursor(backend).is_none() {
+                        return;
+                    }
+                },
+                None => loop {
+                    if remaining < max_width {
+                        backend.print(&self.text[start..]);
+                        backend.pad(max_width - remaining);
+                    } else {
+                        backend.print(&self.text[start..start + max_width]);
+                        remaining -= max_width;
+                        start += max_width;
+                    }
+                    if lines.move_cursor(backend).is_none() {
+                        return;
+                    }
+                },
+            }
+        }
     }
 }
 
@@ -76,88 +127,99 @@ impl Writable for Text {
     }
 
     fn print(&self, backend: &mut Backend) {
-        backend.print(&self.text);
+        match self.style {
+            Some(style) => backend.print_styled(&self.text, style),
+            None => backend.print(&self.text),
+        }
     }
 
     unsafe fn print_truncated(&self, width: usize, backend: &mut Backend) {
-        let text = if self.is_simple() { self.text.get_unchecked(..width) } else { self.text.truncate_width(width) };
-        match self.style {
-            Some(style) => backend.print_styled(text, style),
-            None => backend.print(text),
-        }
+        if self.is_simple() {
+            match self.style {
+                Some(style) => backend.print_styled(self.text.get_unchecked(..width), style),
+                None => backend.print(self.text.get_unchecked(..width)),
+            }
+        } else {
+            let (remaining_w, text) = self.text.truncate_width(width);
+            match self.style {
+                Some(style) => backend.print_styled(text, style),
+                None => backend.print(text),
+            }
+            if remaining_w != 0 {
+                backend.pad(remaining_w);
+            }
+        };
     }
 
     unsafe fn print_truncated_start(&self, width: usize, backend: &mut Backend) {
-        let text = if self.is_simple() { self.text.get_unchecked(width..) } else { self.text.truncate_width(width) };
-        match self.style {
-            Some(style) => backend.print_styled(text, style),
-            None => backend.print(text),
-        }
+        if self.is_simple() {
+            match self.style {
+                Some(style) => backend.print_styled(self.text.get_unchecked(self.len() - width..), style),
+                None => backend.print(self.text.get_unchecked(self.len() - width..)),
+            }
+        } else {
+            let (remaining_w, text) = self.text.truncate_width_start(width);
+            if remaining_w != 0 {
+                backend.pad(remaining_w);
+            }
+            match self.style {
+                Some(style) => backend.print_styled(text, style),
+                None => backend.print(text),
+            }
+        };
     }
 
     fn print_at(&self, line: Line, backend: &mut Backend) {
         let Line { width, row, col } = line;
-        let text = if self.width > width { self.text.truncate_width(width) } else { &self.text };
-
-        match self.style {
-            Some(style) => backend.print_styled_at(row, col, text, style),
-            None => backend.print_at(row, col, text),
+        backend.go_to(row, col);
+        if self.width > width {
+            unsafe { self.print_truncated(width, backend) };
+            return;
+        }
+        let pad_width = width - self.width;
+        self.print(backend);
+        if pad_width != 0 {
+            backend.pad(pad_width);
         }
     }
 
     fn wrap(&self, lines: &mut RectIter, backend: &mut Backend) {
-        for (width, text_chunk) in WriteChunks::new(&self.text, lines.width()) {
-            match lines.next() {
-                Some(line) => backend.print_at(line.row, line.col, text_chunk),
-                None => return,
+        if self.is_simple() {
+            return self.simple_wrap(lines, backend);
+        }
+        let max_width = lines.width();
+        let chunks = WriteChunks::new(&self.text, max_width);
+        match self.style {
+            Some(style) => {
+                for (width, text_chunk) in chunks {
+                    if lines.move_cursor(backend).is_none() {
+                        return;
+                    }
+                    backend.print_styled(text_chunk, style);
+                    if width < max_width {
+                        backend.pad(max_width - width);
+                    }
+                }
+            }
+            None => {
+                for (width, text_chunk) in chunks {
+                    if lines.move_cursor(backend).is_none() {
+                        return;
+                    }
+                    backend.print(text_chunk);
+                    if width < max_width {
+                        backend.pad(max_width - width);
+                    }
+                }
             }
         }
     }
 }
 
-impl From<String> for Text {
-    fn from(text: String) -> Self {
-        Self { char_len: text.char_len(), width: text.width(), text, style: None }
-    }
-}
-
-impl From<char> for Text {
-    #[inline]
-    fn from(value: char) -> Self {
-        Self {
-            char_len: 1,
-            width: UnicodeWidthChar::width(value).unwrap_or_default(),
-            text: value.to_string(),
-            style: None,
-        }
-    }
-}
-
-impl From<(String, Style)> for Text {
-    #[inline]
-    fn from((text, style): (String, Style)) -> Self {
-        Self { char_len: text.char_len(), width: text.width(), text, style: Some(style) }
-    }
-}
-
-impl From<(Style, String)> for Text {
-    #[inline]
-    fn from((style, text): (Style, String)) -> Self {
-        Self { char_len: text.char_len(), width: text.width(), text, style: Some(style) }
-    }
-}
-
+/// Collection of styled texts, useful when rendering multiple times the same string, as it holds meta data for width / charcer len of words
+#[derive(Clone, PartialEq)]
 pub struct StyledLine {
     inner: Vec<Text>,
-}
-
-impl Display for StyledLine {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for text in self.inner.iter() {
-            text.fmt(f)?;
-        }
-        Ok(())
-    }
 }
 
 impl Writable for StyledLine {
@@ -217,7 +279,7 @@ impl Writable for StyledLine {
         backend.go_to(row, col);
         for text in self.inner.iter() {
             if width < text.width {
-                let truncated_text = text.text.truncate_width(width);
+                let truncated_text = text.text.truncate_width(width).1;
                 match text.style {
                     Some(style) => backend.print_styled(truncated_text, style),
                     None => backend.print(truncated_text),
@@ -229,12 +291,24 @@ impl Writable for StyledLine {
         }
     }
 
-    fn wrap(&self, lines: &mut RectIter, backend: &mut Backend) {}
-}
-
-impl From<Vec<Text>> for StyledLine {
-    fn from(inner: Vec<Text>) -> Self {
-        Self { inner }
+    fn wrap(&self, lines: &mut RectIter, backend: &mut Backend) {
+        let mut width = match lines.move_cursor(backend) {
+            Some(width) => width,
+            None => return,
+        };
+        for word in self.inner.iter() {
+            if word.width > width {
+                if width != 0 {
+                    continue;
+                };
+                width = match lines.move_cursor(backend) {
+                    Some(new_width) => new_width,
+                    None => return,
+                }
+            }
+            width -= word.width;
+            word.print(backend);
+        }
     }
 }
 
@@ -308,6 +382,59 @@ pub fn paragraph_styled<'a>(area: Rect, text: impl Iterator<Item = (&'a str, Sty
     }
     for remaining_line in lines {
         remaining_line.render_empty(backend);
+    }
+}
+
+impl Display for Text {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.text)
+    }
+}
+
+impl From<String> for Text {
+    fn from(text: String) -> Self {
+        Self { char_len: text.char_len(), width: text.width(), text, style: None }
+    }
+}
+
+impl From<char> for Text {
+    #[inline]
+    fn from(value: char) -> Self {
+        Self {
+            char_len: 1,
+            width: UnicodeWidthChar::width(value).unwrap_or_default(),
+            text: value.to_string(),
+            style: None,
+        }
+    }
+}
+
+impl From<(String, Style)> for Text {
+    #[inline]
+    fn from((text, style): (String, Style)) -> Self {
+        Self { char_len: text.char_len(), width: text.width(), text, style: Some(style) }
+    }
+}
+
+impl From<(Style, String)> for Text {
+    #[inline]
+    fn from((style, text): (Style, String)) -> Self {
+        Self { char_len: text.char_len(), width: text.width(), text, style: Some(style) }
+    }
+}
+
+impl Display for StyledLine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for text in self.inner.iter() {
+            text.fmt(f)?;
+        }
+        Ok(())
+    }
+}
+
+impl From<Vec<Text>> for StyledLine {
+    fn from(inner: Vec<Text>) -> Self {
+        Self { inner }
     }
 }
 

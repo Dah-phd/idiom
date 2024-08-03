@@ -14,7 +14,9 @@ use crate::{
     workspace::Workspace,
 };
 use crossterm::event::Event;
-use std::{path::PathBuf, time::Instant};
+use std::{path::PathBuf, time::Duration};
+
+const MIN_FRAMERATE: Duration = Duration::from_millis(8);
 
 pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResult<()> {
     // builtin cursor is not used - cursor is positioned during render
@@ -22,7 +24,6 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
 
     let mut gs = GlobalState::new(backend)?;
     let configs = gs.unwrap_or_default(KeyMap::new(), ".keys: ");
-    let mut last_frame_start = Instant::now();
     let mut general_key_map = configs.general_key_map();
 
     // COMPONENTS
@@ -44,8 +45,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
     loop {
         gs.draw(&mut workspace, &mut tree, &mut term)?;
 
-        if crossterm::event::poll(last_frame_start.elapsed())? {
-            last_frame_start = Instant::now();
+        if crossterm::event::poll(MIN_FRAMERATE)? {
             match crossterm::event::read()? {
                 Event::Key(key) => {
                     if gs.map_key(&key, &mut workspace, &mut tree, &mut term) {

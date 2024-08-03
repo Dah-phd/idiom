@@ -29,13 +29,14 @@ fn test_truncate() {
 
 #[test]
 fn test_truncate_utf8() {
-    assert_eq!("123", TEXT.truncate_width(4));
-    assert_eq!(3, TEXT.truncate_width(4).len());
-    assert_eq!("123🚀", TEXT.truncate_width(5));
-    assert_eq!(7, TEXT.truncate_width(5).len());
-    assert_eq!(4, TEXT.truncate_width(5).chars().count());
-    assert_eq!("🚀13", TEXT.truncate_width_start(4));
-    assert_eq!("13", TEXT.truncate_width_start(3));
+    assert_eq!((4, "123"), "123".truncate_width(7));
+    assert_eq!((1, "123"), TEXT.truncate_width(4));
+    assert_eq!(3, TEXT.truncate_width(4).1.len());
+    assert_eq!((0, "123🚀"), TEXT.truncate_width(5));
+    assert_eq!(7, TEXT.truncate_width(5).1.len());
+    assert_eq!(4, TEXT.truncate_width(5).1.chars().count());
+    assert_eq!((0, "🚀13"), TEXT.truncate_width_start(4));
+    assert_eq!((1, "13"), TEXT.truncate_width_start(3));
 }
 
 #[test]

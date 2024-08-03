@@ -254,7 +254,7 @@ impl Workspace {
     }
 
     fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
-        Ok(Editor::from_path(file_path, &self.base_config, gs)?)
+        Editor::from_path(file_path, &self.base_config, gs)
     }
 
     async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {

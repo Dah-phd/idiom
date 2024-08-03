@@ -4,10 +4,10 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 /// Trait allowing UTF8 safe operations on str/String
 pub trait UTF8Safe {
-    /// returns str that will fit into width of columns, removing chars at the end that will not fit
-    fn truncate_width(&self, width: usize) -> &str;
-    /// returns str that will fit into width of columns, removing chars from the start that will not fit
-    fn truncate_width_start(&self, width: usize) -> &str;
+    /// returns str that will fit into width of columns, removing chars at the end returning info about remaining width
+    fn truncate_width(&self, width: usize) -> (usize, &str);
+    /// returns str that will fit into width of columns, removing chars from the start returng info about remaining width
+    fn truncate_width_start(&self, width: usize) -> (usize, &str);
     /// return Some(&str) if wider than allowed width
     fn truncate_if_wider(&self, width: usize) -> Result<&str, usize>;
     /// return Some(&str) truncated from start if wider than allowed width
@@ -94,31 +94,31 @@ impl<'a> WriteChunks<'a> {
 
 impl UTF8Safe for str {
     #[inline(always)]
-    fn truncate_width(&self, mut width: usize) -> &str {
+    fn truncate_width(&self, mut width: usize) -> (usize, &str) {
         let mut end = 0;
         for char in self.chars() {
             let char_width = UnicodeWidthChar::width(char).unwrap_or(0);
             if char_width > width {
-                return unsafe { self.get_unchecked(..end) };
+                return (width, unsafe { self.get_unchecked(..end) });
             };
             width -= char_width;
             end += char.len_utf8();
         }
-        self
+        (width, self)
     }
 
     #[inline(always)]
-    fn truncate_width_start(&self, mut width: usize) -> &str {
+    fn truncate_width_start(&self, mut width: usize) -> (usize, &str) {
         let mut start = 0;
         for char in self.chars().rev() {
             let char_width = UnicodeWidthChar::width(char).unwrap_or(0);
             if char_width > width {
-                return unsafe { self.get_unchecked(self.len() - start..) };
+                return (width, unsafe { self.get_unchecked(self.len() - start..) });
             }
             width -= char_width;
             start += char.len_utf8();
         }
-        self
+        (width, self)
     }
 
     #[inline(always)]
@@ -217,12 +217,12 @@ impl UTF8Safe for str {
 
 impl UTF8Safe for String {
     #[inline(always)]
-    fn truncate_width(&self, width: usize) -> &str {
+    fn truncate_width(&self, width: usize) -> (usize, &str) {
         self.as_str().truncate_width(width)
     }
 
     #[inline(always)]
-    fn truncate_width_start(&self, width: usize) -> &str {
+    fn truncate_width_start(&self, width: usize) -> (usize, &str) {
         self.as_str().truncate_width_start(width)
     }
 

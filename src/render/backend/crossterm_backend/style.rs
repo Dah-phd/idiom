@@ -2,7 +2,7 @@ use crossterm::style::{Attribute, Attributes, ContentStyle};
 
 use super::Color;
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct Style(ContentStyle);
 
 impl Style {
