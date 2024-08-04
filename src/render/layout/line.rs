@@ -83,11 +83,14 @@ impl Line {
     pub fn render_styled(self, text: &str, style: Style, backend: &mut Backend) {
         let Line { width, row, col } = self;
         let (pad_width, text) = text.truncate_width(width);
+        let reset_style = backend.get_style();
+        backend.set_style(style);
         backend.go_to(row, col);
-        backend.print_styled(text, style);
+        backend.print(text);
         if pad_width != 0 {
             backend.pad(pad_width);
         }
+        backend.set_style(reset_style);
     }
 
     /// creates line builder from Line

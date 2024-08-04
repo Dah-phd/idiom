@@ -1,11 +1,6 @@
 use crate::{
     configs::FileType,
-    render::{
-        backend::{Backend, BackendProtocol},
-        layout::Rect,
-        widgets::Writable,
-        UTF8Safe,
-    },
+    render::{widgets::Writable, UTF8Safe},
     syntax::theme::Theme,
 };
 
