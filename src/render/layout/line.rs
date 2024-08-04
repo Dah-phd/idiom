@@ -1,5 +1,3 @@
-use unicode_width::UnicodeWidthChar;
-
 use crate::render::{
     backend::{Backend, BackendProtocol, Style},
     utils::UTF8Safe,
@@ -46,14 +44,22 @@ impl Line {
 
     #[inline]
     pub fn render_left(self, text: &str, backend: &mut Backend) {
-        let text = text.truncate_width_start(self.width).1;
-        backend.print_at(self.row, self.col, format!("{text:>width$}", width = self.width));
+        let (pad_width, text) = text.truncate_width_start(self.width);
+        backend.go_to(self.row, self.col);
+        if pad_width != 0 {
+            backend.pad(pad_width);
+        }
+        backend.print(text);
     }
 
     #[inline]
     pub fn render_left_styled(self, text: &str, style: Style, backend: &mut Backend) {
-        let text = text.truncate_width_start(self.width).1;
-        backend.print_styled_at(self.row, self.col, format!("{text:^width$}", width = self.width), style);
+        let (pad_width, text) = text.truncate_width_start(self.width);
+        backend.go_to(self.row, self.col);
+        if pad_width != 0 {
+            backend.pad(pad_width);
+        }
+        backend.print_styled(text, style);
     }
 
     #[inline]
@@ -64,48 +70,24 @@ impl Line {
 
     #[inline]
     pub fn render(self, text: &str, backend: &mut Backend) {
-        let Line { mut width, row, col } = self;
+        let Line { width, row, col } = self;
+        let (pad_width, text) = text.truncate_width(width);
         backend.go_to(row, col);
-        for ch in text.chars() {
-            match UnicodeWidthChar::width(ch) {
-                Some(w) => {
-                    if w > width {
-                        return;
-                    }
-                    width -= w;
-                }
-                None => continue,
-            }
-            backend.print(ch);
-        }
-        if width != 0 {
-            backend.pad(width)
+        backend.print(text);
+        if pad_width != 0 {
+            backend.pad(pad_width);
         }
     }
 
     #[inline]
     pub fn render_styled(self, text: &str, style: Style, backend: &mut Backend) {
-        let Line { mut width, row, col } = self;
-        let reset_style = backend.get_style();
+        let Line { width, row, col } = self;
+        let (pad_width, text) = text.truncate_width(width);
         backend.go_to(row, col);
-        backend.update_style(style);
-        for ch in text.chars() {
-            match UnicodeWidthChar::width(ch) {
-                Some(w) => {
-                    if w > width {
-                        backend.set_style(reset_style);
-                        return;
-                    }
-                    width -= w;
-                }
-                None => continue,
-            }
-            backend.print(ch);
+        backend.print_styled(text, style);
+        if pad_width != 0 {
+            backend.pad(pad_width);
         }
-        if width != 0 {
-            backend.pad(width)
-        }
-        backend.set_style(reset_style);
     }
 
     /// creates line builder from Line
