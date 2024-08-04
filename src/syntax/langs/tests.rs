@@ -38,9 +38,6 @@ pub fn create_text() -> [String; 16] {
 
 #[test]
 fn test_stylize() {
-    let mut backend = Backend::init();
-    let rect = Rect::new(10, 1, 60, 6);
-    let mut lines = rect.into_iter();
     let theme = Theme::default();
     let lang = Lang::from(FileType::Rust);
     let inputs = create_text();
@@ -49,7 +46,6 @@ fn test_stylize() {
         assert_eq!(sline.len(), inputs[idx].len());
         assert_eq!(sline.char_len(), inputs[idx].char_len());
         assert_eq!(sline.width(), inputs[idx].width());
-        sline.wrap(&mut lines, &mut backend);
+        assert_eq!(sline.to_string(), inputs[idx]);
     }
-    todo!()
 }
