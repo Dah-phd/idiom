@@ -192,6 +192,115 @@ fn test_line_print() {
 }
 
 #[test]
-fn test_line_wrap() {
-    todo!()
+fn test_line_wrap_complex() {
+    let mut backend = Backend::init();
+    let rect = Rect::new(1, 1, 7, 10);
+
+    let line: StyledLine = vec![
+        Text::new("def".to_owned(), Some(Style::fg(color::blue()))),
+        Text::from(" ".to_string()),
+        Text::new("test".to_owned(), Some(Style::fg(color::yellow()))),
+        Text::from("(".to_string()),
+        Text::new("arg".to_owned(), Some(Style::fg(color::blue()))),
+        Text::from(" ".to_string()),
+        Text::from("=".to_string()),
+        Text::from(" ".to_string()),
+        Text::from("\"🚀🚀🚀🚀123\"".to_string()),
+        Text::from(")".to_string()),
+        Text::from(":".to_string()),
+    ]
+    .into();
+    assert_eq!(line.char_len(), 26); // 26 chars
+    assert_eq!(line.width(), 30); // 4 mojis x 2 char width
+    assert_eq!(line.len(), 38); // 4 empjis x 4 bytes 26 - 4 = 22; 4 x 4 = 16; 22 + 16 = 38
+    line.wrap(&mut rect.into_iter(), &mut backend);
+    assert_eq!(
+        backend.drain(),
+        vec![
+            (Style::default(), "<<go to row: 1 col: 1>>".to_owned()),
+            (Style::fg(color::blue()), "def".to_owned()),   // 3
+            (Style::default(), " ".to_owned()),             // 1
+            (Style::fg(color::yellow()), "tes".to_owned()), // 3
+            (Style::default(), "<<go to row: 2 col: 1>>".to_owned()),
+            (Style::fg(color::yellow()), "t".to_owned()), // 1
+            (Style::default(), "(".to_owned()),           // 1
+            (Style::fg(color::blue()), "arg".to_owned()), // 3
+            (Style::default(), " ".to_owned()),           // 1
+            (Style::default(), "=".to_owned()),           // 1
+            (Style::default(), "<<go to row: 3 col: 1>>".to_owned()),
+            (Style::default(), " ".to_owned()),              // 1
+            (Style::default(), "\"".to_owned()),             // 5
+            (Style::default(), "🚀".to_owned()),             // 5
+            (Style::default(), "🚀".to_owned()),             // 5
+            (Style::default(), "<<padding: 1>>".to_owned()), // 1
+            (Style::default(), "<<go to row: 4 col: 1>>".to_owned()),
+            (Style::default(), "🚀".to_owned()), // 2
+            (Style::default(), "🚀".to_owned()), // 2
+            (Style::default(), "1".to_owned()),  // 1
+            (Style::default(), "2".to_owned()),  // 1
+            (Style::default(), "3".to_owned()),  // 1
+            (Style::default(), "<<go to row: 5 col: 1>>".to_owned()),
+            (Style::default(), "\"".to_owned()),             // 1
+            (Style::default(), ")".to_owned()),              // 1
+            (Style::default(), ":".to_owned()),              // 1
+            (Style::default(), "<<padding: 4>>".to_owned()), // 4
+        ]
+    );
+}
+
+#[test]
+fn test_line_wrap_simple() {
+    let mut backend = Backend::init();
+    let rect = Rect::new(1, 1, 7, 10);
+
+    let line: StyledLine = vec![
+        Text::new("def".to_owned(), Some(Style::fg(color::blue()))),
+        Text::from(" ".to_string()),
+        Text::new("test".to_owned(), Some(Style::fg(color::yellow()))),
+        Text::from("(".to_string()),
+        Text::new("arg".to_owned(), Some(Style::fg(color::blue()))),
+        Text::from(" ".to_string()),
+        Text::from("=".to_string()),
+        Text::from(" ".to_string()),
+        Text::from("\"really long text goest here - needs >14\"".to_string()),
+        Text::from(")".to_string()),
+        Text::from(":".to_string()),
+    ]
+    .into();
+    assert_eq!(line.char_len(), 58);
+    assert_eq!(line.width(), 58);
+    assert_eq!(line.len(), 58);
+    line.wrap(&mut rect.into_iter(), &mut backend);
+    assert_eq!(
+        backend.drain(),
+        vec![
+            (Style::default(), "<<go to row: 1 col: 1>>".to_owned()),
+            (Style::fg(color::blue()), "def".to_owned()),   // 3
+            (Style::default(), " ".to_owned()),             // 1
+            (Style::fg(color::yellow()), "tes".to_owned()), // 3
+            (Style::default(), "<<go to row: 2 col: 1>>".to_owned()),
+            (Style::fg(color::yellow()), "t".to_owned()), // 1
+            (Style::default(), "(".to_owned()),           // 1
+            (Style::fg(color::blue()), "arg".to_owned()), // 3
+            (Style::default(), " ".to_owned()),           // 1
+            (Style::default(), "=".to_owned()),           // 1
+            (Style::default(), "<<go to row: 3 col: 1>>".to_owned()),
+            (Style::default(), " ".to_owned()),       // 1
+            (Style::default(), "\"reall".to_owned()), // 6
+            (Style::default(), "<<go to row: 4 col: 1>>".to_owned()),
+            (Style::default(), "y long ".to_owned()), // 7
+            (Style::default(), "<<go to row: 5 col: 1>>".to_owned()),
+            (Style::default(), "text go".to_owned()), // 7
+            (Style::default(), "<<go to row: 6 col: 1>>".to_owned()),
+            (Style::default(), "est her".to_owned()), // 7
+            (Style::default(), "<<go to row: 7 col: 1>>".to_owned()),
+            (Style::default(), "e - nee".to_owned()), // 7
+            (Style::default(), "<<go to row: 8 col: 1>>".to_owned()),
+            (Style::default(), "ds >14\"".to_owned()), // 7
+            (Style::default(), "<<go to row: 9 col: 1>>".to_owned()),
+            (Style::default(), ")".to_owned()),              // 1
+            (Style::default(), ":".to_owned()),              // 1
+            (Style::default(), "<<padding: 5>>".to_owned()), // 5
+        ]
+    );
 }

@@ -107,6 +107,93 @@ impl Text {
             }
         }
     }
+
+    #[inline]
+    fn wrap_with_remainder(&self, lines: &mut RectIter, backend: &mut Backend) -> Option<usize> {
+        if self.is_simple() {
+            self.wrap_with_remainder_simple(lines, backend)
+        } else {
+            self.wrap_with_remainder_complex(lines, backend)
+        }
+    }
+
+    #[inline]
+    pub fn wrap_with_remainder_simple(&self, lines: &mut RectIter, backend: &mut Backend) -> Option<usize> {
+        let max_width = lines.move_cursor(backend)?;
+        if max_width > self.width {
+            match self.style {
+                Some(style) => backend.print_styled(&self.text, style),
+                None => backend.print(&self.text),
+            };
+            Some(max_width - self.width)
+        } else {
+            let mut remaining = self.width;
+            let mut start = 0;
+            match self.style {
+                Some(style) => loop {
+                    if remaining > max_width {
+                        backend.print_styled(&self.text[start..start + max_width], style);
+                        remaining -= max_width;
+                        start += max_width;
+                    } else {
+                        backend.print_styled(&self.text[start..], style);
+                        return Some(max_width - remaining);
+                    }
+                    lines.move_cursor(backend)?;
+                },
+                None => loop {
+                    if remaining < max_width {
+                        backend.print(&self.text[start..]);
+                        return Some(max_width - remaining);
+                    } else {
+                        backend.print(&self.text[start..start + max_width]);
+                        remaining -= max_width;
+                        start += max_width;
+                    }
+                    lines.move_cursor(backend)?;
+                },
+            }
+        }
+    }
+
+    #[inline]
+    pub fn wrap_with_remainder_complex(&self, lines: &mut RectIter, backend: &mut Backend) -> Option<usize> {
+        let max_width = lines.width();
+        let mut chunks = WriteChunks::new(&self.text, max_width);
+        let (mut width, mut chunk) = chunks.next()?;
+        match self.style {
+            Some(style) => loop {
+                lines.move_cursor(backend)?;
+                backend.print_styled(chunk, style);
+                match chunks.next() {
+                    Some(next_chunk) => {
+                        if width < max_width {
+                            backend.pad(max_width - width);
+                        }
+                        (width, chunk) = next_chunk;
+                    }
+                    None => {
+                        return Some(max_width - width);
+                    }
+                }
+            },
+            None => loop {
+                lines.move_cursor(backend)?;
+                backend.print(chunk);
+                match chunks.next() {
+                    Some(next_chunk) => {
+                        if width < max_width {
+                            backend.pad(max_width - width);
+                        }
+                        (width, chunk) = next_chunk;
+                    }
+                    None => {
+                        return Some(max_width - width);
+                    }
+                }
+            },
+        }
+    }
 }
 
 impl Writable for Text {
@@ -188,34 +275,9 @@ impl Writable for Text {
     }
 
     fn wrap(&self, lines: &mut RectIter, backend: &mut Backend) {
-        if self.is_simple() {
-            return self.simple_wrap(lines, backend);
-        }
-        let max_width = lines.width();
-        let chunks = WriteChunks::new(&self.text, max_width);
-        match self.style {
-            Some(style) => {
-                for (width, text_chunk) in chunks {
-                    if lines.move_cursor(backend).is_none() {
-                        return;
-                    }
-                    backend.print_styled(text_chunk, style);
-                    if width < max_width {
-                        backend.pad(max_width - width);
-                    }
-                }
-            }
-            None => {
-                for (width, text_chunk) in chunks {
-                    if lines.move_cursor(backend).is_none() {
-                        return;
-                    }
-                    backend.print(text_chunk);
-                    if width < max_width {
-                        backend.pad(max_width - width);
-                    }
-                }
-            }
+        match self.wrap_with_remainder(lines, backend) {
+            Some(pad_width) if pad_width != 0 => backend.pad(pad_width),
+            _ => (),
         }
     }
 }
@@ -301,16 +363,113 @@ impl Writable for StyledLine {
         };
         for word in self.inner.iter() {
             if word.width > width {
-                if width != 0 {
-                    continue;
-                };
-                width = match lines.move_cursor(backend) {
-                    Some(new_width) => new_width,
-                    None => return,
+                if width == 0 {
+                    width = match word.wrap_with_remainder(lines, backend) {
+                        Some(new_width) => new_width,
+                        None => return,
+                    }
+                } else if word.is_simple() {
+                    let mut remaining = word.width;
+                    let mut start = 0;
+                    match word.style {
+                        Some(style) => loop {
+                            if remaining > width {
+                                backend.print_styled(&word.text[start..start + width], style);
+                                remaining -= width;
+                                start += width;
+                            } else {
+                                backend.print_styled(&word.text[start..], style);
+                                width -= remaining;
+                                break;
+                            }
+                            match lines.move_cursor(backend) {
+                                Some(max_width) => width = max_width,
+                                None => return,
+                            };
+                        },
+                        None => loop {
+                            if remaining > width {
+                                backend.print(&word.text[start..start + width]);
+                                remaining -= width;
+                                start += width;
+                            } else {
+                                backend.print(&word.text[start..]);
+                                width -= remaining;
+                                break;
+                            }
+                            match lines.move_cursor(backend) {
+                                Some(max_width) => width = max_width,
+                                None => return,
+                            };
+                        },
+                    };
+                } else {
+                    match word.style {
+                        Some(style) => {
+                            for ch in word.text.chars() {
+                                let ch_width = match UnicodeWidthChar::width(ch) {
+                                    Some(ch_width) => ch_width,
+                                    None => continue,
+                                };
+                                if ch_width > width {
+                                    if width != 0 {
+                                        backend.pad(width);
+                                    }
+                                    width = match lines.move_cursor(backend) {
+                                        Some(new_width) => {
+                                            backend.print_styled(ch, style);
+                                            new_width - ch_width
+                                        }
+                                        None => {
+                                            if width != 0 {
+                                                backend.pad(width);
+                                            };
+                                            return;
+                                        }
+                                    }
+                                } else {
+                                    backend.print_styled(ch, style);
+                                    width -= ch_width;
+                                }
+                            }
+                        }
+                        None => {
+                            for ch in word.text.chars() {
+                                let ch_width = match UnicodeWidthChar::width(ch) {
+                                    Some(ch_width) => ch_width,
+                                    None => continue,
+                                };
+                                if ch_width > width {
+                                    if width != 0 {
+                                        backend.pad(width);
+                                    }
+                                    width = match lines.move_cursor(backend) {
+                                        Some(new_width) => {
+                                            backend.print(ch);
+                                            new_width - ch_width
+                                        }
+                                        None => {
+                                            if width != 0 {
+                                                backend.pad(width);
+                                            };
+                                            return;
+                                        }
+                                    }
+                                } else {
+                                    backend.print(ch);
+                                    width -= ch_width;
+                                }
+                            }
+                        }
+                    }
                 }
+            } else {
+                width -= word.width;
+                word.print(backend);
             }
-            width -= word.width;
-            word.print(backend);
+        }
+        if width != 0 {
+            backend.pad(width);
         }
     }
 }

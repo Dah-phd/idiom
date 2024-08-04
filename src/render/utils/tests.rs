@@ -198,3 +198,11 @@ fn test_chunks() {
     assert_eq!(chunks.next(), Some((2, "as")));
     assert_eq!(chunks.next(), None);
 }
+
+#[test]
+fn test_chunks_short() {
+    let text = "123";
+    let mut chunks = WriteChunks::new(text, 5);
+    assert_eq!(chunks.next(), Some((3, "123")));
+    assert_eq!(chunks.next(), None);
+}
