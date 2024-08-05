@@ -35,7 +35,7 @@ impl Info {
         let mut text = Vec::new();
         for (msg, color) in info.messages.into_iter() {
             let style = Style::fg(color);
-            for line in msg.lines() {
+            for line in msg.split("\n") {
                 text.push((String::from(line), style).into());
             }
         }
@@ -159,6 +159,9 @@ impl Info {
                         None => break,
                     }
                 }
+                for line in lines {
+                    line.render_empty(&mut gs.writer);
+                }
             }
         }
     }
@@ -178,7 +181,7 @@ fn parse_sig_info(info: SignatureInformation, lang: &Lang, theme: &Theme, lines:
             Documentation::MarkupContent(c) => {
                 if matches!(c.kind, lsp_types::MarkupKind::Markdown) {
                     let mut is_code = false;
-                    for line in c.value.lines() {
+                    for line in c.value.split("\n") {
                         if line.starts_with("```") {
                             is_code = !is_code;
                             continue;
@@ -190,13 +193,13 @@ fn parse_sig_info(info: SignatureInformation, lang: &Lang, theme: &Theme, lines:
                         }
                     }
                 } else {
-                    for line in c.value.lines() {
+                    for line in c.value.split("\n") {
                         lines.push(line.to_owned().into());
                     }
                 }
             }
             Documentation::String(s) => {
-                for line in s.lines() {
+                for line in s.split("\n") {
                     lines.push(lang.stylize(line, theme));
                 }
             }
@@ -223,13 +226,13 @@ fn parse_hover(hover: Hover, lang: &Lang, theme: &Theme, lines: &mut Vec<StyledL
 
 fn handle_markup(markup: lsp_types::MarkupContent, lang: &Lang, theme: &Theme, lines: &mut Vec<StyledLine>) {
     if !matches!(markup.kind, lsp_types::MarkupKind::Markdown) {
-        for line in markup.value.lines() {
+        for line in markup.value.split("\n") {
             lines.push(line.to_owned().into());
         }
         return;
     }
     let mut is_code = false;
-    for line in markup.value.lines() {
+    for line in markup.value.split("\n") {
         if line.trim().starts_with("```") {
             is_code = !is_code;
             continue;
@@ -247,12 +250,12 @@ fn handle_markup(markup: lsp_types::MarkupContent, lang: &Lang, theme: &Theme, l
 fn parse_markedstr(value: MarkedString, lang: &Lang, theme: &Theme, lines: &mut Vec<StyledLine>) {
     match value {
         MarkedString::LanguageString(data) => {
-            for text_line in data.value.lines() {
+            for text_line in data.value.split("\n") {
                 lines.push(lang.stylize(text_line, theme))
             }
         }
         MarkedString::String(value) => {
-            for text_line in value.lines() {
+            for text_line in value.split("\n") {
                 lines.push(StyledLine::from(text_line.to_owned()))
             }
         }

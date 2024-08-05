@@ -1,7 +1,7 @@
 use super::{backend::BackendProtocol, layout::RectIter, utils::WriteChunks};
 use crate::render::{
     backend::{Backend, Style},
-    layout::{Line, Rect},
+    layout::Line,
     UTF8Safe,
 };
 use std::fmt::Display;
@@ -471,79 +471,6 @@ impl Writable for StyledLine {
         if width != 0 {
             backend.pad(width);
         }
-    }
-}
-
-#[allow(dead_code)]
-pub fn paragraph<'a>(area: Rect, text: impl Iterator<Item = &'a str>, backend: &mut Backend) {
-    let mut lines = area.into_iter();
-    for text_line in text {
-        match lines.next() {
-            Some(mut line) => {
-                if text_line.width() > line.width {
-                    let mut at_char = 0;
-                    let mut remaining = text_line.len();
-                    while remaining != 0 {
-                        let width = line.width;
-                        if let Some(text_slice) = text_line.get(at_char..at_char + width) {
-                            line.render(text_slice, backend);
-                        } else {
-                            line.render(text_line[at_char..].as_ref(), backend);
-                            break;
-                        }
-                        if let Some(next_line) = lines.next() {
-                            line = next_line;
-                            at_char += line.width;
-                            remaining = remaining.saturating_sub(width);
-                        } else {
-                            return;
-                        }
-                    }
-                } else {
-                    line.render(text_line, backend);
-                };
-            }
-            None => return,
-        }
-    }
-    for remaining_line in lines {
-        remaining_line.render_empty(backend);
-    }
-}
-
-pub fn paragraph_styled<'a>(area: Rect, text: impl Iterator<Item = (&'a str, Style)>, backend: &mut Backend) {
-    let mut lines = area.into_iter();
-    for (text_line, style) in text {
-        match lines.next() {
-            Some(mut line) => {
-                if text_line.width() > line.width {
-                    let mut at_char = 0;
-                    let mut remaining = text_line.len();
-                    while remaining != 0 {
-                        let width = line.width;
-                        if let Some(text_slice) = text_line.get(at_char..at_char + width) {
-                            line.render_styled(text_slice, style, backend);
-                        } else {
-                            line.render_styled(text_line[at_char..].as_ref(), style, backend);
-                            break;
-                        }
-                        if let Some(next_line) = lines.next() {
-                            line = next_line;
-                            at_char += line.width;
-                            remaining = remaining.saturating_sub(width);
-                        } else {
-                            return;
-                        }
-                    }
-                } else {
-                    line.render_styled(text_line, style, backend);
-                };
-            }
-            None => return,
-        }
-    }
-    for remaining_line in lines {
-        remaining_line.render_empty(backend);
     }
 }
 

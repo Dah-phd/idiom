@@ -80,7 +80,7 @@ impl LSPModal {
             }
             Self::Info(modal) => {
                 let height = std::cmp::min(modal.len() as u16, 7);
-                let area = gs.screen_rect.modal_relative(row, col, 60, height);
+                let area = gs.screen_rect.modal_relative(row, col, 80, height);
                 if area.height != 0 {
                     gs.writer.set_style(gs.theme.accent_style);
                     modal.render(area, gs);
