@@ -98,12 +98,12 @@ impl Lang {
         false
     }
 
-    pub fn stylize(&self, text_line: String, theme: &Theme) -> StyledLine {
-        if self.is_comment(&text_line) {
-            return vec![Text::new(text_line, Some(Style::fg(theme.comment)))].into();
+    pub fn stylize(&self, text_line: &str, theme: &Theme) -> StyledLine {
+        if self.is_comment(text_line) {
+            return vec![Text::new(text_line.to_owned(), Some(Style::fg(theme.comment)))].into();
         }
-        if self.is_import_start(&text_line) {
-            return vec![Text::new(text_line, Some(Style::fg(theme.imports)))].into();
+        if self.is_import_start(text_line) {
+            return vec![Text::new(text_line.to_owned(), Some(Style::fg(theme.imports)))].into();
         }
         let mut buffer = vec![];
         let mut word = String::new();

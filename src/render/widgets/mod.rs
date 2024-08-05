@@ -600,5 +600,23 @@ impl From<Vec<Text>> for StyledLine {
     }
 }
 
+impl From<String> for StyledLine {
+    fn from(text: String) -> Self {
+        Self { inner: vec![text.into()] }
+    }
+}
+
+impl From<(String, Style)> for StyledLine {
+    fn from(text: (String, Style)) -> Self {
+        Self { inner: vec![text.into()] }
+    }
+}
+
+impl From<(Style, String)> for StyledLine {
+    fn from(text: (Style, String)) -> Self {
+        Self { inner: vec![text.into()] }
+    }
+}
+
 #[cfg(test)]
 mod tests;

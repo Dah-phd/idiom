@@ -11,6 +11,8 @@ use info::Info;
 use lsp_types::{CompletionItem, Hover, SignatureHelp};
 use rename::RenameVariable;
 
+use super::theme::Theme;
+
 pub enum LSPModal {
     AutoComplete(AutoComplete),
     RenameVar(RenameVariable),
@@ -81,7 +83,7 @@ impl LSPModal {
                 let area = gs.screen_rect.modal_relative(row, col, 60, height);
                 if area.height != 0 {
                     gs.writer.set_style(gs.theme.accent_style);
-                    modal.render(&area, gs);
+                    modal.render(area, gs);
                     gs.writer.reset_style();
                     return Some(area);
                 };
@@ -102,25 +104,25 @@ impl LSPModal {
         Self::Info(Info::from_info(actions))
     }
 
-    pub fn from_hover(hover: Hover) -> Self {
-        Self::Info(Info::from_hover(hover))
+    pub fn from_hover(hover: Hover, lang: &Lang, theme: &Theme) -> Self {
+        Self::Info(Info::from_hover(hover, lang, theme))
     }
 
-    pub fn hover_map(&mut self, hover: Hover) {
+    pub fn hover_map(&mut self, hover: Hover, lang: &Lang, theme: &Theme) {
         match self {
-            Self::Info(modal) => modal.push_hover(hover),
-            _ => *self = Self::Info(Info::from_hover(hover)),
+            Self::Info(modal) => modal.push_hover(hover, lang, theme),
+            _ => *self = Self::Info(Info::from_hover(hover, lang, theme)),
         }
     }
 
-    pub fn from_signature(signature: SignatureHelp) -> Self {
-        Self::Info(Info::from_signature(signature))
+    pub fn from_signature(signature: SignatureHelp, lang: &Lang, theme: &Theme) -> Self {
+        Self::Info(Info::from_signature(signature, lang, theme))
     }
 
-    pub fn signature_map(&mut self, signature: SignatureHelp) {
+    pub fn signature_map(&mut self, signature: SignatureHelp, lang: &Lang, theme: &Theme) {
         match self {
-            Self::Info(modal) => modal.push_signature(signature),
-            _ => *self = Self::Info(Info::from_signature(signature)),
+            Self::Info(modal) => modal.push_signature(signature, lang, theme),
+            _ => *self = Self::Info(Info::from_signature(signature, lang, theme)),
         }
     }
 

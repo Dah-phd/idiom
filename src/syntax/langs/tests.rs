@@ -36,7 +36,7 @@ fn test_stylize() {
     let theme = Theme::default();
     let lang = Lang::from(FileType::Rust);
     let inputs = create_text();
-    let styled_lines = inputs.iter().map(|text_line| lang.stylize(text_line.to_owned(), &theme)).enumerate();
+    let styled_lines = inputs.iter().map(|text_line| lang.stylize(text_line, &theme)).enumerate();
     for (idx, sline) in styled_lines {
         assert_eq!(sline.len(), inputs[idx].len());
         assert_eq!(sline.char_len(), inputs[idx].char_len());
