@@ -174,8 +174,7 @@ impl From<DiagnosticInfo> for Info {
 }
 
 fn parse_sig_info(info: SignatureInformation, lang: &Lang, theme: &Theme, lines: &mut Vec<StyledLine>) {
-    lines.push(info.label.into());
-    // lines.push(Line::from(generic_line(builder, usize::MAX, &info.label, &mut ctx, Vec::new())));
+    lines.push(lang.stylize(&info.label, theme));
     if let Some(text) = info.documentation {
         match text {
             Documentation::MarkupContent(c) => {
@@ -194,7 +193,7 @@ fn parse_sig_info(info: SignatureInformation, lang: &Lang, theme: &Theme, lines:
                     }
                 } else {
                     for line in c.value.split("\n") {
-                        lines.push(line.to_owned().into());
+                        lines.push(lang.stylize(line, theme));
                     }
                 }
             }
@@ -227,7 +226,7 @@ fn parse_hover(hover: Hover, lang: &Lang, theme: &Theme, lines: &mut Vec<StyledL
 fn handle_markup(markup: lsp_types::MarkupContent, lang: &Lang, theme: &Theme, lines: &mut Vec<StyledLine>) {
     if !matches!(markup.kind, lsp_types::MarkupKind::Markdown) {
         for line in markup.value.split("\n") {
-            lines.push(line.to_owned().into());
+            lines.push(lang.stylize(line, theme));
         }
         return;
     }
