@@ -105,6 +105,10 @@ impl Cursor {
     }
 
     fn move_up(&mut self, content: &[impl EditorLine]) {
+        if self.text_width <= self.char {
+            self.char -= self.text_width;
+            return;
+        }
         if self.line == 0 {
             return;
         }
@@ -135,6 +139,11 @@ impl Cursor {
             return;
         }
         if content.len() <= self.line + 1 {
+            return;
+        }
+        let current_line_len = content[self.line].char_len();
+        if current_line_len > self.char + self.text_width {
+            self.char += self.text_width;
             return;
         }
         self.line += 1;

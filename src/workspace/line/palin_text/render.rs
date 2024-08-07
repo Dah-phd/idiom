@@ -1,13 +1,5 @@
-use super::TextLine;
-use crate::render::{
-    backend::{Backend, BackendProtocol},
-    layout::RectIter,
-};
 use std::{ops::Range, str::Chars};
 use unicode_width::UnicodeWidthChar;
-
-const WRAP_OPEN: &str = "<<";
-const WRAP_CLOSE: &str = ">>";
 
 #[derive(Default, Debug)]
 pub enum RenderStatus {

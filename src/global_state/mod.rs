@@ -443,12 +443,17 @@ impl GlobalState {
                 }
                 WorkspaceEvent::PopupAccess => {
                     self.popup.update_workspace(workspace);
+                    workspace.render(self);
+                    if let Some(editor) = workspace.get_active() {
+                        editor.render(self);
+                    };
                 }
                 WorkspaceEvent::ReplaceNextSelect { new_text, select: (from, to), next_select } => {
                     if let Some(editor) = workspace.get_active() {
                         editor.replace_select(from, to, new_text.as_str());
                         if let Some((from, to)) = next_select {
                             editor.go_to_select(from, to);
+                            editor.render(self);
                         }
                     }
                 }
@@ -463,6 +468,8 @@ impl GlobalState {
                         editor.go_to_select(from, to);
                         if clear_popup {
                             self.clear_popup();
+                        } else {
+                            editor.render(self);
                         }
                     } else {
                         self.clear_popup();

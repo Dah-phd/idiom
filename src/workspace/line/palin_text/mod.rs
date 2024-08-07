@@ -1,19 +1,17 @@
+mod context;
 mod render;
+use context::Context;
 use render::RenderStatus;
-
-use unicode_width::UnicodeWidthChar;
 
 use crate::{
     render::{
-        backend::{Backend, BackendProtocol, Style},
+        backend::Backend,
         layout::{Line, RectIter},
         utils::UTF8SafeStringExt,
         UTF8Safe,
     },
-    syntax::{DiagnosticLine, Lang, Lexer, Token},
     workspace::line::EditorLine,
 };
-use ropey::Rope;
 use std::{
     fmt::Display,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
@@ -28,7 +26,7 @@ pub struct TextLine {
 }
 
 impl EditorLine for TextLine {
-    type Context<'a> = ();
+    type Context<'a> = Context<'a>;
     type Error = String;
 
     #[inline]
@@ -306,22 +304,20 @@ impl EditorLine for TextLine {
     }
 
     #[inline]
-    fn cursor(&mut self, ctx: &mut (), lines: &mut RectIter, backend: &mut Backend) {
+    fn cursor(&mut self, ctx: &mut Context, lines: &mut RectIter, backend: &mut Backend) {
         todo!()
     }
 
     #[inline]
-    fn cursor_fast(&mut self, ctx: &mut (), lines: &mut RectIter, backend: &mut Backend) {
+    fn cursor_fast(&mut self, ctx: &mut Context, lines: &mut RectIter, backend: &mut Backend) {
         todo!()
     }
 
     #[inline]
-    fn render(&mut self, ctx: &mut (), line: Line, backend: &mut Backend) {
-        todo!()
-    }
+    fn render(&mut self, ctx: &mut Context, line: Line, backend: &mut Backend) {}
 
     #[inline]
-    fn fast_render(&mut self, ctx: &mut (), line: Line, backend: &mut Backend) {}
+    fn fast_render(&mut self, ctx: &mut Context, line: Line, backend: &mut Backend) {}
 
     #[inline]
     fn clear_cache(&mut self) {
