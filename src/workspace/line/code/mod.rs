@@ -1,6 +1,6 @@
 mod context;
 mod render;
-use render::{ascii_line, complex_line, RenderCache};
+use render::{ascii_line, complex_line, RenderStatus};
 use unicode_width::UnicodeWidthChar;
 
 use crate::{
@@ -30,75 +30,7 @@ pub struct CodeLine {
     tokens: Vec<Token>,
     diagnostics: Option<DiagnosticLine>,
     // used for caching - 0 is reseved for file tabs and can be used to reset line
-    pub cached: RenderCache,
-}
-
-impl Display for CodeLine {
-    #[inline]
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.content.fmt(f)
-    }
-}
-
-impl From<String> for CodeLine {
-    fn from(content: String) -> Self {
-        Self::new(content)
-    }
-}
-
-impl From<&'static str> for CodeLine {
-    fn from(value: &'static str) -> Self {
-        value.to_owned().into()
-    }
-}
-
-impl CodeLine {
-    pub fn new(content: String) -> Self {
-        Self { char_len: content.char_len(), content, ..Default::default() }
-    }
-}
-
-impl Index<Range<usize>> for CodeLine {
-    type Output = str;
-    #[inline]
-    fn index(&self, index: Range<usize>) -> &Self::Output {
-        if self.char_len == self.content.len() {
-            &self.content[index]
-        } else {
-            self.content.utf8_unsafe_get(index.start, index.end)
-        }
-    }
-}
-
-impl Index<RangeTo<usize>> for CodeLine {
-    type Output = str;
-    #[inline]
-    fn index(&self, index: RangeTo<usize>) -> &Self::Output {
-        if self.char_len == self.content.len() {
-            &self.content[index]
-        } else {
-            self.content.utf8_unsafe_get_to(index.end)
-        }
-    }
-}
-
-impl Index<RangeFrom<usize>> for CodeLine {
-    type Output = str;
-    #[inline]
-    fn index(&self, index: RangeFrom<usize>) -> &Self::Output {
-        if self.char_len == self.content.len() {
-            &self.content[index]
-        } else {
-            self.content.utf8_unsafe_get_from(index.start)
-        }
-    }
-}
-
-impl Index<RangeFull> for CodeLine {
-    type Output = str;
-    fn index(&self, _: RangeFull) -> &Self::Output {
-        &self.content
-    }
+    pub cached: RenderStatus,
 }
 
 impl EditorLine for CodeLine {
@@ -493,6 +425,10 @@ impl EditorLine for CodeLine {
 }
 
 impl CodeLine {
+    pub fn new(content: String) -> Self {
+        Self { char_len: content.char_len(), content, ..Default::default() }
+    }
+
     #[inline(always)]
     fn render_with_select(
         &mut self,
@@ -563,6 +499,68 @@ impl CodeLine {
                 diagnostic.inline_render(line_width - self.content.width(), backend)
             }
         }
+    }
+}
+
+impl Display for CodeLine {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.content.fmt(f)
+    }
+}
+
+impl From<String> for CodeLine {
+    fn from(content: String) -> Self {
+        Self::new(content)
+    }
+}
+
+impl From<&'static str> for CodeLine {
+    fn from(value: &'static str) -> Self {
+        value.to_owned().into()
+    }
+}
+
+impl Index<Range<usize>> for CodeLine {
+    type Output = str;
+    #[inline]
+    fn index(&self, index: Range<usize>) -> &Self::Output {
+        if self.char_len == self.content.len() {
+            &self.content[index]
+        } else {
+            self.content.utf8_unsafe_get(index.start, index.end)
+        }
+    }
+}
+
+impl Index<RangeTo<usize>> for CodeLine {
+    type Output = str;
+    #[inline]
+    fn index(&self, index: RangeTo<usize>) -> &Self::Output {
+        if self.char_len == self.content.len() {
+            &self.content[index]
+        } else {
+            self.content.utf8_unsafe_get_to(index.end)
+        }
+    }
+}
+
+impl Index<RangeFrom<usize>> for CodeLine {
+    type Output = str;
+    #[inline]
+    fn index(&self, index: RangeFrom<usize>) -> &Self::Output {
+        if self.char_len == self.content.len() {
+            &self.content[index]
+        } else {
+            self.content.utf8_unsafe_get_from(index.start)
+        }
+    }
+}
+
+impl Index<RangeFull> for CodeLine {
+    type Output = str;
+    fn index(&self, _: RangeFull) -> &Self::Output {
+        &self.content
     }
 }
 

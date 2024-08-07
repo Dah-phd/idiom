@@ -30,7 +30,7 @@ pub fn render(
 }
 
 #[inline]
-pub fn basic(line: &impl EditorLine, ctx: &CodeLineContext, backend: &mut impl BackendProtocol) {
+pub fn basic(line: &CodeLine, ctx: &CodeLineContext, backend: &mut impl BackendProtocol) {
     let mut tokens = line.iter_tokens();
     let mut maybe_token = tokens.next();
     let mut idx = 0;
@@ -70,7 +70,7 @@ pub fn basic(line: &impl EditorLine, ctx: &CodeLineContext, backend: &mut impl B
 }
 
 #[inline]
-pub fn select(line: &impl EditorLine, ctx: &CodeLineContext, select: Range<usize>, backend: &mut impl BackendProtocol) {
+pub fn select(line: &CodeLine, ctx: &CodeLineContext, select: Range<usize>, backend: &mut impl BackendProtocol) {
     let lexer = &ctx.lexer;
     let cursor_idx = ctx.cursor_char();
     let select_color = lexer.theme.selected;

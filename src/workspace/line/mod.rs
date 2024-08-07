@@ -78,23 +78,28 @@ pub trait EditorLine:
     fn clear(&mut self);
     fn unwrap(self) -> String;
 
-    /// DIAGNOSTICS
-    fn set_diagnostics(&mut self, diagnostics: DiagnosticLine);
-    fn diagnostic_info(&self, lang: &Lang) -> Option<DiagnosticInfo>;
-    fn drop_diagnostics(&mut self);
-
-    /// STYLE
-    fn iter_tokens(&self) -> impl Iterator<Item = &Token>;
-    fn push_token(&mut self, token: Token);
-    fn replace_tokens(&mut self, tokens: Vec<Token>);
-    fn rebuild_tokens(&mut self, lexer: &Lexer);
-
     /// render
     fn cursor(&mut self, ctx: &mut Self::Context<'_>, lines: &mut RectIter, backend: &mut Backend);
     fn cursor_fast(&mut self, ctx: &mut Self::Context<'_>, lines: &mut RectIter, backend: &mut Backend);
     fn render(&mut self, ctx: &mut Self::Context<'_>, line: Line, backend: &mut Backend);
     fn fast_render(&mut self, ctx: &mut Self::Context<'_>, line: Line, backend: &mut Backend);
     fn clear_cache(&mut self);
+
+    // TODO remove
+    /// DIAGNOSTICS
+    fn set_diagnostics(&mut self, diagnostics: DiagnosticLine) {}
+    fn diagnostic_info(&self, lang: &Lang) -> Option<DiagnosticInfo> {
+        None
+    }
+    fn drop_diagnostics(&mut self) {}
+
+    /// STYLE
+    fn iter_tokens(&self) -> impl Iterator<Item = &Token> {
+        [].into_iter()
+    }
+    fn push_token(&mut self, token: Token) {}
+    fn replace_tokens(&mut self, tokens: Vec<Token>) {}
+    fn rebuild_tokens(&mut self, lexer: &Lexer) {}
 }
 
 #[cfg(test)]

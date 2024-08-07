@@ -1,9 +1,4 @@
-pub mod ascii_cursor;
-pub mod ascii_line;
-pub mod complex_cursor;
-pub mod complex_line;
-
-use super::{CodeLine, CodeLineContext, EditorLine};
+use super::TextLine;
 use crate::render::{
     backend::{Backend, BackendProtocol},
     layout::RectIter,
@@ -14,7 +9,7 @@ use unicode_width::UnicodeWidthChar;
 const WRAP_OPEN: &str = "<<";
 const WRAP_CLOSE: &str = ">>";
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub enum RenderStatus {
     Cursor {
         line: u16,
@@ -161,80 +156,5 @@ impl RenderStatus {
         } else {
             0
         }
-    }
-}
-
-#[inline(always)]
-pub fn is_wider_complex(line: &impl EditorLine, line_width: usize) -> bool {
-    let mut current_with = 0;
-    for ch in line.chars() {
-        if let Some(char_width) = UnicodeWidthChar::width(ch) {
-            current_with += char_width;
-            if current_with > line_width {
-                return true;
-            }
-        }
-    }
-    false
-}
-
-#[inline(always)]
-pub fn cursor(line: &mut CodeLine, ctx: &mut CodeLineContext, lines: &mut RectIter, backend: &mut Backend) {
-    let (line_width, select) = match lines.next() {
-        Some(rend_line) => {
-            let line_row = rend_line.row;
-            let (line_width, select) = ctx.setup_line(rend_line, backend);
-            line.cached.cursor(line_row, ctx.cursor_char(), 0, select.clone());
-            (line_width, select)
-        }
-        None => return,
-    };
-    if line.is_simple() {
-        ascii_cursor::render(line, ctx, line_width, select, backend);
-    } else {
-        complex_cursor::render(line, ctx, line_width, select, backend);
-    }
-    backend.reset_style();
-}
-
-#[inline(always)]
-pub fn cursor_fast(line: &mut CodeLine, ctx: &mut CodeLineContext, lines: &mut RectIter, backend: &mut Backend) {
-    let (line_width, select) = match lines.next() {
-        Some(rend_line) => {
-            if !line.cached.should_render_cursor_or_update(
-                rend_line.row,
-                ctx.cursor_char(),
-                ctx.get_select(rend_line.width),
-            ) {
-                ctx.skip_line();
-                return;
-            }
-            let (line_width, select) = ctx.setup_line(rend_line, backend);
-            (line_width, select)
-        }
-        None => return,
-    };
-    if line.is_simple() {
-        ascii_cursor::render(line, ctx, line_width, select, backend);
-    } else {
-        complex_cursor::render(line, ctx, line_width, select, backend);
-    }
-    backend.reset_style();
-}
-
-#[cfg(test)]
-mod test {
-    use super::RenderStatus;
-
-    #[test]
-    fn test_cache() {
-        let mut cached = RenderStatus::default();
-        cached.cursor(3, 0, 0, None);
-        assert!(!cached.should_render_cursor(3, 0, &None));
-        assert!(cached.should_render_cursor(3, 1, &None));
-        assert_eq!(cached.skipped_chars(), 0);
-        cached.set_skipped_chars(7);
-        assert_eq!(cached.skipped_chars(), 7);
-        assert!(cached.should_render_line(3, &None));
     }
 }
