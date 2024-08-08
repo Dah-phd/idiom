@@ -2,14 +2,12 @@ mod code;
 mod markdown;
 mod palin_text;
 
-use crate::{
-    render::{
-        backend::Backend,
-        layout::{Line, RectIter},
-    },
-    syntax::{DiagnosticInfo, DiagnosticLine, Lang, Lexer, Token},
+use crate::render::{
+    backend::Backend,
+    layout::{Line, RectIter},
 };
 pub use code::{CodeLine, CodeLineContext};
+pub use palin_text::TextLine;
 use std::{
     fmt::Display,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
@@ -84,22 +82,6 @@ pub trait EditorLine:
     fn render(&mut self, ctx: &mut Self::Context<'_>, line: Line, backend: &mut Backend);
     fn fast_render(&mut self, ctx: &mut Self::Context<'_>, line: Line, backend: &mut Backend);
     fn clear_cache(&mut self);
-
-    // TODO remove
-    /// DIAGNOSTICS
-    fn set_diagnostics(&mut self, diagnostics: DiagnosticLine) {}
-    fn diagnostic_info(&self, lang: &Lang) -> Option<DiagnosticInfo> {
-        None
-    }
-    fn drop_diagnostics(&mut self) {}
-
-    /// STYLE
-    fn iter_tokens(&self) -> impl Iterator<Item = &Token> {
-        [].into_iter()
-    }
-    fn push_token(&mut self, token: Token) {}
-    fn replace_tokens(&mut self, tokens: Vec<Token>) {}
-    fn rebuild_tokens(&mut self, lexer: &Lexer) {}
 }
 
 #[cfg(test)]

@@ -320,63 +320,6 @@ impl EditorLine for CodeLine {
     }
 
     #[inline]
-    fn iter_tokens(&self) -> impl Iterator<Item = &Token> {
-        self.tokens.iter()
-    }
-
-    #[inline]
-    fn push_token(&mut self, token: Token) {
-        self.cached.reset();
-        self.tokens.push(token);
-    }
-
-    #[inline]
-    fn replace_tokens(&mut self, tokens: Vec<Token>) {
-        self.cached.reset();
-        self.tokens = tokens;
-        if let Some(diagnostics) = self.diagnostics.as_ref() {
-            for diagnostic in diagnostics.data.iter() {
-                for token in self.tokens.iter_mut() {
-                    diagnostic.check_and_update(token);
-                }
-            }
-        };
-    }
-
-    #[inline]
-    fn rebuild_tokens(&mut self, lexer: &Lexer) {
-        self.cached.reset();
-        self.tokens.clear();
-        Token::parse_to_buf(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
-    }
-
-    #[inline]
-    fn set_diagnostics(&mut self, diagnostics: DiagnosticLine) {
-        self.cached.reset();
-        for diagnostic in diagnostics.data.iter() {
-            for token in self.tokens.iter_mut() {
-                diagnostic.check_and_update(token);
-            }
-        }
-        self.diagnostics.replace(diagnostics);
-    }
-
-    #[inline]
-    fn diagnostic_info(&self, lang: &Lang) -> Option<crate::syntax::DiagnosticInfo> {
-        self.diagnostics.as_ref().map(|d| d.collect_info(lang))
-    }
-
-    #[inline]
-    fn drop_diagnostics(&mut self) {
-        if self.diagnostics.take().is_some() {
-            for token in self.tokens.iter_mut() {
-                token.drop_diagstic();
-            }
-            self.cached.reset();
-        };
-    }
-
-    #[inline]
     fn cursor(&mut self, ctx: &mut CodeLineContext<'_>, lines: &mut RectIter, backend: &mut Backend) {
         if self.tokens.is_empty() {
             Token::parse_to_buf(&ctx.lexer.lang, &ctx.lexer.theme, &self.content, &mut self.tokens);
@@ -427,6 +370,63 @@ impl EditorLine for CodeLine {
 impl CodeLine {
     pub fn new(content: String) -> Self {
         Self { char_len: content.char_len(), content, ..Default::default() }
+    }
+
+    #[inline]
+    pub fn push_token(&mut self, token: Token) {
+        self.cached.reset();
+        self.tokens.push(token);
+    }
+
+    #[inline]
+    pub fn replace_tokens(&mut self, tokens: Vec<Token>) {
+        self.cached.reset();
+        self.tokens = tokens;
+        if let Some(diagnostics) = self.diagnostics.as_ref() {
+            for diagnostic in diagnostics.data.iter() {
+                for token in self.tokens.iter_mut() {
+                    diagnostic.check_and_update(token);
+                }
+            }
+        };
+    }
+
+    #[inline]
+    pub fn rebuild_tokens(&mut self, lexer: &Lexer) {
+        self.cached.reset();
+        self.tokens.clear();
+        Token::parse_to_buf(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
+    }
+
+    #[inline]
+    pub fn set_diagnostics(&mut self, diagnostics: DiagnosticLine) {
+        self.cached.reset();
+        for diagnostic in diagnostics.data.iter() {
+            for token in self.tokens.iter_mut() {
+                diagnostic.check_and_update(token);
+            }
+        }
+        self.diagnostics.replace(diagnostics);
+    }
+
+    #[inline]
+    pub fn iter_tokens(&self) -> impl Iterator<Item = &Token> {
+        self.tokens.iter()
+    }
+
+    #[inline]
+    pub fn diagnostic_info(&self, lang: &Lang) -> Option<crate::syntax::DiagnosticInfo> {
+        self.diagnostics.as_ref().map(|d| d.collect_info(lang))
+    }
+
+    #[inline]
+    pub fn drop_diagnostics(&mut self) {
+        if self.diagnostics.take().is_some() {
+            for token in self.tokens.iter_mut() {
+                token.drop_diagstic();
+            }
+            self.cached.reset();
+        };
     }
 
     #[inline(always)]

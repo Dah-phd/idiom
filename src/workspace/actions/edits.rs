@@ -12,7 +12,7 @@ use crate::{
     utils::Offset,
     workspace::{
         cursor::Cursor,
-        line::EditorLine,
+        line::{CodeLine, EditorLine},
         utils::{clip_content, insert_clip, is_scope, remove_content, token_range_at},
         CursorPosition,
     },
@@ -436,7 +436,7 @@ impl EditMetaData {
     }
 
     #[inline]
-    pub fn update_tokens(&self, content: &mut [impl EditorLine], lexer: &Lexer) {
+    pub fn update_tokens(&self, content: &mut [CodeLine], lexer: &Lexer) {
         for line in content.iter_mut().skip(self.start_line).take(self.to) {
             line.rebuild_tokens(lexer);
         }

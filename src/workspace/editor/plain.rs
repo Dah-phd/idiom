@@ -1,17 +1,13 @@
-mod placeholder;
-mod plain;
-
 use crate::{
     configs::{EditorConfigs, FileType},
     error::{IdiomError, IdiomResult},
     global_state::GlobalState,
     lsp::LSPError,
     render::layout::Rect,
-    syntax::Lexer,
     workspace::{
         actions::Actions,
         cursor::{Cursor, CursorPosition},
-        line::{CodeLine, CodeLineContext, EditorLine},
+        line::{EditorLine, TextLine},
         utils::{copy_content, find_line_start, last_modified, token_range_at},
     },
 };
@@ -28,27 +24,25 @@ type SelectLen = usize;
 pub type DocStats<'a> = (DocLen, SelectLen, CursorPosition);
 
 #[allow(dead_code)]
-pub struct Editor {
+pub struct TextEditor {
     pub file_type: FileType,
     pub display: String,
     pub path: PathBuf,
-    pub lexer: Lexer,
     pub cursor: Cursor,
     pub actions: Actions,
-    pub content: Vec<CodeLine>,
+    pub content: Vec<TextLine>,
     timestamp: Option<SystemTime>,
     pub line_number_offset: usize,
     last_render_at_line: Option<usize>,
 }
 
-impl Editor {
+impl TextEditor {
     pub fn from_path(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
-        let content = CodeLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
+        let content = TextLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let file_type = FileType::derive_type(&path);
         let display = build_display(&path);
         Ok(Self {
             line_number_offset: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
-            lexer: Lexer::with_context(file_type, &path, gs),
             content,
             cursor: Cursor::default(),
             actions: Actions::new(cfg.get_indent_cfg(&file_type)),
@@ -61,26 +55,7 @@ impl Editor {
     }
 
     #[inline]
-    pub fn render(&mut self, gs: &mut GlobalState) {
-        self.last_render_at_line.replace(self.cursor.at_line);
-        self.sync(gs);
-        let mut lines = gs.editor_area.into_iter();
-        let mut ctx = CodeLineContext::collect_context(&mut self.lexer, &self.cursor, self.line_number_offset);
-        for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
-            if self.cursor.line == line_idx {
-                text.cursor(&mut ctx, &mut lines, &mut gs.writer);
-            } else if let Some(line) = lines.next() {
-                text.render(&mut ctx, line, &mut gs.writer);
-            } else {
-                break;
-            };
-        }
-        for line in lines {
-            line.render_empty(&mut gs.writer);
-        }
-        gs.render_stats(self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into());
-        ctx.render_cursor(gs);
-    }
+    pub fn render(&mut self, gs: &mut GlobalState) {}
 
     /// renders only updated lines
     #[inline]
@@ -88,23 +63,6 @@ impl Editor {
         if !matches!(self.last_render_at_line, Some(idx) if idx == self.cursor.at_line) {
             return self.render(gs);
         }
-        self.sync(gs);
-        let mut lines = gs.editor_area.into_iter();
-        let mut ctx = CodeLineContext::collect_context(&mut self.lexer, &self.cursor, self.line_number_offset);
-        for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
-            if self.cursor.line == line_idx {
-                text.cursor_fast(&mut ctx, &mut lines, &mut gs.writer);
-            } else if let Some(line) = lines.next() {
-                text.fast_render(&mut ctx, line, &mut gs.writer);
-            } else {
-                break;
-            };
-        }
-        for line in lines {
-            line.render_empty(&mut gs.writer);
-        }
-        gs.render_stats(self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into());
-        ctx.render_cursor(gs);
     }
 
     #[inline(always)]
@@ -121,18 +79,6 @@ impl Editor {
     }
 
     #[inline(always)]
-    pub fn sync(&mut self, gs: &mut GlobalState) {
-        let new_line_number_offset =
-            if self.content.is_empty() { 0 } else { (self.content.len().ilog10() + 1) as usize };
-        if new_line_number_offset != self.line_number_offset {
-            self.line_number_offset = new_line_number_offset;
-            self.last_render_at_line.take();
-        };
-        Lexer::context(self, gs);
-        self.cursor.correct_cursor_position(&self.content);
-    }
-
-    #[inline(always)]
     pub fn get_stats(&self) -> DocStats {
         (self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into())
     }
@@ -141,22 +87,7 @@ impl Editor {
     pub fn update_path(&mut self, new_path: PathBuf) -> Result<(), LSPError> {
         self.display = build_display(&new_path);
         self.path = new_path;
-        self.lexer.update_path(&self.path)
-    }
-
-    #[inline(always)]
-    pub fn help(&mut self, gs: &mut GlobalState) {
-        self.lexer.help((&self.cursor).into(), &self.content, gs);
-    }
-
-    #[inline(always)]
-    pub fn references(&mut self, gs: &mut GlobalState) {
-        self.lexer.go_to_reference((&self.cursor).into(), gs);
-    }
-
-    #[inline(always)]
-    pub fn declarations(&mut self, gs: &mut GlobalState) {
-        self.lexer.go_to_declaration((&self.cursor).into(), gs);
+        Ok(())
     }
 
     #[inline(always)]
@@ -196,7 +127,6 @@ impl Editor {
     pub fn start_renames(&mut self) {
         let line = &self.content[self.cursor.line];
         let token_range = token_range_at(line, self.cursor.char);
-        self.lexer.start_rename((&self.cursor).into(), &line[token_range]);
     }
 
     pub fn is_saved(&self) -> bool {
@@ -472,13 +402,6 @@ impl Editor {
     #[inline(always)]
     pub fn push(&mut self, ch: char, gs: &mut GlobalState) {
         self.actions.push_char(ch, &mut self.cursor, &mut self.content);
-        let line = &self.content[self.cursor.line];
-        if self.lexer.should_autocomplete(self.cursor.char, line) {
-            let line = line.to_string();
-            self.actions.push_buffer();
-            Lexer::sync(self, gs);
-            self.lexer.get_autocomplete((&self.cursor).into(), line, gs);
-        }
     }
 
     #[inline(always)]
@@ -513,7 +436,6 @@ impl Editor {
 
     pub fn save(&mut self, gs: &mut GlobalState) {
         if let Some(content) = self.try_write_file(gs) {
-            self.lexer.save_and_check_lsp(content, gs);
             gs.success(format!("SAVED {}", self.path.display()));
         }
     }
@@ -558,12 +480,3 @@ pub fn build_display(path: &Path) -> String {
     }
     buffer.join(MAIN_SEPARATOR_STR)
 }
-
-impl Drop for Editor {
-    fn drop(&mut self) {
-        self.lexer.close();
-    }
-}
-
-#[cfg(test)]
-pub mod tests;

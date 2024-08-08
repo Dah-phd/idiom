@@ -1,7 +1,7 @@
 use crate::{
     render::backend::{Color, Style},
     syntax::{theme::Theme, Lang, Legend},
-    workspace::line::EditorLine,
+    workspace::line::{CodeLine, EditorLine},
 };
 use lsp_types::SemanticToken;
 
@@ -108,13 +108,7 @@ pub enum TokensType {
 }
 
 #[inline]
-pub fn set_tokens(
-    tokens: Vec<SemanticToken>,
-    legend: &Legend,
-    lang: &Lang,
-    theme: &Theme,
-    content: &mut [impl EditorLine],
-) {
+pub fn set_tokens(tokens: Vec<SemanticToken>, legend: &Legend, lang: &Lang, theme: &Theme, content: &mut [CodeLine]) {
     let mut line_idx = 0;
     let mut char_idx = 0;
     let mut len = 0;
@@ -154,7 +148,7 @@ pub fn set_tokens_partial(
     legend: &Legend,
     lang: &Lang,
     theme: &Theme,
-    content: &mut [impl EditorLine],
+    content: &mut [CodeLine],
 ) {
     let mut line_idx = 0;
     let mut char_idx = 0;

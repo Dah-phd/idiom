@@ -10,7 +10,10 @@ use crate::{
     global_state::{GlobalState, WorkspaceEvent},
     lsp::{LSPClient, LSPError, LSPResponseType},
     render::layout::Rect,
-    workspace::{line::EditorLine, CursorPosition, Editor},
+    workspace::{
+        line::{CodeLine, EditorLine},
+        CursorPosition, Editor,
+    },
 };
 use crossterm::event::KeyEvent;
 pub use diagnostics::{set_diganostics, Action, DiagnosticInfo, DiagnosticLine};
@@ -169,7 +172,7 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn help(&mut self, c: CursorPosition, content: &[impl EditorLine], gs: &mut GlobalState) {
+    pub fn help(&mut self, c: CursorPosition, content: &[CodeLine], gs: &mut GlobalState) {
         if let Some(actions) = content[c.line].diagnostic_info(&self.lang) {
             self.modal.replace(LSPModal::actions(actions));
         }
