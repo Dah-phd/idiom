@@ -23,14 +23,14 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
     match event.kind {
         MouseEventKind::ScrollUp if matches!(gs.mode, Mode::Insert) => {
             if let Some(editor) = workspace.get_active() {
-                editor.scroll_up();
-                editor.scroll_up();
+                editor.map(crate::configs::EditorAction::ScrollUp, gs);
+                editor.map(crate::configs::EditorAction::ScrollUp, gs);
             }
         }
         MouseEventKind::ScrollDown if matches!(gs.mode, Mode::Insert) => {
             if let Some(editor) = workspace.get_active() {
-                editor.scroll_down();
-                editor.scroll_down();
+                editor.map(crate::configs::EditorAction::ScrollDown, gs);
+                editor.map(crate::configs::EditorAction::ScrollDown, gs);
             }
         }
         MouseEventKind::Down(MouseButton::Left) => {

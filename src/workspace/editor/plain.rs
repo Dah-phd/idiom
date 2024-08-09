@@ -37,7 +37,7 @@ pub struct TextEditor {
 }
 
 impl TextEditor {
-    pub fn from_path(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
+    pub fn from_path(path: PathBuf, cfg: &EditorConfigs, _: &mut GlobalState) -> IdiomResult<Self> {
         let content = TextLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let file_type = FileType::derive_type(&path);
         let display = build_display(&path);
@@ -55,7 +55,9 @@ impl TextEditor {
     }
 
     #[inline]
-    pub fn render(&mut self, gs: &mut GlobalState) {}
+    pub fn render(&mut self, _: &mut GlobalState) {
+        todo!()
+    }
 
     /// renders only updated lines
     #[inline]
@@ -63,6 +65,7 @@ impl TextEditor {
         if !matches!(self.last_render_at_line, Some(idx) if idx == self.cursor.at_line) {
             return self.render(gs);
         }
+        todo!()
     }
 
     #[inline(always)]
@@ -125,8 +128,7 @@ impl TextEditor {
     }
 
     pub fn start_renames(&mut self) {
-        let line = &self.content[self.cursor.line];
-        let token_range = token_range_at(line, self.cursor.char);
+        todo!()
     }
 
     pub fn is_saved(&self) -> bool {
@@ -400,7 +402,7 @@ impl TextEditor {
     }
 
     #[inline(always)]
-    pub fn push(&mut self, ch: char, gs: &mut GlobalState) {
+    pub fn push(&mut self, ch: char, _: &mut GlobalState) {
         self.actions.push_char(ch, &mut self.cursor, &mut self.content);
     }
 
@@ -435,18 +437,11 @@ impl TextEditor {
     }
 
     pub fn save(&mut self, gs: &mut GlobalState) {
-        if let Some(content) = self.try_write_file(gs) {
-            gs.success(format!("SAVED {}", self.path.display()));
-        }
-    }
-
-    pub fn try_write_file(&self, gs: &mut GlobalState) -> Option<String> {
         let content = self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n");
-        if let Err(error) = std::fs::write(&self.path, &content) {
-            gs.error(error.to_string());
-            return None;
+        match std::fs::write(&self.path, &content) {
+            Ok(()) => gs.success(format!("SAVED {}", self.path.display())),
+            Err(error) => gs.error(error.to_string()),
         }
-        Some(content)
     }
 
     pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {

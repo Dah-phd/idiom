@@ -429,71 +429,11 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
             return true;
         };
         if let Some(action) = action {
-            match action {
-                EditorAction::Char(ch) => editor.push(ch, gs),
-                EditorAction::NewLine => editor.new_line(),
-                EditorAction::Indent => editor.indent(),
-                EditorAction::Backspace => editor.backspace(),
-                EditorAction::Delete => editor.del(),
-                EditorAction::RemoveLine => editor.remove_line(),
-                EditorAction::IndentStart => editor.indent_start(),
-                EditorAction::Unintent => editor.unindent(),
-                EditorAction::Up => editor.up(),
-                EditorAction::Down => editor.down(),
-                EditorAction::Left => editor.left(),
-                EditorAction::Right => editor.right(),
-                EditorAction::SelectUp => editor.select_up(),
-                EditorAction::SelectDown => editor.select_down(),
-                EditorAction::SelectLeft => editor.select_left(),
-                EditorAction::SelectRight => editor.select_right(),
-                EditorAction::SelectToken => editor.select_token(),
-                EditorAction::SelectLine => editor.select_line(),
-                EditorAction::SelectAll => editor.select_all(),
-                EditorAction::ScrollUp => editor.scroll_up(),
-                EditorAction::ScrollDown => editor.scroll_down(),
-                EditorAction::SwapUp => editor.swap_up(),
-                EditorAction::SwapDown => editor.swap_down(),
-                EditorAction::JumpLeft => editor.jump_left(),
-                EditorAction::JumpLeftSelect => editor.jump_left_select(),
-                EditorAction::JumpRight => editor.jump_right(),
-                EditorAction::JumpRightSelect => editor.jump_right_select(),
-                EditorAction::EndOfLine => editor.end_of_line(),
-                EditorAction::EndOfFile => editor.end_of_file(),
-                EditorAction::StartOfLine => editor.start_of_line(),
-                EditorAction::StartOfFile => editor.start_of_file(),
-                EditorAction::FindReferences => editor.references(gs),
-                EditorAction::GoToDeclaration => editor.declarations(gs),
-                EditorAction::Help => editor.help(gs),
-                EditorAction::LSPRename => editor.start_renames(),
-                EditorAction::CommentOut => editor.comment_out(),
-                EditorAction::Undo => editor.undo(),
-                EditorAction::Redo => editor.redo(),
-                EditorAction::Save => editor.save(gs),
-                EditorAction::Close => ws.close_active(gs),
-                EditorAction::Cancel => {
-                    if editor.cursor.select_take().is_some() {
-                        return true;
-                    }
-                    if ws.editors.len() > 1 {
-                        ws.toggle_tabs();
-                        return true;
-                    }
-                    return false;
-                }
-                EditorAction::Paste => {
-                    if let Some(clip) = gs.clipboard.pull() {
-                        editor.paste(clip);
-                    }
-                }
-                EditorAction::Cut => {
-                    if let Some(clip) = editor.cut() {
-                        gs.clipboard.push(clip);
-                    }
-                }
-                EditorAction::Copy => {
-                    if let Some(clip) = editor.copy() {
-                        gs.clipboard.push(clip);
-                    }
+            if !editor.map(action, gs) {
+                match action {
+                    EditorAction::Close => ws.close_active(gs),
+                    EditorAction::Cancel if ws.editors.len() > 1 => ws.toggle_tabs(),
+                    _ => return false,
                 }
             }
             return true;
