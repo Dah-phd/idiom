@@ -136,8 +136,13 @@ impl<T> TrackedList<T> {
     }
 
     #[inline(always)]
-    pub fn updated(&mut self) -> bool {
+    pub fn collect_status(&mut self) -> bool {
         std::mem::take(&mut self.updated)
+    }
+
+    #[inline(always)]
+    pub fn check_status(&self) -> bool {
+        self.updated
     }
 
     #[inline(always)]
@@ -183,7 +188,7 @@ impl<T> TrackedList<T> {
     #[allow(dead_code)]
     #[inline(always)]
     pub fn iter_if_updated(&mut self) -> Option<std::slice::Iter<'_, T>> {
-        if !self.updated() {
+        if !self.collect_status() {
             return None;
         }
         Some(self.iter())

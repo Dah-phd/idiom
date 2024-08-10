@@ -1,3 +1,4 @@
+mod test_path;
 mod tree_paths;
 use crate::{
     configs::{TreeAction, TreeKeyMap},

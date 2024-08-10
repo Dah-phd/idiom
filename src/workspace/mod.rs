@@ -70,7 +70,7 @@ impl Workspace {
     }
 
     pub fn fast_render(&mut self, gs: &mut GlobalState) {
-        if self.editors.updated() {
+        if self.editors.collect_status() {
             self.render(gs);
         }
     }
