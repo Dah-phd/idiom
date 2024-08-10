@@ -1,4 +1,3 @@
-mod test_path;
 mod tree_paths;
 use crate::{
     configs::{TreeAction, TreeKeyMap},
@@ -26,7 +25,6 @@ pub struct Tree {
     state: State,
     selected_path: PathBuf,
     tree: TreePath,
-    tree_ptrs: Vec<*mut TreePath>,
     sync_handler: JoinHandle<TreePath>,
     rebuild: bool,
     pub lsp_register: Vec<Arc<Mutex<HashMap<PathBuf, Diagnostic>>>>,
@@ -34,21 +32,18 @@ pub struct Tree {
 
 impl Tree {
     pub fn new(key_map: TreeKeyMap) -> Self {
-        let mut tree = TreePath::default();
+        let tree = TreePath::default();
         let mut sync_tree = tree.clone();
-        let mut tree_ptrs = Vec::new();
         let sync_handler = tokio::spawn(async move {
             tokio::time::sleep(TICK).await;
             sync_tree.sync_base();
             sync_tree
         });
-        tree.sync_flat_ptrs(&mut tree_ptrs);
         Self {
             state: State::new(),
             key_map,
             selected_path: PathBuf::from("./"),
             tree,
-            tree_ptrs,
             sync_handler,
             rebuild: true,
             lsp_register: Vec::new(),
@@ -56,8 +51,23 @@ impl Tree {
     }
 
     pub fn render(&mut self, gs: &mut GlobalState) {
-        let options = self.tree_ptrs.iter().flat_map(|ptr| unsafe { ptr.as_ref() }.map(|tp| tp.direct_display()));
-        self.state.render_list_styled(options, &gs.tree_area, &mut gs.writer);
+        let mut iter = self.tree.iter();
+        iter.next();
+        let mut lines = gs.tree_area.into_iter();
+        for (idx, tree_path) in iter.enumerate().skip(self.state.at_line) {
+            let line = match lines.next() {
+                Some(line) => line,
+                None => return,
+            };
+            if idx == self.state.selected {
+                tree_path.render_styled(line, self.state.highlight, &mut gs.writer);
+            } else {
+                tree_path.render(line, &mut gs.writer);
+            }
+        }
+        for line in lines {
+            line.render_empty(&mut gs.writer);
+        }
     }
 
     #[inline]
@@ -115,7 +125,7 @@ impl Tree {
     }
 
     pub fn mouse_select(&mut self, idx: usize) -> Option<PathBuf> {
-        if self.tree_ptrs.len() >= idx {
+        if self.tree.len() > idx {
             self.state.selected = idx.saturating_sub(1);
             if let Some(selected) = self.get_selected() {
                 match selected {
@@ -135,18 +145,20 @@ impl Tree {
     }
 
     fn select_up(&mut self) {
-        if self.tree_ptrs.is_empty() {
+        let tree_len = self.tree.len() - 1;
+        if tree_len == 0 {
             return;
         }
-        self.state.prev(self.tree_ptrs.len());
+        self.state.prev(tree_len);
         self.unsafe_set_path();
     }
 
     fn select_down(&mut self) {
-        if self.tree_ptrs.is_empty() {
+        let tree_len = self.tree.len() - 1;
+        if tree_len == 0 {
             return;
         }
-        self.state.next(self.tree_ptrs.len());
+        self.state.next(tree_len);
         self.unsafe_set_path();
     }
 
@@ -209,7 +221,7 @@ impl Tree {
     }
 
     pub fn shallow_copy_selected_tree_path(&self) -> TreePath {
-        match self.get_selected() {
+        match self.tree.get_from_inner(self.state.selected) {
             Some(tree_path) => tree_path.shallow_copy(),
             None => self.shallow_copy_root_tree_path(),
         }
@@ -225,7 +237,7 @@ impl Tree {
         }
     }
 
-    pub fn get_first_selected_folder_display(&self) -> String {
+    pub fn get_first_selected_folder_display(&mut self) -> String {
         if let Some(tree_path) = self.get_selected() {
             if tree_path.path().is_dir() {
                 return tree_path.path().as_path().display().to_string();
@@ -238,8 +250,8 @@ impl Tree {
     }
 
     #[inline]
-    pub fn get_selected(&self) -> Option<&mut TreePath> {
-        unsafe { self.tree_ptrs.get(self.state.selected)?.as_mut() }
+    pub fn get_selected(&mut self) -> Option<&mut TreePath> {
+        self.tree.get_mut_from_inner(self.state.selected)
     }
 
     pub async fn finish_sync(&mut self, gs: &mut GlobalState) {
@@ -269,7 +281,6 @@ impl Tree {
             match old_handler.await {
                 Ok(tree) => {
                     self.tree = tree;
-                    self.tree.sync_flat_ptrs(&mut self.tree_ptrs);
                     self.fix_select_by_path();
                 }
                 Err(err) => {
@@ -277,7 +288,6 @@ impl Tree {
                 }
             }
         }
-        self.tree.sync_flat_ptrs(&mut self.tree_ptrs);
     }
 
     fn force_sync(&mut self) {
@@ -291,18 +301,13 @@ impl Tree {
             }),
         )
         .abort();
-        self.tree.sync_flat_ptrs(&mut self.tree_ptrs);
     }
 
     fn fix_select_by_path(&mut self) {
-        if let Some(selected) = self.get_selected() {
-            if &self.selected_path != selected.path() {
-                for (idx, tree_path) in self.tree_ptrs.iter_mut().flat_map(|ptr| unsafe { ptr.as_mut() }).enumerate() {
-                    if tree_path.path() == &self.selected_path {
-                        self.state.selected = idx;
-                        break;
-                    }
-                }
+        for (idx, tree_path) in self.tree.iter().skip(1).enumerate() {
+            if tree_path.path() == &self.selected_path {
+                self.state.selected = idx;
+                break;
             }
         }
     }

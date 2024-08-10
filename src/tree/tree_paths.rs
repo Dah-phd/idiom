@@ -3,7 +3,10 @@ use ignore::Match;
 use tokio::task::JoinSet;
 
 use crate::{
-    render::backend::{color, Color, Style},
+    render::{
+        backend::{color, Backend, Color, Style},
+        layout::Line,
+    },
     utils::{get_nested_paths, to_relative_path},
 };
 use std::{
@@ -23,23 +26,7 @@ pub enum TreePath {
     File { path: PathBuf, display: String, errors: usize, warnings: usize },
 }
 
-impl Default for TreePath {
-    fn default() -> Self {
-        Self::clean_from("./")
-    }
-}
-
-impl From<PathBuf> for TreePath {
-    fn from(value: PathBuf) -> Self {
-        let display = get_path_display(&value);
-        if value.is_dir() {
-            Self::Folder { path: value, tree: None, display, errors: 0, warnings: 0 }
-        } else {
-            Self::File { path: value, display, errors: 0, warnings: 0 }
-        }
-    }
-}
-
+#[allow(dead_code)]
 impl TreePath {
     pub fn clean_from(path: &str) -> Self {
         let path = PathBuf::from(path);
@@ -53,22 +40,74 @@ impl TreePath {
         Self::Folder { display: get_path_display(&path), path, tree: Some(tree_buffer), errors: 0, warnings: 0 }
     }
 
-    pub fn sync_flat_ptrs(&mut self, buffer: &mut Vec<*mut Self>) {
-        buffer.clear();
-        if let Some(base_tree) = self.tree_mut() {
-            for base_path in base_tree {
-                base_path.collect_flat_ptrs(buffer);
+    pub fn render_styled(&self, line: Line, mut style: Style, backend: &mut Backend) {
+        let (display, errs, wars) = match self {
+            TreePath::File { display, errors, warnings, .. } => (display, *errors, *warnings),
+            TreePath::Folder { display, errors, warnings, .. } => (display, *errors, *warnings),
+        };
+        if errs != 0 {
+            style.set_fg(Some(ERR));
+        } else if wars != 0 {
+            style.set_fg(Some(WAR));
+        }
+        line.render_styled(display, style, backend);
+    }
+
+    pub fn render(&self, line: Line, backend: &mut Backend) {
+        let (display, errs, wars) = match self {
+            TreePath::File { display, errors, warnings, .. } => (display, *errors, *warnings),
+            TreePath::Folder { display, errors, warnings, .. } => (display, *errors, *warnings),
+        };
+        if errs != 0 {
+            line.render_styled(display, Style::fg(ERR), backend);
+            return;
+        }
+        if wars != 0 {
+            line.render_styled(display, Style::fg(WAR), backend);
+            return;
+        }
+        line.render(display, backend);
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Folder { tree: Some(inner), .. } => 1 + inner.iter().map(Self::len).sum::<usize>(),
+            _ => 1,
+        }
+    }
+
+    pub fn path(&self) -> &PathBuf {
+        match self {
+            Self::Folder { path, .. } => path,
+            Self::File { path, .. } => path,
+        }
+    }
+
+    pub fn file_name(&self) -> Option<String> {
+        self.path().file_name()?.to_str().map(|s| s.to_string())
+    }
+
+    pub fn tree_file_names(&self) -> Vec<String> {
+        match self {
+            Self::File { .. } => self.file_name().into_iter().collect(),
+            Self::Folder { tree, .. } => {
+                tree.as_ref().map(|paths| paths.iter().flat_map(|p| p.file_name()).collect()).unwrap_or_default()
             }
         }
     }
 
-    fn collect_flat_ptrs(&mut self, buffer: &mut Vec<*mut Self>) {
-        buffer.push(self);
-        if let Some(tree) = self.tree_mut() {
-            for tree_path in tree {
-                tree_path.collect_flat_ptrs(buffer);
-            }
+    fn tree_mut(&mut self) -> Option<&mut Vec<TreePath>> {
+        if let Self::Folder { tree: Some(tree), .. } = self {
+            return Some(tree);
         }
+        None
+    }
+
+    pub fn take_tree(&mut self) -> Option<Vec<Self>> {
+        if let Self::Folder { tree, .. } = self {
+            return tree.take();
+        }
+        None
     }
 
     pub fn expand(&mut self) {
@@ -106,58 +145,29 @@ impl TreePath {
         false
     }
 
-    pub fn map_diagnostics_base(&mut self, path: PathBuf, d_errors: usize, d_warnings: usize) {
-        if d_errors == 0 && d_warnings == 0 {
-            return;
-        }
-        if let Ok(d_path) = to_relative_path(&path) {
-            if let Self::Folder { tree: Some(tree), .. } = self {
-                for tree_path in tree {
-                    tree_path.map_diagnostics(&d_path, d_errors, d_warnings);
-                }
+    pub fn update_path(&mut self, new_path: PathBuf) {
+        match self {
+            Self::File { path, display, .. } => {
+                *display = get_path_display(&new_path);
+                *path = new_path;
             }
-        };
+            Self::Folder { path, display, .. } => {
+                *display = get_path_display(&new_path);
+                *path = new_path;
+            }
+        }
     }
 
-    fn map_diagnostics(&mut self, d_path: &PathBuf, d_errors: usize, d_warnings: usize) -> bool {
+    pub fn shallow_copy(&self) -> Self {
         match self {
-            Self::Folder { path, tree, errors, warnings, .. } => {
-                if !d_path.starts_with(path) {
-                    return false;
-                }
-                if let Some(tree) = tree {
-                    for tree_path in tree.iter_mut() {
-                        if tree_path.map_diagnostics(d_path, d_errors, d_warnings) {
-                            return true;
-                        }
-                    }
-                }
-                *errors = d_errors;
-                *warnings = d_warnings;
-            }
-            Self::File { path, errors, warnings, .. } => {
-                if path == d_path {
-                    *errors = d_errors;
-                    *warnings = d_warnings;
-                    return true;
-                }
+            Self::File { .. } => self.clone(),
+            Self::Folder { path, display, .. } => {
+                Self::Folder { path: path.clone(), tree: None, display: display.clone(), errors: 0, warnings: 0 }
             }
         }
-        false
     }
 
-    fn reset_diagnostic(&mut self) {
-        match self {
-            Self::Folder { errors, warnings, .. } => {
-                *errors = 0;
-                *warnings = 0;
-            }
-            Self::File { errors, warnings, .. } => {
-                *errors = 0;
-                *warnings = 0;
-            }
-        }
-    }
+    /// SYNC with real tree
 
     pub fn sync_base(&mut self) {
         if let Self::Folder { path, tree: Some(tree), .. } = self {
@@ -172,90 +182,30 @@ impl TreePath {
         }
     }
 
-    pub fn direct_display(&self) -> (&str, Style) {
-        match self {
-            Self::Folder { display, errors, warnings, .. } => {
-                if errors != &0 {
-                    return (display, Style::fg(ERR));
+    /// Search utils
+
+    pub fn get_from_inner(&self, idx: usize) -> Option<&TreePath> {
+        self.iter().nth(idx + 1)
+    }
+
+    pub fn get_mut_from_inner(&mut self, idx: usize) -> Option<&mut TreePath> {
+        self.serch_by_idx(idx + 1).into()
+    }
+
+    fn serch_by_idx(&mut self, mut idx: usize) -> SerachResult {
+        if idx == 0 {
+            return SerachResult::Found(self);
+        }
+        idx -= 1;
+        if let TreePath::Folder { tree: Some(inner_tree), .. } = self {
+            for tree_path in inner_tree.iter_mut() {
+                match tree_path.serch_by_idx(idx) {
+                    SerachResult::Found(tp) => return SerachResult::Found(tp),
+                    SerachResult::Remainder(new_idx) => idx = new_idx,
                 }
-                if warnings != &0 {
-                    return (display, Style::fg(WAR));
-                }
-                (display, Style::default())
-            }
-            Self::File { display, errors, warnings, .. } => {
-                if errors != &0 {
-                    return (display, Style::fg(ERR));
-                }
-                if warnings != &0 {
-                    return (display, Style::fg(WAR));
-                }
-                (display, Style::default())
             }
         }
-    }
-
-    pub fn path(&self) -> &PathBuf {
-        match self {
-            Self::Folder { path, .. } => path,
-            Self::File { path, .. } => path,
-        }
-    }
-
-    pub fn file_name(&self) -> Option<String> {
-        self.path().file_name()?.to_str().map(|s| s.to_string())
-    }
-
-    pub fn tree_file_names(&self) -> Vec<String> {
-        match self {
-            Self::File { .. } => self.file_name().into_iter().collect(),
-            Self::Folder { tree, .. } => {
-                tree.as_ref().map(|paths| paths.iter().flat_map(|p| p.file_name()).collect()).unwrap_or_default()
-            }
-        }
-    }
-
-    pub fn update_path(&mut self, new_path: PathBuf) {
-        match self {
-            Self::File { path, display, .. } => {
-                *display = get_path_display(&new_path);
-                *path = new_path;
-            }
-            Self::Folder { path, display, .. } => {
-                *display = get_path_display(&new_path);
-                *path = new_path;
-            }
-        }
-    }
-
-    pub fn take_tree(&mut self) -> Option<Vec<Self>> {
-        if let Self::Folder { tree, .. } = self {
-            return tree.take();
-        }
-        None
-    }
-
-    fn tree_mut(&mut self) -> Option<&mut Vec<TreePath>> {
-        if let Self::Folder { tree: Some(tree), .. } = self {
-            return Some(tree);
-        }
-        None
-    }
-
-    pub fn shallow_copy(&self) -> Self {
-        match self {
-            Self::File { .. } => self.clone(),
-            Self::Folder { path, display, .. } => {
-                Self::Folder { path: path.clone(), tree: None, display: display.clone(), errors: 0, warnings: 0 }
-            }
-        }
-    }
-
-    pub fn search_files_join_set(self, pattern: String) -> JoinSet<Vec<(PathBuf, String, usize)>> {
-        let mut buffer = JoinSet::new();
-        let gitgnore = Gitignore::new("./.gitignore").0;
-        self.search_in_files(pattern.into(), &mut buffer, &gitgnore);
-        buffer
+        SerachResult::Remainder(idx)
     }
 
     pub fn search_in_files(
@@ -349,13 +299,126 @@ impl TreePath {
             }
         }
     }
+
+    pub fn search_files_join_set(self, pattern: String) -> JoinSet<Vec<(PathBuf, String, usize)>> {
+        let mut buffer = JoinSet::new();
+        let gitgnore = Gitignore::new("./.gitignore").0;
+        self.search_in_files(pattern.into(), &mut buffer, &gitgnore);
+        buffer
+    }
+
+    /// Diagnostics
+
+    pub fn map_diagnostics_base(&mut self, path: PathBuf, d_errors: usize, d_warnings: usize) {
+        if d_errors == 0 && d_warnings == 0 {
+            return;
+        }
+        if let Ok(d_path) = to_relative_path(&path) {
+            if let Self::Folder { tree: Some(tree), .. } = self {
+                for tree_path in tree {
+                    tree_path.map_diagnostics(&d_path, d_errors, d_warnings);
+                }
+            }
+        };
+    }
+
+    fn map_diagnostics(&mut self, d_path: &PathBuf, d_errors: usize, d_warnings: usize) -> bool {
+        match self {
+            Self::Folder { path, tree, errors, warnings, .. } => {
+                if !d_path.starts_with(path) {
+                    return false;
+                }
+                if let Some(tree) = tree {
+                    for tree_path in tree.iter_mut() {
+                        if tree_path.map_diagnostics(d_path, d_errors, d_warnings) {
+                            return true;
+                        }
+                    }
+                }
+                *errors = d_errors;
+                *warnings = d_warnings;
+            }
+            Self::File { path, errors, warnings, .. } => {
+                if path == d_path {
+                    *errors = d_errors;
+                    *warnings = d_warnings;
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn reset_diagnostic(&mut self) {
+        match self {
+            Self::Folder { errors, warnings, .. } => {
+                *errors = 0;
+                *warnings = 0;
+            }
+            Self::File { errors, warnings, .. } => {
+                *errors = 0;
+                *warnings = 0;
+            }
+        }
+    }
+
+    pub fn iter(&self) -> TreeIter {
+        TreeIter { holder: vec![self] }
+    }
 }
 
-fn order_tree_paths(left: &TreePath, right: &TreePath) -> Ordering {
-    match (left, right) {
-        (TreePath::Folder { .. }, TreePath::File { .. }) => Ordering::Less,
-        (TreePath::File { .. }, TreePath::Folder { .. }) => Ordering::Greater,
-        _ => left.path().cmp(right.path()),
+impl From<PathBuf> for TreePath {
+    fn from(value: PathBuf) -> Self {
+        let display = get_path_display(&value);
+        if value.is_dir() {
+            Self::Folder { path: value, tree: None, display, errors: 0, warnings: 0 }
+        } else {
+            Self::File { path: value, display, errors: 0, warnings: 0 }
+        }
+    }
+}
+
+impl Default for TreePath {
+    fn default() -> Self {
+        Self::clean_from("./")
+    }
+}
+
+pub struct TreeIter<'a> {
+    holder: Vec<&'a TreePath>,
+}
+
+impl<'a> Iterator for TreeIter<'a> {
+    type Item = &'a TreePath;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.holder.pop().inspect(|tree_path| {
+            if let TreePath::Folder { tree: Some(inner_tree), .. } = tree_path {
+                self.holder.extend(inner_tree.iter().rev());
+            }
+        })
+    }
+}
+
+enum SerachResult<'a> {
+    Found(&'a mut TreePath),
+    Remainder(usize),
+}
+
+impl<'a> Into<Option<&'a mut TreePath>> for SerachResult<'a> {
+    fn into(self) -> Option<&'a mut TreePath> {
+        match self {
+            Self::Found(tree_path) => Some(tree_path),
+            Self::Remainder(..) => None,
+        }
+    }
+}
+
+impl<'a> Into<Option<&'a TreePath>> for SerachResult<'a> {
+    fn into(self) -> Option<&'a TreePath> {
+        match self {
+            Self::Found(tree_path) => Some(tree_path),
+            Self::Remainder(..) => None,
+        }
     }
 }
 
@@ -374,6 +437,14 @@ fn get_path_display(path: &Path) -> String {
         buffer.push_str("/..");
     }
     buffer
+}
+
+fn order_tree_paths(left: &TreePath, right: &TreePath) -> Ordering {
+    match (left, right) {
+        (TreePath::Folder { .. }, TreePath::File { .. }) => Ordering::Less,
+        (TreePath::File { .. }, TreePath::Folder { .. }) => Ordering::Greater,
+        _ => left.path().cmp(right.path()),
+    }
 }
 
 fn merge_trees(tree: &mut Vec<TreePath>, new_tree_set: HashSet<PathBuf>) {
