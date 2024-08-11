@@ -1,3 +1,5 @@
+use crate::render::backend::BackendProtocol;
+use crate::render::backend::Style;
 mod context;
 mod render;
 use context::Context;
@@ -319,10 +321,104 @@ impl TextLine {
         ctx: Context,
         backend: &mut Backend,
     ) {
-        let line_width = lines.width();
     }
 
-    pub fn cursor(&mut self, lines: &mut RectIter, ctx: &mut Context, backend: &mut Backend) {}
+    pub fn cursor(&mut self, lines: &mut RectIter, ctx: &mut Context, backend: &mut Backend) {
+        let line = match lines.next() {
+            Some(line) => line,
+            None => return,
+        };
+        let Line { row, col, mut width } = line;
+        backend.go_to(row, col);
+        let select = ctx.get_select(0, line.width);
+        let char = ctx.get_char();
+        match select {
+            Some(select) => {
+                if self.is_simple() {
+                    for (idx, ch) in self.content.chars().enumerate() {
+                        if width == 0 {
+                            match lines.move_cursor(backend) {
+                                Some(new_width) => width = new_width,
+                                None => return,
+                            }
+                        }
+                        if select.start == idx {
+                            backend.set_style(ctx.select_style());
+                        }
+                        if select.end == idx {
+                            backend.reset_style();
+                        }
+                        width -= 1;
+                        if idx == char {
+                            backend.print_styled(ch, Style::reversed());
+                        } else {
+                            backend.print(ch);
+                        }
+                    }
+                } else {
+                    for (idx, ch) in self.content.chars().enumerate() {
+                        if width == 0 {
+                            match lines.move_cursor(backend) {
+                                Some(new_width) => width = new_width,
+                                None => return,
+                            }
+                        }
+                        if select.start == idx {
+                            backend.set_style(ctx.select_style());
+                        }
+                        if select.end == idx {
+                            backend.reset_style();
+                        }
+                        match UnicodeWidthChar::width(ch) {
+                            Some(w) => width -= w,
+                            None => continue,
+                        }
+                        if idx == char {
+                            backend.print_styled(ch, Style::reversed());
+                        } else {
+                            backend.print(ch);
+                        }
+                    }
+                }
+            }
+            None => {
+                if self.is_simple() {
+                    for (idx, ch) in self.content.chars().enumerate() {
+                        if width == 0 {
+                            match lines.move_cursor(backend) {
+                                Some(new_width) => width = new_width,
+                                None => return,
+                            }
+                        }
+                        width -= 1;
+                        if idx == char {
+                            backend.print_styled(ch, Style::reversed());
+                        } else {
+                            backend.print(ch);
+                        }
+                    }
+                } else {
+                    for (idx, ch) in self.content.chars().enumerate() {
+                        if width == 0 {
+                            match lines.move_cursor(backend) {
+                                Some(new_width) => width = new_width,
+                                None => return,
+                            }
+                        }
+                        match UnicodeWidthChar::width(ch) {
+                            Some(w) => width -= w,
+                            None => continue,
+                        }
+                        if idx == char {
+                            backend.print_styled(ch, Style::reversed());
+                        } else {
+                            backend.print(ch);
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     pub fn clear_cache(&mut self) {
         self.cached.reset();

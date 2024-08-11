@@ -201,7 +201,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
                 },
                 None => {
                     if let Some(err) = response.error {
-                        gs.error(err.to_string());
+                        gs.error(format!("{request}: {err}"));
                     }
                 }
             }

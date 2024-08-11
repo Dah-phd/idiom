@@ -5,7 +5,7 @@ use lsp_types::{
     PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, WorkspaceEdit,
 };
 use serde_json::{from_value, Value};
-use std::path::PathBuf;
+use std::{fmt::Display, path::PathBuf};
 
 use crate::{
     lsp::{LSPError, LSPResult},
@@ -184,4 +184,20 @@ pub enum LSPResponse {
     TokensPartial { result: SemanticTokensRangeResult, max_lines: usize },
     Definition(GotoDefinitionResponse),
     Declaration(GotoDeclarationResponse),
+}
+
+impl Display for LSPResponseType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LSPResponseType::Completion(..) => f.write_str("Completion"),
+            LSPResponseType::Declaration(..) => f.write_str("Declaration"),
+            LSPResponseType::Definition(..) => f.write_str("Definition"),
+            LSPResponseType::Hover(..) => f.write_str("Hover"),
+            LSPResponseType::Renames(..) => f.write_str("Renames"),
+            LSPResponseType::SignatureHelp(..) => f.write_str("SignatureHelp"),
+            LSPResponseType::Tokens(..) => f.write_str("Tokens"),
+            LSPResponseType::TokensPartial { .. } => f.write_str("TokensPartial"),
+            LSPResponseType::References(..) => f.write_str("References"),
+        }
+    }
 }

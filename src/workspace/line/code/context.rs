@@ -31,15 +31,13 @@ impl<'a> CodeLineContext<'a> {
     }
 
     #[inline]
-    pub fn setup_line(&mut self, line: Line, backend: &mut impl BackendProtocol) -> (usize, Option<Range<usize>>) {
-        let line_number = self.line_number + 1;
-        let text = format!("{: >1$} ", line_number, self.line_number_offset);
+    pub fn setup_line(&mut self, line: Line, backend: &mut impl BackendProtocol) -> usize {
+        self.line_number += 1;
+        let text = format!("{: >1$} ", self.line_number, self.line_number_offset);
         let remaining_width = line.width - text.len();
-        let select_buffer = build_select_buffer(self.select, self.line_number, remaining_width);
-        self.line_number = line_number;
         backend.print_styled_at(line.row, line.col, text, Style::fg(color::dark_grey()));
         backend.clear_to_eol();
-        (remaining_width, select_buffer)
+        remaining_width
     }
 
     #[inline]

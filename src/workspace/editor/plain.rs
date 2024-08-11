@@ -4,6 +4,7 @@ use crate::{
     global_state::GlobalState,
     lsp::LSPError,
     render::layout::Rect,
+    syntax::theme::Theme,
     workspace::{
         actions::Actions,
         cursor::{Cursor, CursorPosition},
@@ -31,13 +32,14 @@ pub struct TextEditor {
     pub cursor: Cursor,
     pub actions: Actions,
     pub content: Vec<TextLine>,
+    theme: Theme,
     timestamp: Option<SystemTime>,
     pub line_number_offset: usize,
     last_render_at_line: Option<usize>,
 }
 
 impl TextEditor {
-    pub fn from_path(path: PathBuf, cfg: &EditorConfigs, _: &mut GlobalState) -> IdiomResult<Self> {
+    pub fn from_path(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
         let content = TextLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let file_type = FileType::derive_type(&path);
         let display = build_display(&path);
@@ -48,6 +50,7 @@ impl TextEditor {
             actions: Actions::new(cfg.get_indent_cfg(&file_type)),
             file_type,
             display,
+            theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
             timestamp: last_modified(&path),
             path,
             last_render_at_line: None,

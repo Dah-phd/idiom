@@ -404,11 +404,23 @@ impl CodeLine {
 
     #[inline]
     pub fn render(&mut self, ctx: &mut CodeLineContext<'_>, line: Line, backend: &mut Backend) {
+        let select = ctx.get_select(line.width);
+        self._render(ctx, line, select, backend);
+    }
+
+    #[inline]
+    fn _render(
+        &mut self,
+        ctx: &mut CodeLineContext<'_>,
+        line: Line,
+        select: Option<Range<usize>>,
+        backend: &mut Backend,
+    ) {
         if self.tokens.is_empty() {
             Token::parse_to_buf(&ctx.lexer.lang, &ctx.lexer.theme, &self.content, &mut self.tokens);
         };
         let cache_line = line.row;
-        let (line_width, select) = ctx.setup_line(line, backend);
+        let line_width = ctx.setup_line(line, backend);
         self.cached.line(cache_line, select.clone());
         match select {
             Some(select) => self.render_with_select(line_width, select, ctx, backend),
@@ -418,8 +430,9 @@ impl CodeLine {
 
     #[inline]
     pub fn fast_render(&mut self, ctx: &mut CodeLineContext, line: Line, backend: &mut Backend) {
-        if self.cached.should_render_line(line.row, &ctx.get_select(line.width)) {
-            self.render(ctx, line, backend);
+        let select = ctx.get_select(line.width);
+        if self.cached.should_render_line(line.row, &select) {
+            self._render(ctx, line, select, backend);
         } else {
             ctx.skip_line();
         }

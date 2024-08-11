@@ -183,7 +183,8 @@ pub fn cursor(line: &mut CodeLine, ctx: &mut CodeLineContext, lines: &mut RectIt
     let (line_width, select) = match lines.next() {
         Some(rend_line) => {
             let line_row = rend_line.row;
-            let (line_width, select) = ctx.setup_line(rend_line, backend);
+            let select = ctx.get_select(rend_line.width);
+            let line_width = ctx.setup_line(rend_line, backend);
             line.cached.cursor(line_row, ctx.cursor_char(), 0, select.clone());
             (line_width, select)
         }
@@ -201,15 +202,12 @@ pub fn cursor(line: &mut CodeLine, ctx: &mut CodeLineContext, lines: &mut RectIt
 pub fn cursor_fast(line: &mut CodeLine, ctx: &mut CodeLineContext, lines: &mut RectIter, backend: &mut Backend) {
     let (line_width, select) = match lines.next() {
         Some(rend_line) => {
-            if !line.cached.should_render_cursor_or_update(
-                rend_line.row,
-                ctx.cursor_char(),
-                ctx.get_select(rend_line.width),
-            ) {
+            let select = ctx.get_select(rend_line.width);
+            if !line.cached.should_render_cursor_or_update(rend_line.row, ctx.cursor_char(), select.clone()) {
                 ctx.skip_line();
                 return;
             }
-            let (line_width, select) = ctx.setup_line(rend_line, backend);
+            let line_width = ctx.setup_line(rend_line, backend);
             (line_width, select)
         }
         None => return,

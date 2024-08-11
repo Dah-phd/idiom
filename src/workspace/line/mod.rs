@@ -1,10 +1,6 @@
 mod code;
 mod palin_text;
 
-use crate::render::{
-    backend::Backend,
-    layout::{Line, RectIter},
-};
 pub use code::{CodeLine, CodeLineContext};
 pub use palin_text::TextLine;
 use std::{
