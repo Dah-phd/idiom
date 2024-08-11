@@ -43,8 +43,10 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
     drop(configs);
 
     loop {
+        // render updates
         gs.draw(&mut workspace, &mut tree, &mut term)?;
 
+        // handle input events
         if crossterm::event::poll(MIN_FRAMERATE)? {
             match crossterm::event::read()? {
                 Event::Key(key) => {
@@ -127,6 +129,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
             }
         }
 
+        // do event exchanges
         if gs.exchange_should_exit(&mut tree, &mut workspace).await {
             workspace.graceful_exit().await;
             break;

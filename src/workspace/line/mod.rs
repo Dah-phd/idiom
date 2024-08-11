@@ -1,5 +1,4 @@
 mod code;
-mod markdown;
 mod palin_text;
 
 use crate::render::{

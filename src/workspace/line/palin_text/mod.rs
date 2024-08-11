@@ -379,6 +379,8 @@ impl TextLine {
     pub fn new(content: String) -> Self {
         Self { char_len: content.char_len(), width: content.width(), content, cached: RenderStatus::None }
     }
+
+    pub fn resize(&mut self) {}
 }
 
 impl Display for TextLine {

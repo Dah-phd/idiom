@@ -6,11 +6,14 @@ pub enum RenderStatus {
     Cursor {
         line: u16,
         char: usize,
-        skipped_chars: usize,
+        height: usize,
+        at_line: usize,
         select: Option<Range<usize>>,
     },
     Line {
         line: u16,
+        height: usize,
+        at_line: usize,
         select: Option<Range<usize>>,
     },
     #[default]
@@ -19,17 +22,20 @@ pub enum RenderStatus {
 
 impl RenderStatus {
     #[inline(always)]
+    pub fn update_at_line(&mut self) {}
+
+    #[inline(always)]
     pub fn reset(&mut self) {
         *self = Self::None;
     }
 
     #[inline(always)]
-    pub fn line(&mut self, line: u16, select: Option<Range<usize>>) {
-        *self = Self::Line { line, select }
+    pub fn line(&mut self, line: u16, at_line: usize, height: usize, select: Option<Range<usize>>) {
+        *self = Self::Line { line, select, height, at_line }
     }
 
     #[inline(always)]
-    pub fn cursor(&mut self, line: u16, char: usize, skipped_chars: usize, select: Option<Range<usize>>) {
-        *self = Self::Cursor { line, char, skipped_chars, select };
+    pub fn cursor(&mut self, line: u16, char: usize, at_line: usize, height: usize, select: Option<Range<usize>>) {
+        *self = Self::Cursor { line, char, at_line, height, select };
     }
 }

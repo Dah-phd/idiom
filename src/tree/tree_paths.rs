@@ -404,20 +404,20 @@ enum SerachResult<'a> {
     Remainder(usize),
 }
 
-impl<'a> Into<Option<&'a mut TreePath>> for SerachResult<'a> {
-    fn into(self) -> Option<&'a mut TreePath> {
-        match self {
-            Self::Found(tree_path) => Some(tree_path),
-            Self::Remainder(..) => None,
+impl<'a> From<SerachResult<'a>> for Option<&'a mut TreePath> {
+    fn from(val: SerachResult<'a>) -> Self {
+        match val {
+            SerachResult::Found(tree_path) => Some(tree_path),
+            SerachResult::Remainder(..) => None,
         }
     }
 }
 
-impl<'a> Into<Option<&'a TreePath>> for SerachResult<'a> {
-    fn into(self) -> Option<&'a TreePath> {
-        match self {
-            Self::Found(tree_path) => Some(tree_path),
-            Self::Remainder(..) => None,
+impl<'a> From<SerachResult<'a>> for Option<&'a TreePath> {
+    fn from(val: SerachResult<'a>) -> Self {
+        match val {
+            SerachResult::Found(tree_path) => Some(tree_path),
+            SerachResult::Remainder(..) => None,
         }
     }
 }
