@@ -228,6 +228,7 @@ impl EditorLine for CodeLine {
     fn clear(&mut self) {
         self.tokens.clear();
         self.content.clear();
+        self.char_len = 0;
         self.cached.reset();
     }
 
@@ -318,53 +319,6 @@ impl EditorLine for CodeLine {
     fn utf16_len(&self) -> usize {
         self.content.chars().fold(0, |sum, ch| sum + ch.len_utf16())
     }
-
-    #[inline]
-    fn cursor(&mut self, ctx: &mut CodeLineContext<'_>, lines: &mut RectIter, backend: &mut Backend) {
-        if self.tokens.is_empty() {
-            Token::parse_to_buf(&ctx.lexer.lang, &ctx.lexer.theme, &self.content, &mut self.tokens);
-        };
-        render::cursor(self, ctx, lines, backend);
-    }
-
-    #[inline]
-    fn cursor_fast(&mut self, ctx: &mut CodeLineContext<'_>, lines: &mut RectIter, backend: &mut Backend) {
-        if self.tokens.is_empty() {
-            Token::parse_to_buf(&ctx.lexer.lang, &ctx.lexer.theme, &self.content, &mut self.tokens);
-            if !self.tokens.is_empty() {
-                self.cached.reset();
-            }
-        };
-        render::cursor_fast(self, ctx, lines, backend);
-    }
-
-    #[inline]
-    fn render(&mut self, ctx: &mut CodeLineContext<'_>, line: Line, backend: &mut Backend) {
-        if self.tokens.is_empty() {
-            Token::parse_to_buf(&ctx.lexer.lang, &ctx.lexer.theme, &self.content, &mut self.tokens);
-        };
-        let cache_line = line.row;
-        let (line_width, select) = ctx.setup_line(line, backend);
-        self.cached.line(cache_line, select.clone());
-        match select {
-            Some(select) => self.render_with_select(line_width, select, ctx, backend),
-            None => self.render_no_select(line_width, ctx, backend),
-        }
-    }
-
-    #[inline]
-    fn fast_render(&mut self, ctx: &mut CodeLineContext, line: Line, backend: &mut Backend) {
-        if self.cached.should_render_line(line.row, &ctx.get_select(line.width)) {
-            self.render(ctx, line, backend);
-        } else {
-            ctx.skip_line();
-        }
-    }
-
-    #[inline]
-    fn clear_cache(&mut self) {
-        self.cached.reset();
-    }
 }
 
 impl CodeLine {
@@ -427,6 +381,53 @@ impl CodeLine {
             }
             self.cached.reset();
         };
+    }
+
+    #[inline]
+    pub fn cursor(&mut self, ctx: &mut CodeLineContext<'_>, lines: &mut RectIter, backend: &mut Backend) {
+        if self.tokens.is_empty() {
+            Token::parse_to_buf(&ctx.lexer.lang, &ctx.lexer.theme, &self.content, &mut self.tokens);
+        };
+        render::cursor(self, ctx, lines, backend);
+    }
+
+    #[inline]
+    pub fn cursor_fast(&mut self, ctx: &mut CodeLineContext<'_>, lines: &mut RectIter, backend: &mut Backend) {
+        if self.tokens.is_empty() {
+            Token::parse_to_buf(&ctx.lexer.lang, &ctx.lexer.theme, &self.content, &mut self.tokens);
+            if !self.tokens.is_empty() {
+                self.cached.reset();
+            }
+        };
+        render::cursor_fast(self, ctx, lines, backend);
+    }
+
+    #[inline]
+    pub fn render(&mut self, ctx: &mut CodeLineContext<'_>, line: Line, backend: &mut Backend) {
+        if self.tokens.is_empty() {
+            Token::parse_to_buf(&ctx.lexer.lang, &ctx.lexer.theme, &self.content, &mut self.tokens);
+        };
+        let cache_line = line.row;
+        let (line_width, select) = ctx.setup_line(line, backend);
+        self.cached.line(cache_line, select.clone());
+        match select {
+            Some(select) => self.render_with_select(line_width, select, ctx, backend),
+            None => self.render_no_select(line_width, ctx, backend),
+        }
+    }
+
+    #[inline]
+    pub fn fast_render(&mut self, ctx: &mut CodeLineContext, line: Line, backend: &mut Backend) {
+        if self.cached.should_render_line(line.row, &ctx.get_select(line.width)) {
+            self.render(ctx, line, backend);
+        } else {
+            ctx.skip_line();
+        }
+    }
+
+    #[inline]
+    pub fn clear_cache(&mut self) {
+        self.cached.reset();
     }
 
     #[inline(always)]

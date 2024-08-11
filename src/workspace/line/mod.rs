@@ -74,13 +74,6 @@ pub trait EditorLine:
     fn insert_content_to_buffer(&self, at: usize, buffer: &mut String);
     fn clear(&mut self);
     fn unwrap(self) -> String;
-
-    /// render
-    fn cursor(&mut self, ctx: &mut Self::Context<'_>, lines: &mut RectIter, backend: &mut Backend);
-    fn cursor_fast(&mut self, ctx: &mut Self::Context<'_>, lines: &mut RectIter, backend: &mut Backend);
-    fn render(&mut self, ctx: &mut Self::Context<'_>, line: Line, backend: &mut Backend);
-    fn fast_render(&mut self, ctx: &mut Self::Context<'_>, line: Line, backend: &mut Backend);
-    fn clear_cache(&mut self);
 }
 
 #[cfg(test)]

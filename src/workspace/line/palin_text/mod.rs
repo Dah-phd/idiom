@@ -1,12 +1,13 @@
 mod context;
 mod render;
 use context::Context;
+use lsp_types::lsif::Item;
 use render::RenderStatus;
 use unicode_width::UnicodeWidthChar;
 
 use crate::{
     render::{
-        backend::Backend,
+        backend::{self, Backend},
         layout::{Line, RectIter},
         utils::UTF8SafeStringExt,
         UTF8Safe,
@@ -22,7 +23,6 @@ use std::{
 #[derive(Debug, Default)]
 pub struct TextLine {
     content: String,
-    width: usize,
     char_len: usize,
     cached: RenderStatus,
 }
@@ -80,57 +80,35 @@ impl EditorLine for TextLine {
         let add_char_len = string.char_len();
         self.char_len -= to;
         if self.content.len() == self.char_len {
-            self.width -= to;
             self.char_len += add_char_len;
-            if string.len() == add_char_len {
-                self.width += add_char_len;
-            } else {
-                self.width += string.width();
-            }
             self.content.replace_range(..to, string);
         } else {
             self.char_len += add_char_len;
             self.content.utf8_replace_till(to, string);
-            self.width = self.content.width(); // complete recal
         }
     }
 
     #[inline]
     fn replace_from(&mut self, from: usize, string: &str) {
         self.cached.reset();
-        let add_char_len = string.char_len();
-        self.char_len = from + add_char_len;
+        self.char_len = from + string.char_len();
         if self.content.len() == self.char_len {
             self.content.truncate(from);
-            if add_char_len == string.len() {
-                self.width = from + add_char_len;
-            } else {
-                self.width = from + string.width();
-            }
             self.content.push_str(string);
         } else {
             self.content.utf8_replace_from(from, string);
-            self.width = self.content.width();
         }
     }
 
     #[inline]
     fn replace_range(&mut self, range: Range<usize>, string: &str) {
         self.cached.reset();
-        let add_char_len = string.char_len();
         self.char_len -= range.len();
-        self.char_len += add_char_len;
+        self.char_len += string.char_len();
         if self.char_len == self.content.len() {
-            if add_char_len == string.len() {
-                self.width = self.char_len;
-            } else {
-                self.width -= range.len();
-                self.width += string.width();
-            }
             self.content.replace_range(range, string);
         } else {
             self.content.utf8_replace_range(range, string);
-            self.width = self.content.width();
         }
     }
 
@@ -153,7 +131,6 @@ impl EditorLine for TextLine {
     fn insert(&mut self, idx: usize, ch: char) {
         self.cached.reset();
         self.char_len += 1;
-        self.width += UnicodeWidthChar::width(ch).unwrap_or_default();
         if self.char_len == self.content.len() {
             self.content.insert(idx, ch);
         } else {
@@ -165,7 +142,6 @@ impl EditorLine for TextLine {
     fn push(&mut self, ch: char) {
         self.cached.reset();
         self.char_len += 1;
-        self.width += UnicodeWidthChar::width(ch).unwrap_or_default();
         self.content.push(ch);
     }
 
@@ -173,23 +149,11 @@ impl EditorLine for TextLine {
     fn insert_str(&mut self, idx: usize, string: &str) {
         self.cached.reset();
         if self.char_len == self.content.len() {
-            let add_char_len = string.char_len();
-            self.char_len += add_char_len;
-            if add_char_len == string.len() {
-                self.width += add_char_len;
-            } else {
-                self.width += string.width();
-            }
+            self.char_len += string.char_len();
             self.content.insert_str(idx, string);
         } else {
             self.char_len += string.char_len();
-            let add_char_len = string.char_len();
-            self.char_len += add_char_len;
-            if add_char_len == string.len() {
-                self.width += add_char_len;
-            } else {
-                self.width += string.width();
-            }
+            self.char_len += string.char_len();
             self.content.utf8_insert_str(idx, string);
         }
     }
@@ -197,22 +161,15 @@ impl EditorLine for TextLine {
     #[inline]
     fn push_str(&mut self, string: &str) {
         self.cached.reset();
-        let add_char_len = string.char_len();
-        self.char_len += add_char_len;
-        if string.len() == add_char_len {
-            self.width += add_char_len;
-        } else {
-            self.width += string.width();
-        }
+        self.char_len += string.char_len();
         self.content.push_str(string);
     }
 
     #[inline]
     fn push_line(&mut self, line: Self) {
-        let TextLine { content, width, char_len, .. } = line;
+        let TextLine { content, char_len, .. } = line;
         self.cached.reset();
         self.char_len += char_len;
-        self.width += width;
         self.content.push_str(&content)
     }
 
@@ -231,12 +188,10 @@ impl EditorLine for TextLine {
         self.cached.reset();
         if self.content.len() == self.char_len {
             self.char_len -= 1;
-            self.width -= 1;
             return self.content.remove(idx);
         }
         let ch = self.content.utf8_remove(idx);
         self.char_len -= 1;
-        self.width -= UnicodeWidthChar::width(ch).unwrap_or_default();
         ch
     }
 
@@ -277,11 +232,10 @@ impl EditorLine for TextLine {
         if self.content.len() == self.char_len {
             let content = self.content.split_off(at);
             self.char_len = self.content.len();
-            return Self { char_len: content.len(), width: content.len(), content, ..Default::default() };
+            return Self { char_len: content.len(), content, ..Default::default() };
         }
         let content = self.content.utf8_split_off(at);
         self.char_len = self.content.char_len();
-        self.width = self.content.width();
         Self::new(content)
     }
 
@@ -352,35 +306,27 @@ impl EditorLine for TextLine {
     fn utf16_len(&self) -> usize {
         self.content.chars().fold(0, |sum, ch| sum + ch.len_utf16())
     }
-
-    #[inline]
-    fn cursor(&mut self, ctx: &mut Context, lines: &mut RectIter, backend: &mut Backend) {
-        todo!()
-    }
-
-    #[inline]
-    fn cursor_fast(&mut self, ctx: &mut Context, lines: &mut RectIter, backend: &mut Backend) {
-        todo!()
-    }
-
-    #[inline]
-    fn render(&mut self, ctx: &mut Context, line: Line, backend: &mut Backend) {}
-
-    #[inline]
-    fn fast_render(&mut self, ctx: &mut Context, line: Line, backend: &mut Backend) {}
-
-    #[inline]
-    fn clear_cache(&mut self) {
-        self.cached.reset();
-    }
 }
 
 impl TextLine {
     pub fn new(content: String) -> Self {
-        Self { char_len: content.char_len(), width: content.width(), content, cached: RenderStatus::None }
+        Self { char_len: content.char_len(), content, cached: RenderStatus::None }
     }
 
-    pub fn resize(&mut self) {}
+    pub fn render<'a>(
+        self_iter: impl Iterator<Item = &'a mut Self>,
+        mut lines: RectIter,
+        ctx: Context,
+        backend: &mut Backend,
+    ) {
+        let line_width = lines.width();
+    }
+
+    pub fn cursor(&mut self, lines: &mut RectIter, ctx: &mut Context, backend: &mut Backend) {}
+
+    pub fn clear_cache(&mut self) {
+        self.cached.reset();
+    }
 }
 
 impl Display for TextLine {
