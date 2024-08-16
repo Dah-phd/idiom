@@ -3,7 +3,7 @@ use crate::{
     lsp::{LSPClient, LSPResponse, LSPResponseType},
     popups::popups_tree::refrence_selector,
     syntax::Lexer,
-    workspace::{actions::EditMetaData, line::EditorLine, CursorPosition, Editor},
+    workspace::{actions::EditMetaData, line::EditorLine, CodeEditor, CursorPosition},
 };
 use core::str::FromStr;
 use lsp_types::{
@@ -123,9 +123,9 @@ pub fn map(lexer: &mut Lexer, client: LSPClient) {
     lexer.client = client;
 }
 
-pub fn context_local(_: &mut Editor, _: &mut GlobalState) {}
+pub fn context_local(_: &mut CodeEditor, _: &mut GlobalState) {}
 
-pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
+pub fn context(editor: &mut CodeEditor, gs: &mut GlobalState) {
     let lexer = &mut editor.lexer;
     let client = &mut lexer.client;
     let content = &mut editor.content;
@@ -211,7 +211,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     }
 }
 
-pub fn sync_edits(editor: &mut Editor, gs: &mut GlobalState) {
+pub fn sync_edits(editor: &mut CodeEditor, gs: &mut GlobalState) {
     let (version, events) = match editor.actions.get_events() {
         Some(data) => data,
         None => return,
@@ -250,7 +250,7 @@ pub fn sync_edits(editor: &mut Editor, gs: &mut GlobalState) {
     (lexer.tokens_partial)(lexer, meta.range(content), max_lines, gs);
 }
 
-pub fn sync_edits_full(editor: &mut Editor, gs: &mut GlobalState) {
+pub fn sync_edits_full(editor: &mut CodeEditor, gs: &mut GlobalState) {
     let (version, events) = match editor.actions.get_events() {
         Some(data) => data,
         None => return,
@@ -275,7 +275,7 @@ pub fn sync_edits_full(editor: &mut Editor, gs: &mut GlobalState) {
     (lexer.tokens_partial)(lexer, meta.range(content), max_lines, gs)
 }
 
-pub fn sync_edits_local(editor: &mut Editor, _: &mut GlobalState) {
+pub fn sync_edits_local(editor: &mut CodeEditor, _: &mut GlobalState) {
     let events = match editor.actions.get_events_versionless() {
         Some(events) => events,
         None => return,

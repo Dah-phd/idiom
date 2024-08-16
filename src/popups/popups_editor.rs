@@ -24,6 +24,7 @@ pub fn save_all_popup() -> Box<Popup> {
         ],
         size: Some((4, 40)),
         state: 0,
+        updated: true,
     })
 }
 
@@ -39,6 +40,7 @@ pub fn selector_ranges(
         },
         state: State::new(),
         size: None,
+        updated: true,
     })
 }
 
@@ -49,5 +51,6 @@ pub fn selector_editors(options: Vec<String>) -> Box<PopupSelector<String>> {
         command: |popup| WorkspaceEvent::ActivateEditor(popup.state.selected).into(),
         state: State::new(),
         size: None,
+        updated: true,
     })
 }

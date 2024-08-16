@@ -2,13 +2,19 @@ mod code;
 mod plain;
 use std::path::{Path, PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 
-use crate::workspace::CursorPosition;
-pub use code::Editor;
+use crate::{configs::EditorAction, global_state::GlobalState, workspace::CursorPosition};
+pub use code::CodeEditor;
 pub use plain::TextEditor;
 
 type DocLen = usize;
 type SelectLen = usize;
 pub type DocStats<'a> = (DocLen, SelectLen, CursorPosition);
+
+pub trait Editor {
+    fn render(&mut self, gs: &mut GlobalState);
+    fn fast_render(&mut self, gs: &mut GlobalState);
+    fn map(&mut self, action: EditorAction, gs: &mut GlobalState);
+}
 
 pub fn build_display(path: &Path) -> String {
     let mut buffer = Vec::new();

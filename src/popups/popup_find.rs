@@ -12,9 +12,15 @@ use crate::{
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-#[derive(Default)]
 pub struct GoToLinePopup {
     line_idx: String,
+    updated: bool,
+}
+
+impl Default for GoToLinePopup {
+    fn default() -> Self {
+        Self { line_idx: String::default(), updated: true }
+    }
 }
 
 impl GoToLinePopup {
@@ -62,6 +68,14 @@ impl PopupInterface for GoToLinePopup {
             }
         }
     }
+
+    fn mark_as_updated(&mut self) {
+        self.updated = true;
+    }
+
+    fn collect_update_status(&mut self) -> bool {
+        std::mem::take(&mut self.updated)
+    }
 }
 
 pub struct FindPopup {
@@ -94,6 +108,10 @@ impl PopupInterface for FindPopup {
     }
 
     fn render(&mut self, gs: &mut GlobalState) {
+        self.fast_render(gs);
+    }
+
+    fn fast_render(&mut self, gs: &mut GlobalState) {
         if let Some(line) = gs.editor_area.right_top_corner(1, 50).into_iter().next() {
             gs.writer.set_style(gs.theme.accent_style);
             let mut builder = line.unsafe_builder(&mut gs.writer);
@@ -111,5 +129,11 @@ impl PopupInterface for FindPopup {
             editor.find(self.pattern.text.as_str(), &mut self.options);
         }
         self.state = self.options.len().saturating_sub(1);
+    }
+
+    fn mark_as_updated(&mut self) {}
+
+    fn collect_update_status(&mut self) -> bool {
+        true
     }
 }

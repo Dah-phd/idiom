@@ -1,7 +1,10 @@
-use std::{cmp::Ordering, ops::Range};
+use std::{cmp::Ordering, fmt::format, ops::Range};
 
 use crate::{
-    render::backend::Style,
+    render::{
+        backend::{color, Backend, BackendProtocol, Style},
+        layout::{Line, RectIter},
+    },
     syntax::theme::{self, Theme},
     workspace::{cursor::Cursor, CursorPosition},
 };
@@ -9,7 +12,7 @@ use crate::{
 use super::TextLine;
 
 pub struct Context<'a> {
-    at_line: usize,
+    pub line_number: usize,
     pub line: usize,
     pub char: usize,
     select: Option<(CursorPosition, CursorPosition)>,
@@ -20,7 +23,7 @@ pub struct Context<'a> {
 impl<'a> Context<'a> {
     fn collect(cursor: &'a mut Cursor, line_number_offset: usize, theme: &'a Theme) -> Self {
         Self {
-            at_line: cursor.at_line,
+            line_number: cursor.at_line,
             line: cursor.line,
             char: cursor.char,
             select: cursor.select_get(),
@@ -29,8 +32,28 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn get_select(&self, at: usize, width: usize) -> Option<Range<usize>> {
-        build_select_buffer(self.select, at, width - (self.line_number_offset + 1))
+    pub fn get_select(&self, width: usize) -> Option<Range<usize>> {
+        build_select_buffer(self.select, self.line_number, width - (self.line_number_offset + 1))
+    }
+
+    #[inline]
+    pub fn setup_line(&mut self, line: Line, backend: &mut Backend) -> usize {
+        self.line_number += 1;
+        let text = format!("{: >1$} ", self.line_number, self.line_number_offset);
+        let remaining_width = line.width - text.len();
+        backend.print_styled_at(line.row, line.col, text, Style::fg(color::dark_grey()));
+        backend.clear_to_eol();
+        remaining_width
+    }
+
+    #[inline]
+    pub fn skip_line(&self, lines: &mut RectIter, backend: &mut Backend) -> Option<usize> {
+        lines.move_cursor(backend).map(|mut width| {
+            let txt = (0..self.line_number_offset + 1).map(|_| ".").collect::<String>();
+            width -= txt.len();
+            backend.print(txt);
+            width
+        })
     }
 
     pub fn select_style(&self) -> Style {

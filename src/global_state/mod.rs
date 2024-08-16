@@ -203,7 +203,7 @@ impl GlobalState {
     pub fn render_popup(&mut self) {
         // popups do not mutate during render
         let gs = unsafe { &mut *(self as *mut GlobalState) };
-        self.popup.render(gs);
+        self.popup.fast_render(gs);
     }
 
     pub fn popup(&mut self, popup: Box<dyn PopupInterface>) {

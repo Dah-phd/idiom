@@ -1,6 +1,6 @@
 use super::super::{
     cursor::{Cursor, CursorPosition},
-    Editor,
+    CodeEditor,
 };
 use crate::global_state::GlobalState;
 use crate::render::backend::{Backend, BackendProtocol};
@@ -9,12 +9,12 @@ use crate::workspace::{actions::Actions, line::CodeLine};
 use crate::{configs::FileType, workspace::editor::build_display};
 use std::path::PathBuf;
 
-pub fn mock_editor(content: Vec<String>) -> Editor {
+pub fn mock_editor(content: Vec<String>) -> CodeEditor {
     let ft = FileType::Unknown;
     let path = PathBuf::from("");
     let mut gs = GlobalState::new(Backend::init()).unwrap();
     let content: Vec<CodeLine> = content.into_iter().map(CodeLine::from).collect();
-    Editor {
+    CodeEditor {
         line_number_offset: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
         lexer: Lexer::with_context(ft, &path, &mut gs),
         file_type: ft,
@@ -28,14 +28,14 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
     }
 }
 
-pub fn select_eq(select: (CursorPosition, CursorPosition), editor: &Editor) -> bool {
+pub fn select_eq(select: (CursorPosition, CursorPosition), editor: &CodeEditor) -> bool {
     if let Some((p1, p2)) = editor.cursor.select_get() {
         return p1 == select.0 && p2 == select.1;
     }
     false
 }
 
-pub fn pull_line(editor: &Editor, idx: usize) -> Option<String> {
+pub fn pull_line(editor: &CodeEditor, idx: usize) -> Option<String> {
     editor.content.get(idx).map(|line| line.to_string())
 }
 

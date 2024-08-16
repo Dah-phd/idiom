@@ -23,6 +23,7 @@ pub struct ActivePathSearch {
     options: Vec<PathBuf>,
     state: State,
     pattern: TextField<PopupMessage>,
+    updated: bool,
 }
 
 impl ActivePathSearch {
@@ -31,6 +32,7 @@ impl ActivePathSearch {
             options: Vec::new(),
             state: State::default(),
             pattern: TextField::with_tree_access(String::new()),
+            updated: true,
         })
     }
 }
@@ -40,6 +42,7 @@ impl PopupInterface for ActivePathSearch {
         if let Some(msg) = self.pattern.map(key, clipboard) {
             return msg;
         }
+        self.updated = true;
         match key.code {
             KeyCode::Up => self.state.prev(self.options.len()),
             KeyCode::Down => self.state.next(self.options.len()),
@@ -89,8 +92,15 @@ impl PopupInterface for ActivePathSearch {
         } else {
             self.options = file_tree.search_paths(&self.pattern.text);
         };
+        self.updated = true;
         self.state.select(0, self.options.len());
     }
+
+    fn collect_update_status(&mut self) -> bool {
+        std::mem::take(&mut self.updated)
+    }
+
+    fn mark_as_updated(&mut self) {}
 }
 
 enum Mode {
@@ -105,6 +115,7 @@ pub struct ActiveFileSearch {
     state: State,
     mode: Mode,
     pattern: TextField<PopupMessage>,
+    updated: bool,
 }
 
 impl ActiveFileSearch {
@@ -116,6 +127,7 @@ impl ActiveFileSearch {
             options: Vec::default(),
             state: State::default(),
             pattern: TextField::with_tree_access(pattern),
+            updated: true,
         })
     }
 }
@@ -125,6 +137,7 @@ impl PopupInterface for ActiveFileSearch {
         if let Some(msg) = self.pattern.map(key, clipboard) {
             return msg;
         }
+        self.updated = true;
         match key.code {
             KeyCode::Up => self.state.prev(self.options.len()),
             KeyCode::Down => self.state.next(self.options.len()),
@@ -148,9 +161,6 @@ impl PopupInterface for ActiveFileSearch {
     }
 
     fn render(&mut self, gs: &mut GlobalState) {
-        if let Ok(mut buffer) = self.option_buffer.try_lock() {
-            self.options.extend(buffer.drain(..));
-        }
         let mut area = gs.screen_rect.center(20, 120);
         area.bordered();
         area.draw_borders(None, None, &mut gs.writer);
@@ -179,7 +189,20 @@ impl PopupInterface for ActiveFileSearch {
         };
     }
 
+    fn fast_render(&mut self, gs: &mut GlobalState) {
+        if let Ok(mut buffer) = self.option_buffer.try_lock() {
+            if !buffer.is_empty() {
+                self.options.extend(buffer.drain(..));
+                self.updated = true;
+            }
+        }
+        if self.collect_update_status() {
+            self.render(gs);
+        }
+    }
+
     fn update_tree(&mut self, file_tree: &mut Tree) {
+        self.updated = true;
         if self.pattern.text.len() < 2 {
             self.options.clear();
             return;
@@ -205,6 +228,12 @@ impl PopupInterface for ActiveFileSearch {
             }
         }
     }
+
+    fn collect_update_status(&mut self) -> bool {
+        std::mem::take(&mut self.updated)
+    }
+
+    fn mark_as_updated(&mut self) {}
 }
 
 fn build_path_line((path, ..): &SearchResult, mut builder: LineBuilder) {

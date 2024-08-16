@@ -17,7 +17,7 @@ use lsp_types::TextEdit;
 use std::{cmp::Ordering, path::PathBuf, time::SystemTime};
 
 #[allow(dead_code)]
-pub struct Editor {
+pub struct CodeEditor {
     pub file_type: FileType,
     pub display: String,
     pub path: PathBuf,
@@ -30,7 +30,7 @@ pub struct Editor {
     pub last_render_at_line: Option<usize>,
 }
 
-impl Editor {
+impl CodeEditor {
     pub fn from_path(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
         let content = CodeLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let file_type = FileType::derive_type(&path);
@@ -438,7 +438,7 @@ impl Editor {
     }
 }
 
-impl Drop for Editor {
+impl Drop for CodeEditor {
     fn drop(&mut self) {
         self.lexer.close();
     }

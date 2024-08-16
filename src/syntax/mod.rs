@@ -12,7 +12,7 @@ use crate::{
     render::layout::Rect,
     workspace::{
         line::{CodeLine, EditorLine},
-        CursorPosition, Editor,
+        CodeEditor, CursorPosition,
     },
 };
 use crossterm::event::KeyEvent;
@@ -46,7 +46,7 @@ pub struct Lexer {
     modal_rect: Option<Rect>,
     requests: Vec<LSPResponseType>,
     client: LSPClient,
-    context: fn(&mut Editor, &mut GlobalState),
+    context: fn(&mut CodeEditor, &mut GlobalState),
     autocomplete: fn(&mut Lexer, CursorPosition, String, &mut GlobalState),
     tokens: fn(&mut Lexer, &mut GlobalState),
     tokens_partial: fn(&mut Lexer, Range, usize, &mut GlobalState),
@@ -57,7 +57,7 @@ pub struct Lexer {
     signatures: fn(&mut Lexer, CursorPosition, &mut GlobalState),
     start_renames: fn(&mut Lexer, CursorPosition, &str),
     renames: fn(&mut Lexer, CursorPosition, String, &mut GlobalState),
-    sync: fn(&mut Editor, &mut GlobalState),
+    sync: fn(&mut CodeEditor, &mut GlobalState),
     pub encode_position: fn(usize, &str) -> usize,
     char_lsp_pos: fn(char) -> usize,
 }
@@ -96,13 +96,13 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
+    pub fn context(editor: &mut CodeEditor, gs: &mut GlobalState) {
         (editor.lexer.sync)(editor, gs);
         (editor.lexer.context)(editor, gs);
     }
 
     #[inline]
-    pub fn sync(editor: &mut Editor, gs: &mut GlobalState) {
+    pub fn sync(editor: &mut CodeEditor, gs: &mut GlobalState) {
         (editor.lexer.sync)(editor, gs);
     }
 

@@ -26,6 +26,7 @@ pub fn create_file_popup(path: String) -> Box<Popup> {
         buttons,
         size: Some((4, 40)),
         state: 0,
+        updated: true,
     })
 }
 
@@ -41,6 +42,7 @@ pub fn rename_file_popup(path: String) -> Box<Popup> {
         }],
         size: Some((4, 40)),
         state: 0,
+        updated: true,
     })
 }
 
@@ -56,6 +58,7 @@ pub fn refrence_selector(options: Vec<Location>) -> Box<PopupSelector<(String, P
         },
         size: None,
         state: State::new(),
+        updated: true,
     })
 }
 

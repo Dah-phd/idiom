@@ -3,15 +3,14 @@ use crate::render::backend::Style;
 mod context;
 mod render;
 use context::Context;
-use lsp_types::lsif::Item;
 use render::RenderStatus;
 use unicode_width::UnicodeWidthChar;
 
 use crate::{
     render::{
-        backend::{self, Backend},
+        backend::Backend,
         layout::{Line, RectIter},
-        utils::UTF8SafeStringExt,
+        utils::{UTF8SafeStringExt, WriteChunks},
         UTF8Safe,
     },
     workspace::line::EditorLine,
@@ -226,6 +225,7 @@ impl EditorLine for TextLine {
     fn clear(&mut self) {
         self.content.clear();
         self.cached.reset();
+        self.char_len = 0;
     }
 
     #[inline]
@@ -318,9 +318,66 @@ impl TextLine {
     pub fn render<'a>(
         self_iter: impl Iterator<Item = &'a mut Self>,
         mut lines: RectIter,
-        ctx: Context,
+        mut ctx: Context,
         backend: &mut Backend,
     ) {
+        for (idx, text_line) in self_iter.enumerate().skip(ctx.line_number) {
+            if idx == ctx.line {
+                text_line.cursor(&mut lines, &mut ctx, backend);
+            } else {
+                text_line.render_line(&mut lines, &mut ctx, backend);
+            }
+        }
+
+        for remaining in lines {
+            remaining.render_empty(backend);
+        }
+    }
+
+    pub fn render_line(&mut self, lines: &mut RectIter, ctx: &mut Context, backend: &mut Backend) {
+        let line = match lines.next() {
+            Some(line) => line,
+            None => return,
+        };
+        let select = ctx.get_select(line.width);
+        let width = ctx.setup_line(line, backend);
+        match select {
+            Some(select) => {
+                todo!()
+            }
+            None => {
+                if self.is_simple() {
+                    let mut start = 0;
+                    loop {
+                        let end = start + width;
+                        if end >= self.content.len() {
+                            backend.print(unsafe { self.content.get_unchecked(start..) });
+                            let remaing_width = self.content.len() - start;
+                            if remaing_width != 0 {
+                                backend.pad(remaing_width);
+                            }
+                            return;
+                        }
+                        backend.print(unsafe { self.content.get_unchecked(start..end) });
+                        if ctx.skip_line(lines, backend).is_none() {
+                            return;
+                        }
+                        start = end;
+                    }
+                } else {
+                    for (chunk_width, chunk) in WriteChunks::new(&self.content, width) {
+                        backend.print(chunk);
+                        let remaing_width = width - chunk_width;
+                        if remaing_width != 0 {
+                            backend.pad(remaing_width);
+                        }
+                        if ctx.skip_line(lines, backend).is_none() {
+                            return;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     pub fn cursor(&mut self, lines: &mut RectIter, ctx: &mut Context, backend: &mut Backend) {
@@ -328,16 +385,15 @@ impl TextLine {
             Some(line) => line,
             None => return,
         };
-        let Line { row, col, mut width } = line;
-        backend.go_to(row, col);
-        let select = ctx.get_select(0, line.width);
+        let select = ctx.get_select(line.width);
+        let mut width = ctx.setup_line(line, backend);
         let char = ctx.get_char();
         match select {
             Some(select) => {
                 if self.is_simple() {
                     for (idx, ch) in self.content.chars().enumerate() {
                         if width == 0 {
-                            match lines.move_cursor(backend) {
+                            match ctx.skip_line(lines, backend) {
                                 Some(new_width) => width = new_width,
                                 None => return,
                             }
@@ -358,7 +414,7 @@ impl TextLine {
                 } else {
                     for (idx, ch) in self.content.chars().enumerate() {
                         if width == 0 {
-                            match lines.move_cursor(backend) {
+                            match ctx.skip_line(lines, backend) {
                                 Some(new_width) => width = new_width,
                                 None => return,
                             }

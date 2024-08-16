@@ -17,6 +17,7 @@ pub struct Popup {
     pub buttons: Vec<Button>,
     pub size: Option<(u16, usize)>,
     pub state: usize,
+    pub updated: bool,
 }
 
 impl PopupInterface for Popup {
@@ -78,6 +79,14 @@ impl PopupInterface for Popup {
             _ => PopupMessage::None,
         }
     }
+
+    fn mark_as_updated(&mut self) {
+        self.updated = true;
+    }
+
+    fn collect_update_status(&mut self) -> bool {
+        std::mem::take(&mut self.updated)
+    }
 }
 
 impl Popup {
@@ -115,6 +124,7 @@ pub struct PopupSelector<T> {
     pub command: fn(&mut PopupSelector<T>) -> PopupMessage,
     pub state: State,
     pub size: Option<(u16, usize)>,
+    pub updated: bool,
 }
 
 impl<T> PopupInterface for PopupSelector<T> {
@@ -147,5 +157,13 @@ impl<T> PopupInterface for PopupSelector<T> {
             KeyCode::Esc => PopupMessage::Clear,
             _ => PopupMessage::None,
         }
+    }
+
+    fn mark_as_updated(&mut self) {
+        self.updated = true;
+    }
+
+    fn collect_update_status(&mut self) -> bool {
+        std::mem::take(&mut self.updated)
     }
 }

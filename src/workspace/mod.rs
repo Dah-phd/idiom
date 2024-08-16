@@ -13,7 +13,7 @@ use crate::{
 };
 use crossterm::event::KeyEvent;
 pub use cursor::CursorPosition;
-pub use editor::{DocStats, Editor};
+pub use editor::{CodeEditor, DocStats};
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -22,7 +22,7 @@ use std::{
 
 /// implement Drop to attempt keep state upon close/crash
 pub struct Workspace {
-    editors: TrackedList<Editor>,
+    editors: TrackedList<CodeEditor>,
     base_config: EditorConfigs,
     key_map: EditorKeyMap,
     tab_style: Style,
@@ -113,7 +113,7 @@ impl Workspace {
     }
 
     #[inline(always)]
-    pub fn get_active(&mut self) -> Option<&mut Editor> {
+    pub fn get_active(&mut self) -> Option<&mut CodeEditor> {
         self.editors.get_mut_no_update(0)
     }
 
@@ -140,7 +140,8 @@ impl Workspace {
 
     pub fn activate_editor(&mut self, idx: usize, gs: &mut GlobalState) {
         if idx < self.editors.len() {
-            let editor = self.editors.remove(idx);
+            let mut editor = self.editors.remove(idx);
+            editor.clear_screen_cache();
             gs.tree.push(TreeEvent::SelectPath(editor.path.clone()));
             self.editors.insert(0, editor);
         }
@@ -248,17 +249,17 @@ impl Workspace {
         Ok(())
     }
 
-    fn get_editor<T: Into<PathBuf>>(&mut self, path: T) -> Option<&mut Editor> {
+    fn get_editor<T: Into<PathBuf>>(&mut self, path: T) -> Option<&mut CodeEditor> {
         let path: PathBuf = path.into();
         self.editors.iter_mut().find(|editor| editor.path == path)
     }
 
-    fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
-        Editor::from_path(file_path, &self.base_config, gs)
+    fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<CodeEditor> {
+        CodeEditor::from_path(file_path, &self.base_config, gs)
     }
 
-    async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
-        let mut new = Editor::from_path(file_path, &self.base_config, gs)?;
+    async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<CodeEditor> {
+        let mut new = CodeEditor::from_path(file_path, &self.base_config, gs)?;
         new.resize(gs.editor_area.width, gs.editor_area.height as usize);
         let lsp_cmd = match self.base_config.derive_lsp(&new.file_type) {
             None => return Ok(new),
@@ -396,7 +397,7 @@ impl Workspace {
         }
     }
 
-    pub async fn refresh_cfg(&mut self, new_key_map: EditorKeyMap, gs: &mut GlobalState) {
+    pub fn refresh_cfg(&mut self, new_key_map: EditorKeyMap, gs: &mut GlobalState) {
         self.key_map = new_key_map;
         gs.unwrap_or_default(self.base_config.refresh(), ".config: ");
         for editor in self.editors.iter_mut() {

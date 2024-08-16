@@ -71,6 +71,10 @@ impl<'a> Iterator for WriteChunks<'a> {
         for (idx, ch) in self.inner.by_ref() {
             let current_w = UnicodeWidthChar::width(ch).unwrap_or_default();
             if self.width < width + current_w {
+                if current_w > self.width {
+                    self.width = 0;
+                    return None;
+                }
                 self.width_offset = current_w;
                 self.at_byte = idx;
                 return Some((width, unsafe { self.text.get_unchecked(start..self.at_byte) }));

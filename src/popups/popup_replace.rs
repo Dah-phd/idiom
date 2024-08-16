@@ -1,7 +1,6 @@
 use crate::{
     global_state::{Clipboard, GlobalState, PopupMessage, WorkspaceEvent},
     render::backend::{BackendProtocol, Style},
-    tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -97,7 +96,7 @@ impl PopupInterface for ReplacePopup {
         }
     }
 
-    fn render(&mut self, gs: &mut GlobalState) {
+    fn fast_render(&mut self, gs: &mut GlobalState) {
         let area = gs.editor_area.right_top_corner(2, 50);
         if area.height < 2 {
             return;
@@ -124,6 +123,10 @@ impl PopupInterface for ReplacePopup {
         gs.writer.reset_style();
     }
 
+    fn render(&mut self, gs: &mut GlobalState) {
+        self.fast_render(gs);
+    }
+
     fn update_workspace(&mut self, workspace: &mut Workspace) {
         if let Some(editor) = workspace.get_active() {
             self.options.clear();
@@ -132,5 +135,9 @@ impl PopupInterface for ReplacePopup {
         self.state = self.options.len().saturating_sub(1);
     }
 
-    fn update_tree(&mut self, _: &mut Tree) {}
+    fn collect_update_status(&mut self) -> bool {
+        true
+    }
+
+    fn mark_as_updated(&mut self) {}
 }
