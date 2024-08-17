@@ -208,6 +208,7 @@ impl PopupInterface for ActiveFileSearch {
             return;
         };
         self.options.clear();
+        self.state.select(0, 1);
         let tree_path = match self.mode {
             Mode::Full => file_tree.shallow_copy_root_tree_path(),
             Mode::Select => file_tree.shallow_copy_selected_tree_path(),

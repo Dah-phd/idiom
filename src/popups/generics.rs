@@ -12,24 +12,21 @@ use crossterm::event::{KeyCode, KeyEvent};
 
 pub struct Popup {
     pub message: String,
-    pub title: Option<String>,
-    pub message_as_buffer_builder: Option<fn(char) -> Option<char>>,
-    pub buttons: Vec<Button>,
-    pub size: Option<(u16, usize)>,
-    pub state: usize,
-    pub updated: bool,
+    title: String,
+    message_as_buffer_builder: Option<fn(char) -> Option<char>>,
+    buttons: Vec<Button>,
+    size: (u16, usize),
+    state: usize,
+    updated: bool,
 }
 
 impl PopupInterface for Popup {
     fn render(&mut self, gs: &mut GlobalState) {
-        let (height, width) = self.size.unwrap_or((6, 40));
+        let (height, width) = self.size;
         let mut area = gs.screen_rect.center(height, width);
         area.bordered();
         area.draw_borders(None, None, &mut gs.writer);
-        match self.title.as_ref() {
-            Some(text) => area.border_title(text, &mut gs.writer),
-            None => area.border_title("Prompt", &mut gs.writer),
-        }
+        area.border_title(&self.title, &mut gs.writer);
         let mut lines = area.into_iter();
         if let Some(first_line) = lines.next() {
             self.p_from_message(first_line, &mut gs.writer);
@@ -90,6 +87,25 @@ impl PopupInterface for Popup {
 }
 
 impl Popup {
+    pub fn new(
+        message: String,
+        title: Option<String>,
+        message_as_buffer_builder: Option<fn(char) -> Option<char>>,
+        buttons: Vec<Button>,
+        size: Option<(u16, usize)>,
+    ) -> Self {
+        let size = size.unwrap_or((6, 40));
+        let title = title.unwrap_or("Prompt".to_owned());
+        Self { message, title, message_as_buffer_builder, buttons, size, state: 0, updated: true }
+    }
+
+    pub fn with_state(mut self, idx: usize) -> Self {
+        if self.buttons.len() > idx {
+            self.state = idx;
+        }
+        self
+    }
+
     fn p_from_message(&self, line: Line, backend: &mut Backend) {
         if self.message_as_buffer_builder.is_none() {
             return line.render_centered(&self.message, backend);
@@ -120,16 +136,16 @@ impl Popup {
 
 pub struct PopupSelector<T> {
     pub options: Vec<T>,
-    pub display: fn(&T) -> &str,
-    pub command: fn(&mut PopupSelector<T>) -> PopupMessage,
     pub state: State,
-    pub size: Option<(u16, usize)>,
-    pub updated: bool,
+    display: fn(&T) -> &str,
+    command: fn(&mut PopupSelector<T>) -> PopupMessage,
+    size: (u16, usize),
+    updated: bool,
 }
 
 impl<T> PopupInterface for PopupSelector<T> {
     fn render(&mut self, gs: &mut GlobalState) {
-        let (height, width) = self.size.unwrap_or((20, 120));
+        let (height, width) = self.size;
         let mut rect = gs.screen_rect.center(height, width);
         rect.bordered();
         rect.draw_borders(None, None, &mut gs.writer);
@@ -154,7 +170,6 @@ impl<T> PopupInterface for PopupSelector<T> {
                 self.state.next(self.options.len());
                 PopupMessage::None
             }
-            KeyCode::Esc => PopupMessage::Clear,
             _ => PopupMessage::None,
         }
     }
@@ -165,5 +180,22 @@ impl<T> PopupInterface for PopupSelector<T> {
 
     fn collect_update_status(&mut self) -> bool {
         std::mem::take(&mut self.updated)
+    }
+}
+
+impl<T> PopupSelector<T> {
+    pub fn new(
+        options: Vec<T>,
+        display: fn(&T) -> &str,
+        command: fn(&mut PopupSelector<T>) -> PopupMessage,
+        size: Option<(u16, usize)>,
+    ) -> Self {
+        let size = size.unwrap_or((20, 120));
+        Self { options, display, command, state: State::new(), size, updated: true }
+    }
+
+    pub fn with_state(mut self, idx: usize) -> Self {
+        self.state.select(idx, 1);
+        self
     }
 }
