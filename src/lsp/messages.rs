@@ -10,6 +10,7 @@ use std::{fmt::Display, path::PathBuf};
 use crate::{
     lsp::{LSPError, LSPResult},
     syntax::DiagnosticLine,
+    workspace::CursorPosition,
 };
 
 use super::lsp_stream::StdErrMessage;
@@ -124,7 +125,7 @@ impl Diagnostic {
 
 #[derive(Debug)]
 pub enum LSPResponseType {
-    Completion(i64, String, usize),
+    Completion(i64, String, CursorPosition),
     Hover(i64),
     SignatureHelp(i64),
     References(i64),
@@ -175,7 +176,7 @@ impl LSPResponseType {
 }
 
 pub enum LSPResponse {
-    Completion(Vec<CompletionItem>, String, usize),
+    Completion(Vec<CompletionItem>, String, CursorPosition),
     Hover(Hover),
     SignatureHelp(SignatureHelp),
     References(Option<Vec<Location>>),

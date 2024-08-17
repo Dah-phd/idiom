@@ -3,6 +3,7 @@ use crate::{
     global_state::GlobalState,
     render::{layout::Rect, state::State},
     syntax::Lang,
+    workspace::CursorPosition,
 };
 use crossterm::event::{KeyCode, KeyEvent};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
@@ -17,9 +18,9 @@ pub struct AutoComplete {
 }
 
 impl AutoComplete {
-    pub fn new(completions: Vec<CompletionItem>, line: String, idx: usize) -> Self {
+    pub fn new(completions: Vec<CompletionItem>, line: String, c: CursorPosition) -> Self {
         let mut filter = String::new();
-        for ch in line.chars().take(idx) {
+        for ch in line.chars().take(c.char) {
             if ch.is_alphabetic() || ch == '_' {
                 filter.push(ch);
             } else {

@@ -140,8 +140,10 @@ pub fn context(editor: &mut CodeEditor, gs: &mut GlobalState) {
         if let Some(response) = client.get(request.id()) {
             match request.parse(response.result) {
                 Some(result) => match result {
-                    LSPResponse::Completion(completions, line, idx) => {
-                        lexer.modal = LSPModal::auto_complete(completions, line, idx);
+                    LSPResponse::Completion(completions, line, c) => {
+                        if editor.cursor.line == c.line {
+                            lexer.modal = LSPModal::auto_complete(completions, line, c);
+                        }
                     }
                     LSPResponse::Hover(hover) => {
                         if let Some(modal) = lexer.modal.as_mut() {
@@ -288,8 +290,7 @@ pub fn sync_edits_local(editor: &mut CodeEditor, _: &mut GlobalState) {
 }
 
 pub fn get_autocomplete(lexer: &mut Lexer, c: CursorPosition, line: String, gs: &mut GlobalState) {
-    match lexer.client.request_completions(lexer.uri.clone(), c).map(|id| LSPResponseType::Completion(id, line, c.char))
-    {
+    match lexer.client.request_completions(lexer.uri.clone(), c).map(|id| LSPResponseType::Completion(id, line, c)) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }

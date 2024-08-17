@@ -24,7 +24,6 @@ pub use clipboard::Clipboard;
 use controls::map_term;
 use crossterm::event::{KeyEvent, MouseEvent};
 pub use events::{TreeEvent, WorkspaceEvent};
-use std::path::PathBuf;
 
 use self::{draw::Components, message::Messages};
 
@@ -356,15 +355,6 @@ impl GlobalState {
             }
             _ => self.error(err.to_string()),
         }
-    }
-
-    /// Attempts to create new editor if err logs it and returns false else true.
-    pub async fn try_new_editor(&mut self, workspace: &mut Workspace, path: PathBuf) -> bool {
-        if let Err(err) = workspace.new_from(path, self).await {
-            self.error(err.to_string());
-            return false;
-        }
-        true
     }
 
     pub async fn exchange_should_exit(&mut self, tree: &mut Tree, workspace: &mut Workspace) -> bool {

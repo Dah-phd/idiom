@@ -92,8 +92,8 @@ impl LSPModal {
         None
     }
 
-    pub fn auto_complete(completions: Vec<CompletionItem>, line: String, idx: usize) -> Option<Self> {
-        let modal = AutoComplete::new(completions, line, idx);
+    pub fn auto_complete(completions: Vec<CompletionItem>, line: String, c: CursorPosition) -> Option<Self> {
+        let modal = AutoComplete::new(completions, line, c);
         if modal.len() != 0 {
             return Some(LSPModal::AutoComplete(modal));
         }

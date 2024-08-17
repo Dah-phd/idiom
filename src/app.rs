@@ -34,10 +34,12 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
     // CLI SETUP
     if let Some(path) = open_file {
         tree.select_by_path(&path);
-        if gs.try_new_editor(&mut workspace, path).await {
+        if let Err(err) = workspace.new_from(path, &mut gs).await {
+            gs.error(err.to_string());
+        } else {
             gs.insert_mode();
             workspace.render(&mut gs);
-        };
+        }
     }
 
     drop(configs);
