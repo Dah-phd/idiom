@@ -221,6 +221,7 @@ pub fn context(editor: &mut CodeEditor, gs: &mut GlobalState) {
     }
 }
 
+#[inline(always)]
 pub fn sync_edits(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]) -> LSPResult<()> {
     lexer.version += 1;
     let (meta, change_events) = action.change_event(lexer.encode_position, lexer.char_lsp_pos, content);
@@ -255,6 +256,7 @@ pub fn sync_edits_rev(lexer: &mut Lexer, action: &EditType, content: &mut [CodeL
     Ok(())
 }
 
+#[inline(always)]
 pub fn sync_edits_full(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]) -> LSPResult<()> {
     lexer.version += 1;
     let mut text = String::new();
@@ -299,6 +301,7 @@ pub fn sync_edits_full_rev(lexer: &mut Lexer, action: &EditType, content: &mut [
     Ok(())
 }
 
+#[inline(always)]
 pub fn sync_edits_local(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]) -> LSPResult<()> {
     let meta = action.map_to_meta();
     for line in content.iter_mut().skip(meta.start_line).take(meta.to) {
@@ -307,6 +310,7 @@ pub fn sync_edits_local(lexer: &mut Lexer, action: &EditType, content: &mut [Cod
     Ok(())
 }
 
+#[inline(always)]
 pub fn sync_edits_local_rev(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]) -> LSPResult<()> {
     let meta = action.map_to_meta_rev();
     for line in content.iter_mut().skip(meta.start_line).take(meta.to) {

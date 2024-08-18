@@ -492,6 +492,7 @@ impl EditType {
         }
     }
 
+    #[inline(always)]
     pub fn map_to_meta(&self) -> EditMetaData {
         match self {
             Self::Single(edit) => edit.meta,
@@ -501,6 +502,7 @@ impl EditType {
         }
     }
 
+    #[inline(always)]
     pub fn map_to_meta_rev(&self) -> EditMetaData {
         match self {
             Self::Single(edit) => edit.meta.rev(),
@@ -513,6 +515,7 @@ impl EditType {
         }
     }
 
+    #[inline(always)]
     pub fn change_event(
         &self,
         encoding: fn(usize, &str) -> usize,
@@ -540,6 +543,7 @@ impl EditType {
         }
     }
 
+    #[inline(always)]
     pub fn change_event_rev(
         &self,
         encoding: fn(usize, &str) -> usize,

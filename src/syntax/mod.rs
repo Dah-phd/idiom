@@ -104,6 +104,7 @@ impl Lexer {
     }
 
     /// sync event
+    #[inline(always)]
     pub fn sync(&mut self, action: &EditType, content: &mut [CodeLine]) {
         (self.sync)(self, action, content).unwrap();
     }
@@ -120,6 +121,7 @@ impl Lexer {
         };
     }
 
+    #[inline]
     pub fn map_modal_if_exists(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> (bool, Option<Rect>) {
         if let Some(modal) = &mut self.modal {
             match modal.map_and_finish(key, &self.lang, gs) {

@@ -271,6 +271,7 @@ impl Edit {
         (insert_clip(&self.text, content, from), self.new_select)
     }
 
+    #[inline(always)]
     pub fn text_change(
         &self,
         encoding: fn(usize, &str) -> usize,
@@ -297,6 +298,7 @@ impl Edit {
         (self.meta, TextDocumentContentChangeEvent { range: Some(Range::new(start, end)), text, range_length: None })
     }
 
+    #[inline(always)]
     pub fn text_change_rev(
         &self,
         encoding: fn(usize, &str) -> usize,
