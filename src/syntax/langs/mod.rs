@@ -89,9 +89,7 @@ impl Lang {
                 trigger = false;
                 continue;
             }
-            if " (.".contains(ch) {
-                trigger = true;
-            }
+            trigger = "(.".contains(ch);
             if self.is_string_mark(ch, curr_token.chars().last()) {
                 if let Some(opener) = str_opener {
                     if opener == ch {
