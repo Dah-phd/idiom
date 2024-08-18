@@ -3,7 +3,7 @@ use std::{
     ops::{Add, AddAssign},
 };
 
-use lsp_types::Position;
+use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 
 use crate::{
     configs::IndentConfigs,
@@ -269,6 +269,59 @@ impl Edit {
         let to = self.end_position_rev();
         remove_content(from, to, content);
         (insert_clip(&self.text, content, from), self.new_select)
+    }
+
+    pub fn text_change(
+        &self,
+        encoding: fn(usize, &str) -> usize,
+        char_lsp: fn(char) -> usize,
+        content: &[CodeLine],
+    ) -> (EditMetaData, TextDocumentContentChangeEvent) {
+        let mut cursor = self.cursor;
+        let changed = self.meta.from - 1;
+        let text = self.text.to_owned();
+        let mut char = self.reverse.chars().rev().take_while(|ch| ch != &'\n').map(char_lsp).sum::<usize>();
+
+        if cursor.char != 0 {
+            let editor_line = &content[cursor.line];
+            if !editor_line.is_simple() {
+                cursor.char = (encoding)(cursor.char, &editor_line[..]);
+            }
+        }
+
+        if changed == 0 {
+            char += cursor.char;
+        }
+        let end = Position::new((cursor.line + changed) as u32, char as u32);
+        let start = Position::from(cursor);
+        (self.meta, TextDocumentContentChangeEvent { range: Some(Range::new(start, end)), text, range_length: None })
+    }
+
+    pub fn text_change_rev(
+        &self,
+        encoding: fn(usize, &str) -> usize,
+        char_lsp: fn(char) -> usize,
+        content: &[CodeLine],
+    ) -> (EditMetaData, TextDocumentContentChangeEvent) {
+        let rev_meta = self.meta.rev();
+        let mut cursor = self.cursor;
+        let changed = rev_meta.from - 1;
+        let text = self.reverse.to_owned();
+        let mut char = self.text.chars().rev().take_while(|ch| ch != &'\n').map(char_lsp).sum::<usize>();
+
+        if cursor.char != 0 {
+            let editor_line = &content[cursor.line];
+            if !editor_line.is_simple() {
+                cursor.char = (encoding)(cursor.char, &editor_line[..]);
+            }
+        }
+
+        if changed == 0 {
+            char += cursor.char;
+        }
+        let end = Position::new((cursor.line + changed) as u32, char as u32);
+        let start = Position::from(cursor);
+        (rev_meta, TextDocumentContentChangeEvent { range: Some(Range::new(start, end)), text, range_length: None })
     }
 }
 

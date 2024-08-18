@@ -12,7 +12,7 @@ use crate::{
 };
 use action_buffer::ActionBuffer;
 pub use edits::{Edit, EditMetaData};
-use lsp_types::{Position, TextEdit};
+use lsp_types::{Position, TextDocumentContentChangeEvent, TextEdit};
 
 use super::line::CodeLine;
 
@@ -489,6 +489,82 @@ impl EditType {
         match self {
             Self::Single(action) => action.apply(content),
             Self::Multi(actions) => actions.iter().map(|a| a.apply(content)).last().unwrap_or_default(),
+        }
+    }
+
+    pub fn map_to_meta(&self) -> EditMetaData {
+        match self {
+            Self::Single(edit) => edit.meta,
+            Self::Multi(edits) => {
+                edits.iter().map(|edit| edit.meta).reduce(|curr, next| curr + next).expect("EditMeta should exist")
+            }
+        }
+    }
+
+    pub fn map_to_meta_rev(&self) -> EditMetaData {
+        match self {
+            Self::Single(edit) => edit.meta.rev(),
+            Self::Multi(edits) => edits
+                .iter()
+                .rev()
+                .map(|edit| edit.meta.rev())
+                .reduce(|curr, next| curr + next)
+                .expect("EditMeta should exist"),
+        }
+    }
+
+    pub fn change_event(
+        &self,
+        encoding: fn(usize, &str) -> usize,
+        char_lsp: fn(char) -> usize,
+        content: &[CodeLine],
+    ) -> (EditMetaData, Vec<TextDocumentContentChangeEvent>) {
+        match self {
+            Self::Single(edit) => {
+                let (meta, event) = edit.text_change(encoding, char_lsp, content);
+                (meta, vec![event])
+            }
+            Self::Multi(edits) => {
+                let mut events = vec![];
+                let meta = edits
+                    .iter()
+                    .map(|e| {
+                        let (meta, event) = e.text_change(encoding, char_lsp, content);
+                        events.push(event);
+                        meta
+                    })
+                    .reduce(|curr, next| curr + next)
+                    .expect("EditMeta should exist");
+                (meta, events)
+            }
+        }
+    }
+
+    pub fn change_event_rev(
+        &self,
+        encoding: fn(usize, &str) -> usize,
+        char_lsp: fn(char) -> usize,
+        content: &[CodeLine],
+    ) -> (EditMetaData, Vec<TextDocumentContentChangeEvent>) {
+        match self {
+            Self::Single(edit) => {
+                let (meta, event) = edit.text_change_rev(encoding, char_lsp, content);
+                (meta, vec![event])
+            }
+            Self::Multi(edits) => {
+                let mut events = vec![];
+                let meta = edits
+                    .iter()
+                    .rev()
+                    .map(|e| {
+                        let (meta, event) = e.text_change_rev(encoding, char_lsp, content);
+                        events.push(event);
+                        meta
+                    })
+                    .reduce(|curr, next| curr + next)
+                    .expect("EditMeta should exist");
+                (meta, events)
+            }
         }
     }
 }
