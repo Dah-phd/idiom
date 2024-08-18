@@ -33,9 +33,21 @@ const FULL_TOKENS: Duration = Duration::from_secs(10);
 #[inline]
 pub fn map(lexer: &mut Lexer, client: LSPClient) {
     lexer.lsp = true;
+
     lexer.context = context;
-    lexer.autocomplete = get_autocomplete;
-    lexer.completable = completable;
+
+    if let Some(provider) = client.capabilities.completion_provider.as_ref() {
+        lexer.autocomplete = get_autocomplete;
+        lexer.completable = completable;
+        if let Some(chars) = provider.trigger_characters.as_ref() {
+            if !chars.is_empty() {
+                lexer.lang.compl_trigger_chars.clear();
+                for string in chars {
+                    lexer.lang.compl_trigger_chars.push_str(string);
+                }
+            }
+        }
+    }
 
     // tokens
     if let Some(tc) = client.capabilities.semantic_tokens_provider.as_ref() {
@@ -176,6 +188,7 @@ pub fn context(editor: &mut CodeEditor, gs: &mut GlobalState) {
                                 set_tokens(data.data, &lexer.legend, &lexer.lang, &lexer.theme, content);
                             }
                             SemanticTokensResult::Tokens(data) => {
+                                lexer.meta = None;
                                 if !data.data.is_empty() {
                                     set_tokens(data.data, &lexer.legend, &lexer.lang, &lexer.theme, content);
                                     lexer.token_producer = TokensType::LSP;
@@ -219,6 +232,16 @@ pub fn context(editor: &mut CodeEditor, gs: &mut GlobalState) {
             unresolved_requests.push(request);
         }
     }
+    if let Some(meta) = lexer.meta.take() {
+        let max_lines = meta.start_line + meta.to;
+        if max_lines > content.len() {
+            return;
+        }
+        match (lexer.tokens_partial)(lexer, meta.into(), max_lines) {
+            Ok(request) => lexer.requests.push(request),
+            Err(error) => gs.send_error(error, lexer.lang.file_type),
+        };
+    }
 }
 
 #[inline(always)]
@@ -233,9 +256,10 @@ pub fn sync_edits(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]
         return Ok(());
     }
     lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
-    let max_lines = meta.start_line + meta.to;
-    let request = (lexer.tokens_partial)(lexer, meta.into(), max_lines)?;
-    lexer.requests.push(request);
+    match lexer.meta.take() {
+        Some(meta) => lexer.meta.replace(meta + meta),
+        None => lexer.meta.replace(meta),
+    };
     Ok(())
 }
 
@@ -250,9 +274,10 @@ pub fn sync_edits_rev(lexer: &mut Lexer, action: &EditType, content: &mut [CodeL
         return Ok(());
     }
     lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
-    let max_lines = meta.start_line + meta.to;
-    let request = (lexer.tokens_partial)(lexer, meta.into(), max_lines)?;
-    lexer.requests.push(request);
+    match lexer.meta.take() {
+        Some(meta) => lexer.meta.replace(meta + meta),
+        None => lexer.meta.replace(meta),
+    };
     Ok(())
 }
 
@@ -272,10 +297,10 @@ pub fn sync_edits_full(lexer: &mut Lexer, action: &EditType, content: &mut [Code
         lexer.clock = Instant::now();
         return Ok(());
     };
-    let meta = action.map_to_meta();
-    let max_lines = meta.start_line + meta.to;
-    let request = (lexer.tokens_partial)(lexer, meta.into(), max_lines)?;
-    lexer.requests.push(request);
+    match lexer.meta.take() {
+        Some(meta) => lexer.meta.replace(meta + action.map_to_meta()),
+        None => lexer.meta.replace(action.map_to_meta()),
+    };
     Ok(())
 }
 
@@ -294,10 +319,10 @@ pub fn sync_edits_full_rev(lexer: &mut Lexer, action: &EditType, content: &mut [
         lexer.clock = Instant::now();
         return Ok(());
     };
-    let meta = action.map_to_meta_rev();
-    let max_lines = meta.start_line + meta.to;
-    let request = (lexer.tokens_partial)(lexer, meta.into(), max_lines)?;
-    lexer.requests.push(request);
+    match lexer.meta.take() {
+        Some(meta) => lexer.meta.replace(meta + action.map_to_meta_rev()),
+        None => lexer.meta.replace(action.map_to_meta_rev()),
+    };
     Ok(())
 }
 

@@ -48,9 +48,9 @@ impl From<ActionBuffer> for Option<Edit> {
     fn from(buffer: ActionBuffer) -> Self {
         match buffer {
             ActionBuffer::None => None,
-            ActionBuffer::Backspace(buf) => Some(buf.into()),
-            ActionBuffer::Del(buf) => Some(buf.into()),
-            ActionBuffer::Text(buf) => Some(buf.into()),
+            ActionBuffer::Backspace(buf) => buf.into(),
+            ActionBuffer::Del(buf) => buf.into(),
+            ActionBuffer::Text(buf) => buf.into(),
         }
     }
 }
@@ -72,13 +72,16 @@ impl DelBuffer {
             self.text.push(text.remove(char));
             return None;
         }
-        Some(std::mem::replace(self, Self::new(line, char, text)).into())
+        std::mem::replace(self, Self::new(line, char, text)).into()
     }
 }
 
-impl From<DelBuffer> for Edit {
+impl From<DelBuffer> for Option<Edit> {
     fn from(buf: DelBuffer) -> Self {
-        Edit::single_line(CursorPosition { line: buf.line, char: buf.char }, String::new(), buf.text)
+        if buf.text.is_empty() {
+            return None;
+        }
+        Some(Edit::single_line(CursorPosition { line: buf.line, char: buf.char }, String::new(), buf.text))
     }
 }
 
@@ -101,7 +104,7 @@ impl BackspaceBuffer {
             self.backspace_indent_handler(char, text, indent);
             return None;
         }
-        Some(std::mem::replace(self, Self::new(line, char, text, indent)).into())
+        std::mem::replace(self, Self::new(line, char, text, indent)).into()
     }
 
     fn backspace_indent_handler(&mut self, char: usize, text: &mut impl EditorLine, indent: &str) {
@@ -123,13 +126,16 @@ impl BackspaceBuffer {
     }
 }
 
-impl From<BackspaceBuffer> for Edit {
+impl From<BackspaceBuffer> for Option<Edit> {
     fn from(buf: BackspaceBuffer) -> Self {
-        Edit::single_line(
+        if buf.text.is_empty() {
+            return None;
+        }
+        Some(Edit::single_line(
             CursorPosition { line: buf.line, char: buf.last },
             String::new(),
             buf.text.chars().rev().collect(),
-        )
+        ))
     }
 }
 
@@ -152,13 +158,16 @@ impl TextBuffer {
             self.text.push(ch);
             return None;
         }
-        Some(std::mem::replace(self, Self::new(line, char, ch.into())).into())
+        std::mem::replace(self, Self::new(line, char, ch.into())).into()
     }
 }
 
-impl From<TextBuffer> for Edit {
+impl From<TextBuffer> for Option<Edit> {
     fn from(buf: TextBuffer) -> Self {
-        Edit::single_line(CursorPosition { line: buf.line, char: buf.char as usize }, buf.text, String::new())
+        if buf.text.is_empty() {
+            return None;
+        }
+        Some(Edit::single_line(CursorPosition { line: buf.line, char: buf.char as usize }, buf.text, String::new()))
     }
 }
 
@@ -178,7 +187,8 @@ mod tests {
         buf.del(0, 7, &mut code_line);
         buf.del(0, 7, &mut code_line);
         if let ActionBuffer::Del(buf) = buf {
-            let edit: Edit = buf.clone().into();
+            let m_edit: Option<Edit> = buf.clone().into();
+            let edit = m_edit.unwrap();
             assert!(edit.text.is_empty());
             assert_eq!(edit.reverse, "789");
             assert_eq!(edit.cursor, CursorPosition { line: 0, char: 7 });
@@ -196,7 +206,8 @@ mod tests {
         buf.backspace(0, 10, &mut code_line, indent);
         buf.backspace(0, 8, &mut code_line, indent);
         if let ActionBuffer::Backspace(buf) = buf {
-            let edit: Edit = buf.clone().into();
+            let m_edit: Option<Edit> = buf.clone().into();
+            let edit = m_edit.unwrap();
             assert!(edit.text.is_empty());
             assert_eq!(edit.reverse, "      1");
             assert_eq!(code_line.unwrap(), indent);

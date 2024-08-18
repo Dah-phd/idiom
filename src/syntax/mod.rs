@@ -10,7 +10,11 @@ use crate::{
     global_state::{GlobalState, WorkspaceEvent},
     lsp::{LSPClient, LSPError, LSPResponseType, LSPResult},
     render::layout::Rect,
-    workspace::{actions::EditType, line::CodeLine, CodeEditor, CursorPosition},
+    workspace::{
+        actions::{EditMetaData, EditType},
+        line::CodeLine,
+        CodeEditor, CursorPosition,
+    },
 };
 use crossterm::event::KeyEvent;
 pub use diagnostics::{set_diganostics, Action, DiagnosticInfo, DiagnosticLine};
@@ -58,6 +62,7 @@ pub struct Lexer {
     renames: fn(&mut Self, CursorPosition, String, &mut GlobalState),
     sync: fn(&mut Self, &EditType, &mut [CodeLine]) -> LSPResult<()>,
     sync_rev: fn(&mut Self, &EditType, &mut [CodeLine]) -> LSPResult<()>,
+    meta: Option<EditMetaData>,
     pub encode_position: fn(usize, &str) -> usize,
     pub char_lsp_pos: fn(char) -> usize,
 }
@@ -77,6 +82,7 @@ impl Lexer {
             version: 0,
             requests: Vec::new(),
             diagnostics: None,
+            meta: None,
             lsp: false,
             client: LSPClient::placeholder(),
             context: context_local,

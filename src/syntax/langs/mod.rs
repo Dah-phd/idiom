@@ -14,6 +14,7 @@ type DiagnosticHandler = Option<fn(&Lang, &Vec<DiagnosticRelatedInformation>) ->
 #[derive(Debug, Clone, Default)]
 pub struct Lang {
     pub file_type: FileType,
+    pub compl_trigger_chars: String,
     comment_start: Vec<&'static str>,
     declaration: Vec<&'static str>,
     key_words: Vec<&'static str>,
@@ -89,7 +90,7 @@ impl Lang {
                 trigger = false;
                 continue;
             }
-            trigger = "(.".contains(ch);
+            trigger = self.compl_trigger_chars.contains(ch);
             if self.is_string_mark(ch, curr_token.chars().last()) {
                 if let Some(opener) = str_opener {
                     if opener == ch {
@@ -210,6 +211,7 @@ impl From<FileType> for Lang {
                 }),
                 diagnostic_handler: Some(rust_process_related_info),
                 lang_specific_handler: Some(rust_specific_handler),
+                compl_trigger_chars: String::from(":.'("),
                 string_markers: "\"",
                 ..Default::default()
             },
@@ -222,6 +224,7 @@ impl From<FileType> for Lang {
                     "if", "else", "elif", "for", "while", "break", "continue", "try", "except", "raise", "with",
                     "match",
                 ],
+                compl_trigger_chars: String::from(".("),
                 mod_import: vec!["import", "from", "as"],
                 string_markers: "\"'",
                 ..Default::default()
@@ -237,6 +240,7 @@ impl From<FileType> for Lang {
             },
             _ => Self {
                 file_type,
+                compl_trigger_chars: String::from(".("),
                 comment_start: vec!["#", "//"],
                 declaration: vec![
                     "fn", "struct", "enum", "type", "const", "def", "class", "var", "function",
