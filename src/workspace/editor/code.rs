@@ -137,27 +137,29 @@ impl CodeEditor {
     pub fn map(&mut self, action: EditorAction, gs: &mut GlobalState) -> bool {
         match action {
             EditorAction::Char(ch) => {
-                self.actions.push_char(ch, &mut self.cursor, &mut self.content);
+                self.actions.push_char(ch, &mut self.cursor, &mut self.content, &mut self.lexer);
                 let line = &self.content[self.cursor.line];
                 if self.lexer.should_autocomplete(self.cursor.char, line) {
                     let line = line.to_string();
-                    self.actions.push_buffer();
-                    Lexer::sync(self, gs);
+                    self.actions.push_buffer(&mut self.content, &mut self.lexer);
                     self.lexer.get_autocomplete((&self.cursor).into(), line, gs);
                 }
+                return true;
             }
-            EditorAction::NewLine => self.actions.new_line(&mut self.cursor, &mut self.content),
-            EditorAction::Indent => self.actions.indent(&mut self.cursor, &mut self.content),
-            EditorAction::Backspace => self.actions.backspace(&mut self.cursor, &mut self.content),
-            EditorAction::Delete => self.actions.del(&mut self.cursor, &mut self.content),
+            EditorAction::NewLine => self.actions.new_line(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::Indent => self.actions.indent(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::Backspace => self.actions.backspace(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::Delete => self.actions.del(&mut self.cursor, &mut self.content, &mut self.lexer),
             EditorAction::RemoveLine => {
                 self.select_line();
                 if !self.cursor.select_is_none() {
-                    self.actions.del(&mut self.cursor, &mut self.content);
+                    self.actions.del(&mut self.cursor, &mut self.content, &mut self.lexer);
                 };
             }
-            EditorAction::IndentStart => self.actions.indent_start(&mut self.cursor, &mut self.content),
-            EditorAction::Unintent => self.actions.unindent(&mut self.cursor, &mut self.content),
+            EditorAction::IndentStart => {
+                self.actions.indent_start(&mut self.cursor, &mut self.content, &mut self.lexer)
+            }
+            EditorAction::Unintent => self.actions.unindent(&mut self.cursor, &mut self.content, &mut self.lexer),
             EditorAction::Up => self.cursor.up(&self.content),
             EditorAction::Down => self.cursor.down(&self.content),
             EditorAction::Left => self.cursor.left(&self.content),
@@ -179,8 +181,8 @@ impl CodeEditor {
             EditorAction::SelectAll => self.select_all(),
             EditorAction::ScrollUp => self.cursor.scroll_up(&self.content),
             EditorAction::ScrollDown => self.cursor.scroll_down(&self.content),
-            EditorAction::SwapUp => self.actions.swap_up(&mut self.cursor, &mut self.content),
-            EditorAction::SwapDown => self.actions.swap_down(&mut self.cursor, &mut self.content),
+            EditorAction::SwapUp => self.actions.swap_up(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::SwapDown => self.actions.swap_down(&mut self.cursor, &mut self.content, &mut self.lexer),
             EditorAction::JumpLeft => self.cursor.jump_left(&self.content),
             EditorAction::JumpLeftSelect => self.cursor.jump_left_select(&self.content),
             EditorAction::JumpRight => self.cursor.jump_right(&self.content),
@@ -197,20 +199,24 @@ impl CodeEditor {
                 let token_range = token_range_at(line, self.cursor.char);
                 self.lexer.start_rename((&self.cursor).into(), &line[token_range]);
             }
-            EditorAction::CommentOut => {
-                self.actions.comment_out(self.file_type.comment_start(), &mut self.cursor, &mut self.content)
-            }
-            EditorAction::Undo => self.actions.undo(&mut self.cursor, &mut self.content),
-            EditorAction::Redo => self.actions.redo(&mut self.cursor, &mut self.content),
+            EditorAction::CommentOut => self.actions.comment_out(
+                self.file_type.comment_start(),
+                &mut self.cursor,
+                &mut self.content,
+                &mut self.lexer,
+            ),
+            EditorAction::Undo => self.actions.undo(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::Redo => self.actions.redo(&mut self.cursor, &mut self.content, &mut self.lexer),
             EditorAction::Save => self.save(gs),
             EditorAction::Cancel => {
                 if self.cursor.select_take().is_none() {
+                    self.actions.push_buffer(&mut self.content, &mut self.lexer);
                     return false;
                 }
             }
             EditorAction::Paste => {
                 if let Some(clip) = gs.clipboard.pull() {
-                    self.actions.paste(clip, &mut self.cursor, &mut self.content);
+                    self.actions.paste(clip, &mut self.cursor, &mut self.content, &mut self.lexer);
                 }
             }
             EditorAction::Cut => {
@@ -225,6 +231,7 @@ impl CodeEditor {
             }
             EditorAction::Close => return false,
         }
+        self.actions.push_buffer(&mut self.content, &mut self.lexer);
         true
     }
 
@@ -267,22 +274,22 @@ impl CodeEditor {
 
     #[inline(always)]
     pub fn insert_text_with_relative_offset(&mut self, insert: String) {
-        self.actions.insert_top_cursor_relative_offset(insert, &mut self.cursor, &mut self.content);
+        self.actions.insert_top_cursor_relative_offset(insert, &mut self.cursor, &mut self.content, &mut self.lexer);
     }
 
     #[inline(always)]
     pub fn replace_select(&mut self, from: CursorPosition, to: CursorPosition, new_clip: &str) {
-        self.actions.replace_select(from, to, new_clip, &mut self.cursor, &mut self.content);
+        self.actions.replace_select(from, to, new_clip, &mut self.cursor, &mut self.content, &mut self.lexer);
     }
 
     #[inline(always)]
     pub fn replace_token(&mut self, new: String) {
-        self.actions.replace_token(new, &mut self.cursor, &mut self.content);
+        self.actions.replace_token(new, &mut self.cursor, &mut self.content, &mut self.lexer);
     }
 
     #[inline(always)]
     pub fn insert_snippet(&mut self, snippet: String, cursor_offset: Option<(usize, usize)>) {
-        self.actions.insert_snippet(&mut self.cursor, snippet, cursor_offset, &mut self.content);
+        self.actions.insert_snippet(&mut self.cursor, snippet, cursor_offset, &mut self.content, &mut self.lexer);
     }
 
     pub fn mass_replace(&mut self, mut ranges: Vec<(CursorPosition, CursorPosition)>, clip: String) {
@@ -293,7 +300,7 @@ impl CodeEditor {
             }
             line_ord
         });
-        self.actions.mass_replace(&mut self.cursor, ranges, clip, &mut self.content);
+        self.actions.mass_replace(&mut self.cursor, ranges, clip, &mut self.content, &mut self.lexer);
     }
 
     pub fn apply_file_edits(&mut self, mut edits: Vec<TextEdit>) {
@@ -304,7 +311,7 @@ impl CodeEditor {
             }
             line_ord
         });
-        self.actions.apply_edits(edits, &mut self.content);
+        self.actions.apply_edits(edits, &mut self.content, &mut self.lexer);
     }
 
     #[inline(always)]
@@ -355,7 +362,7 @@ impl CodeEditor {
         if self.content.is_empty() {
             return None;
         }
-        Some(self.actions.cut(&mut self.cursor, &mut self.content))
+        Some(self.actions.cut(&mut self.cursor, &mut self.content, &mut self.lexer))
     }
 
     #[inline(always)]
@@ -400,7 +407,7 @@ impl CodeEditor {
         position.line += self.cursor.at_line;
         position.char = position.char.saturating_sub(self.line_number_offset + 1);
         self.cursor.set_cursor_checked(position, &self.content);
-        self.actions.paste(clip?, &mut self.cursor, &mut self.content);
+        self.actions.paste(clip?, &mut self.cursor, &mut self.content, &mut self.lexer);
         None
     }
 

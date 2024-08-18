@@ -1,7 +1,4 @@
 use crate::workspace::{actions::Edit, line::EditorLine, CursorPosition};
-use std::time::{Duration, Instant};
-
-const TICK: Duration = Duration::from_millis(200);
 
 #[derive(Default, Debug)]
 pub enum ActionBuffer {
@@ -15,31 +12,6 @@ pub enum ActionBuffer {
 impl ActionBuffer {
     pub fn collect(&mut self) -> Option<Edit> {
         std::mem::take(self).into()
-    }
-
-    pub fn timed_collect(&mut self) -> Option<Edit> {
-        match std::mem::take(self) {
-            Self::Text(buf) => {
-                if buf.clock.elapsed() > TICK {
-                    return Some(buf.into());
-                };
-                let _ = std::mem::replace(self, Self::Text(buf));
-            }
-            Self::Backspace(buf) => {
-                if buf.clock.elapsed() > TICK {
-                    return Some(buf.into());
-                };
-                let _ = std::mem::replace(self, Self::Backspace(buf));
-            }
-            Self::Del(buf) => {
-                if buf.clock.elapsed() > TICK {
-                    return Some(buf.into());
-                };
-                let _ = std::mem::replace(self, Self::Del(buf));
-            }
-            Self::None => (),
-        }
-        None
     }
 
     pub fn last_char(&self) -> usize {
@@ -88,17 +60,15 @@ pub struct DelBuffer {
     line: usize,
     char: usize,
     text: String,
-    clock: Instant,
 }
 
 impl DelBuffer {
     fn new(line: usize, char: usize, text: &mut impl EditorLine) -> Self {
-        Self { line, char, text: text.remove(char).into(), clock: Instant::now() }
+        Self { line, char, text: text.remove(char).into() }
     }
 
     fn del(&mut self, line: usize, char: usize, text: &mut impl EditorLine) -> Option<Edit> {
-        if line == self.line && char == self.char && self.clock.elapsed() <= TICK {
-            self.clock = Instant::now();
+        if line == self.line && char == self.char {
             self.text.push(text.remove(char));
             return None;
         }
@@ -117,18 +87,17 @@ pub struct BackspaceBuffer {
     line: usize,
     last: usize,
     text: String,
-    clock: Instant,
 }
 
 impl BackspaceBuffer {
     fn new(line: usize, char: usize, text: &mut impl EditorLine, indent: &str) -> Self {
-        let mut new = Self { line, last: char, text: String::new(), clock: Instant::now() };
+        let mut new = Self { line, last: char, text: String::new() };
         new.backspace_indent_handler(char, text, indent);
         new
     }
 
     fn backspace(&mut self, line: usize, char: usize, text: &mut impl EditorLine, indent: &str) -> Option<Edit> {
-        if line == self.line && self.last == char && self.clock.elapsed() <= TICK {
+        if line == self.line && self.last == char {
             self.backspace_indent_handler(char, text, indent);
             return None;
         }
@@ -170,17 +139,15 @@ pub struct TextBuffer {
     char: u32,
     last: usize,
     text: String,
-    clock: Instant,
 }
 
 impl TextBuffer {
     fn new(line: usize, char: usize, text: String) -> Self {
-        Self { line, last: char + 1, char: char as u32, text, clock: Instant::now() }
+        Self { line, last: char + 1, char: char as u32, text }
     }
 
     fn push(&mut self, line: usize, char: usize, ch: char) -> Option<Edit> {
-        if line == self.line && char == self.last && self.clock.elapsed() <= TICK {
-            self.clock = Instant::now();
+        if line == self.line && char == self.last && (ch.is_alphabetic() || ch == '_') {
             self.last += 1;
             self.text.push(ch);
             return None;
@@ -242,16 +209,24 @@ mod tests {
     #[test]
     fn test_text() {
         let mut buf = ActionBuffer::None;
-        buf.push(0, 0, '1');
-        buf.push(0, 1, '2');
-        buf.push(0, 2, '3');
-        if let ActionBuffer::Text(buf) = buf {
-            let edit: Edit = buf.clone().into();
+        buf.push(0, 0, 'a');
+        buf.push(0, 1, 'b');
+        buf.push(0, 2, 'c');
+        if let Some(edit) = buf.push(0, 3, ' ') {
             assert!(edit.reverse.is_empty());
-            assert_eq!(edit.text, "123");
+            assert_eq!(edit.text, "abc");
             assert_eq!(edit.cursor, CursorPosition { line: 0, char: 0 });
-            return;
+        } else {
+            panic!("Expected edit!")
         }
-        panic!("Expected Text buf!")
+        buf.push(0, 4, 'a');
+        buf.push(0, 5, '_');
+        if let Some(edit) = buf.push(0, 6, '1') {
+            assert!(edit.reverse.is_empty());
+            assert_eq!(edit.text, " a_");
+            assert_eq!(edit.cursor, CursorPosition { line: 0, char: 3 });
+        } else {
+            panic!("Expected edit!")
+        }
     }
 }

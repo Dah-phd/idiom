@@ -86,7 +86,9 @@ impl Legend {
                 _ => {
                     for token_type in tokens.legend.token_types.iter() {
                         let token_type = token_type.as_str();
-                        self.generic_mapping(token_type, theme);
+                        if !self.generic_mapping(token_type, theme) {
+                            self.legend.push(ColorResult::Final(theme.default));
+                        };
                     }
                 }
             }

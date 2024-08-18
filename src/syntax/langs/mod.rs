@@ -78,24 +78,43 @@ impl Lang {
     pub fn completable(&self, line: &impl EditorLine, idx: usize) -> bool {
         let mut curr_token = String::new();
         let mut prev_token = String::new();
+        let mut str_opener: Option<char> = None;
         let mut trigger = false;
-        for (char_idx, ch) in line.char_indices() {
+        if idx == 0 {
+            return false;
+        }
+        for ch in line.chars().take(idx) {
             if ch.is_alphabetic() || ch == '_' {
-                if char_idx + 1 == idx {
-                    return trigger
-                        || prev_token.is_empty()
-                            && curr_token.len() < 4
-                            && !self.declaration.contains(&prev_token.as_str());
-                }
                 curr_token.push(ch);
-            } else {
-                if " (.".contains(ch) {
-                    trigger = true;
+                trigger = false;
+                continue;
+            }
+            if " (.".contains(ch) {
+                trigger = true;
+            }
+            if self.is_string_mark(ch, curr_token.chars().last()) {
+                if let Some(opener) = str_opener {
+                    if opener == ch {
+                        str_opener = None;
+                    }
+                } else {
+                    str_opener = Some(ch);
                 }
+            };
+            if !curr_token.is_empty() {
                 prev_token = std::mem::take(&mut curr_token);
             }
         }
-        false
+        if str_opener.is_some() {
+            return false;
+        }
+        if trigger {
+            return true;
+        }
+        if self.declaration.contains(&prev_token.as_str()) {
+            return false;
+        }
+        curr_token.len() < 4 && !curr_token.is_empty()
     }
 
     pub fn stylize(&self, text_line: &str, theme: &Theme) -> StyledLine {

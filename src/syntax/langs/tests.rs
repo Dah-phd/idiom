@@ -2,6 +2,7 @@ use crate::{
     configs::FileType,
     render::{widgets::Writable, UTF8Safe},
     syntax::theme::Theme,
+    workspace::line::CodeLine,
 };
 
 use super::Lang;
@@ -43,4 +44,27 @@ fn test_stylize() {
         assert_eq!(sline.width(), inputs[idx].width());
         assert_eq!(sline.to_string(), inputs[idx]);
     }
+}
+
+#[test]
+fn test_completable() {
+    let lang = Lang::from(FileType::Rust);
+    let line = CodeLine::from("vec.");
+    assert!(lang.completable(&line, 4));
+    let line = CodeLine::from("vec.push(\"t");
+    assert!(!lang.completable(&line, 11));
+    let line = CodeLine::from("vec.push(\"text goes here");
+    assert!(!lang.completable(&line, 24));
+    let line = CodeLine::from("vec.push(\"text goes here\"");
+    assert!(!lang.completable(&line, 18));
+    let line = CodeLine::from("vec.push(\"text goes here\".");
+    assert!(lang.completable(&line, 26));
+    let line = CodeLine::from("fn p");
+    assert!(!lang.completable(&line, 4));
+    let line = CodeLine::from("fn p");
+    assert!(!lang.completable(&line, 0));
+    let line = CodeLine::from("struct");
+    assert!(!lang.completable(&line, 6));
+    let line = CodeLine::from("struct Um");
+    assert!(!lang.completable(&line, 9));
 }

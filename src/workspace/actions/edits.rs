@@ -3,7 +3,7 @@ use std::{
     ops::{Add, AddAssign},
 };
 
-use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
+use lsp_types::Position;
 
 use crate::{
     configs::IndentConfigs,
@@ -40,7 +40,7 @@ impl Edit {
         Self { meta: EditMetaData::line_changed(cursor.line), cursor, reverse, text, select: None, new_select: None }
     }
 
-    pub fn swap_down(up_line: usize, cfg: &IndentConfigs, content: &mut [impl EditorLine]) -> (Offset, Offset, Self) {
+    pub fn swap_down(up_line: usize, cfg: &IndentConfigs, content: &mut [CodeLine]) -> (Offset, Offset, Self) {
         let to = up_line + 1;
         let reverse = format!("{}\n{}\n", content[up_line], content[to]);
         content.swap(up_line, to);
@@ -51,7 +51,7 @@ impl Edit {
         (up_offset, down_offset, Self::without_select(cursor, 2, 2, text, reverse))
     }
 
-    pub fn merge_next_line(line: usize, content: &mut Vec<impl EditorLine>) -> Self {
+    pub fn merge_next_line(line: usize, content: &mut Vec<CodeLine>) -> Self {
         let removed_line = content.remove(line + 1);
         let merged_to = &mut content[line];
         let cursor = CursorPosition { line, char: merged_to.char_len() };
@@ -59,7 +59,7 @@ impl Edit {
         Self::without_select(cursor, 2, 1, String::new(), "\n".to_owned())
     }
 
-    pub fn unindent(line: usize, text: &mut impl EditorLine, indent: &str) -> Option<(Offset, Self)> {
+    pub fn unindent(line: usize, text: &mut CodeLine, indent: &str) -> Option<(Offset, Self)> {
         let mut idx = 0;
         while text[idx..].starts_with(indent) {
             idx += indent.len();
@@ -92,7 +92,7 @@ impl Edit {
     }
 
     #[inline]
-    pub fn remove_from_line(line: usize, from: usize, to: usize, text: &mut impl EditorLine) -> Self {
+    pub fn remove_from_line(line: usize, from: usize, to: usize, text: &mut CodeLine) -> Self {
         let reverse = text[from..to].to_owned();
         text.replace_range(from..to, "");
         Self::single_line(CursorPosition { line, char: from }, String::new(), reverse)
@@ -107,21 +107,21 @@ impl Edit {
     }
 
     #[inline]
-    pub fn insert_clip(cursor: CursorPosition, clip: String, content: &mut Vec<impl EditorLine>) -> Self {
+    pub fn insert_clip(cursor: CursorPosition, clip: String, content: &mut Vec<CodeLine>) -> Self {
         let end = insert_clip(&clip, content, cursor);
         let to = (end.line - cursor.line) + 1;
         Self::without_select(cursor, 1, to, clip, String::new())
     }
 
     #[inline]
-    pub fn remove_line(line: usize, content: &mut Vec<impl EditorLine>) -> Self {
+    pub fn remove_line(line: usize, content: &mut Vec<CodeLine>) -> Self {
         let mut reverse = content.remove(line).unwrap();
         reverse.push('\n');
         Self::without_select(CursorPosition { line, char: 0 }, 2, 1, String::new(), reverse)
     }
 
     #[inline]
-    pub fn remove_select(from: CursorPosition, to: CursorPosition, content: &mut Vec<impl EditorLine>) -> Self {
+    pub fn remove_select(from: CursorPosition, to: CursorPosition, content: &mut Vec<CodeLine>) -> Self {
         Self {
             cursor: from,
             meta: EditMetaData { start_line: from.line, from: to.line - from.line + 1, to: 1 },
@@ -133,12 +133,7 @@ impl Edit {
     }
 
     #[inline]
-    pub fn replace_select(
-        from: CursorPosition,
-        to: CursorPosition,
-        clip: String,
-        content: &mut Vec<impl EditorLine>,
-    ) -> Self {
+    pub fn replace_select(from: CursorPosition, to: CursorPosition, clip: String, content: &mut Vec<CodeLine>) -> Self {
         let reverse_text_edit = clip_content(from, to, content);
         let end = if !clip.is_empty() { insert_clip(&clip, content, from) } else { from };
         let meta =
@@ -147,7 +142,7 @@ impl Edit {
     }
 
     #[inline]
-    pub fn replace_token(line: usize, char: usize, new_text: String, content: &mut [impl EditorLine]) -> Self {
+    pub fn replace_token(line: usize, char: usize, new_text: String, content: &mut [CodeLine]) -> Self {
         let code_line = &mut content[line];
         let range = token_range_at(code_line, char);
         let char = range.start;
@@ -160,7 +155,7 @@ impl Edit {
     pub fn new_line(
         mut cursor: CursorPosition,
         cfg: &IndentConfigs,
-        content: &mut Vec<impl EditorLine>,
+        content: &mut Vec<CodeLine>,
     ) -> (CursorPosition, Self) {
         let mut from_cursor = cursor;
         let mut reverse = String::new();
@@ -197,7 +192,7 @@ impl Edit {
         snippet: String,
         cursor_offset: Option<(usize, usize)>,
         cfg: &IndentConfigs,
-        content: &mut Vec<impl EditorLine>,
+        content: &mut Vec<CodeLine>,
     ) -> (CursorPosition, Self) {
         let code_line = &mut content[c.line];
         let range = token_range_at(code_line, c.char);
@@ -261,121 +256,19 @@ impl Edit {
     }
 
     /// apply reverse edit (goes into undone)
-    pub fn apply_rev(
-        &self,
-        content: &mut Vec<impl EditorLine>,
-        events: &mut Vec<(EditMetaData, LSPEvent)>,
-    ) -> (CursorPosition, Option<(CursorPosition, CursorPosition)>) {
+    pub fn apply_rev(&self, content: &mut Vec<CodeLine>) -> (CursorPosition, Option<(CursorPosition, CursorPosition)>) {
         let from = self.start_position();
         let to = self.end_position();
         remove_content(from, to, content);
-        events.push(self.reverse_event());
         (insert_clip(&self.reverse, content, from), self.select)
     }
 
     /// apply edit (goes into done)
-    pub fn apply(
-        &self,
-        content: &mut Vec<impl EditorLine>,
-        events: &mut Vec<(EditMetaData, LSPEvent)>,
-    ) -> (CursorPosition, Option<(CursorPosition, CursorPosition)>) {
+    pub fn apply(&self, content: &mut Vec<CodeLine>) -> (CursorPosition, Option<(CursorPosition, CursorPosition)>) {
         let from = self.start_position();
         let to = self.end_position_rev();
         remove_content(from, to, content);
-        events.push(self.event());
         (insert_clip(&self.text, content, from), self.new_select)
-    }
-
-    pub fn reverse_event(&self) -> (EditMetaData, LSPEvent) {
-        let meta = self.meta.rev();
-        (meta, LSPEvent::new(self.cursor, meta.from - 1, &self.reverse, &self.text))
-    }
-
-    pub fn event(&self) -> (EditMetaData, LSPEvent) {
-        (self.meta, LSPEvent::new(self.cursor, self.meta.from - 1, &self.text, &self.reverse))
-    }
-}
-
-pub struct LSPEvent {
-    pub cursor: CursorPosition,
-    pub changed_lines: usize,
-    pub text: String,
-    pub last_line: String,
-}
-
-impl LSPEvent {
-    #[inline]
-    pub fn new(cursor: CursorPosition, changed: usize, text: &str, rev_text: &str) -> Self {
-        Self {
-            cursor,
-            changed_lines: changed,
-            text: text.to_owned(),
-            last_line: rev_text.chars().rev().take_while(|ch| ch != &'\n').collect(),
-        }
-    }
-
-    #[inline(always)]
-    pub fn lsp_encode(&mut self, encoding: fn(usize, &str) -> usize, content: &[impl EditorLine]) {
-        if self.cursor.char == 0 {
-            return;
-        }
-        let editor_line = &content[self.cursor.line];
-        if editor_line.is_simple() {
-            return;
-        }
-        self.cursor.char = (encoding)(self.cursor.char, &editor_line[..]);
-    }
-
-    #[inline]
-    pub fn utf8_encode_start(&mut self, content: &[impl EditorLine]) {
-        self.cursor.char = content[self.cursor.line].unsafe_utf8_idx_at(self.cursor.char);
-    }
-
-    #[inline]
-    pub fn utf16_encode_start(&mut self, content: &[impl EditorLine]) {
-        self.cursor.char = content[self.cursor.line].unsafe_utf16_idx_at(self.cursor.char);
-    }
-
-    #[inline]
-    pub fn utf8_text_change(self) -> TextDocumentContentChangeEvent {
-        let mut char = self.last_line.len();
-        if self.changed_lines == 0 {
-            char += self.cursor.char;
-        }
-        let to = CursorPosition { line: self.cursor.line + self.changed_lines, char };
-        TextDocumentContentChangeEvent {
-            range: Some(Range::new(self.cursor.into(), to.into())),
-            text: self.text,
-            range_length: None,
-        }
-    }
-
-    #[inline]
-    pub fn utf16_text_change(self) -> TextDocumentContentChangeEvent {
-        let mut char = self.last_line.chars().fold(0, |sum, ch| sum + ch.len_utf16());
-        if self.changed_lines == 0 {
-            char += self.cursor.char;
-        }
-        let to = CursorPosition { line: self.cursor.line + self.changed_lines, char };
-        TextDocumentContentChangeEvent {
-            range: Some(Range::new(self.cursor.into(), to.into())),
-            text: self.text,
-            range_length: None,
-        }
-    }
-
-    #[inline]
-    pub fn utf32_text_change(self) -> TextDocumentContentChangeEvent {
-        let mut char = self.last_line.chars().count();
-        if self.changed_lines == 0 {
-            char += self.cursor.char;
-        }
-        let to = CursorPosition { line: self.cursor.line + self.changed_lines, char };
-        TextDocumentContentChangeEvent {
-            range: Some(Range::new(self.cursor.into(), to.into())),
-            text: self.text,
-            range_length: None,
-        }
     }
 }
 
@@ -411,8 +304,8 @@ impl Add for EditMetaData {
 
 impl AddAssign for EditMetaData {
     fn add_assign(&mut self, other: Self) {
-        let self_end_line = self.start_line + self.to;
-        let other_end_line = other.start_line + other.to;
+        let self_end_line = self.end_line();
+        let other_end_line = other.end_line();
         self.start_line = std::cmp::min(self.start_line, other.start_line);
         if self_end_line > other_end_line {
             self.to = self_end_line - self.start_line;
@@ -456,5 +349,13 @@ impl EditMetaData {
 impl Debug for EditMetaData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&format!("{} >> {}", self.from, self.to))
+    }
+}
+
+impl From<EditMetaData> for lsp_types::Range {
+    fn from(meta: EditMetaData) -> Self {
+        let start = lsp_types::Position::new(meta.start_line as u32, 0);
+        let end = lsp_types::Position::new((meta.start_line + meta.to) as u32, 0);
+        lsp_types::Range::new(start, end)
     }
 }

@@ -1,10 +1,5 @@
 use super::{Diagnostic, LSPNotification, LSPRequest, LSPResult, Response};
-use crate::{
-    configs::FileType,
-    lsp::LSPError,
-    syntax::DiagnosticLine,
-    workspace::{actions::LSPEvent, CursorPosition},
-};
+use crate::{configs::FileType, lsp::LSPError, syntax::DiagnosticLine, workspace::CursorPosition};
 use lsp_types::{
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidRenameFiles, DidSaveTextDocument, Exit,
@@ -32,7 +27,7 @@ use tokio::{
 
 pub enum Payload {
     /// Notifications
-    Sync(Uri, i32, Vec<LSPEvent>),
+    Sync(Uri, i32, Vec<TextDocumentContentChangeEvent>),
     FullSync(Uri, i32, String),
     /// Requests
     Tokens(Uri, i64),
@@ -49,14 +44,13 @@ pub enum Payload {
 }
 
 impl Payload {
-    fn try_stringify(self, position_map: fn(LSPEvent) -> TextDocumentContentChangeEvent) -> Result<String, LSPError> {
+    fn try_stringify(self) -> Result<String, LSPError> {
         match self {
             // Direct sending of serialized message
             Payload::Direct(msg) => Ok(msg),
             // Create and stringify notification
             Payload::Sync(uri, version, events) => {
-                let changes = events.into_iter().map(position_map).collect();
-                LSPNotification::<DidChangeTextDocument>::file_did_change(uri, version, changes).stringify()
+                LSPNotification::<DidChangeTextDocument>::file_did_change(uri, version, events).stringify()
             }
             Payload::FullSync(uri, version, text) => {
                 let full_changes = vec![TextDocumentContentChangeEvent { range: None, range_length: None, text }];
@@ -112,16 +106,10 @@ impl LSPClient {
     ) -> LSPResult<(JoinHandle<LSPResult<()>>, Self)> {
         let (channel, mut rx) = unbounded_channel::<Payload>();
 
-        let position_map = match capabilities.position_encoding.as_ref().map(|inner| inner.as_str()) {
-            Some("utf-8") => pos_utf8,
-            Some("utf-32") => pos_utf32,
-            _ => pos_utf16,
-        };
-
         // starting send handler
         let lsp_send_handler = tokio::task::spawn(async move {
             while let Some(msg) = rx.recv().await {
-                if let Ok(lsp_msg_text) = msg.try_stringify(position_map) {
+                if let Ok(lsp_msg_text) = msg.try_stringify() {
                     stdin.write_all(lsp_msg_text.as_bytes()).await?;
                     stdin.flush().await?;
                 }
@@ -236,7 +224,12 @@ impl LSPClient {
         self.channel.send(Payload::FullSync(uri, version, text)).map_err(LSPError::from)
     }
 
-    pub fn sync(&mut self, uri: Uri, version: i32, events: Vec<LSPEvent>) -> Result<(), LSPError> {
+    pub fn sync(
+        &mut self,
+        uri: Uri,
+        version: i32,
+        events: Vec<TextDocumentContentChangeEvent>,
+    ) -> Result<(), LSPError> {
         self.channel.send(Payload::Sync(uri, version, events)).map_err(LSPError::from)
     }
 
@@ -280,26 +273,20 @@ impl MonoID {
     }
 }
 
-fn pos_utf8(event: LSPEvent) -> TextDocumentContentChangeEvent {
-    event.utf8_text_change()
-}
-
-fn pos_utf16(event: LSPEvent) -> TextDocumentContentChangeEvent {
-    event.utf16_text_change()
-}
-
-fn pos_utf32(event: LSPEvent) -> TextDocumentContentChangeEvent {
-    event.utf32_text_change()
-}
-
 #[cfg(test)]
 mod test {
-    use super::MonoID;
+    use super::{LSPClient, MonoID};
 
     #[test]
     fn test_gen_id() {
         let mut gen = MonoID::default();
         assert_eq!(1, gen.next_id());
         assert_eq!(2, gen.next_id());
+    }
+
+    #[test]
+    fn test_holder() {
+        let holder = LSPClient::placeholder();
+        assert!(holder.channel.is_closed());
     }
 }

@@ -1,15 +1,16 @@
 mod code;
-mod plain;
+// mod plain;
 use std::path::{Path, PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 
 use crate::{configs::EditorAction, global_state::GlobalState, workspace::CursorPosition};
 pub use code::CodeEditor;
-pub use plain::TextEditor;
+// pub use plain::TextEditor;
 
 type DocLen = usize;
 type SelectLen = usize;
 pub type DocStats<'a> = (DocLen, SelectLen, CursorPosition);
 
+#[allow(dead_code)]
 pub trait Editor {
     fn render(&mut self, gs: &mut GlobalState);
     fn fast_render(&mut self, gs: &mut GlobalState);

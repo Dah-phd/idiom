@@ -8,20 +8,17 @@ pub mod token;
 use crate::{
     configs::FileType,
     global_state::{GlobalState, WorkspaceEvent},
-    lsp::{LSPClient, LSPError, LSPResponseType},
+    lsp::{LSPClient, LSPError, LSPResponseType, LSPResult},
     render::layout::Rect,
-    workspace::{
-        line::{CodeLine, EditorLine},
-        CodeEditor, CursorPosition,
-    },
+    workspace::{actions::EditType, line::CodeLine, CodeEditor, CursorPosition},
 };
 use crossterm::event::KeyEvent;
 pub use diagnostics::{set_diganostics, Action, DiagnosticInfo, DiagnosticLine};
 pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
-    as_url, char_lsp_pos, context_local, encode_pos_utf32, get_autocomplete_dead, info_position_dead, map,
-    renames_dead, start_renames_dead, sync_edits_local, tokens_dead, tokens_partial_dead,
+    as_url, char_lsp_pos, completable_dead, context_local, encode_pos_utf32, get_autocomplete_dead, info_position_dead,
+    map, renames_dead, start_renames_dead, sync_edits_local, sync_edits_local_rev, tokens_dead, tokens_partial_dead,
 };
 use lsp_types::{PublishDiagnosticsParams, Range, Uri};
 use modal::{LSPModal, ModalMessage};
@@ -41,25 +38,28 @@ pub struct Lexer {
     pub lsp: bool,
     pub uri: Uri,
     pub path: PathBuf,
+    version: i32,
     clock: Instant,
     modal: Option<LSPModal>,
     modal_rect: Option<Rect>,
     requests: Vec<LSPResponseType>,
     client: LSPClient,
     context: fn(&mut CodeEditor, &mut GlobalState),
-    autocomplete: fn(&mut Lexer, CursorPosition, String, &mut GlobalState),
-    tokens: fn(&mut Lexer, &mut GlobalState),
-    tokens_partial: fn(&mut Lexer, Range, usize, &mut GlobalState),
-    references: fn(&mut Lexer, CursorPosition, &mut GlobalState),
-    definitions: fn(&mut Lexer, CursorPosition, &mut GlobalState),
-    declarations: fn(&mut Lexer, CursorPosition, &mut GlobalState),
-    hover: fn(&mut Lexer, CursorPosition, &mut GlobalState),
-    signatures: fn(&mut Lexer, CursorPosition, &mut GlobalState),
-    start_renames: fn(&mut Lexer, CursorPosition, &str),
-    renames: fn(&mut Lexer, CursorPosition, String, &mut GlobalState),
-    sync: fn(&mut CodeEditor, &mut GlobalState),
+    completable: fn(&Self, char_idx: usize, line: &CodeLine) -> bool,
+    autocomplete: fn(&mut Self, CursorPosition, String, &mut GlobalState),
+    tokens: fn(&mut Self) -> LSPResult<LSPResponseType>,
+    tokens_partial: fn(&mut Self, Range, usize) -> LSPResult<LSPResponseType>,
+    references: fn(&mut Self, CursorPosition, &mut GlobalState),
+    definitions: fn(&mut Self, CursorPosition, &mut GlobalState),
+    declarations: fn(&mut Self, CursorPosition, &mut GlobalState),
+    hover: fn(&mut Self, CursorPosition, &mut GlobalState),
+    signatures: fn(&mut Self, CursorPosition, &mut GlobalState),
+    start_renames: fn(&mut Self, CursorPosition, &str),
+    renames: fn(&mut Self, CursorPosition, String, &mut GlobalState),
+    sync: fn(&mut Self, &EditType, &mut [CodeLine]) -> LSPResult<()>,
+    sync_rev: fn(&mut Self, &EditType, &mut [CodeLine]) -> LSPResult<()>,
     pub encode_position: fn(usize, &str) -> usize,
-    char_lsp_pos: fn(char) -> usize,
+    pub char_lsp_pos: fn(char) -> usize,
 }
 
 impl Lexer {
@@ -74,11 +74,13 @@ impl Lexer {
             modal_rect: None,
             uri: as_url(path),
             path: path.into(),
+            version: 0,
             requests: Vec::new(),
             diagnostics: None,
             lsp: false,
             client: LSPClient::placeholder(),
             context: context_local,
+            completable: completable_dead,
             autocomplete: get_autocomplete_dead,
             tokens: tokens_dead,
             tokens_partial: tokens_partial_dead,
@@ -90,6 +92,7 @@ impl Lexer {
             start_renames: start_renames_dead,
             renames: renames_dead,
             sync: sync_edits_local,
+            sync_rev: sync_edits_local_rev,
             encode_position: encode_pos_utf32,
             char_lsp_pos,
         }
@@ -97,13 +100,17 @@ impl Lexer {
 
     #[inline]
     pub fn context(editor: &mut CodeEditor, gs: &mut GlobalState) {
-        (editor.lexer.sync)(editor, gs);
         (editor.lexer.context)(editor, gs);
     }
 
-    #[inline]
-    pub fn sync(editor: &mut CodeEditor, gs: &mut GlobalState) {
-        (editor.lexer.sync)(editor, gs);
+    /// sync event
+    pub fn sync(&mut self, action: &EditType, content: &mut [CodeLine]) {
+        (self.sync)(self, action, content).unwrap();
+    }
+
+    /// sync reverse event
+    pub fn sync_rev(&mut self, action: &EditType, content: &mut [CodeLine]) {
+        (self.sync_rev)(self, action, content).unwrap();
     }
 
     #[inline]
@@ -144,7 +151,10 @@ impl Lexer {
         }
         map(self, client);
         gs.success("LSP mapped!");
-        (self.tokens)(self, gs);
+        match (self.tokens)(self) {
+            Ok(request) => self.requests.push(request),
+            Err(error) => gs.send_error(error, self.lang.file_type),
+        };
     }
 
     pub fn update_path(&mut self, path: &Path) -> Result<(), LSPError> {
@@ -162,8 +172,8 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn should_autocomplete(&mut self, char_idx: usize, line: &impl EditorLine) -> bool {
-        self.lsp && self.lang.completable(line, char_idx) && !matches!(self.modal, Some(LSPModal::AutoComplete(..)))
+    pub fn should_autocomplete(&self, char_idx: usize, line: &CodeLine) -> bool {
+        (self.completable)(self, char_idx, line)
     }
 
     #[inline]
@@ -214,12 +224,14 @@ impl Lexer {
             if let Some(capabilities) = &self.client.capabilities.semantic_tokens_provider {
                 self.legend.map_styles(&self.lang.file_type, &self.theme, capabilities);
             }
-            (self.tokens)(self, gs);
+            match (self.tokens)(self) {
+                Ok(request) => self.requests.push(request),
+                Err(error) => gs.send_error(error, self.lang.file_type),
+            };
         };
     }
 
     pub fn save_and_check_lsp(&mut self, content: String, gs: &mut GlobalState) {
-        // self.line_builder.mark_saved();
         if self.lsp {
             gs.message("Checking LSP status (on save) ...");
             if self.client.file_did_save(self.uri.clone(), content).is_err() && self.client.is_closed() {
@@ -227,7 +239,10 @@ impl Lexer {
             } else {
                 gs.success("LSP running ...");
             }
-            (self.tokens)(self, gs);
+            match (self.tokens)(self) {
+                Ok(request) => self.requests.push(request),
+                Err(error) => gs.send_error(error, self.lang.file_type),
+            };
         }
     }
 

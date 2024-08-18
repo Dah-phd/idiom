@@ -1,14 +1,18 @@
 use crate::{
     global_state::GlobalState,
-    lsp::{LSPClient, LSPResponse, LSPResponseType},
+    lsp::{LSPClient, LSPResponse, LSPResponseType, LSPResult},
     popups::popups_tree::refrence_selector,
     syntax::Lexer,
-    workspace::{actions::EditMetaData, line::EditorLine, CodeEditor, CursorPosition},
+    workspace::{
+        actions::{Edit, EditMetaData, EditType},
+        line::{CodeLine, EditorLine},
+        CodeEditor, CursorPosition,
+    },
 };
 use core::str::FromStr;
 use lsp_types::{
     Range, SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions, Uri,
+    TextDocumentContentChangeEvent, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions, Uri,
 };
 use std::{
     path::Path,
@@ -31,6 +35,7 @@ pub fn map(lexer: &mut Lexer, client: LSPClient) {
     lexer.lsp = true;
     lexer.context = context;
     lexer.autocomplete = get_autocomplete;
+    lexer.completable = completable;
 
     // tokens
     if let Some(tc) = client.capabilities.semantic_tokens_provider.as_ref() {
@@ -96,13 +101,16 @@ pub fn map(lexer: &mut Lexer, client: LSPClient) {
                 ..
             }) => {
                 lexer.sync = sync_edits;
+                lexer.sync_rev = sync_edits_rev;
             }
             _ => {
                 lexer.sync = sync_edits_full;
+                lexer.sync = sync_edits_full_rev;
             }
         }
     } else {
         lexer.sync = sync_edits_local;
+        lexer.sync_rev = sync_edits_local_rev;
     }
 
     match client.capabilities.position_encoding.as_ref().map(|encode| encode.as_str()) {
@@ -213,80 +221,104 @@ pub fn context(editor: &mut CodeEditor, gs: &mut GlobalState) {
     }
 }
 
-pub fn sync_edits(editor: &mut CodeEditor, gs: &mut GlobalState) {
-    let (version, events) = match editor.actions.get_events() {
-        Some(data) => data,
-        None => return,
-    };
-    let lexer = &mut editor.lexer;
-    let content = &editor.content;
+pub fn sync_edits(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]) -> LSPResult<()> {
+    lexer.version += 1;
+    let (meta, change_events) = map_action(action, lexer, content);
     if lexer.clock.elapsed() > FULL_TOKENS && lexer.modal.is_none() {
-        let result = lexer.client.sync(
-            lexer.uri.clone(),
-            version,
-            events
-                .drain(..)
-                .map(|(_, mut edit)| {
-                    edit.lsp_encode(lexer.encode_position, content);
-                    edit
-                })
-                .collect(),
-        );
-        gs.log_if_lsp_error(result, editor.file_type);
-        (lexer.tokens)(lexer, gs);
+        lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
+        let request = (lexer.tokens)(lexer)?;
+        lexer.requests.push(request);
         lexer.clock = Instant::now();
-        return;
+        return Ok(());
     }
-    let mut change_events = Vec::new();
-    let meta = events
-        .drain(..)
-        .map(|(meta, mut edit)| {
-            edit.lsp_encode(lexer.encode_position, content);
-            change_events.push(edit);
-            meta
-        })
-        .reduce(|em1, em2| em1 + em2)
-        .expect("Value is checked");
-    gs.log_if_lsp_error(lexer.client.sync(lexer.uri.clone(), version, change_events), editor.file_type);
+    lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
     let max_lines = meta.start_line + meta.to;
-    (lexer.tokens_partial)(lexer, meta.range(content), max_lines, gs);
+    let request = (lexer.tokens_partial)(lexer, meta.into(), max_lines)?;
+    lexer.requests.push(request);
+    Ok(())
 }
 
-pub fn sync_edits_full(editor: &mut CodeEditor, gs: &mut GlobalState) {
-    let (version, events) = match editor.actions.get_events() {
-        Some(data) => data,
-        None => return,
-    };
-    let lexer = &mut editor.lexer;
-    let content = &editor.content;
+pub fn sync_edits_rev(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]) -> LSPResult<()> {
+    lexer.version += 1;
+    let (meta, change_events) = map_action_rev(action, lexer, content);
+    if lexer.clock.elapsed() > FULL_TOKENS && lexer.modal.is_none() {
+        lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
+        let request = (lexer.tokens)(lexer)?;
+        lexer.requests.push(request);
+        lexer.clock = Instant::now();
+        return Ok(());
+    }
+    lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
+    let max_lines = meta.start_line + meta.to;
+    let request = (lexer.tokens_partial)(lexer, meta.into(), max_lines)?;
+    lexer.requests.push(request);
+    Ok(())
+}
+
+pub fn sync_edits_full(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]) -> LSPResult<()> {
+    lexer.version += 1;
     let mut text = String::new();
     for editor_line in content.iter() {
         editor_line.push_content_to_buffer(&mut text);
         text.push('\n');
     }
     text.push('\n');
-    gs.log_if_lsp_error(lexer.client.full_sync(lexer.uri.clone(), version, text), editor.file_type);
+    lexer.client.full_sync(lexer.uri.clone(), lexer.version, text)?;
     if lexer.clock.elapsed() > FULL_TOKENS && lexer.modal.is_none() {
-        events.clear();
-        (lexer.tokens)(lexer, gs);
+        let request = (lexer.tokens)(lexer)?;
+        lexer.requests.push(request);
         lexer.clock = Instant::now();
-        return;
+        return Ok(());
     };
-    let meta = events.drain(..).map(|(meta, _)| meta).reduce(|em1, em2| em1 + em2).expect("Value is checked");
+    let meta = map_action_to_meta(action);
     let max_lines = meta.start_line + meta.to;
-    (lexer.tokens_partial)(lexer, meta.range(content), max_lines, gs)
+    let request = (lexer.tokens_partial)(lexer, meta.into(), max_lines)?;
+    lexer.requests.push(request);
+    Ok(())
 }
 
-pub fn sync_edits_local(editor: &mut CodeEditor, _: &mut GlobalState) {
-    let events = match editor.actions.get_events_versionless() {
-        Some(events) => events,
-        None => return,
-    };
-    if let Some(meta) = events.drain(..).map(|(meta, ..)| meta).reduce(|left, right| left + right) {
-        for line in editor.content.iter_mut().skip(meta.start_line).take(meta.to) {
-            line.rebuild_tokens(&editor.lexer);
-        }
+pub fn sync_edits_full_rev(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]) -> LSPResult<()> {
+    lexer.version += 1;
+    let mut text = String::new();
+    for editor_line in content.iter() {
+        editor_line.push_content_to_buffer(&mut text);
+        text.push('\n');
     }
+    text.push('\n');
+    lexer.client.full_sync(lexer.uri.clone(), lexer.version, text)?;
+    if lexer.clock.elapsed() > FULL_TOKENS && lexer.modal.is_none() {
+        let request = (lexer.tokens)(lexer)?;
+        lexer.requests.push(request);
+        lexer.clock = Instant::now();
+        return Ok(());
+    };
+    let meta = map_action_to_meta_rev(action);
+    let max_lines = meta.start_line + meta.to;
+    let request = (lexer.tokens_partial)(lexer, meta.into(), max_lines)?;
+    lexer.requests.push(request);
+    Ok(())
+}
+
+pub fn sync_edits_local(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]) -> LSPResult<()> {
+    let meta = map_action_to_meta(action);
+    for line in content.iter_mut().skip(meta.start_line).take(meta.to) {
+        line.rebuild_tokens(lexer);
+    }
+    Ok(())
+}
+
+pub fn sync_edits_local_rev(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]) -> LSPResult<()> {
+    let meta = map_action_to_meta_rev(action);
+    for line in content.iter_mut().skip(meta.start_line).take(meta.to) {
+        line.rebuild_tokens(lexer);
+    }
+    Ok(())
+}
+
+pub fn completable(lexer: &Lexer, char_idx: usize, line: &CodeLine) -> bool {
+    !matches!(lexer.modal, Some(LSPModal::AutoComplete(..)))
+        && !lexer.requests.iter().any(|req| matches!(req, LSPResponseType::Completion(..)))
+        && lexer.lang.completable(line, char_idx)
 }
 
 pub fn get_autocomplete(lexer: &mut Lexer, c: CursorPosition, line: String, gs: &mut GlobalState) {
@@ -296,33 +328,34 @@ pub fn get_autocomplete(lexer: &mut Lexer, c: CursorPosition, line: String, gs: 
     }
 }
 
-pub fn get_autocomplete_dead(_: &mut Lexer, _: CursorPosition, _: String, _: &mut GlobalState) {}
-
-pub fn tokens(lexer: &mut Lexer, gs: &mut GlobalState) {
-    match lexer.client.request_full_tokens(lexer.uri.clone()).map(LSPResponseType::Tokens) {
-        Ok(request) => lexer.requests.push(request),
-        Err(err) => gs.send_error(err, lexer.lang.file_type),
-    }
+pub fn completable_dead(_lexer: &Lexer, _idx: usize, _line: &CodeLine) -> bool {
+    false
 }
 
-pub fn tokens_dead(_: &mut Lexer, _: &mut GlobalState) {}
+pub fn get_autocomplete_dead(_: &mut Lexer, _: CursorPosition, _: String, _: &mut GlobalState) {}
 
-pub fn tokens_partial(lexer: &mut Lexer, range: Range, max_lines: usize, gs: &mut GlobalState) {
-    match lexer
+pub fn tokens(lexer: &mut Lexer) -> LSPResult<LSPResponseType> {
+    lexer.client.request_full_tokens(lexer.uri.clone()).map(LSPResponseType::Tokens)
+}
+
+pub fn tokens_dead(_: &mut Lexer) -> LSPResult<LSPResponseType> {
+    Ok(LSPResponseType::Tokens(0))
+}
+
+pub fn tokens_partial(lexer: &mut Lexer, range: Range, max_lines: usize) -> LSPResult<LSPResponseType> {
+    lexer
         .client
         .request_partial_tokens(lexer.uri.clone(), range)
         .map(|id| LSPResponseType::TokensPartial { id, max_lines })
-    {
-        Ok(request) => lexer.requests.push(request),
-        Err(err) => gs.send_error(err, lexer.lang.file_type),
-    }
 }
 
-pub fn tokens_partial_redirect(lexer: &mut Lexer, _: Range, _: usize, gs: &mut GlobalState) {
-    tokens(lexer, gs)
+pub fn tokens_partial_redirect(lexer: &mut Lexer, _: Range, _: usize) -> LSPResult<LSPResponseType> {
+    tokens(lexer)
 }
 
-pub fn tokens_partial_dead(_: &mut Lexer, _: Range, _: usize, _: &mut GlobalState) {}
+pub fn tokens_partial_dead(_: &mut Lexer, _: Range, _: usize) -> LSPResult<LSPResponseType> {
+    Ok(LSPResponseType::TokensPartial { id: 0, max_lines: 0 })
+}
 
 pub fn info_position_dead(_: &mut Lexer, _: CursorPosition, _: &mut GlobalState) {}
 
@@ -388,6 +421,114 @@ fn range_tokens_are_supported(provider: &SemanticTokensServerCapabilities) -> bo
     }
 }
 
+pub fn map_action_to_meta(action: &EditType) -> EditMetaData {
+    match action {
+        EditType::Single(edit) => edit.meta,
+        EditType::Multi(edits) => edits.iter().map(|edit| edit.meta).reduce(|e1, e2| e1 + e2).expect("Value exists!"),
+    }
+}
+
+pub fn map_action(
+    action: &EditType,
+    lexer: &Lexer,
+    content: &[CodeLine],
+) -> (EditMetaData, Vec<TextDocumentContentChangeEvent>) {
+    match action {
+        EditType::Single(edit) => (edit.meta, vec![map_edit(edit, lexer, content)]),
+        EditType::Multi(edits) => {
+            let mut events = vec![];
+            let meta = edits
+                .iter()
+                .map(|edit| {
+                    events.push(map_edit(edit, lexer, content));
+                    edit.meta
+                })
+                .reduce(|curr, next| curr + next)
+                .expect("EditMetaData should exists!");
+            (meta, events)
+        }
+    }
+}
+
+pub fn map_edit(edit: &Edit, lexer: &Lexer, content: &[CodeLine]) -> TextDocumentContentChangeEvent {
+    let mut cursor = edit.cursor;
+    let changed = edit.meta.from - 1;
+    let text = edit.text.to_owned();
+    let mut char = edit.reverse.chars().rev().take_while(|ch| ch != &'\n').map(lexer.char_lsp_pos).sum::<usize>();
+    if cursor.char != 0 {
+        let editor_line = &content[cursor.line];
+        if !editor_line.is_simple() {
+            cursor.char = (lexer.encode_position)(cursor.char, &editor_line[..]);
+        }
+    }
+
+    if changed == 0 {
+        char += cursor.char;
+    }
+    let to = CursorPosition { line: cursor.line + changed, char };
+    TextDocumentContentChangeEvent { range: Some(Range::new(cursor.into(), to.into())), text, range_length: None }
+}
+
+pub fn map_action_to_meta_rev(action: &EditType) -> EditMetaData {
+    match action {
+        EditType::Single(edit) => edit.meta.rev(),
+        EditType::Multi(edits) => {
+            edits.iter().rev().map(|edit| edit.meta.rev()).reduce(|e1, e2| e1 + e2).expect("Value exists!")
+        }
+    }
+}
+
+pub fn map_action_rev(
+    action: &EditType,
+    lexer: &Lexer,
+    content: &[CodeLine],
+) -> (EditMetaData, Vec<TextDocumentContentChangeEvent>) {
+    match action {
+        EditType::Single(edit) => {
+            let rev_meta = edit.meta.rev();
+            (rev_meta, vec![map_edit_rev(edit, lexer, content, rev_meta)])
+        }
+        EditType::Multi(edits) => {
+            let mut events = vec![];
+            let meta = edits
+                .iter()
+                .rev()
+                .map(|edit| {
+                    let rev_meta = edit.meta.rev();
+                    events.push(map_edit_rev(edit, lexer, content, rev_meta));
+                    rev_meta
+                })
+                .reduce(|curr, next| curr + next)
+                .expect("EditMetaData should exists!");
+            (meta, events)
+        }
+    }
+}
+
+pub fn map_edit_rev(
+    edit: &Edit,
+    lexer: &Lexer,
+    content: &[CodeLine],
+    rev_meta: EditMetaData,
+) -> TextDocumentContentChangeEvent {
+    let mut cursor = edit.cursor;
+    let changed = rev_meta.from - 1;
+    let text = edit.reverse.to_owned();
+    let mut char = edit.text.chars().rev().take_while(|ch| ch != &'\n').map(lexer.char_lsp_pos).sum::<usize>();
+    if cursor.char != 0 {
+        let editor_line = &content[cursor.line];
+        if !editor_line.is_simple() {
+            cursor.char = (lexer.encode_position)(cursor.char, &editor_line[..]);
+        }
+    }
+
+    if changed == 0 {
+        char += cursor.char;
+    }
+    let to = CursorPosition { line: cursor.line + changed, char };
+    TextDocumentContentChangeEvent { range: Some(Range::new(cursor.into(), to.into())), text, range_length: None }
+}
+
 #[inline]
 pub fn encode_pos_utf8(char_idx: usize, from_str: &str) -> usize {
     from_str.char_indices().take(char_idx).last().map(|(idx, _)| idx).unwrap_or_default()
@@ -421,16 +562,4 @@ pub fn char_lsp_utf16(ch: char) -> usize {
 #[inline(always)]
 pub fn as_url(path: &Path) -> Uri {
     Uri::from_str(format!("file://{}", path.display()).as_str()).expect("Path should always be parsable!")
-}
-
-impl EditMetaData {
-    #[inline]
-    pub fn range(self, content: &[impl EditorLine]) -> lsp_types::Range {
-        let end_line = self.end_line();
-        let end_character = content.get(end_line).map(|l| l.char_len()).unwrap_or_default() as u32;
-        lsp_types::Range::new(
-            lsp_types::Position::new(self.start_line as u32, 0),
-            lsp_types::Position::new(end_line as u32, end_character),
-        )
-    }
 }
