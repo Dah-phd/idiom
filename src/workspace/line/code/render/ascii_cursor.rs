@@ -19,7 +19,7 @@ pub fn render(
             None => self::basic(line, ctx, backend),
         }
         if let Some(diagnostics) = line.diagnostics.as_ref() {
-            diagnostics.inline_render(line_width - (line.char_len + 1), backend);
+            diagnostics.inline_render(line_width - line.char_len, backend);
         }
     } else {
         match select {

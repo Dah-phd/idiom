@@ -115,9 +115,12 @@ impl DiagnosticLine {
     /// Prints truncated text based on info from diagnostics
     #[inline(always)]
     pub fn inline_render(&self, max_width: usize, backend: &mut impl BackendProtocol) {
+        if max_width < 5 {
+            return;
+        }
         if let Some(first_diagnostic) = self.data.first() {
             let style = first_diagnostic.text_style();
-            let text = first_diagnostic.inline_text.truncate_width(max_width).1;
+            let text = first_diagnostic.inline_text.truncate_width(max_width - 1).1;
             backend.print_styled(text, style);
         }
     }
