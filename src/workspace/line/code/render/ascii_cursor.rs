@@ -18,6 +18,9 @@ pub fn render(
             Some(select) => self::select(line, ctx, select, backend),
             None => self::basic(line, ctx, backend),
         }
+        if let Some(diagnostics) = line.diagnostics.as_ref() {
+            diagnostics.inline_render(line_width - line.char_len, backend);
+        }
     } else {
         match select {
             Some(select) => self::partial_select(line, ctx, line_width, select, backend),

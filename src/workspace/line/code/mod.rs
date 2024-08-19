@@ -405,11 +405,11 @@ impl CodeLine {
     #[inline]
     pub fn render(&mut self, ctx: &mut CodeLineContext<'_>, line: Line, backend: &mut Backend) {
         let select = ctx.get_select(line.width);
-        self._render(ctx, line, select, backend);
+        self.inner_render(ctx, line, select, backend);
     }
 
     #[inline]
-    fn _render(
+    fn inner_render(
         &mut self,
         ctx: &mut CodeLineContext<'_>,
         line: Line,
@@ -432,7 +432,7 @@ impl CodeLine {
     pub fn fast_render(&mut self, ctx: &mut CodeLineContext, line: Line, backend: &mut Backend) {
         let select = ctx.get_select(line.width);
         if self.cached.should_render_line(line.row, &select) {
-            self._render(ctx, line, select, backend);
+            self.inner_render(ctx, line, select, backend);
         } else {
             ctx.skip_line();
         }
