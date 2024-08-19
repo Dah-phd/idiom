@@ -165,17 +165,17 @@ impl RenderStatus {
 }
 
 #[inline(always)]
-pub fn is_wider_complex(line: &impl EditorLine, line_width: usize) -> bool {
+pub fn width_remainder(line: &CodeLine, line_width: usize) -> Option<usize> {
     let mut current_with = 0;
     for ch in line.chars() {
         if let Some(char_width) = UnicodeWidthChar::width(ch) {
             current_with += char_width;
-            if current_with > line_width {
-                return true;
+            if current_with >= line_width {
+                return None;
             }
         }
     }
-    false
+    Some(line_width - current_with)
 }
 
 #[inline(always)]

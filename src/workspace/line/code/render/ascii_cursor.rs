@@ -13,13 +13,13 @@ pub fn render(
     select: Option<Range<usize>>,
     backend: &mut Backend,
 ) {
-    if line_width > line.char_len() {
+    if line_width > line.char_len {
         match select {
             Some(select) => self::select(line, ctx, select, backend),
             None => self::basic(line, ctx, backend),
         }
         if let Some(diagnostics) = line.diagnostics.as_ref() {
-            diagnostics.inline_render(line_width - line.char_len, backend);
+            diagnostics.inline_render(line_width - (line.char_len + 1), backend);
         }
     } else {
         match select {

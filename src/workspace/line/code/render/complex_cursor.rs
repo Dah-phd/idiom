@@ -6,7 +6,7 @@ use crate::{
 };
 use std::ops::Range;
 
-use super::{is_wider_complex, WRAP_CLOSE, WRAP_OPEN};
+use super::{width_remainder, WRAP_CLOSE, WRAP_OPEN};
 
 #[inline(always)]
 pub fn render(
@@ -16,15 +16,18 @@ pub fn render(
     select: Option<Range<usize>>,
     backend: &mut impl BackendProtocol,
 ) {
-    if is_wider_complex(line, line_width) {
-        match select {
-            Some(select) => partial_select(line, ctx, select, line_width, backend),
-            None => partial(line, ctx, line_width, backend),
-        }
-    } else {
+    if let Some(remainder) = width_remainder(line, line_width) {
         match select {
             Some(select) => self::select(line, ctx, select, backend),
             None => self::basic(line, ctx, backend),
+        }
+        if let Some(diagnostic) = line.diagnostics.as_ref() {
+            diagnostic.inline_render(remainder - 1, backend);
+        }
+    } else {
+        match select {
+            Some(select) => partial_select(line, ctx, select, line_width, backend),
+            None => partial(line, ctx, line_width, backend),
         }
     }
 }
