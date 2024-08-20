@@ -39,7 +39,7 @@ pub fn basic(line: &CodeLine, ctx: &CodeLineContext, backend: &mut impl BackendP
     let mut idx = 0;
     let mut lsp_idx = 0;
     let cursor_idx = ctx.cursor_char();
-    let lexer = &ctx.lexer;
+    let lsp_encoding = ctx.lexer.char_lsp_pos;
     for text in line.chars() {
         if let Some(token) = maybe_token {
             if token.from == lsp_idx {
@@ -63,7 +63,7 @@ pub fn basic(line: &CodeLine, ctx: &CodeLineContext, backend: &mut impl BackendP
         } else {
             backend.print(text);
         }
-        lsp_idx += lexer.char_lsp_pos(text);
+        lsp_idx += lsp_encoding(text);
         idx += 1;
     }
     if idx <= cursor_idx {
@@ -74,9 +74,9 @@ pub fn basic(line: &CodeLine, ctx: &CodeLineContext, backend: &mut impl BackendP
 
 #[inline]
 pub fn select(line: &CodeLine, ctx: &CodeLineContext, select: Range<usize>, backend: &mut impl BackendProtocol) {
-    let lexer = &ctx.lexer;
+    let lsp_encoding = ctx.lexer.char_lsp_pos;
     let cursor_idx = ctx.cursor_char();
-    let select_color = lexer.theme.selected;
+    let select_color = ctx.lexer.theme.selected;
     let mut reset_style = Style::default();
     let mut tokens = line.iter_tokens();
     let mut maybe_token = tokens.next();
@@ -113,7 +113,7 @@ pub fn select(line: &CodeLine, ctx: &CodeLineContext, select: Range<usize>, back
         } else {
             backend.print(text);
         }
-        lsp_idx += lexer.char_lsp_pos(text);
+        lsp_idx += lsp_encoding(text);
         idx += 1;
     }
     if idx <= cursor_idx {
@@ -131,13 +131,13 @@ pub fn partial(
 ) {
     line_width -= 2;
     let cursor_idx = ctx.cursor_char();
-    let lexer = &ctx.lexer;
+    let lsp_encoding = ctx.lexer.char_lsp_pos;
     let mut idx = line.cached.generate_skipped_chars_complex(cursor_idx, line_width, line.content.chars());
     let mut content = line.chars();
     let mut counter_to_idx = idx;
     let mut lsp_idx = 0;
     while counter_to_idx != 0 {
-        lsp_idx += content.next().map(|ch| lexer.char_lsp_pos(ch)).unwrap_or_default();
+        lsp_idx += content.next().map(lsp_encoding).unwrap_or_default();
         counter_to_idx -= 1;
     }
     let expected_token_end = lsp_idx;
@@ -180,7 +180,7 @@ pub fn partial(
                     backend.print_styled("?", Style::fg(color::red()));
                 }
                 idx += 1;
-                lsp_idx += lexer.char_lsp_pos(text);
+                lsp_idx += lsp_encoding(text);
                 continue;
             }
         };
@@ -197,7 +197,7 @@ pub fn partial(
         }
 
         idx += 1;
-        lsp_idx += lexer.char_lsp_pos(text);
+        lsp_idx += lsp_encoding(text);
     }
     if idx <= cursor_idx {
         backend.print_styled(" ", Style::reversed());
@@ -217,18 +217,18 @@ pub fn partial_select(
 ) {
     line_width -= 2;
     let cursor_idx = ctx.cursor_char();
-    let lexer = &ctx.lexer;
+    let lsp_encoding = ctx.lexer.char_lsp_pos;
     let mut idx = line.cached.generate_skipped_chars_complex(cursor_idx, line_width, line.content.chars());
     let mut content = line.chars();
     let mut counter_to_idx = idx;
     let mut lsp_idx = 0;
     while counter_to_idx != 0 {
-        lsp_idx += content.next().map(|ch| lexer.char_lsp_pos(ch)).unwrap_or_default();
+        lsp_idx += content.next().map(lsp_encoding).unwrap_or_default();
         counter_to_idx -= 1;
     }
 
     let expected_token_end = lsp_idx;
-    let select_color = lexer.theme.selected;
+    let select_color = ctx.lexer.theme.selected;
     let mut reset_style = Style::default();
     let mut tokens = line.iter_tokens().skip_while(|token| token.to < expected_token_end).peekable();
     if let Some(token) = tokens.peek() {
@@ -278,7 +278,7 @@ pub fn partial_select(
                     backend.print_styled("?", Style::fg(color::red()));
                 }
                 idx += 1;
-                lsp_idx += lexer.char_lsp_pos(text);
+                lsp_idx += lsp_encoding(text);
                 continue;
             }
         };
@@ -294,7 +294,7 @@ pub fn partial_select(
             backend.print(text);
         }
         idx += 1;
-        lsp_idx += lexer.char_lsp_pos(text);
+        lsp_idx += lsp_encoding(text);
     }
     if idx <= cursor_idx {
         backend.print_styled(" ", Style::reversed());
