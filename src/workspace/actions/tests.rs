@@ -1,5 +1,3 @@
-use lsp_types::Position;
-
 use crate::workspace::actions::edits::EditMetaData;
 use crate::workspace::actions::Edit;
 use crate::workspace::cursor::Cursor;
@@ -142,12 +140,12 @@ fn test_record_inline_insert() {
     let mut content = vec![this_line];
     let test_ins = String::from("    ");
     content[0].insert_str(0, &test_ins);
-    let edit = Edit::record_in_line_insertion(Position::new(0, 0), test_ins.clone());
+    let edit = Edit::record_in_line_insertion(CursorPosition::default(), test_ins.clone());
     match_line(&content[0], &"    text");
     edit.apply_rev(&mut content);
     match_line(&content[0], &"text");
     content[0].insert_str(2, &test_ins);
-    let edit = Edit::record_in_line_insertion(Position::new(0, 2), test_ins);
+    let edit = Edit::record_in_line_insertion(CursorPosition { line: 0, char: 2 }, test_ins);
     match_line(&content[0], &"te    xt");
     edit.apply_rev(&mut content);
     match_line(&content[0], &"text");

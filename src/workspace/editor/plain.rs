@@ -6,7 +6,7 @@ use crate::{
     render::layout::Rect,
     syntax::theme::Theme,
     workspace::{
-        actions::Actions,
+        actions::internal::InternalActions,
         cursor::{Cursor, CursorPosition},
         line::{EditorLine, TextLine},
         utils::{copy_content, find_line_start, last_modified, token_range_at},
@@ -30,7 +30,7 @@ pub struct TextEditor {
     pub display: String,
     pub path: PathBuf,
     pub cursor: Cursor,
-    pub actions: Actions,
+    pub actions: InternalActions,
     pub content: Vec<TextLine>,
     theme: Theme,
     timestamp: Option<SystemTime>,
@@ -47,7 +47,7 @@ impl TextEditor {
             line_number_offset: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
             content,
             cursor: Cursor::default(),
-            actions: Actions::new(cfg.get_indent_cfg(&file_type)),
+            actions: InternalActions::new(cfg.get_indent_cfg(&file_type)),
             file_type,
             display,
             theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
@@ -73,7 +73,91 @@ impl TextEditor {
 
     #[inline]
     pub fn map(&mut self, action: EditorAction, gs: &mut GlobalState) -> bool {
-        false
+        match action {
+            EditorAction::Char(ch) => {
+                self.actions.push_char(ch, &mut self.cursor, &mut self.content);
+                return true;
+            }
+            EditorAction::NewLine => self.actions.new_line(&mut self.cursor, &mut self.content),
+            EditorAction::Indent => self.actions.indent(&mut self.cursor, &mut self.content),
+            EditorAction::Backspace => self.actions.backspace(&mut self.cursor, &mut self.content),
+            EditorAction::Delete => self.actions.del(&mut self.cursor, &mut self.content),
+            EditorAction::RemoveLine => {
+                self.select_line();
+                if !self.cursor.select_is_none() {
+                    self.actions.del(&mut self.cursor, &mut self.content);
+                };
+            }
+            EditorAction::IndentStart => self.actions.indent_start(&mut self.cursor, &mut self.content),
+            EditorAction::Unintent => self.actions.unindent(&mut self.cursor, &mut self.content),
+            EditorAction::Up => self.cursor.up(&self.content),
+            EditorAction::Down => self.cursor.down(&self.content),
+            EditorAction::Left => self.cursor.left(&self.content),
+            EditorAction::Right => self.cursor.right(&self.content),
+            EditorAction::SelectUp => self.cursor.select_up(&self.content),
+            EditorAction::SelectDown => self.cursor.select_down(&self.content),
+            EditorAction::SelectLeft => self.cursor.select_left(&self.content),
+            EditorAction::SelectRight => self.cursor.select_right(&self.content),
+            EditorAction::SelectToken => {
+                let range = token_range_at(&self.content[self.cursor.line], self.cursor.char);
+                if !range.is_empty() {
+                    self.cursor.select_set(
+                        CursorPosition { line: self.cursor.line, char: range.start },
+                        CursorPosition { line: self.cursor.line, char: range.end },
+                    )
+                }
+            }
+            EditorAction::SelectLine => self.select_line(),
+            EditorAction::SelectAll => self.select_all(),
+            EditorAction::ScrollUp => self.cursor.scroll_up(&self.content),
+            EditorAction::ScrollDown => self.cursor.scroll_down(&self.content),
+            EditorAction::SwapUp => self.actions.swap_up(&mut self.cursor, &mut self.content),
+            EditorAction::SwapDown => self.actions.swap_down(&mut self.cursor, &mut self.content),
+            EditorAction::JumpLeft => self.cursor.jump_left(&self.content),
+            EditorAction::JumpLeftSelect => self.cursor.jump_left_select(&self.content),
+            EditorAction::JumpRight => self.cursor.jump_right(&self.content),
+            EditorAction::JumpRightSelect => self.cursor.jump_right_select(&self.content),
+            EditorAction::EndOfLine => self.cursor.end_of_line(&self.content),
+            EditorAction::EndOfFile => self.cursor.end_of_file(&self.content),
+            EditorAction::StartOfLine => self.cursor.start_of_line(&self.content),
+            EditorAction::StartOfFile => self.cursor.start_of_file(),
+            EditorAction::FindReferences => todo!(),
+            EditorAction::GoToDeclaration => todo!(),
+            EditorAction::Help => todo!(),
+            EditorAction::LSPRename => {
+                todo!()
+            }
+            EditorAction::CommentOut => {
+                self.actions.comment_out(self.file_type.comment_start(), &mut self.cursor, &mut self.content)
+            }
+            EditorAction::Undo => self.actions.undo(&mut self.cursor, &mut self.content),
+            EditorAction::Redo => self.actions.redo(&mut self.cursor, &mut self.content),
+            EditorAction::Save => self.save(gs),
+            EditorAction::Cancel => {
+                if self.cursor.select_take().is_none() {
+                    self.actions.push_buffer();
+                    return false;
+                }
+            }
+            EditorAction::Paste => {
+                if let Some(clip) = gs.clipboard.pull() {
+                    self.actions.paste(clip, &mut self.cursor, &mut self.content);
+                }
+            }
+            EditorAction::Cut => {
+                if let Some(clip) = self.cut() {
+                    gs.clipboard.push(clip);
+                }
+            }
+            EditorAction::Copy => {
+                if let Some(clip) = self.copy() {
+                    gs.clipboard.push(clip);
+                }
+            }
+            EditorAction::Close => return false,
+        }
+        self.actions.push_buffer();
+        true
     }
 
     #[inline(always)]
@@ -182,14 +266,7 @@ impl TextEditor {
     }
 
     pub fn apply_file_edits(&mut self, mut edits: Vec<TextEdit>) {
-        edits.sort_by(|a, b| {
-            let line_ord = b.range.start.line.cmp(&a.range.start.line);
-            if let Ordering::Equal = line_ord {
-                return b.range.start.character.cmp(&a.range.start.character);
-            }
-            line_ord
-        });
-        self.actions.apply_edits(edits, &mut self.content);
+        todo!()
     }
 
     #[inline(always)]
