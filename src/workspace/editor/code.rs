@@ -330,7 +330,7 @@ impl CodeEditor {
         self.cursor.select_set(from, to);
     }
 
-    pub fn find(&mut self, pat: &str, buffer: &mut Vec<(CursorPosition, CursorPosition)>) {
+    pub fn find(&self, pat: &str, buffer: &mut Vec<(CursorPosition, CursorPosition)>) {
         if pat.is_empty() {
             return;
         }

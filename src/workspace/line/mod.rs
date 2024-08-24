@@ -1,14 +1,14 @@
 mod code;
-mod palin_text;
+mod text;
 
 pub use code::{CodeLine, CodeLineContext};
-pub use palin_text::TextLine;
 use std::{
     fmt::Display,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
     path::Path,
     str::{CharIndices, Chars, MatchIndices},
 };
+pub use text::TextLine;
 
 /// The trait can be used in future to add rope version for non code text
 pub trait EditorLine:

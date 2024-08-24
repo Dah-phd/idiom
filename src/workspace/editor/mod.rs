@@ -3,8 +3,9 @@ mod plain;
 use std::path::{Path, PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 
 use crate::{
-    configs::{EditorAction, EditorConfigs},
+    configs::{EditorAction, EditorConfigs, FileType},
     global_state::GlobalState,
+    lsp::LSPResult,
     workspace::CursorPosition,
 };
 pub use code::CodeEditor;
@@ -24,6 +25,69 @@ impl Editor {
         match self {
             Self::Code(editor) => editor.map(action, gs),
             Self::Text(editor) => editor.map(action, gs),
+        }
+    }
+
+    pub fn go_to(&mut self, line: usize) {
+        match self {
+            Self::Code(editor) => editor.go_to(line),
+            Self::Text(editor) => editor.go_to(line),
+        }
+    }
+
+    pub fn find(&self, pat: &str, buffer: &mut Vec<(CursorPosition, CursorPosition)>) {
+        match self {
+            Self::Code(editor) => editor.find(pat, buffer),
+            Self::Text(editor) => editor.find(pat, buffer),
+        }
+    }
+
+    pub fn file_type(&self) -> FileType {
+        match self {
+            Self::Code(editor) => editor.file_type,
+            _ => FileType::Unknown,
+        }
+    }
+
+    pub fn update_path(&mut self, new_path: PathBuf) -> LSPResult<()> {
+        match self {
+            Self::Code(editor) => editor.update_path(new_path),
+            _ => Ok(()),
+        }
+    }
+
+    pub fn resize(&mut self, width: usize, height: usize) {
+        match self {
+            Self::Code(editor) => editor.resize(width, height),
+            Self::Text(editor) => todo!(),
+        }
+    }
+
+    pub fn get_stats(&self) -> DocStats {
+        match self {
+            Self::Code(editor) => editor.get_stats(),
+            Self::Text(editor) => editor.get_stats(),
+        }
+    }
+
+    pub fn clear_screen_cache(&mut self) {
+        match self {
+            Self::Code(editor) => editor.clear_screen_cache(),
+            Self::Text(editor) => editor.clear_screen_cache(),
+        }
+    }
+
+    pub fn display(&self) -> &str {
+        match self {
+            Self::Code(editor) => &editor.display,
+            Self::Text(editor) => &editor.display,
+        }
+    }
+
+    pub fn path(&self) -> &PathBuf {
+        match self {
+            Self::Code(editor) => &editor.path,
+            Self::Text(editor) => &editor.path,
         }
     }
 
