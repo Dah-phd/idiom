@@ -67,11 +67,7 @@ impl Write for Backend {
 impl BackendProtocol for Backend {
     #[inline]
     fn init() -> Self {
-        // #[cfg(test)]
-        // return Self { writer: DummyOut {}, default_styled: None };
-        // #[cfg(not(test))]
         init_terminal().expect(ERR_MSG);
-        // #[cfg(not(test))]
         Self { writer: std::io::stdout(), default_styled: None }
     }
 

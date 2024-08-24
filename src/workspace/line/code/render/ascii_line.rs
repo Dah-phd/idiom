@@ -8,23 +8,39 @@ use crate::{
 
 #[inline]
 pub fn ascii_line(content: &str, tokens: &[Token], backend: &mut impl BackendProtocol) {
-    let mut end = 0;
+    let mut cursor = 0;
+    let mut last_len = 0;
     for token in tokens.iter() {
-        if token.from > end {
-            if let Some(text) = content.get(end..token.from) {
-                backend.print(text);
-            } else if let Some(text) = content.get(end..) {
-                return backend.print(text);
-            };
-        };
-        if let Some(text) = content.get(token.from..token.to) {
-            backend.print_styled(text, token.style);
-        } else if let Some(text) = content.get(token.from..) {
-            return backend.print_styled(text, token.style);
-        };
-        end = token.to;
+        // handle tokne gap
+        if token.delta_start > last_len {
+            let gap_start = cursor + last_len;
+            cursor += token.delta_start;
+            match content.get(gap_start..cursor) {
+                Some(text) => backend.print(text),
+                None => {
+                    if let Some(text) = content.get(gap_start..) {
+                        backend.print(text);
+                    }
+                    return;
+                }
+            }
+        } else {
+            cursor += token.delta_start;
+        }
+
+        // print token
+        last_len = token.len;
+        match content.get(cursor..cursor + last_len) {
+            Some(text) => backend.print_styled(text, token.style),
+            None => {
+                if let Some(text) = content.get(cursor..) {
+                    backend.print_styled(text, token.style);
+                }
+                return;
+            }
+        }
     }
-    match content.get(end..) {
+    match content.get(cursor + last_len..) {
         Some(text) if !text.is_empty() => backend.print(text),
         _ => (),
     }
@@ -39,9 +55,21 @@ pub fn ascii_line_with_select(
     backend: &mut impl BackendProtocol,
 ) {
     let select_color = lexer.theme.selected;
-    let mut iter_tokens = tokens.iter();
-    let mut maybe_token = iter_tokens.next();
     let mut reset_style = Style::default();
+    let mut iter_tokens = tokens.iter();
+    let mut counter = 0;
+    let mut last_len = 0;
+    let mut lined_up = None;
+    if let Some(token) = iter_tokens.next() {
+        if token.delta_start == 0 {
+            counter = token.len;
+            backend.set_style(token.style);
+        } else {
+            lined_up.replace(token.style);
+            counter = token.delta_start;
+        }
+        last_len = token.len;
+    };
     for (idx, text) in content {
         if select.start == idx {
             backend.set_bg(Some(select_color));
@@ -51,22 +79,32 @@ pub fn ascii_line_with_select(
             backend.set_bg(None);
             reset_style.set_bg(None);
         }
-        if let Some(token) = maybe_token {
-            if token.from == idx {
-                backend.update_style(token.style);
-            } else if token.to == idx {
-                if let Some(token) = iter_tokens.next() {
-                    if token.from == idx {
-                        backend.update_style(token.style);
-                    } else {
+        if counter == 0 {
+            match lined_up.take() {
+                Some(style) => {
+                    backend.update_style(style);
+                    counter = last_len - 1;
+                }
+                None => match iter_tokens.next() {
+                    None => {
+                        counter = usize::MAX;
                         backend.set_style(reset_style);
-                    };
-                    maybe_token.replace(token);
-                } else {
-                    backend.set_style(reset_style);
-                    maybe_token = None;
-                };
-            };
+                    }
+                    Some(token) => {
+                        if token.delta_start > last_len {
+                            counter = token.delta_start - (last_len + 1);
+                            lined_up.replace(token.style);
+                            backend.set_style(reset_style);
+                        } else {
+                            counter = token.len - 1;
+                            backend.update_style(token.style);
+                        }
+                        last_len = token.len;
+                    }
+                },
+            }
+        } else {
+            counter -= 1;
         }
         backend.print(text);
     }

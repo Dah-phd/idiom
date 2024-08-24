@@ -32,29 +32,51 @@ pub fn render(
 #[inline]
 pub fn basic(line: &CodeLine, ctx: &CodeLineContext, backend: &mut Backend) {
     let mut iter_tokens = line.iter_tokens();
-    let mut maybe_token = iter_tokens.next();
+    let mut counter = 0;
+    let mut last_len = 0;
+    let mut lined_up = None;
     let mut idx = 0;
     let cursor_idx = ctx.cursor_char();
-    for text in line.chars() {
-        if let Some(token) = maybe_token {
-            if token.from == idx {
-                backend.set_style(token.style);
-            } else if token.to == idx {
-                if let Some(token) = iter_tokens.next() {
-                    if token.from == idx {
-                        backend.set_style(token.style);
-                    } else {
-                        backend.reset_style();
-                    };
-                    maybe_token.replace(token);
-                } else {
-                    backend.reset_style();
-                    maybe_token = None;
-                };
-            };
+    if let Some(token) = iter_tokens.next() {
+        if token.delta_start == 0 {
+            counter = token.len;
+            backend.set_style(token.style);
+        } else {
+            lined_up.replace(token.style);
+            counter = token.delta_start;
         }
-        if idx == cursor_idx {
-            backend.print_styled(text, Style::reversed());
+        last_len = token.len;
+    };
+    for text in line.chars() {
+        if counter == 0 {
+            match lined_up.take() {
+                Some(style) => {
+                    backend.set_style(style);
+                    counter = last_len - 1;
+                }
+                None => match iter_tokens.next() {
+                    None => {
+                        backend.reset_style();
+                        counter = usize::MAX;
+                    }
+                    Some(token) => {
+                        if token.delta_start > last_len {
+                            counter = token.delta_start - (last_len + 1);
+                            lined_up.replace(token.style);
+                            backend.reset_style();
+                        } else {
+                            counter = token.len - 1;
+                            backend.set_style(token.style);
+                        }
+                        last_len = token.len;
+                    }
+                },
+            }
+        } else {
+            counter -= 1;
+        }
+        if cursor_idx == idx {
+            backend.print_styled(text, Style::reversed())
         } else {
             backend.print(text);
         }
@@ -68,40 +90,62 @@ pub fn basic(line: &CodeLine, ctx: &CodeLineContext, backend: &mut Backend) {
 
 #[inline]
 pub fn select(line: &CodeLine, ctx: &CodeLineContext, select: Range<usize>, backend: &mut Backend) {
+    let select_color = ctx.lexer.theme.selected;
     let mut reset_style = Style::default();
     let mut iter_tokens = line.iter_tokens();
-    let mut maybe_token = iter_tokens.next();
+    let mut counter = 0;
+    let mut last_len = 0;
+    let mut lined_up = None;
     let mut idx = 0;
-    let select_color = ctx.lexer.theme.selected;
     let cursor_idx = ctx.cursor_char();
+    if let Some(token) = iter_tokens.next() {
+        if token.delta_start == 0 {
+            backend.set_style(token.style);
+            counter = token.len;
+        } else {
+            lined_up.replace(token.style);
+            counter = token.delta_start;
+        }
+        last_len = token.len;
+    };
     for text in line.chars() {
         if select.start == idx {
-            reset_style.set_bg(Some(select_color));
             backend.set_bg(Some(select_color));
+            reset_style.set_bg(Some(select_color));
         }
         if select.end == idx {
-            reset_style.set_bg(None);
             backend.set_bg(None);
+            reset_style.set_bg(None);
         }
-        if let Some(token) = maybe_token {
-            if token.from == idx {
-                backend.update_style(token.style);
-            } else if token.to == idx {
-                if let Some(token) = iter_tokens.next() {
-                    if token.from == idx {
-                        backend.update_style(token.style);
-                    } else {
+        if counter == 0 {
+            match lined_up.take() {
+                Some(style) => {
+                    backend.update_style(style);
+                    counter = last_len - 1;
+                }
+                None => match iter_tokens.next() {
+                    None => {
                         backend.set_style(reset_style);
-                    };
-                    maybe_token.replace(token);
-                } else {
-                    backend.set_style(reset_style);
-                    maybe_token = None;
-                };
-            };
+                        counter = usize::MAX;
+                    }
+                    Some(token) => {
+                        if token.delta_start > last_len {
+                            counter = token.delta_start - (last_len + 1);
+                            lined_up.replace(token.style);
+                            backend.set_style(reset_style);
+                        } else {
+                            counter = token.len - 1;
+                            backend.update_style(token.style);
+                        }
+                        last_len = token.len;
+                    }
+                },
+            }
+        } else {
+            counter -= 1;
         }
-        if idx == cursor_idx {
-            backend.print_styled(text, Style::reversed());
+        if cursor_idx == idx {
+            backend.print_styled(text, Style::reversed())
         } else {
             backend.print(text);
         }
