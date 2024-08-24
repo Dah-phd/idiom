@@ -265,8 +265,8 @@ impl TextEditor {
         self.actions.mass_replace(&mut self.cursor, ranges, clip, &mut self.content);
     }
 
-    pub fn apply_file_edits(&mut self, mut edits: Vec<TextEdit>) {
-        todo!()
+    pub fn apply_file_edits(&mut self, _edits: Vec<TextEdit>) {
+        panic!("Should not be called on plain text")
     }
 
     #[inline(always)]

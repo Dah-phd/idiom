@@ -11,10 +11,7 @@ use crate::{
 pub use code::CodeEditor;
 pub use plain::TextEditor;
 
-type DocLen = usize;
-type SelectLen = usize;
-pub type DocStats<'a> = (DocLen, SelectLen, CursorPosition);
-
+#[allow(dead_code)]
 pub enum Editor {
     Code(CodeEditor),
     Text(TextEditor),
@@ -59,14 +56,7 @@ impl Editor {
     pub fn resize(&mut self, width: usize, height: usize) {
         match self {
             Self::Code(editor) => editor.resize(width, height),
-            Self::Text(editor) => todo!(),
-        }
-    }
-
-    pub fn get_stats(&self) -> DocStats {
-        match self {
-            Self::Code(editor) => editor.get_stats(),
-            Self::Text(editor) => editor.get_stats(),
+            Self::Text(editor) => editor.resize(width, height),
         }
     }
 

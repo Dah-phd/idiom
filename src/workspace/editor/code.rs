@@ -8,7 +8,7 @@ use crate::{
     workspace::{
         actions::Actions,
         cursor::{Cursor, CursorPosition},
-        editor::{build_display, DocStats},
+        editor::build_display,
         line::{CodeLine, CodeLineContext, EditorLine},
         utils::{copy_content, find_line_start, last_modified, token_range_at},
     },
@@ -119,11 +119,6 @@ impl CodeEditor {
         };
         Lexer::context(self, gs);
         self.cursor.correct_cursor_position(&self.content);
-    }
-
-    #[inline(always)]
-    pub fn get_stats(&self) -> DocStats {
-        (self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into())
     }
 
     #[inline(always)]

@@ -13,7 +13,7 @@ use crate::{
 };
 use crossterm::event::KeyEvent;
 pub use cursor::CursorPosition;
-pub use editor::{CodeEditor, DocStats};
+pub use editor::CodeEditor;
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -101,11 +101,6 @@ impl Workspace {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.editors.is_empty()
-    }
-
-    #[inline]
-    pub fn get_stats(&self) -> Option<DocStats> {
-        self.editors.first().map(|editor| editor.get_stats())
     }
 
     pub fn tabs(&self) -> Vec<String> {
