@@ -50,7 +50,7 @@ pub fn basic(line: &CodeLine, ctx: &CodeLineContext, backend: &mut Backend) {
             match lined_up.take() {
                 Some(style) => {
                     backend.set_style(style);
-                    counter = last_len - 1;
+                    counter = last_len;
                 }
                 None => match iter_tokens.next() {
                     None => {
@@ -59,20 +59,20 @@ pub fn basic(line: &CodeLine, ctx: &CodeLineContext, backend: &mut Backend) {
                     }
                     Some(token) => {
                         if token.delta_start > last_len {
-                            counter = token.delta_start - (last_len + 1);
+                            counter = token.delta_start - last_len;
                             lined_up.replace(token.style);
                             backend.reset_style();
                         } else {
-                            counter = token.len - 1;
+                            counter = token.len;
                             backend.set_style(token.style);
                         }
                         last_len = token.len;
                     }
                 },
             }
-        } else {
-            counter -= 1;
         }
+        counter -= 1;
+
         if cursor_idx == idx {
             backend.print_styled(text, Style::reversed())
         } else {
@@ -119,7 +119,7 @@ pub fn select(line: &CodeLine, ctx: &CodeLineContext, select: Range<usize>, back
             match lined_up.take() {
                 Some(style) => {
                     backend.update_style(style);
-                    counter = last_len - 1;
+                    counter = last_len;
                 }
                 None => match iter_tokens.next() {
                     None => {
@@ -128,20 +128,20 @@ pub fn select(line: &CodeLine, ctx: &CodeLineContext, select: Range<usize>, back
                     }
                     Some(token) => {
                         if token.delta_start > last_len {
-                            counter = token.delta_start - (last_len + 1);
+                            counter = token.delta_start - last_len;
                             lined_up.replace(token.style);
                             backend.set_style(reset_style);
                         } else {
-                            counter = token.len - 1;
+                            counter = token.len;
                             backend.update_style(token.style);
                         }
                         last_len = token.len;
                     }
                 },
             }
-        } else {
-            counter -= 1;
         }
+        counter -= 1;
+
         if cursor_idx == idx {
             backend.print_styled(text, Style::reversed())
         } else {
@@ -188,7 +188,7 @@ pub fn partial(line: &mut CodeLine, ctx: &CodeLineContext, line_width: usize, ba
             match lined_up.take() {
                 Some(style) => {
                     backend.set_style(style);
-                    counter = last_len - 1;
+                    counter = last_len;
                 }
                 None => match tokens.next() {
                     None => {
@@ -197,20 +197,20 @@ pub fn partial(line: &mut CodeLine, ctx: &CodeLineContext, line_width: usize, ba
                     }
                     Some(token) => {
                         if token.delta_start > last_len {
-                            counter = token.delta_start - (last_len + 1);
+                            counter = token.delta_start - last_len;
                             lined_up.replace(token.style);
                             backend.reset_style();
                         } else {
-                            counter = token.len - 1;
+                            counter = token.len;
                             backend.set_style(token.style);
                         }
                         last_len = token.len;
                     }
                 },
             }
-        } else {
-            counter -= 1;
         }
+        counter -= 1;
+
         if cursor_idx == idx {
             backend.print_styled(text, Style::reversed())
         } else {
@@ -275,11 +275,12 @@ pub fn partial_select(
             reset_style.set_bg(None);
             backend.set_bg(None);
         }
+
         if counter == 0 {
             match lined_up.take() {
                 Some(style) => {
                     backend.update_style(style);
-                    counter = last_len - 1;
+                    counter = last_len;
                 }
                 None => match tokens.next() {
                     None => {
@@ -288,20 +289,20 @@ pub fn partial_select(
                     }
                     Some(token) => {
                         if token.delta_start > last_len {
-                            counter = token.delta_start - (last_len + 1);
+                            counter = token.delta_start - last_len;
                             lined_up.replace(token.style);
                             backend.set_style(reset_style);
                         } else {
-                            counter = token.len - 1;
+                            counter = token.len;
                             backend.update_style(token.style);
                         }
                         last_len = token.len;
                     }
                 },
             }
-        } else {
-            counter -= 1;
         }
+        counter -= 1;
+
         if cursor_idx == idx {
             backend.print_styled(text, Style::reversed());
         } else {

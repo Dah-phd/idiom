@@ -1,7 +1,7 @@
 use unicode_width::UnicodeWidthChar;
 
 use crate::{
-    render::backend::{color, BackendProtocol, Style},
+    render::backend::{Backend, BackendProtocol, Style},
     workspace::line::{CodeLine, CodeLineContext, EditorLine},
 };
 use std::ops::Range;
@@ -13,7 +13,7 @@ pub fn render(
     ctx: &mut CodeLineContext,
     line_width: usize,
     select: Option<Range<usize>>,
-    backend: &mut impl BackendProtocol,
+    backend: &mut Backend,
 ) {
     if let Some(remainder) = width_remainder(line, line_width) {
         match select {
@@ -31,15 +31,15 @@ pub fn render(
     }
 }
 
-pub fn basic(line: &CodeLine, ctx: &CodeLineContext, backend: &mut impl BackendProtocol) {
-    let mut iter_tokens = line.iter_tokens();
+pub fn basic(line: &CodeLine, ctx: &CodeLineContext, backend: &mut Backend) {
+    let mut tokens = line.iter_tokens();
     let mut counter = 0;
     let mut last_len = 0;
     let mut lined_up = None;
     let mut idx = 0;
     let char_position = ctx.lexer.char_lsp_pos;
     let cursor_idx = ctx.cursor_char();
-    if let Some(token) = iter_tokens.next() {
+    if let Some(token) = tokens.next() {
         if token.delta_start == 0 {
             counter = token.len;
             backend.set_style(token.style);
@@ -56,7 +56,7 @@ pub fn basic(line: &CodeLine, ctx: &CodeLineContext, backend: &mut impl BackendP
                     backend.set_style(style);
                     counter = last_len - 1;
                 }
-                None => match iter_tokens.next() {
+                None => match tokens.next() {
                     None => {
                         backend.reset_style();
                         counter = usize::MAX;
@@ -77,6 +77,7 @@ pub fn basic(line: &CodeLine, ctx: &CodeLineContext, backend: &mut impl BackendP
         } else {
             counter = counter.saturating_sub(char_position(text));
         }
+
         if cursor_idx == idx {
             backend.print_styled(text, Style::reversed())
         } else {
@@ -90,18 +91,17 @@ pub fn basic(line: &CodeLine, ctx: &CodeLineContext, backend: &mut impl BackendP
     backend.reset_style();
 }
 
-#[inline]
-pub fn select(line: &CodeLine, ctx: &CodeLineContext, select: Range<usize>, backend: &mut impl BackendProtocol) {
+pub fn select(line: &CodeLine, ctx: &CodeLineContext, select: Range<usize>, backend: &mut Backend) {
     let char_position = ctx.lexer.char_lsp_pos;
     let select_color = ctx.lexer.theme.selected;
     let mut reset_style = Style::default();
-    let mut iter_tokens = line.iter_tokens();
+    let mut tokens = line.iter_tokens();
     let mut counter = 0;
     let mut last_len = 0;
     let mut lined_up = None;
     let mut idx = 0;
     let cursor_idx = ctx.cursor_char();
-    if let Some(token) = iter_tokens.next() {
+    if let Some(token) = tokens.next() {
         if token.delta_start == 0 {
             backend.set_style(token.style);
             counter = token.len;
@@ -126,7 +126,7 @@ pub fn select(line: &CodeLine, ctx: &CodeLineContext, select: Range<usize>, back
                     backend.update_style(style);
                     counter = last_len - 1;
                 }
-                None => match iter_tokens.next() {
+                None => match tokens.next() {
                     None => {
                         backend.set_style(reset_style);
                         counter = usize::MAX;
@@ -147,11 +147,13 @@ pub fn select(line: &CodeLine, ctx: &CodeLineContext, select: Range<usize>, back
         } else {
             counter = counter.saturating_sub(char_position(text));
         }
+
         if cursor_idx == idx {
             backend.print_styled(text, Style::reversed())
         } else {
             backend.print(text);
         }
+
         idx += 1;
     }
     if idx <= cursor_idx {
@@ -160,68 +162,78 @@ pub fn select(line: &CodeLine, ctx: &CodeLineContext, select: Range<usize>, back
     backend.reset_style();
 }
 
-#[inline(always)]
-pub fn partial(
-    line: &mut CodeLine,
-    ctx: &mut CodeLineContext,
-    mut line_width: usize,
-    backend: &mut impl BackendProtocol,
-) {
+pub fn partial(line: &mut CodeLine, ctx: &mut CodeLineContext, mut line_width: usize, backend: &mut Backend) {
     line_width -= 2;
+
     let cursor_idx = ctx.cursor_char();
-    let lsp_encoding = ctx.lexer.char_lsp_pos;
+    let char_position = ctx.lexer.char_lsp_pos;
     let mut idx = line.cached.generate_skipped_chars_complex(cursor_idx, line_width, line.content.chars());
     let mut content = line.chars();
+
+    let mut cursor = 0;
     let mut counter_to_idx = idx;
-    let mut lsp_idx = 0;
     while counter_to_idx != 0 {
-        lsp_idx += content.next().map(lsp_encoding).unwrap_or_default();
+        cursor += content.next().map(char_position).unwrap_or_default();
         counter_to_idx -= 1;
     }
-    let expected_token_end = lsp_idx;
-    let mut tokens = line.iter_tokens().skip_while(|token| token.to < expected_token_end).peekable();
-    if let Some(token) = tokens.peek() {
-        if token.from < expected_token_end {
-            backend.set_style(token.style);
+
+    let mut tokens = line.iter_tokens();
+    let mut counter = 0;
+    let mut last_len = 0;
+    let mut lined_up = None;
+
+    for token in tokens.by_ref() {
+        if token.delta_start + token.len > cursor {
+            last_len = token.len;
+            if token.delta_start > cursor {
+                counter = token.delta_start - cursor;
+                lined_up.replace(token.style);
+            } else {
+                backend.set_style(token.style);
+                counter = (token.delta_start + last_len) - cursor;
+            }
+            break;
         }
-    };
-    let mut maybe_token = tokens.next();
+        cursor -= token.delta_start;
+    }
+
     if idx != 0 {
         backend.print_styled(WRAP_OPEN, Style::reversed());
         line_width -= 2;
     }
+
     for text in content {
-        if let Some(token) = maybe_token {
-            if token.from == lsp_idx {
-                backend.set_style(token.style);
-            } else if token.to == lsp_idx {
-                if let Some(token) = tokens.next() {
-                    if token.from == lsp_idx {
-                        backend.set_style(token.style);
-                    } else {
-                        backend.reset_style();
-                    };
-                    maybe_token.replace(token);
-                } else {
-                    backend.reset_style();
-                    maybe_token = None;
-                };
-            };
-        }
-        // handle width
-        let char_width = match UnicodeWidthChar::width(text) {
-            Some(w) => w,
-            None => {
-                if idx == cursor_idx {
-                    backend.print_styled("?", Style::reversed());
-                } else {
-                    backend.print_styled("?", Style::fg(color::red()));
+        if counter == 0 {
+            match lined_up.take() {
+                Some(style) => {
+                    backend.set_style(style);
+                    counter = last_len - 1;
                 }
-                idx += 1;
-                lsp_idx += lsp_encoding(text);
-                continue;
+                None => match tokens.next() {
+                    None => {
+                        backend.reset_style();
+                        counter = usize::MAX;
+                    }
+                    Some(token) => {
+                        if token.delta_start > last_len {
+                            counter = token.delta_start - (last_len + 1);
+                            lined_up.replace(token.style);
+                            backend.reset_style();
+                        } else {
+                            counter = token.len - 1;
+                            backend.set_style(token.style);
+                        }
+                        last_len = token.len;
+                    }
+                },
             }
-        };
+        } else {
+            counter = counter.saturating_sub(char_position(text));
+        }
+
+        // handle width
+        let char_width = UnicodeWidthChar::width(text).unwrap_or(1);
+
         if char_width > line_width {
             break;
         } else {
@@ -235,7 +247,6 @@ pub fn partial(
         }
 
         idx += 1;
-        lsp_idx += lsp_encoding(text);
     }
     if idx <= cursor_idx {
         backend.print_styled(" ", Style::reversed());
@@ -250,75 +261,94 @@ pub fn partial_select(
     ctx: &mut CodeLineContext,
     select: Range<usize>,
     mut line_width: usize,
-    backend: &mut impl BackendProtocol,
+    backend: &mut Backend,
 ) {
     line_width -= 2;
+
     let cursor_idx = ctx.cursor_char();
-    let lsp_encoding = ctx.lexer.char_lsp_pos;
+    let char_position = ctx.lexer.char_lsp_pos;
     let mut idx = line.cached.generate_skipped_chars_complex(cursor_idx, line_width, line.content.chars());
     let mut content = line.chars();
+
+    let mut cursor = 0;
     let mut counter_to_idx = idx;
-    let mut lsp_idx = 0;
     while counter_to_idx != 0 {
-        lsp_idx += content.next().map(lsp_encoding).unwrap_or_default();
+        cursor += content.next().map(char_position).unwrap_or_default();
         counter_to_idx -= 1;
     }
 
-    let expected_token_end = lsp_idx;
     let select_color = ctx.lexer.theme.selected;
     let mut reset_style = Style::default();
-    let mut tokens = line.iter_tokens().skip_while(|token| token.to < expected_token_end).peekable();
-    if let Some(token) = tokens.peek() {
-        if token.from < expected_token_end {
-            backend.update_style(token.style);
+    if select.start <= idx && idx < select.end {
+        reset_style.set_bg(Some(select_color));
+        backend.set_bg(Some(select_color));
+    }
+
+    let mut tokens = line.iter_tokens();
+    let mut counter = 0;
+    let mut last_len = 0;
+    let mut lined_up = None;
+
+    for token in tokens.by_ref() {
+        if token.delta_start + token.len > cursor {
+            last_len = token.len;
+            if token.delta_start > cursor {
+                counter = token.delta_start - cursor;
+                lined_up.replace(token.style);
+            } else {
+                backend.update_style(token.style);
+                counter = (token.delta_start + last_len) - cursor;
+            }
+            break;
         }
-    };
-    let mut maybe_token = tokens.next();
+        cursor -= token.delta_start;
+    }
+
     if idx != 0 {
         backend.print_styled(WRAP_OPEN, Style::reversed());
         line_width -= 2;
     };
+
     for text in content {
         if select.start == idx {
-            reset_style.set_bg(Some(select_color));
             backend.set_bg(Some(select_color));
+            reset_style.set_bg(Some(select_color));
         }
         if select.end == idx {
-            reset_style.set_bg(None);
             backend.set_bg(None);
+            reset_style.set_bg(None);
         }
-        if let Some(token) = maybe_token {
-            if token.from == lsp_idx {
-                backend.update_style(token.style);
-            } else if token.to == lsp_idx {
-                if let Some(token) = tokens.next() {
-                    if token.from == lsp_idx {
-                        backend.update_style(token.style);
-                    } else {
+        if counter == 0 {
+            match lined_up.take() {
+                Some(style) => {
+                    backend.update_style(style);
+                    counter = last_len.saturating_sub(char_position(text));
+                }
+                None => match tokens.next() {
+                    None => {
                         backend.set_style(reset_style);
-                    };
-                    maybe_token.replace(token);
-                } else {
-                    backend.set_style(reset_style);
-                    maybe_token = None;
-                };
-            };
+                        counter = usize::MAX;
+                    }
+                    Some(token) => {
+                        if token.delta_start > last_len {
+                            counter = token.delta_start.saturating_sub(last_len + char_position(text));
+                            lined_up.replace(token.style);
+                            backend.set_style(reset_style);
+                        } else {
+                            counter = token.len.saturating_sub(char_position(text));
+                            backend.update_style(token.style);
+                        }
+                        last_len = token.len;
+                    }
+                },
+            }
+        } else {
+            counter = counter.saturating_sub(char_position(text));
         }
 
         // handle width
-        let char_width = match UnicodeWidthChar::width(text) {
-            Some(w) => w,
-            None => {
-                if idx == cursor_idx {
-                    backend.print_styled("?", Style::reversed());
-                } else {
-                    backend.print_styled("?", Style::fg(color::red()));
-                }
-                idx += 1;
-                lsp_idx += lsp_encoding(text);
-                continue;
-            }
-        };
+        let char_width = UnicodeWidthChar::width(text).unwrap_or(1);
+
         if char_width > line_width {
             break;
         } else {
@@ -331,7 +361,6 @@ pub fn partial_select(
             backend.print(text);
         }
         idx += 1;
-        lsp_idx += lsp_encoding(text);
     }
     if idx <= cursor_idx {
         backend.print_styled(" ", Style::reversed());

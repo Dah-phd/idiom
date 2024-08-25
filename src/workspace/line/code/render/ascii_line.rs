@@ -81,7 +81,7 @@ pub fn ascii_line_with_select(
             match lined_up.take() {
                 Some(style) => {
                     backend.update_style(style);
-                    counter = last_len - 1;
+                    counter = last_len;
                 }
                 None => match iter_tokens.next() {
                     None => {
@@ -90,20 +90,20 @@ pub fn ascii_line_with_select(
                     }
                     Some(token) => {
                         if token.delta_start > last_len {
-                            counter = token.delta_start - (last_len + 1);
+                            counter = token.delta_start - last_len;
                             lined_up.replace(token.style);
                             backend.set_style(reset_style);
                         } else {
-                            counter = token.len - 1;
+                            counter = token.len;
                             backend.update_style(token.style);
                         }
                         last_len = token.len;
                     }
                 },
             }
-        } else {
-            counter -= 1;
         }
+        counter -= 1;
+
         backend.print(text);
     }
     backend.reset_style();
