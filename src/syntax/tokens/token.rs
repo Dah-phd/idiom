@@ -139,7 +139,7 @@ impl Token {
     //     Self { len, delta_start, style: Style::fg(color) }
     // }
 
-    pub fn enrich(mut char_idx: usize, lang: &Lang, theme: &Theme, snippet: &str, buf: &mut TokenLine) {
+    pub fn enrich(mut delta_start: usize, lang: &Lang, theme: &Theme, snippet: &str, buf: &mut TokenLine) {
         let mut last_word = String::new();
         for ch in snippet.chars() {
             if ch.is_alphabetic() || "_\"'\\".contains(ch) {
@@ -147,15 +147,21 @@ impl Token {
                 continue;
             };
             if last_word.is_empty() {
-                char_idx += 1;
+                delta_start += 1;
                 continue;
             };
             let token_base = std::mem::take(&mut last_word);
             let len = token_base.len();
             if lang.is_keyword(token_base.as_str()) {
-                buf.push(Token { len, delta_start: 0, style: Style::fg(theme.key_words) });
+                buf.push(Token { len, delta_start, style: Style::fg(theme.key_words) });
+                delta_start = len;
+            } else if lang.is_string(token_base.as_str()) {
+                buf.push(Token { len, delta_start, style: Style::fg(theme.string) });
+                delta_start = len;
+            } else {
+                buf.push(Token { len, delta_start, style: Style::fg(theme.default) });
+                delta_start = len;
             };
-            char_idx += len;
         }
     }
 
