@@ -5,7 +5,6 @@ use crate::{
     syntax::{tokens::TokenLine, Lexer},
 };
 
-#[inline]
 pub fn complex_line(
     content: impl Iterator<Item = char>,
     tokens: &TokenLine,
@@ -13,33 +12,53 @@ pub fn complex_line(
     backend: &mut impl BackendProtocol,
 ) {
     let mut iter_tokens = tokens.iter();
-    let mut maybe_token = iter_tokens.next();
-    let mut idx = 0;
+    let mut counter = 0;
+    let mut last_len = 0;
+    let mut lined_up = None;
+    let char_position = lexer.char_lsp_pos;
+    if let Some(token) = iter_tokens.next() {
+        if token.delta_start == 0 {
+            counter = token.len;
+            backend.set_style(token.style);
+        } else {
+            lined_up.replace(token.style);
+            counter = token.delta_start;
+        }
+        last_len = token.len;
+    };
     for text in content {
-        if let Some(token) = maybe_token {
-            if token.from == idx {
-                backend.update_style(token.style);
-            } else if token.to == idx {
-                if let Some(token) = iter_tokens.next() {
-                    if token.from == idx {
-                        backend.update_style(token.style);
-                    } else {
+        if counter == 0 {
+            match lined_up.take() {
+                Some(style) => {
+                    backend.set_style(style);
+                    counter = last_len - 1;
+                }
+                None => match iter_tokens.next() {
+                    None => {
                         backend.reset_style();
-                    };
-                    maybe_token.replace(token);
-                } else {
-                    backend.reset_style();
-                    maybe_token = None;
-                };
-            };
+                        counter = usize::MAX;
+                    }
+                    Some(token) => {
+                        if token.delta_start > last_len {
+                            counter = token.delta_start - (last_len + 1);
+                            lined_up.replace(token.style);
+                            backend.reset_style();
+                        } else {
+                            counter = token.len - 1;
+                            backend.set_style(token.style);
+                        }
+                        last_len = token.len;
+                    }
+                },
+            }
+        } else {
+            counter = counter.saturating_sub(char_position(text));
         }
         backend.print(text);
-        idx += lexer.char_lsp_pos(text);
     }
     backend.reset_style();
 }
 
-#[inline]
 pub fn complex_line_with_select(
     content: impl Iterator<Item = char>,
     tokens: &TokenLine,
@@ -47,39 +66,59 @@ pub fn complex_line_with_select(
     lexer: &Lexer,
     backend: &mut impl BackendProtocol,
 ) {
-    let mut iter_tokens = tokens.iter();
-    let mut maybe_token = iter_tokens.next();
-    let mut reset_style = Style::default();
     let select_color = lexer.theme.selected;
-    let mut lsp_idx = 0;
-    for (char_idx, text) in content.enumerate() {
-        if select.start == char_idx {
+    let mut reset_style = Style::default();
+    let mut iter_tokens = tokens.iter();
+    let mut counter = 0;
+    let mut last_len = 0;
+    let mut lined_up = None;
+    if let Some(token) = iter_tokens.next() {
+        if token.delta_start == 0 {
+            counter = token.len;
+            backend.set_style(token.style);
+        } else {
+            lined_up.replace(token.style);
+            counter = token.delta_start;
+        }
+        last_len = token.len;
+    };
+    for (idx, text) in content.enumerate() {
+        if select.start == idx {
             backend.set_bg(Some(select_color));
             reset_style.set_bg(Some(select_color));
         }
-        if select.end == char_idx {
+        if select.end == idx {
             backend.set_bg(None);
             reset_style.set_bg(None);
         }
-        if let Some(token) = maybe_token {
-            if token.from == lsp_idx {
-                backend.update_style(token.style);
-            } else if token.to == lsp_idx {
-                if let Some(token) = iter_tokens.next() {
-                    if token.from == lsp_idx {
-                        backend.update_style(token.style);
-                    } else {
+        if counter == 0 {
+            match lined_up.take() {
+                Some(style) => {
+                    backend.update_style(style);
+                    counter = last_len - 1;
+                }
+                None => match iter_tokens.next() {
+                    None => {
+                        counter = usize::MAX;
                         backend.set_style(reset_style);
-                    };
-                    maybe_token.replace(token);
-                } else {
-                    backend.set_style(reset_style);
-                    maybe_token = None;
-                };
-            };
+                    }
+                    Some(token) => {
+                        if token.delta_start > last_len {
+                            counter = token.delta_start - (last_len + 1);
+                            lined_up.replace(token.style);
+                            backend.set_style(reset_style);
+                        } else {
+                            counter = token.len - 1;
+                            backend.update_style(token.style);
+                        }
+                        last_len = token.len;
+                    }
+                },
+            }
+        } else {
+            counter -= 1;
         }
         backend.print(text);
-        lsp_idx += lexer.char_lsp_pos(text);
     }
     backend.reset_style();
 }

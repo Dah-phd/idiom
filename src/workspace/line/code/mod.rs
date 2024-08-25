@@ -456,13 +456,13 @@ impl CodeLine {
         }
         if self.is_simple() {
             if line_width > self.char_len() {
-                let content = self.content.char_indices();
+                let content = self.content.chars();
                 ascii_line::ascii_line_with_select(content, &self.tokens, select, ctx.lexer, backend);
                 if let Some(diagnostic) = self.diagnostics.as_ref() {
                     diagnostic.inline_render(line_width - self.char_len, backend)
                 }
             } else {
-                let content = self.content.char_indices().take(line_width.saturating_sub(2));
+                let content = self.content.chars().take(line_width.saturating_sub(2));
                 ascii_line::ascii_line_with_select(content, &self.tokens, select, ctx.lexer, backend);
                 backend.print_styled(">>", Style::reversed());
             }

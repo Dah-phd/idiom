@@ -6,7 +6,6 @@ use crate::{
     BackendProtocol,
 };
 
-#[inline]
 pub fn ascii_line(content: &str, tokens: &TokenLine, backend: &mut impl BackendProtocol) {
     let mut cursor = 0;
     let mut last_len = 0;
@@ -46,9 +45,8 @@ pub fn ascii_line(content: &str, tokens: &TokenLine, backend: &mut impl BackendP
     }
 }
 
-#[inline]
 pub fn ascii_line_with_select(
-    content: impl Iterator<Item = (usize, char)>,
+    content: impl Iterator<Item = char>,
     tokens: &TokenLine,
     select: Range<usize>,
     lexer: &Lexer,
@@ -70,7 +68,7 @@ pub fn ascii_line_with_select(
         }
         last_len = token.len;
     };
-    for (idx, text) in content {
+    for (idx, text) in content.enumerate() {
         if select.start == idx {
             backend.set_bg(Some(select_color));
             reset_style.set_bg(Some(select_color));
