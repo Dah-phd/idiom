@@ -2,13 +2,13 @@ use std::ops::Range;
 
 use crate::{
     render::backend::{BackendProtocol, Style},
-    syntax::{Lexer, Token},
+    syntax::{tokens::TokenLine, Lexer},
 };
 
 #[inline]
 pub fn complex_line(
     content: impl Iterator<Item = char>,
-    tokens: &[Token],
+    tokens: &TokenLine,
     lexer: &Lexer,
     backend: &mut impl BackendProtocol,
 ) {
@@ -42,7 +42,7 @@ pub fn complex_line(
 #[inline]
 pub fn complex_line_with_select(
     content: impl Iterator<Item = char>,
-    tokens: &[Token],
+    tokens: &TokenLine,
     select: Range<usize>,
     lexer: &Lexer,
     backend: &mut impl BackendProtocol,

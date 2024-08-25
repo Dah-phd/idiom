@@ -4,7 +4,7 @@ pub mod legend;
 mod lsp_calls;
 pub mod modal;
 pub mod theme;
-pub mod token;
+pub mod tokens;
 use crate::{
     configs::FileType,
     global_state::{GlobalState, WorkspaceEvent},
@@ -31,7 +31,7 @@ use std::{
     time::Instant,
 };
 use theme::Theme;
-pub use token::{Token, TokensType};
+pub use tokens::{Token, TokensType};
 
 pub struct Lexer {
     pub lang: Lang,

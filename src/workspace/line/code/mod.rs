@@ -10,7 +10,7 @@ use crate::{
         utils::UTF8SafeStringExt,
         UTF8Safe,
     },
-    syntax::{DiagnosticLine, Lang, Lexer, Token},
+    syntax::{tokens::TokenLine, DiagnosticLine, Lang, Lexer, Token},
     workspace::line::EditorLine,
 };
 pub use context::CodeLineContext;
@@ -27,7 +27,7 @@ pub struct CodeLine {
     // keeps trach of utf8 char len
     char_len: usize,
     // syntax
-    tokens: Vec<Token>,
+    tokens: TokenLine,
     diagnostics: Option<DiagnosticLine>,
     // used for caching - 0 is reseved for file tabs and can be used to reset line
     pub cached: RenderStatus,
@@ -136,7 +136,9 @@ impl EditorLine for CodeLine {
     #[inline]
     fn insert(&mut self, idx: usize, ch: char) {
         self.cached.reset();
+        self.tokens.increment_at(idx);
         if self.char_len == self.content.len() {
+            // base update on delta start
             self.char_len += 1;
             self.content.insert(idx, ch);
         } else {
@@ -148,6 +150,9 @@ impl EditorLine for CodeLine {
     #[inline]
     fn push(&mut self, ch: char) {
         self.cached.reset();
+        if self.char_len == self.tokens.char_len() {
+            self.tokens.increment_end();
+        }
         self.char_len += 1;
         self.content.push(ch);
     }
@@ -191,6 +196,7 @@ impl EditorLine for CodeLine {
     #[inline]
     fn remove(&mut self, idx: usize) -> char {
         self.cached.reset();
+        self.tokens.decrement_at(idx);
         if self.content.len() == self.char_len {
             self.char_len -= 1;
             return self.content.remove(idx);
@@ -333,14 +339,12 @@ impl CodeLine {
     }
 
     #[inline]
-    pub fn replace_tokens(&mut self, tokens: Vec<Token>) {
+    pub fn replace_tokens(&mut self, tokens: TokenLine) {
         self.cached.reset();
         self.tokens = tokens;
         if let Some(diagnostics) = self.diagnostics.as_ref() {
             for diagnostic in diagnostics.data.iter() {
-                for token in self.tokens.iter_mut() {
-                    diagnostic.check_and_update(token);
-                }
+                self.tokens.mark_diagnostics(diagnostic);
             }
         };
     }
@@ -348,17 +352,14 @@ impl CodeLine {
     #[inline]
     pub fn rebuild_tokens(&mut self, lexer: &Lexer) {
         self.cached.reset();
-        self.tokens.clear();
-        Token::parse_to_buf(&lexer.lang, &lexer.theme, &self.content, &mut self.tokens);
+        self.tokens.internal_rebase(&self.content, &lexer.lang, &lexer.theme)
     }
 
     #[inline]
     pub fn set_diagnostics(&mut self, diagnostics: DiagnosticLine) {
         self.cached.reset();
         for diagnostic in diagnostics.data.iter() {
-            for token in self.tokens.iter_mut() {
-                diagnostic.check_and_update(token);
-            }
+            self.tokens.mark_diagnostics(diagnostic);
         }
         self.diagnostics.replace(diagnostics);
     }
@@ -376,9 +377,7 @@ impl CodeLine {
     #[inline]
     pub fn drop_diagnostics(&mut self) {
         if self.diagnostics.take().is_some() {
-            for token in self.tokens.iter_mut() {
-                token.drop_diagstic();
-            }
+            self.tokens.drop_diagnostics();
             self.cached.reset();
         };
     }
@@ -386,7 +385,7 @@ impl CodeLine {
     #[inline]
     pub fn cursor(&mut self, ctx: &mut CodeLineContext<'_>, lines: &mut RectIter, backend: &mut Backend) {
         if self.tokens.is_empty() {
-            Token::parse_to_buf(&ctx.lexer.lang, &ctx.lexer.theme, &self.content, &mut self.tokens);
+            self.tokens.internal_rebase(&self.content, &ctx.lexer.lang, &ctx.lexer.theme);
         };
         render::cursor(self, ctx, lines, backend);
     }
@@ -394,7 +393,7 @@ impl CodeLine {
     #[inline]
     pub fn cursor_fast(&mut self, ctx: &mut CodeLineContext<'_>, lines: &mut RectIter, backend: &mut Backend) {
         if self.tokens.is_empty() {
-            Token::parse_to_buf(&ctx.lexer.lang, &ctx.lexer.theme, &self.content, &mut self.tokens);
+            self.tokens.internal_rebase(&self.content, &ctx.lexer.lang, &ctx.lexer.theme);
             if !self.tokens.is_empty() {
                 self.cached.reset();
             }
@@ -417,7 +416,7 @@ impl CodeLine {
         backend: &mut Backend,
     ) {
         if self.tokens.is_empty() {
-            Token::parse_to_buf(&ctx.lexer.lang, &ctx.lexer.theme, &self.content, &mut self.tokens);
+            self.tokens.internal_rebase(&self.content, &ctx.lexer.lang, &ctx.lexer.theme);
         };
         let cache_line = line.row;
         let line_width = ctx.setup_line(line, backend);

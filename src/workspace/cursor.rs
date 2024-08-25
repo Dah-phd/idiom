@@ -288,7 +288,7 @@ impl Cursor {
             self.at_line = self.line
         }
         if self.line + 1 >= self.max_rows + self.at_line {
-            self.at_line = self.line - self.max_rows + 1;
+            self.at_line = self.line + 1 - self.max_rows;
             if content[self.line].char_len() > self.text_width {
                 self.at_line += 1;
             }

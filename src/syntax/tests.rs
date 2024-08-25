@@ -7,7 +7,7 @@ use crate::{configs::FileType, global_state::GlobalState, workspace::line::CodeL
 use super::{
     lsp_calls::{char_lsp_utf16, char_lsp_utf8, encode_pos_utf16, encode_pos_utf8},
     theme::Theme,
-    token::set_tokens,
+    tokens::set_tokens,
     Lang, Legend, Lexer,
 };
 

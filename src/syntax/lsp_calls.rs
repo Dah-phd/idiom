@@ -22,7 +22,7 @@ use std::{
 use super::{
     modal::LSPModal,
     set_diganostics,
-    token::{set_tokens, set_tokens_partial},
+    tokens::{set_tokens, set_tokens_partial},
     TokensType,
 };
 

@@ -2,12 +2,12 @@ use std::ops::Range;
 
 use crate::{
     render::backend::Style,
-    syntax::{Lexer, Token},
+    syntax::{tokens::TokenLine, Lexer},
     BackendProtocol,
 };
 
 #[inline]
-pub fn ascii_line(content: &str, tokens: &[Token], backend: &mut impl BackendProtocol) {
+pub fn ascii_line(content: &str, tokens: &TokenLine, backend: &mut impl BackendProtocol) {
     let mut cursor = 0;
     let mut last_len = 0;
     for token in tokens.iter() {
@@ -49,7 +49,7 @@ pub fn ascii_line(content: &str, tokens: &[Token], backend: &mut impl BackendPro
 #[inline]
 pub fn ascii_line_with_select(
     content: impl Iterator<Item = (usize, char)>,
-    tokens: &[Token],
+    tokens: &TokenLine,
     select: Range<usize>,
     lexer: &Lexer,
     backend: &mut impl BackendProtocol,
