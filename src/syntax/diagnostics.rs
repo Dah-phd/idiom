@@ -1,7 +1,7 @@
 use crate::global_state::WorkspaceEvent;
 use crate::render::backend::{color, BackendProtocol, Color, Style};
 use crate::render::UTF8Safe;
-use crate::syntax::{Lang, Token};
+use crate::syntax::Lang;
 use crate::workspace::line::CodeLine;
 use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
 
@@ -74,19 +74,6 @@ impl DiagnosticData {
     #[inline]
     pub fn text_style(&self) -> Style {
         Style::fg(self.color)
-    }
-
-    #[inline]
-    pub fn check_and_update(&self, token: &mut Token) {
-        match self.end {
-            Some(end) if self.start <= token.from && token.to <= end => {
-                token.style.undercurle(Some(self.color));
-            }
-            None if self.start <= token.from => {
-                token.style.undercurle(Some(self.color));
-            }
-            _ => {}
-        }
     }
 }
 

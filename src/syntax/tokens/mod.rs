@@ -30,7 +30,6 @@ pub fn set_tokens(tokens: Vec<SemanticToken>, legend: &Legend, lang: &Lang, them
             line_idx += token.delta_line as usize;
         };
         let from = char_idx + token.delta_start as usize;
-        let to = from + token.length as usize;
         // enriches the tokens with additinal highlights
         if from.saturating_sub(char_idx + len) > 3 {
             content[line_idx].get(char_idx + len, from).inspect(|snippet| {
@@ -38,8 +37,8 @@ pub fn set_tokens(tokens: Vec<SemanticToken>, legend: &Legend, lang: &Lang, them
             });
         };
         len = token.length as usize;
-        let token_type = legend.parse_to_color(token.token_type as usize, token.token_modifiers_bitset, theme);
-        token_line.push(Token { from, to, len, delta_start: token.delta_start as usize, style: Style::fg(token_type) });
+        let color = legend.parse_to_color(token.token_type as usize, token.token_modifiers_bitset, theme);
+        token_line.push(Token { len, delta_start: token.delta_start as usize, style: Style::fg(color) });
         char_idx = from;
     }
     if !token_line.is_empty() {
@@ -70,7 +69,6 @@ pub fn set_tokens_partial(
             }
         };
         let from = char_idx + token.delta_start as usize;
-        let to = from + token.length as usize;
         // enriches the tokens with additinal highlights
         if from.saturating_sub(char_idx + len) > 3 {
             content[line_idx].get(char_idx + len, from).inspect(|snippet| {
@@ -78,8 +76,8 @@ pub fn set_tokens_partial(
             });
         };
         len = token.length as usize;
-        let token_type = legend.parse_to_color(token.token_type as usize, token.token_modifiers_bitset, theme);
-        token_line.push(Token { from, to, len, delta_start: token.delta_start as usize, style: Style::fg(token_type) });
+        let color = legend.parse_to_color(token.token_type as usize, token.token_modifiers_bitset, theme);
+        token_line.push(Token { len, delta_start: token.delta_start as usize, style: Style::fg(color) });
         char_idx = from;
     }
     if !token_line.is_empty() {

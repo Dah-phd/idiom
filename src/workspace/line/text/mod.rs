@@ -9,7 +9,7 @@ use unicode_width::UnicodeWidthChar;
 use crate::{
     render::{
         backend::Backend,
-        layout::{Line, RectIter},
+        layout::RectIter,
         utils::{UTF8SafeStringExt, WriteChunks},
         UTF8Safe,
     },
