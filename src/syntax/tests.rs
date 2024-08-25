@@ -8,7 +8,7 @@ use super::{
     lsp_calls::{char_lsp_utf16, char_lsp_utf8, encode_pos_utf16, encode_pos_utf8},
     theme::Theme,
     tokens::set_tokens,
-    Lang, Legend, Lexer,
+    Legend, Lexer,
 };
 
 fn get_text() -> Vec<String> {
@@ -441,11 +441,9 @@ pub fn create_token_pairs_utf32() -> (Vec<SemanticToken>, Vec<String>) {
 
 pub fn zip_text_tokens(text: Vec<String>, tokens: Vec<SemanticToken>) -> Vec<CodeLine> {
     let mut content = text.into_iter().map(CodeLine::new).collect::<Vec<_>>();
-    let file_type = FileType::Rust;
-    let lang = Lang::from(file_type);
     let legend = Legend::default();
     let theme = Theme::default();
-    set_tokens(tokens, &legend, &lang, &theme, &mut content);
+    set_tokens(tokens, &legend, &theme, &mut content);
     content
 }
 

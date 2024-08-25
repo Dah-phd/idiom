@@ -1,6 +1,8 @@
+use lsp_types::SemanticToken;
+
 use crate::{
     render::backend::Style,
-    syntax::{diagnostics::DiagnosticData, theme::Theme, Lang},
+    syntax::{diagnostics::DiagnosticData, theme::Theme, Lang, Legend},
 };
 
 #[derive(Default)]
@@ -135,9 +137,11 @@ pub struct Token {
 }
 
 impl Token {
-    // pub fn new(len: usize, delta_start: usize, color: Color) -> Self {
-    //     Self { len, delta_start, style: Style::fg(color) }
-    // }
+    pub fn parse(token: SemanticToken, legend: &Legend, theme: &Theme) -> Self {
+        let SemanticToken { delta_start, length, token_type, token_modifiers_bitset, .. } = token;
+        let style = Style::fg(legend.parse_to_color(token_type as usize, token_modifiers_bitset, theme));
+        Self { delta_start: delta_start as usize, len: length as usize, style }
+    }
 
     pub fn enrich(mut delta_start: usize, lang: &Lang, theme: &Theme, snippet: &str, buf: &mut TokenLine) {
         let mut last_word = String::new();

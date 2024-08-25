@@ -364,6 +364,12 @@ impl CodeLine {
         self.diagnostics.replace(diagnostics);
     }
 
+    #[inline(always)]
+    pub fn tokens_mut(&mut self) -> &mut TokenLine {
+        self.clear_cache();
+        &mut self.tokens
+    }
+
     #[inline]
     pub fn iter_tokens(&self) -> impl Iterator<Item = &Token> {
         self.tokens.iter()

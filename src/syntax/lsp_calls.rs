@@ -185,12 +185,12 @@ pub fn context(editor: &mut CodeEditor, gs: &mut GlobalState) {
                     LSPResponse::Tokens(tokens) => {
                         match tokens {
                             SemanticTokensResult::Partial(data) => {
-                                set_tokens(data.data, &lexer.legend, &lexer.lang, &lexer.theme, content);
+                                set_tokens(data.data, &lexer.legend, &lexer.theme, content);
                             }
                             SemanticTokensResult::Tokens(data) => {
                                 lexer.meta = None;
                                 if !data.data.is_empty() {
-                                    set_tokens(data.data, &lexer.legend, &lexer.lang, &lexer.theme, content);
+                                    set_tokens(data.data, &lexer.legend, &lexer.theme, content);
                                     lexer.token_producer = TokensType::LSP;
                                     gs.success("LSP tokens mapped!");
                                 } else if let Ok(id) = client.request_full_tokens(lexer.uri.clone()) {
@@ -204,7 +204,7 @@ pub fn context(editor: &mut CodeEditor, gs: &mut GlobalState) {
                             SemanticTokensRangeResult::Partial(data) => data.data,
                             SemanticTokensRangeResult::Tokens(data) => data.data,
                         };
-                        set_tokens_partial(tokens, max_lines, &lexer.legend, &lexer.lang, &lexer.theme, content);
+                        set_tokens_partial(tokens, max_lines, &lexer.legend, &lexer.theme, content);
                     }
                     LSPResponse::References(locations) => {
                         if let Some(mut locations) = locations {
