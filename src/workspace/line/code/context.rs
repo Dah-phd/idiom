@@ -40,6 +40,17 @@ impl<'a> CodeLineContext<'a> {
         remaining_width
     }
 
+    /// adds accent
+    #[inline]
+    pub fn setup_cursor(&mut self, line: Line, backend: &mut impl BackendProtocol) -> usize {
+        self.line_number += 1;
+        let text = format!("{: >1$} ", self.line_number, self.line_number_offset);
+        let remaining_width = line.width - text.len();
+        backend.print_at(line.row, line.col, text);
+        backend.clear_to_eol();
+        remaining_width
+    }
+
     #[inline]
     pub fn get_select(&self, width: usize) -> Option<Range<usize>> {
         build_select_buffer(self.select, self.line_number, width - (self.line_number_offset + 1))

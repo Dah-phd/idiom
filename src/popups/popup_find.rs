@@ -63,6 +63,7 @@ impl PopupInterface for GoToLinePopup {
 
     fn update_workspace(&mut self, workspace: &mut Workspace) {
         if let Some(editor) = workspace.get_active() {
+            self.updated = true;
             if let Ok(idx) = self.line_idx.parse::<usize>() {
                 editor.go_to(idx.saturating_sub(1));
             }

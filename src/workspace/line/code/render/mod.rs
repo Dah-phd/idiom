@@ -184,7 +184,7 @@ pub fn cursor(line: &mut CodeLine, ctx: &mut CodeLineContext, lines: &mut RectIt
         Some(rend_line) => {
             let line_row = rend_line.row;
             let select = ctx.get_select(rend_line.width);
-            let line_width = ctx.setup_line(rend_line, backend);
+            let line_width = ctx.setup_cursor(rend_line, backend);
             line.cached.cursor(line_row, ctx.cursor_char(), 0, select.clone());
             (line_width, select)
         }
@@ -207,7 +207,7 @@ pub fn cursor_fast(line: &mut CodeLine, ctx: &mut CodeLineContext, lines: &mut R
                 ctx.skip_line();
                 return;
             }
-            let line_width = ctx.setup_line(rend_line, backend);
+            let line_width = ctx.setup_cursor(rend_line, backend);
             (line_width, select)
         }
         None => return,

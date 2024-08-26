@@ -87,6 +87,18 @@ impl Legend {
                     }
                 }
             }
+            FileType::TypeScript => {
+                for token_type in legend.token_types.iter() {
+                    let token_type = token_type.as_str();
+                    if self.generic_mapping(token_type, theme) {
+                        continue;
+                    }
+                    match token_type {
+                        "member" => self.legend.push(ColorResult::Final(theme.functions)),
+                        _ => self.legend.push(ColorResult::Final(theme.default)),
+                    }
+                }
+            }
             _ => {
                 for token_type in legend.token_types.iter() {
                     let token_type = token_type.as_str();
