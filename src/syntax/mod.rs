@@ -121,6 +121,16 @@ impl Lexer {
     }
 
     #[inline]
+    pub fn modal_is_rendered(&self) -> bool {
+        self.modal_rect.is_some()
+    }
+
+    #[inline]
+    pub fn forece_modal_render_if_exists(&mut self, row: u16, col: u16, gs: &mut GlobalState) {
+        self.modal_rect = self.modal.as_mut().and_then(|modal| modal.render_at(col, row, gs));
+    }
+
+    #[inline]
     pub fn render_modal_if_exist(&mut self, row: u16, col: u16, gs: &mut GlobalState) {
         if self.modal_rect.is_none() {
             self.modal_rect = self.modal.as_mut().and_then(|modal| modal.render_at(col, row, gs));

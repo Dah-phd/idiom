@@ -6,7 +6,7 @@ pub mod complex_line;
 use super::{CodeLine, CodeLineContext, EditorLine};
 use crate::render::{
     backend::{Backend, BackendProtocol},
-    layout::{Line, RectIter},
+    layout::Line,
 };
 use std::{ops::Range, str::Chars};
 use unicode_width::UnicodeWidthChar;

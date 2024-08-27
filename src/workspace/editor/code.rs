@@ -70,7 +70,7 @@ impl CodeEditor {
             line.render_empty(&mut gs.writer);
         }
         gs.render_stats(self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into());
-        ctx.render_modal(gs);
+        ctx.forced_modal_render(gs);
     }
 
     /// renders only updated lines
@@ -93,8 +93,10 @@ impl CodeEditor {
                 break;
             };
         }
-        for line in lines {
-            line.render_empty(&mut gs.writer);
+        if !ctx.lexer.modal_is_rendered() {
+            for line in lines {
+                line.render_empty(&mut gs.writer);
+            }
         }
         gs.render_stats(self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into());
         ctx.render_modal(gs);

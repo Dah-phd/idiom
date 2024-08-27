@@ -6,7 +6,7 @@ use unicode_width::UnicodeWidthChar;
 use crate::{
     render::{
         backend::{Backend, BackendProtocol, Style},
-        layout::{Line, RectIter},
+        layout::Line,
         utils::UTF8SafeStringExt,
         UTF8Safe,
     },
