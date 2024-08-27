@@ -6,7 +6,7 @@ pub mod complex_line;
 use super::{CodeLine, CodeLineContext, EditorLine};
 use crate::render::{
     backend::{Backend, BackendProtocol},
-    layout::RectIter,
+    layout::{Line, RectIter},
 };
 use std::{ops::Range, str::Chars};
 use unicode_width::UnicodeWidthChar;
@@ -179,17 +179,11 @@ pub fn width_remainder(line: &CodeLine, line_width: usize) -> Option<usize> {
 }
 
 #[inline(always)]
-pub fn cursor(line: &mut CodeLine, ctx: &mut CodeLineContext, lines: &mut RectIter, backend: &mut Backend) {
-    let (line_width, select) = match lines.next() {
-        Some(rend_line) => {
-            let line_row = rend_line.row;
-            let select = ctx.get_select(rend_line.width);
-            let line_width = ctx.setup_cursor(rend_line, backend);
-            line.cached.cursor(line_row, ctx.cursor_char(), 0, select.clone());
-            (line_width, select)
-        }
-        None => return,
-    };
+pub fn cursor(line: &mut CodeLine, ctx: &mut CodeLineContext, rend_line: Line, backend: &mut Backend) {
+    let line_row = rend_line.row;
+    let select = ctx.get_select(rend_line.width);
+    let line_width = ctx.setup_cursor(rend_line, backend);
+    line.cached.cursor(line_row, ctx.cursor_char(), 0, select.clone());
     if line.is_simple() {
         ascii_cursor::render(line, ctx, line_width, select, backend);
     } else {
@@ -199,19 +193,13 @@ pub fn cursor(line: &mut CodeLine, ctx: &mut CodeLineContext, lines: &mut RectIt
 }
 
 #[inline(always)]
-pub fn cursor_fast(line: &mut CodeLine, ctx: &mut CodeLineContext, lines: &mut RectIter, backend: &mut Backend) {
-    let (line_width, select) = match lines.next() {
-        Some(rend_line) => {
-            let select = ctx.get_select(rend_line.width);
-            if !line.cached.should_render_cursor_or_update(rend_line.row, ctx.cursor_char(), select.clone()) {
-                ctx.skip_line();
-                return;
-            }
-            let line_width = ctx.setup_cursor(rend_line, backend);
-            (line_width, select)
-        }
-        None => return,
-    };
+pub fn cursor_fast(line: &mut CodeLine, ctx: &mut CodeLineContext, rend_line: Line, backend: &mut Backend) {
+    let select = ctx.get_select(rend_line.width);
+    if !line.cached.should_render_cursor_or_update(rend_line.row, ctx.cursor_char(), select.clone()) {
+        ctx.skip_line();
+        return;
+    }
+    let line_width = ctx.setup_cursor(rend_line, backend);
     if line.is_simple() {
         ascii_cursor::render(line, ctx, line_width, select, backend);
     } else {

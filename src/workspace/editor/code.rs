@@ -56,10 +56,12 @@ impl CodeEditor {
         let mut lines = gs.editor_area.into_iter();
         let mut ctx = CodeLineContext::collect_context(&mut self.lexer, &self.cursor, self.line_number_offset);
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
-            if self.cursor.line == line_idx {
-                text.cursor(&mut ctx, &mut lines, &mut gs.writer);
-            } else if let Some(line) = lines.next() {
-                text.render(&mut ctx, line, &mut gs.writer);
+            if let Some(line) = lines.next() {
+                if self.cursor.line == line_idx {
+                    text.cursor(&mut ctx, line, &mut gs.writer);
+                } else {
+                    text.render(&mut ctx, line, &mut gs.writer);
+                }
             } else {
                 break;
             };
@@ -68,7 +70,7 @@ impl CodeEditor {
             line.render_empty(&mut gs.writer);
         }
         gs.render_stats(self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into());
-        ctx.render_cursor(gs);
+        ctx.render_modal(gs);
     }
 
     /// renders only updated lines
@@ -81,10 +83,12 @@ impl CodeEditor {
         let mut lines = gs.editor_area.into_iter();
         let mut ctx = CodeLineContext::collect_context(&mut self.lexer, &self.cursor, self.line_number_offset);
         for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
-            if self.cursor.line == line_idx {
-                text.cursor_fast(&mut ctx, &mut lines, &mut gs.writer);
-            } else if let Some(line) = lines.next() {
-                text.fast_render(&mut ctx, line, &mut gs.writer);
+            if let Some(line) = lines.next() {
+                if self.cursor.line == line_idx {
+                    text.cursor_fast(&mut ctx, line, &mut gs.writer);
+                } else {
+                    text.fast_render(&mut ctx, line, &mut gs.writer);
+                }
             } else {
                 break;
             };
@@ -93,7 +97,7 @@ impl CodeEditor {
             line.render_empty(&mut gs.writer);
         }
         gs.render_stats(self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into());
-        ctx.render_cursor(gs);
+        ctx.render_modal(gs);
     }
 
     #[inline(always)]

@@ -389,22 +389,22 @@ impl CodeLine {
     }
 
     #[inline]
-    pub fn cursor(&mut self, ctx: &mut CodeLineContext<'_>, lines: &mut RectIter, backend: &mut Backend) {
+    pub fn cursor(&mut self, ctx: &mut CodeLineContext<'_>, line: Line, backend: &mut Backend) {
         if self.tokens.is_empty() {
             self.tokens.internal_rebase(&self.content, &ctx.lexer.lang, &ctx.lexer.theme);
         };
-        render::cursor(self, ctx, lines, backend);
+        render::cursor(self, ctx, line, backend);
     }
 
     #[inline]
-    pub fn cursor_fast(&mut self, ctx: &mut CodeLineContext<'_>, lines: &mut RectIter, backend: &mut Backend) {
+    pub fn cursor_fast(&mut self, ctx: &mut CodeLineContext<'_>, line: Line, backend: &mut Backend) {
         if self.tokens.is_empty() {
             self.tokens.internal_rebase(&self.content, &ctx.lexer.lang, &ctx.lexer.theme);
             if !self.tokens.is_empty() {
                 self.cached.reset();
             }
         };
-        render::cursor_fast(self, ctx, lines, backend);
+        render::cursor_fast(self, ctx, line, backend);
     }
 
     #[inline]

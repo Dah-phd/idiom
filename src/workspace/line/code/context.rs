@@ -61,7 +61,7 @@ impl<'a> CodeLineContext<'a> {
     }
 
     #[inline]
-    pub fn render_cursor(self, gs: &mut GlobalState) {
+    pub fn render_modal(self, gs: &mut GlobalState) {
         let row = gs.editor_area.row + self.line as u16;
         let col = gs.editor_area.col + (self.char + self.line_number_offset + 1) as u16;
         self.lexer.render_modal_if_exist(row, col, gs);
