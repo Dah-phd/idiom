@@ -239,7 +239,38 @@ impl From<FileType> for Lang {
                 string_markers: "\"'",
                 ..Default::default()
             },
-            FileType::MarkDown => Self {
+            FileType::JavaScript | FileType::TypeScript => Self {
+                file_type,
+                compl_trigger_chars: String::from(".("),
+                comment_start: vec!["//"],
+                declaration: vec!["class", "enum", "let", "const", "var", "function"],
+                key_words: vec![
+                    "new",
+                    "this",
+                    "void",
+                    "async",
+                    "super",
+                    "public",
+                    "delete",
+                    "typeof",
+                    "static",
+                    "private",
+                    "default",
+                    "extends",
+                    "interface",
+                    "protected",
+                    "instanceof",
+                    "implements",
+                ],
+                flow_control: vec![
+                    "if", "for", "in", "while", "break", "continue", "await", "return", "switch", "else", "case",
+                    "with", "try", "catch", "export", "throw", "debugger", "finally", "yield", "do",
+                ],
+                mod_import: vec!["require", "import"],
+                string_markers: "\"'`",
+                ..Default::default()
+            },
+            FileType::MarkDown | FileType::Unknown => Self {
                 file_type,
                 comment_start: vec![],
                 declaration: vec![],

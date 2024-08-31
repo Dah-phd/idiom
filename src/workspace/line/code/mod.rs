@@ -243,8 +243,10 @@ impl EditorLine for CodeLine {
         self.cached.reset();
         if self.content.len() == self.char_len {
             let content = self.content.split_off(at);
-            self.char_len = self.content.len();
-            self.tokens.clear();
+            if !content.is_empty() {
+                self.char_len = self.content.len();
+                self.tokens.clear();
+            }
             return Self {
                 char_len: content.len(),
                 content,
@@ -253,8 +255,10 @@ impl EditorLine for CodeLine {
             };
         }
         let content = self.content.utf8_split_off(at);
-        self.char_len = self.content.char_len();
-        self.tokens.clear();
+        if !content.is_empty() {
+            self.char_len = self.content.char_len();
+            self.tokens.clear();
+        }
         Self { char_len: content.char_len(), content, diagnostics: self.diagnostics.take(), ..Default::default() }
     }
 
