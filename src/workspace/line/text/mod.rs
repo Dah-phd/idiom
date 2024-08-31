@@ -1,7 +1,8 @@
-use crate::render::backend::BackendProtocol;
-use crate::render::backend::Style;
 mod context;
 mod render;
+mod types;
+use crate::render::backend::BackendProtocol;
+use crate::render::backend::Style;
 use context::Context;
 use render::RenderStatus;
 use unicode_width::UnicodeWidthChar;

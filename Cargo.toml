@@ -19,9 +19,9 @@ authors = ["Daniel Nikolaev <toolsproed@gmail.com>"]
 [dependencies]
 crossterm = "0.28.1"
 lsp-types = "0.97.0"
-serde = { version = "1.0.208", features = ["derive"] }
+serde = { version = "1.0.209", features = ["derive"] }
 serde_json = "1.0.125"
-tokio = { version="1.39.2", features=["rt", "macros", "rt-multi-thread", "process", "io-util"] }
+tokio = { version="1.40.0", features=["rt", "macros", "rt-multi-thread", "process", "io-util"] }
 tokio-util = { version="0.7.11", features = ["codec", "io"] }
 tokio-stream = "0.1.15"
 dirs = "5.0.1"

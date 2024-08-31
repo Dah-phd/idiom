@@ -281,10 +281,9 @@ impl Workspace {
 
     pub async fn new_from(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<bool> {
         let file_path = file_path.canonicalize()?;
-        if let Some(idx) =
-            self.editors.iter().enumerate().find(|(_, editor)| editor.path == file_path).map(|(idx, _)| idx)
-        {
-            let editor = self.editors.remove(idx);
+        if let Some(idx) = self.editors.iter().position(|e| e.path == file_path) {
+            let mut editor = self.editors.remove(idx);
+            editor.clear_screen_cache();
             self.editors.insert(0, editor);
             return Ok(false);
         }

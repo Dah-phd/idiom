@@ -234,7 +234,7 @@ pub fn context(editor: &mut CodeEditor, gs: &mut GlobalState) {
     }
     if let Some(meta) = lexer.meta.take() {
         let max_lines = (meta.start_line + meta.to) - 1;
-        if max_lines > content.len() {
+        if max_lines >= content.len() {
             return;
         }
         match (lexer.tokens_partial)(lexer, meta.into(), max_lines) {
