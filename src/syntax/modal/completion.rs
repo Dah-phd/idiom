@@ -1,11 +1,11 @@
 use super::ModalMessage;
 use crate::{
+    configs::EditorAction,
     global_state::GlobalState,
     render::{layout::Rect, state::State},
     syntax::Lang,
     workspace::CursorPosition,
 };
-use crossterm::event::{KeyCode, KeyEvent};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use lsp_types::CompletionItem;
 
@@ -33,9 +33,9 @@ impl AutoComplete {
         modal
     }
 
-    pub fn map(&mut self, key: &KeyEvent, lang: &Lang, gs: &mut GlobalState) -> ModalMessage {
-        match key.code {
-            KeyCode::Enter | KeyCode::Tab => {
+    pub fn map(&mut self, action: EditorAction, lang: &Lang, gs: &mut GlobalState) -> ModalMessage {
+        match action {
+            EditorAction::NewLine | EditorAction::Indent => {
                 let mut filtered_completion = self.completions.remove(self.filtered.remove(self.state.selected).2);
                 if let Some(data) = filtered_completion.data.take() {
                     lang.handle_completion_data(data, gs);
@@ -43,16 +43,16 @@ impl AutoComplete {
                 gs.workspace.push(filtered_completion.into());
                 ModalMessage::TakenDone
             }
-            KeyCode::Char(ch) => self.push_filter(ch),
-            KeyCode::Down => {
+            EditorAction::Char(ch) => self.push_filter(ch),
+            EditorAction::Down => {
                 self.state.next(self.filtered.len());
                 ModalMessage::Taken
             }
-            KeyCode::Up => {
+            EditorAction::Up => {
                 self.state.prev(self.filtered.len());
                 ModalMessage::Taken
             }
-            KeyCode::Backspace => self.filter_pop(),
+            EditorAction::Backspace => self.filter_pop(),
             _ => ModalMessage::Done,
         }
     }

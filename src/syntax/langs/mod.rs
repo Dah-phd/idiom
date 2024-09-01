@@ -197,6 +197,9 @@ impl Lang {
 impl From<FileType> for Lang {
     fn from(file_type: FileType) -> Self {
         match file_type {
+            FileType::Ignored => {
+                panic!("FileType::Ignored passed to Lang syntax handler!")
+            }
             FileType::Rust => Self {
                 file_type,
                 comment_start: vec!["//", "///"],

@@ -418,27 +418,22 @@ impl Workspace {
 
 /// handels keybindings for editor
 fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
-    let action = ws.key_map.map(key);
-    if let Some(editor) = ws.get_active() {
-        let (taken, render_update) = editor.lexer.map_modal_if_exists(key, gs);
-        if let Some(modal_rect) = render_update {
-            editor.updated_rect(modal_rect, gs);
-        }
-        if taken {
-            return true;
-        };
-        if let Some(action) = action {
-            if !editor.map(action, gs) {
-                match action {
-                    EditorAction::Close => ws.close_active(gs),
-                    EditorAction::Cancel if ws.editors.len() > 1 => ws.toggle_tabs(),
-                    _ => return false,
-                }
-            }
-            return true;
+    let editor = match ws.editors.get_mut_no_update(0) {
+        None => return false,
+        Some(editor) => editor,
+    };
+    let action = match ws.key_map.map(key) {
+        None => return false,
+        Some(action) => action,
+    };
+    if !editor.map(action, gs) {
+        match action {
+            EditorAction::Close => ws.close_active(gs),
+            EditorAction::Cancel if ws.editors.len() > 1 => ws.toggle_tabs(),
+            _ => return false,
         }
     }
-    false
+    true
 }
 
 /// Handles keybinding while on tabs

@@ -140,6 +140,13 @@ impl CodeEditor {
 
     #[inline]
     pub fn map(&mut self, action: EditorAction, gs: &mut GlobalState) -> bool {
+        let (taken, render_update) = self.lexer.map_modal_if_exists(action, gs);
+        if let Some(modal_rect) = render_update {
+            self.updated_rect(modal_rect, gs);
+        }
+        if taken {
+            return true;
+        };
         match action {
             EditorAction::Char(ch) => {
                 self.actions.push_char(ch, &mut self.cursor, &mut self.content, &mut self.lexer);

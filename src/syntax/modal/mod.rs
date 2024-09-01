@@ -1,3 +1,4 @@
+use crate::configs::EditorAction;
 use crate::render::{backend::BackendProtocol, layout::Rect};
 use crate::syntax::{DiagnosticInfo, Lang};
 mod completion;
@@ -6,7 +7,6 @@ mod rename;
 
 use crate::{global_state::GlobalState, workspace::CursorPosition};
 use completion::AutoComplete;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use info::Info;
 use lsp_types::{CompletionItem, Hover, SignatureHelp};
 use rename::RenameVariable;
@@ -40,19 +40,13 @@ impl<T> From<&[T]> for ModalMessage {
 }
 
 impl LSPModal {
-    pub fn map_and_finish(&mut self, key: &KeyEvent, lang: &Lang, gs: &mut GlobalState) -> ModalMessage {
-        match key {
-            KeyEvent { code: KeyCode::Esc, .. } => ModalMessage::TakenDone,
-            KeyEvent { code: KeyCode::Char('q' | 'Q'), modifiers: KeyModifiers::CONTROL, .. } => {
-                ModalMessage::TakenDone
-            }
-            KeyEvent { code: KeyCode::Char('d' | 'D'), modifiers: KeyModifiers::CONTROL, .. } => {
-                ModalMessage::TakenDone
-            }
+    pub fn map_and_finish(&mut self, action: EditorAction, lang: &Lang, gs: &mut GlobalState) -> ModalMessage {
+        match action {
+            EditorAction::Cancel | EditorAction::Close => ModalMessage::TakenDone,
             _ => match self {
-                Self::AutoComplete(modal) => modal.map(key, lang, gs),
-                Self::Info(modal) => modal.map(key, gs),
-                Self::RenameVar(modal) => modal.map(key, gs),
+                Self::AutoComplete(modal) => modal.map(action, lang, gs),
+                Self::Info(modal) => modal.map(action, gs),
+                Self::RenameVar(modal) => modal.map(action, gs),
             },
         }
     }

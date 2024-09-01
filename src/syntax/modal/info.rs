@@ -1,5 +1,6 @@
 use super::ModalMessage;
 use crate::{
+    configs::EditorAction,
     global_state::GlobalState,
     render::{
         backend::Style,
@@ -9,7 +10,6 @@ use crate::{
     },
     syntax::{theme::Theme, Action, DiagnosticInfo, Lang},
 };
-use crossterm::event::{KeyCode, KeyEvent};
 use lsp_types::{Documentation, Hover, HoverContents, MarkedString, SignatureHelp, SignatureInformation};
 use std::cmp::Ordering;
 
@@ -64,12 +64,12 @@ impl Info {
         }
     }
 
-    pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> ModalMessage {
+    pub fn map(&mut self, action: EditorAction, gs: &mut GlobalState) -> ModalMessage {
         if self.text.is_empty() && self.actions.is_none() {
             return ModalMessage::Done;
         }
-        match key.code {
-            KeyCode::Enter | KeyCode::Right => {
+        match action {
+            EditorAction::NewLine | EditorAction::Right => {
                 if !matches!(self.mode, Mode::Select) {
                     return ModalMessage::Done;
                 }
@@ -87,9 +87,9 @@ impl Info {
                 }
                 ModalMessage::Done
             }
-            KeyCode::Up => self.prev(),
-            KeyCode::Down => self.next(),
-            KeyCode::Left if !matches!(self.mode, Mode::Select) && self.actions.is_some() => {
+            EditorAction::Up => self.prev(),
+            EditorAction::Down => self.next(),
+            EditorAction::Left if !matches!(self.mode, Mode::Select) && self.actions.is_some() => {
                 self.mode = Mode::Select;
                 ModalMessage::Taken
             }

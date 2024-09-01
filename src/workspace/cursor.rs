@@ -138,13 +138,13 @@ impl Cursor {
         if content.is_empty() {
             return;
         }
-        if content.len() <= self.line + 1 {
-            return;
-        }
         let current_line_len = content[self.line].char_len();
         if current_line_len > self.char + self.text_width {
             self.char += self.text_width;
             return;
+        }
+        if content.len() <= self.line + 1 {
+            self.char = current_line_len;
         }
         self.line += 1;
         self.adjust_char(&content[self.line]);
