@@ -145,6 +145,7 @@ impl Cursor {
         }
         if content.len() <= self.line + 1 {
             self.char = current_line_len;
+            return;
         }
         self.line += 1;
         self.adjust_char(&content[self.line]);
