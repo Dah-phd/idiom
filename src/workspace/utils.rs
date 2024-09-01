@@ -2,7 +2,7 @@ use crate::{
     render::UTF8Safe,
     workspace::{cursor::CursorPosition, line::EditorLine},
 };
-use std::{ops::Range, path::PathBuf, time::SystemTime};
+use std::ops::Range;
 
 #[inline(always)]
 pub fn insert_clip(clip: &str, content: &mut Vec<impl EditorLine>, mut cursor: CursorPosition) -> CursorPosition {
@@ -159,12 +159,6 @@ pub fn token_range_at(line: &impl EditorLine, idx: usize) -> Range<usize> {
     } else {
         idx..idx
     }
-}
-
-#[inline(always)]
-pub fn last_modified(path: &PathBuf) -> Option<SystemTime> {
-    let meta = std::fs::metadata(path).ok()?;
-    meta.modified().ok()
 }
 
 #[inline(always)]

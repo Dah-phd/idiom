@@ -11,6 +11,36 @@ use crate::{
 pub use code::CodeEditor;
 pub use plain::TextEditor;
 
+pub enum FileUpdate {
+    None,
+    Updated,
+    Deny,
+}
+
+impl FileUpdate {
+    pub fn deny(&mut self) {
+        *self = Self::Deny
+    }
+
+    pub fn collect(&mut self) -> bool {
+        match self {
+            Self::Updated => {
+                *self = Self::None;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    pub fn mark_updated(&mut self) {
+        match self {
+            Self::None => *self = Self::Updated,
+            Self::Deny => *self = Self::None,
+            _ => (),
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub enum Editor {
     Code(CodeEditor),

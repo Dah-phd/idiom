@@ -84,7 +84,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                     };
                                 }
                                 GeneralAction::FileTreeModeOrCancelInput => gs.select_mode(),
-                                GeneralAction::SaveAll => workspace.save(&mut gs),
+                                GeneralAction::SaveAll => workspace.save_all(&mut gs),
                                 GeneralAction::HideFileTree => {
                                     gs.toggle_tree();
                                 }

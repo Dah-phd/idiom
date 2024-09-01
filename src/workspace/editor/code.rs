@@ -10,11 +10,13 @@ use crate::{
         cursor::{Cursor, CursorPosition},
         editor::build_display,
         line::{CodeLine, CodeLineContext, EditorLine},
-        utils::{copy_content, find_line_start, last_modified, token_range_at},
+        utils::{copy_content, find_line_start, token_range_at},
     },
 };
 use lsp_types::TextEdit;
-use std::{cmp::Ordering, path::PathBuf, time::SystemTime};
+use std::{cmp::Ordering, path::PathBuf};
+
+use super::FileUpdate;
 
 #[allow(dead_code)]
 pub struct CodeEditor {
@@ -25,7 +27,7 @@ pub struct CodeEditor {
     pub cursor: Cursor,
     pub actions: Actions,
     pub content: Vec<CodeLine>,
-    pub timestamp: Option<SystemTime>,
+    pub update_status: FileUpdate,
     pub line_number_offset: usize,
     pub last_render_at_line: Option<usize>,
 }
@@ -47,7 +49,7 @@ impl CodeEditor {
             actions: Actions::new(cfg.get_indent_cfg(&file_type)),
             file_type,
             display,
-            timestamp: last_modified(&path),
+            update_status: FileUpdate::None,
             path,
             last_render_at_line: None,
         })
@@ -423,8 +425,27 @@ impl CodeEditor {
         None
     }
 
+    pub fn rebase(&mut self, gs: &mut GlobalState) {
+        self.actions.clear();
+        self.cursor.reset();
+        self.lexer.close();
+        let content = match std::fs::read_to_string(&self.path) {
+            Ok(content) => content,
+            Err(err) => {
+                gs.error(format!("File rebase failed! ERR: {err}"));
+                return;
+            }
+        };
+        self.content = content.split('\n').map(|line| CodeLine::new(line.to_owned())).collect();
+        match self.lexer.reopen(content, self.file_type) {
+            Ok(()) => gs.success("File rebased!"),
+            Err(err) => gs.error(format!("Filed to reactivate LSP after rebase! ERR: {}", err)),
+        }
+    }
+
     pub fn save(&mut self, gs: &mut GlobalState) {
         if let Some(content) = self.try_write_file(gs) {
+            self.update_status.deny();
             self.lexer.save_and_check_lsp(content, gs);
             gs.success(format!("SAVED {}", self.path.display()));
         }

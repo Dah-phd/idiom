@@ -1,5 +1,6 @@
 use super::super::{
     cursor::{Cursor, CursorPosition},
+    editor::FileUpdate,
     CodeEditor,
 };
 use crate::global_state::GlobalState;
@@ -20,7 +21,7 @@ pub fn mock_editor(content: Vec<String>) -> CodeEditor {
         file_type: ft,
         display: "".to_string(),
         path,
-        timestamp: None,
+        update_status: FileUpdate::None,
         cursor: Cursor::default(),
         actions: Actions::default(),
         content,

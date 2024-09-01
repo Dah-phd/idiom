@@ -168,7 +168,9 @@ impl GlobalState {
 
     pub fn select_mode(&mut self) {
         self.mode = Mode::Select;
-        self.key_mapper = controls::map_tree;
+        if !self.components.contains(Components::POPUP) {
+            self.key_mapper = controls::map_tree;
+        }
         if !self.components.contains(Components::TREE) {
             self.draw_callback = draw::full_rebuild;
         };
@@ -179,7 +181,9 @@ impl GlobalState {
 
     pub fn insert_mode(&mut self) {
         self.mode = Mode::Insert;
-        self.key_mapper = controls::map_editor;
+        if !self.components.contains(Components::POPUP) {
+            self.key_mapper = controls::map_editor;
+        }
         if !self.components.contains(Components::TREE) {
             self.draw_callback = draw::full_rebuild;
         };
@@ -361,6 +365,16 @@ impl GlobalState {
         tree.finish_sync(self).await;
         for event in std::mem::take(&mut self.tree) {
             match event {
+                TreeEvent::TrackPath(path) => {
+                    if let Err(error) = tree.track_path(path) {
+                        self.error(error.to_string());
+                    }
+                }
+                TreeEvent::UntrackPath(path) => {
+                    if let Err(error) = tree.untrack_path(path) {
+                        self.error(error.to_string());
+                    }
+                }
                 TreeEvent::PopupAccess => {
                     self.popup.update_tree(tree);
                 }
@@ -503,6 +517,21 @@ impl GlobalState {
                     if let Some(editor) = workspace.get_active() {
                         editor.insert_snippet(snippet, cursor_offset);
                     };
+                }
+                WorkspaceEvent::FileUpdated(path) => {
+                    workspace.notify_update(path, self);
+                }
+                WorkspaceEvent::Rebase => {
+                    if let Some(editor) = workspace.get_active() {
+                        editor.rebase(self);
+                    }
+                    self.clear_popup();
+                }
+                WorkspaceEvent::Save => {
+                    if let Some(editor) = workspace.get_active() {
+                        editor.save(self);
+                    }
+                    self.clear_popup();
                 }
                 WorkspaceEvent::Resize => {
                     workspace.resize_all(self.editor_area.width, self.editor_area.height as usize);

@@ -263,6 +263,16 @@ impl Lexer {
         }
     }
 
+    pub fn reopen(&mut self, content: String, file_type: FileType) -> Result<(), LSPError> {
+        if !self.lsp {
+            return Ok(());
+        };
+        if let Ok(request) = (self.tokens)(self) {
+            self.requests.push(request);
+        }
+        self.client.file_did_open(self.uri.clone(), file_type, content)
+    }
+
     pub fn close(&mut self) {
         if !self.lsp {
             return;

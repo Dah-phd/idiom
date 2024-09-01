@@ -9,6 +9,10 @@ use crate::{
     utils::{build_file_or_folder, to_relative_path},
 };
 use crossterm::event::KeyEvent;
+use notify::{
+    event::{AccessKind, AccessMode},
+    Config, Error, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
+};
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -22,12 +26,14 @@ const TICK: Duration = Duration::from_millis(500);
 
 pub struct Tree {
     pub key_map: TreeKeyMap,
+    pub watcher: Option<RecommendedWatcher>,
+    pub lsp_register: Vec<Arc<Mutex<HashMap<PathBuf, Diagnostic>>>>,
     state: State,
     selected_path: PathBuf,
     tree: TreePath,
     sync_handler: JoinHandle<TreePath>,
     rebuild: bool,
-    pub lsp_register: Vec<Arc<Mutex<HashMap<PathBuf, Diagnostic>>>>,
+    receiver: std::sync::mpsc::Receiver<Result<Event, Error>>,
 }
 
 impl Tree {
@@ -39,7 +45,10 @@ impl Tree {
             sync_tree.sync_base();
             sync_tree
         });
+        let (tx, receiver) = std::sync::mpsc::channel();
         Self {
+            receiver,
+            watcher: RecommendedWatcher::new(tx, Config::default()).ok(),
             state: State::new(),
             key_map,
             selected_path: PathBuf::from("./"),
@@ -254,8 +263,37 @@ impl Tree {
         self.tree.get_mut_from_inner(self.state.selected)
     }
 
+    pub fn get_base_file_names(&self) -> Vec<String> {
+        self.tree.tree_file_names()
+    }
+
+    pub fn track_path(&mut self, path: PathBuf) -> IdiomResult<()> {
+        if let Some(watcher) = &mut self.watcher {
+            watcher
+                .watch(&path, RecursiveMode::NonRecursive)
+                .map_err(|_| IdiomError::GeneralError("File watcher error!".to_string()))
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn untrack_path(&mut self, path: PathBuf) -> IdiomResult<()> {
+        if let Some(watcher) = &mut self.watcher {
+            watcher.unwatch(&path).map_err(|_| IdiomError::GeneralError("File watcher error!".to_string()))
+        } else {
+            Ok(())
+        }
+    }
+
     pub async fn finish_sync(&mut self, gs: &mut GlobalState) {
         if self.sync_handler.is_finished() {
+            while let Ok(event) = self.receiver.try_recv() {
+                if let Ok(Event { kind: EventKind::Access(AccessKind::Close(AccessMode::Write)), paths, .. }) = event {
+                    for path in paths {
+                        gs.workspace.push(WorkspaceEvent::FileUpdated(path));
+                    }
+                }
+            }
             self.rebuild = true;
             let mut tree = self.tree.clone();
             let lsp_register = self.lsp_register.clone();
@@ -317,9 +355,5 @@ impl Tree {
         if let Some(selected) = self.get_selected() {
             self.selected_path = selected.path().clone();
         }
-    }
-
-    pub fn get_base_file_names(&self) -> Vec<String> {
-        self.tree.tree_file_names()
     }
 }

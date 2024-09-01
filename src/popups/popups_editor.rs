@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use super::{Popup, PopupSelector};
 use crate::global_state::WorkspaceEvent;
 use crate::render::Button;
@@ -43,5 +45,26 @@ pub fn selector_editors(options: Vec<String>) -> Box<PopupSelector<String>> {
         |editor| editor,
         |popup| WorkspaceEvent::ActivateEditor(popup.state.selected).into(),
         None,
+    ))
+}
+
+pub fn file_updated(path: PathBuf) -> Box<Popup> {
+    Box::new(Popup::new(
+        "File updated! (Use cancel/close to do nothing)".into(),
+        Some(path.display().to_string()),
+        None,
+        vec![
+            Button {
+                command: |_| WorkspaceEvent::Save.into(),
+                name: "Overwrite (S)",
+                key: Some(vec![KeyCode::Char('s'), KeyCode::Char('S')]),
+            },
+            Button {
+                command: |_| WorkspaceEvent::Rebase.into(),
+                name: "Rebase (L)",
+                key: Some(vec![KeyCode::Char('l'), KeyCode::Char('L')]),
+            },
+        ],
+        Some((4, 60)),
     ))
 }

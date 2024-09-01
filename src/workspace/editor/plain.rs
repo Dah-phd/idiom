@@ -9,7 +9,7 @@ use crate::{
         actions::internal::InternalActions,
         cursor::{Cursor, CursorPosition},
         line::{EditorLine, TextLine, TextType},
-        utils::{copy_content, find_line_start, last_modified, token_range_at},
+        utils::{copy_content, find_line_start, token_range_at},
     },
 };
 use lsp_types::TextEdit;
@@ -17,7 +17,6 @@ use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 use std::{
     cmp::Ordering,
     path::{Path, PathBuf},
-    time::SystemTime,
 };
 
 type DocLen = usize;
@@ -33,7 +32,6 @@ pub struct TextEditor {
     pub actions: InternalActions,
     pub content: Vec<TextLine>,
     theme: Theme,
-    timestamp: Option<SystemTime>,
     pub line_number_offset: usize,
     last_render_at_line: Option<usize>,
 }
@@ -55,7 +53,6 @@ impl TextEditor {
             actions: InternalActions::new(cfg.get_indent_cfg(&file_type)),
             display,
             theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
-            timestamp: last_modified(&path),
             path,
             last_render_at_line: None,
         })

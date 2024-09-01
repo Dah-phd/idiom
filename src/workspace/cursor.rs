@@ -377,6 +377,14 @@ impl Cursor {
             })
             .unwrap_or_default()
     }
+
+    pub fn reset(&mut self) {
+        self.line = 0;
+        self.char = 0;
+        self.phantm_char = 0;
+        self.at_line = 0;
+        self.select = None;
+    }
 }
 
 impl From<&mut Cursor> for CursorPosition {

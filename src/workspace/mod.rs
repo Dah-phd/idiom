@@ -8,6 +8,7 @@ use crate::{
     error::{IdiomError, IdiomResult},
     global_state::{GlobalState, TreeEvent},
     lsp::LSP,
+    popups::popups_editor::file_updated,
     render::backend::{color, BackendProtocol, Style},
     utils::TrackedList,
 };
@@ -51,7 +52,6 @@ impl Workspace {
                 Some(line) => line,
                 None => return,
             };
-            gs.writer.save_cursor();
             gs.writer.set_style(Style::underlined(None));
             {
                 let mut builder = line.unsafe_builder(&mut gs.writer);
@@ -63,7 +63,6 @@ impl Workspace {
                 }
             }
             gs.writer.reset_style();
-            gs.writer.restore_cursor();
         } else if let Some(line) = gs.tab_area.into_iter().next() {
             line.render_empty(&mut gs.writer);
         }
@@ -138,6 +137,9 @@ impl Workspace {
             let mut editor = self.editors.remove(idx);
             editor.clear_screen_cache();
             gs.tree.push(TreeEvent::SelectPath(editor.path.clone()));
+            if editor.update_status.collect() {
+                gs.popup(file_updated(editor.path.clone()))
+            }
             self.editors.insert(0, editor);
         }
     }
@@ -288,9 +290,13 @@ impl Workspace {
         if let Some(idx) = self.editors.iter().position(|e| e.path == file_path) {
             let mut editor = self.editors.remove(idx);
             editor.clear_screen_cache();
+            if editor.update_status.collect() {
+                gs.popup(file_updated(editor.path.clone()));
+            }
             self.editors.insert(0, editor);
             return Ok(false);
         }
+        gs.tree.push(TreeEvent::TrackPath(file_path.clone()));
         let editor = self.build_editor(file_path, gs).await?;
         self.editors.insert(0, editor);
         self.toggle_editor();
@@ -343,16 +349,36 @@ impl Workspace {
         }
     }
 
+    pub fn notify_update(&mut self, path: PathBuf, gs: &mut GlobalState) {
+        for (idx, editor) in self.editors.iter_mut().enumerate() {
+            if editor.path == path {
+                editor.update_status.mark_updated();
+                if idx == 0 && editor.update_status.collect() {
+                    gs.popup(file_updated(path));
+                }
+                break;
+            }
+        }
+    }
+
     pub fn close_active(&mut self, gs: &mut GlobalState) {
         if self.editors.is_empty() {
             return;
         }
-        self.editors.remove(0);
-        if self.editors.is_empty() {
-            gs.editor_area.clear(&mut gs.writer);
-            gs.select_mode();
-        } else {
-            self.editors.inner_mut_no_update()[0].clear_screen_cache();
+        let editor = self.editors.remove(0);
+        gs.tree.push(TreeEvent::UntrackPath(editor.path.clone()));
+        drop(editor);
+        match self.get_active() {
+            None => {
+                gs.editor_area.clear(&mut gs.writer);
+                gs.select_mode();
+            }
+            Some(editor) => {
+                editor.clear_screen_cache();
+                if editor.update_status.collect() {
+                    gs.popup(file_updated(editor.path.clone()));
+                }
+            }
         }
     }
 
@@ -378,20 +404,17 @@ impl Workspace {
             if idx >= self.editors.len() { self.editors.pop().expect("garded") } else { self.editors.remove(idx) };
         gs.tree.push(TreeEvent::SelectPath(editor.path.clone()));
         editor.clear_screen_cache();
+        if editor.update_status.collect() {
+            gs.popup(file_updated(editor.path.clone()));
+        }
         self.editors.insert(0, editor);
         self.toggle_editor();
         gs.insert_mode();
     }
 
-    pub fn save(&mut self, gs: &mut GlobalState) {
-        if let Some(editor) = self.get_active() {
-            editor.save(gs);
-        }
-    }
-
-    pub fn save_all(&mut self, events: &mut GlobalState) {
+    pub fn save_all(&mut self, gs: &mut GlobalState) {
         for editor in self.editors.iter_mut() {
-            editor.save(events);
+            editor.save(gs);
         }
     }
 
@@ -455,13 +478,20 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
             EditorAction::Right | EditorAction::Indent => {
                 let editor = ws.editors.remove(0);
                 ws.editors.push(editor);
-                ws.editors.inner_mut_no_update()[0].clear_screen_cache();
+                let editor = &mut ws.editors.inner_mut_no_update()[0];
+                editor.clear_screen_cache();
+                if editor.update_status.collect() {
+                    gs.popup(file_updated(editor.path.clone()));
+                }
                 gs.tree.push(TreeEvent::SelectPath(ws.editors.inner()[0].path.clone()));
             }
             EditorAction::Left | EditorAction::Unintent => {
                 if let Some(mut editor) = ws.editors.pop() {
                     gs.tree.push(TreeEvent::SelectPath(editor.path.clone()));
                     editor.clear_screen_cache();
+                    if editor.update_status.collect() {
+                        gs.popup(file_updated(editor.path.clone()));
+                    }
                     ws.editors.insert(0, editor);
                 }
             }

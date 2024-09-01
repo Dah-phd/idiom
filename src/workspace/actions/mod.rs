@@ -472,6 +472,12 @@ impl Actions {
             self.push_done(action, lexer, content);
         }
     }
+
+    pub fn clear(&mut self) {
+        self.done.clear();
+        self.undone.clear();
+        let _ = self.buffer.collect();
+    }
 }
 
 #[derive(Debug)]
