@@ -42,7 +42,7 @@ impl Editor {
     pub fn file_type(&self) -> FileType {
         match self {
             Self::Code(editor) => editor.file_type,
-            _ => FileType::Unknown,
+            _ => todo!(),
         }
     }
 

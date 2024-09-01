@@ -10,7 +10,7 @@ use crate::{configs::FileType, workspace::editor::build_display};
 use std::path::PathBuf;
 
 pub fn mock_editor(content: Vec<String>) -> CodeEditor {
-    let ft = FileType::Unknown;
+    let ft = FileType::Rust;
     let path = PathBuf::from("");
     let mut gs = GlobalState::new(Backend::init()).unwrap();
     let content: Vec<CodeLine> = content.into_iter().map(CodeLine::from).collect();

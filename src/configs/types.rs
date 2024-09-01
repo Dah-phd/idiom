@@ -2,7 +2,10 @@ use std::path::PathBuf;
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone, Copy, Default)]
 pub enum FileType {
+    #[default]
+    Ignored,
     Rust,
+    Zig,
     Python,
     JavaScript,
     TypeScript,
@@ -12,31 +15,26 @@ pub enum FileType {
     Yml,
     Toml,
     Nim,
-    MarkDown,
-    #[default]
-    Unknown,
 }
 
 impl FileType {
     #[allow(clippy::ptr_arg)]
-    pub fn derive_type(path: &PathBuf) -> Self {
-        if let Some(extension) = path.extension().and_then(|e| e.to_str()) {
-            return match extension.to_lowercase().as_str() {
-                "rs" => Self::Rust,
-                "c" => Self::C,
-                "nim" => Self::Nim,
-                "cpp" => Self::Cpp,
-                "py" | "pyw" => Self::Python,
-                "md" => Self::MarkDown,
-                "js" => Self::JavaScript,
-                "ts" => Self::TypeScript,
-                "yml" | "yaml" => Self::Yml,
-                "toml" => Self::Toml,
-                "html" => Self::Html,
-                _ => Self::Unknown,
-            };
-        };
-        Self::Unknown
+    pub fn derive_type(path: &PathBuf) -> Option<Self> {
+        let extension = path.extension().and_then(|e| e.to_str())?;
+        match extension.to_lowercase().as_str() {
+            "rs" => Some(Self::Rust),
+            "zig" => Some(Self::Zig),
+            "c" => Some(Self::C),
+            "nim" => Some(Self::Nim),
+            "cpp" => Some(Self::Cpp),
+            "py" | "pyw" => Some(Self::Python),
+            "js" => Some(Self::JavaScript),
+            "ts" => Some(Self::TypeScript),
+            "yml" | "yaml" => Some(Self::Yml),
+            "toml" => Some(Self::Toml),
+            "html" => Some(Self::Html),
+            _ => None,
+        }
     }
 
     pub fn comment_start(&self) -> &str {
@@ -50,6 +48,8 @@ impl FileType {
 impl From<FileType> for &'static str {
     fn from(value: FileType) -> Self {
         match value {
+            FileType::Ignored => "unknown file type - error",
+            FileType::Zig => "zig",
             FileType::Rust => "rust",
             FileType::Python => "python",
             FileType::TypeScript => "typescript",
@@ -60,8 +60,6 @@ impl From<FileType> for &'static str {
             FileType::Cpp => "c++",
             FileType::Yml => "yaml",
             FileType::Toml => "toml",
-            FileType::MarkDown => "markdown",
-            FileType::Unknown => "unknown",
         }
     }
 }

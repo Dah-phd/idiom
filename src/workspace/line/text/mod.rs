@@ -21,6 +21,7 @@ use std::{
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
     path::Path,
 };
+pub use types::TextType;
 
 #[derive(Debug, Default)]
 pub struct TextLine {

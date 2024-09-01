@@ -83,8 +83,11 @@ pub struct EditorConfigs {
     pub indent_after: String,
     #[serde(skip, default = "get_unident_before")]
     pub unindent_before: String,
+    /// LSP
     rust_lsp: Option<String>,
     rust_lsp_preload_if_present: Option<Vec<String>>,
+    zig_lsp: Option<String>,
+    zig_lsp_preload_if_present: Option<Vec<String>>,
     python_lsp: Option<String>,
     python_lsp_preload_if_present: Option<Vec<String>>,
     nim_lsp: Option<String>,
@@ -112,8 +115,11 @@ impl Default for EditorConfigs {
             indent_spaces: 4, // only spaces are allowed as indent
             indent_after: get_indent_after(),
             unindent_before: get_unident_before(),
+            // lsp
             rust_lsp: Some(String::from("rust-analyzer")),
             rust_lsp_preload_if_present: Some(vec!["Cargo.toml".to_owned(), "Cargo.lock".to_owned()]),
+            zig_lsp: None,
+            zig_lsp_preload_if_present: Some(vec!["build.zig".to_owned()]),
             python_lsp: Some(String::from("jedi-language-server")),
             python_lsp_preload_if_present: Some(vec!["pyproject.toml".to_owned(), "pytest.init".to_owned()]),
             nim_lsp: Some(String::from("nimlsp")),
@@ -152,7 +158,9 @@ impl EditorConfigs {
 
     pub fn derive_lsp(&self, file_type: &FileType) -> Option<String> {
         match file_type {
+            FileType::Ignored => None,
             FileType::Rust => self.rust_lsp.to_owned(),
+            FileType::Zig => self.zig_lsp.to_owned(),
             FileType::Python => self.python_lsp.to_owned(),
             FileType::Nim => self.nim_lsp.to_owned(),
             FileType::C => self.c_lsp.to_owned(),
@@ -162,14 +170,13 @@ impl EditorConfigs {
             FileType::Html => self.html_lsp.to_owned(),
             FileType::Yml => self.yaml_lsp.to_owned(),
             FileType::Toml => self.toml_lsp.to_owned(),
-            FileType::MarkDown => None,
-            FileType::Unknown => None,
         }
     }
 
     pub fn derive_lsp_preloads(&mut self, base_tree: Vec<String>, gs: &mut GlobalState) -> Vec<(FileType, String)> {
         [
             (FileType::Rust, self.rust_lsp_preload_if_present.take(), self.rust_lsp.as_ref()),
+            (FileType::Zig, self.zig_lsp_preload_if_present.take(), self.zig_lsp.as_ref()),
             (FileType::Python, self.python_lsp_preload_if_present.take(), self.python_lsp.as_ref()),
             (FileType::C, self.c_lsp_preload_if_present.take(), self.c_lsp.as_ref()),
             (FileType::Cpp, self.cpp_preload_if_present.take(), self.cpp_lsp.as_ref()),

@@ -8,7 +8,7 @@ use std::{
     path::Path,
     str::{CharIndices, Chars, MatchIndices},
 };
-pub use text::TextLine;
+pub use text::{TextLine, TextType};
 
 /// The trait can be used in future to add rope version for non code text
 pub trait EditorLine:

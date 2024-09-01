@@ -8,7 +8,7 @@ use crate::{
     workspace::{
         actions::internal::InternalActions,
         cursor::{Cursor, CursorPosition},
-        line::{EditorLine, TextLine},
+        line::{EditorLine, TextLine, TextType},
         utils::{copy_content, find_line_start, last_modified, token_range_at},
     },
 };
@@ -26,7 +26,7 @@ pub type DocStats<'a> = (DocLen, SelectLen, CursorPosition);
 
 #[allow(dead_code)]
 pub struct TextEditor {
-    pub file_type: FileType,
+    pub style: TextType,
     pub display: String,
     pub path: PathBuf,
     pub cursor: Cursor,
@@ -41,14 +41,18 @@ pub struct TextEditor {
 impl TextEditor {
     pub fn from_path(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
         let content = TextLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
-        let file_type = FileType::derive_type(&path);
+        let file_type = FileType::default();
         let display = build_display(&path);
+        let style = match path.extension() {
+            Some(ext) if ext.to_ascii_lowercase() == "md" => TextType::MarkDown,
+            _ => TextType::Plain,
+        };
         Ok(Self {
+            style,
             line_number_offset: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
             content,
             cursor: Cursor::default(),
             actions: InternalActions::new(cfg.get_indent_cfg(&file_type)),
-            file_type,
             display,
             theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
             timestamp: last_modified(&path),
@@ -127,9 +131,7 @@ impl TextEditor {
             EditorAction::LSPRename => {
                 todo!()
             }
-            EditorAction::CommentOut => {
-                self.actions.comment_out(self.file_type.comment_start(), &mut self.cursor, &mut self.content)
-            }
+            EditorAction::CommentOut => self.actions.comment_out("//", &mut self.cursor, &mut self.content),
             EditorAction::Undo => self.actions.undo(&mut self.cursor, &mut self.content),
             EditorAction::Redo => self.actions.redo(&mut self.cursor, &mut self.content),
             EditorAction::Save => self.save(gs),
@@ -516,11 +518,6 @@ impl TextEditor {
         self.actions.unindent(&mut self.cursor, &mut self.content);
     }
 
-    #[inline(always)]
-    pub fn comment_out(&mut self) {
-        self.actions.comment_out(self.file_type.comment_start(), &mut self.cursor, &mut self.content);
-    }
-
     pub fn save(&mut self, gs: &mut GlobalState) {
         let content = self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n");
         match std::fs::write(&self.path, &content) {
@@ -530,7 +527,7 @@ impl TextEditor {
     }
 
     pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {
-        self.actions.cfg = new_cfg.get_indent_cfg(&self.file_type);
+        self.actions.cfg = new_cfg.get_indent_cfg(&FileType::Ignored);
     }
 
     #[inline]

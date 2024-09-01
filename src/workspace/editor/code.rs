@@ -31,9 +31,13 @@ pub struct CodeEditor {
 }
 
 impl CodeEditor {
-    pub fn from_path(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
+    pub fn from_path(
+        path: PathBuf,
+        file_type: FileType,
+        cfg: &EditorConfigs,
+        gs: &mut GlobalState,
+    ) -> IdiomResult<Self> {
         let content = CodeLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
-        let file_type = FileType::derive_type(&path);
         let display = build_display(&path);
         Ok(Self {
             line_number_offset: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },

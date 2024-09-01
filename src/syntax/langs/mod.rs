@@ -28,10 +28,6 @@ pub struct Lang {
 }
 
 impl Lang {
-    pub fn is_code(&self) -> bool {
-        !matches!(self.file_type, FileType::Unknown)
-    }
-
     pub fn is_keyword(&self, token: &str) -> bool {
         self.declaration.contains(&token) || self.key_words.contains(&token)
     }
@@ -268,15 +264,6 @@ impl From<FileType> for Lang {
                 ],
                 mod_import: vec!["require", "import"],
                 string_markers: "\"'`",
-                ..Default::default()
-            },
-            FileType::MarkDown | FileType::Unknown => Self {
-                file_type,
-                comment_start: vec![],
-                declaration: vec![],
-                key_words: vec![],
-                flow_control: vec![],
-                mod_import: vec![],
                 ..Default::default()
             },
             _ => Self {

@@ -250,11 +250,15 @@ impl Workspace {
     }
 
     fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<CodeEditor> {
-        CodeEditor::from_path(file_path, &self.base_config, gs)
+        CodeEditor::from_path(file_path, FileType::Ignored, &self.base_config, gs)
     }
 
     async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<CodeEditor> {
-        let mut new = CodeEditor::from_path(file_path, &self.base_config, gs)?;
+        let file_type = match FileType::derive_type(&file_path) {
+            Some(file_type) => file_type,
+            None => return Err(IdiomError::GeneralError("Unknown file type!".to_owned())),
+        };
+        let mut new = CodeEditor::from_path(file_path, file_type, &self.base_config, gs)?;
         new.resize(gs.editor_area.width, gs.editor_area.height as usize);
         let lsp_cmd = match self.base_config.derive_lsp(&new.file_type) {
             None => return Ok(new),
