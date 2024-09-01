@@ -1,9 +1,13 @@
 mod code;
 mod plain;
-use std::path::{Path, PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
+use std::{
+    os::unix::fs::MetadataExt,
+    path::{Path, PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR},
+};
 
 use crate::{
     configs::{EditorAction, EditorConfigs, FileType},
+    error::{IdiomError, IdiomResult},
     global_state::GlobalState,
     lsp::LSPResult,
     workspace::CursorPosition,
@@ -59,6 +63,14 @@ fn build_display(path: &Path) -> String {
         buffer.insert(0, part);
     }
     buffer.join(MAIN_SEPARATOR_STR)
+}
+
+pub fn big_file_protection(path: &Path) -> IdiomResult<()> {
+    let meta = std::fs::metadata(path)?;
+    if meta.size() > 50 * 1024 * 1024 {
+        return Err(IdiomError::IOError("File over 50MB".to_owned()));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

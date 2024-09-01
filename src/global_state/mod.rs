@@ -502,11 +502,14 @@ impl GlobalState {
                 }
                 WorkspaceEvent::WorkspaceEdit(edits) => workspace.apply_edits(edits, self),
                 WorkspaceEvent::Open(path, line) => {
-                    if !path.is_dir() && workspace.new_at_line(path, line, self).await.is_ok() {
-                        self.insert_mode();
-                    } else {
+                    if path.is_dir() {
                         self.select_mode();
-                    };
+                    } else {
+                        match workspace.new_at_line(path, line, self).await {
+                            Ok(..) => self.insert_mode(),
+                            Err(error) => self.error(error.to_string()),
+                        }
+                    }
                 }
                 WorkspaceEvent::InsertText(insert) => {
                     if let Some(editor) = workspace.get_active() {

@@ -16,7 +16,7 @@ use crate::{
 use lsp_types::TextEdit;
 use std::{cmp::Ordering, path::PathBuf};
 
-use super::FileUpdate;
+use super::{big_file_protection, FileUpdate};
 
 #[allow(dead_code)]
 pub struct CodeEditor {
@@ -39,6 +39,7 @@ impl CodeEditor {
         cfg: &EditorConfigs,
         gs: &mut GlobalState,
     ) -> IdiomResult<Self> {
+        big_file_protection(&path)?;
         let content = CodeLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
         Ok(Self {
@@ -426,6 +427,10 @@ impl CodeEditor {
     }
 
     pub fn rebase(&mut self, gs: &mut GlobalState) {
+        if let Err(error) = big_file_protection(&self.path) {
+            gs.error(format!("Failed to load file {}", error));
+            return;
+        };
         self.actions.clear();
         self.cursor.reset();
         self.lexer.close();
