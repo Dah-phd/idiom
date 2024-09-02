@@ -398,7 +398,15 @@ impl GlobalState {
                 TreeEvent::CreateFileOrFolder(name) => {
                     if let Ok(new_path) = tree.create_file_or_folder(name) {
                         if !new_path.is_dir() {
-                            self.workspace.push(WorkspaceEvent::Open(new_path, 0));
+                            match workspace.new_at_line(new_path, 0, self).await {
+                                Ok(..) => {
+                                    self.insert_mode();
+                                    if let Some(editor) = workspace.get_active() {
+                                        editor.update_status.deny();
+                                    }
+                                }
+                                Err(error) => self.error(error.to_string()),
+                            };
                             self.insert_mode();
                         }
                     }
@@ -407,7 +415,15 @@ impl GlobalState {
                 TreeEvent::CreateFileOrFolderBase(name) => {
                     if let Ok(new_path) = tree.create_file_or_folder_base(name) {
                         if !new_path.is_dir() {
-                            self.workspace.push(WorkspaceEvent::Open(new_path, 0));
+                            match workspace.new_at_line(new_path, 0, self).await {
+                                Ok(..) => {
+                                    self.insert_mode();
+                                    if let Some(editor) = workspace.get_active() {
+                                        editor.update_status.deny();
+                                    }
+                                }
+                                Err(error) => self.error(error.to_string()),
+                            };
                             self.insert_mode();
                         }
                     }

@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const MSG_DURATION: Duration = Duration::from_secs(3);
+const MSG_DURATION: Duration = Duration::from_secs(2);
 
 #[derive(Debug)]
 pub struct Messages {

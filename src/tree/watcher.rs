@@ -25,7 +25,7 @@ impl TreeWatcher {
     pub fn root() -> Result<Self, Error> {
         let (tx, receiver) = std::sync::mpsc::channel();
         RecommendedWatcher::new(tx, Config::default().with_poll_interval(Duration::from_secs(1)))
-            .and_then(|mut inner| inner.watch(&PathBuf::from("."), RecursiveMode::Recursive).map(|_| inner))
+            .and_then(|mut inner| inner.watch(&PathBuf::from("./src"), RecursiveMode::Recursive).map(|_| inner))
             .map(|_inner| Self { _inner, receiver, sync_handler: None, lsp_register: Vec::new() })
     }
 
@@ -33,9 +33,12 @@ impl TreeWatcher {
         let mut status = false;
 
         if matches!(&self.sync_handler, Some(handle) if handle.is_finished()) {
-            if let Ok(new_tree) = self.sync_handler.take().unwrap().await {
-                *tree = new_tree;
-                status = true;
+            match self.sync_handler.take().unwrap().await {
+                Ok(new_tree) => {
+                    *tree = new_tree;
+                    status = true;
+                }
+                Err(err) => gs.error(format!("File tree sync failure! ERR: {err}")),
             };
         }
 
