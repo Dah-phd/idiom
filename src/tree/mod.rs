@@ -92,10 +92,13 @@ impl Tree {
     }
 
     pub fn expand_dir_or_get_path(&mut self) -> Option<PathBuf> {
-        let tree_path = self.get_selected()?;
+        let tree_path = self.tree.get_mut_from_inner(self.state.selected)?;
         if tree_path.path().is_dir() {
             tree_path.expand();
-            self.force_sync();
+            if let Some(watcher) = self.watcher.as_ref() {
+                watcher.map_errors(tree_path);
+            }
+            self.rebuild = true;
             None
         } else {
             Some(tree_path.path().clone())
@@ -105,7 +108,7 @@ impl Tree {
     fn shrink(&mut self) {
         if let Some(tree_path) = self.get_selected() {
             tree_path.take_tree();
-            self.force_sync();
+            self.rebuild = true;
         }
     }
 
@@ -122,9 +125,9 @@ impl Tree {
                         return Some(path.clone());
                     }
                 }
-                self.selected_path = selected.path().to_owned()
+                self.selected_path = selected.path().to_owned();
             };
-            self.force_sync();
+            self.rebuild = true;
         }
         None
     }
@@ -149,14 +152,16 @@ impl Tree {
 
     pub fn create_file_or_folder(&mut self, name: String) -> IdiomResult<PathBuf> {
         let path = build_file_or_folder(self.selected_path.clone(), &name)?;
-        self.force_sync();
+        self.tree.sync_base();
+        self.rebuild = true;
         self.select_by_path(&path);
         Ok(path)
     }
 
     pub fn create_file_or_folder_base(&mut self, name: String) -> IdiomResult<PathBuf> {
         let path = build_file_or_folder(PathBuf::from("./"), &name)?;
-        self.force_sync();
+        self.tree.sync_base();
+        self.rebuild = true;
         self.select_by_path(&path);
         Ok(path)
     }
@@ -168,7 +173,8 @@ impl Tree {
             std::fs::remove_dir_all(&self.selected_path)?
         };
         self.select_up();
-        self.force_sync();
+        self.tree.sync_base();
+        self.rebuild = true;
         Ok(())
     }
 
@@ -192,7 +198,8 @@ impl Tree {
         if result.is_ok() {
             rel_new_path.push(name);
             selected.update_path(rel_new_path);
-            self.force_sync();
+            self.tree.sync_base();
+            self.rebuild = true;
         }
         Some(result)
     }
@@ -218,7 +225,7 @@ impl Tree {
         if self.tree.expand_contained(path) {
             self.state.selected = 0;
             self.selected_path.clone_from(path);
-            self.force_sync();
+            self.rebuild = true;
         }
     }
 
@@ -261,12 +268,8 @@ impl Tree {
     pub fn register_lsp(&mut self, lsp: DianosticHandle) {
         if let Some(watcher) = self.watcher.as_mut() {
             watcher.register_lsp(&mut self.tree, lsp);
+            self.rebuild = true;
         }
-    }
-
-    fn force_sync(&mut self) {
-        self.rebuild = true;
-        self.tree.sync_base();
     }
 
     fn unsafe_set_path(&mut self) {

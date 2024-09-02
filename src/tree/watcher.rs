@@ -70,7 +70,11 @@ impl TreeWatcher {
             self.start_sync(tree.clone());
         }
 
-        status
+        status || map_errors
+    }
+
+    pub fn map_errors(&self, tree: &mut TreePath) {
+        lsp_sync_diagnosic(tree, &self.lsp_register);
     }
 
     fn start_sync(&mut self, mut tree: TreePath) {

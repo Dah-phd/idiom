@@ -407,7 +407,6 @@ impl GlobalState {
                                 }
                                 Err(error) => self.error(error.to_string()),
                             };
-                            self.insert_mode();
                         }
                     }
                     self.clear_popup();
@@ -424,7 +423,6 @@ impl GlobalState {
                                 }
                                 Err(error) => self.error(error.to_string()),
                             };
-                            self.insert_mode();
                         }
                     }
                     self.clear_popup();
