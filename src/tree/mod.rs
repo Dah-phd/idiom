@@ -79,7 +79,7 @@ impl Tree {
                 }
                 TreeAction::NewFile => gs.popup(create_file_popup(self.get_first_selected_folder_display())),
                 TreeAction::Rename => {
-                    if let Some(tree_path) = self.get_selected() {
+                    if let Some(tree_path) = self.tree.get_mut_from_inner(self.state.selected) {
                         gs.popup(rename_file_popup(tree_path.path().display().to_string()));
                     }
                 }
@@ -106,7 +106,7 @@ impl Tree {
     }
 
     fn shrink(&mut self) {
-        if let Some(tree_path) = self.get_selected() {
+        if let Some(tree_path) = self.tree.get_mut_from_inner(self.state.selected) {
             tree_path.take_tree();
             self.rebuild = true;
         }
@@ -115,13 +115,15 @@ impl Tree {
     pub fn mouse_select(&mut self, idx: usize) -> Option<PathBuf> {
         if self.tree.len() > idx {
             self.state.selected = idx.saturating_sub(1);
-            if let Some(selected) = self.get_selected() {
+            if let Some(selected) = self.tree.get_mut_from_inner(self.state.selected) {
                 match selected {
                     TreePath::Folder { tree: Some(..), .. } => {
                         selected.take_tree();
                     }
                     TreePath::Folder { tree: None, .. } => selected.expand(),
                     TreePath::File { path, .. } => {
+                        self.selected_path = path.clone();
+                        self.rebuild = true;
                         return Some(path.clone());
                     }
                 }
@@ -180,7 +182,7 @@ impl Tree {
 
     pub fn rename_path(&mut self, name: String) -> Option<IdiomResult<(PathBuf, PathBuf)>> {
         // not efficient but safe - calls should be rare enough
-        let selected = self.get_selected()?;
+        let selected = self.tree.get_mut_from_inner(self.state.selected)?;
         let mut rel_new_path = selected.path().clone();
         if !rel_new_path.pop() {
             return None;
@@ -223,14 +225,14 @@ impl Tree {
         let rel_result = to_relative_path(path);
         let path = rel_result.as_ref().unwrap_or(path);
         if self.tree.expand_contained(path) {
-            self.state.selected = 0;
             self.selected_path.clone_from(path);
+            self.state.selected = self.tree.iter().skip(1).position(|tp| tp.path() == path).unwrap_or_default();
             self.rebuild = true;
         }
     }
 
     pub fn get_first_selected_folder_display(&mut self) -> String {
-        if let Some(tree_path) = self.get_selected() {
+        if let Some(tree_path) = self.tree.get_mut_from_inner(self.state.selected) {
             if tree_path.path().is_dir() {
                 return tree_path.path().as_path().display().to_string();
             }
@@ -239,11 +241,6 @@ impl Tree {
             }
         }
         "./".to_owned()
-    }
-
-    #[inline]
-    pub fn get_selected(&mut self) -> Option<&mut TreePath> {
-        self.tree.get_mut_from_inner(self.state.selected)
     }
 
     pub fn get_base_file_names(&self) -> Vec<String> {
@@ -274,7 +271,7 @@ impl Tree {
 
     fn unsafe_set_path(&mut self) {
         self.rebuild = true;
-        if let Some(selected) = self.get_selected() {
+        if let Some(selected) = self.tree.get_mut_from_inner(self.state.selected) {
             self.selected_path = selected.path().clone();
         }
     }

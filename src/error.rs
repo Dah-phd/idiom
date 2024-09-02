@@ -38,7 +38,3 @@ impl Display for IdiomError {
         }
     }
 }
-
-pub fn test() {
-    println!("hello world");
-}
