@@ -309,11 +309,11 @@ impl TreePath {
 
     /// Diagnostics
 
-    pub fn map_diagnostics_base(&mut self, path: PathBuf, d_errors: usize, d_warnings: usize) {
+    pub fn map_diagnostics_base(&mut self, path: &Path, d_errors: usize, d_warnings: usize) {
         if d_errors == 0 && d_warnings == 0 {
             return;
         }
-        if let Ok(d_path) = to_relative_path(&path) {
+        if let Ok(d_path) = to_relative_path(path) {
             if let Self::Folder { tree: Some(tree), .. } = self {
                 for tree_path in tree {
                     tree_path.map_diagnostics(&d_path, d_errors, d_warnings);

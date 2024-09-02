@@ -296,7 +296,6 @@ impl Workspace {
             self.editors.insert(0, editor);
             return Ok(false);
         }
-        gs.tree.push(TreeEvent::TrackPath(file_path.clone()));
         let editor = self.build_editor(file_path, gs).await?;
         self.editors.insert(0, editor);
         self.toggle_editor();
@@ -366,7 +365,6 @@ impl Workspace {
             return;
         }
         let editor = self.editors.remove(0);
-        gs.tree.push(TreeEvent::UntrackPath(editor.path.clone()));
         drop(editor);
         match self.get_active() {
             None => {

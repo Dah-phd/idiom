@@ -365,16 +365,6 @@ impl GlobalState {
         tree.finish_sync(self).await;
         for event in std::mem::take(&mut self.tree) {
             match event {
-                TreeEvent::TrackPath(path) => {
-                    if let Err(error) = tree.track_path(path) {
-                        self.error(error.to_string());
-                    }
-                }
-                TreeEvent::UntrackPath(path) => {
-                    if let Err(error) = tree.untrack_path(path) {
-                        self.error(error.to_string());
-                    }
-                }
                 TreeEvent::PopupAccess => {
                     self.popup.update_tree(tree);
                 }
@@ -433,7 +423,7 @@ impl GlobalState {
                     self.clear_popup();
                 }
                 TreeEvent::RegisterLSP(lsp) => {
-                    tree.lsp_register.push(lsp);
+                    tree.register_lsp(lsp);
                 }
             }
         }

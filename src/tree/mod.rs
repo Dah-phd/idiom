@@ -1,61 +1,37 @@
 mod tree_paths;
+mod watcher;
 use crate::{
     configs::{TreeAction, TreeKeyMap},
     error::{IdiomError, IdiomResult},
     global_state::{GlobalState, WorkspaceEvent},
-    lsp::Diagnostic,
     popups::popups_tree::{create_file_popup, rename_file_popup},
     render::state::State,
     utils::{build_file_or_folder, to_relative_path},
 };
 use crossterm::event::KeyEvent;
-use notify::{
-    event::{AccessKind, AccessMode},
-    Config, Error, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
-};
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
-use tokio::task::JoinHandle;
+use std::path::PathBuf;
 use tree_paths::TreePath;
-
-const TICK: Duration = Duration::from_millis(500);
+use watcher::{DianosticHandle, TreeWatcher};
 
 pub struct Tree {
     pub key_map: TreeKeyMap,
-    pub watcher: Option<RecommendedWatcher>,
-    pub lsp_register: Vec<Arc<Mutex<HashMap<PathBuf, Diagnostic>>>>,
+    pub watcher: Option<TreeWatcher>,
     state: State,
     selected_path: PathBuf,
     tree: TreePath,
-    sync_handler: JoinHandle<TreePath>,
     rebuild: bool,
-    receiver: std::sync::mpsc::Receiver<Result<Event, Error>>,
 }
 
 impl Tree {
     pub fn new(key_map: TreeKeyMap) -> Self {
         let tree = TreePath::default();
-        let mut sync_tree = tree.clone();
-        let sync_handler = tokio::spawn(async move {
-            tokio::time::sleep(TICK).await;
-            sync_tree.sync_base();
-            sync_tree
-        });
-        let (tx, receiver) = std::sync::mpsc::channel();
         Self {
-            receiver,
-            watcher: RecommendedWatcher::new(tx, Config::default()).ok(),
+            watcher: TreeWatcher::root().ok(),
             state: State::new(),
             key_map,
             selected_path: PathBuf::from("./"),
             tree,
-            sync_handler,
             rebuild: true,
-            lsp_register: Vec::new(),
         }
     }
 
@@ -267,87 +243,30 @@ impl Tree {
         self.tree.tree_file_names()
     }
 
-    pub fn track_path(&mut self, path: PathBuf) -> IdiomResult<()> {
-        if let Some(watcher) = &mut self.watcher {
-            watcher
-                .watch(&path, RecursiveMode::NonRecursive)
-                .map_err(|_| IdiomError::GeneralError("File watcher error!".to_string()))
-        } else {
-            Ok(())
-        }
-    }
-
-    pub fn untrack_path(&mut self, path: PathBuf) -> IdiomResult<()> {
-        if let Some(watcher) = &mut self.watcher {
-            watcher.unwatch(&path).map_err(|_| IdiomError::GeneralError("File watcher error!".to_string()))
-        } else {
-            Ok(())
-        }
-    }
-
     pub async fn finish_sync(&mut self, gs: &mut GlobalState) {
-        if self.sync_handler.is_finished() {
-            while let Ok(event) = self.receiver.try_recv() {
-                if let Ok(Event { kind: EventKind::Access(AccessKind::Close(AccessMode::Write)), paths, .. }) = event {
-                    for path in paths {
-                        gs.workspace.push(WorkspaceEvent::FileUpdated(path));
-                    }
+        if let Some(watcher) = self.watcher.as_mut() {
+            self.rebuild = watcher.poll(&mut self.tree, gs).await;
+            if !self.rebuild {
+                return;
+            }
+            for (idx, tree_path) in self.tree.iter().skip(1).enumerate() {
+                if tree_path.path() == &self.selected_path {
+                    self.state.selected = idx;
+                    break;
                 }
             }
-            self.rebuild = true;
-            let mut tree = self.tree.clone();
-            let lsp_register = self.lsp_register.clone();
-            let old_handler = std::mem::replace(
-                &mut self.sync_handler,
-                tokio::spawn(async move {
-                    tokio::time::sleep(TICK).await;
-                    tree.sync_base();
-                    let mut buffer = Vec::new();
-                    for lsp in lsp_register.into_iter() {
-                        if let Ok(lock) = lsp.try_lock() {
-                            for (path, diagnostic) in lock.iter() {
-                                buffer.push((path.clone(), diagnostic.errors, diagnostic.warnings));
-                            }
-                        }
-                    }
-                    for (path, d_errors, d_warnings) in buffer {
-                        tree.map_diagnostics_base(path, d_errors, d_warnings);
-                    }
-                    tree
-                }),
-            );
-            match old_handler.await {
-                Ok(tree) => {
-                    self.tree = tree;
-                    self.fix_select_by_path();
-                }
-                Err(err) => {
-                    gs.error(format!("Tree sync error: {err}"));
-                }
-            }
+        }
+    }
+
+    pub fn register_lsp(&mut self, lsp: DianosticHandle) {
+        if let Some(watcher) = self.watcher.as_mut() {
+            watcher.register_lsp(&mut self.tree, lsp);
         }
     }
 
     fn force_sync(&mut self) {
         self.rebuild = true;
-        let mut tree = self.tree.clone();
-        std::mem::replace(
-            &mut self.sync_handler,
-            tokio::spawn(async move {
-                tree.sync_base();
-                tree
-            }),
-        )
-        .abort();
-    }
-
-    fn fix_select_by_path(&mut self) {
-        for (idx, tree_path) in self.tree.iter().skip(1).enumerate() {
-            if tree_path.path() == &self.selected_path {
-                self.state.selected = idx;
-                break;
-            }
-        }
+        self.tree.sync_base();
     }
 
     fn unsafe_set_path(&mut self) {

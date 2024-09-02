@@ -18,8 +18,6 @@ pub enum TreeEvent {
     RenameFile(String),
     SearchFiles(String),
     RegisterLSP(Arc<Mutex<HashMap<PathBuf, Diagnostic>>>),
-    TrackPath(PathBuf),
-    UntrackPath(PathBuf),
 }
 
 impl From<TreeEvent> for PopupMessage {
