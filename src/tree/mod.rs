@@ -15,7 +15,7 @@ use watcher::{DianosticHandle, TreeWatcher};
 
 pub struct Tree {
     pub key_map: TreeKeyMap,
-    pub watcher: Option<TreeWatcher>,
+    pub watcher: TreeWatcher,
     state: State,
     selected_path: PathBuf,
     tree: TreePath,
@@ -32,7 +32,7 @@ impl Tree {
                 let display_offset = path_str.split(std::path::MAIN_SEPARATOR).count() * 2;
                 let tree = TreePath::from_path(selected_path.clone());
                 Self {
-                    watcher: TreeWatcher::root().ok(),
+                    watcher: TreeWatcher::root(),
                     state: State::new(),
                     key_map,
                     display_offset,
@@ -45,7 +45,7 @@ impl Tree {
             Err(..) => {
                 let tree = TreePath::from_path(PathBuf::from("./"));
                 Self {
-                    watcher: TreeWatcher::root().ok(),
+                    watcher: TreeWatcher::root(),
                     state: State::new(),
                     key_map,
                     display_offset: 2,
@@ -118,9 +118,7 @@ impl Tree {
         let tree_path = self.tree.get_mut_from_inner(self.state.selected)?;
         if tree_path.path().is_dir() {
             tree_path.expand();
-            if let Some(watcher) = self.watcher.as_ref() {
-                watcher.map_errors(tree_path);
-            }
+            self.watcher.map_errors(tree_path);
             self.rebuild = true;
             None
         } else {
@@ -177,14 +175,12 @@ impl Tree {
 
     pub fn create_file_or_folder(&mut self, name: String) -> IdiomResult<PathBuf> {
         let path = build_file_or_folder(self.selected_path.clone(), &name)?;
-        self.rebuild = true;
         self.select_by_path(&path);
         Ok(path)
     }
 
     pub fn create_file_or_folder_base(&mut self, name: String) -> IdiomResult<PathBuf> {
         let path = build_file_or_folder(PathBuf::from("./"), &name)?;
-        self.rebuild = true;
         self.select_by_path(&path);
         Ok(path)
     }
@@ -267,25 +263,21 @@ impl Tree {
     }
 
     pub fn finish_sync(&mut self, gs: &mut GlobalState) {
-        if let Some(watcher) = self.watcher.as_mut() {
-            self.rebuild = watcher.poll(&mut self.tree, self.path_parser, gs);
-            if !self.rebuild {
-                return;
-            }
-            for (idx, tree_path) in self.tree.iter().skip(1).enumerate() {
-                if tree_path.path() == &self.selected_path {
-                    self.state.selected = idx;
-                    break;
-                }
+        self.rebuild = self.watcher.poll(&mut self.tree, self.path_parser, gs);
+        if !self.rebuild {
+            return;
+        }
+        for (idx, tree_path) in self.tree.iter().skip(1).enumerate() {
+            if tree_path.path() == &self.selected_path {
+                self.state.selected = idx;
+                break;
             }
         }
     }
 
     pub fn register_lsp(&mut self, lsp: DianosticHandle) {
-        if let Some(watcher) = self.watcher.as_mut() {
-            watcher.register_lsp(&mut self.tree, lsp);
-            self.rebuild = true;
-        }
+        self.watcher.register_lsp(&mut self.tree, lsp);
+        self.rebuild = true;
     }
 
     fn unsafe_set_path(&mut self) {
