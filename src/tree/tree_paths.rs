@@ -28,8 +28,7 @@ pub enum TreePath {
 
 #[allow(dead_code)]
 impl TreePath {
-    pub fn clean_from(path: &str) -> Self {
-        let path = PathBuf::from(path);
+    pub fn from_path(path: PathBuf) -> Self {
         if !path.is_dir() {
             return Self::File { display: get_path_display(&path), path, errors: 0, warnings: 0 };
         }
@@ -40,10 +39,10 @@ impl TreePath {
         Self::Folder { display: get_path_display(&path), path, tree: Some(tree_buffer), errors: 0, warnings: 0 }
     }
 
-    pub fn render_styled(&self, line: Line, mut style: Style, backend: &mut Backend) {
+    pub fn render_styled(&self, char_offset: usize, line: Line, mut style: Style, backend: &mut Backend) {
         let (display, errs, wars) = match self {
-            TreePath::File { display, errors, warnings, .. } => (display, *errors, *warnings),
-            TreePath::Folder { display, errors, warnings, .. } => (display, *errors, *warnings),
+            TreePath::File { display, errors, warnings, .. } => (&display[char_offset..], *errors, *warnings),
+            TreePath::Folder { display, errors, warnings, .. } => (&display[char_offset..], *errors, *warnings),
         };
         if errs != 0 {
             style.set_fg(Some(ERR));
@@ -53,10 +52,10 @@ impl TreePath {
         line.render_styled(display, style, backend);
     }
 
-    pub fn render(&self, line: Line, backend: &mut Backend) {
+    pub fn render(&self, char_offset: usize, line: Line, backend: &mut Backend) {
         let (display, errs, wars) = match self {
-            TreePath::File { display, errors, warnings, .. } => (display, *errors, *warnings),
-            TreePath::Folder { display, errors, warnings, .. } => (display, *errors, *warnings),
+            TreePath::File { display, errors, warnings, .. } => (&display[char_offset..], *errors, *warnings),
+            TreePath::Folder { display, errors, warnings, .. } => (&display[char_offset..], *errors, *warnings),
         };
         if errs != 0 {
             line.render_styled(display, Style::fg(ERR), backend);
@@ -175,7 +174,7 @@ impl TreePath {
         }
     }
 
-    fn sync(&mut self) {
+    pub fn sync(&mut self) {
         self.reset_diagnostic();
         if let Self::Folder { path, tree: Some(tree), .. } = self {
             merge_trees(tree, get_nested_paths(path).collect());
@@ -251,6 +250,32 @@ impl TreePath {
         let gitignore = Gitignore::new("./.gitignore").0;
         self.search_in_paths(pattern, &mut buffer, &gitignore);
         buffer
+    }
+
+    pub fn find_by_path_skip_root(&mut self, search_path: &Path) -> Option<&mut Self> {
+        if let Self::Folder { tree: Some(inner_tree), .. } = self {
+            for tree_path in inner_tree {
+                if search_path.starts_with(tree_path.path()) {
+                    return tree_path.find_by_path(search_path);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn find_by_path(&mut self, search_path: &Path) -> Option<&mut Self> {
+        match self {
+            Self::File { path, .. } | Self::Folder { path, .. } if path == search_path => Some(self),
+            Self::Folder { tree: Some(inner_tree), .. } => {
+                for tree_path in inner_tree {
+                    if search_path.starts_with(tree_path.path()) {
+                        return tree_path.find_by_path(search_path);
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
     }
 
     pub fn search_in_paths(mut self, pattern: &str, buffer: &mut Vec<PathBuf>, gitignore: &Gitignore) {
@@ -378,12 +403,6 @@ impl From<PathBuf> for TreePath {
     }
 }
 
-impl Default for TreePath {
-    fn default() -> Self {
-        Self::clean_from("./")
-    }
-}
-
 pub struct TreeIter<'a> {
     holder: Vec<&'a TreePath>,
 }
@@ -423,7 +442,7 @@ impl<'a> From<SerachResult<'a>> for Option<&'a TreePath> {
 }
 
 fn get_path_display(path: &Path) -> String {
-    let path_str = &path.display().to_string()[2..];
+    let path_str = &path.display().to_string();
     let mut buffer = String::new();
     let mut path_split = path_str.split(std::path::MAIN_SEPARATOR).peekable();
     while let Some(path_element) = path_split.next() {

@@ -92,6 +92,10 @@ pub fn to_relative_path(target_dir: &Path) -> IdiomResult<PathBuf> {
     }
 }
 
+pub fn to_canon_path(target_dir: &Path) -> IdiomResult<PathBuf> {
+    Ok(target_dir.canonicalize()?)
+}
+
 pub struct TrackedList<T> {
     inner: Vec<T>,
     updated: bool,

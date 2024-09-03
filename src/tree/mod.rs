@@ -6,10 +6,10 @@ use crate::{
     global_state::{GlobalState, WorkspaceEvent},
     popups::popups_tree::{create_file_popup, rename_file_popup},
     render::state::State,
-    utils::{build_file_or_folder, to_relative_path},
+    utils::{build_file_or_folder, to_canon_path, to_relative_path},
 };
 use crossterm::event::KeyEvent;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tree_paths::TreePath;
 use watcher::{DianosticHandle, TreeWatcher};
 
@@ -19,19 +19,42 @@ pub struct Tree {
     state: State,
     selected_path: PathBuf,
     tree: TreePath,
+    display_offset: usize,
+    path_parser: fn(&Path) -> IdiomResult<PathBuf>,
     rebuild: bool,
 }
 
 impl Tree {
     pub fn new(key_map: TreeKeyMap) -> Self {
-        let tree = TreePath::default();
-        Self {
-            watcher: TreeWatcher::root().ok(),
-            state: State::new(),
-            key_map,
-            selected_path: PathBuf::from("./"),
-            tree,
-            rebuild: true,
+        match PathBuf::from("./").canonicalize() {
+            Ok(selected_path) => {
+                let path_str = selected_path.display().to_string();
+                let display_offset = path_str.split(std::path::MAIN_SEPARATOR).count() * 2;
+                let tree = TreePath::from_path(selected_path.clone());
+                Self {
+                    watcher: TreeWatcher::root().ok(),
+                    state: State::new(),
+                    key_map,
+                    display_offset,
+                    path_parser: to_canon_path,
+                    selected_path,
+                    tree,
+                    rebuild: true,
+                }
+            }
+            Err(..) => {
+                let tree = TreePath::from_path(PathBuf::from("./"));
+                Self {
+                    watcher: TreeWatcher::root().ok(),
+                    state: State::new(),
+                    key_map,
+                    display_offset: 2,
+                    path_parser: to_relative_path,
+                    selected_path: PathBuf::from("./"),
+                    tree,
+                    rebuild: true,
+                }
+            }
         }
     }
 
@@ -45,9 +68,9 @@ impl Tree {
                 None => return,
             };
             if idx == self.state.selected {
-                tree_path.render_styled(line, self.state.highlight, &mut gs.writer);
+                tree_path.render_styled(self.display_offset, line, self.state.highlight, &mut gs.writer);
             } else {
-                tree_path.render(line, &mut gs.writer);
+                tree_path.render(self.display_offset, line, &mut gs.writer);
             }
         }
         for line in lines {
@@ -154,7 +177,6 @@ impl Tree {
 
     pub fn create_file_or_folder(&mut self, name: String) -> IdiomResult<PathBuf> {
         let path = build_file_or_folder(self.selected_path.clone(), &name)?;
-        self.tree.sync_base();
         self.rebuild = true;
         self.select_by_path(&path);
         Ok(path)
@@ -162,7 +184,6 @@ impl Tree {
 
     pub fn create_file_or_folder_base(&mut self, name: String) -> IdiomResult<PathBuf> {
         let path = build_file_or_folder(PathBuf::from("./"), &name)?;
-        self.tree.sync_base();
         self.rebuild = true;
         self.select_by_path(&path);
         Ok(path)
@@ -175,7 +196,6 @@ impl Tree {
             std::fs::remove_dir_all(&self.selected_path)?
         };
         self.select_up();
-        self.tree.sync_base();
         self.rebuild = true;
         Ok(())
     }
@@ -200,7 +220,6 @@ impl Tree {
         if result.is_ok() {
             rel_new_path.push(name);
             selected.update_path(rel_new_path);
-            self.tree.sync_base();
             self.rebuild = true;
         }
         Some(result)
@@ -222,7 +241,7 @@ impl Tree {
     }
 
     pub fn select_by_path(&mut self, path: &PathBuf) {
-        let rel_result = to_relative_path(path);
+        let rel_result = (self.path_parser)(path);
         let path = rel_result.as_ref().unwrap_or(path);
         if self.tree.expand_contained(path) {
             self.selected_path.clone_from(path);
@@ -247,9 +266,9 @@ impl Tree {
         self.tree.tree_file_names()
     }
 
-    pub async fn finish_sync(&mut self, gs: &mut GlobalState) {
+    pub fn finish_sync(&mut self, gs: &mut GlobalState) {
         if let Some(watcher) = self.watcher.as_mut() {
-            self.rebuild = watcher.poll(&mut self.tree, gs).await;
+            self.rebuild = watcher.poll(&mut self.tree, self.path_parser, gs);
             if !self.rebuild {
                 return;
             }

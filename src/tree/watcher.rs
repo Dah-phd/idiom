@@ -1,6 +1,6 @@
-use std::{path::PathBuf, time::Duration};
+use std::path::{Path, PathBuf};
 
-use crate::lsp::Diagnostic;
+use crate::{error::IdiomResult, lsp::Diagnostic};
 use crate::{global_state::GlobalState, tree::TreePath};
 use notify::{
     event::{AccessKind, AccessMode, ModifyKind},
@@ -10,38 +10,29 @@ use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
-use tokio::task::JoinHandle;
-
 pub type DianosticHandle = Arc<Mutex<HashMap<PathBuf, Diagnostic>>>;
 
 pub struct TreeWatcher {
     _inner: RecommendedWatcher,
     receiver: std::sync::mpsc::Receiver<Result<Event, Error>>,
-    sync_handler: Option<JoinHandle<TreePath>>,
     lsp_register: Vec<DianosticHandle>,
 }
 
 impl TreeWatcher {
     pub fn root() -> Result<Self, Error> {
         let (tx, receiver) = std::sync::mpsc::channel();
-        RecommendedWatcher::new(tx, Config::default().with_poll_interval(Duration::from_secs(1)))
-            .and_then(|mut inner| inner.watch(&PathBuf::from("./src"), RecursiveMode::Recursive).map(|_| inner))
-            .map(|_inner| Self { _inner, receiver, sync_handler: None, lsp_register: Vec::new() })
+        RecommendedWatcher::new(tx, Config::default())
+            .and_then(|mut inner| inner.watch(&PathBuf::from("."), RecursiveMode::Recursive).map(|_| inner))
+            .map(|_inner| Self { _inner, receiver, lsp_register: Vec::new() })
     }
 
-    pub async fn poll(&mut self, tree: &mut TreePath, gs: &mut GlobalState) -> bool {
-        let mut status = false;
-
-        if matches!(&self.sync_handler, Some(handle) if handle.is_finished()) {
-            match self.sync_handler.take().unwrap().await {
-                Ok(new_tree) => {
-                    *tree = new_tree;
-                    status = true;
-                }
-                Err(err) => gs.error(format!("File tree sync failure! ERR: {err}")),
-            };
-        }
-
+    pub fn poll(
+        &mut self,
+        tree: &mut TreePath,
+        path_parser: fn(&Path) -> IdiomResult<PathBuf>,
+        gs: &mut GlobalState,
+    ) -> bool {
+        let mut full_sync = false;
         let mut should_sync = false;
         let mut map_errors = false;
 
@@ -49,13 +40,36 @@ impl TreeWatcher {
             if let Ok(Event { kind, paths, .. }) = result {
                 match kind {
                     EventKind::Access(AccessKind::Close(AccessMode::Write)) => {
-                        map_errors = !status;
+                        map_errors = true;
                         for path in paths {
                             gs.workspace.push(crate::global_state::WorkspaceEvent::FileUpdated(path));
                         }
                     }
-                    EventKind::Modify(ModifyKind::Name(..)) | EventKind::Create(..) | EventKind::Remove(..) => {
+                    EventKind::Modify(ModifyKind::Name(..)) | EventKind::Create(..) | EventKind::Remove(..)
+                        if !full_sync =>
+                    {
                         should_sync = true;
+                        for path in paths {
+                            match path.parent() {
+                                Some(path) => match path_parser(path) {
+                                    Ok(formatted_path) => match tree.find_by_path_skip_root(&formatted_path) {
+                                        Some(inner_tree) => {
+                                            inner_tree.sync();
+                                            panic!("bumba")
+                                        }
+                                        None => full_sync = true,
+                                    },
+                                    Err(..) => match tree.find_by_path_skip_root(path) {
+                                        Some(inner_tree) => {
+                                            inner_tree.sync();
+                                            panic!("bumba")
+                                        }
+                                        None => full_sync = true,
+                                    },
+                                },
+                                _ => full_sync = true,
+                            }
+                        }
                     }
                     _ => {}
                 }
@@ -66,26 +80,15 @@ impl TreeWatcher {
             lsp_sync_diagnosic(tree, &self.lsp_register);
         }
 
-        if should_sync {
-            self.start_sync(tree.clone());
+        if full_sync {
+            tree.sync_base();
         }
 
-        status || map_errors
+        should_sync || map_errors
     }
 
     pub fn map_errors(&self, tree: &mut TreePath) {
         lsp_sync_diagnosic(tree, &self.lsp_register);
-    }
-
-    fn start_sync(&mut self, mut tree: TreePath) {
-        let lsp_register = self.lsp_register.clone();
-        if let Some(handle) = self.sync_handler.replace(tokio::spawn(async move {
-            tree.sync_base();
-            lsp_sync_diagnosic(&mut tree, &lsp_register);
-            tree
-        })) {
-            handle.abort();
-        };
     }
 
     pub fn register_lsp(&mut self, tree: &mut TreePath, lsp: DianosticHandle) {

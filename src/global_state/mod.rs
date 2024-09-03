@@ -362,7 +362,7 @@ impl GlobalState {
     }
 
     pub async fn exchange_should_exit(&mut self, tree: &mut Tree, workspace: &mut Workspace) -> bool {
-        tree.finish_sync(self).await;
+        tree.finish_sync(self);
         for event in std::mem::take(&mut self.tree) {
             match event {
                 TreeEvent::PopupAccess => {
