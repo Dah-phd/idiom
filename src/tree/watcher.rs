@@ -2,7 +2,11 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use crate::{error::IdiomResult, lsp::Diagnostic};
-use crate::{global_state::GlobalState, tree::TreePath};
+use crate::{
+    global_state::{GlobalState, WorkspaceEvent},
+    tree::TreePath,
+};
+use bitflags::bitflags;
 use notify::{
     event::{AccessKind, AccessMode, ModifyKind},
     Config, Error, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
@@ -42,69 +46,25 @@ impl TreeWatcher {
         path_parser: fn(&Path) -> IdiomResult<PathBuf>,
         gs: &mut GlobalState,
     ) -> bool {
-        let mut full_sync = false;
-        let mut should_sync = false;
-        let mut map_errors = false;
         match self {
             Self::System { receiver, lsp_register, .. } => {
-                while let Ok(result) = receiver.try_recv() {
-                    if let Ok(Event { kind, paths, .. }) = result {
-                        match kind {
-                            EventKind::Access(AccessKind::Close(AccessMode::Write)) => {
-                                map_errors = true;
-                                for path in paths {
-                                    gs.workspace.push(crate::global_state::WorkspaceEvent::FileUpdated(path));
-                                }
-                            }
-                            EventKind::Modify(ModifyKind::Name(..)) | EventKind::Create(..) | EventKind::Remove(..)
-                                if !full_sync =>
-                            {
-                                should_sync = true;
-                                for path in paths {
-                                    match path.parent() {
-                                        Some(path) => match path_parser(path) {
-                                            Ok(formatted_path) => match tree.find_by_path_skip_root(&formatted_path) {
-                                                Some(inner_tree) => {
-                                                    inner_tree.sync();
-                                                    panic!("bumba")
-                                                }
-                                                None => full_sync = true,
-                                            },
-                                            Err(..) => match tree.find_by_path_skip_root(path) {
-                                                Some(inner_tree) => {
-                                                    inner_tree.sync();
-                                                    panic!("bumba")
-                                                }
-                                                None => full_sync = true,
-                                            },
-                                        },
-                                        _ => full_sync = true,
-                                    }
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
+                let mut handler = EventHandles::default();
+                while let Ok(event) = receiver.try_recv() {
+                    handler.handle(event, tree, gs, path_parser, lsp_register);
                 }
-                if map_errors {
-                    lsp_sync_diagnosic(tree, lsp_register);
-                }
+                !handler.is_all()
             }
             Self::Manual { clock, lsp_register } => {
-                full_sync = clock.elapsed() > TICK;
-                if full_sync {
+                if clock.elapsed() > TICK {
+                    tree.sync_base();
                     *clock = Instant::now();
                     lsp_sync_diagnosic(tree, lsp_register);
-                    should_sync = true;
+                    true
+                } else {
+                    false
                 }
             }
         }
-
-        if full_sync {
-            tree.sync_base();
-        }
-
-        should_sync || map_errors
     }
 
     pub fn map_errors(&self, tree: &mut TreePath) {
@@ -137,6 +97,82 @@ fn lsp_sync_diagnosic(tree: &mut TreePath, lsp_register: &[DianosticHandle]) {
         if let Ok(lock) = lsp.try_lock() {
             for (path, diagnostic) in lock.iter() {
                 tree.map_diagnostics_base(path, diagnostic.errors, diagnostic.warnings);
+            }
+        }
+    }
+}
+
+bitflags! {
+    /// Workspace and Footer are always drawn
+    #[derive(PartialEq, Eq)]
+    pub struct EventHandles: u8 {
+        const CONTENT = 0b0000_0100;
+        const TREE_PARTIAL = 0b0000_0010;
+        const TREE  = 0b0000_0001;
+    }
+}
+
+impl Default for EventHandles {
+    fn default() -> Self {
+        Self::CONTENT | Self::TREE | Self::TREE_PARTIAL
+    }
+}
+
+impl EventHandles {
+    fn handle(
+        &mut self,
+        event: Result<Event, Error>,
+        tree: &mut TreePath,
+        gs: &mut GlobalState,
+        path_parser: fn(&Path) -> IdiomResult<PathBuf>,
+        lsp_register: &[DianosticHandle],
+    ) {
+        if let Ok(Event { kind, paths, .. }) = event {
+            match kind {
+                EventKind::Access(AccessKind::Close(AccessMode::Write)) => {
+                    for path in paths {
+                        gs.workspace.push(WorkspaceEvent::FileUpdated(path));
+                    }
+                    if self.contains(Self::CONTENT) {
+                        self.remove(Self::CONTENT);
+                        lsp_sync_diagnosic(tree, lsp_register);
+                    }
+                }
+                EventKind::Modify(ModifyKind::Name(..)) | EventKind::Create(..) | EventKind::Remove(..)
+                    if self.contains(Self::TREE) =>
+                {
+                    for path in paths {
+                        match path.parent() {
+                            Some(path) => match path_parser(path) {
+                                Ok(formatted_path) => match tree.find_by_path_skip_root(&formatted_path) {
+                                    Some(inner_tree) => {
+                                        self.remove(Self::TREE_PARTIAL);
+                                        inner_tree.sync();
+                                    }
+                                    None => {
+                                        tree.sync_base();
+                                        self.remove(Self::TREE)
+                                    }
+                                },
+                                Err(..) => match tree.find_by_path_skip_root(path) {
+                                    Some(inner_tree) => {
+                                        self.remove(Self::TREE_PARTIAL);
+                                        inner_tree.sync();
+                                    }
+                                    None => {
+                                        tree.sync_base();
+                                        self.remove(Self::TREE)
+                                    }
+                                },
+                            },
+                            _ => {
+                                tree.sync_base();
+                                self.remove(Self::TREE)
+                            }
+                        }
+                    }
+                }
+                _ => {}
             }
         }
     }
