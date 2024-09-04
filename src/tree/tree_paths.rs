@@ -16,7 +16,8 @@ use std::{
     sync::Arc,
 };
 
-const GIT: &str = "./.git";
+use super::PathParser;
+
 const ERR: Color = color::red();
 const WAR: Color = color::dark_yellow();
 
@@ -33,7 +34,7 @@ impl TreePath {
             return Self::File { display: get_path_display(&path), path, errors: 0, warnings: 0 };
         }
         let mut tree_buffer = get_nested_paths(&path)
-            .filter_map(|p| if p.starts_with(GIT) { None } else { Some(p.into()) })
+            .filter_map(|p| if is_git_dir(&p) { None } else { Some(p.into()) })
             .collect::<Vec<Self>>();
         tree_buffer.sort_by(order_tree_paths);
         Self::Folder { display: get_path_display(&path), path, tree: Some(tree_buffer), errors: 0, warnings: 0 }
@@ -170,7 +171,7 @@ impl TreePath {
 
     pub fn sync_base(&mut self) {
         if let Self::Folder { path, tree: Some(tree), .. } = self {
-            merge_trees(tree, get_nested_paths(path).filter(|p| !p.starts_with(GIT)).collect());
+            merge_trees(tree, get_nested_paths(path).filter(|p| !is_git_dir(p)).collect());
         }
     }
 
@@ -235,7 +236,7 @@ impl TreePath {
             }
             Self::Folder { tree: Some(tree), .. } => {
                 for tree_path in tree {
-                    if tree_path.path().starts_with(GIT) {
+                    if is_git_dir(tree_path.path()) {
                         continue;
                     }
                     tree_path.search_in_files(Arc::clone(&pattern), buffer, gitignore);
@@ -252,15 +253,19 @@ impl TreePath {
         buffer
     }
 
-    pub fn find_by_path_skip_root(&mut self, search_path: &Path) -> Option<&mut Self> {
-        if let Self::Folder { tree: Some(inner_tree), .. } = self {
-            for tree_path in inner_tree {
-                if search_path.starts_with(tree_path.path()) {
-                    return tree_path.find_by_path(search_path);
+    pub fn find_by_path_skip_root(&mut self, search_path: &Path, path_parser: PathParser) -> Option<&mut Self> {
+        let search_path = path_parser(search_path).ok()?;
+        match self {
+            Self::Folder { path, tree: Some(inner_tree), .. } if !path.starts_with(&search_path) => {
+                for tree_path in inner_tree {
+                    if search_path.starts_with(tree_path.path()) {
+                        return tree_path.find_by_path(&search_path);
+                    }
                 }
+                None
             }
+            _ => None,
         }
-        None
     }
 
     pub fn find_by_path(&mut self, search_path: &Path) -> Option<&mut Self> {
@@ -300,7 +305,7 @@ impl TreePath {
                     }
                 } else if let Some(tree) = tree {
                     for tree_path in tree {
-                        if tree_path.path().starts_with(GIT) {
+                        if is_git_dir(tree_path.path()) {
                             continue;
                         }
                         tree_path.search_in_paths(pattern, buffer, gitignore);
@@ -480,4 +485,8 @@ fn merge_trees(tree: &mut Vec<TreePath>, new_tree_set: HashSet<PathBuf>) {
         false
     });
     tree.sort_by(order_tree_paths)
+}
+
+fn is_git_dir(path: &Path) -> bool {
+    path.file_name().and_then(|os_str| os_str.to_str()) == Some(".git")
 }

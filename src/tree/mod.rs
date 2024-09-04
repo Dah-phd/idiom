@@ -13,6 +13,8 @@ use std::path::{Path, PathBuf};
 use tree_paths::TreePath;
 use watcher::{DianosticHandle, TreeWatcher};
 
+type PathParser = fn(&Path) -> IdiomResult<PathBuf>;
+
 pub struct Tree {
     pub key_map: TreeKeyMap,
     pub watcher: TreeWatcher,
@@ -20,7 +22,7 @@ pub struct Tree {
     selected_path: PathBuf,
     tree: TreePath,
     display_offset: usize,
-    path_parser: fn(&Path) -> IdiomResult<PathBuf>,
+    path_parser: PathParser,
     rebuild: bool,
 }
 

@@ -15,6 +15,8 @@ use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
+
+use super::PathParser;
 pub type DianosticHandle = Arc<Mutex<HashMap<PathBuf, Diagnostic>>>;
 
 const TICK: Duration = Duration::from_secs(1);
@@ -40,12 +42,7 @@ impl TreeWatcher {
             .unwrap_or(Self::Manual { clock: Instant::now(), lsp_register: Vec::new() })
     }
 
-    pub fn poll(
-        &mut self,
-        tree: &mut TreePath,
-        path_parser: fn(&Path) -> IdiomResult<PathBuf>,
-        gs: &mut GlobalState,
-    ) -> bool {
+    pub fn poll(&mut self, tree: &mut TreePath, path_parser: PathParser, gs: &mut GlobalState) -> bool {
         match self {
             Self::System { receiver, lsp_register, .. } => {
                 let mut handler = EventHandles::default();
@@ -128,8 +125,9 @@ impl EventHandles {
         lsp_register: &[DianosticHandle],
     ) {
         if let Ok(Event { kind, paths, .. }) = event {
+            use EventKind::*;
             match kind {
-                EventKind::Access(AccessKind::Close(AccessMode::Write)) => {
+                Access(AccessKind::Close(AccessMode::Write)) => {
                     for path in paths {
                         gs.workspace.push(WorkspaceEvent::FileUpdated(path));
                     }
@@ -138,34 +136,14 @@ impl EventHandles {
                         lsp_sync_diagnosic(tree, lsp_register);
                     }
                 }
-                EventKind::Modify(ModifyKind::Name(..)) | EventKind::Create(..) | EventKind::Remove(..)
-                    if self.contains(Self::TREE) =>
-                {
-                    for path in paths {
-                        match path.parent() {
-                            Some(path) => match path_parser(path) {
-                                Ok(formatted_path) => match tree.find_by_path_skip_root(&formatted_path) {
-                                    Some(inner_tree) => {
-                                        self.remove(Self::TREE_PARTIAL);
-                                        inner_tree.sync();
-                                    }
-                                    None => {
-                                        tree.sync_base();
-                                        self.remove(Self::TREE)
-                                    }
-                                },
-                                Err(..) => match tree.find_by_path_skip_root(path) {
-                                    Some(inner_tree) => {
-                                        self.remove(Self::TREE_PARTIAL);
-                                        inner_tree.sync();
-                                    }
-                                    None => {
-                                        tree.sync_base();
-                                        self.remove(Self::TREE)
-                                    }
-                                },
-                            },
-                            _ => {
+                Create(..) | Remove(..) | Modify(ModifyKind::Name(..)) if self.contains(Self::TREE) => {
+                    for path in paths.into_iter() {
+                        match path.parent().and_then(|path| tree.find_by_path_skip_root(path, path_parser)) {
+                            Some(inner_tree) => {
+                                self.remove(Self::TREE_PARTIAL);
+                                inner_tree.sync();
+                            }
+                            None => {
                                 tree.sync_base();
                                 self.remove(Self::TREE)
                             }
