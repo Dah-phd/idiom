@@ -1,6 +1,7 @@
 use crate::{
-    global_state::{Clipboard, GlobalState, PopupMessage, WorkspaceEvent},
+    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::backend::{BackendProtocol, Style},
+    tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -64,7 +65,7 @@ impl PopupInterface for ReplacePopup {
                 if self.options.is_empty() {
                     return PopupMessage::None;
                 }
-                WorkspaceEvent::ReplaceNextSelect {
+                IdiomEvent::ReplaceNextSelect {
                     new_text: self.new_text.to_owned(),
                     select: self.drain_next(),
                     next_select: self.get_state(),
@@ -75,15 +76,15 @@ impl PopupInterface for ReplacePopup {
                 if self.options.is_empty() {
                     return PopupMessage::None;
                 }
-                WorkspaceEvent::ReplaceAll(self.new_text.to_owned(), self.options.clone()).into()
+                IdiomEvent::ReplaceAll(self.new_text.to_owned(), self.options.clone()).into()
             }
             KeyCode::Char(ch) => {
                 self.push(ch);
-                WorkspaceEvent::PopupAccess.into()
+                IdiomEvent::PopupAccess.into()
             }
             KeyCode::Backspace => {
                 self.backspace();
-                WorkspaceEvent::PopupAccess.into()
+                IdiomEvent::PopupAccess.into()
             }
             KeyCode::Tab => {
                 self.on_text = !self.on_text;
@@ -127,8 +128,8 @@ impl PopupInterface for ReplacePopup {
         self.fast_render(gs);
     }
 
-    fn update_workspace(&mut self, workspace: &mut Workspace) {
-        if let Some(editor) = workspace.get_active() {
+    fn component_access(&mut self, ws: &mut Workspace, _tree: &mut Tree) {
+        if let Some(editor) = ws.get_active() {
             self.options.clear();
             editor.find(&self.pattern, &mut self.options);
         }

@@ -76,7 +76,7 @@ impl Info {
                 if let Some(mut i) = self.actions.take() {
                     return match i.len().cmp(&self.state.selected) {
                         Ordering::Greater => {
-                            gs.workspace.push(i.remove(self.state.selected).into());
+                            gs.event.push(i.remove(self.state.selected).into());
                             ModalMessage::TakenDone
                         }
                         _ => {

@@ -180,7 +180,7 @@ pub fn context(editor: &mut CodeEditor, gs: &mut GlobalState) {
                         }
                     }
                     LSPResponse::Renames(workspace_edit) => {
-                        gs.workspace.push(workspace_edit.into());
+                        gs.event.push(workspace_edit.into());
                     }
                     LSPResponse::Tokens(tokens) => {
                         match tokens {
@@ -209,7 +209,7 @@ pub fn context(editor: &mut CodeEditor, gs: &mut GlobalState) {
                     LSPResponse::References(locations) => {
                         if let Some(mut locations) = locations {
                             if locations.len() == 1 {
-                                gs.tree.push(locations.remove(0).into());
+                                gs.event.push(locations.remove(0).into());
                             } else {
                                 gs.popup(refrence_selector(locations));
                             }

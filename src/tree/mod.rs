@@ -3,7 +3,7 @@ mod watcher;
 use crate::{
     configs::{TreeAction, TreeKeyMap},
     error::{IdiomError, IdiomResult},
-    global_state::{GlobalState, WorkspaceEvent},
+    global_state::{GlobalState, IdiomEvent},
     popups::popups_tree::{create_file_popup, rename_file_popup},
     render::state::State,
     utils::{build_file_or_folder, to_canon_path, to_relative_path},
@@ -96,7 +96,7 @@ impl Tree {
                 TreeAction::Shrink => self.shrink(),
                 TreeAction::Expand => {
                     if let Some(path) = self.expand_dir_or_get_path() {
-                        gs.workspace.push(WorkspaceEvent::Open(path, 0));
+                        gs.event.push(IdiomEvent::OpenAtLine(path, 0));
                     }
                 }
                 TreeAction::Delete => {

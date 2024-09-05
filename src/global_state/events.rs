@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
-pub enum TreeEvent {
+pub enum IdiomEvent {
     PopupAccess,
     Open(PathBuf),
     OpenAtLine(PathBuf, usize),
@@ -18,53 +18,26 @@ pub enum TreeEvent {
     RenameFile(String),
     SearchFiles(String),
     RegisterLSP(Arc<Mutex<HashMap<PathBuf, Diagnostic>>>),
-}
-
-impl From<TreeEvent> for PopupMessage {
-    fn from(event: TreeEvent) -> Self {
-        PopupMessage::Tree(event)
-    }
-}
-
-impl From<Location> for TreeEvent {
-    fn from(loc: Location) -> Self {
-        Self::OpenAtSelect(PathBuf::from(loc.uri.path().as_str()), (loc.range.start.into(), loc.range.end.into()))
-    }
-}
-
-impl From<LocationLink> for TreeEvent {
-    fn from(loc: LocationLink) -> Self {
-        Self::OpenAtSelect(
-            PathBuf::from(loc.target_uri.path().as_str()),
-            (loc.target_range.start.into(), loc.target_range.end.into()),
-        )
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum WorkspaceEvent {
-    PopupAccess,
+    FileUpdated(PathBuf),
+    CheckLSP(FileType),
+    AutoComplete(String),
+    Snippet(String, Option<(usize, usize)>),
+    InsertText(String),
+    WorkspaceEdit(WorkspaceEdit),
+    FindSelector(String),
+    ActivateEditor(usize),
+    ReplaceAll(String, Vec<(CursorPosition, CursorPosition)>),
+    FindToReplace(String, Vec<(CursorPosition, CursorPosition)>),
     ReplaceNextSelect {
         new_text: String,
         select: (CursorPosition, CursorPosition),
         next_select: Option<(CursorPosition, CursorPosition)>,
     },
-    ReplaceAll(String, Vec<(CursorPosition, CursorPosition)>),
-    GoToLine(usize),
     GoToSelect {
         select: (CursorPosition, CursorPosition),
         clear_popup: bool,
     },
-    AutoComplete(String),
-    ActivateEditor(usize),
-    FindSelector(String),
-    FindToReplace(String, Vec<(CursorPosition, CursorPosition)>),
-    Open(PathBuf, usize),
-    InsertText(String),
-    Snippet(String, Option<(usize, usize)>),
-    CheckLSP(FileType),
-    WorkspaceEdit(WorkspaceEdit),
-    FileUpdated(PathBuf),
+    GoToLine(usize),
     Resize,
     Save,
     Rebase,
@@ -72,7 +45,7 @@ pub enum WorkspaceEvent {
     SaveAndExit,
 }
 
-fn parse_snippet(snippet: String) -> WorkspaceEvent {
+fn parse_snippet(snippet: String) -> IdiomEvent {
     let mut cursor_offset = None;
     let mut named = false;
     let mut text = String::default();
@@ -114,26 +87,41 @@ fn parse_snippet(snippet: String) -> WorkspaceEvent {
             text.push(ch);
         };
     }
-    WorkspaceEvent::Snippet(text, cursor_offset)
+    IdiomEvent::Snippet(text, cursor_offset)
 }
 
-impl From<WorkspaceEvent> for PopupMessage {
-    fn from(event: WorkspaceEvent) -> Self {
-        PopupMessage::Workspace(event)
+impl From<IdiomEvent> for PopupMessage {
+    fn from(event: IdiomEvent) -> Self {
+        PopupMessage::Tree(event)
     }
 }
 
-impl From<WorkspaceEdit> for WorkspaceEvent {
+impl From<Location> for IdiomEvent {
+    fn from(loc: Location) -> Self {
+        Self::OpenAtSelect(PathBuf::from(loc.uri.path().as_str()), (loc.range.start.into(), loc.range.end.into()))
+    }
+}
+
+impl From<LocationLink> for IdiomEvent {
+    fn from(loc: LocationLink) -> Self {
+        Self::OpenAtSelect(
+            PathBuf::from(loc.target_uri.path().as_str()),
+            (loc.target_range.start.into(), loc.target_range.end.into()),
+        )
+    }
+}
+
+impl From<WorkspaceEdit> for IdiomEvent {
     fn from(value: WorkspaceEdit) -> Self {
         Self::WorkspaceEdit(value)
     }
 }
 
-impl From<CompletionItem> for WorkspaceEvent {
+impl From<CompletionItem> for IdiomEvent {
     fn from(item: CompletionItem) -> Self {
         let parser = match item.insert_text_format {
             Some(InsertTextFormat::SNIPPET) => parse_snippet,
-            _ => WorkspaceEvent::AutoComplete,
+            _ => IdiomEvent::AutoComplete,
         };
         if let Some(text) = item.insert_text {
             return (parser)(text);
@@ -148,17 +136,11 @@ impl From<CompletionItem> for WorkspaceEvent {
                 }
             };
         }
-        WorkspaceEvent::AutoComplete(item.label)
+        IdiomEvent::AutoComplete(item.label)
     }
 }
 
-impl From<Location> for WorkspaceEvent {
-    fn from(value: Location) -> Self {
-        Self::Open(PathBuf::from(value.uri.path().as_str()), value.range.start.line as usize)
-    }
-}
-
-impl TryFrom<GotoDeclarationResponse> for TreeEvent {
+impl TryFrom<GotoDeclarationResponse> for IdiomEvent {
     type Error = ();
     fn try_from(value: GotoDeclarationResponse) -> Result<Self, ()> {
         Ok(match value {

@@ -1,7 +1,8 @@
 mod rust;
+use crate::global_state::IdiomEvent;
 use crate::render::backend::Style;
 use crate::render::widgets::{StyledLine, Text};
-use crate::syntax::{theme::Theme, Action, GlobalState, WorkspaceEvent};
+use crate::syntax::{theme::Theme, Action, GlobalState};
 use crate::workspace::line::EditorLine;
 use crate::{configs::FileType, render::backend::Color};
 use lsp_types::DiagnosticRelatedInformation;
@@ -213,7 +214,7 @@ impl From<FileType> for Lang {
                     if let Value::Object(map) = data {
                         if let Some(Value::Object(import_map)) = map.get("imports").and_then(|arr| arr.get(0)) {
                             if let Some(Value::String(import)) = import_map.get("full_import_path") {
-                                gs.workspace.push(WorkspaceEvent::InsertText(format!("use {import};\n")));
+                                gs.event.push(IdiomEvent::InsertText(format!("use {import};\n")));
                             }
                         };
                     }

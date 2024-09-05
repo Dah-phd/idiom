@@ -23,7 +23,7 @@ use crate::{
 pub use clipboard::Clipboard;
 use controls::map_term;
 use crossterm::event::{KeyEvent, MouseEvent};
-pub use events::{TreeEvent, WorkspaceEvent};
+pub use events::IdiomEvent;
 
 use self::{draw::Components, message::Messages};
 
@@ -34,8 +34,7 @@ const SELECT_SPAN: &str = "  --SELECT--   ";
 pub enum PopupMessage {
     #[default]
     None,
-    Tree(TreeEvent),
-    Workspace(WorkspaceEvent),
+    Tree(IdiomEvent),
     Clear,
 }
 
@@ -85,8 +84,7 @@ pub struct GlobalState {
     pub theme: UITheme,
     pub writer: Backend,
     pub popup: Box<dyn PopupInterface>,
-    pub workspace: Vec<WorkspaceEvent>,
-    pub tree: Vec<TreeEvent>,
+    pub event: Vec<IdiomEvent>,
     pub clipboard: Clipboard,
     pub exit: bool,
     pub screen_rect: Rect,
@@ -111,8 +109,7 @@ impl GlobalState {
             theme,
             writer: backend,
             popup: placeholder(),
-            workspace: Vec::default(),
-            tree: Vec::default(),
+            event: Vec::default(),
             clipboard: Clipboard::default(),
             exit: false,
             screen_rect,
@@ -277,18 +274,15 @@ impl GlobalState {
             }
             PopupMessage::None => {}
             PopupMessage::Tree(event) => {
-                self.tree.push(event);
-            }
-            PopupMessage::Workspace(event) => {
-                self.workspace.push(event);
+                self.event.push(event);
             }
         }
         true
     }
 
-    pub fn try_tree_event(&mut self, value: impl TryInto<TreeEvent>) {
+    pub fn try_tree_event(&mut self, value: impl TryInto<IdiomEvent>) {
         if let Ok(event) = value.try_into() {
-            self.tree.push(event);
+            self.event.push(event);
         }
     }
 
@@ -355,53 +349,66 @@ impl GlobalState {
             LSPError::Null => (),
             LSPError::InternalError(message) => {
                 self.messages.error(message);
-                self.workspace.push(WorkspaceEvent::CheckLSP(file_type));
+                self.event.push(IdiomEvent::CheckLSP(file_type));
             }
             _ => self.error(err.to_string()),
         }
     }
 
-    pub async fn exchange_should_exit(&mut self, tree: &mut Tree, workspace: &mut Workspace) -> bool {
+    pub async fn exchange_should_exit(&mut self, tree: &mut Tree, ws: &mut Workspace) -> bool {
         tree.finish_sync(self);
-        for event in std::mem::take(&mut self.tree) {
+        for event in std::mem::take(&mut self.event) {
             match event {
-                TreeEvent::PopupAccess => {
-                    self.popup.update_tree(tree);
+                IdiomEvent::PopupAccess => {
+                    self.popup.component_access(ws, tree);
                 }
-                TreeEvent::SearchFiles(pattern) => {
+                IdiomEvent::SearchFiles(pattern) => {
                     if pattern.len() > 1 {
                         let mut new_popup = ActiveFileSearch::new(pattern);
-                        new_popup.update_tree(tree);
+                        new_popup.component_access(ws, tree);
                         self.popup(new_popup);
                     } else {
                         self.popup(ActiveFileSearch::new(pattern));
                     }
                 }
-                TreeEvent::Open(path) => {
+                IdiomEvent::Open(path) => {
                     tree.select_by_path(&path);
                     self.clear_popup();
-                    self.workspace.push(WorkspaceEvent::Open(path, 0));
+                    if path.is_dir() {
+                        self.select_mode();
+                    } else {
+                        match ws.new_from(path, self).await {
+                            Ok(..) => self.insert_mode(),
+                            Err(error) => self.error(error.to_string()),
+                        }
+                    }
                 }
-                TreeEvent::OpenAtLine(path, line) => {
+                IdiomEvent::OpenAtLine(path, line) => {
                     tree.select_by_path(&path);
                     self.clear_popup();
-                    self.workspace.push(WorkspaceEvent::Open(path, line));
+                    match ws.new_at_line(path, line, self).await {
+                        Ok(..) => self.insert_mode(),
+                        Err(error) => self.error(error.to_string()),
+                    }
                 }
-                TreeEvent::OpenAtSelect(path, select) => {
+                IdiomEvent::OpenAtSelect(path, select) => {
                     tree.select_by_path(&path);
-                    self.workspace.push(WorkspaceEvent::Open(path, 0));
-                    self.workspace.push(WorkspaceEvent::GoToSelect { select, clear_popup: true });
+                    match ws.new_from(path, self).await {
+                        Ok(..) => self.insert_mode(),
+                        Err(error) => self.error(error.to_string()),
+                    }
+                    self.event.push(IdiomEvent::GoToSelect { select, clear_popup: true });
                 }
-                TreeEvent::SelectPath(path) => {
+                IdiomEvent::SelectPath(path) => {
                     tree.select_by_path(&path);
                 }
-                TreeEvent::CreateFileOrFolder(name) => {
+                IdiomEvent::CreateFileOrFolder(name) => {
                     if let Ok(new_path) = tree.create_file_or_folder(name) {
                         if !new_path.is_dir() {
-                            match workspace.new_at_line(new_path, 0, self).await {
+                            match ws.new_at_line(new_path, 0, self).await {
                                 Ok(..) => {
                                     self.insert_mode();
-                                    if let Some(editor) = workspace.get_active() {
+                                    if let Some(editor) = ws.get_active() {
                                         editor.update_status.deny();
                                     }
                                 }
@@ -411,13 +418,13 @@ impl GlobalState {
                     }
                     self.clear_popup();
                 }
-                TreeEvent::CreateFileOrFolderBase(name) => {
+                IdiomEvent::CreateFileOrFolderBase(name) => {
                     if let Ok(new_path) = tree.create_file_or_folder_base(name) {
                         if !new_path.is_dir() {
-                            match workspace.new_at_line(new_path, 0, self).await {
+                            match ws.new_at_line(new_path, 0, self).await {
                                 Ok(..) => {
                                     self.insert_mode();
-                                    if let Some(editor) = workspace.get_active() {
+                                    if let Some(editor) = ws.get_active() {
                                         editor.update_status.deny();
                                     }
                                 }
@@ -427,52 +434,86 @@ impl GlobalState {
                     }
                     self.clear_popup();
                 }
-                TreeEvent::RenameFile(name) => {
+                IdiomEvent::RenameFile(name) => {
                     if let Some(result) = tree.rename_path(name) {
                         match result {
-                            Ok((old, new_path)) => workspace.rename_editors(old, new_path, self),
+                            Ok((old, new_path)) => ws.rename_editors(old, new_path, self),
                             Err(err) => self.messages.error(err.to_string()),
                         }
                     };
                     self.clear_popup();
                 }
-                TreeEvent::RegisterLSP(lsp) => {
+                IdiomEvent::RegisterLSP(lsp) => {
                     tree.register_lsp(lsp);
                 }
-            }
-        }
-        for event in std::mem::take(&mut self.workspace) {
-            match event {
-                WorkspaceEvent::GoToLine(idx) => {
-                    if let Some(editor) = workspace.get_active() {
+                IdiomEvent::AutoComplete(completion) => {
+                    if let Some(editor) = ws.get_active() {
+                        editor.replace_token(completion);
+                    }
+                }
+                IdiomEvent::Snippet(snippet, cursor_offset) => {
+                    if let Some(editor) = ws.get_active() {
+                        editor.insert_snippet(snippet, cursor_offset);
+                    };
+                }
+                IdiomEvent::WorkspaceEdit(edits) => ws.apply_edits(edits, self),
+                IdiomEvent::Resize => {
+                    ws.resize_all(self.editor_area.width, self.editor_area.height as usize);
+                }
+                IdiomEvent::Rebase => {
+                    if let Some(editor) = ws.get_active() {
+                        editor.rebase(self);
+                    }
+                    self.clear_popup();
+                }
+                IdiomEvent::Save => {
+                    if let Some(editor) = ws.get_active() {
+                        editor.save(self);
+                    }
+                    self.clear_popup();
+                }
+                IdiomEvent::CheckLSP(ft) => {
+                    ws.check_lsp(ft, self).await;
+                }
+                IdiomEvent::SaveAndExit => {
+                    ws.save_all(self);
+                    self.exit = true;
+                }
+                IdiomEvent::Exit => {
+                    self.exit = true;
+                }
+                IdiomEvent::FileUpdated(path) => {
+                    ws.notify_update(path, self);
+                }
+                IdiomEvent::InsertText(insert) => {
+                    if let Some(editor) = ws.get_active() {
+                        editor.insert_text_with_relative_offset(insert);
+                    };
+                }
+                IdiomEvent::FindSelector(pattern) => {
+                    if let Some(editor) = ws.get_active() {
+                        self.insert_mode();
+                        self.popup(selector_ranges(editor.find_with_line(&pattern)));
+                    } else {
+                        self.clear_popup();
+                    }
+                }
+                IdiomEvent::ActivateEditor(idx) => {
+                    ws.activate_editor(idx, self);
+                    self.clear_popup();
+                    self.insert_mode();
+                }
+                IdiomEvent::FindToReplace(pattern, options) => {
+                    self.popup(ReplacePopup::from_search(pattern, options));
+                }
+                IdiomEvent::GoToLine(idx) => {
+                    if let Some(editor) = ws.get_active() {
                         editor.go_to(idx);
                     }
                     self.clear_popup();
                 }
-                WorkspaceEvent::PopupAccess => {
-                    self.popup.update_workspace(workspace);
-                    workspace.render(self);
-                    if let Some(editor) = workspace.get_active() {
-                        editor.render(self);
-                    };
-                }
-                WorkspaceEvent::ReplaceNextSelect { new_text, select: (from, to), next_select } => {
-                    if let Some(editor) = workspace.get_active() {
-                        editor.replace_select(from, to, new_text.as_str());
-                        if let Some((from, to)) = next_select {
-                            editor.go_to_select(from, to);
-                            editor.render(self);
-                        }
-                    }
-                }
-                WorkspaceEvent::ReplaceAll(clip, ranges) => {
-                    if let Some(editor) = workspace.get_active() {
-                        editor.mass_replace(ranges, clip);
-                    }
-                    self.clear_popup();
-                }
-                WorkspaceEvent::GoToSelect { select: (from, to), clear_popup } => {
-                    if let Some(editor) = workspace.get_active() {
+                IdiomEvent::GoToSelect { select: (from, to), clear_popup } => {
+                    if let Some(editor) = ws.get_active() {
                         editor.go_to_select(from, to);
                         if clear_popup {
                             self.clear_popup();
@@ -483,75 +524,20 @@ impl GlobalState {
                         self.clear_popup();
                     }
                 }
-                WorkspaceEvent::ActivateEditor(idx) => {
-                    workspace.activate_editor(idx, self);
+                IdiomEvent::ReplaceAll(clip, ranges) => {
+                    if let Some(editor) = ws.get_active() {
+                        editor.mass_replace(ranges, clip);
+                    }
                     self.clear_popup();
-                    self.insert_mode();
                 }
-                WorkspaceEvent::FindSelector(pattern) => {
-                    if let Some(editor) = workspace.get_active() {
-                        self.insert_mode();
-                        self.popup(selector_ranges(editor.find_with_line(&pattern)));
-                    } else {
-                        self.clear_popup();
-                    }
-                }
-                WorkspaceEvent::FindToReplace(pattern, options) => {
-                    self.popup(ReplacePopup::from_search(pattern, options));
-                }
-                WorkspaceEvent::AutoComplete(completion) => {
-                    if let Some(editor) = workspace.get_active() {
-                        editor.replace_token(completion);
-                    }
-                }
-                WorkspaceEvent::WorkspaceEdit(edits) => workspace.apply_edits(edits, self),
-                WorkspaceEvent::Open(path, line) => {
-                    if path.is_dir() {
-                        self.select_mode();
-                    } else {
-                        match workspace.new_at_line(path, line, self).await {
-                            Ok(..) => self.insert_mode(),
-                            Err(error) => self.error(error.to_string()),
+                IdiomEvent::ReplaceNextSelect { new_text, select: (from, to), next_select } => {
+                    if let Some(editor) = ws.get_active() {
+                        editor.replace_select(from, to, new_text.as_str());
+                        if let Some((from, to)) = next_select {
+                            editor.go_to_select(from, to);
+                            editor.render(self);
                         }
                     }
-                }
-                WorkspaceEvent::InsertText(insert) => {
-                    if let Some(editor) = workspace.get_active() {
-                        editor.insert_text_with_relative_offset(insert);
-                    };
-                }
-                WorkspaceEvent::Snippet(snippet, cursor_offset) => {
-                    if let Some(editor) = workspace.get_active() {
-                        editor.insert_snippet(snippet, cursor_offset);
-                    };
-                }
-                WorkspaceEvent::FileUpdated(path) => {
-                    workspace.notify_update(path, self);
-                }
-                WorkspaceEvent::Rebase => {
-                    if let Some(editor) = workspace.get_active() {
-                        editor.rebase(self);
-                    }
-                    self.clear_popup();
-                }
-                WorkspaceEvent::Save => {
-                    if let Some(editor) = workspace.get_active() {
-                        editor.save(self);
-                    }
-                    self.clear_popup();
-                }
-                WorkspaceEvent::Resize => {
-                    workspace.resize_all(self.editor_area.width, self.editor_area.height as usize);
-                }
-                WorkspaceEvent::CheckLSP(ft) => {
-                    workspace.check_lsp(ft, self).await;
-                }
-                WorkspaceEvent::SaveAndExit => {
-                    workspace.save_all(self);
-                    self.exit = true;
-                }
-                WorkspaceEvent::Exit => {
-                    self.exit = true;
                 }
             }
         }

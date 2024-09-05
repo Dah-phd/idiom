@@ -1,11 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use crate::global_state::IdiomEvent;
 use crate::{error::IdiomResult, lsp::Diagnostic};
-use crate::{
-    global_state::{GlobalState, WorkspaceEvent},
-    tree::TreePath,
-};
+use crate::{global_state::GlobalState, tree::TreePath};
 use bitflags::bitflags;
 use notify::{
     event::{AccessKind, AccessMode, ModifyKind},
@@ -129,7 +127,7 @@ impl EventHandles {
             match kind {
                 Access(AccessKind::Close(AccessMode::Write)) => {
                     for path in paths {
-                        gs.workspace.push(WorkspaceEvent::FileUpdated(path));
+                        gs.event.push(IdiomEvent::FileUpdated(path));
                     }
                     if self.contains(Self::CONTENT) {
                         self.remove(Self::CONTENT);

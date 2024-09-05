@@ -7,7 +7,7 @@ pub mod theme;
 pub mod tokens;
 use crate::{
     configs::{EditorAction, FileType},
-    global_state::{GlobalState, WorkspaceEvent},
+    global_state::{GlobalState, IdiomEvent},
     lsp::{LSPClient, LSPError, LSPResponseType, LSPResult},
     render::layout::Rect,
     workspace::{
@@ -252,7 +252,7 @@ impl Lexer {
         if self.lsp {
             gs.message("Checking LSP status (on save) ...");
             if self.client.file_did_save(self.uri.clone(), content).is_err() && self.client.is_closed() {
-                gs.workspace.push(WorkspaceEvent::CheckLSP(self.lang.file_type));
+                gs.event.push(IdiomEvent::CheckLSP(self.lang.file_type));
             } else {
                 gs.success("LSP running ...");
             }

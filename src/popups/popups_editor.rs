@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use super::{Popup, PopupSelector};
-use crate::global_state::WorkspaceEvent;
+use crate::global_state::IdiomEvent;
 use crate::render::Button;
 use crate::workspace::CursorPosition;
 use crossterm::event::KeyCode;
@@ -13,12 +13,12 @@ pub fn save_all_popup() -> Box<Popup> {
         None,
         vec![
             Button {
-                command: |_| WorkspaceEvent::SaveAndExit.into(),
+                command: |_| IdiomEvent::SaveAndExit.into(),
                 name: "Save All (Y)",
                 key: Some(vec![KeyCode::Char('y'), KeyCode::Char('Y')]),
             },
             Button {
-                command: |_| WorkspaceEvent::Exit.into(),
+                command: |_| IdiomEvent::Exit.into(),
                 name: "Don't save (N)",
                 key: Some(vec![KeyCode::Char('n'), KeyCode::Char('N')]),
             },
@@ -34,7 +34,7 @@ pub fn selector_ranges(
         options,
         // display: |((from, _), line)| format!("({}) {line}", from.line + 1),
         |((..), line)| line,
-        |popup| WorkspaceEvent::GoToSelect { select: popup.options[popup.state.selected].0, clear_popup: true }.into(),
+        |popup| IdiomEvent::GoToSelect { select: popup.options[popup.state.selected].0, clear_popup: true }.into(),
         None,
     ))
 }
@@ -43,7 +43,7 @@ pub fn selector_editors(options: Vec<String>) -> Box<PopupSelector<String>> {
     Box::new(PopupSelector::new(
         options,
         |editor| editor,
-        |popup| WorkspaceEvent::ActivateEditor(popup.state.selected).into(),
+        |popup| IdiomEvent::ActivateEditor(popup.state.selected).into(),
         None,
     ))
 }
@@ -55,12 +55,12 @@ pub fn file_updated(path: PathBuf) -> Box<Popup> {
         None,
         vec![
             Button {
-                command: |_| WorkspaceEvent::Save.into(),
+                command: |_| IdiomEvent::Save.into(),
                 name: "Overwrite (S)",
                 key: Some(vec![KeyCode::Char('s'), KeyCode::Char('S')]),
             },
             Button {
-                command: |_| WorkspaceEvent::Rebase.into(),
+                command: |_| IdiomEvent::Rebase.into(),
                 name: "Rebase (L)",
                 key: Some(vec![KeyCode::Char('l'), KeyCode::Char('L')]),
             },

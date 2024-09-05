@@ -40,7 +40,7 @@ impl AutoComplete {
                 if let Some(data) = filtered_completion.data.take() {
                     lang.handle_completion_data(data, gs);
                 };
-                gs.workspace.push(filtered_completion.into());
+                gs.event.push(filtered_completion.into());
                 ModalMessage::TakenDone
             }
             EditorAction::Char(ch) => self.push_filter(ch),

@@ -1,4 +1,4 @@
-use crate::global_state::WorkspaceEvent;
+use crate::global_state::IdiomEvent;
 use crate::render::backend::{color, BackendProtocol, Color, Style};
 use crate::render::UTF8Safe;
 use crate::syntax::Lang;
@@ -23,10 +23,10 @@ pub enum Action {
     Import(String),
 }
 
-impl From<Action> for WorkspaceEvent {
+impl From<Action> for IdiomEvent {
     fn from(value: Action) -> Self {
         match value {
-            Action::Import(text) => WorkspaceEvent::InsertText(text),
+            Action::Import(text) => IdiomEvent::InsertText(text),
         }
     }
 }

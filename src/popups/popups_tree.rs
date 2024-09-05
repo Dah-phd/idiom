@@ -1,6 +1,6 @@
 use super::{Popup, PopupSelector};
 use crate::{
-    global_state::{PopupMessage, TreeEvent},
+    global_state::{IdiomEvent, PopupMessage},
     render::Button,
 };
 use lsp_types::{Location, Range};
@@ -8,13 +8,13 @@ use std::path::PathBuf;
 
 pub fn create_file_popup(path: String) -> Box<Popup> {
     let mut buttons = vec![Button {
-        command: |popup| TreeEvent::CreateFileOrFolder(popup.message.to_owned()).into(),
+        command: |popup| IdiomEvent::CreateFileOrFolder(popup.message.to_owned()).into(),
         name: "Create",
         key: None,
     }];
     if path != "./" {
         buttons.push(Button {
-            command: |popup| TreeEvent::CreateFileOrFolderBase(popup.message.to_owned()).into(),
+            command: |popup| IdiomEvent::CreateFileOrFolderBase(popup.message.to_owned()).into(),
             name: "Create in ./",
             key: None,
         })
@@ -28,7 +28,7 @@ pub fn rename_file_popup(path: String) -> Box<Popup> {
         Some(format!("Rename: {path}")),
         Some(Some),
         vec![Button {
-            command: |popup| TreeEvent::RenameFile(popup.message.to_owned()).into(),
+            command: |popup| IdiomEvent::RenameFile(popup.message.to_owned()).into(),
             name: "Rename",
             key: None,
         }],
@@ -42,7 +42,7 @@ pub fn refrence_selector(options: Vec<Location>) -> Box<PopupSelector<(String, P
         |(display, ..)| display,
         |popup| {
             if let Some((_, path, range)) = popup.options.get(popup.state.selected) {
-                return TreeEvent::OpenAtSelect(path.clone(), (range.start.into(), range.end.into())).into();
+                return IdiomEvent::OpenAtSelect(path.clone(), (range.start.into(), range.end.into())).into();
             }
             PopupMessage::Clear
         },

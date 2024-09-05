@@ -15,11 +15,8 @@ const SHELL: &str = "bash";
 const SHELL: &str = "cmd";
 
 use crate::error::{IdiomError, IdiomResult};
-use crate::{
-    configs::CONFIG_FOLDER,
-    global_state::{GlobalState, WorkspaceEvent},
-    utils::force_lock,
-};
+use crate::global_state::IdiomEvent;
+use crate::{configs::CONFIG_FOLDER, global_state::GlobalState, utils::force_lock};
 use dirs::config_dir;
 
 pub struct Terminal {
@@ -130,7 +127,7 @@ pub fn load_file(f: &str, gs: &mut GlobalState) -> Option<String> {
     let path = PathBuf::from(f);
     match path.canonicalize() {
         Ok(path) => {
-            gs.workspace.push(WorkspaceEvent::Open(path, 0));
+            gs.event.push(IdiomEvent::OpenAtLine(path, 0));
             None
         }
         Err(err) => Some(err.to_string()),
@@ -146,7 +143,7 @@ pub fn load_cfg(f: &str, gs: &mut GlobalState) -> Option<String> {
     };
     path.push(CONFIG_FOLDER);
     path.push(f);
-    gs.workspace.push(WorkspaceEvent::Open(path, 0));
+    gs.event.push(IdiomEvent::OpenAtLine(path, 0));
     None
 }
 

@@ -39,8 +39,7 @@ pub trait PopupInterface {
 
     fn render(&mut self, gs: &mut GlobalState);
     fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage;
-    fn update_workspace(&mut self, _workspace: &mut Workspace) {}
-    fn update_tree(&mut self, _file_tree: &mut Tree) {}
+    fn component_access(&mut self, _ws: &mut Workspace, _tree: &mut Tree) {}
     fn mark_as_updated(&mut self);
     fn collect_update_status(&mut self) -> bool;
 }

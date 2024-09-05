@@ -1,5 +1,5 @@
 use crate::{
-    global_state::{GlobalState, Mode, TreeEvent},
+    global_state::{GlobalState, IdiomEvent, Mode},
     render::layout::Rect,
     runner::EditorTerminal,
     tree::Tree,
@@ -45,7 +45,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
             }
             if let Some((line_idx, _)) = contained_position(gs.tree_area, event.row, event.column) {
                 if let Some(path) = tree.mouse_select(line_idx + 1) {
-                    gs.tree.push(TreeEvent::Open(path));
+                    gs.event.push(IdiomEvent::Open(path));
                     return;
                 };
                 gs.select_mode();

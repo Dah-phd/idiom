@@ -3,11 +3,12 @@ use super::{
     PopupInterface,
 };
 use crate::{
-    global_state::{Clipboard, GlobalState, PopupMessage, WorkspaceEvent},
+    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::{
         backend::{BackendProtocol, Style},
         count_as_string, TextField,
     },
+    tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -35,13 +36,13 @@ impl PopupInterface for GoToLinePopup {
             KeyCode::Char(ch) => {
                 if ch.is_numeric() {
                     self.line_idx.push(ch);
-                    return WorkspaceEvent::PopupAccess.into();
+                    return IdiomEvent::PopupAccess.into();
                 };
                 PopupMessage::None
             }
             KeyCode::Backspace => {
                 if self.line_idx.pop().is_some() {
-                    return WorkspaceEvent::PopupAccess.into();
+                    return IdiomEvent::PopupAccess.into();
                 };
                 PopupMessage::None
             }
@@ -61,8 +62,8 @@ impl PopupInterface for GoToLinePopup {
         };
     }
 
-    fn update_workspace(&mut self, workspace: &mut Workspace) {
-        if let Some(editor) = workspace.get_active() {
+    fn component_access(&mut self, ws: &mut Workspace, _tree: &mut Tree) {
+        if let Some(editor) = ws.get_active() {
             self.updated = true;
             if let Ok(idx) = self.line_idx.parse::<usize>() {
                 editor.go_to(idx.saturating_sub(1));
@@ -94,7 +95,7 @@ impl FindPopup {
 impl PopupInterface for FindPopup {
     fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {
         if matches!(key.code, KeyCode::Char('h' | 'H') if key.modifiers.contains(KeyModifiers::CONTROL)) {
-            return WorkspaceEvent::FindToReplace(self.pattern.text.to_owned(), self.options.clone()).into();
+            return IdiomEvent::FindToReplace(self.pattern.text.to_owned(), self.options.clone()).into();
         }
         if let Some(event) = self.pattern.map(key, clipboard) {
             return event;
@@ -103,7 +104,7 @@ impl PopupInterface for FindPopup {
             KeyCode::Enter | KeyCode::Down => into_message(next_option(&self.options, &mut self.state)),
             KeyCode::Up => into_message(prev_option(&self.options, &mut self.state)),
             KeyCode::Esc | KeyCode::Left => PopupMessage::Clear,
-            KeyCode::Tab => WorkspaceEvent::FindSelector(self.pattern.text.to_owned()).into(),
+            KeyCode::Tab => IdiomEvent::FindSelector(self.pattern.text.to_owned()).into(),
             _ => PopupMessage::None,
         }
     }
@@ -124,8 +125,8 @@ impl PopupInterface for FindPopup {
         }
     }
 
-    fn update_workspace(&mut self, workspace: &mut Workspace) {
-        if let Some(editor) = workspace.get_active() {
+    fn component_access(&mut self, ws: &mut Workspace, _tree: &mut Tree) {
+        if let Some(editor) = ws.get_active() {
             self.options.clear();
             editor.find(self.pattern.text.as_str(), &mut self.options);
         }

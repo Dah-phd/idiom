@@ -6,7 +6,7 @@ pub mod utils;
 use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
     error::{IdiomError, IdiomResult},
-    global_state::{GlobalState, TreeEvent},
+    global_state::{GlobalState, IdiomEvent},
     lsp::LSP,
     popups::popups_editor::file_updated,
     render::backend::{color, BackendProtocol, Style},
@@ -38,7 +38,7 @@ impl Workspace {
         for (ft, lsp_cmd) in base_config.derive_lsp_preloads(base_tree_paths, gs) {
             gs.success(format!("Preloading {lsp_cmd}"));
             if let Ok(lsp) = LSP::new(lsp_cmd).await {
-                gs.tree.push(TreeEvent::RegisterLSP(lsp.borrow_client().get_lsp_registration()));
+                gs.event.push(IdiomEvent::RegisterLSP(lsp.borrow_client().get_lsp_registration()));
                 lsp_servers.insert(ft, lsp);
             };
         }
@@ -136,7 +136,7 @@ impl Workspace {
         if idx < self.editors.len() {
             let mut editor = self.editors.remove(idx);
             editor.clear_screen_cache();
-            gs.tree.push(TreeEvent::SelectPath(editor.path.clone()));
+            gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
             if editor.update_status.collect() {
                 gs.popup(file_updated(editor.path.clone()))
             }
@@ -270,7 +270,7 @@ impl Workspace {
             Entry::Vacant(entry) => {
                 if let Ok(lsp) = LSP::new(lsp_cmd).await {
                     let client = lsp.aquire_client();
-                    gs.tree.push(TreeEvent::RegisterLSP(client.get_lsp_registration()));
+                    gs.event.push(IdiomEvent::RegisterLSP(client.get_lsp_registration()));
                     new.lexer.set_lsp_client(client, new.stringify(), gs);
                     for editor in self.editors.iter_mut().filter(|e| e.file_type == new.file_type) {
                         editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);
@@ -400,7 +400,7 @@ impl Workspace {
         }
         let mut editor =
             if idx >= self.editors.len() { self.editors.pop().expect("garded") } else { self.editors.remove(idx) };
-        gs.tree.push(TreeEvent::SelectPath(editor.path.clone()));
+        gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
         editor.clear_screen_cache();
         if editor.update_status.collect() {
             gs.popup(file_updated(editor.path.clone()));
@@ -481,11 +481,11 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
                 if editor.update_status.collect() {
                     gs.popup(file_updated(editor.path.clone()));
                 }
-                gs.tree.push(TreeEvent::SelectPath(ws.editors.inner()[0].path.clone()));
+                gs.event.push(IdiomEvent::SelectPath(ws.editors.inner()[0].path.clone()));
             }
             EditorAction::Left | EditorAction::Unintent => {
                 if let Some(mut editor) = ws.editors.pop() {
-                    gs.tree.push(TreeEvent::SelectPath(editor.path.clone()));
+                    gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
                     editor.clear_screen_cache();
                     if editor.update_status.collect() {
                         gs.popup(file_updated(editor.path.clone()));
