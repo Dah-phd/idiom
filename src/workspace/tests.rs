@@ -1,5 +1,5 @@
 use super::{
-    editor::CodeEditor,
+    editor::Editor,
     line::CodeLine,
     map_editor,
     utils::{clip_content, copy_content, insert_clip, remove_content},
@@ -42,7 +42,7 @@ fn base_ws() -> Workspace {
     ])
 }
 
-fn active(ws: &mut Workspace) -> &mut CodeEditor {
+fn active(ws: &mut Workspace) -> &mut Editor {
     ws.get_active().unwrap()
 }
 

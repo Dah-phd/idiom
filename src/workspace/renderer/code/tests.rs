@@ -1,5 +1,4 @@
-use super::code::CodeLine;
-use super::EditorLine;
+use super::{cursor as rend_cursor, inner_render, EditorLine};
 use crate::configs::FileType;
 use crate::global_state::GlobalState;
 use crate::render::backend::{Backend, BackendProtocol, Style};
@@ -10,7 +9,7 @@ use crate::syntax::tests::{
     zip_text_tokens,
 };
 use crate::workspace::cursor::Cursor;
-use crate::workspace::line::CodeLineContext;
+use crate::workspace::line::{CodeLine, CodeLineContext};
 use crate::workspace::CursorPosition;
 
 #[test]
@@ -201,7 +200,9 @@ fn test_line_render_utf8() {
     let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
-        code_line.render(&mut ctx, Line { row: idx as u16, col: 0, width: 100 }, &mut gs.writer);
+        let line = Line { row: idx as u16, col: 0, width: 100 };
+        let select = ctx.get_select(line.width);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
     }
 
     test_content(gs.writer.drain());
@@ -220,7 +221,9 @@ fn test_line_render_utf16() {
     let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
-        code_line.render(&mut ctx, Line { row: idx as u16, col: 0, width: 100 }, &mut gs.writer);
+        let line = Line { row: idx as u16, col: 0, width: 100 };
+        let select = ctx.get_select(line.width);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
     }
 
     test_content(gs.writer.drain());
@@ -239,7 +242,9 @@ fn test_line_render_utf32() {
     let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
-        code_line.render(&mut ctx, Line { row: idx as u16, col: 0, width: 100 }, &mut gs.writer);
+        let line = Line { row: idx as u16, col: 0, width: 100 };
+        let select = ctx.get_select(line.width);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
     }
 
     test_content(gs.writer.drain());
@@ -260,7 +265,9 @@ fn test_line_render_shrunk_utf8() {
     let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
-        code_line.render(&mut ctx, Line { row: idx as u16, col: 0, width: limit }, &mut gs.writer);
+        let line = Line { row: idx as u16, col: 0, width: limit };
+        let select = ctx.get_select(line.width);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
     }
 
     test_content_shrunk(gs.writer.drain());
@@ -281,7 +288,9 @@ fn test_line_render_shrunk_utf16() {
     let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
-        code_line.render(&mut ctx, Line { row: idx as u16, col: 0, width: limit }, &mut gs.writer);
+        let line = Line { row: idx as u16, col: 0, width: limit };
+        let select = ctx.get_select(line.width);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
     }
 
     test_content_shrunk(gs.writer.drain());
@@ -302,7 +311,9 @@ fn test_line_render_shrunk_utf32() {
     let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
-        code_line.render(&mut ctx, Line { row: idx as u16, col: 0, width: limit }, &mut gs.writer);
+        let line = Line { row: idx as u16, col: 0, width: limit };
+        let select = ctx.get_select(line.width);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
     }
 
     test_content_shrunk(gs.writer.drain());
@@ -322,7 +333,9 @@ fn test_line_render_select_utf8() {
     let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
-        code_line.render(&mut ctx, Line { row: idx as u16, col: 0, width: 100 }, &mut gs.writer);
+        let line = Line { row: idx as u16, col: 0, width: 100 };
+        let select = ctx.get_select(line.width);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
     }
 
     test_content_select(gs.writer.drain());
@@ -342,7 +355,9 @@ fn test_line_render_select_utf16() {
     let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
-        code_line.render(&mut ctx, Line { row: idx as u16, col: 0, width: 100 }, &mut gs.writer);
+        let line = Line { row: idx as u16, col: 0, width: 100 };
+        let select = ctx.get_select(line.width);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
     }
 
     test_content_select(gs.writer.drain());
@@ -362,7 +377,9 @@ fn test_line_render_select_utf32() {
     let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
-        code_line.render(&mut ctx, Line { row: idx as u16, col: 0, width: 100 }, &mut gs.writer);
+        let line = Line { row: idx as u16, col: 0, width: 100 };
+        let select = ctx.get_select(line.width);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
     }
 
     test_content_select(gs.writer.drain());
@@ -383,8 +400,15 @@ fn test_line_wrapping_utf8() {
     let mut content = zip_text_tokens(text, tokens);
 
     let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 1);
-    content[0].render(&mut ctx, lines.next().unwrap(), &mut gs.writer);
-    content[1].cursor(&mut ctx, lines.next().unwrap(), &mut gs.writer);
+    let line = lines.next().unwrap();
+    let select = ctx.get_select(line.width);
+    inner_render(&mut content[0], &mut ctx, line, select, &mut gs.writer);
+    let line = lines.next().unwrap();
+    let text = &mut content[1];
+    if text.tokens.is_empty() {
+        text.tokens.internal_rebase(&text.content, &ctx.lexer.lang, &ctx.lexer.theme);
+    };
+    rend_cursor(text, &mut ctx, line, &mut gs.writer);
 
     test_line_wrap(gs.writer.drain());
 }
@@ -404,8 +428,15 @@ fn test_line_wrapping_utf16() {
     let mut content = zip_text_tokens(text, tokens);
 
     let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 1);
-    content[0].render(&mut ctx, lines.next().unwrap(), &mut gs.writer);
-    content[1].cursor(&mut ctx, lines.next().unwrap(), &mut gs.writer);
+    let line = lines.next().unwrap();
+    let select = ctx.get_select(line.width);
+    inner_render(&mut content[0], &mut ctx, line, select, &mut gs.writer);
+    let line = lines.next().unwrap();
+    let text = &mut content[1];
+    if text.tokens.is_empty() {
+        text.tokens.internal_rebase(&text.content, &ctx.lexer.lang, &ctx.lexer.theme);
+    };
+    rend_cursor(text, &mut ctx, line, &mut gs.writer);
 
     test_line_wrap(gs.writer.drain());
 }
@@ -425,8 +456,15 @@ fn test_line_wrapping_utf32() {
     let mut content = zip_text_tokens(text, tokens);
 
     let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 1);
-    content[0].render(&mut ctx, lines.next().unwrap(), &mut gs.writer);
-    content[1].cursor(&mut ctx, lines.next().unwrap(), &mut gs.writer);
+    let line = lines.next().unwrap();
+    let select = ctx.get_select(line.width);
+    inner_render(&mut content[0], &mut ctx, line, select, &mut gs.writer);
+    let line = lines.next().unwrap();
+    let text = &mut content[1];
+    if text.tokens.is_empty() {
+        text.tokens.internal_rebase(&text.content, &ctx.lexer.lang, &ctx.lexer.theme);
+    };
+    rend_cursor(text, &mut ctx, line, &mut gs.writer);
 
     test_line_wrap(gs.writer.drain());
 }

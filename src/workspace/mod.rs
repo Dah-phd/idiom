@@ -2,6 +2,7 @@ pub mod actions;
 pub mod cursor;
 pub mod editor;
 pub mod line;
+pub mod renderer;
 pub mod utils;
 use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
@@ -14,7 +15,7 @@ use crate::{
 };
 use crossterm::event::KeyEvent;
 pub use cursor::CursorPosition;
-pub use editor::CodeEditor;
+pub use editor::Editor;
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -23,7 +24,7 @@ use std::{
 
 /// implement Drop to attempt keep state upon close/crash
 pub struct Workspace {
-    editors: TrackedList<CodeEditor>,
+    editors: TrackedList<Editor>,
     base_config: EditorConfigs,
     key_map: EditorKeyMap,
     tab_style: Style,
@@ -107,7 +108,7 @@ impl Workspace {
     }
 
     #[inline(always)]
-    pub fn get_active(&mut self) -> Option<&mut CodeEditor> {
+    pub fn get_active(&mut self) -> Option<&mut Editor> {
         self.editors.get_mut_no_update(0)
     }
 
@@ -246,21 +247,21 @@ impl Workspace {
         Ok(())
     }
 
-    fn get_editor<T: Into<PathBuf>>(&mut self, path: T) -> Option<&mut CodeEditor> {
+    fn get_editor<T: Into<PathBuf>>(&mut self, path: T) -> Option<&mut Editor> {
         let path: PathBuf = path.into();
         self.editors.iter_mut().find(|editor| editor.path == path)
     }
 
-    fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<CodeEditor> {
-        CodeEditor::from_path(file_path, FileType::Ignored, &self.base_config, gs)
+    fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
+        Editor::from_path(file_path, FileType::Ignored, &self.base_config, gs)
     }
 
-    async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<CodeEditor> {
+    async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
         let file_type = match FileType::derive_type(&file_path) {
             Some(file_type) => file_type,
             None => return Err(IdiomError::GeneralError("Unknown file type!".to_owned())),
         };
-        let mut new = CodeEditor::from_path(file_path, file_type, &self.base_config, gs)?;
+        let mut new = Editor::from_path(file_path, file_type, &self.base_config, gs)?;
         new.resize(gs.editor_area.width, gs.editor_area.height as usize);
         let lsp_cmd = match self.base_config.derive_lsp(&new.file_type) {
             None => return Ok(new),

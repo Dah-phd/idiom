@@ -6,7 +6,7 @@ use crate::{
     workspace::{
         actions::EditType,
         line::{CodeLine, EditorLine},
-        CodeEditor, CursorPosition,
+        CursorPosition, Editor,
     },
 };
 use core::str::FromStr;
@@ -143,9 +143,9 @@ pub fn map(lexer: &mut Lexer, client: LSPClient) {
     lexer.client = client;
 }
 
-pub fn context_local(_: &mut CodeEditor, _: &mut GlobalState) {}
+pub fn context_local(_: &mut Editor, _: &mut GlobalState) {}
 
-pub fn context(editor: &mut CodeEditor, gs: &mut GlobalState) {
+pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     let lexer = &mut editor.lexer;
     let client = &mut lexer.client;
     let content = &mut editor.content;

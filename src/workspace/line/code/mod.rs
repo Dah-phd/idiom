@@ -1,15 +1,10 @@
 mod context;
-mod render;
-use render::{ascii_line, complex_line, RenderStatus};
-use unicode_width::UnicodeWidthChar;
+// mod render;
+mod status;
+use status::RenderStatus;
 
 use crate::{
-    render::{
-        backend::{Backend, BackendProtocol, Style},
-        layout::Line,
-        utils::UTF8SafeStringExt,
-        UTF8Safe,
-    },
+    render::{utils::UTF8SafeStringExt, UTF8Safe},
     syntax::{tokens::TokenLine, DiagnosticLine, Lang, Lexer, Token},
     workspace::line::EditorLine,
 };
@@ -23,12 +18,12 @@ use std::{
 /// Used to represent code, has simpler wrapping as cpde lines shoud be shorter than 120 chars in most cases
 #[derive(Default)]
 pub struct CodeLine {
-    content: String,
+    pub content: String,
     // keeps trach of utf8 char len
-    char_len: usize,
+    pub char_len: usize,
     // syntax
-    tokens: TokenLine,
-    diagnostics: Option<DiagnosticLine>,
+    pub tokens: TokenLine,
+    pub diagnostics: Option<DiagnosticLine>,
     // used for caching - 0 is reseved for file tabs and can be used to reset line
     pub cached: RenderStatus,
 }
@@ -393,135 +388,8 @@ impl CodeLine {
     }
 
     #[inline]
-    pub fn cursor(&mut self, ctx: &mut CodeLineContext<'_>, line: Line, backend: &mut Backend) {
-        if self.tokens.is_empty() {
-            self.tokens.internal_rebase(&self.content, &ctx.lexer.lang, &ctx.lexer.theme);
-        };
-        render::cursor(self, ctx, line, backend);
-    }
-
-    #[inline]
-    pub fn cursor_fast(&mut self, ctx: &mut CodeLineContext<'_>, line: Line, backend: &mut Backend) {
-        if self.tokens.is_empty() {
-            self.tokens.internal_rebase(&self.content, &ctx.lexer.lang, &ctx.lexer.theme);
-            if !self.tokens.is_empty() {
-                self.cached.reset();
-            }
-        };
-        render::cursor_fast(self, ctx, line, backend);
-    }
-
-    #[inline]
-    pub fn render(&mut self, ctx: &mut CodeLineContext<'_>, line: Line, backend: &mut Backend) {
-        let select = ctx.get_select(line.width);
-        self.inner_render(ctx, line, select, backend);
-    }
-
-    #[inline]
-    fn inner_render(
-        &mut self,
-        ctx: &mut CodeLineContext<'_>,
-        line: Line,
-        select: Option<Range<usize>>,
-        backend: &mut Backend,
-    ) {
-        if self.tokens.is_empty() {
-            self.tokens.internal_rebase(&self.content, &ctx.lexer.lang, &ctx.lexer.theme);
-        };
-        let cache_line = line.row;
-        let line_width = ctx.setup_line(line, backend);
-        self.cached.line(cache_line, select.clone());
-        match select {
-            Some(select) => self.render_with_select(line_width, select, ctx, backend),
-            None => self.render_no_select(line_width, ctx, backend),
-        }
-    }
-
-    #[inline]
-    pub fn fast_render(&mut self, ctx: &mut CodeLineContext, line: Line, backend: &mut Backend) {
-        let select = ctx.get_select(line.width);
-        if self.cached.should_render_line(line.row, &select) {
-            self.inner_render(ctx, line, select, backend);
-        } else {
-            ctx.skip_line();
-        }
-    }
-
-    #[inline]
     pub fn clear_cache(&mut self) {
         self.cached.reset();
-    }
-
-    #[inline(always)]
-    fn render_with_select(
-        &mut self,
-        line_width: usize,
-        select: Range<usize>,
-        ctx: &mut CodeLineContext,
-        backend: &mut impl BackendProtocol,
-    ) {
-        if self.char_len == 0 && select.end != 0 {
-            backend.print_styled(" ", Style::bg(ctx.lexer.theme.selected));
-            return;
-        }
-        if self.is_simple() {
-            if line_width > self.char_len() {
-                let content = self.content.chars();
-                ascii_line::ascii_line_with_select(content, &self.tokens, select, ctx.lexer, backend);
-                if let Some(diagnostic) = self.diagnostics.as_ref() {
-                    diagnostic.inline_render(line_width - self.char_len, backend)
-                }
-            } else {
-                let content = self.content.chars().take(line_width.saturating_sub(2));
-                ascii_line::ascii_line_with_select(content, &self.tokens, select, ctx.lexer, backend);
-                backend.print_styled(">>", Style::reversed());
-            }
-        // handles non ascii shrunk lines
-        } else if let Ok(truncated) = self.content.truncate_if_wider(line_width) {
-            let mut content = truncated.chars();
-            if let Some(ch) = content.next_back() {
-                if UnicodeWidthChar::width(ch).unwrap_or_default() <= 1 {
-                    content.next_back();
-                }
-            };
-            complex_line::complex_line_with_select(content, &self.tokens, select, ctx.lexer, backend);
-            backend.print_styled(">>", Style::reversed());
-        } else {
-            complex_line::complex_line_with_select(self.content.chars(), &self.tokens, select, ctx.lexer, backend);
-            if let Some(diagnostic) = self.diagnostics.as_ref() {
-                diagnostic.inline_render(line_width - self.content.width(), backend)
-            }
-        }
-    }
-
-    #[inline(always)]
-    fn render_no_select(&mut self, line_width: usize, ctx: &mut CodeLineContext, backend: &mut impl BackendProtocol) {
-        if self.is_simple() {
-            if line_width > self.content.len() {
-                ascii_line::ascii_line(&self.content, &self.tokens, backend);
-                if let Some(diagnostic) = self.diagnostics.as_ref() {
-                    diagnostic.inline_render(line_width - self.char_len, backend)
-                }
-            } else {
-                ascii_line::ascii_line(&self.content[..line_width.saturating_sub(2)], &self.tokens, backend);
-                backend.print_styled(">>", Style::reversed());
-            }
-        // handles non ascii shrunk lines
-        } else if let Ok(truncated) = self.content.truncate_if_wider(line_width) {
-            let mut content = truncated.chars();
-            if let Some(ch) = content.next_back() {
-                if UnicodeWidthChar::width(ch).unwrap_or_default() <= 1 {
-                    content.next_back();
-                }
-            };
-            complex_line::complex_line(content, &self.tokens, ctx.lexer, backend);
-            backend.print_styled(">>", Style::reversed());
-        } else {
-            complex_line::complex_line(self.content.chars(), &self.tokens, ctx.lexer, backend);
-            if let Some(diagnostic) = self.diagnostics.as_ref() {
-                diagnostic.inline_render(line_width - self.content.width(), backend)
-            }
-        }
     }
 }
 

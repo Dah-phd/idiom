@@ -13,7 +13,7 @@ use crate::{
     workspace::{
         actions::{EditMetaData, EditType},
         line::CodeLine,
-        CodeEditor, CursorPosition,
+        CursorPosition, Editor,
     },
 };
 pub use diagnostics::{set_diganostics, Action, DiagnosticInfo, DiagnosticLine};
@@ -47,7 +47,7 @@ pub struct Lexer {
     modal_rect: Option<Rect>,
     requests: Vec<LSPResponseType>,
     client: LSPClient,
-    context: fn(&mut CodeEditor, &mut GlobalState),
+    context: fn(&mut Editor, &mut GlobalState),
     completable: fn(&Self, char_idx: usize, line: &CodeLine) -> bool,
     autocomplete: fn(&mut Self, CursorPosition, String, &mut GlobalState),
     tokens: fn(&mut Self) -> LSPResult<LSPResponseType>,
@@ -104,7 +104,7 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn context(editor: &mut CodeEditor, gs: &mut GlobalState) {
+    pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
         (editor.lexer.context)(editor, gs);
     }
 

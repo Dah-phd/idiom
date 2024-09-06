@@ -69,6 +69,3 @@ pub trait EditorLine:
     fn clear(&mut self);
     fn unwrap(self) -> String;
 }
-
-#[cfg(test)]
-mod tests;

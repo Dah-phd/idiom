@@ -1,18 +1,5 @@
-pub mod ascii_cursor;
-pub mod ascii_line;
-pub mod complex_cursor;
-pub mod complex_line;
-
-use super::{CodeLine, CodeLineContext, EditorLine};
-use crate::render::{
-    backend::{Backend, BackendProtocol},
-    layout::Line,
-};
 use std::{ops::Range, str::Chars};
 use unicode_width::UnicodeWidthChar;
-
-const WRAP_OPEN: &str = "<<";
-const WRAP_CLOSE: &str = ">>";
 
 #[derive(Default)]
 pub enum RenderStatus {
@@ -162,50 +149,6 @@ impl RenderStatus {
             0
         }
     }
-}
-
-#[inline(always)]
-pub fn width_remainder(line: &CodeLine, line_width: usize) -> Option<usize> {
-    let mut current_with = 0;
-    for ch in line.chars() {
-        if let Some(char_width) = UnicodeWidthChar::width(ch) {
-            current_with += char_width;
-            if current_with >= line_width {
-                return None;
-            }
-        }
-    }
-    Some(line_width - current_with)
-}
-
-#[inline(always)]
-pub fn cursor(line: &mut CodeLine, ctx: &mut CodeLineContext, rend_line: Line, backend: &mut Backend) {
-    let line_row = rend_line.row;
-    let select = ctx.get_select(rend_line.width);
-    let line_width = ctx.setup_cursor(rend_line, backend);
-    line.cached.cursor(line_row, ctx.cursor_char(), 0, select.clone());
-    if line.is_simple() {
-        ascii_cursor::render(line, ctx, line_width, select, backend);
-    } else {
-        complex_cursor::render(line, ctx, line_width, select, backend);
-    }
-    backend.reset_style();
-}
-
-#[inline(always)]
-pub fn cursor_fast(line: &mut CodeLine, ctx: &mut CodeLineContext, rend_line: Line, backend: &mut Backend) {
-    let select = ctx.get_select(rend_line.width);
-    if !line.cached.should_render_cursor_or_update(rend_line.row, ctx.cursor_char(), select.clone()) {
-        ctx.skip_line();
-        return;
-    }
-    let line_width = ctx.setup_cursor(rend_line, backend);
-    if line.is_simple() {
-        ascii_cursor::render(line, ctx, line_width, select, backend);
-    } else {
-        complex_cursor::render(line, ctx, line_width, select, backend);
-    }
-    backend.reset_style();
 }
 
 #[cfg(test)]
