@@ -29,14 +29,14 @@ impl ActionBuffer {
         std::mem::replace(self, Self::Text(TextBuffer::new(line, char, ch.into()))).into()
     }
 
-    pub fn del(&mut self, line: usize, char: usize, text: &mut impl EditorLine) -> Option<Edit> {
+    pub fn del(&mut self, line: usize, char: usize, text: &mut EditorLine) -> Option<Edit> {
         if let Self::Del(buf) = self {
             return buf.del(line, char, text);
         }
         std::mem::replace(self, Self::Del(DelBuffer::new(line, char, text))).into()
     }
 
-    pub fn backspace(&mut self, line: usize, char: usize, text: &mut impl EditorLine, indent: &str) -> Option<Edit> {
+    pub fn backspace(&mut self, line: usize, char: usize, text: &mut EditorLine, indent: &str) -> Option<Edit> {
         if let Self::Backspace(buf) = self {
             return buf.backspace(line, char, text, indent);
         }
@@ -63,11 +63,11 @@ pub struct DelBuffer {
 }
 
 impl DelBuffer {
-    fn new(line: usize, char: usize, text: &mut impl EditorLine) -> Self {
+    fn new(line: usize, char: usize, text: &mut EditorLine) -> Self {
         Self { line, char, text: text.remove(char).into() }
     }
 
-    fn del(&mut self, line: usize, char: usize, text: &mut impl EditorLine) -> Option<Edit> {
+    fn del(&mut self, line: usize, char: usize, text: &mut EditorLine) -> Option<Edit> {
         if line == self.line && char == self.char {
             self.text.push(text.remove(char));
             return None;
@@ -93,13 +93,13 @@ pub struct BackspaceBuffer {
 }
 
 impl BackspaceBuffer {
-    fn new(line: usize, char: usize, text: &mut impl EditorLine, indent: &str) -> Self {
+    fn new(line: usize, char: usize, text: &mut EditorLine, indent: &str) -> Self {
         let mut new = Self { line, last: char, text: String::new() };
         new.backspace_indent_handler(char, text, indent);
         new
     }
 
-    fn backspace(&mut self, line: usize, char: usize, text: &mut impl EditorLine, indent: &str) -> Option<Edit> {
+    fn backspace(&mut self, line: usize, char: usize, text: &mut EditorLine, indent: &str) -> Option<Edit> {
         if line == self.line && self.last == char {
             self.backspace_indent_handler(char, text, indent);
             return None;
@@ -107,7 +107,7 @@ impl BackspaceBuffer {
         std::mem::replace(self, Self::new(line, char, text, indent)).into()
     }
 
-    fn backspace_indent_handler(&mut self, char: usize, text: &mut impl EditorLine, indent: &str) {
+    fn backspace_indent_handler(&mut self, char: usize, text: &mut EditorLine, indent: &str) {
         let chars_after_indent = text[..char].trim_start_matches(indent);
         if chars_after_indent.is_empty() {
             self.text.push_str(indent);
@@ -174,14 +174,14 @@ impl From<TextBuffer> for Option<Edit> {
 #[cfg(test)]
 mod tests {
     use super::super::edits::Edit;
-    use crate::workspace::line::{CodeLine, EditorLine};
+    use crate::workspace::line::EditorLine;
     use crate::workspace::CursorPosition;
 
     use super::ActionBuffer;
 
     #[test]
     fn test_del() {
-        let mut code_line = CodeLine::new("0123456789".to_owned());
+        let mut code_line = EditorLine::new("0123456789".to_owned());
         let mut buf = ActionBuffer::None;
         buf.del(0, 7, &mut code_line);
         buf.del(0, 7, &mut code_line);
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn test_backspace() {
-        let mut code_line = CodeLine::new("          1".to_owned());
+        let mut code_line = EditorLine::new("          1".to_owned());
         let indent = "    ";
         let mut buf = ActionBuffer::None;
         buf.backspace(0, 11, &mut code_line, indent);

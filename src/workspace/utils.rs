@@ -5,7 +5,7 @@ use crate::{
 use std::ops::Range;
 
 #[inline(always)]
-pub fn insert_clip(clip: &str, content: &mut Vec<impl EditorLine>, mut cursor: CursorPosition) -> CursorPosition {
+pub fn insert_clip(clip: &str, content: &mut Vec<EditorLine>, mut cursor: CursorPosition) -> CursorPosition {
     let mut lines = clip.split('\n').collect::<Vec<_>>();
     if lines.len() == 1 {
         let text = lines[0];
@@ -35,7 +35,7 @@ pub fn insert_clip(clip: &str, content: &mut Vec<impl EditorLine>, mut cursor: C
 
 /// panics if out of bounds
 #[inline(always)]
-pub fn clip_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<impl EditorLine>) -> String {
+pub fn clip_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<EditorLine>) -> String {
     if from.line == to.line {
         let line = &mut content[from.line];
         let clip = line[from.char..to.char].to_owned();
@@ -55,7 +55,7 @@ pub fn clip_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<
 
 /// panics if range is out of bounds
 #[inline(always)]
-pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<impl EditorLine>) {
+pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<EditorLine>) {
     if from.line == to.line {
         match content.get_mut(from.line) {
             Some(line) => line.replace_range(from.char..to.char, ""),
@@ -68,7 +68,7 @@ pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Ve
 }
 
 #[inline(always)]
-pub fn copy_content(from: CursorPosition, to: CursorPosition, content: &[impl EditorLine]) -> String {
+pub fn copy_content(from: CursorPosition, to: CursorPosition, content: &[EditorLine]) -> String {
     if from.line == to.line {
         return content[from.line][from.char..to.char].to_owned();
     };
@@ -115,7 +115,7 @@ pub fn is_scope(first_line: &str, second_line: &str) -> bool {
 }
 
 #[inline(always)]
-pub fn is_closing_repeat(line: &impl EditorLine, ch: char, at: usize) -> bool {
+pub fn is_closing_repeat(line: &EditorLine, ch: char, at: usize) -> bool {
     if let Some(opening) = get_opening_char(ch) {
         line[at..].starts_with(ch) && line[..at].contains(opening)
     } else {
@@ -124,7 +124,7 @@ pub fn is_closing_repeat(line: &impl EditorLine, ch: char, at: usize) -> bool {
 }
 
 #[inline(always)]
-pub fn find_line_start(line: &impl EditorLine) -> usize {
+pub fn find_line_start(line: &EditorLine) -> usize {
     for (idx, ch) in line.char_indices() {
         if !ch.is_whitespace() {
             return idx;
@@ -134,7 +134,7 @@ pub fn find_line_start(line: &impl EditorLine) -> usize {
 }
 
 #[inline(always)]
-pub fn token_range_at(line: &impl EditorLine, idx: usize) -> Range<usize> {
+pub fn token_range_at(line: &EditorLine, idx: usize) -> Range<usize> {
     let mut token_start = 0;
     let mut last_not_in_token = false;
     for (char_idx, ch) in line.chars().enumerate() {

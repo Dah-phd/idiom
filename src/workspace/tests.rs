@@ -1,6 +1,6 @@
 use super::{
     editor::Editor,
-    line::CodeLine,
+    line::EditorLine,
     map_editor,
     utils::{clip_content, copy_content, insert_clip, remove_content},
     Workspace,
@@ -72,7 +72,7 @@ fn assert_position(ws: &mut Workspace, position: CursorPosition) {
 #[test]
 fn test_insert_clip() {
     // ensure utf8 safety on critical func
-    let mut content = vec![CodeLine::new("one🚀line".to_owned())];
+    let mut content = vec![EditorLine::new("one🚀line".to_owned())];
     let cursor = CursorPosition { line: 0, char: 4 };
     let cursor = insert_clip("first\nsecond\nrocket🚀", &mut content, cursor);
     assert_eq!(&content[0].to_string(), "one🚀first");

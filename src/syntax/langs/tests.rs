@@ -2,7 +2,7 @@ use crate::{
     configs::FileType,
     render::{widgets::Writable, UTF8Safe},
     syntax::theme::Theme,
-    workspace::line::CodeLine,
+    workspace::line::EditorLine,
 };
 
 use super::Lang;
@@ -49,22 +49,22 @@ fn test_stylize() {
 #[test]
 fn test_completable() {
     let lang = Lang::from(FileType::Rust);
-    let line = CodeLine::from("vec.");
+    let line = EditorLine::from("vec.");
     assert!(lang.completable(&line, 4));
-    let line = CodeLine::from("vec.push(\"t");
+    let line = EditorLine::from("vec.push(\"t");
     assert!(!lang.completable(&line, 11));
-    let line = CodeLine::from("vec.push(\"text goes here");
+    let line = EditorLine::from("vec.push(\"text goes here");
     assert!(!lang.completable(&line, 24));
-    let line = CodeLine::from("vec.push(\"text goes here\"");
+    let line = EditorLine::from("vec.push(\"text goes here\"");
     assert!(!lang.completable(&line, 18));
-    let line = CodeLine::from("vec.push(\"text goes here\".");
+    let line = EditorLine::from("vec.push(\"text goes here\".");
     assert!(lang.completable(&line, 26));
-    let line = CodeLine::from("fn p");
+    let line = EditorLine::from("fn p");
     assert!(!lang.completable(&line, 4));
-    let line = CodeLine::from("fn p");
+    let line = EditorLine::from("fn p");
     assert!(!lang.completable(&line, 0));
-    let line = CodeLine::from("struct");
+    let line = EditorLine::from("struct");
     assert!(!lang.completable(&line, 6));
-    let line = CodeLine::from("struct Um");
+    let line = EditorLine::from("struct Um");
     assert!(!lang.completable(&line, 9));
 }

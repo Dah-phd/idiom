@@ -83,7 +83,7 @@ impl Lang {
         self.diagnostic_handler.as_ref().and_then(|cb| (cb)(self, info?))
     }
 
-    pub fn completable(&self, line: &impl EditorLine, idx: usize) -> bool {
+    pub fn completable(&self, line: &EditorLine, idx: usize) -> bool {
         let mut curr_token = String::new();
         let mut prev_token = String::new();
         let mut str_opener: Option<char> = None;

@@ -2,7 +2,7 @@ use crate::global_state::IdiomEvent;
 use crate::render::backend::{color, BackendProtocol, Color, Style};
 use crate::render::UTF8Safe;
 use crate::syntax::Lang;
-use crate::workspace::line::CodeLine;
+use crate::workspace::line::EditorLine;
 use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
 
 const ELS_COLOR: Color = color::dark_grey();
@@ -154,7 +154,7 @@ impl From<Diagnostic> for DiagnosticLine {
     }
 }
 
-pub fn set_diganostics(content: &mut [CodeLine], diagnostics: Vec<(usize, DiagnosticLine)>) {
+pub fn set_diganostics(content: &mut [EditorLine], diagnostics: Vec<(usize, DiagnosticLine)>) {
     for line in content.iter_mut() {
         line.drop_diagnostics();
     }

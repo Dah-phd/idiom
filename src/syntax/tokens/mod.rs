@@ -2,7 +2,7 @@ mod token;
 
 use crate::{
     syntax::{theme::Theme, Legend},
-    workspace::line::CodeLine,
+    workspace::line::EditorLine,
 };
 use lsp_types::SemanticToken;
 
@@ -16,7 +16,7 @@ pub enum TokensType {
     Internal,
 }
 
-pub fn set_tokens(tokens: Vec<SemanticToken>, legend: &Legend, theme: &Theme, content: &mut [CodeLine]) {
+pub fn set_tokens(tokens: Vec<SemanticToken>, legend: &Legend, theme: &Theme, content: &mut [EditorLine]) {
     let mut tokens = tokens.into_iter();
 
     let token = match tokens.next() {
@@ -43,7 +43,7 @@ pub fn set_tokens_partial(
     max_lines: usize,
     legend: &Legend,
     theme: &Theme,
-    content: &mut [CodeLine],
+    content: &mut [EditorLine],
 ) {
     let mut tokens = tokens.into_iter();
 

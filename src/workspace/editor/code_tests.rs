@@ -6,7 +6,7 @@ use super::super::{
 use crate::global_state::GlobalState;
 use crate::render::backend::{Backend, BackendProtocol};
 use crate::syntax::Lexer;
-use crate::workspace::{actions::Actions, line::CodeLine};
+use crate::workspace::{actions::Actions, line::EditorLine};
 use crate::{configs::FileType, workspace::renderer::Renderer};
 use std::path::PathBuf;
 
@@ -14,7 +14,7 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
     let ft = FileType::Rust;
     let path = PathBuf::from("");
     let mut gs = GlobalState::new(Backend::init()).unwrap();
-    let content: Vec<CodeLine> = content.into_iter().map(CodeLine::from).collect();
+    let content: Vec<EditorLine> = content.into_iter().map(EditorLine::from).collect();
     Editor {
         line_number_offset: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
         lexer: Lexer::with_context(ft, &path, &mut gs),

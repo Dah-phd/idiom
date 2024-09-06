@@ -14,13 +14,13 @@ pub struct Cursor {
 }
 
 impl Cursor {
-    pub fn set_cursor_checked_with_select(&mut self, position: CursorPosition, content: &[impl EditorLine]) {
+    pub fn set_cursor_checked_with_select(&mut self, position: CursorPosition, content: &[EditorLine]) {
         self.set_cursor_checked(position, content);
         self.init_select();
         self.push_to_select();
     }
 
-    pub fn set_cursor_checked(&mut self, mut position: CursorPosition, content: &[impl EditorLine]) {
+    pub fn set_cursor_checked(&mut self, mut position: CursorPosition, content: &[EditorLine]) {
         if self.line < position.line {
             let mut current_line_len = content[self.line].char_len();
             let mut offset = 0;
@@ -70,12 +70,12 @@ impl Cursor {
         self.phantm_char = char;
     }
 
-    pub fn end_of_line(&mut self, content: &[impl EditorLine]) {
+    pub fn end_of_line(&mut self, content: &[EditorLine]) {
         self.char = content[self.line].char_len();
         self.phantm_char = self.char;
     }
 
-    pub fn end_of_file(&mut self, content: &[impl EditorLine]) {
+    pub fn end_of_file(&mut self, content: &[EditorLine]) {
         if !content.is_empty() {
             self.line = content.len() - 1;
             self.char = content[self.line].char_len();
@@ -88,7 +88,7 @@ impl Cursor {
         self.line = 0;
     }
 
-    pub fn start_of_line(&mut self, content: &[impl EditorLine]) {
+    pub fn start_of_line(&mut self, content: &[EditorLine]) {
         self.char = 0;
         for ch in content[self.line].chars() {
             if !ch.is_whitespace() {
@@ -99,12 +99,12 @@ impl Cursor {
         }
     }
 
-    pub fn up(&mut self, content: &[impl EditorLine]) {
+    pub fn up(&mut self, content: &[EditorLine]) {
         self.select = None;
         self.move_up(content)
     }
 
-    fn move_up(&mut self, content: &[impl EditorLine]) {
+    fn move_up(&mut self, content: &[EditorLine]) {
         if self.text_width <= self.char {
             self.char -= self.text_width;
             return;
@@ -116,25 +116,25 @@ impl Cursor {
         self.adjust_char(&content[self.line]);
     }
 
-    pub fn scroll_up(&mut self, content: &[impl EditorLine]) {
+    pub fn scroll_up(&mut self, content: &[EditorLine]) {
         if self.at_line != 0 {
             self.at_line -= 1;
             self.up(content)
         }
     }
 
-    pub fn select_up(&mut self, content: &[impl EditorLine]) {
+    pub fn select_up(&mut self, content: &[EditorLine]) {
         self.init_select();
         self.move_up(content);
         self.push_to_select();
     }
 
-    pub fn down(&mut self, content: &[impl EditorLine]) {
+    pub fn down(&mut self, content: &[EditorLine]) {
         self.select = None;
         self.move_down(content);
     }
 
-    fn move_down(&mut self, content: &[impl EditorLine]) {
+    fn move_down(&mut self, content: &[EditorLine]) {
         if content.is_empty() {
             return;
         }
@@ -151,25 +151,25 @@ impl Cursor {
         self.adjust_char(&content[self.line]);
     }
 
-    pub fn select_down(&mut self, content: &[impl EditorLine]) {
+    pub fn select_down(&mut self, content: &[EditorLine]) {
         self.init_select();
         self.move_down(content);
         self.push_to_select();
     }
 
-    pub fn scroll_down(&mut self, content: &[impl EditorLine]) {
+    pub fn scroll_down(&mut self, content: &[EditorLine]) {
         if self.at_line + 2 < content.len() {
             self.at_line += 1;
             self.down(content)
         }
     }
 
-    pub fn left(&mut self, content: &[impl EditorLine]) {
+    pub fn left(&mut self, content: &[EditorLine]) {
         self.select = None;
         self.move_left(content);
     }
 
-    fn move_left(&mut self, content: &[impl EditorLine]) {
+    fn move_left(&mut self, content: &[EditorLine]) {
         if self.char > 0 {
             self.char -= 1
         } else if self.line > 0 {
@@ -184,18 +184,18 @@ impl Cursor {
         self.phantm_char = self.char;
     }
 
-    pub fn jump_left(&mut self, content: &[impl EditorLine]) {
+    pub fn jump_left(&mut self, content: &[EditorLine]) {
         self.select = None;
         self._jump_left(content);
     }
 
-    pub fn jump_left_select(&mut self, content: &[impl EditorLine]) {
+    pub fn jump_left_select(&mut self, content: &[EditorLine]) {
         self.init_select();
         self._jump_left(content);
         self.push_to_select();
     }
 
-    fn _jump_left(&mut self, content: &[impl EditorLine]) {
+    fn _jump_left(&mut self, content: &[EditorLine]) {
         let mut line = &content[self.line][..self.char];
         let mut last_was_char = false;
         if line.is_empty() && self.line > 0 {
@@ -212,18 +212,18 @@ impl Cursor {
         }
     }
 
-    pub fn select_left(&mut self, content: &[impl EditorLine]) {
+    pub fn select_left(&mut self, content: &[EditorLine]) {
         self.init_select();
         self.move_left(content);
         self.push_to_select();
     }
 
-    pub fn right(&mut self, content: &[impl EditorLine]) {
+    pub fn right(&mut self, content: &[EditorLine]) {
         self.select = None;
         self.move_right(content);
     }
 
-    fn move_right(&mut self, content: &[impl EditorLine]) {
+    fn move_right(&mut self, content: &[EditorLine]) {
         if let Some(line) = content.get(self.line) {
             if line.char_len() > self.char {
                 self.char += 1
@@ -235,18 +235,18 @@ impl Cursor {
         self.phantm_char = self.char;
     }
 
-    pub fn jump_right(&mut self, content: &[impl EditorLine]) {
+    pub fn jump_right(&mut self, content: &[EditorLine]) {
         self.select = None;
         self._jump_right(content);
     }
 
-    pub fn jump_right_select(&mut self, content: &[impl EditorLine]) {
+    pub fn jump_right_select(&mut self, content: &[EditorLine]) {
         self.init_select();
         self._jump_right(content);
         self.push_to_select();
     }
 
-    pub fn _jump_right(&mut self, content: &[impl EditorLine]) {
+    pub fn _jump_right(&mut self, content: &[EditorLine]) {
         let mut line = &content[self.line][self.char..];
         let mut last_was_char = false;
         if line.is_empty() && content.len() - 1 > self.line {
@@ -263,13 +263,13 @@ impl Cursor {
         }
     }
 
-    pub fn select_right(&mut self, content: &[impl EditorLine]) {
+    pub fn select_right(&mut self, content: &[EditorLine]) {
         self.init_select();
         self.move_right(content);
         self.push_to_select();
     }
 
-    pub fn adjust_max_line(&mut self, content: &[impl EditorLine]) {
+    pub fn adjust_max_line(&mut self, content: &[EditorLine]) {
         if self.line >= content.len() {
             self.line = content.len().saturating_sub(1);
             self.adjust_char(&content[self.line]);
@@ -277,14 +277,14 @@ impl Cursor {
     }
 
     #[inline(always)]
-    pub fn adjust_char(&mut self, line: &impl EditorLine) {
+    pub fn adjust_char(&mut self, line: &EditorLine) {
         self.char = self.phantm_char;
         if line.char_len() < self.char {
             self.char = line.char_len()
         }
     }
 
-    pub fn correct_cursor_position(&mut self, content: &[impl EditorLine]) {
+    pub fn correct_cursor_position(&mut self, content: &[EditorLine]) {
         if self.line < self.at_line {
             self.at_line = self.line
         }
@@ -362,7 +362,7 @@ impl Cursor {
         }
     }
 
-    pub fn select_len(&self, content: &[impl EditorLine]) -> usize {
+    pub fn select_len(&self, content: &[EditorLine]) -> usize {
         self.select_get()
             .map(|(from, to)| {
                 if from.line == to.line {

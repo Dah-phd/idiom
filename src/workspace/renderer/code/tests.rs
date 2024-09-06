@@ -1,4 +1,4 @@
-use super::{cursor as rend_cursor, inner_render, EditorLine};
+use super::{cursor as rend_cursor, inner_render};
 use crate::configs::FileType;
 use crate::global_state::GlobalState;
 use crate::render::backend::{Backend, BackendProtocol, Style};
@@ -9,12 +9,12 @@ use crate::syntax::tests::{
     zip_text_tokens,
 };
 use crate::workspace::cursor::Cursor;
-use crate::workspace::line::{CodeLine, CodeLineContext};
+use crate::workspace::line::{CodeLineContext, EditorLine};
 use crate::workspace::CursorPosition;
 
 #[test]
 fn test_insert() {
-    let mut line = CodeLine::new("text".to_owned());
+    let mut line = EditorLine::new("text".to_owned());
     assert!(line.char_len() == 4);
     line.insert(2, 'e');
     assert!(line.is_simple());
@@ -28,7 +28,7 @@ fn test_insert() {
 
 #[test]
 fn test_insert_str() {
-    let mut line = CodeLine::new("text".to_owned());
+    let mut line = EditorLine::new("text".to_owned());
     line.insert_str(0, "text");
     assert!(line.is_simple());
     assert!(line.char_len() == 8);
@@ -40,7 +40,7 @@ fn test_insert_str() {
 
 #[test]
 fn test_push() {
-    let mut line = CodeLine::new("text".to_owned());
+    let mut line = EditorLine::new("text".to_owned());
     line.push('1');
     assert!(line.is_simple());
     assert!(line.char_len() == 5);
@@ -53,7 +53,7 @@ fn test_push() {
 
 #[test]
 fn test_push_str() {
-    let mut line = CodeLine::new(String::new());
+    let mut line = EditorLine::new(String::new());
     assert!(line.is_simple());
     assert!(line.char_len() == 0);
     line.push_str("text");
@@ -68,7 +68,7 @@ fn test_push_str() {
 
 #[test]
 fn test_replace_range() {
-    let mut line = CodeLine::new(String::from("🚀123"));
+    let mut line = EditorLine::new(String::from("🚀123"));
     assert!(!line.is_simple());
     assert!(line.char_len() == 4);
     line.replace_range(0..2, "text");
@@ -83,7 +83,7 @@ fn test_replace_range() {
 
 #[test]
 fn test_replace_till() {
-    let mut line = CodeLine::new(String::from("🚀123"));
+    let mut line = EditorLine::new(String::from("🚀123"));
     assert!(!line.is_simple());
     assert!(line.char_len() == 4);
     line.replace_till(3, "text");
@@ -98,7 +98,7 @@ fn test_replace_till() {
 
 #[test]
 fn test_replace_from() {
-    let mut line = CodeLine::new(String::from("123🚀"));
+    let mut line = EditorLine::new(String::from("123🚀"));
     assert!(!line.is_simple());
     assert!(line.char_len() == 4);
     line.replace_from(3, "text");
@@ -113,7 +113,7 @@ fn test_replace_from() {
 
 #[test]
 fn test_remove() {
-    let mut line = CodeLine::new("text🚀123".to_owned());
+    let mut line = EditorLine::new("text🚀123".to_owned());
     assert!(!line.is_simple());
     assert!(line.char_len() == 8);
     assert!('1' == line.remove(5));
@@ -127,7 +127,7 @@ fn test_remove() {
 
 #[test]
 fn test_utf8_idx_at() {
-    let line = CodeLine::new("text🚀123🚀".to_owned());
+    let line = EditorLine::new("text🚀123🚀".to_owned());
     assert_eq!(4, line.unsafe_utf8_idx_at(4));
     assert_eq!(2, line.unsafe_utf8_idx_at(2));
     assert_eq!(8, line.unsafe_utf8_idx_at(5));
@@ -138,13 +138,13 @@ fn test_utf8_idx_at() {
 #[test]
 #[should_panic]
 fn test_utf8_idx_at_panic() {
-    let line = CodeLine::new("text🚀123🚀".to_owned());
+    let line = EditorLine::new("text🚀123🚀".to_owned());
     line.unsafe_utf8_idx_at(10);
 }
 
 #[test]
 fn test_utf16_idx_at() {
-    let line = CodeLine::new("text🚀123🚀".to_owned());
+    let line = EditorLine::new("text🚀123🚀".to_owned());
     assert_eq!(4, line.unsafe_utf16_idx_at(4));
     assert_eq!(2, line.unsafe_utf16_idx_at(2));
     assert_eq!(6, line.unsafe_utf16_idx_at(5));
@@ -155,13 +155,13 @@ fn test_utf16_idx_at() {
 #[test]
 #[should_panic]
 fn test_utf16_idx_at_panic() {
-    let line = CodeLine::new("text🚀123🚀".to_owned());
+    let line = EditorLine::new("text🚀123🚀".to_owned());
     line.unsafe_utf16_idx_at(10);
 }
 
 #[test]
 fn test_split_off() {
-    let mut line = CodeLine::new("text🚀123🚀".to_owned());
+    let mut line = EditorLine::new("text🚀123🚀".to_owned());
     line = line.split_off(2);
     assert_eq!(line.to_string(), "xt🚀123🚀");
     assert_eq!(line.char_len(), 7);
@@ -174,7 +174,7 @@ fn test_split_off() {
 
 #[test]
 fn test_split_off_ascii() {
-    let mut line = CodeLine::new("texttext".to_owned());
+    let mut line = EditorLine::new("texttext".to_owned());
     let remaining = line.split_off(4);
     assert_eq!(remaining.char_len(), 4);
     assert_eq!(remaining.len(), 4);

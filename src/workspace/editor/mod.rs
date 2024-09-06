@@ -9,7 +9,7 @@ use crate::{
     workspace::{
         actions::Actions,
         cursor::{Cursor, CursorPosition},
-        line::{CodeLine, EditorLine},
+        line::EditorLine,
         renderer::Renderer,
         utils::{copy_content, find_line_start, token_range_at},
     },
@@ -26,7 +26,7 @@ pub struct Editor {
     pub lexer: Lexer,
     pub cursor: Cursor,
     actions: Actions,
-    pub content: Vec<CodeLine>,
+    pub content: Vec<EditorLine>,
     renderer: Renderer,
     pub update_status: FileUpdate,
     pub line_number_offset: usize,
@@ -41,7 +41,7 @@ impl Editor {
         gs: &mut GlobalState,
     ) -> IdiomResult<Self> {
         big_file_protection(&path)?;
-        let content = CodeLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
+        let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
         Ok(Self {
             line_number_offset: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
@@ -401,7 +401,7 @@ impl Editor {
                 return;
             }
         };
-        self.content = content.split('\n').map(|line| CodeLine::new(line.to_owned())).collect();
+        self.content = content.split('\n').map(|line| EditorLine::new(line.to_owned())).collect();
         match self.lexer.reopen(content, self.file_type) {
             Ok(()) => gs.success("File rebased!"),
             Err(err) => gs.error(format!("Filed to reactivate LSP after rebase! ERR: {}", err)),

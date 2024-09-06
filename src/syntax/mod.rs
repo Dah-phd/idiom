@@ -12,7 +12,7 @@ use crate::{
     render::layout::Rect,
     workspace::{
         actions::{EditMetaData, EditType},
-        line::CodeLine,
+        line::EditorLine,
         CursorPosition, Editor,
     },
 };
@@ -48,7 +48,7 @@ pub struct Lexer {
     requests: Vec<LSPResponseType>,
     client: LSPClient,
     context: fn(&mut Editor, &mut GlobalState),
-    completable: fn(&Self, char_idx: usize, line: &CodeLine) -> bool,
+    completable: fn(&Self, char_idx: usize, line: &EditorLine) -> bool,
     autocomplete: fn(&mut Self, CursorPosition, String, &mut GlobalState),
     tokens: fn(&mut Self) -> LSPResult<LSPResponseType>,
     tokens_partial: fn(&mut Self, Range, usize) -> LSPResult<LSPResponseType>,
@@ -59,8 +59,8 @@ pub struct Lexer {
     signatures: fn(&mut Self, CursorPosition, &mut GlobalState),
     start_renames: fn(&mut Self, CursorPosition, &str),
     renames: fn(&mut Self, CursorPosition, String, &mut GlobalState),
-    sync: fn(&mut Self, &EditType, &mut [CodeLine]) -> LSPResult<()>,
-    sync_rev: fn(&mut Self, &EditType, &mut [CodeLine]) -> LSPResult<()>,
+    sync: fn(&mut Self, &EditType, &mut [EditorLine]) -> LSPResult<()>,
+    sync_rev: fn(&mut Self, &EditType, &mut [EditorLine]) -> LSPResult<()>,
     meta: Option<EditMetaData>,
     pub encode_position: fn(usize, &str) -> usize,
     pub char_lsp_pos: fn(char) -> usize,
@@ -110,12 +110,12 @@ impl Lexer {
 
     /// sync event
     #[inline(always)]
-    pub fn sync(&mut self, action: &EditType, content: &mut [CodeLine]) {
+    pub fn sync(&mut self, action: &EditType, content: &mut [EditorLine]) {
         (self.sync)(self, action, content).unwrap();
     }
 
     /// sync reverse event
-    pub fn sync_rev(&mut self, action: &EditType, content: &mut [CodeLine]) {
+    pub fn sync_rev(&mut self, action: &EditType, content: &mut [EditorLine]) {
         (self.sync_rev)(self, action, content).unwrap();
     }
 
@@ -189,7 +189,7 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn should_autocomplete(&self, char_idx: usize, line: &CodeLine) -> bool {
+    pub fn should_autocomplete(&self, char_idx: usize, line: &EditorLine) -> bool {
         (self.completable)(self, char_idx, line)
     }
 
@@ -199,7 +199,7 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn help(&mut self, c: CursorPosition, content: &[CodeLine], gs: &mut GlobalState) {
+    pub fn help(&mut self, c: CursorPosition, content: &[EditorLine], gs: &mut GlobalState) {
         if let Some(actions) = content[c.line].diagnostic_info(&self.lang) {
             self.modal.replace(LSPModal::actions(actions));
         }

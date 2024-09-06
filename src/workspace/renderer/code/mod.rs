@@ -9,7 +9,7 @@ use crate::render::{
     layout::Line,
     UTF8Safe,
 };
-use crate::workspace::line::{CodeLine, CodeLineContext, EditorLine};
+use crate::workspace::line::{CodeLineContext, EditorLine};
 use std::ops::Range;
 use unicode_width::UnicodeWidthChar;
 
@@ -17,7 +17,7 @@ const WRAP_OPEN: &str = "<<";
 const WRAP_CLOSE: &str = ">>";
 
 #[inline(always)]
-pub fn width_remainder(line: &CodeLine, line_width: usize) -> Option<usize> {
+pub fn width_remainder(line: &EditorLine, line_width: usize) -> Option<usize> {
     let mut current_with = 0;
     for ch in line.chars() {
         if let Some(char_width) = UnicodeWidthChar::width(ch) {
@@ -31,7 +31,7 @@ pub fn width_remainder(line: &CodeLine, line_width: usize) -> Option<usize> {
 }
 
 #[inline(always)]
-pub fn cursor(line: &mut CodeLine, ctx: &mut CodeLineContext, rend_line: Line, backend: &mut Backend) {
+pub fn cursor(line: &mut EditorLine, ctx: &mut CodeLineContext, rend_line: Line, backend: &mut Backend) {
     let line_row = rend_line.row;
     let select = ctx.get_select(rend_line.width);
     let line_width = ctx.setup_cursor(rend_line, backend);
@@ -45,7 +45,7 @@ pub fn cursor(line: &mut CodeLine, ctx: &mut CodeLineContext, rend_line: Line, b
 }
 
 pub fn inner_render(
-    code: &mut CodeLine,
+    code: &mut EditorLine,
     ctx: &mut CodeLineContext<'_>,
     line: Line,
     select: Option<Range<usize>>,
@@ -65,7 +65,7 @@ pub fn inner_render(
 
 #[inline(always)]
 fn render_with_select(
-    code: &mut CodeLine,
+    code: &mut EditorLine,
     line_width: usize,
     select: Range<usize>,
     ctx: &mut CodeLineContext,
@@ -107,7 +107,7 @@ fn render_with_select(
 
 #[inline(always)]
 fn render_no_select(
-    code: &mut CodeLine,
+    code: &mut EditorLine,
     line_width: usize,
     ctx: &mut CodeLineContext,
     backend: &mut impl BackendProtocol,
@@ -141,7 +141,7 @@ fn render_no_select(
 }
 
 #[inline(always)]
-pub fn cursor_fast(line: &mut CodeLine, ctx: &mut CodeLineContext, rend_line: Line, backend: &mut Backend) {
+pub fn cursor_fast(line: &mut EditorLine, ctx: &mut CodeLineContext, rend_line: Line, backend: &mut Backend) {
     let select = ctx.get_select(rend_line.width);
     if !line.cached.should_render_cursor_or_update(rend_line.row, ctx.cursor_char(), select.clone()) {
         ctx.skip_line();

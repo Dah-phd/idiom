@@ -3,11 +3,7 @@ use crate::{
     lsp::{LSPClient, LSPResponse, LSPResponseType, LSPResult},
     popups::popups_tree::refrence_selector,
     syntax::Lexer,
-    workspace::{
-        actions::EditType,
-        line::{CodeLine, EditorLine},
-        CursorPosition, Editor,
-    },
+    workspace::{actions::EditType, line::EditorLine, CursorPosition, Editor},
 };
 use core::str::FromStr;
 use lsp_types::{
@@ -245,7 +241,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
 }
 
 #[inline(always)]
-pub fn sync_edits(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]) -> LSPResult<()> {
+pub fn sync_edits(lexer: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
     lexer.version += 1;
     let (meta, change_events) = action.change_event(lexer.encode_position, lexer.char_lsp_pos, content);
     if lexer.clock.elapsed() > FULL_TOKENS && lexer.modal.is_none() {
@@ -263,7 +259,7 @@ pub fn sync_edits(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]
     Ok(())
 }
 
-pub fn sync_edits_rev(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]) -> LSPResult<()> {
+pub fn sync_edits_rev(lexer: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
     lexer.version += 1;
     let (meta, change_events) = action.change_event_rev(lexer.encode_position, lexer.char_lsp_pos, content);
     if lexer.clock.elapsed() > FULL_TOKENS && lexer.modal.is_none() {
@@ -282,7 +278,7 @@ pub fn sync_edits_rev(lexer: &mut Lexer, action: &EditType, content: &mut [CodeL
 }
 
 #[inline(always)]
-pub fn sync_edits_full(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]) -> LSPResult<()> {
+pub fn sync_edits_full(lexer: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
     lexer.version += 1;
     let mut text = String::new();
     for editor_line in content.iter() {
@@ -304,7 +300,7 @@ pub fn sync_edits_full(lexer: &mut Lexer, action: &EditType, content: &mut [Code
     Ok(())
 }
 
-pub fn sync_edits_full_rev(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]) -> LSPResult<()> {
+pub fn sync_edits_full_rev(lexer: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
     lexer.version += 1;
     let mut text = String::new();
     for editor_line in content.iter() {
@@ -327,7 +323,7 @@ pub fn sync_edits_full_rev(lexer: &mut Lexer, action: &EditType, content: &mut [
 }
 
 #[inline(always)]
-pub fn sync_edits_local(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]) -> LSPResult<()> {
+pub fn sync_edits_local(lexer: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
     let meta = action.map_to_meta();
     for line in content.iter_mut().skip(meta.start_line).take(meta.to) {
         line.rebuild_tokens(lexer);
@@ -336,7 +332,7 @@ pub fn sync_edits_local(lexer: &mut Lexer, action: &EditType, content: &mut [Cod
 }
 
 #[inline(always)]
-pub fn sync_edits_local_rev(lexer: &mut Lexer, action: &EditType, content: &mut [CodeLine]) -> LSPResult<()> {
+pub fn sync_edits_local_rev(lexer: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
     let meta = action.map_to_meta_rev();
     for line in content.iter_mut().skip(meta.start_line).take(meta.to) {
         line.rebuild_tokens(lexer);
@@ -344,7 +340,7 @@ pub fn sync_edits_local_rev(lexer: &mut Lexer, action: &EditType, content: &mut 
     Ok(())
 }
 
-pub fn completable(lexer: &Lexer, char_idx: usize, line: &CodeLine) -> bool {
+pub fn completable(lexer: &Lexer, char_idx: usize, line: &EditorLine) -> bool {
     !matches!(lexer.modal, Some(LSPModal::AutoComplete(..)))
         && !lexer.requests.iter().any(|req| matches!(req, LSPResponseType::Completion(..)))
         && lexer.lang.completable(line, char_idx)
@@ -357,7 +353,7 @@ pub fn get_autocomplete(lexer: &mut Lexer, c: CursorPosition, line: String, gs: 
     }
 }
 
-pub fn completable_dead(_lexer: &Lexer, _idx: usize, _line: &CodeLine) -> bool {
+pub fn completable_dead(_lexer: &Lexer, _idx: usize, _line: &EditorLine) -> bool {
     false
 }
 

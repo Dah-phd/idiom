@@ -9,7 +9,7 @@ use crate::{
     workspace::line::EditorLine,
 };
 
-pub fn trim_start_inplace(line: &mut impl EditorLine) -> usize {
+pub fn trim_start_inplace(line: &mut EditorLine) -> usize {
     if let Some(idx) = line.to_string().find(|c: char| !c.is_whitespace() && c != '\t') {
         line.replace_till(idx, "");
         return idx;

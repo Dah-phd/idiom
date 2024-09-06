@@ -1,11 +1,11 @@
+use crate::configs::IndentConfigs;
 use crate::workspace::actions::edits::EditMetaData;
 use crate::workspace::actions::Edit;
 use crate::workspace::cursor::Cursor;
 use crate::workspace::line::EditorLine;
 use crate::workspace::CursorPosition;
-use crate::{configs::IndentConfigs, workspace::line::CodeLine};
 
-pub fn create_content() -> Vec<CodeLine> {
+pub fn create_content() -> Vec<EditorLine> {
     vec![
         "here comes the text".into(),                                                            // 0
         "more lines of code should be here but only text".into(),                                // 1
@@ -24,7 +24,7 @@ fn match_line(l1: &impl ToString, l2: &impl ToString) {
     assert_eq!(l1.to_string(), l2.to_string())
 }
 
-fn assert_initial(content: &[CodeLine]) {
+fn assert_initial(content: &[EditorLine]) {
     let init_state = create_content();
     assert_eq!(content.len(), init_state.len());
     for (og, new) in init_state.iter().zip(content.iter()) {
@@ -32,9 +32,9 @@ fn assert_initial(content: &[CodeLine]) {
     }
 }
 
-fn assert_edits_applicable(mut content: Vec<CodeLine>, edits: Vec<Edit>) {
+fn assert_edits_applicable(mut content: Vec<EditorLine>, edits: Vec<Edit>) {
     // ensure every event can be undone and redone
-    let reseved_content: Vec<CodeLine> = content.iter().map(|cl| CodeLine::new(cl.to_string())).collect();
+    let reseved_content: Vec<EditorLine> = content.iter().map(|cl| EditorLine::new(cl.to_string())).collect();
     for edit in edits.iter().rev() {
         edit.apply_rev(&mut content);
     }
@@ -54,7 +54,7 @@ fn assert_edits_applicable(mut content: Vec<CodeLine>, edits: Vec<Edit>) {
 fn test_new_line() {
     let cfg = IndentConfigs::default();
 
-    let mut content = vec![CodeLine::new("        ".to_owned())];
+    let mut content = vec![EditorLine::new("        ".to_owned())];
     let (cursor, edit) = Edit::new_line(CursorPosition { line: 0, char: 8 }, &cfg, &mut content);
     assert_eq!(cursor, CursorPosition { line: 1, char: 8 });
     assert_eq!(content.len(), 2);
@@ -129,14 +129,14 @@ fn test_indent_unindent() {
     let cfg = IndentConfigs::default();
     Edit::unindent(7, &mut content[7], &cfg.indent);
     match_line(&content[7], &"this is the first scope");
-    let mut this_line: CodeLine = "     text".into();
+    let mut this_line: EditorLine = "     text".into();
     Edit::unindent(0, &mut this_line, &cfg.indent);
     match_line(&this_line, &"    text");
 }
 
 #[test]
 fn test_record_inline_insert() {
-    let this_line: CodeLine = "text".into();
+    let this_line: EditorLine = "text".into();
     let mut content = vec![this_line];
     let test_ins = String::from("    ");
     content[0].insert_str(0, &test_ins);
