@@ -1,19 +1,10 @@
 mod code;
-mod plain;
+use crate::error::{IdiomError, IdiomResult};
+pub use code::CodeEditor;
 use std::{
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR},
 };
-
-use crate::{
-    configs::{EditorAction, EditorConfigs, FileType},
-    error::{IdiomError, IdiomResult},
-    global_state::GlobalState,
-    lsp::LSPResult,
-    workspace::CursorPosition,
-};
-pub use code::CodeEditor;
-pub use plain::TextEditor;
 
 pub enum FileUpdate {
     None,
@@ -43,12 +34,6 @@ impl FileUpdate {
             _ => (),
         }
     }
-}
-
-#[allow(dead_code)]
-pub enum Editor {
-    Code(CodeEditor),
-    Text(TextEditor),
 }
 
 fn build_display(path: &Path) -> String {

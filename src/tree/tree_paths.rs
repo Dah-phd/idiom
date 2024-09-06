@@ -124,7 +124,7 @@ impl TreePath {
         }
     }
 
-    pub fn expand_contained(&mut self, rel_path: &PathBuf) -> bool {
+    pub fn expand_contained(&mut self, rel_path: &Path) -> bool {
         if self.path() == rel_path {
             return true;
         }

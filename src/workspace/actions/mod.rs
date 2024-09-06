@@ -1,6 +1,5 @@
 mod action_buffer;
 mod edits;
-pub mod internal;
 use crate::{
     configs::IndentConfigs,
     syntax::Lexer,
