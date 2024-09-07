@@ -292,18 +292,6 @@ impl Cursor {
         }
     }
 
-    pub fn correct_cursor_position(&mut self, content: &[EditorLine]) {
-        if self.line < self.at_line {
-            self.at_line = self.line
-        }
-        if self.line + 1 >= self.max_rows + self.at_line {
-            self.at_line = self.line + 1 - self.max_rows;
-            if content[self.line].char_len() > self.text_width {
-                self.at_line += 1;
-            }
-        }
-    }
-
     pub fn init_select(&mut self) {
         if self.select.is_none() {
             let position = self.into();
