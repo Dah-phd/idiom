@@ -9,7 +9,7 @@ use crate::{
 };
 use std::{cmp::Ordering, ops::Range};
 
-pub struct CodeLineContext<'a> {
+pub struct LineContext<'a> {
     pub lexer: &'a mut Lexer,
     line_number: usize,
     line_number_offset: usize,
@@ -18,7 +18,7 @@ pub struct CodeLineContext<'a> {
     select: Option<(CursorPosition, CursorPosition)>,
 }
 
-impl<'a> CodeLineContext<'a> {
+impl<'a> LineContext<'a> {
     pub fn collect_context(lexer: &'a mut Lexer, cursor: &Cursor, line_number_offset: usize) -> Self {
         let line_number = cursor.at_line;
         let select = cursor.select_get();
@@ -31,6 +31,16 @@ impl<'a> CodeLineContext<'a> {
     }
 
     #[inline]
+    pub fn setup_cursor(&mut self, line: Line, backend: &mut impl BackendProtocol) -> usize {
+        self.line_number += 1;
+        let text = format!("{: >1$} ", self.line_number, self.line_number_offset);
+        let remaining_width = line.width - text.len();
+        backend.print_at(line.row, line.col, text);
+        backend.clear_to_eol();
+        remaining_width
+    }
+
+    #[inline]
     pub fn setup_line(&mut self, line: Line, backend: &mut impl BackendProtocol) -> usize {
         self.line_number += 1;
         let text = format!("{: >1$} ", self.line_number, self.line_number_offset);
@@ -40,15 +50,12 @@ impl<'a> CodeLineContext<'a> {
         remaining_width
     }
 
-    /// adds accent
     #[inline]
-    pub fn setup_cursor(&mut self, line: Line, backend: &mut impl BackendProtocol) -> usize {
+    pub fn wrap_line(&mut self, line: Line, backend: &mut impl BackendProtocol) {
         self.line_number += 1;
-        let text = format!("{: >1$} ", self.line_number, self.line_number_offset);
-        let remaining_width = line.width - text.len();
-        backend.print_at(line.row, line.col, text);
+        let text = format!("{: >1$} ", '.', self.line_number_offset);
+        backend.print_styled_at(line.row, line.col, text, Style::fg(color::dark_grey()));
         backend.clear_to_eol();
-        remaining_width
     }
 
     #[inline]

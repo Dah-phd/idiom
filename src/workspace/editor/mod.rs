@@ -43,14 +43,59 @@ impl Editor {
         big_file_protection(&path)?;
         let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
+        let line_number_offset = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
         Ok(Self {
-            line_number_offset: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
+            cursor: Cursor::sized(gs, line_number_offset),
+            line_number_offset,
             lexer: Lexer::with_context(file_type, &path, gs),
             content,
             renderer: Renderer::code(),
-            cursor: Cursor::default(),
             actions: Actions::new(cfg.get_indent_cfg(&file_type)),
             file_type,
+            display,
+            update_status: FileUpdate::None,
+            path,
+            last_render_at_line: None,
+        })
+    }
+
+    pub fn from_path_text(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
+        big_file_protection(&path)?;
+        gs.message(
+            "The file is opened in text mode, beware idiom is not designed with plain text performance in mind!",
+        );
+        let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
+        let display = build_display(&path);
+        let line_number_offset = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
+        Ok(Self {
+            cursor: Cursor::sized(gs, line_number_offset),
+            line_number_offset,
+            lexer: Lexer::text_lexer(&path, gs),
+            content,
+            renderer: Renderer::text(),
+            actions: Actions::new(cfg.default_indent_cfg()),
+            file_type: FileType::Ignored,
+            display,
+            update_status: FileUpdate::None,
+            path,
+            last_render_at_line: None,
+        })
+    }
+
+    pub fn from_path_md(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
+        big_file_protection(&path)?;
+        gs.message("The file is opened in MD mode, beware idiom is not designed with MD performance in mind!");
+        let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
+        let display = build_display(&path);
+        let line_number_offset = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
+        Ok(Self {
+            cursor: Cursor::sized(gs, line_number_offset),
+            line_number_offset,
+            lexer: Lexer::text_lexer(&path, gs),
+            content,
+            renderer: Renderer::markdown(),
+            actions: Actions::new(cfg.default_indent_cfg()),
+            file_type: FileType::Ignored,
             display,
             update_status: FileUpdate::None,
             path,
@@ -438,8 +483,8 @@ impl Editor {
 
     pub fn resize(&mut self, width: usize, height: usize) {
         self.cursor.max_rows = height;
-        let offset = if self.content.is_empty() { 0 } else { (self.content.len().ilog10() + 1) as usize };
-        self.cursor.text_width = width.saturating_sub(offset + 1);
+        self.line_number_offset = if self.content.is_empty() { 0 } else { (self.content.len().ilog10() + 1) as usize };
+        self.cursor.text_width = width.saturating_sub(self.line_number_offset + 1);
     }
 }
 

@@ -92,10 +92,8 @@ impl IdiomEvent {
                         gs.insert_mode();
                         if let Some(editor) = ws.get_active() {
                             editor.go_to_select(from, to);
-                            gs.clear_popup();
-                        } else {
-                            gs.clear_popup();
-                        }
+                        };
+                        gs.clear_popup();
                     }
                     Err(error) => gs.error(error.to_string()),
                 }

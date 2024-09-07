@@ -1,8 +1,13 @@
 mod code;
+mod markdown;
+mod text;
+
+use super::line::LineContext;
 use crate::{global_state::GlobalState, workspace::Editor};
 
-use super::line::CodeLineContext;
-
+/// Component containing logic regarding rendering
+/// In order to escape complicated state machines and any form on polymorphism,
+/// it derives the correct function pointers on file opening.
 pub struct Renderer {
     pub render: fn(&mut Editor, &mut GlobalState),
     pub fast_render: fn(&mut Editor, &mut GlobalState),
@@ -12,13 +17,21 @@ impl Renderer {
     pub fn code() -> Self {
         Self { render: code_render, fast_render: fast_code_render }
     }
+
+    pub fn text() -> Self {
+        Self { render: text_render, fast_render: fast_text_render }
+    }
+
+    pub fn markdown() -> Self {
+        Self { render: md_render, fast_render: fast_md_render }
+    }
 }
 
 fn code_render(editor: &mut Editor, gs: &mut GlobalState) {
     editor.last_render_at_line.replace(editor.cursor.at_line);
     editor.sync(gs);
     let mut lines = gs.editor_area.into_iter();
-    let mut ctx = CodeLineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
+    let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
     let backend = &mut gs.writer;
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
         if let Some(line) = lines.next() {
@@ -48,7 +61,7 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     }
     editor.sync(gs);
     let mut lines = gs.editor_area.into_iter();
-    let mut ctx = CodeLineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
+    let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
     let backend = &mut gs.writer;
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
         if let Some(line) = lines.next() {
@@ -79,4 +92,33 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     }
     gs.render_stats(editor.content.len(), editor.cursor.select_len(&editor.content), (&editor.cursor).into());
     ctx.render_modal(gs);
+}
+
+fn text_render(editor: &mut Editor, gs: &mut GlobalState) {
+    editor.last_render_at_line.replace(editor.cursor.at_line);
+    let mut lines = gs.editor_area.into_iter();
+    let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
+    let backend = &mut gs.writer;
+    for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
+        if editor.cursor.line == line_idx {
+            text::cursor(text, &mut ctx, &mut lines, backend);
+        } else {
+            text::line(text, &mut ctx, &mut lines, backend)
+        }
+    }
+    for line in lines {
+        line.render_empty(&mut gs.writer);
+    }
+    gs.render_stats(editor.content.len(), editor.cursor.select_len(&editor.content), (&editor.cursor).into());
+    ctx.forced_modal_render(gs);
+}
+fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
+    text_render(editor, gs);
+}
+
+fn md_render(editor: &mut Editor, gs: &mut GlobalState) {
+    text_render(editor, gs);
+}
+fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
+    fast_text_render(editor, gs);
 }

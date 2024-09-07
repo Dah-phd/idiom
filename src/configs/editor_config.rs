@@ -148,12 +148,16 @@ impl EditorConfigs {
     }
 
     pub fn get_indent_cfg(&self, file_type: &FileType) -> IndentConfigs {
-        let indent_cfg = IndentConfigs {
+        let indent_cfg = self.default_indent_cfg();
+        indent_cfg.update_by_file_type(file_type)
+    }
+
+    pub fn default_indent_cfg(&self) -> IndentConfigs {
+        IndentConfigs {
             indent: (0..self.indent_spaces).map(|_| ' ').collect(),
             indent_after: self.indent_after.to_owned(),
             unindent_before: self.unindent_before.to_owned(),
-        };
-        indent_cfg.update_by_file_type(file_type)
+        }
     }
 
     pub fn derive_lsp(&self, file_type: &FileType) -> Option<String> {

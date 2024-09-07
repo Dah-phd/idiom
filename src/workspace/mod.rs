@@ -259,10 +259,14 @@ impl Workspace {
     async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
         let file_type = match FileType::derive_type(&file_path) {
             Some(file_type) => file_type,
-            None => return Err(IdiomError::GeneralError("Unknown file type!".to_owned())),
+            None => {
+                return match file_path.extension().and_then(|ext| ext.to_str()) {
+                    Some(ext) if ext.to_lowercase() == "md" => Editor::from_path_md(file_path, &self.base_config, gs),
+                    _ => Editor::from_path_text(file_path, &self.base_config, gs),
+                }
+            }
         };
         let mut new = Editor::from_path(file_path, file_type, &self.base_config, gs)?;
-        new.resize(gs.editor_area.width, gs.editor_area.height as usize);
         let lsp_cmd = match self.base_config.derive_lsp(&new.file_type) {
             None => return Ok(new),
             Some(cmd) => cmd,

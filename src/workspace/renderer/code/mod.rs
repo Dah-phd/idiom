@@ -9,7 +9,7 @@ use crate::render::{
     layout::Line,
     UTF8Safe,
 };
-use crate::workspace::line::{CodeLineContext, EditorLine};
+use crate::workspace::line::{EditorLine, LineContext};
 use std::ops::Range;
 use unicode_width::UnicodeWidthChar;
 
@@ -31,22 +31,22 @@ pub fn width_remainder(line: &EditorLine, line_width: usize) -> Option<usize> {
 }
 
 #[inline(always)]
-pub fn cursor(line: &mut EditorLine, ctx: &mut CodeLineContext, rend_line: Line, backend: &mut Backend) {
-    let line_row = rend_line.row;
-    let select = ctx.get_select(rend_line.width);
-    let line_width = ctx.setup_cursor(rend_line, backend);
-    line.cached.cursor(line_row, ctx.cursor_char(), 0, select.clone());
-    if line.is_simple() {
-        ascii_cursor::render(line, ctx, line_width, select, backend);
+pub fn cursor(code: &mut EditorLine, ctx: &mut LineContext, line: Line, backend: &mut Backend) {
+    let line_row = line.row;
+    let select = ctx.get_select(line.width);
+    let line_width = ctx.setup_cursor(line, backend);
+    code.cached.cursor(line_row, ctx.cursor_char(), 0, select.clone());
+    if code.is_simple() {
+        ascii_cursor::render(code, ctx, line_width, select, backend);
     } else {
-        complex_cursor::render(line, ctx, line_width, select, backend);
+        complex_cursor::render(code, ctx, line_width, select, backend);
     }
     backend.reset_style();
 }
 
 pub fn inner_render(
     code: &mut EditorLine,
-    ctx: &mut CodeLineContext<'_>,
+    ctx: &mut LineContext<'_>,
     line: Line,
     select: Option<Range<usize>>,
     backend: &mut Backend,
@@ -68,7 +68,7 @@ fn render_with_select(
     code: &mut EditorLine,
     line_width: usize,
     select: Range<usize>,
-    ctx: &mut CodeLineContext,
+    ctx: &mut LineContext,
     backend: &mut impl BackendProtocol,
 ) {
     if code.char_len == 0 && select.end != 0 {
@@ -109,7 +109,7 @@ fn render_with_select(
 fn render_no_select(
     code: &mut EditorLine,
     line_width: usize,
-    ctx: &mut CodeLineContext,
+    ctx: &mut LineContext,
     backend: &mut impl BackendProtocol,
 ) {
     if code.is_simple() {
@@ -141,17 +141,17 @@ fn render_no_select(
 }
 
 #[inline(always)]
-pub fn cursor_fast(line: &mut EditorLine, ctx: &mut CodeLineContext, rend_line: Line, backend: &mut Backend) {
-    let select = ctx.get_select(rend_line.width);
-    if !line.cached.should_render_cursor_or_update(rend_line.row, ctx.cursor_char(), select.clone()) {
+pub fn cursor_fast(code: &mut EditorLine, ctx: &mut LineContext, line: Line, backend: &mut Backend) {
+    let select = ctx.get_select(line.width);
+    if !code.cached.should_render_cursor_or_update(line.row, ctx.cursor_char(), select.clone()) {
         ctx.skip_line();
         return;
     }
-    let line_width = ctx.setup_cursor(rend_line, backend);
-    if line.is_simple() {
-        ascii_cursor::render(line, ctx, line_width, select, backend);
+    let line_width = ctx.setup_cursor(line, backend);
+    if code.is_simple() {
+        ascii_cursor::render(code, ctx, line_width, select, backend);
     } else {
-        complex_cursor::render(line, ctx, line_width, select, backend);
+        complex_cursor::render(code, ctx, line_width, select, backend);
     }
     backend.reset_style();
 }

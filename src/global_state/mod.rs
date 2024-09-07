@@ -299,10 +299,10 @@ impl GlobalState {
     }
 
     #[inline]
-    pub fn full_resize(&mut self, height: u16, width: u16, workspace: &mut Workspace) {
+    pub fn full_resize(&mut self, height: u16, width: u16) {
         self.screen_rect = (width, height).into();
         self.draw_callback = draw::full_rebuild;
-        workspace.resize_all(self.editor_area.width, self.editor_area.height as usize);
+        self.event.push(IdiomEvent::Resize);
     }
 
     pub fn recalc_draw_size(&mut self) {

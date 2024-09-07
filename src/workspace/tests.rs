@@ -307,7 +307,6 @@ fn test_cut_paste() {
     shift_press(&mut ws, KeyCode::Down, &mut gs);
     shift_press(&mut ws, KeyCode::Down, &mut gs);
     ctrl_press(&mut ws, KeyCode::Char('x'), &mut gs);
-    press(&mut ws, KeyCode::Up, &mut gs);
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nextly long line here");
     shift_press(&mut ws, KeyCode::Down, &mut gs); // with select
     ctrl_press(&mut ws, KeyCode::Char('v'), &mut gs);

@@ -9,7 +9,7 @@ use crate::syntax::tests::{
     zip_text_tokens,
 };
 use crate::workspace::cursor::Cursor;
-use crate::workspace::line::{CodeLineContext, EditorLine};
+use crate::workspace::line::{EditorLine, LineContext};
 use crate::workspace::CursorPosition;
 
 #[test]
@@ -197,7 +197,7 @@ fn test_line_render_utf8() {
     let (tokens, text) = create_token_pairs_utf8();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
@@ -218,7 +218,7 @@ fn test_line_render_utf16() {
     let (tokens, text) = create_token_pairs_utf16();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
@@ -239,7 +239,7 @@ fn test_line_render_utf32() {
     let (tokens, text) = create_token_pairs_utf32();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
@@ -262,7 +262,7 @@ fn test_line_render_shrunk_utf8() {
     let (tokens, text) = create_token_pairs_utf8();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: limit };
@@ -285,7 +285,7 @@ fn test_line_render_shrunk_utf16() {
     let (tokens, text) = create_token_pairs_utf16();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: limit };
@@ -308,7 +308,7 @@ fn test_line_render_shrunk_utf32() {
     let (tokens, text) = create_token_pairs_utf32();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: limit };
@@ -330,7 +330,7 @@ fn test_line_render_select_utf8() {
     let (tokens, text) = create_token_pairs_utf8();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
@@ -352,7 +352,7 @@ fn test_line_render_select_utf16() {
     let (tokens, text) = create_token_pairs_utf16();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
@@ -374,7 +374,7 @@ fn test_line_render_select_utf32() {
     let (tokens, text) = create_token_pairs_utf32();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 2);
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2);
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
@@ -399,7 +399,7 @@ fn test_line_wrapping_utf8() {
     let (tokens, text) = longline_token_pair_utf8();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 1);
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 1);
     let line = lines.next().unwrap();
     let select = ctx.get_select(line.width);
     inner_render(&mut content[0], &mut ctx, line, select, &mut gs.writer);
@@ -427,7 +427,7 @@ fn test_line_wrapping_utf16() {
     let (tokens, text) = longline_token_pair_utf16();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 1);
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 1);
     let line = lines.next().unwrap();
     let select = ctx.get_select(line.width);
     inner_render(&mut content[0], &mut ctx, line, select, &mut gs.writer);
@@ -455,7 +455,7 @@ fn test_line_wrapping_utf32() {
     let (tokens, text) = longline_token_pair_utf32();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = CodeLineContext::collect_context(&mut lexer, &cursor, 1);
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 1);
     let line = lines.next().unwrap();
     let select = ctx.get_select(line.width);
     inner_render(&mut content[0], &mut ctx, line, select, &mut gs.writer);

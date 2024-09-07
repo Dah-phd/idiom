@@ -1,4 +1,4 @@
-use crate::workspace::line::EditorLine;
+use crate::{global_state::GlobalState, workspace::line::EditorLine};
 use lsp_types::Position;
 pub type Select = (CursorPosition, CursorPosition);
 
@@ -14,6 +14,12 @@ pub struct Cursor {
 }
 
 impl Cursor {
+    pub fn sized(gs: &GlobalState, offset: usize) -> Self {
+        let text_width = gs.editor_area.width.saturating_sub(offset + 1);
+        let max_rows = gs.editor_area.height as usize;
+        Self { text_width, max_rows, ..Default::default() }
+    }
+
     pub fn set_cursor_checked_with_select(&mut self, position: CursorPosition, content: &[EditorLine]) {
         self.set_cursor_checked(position, content);
         self.init_select();
@@ -65,6 +71,7 @@ impl Cursor {
         self.phantm_char = self.char;
     }
 
+    #[inline(always)]
     pub fn set_char(&mut self, char: usize) {
         self.char = char;
         self.phantm_char = char;
@@ -110,6 +117,7 @@ impl Cursor {
             return;
         }
         if self.line == 0 {
+            self.set_char(0);
             return;
         }
         self.line -= 1;

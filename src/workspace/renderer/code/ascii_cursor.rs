@@ -1,13 +1,13 @@
 use super::{WRAP_CLOSE, WRAP_OPEN};
 use crate::{
     render::backend::{Backend, BackendProtocol, Style},
-    workspace::line::{CodeLineContext, EditorLine},
+    workspace::line::{EditorLine, LineContext},
 };
 use std::ops::Range;
 
 pub fn render(
     line: &mut EditorLine,
-    ctx: &mut CodeLineContext,
+    ctx: &mut LineContext,
     line_width: usize,
     select: Option<Range<usize>>,
     backend: &mut Backend,
@@ -28,7 +28,7 @@ pub fn render(
     }
 }
 
-pub fn basic(line: &EditorLine, ctx: &CodeLineContext, backend: &mut Backend) {
+pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut Backend) {
     let mut iter_tokens = line.iter_tokens();
     let mut counter = 0;
     let mut last_len = 0;
@@ -87,7 +87,7 @@ pub fn basic(line: &EditorLine, ctx: &CodeLineContext, backend: &mut Backend) {
 }
 
 #[inline]
-pub fn select(line: &EditorLine, ctx: &CodeLineContext, select: Range<usize>, backend: &mut Backend) {
+pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backend: &mut Backend) {
     let select_color = ctx.lexer.theme.selected;
     let mut reset_style = Style::default();
     let mut iter_tokens = line.iter_tokens();
@@ -156,7 +156,7 @@ pub fn select(line: &EditorLine, ctx: &CodeLineContext, select: Range<usize>, ba
 }
 
 #[inline(always)]
-pub fn partial(line: &mut EditorLine, ctx: &CodeLineContext, line_width: usize, backend: &mut Backend) {
+pub fn partial(line: &mut EditorLine, ctx: &LineContext, line_width: usize, backend: &mut Backend) {
     let cursor_idx = ctx.cursor_char();
     let (mut idx, reduction) = line.cached.generate_skipped_chars_simple(cursor_idx, line_width);
     if idx != 0 {
@@ -228,7 +228,7 @@ pub fn partial(line: &mut EditorLine, ctx: &CodeLineContext, line_width: usize, 
 
 pub fn partial_select(
     line: &mut EditorLine,
-    ctx: &CodeLineContext,
+    ctx: &LineContext,
     line_width: usize,
     select: Range<usize>,
     backend: &mut Backend,

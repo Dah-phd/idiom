@@ -103,6 +103,78 @@ impl Lexer {
         }
     }
 
+    pub fn text_lexer(path: &Path, gs: &mut GlobalState) -> Self {
+        Self {
+            lang: Lang::default(),
+            legend: Legend::default(),
+            theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
+            token_producer: TokensType::Internal,
+            clock: Instant::now(),
+            modal: None,
+            modal_rect: None,
+            uri: as_url(path),
+            path: path.into(),
+            version: 0,
+            requests: Vec::new(),
+            diagnostics: None,
+            meta: None,
+            lsp: false,
+            client: LSPClient::placeholder(),
+            context: context_local,
+            completable: completable_dead,
+            autocomplete: get_autocomplete_dead,
+            tokens: tokens_dead,
+            tokens_partial: tokens_partial_dead,
+            references: info_position_dead,
+            definitions: info_position_dead,
+            declarations: info_position_dead,
+            hover: info_position_dead,
+            signatures: info_position_dead,
+            start_renames: start_renames_dead,
+            renames: renames_dead,
+            sync: sync_edits_local,
+            sync_rev: sync_edits_local_rev,
+            encode_position: encode_pos_utf32,
+            char_lsp_pos,
+        }
+    }
+
+    pub fn md_lexer(path: &Path, gs: &mut GlobalState) -> Self {
+        Self {
+            lang: Lang::default(),
+            legend: Legend::default(),
+            theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
+            token_producer: TokensType::Internal,
+            clock: Instant::now(),
+            modal: None,
+            modal_rect: None,
+            uri: as_url(path),
+            path: path.into(),
+            version: 0,
+            requests: Vec::new(),
+            diagnostics: None,
+            meta: None,
+            lsp: false,
+            client: LSPClient::placeholder(),
+            context: context_local,
+            completable: completable_dead,
+            autocomplete: get_autocomplete_dead,
+            tokens: tokens_dead,
+            tokens_partial: tokens_partial_dead,
+            references: info_position_dead,
+            definitions: info_position_dead,
+            declarations: info_position_dead,
+            hover: info_position_dead,
+            signatures: info_position_dead,
+            start_renames: start_renames_dead,
+            renames: renames_dead,
+            sync: sync_edits_local,
+            sync_rev: sync_edits_local_rev,
+            encode_position: encode_pos_utf32,
+            char_lsp_pos,
+        }
+    }
+
     #[inline]
     pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
         (editor.lexer.context)(editor, gs);

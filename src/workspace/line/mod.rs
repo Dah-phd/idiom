@@ -8,7 +8,7 @@ use crate::{
     syntax::{tokens::TokenLine, DiagnosticLine, Lang, Lexer, Token},
     // workspace::line::EditorLine,
 };
-pub use context::CodeLineContext;
+pub use context::LineContext;
 use std::{
     fmt::Display,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},

@@ -2,7 +2,7 @@ use unicode_width::UnicodeWidthChar;
 
 use crate::{
     render::backend::{Backend, BackendProtocol, Style},
-    workspace::line::{CodeLineContext, EditorLine},
+    workspace::line::{EditorLine, LineContext},
 };
 use std::ops::Range;
 
@@ -10,7 +10,7 @@ use super::{width_remainder, WRAP_CLOSE, WRAP_OPEN};
 
 pub fn render(
     line: &mut EditorLine,
-    ctx: &mut CodeLineContext,
+    ctx: &mut LineContext,
     line_width: usize,
     select: Option<Range<usize>>,
     backend: &mut Backend,
@@ -31,7 +31,7 @@ pub fn render(
     }
 }
 
-pub fn basic(line: &EditorLine, ctx: &CodeLineContext, backend: &mut Backend) {
+pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut Backend) {
     let mut tokens = line.iter_tokens();
     let mut counter = 0;
     let mut last_len = 0;
@@ -91,7 +91,7 @@ pub fn basic(line: &EditorLine, ctx: &CodeLineContext, backend: &mut Backend) {
     backend.reset_style();
 }
 
-pub fn select(line: &EditorLine, ctx: &CodeLineContext, select: Range<usize>, backend: &mut Backend) {
+pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backend: &mut Backend) {
     let char_position = ctx.lexer.char_lsp_pos;
     let select_color = ctx.lexer.theme.selected;
     let mut reset_style = Style::default();
@@ -162,7 +162,7 @@ pub fn select(line: &EditorLine, ctx: &CodeLineContext, select: Range<usize>, ba
     backend.reset_style();
 }
 
-pub fn partial(line: &mut EditorLine, ctx: &mut CodeLineContext, mut line_width: usize, backend: &mut Backend) {
+pub fn partial(line: &mut EditorLine, ctx: &mut LineContext, mut line_width: usize, backend: &mut Backend) {
     line_width -= 2;
 
     let cursor_idx = ctx.cursor_char();
@@ -258,7 +258,7 @@ pub fn partial(line: &mut EditorLine, ctx: &mut CodeLineContext, mut line_width:
 
 pub fn partial_select(
     line: &mut EditorLine,
-    ctx: &mut CodeLineContext,
+    ctx: &mut LineContext,
     select: Range<usize>,
     mut line_width: usize,
     backend: &mut Backend,
