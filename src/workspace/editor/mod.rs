@@ -136,7 +136,6 @@ impl Editor {
             self.last_render_at_line.take();
         };
         Lexer::context(self, gs);
-        self.cursor.correct_cursor_position(&self.content);
     }
 
     #[inline(always)]

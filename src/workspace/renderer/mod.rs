@@ -2,6 +2,8 @@ mod code;
 mod markdown;
 mod text;
 
+use code::code_repositioning;
+
 use super::line::LineContext;
 use crate::{global_state::GlobalState, workspace::Editor};
 
@@ -30,6 +32,7 @@ impl Renderer {
 fn code_render(editor: &mut Editor, gs: &mut GlobalState) {
     editor.last_render_at_line.replace(editor.cursor.at_line);
     editor.sync(gs);
+    code_repositioning(&mut editor.cursor, &editor.content);
     let mut lines = gs.editor_area.into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
     let backend = &mut gs.writer;
@@ -60,6 +63,7 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
         return code_render(editor, gs);
     }
     editor.sync(gs);
+    code_repositioning(&mut editor.cursor, &editor.content);
     let mut lines = gs.editor_area.into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
     let backend = &mut gs.writer;
