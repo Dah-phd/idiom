@@ -1,5 +1,6 @@
-use std::{ops::Range, str::CharIndices};
-
+mod chunks;
+pub use chunks::{ByteChunks, StrChunks, WriteChunks};
+use std::ops::Range;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 /// Trait allowing UTF8 safe operations on str/String
@@ -50,50 +51,6 @@ pub trait UTF8SafeStringExt {
     fn utf8_replace_till(&mut self, to: usize, string: &str);
     fn utf8_replace_from(&mut self, from: usize, string: &str);
     fn utf8_split_off(&mut self, at: usize) -> Self;
-}
-
-pub struct WriteChunks<'a> {
-    pub width: usize,
-    at_byte: usize,
-    text: &'a str,
-    inner: CharIndices<'a>,
-    width_offset: usize,
-}
-
-impl<'a> Iterator for WriteChunks<'a> {
-    type Item = (usize, &'a str);
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.width == 0 {
-            return None;
-        }
-        let start = self.at_byte;
-        let mut width = self.width_offset;
-        for (idx, ch) in self.inner.by_ref() {
-            let current_w = UnicodeWidthChar::width(ch).unwrap_or_default();
-            if self.width < width + current_w {
-                if current_w > self.width {
-                    self.width = 0;
-                    return None;
-                }
-                self.width_offset = current_w;
-                self.at_byte = idx;
-                return Some((width, unsafe { self.text.get_unchecked(start..self.at_byte) }));
-            };
-            width += current_w;
-        }
-        self.width = 0;
-        return Some((width, unsafe { self.text.get_unchecked(start..) }));
-    }
-}
-
-impl<'a> WriteChunks<'a> {
-    pub fn new(text: &'a str, width: usize) -> Self {
-        Self { inner: text.char_indices(), text, at_byte: 0, width, width_offset: 0 }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.width == 0
-    }
 }
 
 impl UTF8Safe for str {

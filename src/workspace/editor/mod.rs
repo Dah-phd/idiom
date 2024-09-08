@@ -43,7 +43,7 @@ impl Editor {
         big_file_protection(&path)?;
         let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
-        let line_number_offset = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
+        let line_number_offset = if content.is_empty() { 1 } else { (content.len().ilog10() + 1) as usize };
         Ok(Self {
             cursor: Cursor::sized(gs, line_number_offset),
             line_number_offset,
@@ -66,7 +66,7 @@ impl Editor {
         );
         let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
-        let line_number_offset = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
+        let line_number_offset = if content.is_empty() { 1 } else { (content.len().ilog10() + 1) as usize };
         Ok(Self {
             cursor: Cursor::sized(gs, line_number_offset),
             line_number_offset,
@@ -87,7 +87,7 @@ impl Editor {
         gs.message("The file is opened in MD mode, beware idiom is not designed with MD performance in mind!");
         let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
-        let line_number_offset = if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize };
+        let line_number_offset = if content.is_empty() { 1 } else { (content.len().ilog10() + 1) as usize };
         Ok(Self {
             cursor: Cursor::sized(gs, line_number_offset),
             line_number_offset,
@@ -130,7 +130,7 @@ impl Editor {
     #[inline(always)]
     pub fn sync(&mut self, gs: &mut GlobalState) {
         let new_line_number_offset =
-            if self.content.is_empty() { 0 } else { (self.content.len().ilog10() + 1) as usize };
+            if self.content.is_empty() { 1 } else { (self.content.len().ilog10() + 1) as usize };
         if new_line_number_offset != self.line_number_offset {
             self.line_number_offset = new_line_number_offset;
             self.last_render_at_line.take();
@@ -482,7 +482,7 @@ impl Editor {
 
     pub fn resize(&mut self, width: usize, height: usize) {
         self.cursor.max_rows = height;
-        self.line_number_offset = if self.content.is_empty() { 0 } else { (self.content.len().ilog10() + 1) as usize };
+        self.line_number_offset = if self.content.is_empty() { 1 } else { (self.content.len().ilog10() + 1) as usize };
         self.cursor.text_width = width.saturating_sub(self.line_number_offset + 1);
     }
 }

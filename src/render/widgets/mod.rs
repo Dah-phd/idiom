@@ -1,4 +1,8 @@
-use super::{backend::BackendProtocol, layout::RectIter, utils::WriteChunks};
+use super::{
+    backend::BackendProtocol,
+    layout::RectIter,
+    utils::{StrChunks, WriteChunks},
+};
 use crate::render::{
     backend::{Backend, Style},
     layout::Line,
@@ -160,17 +164,17 @@ impl Text {
     pub fn wrap_with_remainder_complex(&self, lines: &mut RectIter, backend: &mut Backend) -> Option<usize> {
         let max_width = lines.width();
         let mut chunks = WriteChunks::new(&self.text, max_width);
-        let (mut width, mut chunk) = chunks.next()?;
+        let StrChunks { mut width, mut text } = chunks.next()?;
         match self.style {
             Some(style) => loop {
                 lines.move_cursor(backend)?;
-                backend.print_styled(chunk, style);
+                backend.print_styled(text, style);
                 match chunks.next() {
                     Some(next_chunk) => {
                         if width < max_width {
                             backend.pad(max_width - width);
                         }
-                        (width, chunk) = next_chunk;
+                        StrChunks { width, text } = next_chunk;
                     }
                     None => {
                         return Some(max_width - width);
@@ -179,13 +183,13 @@ impl Text {
             },
             None => loop {
                 lines.move_cursor(backend)?;
-                backend.print(chunk);
+                backend.print(text);
                 match chunks.next() {
                     Some(next_chunk) => {
                         if width < max_width {
                             backend.pad(max_width - width);
                         }
-                        (width, chunk) = next_chunk;
+                        StrChunks { width, text } = next_chunk;
                     }
                     None => {
                         return Some(max_width - width);

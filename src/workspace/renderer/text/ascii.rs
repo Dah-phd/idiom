@@ -2,17 +2,13 @@ use crate::{
     render::{
         backend::{Backend, BackendProtocol, Style},
         layout::RectIter,
+        utils::ByteChunks,
     },
     workspace::line::{EditorLine, LineContext},
 };
 use std::ops::Range;
 
-pub fn ascii_line(
-    text: &mut EditorLine,
-    lines: &mut RectIter,
-    ctx: &mut LineContext,
-    backend: &mut impl BackendProtocol,
-) {
+pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut impl BackendProtocol) {
     let line_width = match lines.next() {
         Some(line) => {
             text.cached.line(line.row, None);
@@ -20,21 +16,21 @@ pub fn ascii_line(
         }
         None => return,
     };
-    let mut start = 0;
-    while let Some(text_chunk) = text.content.get(start..start + line_width) {
-        backend.print(text_chunk);
-        start += line_width;
-        match lines.next() {
-            Some(line) => ctx.wrap_line(line, backend),
-            None => return,
-        }
+    let mut chunks = ByteChunks::new(&text.content, line_width);
+    match chunks.next() {
+        Some(chunk) => backend.print(chunk.text),
+        None => return,
     }
-    if let Some(last_chunk) = text.content.get(start..) {
-        backend.print(last_chunk);
+    for chunk in chunks {
+        match lines.next() {
+            None => return,
+            Some(line) => ctx.wrap_line(line, backend),
+        }
+        backend.print(chunk.text);
     }
 }
 
-pub fn ascii_line_with_select(
+pub fn line_with_select(
     text: &mut EditorLine,
     select: Range<usize>,
     lines: &mut RectIter,
@@ -73,7 +69,7 @@ pub fn ascii_line_with_select(
     }
 }
 
-pub fn render(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut Backend) {
+pub fn cursor(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut Backend) {
     match ctx.get_select(text.char_len()) {
         Some(select) => self::select(text, select, lines, ctx, backend),
         None => self::basic(text, lines, ctx, backend),

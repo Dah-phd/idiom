@@ -1,4 +1,6 @@
-use super::{UTF8Safe, UTF8SafeStringExt, WriteChunks};
+use crate::render::utils::chunks::ByteChunks;
+
+use super::{StrChunks, UTF8Safe, UTF8SafeStringExt, WriteChunks};
 const TEXT: &str = "123🚀13";
 
 #[test]
@@ -188,14 +190,14 @@ fn test_utf8_remove_panic() {
 fn test_chunks() {
     let text = "123🚀asdas123123123afsadasras";
     let mut chunks = WriteChunks::new(text, 4);
-    assert_eq!(chunks.next(), Some((3, "123")));
-    assert_eq!(chunks.next(), Some((4, "🚀as")));
-    assert_eq!(chunks.next(), Some((4, "das1")));
-    assert_eq!(chunks.next(), Some((4, "2312")));
-    assert_eq!(chunks.next(), Some((4, "3123")));
-    assert_eq!(chunks.next(), Some((4, "afsa")));
-    assert_eq!(chunks.next(), Some((4, "dasr")));
-    assert_eq!(chunks.next(), Some((2, "as")));
+    assert_eq!(chunks.next(), Some(StrChunks { width: 3, text: "123" }));
+    assert_eq!(chunks.next(), Some(StrChunks { width: 4, text: "🚀as" }));
+    assert_eq!(chunks.next(), Some(StrChunks { width: 4, text: "das1" }));
+    assert_eq!(chunks.next(), Some(StrChunks { width: 4, text: "2312" }));
+    assert_eq!(chunks.next(), Some(StrChunks { width: 4, text: "3123" }));
+    assert_eq!(chunks.next(), Some(StrChunks { width: 4, text: "afsa" }));
+    assert_eq!(chunks.next(), Some(StrChunks { width: 4, text: "dasr" }));
+    assert_eq!(chunks.next(), Some(StrChunks { width: 2, text: "as" }));
     assert_eq!(chunks.next(), None);
 }
 
@@ -203,6 +205,28 @@ fn test_chunks() {
 fn test_chunks_short() {
     let text = "123";
     let mut chunks = WriteChunks::new(text, 5);
-    assert_eq!(chunks.next(), Some((3, "123")));
+    assert_eq!(chunks.next(), Some(StrChunks { width: 3, text: "123" }));
+    assert_eq!(chunks.next(), None);
+}
+
+#[test]
+fn test_chunks_byte() {
+    let text = "123asdas123123123afsadasras";
+    let mut chunks = ByteChunks::new(text, 4);
+    assert_eq!(chunks.next(), Some(StrChunks { width: 4, text: "123a" }));
+    assert_eq!(chunks.next(), Some(StrChunks { width: 4, text: "sdas" }));
+    assert_eq!(chunks.next(), Some(StrChunks { width: 4, text: "1231" }));
+    assert_eq!(chunks.next(), Some(StrChunks { width: 4, text: "2312" }));
+    assert_eq!(chunks.next(), Some(StrChunks { width: 4, text: "3afs" }));
+    assert_eq!(chunks.next(), Some(StrChunks { width: 4, text: "adas" }));
+    assert_eq!(chunks.next(), Some(StrChunks { width: 3, text: "ras" }));
+    assert_eq!(chunks.next(), None);
+}
+
+#[test]
+fn test_chunks_byte_short() {
+    let text = "123";
+    let mut chunks = ByteChunks::new(text, 5);
+    assert_eq!(chunks.next(), Some(StrChunks { width: 3, text: "123" }));
     assert_eq!(chunks.next(), None);
 }

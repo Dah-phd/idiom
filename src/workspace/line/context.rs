@@ -52,7 +52,6 @@ impl<'a> LineContext<'a> {
 
     #[inline]
     pub fn wrap_line(&mut self, line: Line, backend: &mut impl BackendProtocol) {
-        self.line_number += 1;
         let text = format!("{: >1$} ", '.', self.line_number_offset);
         backend.print_styled_at(line.row, line.col, text, Style::fg(color::dark_grey()));
         backend.clear_to_eol();
