@@ -26,7 +26,9 @@ pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, 
     for chunk in chunks {
         match lines.next() {
             None => return,
-            Some(line) => ctx.wrap_line(line, backend),
+            Some(line) => {
+                ctx.wrap_line(line, backend);
+            }
         }
         backend.print(chunk.text);
     }
@@ -91,7 +93,7 @@ pub fn basic(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext,
     };
     let mut remaining_width = line_width;
     let mut idx = 0;
-    for text in text.chars() {
+    for text in text.content.chars() {
         let current_width = UnicodeWidthChar::width(text).unwrap_or_default();
         if remaining_width < current_width {
             remaining_width = line_width;
@@ -133,7 +135,7 @@ pub fn select(
     let select_color = ctx.lexer.theme.selected;
     let mut remaining_width = line_width;
     let mut idx = 0;
-    for text in text.chars() {
+    for text in text.content.chars() {
         let current_width = UnicodeWidthChar::width(text).unwrap_or_default();
         if remaining_width < current_width {
             remaining_width = line_width;

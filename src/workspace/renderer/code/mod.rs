@@ -159,15 +159,11 @@ pub fn cursor_fast(code: &mut EditorLine, ctx: &mut LineContext, line: Line, bac
     backend.reset_style();
 }
 
-pub fn code_repositioning(cursor: &mut Cursor, content: &[EditorLine]) {
+pub fn repositioning(cursor: &mut Cursor) {
     if cursor.line < cursor.at_line {
-        cursor.at_line = cursor.line
-    }
-    if cursor.line + 1 >= cursor.max_rows + cursor.at_line {
+        cursor.at_line = cursor.line;
+    } else if cursor.line + 1 >= cursor.max_rows + cursor.at_line {
         cursor.at_line = cursor.line + 1 - cursor.max_rows;
-        if content[cursor.line].char_len() > cursor.text_width {
-            cursor.at_line += 1;
-        }
     }
 }
 

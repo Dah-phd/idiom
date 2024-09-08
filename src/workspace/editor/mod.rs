@@ -5,7 +5,7 @@ use crate::{
     global_state::GlobalState,
     lsp::LSPError,
     render::layout::Rect,
-    syntax::Lexer,
+    syntax::{tokens::calc_wraps, Lexer},
     workspace::{
         actions::Actions,
         cursor::{Cursor, CursorPosition},
@@ -64,11 +64,13 @@ impl Editor {
         gs.message(
             "The file is opened in text mode, beware idiom is not designed with plain text performance in mind!",
         );
-        let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
+        let mut content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
         let line_number_offset = if content.is_empty() { 1 } else { (content.len().ilog10() + 1) as usize };
+        let cursor = Cursor::sized(gs, line_number_offset);
+        calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
-            cursor: Cursor::sized(gs, line_number_offset),
+            cursor,
             line_number_offset,
             lexer: Lexer::text_lexer(&path, gs),
             content,
@@ -85,11 +87,13 @@ impl Editor {
     pub fn from_path_md(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
         big_file_protection(&path)?;
         gs.message("The file is opened in MD mode, beware idiom is not designed with MD performance in mind!");
-        let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
+        let mut content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
         let line_number_offset = if content.is_empty() { 1 } else { (content.len().ilog10() + 1) as usize };
+        let cursor = Cursor::sized(gs, line_number_offset);
+        calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
-            cursor: Cursor::sized(gs, line_number_offset),
+            cursor,
             line_number_offset,
             lexer: Lexer::text_lexer(&path, gs),
             content,

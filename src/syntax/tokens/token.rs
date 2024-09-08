@@ -1,8 +1,10 @@
 use lsp_types::SemanticToken;
+use unicode_width::UnicodeWidthChar;
 
 use crate::{
     render::backend::Style,
     syntax::{diagnostics::DiagnosticData, theme::Theme, Lang, Legend},
+    workspace::line::EditorLine,
 };
 
 #[derive(Default)]
@@ -129,7 +131,6 @@ impl TokenLine {
     }
 }
 
-#[derive(Debug)]
 pub struct Token {
     pub len: usize,
     pub delta_start: usize,
@@ -235,5 +236,33 @@ impl Token {
         } else {
             buf.push(Token { len, delta_start, style: Style::fg(theme.default) });
         };
+    }
+}
+
+/// In plain text condition TokenLine is used to store wrapped lines, without affecting the code editing
+pub fn calc_wraps(content: &mut [EditorLine], text_width: usize) {
+    for text in content.iter_mut() {
+        calc_wrapse_line(text, text_width);
+    }
+}
+
+pub fn calc_wrapse_line(text: &mut EditorLine, text_width: usize) {
+    if text.is_simple() {
+        text.tokens.char_len = text.content.len() / text_width;
+    } else {
+        complex_wrap_calc(text, text_width);
+    }
+}
+
+pub fn complex_wrap_calc(text: &mut EditorLine, text_width: usize) {
+    text.tokens.char_len = 0;
+    let mut counter = text_width;
+    for ch in text.content.chars() {
+        let w = UnicodeWidthChar::width(ch).unwrap_or_default();
+        if w > counter {
+            counter = text_width;
+            text.tokens.char_len += 1;
+        }
+        counter -= w;
     }
 }

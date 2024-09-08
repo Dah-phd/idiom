@@ -1,8 +1,5 @@
 mod code;
-mod markdown;
 mod text;
-
-use code::code_repositioning;
 
 use super::line::LineContext;
 use crate::{global_state::GlobalState, syntax::Lexer, workspace::Editor};
@@ -29,41 +26,20 @@ impl Renderer {
     }
 }
 
+// CODE
+
 fn code_render(editor: &mut Editor, gs: &mut GlobalState) {
-    editor.last_render_at_line.replace(editor.cursor.at_line);
     Lexer::context(editor, gs);
-    code_repositioning(&mut editor.cursor, &editor.content);
-    let mut lines = gs.editor_area.into_iter();
-    let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
-    let backend = &mut gs.writer;
-    for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
-        if let Some(line) = lines.next() {
-            if editor.cursor.line == line_idx {
-                if text.tokens.is_empty() {
-                    text.tokens.internal_rebase(&text.content, &ctx.lexer.lang, &ctx.lexer.theme);
-                };
-                code::cursor(text, &mut ctx, line, backend);
-            } else {
-                let select = ctx.get_select(line.width);
-                code::inner_render(text, &mut ctx, line, select, backend);
-            }
-        } else {
-            break;
-        };
-    }
-    for line in lines {
-        line.render_empty(&mut gs.writer);
-    }
-    gs.render_stats(editor.content.len(), editor.cursor.select_len(&editor.content), (&editor.cursor).into());
-    ctx.forced_modal_render(gs);
+    code::repositioning(&mut editor.cursor);
+    code_render_full(editor, gs);
 }
 
 fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
-    if !matches!(editor.last_render_at_line, Some(idx) if idx == editor.cursor.at_line) {
-        return code_render(editor, gs);
-    }
     Lexer::context(editor, gs);
-    code_repositioning(&mut editor.cursor, &editor.content);
+    code::repositioning(&mut editor.cursor);
+    if !matches!(editor.last_render_at_line, Some(idx) if idx == editor.cursor.at_line) {
+        return code_render_full(editor, gs);
+    }
     let mut lines = gs.editor_area.into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
     let backend = &mut gs.writer;
@@ -98,7 +74,39 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     ctx.render_modal(gs);
 }
 
+#[inline(always)]
+fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
+    editor.last_render_at_line.replace(editor.cursor.at_line);
+    let mut lines = gs.editor_area.into_iter();
+    let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
+    let backend = &mut gs.writer;
+    for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
+        if let Some(line) = lines.next() {
+            if editor.cursor.line == line_idx {
+                if text.tokens.is_empty() {
+                    text.tokens.internal_rebase(&text.content, &ctx.lexer.lang, &ctx.lexer.theme);
+                };
+                code::cursor(text, &mut ctx, line, backend);
+            } else {
+                let select = ctx.get_select(line.width);
+                code::inner_render(text, &mut ctx, line, select, backend);
+            }
+        } else {
+            break;
+        };
+    }
+    for line in lines {
+        line.render_empty(&mut gs.writer);
+    }
+    gs.render_stats(editor.content.len(), editor.cursor.select_len(&editor.content), (&editor.cursor).into());
+    ctx.forced_modal_render(gs);
+}
+
+// TEXT
+
 fn text_render(editor: &mut Editor, gs: &mut GlobalState) {
+    editor.last_render_at_line.replace(editor.cursor.at_line);
+    text::repositioning(&mut editor.cursor, &mut editor.content);
     editor.last_render_at_line.replace(editor.cursor.at_line);
     let mut lines = gs.editor_area.into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
@@ -114,15 +122,39 @@ fn text_render(editor: &mut Editor, gs: &mut GlobalState) {
         line.render_empty(&mut gs.writer);
     }
     gs.render_stats(editor.content.len(), editor.cursor.select_len(&editor.content), (&editor.cursor).into());
-    ctx.forced_modal_render(gs);
 }
+
 fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
-    text_render(editor, gs);
+    if !matches!(editor.last_render_at_line, Some(idx) if idx == editor.cursor.at_line) {
+        return text_render(editor, gs);
+    }
+    text::repositioning(&mut editor.cursor, &mut editor.content);
+    editor.last_render_at_line.replace(editor.cursor.at_line);
+    let mut lines = gs.editor_area.into_iter();
+    let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
+    let backend = &mut gs.writer;
+    for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
+        if editor.cursor.line == line_idx {
+            text::cursor(text, &mut ctx, &mut lines, backend);
+        } else {
+            text::line(text, &mut ctx, &mut lines, backend)
+        }
+    }
+    for line in lines {
+        line.render_empty(&mut gs.writer);
+    }
+    gs.render_stats(editor.content.len(), editor.cursor.select_len(&editor.content), (&editor.cursor).into());
 }
+
+// MARKDOWN
 
 fn md_render(editor: &mut Editor, gs: &mut GlobalState) {
     text_render(editor, gs);
 }
+
 fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
+    if !matches!(editor.last_render_at_line, Some(idx) if idx == editor.cursor.at_line) {
+        return text_render(editor, gs);
+    }
     fast_text_render(editor, gs);
 }
