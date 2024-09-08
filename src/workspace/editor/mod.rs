@@ -105,12 +105,22 @@ impl Editor {
 
     #[inline]
     pub fn render(&mut self, gs: &mut GlobalState) {
+        let new_offset = if self.content.is_empty() { 1 } else { (self.content.len().ilog10() + 1) as usize };
+        if new_offset != self.line_number_offset {
+            self.line_number_offset = new_offset;
+            self.last_render_at_line.take();
+        };
         (self.renderer.render)(self, gs);
     }
 
     /// renders only updated lines
     #[inline]
     pub fn fast_render(&mut self, gs: &mut GlobalState) {
+        let new_offset = if self.content.is_empty() { 1 } else { (self.content.len().ilog10() + 1) as usize };
+        if new_offset != self.line_number_offset {
+            self.line_number_offset = new_offset;
+            self.last_render_at_line.take();
+        };
         (self.renderer.fast_render)(self, gs)
     }
 
@@ -125,17 +135,6 @@ impl Editor {
         for line in self.content.iter_mut().skip(self.cursor.at_line + skip_offset).take(rect.width) {
             line.clear_cache();
         }
-    }
-
-    #[inline(always)]
-    pub fn sync(&mut self, gs: &mut GlobalState) {
-        let new_line_number_offset =
-            if self.content.is_empty() { 1 } else { (self.content.len().ilog10() + 1) as usize };
-        if new_line_number_offset != self.line_number_offset {
-            self.line_number_offset = new_line_number_offset;
-            self.last_render_at_line.take();
-        };
-        Lexer::context(self, gs);
     }
 
     #[inline(always)]

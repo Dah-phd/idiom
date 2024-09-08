@@ -5,7 +5,7 @@ mod text;
 use code::code_repositioning;
 
 use super::line::LineContext;
-use crate::{global_state::GlobalState, workspace::Editor};
+use crate::{global_state::GlobalState, syntax::Lexer, workspace::Editor};
 
 /// Component containing logic regarding rendering
 /// In order to escape complicated state machines and any form on polymorphism,
@@ -31,7 +31,7 @@ impl Renderer {
 
 fn code_render(editor: &mut Editor, gs: &mut GlobalState) {
     editor.last_render_at_line.replace(editor.cursor.at_line);
-    editor.sync(gs);
+    Lexer::context(editor, gs);
     code_repositioning(&mut editor.cursor, &editor.content);
     let mut lines = gs.editor_area.into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
@@ -62,7 +62,7 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     if !matches!(editor.last_render_at_line, Some(idx) if idx == editor.cursor.at_line) {
         return code_render(editor, gs);
     }
-    editor.sync(gs);
+    Lexer::context(editor, gs);
     code_repositioning(&mut editor.cursor, &editor.content);
     let mut lines = gs.editor_area.into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
