@@ -237,6 +237,20 @@ impl From<FileType> for Lang {
                 string_markers: "\"'",
                 ..Default::default()
             },
+            FileType::Lobster => Self {
+                comment_start: vec!["//"],
+                file_type,
+                declaration: vec!["def", "class", "len"],
+                key_words: vec!["true", "false"],
+                flow_control: vec![
+                    "if", "else", "elif", "for", "while", "break", "continue", "try", "except", "raise", "with",
+                    "match",
+                ],
+                compl_trigger_chars: String::from(".("),
+                mod_import: vec!["import"],
+                string_markers: "\"'",
+                ..Default::default()
+            },
             FileType::JavaScript | FileType::TypeScript => Self {
                 file_type,
                 compl_trigger_chars: String::from(".("),

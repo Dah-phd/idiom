@@ -163,6 +163,7 @@ impl EditorConfigs {
     pub fn derive_lsp(&self, file_type: &FileType) -> Option<String> {
         match file_type {
             FileType::Ignored => None,
+            FileType::Lobster => None, // no LSP available as far as I know
             FileType::Rust => self.rust_lsp.to_owned(),
             FileType::Zig => self.zig_lsp.to_owned(),
             FileType::Python => self.python_lsp.to_owned(),
