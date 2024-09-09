@@ -9,17 +9,9 @@ use crate::{
     workspace::line::EditorLine,
 };
 
-pub fn trim_start_inplace(line: &mut impl EditorLine) -> usize {
+pub fn trim_start_inplace(line: &mut EditorLine) -> usize {
     if let Some(idx) = line.to_string().find(|c: char| !c.is_whitespace() && c != '\t') {
-        line.replace_range(..idx, "");
-        return idx;
-    };
-    0
-}
-
-pub fn trim_string_start_inplace(line: &mut String) -> usize {
-    if let Some(idx) = line.find(|c: char| !c.is_whitespace() && c != '\t') {
-        line.replace_range(..idx, "");
+        line.replace_till(idx, "");
         return idx;
     };
     0
@@ -31,13 +23,7 @@ pub fn split_arc_mutex<T>(inner: T) -> (Arc<Mutex<T>>, Arc<Mutex<T>>) {
     (arc, clone)
 }
 
-pub fn split_arc_mutex_async<T>(inner: T) -> (Arc<tokio::sync::Mutex<T>>, Arc<tokio::sync::Mutex<T>>) {
-    let arc = Arc::new(tokio::sync::Mutex::new(inner));
-    let clone = Arc::clone(&arc);
-    (arc, clone)
-}
-
-pub fn into_guard<T>(mutex: &Mutex<T>) -> MutexGuard<T> {
+pub fn force_lock<T>(mutex: &Mutex<T>) -> MutexGuard<T> {
     match mutex.lock() {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),
@@ -106,25 +92,8 @@ pub fn to_relative_path(target_dir: &Path) -> IdiomResult<PathBuf> {
     }
 }
 
-#[allow(dead_code)]
-pub fn find_code_blocks(buffer: &mut Vec<(usize, String)>, content: &[String], pattern: &str) {
-    let mut content_iter = content.iter().enumerate().peekable();
-    while let Some((idx, line)) = content_iter.next() {
-        if !line.contains(pattern) {
-            continue;
-        }
-        let mut line = line.to_owned();
-        let white_chars_len = trim_string_start_inplace(&mut line);
-        if let Some((_, next_line)) = content_iter.peek() {
-            if let Some(first_non_white) = next_line.find(|c: char| !c.is_whitespace()) {
-                if first_non_white >= white_chars_len {
-                    line.push('\n');
-                    line.push_str(&next_line[white_chars_len..]);
-                }
-            }
-        }
-        buffer.push((idx, line));
-    }
+pub fn to_canon_path(target_dir: &Path) -> IdiomResult<PathBuf> {
+    Ok(target_dir.canonicalize()?)
 }
 
 pub struct TrackedList<T> {
@@ -171,8 +140,13 @@ impl<T> TrackedList<T> {
     }
 
     #[inline(always)]
-    pub fn updated(&mut self) -> bool {
+    pub fn collect_status(&mut self) -> bool {
         std::mem::take(&mut self.updated)
+    }
+
+    #[inline(always)]
+    pub fn check_status(&self) -> bool {
+        self.updated
     }
 
     #[inline(always)]
@@ -218,7 +192,7 @@ impl<T> TrackedList<T> {
     #[allow(dead_code)]
     #[inline(always)]
     pub fn iter_if_updated(&mut self) -> Option<std::slice::Iter<'_, T>> {
-        if !self.updated() {
+        if !self.collect_status() {
             return None;
         }
         Some(self.iter())
@@ -235,9 +209,8 @@ impl<T> TrackedList<T> {
     where
         P: FnMut(&T) -> bool,
     {
-        let mut iter = self.inner.iter_mut();
-        while let Some(element) = iter.next() {
-            if (predicate)(&element) {
+        for element in self.inner.iter_mut() {
+            if (predicate)(element) {
                 self.updated = true;
                 return Some(element);
             }
@@ -330,12 +303,4 @@ impl From<usize> for Offset {
     fn from(value: usize) -> Self {
         Self::Pos(value)
     }
-}
-
-#[cfg(build = "debug")]
-#[allow(unused_must_use)]
-pub fn debug_to_file(path: &str, obj: impl Debug) {
-    let mut data = std::fs::read_to_string(path).unwrap_or_default();
-    data.push_str(&format!("\n{obj:?}"));
-    std::fs::write(path, data);
 }

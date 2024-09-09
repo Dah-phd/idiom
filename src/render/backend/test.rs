@@ -2,53 +2,111 @@ use std::io::Write;
 
 use super::{BackendProtocol, Style};
 
-pub struct Backend();
+pub struct Backend {
+    pub data: Vec<(Style, String)>,
+    pub default_style: Style,
+}
 
 impl BackendProtocol for Backend {
-    fn clear_all(&mut self) {}
-    fn clear_line(&mut self) {}
-    fn clear_to_eol(&mut self) {}
+    fn clear_all(&mut self) {
+        self.data.push((Style::default(), String::from("<<clear all>>")));
+    }
+    fn clear_line(&mut self) {
+        self.data.push((Style::default(), String::from("<<clear line>>")));
+    }
+    fn clear_to_eol(&mut self) {
+        self.data.push((Style::default(), String::from("<<clear EOL>>")));
+    }
 
     fn exit() -> std::io::Result<()> {
         Ok(())
     }
 
-    fn get_style(&mut self) -> super::Style {
-        Style::default()
+    fn get_style(&mut self) -> Style {
+        self.default_style
     }
 
-    fn go_to(&mut self, _row: u16, _col: u16) {}
+    fn go_to(&mut self, row: u16, col: u16) {
+        self.data.push((Style::default(), format!("<<go to row: {row} col: {col}>>")))
+    }
 
-    fn hide_cursor(&mut self) {}
+    fn hide_cursor(&mut self) {
+        self.data.push((Style::default(), String::from("<<hide cursor>>")));
+    }
 
     fn init() -> Self {
-        Self()
+        Self { data: Vec::new(), default_style: Style::default() }
     }
 
-    fn print<D: std::fmt::Display>(&mut self, _text: D) {}
+    fn print<D: std::fmt::Display>(&mut self, text: D) {
+        self.data.push((self.default_style, text.to_string()));
+    }
 
-    fn print_at<D: std::fmt::Display>(&mut self, _row: u16, _col: u16, _text: D) {}
-    fn print_styled<D: std::fmt::Display>(&mut self, _text: D, _style: Style) {}
-    fn print_styled_at<D: std::fmt::Display>(&mut self, _row: u16, _col: u16, _text: D, _style: Style) {}
+    fn print_at<D: std::fmt::Display>(&mut self, row: u16, col: u16, text: D) {
+        self.go_to(row, col);
+        self.print(text)
+    }
+    fn print_styled<D: std::fmt::Display>(&mut self, text: D, style: Style) {
+        self.data.push((style, text.to_string()));
+    }
 
-    fn render_cursor_at(&mut self, _row: u16, _col: u16) {}
+    fn print_styled_at<D: std::fmt::Display>(&mut self, row: u16, col: u16, text: D, style: Style) {
+        self.go_to(row, col);
+        self.print_styled(text, style);
+    }
 
-    fn reset_style(&mut self) {}
-    fn restore_cursor(&mut self) {}
-    fn save_cursor(&mut self) {}
+    fn render_cursor_at(&mut self, row: u16, col: u16) {
+        self.data.push((self.default_style, format!("<<draw cursor row: {row} col: {col}>>")));
+    }
+
+    fn reset_style(&mut self) {
+        self.default_style = Style::default();
+        self.data.push((self.default_style, String::from("<<reset style>>")));
+    }
+
+    fn restore_cursor(&mut self) {
+        self.data.push((self.default_style, String::from("<<restored cursor>>")))
+    }
+
+    fn save_cursor(&mut self) {
+        self.data.push((self.default_style, String::from("<<saved cursor>>")));
+    }
 
     fn screen() -> std::io::Result<crate::render::layout::Rect> {
         Ok(crate::render::layout::Rect::new(0, 0, 120, 60))
     }
 
-    fn set_bg(&mut self, _color: Option<super::Color>) {}
-    fn set_fg(&mut self, _color: Option<super::Color>) {}
-    fn set_style(&mut self, _style: Style) {}
-    fn show_cursor(&mut self) {}
+    fn set_bg(&mut self, color: Option<super::Color>) {
+        self.default_style.set_bg(color);
+        self.data.push((self.default_style, format!("<<set bg {:?}>>", color)));
+    }
 
-    fn to_set_style(&mut self) {}
+    fn set_fg(&mut self, color: Option<super::Color>) {
+        self.default_style.set_fg(color);
+        self.data.push((self.default_style, format!("<<set fg {:?}>>", color)));
+    }
 
-    fn update_style(&mut self, _style: Style) {}
+    fn set_style(&mut self, style: Style) {
+        self.default_style = style;
+        self.data.push((self.default_style, format!("<<style set to {:?}>>", self.default_style)))
+    }
+
+    fn show_cursor(&mut self) {
+        self.data.push((self.default_style, String::from("<<show cursor>>")));
+    }
+
+    fn to_set_style(&mut self) {
+        self.data.push((self.default_style, String::from("<<set style>>")));
+    }
+
+    fn update_style(&mut self, style: Style) {
+        self.default_style.update(style);
+        self.data.push((self.default_style, String::from("<<updated style>>")))
+    }
+
+    fn pad(&mut self, width: usize) {
+        self.data.push((self.default_style, format!("<<padding: {:?}>>", width)))
+    }
 }
 
 impl Write for Backend {
@@ -69,5 +127,15 @@ impl Write for Backend {
 
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         Ok(buf.len())
+    }
+}
+
+impl Backend {
+    pub fn unwrap(self) -> Vec<(Style, String)> {
+        self.data
+    }
+
+    pub fn drain(&mut self) -> Vec<(Style, String)> {
+        std::mem::take(&mut self.data)
     }
 }

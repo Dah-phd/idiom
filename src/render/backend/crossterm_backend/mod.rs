@@ -67,11 +67,7 @@ impl Write for Backend {
 impl BackendProtocol for Backend {
     #[inline]
     fn init() -> Self {
-        // #[cfg(test)]
-        // return Self { writer: DummyOut {}, default_styled: None };
-        // #[cfg(not(test))]
         init_terminal().expect(ERR_MSG);
-        // #[cfg(not(test))]
         Self { writer: std::io::stdout(), default_styled: None }
     }
 
@@ -86,7 +82,7 @@ impl BackendProtocol for Backend {
     /// get whole screen as rect
     #[inline]
     fn screen() -> std::io::Result<Rect> {
-        size().map(|size| Rect::from(size))
+        size().map(Rect::from)
     }
 
     /// clears from cursor until the End Of Line
@@ -106,23 +102,23 @@ impl BackendProtocol for Backend {
         queue!(self, Clear(ClearType::All)).expect(ERR_MSG);
     }
 
-    /// stores the cursor and hides it
+    /// stores the cursor
     #[inline]
     fn save_cursor(&mut self) {
-        execute!(self, SavePosition, Hide).expect(ERR_MSG);
+        execute!(self, SavePosition).expect(ERR_MSG);
     }
 
-    /// restores cursor position and shows cursor
+    /// restores cursor position
     #[inline]
     fn restore_cursor(&mut self) {
-        queue!(self, RestorePosition, Show).expect(ERR_MSG);
+        queue!(self, RestorePosition).expect(ERR_MSG);
     }
 
     /// sets the style for the print/print at
     #[inline]
     fn set_style(&mut self, style: Style) {
         self.default_styled.replace(style);
-        queue!(self, SetStyle(style.into())).expect(ERR_MSG);
+        queue!(self, ResetColor, SetStyle(style.into())).expect(ERR_MSG);
     }
 
     #[inline]
@@ -243,6 +239,11 @@ impl BackendProtocol for Backend {
             queue!(self, SetStyle(style.into()), MoveTo(col, row), Print(text), ResetColor,)
         }
         .expect(ERR_MSG);
+    }
+
+    #[inline]
+    fn pad(&mut self, width: usize) {
+        queue!(self, Print(format!("{:width$}", ""))).expect(ERR_MSG);
     }
 }
 

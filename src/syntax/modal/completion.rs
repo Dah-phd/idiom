@@ -1,12 +1,11 @@
 use super::ModalMessage;
-#[cfg(build = "debug")]
-use crate::debug_to_file;
 use crate::{
+    configs::EditorAction,
     global_state::GlobalState,
     render::{layout::Rect, state::State},
     syntax::Lang,
+    workspace::CursorPosition,
 };
-use crossterm::event::{KeyCode, KeyEvent};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use lsp_types::CompletionItem;
 
@@ -19,9 +18,9 @@ pub struct AutoComplete {
 }
 
 impl AutoComplete {
-    pub fn new(completions: Vec<CompletionItem>, line: String, idx: usize) -> Self {
+    pub fn new(completions: Vec<CompletionItem>, line: String, c: CursorPosition) -> Self {
         let mut filter = String::new();
-        for ch in line[..idx].chars() {
+        for ch in line.chars().take(c.char) {
             if ch.is_alphabetic() || ch == '_' {
                 filter.push(ch);
             } else {
@@ -34,28 +33,26 @@ impl AutoComplete {
         modal
     }
 
-    pub fn map(&mut self, key: &KeyEvent, lang: &Lang, gs: &mut GlobalState) -> ModalMessage {
-        match key.code {
-            KeyCode::Enter | KeyCode::Tab => {
+    pub fn map(&mut self, action: EditorAction, lang: &Lang, gs: &mut GlobalState) -> ModalMessage {
+        match action {
+            EditorAction::NewLine | EditorAction::Indent => {
                 let mut filtered_completion = self.completions.remove(self.filtered.remove(self.state.selected).2);
-                #[cfg(build = "debug")]
-                debug_to_file("test_data.comp", filtered_completion);
                 if let Some(data) = filtered_completion.data.take() {
                     lang.handle_completion_data(data, gs);
                 };
-                gs.workspace.push(filtered_completion.into());
+                gs.event.push(filtered_completion.into());
                 ModalMessage::TakenDone
             }
-            KeyCode::Char(ch) => self.push_filter(ch),
-            KeyCode::Down => {
+            EditorAction::Char(ch) => self.push_filter(ch),
+            EditorAction::Down => {
                 self.state.next(self.filtered.len());
                 ModalMessage::Taken
             }
-            KeyCode::Up => {
+            EditorAction::Up => {
                 self.state.prev(self.filtered.len());
                 ModalMessage::Taken
             }
-            KeyCode::Backspace => self.filter_pop(),
+            EditorAction::Backspace => self.filter_pop(),
             _ => ModalMessage::Done,
         }
     }

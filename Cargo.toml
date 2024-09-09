@@ -1,7 +1,7 @@
 [package]
 rust-version = "1.76"
 name = "idiom"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 include = [
     "src/**/*",
@@ -17,24 +17,24 @@ categories = ["development-tools", "text-editors"]
 authors = ["Daniel Nikolaev <toolsproed@gmail.com>"]
 
 [dependencies]
-crossterm = "0.27.0"
-lsp-types = "0.95.0" # still on version 0.95.0 (at this stage fluent-uri looks more annoying than uri)
-serde = { version = "1.0.198", features = ["derive"] }
-serde_json = "1.0.116"
-tokio = { version="1.36.0", features=["rt", "macros", "rt-multi-thread", "process", "io-util"] }
-tokio-util = { version="0.7.10", features = ["codec", "io"] }
-tokio-stream = "0.1.15"
+crossterm = "0.28.1"
+lsp-types = "0.97.0"
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.125"
+tokio = { version="1.40.0", features=["rt", "macros", "rt-multi-thread", "process", "io-util"] }
+tokio-util = { version="0.7.12", features = ["codec", "io"] }
+tokio-stream = "0.1.16"
 dirs = "5.0.1"
-# reqwest = "0.11.20"  !TODO enable when autodownloading is created
-ignore = "0.4.20"
+ignore = "0.4.23"
 fuzzy-matcher = "0.3.7"
-copypasta = "0.10.1"
 portable-pty = "0.8.1"
 strip-ansi-escapes = "0.2.0"
-bitflags = "2.4.2"
-regex = "1.10.4"
-thiserror = "1.0.60"
-url = {version = "2.5.0", features = ["serde"]}
+bitflags = "2.6.0"
+regex = "1.10.6"
+thiserror = "1.0.63"
+unicode-width = "0.1.13"
+copypasta = "0.10.1"
+notify = { version = "6.1.1", default-features = false, features = ["macos_kqueue"] }
 
 [profile.dev]
 debug = true

@@ -23,7 +23,7 @@ impl<'de> serde::Deserialize<'de> for UITheme {
                     pull_color(&mut map, "accent").unwrap_or(Ok(ACCENT)).map_err(serde::de::Error::custom)?;
                 Ok(Self { accent_style: Style::bg(accent_background), accent_background })
             }
-            _ => Err(IdiomError::io_err("theme_ui.json in not an Object!")).map_err(serde::de::Error::custom),
+            _ => Err(serde::de::Error::custom(IdiomError::io_err("theme_ui.json in not an Object!"))),
         }
     }
 }

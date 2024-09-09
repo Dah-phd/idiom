@@ -1,6 +1,6 @@
 use super::PopupInterface;
 use crate::{
-    global_state::{Clipboard, GlobalState, PopupMessage, TreeEvent},
+    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::{
         backend::{color, Style},
         layout::{LineBuilder, BORDERS},
@@ -8,6 +8,7 @@ use crate::{
         TextField,
     },
     tree::Tree,
+    workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent};
 use std::{path::PathBuf, sync::Arc};
@@ -23,6 +24,7 @@ pub struct ActivePathSearch {
     options: Vec<PathBuf>,
     state: State,
     pattern: TextField<PopupMessage>,
+    updated: bool,
 }
 
 impl ActivePathSearch {
@@ -31,6 +33,7 @@ impl ActivePathSearch {
             options: Vec::new(),
             state: State::default(),
             pattern: TextField::with_tree_access(String::new()),
+            updated: true,
         })
     }
 }
@@ -40,13 +43,14 @@ impl PopupInterface for ActivePathSearch {
         if let Some(msg) = self.pattern.map(key, clipboard) {
             return msg;
         }
+        self.updated = true;
         match key.code {
             KeyCode::Up => self.state.prev(self.options.len()),
             KeyCode::Down => self.state.next(self.options.len()),
-            KeyCode::Tab => return PopupMessage::Tree(TreeEvent::SearchFiles(self.pattern.text.to_owned())),
+            KeyCode::Tab => return PopupMessage::Tree(IdiomEvent::SearchFiles(self.pattern.text.to_owned())),
             KeyCode::Enter => {
                 if self.options.len() > self.state.selected {
-                    return TreeEvent::Open(self.options.remove(self.state.selected)).into();
+                    return IdiomEvent::Open(self.options.remove(self.state.selected)).into();
                 }
                 return PopupMessage::Clear;
             }
@@ -67,7 +71,7 @@ impl PopupInterface for ActivePathSearch {
         if let Some(line) = lines.next() {
             line.fill(BORDERS.horizontal, &mut gs.writer);
         }
-        if let Some(list_rect) = lines.to_rect() {
+        if let Some(list_rect) = lines.into_rect() {
             if self.options.is_empty() {
                 self.state.render_list(["No results found!"].into_iter(), &list_rect, &mut gs.writer);
             } else {
@@ -83,14 +87,21 @@ impl PopupInterface for ActivePathSearch {
         };
     }
 
-    fn update_tree(&mut self, file_tree: &mut Tree) {
+    fn component_access(&mut self, _ws: &mut Workspace, tree: &mut Tree) {
         if self.pattern.text.is_empty() {
             self.options.clear();
         } else {
-            self.options = file_tree.search_paths(&self.pattern.text);
+            self.options = tree.search_paths(&self.pattern.text);
         };
+        self.updated = true;
         self.state.select(0, self.options.len());
     }
+
+    fn collect_update_status(&mut self) -> bool {
+        std::mem::take(&mut self.updated)
+    }
+
+    fn mark_as_updated(&mut self) {}
 }
 
 enum Mode {
@@ -105,6 +116,7 @@ pub struct ActiveFileSearch {
     state: State,
     mode: Mode,
     pattern: TextField<PopupMessage>,
+    updated: bool,
 }
 
 impl ActiveFileSearch {
@@ -116,6 +128,7 @@ impl ActiveFileSearch {
             options: Vec::default(),
             state: State::default(),
             pattern: TextField::with_tree_access(pattern),
+            updated: true,
         })
     }
 }
@@ -125,6 +138,7 @@ impl PopupInterface for ActiveFileSearch {
         if let Some(msg) = self.pattern.map(key, clipboard) {
             return msg;
         }
+        self.updated = true;
         match key.code {
             KeyCode::Up => self.state.prev(self.options.len()),
             KeyCode::Down => self.state.next(self.options.len()),
@@ -133,12 +147,12 @@ impl PopupInterface for ActiveFileSearch {
                     return PopupMessage::Clear;
                 }
                 self.mode = Mode::Full;
-                return PopupMessage::Tree(TreeEvent::PopupAccess);
+                return PopupMessage::Tree(IdiomEvent::PopupAccess);
             }
             KeyCode::Enter => {
                 if self.options.len() > self.state.selected {
                     let (path, _, line) = self.options.remove(self.state.selected);
-                    return TreeEvent::OpenAtLine(path, line).into();
+                    return IdiomEvent::OpenAtLine(path, line).into();
                 }
                 return PopupMessage::Clear;
             }
@@ -148,9 +162,6 @@ impl PopupInterface for ActiveFileSearch {
     }
 
     fn render(&mut self, gs: &mut GlobalState) {
-        if let Ok(mut buffer) = self.option_buffer.try_lock() {
-            self.options.extend(buffer.drain(..));
-        }
         let mut area = gs.screen_rect.center(20, 120);
         area.bordered();
         area.draw_borders(None, None, &mut gs.writer);
@@ -165,7 +176,7 @@ impl PopupInterface for ActiveFileSearch {
         if let Some(line) = lines.next() {
             line.fill(BORDERS.horizontal, &mut gs.writer);
         }
-        if let Some(list_rect) = lines.to_rect() {
+        if let Some(list_rect) = lines.into_rect() {
             if self.options.is_empty() {
                 self.state.render_list(["No results found!"].into_iter(), &list_rect, &mut gs.writer);
             } else {
@@ -179,12 +190,26 @@ impl PopupInterface for ActiveFileSearch {
         };
     }
 
-    fn update_tree(&mut self, file_tree: &mut Tree) {
+    fn fast_render(&mut self, gs: &mut GlobalState) {
+        if let Ok(mut buffer) = self.option_buffer.try_lock() {
+            if !buffer.is_empty() {
+                self.options.extend(buffer.drain(..));
+                self.updated = true;
+            }
+        }
+        if self.collect_update_status() {
+            self.render(gs);
+        }
+    }
+
+    fn component_access(&mut self, _ws: &mut Workspace, file_tree: &mut Tree) {
+        self.updated = true;
         if self.pattern.text.len() < 2 {
             self.options.clear();
             return;
         };
         self.options.clear();
+        self.state.select(0, 1);
         let tree_path = match self.mode {
             Mode::Full => file_tree.shallow_copy_root_tree_path(),
             Mode::Select => file_tree.shallow_copy_selected_tree_path(),
@@ -205,6 +230,12 @@ impl PopupInterface for ActiveFileSearch {
             }
         }
     }
+
+    fn collect_update_status(&mut self) -> bool {
+        std::mem::take(&mut self.updated)
+    }
+
+    fn mark_as_updated(&mut self) {}
 }
 
 fn build_path_line((path, ..): &SearchResult, mut builder: LineBuilder) {
@@ -213,5 +244,5 @@ fn build_path_line((path, ..): &SearchResult, mut builder: LineBuilder) {
 
 fn build_text_line((.., line_txt, line_idx): &SearchResult, mut builder: LineBuilder) {
     builder.push(&format!("{line_idx}| "));
-    builder.push(&line_txt);
+    builder.push(line_txt);
 }

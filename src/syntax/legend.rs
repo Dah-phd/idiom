@@ -1,7 +1,4 @@
-use super::Lang;
 use crate::render::backend::{color, Color};
-#[cfg(build = "debug")]
-use crate::utils::debug_to_file;
 use crate::{configs::FileType, syntax::Theme};
 use lsp_types::SemanticTokensServerCapabilities;
 
@@ -23,10 +20,10 @@ pub struct Legend {
 }
 
 impl Legend {
-    pub fn parse_to_color(&self, token_type: usize, theme: &Theme, lang: &Lang, word: &str) -> Color {
+    pub fn parse_to_color(&self, token_type: usize, modifier: u32, theme: &Theme) -> Color {
         match self.legend.get(token_type) {
             Some(ColorResult::KeyWord) => {
-                if lang.is_flow(word) {
+                if modifier != 0 {
                     return theme.flow_control;
                 }
                 theme.key_words
@@ -37,61 +34,77 @@ impl Legend {
     }
 
     pub fn map_styles(&mut self, file_type: &FileType, theme: &Theme, tc: &SemanticTokensServerCapabilities) {
-        #[cfg(build = "debug")]
-        debug_to_file("test_data.init", tc);
-        if let SemanticTokensServerCapabilities::SemanticTokensOptions(tokens) = tc {
-            match file_type {
-                FileType::Rust => {
-                    for token_type in tokens.legend.token_types.iter() {
-                        let token_type = token_type.as_str();
-                        if self.generic_mapping(token_type, theme) {
-                            continue;
-                        }
-                        match token_type {
-                            "decorator" => self.legend.push(ColorResult::Final(theme.functions)),
-                            "bitwise" => self.legend.push(ColorResult::Final(theme.key_words)),
-                            "arithmetic" => self.legend.push(ColorResult::default()),
-                            "boolean" => self.legend.push(ColorResult::Final(theme.key_words)),
-                            "builtinAttribute" => self.legend.push(ColorResult::Final(theme.constant)),
-                            "builtinType" => self.legend.push(ColorResult::Final(theme.class_or_struct)),
-                            "character" => self.legend.push(ColorResult::Final(theme.string)),
-                            "colon" => self.legend.push(ColorResult::default()),
-                            "comma" => self.legend.push(ColorResult::default()),
-                            "comparison" => self.legend.push(ColorResult::default()),
-                            "constParameter" => self.legend.push(ColorResult::Final(theme.key_words)),
-                            "derive" => self.legend.push(ColorResult::Final(theme.functions)),
-                            "dot" => self.legend.push(ColorResult::default()),
-                            "escapeSequence" => self.legend.push(ColorResult::Final(theme.string_escape)),
-                            "invalidEscapeSequence" => self.legend.push(ColorResult::Final(color::red())),
-                            "lifetime" => self.legend.push(ColorResult::Final(theme.key_words)),
-                            "macroBang" => self.legend.push(ColorResult::Final(theme.key_words)),
-                            "selfKeyword" => self.legend.push(ColorResult::Final(theme.key_words)),
-                            "selfTypeKeyword" => self.legend.push(ColorResult::Final(theme.key_words)),
-                            "semicolon" => self.legend.push(ColorResult::default()),
-                            "typeAlias" => self.legend.push(ColorResult::Final(theme.class_or_struct)),
-                            // "attributeBracket" => {}
-                            // "bracket" => {}
-                            // "brace" => {}
-                            // "deriveHelper" => {}
-                            // "formatSpecifier" => {}
-                            // "generic" => {}
-                            // "label" => {}
-                            // "logical" => {}
-                            // "parenthesis" => {}
-                            // "punctuation" => {}
-                            // "angle" => {}
-                            // "toolModule" => {}
-                            // "union" => {}
-                            // "unresolvedReference" => {},
-                            _ => self.legend.push(ColorResult::Final(theme.default)),
-                        }
+        let legend = match tc {
+            SemanticTokensServerCapabilities::SemanticTokensOptions(opt) => &opt.legend,
+            SemanticTokensServerCapabilities::SemanticTokensRegistrationOptions(opt) => {
+                &opt.semantic_tokens_options.legend
+            }
+        };
+        match file_type {
+            FileType::Rust => {
+                for token_type in legend.token_types.iter() {
+                    let token_type = token_type.as_str();
+                    if self.generic_mapping(token_type, theme) {
+                        continue;
+                    }
+                    match token_type {
+                        "decorator" => self.legend.push(ColorResult::Final(theme.functions)),
+                        "bitwise" => self.legend.push(ColorResult::Final(theme.key_words)),
+                        "arithmetic" => self.legend.push(ColorResult::default()),
+                        "boolean" => self.legend.push(ColorResult::Final(theme.key_words)),
+                        "builtinAttribute" => self.legend.push(ColorResult::Final(theme.constant)),
+                        "builtinType" => self.legend.push(ColorResult::Final(theme.class_or_struct)),
+                        "character" => self.legend.push(ColorResult::Final(theme.string)),
+                        "colon" => self.legend.push(ColorResult::default()),
+                        "comma" => self.legend.push(ColorResult::default()),
+                        "comparison" => self.legend.push(ColorResult::default()),
+                        "constParameter" => self.legend.push(ColorResult::Final(theme.key_words)),
+                        "derive" => self.legend.push(ColorResult::Final(theme.functions)),
+                        "dot" => self.legend.push(ColorResult::default()),
+                        "escapeSequence" => self.legend.push(ColorResult::Final(theme.string_escape)),
+                        "invalidEscapeSequence" => self.legend.push(ColorResult::Final(color::red())),
+                        "lifetime" => self.legend.push(ColorResult::Final(theme.key_words)),
+                        "macroBang" => self.legend.push(ColorResult::Final(theme.key_words)),
+                        "selfKeyword" => self.legend.push(ColorResult::Final(theme.key_words)),
+                        "selfTypeKeyword" => self.legend.push(ColorResult::Final(theme.key_words)),
+                        "semicolon" => self.legend.push(ColorResult::default()),
+                        "typeAlias" => self.legend.push(ColorResult::Final(theme.class_or_struct)),
+                        // "attributeBracket" => {}
+                        // "bracket" => {}
+                        // "brace" => {}
+                        // "deriveHelper" => {}
+                        // "formatSpecifier" => {}
+                        // "generic" => {}
+                        // "label" => {}
+                        // "logical" => {}
+                        // "parenthesis" => {}
+                        // "punctuation" => {}
+                        // "angle" => {}
+                        // "toolModule" => {}
+                        // "union" => {}
+                        // "unresolvedReference" => {},
+                        _ => self.legend.push(ColorResult::Final(theme.default)),
                     }
                 }
-                _ => {
-                    for token_type in tokens.legend.token_types.iter() {
-                        let token_type = token_type.as_str();
-                        self.generic_mapping(token_type, theme);
+            }
+            FileType::TypeScript => {
+                for token_type in legend.token_types.iter() {
+                    let token_type = token_type.as_str();
+                    if self.generic_mapping(token_type, theme) {
+                        continue;
                     }
+                    match token_type {
+                        "member" => self.legend.push(ColorResult::Final(theme.functions)),
+                        _ => self.legend.push(ColorResult::Final(theme.default)),
+                    }
+                }
+            }
+            _ => {
+                for token_type in legend.token_types.iter() {
+                    let token_type = token_type.as_str();
+                    if !self.generic_mapping(token_type, theme) {
+                        self.legend.push(ColorResult::Final(theme.default));
+                    };
                 }
             }
         }

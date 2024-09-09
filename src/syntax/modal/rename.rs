@@ -1,10 +1,10 @@
 use super::ModalMessage;
 use crate::{
+    configs::EditorAction,
     global_state::GlobalState,
     render::{layout::Rect, TextField},
     workspace::CursorPosition,
 };
-use crossterm::event::{KeyCode, KeyEvent};
 
 pub struct RenameVariable {
     new_name: TextField<()>,
@@ -28,10 +28,10 @@ impl RenameVariable {
         self.new_name.widget(area.get_line(1).unwrap(), &mut gs.writer);
     }
 
-    pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> ModalMessage {
-        self.new_name.map(key, &mut gs.clipboard);
-        match key.code {
-            KeyCode::Enter => ModalMessage::RenameVar(self.new_name.text.to_owned(), self.cursor),
+    pub fn map(&mut self, action: EditorAction, gs: &mut GlobalState) -> ModalMessage {
+        self.new_name.map_actions(action, &mut gs.clipboard);
+        match action {
+            EditorAction::NewLine => ModalMessage::RenameVar(self.new_name.text.to_owned(), self.cursor),
             _ => ModalMessage::Taken,
         }
     }

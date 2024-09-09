@@ -1,26 +1,22 @@
+mod utils;
 use crate::{
-    configs::{EditorConfigs, FileType},
+    configs::{EditorAction, EditorConfigs, FileType},
+    error::{IdiomError, IdiomResult},
     global_state::GlobalState,
+    lsp::LSPError,
     render::layout::Rect,
-    syntax::Lexer,
+    syntax::{tokens::calc_wraps, Lexer},
     workspace::{
         actions::Actions,
         cursor::{Cursor, CursorPosition},
-        line::{CodeLine, CodeLineContext, Context, EditorLine},
-        utils::{copy_content, find_line_start, last_modified, token_range_at},
+        line::EditorLine,
+        renderer::Renderer,
+        utils::{copy_content, find_line_start, token_range_at},
     },
 };
 use lsp_types::TextEdit;
-use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
-use std::{
-    cmp::Ordering,
-    path::{Path, PathBuf},
-    time::SystemTime,
-};
-
-type DocLen = usize;
-type SelectLen = usize;
-pub type DocStats<'a> = (DocLen, SelectLen, CursorPosition);
+use std::{cmp::Ordering, path::PathBuf};
+use utils::{big_file_protection, build_display, FileUpdate};
 
 #[allow(dead_code)]
 pub struct Editor {
@@ -29,28 +25,83 @@ pub struct Editor {
     pub path: PathBuf,
     pub lexer: Lexer,
     pub cursor: Cursor,
-    pub actions: Actions,
-    pub content: Vec<CodeLine>,
-    timestamp: Option<SystemTime>,
+    actions: Actions,
+    pub content: Vec<EditorLine>,
+    renderer: Renderer,
+    pub update_status: FileUpdate,
     pub line_number_offset: usize,
-    last_render_at_line: Option<usize>,
+    pub last_render_at_line: Option<usize>,
 }
 
 impl Editor {
-    pub fn from_path(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> std::io::Result<Self> {
-        let content: Vec<_> =
-            std::fs::read_to_string(&path)?.split('\n').map(|line| CodeLine::new(line.to_owned())).collect();
-        let file_type = FileType::derive_type(&path);
+    pub fn from_path(
+        path: PathBuf,
+        file_type: FileType,
+        cfg: &EditorConfigs,
+        gs: &mut GlobalState,
+    ) -> IdiomResult<Self> {
+        big_file_protection(&path)?;
+        let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
+        let line_number_offset = if content.is_empty() { 1 } else { (content.len().ilog10() + 1) as usize };
         Ok(Self {
-            line_number_offset: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
+            cursor: Cursor::sized(gs, line_number_offset),
+            line_number_offset,
             lexer: Lexer::with_context(file_type, &path, gs),
             content,
-            cursor: Cursor::default(),
+            renderer: Renderer::code(),
             actions: Actions::new(cfg.get_indent_cfg(&file_type)),
             file_type,
             display,
-            timestamp: last_modified(&path),
+            update_status: FileUpdate::None,
+            path,
+            last_render_at_line: None,
+        })
+    }
+
+    pub fn from_path_text(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
+        big_file_protection(&path)?;
+        gs.message(
+            "The file is opened in text mode, beware idiom is not designed with plain text performance in mind!",
+        );
+        let mut content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
+        let display = build_display(&path);
+        let line_number_offset = if content.is_empty() { 1 } else { (content.len().ilog10() + 1) as usize };
+        let cursor = Cursor::sized(gs, line_number_offset);
+        calc_wraps(&mut content, cursor.text_width);
+        Ok(Self {
+            cursor,
+            line_number_offset,
+            lexer: Lexer::text_lexer(&path, gs),
+            content,
+            renderer: Renderer::text(),
+            actions: Actions::new(cfg.default_indent_cfg()),
+            file_type: FileType::Ignored,
+            display,
+            update_status: FileUpdate::None,
+            path,
+            last_render_at_line: None,
+        })
+    }
+
+    pub fn from_path_md(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
+        big_file_protection(&path)?;
+        gs.message("The file is opened in MD mode, beware idiom is not designed with MD performance in mind!");
+        let mut content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
+        let display = build_display(&path);
+        let line_number_offset = if content.is_empty() { 1 } else { (content.len().ilog10() + 1) as usize };
+        let cursor = Cursor::sized(gs, line_number_offset);
+        calc_wraps(&mut content, cursor.text_width);
+        Ok(Self {
+            cursor,
+            line_number_offset,
+            lexer: Lexer::text_lexer(&path, gs),
+            content,
+            renderer: Renderer::markdown(),
+            actions: Actions::new(cfg.default_indent_cfg()),
+            file_type: FileType::Ignored,
+            display,
+            update_status: FileUpdate::None,
             path,
             last_render_at_line: None,
         })
@@ -58,60 +109,26 @@ impl Editor {
 
     #[inline]
     pub fn render(&mut self, gs: &mut GlobalState) {
-        self.last_render_at_line.replace(self.cursor.at_line);
-        self.sync(gs);
-        let mut lines = gs.editor_area.into_iter();
-        let mut ctx = CodeLineContext::collect_context(&mut self.lexer, &self.cursor, self.line_number_offset);
-        for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
-            if self.cursor.line == line_idx && text.len() > self.cursor.text_width {
-                text.wrapped_render(&mut ctx, &mut lines, &mut gs.writer);
-            } else if let Some(line) = lines.next() {
-                text.render(&mut ctx, line, &mut gs.writer);
-            } else {
-                break;
-            };
-        }
-        for line in lines {
-            line.render_empty(&mut gs.writer);
-        }
-        gs.render_stats(self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into());
-        ctx.render_cursor(gs);
+        let new_offset = if self.content.is_empty() { 1 } else { (self.content.len().ilog10() + 1) as usize };
+        if new_offset != self.line_number_offset {
+            self.line_number_offset = new_offset;
+            self.last_render_at_line.take();
+        };
+        (self.renderer.render)(self, gs);
     }
 
     /// renders only updated lines
     #[inline]
     pub fn fast_render(&mut self, gs: &mut GlobalState) {
-        if self.last_render_at_line.is_none()
-            || matches!(self.last_render_at_line, Some(idx) if idx != self.cursor.at_line)
-        {
-            return self.render(gs);
-        }
-        self.sync(gs);
-        let mut lines = gs.editor_area.into_iter();
-        let mut ctx = CodeLineContext::collect_context(&mut self.lexer, &self.cursor, self.line_number_offset);
-        for (line_idx, text) in self.content.iter_mut().enumerate().skip(self.cursor.at_line) {
-            if self.cursor.line == line_idx {
-                if text.len() > self.cursor.text_width {
-                    text.wrapped_render(&mut ctx, &mut lines, &mut gs.writer);
-                } else if let Some(line) = lines.next() {
-                    text.render(&mut ctx, line, &mut gs.writer);
-                } else {
-                    break;
-                }
-            } else if let Some(line) = lines.next() {
-                text.fast_render(&mut ctx, line, &mut gs.writer);
-            } else {
-                break;
-            };
-        }
-        for line in lines {
-            line.render_empty(&mut gs.writer);
-        }
-        gs.render_stats(self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into());
-        ctx.render_cursor(gs);
+        let new_offset = if self.content.is_empty() { 1 } else { (self.content.len().ilog10() + 1) as usize };
+        if new_offset != self.line_number_offset {
+            self.line_number_offset = new_offset;
+            self.last_render_at_line.take();
+        };
+        (self.renderer.fast_render)(self, gs)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn clear_screen_cache(&mut self) {
         self.last_render_at_line = None;
     }
@@ -119,45 +136,128 @@ impl Editor {
     #[inline]
     pub fn updated_rect(&mut self, rect: Rect, gs: &GlobalState) {
         let skip_offset = rect.row.saturating_sub(gs.editor_area.row) as usize;
-        for line in self.content.iter_mut().skip(self.cursor.at_line + skip_offset).take(rect.width as usize) {
+        for line in self.content.iter_mut().skip(self.cursor.at_line + skip_offset).take(rect.width) {
             line.clear_cache();
         }
     }
 
-    #[inline]
-    pub fn sync(&mut self, gs: &mut GlobalState) {
-        let new_line_number_offset =
-            if self.content.is_empty() { 0 } else { (self.content.len().ilog10() + 1) as usize };
-        if new_line_number_offset != self.line_number_offset {
-            self.line_number_offset = new_line_number_offset;
-            self.last_render_at_line.take();
-        };
-        Lexer::context(self, gs);
-        self.cursor.correct_cursor_position(&self.content);
-    }
-
-    pub fn get_stats(&self) -> DocStats {
-        (self.content.len(), self.cursor.select_len(&self.content), (&self.cursor).into())
-    }
-
-    #[inline]
-    pub fn update_path(&mut self, new_path: PathBuf) {
+    #[inline(always)]
+    pub fn update_path(&mut self, new_path: PathBuf) -> Result<(), LSPError> {
         self.display = build_display(&new_path);
         self.path = new_path;
+        self.lexer.update_path(&self.path)
     }
 
-    pub fn help(&mut self, gs: &mut GlobalState) {
-        self.lexer.help((&self.cursor).into(), &self.content, gs);
+    #[inline]
+    pub fn map(&mut self, action: EditorAction, gs: &mut GlobalState) -> bool {
+        let (taken, render_update) = self.lexer.map_modal_if_exists(action, gs);
+        if let Some(modal_rect) = render_update {
+            self.updated_rect(modal_rect, gs);
+        }
+        if taken {
+            return true;
+        };
+        match action {
+            EditorAction::Char(ch) => {
+                self.actions.push_char(ch, &mut self.cursor, &mut self.content, &mut self.lexer);
+                let line = &self.content[self.cursor.line];
+                if self.lexer.should_autocomplete(self.cursor.char, line) {
+                    let line = line.to_string();
+                    self.actions.push_buffer(&mut self.content, &mut self.lexer);
+                    self.lexer.get_autocomplete((&self.cursor).into(), line, gs);
+                }
+                return true;
+            }
+            EditorAction::NewLine => self.actions.new_line(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::Indent => self.actions.indent(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::Backspace => self.actions.backspace(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::Delete => self.actions.del(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::RemoveLine => {
+                self.select_line();
+                if !self.cursor.select_is_none() {
+                    self.actions.del(&mut self.cursor, &mut self.content, &mut self.lexer);
+                };
+            }
+            EditorAction::IndentStart => {
+                self.actions.indent_start(&mut self.cursor, &mut self.content, &mut self.lexer)
+            }
+            EditorAction::Unintent => self.actions.unindent(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::Up => self.cursor.up(&self.content),
+            EditorAction::Down => self.cursor.down(&self.content),
+            EditorAction::Left => self.cursor.left(&self.content),
+            EditorAction::Right => self.cursor.right(&self.content),
+            EditorAction::SelectUp => self.cursor.select_up(&self.content),
+            EditorAction::SelectDown => self.cursor.select_down(&self.content),
+            EditorAction::SelectLeft => self.cursor.select_left(&self.content),
+            EditorAction::SelectRight => self.cursor.select_right(&self.content),
+            EditorAction::SelectToken => {
+                let range = token_range_at(&self.content[self.cursor.line], self.cursor.char);
+                if !range.is_empty() {
+                    self.cursor.select_set(
+                        CursorPosition { line: self.cursor.line, char: range.start },
+                        CursorPosition { line: self.cursor.line, char: range.end },
+                    )
+                }
+            }
+            EditorAction::SelectLine => self.select_line(),
+            EditorAction::SelectAll => self.select_all(),
+            EditorAction::ScrollUp => self.cursor.scroll_up(&self.content),
+            EditorAction::ScrollDown => self.cursor.scroll_down(&self.content),
+            EditorAction::SwapUp => self.actions.swap_up(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::SwapDown => self.actions.swap_down(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::JumpLeft => self.cursor.jump_left(&self.content),
+            EditorAction::JumpLeftSelect => self.cursor.jump_left_select(&self.content),
+            EditorAction::JumpRight => self.cursor.jump_right(&self.content),
+            EditorAction::JumpRightSelect => self.cursor.jump_right_select(&self.content),
+            EditorAction::EndOfLine => self.cursor.end_of_line(&self.content),
+            EditorAction::EndOfFile => self.cursor.end_of_file(&self.content),
+            EditorAction::StartOfLine => self.cursor.start_of_line(&self.content),
+            EditorAction::StartOfFile => self.cursor.start_of_file(),
+            EditorAction::FindReferences => self.lexer.go_to_reference((&self.cursor).into(), gs),
+            EditorAction::GoToDeclaration => self.lexer.go_to_declaration((&self.cursor).into(), gs),
+            EditorAction::Help => self.lexer.help((&self.cursor).into(), &self.content, gs),
+            EditorAction::LSPRename => {
+                let line = &self.content[self.cursor.line];
+                let token_range = token_range_at(line, self.cursor.char);
+                self.lexer.start_rename((&self.cursor).into(), &line[token_range]);
+            }
+            EditorAction::CommentOut => self.actions.comment_out(
+                self.file_type.comment_start(),
+                &mut self.cursor,
+                &mut self.content,
+                &mut self.lexer,
+            ),
+            EditorAction::Undo => self.actions.undo(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::Redo => self.actions.redo(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::Save => self.save(gs),
+            EditorAction::Cancel => {
+                if self.cursor.select_take().is_none() {
+                    self.actions.push_buffer(&mut self.content, &mut self.lexer);
+                    return false;
+                }
+            }
+            EditorAction::Paste => {
+                if let Some(clip) = gs.clipboard.pull() {
+                    self.actions.paste(clip, &mut self.cursor, &mut self.content, &mut self.lexer);
+                }
+            }
+            EditorAction::Cut => {
+                if let Some(clip) = self.cut() {
+                    gs.clipboard.push(clip);
+                }
+            }
+            EditorAction::Copy => {
+                if let Some(clip) = self.copy() {
+                    gs.clipboard.push(clip);
+                }
+            }
+            EditorAction::Close => return false,
+        }
+        self.actions.push_buffer(&mut self.content, &mut self.lexer);
+        true
     }
 
-    pub fn references(&mut self, gs: &mut GlobalState) {
-        self.lexer.go_to_reference((&self.cursor).into(), gs);
-    }
-
-    pub fn declarations(&mut self, gs: &mut GlobalState) {
-        self.lexer.go_to_declaration((&self.cursor).into(), gs);
-    }
-
+    #[inline(always)]
     pub fn select_token(&mut self) {
         let range = token_range_at(&self.content[self.cursor.line], self.cursor.char);
         if !range.is_empty() {
@@ -168,31 +268,19 @@ impl Editor {
         }
     }
 
+    #[inline(always)]
     pub fn select_line(&mut self) {
         let start = CursorPosition { line: self.cursor.line, char: 0 };
         let next_line = self.cursor.line + 1;
         if self.content.len() > next_line {
             self.cursor.select_set(start, CursorPosition { line: next_line, char: 0 });
         } else {
-            let char = self.content[start.line].len();
+            let char = self.content[start.line].char_len();
             if char == 0 {
                 return;
             };
             self.cursor.select_set(start, CursorPosition { line: self.cursor.line, char });
         };
-    }
-
-    pub fn remove_line(&mut self) {
-        self.select_line();
-        if !self.cursor.select_is_none() {
-            self.del();
-        };
-    }
-
-    pub fn start_renames(&mut self) {
-        let line = &self.content[self.cursor.line];
-        let token_range = token_range_at(line, self.cursor.char);
-        self.lexer.start_rename((&self.cursor).into(), &line[token_range]);
     }
 
     pub fn is_saved(&self) -> bool {
@@ -206,20 +294,24 @@ impl Editor {
         false
     }
 
+    #[inline(always)]
     pub fn insert_text_with_relative_offset(&mut self, insert: String) {
-        self.actions.insert_top_cursor_relative_offset(insert, &mut self.cursor, &mut self.content);
+        self.actions.insert_top_cursor_relative_offset(insert, &mut self.cursor, &mut self.content, &mut self.lexer);
     }
 
+    #[inline(always)]
     pub fn replace_select(&mut self, from: CursorPosition, to: CursorPosition, new_clip: &str) {
-        self.actions.replace_select(from, to, new_clip, &mut self.cursor, &mut self.content);
+        self.actions.replace_select(from, to, new_clip, &mut self.cursor, &mut self.content, &mut self.lexer);
     }
 
+    #[inline(always)]
     pub fn replace_token(&mut self, new: String) {
-        self.actions.replace_token(new, &mut self.cursor, &mut self.content);
+        self.actions.replace_token(new, &mut self.cursor, &mut self.content, &mut self.lexer);
     }
 
+    #[inline(always)]
     pub fn insert_snippet(&mut self, snippet: String, cursor_offset: Option<(usize, usize)>) {
-        self.actions.insert_snippet(&mut self.cursor, snippet, cursor_offset, &mut self.content);
+        self.actions.insert_snippet(&mut self.cursor, snippet, cursor_offset, &mut self.content, &mut self.lexer);
     }
 
     pub fn mass_replace(&mut self, mut ranges: Vec<(CursorPosition, CursorPosition)>, clip: String) {
@@ -230,7 +322,7 @@ impl Editor {
             }
             line_ord
         });
-        self.actions.mass_replace(&mut self.cursor, ranges, clip, &mut self.content);
+        self.actions.mass_replace(&mut self.cursor, ranges, clip, &mut self.content, &mut self.lexer);
     }
 
     pub fn apply_file_edits(&mut self, mut edits: Vec<TextEdit>) {
@@ -241,9 +333,10 @@ impl Editor {
             }
             line_ord
         });
-        self.actions.apply_edits(edits, &mut self.content);
+        self.actions.apply_edits(edits, &mut self.content, &mut self.lexer);
     }
 
+    #[inline(always)]
     pub fn go_to(&mut self, line: usize) {
         self.cursor.select_drop();
         if self.content.len() >= line {
@@ -253,12 +346,13 @@ impl Editor {
         }
     }
 
+    #[inline(always)]
     pub fn go_to_select(&mut self, from: CursorPosition, to: CursorPosition) {
         self.cursor.at_line = to.line.saturating_sub(self.cursor.max_rows / 2);
         self.cursor.select_set(from, to);
     }
 
-    pub fn find(&mut self, pat: &str, buffer: &mut Vec<(CursorPosition, CursorPosition)>) {
+    pub fn find(&self, pat: &str, buffer: &mut Vec<(CursorPosition, CursorPosition)>) {
         if pat.is_empty() {
             return;
         }
@@ -285,13 +379,15 @@ impl Editor {
         buffer
     }
 
+    #[inline(always)]
     pub fn cut(&mut self) -> Option<String> {
         if self.content.is_empty() {
             return None;
         }
-        Some(self.actions.cut(&mut self.cursor, &mut self.content))
+        Some(self.actions.cut(&mut self.cursor, &mut self.content, &mut self.lexer))
     }
 
+    #[inline(always)]
     pub fn copy(&mut self) -> Option<String> {
         if self.content.is_empty() {
             None
@@ -302,26 +398,15 @@ impl Editor {
         }
     }
 
+    #[inline(always)]
     pub fn select_all(&mut self) {
         self.cursor.select_set(
             CursorPosition::default(),
             CursorPosition {
                 line: self.content.len() - 1,
-                char: self.content.last().map(|line| line.len()).unwrap_or_default(),
+                char: self.content.last().map(|line| line.char_len()).unwrap_or_default(),
             },
         );
-    }
-
-    pub fn paste(&mut self, clip: String) {
-        self.actions.paste(clip, &mut self.cursor, &mut self.content);
-    }
-
-    pub fn undo(&mut self) {
-        self.actions.undo(&mut self.cursor, &mut self.content);
-    }
-
-    pub fn redo(&mut self) {
-        self.actions.redo(&mut self.cursor, &mut self.content);
     }
 
     pub fn mouse_cursor(&mut self, mut position: CursorPosition) {
@@ -344,144 +429,47 @@ impl Editor {
         position.line += self.cursor.at_line;
         position.char = position.char.saturating_sub(self.line_number_offset + 1);
         self.cursor.set_cursor_checked(position, &self.content);
-        self.paste(clip?);
+        self.actions.paste(clip?, &mut self.cursor, &mut self.content, &mut self.lexer);
         None
     }
 
-    pub fn end_of_line(&mut self) {
-        self.cursor.end_of_line(&self.content);
-    }
-
-    pub fn end_of_file(&mut self) {
-        self.cursor.end_of_file(&self.content);
-    }
-
-    pub fn start_of_file(&mut self) {
-        self.cursor.start_of_file();
-    }
-
-    pub fn start_of_line(&mut self) {
-        self.cursor.start_of_line(&self.content);
-    }
-
-    pub fn up(&mut self) {
-        self.cursor.up(&self.content);
-    }
-
-    pub fn select_up(&mut self) {
-        self.cursor.select_up(&self.content);
-    }
-
-    pub fn scroll_up(&mut self) {
-        self.cursor.scroll_up(&self.content);
-    }
-
-    pub fn swap_up(&mut self) {
-        self.actions.swap_up(&mut self.cursor, &mut self.content);
-    }
-
-    pub fn down(&mut self) {
-        self.cursor.down(&self.content);
-    }
-
-    pub fn select_down(&mut self) {
-        self.cursor.select_down(&self.content);
-    }
-
-    pub fn scroll_down(&mut self) {
-        self.cursor.scroll_down(&self.content);
-    }
-
-    pub fn swap_down(&mut self) {
-        self.actions.swap_down(&mut self.cursor, &mut self.content);
-    }
-
-    pub fn left(&mut self) {
-        self.cursor.left(&self.content);
-    }
-
-    pub fn jump_left(&mut self) {
-        self.cursor.jump_left(&self.content);
-    }
-
-    pub fn jump_left_select(&mut self) {
-        self.cursor.jump_left_select(&self.content);
-    }
-
-    pub fn select_left(&mut self) {
-        self.cursor.select_left(&self.content);
-    }
-
-    pub fn right(&mut self) {
-        self.cursor.right(&self.content);
-    }
-
-    pub fn jump_right(&mut self) {
-        self.cursor.jump_right(&self.content);
-    }
-
-    pub fn jump_right_select(&mut self) {
-        self.cursor.jump_right_select(&self.content);
-    }
-
-    pub fn select_right(&mut self) {
-        self.cursor.select_right(&self.content);
-    }
-
-    pub fn new_line(&mut self) {
-        self.actions.new_line(&mut self.cursor, &mut self.content);
-    }
-
-    pub fn push(&mut self, ch: char, gs: &mut GlobalState) {
-        self.actions.push_char(ch, &mut self.cursor, &mut self.content);
-        let line = &self.content[self.cursor.line];
-        if self.lexer.should_autocomplete(self.cursor.char, line) {
-            let line = line.to_string();
-            self.actions.push_buffer();
-            Lexer::sync(self, gs);
-            self.lexer.get_autocomplete((&self.cursor).into(), line, gs);
+    pub fn rebase(&mut self, gs: &mut GlobalState) {
+        if let Err(error) = big_file_protection(&self.path) {
+            gs.error(format!("Failed to load file {}", error));
+            return;
+        };
+        self.actions.clear();
+        self.cursor.reset();
+        self.lexer.close();
+        let content = match std::fs::read_to_string(&self.path) {
+            Ok(content) => content,
+            Err(err) => {
+                gs.error(format!("File rebase failed! ERR: {err}"));
+                return;
+            }
+        };
+        self.content = content.split('\n').map(|line| EditorLine::new(line.to_owned())).collect();
+        match self.lexer.reopen(content, self.file_type) {
+            Ok(()) => gs.success("File rebased!"),
+            Err(err) => gs.error(format!("Filed to reactivate LSP after rebase! ERR: {}", err)),
         }
     }
 
-    pub fn backspace(&mut self) {
-        self.actions.backspace(&mut self.cursor, &mut self.content);
-    }
-
-    pub fn del(&mut self) {
-        self.actions.del(&mut self.cursor, &mut self.content);
-    }
-
-    pub fn indent(&mut self) {
-        self.actions.indent(&mut self.cursor, &mut self.content);
-    }
-
-    pub fn indent_start(&mut self) {
-        self.actions.indent_start(&mut self.cursor, &mut self.content);
-    }
-
-    pub fn unindent(&mut self) {
-        self.actions.unindent(&mut self.cursor, &mut self.content);
-    }
-
-    pub fn comment_out(&mut self) {
-        self.actions.comment_out(self.file_type.comment_start(), &mut self.cursor, &mut self.content);
-    }
-
     pub fn save(&mut self, gs: &mut GlobalState) {
-        if self.try_write_file(gs) {
-            self.lexer.save_and_check_lsp(gs);
+        if let Some(content) = self.try_write_file(gs) {
+            self.update_status.deny();
+            self.lexer.save_and_check_lsp(content, gs);
             gs.success(format!("SAVED {}", self.path.display()));
         }
     }
 
-    pub fn try_write_file(&self, gs: &mut GlobalState) -> bool {
-        if let Err(error) =
-            std::fs::write(&self.path, self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n"))
-        {
+    pub fn try_write_file(&self, gs: &mut GlobalState) -> Option<String> {
+        let content = self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n");
+        if let Err(error) = std::fs::write(&self.path, &content) {
             gs.error(error.to_string());
-            return false;
+            return None;
         }
-        true
+        Some(content)
     }
 
     pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {
@@ -497,30 +485,16 @@ impl Editor {
 
     pub fn resize(&mut self, width: usize, height: usize) {
         self.cursor.max_rows = height;
-        let offset = if self.content.is_empty() { 0 } else { (self.content.len().ilog10() + 1) as usize };
-        self.cursor.text_width = width.saturating_sub(offset + 1);
+        self.line_number_offset = if self.content.is_empty() { 1 } else { (self.content.len().ilog10() + 1) as usize };
+        self.cursor.text_width = width.saturating_sub(self.line_number_offset + 1);
     }
-}
-
-fn build_display(path: &Path) -> String {
-    let mut buffer = Vec::new();
-    let mut text_path = path.display().to_string();
-    if let Ok(base_path) = PathBuf::from("./").canonicalize().map(|p| p.display().to_string()) {
-        if let Some(rel) = text_path.strip_prefix(&base_path).to_owned() {
-            text_path = rel.to_owned();
-        }
-    }
-    for part in text_path.split(MAIN_SEPARATOR).rev().take(2) {
-        buffer.insert(0, part);
-    }
-    buffer.join(MAIN_SEPARATOR_STR)
 }
 
 impl Drop for Editor {
     fn drop(&mut self) {
-        self.lexer.close(&self.path);
+        self.lexer.close();
     }
 }
 
 #[cfg(test)]
-pub mod test;
+pub mod code_tests;

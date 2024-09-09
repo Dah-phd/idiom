@@ -1,10 +1,17 @@
-use super::{editor::Editor, map_editor, Workspace};
+use super::{
+    editor::Editor,
+    line::EditorLine,
+    map_editor,
+    utils::{clip_content, copy_content, insert_clip, remove_content},
+    Workspace,
+};
 use crate::{
     configs::{test::mock_editor_key_map, EditorConfigs},
     global_state::GlobalState,
     render::backend::{Backend, BackendProtocol, Style},
     workspace::{
-        editor::test::{mock_editor, pull_line, select_eq},
+        actions::tests::create_content,
+        editor::code_tests::{mock_editor, pull_line, select_eq},
         CursorPosition,
     },
 };
@@ -59,6 +66,77 @@ fn assert_position(ws: &mut Workspace, position: CursorPosition) {
     let current: CursorPosition = (&active(ws).cursor).into();
     assert_eq!(current, position);
 }
+
+/// UTILS
+
+#[test]
+fn test_insert_clip() {
+    // ensure utf8 safety on critical func
+    let mut content = vec![EditorLine::new("one🚀line".to_owned())];
+    let cursor = CursorPosition { line: 0, char: 4 };
+    let cursor = insert_clip("first\nsecond\nrocket🚀", &mut content, cursor);
+    assert_eq!(&content[0].to_string(), "one🚀first");
+    assert_eq!(&content[1].to_string(), "second");
+    assert_eq!(&content[2].to_string(), "rocket🚀line");
+    assert_eq!(cursor, CursorPosition { line: 2, char: 7 });
+    // single line
+    let cursor = insert_clip("single", &mut content, cursor);
+    assert_eq!(&content[2].to_string(), "rocket🚀singleline");
+    assert_eq!(cursor, CursorPosition { line: 2, char: 13 });
+    // end on new line
+    let cursor = insert_clip("text\n", &mut content, CursorPosition { line: 0, char: 0 });
+    assert_eq!(&content[0].to_string(), "text");
+    assert_eq!(&content[1].to_string(), "one🚀first");
+    assert_eq!(cursor, CursorPosition { line: 1, char: 0 });
+}
+
+#[test]
+fn test_remove_content() {
+    // ensure utf8 safety on critical func
+    let mut content = create_content();
+    let from = CursorPosition { line: 4, char: 1 };
+    remove_content(from, CursorPosition { line: 5, char: 15 }, &mut content);
+    assert_eq!(&content[4].to_string(), "🚀 everywhere in the end");
+    // within line
+    remove_content(from, CursorPosition { line: 4, char: 10 }, &mut content);
+    assert_eq!(&content[4].to_string(), "🚀re in the end");
+    // end on new line
+    remove_content(from, CursorPosition { line: 5, char: 0 }, &mut content);
+    assert_eq!(&content[4].to_string(), "🚀i will have to have some scopes {");
+}
+
+#[test]
+fn test_clip_content() {
+    // ensure utf8 safety on critical func
+    let mut content = create_content();
+    let from = CursorPosition { line: 4, char: 1 };
+    let clip = clip_content(from, CursorPosition { line: 5, char: 15 }, &mut content);
+    assert_eq!(&content[4].to_string(), "🚀 everywhere in the end");
+    assert_eq!(&clip, " things will get really complicated especially with all the utf8 chars and utf16 pos encoding\nthere will be 🚀");
+    // within line
+    let clip2 = clip_content(from, CursorPosition { line: 4, char: 10 }, &mut content);
+    assert_eq!(&content[4].to_string(), "🚀re in the end");
+    assert_eq!(&clip2, " everywhe");
+    // end on new line
+    let clip3 = clip_content(CursorPosition { line: 0, char: 0 }, CursorPosition { line: 1, char: 0 }, &mut content);
+    assert_eq!(&content[0].to_string(), "more lines of code should be here but only text");
+    assert_eq!(&clip3, "here comes the text\n");
+}
+
+#[test]
+fn test_copy_content() {
+    let content = create_content();
+    let clip = copy_content(CursorPosition { line: 4, char: 1 }, CursorPosition { line: 5, char: 15 }, &content);
+    assert_eq!(&clip, " things will get really complicated especially with all the utf8 chars and utf16 pos encoding\nthere will be 🚀");
+    // within line
+    let clip2 = copy_content(CursorPosition { line: 5, char: 14 }, CursorPosition { line: 5, char: 15 }, &content);
+    assert_eq!(&clip2, "🚀");
+    // end on new line
+    let clip3 = copy_content(CursorPosition { line: 0, char: 0 }, CursorPosition { line: 1, char: 0 }, &content);
+    assert_eq!(&clip3, "here comes the text\n");
+}
+
+/// ACTIONS
 
 #[test]
 fn test_open_scope() {
@@ -164,6 +242,22 @@ fn test_new_line() {
     press(&mut ws, KeyCode::Enter, &mut gs);
     assert_eq!(pull_line(active(&mut ws), 2).unwrap(), "ello world!");
     assert_eq!(pull_line(active(&mut ws), 3).unwrap(), "");
+    // scopes
+    press(&mut ws, KeyCode::Down, &mut gs);
+    ctrl_press(&mut ws, KeyCode::Right, &mut gs);
+    press(&mut ws, KeyCode::Char('{'), &mut gs);
+    press(&mut ws, KeyCode::Enter, &mut gs);
+    assert_eq!(CursorPosition { line: 5, char: 4 }, (&ws.get_active().unwrap().cursor).into());
+    assert_eq!(pull_line(active(&mut ws), 4).unwrap(), "next{");
+    assert_eq!(pull_line(active(&mut ws), 5).unwrap(), "    ");
+    assert_eq!(pull_line(active(&mut ws), 6).unwrap(), "} line");
+    // scopes depth
+    press(&mut ws, KeyCode::Char('['), &mut gs);
+    press(&mut ws, KeyCode::Enter, &mut gs);
+    assert_eq!(CursorPosition { line: 6, char: 8 }, (&ws.get_active().unwrap().cursor).into());
+    assert_eq!(pull_line(active(&mut ws), 5).unwrap(), "    [");
+    assert_eq!(pull_line(active(&mut ws), 6).unwrap(), "        ");
+    assert_eq!(pull_line(active(&mut ws), 7).unwrap(), "    ]");
 }
 
 #[test]
@@ -213,7 +307,6 @@ fn test_cut_paste() {
     shift_press(&mut ws, KeyCode::Down, &mut gs);
     shift_press(&mut ws, KeyCode::Down, &mut gs);
     ctrl_press(&mut ws, KeyCode::Char('x'), &mut gs);
-    press(&mut ws, KeyCode::Up, &mut gs);
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nextly long line here");
     shift_press(&mut ws, KeyCode::Down, &mut gs); // with select
     ctrl_press(&mut ws, KeyCode::Char('v'), &mut gs);

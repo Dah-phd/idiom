@@ -21,8 +21,14 @@ pub fn placeholder() -> Box<PlaceHolderPopup> {
 }
 
 pub trait PopupInterface {
-    fn render(&mut self, gs: &mut GlobalState);
+    fn fast_render(&mut self, gs: &mut GlobalState) {
+        if self.collect_update_status() {
+            self.render(gs);
+        }
+    }
+
     fn map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {
+        self.mark_as_updated();
         match key {
             KeyEvent { code: KeyCode::Char('d' | 'D'), modifiers: KeyModifiers::CONTROL, .. } => PopupMessage::Clear,
             KeyEvent { code: KeyCode::Char('q' | 'Q'), modifiers: KeyModifiers::CONTROL, .. } => PopupMessage::Clear,
@@ -30,9 +36,12 @@ pub trait PopupInterface {
             _ => self.key_map(key, clipboard),
         }
     }
+
+    fn render(&mut self, gs: &mut GlobalState);
     fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage;
-    fn update_workspace(&mut self, _workspace: &mut Workspace) {}
-    fn update_tree(&mut self, _file_tree: &mut Tree) {}
+    fn component_access(&mut self, _ws: &mut Workspace, _tree: &mut Tree) {}
+    fn mark_as_updated(&mut self);
+    fn collect_update_status(&mut self) -> bool;
 }
 
 // syntactic sugar for popups used instead of Option<popup>
@@ -41,6 +50,11 @@ pub struct PlaceHolderPopup();
 impl PopupInterface for PlaceHolderPopup {
     fn key_map(&mut self, _key: &KeyEvent, _clipboard: &mut Clipboard) -> PopupMessage {
         PopupMessage::Clear
+    }
+
+    fn mark_as_updated(&mut self) {}
+    fn collect_update_status(&mut self) -> bool {
+        false
     }
     fn render(&mut self, _gs: &mut GlobalState) {}
 }

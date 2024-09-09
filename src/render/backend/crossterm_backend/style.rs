@@ -2,7 +2,7 @@ use crossterm::style::{Attribute, Attributes, ContentStyle};
 
 use super::Color;
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct Style(ContentStyle);
 
 impl Style {
@@ -139,16 +139,16 @@ impl Style {
     }
 }
 
-impl Into<ContentStyle> for Style {
+impl From<Style> for ContentStyle {
     #[inline]
-    fn into(self) -> ContentStyle {
-        self.0
+    fn from(val: Style) -> Self {
+        val.0
     }
 }
 
-impl Into<ContentStyle> for &Style {
+impl From<&Style> for ContentStyle {
     #[inline]
-    fn into(self) -> ContentStyle {
-        self.0.clone()
+    fn from(val: &Style) -> Self {
+        val.0
     }
 }

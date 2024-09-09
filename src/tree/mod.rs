@@ -1,62 +1,83 @@
 mod tree_paths;
+mod watcher;
 use crate::{
     configs::{TreeAction, TreeKeyMap},
     error::{IdiomError, IdiomResult},
-    global_state::{GlobalState, WorkspaceEvent},
-    lsp::Diagnostic,
+    global_state::{GlobalState, IdiomEvent},
     popups::popups_tree::{create_file_popup, rename_file_popup},
-    render::state::State,
-    utils::{build_file_or_folder, to_relative_path},
+    render::{backend::Backend, layout::Rect, state::State},
+    utils::{build_file_or_folder, to_canon_path, to_relative_path},
 };
 use crossterm::event::KeyEvent;
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
-use tokio::task::JoinHandle;
+use std::path::{Path, PathBuf};
 use tree_paths::TreePath;
+use watcher::TreeWatcher;
 
-const TICK: Duration = Duration::from_millis(500);
+type PathParser = fn(&Path) -> IdiomResult<PathBuf>;
 
 pub struct Tree {
     pub key_map: TreeKeyMap,
+    pub watcher: TreeWatcher,
     state: State,
     selected_path: PathBuf,
     tree: TreePath,
-    tree_ptrs: Vec<*mut TreePath>,
-    sync_handler: JoinHandle<TreePath>,
+    display_offset: usize,
+    path_parser: PathParser,
     rebuild: bool,
-    pub lsp_register: Vec<Arc<Mutex<HashMap<PathBuf, Diagnostic>>>>,
 }
 
 impl Tree {
     pub fn new(key_map: TreeKeyMap) -> Self {
-        let mut tree = TreePath::default();
-        let mut sync_tree = tree.clone();
-        let mut tree_ptrs = Vec::new();
-        let sync_handler = tokio::spawn(async move {
-            tokio::time::sleep(TICK).await;
-            sync_tree.sync_base();
-            sync_tree
-        });
-        tree.sync_flat_ptrs(&mut tree_ptrs);
-        Self {
-            state: State::new(),
-            key_map,
-            selected_path: PathBuf::from("./"),
-            tree,
-            tree_ptrs,
-            sync_handler,
-            rebuild: true,
-            lsp_register: Vec::new(),
+        match PathBuf::from("./").canonicalize() {
+            Ok(selected_path) => {
+                let path_str = selected_path.display().to_string();
+                let display_offset = path_str.split(std::path::MAIN_SEPARATOR).count() * 2;
+                let tree = TreePath::from_path(selected_path.clone());
+                Self {
+                    watcher: TreeWatcher::root(),
+                    state: State::new(),
+                    key_map,
+                    display_offset,
+                    path_parser: to_canon_path,
+                    selected_path,
+                    tree,
+                    rebuild: true,
+                }
+            }
+            Err(..) => {
+                let tree = TreePath::from_path(PathBuf::from("./"));
+                Self {
+                    watcher: TreeWatcher::root(),
+                    state: State::new(),
+                    key_map,
+                    display_offset: 2,
+                    path_parser: to_relative_path,
+                    selected_path: PathBuf::from("./"),
+                    tree,
+                    rebuild: true,
+                }
+            }
         }
     }
 
     pub fn render(&mut self, gs: &mut GlobalState) {
-        let options = self.tree_ptrs.iter().flat_map(|ptr| unsafe { ptr.as_ref() }.map(|tp| tp.direct_display()));
-        self.state.render_list_styled(options, &gs.tree_area, &mut gs.writer);
+        let mut iter = self.tree.iter();
+        iter.next();
+        let mut lines = gs.tree_area.into_iter();
+        for (idx, tree_path) in iter.enumerate().skip(self.state.at_line) {
+            let line = match lines.next() {
+                Some(line) => line,
+                None => return,
+            };
+            if idx == self.state.selected {
+                tree_path.render_styled(self.display_offset, line, self.state.highlight, &mut gs.writer);
+            } else {
+                tree_path.render(self.display_offset, line, &mut gs.writer);
+            }
+        }
+        for line in lines {
+            line.render_empty(&mut gs.writer);
+        }
     }
 
     #[inline]
@@ -75,7 +96,7 @@ impl Tree {
                 TreeAction::Shrink => self.shrink(),
                 TreeAction::Expand => {
                     if let Some(path) = self.expand_dir_or_get_path() {
-                        gs.workspace.push(WorkspaceEvent::Open(path, 0));
+                        gs.event.push(IdiomEvent::OpenAtLine(path, 0));
                     }
                 }
                 TreeAction::Delete => {
@@ -83,7 +104,7 @@ impl Tree {
                 }
                 TreeAction::NewFile => gs.popup(create_file_popup(self.get_first_selected_folder_display())),
                 TreeAction::Rename => {
-                    if let Some(tree_path) = self.get_selected() {
+                    if let Some(tree_path) = self.tree.get_mut_from_inner(self.state.selected) {
                         gs.popup(rename_file_popup(tree_path.path().display().to_string()));
                     }
                 }
@@ -96,10 +117,10 @@ impl Tree {
     }
 
     pub fn expand_dir_or_get_path(&mut self) -> Option<PathBuf> {
-        let tree_path = self.get_selected()?;
+        let tree_path = self.tree.get_mut_from_inner(self.state.selected)?;
         if tree_path.path().is_dir() {
             tree_path.expand();
-            self.force_sync();
+            self.rebuild = true;
             None
         } else {
             Some(tree_path.path().clone())
@@ -107,58 +128,60 @@ impl Tree {
     }
 
     fn shrink(&mut self) {
-        if let Some(tree_path) = self.get_selected() {
+        if let Some(tree_path) = self.tree.get_mut_from_inner(self.state.selected) {
             tree_path.take_tree();
-            self.force_sync();
+            self.rebuild = true;
         }
     }
 
     pub fn mouse_select(&mut self, idx: usize) -> Option<PathBuf> {
-        if self.tree_ptrs.len() >= idx {
+        if self.tree.len() > idx {
             self.state.selected = idx.saturating_sub(1);
-            if let Some(selected) = self.get_selected() {
+            if let Some(selected) = self.tree.get_mut_from_inner(self.state.selected) {
                 match selected {
                     TreePath::Folder { tree: Some(..), .. } => {
                         selected.take_tree();
                     }
                     TreePath::Folder { tree: None, .. } => selected.expand(),
                     TreePath::File { path, .. } => {
+                        self.selected_path = path.clone();
+                        self.rebuild = true;
                         return Some(path.clone());
                     }
                 }
-                self.selected_path = selected.path().clone();
+                self.selected_path = selected.path().to_owned();
             };
-            self.force_sync();
+            self.rebuild = true;
         }
         None
     }
 
     fn select_up(&mut self) {
-        if self.tree_ptrs.is_empty() {
+        let tree_len = self.tree.len() - 1;
+        if tree_len == 0 {
             return;
         }
-        self.state.prev(self.tree_ptrs.len());
+        self.state.prev(tree_len);
         self.unsafe_set_path();
     }
 
     fn select_down(&mut self) {
-        if self.tree_ptrs.is_empty() {
+        let tree_len = self.tree.len() - 1;
+        if tree_len == 0 {
             return;
         }
-        self.state.next(self.tree_ptrs.len());
+        self.state.next(tree_len);
         self.unsafe_set_path();
     }
 
     pub fn create_file_or_folder(&mut self, name: String) -> IdiomResult<PathBuf> {
         let path = build_file_or_folder(self.selected_path.clone(), &name)?;
-        self.force_sync();
         self.select_by_path(&path);
         Ok(path)
     }
 
     pub fn create_file_or_folder_base(&mut self, name: String) -> IdiomResult<PathBuf> {
         let path = build_file_or_folder(PathBuf::from("./"), &name)?;
-        self.force_sync();
         self.select_by_path(&path);
         Ok(path)
     }
@@ -170,13 +193,13 @@ impl Tree {
             std::fs::remove_dir_all(&self.selected_path)?
         };
         self.select_up();
-        self.force_sync();
+        self.rebuild = true;
         Ok(())
     }
 
     pub fn rename_path(&mut self, name: String) -> Option<IdiomResult<(PathBuf, PathBuf)>> {
         // not efficient but safe - calls should be rare enough
-        let selected = self.get_selected()?;
+        let selected = self.tree.get_mut_from_inner(self.state.selected)?;
         let mut rel_new_path = selected.path().clone();
         if !rel_new_path.pop() {
             return None;
@@ -194,7 +217,7 @@ impl Tree {
         if result.is_ok() {
             rel_new_path.push(name);
             selected.update_path(rel_new_path);
-            self.force_sync();
+            self.rebuild = true;
         }
         Some(result)
     }
@@ -208,24 +231,24 @@ impl Tree {
     }
 
     pub fn shallow_copy_selected_tree_path(&self) -> TreePath {
-        match self.get_selected() {
+        match self.tree.get_from_inner(self.state.selected) {
             Some(tree_path) => tree_path.shallow_copy(),
             None => self.shallow_copy_root_tree_path(),
         }
     }
 
     pub fn select_by_path(&mut self, path: &PathBuf) {
-        let rel_result = to_relative_path(path);
+        let rel_result = (self.path_parser)(path);
         let path = rel_result.as_ref().unwrap_or(path);
         if self.tree.expand_contained(path) {
-            self.state.selected = 0;
-            self.selected_path = path.clone();
-            self.force_sync();
+            self.selected_path.clone_from(path);
+            self.state.selected = self.tree.iter().skip(1).position(|tp| tp.path() == path).unwrap_or_default();
+            self.rebuild = true;
         }
     }
 
-    pub fn get_first_selected_folder_display(&self) -> String {
-        if let Some(tree_path) = self.get_selected() {
+    pub fn get_first_selected_folder_display(&mut self) -> String {
+        if let Some(tree_path) = self.tree.get_mut_from_inner(self.state.selected) {
             if tree_path.path().is_dir() {
                 return tree_path.path().as_path().display().to_string();
             }
@@ -236,84 +259,80 @@ impl Tree {
         "./".to_owned()
     }
 
-    #[inline]
-    pub fn get_selected(&self) -> Option<&mut TreePath> {
-        unsafe { self.tree_ptrs.get(self.state.selected)?.as_mut() }
+    pub fn get_base_file_names(&self) -> Vec<String> {
+        self.tree.tree_file_names()
     }
 
-    pub async fn finish_sync(&mut self, gs: &mut GlobalState) {
-        if self.sync_handler.is_finished() {
-            self.rebuild = true;
-            let mut tree = self.tree.clone();
-            let lsp_register = self.lsp_register.clone();
-            let old_handler = std::mem::replace(
-                &mut self.sync_handler,
-                tokio::spawn(async move {
-                    tokio::time::sleep(TICK).await;
-                    tree.sync_base();
-                    let mut buffer = Vec::new();
-                    for lsp in lsp_register.into_iter() {
-                        if let Ok(lock) = lsp.try_lock() {
-                            for (path, diagnostic) in lock.iter() {
-                                buffer.push((path.clone(), diagnostic.errors, diagnostic.warnings));
-                            }
-                        }
-                    }
-                    for (path, d_errors, d_warnings) in buffer {
-                        tree.map_diagnostics_base(path, d_errors, d_warnings);
-                    }
-                    tree
-                }),
-            );
-            match old_handler.await {
-                Ok(tree) => {
-                    self.tree = tree;
-                    self.tree.sync_flat_ptrs(&mut self.tree_ptrs);
-                    self.fix_select_by_path();
-                }
-                Err(err) => {
-                    gs.error(format!("Tree sync error: {err}"));
-                }
-            }
+    pub fn finish_sync(&mut self, gs: &mut GlobalState) {
+        self.rebuild = self.watcher.poll(&mut self.tree, self.path_parser, gs);
+        if !self.rebuild {
+            return;
         }
-        self.tree.sync_flat_ptrs(&mut self.tree_ptrs);
-    }
-
-    fn force_sync(&mut self) {
-        self.rebuild = true;
-        let mut tree = self.tree.clone();
-        std::mem::replace(
-            &mut self.sync_handler,
-            tokio::spawn(async move {
-                tree.sync_base();
-                tree
-            }),
-        )
-        .abort();
-        self.tree.sync_flat_ptrs(&mut self.tree_ptrs);
-    }
-
-    fn fix_select_by_path(&mut self) {
-        if let Some(selected) = self.get_selected() {
-            if &self.selected_path != selected.path() {
-                for (idx, tree_path) in self.tree_ptrs.iter_mut().flat_map(|ptr| unsafe { ptr.as_mut() }).enumerate() {
-                    if tree_path.path() == &self.selected_path {
-                        self.state.selected = idx;
-                        break;
-                    }
-                }
+        for (idx, tree_path) in self.tree.iter().skip(1).enumerate() {
+            if tree_path.path() == &self.selected_path {
+                self.state.selected = idx;
+                break;
             }
         }
     }
 
     fn unsafe_set_path(&mut self) {
         self.rebuild = true;
-        if let Some(selected) = self.get_selected() {
+        if let Some(selected) = self.tree.get_mut_from_inner(self.state.selected) {
             self.selected_path = selected.path().clone();
         }
     }
+}
 
-    pub fn get_base_file_names(&self) -> Vec<String> {
-        self.tree.tree_file_names()
+/// Stateless calls
+impl Tree {
+    pub fn render_stateless(&mut self, rect: Rect, backend: &mut Backend) {
+        let mut iter = self.tree.iter();
+        iter.next();
+        let mut lines = rect.into_iter();
+        for (idx, tree_path) in iter.enumerate().skip(self.state.at_line) {
+            let line = match lines.next() {
+                Some(line) => line,
+                None => return,
+            };
+            if idx == self.state.selected {
+                tree_path.render_styled(self.display_offset, line, self.state.highlight, backend);
+            } else {
+                tree_path.render(self.display_offset, line, backend);
+            }
+        }
+        for line in lines {
+            line.render_empty(backend);
+        }
+    }
+
+    pub fn fast_render_stateless(&mut self, rect: Rect, backend: &mut Backend) {
+        if self.rebuild {
+            self.rebuild = false;
+            self.render_stateless(rect, backend);
+        };
+    }
+
+    pub fn map_stateless(&mut self, key: &KeyEvent) -> bool {
+        if let Some(action) = self.key_map.map(key) {
+            match action {
+                TreeAction::Up => self.select_up(),
+                TreeAction::Down => self.select_down(),
+                TreeAction::Shrink => self.shrink(),
+                TreeAction::Expand => {
+                    let _ = self.expand_dir_or_get_path();
+                }
+                TreeAction::Delete => {
+                    let _ = self.delete_file();
+                }
+                _ => {}
+            }
+            return true;
+        }
+        false
+    }
+
+    pub fn unwrap_selected(self) -> PathBuf {
+        self.selected_path
     }
 }

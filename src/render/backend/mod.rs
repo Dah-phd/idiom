@@ -14,6 +14,7 @@ pub use crossterm_backend::{
 use crate::render::layout::Rect;
 
 /// If stdout is returning errors the program should crash -> use expect
+#[allow(dead_code)] // impl all utilities although not all are used
 pub trait BackendProtocol: Write + Sized {
     fn init() -> Self;
 
@@ -30,10 +31,10 @@ pub trait BackendProtocol: Write + Sized {
 
     fn clear_all(&mut self);
 
-    /// stores the cursor and hides it
+    /// stores the cursor
     fn save_cursor(&mut self);
 
-    /// restores cursor position and shows cursor
+    /// restores cursor position
     fn restore_cursor(&mut self);
 
     /// sets the style for the print/print at
@@ -78,6 +79,9 @@ pub trait BackendProtocol: Write + Sized {
 
     /// goes to location and prints styled text without affecting the writer set style
     fn print_styled_at<D: Display>(&mut self, row: u16, col: u16, text: D, style: Style);
+
+    /// padding with empty space
+    fn pad(&mut self, width: usize);
 }
 
 #[cfg(test)]

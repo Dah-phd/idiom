@@ -1,5 +1,6 @@
 use crate::{
-    global_state::{Clipboard, PopupMessage, TreeEvent, WorkspaceEvent},
+    configs::EditorAction,
+    global_state::{Clipboard, IdiomEvent, PopupMessage},
     render::backend::{color, Backend, Style},
 };
 use core::ops::Range;
@@ -202,6 +203,125 @@ impl<T: Default + Clone> TextField<T> {
         Some(T::default())
     }
 
+    pub fn map_actions(&mut self, action: EditorAction, clipboard: &mut Clipboard) -> Option<T> {
+        match action {
+            EditorAction::Copy => {
+                if let Some(clip) = self.get_selected() {
+                    clipboard.push(clip);
+                };
+                Some(T::default())
+            }
+            EditorAction::Cut => {
+                if let Some(clip) = self.take_selected() {
+                    clipboard.push(clip);
+                    return Some(self.on_text_update.clone().unwrap_or_default());
+                };
+                Some(T::default())
+            }
+            EditorAction::Paste => {
+                if let Some(clip) = clipboard.pull() {
+                    if !clip.contains('\n') {
+                        self.take_selected();
+                        self.text.insert_str(self.char, clip.as_str());
+                        self.char += clip.len();
+                        return Some(self.on_text_update.clone().unwrap_or_default());
+                    };
+                };
+                Some(T::default())
+            }
+            EditorAction::Char(ch) => {
+                self.take_selected();
+                self.text.insert(self.char, ch);
+                self.char += 1;
+                Some(self.on_text_update.clone().unwrap_or_default())
+            }
+            EditorAction::Delete => {
+                if self.take_selected().is_some() {
+                } else if self.char < self.text.len() && !self.text.is_empty() {
+                    self.text.remove(self.char);
+                };
+                Some(self.on_text_update.clone().unwrap_or_default())
+            }
+            EditorAction::Backspace => {
+                if self.take_selected().is_some() {
+                } else if self.char > 0 && !self.text.is_empty() {
+                    self.char -= 1;
+                    self.text.remove(self.char);
+                };
+                Some(self.on_text_update.clone().unwrap_or_default())
+            }
+            EditorAction::EndOfLine | EditorAction::EndOfFile => {
+                self.char = self.text.len().saturating_sub(1);
+                Some(T::default())
+            }
+            EditorAction::Left => {
+                self.char = self.char.saturating_sub(1);
+                self.select = None;
+                Some(T::default())
+            }
+            EditorAction::SelectLeft => {
+                self.init_select();
+                self.char = self.char.saturating_sub(1);
+                self.push_select();
+                Some(T::default())
+            }
+            EditorAction::JumpLeft => {
+                self.select = None;
+                self.jump_left();
+                Some(T::default())
+            }
+            EditorAction::JumpLeftSelect => {
+                self.init_select();
+                self.jump_left();
+                self.push_select();
+                Some(T::default())
+            }
+            EditorAction::Right => {
+                self.char = std::cmp::min(self.text.len(), self.char + 1);
+                self.select = None;
+                Some(T::default())
+            }
+            EditorAction::SelectRight => {
+                self.init_select();
+                self.char = std::cmp::min(self.text.len(), self.char + 1);
+                self.push_select();
+                Some(T::default())
+            }
+            EditorAction::JumpRight => {
+                self.select = None;
+                self.jump_right();
+                Some(T::default())
+            }
+            EditorAction::JumpRightSelect => {
+                self.init_select();
+                self.jump_right();
+                self.push_select();
+                Some(T::default())
+            }
+            _ => None,
+        }
+    }
+
+    fn jump_left(&mut self) {
+        while self.char > 0 {
+            let next_idx = self.char - 1;
+            if matches!(self.text.chars().nth(next_idx), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
+                break;
+            };
+            self.char = next_idx;
+        }
+    }
+
+    fn jump_right(&mut self) {
+        // jump
+        while self.text.len() > self.char {
+            self.char += 1;
+            if matches!(self.text.chars().nth(self.char), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
+                break;
+            }
+        }
+    }
+
     fn init_select(&mut self) {
         if self.select.is_none() {
             self.select = Some((self.char, self.char))
@@ -263,11 +383,11 @@ pub fn arg_range_at(line: &str, idx: usize) -> Range<usize> {
 
 impl TextField<PopupMessage> {
     pub fn with_tree_access(text: String) -> Self {
-        Self::new(text, Some(PopupMessage::Tree(TreeEvent::PopupAccess)))
+        Self::new(text, Some(PopupMessage::Tree(IdiomEvent::PopupAccess)))
     }
 
     pub fn with_editor_access(text: String) -> Self {
-        Self::new(text, Some(PopupMessage::Workspace(WorkspaceEvent::PopupAccess)))
+        Self::new(text, Some(PopupMessage::Tree(IdiomEvent::PopupAccess)))
     }
 }
 

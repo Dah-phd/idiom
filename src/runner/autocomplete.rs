@@ -14,15 +14,13 @@ fn path_finder(path_fragment: &str) -> Option<String> {
     };
     let path_fragment_buf = PathBuf::from(&path_fragment);
     if let Some(parent) = path_fragment_buf.parent() {
-        for p in std::fs::read_dir(parent).ok()? {
-            if let Ok(path) = p {
-                let mut derived_path_string = path.path().display().to_string();
-                if path.path().is_dir() {
-                    derived_path_string.push(MAIN_SEPARATOR);
-                };
-                if derived_path_string.starts_with(&path_fragment) {
-                    return Some(derived_path_string);
-                };
+        for path in std::fs::read_dir(parent).ok()?.flatten() {
+            let mut derived_path_string = path.path().display().to_string();
+            if path.path().is_dir() {
+                derived_path_string.push(MAIN_SEPARATOR);
+            };
+            if derived_path_string.starts_with(&path_fragment) {
+                return Some(derived_path_string);
             };
         }
     }
@@ -35,12 +33,10 @@ fn derive_executables(cmd: &str) -> Option<String> {
     if cmd.split(' ').count() != 1 {
         return None;
     }
-    for bin in std::fs::read_dir(executable_dir()?).ok()? {
-        if let Ok(bin) = bin {
-            let bin = bin.path().display().to_string();
-            if bin.starts_with(cmd) {
-                return Some(bin);
-            };
+    for bin in std::fs::read_dir(executable_dir()?).ok()?.flatten() {
+        let bin = bin.path().display().to_string();
+        if bin.starts_with(cmd) {
+            return Some(bin);
         };
     }
     None

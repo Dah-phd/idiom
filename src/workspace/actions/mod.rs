@@ -2,6 +2,7 @@ mod action_buffer;
 mod edits;
 use crate::{
     configs::IndentConfigs,
+    syntax::Lexer,
     utils::Offset,
     workspace::{
         cursor::{Cursor, CursorPosition, Select},
@@ -10,48 +11,44 @@ use crate::{
     },
 };
 use action_buffer::ActionBuffer;
-pub use edits::{Edit, EditMetaData, NewLineBuilder};
-use lsp_types::{Position, TextDocumentContentChangeEvent, TextEdit};
-
-pub type Events = Vec<(EditMetaData, TextDocumentContentChangeEvent)>;
+pub use edits::{Edit, EditMetaData};
+use lsp_types::{TextDocumentContentChangeEvent, TextEdit};
 
 #[derive(Default)]
 pub struct Actions {
     pub cfg: IndentConfigs,
-    version: i32,
     done: Vec<EditType>,
     undone: Vec<EditType>,
-    events: Events,
     buffer: ActionBuffer,
 }
 
 impl Actions {
     pub fn new(cfg: IndentConfigs) -> Self {
-        Self { cfg, events: Vec::with_capacity(2), ..Default::default() }
+        Self { cfg, ..Default::default() }
     }
 
-    pub fn swap_up(&mut self, cursor: &mut Cursor, content: &mut [impl EditorLine]) {
+    pub fn swap_up(&mut self, cursor: &mut Cursor, content: &mut [EditorLine], lexer: &mut Lexer) {
         if cursor.line == 0 {
             return;
         }
         cursor.select_drop();
-        self.push_buffer();
+        self.push_buffer(content, lexer);
         cursor.line -= 1;
         let (top, _, action) = Edit::swap_down(cursor.line, &self.cfg, content);
         cursor.char = top.offset(cursor.char);
-        self.push_done(action);
+        self.push_done(action, lexer, content);
     }
 
-    pub fn swap_down(&mut self, cursor: &mut Cursor, content: &mut [impl EditorLine]) {
+    pub fn swap_down(&mut self, cursor: &mut Cursor, content: &mut [EditorLine], lexer: &mut Lexer) {
         if content.is_empty() || content.len() - 1 <= cursor.line {
             return;
         }
         cursor.select_drop();
-        self.push_buffer();
+        self.push_buffer(content, lexer);
         let (_, bot, action) = Edit::swap_down(cursor.line, &self.cfg, content);
         cursor.line += 1;
         cursor.char = bot.offset(cursor.char);
-        self.push_done(action);
+        self.push_done(action, lexer, content);
     }
 
     /// Insert new text at the top of the file preserving cursor/select relative position
@@ -59,22 +56,23 @@ impl Actions {
         &mut self,
         line: String,
         cursor: &mut Cursor,
-        content: &mut Vec<impl EditorLine>,
+        content: &mut Vec<EditorLine>,
+        lexer: &mut Lexer,
     ) {
-        self.push_buffer();
+        self.push_buffer(content, lexer);
         let edit = Edit::replace_select(CursorPosition::default(), CursorPosition::default(), line, content);
         let offset = edit.meta.to - edit.meta.from;
         cursor.line += offset;
         cursor.at_line += offset;
         cursor.select_line_offset(offset);
-        self.push_done(edit);
+        self.push_done(edit, lexer, content);
     }
 
-    pub fn replace_token(&mut self, new: String, cursor: &mut Cursor, content: &mut [impl EditorLine]) {
-        self.push_buffer();
+    pub fn replace_token(&mut self, new: String, cursor: &mut Cursor, content: &mut [EditorLine], lexer: &mut Lexer) {
+        self.push_buffer(content, lexer);
         let action = Edit::replace_token(cursor.line, cursor.char, new, content);
-        cursor.set_position(action.reverse_text_edit.range.end.into());
-        self.push_done(action);
+        cursor.set_position(action.end_position());
+        self.push_done(action, lexer, content);
     }
 
     pub fn replace_select(
@@ -83,13 +81,14 @@ impl Actions {
         to: CursorPosition,
         clip: impl Into<String>,
         cursor: &mut Cursor,
-        content: &mut Vec<impl EditorLine>,
+        content: &mut Vec<EditorLine>,
+        lexer: &mut Lexer,
     ) {
-        self.push_buffer();
+        self.push_buffer(content, lexer);
         cursor.select_drop();
         let action = Edit::replace_select(from, to, clip.into(), content);
         cursor.set_position(action.end_position());
-        self.push_done(action);
+        self.push_done(action, lexer, content);
     }
 
     pub fn insert_snippet(
@@ -97,12 +96,13 @@ impl Actions {
         c: &mut Cursor,
         snippet: String,
         cursor_offset: Option<(usize, usize)>,
-        content: &mut Vec<impl EditorLine>,
+        content: &mut Vec<EditorLine>,
+        lexer: &mut Lexer,
     ) {
-        self.push_buffer();
+        self.push_buffer(content, lexer);
         let (position, action) = Edit::insert_snippet(c, snippet, cursor_offset, &self.cfg, content);
         c.set_position(position);
-        self.push_done(action);
+        self.push_done(action, lexer, content);
     }
 
     pub fn mass_replace(
@@ -110,9 +110,10 @@ impl Actions {
         cursor: &mut Cursor,
         ranges: Vec<Select>,
         clip: String,
-        content: &mut Vec<impl EditorLine>,
+        content: &mut Vec<EditorLine>,
+        lexer: &mut Lexer,
     ) {
-        self.push_buffer();
+        self.push_buffer(content, lexer);
         cursor.select_drop();
         let actions = ranges
             .into_iter()
@@ -121,48 +122,48 @@ impl Actions {
         if let Some(last) = actions.last() {
             cursor.set_position(last.end_position());
         }
-        self.push_done(actions);
+        self.push_done(actions, lexer, content);
     }
 
-    pub fn apply_edits(&mut self, edits: Vec<TextEdit>, content: &mut Vec<impl EditorLine>) {
-        self.push_buffer();
+    pub fn apply_edits(&mut self, edits: Vec<TextEdit>, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
+        self.push_buffer(content, lexer);
         let actions = edits
             .into_iter()
             .map(|e| Edit::replace_select(e.range.start.into(), e.range.end.into(), e.new_text, content))
             .collect::<Vec<Edit>>();
-        self.push_done(actions);
+        self.push_done(actions, lexer, content);
     }
 
-    pub fn indent(&mut self, cursor: &mut Cursor, content: &mut Vec<impl EditorLine>) {
-        self.push_buffer();
+    pub fn indent(&mut self, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
+        self.push_buffer(content, lexer);
         match cursor.select_take() {
             Some((from, to)) => {
                 if from.line == to.line {
-                    self.push_done(Edit::replace_select(from, to, self.cfg.indent.to_owned(), content));
+                    self.push_done(Edit::replace_select(from, to, self.cfg.indent.to_owned(), content), lexer, content);
                 } else {
                     let edits = self.indent_range(cursor, from, to, content);
-                    self.push_done(edits);
+                    self.push_done(edits, lexer, content);
                 }
             }
             None => {
-                self.push_done(Edit::insert_clip(cursor.into(), self.cfg.indent.to_owned(), content));
+                self.push_done(Edit::insert_clip(cursor.into(), self.cfg.indent.to_owned(), content), lexer, content);
                 cursor.add_to_char(self.cfg.indent.len());
             }
         }
     }
 
-    pub fn indent_start(&mut self, cursor: &mut Cursor, content: &mut Vec<impl EditorLine>) {
-        self.push_buffer();
+    pub fn indent_start(&mut self, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
+        self.push_buffer(content, lexer);
         match cursor.select_take() {
             Some((from, to)) => {
                 let edits = self.indent_range(cursor, from, to, content);
-                self.push_done(edits);
+                self.push_done(edits, lexer, content);
             }
             None => {
                 let start = CursorPosition { line: cursor.line, char: 0 };
                 let edit = Edit::insert_clip(start, self.cfg.indent.to_owned(), content);
                 cursor.add_to_char(self.cfg.indent.len());
-                self.push_done(edit);
+                self.push_done(edit, lexer, content);
             }
         }
     }
@@ -172,7 +173,7 @@ impl Actions {
         cursor: &mut Cursor,
         mut from: CursorPosition,
         mut to: CursorPosition,
-        content: &mut [impl EditorLine],
+        content: &mut [EditorLine],
     ) -> Vec<Edit> {
         let initial_select = (from, to);
         if from.char != 0 {
@@ -187,15 +188,17 @@ impl Actions {
         let mut edits = Vec::with_capacity(edit_lines);
         for (line_idx, text) in content.iter_mut().enumerate().skip(from.line).take(edit_lines) {
             text.insert_str(0, &self.cfg.indent);
-            let position = Position::new(line_idx as u32, 0);
-            edits.push(Edit::record_in_line_insertion(position, self.cfg.indent.to_owned()))
+            edits.push(Edit::record_in_line_insertion(
+                CursorPosition { line: line_idx, char: 0 },
+                self.cfg.indent.to_owned(),
+            ))
         }
         add_select(&mut edits, Some(initial_select), Some((from, to)));
         edits
     }
 
-    pub fn unindent(&mut self, cursor: &mut Cursor, content: &mut [impl EditorLine]) {
-        self.push_buffer();
+    pub fn unindent(&mut self, cursor: &mut Cursor, content: &mut [EditorLine], lexer: &mut Lexer) {
+        self.push_buffer(content, lexer);
         match cursor.select_take() {
             Some((mut from, mut to)) => {
                 let initial_select = (from, to);
@@ -218,56 +221,43 @@ impl Actions {
                 }
                 cursor.select_set(from, to);
                 add_select(&mut edits, Some(initial_select), Some((from, to)));
-                self.push_done(edits);
+                self.push_done(edits, lexer, content);
             }
             None => {
                 let _ = content
                     .get_mut(cursor.line)
                     .and_then(|text| Edit::unindent(cursor.line, text, &self.cfg.indent))
                     .map(|(offset, edit)| {
-                        self.push_done(edit);
+                        self.push_done(edit, lexer, content);
                         cursor.char = offset.offset(cursor.char);
                     });
             }
         }
     }
 
-    pub fn new_line(&mut self, cursor: &mut Cursor, content: &mut Vec<impl EditorLine>) {
-        self.push_buffer();
-        let mut builder = NewLineBuilder::new(cursor, content);
+    pub fn new_line(&mut self, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
         if content.is_empty() {
-            content.push(String::new().into());
-            cursor.line += 1;
-            self.push_done(builder.finish(cursor.into(), content));
+            cursor.set_position(CursorPosition { line: 0, char: 0 });
+            content.push(Default::default());
             return;
         }
-        let prev_line = &mut content[cursor.line];
-        let mut line = prev_line.split_off(cursor.char);
-        let indent = self.cfg.derive_indent_from(prev_line);
-        line.insert_str(0, &indent);
-        cursor.line += 1;
-        cursor.set_char(indent.len());
-        // expand scope
-        if let Some(opening) = prev_line.trim_end().chars().last() {
-            if let Some(closing) = line.trim_start().chars().next() {
-                if [('{', '}'), ('(', ')'), ('[', ']')].contains(&(opening, closing)) {
-                    self.cfg.unindent_if_before_base_pattern(&mut line);
-                    let new_char = indent.len() - self.cfg.indent.len();
-                    content.insert(cursor.line, line);
-                    content.insert(cursor.line, indent.into());
-                    self.push_done(builder.finish((cursor.line + 1, new_char).into(), content));
-                    return;
-                }
+        self.push_buffer(content, lexer);
+        match cursor.select_take() {
+            Some((from, to)) => {
+                let cut_edit = Edit::remove_select(from, to, content);
+                let (new_position, new_line_edit) = Edit::new_line(from, &self.cfg, content);
+                cursor.set_position(new_position);
+                self.push_done(vec![cut_edit, new_line_edit], lexer, content)
+            }
+            None => {
+                let (new_position, edit) = Edit::new_line(cursor.into(), &self.cfg, content);
+                cursor.set_position(new_position);
+                self.push_done(edit, lexer, content);
             }
         }
-        if prev_line.chars().all(|c| c.is_whitespace()) && prev_line.len().rem_euclid(self.cfg.indent.len()) == 0 {
-            builder.and_clear_first_line(prev_line);
-        }
-        content.insert(cursor.line, line);
-        self.push_done(builder.finish(cursor.into(), content));
     }
 
-    pub fn comment_out(&mut self, pat: &str, cursor: &mut Cursor, content: &mut [impl EditorLine]) {
+    pub fn comment_out(&mut self, pat: &str, cursor: &mut Cursor, content: &mut [EditorLine], lexer: &mut Lexer) {
         // TODO refactor
         match cursor.select_take() {
             Some((mut from, mut to)) => {
@@ -299,150 +289,155 @@ impl Actions {
                 } else {
                     cursor.select_set(from, to);
                 };
-                self.push_done(edits);
+                self.push_done(edits, lexer, content);
             }
             _ => {
                 let line = &mut content[cursor.line];
                 if let Some((offset, edit)) = uncomment(pat, line, cursor.into()) {
-                    self.push_done(edit);
+                    self.push_done(edit, lexer, content);
                     cursor.char = offset.offset(cursor.char);
                 } else if let Some((offset, edit)) = into_comment(pat, line, cursor.into()) {
-                    self.push_done(edit);
+                    self.push_done(edit, lexer, content);
                     cursor.char = offset.offset(cursor.char);
                 }
             }
         }
     }
 
-    pub fn push_char(&mut self, ch: char, cursor: &mut Cursor, content: &mut Vec<impl EditorLine>) {
+    pub fn push_char(&mut self, ch: char, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
         match cursor.select_take() {
             Some((mut from, mut to)) => {
-                self.push_buffer();
+                self.push_buffer(content, lexer);
                 match get_closing_char(ch) {
                     Some(closing) => {
                         content[to.line].insert(to.char, closing);
                         content[from.line].insert(from.char, ch);
-                        let first_edit = Edit::record_in_line_insertion(to.into(), closing.into()).select(from, to);
-                        let second_edit = Edit::record_in_line_insertion(from.into(), ch.to_string());
+                        let first_edit = Edit::record_in_line_insertion(to, closing.into()).select(from, to);
+                        let second_edit = Edit::record_in_line_insertion(from, ch.into());
                         from.char += 1;
                         if from.line == to.line {
                             to.char += 1;
                         }
-                        self.push_done(vec![first_edit, second_edit.new_select(from, to)]);
+                        self.push_done(vec![first_edit, second_edit.new_select(from, to)], lexer, content);
                         cursor.set_position(to);
                         cursor.select_set(from, to);
                     }
                     None => {
                         cursor.set_position(from);
-                        self.push_done(Edit::remove_select(from, to, content));
-                        self.push_char_simple(ch, cursor, content);
+                        self.push_done(Edit::remove_select(from, to, content), lexer, content);
+                        self.push_char_simple(ch, cursor, content, lexer);
                     }
                 }
             }
-            None => self.push_char_simple(ch, cursor, content),
+            None => self.push_char_simple(ch, cursor, content, lexer),
         }
     }
 
-    fn push_char_simple(&mut self, ch: char, cursor: &mut Cursor, content: &mut [impl EditorLine]) {
+    fn push_char_simple(&mut self, ch: char, cursor: &mut Cursor, content: &mut [EditorLine], lexer: &mut Lexer) {
         if let Some(line) = content.get_mut(cursor.line) {
             if is_closing_repeat(line, ch, cursor.char) {
             } else if let Some(closing) = get_closing_char(ch) {
                 let new_text = format!("{ch}{closing}");
                 line.insert_str(cursor.char, &new_text);
-                self.push_buffer();
-                self.push_done(Edit::record_in_line_insertion(cursor.into(), new_text));
+                self.push_buffer(content, lexer);
+                self.push_done(Edit::record_in_line_insertion(cursor.into(), new_text), lexer, content);
             } else {
-                let _ = self.buffer.push(cursor.line, cursor.char, ch).map(|edit| self.push_done(edit));
+                let buf_result = self.buffer.push(cursor.line, cursor.char, ch);
                 line.insert(cursor.char, ch);
+                if let Some(edit) = buf_result {
+                    self.push_done(edit, lexer, content);
+                }
             }
             cursor.add_to_char(1);
         }
     }
 
-    pub fn del(&mut self, cursor: &mut Cursor, content: &mut Vec<impl EditorLine>) {
+    pub fn del(&mut self, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
         if content.is_empty() {
             return;
         }
         match cursor.select_take() {
             Some((from, to)) => {
-                self.push_buffer();
+                self.push_buffer(content, lexer);
                 cursor.set_position(from);
-                self.push_done(Edit::remove_select(from, to, content));
+                self.push_done(Edit::remove_select(from, to, content), lexer, content);
             }
-            None if content[cursor.line].len() == cursor.char => {
-                self.push_buffer();
+            None if content[cursor.line].char_len() == cursor.char => {
+                self.push_buffer(content, lexer);
                 if content.len() > cursor.line + 1 {
-                    self.push_done(Edit::merge_next_line(cursor.line, content));
+                    self.push_done(Edit::merge_next_line(cursor.line, content), lexer, content);
                 }
             }
             None => {
                 let _ = self
                     .buffer
                     .del(cursor.line, cursor.char, &mut content[cursor.line])
-                    .map(|edit| self.push_done(edit));
+                    .map(|edit| self.push_done(edit, lexer, content));
             }
         }
     }
 
-    pub fn backspace(&mut self, cursor: &mut Cursor, content: &mut Vec<impl EditorLine>) {
+    pub fn backspace(&mut self, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
         if content.is_empty() || cursor.line == 0 && cursor.char == 0 && cursor.select_is_none() {
             return;
         }
         match cursor.select_take() {
             Some((from, to)) => {
-                self.push_buffer();
+                self.push_buffer(content, lexer);
                 cursor.set_position(from);
-                self.push_done(Edit::remove_select(from, to, content));
+                self.push_done(Edit::remove_select(from, to, content), lexer, content);
             }
             None if cursor.char == 0 => {
-                self.push_buffer();
+                self.push_buffer(content, lexer);
                 cursor.line -= 1;
                 let edit = Edit::merge_next_line(cursor.line, content);
-                cursor.set_char(edit.text_edit.range.start.character as usize);
-                self.push_done(edit);
+                cursor.set_char(edit.cursor.char);
+                self.push_done(edit, lexer, content);
             }
             None => {
                 let _ = self
                     .buffer
                     .backspace(cursor.line, cursor.char, &mut content[cursor.line], &self.cfg.indent)
-                    .map(|edit| self.push_done(edit));
+                    .map(|edit| self.push_done(edit, lexer, content));
                 cursor.set_char(self.buffer.last_char());
             }
         }
     }
 
-    pub fn undo(&mut self, cursor: &mut Cursor, content: &mut Vec<impl EditorLine>) {
-        self.push_buffer();
+    pub fn undo(&mut self, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
+        self.push_buffer(content, lexer);
         if let Some(action) = self.done.pop() {
-            let (position, select) = action.apply_rev(content, &mut self.events);
+            let (position, select) = action.apply_rev(content);
+            lexer.sync_rev(&action, content);
             cursor.set_position(position);
             cursor.select_replace(select);
             self.undone.push(action);
         }
     }
 
-    pub fn redo(&mut self, cursor: &mut Cursor, content: &mut Vec<impl EditorLine>) {
-        self.push_buffer();
+    pub fn redo(&mut self, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
+        self.push_buffer(content, lexer);
         if let Some(action) = self.undone.pop() {
-            let (position, select) = action.apply(content, &mut self.events);
+            let (position, select) = action.apply(content);
+            lexer.sync(&action, content);
             cursor.set_position(position);
             cursor.select_replace(select);
             self.done.push(action);
         }
     }
 
-    pub fn paste(&mut self, clip: String, cursor: &mut Cursor, content: &mut Vec<impl EditorLine>) {
-        self.push_buffer();
+    pub fn paste(&mut self, clip: String, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
+        self.push_buffer(content, lexer);
         let edit = match cursor.select_take() {
             Some((from, to)) => Edit::replace_select(from, to, clip, content),
             None => Edit::insert_clip(cursor.into(), clip, content),
         };
         cursor.set_position(edit.end_position());
-        self.push_done(edit);
+        self.push_done(edit, lexer, content);
     }
 
-    pub fn cut(&mut self, cursor: &mut Cursor, content: &mut Vec<impl EditorLine>) -> String {
-        self.push_buffer();
+    pub fn cut(&mut self, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) -> String {
+        self.push_buffer(content, lexer);
         let edit = if let Some((from, to)) = cursor.select_take() {
             cursor.set_position(from);
             Edit::remove_select(from, to, content)
@@ -458,50 +453,27 @@ impl Actions {
             action
         };
         let clip = edit.get_removed_text().to_owned();
-        self.push_done(edit);
+        self.push_done(edit, lexer, content);
         clip
     }
 
-    pub fn get_events(&mut self) -> Option<(i32, &mut Events)> {
-        if let Some(action) = self.buffer.timed_collect() {
-            self.push_done(action);
-        }
-        if self.events.is_empty() {
-            return None;
-        }
-        self.version += 1;
-        Some((self.version, &mut self.events))
-    }
-
-    pub fn get_events_versionless(&mut self) -> Option<&mut Events> {
-        if let Some(action) = self.buffer.timed_collect() {
-            self.push_done(action);
-        }
-        if self.events.is_empty() {
-            return None;
-        }
-        Some(&mut self.events)
-    }
-
-    pub fn get_events_forced(&mut self) -> (i32, &mut Vec<(EditMetaData, TextDocumentContentChangeEvent)>) {
-        self.push_buffer();
-        if !self.events.is_empty() {
-            self.version += 1;
-        }
-        (self.version, &mut self.events)
-    }
-
-    fn push_done(&mut self, edit: impl Into<EditType>) {
+    fn push_done(&mut self, edit: impl Into<EditType>, lexer: &mut Lexer, content: &mut [EditorLine]) {
         let action: EditType = edit.into();
-        action.collect_events(&mut self.events);
+        lexer.sync(&action, content);
         self.done.push(action);
     }
 
-    pub fn push_buffer(&mut self) {
+    pub fn push_buffer(&mut self, content: &mut [EditorLine], lexer: &mut Lexer) {
         if let Some(action) = self.buffer.collect() {
             self.undone.clear();
-            self.push_done(action);
+            self.push_done(action, lexer, content);
         }
+    }
+
+    pub fn clear(&mut self) {
+        self.done.clear();
+        self.undone.clear();
+        let _ = self.buffer.collect();
     }
 }
 
@@ -512,44 +484,96 @@ pub enum EditType {
 }
 
 impl EditType {
-    #[allow(dead_code)]
-    fn add_select(&mut self, old: Option<Select>, new: Option<Select>) {
+    pub fn apply_rev(&self, content: &mut Vec<EditorLine>) -> (CursorPosition, Option<Select>) {
         match self {
-            Self::Multi(edits) => add_select(edits, old, new),
-            Self::Single(edit) => {
-                edit.select = old;
-                edit.new_select = new;
+            Self::Single(action) => action.apply_rev(content),
+            Self::Multi(actions) => actions.iter().rev().map(|a| a.apply_rev(content)).last().unwrap_or_default(),
+        }
+    }
+
+    pub fn apply(&self, content: &mut Vec<EditorLine>) -> (CursorPosition, Option<Select>) {
+        match self {
+            Self::Single(action) => action.apply(content),
+            Self::Multi(actions) => actions.iter().map(|a| a.apply(content)).last().unwrap_or_default(),
+        }
+    }
+
+    #[inline(always)]
+    pub fn map_to_meta(&self) -> EditMetaData {
+        match self {
+            Self::Single(edit) => edit.meta,
+            Self::Multi(edits) => {
+                edits.iter().map(|edit| edit.meta).reduce(|curr, next| curr + next).expect("EditMeta should exist")
             }
         }
     }
 
-    pub fn apply_rev(
+    #[inline(always)]
+    pub fn map_to_meta_rev(&self) -> EditMetaData {
+        match self {
+            Self::Single(edit) => edit.meta.rev(),
+            Self::Multi(edits) => edits
+                .iter()
+                .rev()
+                .map(|edit| edit.meta.rev())
+                .reduce(|curr, next| curr + next)
+                .expect("EditMeta should exist"),
+        }
+    }
+
+    #[inline(always)]
+    pub fn change_event(
         &self,
-        content: &mut Vec<impl EditorLine>,
-        events: &mut Events,
-    ) -> (CursorPosition, Option<Select>) {
+        encoding: fn(usize, &str) -> usize,
+        char_lsp: fn(char) -> usize,
+        content: &[EditorLine],
+    ) -> (EditMetaData, Vec<TextDocumentContentChangeEvent>) {
         match self {
-            Self::Single(action) => action.apply_rev(content, events),
-            Self::Multi(actions) => {
-                actions.iter().rev().map(|a| a.apply_rev(content, events)).last().unwrap_or_default()
+            Self::Single(edit) => {
+                let (meta, event) = edit.text_change(encoding, char_lsp, content);
+                (meta, vec![event])
+            }
+            Self::Multi(edits) => {
+                let mut events = vec![];
+                let meta = edits
+                    .iter()
+                    .map(|e| {
+                        let (meta, event) = e.text_change(encoding, char_lsp, content);
+                        events.push(event);
+                        meta
+                    })
+                    .reduce(|curr, next| curr + next)
+                    .expect("EditMeta should exist");
+                (meta, events)
             }
         }
     }
 
-    pub fn apply(&self, content: &mut Vec<impl EditorLine>, events: &mut Events) -> (CursorPosition, Option<Select>) {
+    #[inline(always)]
+    pub fn change_event_rev(
+        &self,
+        encoding: fn(usize, &str) -> usize,
+        char_lsp: fn(char) -> usize,
+        content: &[EditorLine],
+    ) -> (EditMetaData, Vec<TextDocumentContentChangeEvent>) {
         match self {
-            Self::Single(action) => action.apply(content, events),
-            Self::Multi(actions) => actions.iter().map(|a| a.apply(content, events)).last().unwrap_or_default(),
-        }
-    }
-
-    pub fn collect_events(&self, events: &mut Events) {
-        match self {
-            Self::Single(action) => events.push((action.meta, action.event())),
-            Self::Multi(actions) => {
-                for action in actions {
-                    events.push((action.meta, action.event()));
-                }
+            Self::Single(edit) => {
+                let (meta, event) = edit.text_change_rev(encoding, char_lsp, content);
+                (meta, vec![event])
+            }
+            Self::Multi(edits) => {
+                let mut events = vec![];
+                let meta = edits
+                    .iter()
+                    .rev()
+                    .map(|e| {
+                        let (meta, event) = e.text_change_rev(encoding, char_lsp, content);
+                        events.push(event);
+                        meta
+                    })
+                    .reduce(|curr, next| curr + next)
+                    .expect("EditMeta should exist");
+                (meta, events)
             }
         }
     }
@@ -567,6 +591,7 @@ impl From<Vec<Edit>> for EditType {
     }
 }
 
+#[inline]
 fn add_select(edits: &mut [Edit], old: Option<Select>, new: Option<Select>) {
     if let Some(edit) = edits.first_mut() {
         edit.select = old;
@@ -576,22 +601,22 @@ fn add_select(edits: &mut [Edit], old: Option<Select>, new: Option<Select>) {
     }
 }
 
-fn select_is_commented(from: usize, n: usize, pat: &str, content: &[impl EditorLine]) -> bool {
+#[inline]
+fn select_is_commented(from: usize, n: usize, pat: &str, content: &[EditorLine]) -> bool {
     content.iter().skip(from).take(n).all(|l| l.trim_start().starts_with(pat) || l.chars().all(|c| c.is_whitespace()))
 }
 
-fn into_comment(pat: &str, line: &mut impl EditorLine, cursor: CursorPosition) -> Option<(Offset, Edit)> {
+#[inline]
+fn into_comment(pat: &str, line: &mut EditorLine, cursor: CursorPosition) -> Option<(Offset, Edit)> {
     let idx = line.char_indices().flat_map(|(idx, c)| if c.is_whitespace() { None } else { Some(idx) }).next()?;
     let comment_start = format!("{pat} ");
     line.insert_str(idx, &comment_start);
     let offset = if cursor.char >= idx { Offset::Pos(comment_start.len()) } else { Offset::Pos(0) };
-    Some((
-        offset,
-        Edit::record_in_line_insertion(CursorPosition { line: cursor.line, char: idx }.into(), comment_start),
-    ))
+    Some((offset, Edit::record_in_line_insertion(CursorPosition { line: cursor.line, char: idx }, comment_start)))
 }
 
-fn uncomment(pat: &str, line: &mut impl EditorLine, cursor: CursorPosition) -> Option<(Offset, Edit)> {
+#[inline]
+fn uncomment(pat: &str, line: &mut EditorLine, cursor: CursorPosition) -> Option<(Offset, Edit)> {
     if !line.trim_start().starts_with(pat) {
         return None;
     }
@@ -601,3 +626,6 @@ fn uncomment(pat: &str, line: &mut impl EditorLine, cursor: CursorPosition) -> O
     let offset = if cursor.char >= idx { Offset::Neg(end_idx - idx) } else { Offset::Neg(0) };
     Some((offset, Edit::remove_from_line(cursor.line, idx, end_idx, line)))
 }
+
+#[cfg(test)]
+pub mod tests;

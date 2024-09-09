@@ -1,5 +1,5 @@
 use crate::{
-    global_state::{GlobalState, Mode, TreeEvent},
+    global_state::{GlobalState, IdiomEvent, Mode},
     render::layout::Rect,
     runner::EditorTerminal,
     tree::Tree,
@@ -23,14 +23,14 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
     match event.kind {
         MouseEventKind::ScrollUp if matches!(gs.mode, Mode::Insert) => {
             if let Some(editor) = workspace.get_active() {
-                editor.scroll_up();
-                editor.scroll_up();
+                editor.map(crate::configs::EditorAction::ScrollUp, gs);
+                editor.map(crate::configs::EditorAction::ScrollUp, gs);
             }
         }
         MouseEventKind::ScrollDown if matches!(gs.mode, Mode::Insert) => {
             if let Some(editor) = workspace.get_active() {
-                editor.scroll_down();
-                editor.scroll_down();
+                editor.map(crate::configs::EditorAction::ScrollDown, gs);
+                editor.map(crate::configs::EditorAction::ScrollDown, gs);
             }
         }
         MouseEventKind::Down(MouseButton::Left) => {
@@ -45,7 +45,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
             }
             if let Some((line_idx, _)) = contained_position(gs.tree_area, event.row, event.column) {
                 if let Some(path) = tree.mouse_select(line_idx + 1) {
-                    gs.tree.push(TreeEvent::Open(path));
+                    gs.event.push(IdiomEvent::Open(path));
                     return;
                 };
                 gs.select_mode();
@@ -100,8 +100,8 @@ pub fn map_editor(
     workspace: &mut Workspace,
     _t: &mut Tree,
     _r: &mut EditorTerminal,
-) -> std::io::Result<bool> {
-    Ok(workspace.map(key, gs))
+) -> bool {
+    workspace.map(key, gs)
 }
 
 pub fn map_tree(
@@ -110,8 +110,8 @@ pub fn map_tree(
     _w: &mut Workspace,
     tree: &mut Tree,
     _r: &mut EditorTerminal,
-) -> std::io::Result<bool> {
-    Ok(tree.map(key, gs))
+) -> bool {
+    tree.map(key, gs)
 }
 
 pub fn map_popup(
@@ -120,8 +120,8 @@ pub fn map_popup(
     _w: &mut Workspace,
     _t: &mut Tree,
     _r: &mut EditorTerminal,
-) -> std::io::Result<bool> {
-    Ok(gs.map_popup_if_exists(key))
+) -> bool {
+    gs.map_popup_if_exists(key)
 }
 
 pub fn map_term(
@@ -130,6 +130,6 @@ pub fn map_term(
     _w: &mut Workspace,
     _t: &mut Tree,
     runner: &mut EditorTerminal,
-) -> std::io::Result<bool> {
-    Ok(runner.map(key, gs))
+) -> bool {
+    runner.map(key, gs)
 }

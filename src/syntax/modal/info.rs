@@ -1,15 +1,15 @@
 use super::ModalMessage;
 use crate::{
+    configs::EditorAction,
     global_state::GlobalState,
     render::{
-        backend::{color, Color, Style},
+        backend::Style,
         layout::Rect,
         state::State,
-        widgets::paragraph_styled,
+        widgets::{StyledLine, Writable},
     },
-    syntax::{Action, DiagnosticInfo},
+    syntax::{theme::Theme, Action, DiagnosticInfo, Lang},
 };
-use crossterm::event::{KeyCode, KeyEvent};
 use lsp_types::{Documentation, Hover, HoverContents, MarkedString, SignatureHelp, SignatureInformation};
 use std::cmp::Ordering;
 
@@ -23,7 +23,7 @@ enum Mode {
 #[derive(Default)]
 pub struct Info {
     actions: Option<Vec<Action>>,
-    text: Vec<(String, Color)>,
+    text: Vec<StyledLine>,
     state: State,
     text_state: usize,
     mode: Mode,
@@ -34,23 +34,24 @@ impl Info {
         let mode = if info.actions.is_some() { Mode::Select } else { Mode::Text };
         let mut text = Vec::new();
         for (msg, color) in info.messages.into_iter() {
-            for line in msg.lines() {
-                text.push((String::from(line), color));
+            let style = Style::fg(color);
+            for line in msg.split("\n") {
+                text.push((String::from(line), style).into());
             }
         }
         Self { actions: info.actions, text, mode, ..Default::default() }
     }
 
-    pub fn from_hover(hover: Hover) -> Self {
+    pub fn from_hover(hover: Hover, lang: &Lang, theme: &Theme) -> Self {
         let mut lines = Vec::new();
-        parse_hover(hover, &mut lines);
+        parse_hover(hover, lang, theme, &mut lines);
         Self { text: lines, ..Default::default() }
     }
 
-    pub fn from_signature(signature: SignatureHelp) -> Self {
+    pub fn from_signature(signature: SignatureHelp, lang: &Lang, theme: &Theme) -> Self {
         let mut lines = Vec::new();
         for info in signature.signatures {
-            parse_sig_info(info, &mut lines);
+            parse_sig_info(info, lang, theme, &mut lines);
         }
         Self { text: lines, ..Default::default() }
     }
@@ -63,19 +64,19 @@ impl Info {
         }
     }
 
-    pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> ModalMessage {
+    pub fn map(&mut self, action: EditorAction, gs: &mut GlobalState) -> ModalMessage {
         if self.text.is_empty() && self.actions.is_none() {
             return ModalMessage::Done;
         }
-        match key.code {
-            KeyCode::Enter | KeyCode::Right => {
+        match action {
+            EditorAction::NewLine | EditorAction::Right => {
                 if !matches!(self.mode, Mode::Select) {
                     return ModalMessage::Done;
                 }
                 if let Some(mut i) = self.actions.take() {
                     return match i.len().cmp(&self.state.selected) {
                         Ordering::Greater => {
-                            gs.workspace.push(i.remove(self.state.selected).into());
+                            gs.event.push(i.remove(self.state.selected).into());
                             ModalMessage::TakenDone
                         }
                         _ => {
@@ -86,9 +87,9 @@ impl Info {
                 }
                 ModalMessage::Done
             }
-            KeyCode::Up => self.prev(),
-            KeyCode::Down => self.next(),
-            KeyCode::Left if !matches!(self.mode, Mode::Select) && self.actions.is_some() => {
+            EditorAction::Up => self.prev(),
+            EditorAction::Down => self.next(),
+            EditorAction::Left if !matches!(self.mode, Mode::Select) && self.actions.is_some() => {
                 self.mode = Mode::Select;
                 ModalMessage::Taken
             }
@@ -123,38 +124,44 @@ impl Info {
         ModalMessage::Taken
     }
 
-    pub fn push_hover(&mut self, hover: Hover) {
-        parse_hover(hover, &mut self.text);
+    pub fn push_hover(&mut self, hover: Hover, lang: &Lang, theme: &Theme) {
+        parse_hover(hover, lang, theme, &mut self.text);
         self.state.selected = 0;
     }
 
-    pub fn push_signature(&mut self, signature: SignatureHelp) {
+    pub fn push_signature(&mut self, signature: SignatureHelp, lang: &Lang, theme: &Theme) {
         for info in signature.signatures {
-            parse_sig_info(info, &mut self.text);
+            parse_sig_info(info, lang, theme, &mut self.text);
         }
         self.state.selected = 0;
     }
 
     #[inline]
-    pub fn render(&mut self, rect: &Rect, gs: &mut GlobalState) {
+    pub fn render(&mut self, area: Rect, gs: &mut GlobalState) {
         match self.mode {
             Mode::Select => {
                 if let Some(actions) = self.actions.as_ref() {
                     let actions = actions.iter().map(|a| a.to_string()).collect::<Vec<_>>();
                     let options = actions.iter().map(|s| s.as_str());
                     if !self.text.is_empty() {
-                        self.state.render_list(options.chain(["Information"]), rect, &mut gs.writer);
+                        self.state.render_list(options.chain(["Information"]), &area, &mut gs.writer);
                     } else {
-                        self.state.render_list(options, rect, &mut gs.writer);
+                        self.state.render_list(options, &area, &mut gs.writer);
                     };
                 }
             }
             Mode::Text => {
-                paragraph_styled(
-                    *rect,
-                    self.text.iter().skip(self.text_state).map(|(d, c)| (d.as_str(), Style::fg(*c))),
-                    &mut gs.writer,
-                );
+                let mut lines = area.into_iter();
+                let mut text = self.text.iter().skip(self.text_state);
+                while lines.len() > 0 {
+                    match text.next() {
+                        Some(text) => text.wrap(&mut lines, &mut gs.writer),
+                        None => break,
+                    }
+                }
+                for line in lines {
+                    line.render_empty(&mut gs.writer);
+                }
             }
         }
     }
@@ -166,94 +173,90 @@ impl From<DiagnosticInfo> for Info {
     }
 }
 
-fn parse_sig_info(info: SignatureInformation, lines: &mut Vec<(String, Color)>) {
-    lines.push((info.label, color::reset()));
-    // lines.push(Line::from(generic_line(builder, usize::MAX, &info.label, &mut ctx, Vec::new())));
+fn parse_sig_info(info: SignatureInformation, lang: &Lang, theme: &Theme, lines: &mut Vec<StyledLine>) {
+    lines.push(lang.stylize(&info.label, theme));
     if let Some(text) = info.documentation {
         match text {
             Documentation::MarkupContent(c) => {
                 if matches!(c.kind, lsp_types::MarkupKind::Markdown) {
                     let mut is_code = false;
-                    for line in c.value.lines() {
+                    for line in c.value.split("\n") {
                         if line.starts_with("```") {
                             is_code = !is_code;
                             continue;
                         }
                         if is_code {
-                            lines.push((String::from(line), color::reset()));
-                            // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
+                            lines.push(lang.stylize(line, theme));
                         } else {
-                            lines.push((String::from(line), color::reset()));
+                            lines.push(line.to_owned().into());
                         }
                     }
                 } else {
-                    for line in c.value.lines() {
-                        lines.push((String::from(line), color::reset()));
+                    for line in c.value.split("\n") {
+                        lines.push(lang.stylize(line, theme));
                     }
                 }
             }
             Documentation::String(s) => {
-                for line in s.lines() {
-                    lines.push((String::from(line), color::reset()));
-                    // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
+                for line in s.split("\n") {
+                    lines.push(lang.stylize(line, theme));
                 }
             }
         }
     }
 }
 
-fn parse_hover(hover: Hover, lines: &mut Vec<(String, Color)>) {
+fn parse_hover(hover: Hover, lang: &Lang, theme: &Theme, lines: &mut Vec<StyledLine>) {
     match hover.contents {
         HoverContents::Array(arr) => {
             // let mut ctx = LineBuilderContext::default();
             for value in arr {
-                for line in parse_markedstr(value).lines() {
-                    lines.push((String::from(line), color::reset()));
-                    // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
-                }
+                parse_markedstr(value, lang, theme, lines);
             }
         }
         HoverContents::Markup(markup) => {
-            handle_markup(markup, lines);
+            handle_markup(markup, lang, theme, lines);
         }
         HoverContents::Scalar(value) => {
-            for line in parse_markedstr(value).lines() {
-                // TODO parse to tokens
-                lines.push((line.to_owned(), color::reset()))
-                // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
-            }
+            parse_markedstr(value, lang, theme, lines);
         }
     }
 }
 
-fn handle_markup(markup: lsp_types::MarkupContent, lines: &mut Vec<(String, Color)>) {
+fn handle_markup(markup: lsp_types::MarkupContent, lang: &Lang, theme: &Theme, lines: &mut Vec<StyledLine>) {
     if !matches!(markup.kind, lsp_types::MarkupKind::Markdown) {
-        for line in markup.value.lines() {
-            lines.push((line.to_owned(), color::reset()));
-            // TODO parse to tokens
-            // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
+        for line in markup.value.split("\n") {
+            lines.push(lang.stylize(line, theme));
         }
         return;
     }
     let mut is_code = false;
-    for line in markup.value.lines() {
+    for line in markup.value.split("\n") {
         if line.trim().starts_with("```") {
             is_code = !is_code;
             continue;
         }
         if is_code {
-            // lines.push(Line::from(generic_line(builder, usize::MAX, line, &mut ctx, Vec::new())));
+            lines.push(lang.stylize(line, theme));
         } else if line.trim().starts_with('#') {
-            lines.push((line.to_owned(), color::reset()));
+            lines.push(line.to_owned().into());
         } else {
-            lines.push((line.to_owned(), color::reset()))
+            lines.push(line.to_owned().into())
         }
     }
 }
 
-fn parse_markedstr(value: MarkedString) -> String {
+fn parse_markedstr(value: MarkedString, lang: &Lang, theme: &Theme, lines: &mut Vec<StyledLine>) {
     match value {
-        MarkedString::LanguageString(data) => data.value,
-        MarkedString::String(value) => value,
+        MarkedString::LanguageString(data) => {
+            for text_line in data.value.split("\n") {
+                lines.push(lang.stylize(text_line, theme))
+            }
+        }
+        MarkedString::String(value) => {
+            for text_line in value.split("\n") {
+                lines.push(StyledLine::from(text_line.to_owned()))
+            }
+        }
     }
 }

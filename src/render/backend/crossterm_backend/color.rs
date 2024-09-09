@@ -113,21 +113,19 @@ pub fn serialize_rgb(r: u8, g: u8, b: u8) -> HashMap<&'static str, [u8; 3]> {
 
 #[inline]
 pub fn pull_color(map: &mut Map<String, Value>, key: &str) -> Option<Result<Color, String>> {
-    map.remove(key).map(|obj| parse_color(obj))
+    map.remove(key).map(parse_color)
 }
 
 pub fn parse_color(obj: Value) -> Result<Color, String> {
     match obj {
         Value::String(data) => from_str(&data).map_err(|e| e.to_string()),
         Value::Object(map) => {
-            if let Some(data) = map.get("rgb").or(map.get("Rgb").or(map.get("RGB"))) {
-                if let Value::Array(rgb_value) = data {
-                    if rgb_value.len() == 3 {
-                        let b = object_to_u8(rgb_value[2].clone()).ok_or("Failed to parse B in RGB color")?;
-                        let g = object_to_u8(rgb_value[1].clone()).ok_or("Failed to parse G in RGB color")?;
-                        let r = object_to_u8(rgb_value[0].clone()).ok_or("Failed to parse R in RGB color")?;
-                        return Ok(rgb(r, g, b));
-                    }
+            if let Some(Value::Array(rgb_value)) = map.get("rgb").or(map.get("Rgb").or(map.get("RGB"))) {
+                if rgb_value.len() == 3 {
+                    let b = object_to_u8(rgb_value[2].clone()).ok_or("Failed to parse B in RGB color")?;
+                    let g = object_to_u8(rgb_value[1].clone()).ok_or("Failed to parse G in RGB color")?;
+                    let r = object_to_u8(rgb_value[0].clone()).ok_or("Failed to parse R in RGB color")?;
+                    return Ok(rgb(r, g, b));
                 }
             };
             Err(String::from("When representing Color as Object(Map) - should be {\"rgb\": [number, number, number]}!"))

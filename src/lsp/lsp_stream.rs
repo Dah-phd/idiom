@@ -12,9 +12,6 @@ use tokio::{
 use tokio_stream::StreamExt;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
-#[cfg(build = "debug")]
-use crate::utils::debug_to_file;
-
 /// Streams LSPMessage every time next is called - it handles receiving, deserialization and objec parsing.
 /// LSPMessages are nothing more than wrapper around object determining type [Request, Notification, Response, Error, Unknown].
 /// Fail conditions:
@@ -23,7 +20,7 @@ use crate::utils::debug_to_file;
 ///  * failure to parse message len
 pub struct JsonRCP {
     inner: FramedRead<ChildStdout, BytesCodec>,
-    _stderr: JoinHandle<()>,
+    stderr: JoinHandle<()>,
     errors: Arc<Mutex<Vec<String>>>,
     str_buffer: String,
     buffer: Vec<u8>,
@@ -44,11 +41,9 @@ impl JsonRCP {
             errors,
             parsed_que: Vec::new(),
             expected_len: 0,
-            _stderr: tokio::task::spawn(async move {
+            stderr: tokio::task::spawn(async move {
                 while let Some(Ok(err)) = stderr.next().await {
                     if let Ok(msg) = String::from_utf8(err.into()) {
-                        #[cfg(build = "debug")]
-                        debug_to_file("test_data.jsonrcp_errors", &msg);
                         into_guard(&errors_handler).push(msg);
                     }
                 }
@@ -84,7 +79,7 @@ impl JsonRCP {
 
     fn check_errors(&mut self) -> Option<StdErrMessage> {
         let mut errors = self.errors.try_lock().ok()?;
-        errors.drain(..).reduce(to_lines).map(|err| StdErrMessage(err))
+        errors.drain(..).reduce(to_lines).map(StdErrMessage)
     }
 
     fn parse(&mut self) -> Result<(), RCPError> {
@@ -152,6 +147,12 @@ fn into_guard<T>(mutex: &Mutex<T>) -> MutexGuard<T> {
     match mutex.lock() {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),
+    }
+}
+
+impl Drop for JsonRCP {
+    fn drop(&mut self) {
+        self.stderr.abort();
     }
 }
 

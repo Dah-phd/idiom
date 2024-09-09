@@ -8,10 +8,7 @@ mod message;
 use crate::{
     configs::{FileType, UITheme},
     lsp::{LSPError, LSPResult},
-    popups::{
-        placeholder, popup_replace::ReplacePopup, popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges,
-        PopupInterface,
-    },
+    popups::{placeholder, PopupInterface},
     render::{
         backend::{color, Backend, BackendProtocol, Style},
         layout::{Line, Rect, DOUBLE_BORDERS},
@@ -23,20 +20,18 @@ use crate::{
 pub use clipboard::Clipboard;
 use controls::map_term;
 use crossterm::event::{KeyEvent, MouseEvent};
-pub use events::{TreeEvent, WorkspaceEvent};
-use std::path::PathBuf;
+pub use events::IdiomEvent;
 
 use self::{draw::Components, message::Messages};
 
-const INSERT_SPAN: &'static str = "  --INSERT--   ";
-const SELECT_SPAN: &'static str = "  --SELECT--   ";
+const INSERT_SPAN: &str = "  --INSERT--   ";
+const SELECT_SPAN: &str = "  --SELECT--   ";
 
 #[derive(Default, Clone)]
 pub enum PopupMessage {
     #[default]
     None,
-    Tree(TreeEvent),
-    Workspace(WorkspaceEvent),
+    Tree(IdiomEvent),
     Clear,
 }
 
@@ -73,8 +68,7 @@ impl Mode {
     }
 }
 
-type KeyMapCallback =
-    fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> std::io::Result<bool>;
+type KeyMapCallback = fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool;
 type MouseMapCallback = fn(&mut GlobalState, MouseEvent, &mut Tree, &mut Workspace);
 type DrawCallback = fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal) -> std::io::Result<()>;
 
@@ -87,8 +81,7 @@ pub struct GlobalState {
     pub theme: UITheme,
     pub writer: Backend,
     pub popup: Box<dyn PopupInterface>,
-    pub workspace: Vec<WorkspaceEvent>,
-    pub tree: Vec<TreeEvent>,
+    pub event: Vec<IdiomEvent>,
     pub clipboard: Clipboard,
     pub exit: bool,
     pub screen_rect: Rect,
@@ -113,8 +106,7 @@ impl GlobalState {
             theme,
             writer: backend,
             popup: placeholder(),
-            workspace: Vec::default(),
-            tree: Vec::default(),
+            event: Vec::default(),
             clipboard: Clipboard::default(),
             exit: false,
             screen_rect,
@@ -146,7 +138,7 @@ impl GlobalState {
                 rev_builder.push(&format!(" ({select_len} selected)"));
             }
             rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {}", cursor.line + 1, cursor.char + 1));
-            self.messages.set_line(rev_builder.to_line());
+            self.messages.set_line(rev_builder.into_line());
             self.messages.fast_render(self.theme.accent_style, &mut self.writer);
             self.writer.reset_style();
         }
@@ -159,7 +151,7 @@ impl GlobalState {
         workspace: &mut Workspace,
         tree: &mut Tree,
         tmux: &mut EditorTerminal,
-    ) -> std::io::Result<bool> {
+    ) -> bool {
         (self.key_mapper)(self, event, workspace, tree, tmux)
     }
 
@@ -170,7 +162,9 @@ impl GlobalState {
 
     pub fn select_mode(&mut self) {
         self.mode = Mode::Select;
-        self.key_mapper = controls::map_tree;
+        if !self.components.contains(Components::POPUP) {
+            self.key_mapper = controls::map_tree;
+        }
         if !self.components.contains(Components::TREE) {
             self.draw_callback = draw::full_rebuild;
         };
@@ -181,7 +175,9 @@ impl GlobalState {
 
     pub fn insert_mode(&mut self) {
         self.mode = Mode::Insert;
-        self.key_mapper = controls::map_editor;
+        if !self.components.contains(Components::POPUP) {
+            self.key_mapper = controls::map_editor;
+        }
         if !self.components.contains(Components::TREE) {
             self.draw_callback = draw::full_rebuild;
         };
@@ -204,7 +200,7 @@ impl GlobalState {
     pub fn render_popup(&mut self) {
         // popups do not mutate during render
         let gs = unsafe { &mut *(self as *mut GlobalState) };
-        self.popup.render(gs);
+        self.popup.fast_render(gs);
     }
 
     pub fn popup(&mut self, popup: Box<dyn PopupInterface>) {
@@ -275,18 +271,15 @@ impl GlobalState {
             }
             PopupMessage::None => {}
             PopupMessage::Tree(event) => {
-                self.tree.push(event);
-            }
-            PopupMessage::Workspace(event) => {
-                self.workspace.push(event);
+                self.event.push(event);
             }
         }
-        return true;
+        true
     }
 
-    pub fn try_tree_event(&mut self, value: impl TryInto<TreeEvent>) {
+    pub fn try_tree_event(&mut self, value: impl TryInto<IdiomEvent>) {
         if let Ok(event) = value.try_into() {
-            self.tree.push(event);
+            self.event.push(event);
         }
     }
 
@@ -306,14 +299,14 @@ impl GlobalState {
     }
 
     #[inline]
-    pub fn full_resize(&mut self, height: u16, width: u16, workspace: &mut Workspace) {
+    pub fn full_resize(&mut self, height: u16, width: u16) {
         self.screen_rect = (width, height).into();
         self.draw_callback = draw::full_rebuild;
-        workspace.resize_all(self.editor_area.width, self.editor_area.height as usize);
+        self.event.push(IdiomEvent::Resize);
     }
 
     pub fn recalc_draw_size(&mut self) {
-        self.tree_area = self.screen_rect.clone();
+        self.tree_area = self.screen_rect;
         self.footer_area = self.tree_area.splitoff_rows(1);
         if let Some(mut line) = self.footer_area.get_line(0) {
             line += SELECT_SPAN.len();
@@ -340,7 +333,7 @@ impl GlobalState {
 
     /// unwrap LSP error and check status
     #[inline]
-    pub fn unwrap_lsp_error(&mut self, result: LSPResult<()>, file_type: FileType) {
+    pub fn log_if_lsp_error(&mut self, result: LSPResult<()>, file_type: FileType) {
         if let Err(err) = result {
             self.send_error(err, file_type);
         }
@@ -353,175 +346,16 @@ impl GlobalState {
             LSPError::Null => (),
             LSPError::InternalError(message) => {
                 self.messages.error(message);
-                self.workspace.push(WorkspaceEvent::CheckLSP(file_type));
+                self.event.push(IdiomEvent::CheckLSP(file_type));
             }
             _ => self.error(err.to_string()),
         }
     }
 
-    /// Attempts to create new editor if err logs it and returns false else true.
-    pub async fn try_new_editor(&mut self, workspace: &mut Workspace, path: PathBuf) -> bool {
-        if let Err(err) = workspace.new_from(path, self).await {
-            self.error(err.to_string());
-            return false;
-        }
-        true
-    }
-
-    pub async fn exchange_should_exit(&mut self, tree: &mut Tree, workspace: &mut Workspace) -> bool {
-        tree.finish_sync(self).await;
-        for event in std::mem::take(&mut self.tree) {
-            match event {
-                TreeEvent::PopupAccess => {
-                    self.popup.update_tree(tree);
-                }
-                TreeEvent::SearchFiles(pattern) => {
-                    if pattern.len() > 1 {
-                        let mut new_popup = ActiveFileSearch::new(pattern);
-                        new_popup.update_tree(tree);
-                        self.popup(new_popup);
-                    } else {
-                        self.popup(ActiveFileSearch::new(pattern));
-                    }
-                }
-                TreeEvent::Open(path) => {
-                    tree.select_by_path(&path);
-                    self.clear_popup();
-                    self.workspace.push(WorkspaceEvent::Open(path, 0));
-                }
-                TreeEvent::OpenAtLine(path, line) => {
-                    tree.select_by_path(&path);
-                    self.clear_popup();
-                    self.workspace.push(WorkspaceEvent::Open(path, line));
-                }
-                TreeEvent::OpenAtSelect(path, select) => {
-                    tree.select_by_path(&path);
-                    self.workspace.push(WorkspaceEvent::Open(path, 0));
-                    self.workspace.push(WorkspaceEvent::GoToSelect { select, clear_popup: true });
-                }
-                TreeEvent::SelectPath(path) => {
-                    tree.select_by_path(&path);
-                }
-                TreeEvent::CreateFileOrFolder(name) => {
-                    if let Ok(new_path) = tree.create_file_or_folder(name) {
-                        if !new_path.is_dir() {
-                            self.workspace.push(WorkspaceEvent::Open(new_path, 0));
-                            self.insert_mode();
-                        }
-                    }
-                    self.clear_popup();
-                }
-                TreeEvent::CreateFileOrFolderBase(name) => {
-                    if let Ok(new_path) = tree.create_file_or_folder_base(name) {
-                        if !new_path.is_dir() {
-                            self.workspace.push(WorkspaceEvent::Open(new_path, 0));
-                            self.insert_mode();
-                        }
-                    }
-                    self.clear_popup();
-                }
-                TreeEvent::RenameFile(name) => {
-                    if let Some(result) = tree.rename_path(name) {
-                        match result {
-                            Ok((old, new_path)) => workspace.rename_editors(old, new_path),
-                            Err(err) => self.messages.error(err.to_string()),
-                        }
-                    };
-                    self.clear_popup();
-                }
-                TreeEvent::RegisterLSP(lsp) => {
-                    tree.lsp_register.push(lsp);
-                }
-            }
-        }
-        for event in std::mem::take(&mut self.workspace) {
-            match event {
-                WorkspaceEvent::GoToLine(idx) => {
-                    if let Some(editor) = workspace.get_active() {
-                        editor.go_to(idx);
-                    }
-                    self.clear_popup();
-                }
-                WorkspaceEvent::PopupAccess => {
-                    self.popup.update_workspace(workspace);
-                }
-                WorkspaceEvent::ReplaceNextSelect { new_text, select: (from, to), next_select } => {
-                    if let Some(editor) = workspace.get_active() {
-                        editor.replace_select(from, to, new_text.as_str());
-                        if let Some((from, to)) = next_select {
-                            editor.go_to_select(from, to);
-                        }
-                    }
-                }
-                WorkspaceEvent::ReplaceAll(clip, ranges) => {
-                    if let Some(editor) = workspace.get_active() {
-                        editor.mass_replace(ranges, clip);
-                    }
-                    self.clear_popup();
-                }
-                WorkspaceEvent::GoToSelect { select: (from, to), clear_popup } => {
-                    if let Some(editor) = workspace.get_active() {
-                        editor.go_to_select(from, to);
-                        if clear_popup {
-                            self.clear_popup();
-                        }
-                    } else {
-                        self.clear_popup();
-                    }
-                }
-                WorkspaceEvent::ActivateEditor(idx) => {
-                    workspace.activate_editor(idx, self);
-                    self.clear_popup();
-                    self.insert_mode();
-                }
-                WorkspaceEvent::FindSelector(pattern) => {
-                    if let Some(editor) = workspace.get_active() {
-                        self.insert_mode();
-                        self.popup(selector_ranges(editor.find_with_line(&pattern)));
-                    } else {
-                        self.clear_popup();
-                    }
-                }
-                WorkspaceEvent::FindToReplace(pattern, options) => {
-                    self.popup(ReplacePopup::from_search(pattern, options));
-                }
-                WorkspaceEvent::AutoComplete(completion) => {
-                    if let Some(editor) = workspace.get_active() {
-                        editor.replace_token(completion);
-                    }
-                }
-                WorkspaceEvent::WorkspaceEdit(edits) => workspace.apply_edits(edits, self),
-                WorkspaceEvent::Open(path, line) => {
-                    if !path.is_dir() && workspace.new_at_line(path, line, self).await.is_ok() {
-                        self.insert_mode();
-                    } else {
-                        self.select_mode();
-                    };
-                }
-                WorkspaceEvent::InsertText(insert) => {
-                    if let Some(editor) = workspace.get_active() {
-                        editor.insert_text_with_relative_offset(insert);
-                    };
-                }
-                WorkspaceEvent::Snippet(snippet, cursor_offset) => {
-                    if let Some(editor) = workspace.get_active() {
-                        editor.insert_snippet(snippet, cursor_offset);
-                    };
-                }
-                WorkspaceEvent::Resize => {
-                    workspace.resize_all(self.editor_area.width as usize, self.editor_area.height as usize);
-                }
-                WorkspaceEvent::CheckLSP(ft) => {
-                    workspace.check_lsp(ft, self).await;
-                }
-                WorkspaceEvent::SaveAndExit => {
-                    workspace.save_all(self);
-                    self.exit = true;
-                }
-                WorkspaceEvent::Exit => {
-                    self.exit = true;
-                }
-            }
+    pub async fn exchange_should_exit(&mut self, tree: &mut Tree, ws: &mut Workspace) -> bool {
+        tree.finish_sync(self);
+        while let Some(event) = self.event.pop() {
+            event.handle(self, ws, tree).await
         }
         self.exit
     }

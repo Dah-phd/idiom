@@ -1,7 +1,7 @@
 use crate::render::{
     backend::{Backend, BackendProtocol, Color, Style},
     layout::{BorderSet, Borders, Line, BORDERS},
-    utils::truncate_str,
+    utils::UTF8Safe,
 };
 use std::ops::Range;
 
@@ -229,7 +229,7 @@ impl Rect {
     #[inline]
     pub fn border_title(&self, text: &str, backend: &mut Backend) {
         if self.borders.contains(Borders::TOP) {
-            backend.print_at(self.row - 1, self.col, truncate_str(text, self.width));
+            backend.print_at(self.row - 1, self.col, text.truncate_width(self.width).1);
         };
     }
 
@@ -237,7 +237,7 @@ impl Rect {
     #[inline]
     pub fn border_title_styled(&self, text: &str, style: Style, backend: &mut Backend) {
         if self.borders.contains(Borders::TOP) {
-            backend.print_styled_at(self.row - 1, self.col, truncate_str(text, self.width), style);
+            backend.print_styled_at(self.row - 1, self.col, text.truncate_width(self.width).1, style);
         };
     }
 
@@ -246,7 +246,7 @@ impl Rect {
     #[inline]
     pub fn border_title_bot(&self, text: &str, backend: &mut Backend) {
         if self.borders.contains(Borders::BOTTOM) {
-            backend.print_at(self.row + self.height + 1, self.col, truncate_str(text, self.width));
+            backend.print_at(self.row + self.height + 1, self.col, text.truncate_width(self.width).1);
         };
     }
 
@@ -257,7 +257,7 @@ impl Rect {
             return backend.print_styled_at(
                 self.row + self.height + 1,
                 self.col,
-                truncate_str(text, self.width),
+                text.truncate_width(self.width).1,
                 style,
             );
         }
@@ -338,24 +338,36 @@ impl From<(u16, u16)> for Rect {
     }
 }
 
-pub struct RectIter<'a> {
-    rect: &'a Rect,
+pub struct RectIter {
+    rect: Rect,
     row_range: Range<u16>,
 }
 
-impl RectIter<'_> {
+impl RectIter {
     /// return the number of lines remaining
+    #[inline]
     pub fn len(&self) -> usize {
         self.row_range.len()
     }
 
     /// returns the text width within the lines
+    #[inline]
     pub fn width(&self) -> usize {
         self.rect.width
     }
 
+    /// moves to next line and returns width if success
+    #[inline]
+    pub fn move_cursor(&mut self, backend: &mut Backend) -> Option<usize> {
+        self.next().map(|Line { row, col, width }| {
+            backend.go_to(row, col);
+            width
+        })
+    }
+
     /// returns the remaining lines as rect (None if all lines are used)
-    pub fn to_rect(mut self) -> Option<Rect> {
+    #[inline]
+    pub fn into_rect(mut self) -> Option<Rect> {
         let height = self.row_range.len() as u16;
         self.row_range.next().map(|row| Rect {
             row,
@@ -365,19 +377,37 @@ impl RectIter<'_> {
             ..Default::default()
         })
     }
+
+    #[inline]
+    pub fn forward(&mut self, mut steps: usize) {
+        while steps != 0 {
+            steps -= 1;
+            self.row_range.next();
+        }
+    }
+
+    #[inline]
+    pub fn is_finished(&self) -> bool {
+        self.row_range.is_empty()
+    }
+
+    #[inline]
+    pub fn next_line_idx(&self) -> u16 {
+        self.row_range.start
+    }
 }
 
-impl<'a> Iterator for RectIter<'a> {
+impl Iterator for RectIter {
     type Item = Line;
     fn next(&mut self) -> Option<Self::Item> {
         self.row_range.next().map(|row| Line { col: self.rect.col, row, width: self.rect.width })
     }
 }
 
-impl<'a> IntoIterator for &'a Rect {
-    type IntoIter = RectIter<'a>;
+impl IntoIterator for Rect {
+    type IntoIter = RectIter;
     type Item = Line;
     fn into_iter(self) -> Self::IntoIter {
-        RectIter { rect: self, row_range: self.row..self.row + self.height }
+        RectIter { row_range: self.row..self.row + self.height, rect: self }
     }
 }

@@ -1,6 +1,8 @@
-use crate::render::backend::{color, Color, Style};
-use crate::syntax::{Lang, Token};
-use crate::{global_state::WorkspaceEvent, workspace::line::EditorLine};
+use crate::global_state::IdiomEvent;
+use crate::render::backend::{color, BackendProtocol, Color, Style};
+use crate::render::UTF8Safe;
+use crate::syntax::Lang;
+use crate::workspace::line::EditorLine;
 use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
 
 const ELS_COLOR: Color = color::dark_grey();
@@ -21,10 +23,10 @@ pub enum Action {
     Import(String),
 }
 
-impl From<Action> for WorkspaceEvent {
+impl From<Action> for IdiomEvent {
     fn from(value: Action) -> Self {
         match value {
-            Action::Import(text) => WorkspaceEvent::InsertText(text),
+            Action::Import(text) => IdiomEvent::InsertText(text),
         }
     }
 }
@@ -73,19 +75,6 @@ impl DiagnosticData {
     pub fn text_style(&self) -> Style {
         Style::fg(self.color)
     }
-
-    #[inline]
-    pub fn check_and_update(&self, token: &mut Token) {
-        match self.end {
-            Some(end) if self.start <= token.from && token.to <= end => {
-                token.style.undercurle(Some(self.color));
-            }
-            None if self.start <= token.from => {
-                token.style.undercurle(Some(self.color));
-            }
-            _ => {}
-        }
-    }
 }
 
 pub struct DiagnosticLine {
@@ -108,6 +97,19 @@ impl DiagnosticLine {
             info.actions.replace(buffer);
         }
         info
+    }
+
+    /// Prints truncated text based on info from diagnostics
+    #[inline(always)]
+    pub fn inline_render(&self, max_width: usize, backend: &mut impl BackendProtocol) {
+        if max_width < 5 {
+            return;
+        }
+        if let Some(first_diagnostic) = self.data.first() {
+            let style = first_diagnostic.text_style();
+            let text = first_diagnostic.inline_text.truncate_width(max_width - 1).1;
+            backend.print_styled(text, style);
+        }
     }
 
     pub fn drop_non_errs(&mut self) {
@@ -152,7 +154,7 @@ impl From<Diagnostic> for DiagnosticLine {
     }
 }
 
-pub fn set_diganostics(content: &mut Vec<impl EditorLine>, diagnostics: Vec<(usize, DiagnosticLine)>) {
+pub fn set_diganostics(content: &mut [EditorLine], diagnostics: Vec<(usize, DiagnosticLine)>) {
     for line in content.iter_mut() {
         line.drop_diagnostics();
     }

@@ -5,36 +5,29 @@ mod messages;
 mod notification;
 mod request;
 mod servers;
-use crate::utils::{into_guard, split_arc_mutex, split_arc_mutex_async};
+use crate::utils::{force_lock, split_arc_mutex};
 pub use client::LSPClient;
 pub use error::{LSPError, LSPResult};
 use lsp_stream::JsonRCP;
-pub use messages::{Diagnostic, GeneralNotification, LSPMessage, LSPResponse, LSPResponseType, Request, Response};
+pub use messages::{Diagnostic, LSPMessage, LSPResponse, LSPResponseType, Response};
 pub use notification::LSPNotification;
 pub use request::LSPRequest;
-use url::Url;
 
-use lsp_types::{
-    notification::{Exit, Initialized},
-    request::{Initialize, Shutdown},
-    InitializeResult, InitializedParams,
-};
+use lsp_types::{request::Initialize, InitializeResult, Uri};
 use serde_json::from_value;
 use std::{
     collections::HashMap,
     path::Path,
     process::Stdio,
-    sync::{Arc, Mutex},
+    str::FromStr,
+    // sync::{Arc, Mutex},
 };
-use tokio::{io::AsyncWriteExt, process::Child, sync::mpsc, task::JoinHandle};
-
-#[cfg(build = "debug")]
-use crate::utils::debug_to_file;
+use tokio::{io::AsyncWriteExt, process::Child, task::JoinHandle};
 
 #[allow(clippy::upper_case_acronyms)]
 pub struct LSP {
-    pub notifications: Arc<Mutex<Vec<GeneralNotification>>>,
-    pub requests: Arc<tokio::sync::Mutex<Vec<Request>>>,
+    // pub notifications: Arc<Mutex<Vec<GeneralNotification>>>,
+    // pub requests: Arc<tokio::sync::Mutex<Vec<Request>>>,
     lsp_cmd: String,
     inner: Child,
     client: LSPClient,
@@ -55,8 +48,8 @@ impl LSP {
 
         // setting up storage
         let (responses, responses_handler) = split_arc_mutex(HashMap::new());
-        let (notifications, notifications_handler) = split_arc_mutex(Vec::new());
-        let (requests, requests_handler) = split_arc_mutex_async(Vec::new());
+        // let (notifications, notifications_handler) = split_arc_mutex(Vec::new());
+        // let (requests, requests_handler) = split_arc_mutex_async(Vec::new());
         let (diagnostics, diagnostics_handler) = split_arc_mutex(HashMap::new());
 
         // sending init requests
@@ -71,60 +64,30 @@ impl LSP {
         // starting response handler
         let lsp_json_handler = tokio::task::spawn(async move {
             loop {
-                let msg = json_rpc.next().await?;
-                match msg {
+                match json_rpc.next().await? {
                     LSPMessage::Response(inner) => {
-                        into_guard(&responses_handler).insert(inner.id, inner);
+                        force_lock(&responses_handler).insert(inner.id, inner);
                     }
-                    LSPMessage::Notification(inner) => into_guard(&notifications_handler).push(inner),
                     LSPMessage::Diagnostic(uri, params) => {
-                        into_guard(&diagnostics_handler).insert(uri, params);
+                        force_lock(&diagnostics_handler).insert(uri, params);
                     }
-                    LSPMessage::Request(inner) => {
-                        #[cfg(build = "debug")]
-                        debug_to_file("test_data.lsp_request", inner.to_string());
-                        requests_handler.lock().await.push(inner)
+                    LSPMessage::Request(_inner) => {
+                        // TODO: investigate handle
+                        // requests_handler.lock().await.push(inner)
                     }
                     LSPMessage::Error(_err) => {
-                        #[cfg(build = "debug")]
-                        debug_to_file("test_data.lsp_err", _err.to_string());
                         // TODO: investigate handle
                     }
                     LSPMessage::Unknown(_obj) => {
-                        #[cfg(build = "debug")]
-                        debug_to_file("test_data.lsp_unknown", _obj.to_string());
                         // TODO: investigate handle
                     }
                 }
             }
         });
 
-        // starting sending channel
-        let (channel, mut rx) = mpsc::unbounded_channel::<String>();
+        let (lsp_send_handler, client) = LSPClient::new(stdin, diagnostics, responses, capabilities)?;
 
-        // starting send handler
-        let lsp_send_handler = tokio::task::spawn(async move {
-            while let Some(msg) = rx.recv().await {
-                stdin.write_all(msg.as_bytes()).await?;
-                stdin.flush().await?;
-            }
-            Ok(())
-        });
-
-        let mut lsp = Self {
-            notifications,
-            requests,
-            client: LSPClient::new(diagnostics, responses, channel, capabilities),
-            lsp_cmd,
-            inner,
-            lsp_json_handler,
-            lsp_send_handler,
-            attempts: 5,
-        };
-
-        //initialized
-        lsp.initialized().await?;
-        Ok(lsp)
+        Ok(Self { client, lsp_cmd, inner, lsp_json_handler, lsp_send_handler, attempts: 5 })
     }
 
     pub async fn check_status(&mut self) -> LSPResult<Option<LSPError>> {
@@ -134,8 +97,6 @@ impl LSP {
             }
             match Self::new(self.lsp_cmd.to_owned()).await {
                 Ok(lsp) => {
-                    #[cfg(build = "debug")]
-                    debug_to_file("test_data.restart", self.attempts);
                     let mut broken = std::mem::replace(self, lsp);
                     let _ = broken.dash_nine().await; // ensure old lsp is dead!
                     return Ok(Some(match broken.lsp_json_handler.await {
@@ -153,12 +114,6 @@ impl LSP {
         Ok(None)
     }
 
-    async fn initialized(&mut self) -> LSPResult<()> {
-        let notification: LSPNotification<Initialized> = LSPNotification::with(InitializedParams {});
-        self.client.notify(notification)?;
-        Ok(())
-    }
-
     pub fn aquire_client(&self) -> LSPClient {
         self.client.clone()
     }
@@ -168,10 +123,7 @@ impl LSP {
     }
 
     pub async fn graceful_exit(&mut self) -> LSPResult<()> {
-        let shoutdown_request: LSPRequest<Shutdown> = LSPRequest::with(0, ());
-        let _ = self.client.request(shoutdown_request);
-        let notification: LSPNotification<Exit> = LSPNotification::with(());
-        let _ = self.client.notify(notification);
+        self.client.stop();
         self.dash_nine().await?;
         Ok(())
     }
@@ -185,6 +137,6 @@ impl LSP {
 }
 
 #[inline(always)]
-fn as_url(path: &Path) -> Result<Url, url::ParseError> {
-    Url::parse(&format!("file:///{}", path.display()))
+pub fn as_url(path: &Path) -> Uri {
+    Uri::from_str(format!("file://{}", path.display()).as_str()).expect("Path should always be parsable!")
 }

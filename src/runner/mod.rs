@@ -8,7 +8,7 @@ mod commands;
 mod components;
 use crate::configs::{EditorConfigs, KeyMap, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE};
 use crate::global_state::GlobalState;
-use crate::utils::into_guard;
+use crate::utils::force_lock;
 use commands::{load_cfg, overwrite_cfg, Terminal};
 use components::CmdHistory;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -45,12 +45,12 @@ impl EditorTerminal {
         }
         for line in &mut lines {
             match logs.next() {
-                Some(log) => line.render(&log, &mut gs.writer),
+                Some(log) => line.render(log, &mut gs.writer),
                 None => {
                     let prompt = self
                         .prompt
                         .as_ref()
-                        .map(|p| into_guard(p).to_owned())
+                        .map(|p| force_lock(p).to_owned())
                         .unwrap_or(String::from("[Dead terminal]"));
                     let mut buider = line.unsafe_builder(&mut gs.writer);
                     buider.push(&prompt);
@@ -121,7 +121,7 @@ impl EditorTerminal {
                 None => self.cmd.text_set(String::new()),
             },
             KeyEvent { code: KeyCode::Tab, .. } => {
-                if let Some(text) = self.cmd.text_get_token_at_cursor().and_then(|cmd| try_autocomplete(cmd)) {
+                if let Some(text) = self.cmd.text_get_token_at_cursor().and_then(try_autocomplete) {
                     self.cmd.text_replace_token(&text);
                 };
             }

@@ -240,6 +240,15 @@ pub enum GeneralAction {
     RefreshSettings,
     GoToLinePopup,
     ToggleTerminal,
+    GoToTab1,
+    GoToTab2,
+    GoToTab3,
+    GoToTab4,
+    GoToTab5,
+    GoToTab6,
+    GoToTab7,
+    GoToTab8,
+    GoToTab9,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -257,6 +266,15 @@ pub struct GeneralUserKeyMap {
     refresh_settings: String,
     go_to_line: String,
     toggle_terminal: String,
+    go_to_tab_1: String,
+    go_to_tab_2: String,
+    go_to_tab_3: String,
+    go_to_tab_4: String,
+    go_to_tab_5: String,
+    go_to_tab_6: String,
+    go_to_tab_7: String,
+    go_to_tab_8: String,
+    go_to_tab_9: String,
 }
 
 impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
@@ -273,6 +291,15 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
         insert_key_event(&mut hash, &val.refresh_settings, GeneralAction::RefreshSettings);
         insert_key_event(&mut hash, &val.go_to_line, GeneralAction::GoToLinePopup);
         insert_key_event(&mut hash, &val.toggle_terminal, GeneralAction::ToggleTerminal);
+        insert_key_event(&mut hash, &val.go_to_tab_1, GeneralAction::GoToTab1);
+        insert_key_event(&mut hash, &val.go_to_tab_2, GeneralAction::GoToTab2);
+        insert_key_event(&mut hash, &val.go_to_tab_3, GeneralAction::GoToTab3);
+        insert_key_event(&mut hash, &val.go_to_tab_4, GeneralAction::GoToTab4);
+        insert_key_event(&mut hash, &val.go_to_tab_5, GeneralAction::GoToTab5);
+        insert_key_event(&mut hash, &val.go_to_tab_6, GeneralAction::GoToTab6);
+        insert_key_event(&mut hash, &val.go_to_tab_7, GeneralAction::GoToTab7);
+        insert_key_event(&mut hash, &val.go_to_tab_8, GeneralAction::GoToTab8);
+        insert_key_event(&mut hash, &val.go_to_tab_9, GeneralAction::GoToTab9);
         hash
     }
 }
@@ -292,6 +319,15 @@ impl Default for GeneralUserKeyMap {
             refresh_settings: format!("{F}5"),
             go_to_line: format!("{CTRL} && g"),
             toggle_terminal: format!("{CTRL} && `"),
+            go_to_tab_1: format!("{ALT} && 1"),
+            go_to_tab_2: format!("{ALT} && 2"),
+            go_to_tab_3: format!("{ALT} && 3"),
+            go_to_tab_4: format!("{ALT} && 4"),
+            go_to_tab_5: format!("{ALT} && 5"),
+            go_to_tab_6: format!("{ALT} && 6"),
+            go_to_tab_7: format!("{ALT} && 7"),
+            go_to_tab_8: format!("{ALT} && 8"),
+            go_to_tab_9: format!("{ALT} && 9"),
         }
     }
 }

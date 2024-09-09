@@ -28,19 +28,17 @@ impl IndentConfigs {
         self
     }
 
-    pub fn unindent_if_before_base_pattern(&self, line: &mut impl EditorLine) -> usize {
-        if line.starts_with(&self.indent) {
-            if let Some(first) = line.trim_start().chars().next() {
-                if self.unindent_before.contains(first) {
-                    line.replace_range(..self.indent.len(), "");
-                    return self.indent.len();
-                }
-            }
+    pub fn unindent_if_before_base_pattern(&self, line: &mut EditorLine) -> usize {
+        if line.starts_with(&self.indent)
+            && matches!(line.trim_start().chars().next(), Some(first) if self.unindent_before.contains(first))
+        {
+            line.replace_till(self.indent.len(), "");
+            return self.indent.len();
         }
         0
     }
 
-    pub fn derive_indent_from(&self, prev_line: &impl EditorLine) -> String {
+    pub fn derive_indent_from(&self, prev_line: &EditorLine) -> String {
         let mut indent = prev_line.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
         if let Some(last) = prev_line.trim_end().chars().last() {
             if self.indent_after.contains(last) {
@@ -50,16 +48,16 @@ impl IndentConfigs {
         indent
     }
 
-    pub fn derive_indent_from_lines(&self, prev_lines: &[impl EditorLine]) -> String {
-        for prev_line in prev_lines.iter().rev().map(|line| line) {
+    pub fn derive_indent_from_lines(&self, prev_lines: &[EditorLine]) -> String {
+        for prev_line in prev_lines.iter().rev() {
             if !prev_line.chars().all(|c| c.is_whitespace()) {
                 return self.derive_indent_from(prev_line);
             }
         }
-        "".to_owned()
+        String::new()
     }
 
-    pub fn indent_line(&self, line_idx: usize, content: &mut [impl EditorLine]) -> Offset {
+    pub fn indent_line(&self, line_idx: usize, content: &mut [EditorLine]) -> Offset {
         if line_idx > 0 {
             let indent = self.derive_indent_from_lines(&content[..line_idx]);
             if indent.is_empty() {
@@ -85,8 +83,11 @@ pub struct EditorConfigs {
     pub indent_after: String,
     #[serde(skip, default = "get_unident_before")]
     pub unindent_before: String,
+    /// LSP
     rust_lsp: Option<String>,
     rust_lsp_preload_if_present: Option<Vec<String>>,
+    zig_lsp: Option<String>,
+    zig_lsp_preload_if_present: Option<Vec<String>>,
     python_lsp: Option<String>,
     python_lsp_preload_if_present: Option<Vec<String>>,
     nim_lsp: Option<String>,
@@ -111,11 +112,14 @@ impl Default for EditorConfigs {
     fn default() -> Self {
         Self {
             format_on_save: true,
-            indent_spaces: 4,
+            indent_spaces: 4, // only spaces are allowed as indent
             indent_after: get_indent_after(),
             unindent_before: get_unident_before(),
-            rust_lsp: Some(String::from("${cfg_dir}/rust-analyzer")),
+            // lsp
+            rust_lsp: Some(String::from("rust-analyzer")),
             rust_lsp_preload_if_present: Some(vec!["Cargo.toml".to_owned(), "Cargo.lock".to_owned()]),
+            zig_lsp: None,
+            zig_lsp_preload_if_present: Some(vec!["build.zig".to_owned()]),
             python_lsp: Some(String::from("jedi-language-server")),
             python_lsp_preload_if_present: Some(vec!["pyproject.toml".to_owned(), "pytest.init".to_owned()]),
             nim_lsp: Some(String::from("nimlsp")),
@@ -144,17 +148,23 @@ impl EditorConfigs {
     }
 
     pub fn get_indent_cfg(&self, file_type: &FileType) -> IndentConfigs {
-        let indent_cfg = IndentConfigs {
+        let indent_cfg = self.default_indent_cfg();
+        indent_cfg.update_by_file_type(file_type)
+    }
+
+    pub fn default_indent_cfg(&self) -> IndentConfigs {
+        IndentConfigs {
             indent: (0..self.indent_spaces).map(|_| ' ').collect(),
             indent_after: self.indent_after.to_owned(),
             unindent_before: self.unindent_before.to_owned(),
-        };
-        indent_cfg.update_by_file_type(file_type)
+        }
     }
 
     pub fn derive_lsp(&self, file_type: &FileType) -> Option<String> {
         match file_type {
+            FileType::Ignored => None,
             FileType::Rust => self.rust_lsp.to_owned(),
+            FileType::Zig => self.zig_lsp.to_owned(),
             FileType::Python => self.python_lsp.to_owned(),
             FileType::Nim => self.nim_lsp.to_owned(),
             FileType::C => self.c_lsp.to_owned(),
@@ -164,14 +174,13 @@ impl EditorConfigs {
             FileType::Html => self.html_lsp.to_owned(),
             FileType::Yml => self.yaml_lsp.to_owned(),
             FileType::Toml => self.toml_lsp.to_owned(),
-            FileType::MarkDown => None,
-            FileType::Unknown => None,
         }
     }
 
     pub fn derive_lsp_preloads(&mut self, base_tree: Vec<String>, gs: &mut GlobalState) -> Vec<(FileType, String)> {
         [
             (FileType::Rust, self.rust_lsp_preload_if_present.take(), self.rust_lsp.as_ref()),
+            (FileType::Zig, self.zig_lsp_preload_if_present.take(), self.zig_lsp.as_ref()),
             (FileType::Python, self.python_lsp_preload_if_present.take(), self.python_lsp.as_ref()),
             (FileType::C, self.c_lsp_preload_if_present.take(), self.c_lsp.as_ref()),
             (FileType::Cpp, self.cpp_preload_if_present.take(), self.cpp_lsp.as_ref()),

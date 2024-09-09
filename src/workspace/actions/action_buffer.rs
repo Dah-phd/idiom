@@ -1,11 +1,4 @@
-use crate::workspace::{
-    actions::edits::{Edit, EditMetaData},
-    line::EditorLine,
-};
-use lsp_types::{Position, Range, TextEdit};
-use std::time::{Duration, Instant};
-
-const TICK: Duration = Duration::from_millis(200);
+use crate::workspace::{actions::Edit, line::EditorLine, CursorPosition};
 
 #[derive(Default, Debug)]
 pub enum ActionBuffer {
@@ -19,31 +12,6 @@ pub enum ActionBuffer {
 impl ActionBuffer {
     pub fn collect(&mut self) -> Option<Edit> {
         std::mem::take(self).into()
-    }
-
-    pub fn timed_collect(&mut self) -> Option<Edit> {
-        match std::mem::take(self) {
-            Self::Text(buf) => {
-                if buf.clock.elapsed() > TICK {
-                    return Some(buf.into());
-                };
-                let _ = std::mem::replace(self, Self::Text(buf));
-            }
-            Self::Backspace(buf) => {
-                if buf.clock.elapsed() > TICK {
-                    return Some(buf.into());
-                };
-                let _ = std::mem::replace(self, Self::Backspace(buf));
-            }
-            Self::Del(buf) => {
-                if buf.clock.elapsed() > TICK {
-                    return Some(buf.into());
-                };
-                let _ = std::mem::replace(self, Self::Del(buf));
-            }
-            Self::None => (),
-        }
-        None
     }
 
     pub fn last_char(&self) -> usize {
@@ -61,14 +29,14 @@ impl ActionBuffer {
         std::mem::replace(self, Self::Text(TextBuffer::new(line, char, ch.into()))).into()
     }
 
-    pub fn del(&mut self, line: usize, char: usize, text: &mut impl EditorLine) -> Option<Edit> {
+    pub fn del(&mut self, line: usize, char: usize, text: &mut EditorLine) -> Option<Edit> {
         if let Self::Del(buf) = self {
             return buf.del(line, char, text);
         }
         std::mem::replace(self, Self::Del(DelBuffer::new(line, char, text))).into()
     }
 
-    pub fn backspace(&mut self, line: usize, char: usize, text: &mut impl EditorLine, indent: &str) -> Option<Edit> {
+    pub fn backspace(&mut self, line: usize, char: usize, text: &mut EditorLine, indent: &str) -> Option<Edit> {
         if let Self::Backspace(buf) = self {
             return buf.backspace(line, char, text, indent);
         }
@@ -80,80 +48,70 @@ impl From<ActionBuffer> for Option<Edit> {
     fn from(buffer: ActionBuffer) -> Self {
         match buffer {
             ActionBuffer::None => None,
-            ActionBuffer::Backspace(buf) => Some(buf.into()),
-            ActionBuffer::Del(buf) => Some(buf.into()),
-            ActionBuffer::Text(buf) => Some(buf.into()),
+            ActionBuffer::Backspace(buf) => buf.into(),
+            ActionBuffer::Del(buf) => buf.into(),
+            ActionBuffer::Text(buf) => buf.into(),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DelBuffer {
     line: usize,
     char: usize,
     text: String,
-    clock: Instant,
 }
 
 impl DelBuffer {
-    fn new(line: usize, char: usize, text: &mut impl EditorLine) -> Self {
-        Self { line, char, text: text.remove(char).into(), clock: Instant::now() }
+    fn new(line: usize, char: usize, text: &mut EditorLine) -> Self {
+        Self { line, char, text: text.remove(char).into() }
     }
-    fn del(&mut self, line: usize, char: usize, text: &mut impl EditorLine) -> Option<Edit> {
-        if line == self.line && char == self.char && self.clock.elapsed() <= TICK {
-            self.clock = Instant::now();
+
+    fn del(&mut self, line: usize, char: usize, text: &mut EditorLine) -> Option<Edit> {
+        if line == self.line && char == self.char {
             self.text.push(text.remove(char));
             return None;
         }
-        Some(std::mem::replace(self, Self::new(line, char, text)).into())
+        std::mem::replace(self, Self::new(line, char, text)).into()
     }
 }
 
-impl From<DelBuffer> for Edit {
+impl From<DelBuffer> for Option<Edit> {
     fn from(buf: DelBuffer) -> Self {
-        let start = Position::new(buf.line as u32, buf.char as u32);
-        Edit {
-            meta: EditMetaData::line_changed(buf.line),
-            text_edit: TextEdit::new(
-                Range::new(start, Position::new(buf.line as u32, (buf.char + buf.text.len()) as u32)),
-                String::new(),
-            ),
-            reverse_text_edit: TextEdit::new(Range::new(start, start), buf.text),
-            select: None,
-            new_select: None,
+        if buf.text.is_empty() {
+            return None;
         }
+        Some(Edit::single_line(CursorPosition { line: buf.line, char: buf.char }, String::new(), buf.text))
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BackspaceBuffer {
     line: usize,
-    char: u32,
     last: usize,
     text: String,
-    clock: Instant,
 }
 
 impl BackspaceBuffer {
-    fn new(line: usize, char: usize, text: &mut impl EditorLine, indent: &str) -> Self {
-        let mut new = Self { line, last: char, char: char as u32, text: String::new(), clock: Instant::now() };
+    fn new(line: usize, char: usize, text: &mut EditorLine, indent: &str) -> Self {
+        let mut new = Self { line, last: char, text: String::new() };
         new.backspace_indent_handler(char, text, indent);
         new
     }
 
-    fn backspace(&mut self, line: usize, char: usize, text: &mut impl EditorLine, indent: &str) -> Option<Edit> {
-        if line == self.line && self.last == char && self.clock.elapsed() <= TICK {
+    fn backspace(&mut self, line: usize, char: usize, text: &mut EditorLine, indent: &str) -> Option<Edit> {
+        if line == self.line && self.last == char {
             self.backspace_indent_handler(char, text, indent);
             return None;
         }
-        Some(std::mem::replace(self, Self::new(line, char, text, indent)).into())
+        std::mem::replace(self, Self::new(line, char, text, indent)).into()
     }
 
-    fn backspace_indent_handler(&mut self, char: usize, text: &mut impl EditorLine, indent: &str) {
+    fn backspace_indent_handler(&mut self, char: usize, text: &mut EditorLine, indent: &str) {
         let chars_after_indent = text[..char].trim_start_matches(indent);
         if chars_after_indent.is_empty() {
             self.text.push_str(indent);
-            text.replace_range(..indent.len(), "");
+            text.replace_till(indent.len(), "");
             self.last -= indent.len();
             return;
         }
@@ -168,56 +126,118 @@ impl BackspaceBuffer {
     }
 }
 
-impl From<BackspaceBuffer> for Edit {
+impl From<BackspaceBuffer> for Option<Edit> {
     fn from(buf: BackspaceBuffer) -> Self {
-        let end = Position::new(buf.line as u32, buf.last as u32);
-        Edit {
-            meta: EditMetaData::line_changed(buf.line),
-            reverse_text_edit: TextEdit::new(Range::new(end, end), buf.text.chars().rev().collect()),
-            text_edit: TextEdit::new(Range::new(end, Position::new(buf.line as u32, buf.char)), String::new()),
-            select: None,
-            new_select: None,
+        if buf.text.is_empty() {
+            return None;
         }
+        Some(Edit::single_line(
+            CursorPosition { line: buf.line, char: buf.last },
+            String::new(),
+            buf.text.chars().rev().collect(),
+        ))
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TextBuffer {
     line: usize,
     char: u32,
     last: usize,
     text: String,
-    clock: Instant,
 }
 
 impl TextBuffer {
     fn new(line: usize, char: usize, text: String) -> Self {
-        Self { line, last: char + 1, char: char as u32, text, clock: Instant::now() }
+        Self { line, last: char + 1, char: char as u32, text }
     }
 
     fn push(&mut self, line: usize, char: usize, ch: char) -> Option<Edit> {
-        if line == self.line && char == self.last && self.clock.elapsed() <= TICK {
-            self.clock = Instant::now();
+        if line == self.line && char == self.last && (ch.is_alphabetic() || ch == '_') {
             self.last += 1;
             self.text.push(ch);
             return None;
         }
-        Some(std::mem::replace(self, Self::new(line, char, ch.into())).into())
+        std::mem::replace(self, Self::new(line, char, ch.into())).into()
     }
 }
 
-impl From<TextBuffer> for Edit {
+impl From<TextBuffer> for Option<Edit> {
     fn from(buf: TextBuffer) -> Self {
-        let start = Position::new(buf.line as u32, buf.char);
-        Edit {
-            meta: EditMetaData::line_changed(buf.line),
-            reverse_text_edit: TextEdit::new(
-                Range::new(start, Position::new(buf.line as u32, buf.last as u32)),
-                String::new(),
-            ),
-            text_edit: TextEdit::new(Range::new(start, start), buf.text),
-            select: None,
-            new_select: None,
+        if buf.text.is_empty() {
+            return None;
+        }
+        Some(Edit::single_line(CursorPosition { line: buf.line, char: buf.char as usize }, buf.text, String::new()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::edits::Edit;
+    use crate::workspace::line::EditorLine;
+    use crate::workspace::CursorPosition;
+
+    use super::ActionBuffer;
+
+    #[test]
+    fn test_del() {
+        let mut code_line = EditorLine::new("0123456789".to_owned());
+        let mut buf = ActionBuffer::None;
+        buf.del(0, 7, &mut code_line);
+        buf.del(0, 7, &mut code_line);
+        buf.del(0, 7, &mut code_line);
+        if let ActionBuffer::Del(buf) = buf {
+            let m_edit: Option<Edit> = buf.clone().into();
+            let edit = m_edit.unwrap();
+            assert!(edit.text.is_empty());
+            assert_eq!(edit.reverse, "789");
+            assert_eq!(edit.cursor, CursorPosition { line: 0, char: 7 });
+            return;
+        }
+        panic!("Expected Del buf!")
+    }
+
+    #[test]
+    fn test_backspace() {
+        let mut code_line = EditorLine::new("          1".to_owned());
+        let indent = "    ";
+        let mut buf = ActionBuffer::None;
+        buf.backspace(0, 11, &mut code_line, indent);
+        buf.backspace(0, 10, &mut code_line, indent);
+        buf.backspace(0, 8, &mut code_line, indent);
+        if let ActionBuffer::Backspace(buf) = buf {
+            let m_edit: Option<Edit> = buf.clone().into();
+            let edit = m_edit.unwrap();
+            assert!(edit.text.is_empty());
+            assert_eq!(edit.reverse, "      1");
+            assert_eq!(code_line.unwrap(), indent);
+            assert_eq!(edit.cursor, CursorPosition { line: 0, char: 4 });
+            return;
+        }
+        panic!("Expected Backspace buf!")
+    }
+
+    #[test]
+    fn test_text() {
+        let mut buf = ActionBuffer::None;
+        buf.push(0, 0, 'a');
+        buf.push(0, 1, 'b');
+        buf.push(0, 2, 'c');
+        if let Some(edit) = buf.push(0, 3, ' ') {
+            assert!(edit.reverse.is_empty());
+            assert_eq!(edit.text, "abc");
+            assert_eq!(edit.cursor, CursorPosition { line: 0, char: 0 });
+        } else {
+            panic!("Expected edit!")
+        }
+        buf.push(0, 4, 'a');
+        buf.push(0, 5, '_');
+        if let Some(edit) = buf.push(0, 6, '1') {
+            assert!(edit.reverse.is_empty());
+            assert_eq!(edit.text, " a_");
+            assert_eq!(edit.cursor, CursorPosition { line: 0, char: 3 });
+        } else {
+            panic!("Expected edit!")
         }
     }
 }
