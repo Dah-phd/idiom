@@ -119,6 +119,9 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
     let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
     let backend = &mut gs.writer;
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
+        if lines.is_finished() {
+            break;
+        }
         let select = ctx.get_select_full_line(text.char_len());
         if editor.cursor.line == line_idx {
             if text.cached.should_render_cursor(lines.next_line_idx(), ctx.cursor_char(), &select)
@@ -149,6 +152,9 @@ fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
     let backend = &mut gs.writer;
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
+        if lines.is_finished() {
+            break;
+        }
         let select = ctx.get_select_full_line(text.char_len());
         if editor.cursor.line == line_idx {
             text::cursor(text, select, skip, &mut ctx, &mut lines, backend);

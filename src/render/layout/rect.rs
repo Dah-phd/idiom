@@ -387,6 +387,11 @@ impl RectIter {
     }
 
     #[inline]
+    pub fn is_finished(&self) -> bool {
+        self.row_range.is_empty()
+    }
+
+    #[inline]
     pub fn next_line_idx(&self) -> u16 {
         self.row_range.start
     }

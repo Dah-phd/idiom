@@ -12,10 +12,7 @@ use std::ops::Range;
 
 pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut impl BackendProtocol) {
     let line_width = match lines.next() {
-        Some(line) => {
-            text.cached.line(line.row, None);
-            ctx.setup_line(line, backend)
-        }
+        Some(line) => ctx.setup_line(line, backend),
         None => return,
     };
     let mut chunks = WriteChunks::new(&text.content, line_width);
@@ -42,10 +39,7 @@ pub fn line_with_select(
     backend: &mut impl BackendProtocol,
 ) {
     let line_width = match lines.next() {
-        Some(line) => {
-            text.cached.line(line.row, None);
-            ctx.setup_line(line, backend)
-        }
+        Some(line) => ctx.setup_line(line, backend),
         None => return,
     };
     let mut remaining_width = line_width;
@@ -99,10 +93,7 @@ pub fn basic(
 ) {
     let cursor_idx = ctx.cursor_char();
     let line_width = match lines.next() {
-        Some(line) => {
-            text.cached.cursor(line.row, cursor_idx, 0, None);
-            ctx.setup_line(line, backend)
-        }
+        Some(line) => ctx.setup_line(line, backend),
         None => return,
     };
     let mut content = text.content.chars();
@@ -160,10 +151,7 @@ pub fn select(
 ) {
     let cursor_idx = ctx.cursor_char();
     let line_width = match lines.next() {
-        Some(line) => {
-            text.cached.cursor(line.row, cursor_idx, 0, Some(select.clone()));
-            ctx.setup_line(line, backend)
-        }
+        Some(line) => ctx.setup_line(line, backend),
         None => return,
     };
     let select_color = ctx.lexer.theme.selected;

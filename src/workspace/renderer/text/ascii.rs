@@ -10,10 +10,7 @@ use std::ops::Range;
 
 pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut impl BackendProtocol) {
     let line_width = match lines.next() {
-        Some(line) => {
-            text.cached.line(line.row, None);
-            ctx.setup_line(line, backend)
-        }
+        Some(line) => ctx.setup_line(line, backend),
         None => return,
     };
     let mut chunks = ByteChunks::new(&text.content, line_width);
@@ -40,10 +37,7 @@ pub fn line_with_select(
     backend: &mut impl BackendProtocol,
 ) {
     let line_width = match lines.next() {
-        Some(line) => {
-            text.cached.line(line.row, None);
-            ctx.setup_line(line, backend)
-        }
+        Some(line) => ctx.setup_line(line, backend),
         None => return,
     };
     if text.char_len == 0 {
@@ -93,10 +87,7 @@ pub fn cursor(
 pub fn basic(text: &mut EditorLine, skip: usize, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut Backend) {
     let cursor_idx = ctx.cursor_char();
     let line_width = match lines.next() {
-        Some(line) => {
-            text.cached.cursor(line.row, cursor_idx, skip, None);
-            ctx.setup_line(line, backend)
-        }
+        Some(line) => ctx.setup_line(line, backend),
         None => return,
     };
     let mut idx = skip * line_width;
@@ -135,10 +126,7 @@ pub fn select(
 ) {
     let cursor_idx = ctx.cursor_char();
     let line_width = match lines.next() {
-        Some(line) => {
-            text.cached.cursor(line.row, cursor_idx, skip, Some(select.clone()));
-            ctx.setup_line(line, backend)
-        }
+        Some(line) => ctx.setup_line(line, backend),
         None => return,
     };
     let select_color = ctx.lexer.theme.selected;
