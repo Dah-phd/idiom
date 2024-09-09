@@ -107,26 +107,25 @@ pub fn basic(
     };
     let mut content = text.content.chars();
     let mut idx = 0;
-    let mut remaining_width = if skip != 0 {
-        let mut skip_width = line_width;
+    let mut remaining_width = line_width;
+
+    if skip != 0 {
         for ch in content.by_ref() {
             idx += 1;
             let char_w = UnicodeWidthChar::width(ch).unwrap_or_default();
-            if skip_width < char_w {
+            if remaining_width < char_w {
+                remaining_width = line_width - char_w;
                 skip -= 1;
                 if skip == 0 {
-                    skip_width = char_w;
                     backend.print(ch);
                     break;
                 }
-                skip_width = line_width - char_w;
+            } else {
+                remaining_width -= char_w;
             }
-            skip_width -= char_w;
         }
-        line_width - skip_width
-    } else {
-        line_width
     };
+
     for text in content {
         let current_width = UnicodeWidthChar::width(text).unwrap_or_default();
         if remaining_width < current_width {
@@ -170,29 +169,28 @@ pub fn select(
     let select_color = ctx.lexer.theme.selected;
     let mut content = text.content.chars();
     let mut idx = 0;
-    let mut remaining_width = if skip != 0 {
-        let mut skip_width = line_width;
+    let mut remaining_width = line_width;
+
+    if skip != 0 {
         for ch in content.by_ref() {
             idx += 1;
             let char_w = UnicodeWidthChar::width(ch).unwrap_or_default();
-            if skip_width < char_w {
+            if remaining_width < char_w {
+                remaining_width = line_width - char_w;
                 skip -= 1;
                 if skip == 0 {
-                    skip_width = char_w;
                     if idx > select.start && select.end > idx {
                         backend.set_bg(Some(select_color));
                     }
                     backend.print(ch);
                     break;
                 }
-                skip_width = line_width - char_w;
+            } else {
+                remaining_width -= char_w;
             }
-            skip_width -= char_w;
         }
-        line_width - skip_width
-    } else {
-        line_width
-    };
+    }
+
     for text in content {
         let current_width = UnicodeWidthChar::width(text).unwrap_or_default();
         if remaining_width < current_width {

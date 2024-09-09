@@ -274,7 +274,7 @@ pub fn calc_wrap_line_capped(text: &mut EditorLine, cursor: &Cursor) -> Option<u
     let max_rows = cursor.max_rows;
     if text.is_simple() {
         text.tokens.char_len = text.content.len() / text_width;
-        let cursor_at_row = 1 + cursor_char / text_width;
+        let cursor_at_row = 2 + cursor_char / text_width;
         if cursor_at_row > max_rows {
             return Some(cursor_at_row - max_rows);
         }
@@ -294,6 +294,9 @@ pub fn calc_wrap_line_capped(text: &mut EditorLine, cursor: &Cursor) -> Option<u
                 prev_idx_break = idx;
             }
             counter -= w;
+        }
+        if prev_idx_break < cursor_char {
+            cursor_at_row += 1;
         }
         if cursor_at_row > max_rows {
             return Some(cursor_at_row - max_rows);

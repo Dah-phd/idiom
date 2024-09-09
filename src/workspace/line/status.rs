@@ -1,7 +1,7 @@
 use std::{ops::Range, str::Chars};
 use unicode_width::UnicodeWidthChar;
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub enum RenderStatus {
     Cursor {
         line: u16,
