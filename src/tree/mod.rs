@@ -5,13 +5,13 @@ use crate::{
     error::{IdiomError, IdiomResult},
     global_state::{GlobalState, IdiomEvent},
     popups::popups_tree::{create_file_popup, rename_file_popup},
-    render::state::State,
+    render::{backend::Backend, layout::Rect, state::State},
     utils::{build_file_or_folder, to_canon_path, to_relative_path},
 };
 use crossterm::event::KeyEvent;
 use std::path::{Path, PathBuf};
 use tree_paths::TreePath;
-use watcher::{DianosticHandle, TreeWatcher};
+use watcher::TreeWatcher;
 
 type PathParser = fn(&Path) -> IdiomResult<PathBuf>;
 
@@ -120,7 +120,6 @@ impl Tree {
         let tree_path = self.tree.get_mut_from_inner(self.state.selected)?;
         if tree_path.path().is_dir() {
             tree_path.expand();
-            self.watcher.map_errors(tree_path);
             self.rebuild = true;
             None
         } else {
@@ -277,15 +276,63 @@ impl Tree {
         }
     }
 
-    pub fn register_lsp(&mut self, lsp: DianosticHandle) {
-        self.watcher.register_lsp(&mut self.tree, lsp);
-        self.rebuild = true;
-    }
-
     fn unsafe_set_path(&mut self) {
         self.rebuild = true;
         if let Some(selected) = self.tree.get_mut_from_inner(self.state.selected) {
             self.selected_path = selected.path().clone();
         }
+    }
+}
+
+/// Stateless calls
+impl Tree {
+    pub fn render_stateless(&mut self, rect: Rect, backend: &mut Backend) {
+        let mut iter = self.tree.iter();
+        iter.next();
+        let mut lines = rect.into_iter();
+        for (idx, tree_path) in iter.enumerate().skip(self.state.at_line) {
+            let line = match lines.next() {
+                Some(line) => line,
+                None => return,
+            };
+            if idx == self.state.selected {
+                tree_path.render_styled(self.display_offset, line, self.state.highlight, backend);
+            } else {
+                tree_path.render(self.display_offset, line, backend);
+            }
+        }
+        for line in lines {
+            line.render_empty(backend);
+        }
+    }
+
+    pub fn fast_render_stateless(&mut self, rect: Rect, backend: &mut Backend) {
+        if self.rebuild {
+            self.rebuild = false;
+            self.render_stateless(rect, backend);
+        };
+    }
+
+    pub fn map_stateless(&mut self, key: &KeyEvent) -> bool {
+        if let Some(action) = self.key_map.map(key) {
+            match action {
+                TreeAction::Up => self.select_up(),
+                TreeAction::Down => self.select_down(),
+                TreeAction::Shrink => self.shrink(),
+                TreeAction::Expand => {
+                    let _ = self.expand_dir_or_get_path();
+                }
+                TreeAction::Delete => {
+                    let _ = self.delete_file();
+                }
+                _ => {}
+            }
+            return true;
+        }
+        false
+    }
+
+    pub fn unwrap_selected(self) -> PathBuf {
+        self.selected_path
     }
 }

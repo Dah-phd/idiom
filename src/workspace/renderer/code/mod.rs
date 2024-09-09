@@ -47,6 +47,7 @@ pub fn cursor(code: &mut EditorLine, ctx: &mut LineContext, line: Line, backend:
     backend.reset_style();
 }
 
+#[inline(always)]
 pub fn inner_render(
     code: &mut EditorLine,
     ctx: &mut LineContext<'_>,

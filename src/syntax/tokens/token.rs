@@ -4,7 +4,7 @@ use unicode_width::UnicodeWidthChar;
 use crate::{
     render::backend::Style,
     syntax::{diagnostics::DiagnosticData, theme::Theme, Lang, Legend},
-    workspace::line::EditorLine,
+    workspace::{cursor::Cursor, line::EditorLine},
 };
 
 #[derive(Default)]
@@ -242,16 +242,17 @@ impl Token {
 /// In plain text condition TokenLine is used to store wrapped lines, without affecting the code editing
 pub fn calc_wraps(content: &mut [EditorLine], text_width: usize) {
     for text in content.iter_mut() {
-        calc_wrapse_line(text, text_width);
+        calc_wrap_line(text, text_width);
     }
 }
 
-pub fn calc_wrapse_line(text: &mut EditorLine, text_width: usize) {
+pub fn calc_wrap_line(text: &mut EditorLine, text_width: usize) -> usize {
     if text.is_simple() {
         text.tokens.char_len = text.content.len() / text_width;
     } else {
         complex_wrap_calc(text, text_width);
     }
+    text.tokens.char_len
 }
 
 pub fn complex_wrap_calc(text: &mut EditorLine, text_width: usize) {
@@ -265,4 +266,38 @@ pub fn complex_wrap_calc(text: &mut EditorLine, text_width: usize) {
         }
         counter -= w;
     }
+}
+
+pub fn calc_wrap_line_capped(text: &mut EditorLine, cursor: &Cursor) -> Option<usize> {
+    let text_width = cursor.text_width;
+    let cursor_char = cursor.char;
+    let max_rows = cursor.max_rows;
+    if text.is_simple() {
+        text.tokens.char_len = text.content.len() / text_width;
+        let cursor_at_row = 1 + cursor_char / text_width;
+        if cursor_at_row > max_rows {
+            return Some(cursor_at_row - max_rows);
+        }
+    } else {
+        text.tokens.char_len = 0;
+        let mut counter = text_width;
+        let mut cursor_at_row = 1;
+        let mut prev_idx_break = 0;
+        for (idx, ch) in text.content.chars().enumerate() {
+            let w = UnicodeWidthChar::width(ch).unwrap_or_default();
+            if w > counter {
+                counter = text_width;
+                text.tokens.char_len += 1;
+                if prev_idx_break < cursor_char {
+                    cursor_at_row += 1;
+                }
+                prev_idx_break = idx;
+            }
+            counter -= w;
+        }
+        if cursor_at_row > max_rows {
+            return Some(cursor_at_row - max_rows);
+        }
+    }
+    None
 }

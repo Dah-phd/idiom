@@ -4,12 +4,10 @@ use crate::popups::popups_editor::selector_ranges;
 use crate::popups::{popup_tree_search::ActiveFileSearch, PopupInterface};
 use crate::tree::Tree;
 use crate::workspace::Workspace;
-use crate::{configs::FileType, lsp::Diagnostic, workspace::CursorPosition};
+use crate::{configs::FileType, workspace::CursorPosition};
 use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, WorkspaceEdit};
 use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat};
-use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
 pub enum IdiomEvent {
@@ -22,7 +20,6 @@ pub enum IdiomEvent {
     CreateFileOrFolderBase(String),
     RenameFile(String),
     SearchFiles(String),
-    RegisterLSP(Arc<Mutex<HashMap<PathBuf, Diagnostic>>>),
     FileUpdated(PathBuf),
     CheckLSP(FileType),
     AutoComplete(String),
@@ -153,9 +150,6 @@ impl IdiomEvent {
                     }
                 };
                 gs.clear_popup();
-            }
-            IdiomEvent::RegisterLSP(lsp) => {
-                tree.register_lsp(lsp);
             }
             IdiomEvent::AutoComplete(completion) => {
                 if let Some(editor) = ws.get_active() {

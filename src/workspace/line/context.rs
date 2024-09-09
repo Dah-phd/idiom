@@ -62,6 +62,11 @@ impl<'a> LineContext<'a> {
         build_select_buffer(self.select, self.line_number, width - (self.line_number_offset + 1))
     }
 
+    #[inline]
+    pub fn get_select_full_line(&self, char_len: usize) -> Option<Range<usize>> {
+        build_select_buffer(self.select, self.line_number, char_len)
+    }
+
     pub fn skip_line(&mut self) {
         self.line_number += 1;
     }

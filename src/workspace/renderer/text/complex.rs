@@ -69,20 +69,34 @@ pub fn line_with_select(
             backend.set_bg(Some(select_color));
         }
         if select.end == idx {
-            backend.set_bg(None);
+            backend.reset_style();
         }
         backend.print(text);
     }
+    backend.reset_style();
 }
 
-pub fn cursor(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut Backend) {
-    match ctx.get_select(text.char_len()) {
-        Some(select) => self::select(text, select, lines, ctx, backend),
-        None => self::basic(text, lines, ctx, backend),
+pub fn cursor(
+    text: &mut EditorLine,
+    select: Option<Range<usize>>,
+    skip: usize,
+    lines: &mut RectIter,
+    ctx: &mut LineContext,
+    backend: &mut Backend,
+) {
+    match select {
+        Some(select) => self::select(text, select, skip, lines, ctx, backend),
+        None => self::basic(text, skip, lines, ctx, backend),
     }
 }
 
-pub fn basic(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut Backend) {
+pub fn basic(
+    text: &mut EditorLine,
+    mut skip: usize,
+    lines: &mut RectIter,
+    ctx: &mut LineContext,
+    backend: &mut Backend,
+) {
     let cursor_idx = ctx.cursor_char();
     let line_width = match lines.next() {
         Some(line) => {
@@ -91,15 +105,35 @@ pub fn basic(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext,
         }
         None => return,
     };
-    let mut remaining_width = line_width;
+    let mut content = text.content.chars();
     let mut idx = 0;
-    for text in text.content.chars() {
+    let mut remaining_width = if skip != 0 {
+        let mut skip_width = line_width;
+        for ch in content.by_ref() {
+            idx += 1;
+            let char_w = UnicodeWidthChar::width(ch).unwrap_or_default();
+            if skip_width < char_w {
+                skip -= 1;
+                if skip == 0 {
+                    skip_width = char_w;
+                    backend.print(ch);
+                    break;
+                }
+                skip_width = line_width - char_w;
+            }
+            skip_width -= char_w;
+        }
+        line_width - skip_width
+    } else {
+        line_width
+    };
+    for text in content {
         let current_width = UnicodeWidthChar::width(text).unwrap_or_default();
         if remaining_width < current_width {
             remaining_width = line_width;
             match lines.next() {
                 Some(line) => ctx.wrap_line(line, backend),
-                None => return,
+                None => break,
             }
         }
         remaining_width -= current_width;
@@ -120,6 +154,7 @@ pub fn basic(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext,
 pub fn select(
     text: &mut EditorLine,
     select: Range<usize>,
+    mut skip: usize,
     lines: &mut RectIter,
     ctx: &mut LineContext,
     backend: &mut Backend,
@@ -133,9 +168,32 @@ pub fn select(
         None => return,
     };
     let select_color = ctx.lexer.theme.selected;
-    let mut remaining_width = line_width;
+    let mut content = text.content.chars();
     let mut idx = 0;
-    for text in text.content.chars() {
+    let mut remaining_width = if skip != 0 {
+        let mut skip_width = line_width;
+        for ch in content.by_ref() {
+            idx += 1;
+            let char_w = UnicodeWidthChar::width(ch).unwrap_or_default();
+            if skip_width < char_w {
+                skip -= 1;
+                if skip == 0 {
+                    skip_width = char_w;
+                    if idx > select.start && select.end > idx {
+                        backend.set_bg(Some(select_color));
+                    }
+                    backend.print(ch);
+                    break;
+                }
+                skip_width = line_width - char_w;
+            }
+            skip_width -= char_w;
+        }
+        line_width - skip_width
+    } else {
+        line_width
+    };
+    for text in content {
         let current_width = UnicodeWidthChar::width(text).unwrap_or_default();
         if remaining_width < current_width {
             remaining_width = line_width;
@@ -146,7 +204,7 @@ pub fn select(
                     ctx.wrap_line(line, backend);
                     backend.set_style(reset_style)
                 }
-                None => return,
+                None => break,
             }
         }
         remaining_width -= current_width;

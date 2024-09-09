@@ -39,7 +39,6 @@ impl Workspace {
         for (ft, lsp_cmd) in base_config.derive_lsp_preloads(base_tree_paths, gs) {
             gs.success(format!("Preloading {lsp_cmd}"));
             if let Ok(lsp) = LSP::new(lsp_cmd).await {
-                gs.event.push(IdiomEvent::RegisterLSP(lsp.borrow_client().get_lsp_registration()));
                 lsp_servers.insert(ft, lsp);
             };
         }
@@ -275,7 +274,6 @@ impl Workspace {
             Entry::Vacant(entry) => {
                 if let Ok(lsp) = LSP::new(lsp_cmd).await {
                     let client = lsp.aquire_client();
-                    gs.event.push(IdiomEvent::RegisterLSP(client.get_lsp_registration()));
                     new.lexer.set_lsp_client(client, new.stringify(), gs);
                     for editor in self.editors.iter_mut().filter(|e| e.file_type == new.file_type) {
                         editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);

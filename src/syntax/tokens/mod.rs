@@ -6,7 +6,7 @@ use crate::{
 };
 use lsp_types::SemanticToken;
 
-pub use token::{calc_wraps, calc_wrapse_line, complex_wrap_calc, Token, TokenLine};
+pub use token::{calc_wrap_line, calc_wrap_line_capped, calc_wraps, Token, TokenLine};
 
 #[derive(Default)]
 #[allow(clippy::upper_case_acronyms)]

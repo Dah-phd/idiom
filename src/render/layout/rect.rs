@@ -377,6 +377,19 @@ impl RectIter {
             ..Default::default()
         })
     }
+
+    #[inline]
+    pub fn forward(&mut self, mut steps: usize) {
+        while steps != 0 {
+            steps -= 1;
+            self.row_range.next();
+        }
+    }
+
+    #[inline]
+    pub fn next_line_idx(&self) -> u16 {
+        self.row_range.start
+    }
 }
 
 impl Iterator for RectIter {
