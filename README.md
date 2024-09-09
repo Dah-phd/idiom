@@ -1,39 +1,23 @@
 # Low config terminal IDE - designed for me
 
 ## Info
+Code editor I develop for myself, both as learning experience and fun side project.
+
 Main goal is to work with code, as a result the current implementation do not use rope under the hood - this means performance when working with long lines might not be optimal, and storage in text document will be opinionated.
 
-
+**The project is currently in development - so if you want to try it do it with caution.**
 This is a very early version of the editor, currently LSP is supported and tested for rust (rust-analyzer) and partially for python with jedi-language-server. Thouse are set as defaults. You will need to supply the LSP servers on your own. And configure them in the .config file this could be done in the integrated terminal (CTRL + ~) with command %i load config.
 
-In the integrated terminal you can also run %i help to get some besic idea what can be configured and most importantly the key map (very similar to VS code).
-
-More documentation will not come very soon - current focus is developing basic features, although I would say the editor is quite usable.
+### Screen shots
+![](/non_dev/screen1.png)
 
 ## Tested platform
-
 - Linux Fedora derivate (Nobara)
+- Linux Mint
 
 ## TODO
-- check correctness on cursor during wrap
-- enforce rerender of info modal on update
-- add styling on info modal
-
-
-- add state upone closing
-- cleanup workspace render
-- optimize the cache to reduce imput lag
-- migrate to lsp_types 0.96
-- implement proper len checks on info modals (currently some lines will be longer due to characters with greater width - non-breaking issue)
-- improve error handling
-- syntax on info modal
-- optimize snippet insertion (current implementation is only functional)
-- markdown rendering / editing
-- !! more tests - till that point the goal has been to make the editor self-developing, so bugs can be easily found and structure crystalizes
-- fix gihub actions (tests passing locally)
-- multi-cursor support
-- runner passing arrow presses while process is running
-- (backlog) semantic token styles for different lsp langs
+- write tests
+- write todos
 
 ## Initial target langs
 
