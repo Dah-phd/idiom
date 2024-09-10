@@ -257,15 +257,7 @@ fn init_terminal() -> std::io::Result<()> {
         crossterm::terminal::EnterAlternateScreen,
         crossterm::style::ResetColor,
         crossterm::event::EnableMouseCapture,
-    )?;
-
-    // loading panic
-    let original_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |panic| {
-        graceful_exit().unwrap();
-        original_hook(panic);
-    }));
-    Ok(())
+    )
 }
 
 fn graceful_exit() -> std::io::Result<()> {
@@ -276,6 +268,5 @@ fn graceful_exit() -> std::io::Result<()> {
         crossterm::event::DisableMouseCapture,
         crossterm::cursor::Show,
     )?;
-    crossterm::terminal::disable_raw_mode()?;
-    Ok(())
+    crossterm::terminal::disable_raw_mode()
 }
