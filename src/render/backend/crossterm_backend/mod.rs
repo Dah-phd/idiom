@@ -73,9 +73,6 @@ impl BackendProtocol for Backend {
 
     #[inline]
     fn exit() -> std::io::Result<()> {
-        #[cfg(test)]
-        return Ok(());
-        #[cfg(not(test))]
         graceful_exit()
     }
 
@@ -247,7 +244,12 @@ impl BackendProtocol for Backend {
     }
 }
 
-#[allow(dead_code)]
+impl Drop for Backend {
+    fn drop(&mut self) {
+        let _ = Backend::exit();
+    }
+}
+
 fn init_terminal() -> std::io::Result<()> {
     crossterm::terminal::enable_raw_mode()?;
     crossterm::execute!(
@@ -266,7 +268,6 @@ fn init_terminal() -> std::io::Result<()> {
     Ok(())
 }
 
-#[allow(dead_code)]
 fn graceful_exit() -> std::io::Result<()> {
     crossterm::execute!(
         std::io::stdout(),

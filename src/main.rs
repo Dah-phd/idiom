@@ -26,7 +26,5 @@ async fn main() -> IdiomResult<()> {
         false => args.get_path()?,
         true => TreeSeletor::select(&mut backend)?,
     };
-    app(open_file, backend).await?;
-    Backend::exit()?;
-    Ok(())
+    app(open_file, backend).await
 }
