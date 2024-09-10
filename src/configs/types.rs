@@ -5,6 +5,7 @@ pub enum FileType {
     #[default]
     Ignored,
     Rust,
+    Lobster,
     Zig,
     Python,
     JavaScript,
@@ -33,6 +34,7 @@ impl FileType {
             "yml" | "yaml" => Some(Self::Yml),
             "toml" => Some(Self::Toml),
             "html" => Some(Self::Html),
+            "lobster" => Some(Self::Lobster),
             _ => None,
         }
     }
@@ -60,6 +62,7 @@ impl From<FileType> for &'static str {
             FileType::Cpp => "c++",
             FileType::Yml => "yaml",
             FileType::Toml => "toml",
+            FileType::Lobster => "lobster",
         }
     }
 }

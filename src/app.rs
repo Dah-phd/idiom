@@ -1,7 +1,7 @@
 use crate::{
     configs::{GeneralAction, KeyMap},
     error::IdiomResult,
-    global_state::GlobalState,
+    global_state::{GlobalState, IdiomEvent},
     popups::{
         popup_find::{FindPopup, GoToLinePopup},
         popup_replace::ReplacePopup,
@@ -34,12 +34,8 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
     // CLI SETUP
     if let Some(path) = open_file {
         tree.select_by_path(&path);
-        if let Err(err) = workspace.new_from(path, &mut gs).await {
-            gs.error(err.to_string());
-        } else {
-            gs.insert_mode();
-            workspace.render(&mut gs);
-        }
+        gs.event.push(IdiomEvent::Open(path));
+        gs.toggle_tree();
     }
 
     drop(configs);
