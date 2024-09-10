@@ -17,6 +17,7 @@ categories = ["development-tools", "text-editors"]
 authors = ["Daniel Nikolaev <toolsproed@gmail.com>"]
 
 [dependencies]
+clap = {version = "4.5.17", features = ["derive"]}
 crossterm = "0.28.1"
 lsp-types = "0.97.0"
 serde = { version = "1.0.210", features = ["derive"] }
