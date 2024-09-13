@@ -75,7 +75,6 @@ impl IndentConfigs {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct EditorConfigs {
     pub format_on_save: bool,
     pub indent_spaces: usize,
@@ -143,7 +142,7 @@ impl Default for EditorConfigs {
 }
 
 impl EditorConfigs {
-    pub fn new() -> Result<Self, serde_json::Error> {
+    pub fn new() -> Result<Self, toml::de::Error> {
         load_or_create_config(EDITOR_CFG_FILE)
     }
 
@@ -197,7 +196,7 @@ impl EditorConfigs {
         .collect()
     }
 
-    pub fn refresh(&mut self) -> Result<(), serde_json::Error> {
+    pub fn refresh(&mut self) -> Result<(), toml::de::Error> {
         (*self) = Self::new()?;
         Ok(())
     }

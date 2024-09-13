@@ -36,6 +36,8 @@ thiserror = "1.0.63"
 unicode-width = "0.1.13"
 copypasta = "0.10.1"
 notify = { version = "6.1.1", default-features = false, features = ["macos_kqueue"] }
+logos = "0.14.1"
+toml = "0.8.19"
 
 [profile.dev]
 debug = true

@@ -1,5 +1,6 @@
 mod client;
 mod error;
+mod local;
 mod lsp_stream;
 mod messages;
 mod notification;

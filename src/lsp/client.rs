@@ -88,13 +88,27 @@ impl From<String> for Payload {
 /// Responses are received by ID - so every editor can receive its answere only to send Requests.
 /// Failure on broken LSP server.
 /// Diagnostics are received from Diagnostic objec stored in hashmap based on path.
-#[derive(Clone)]
 pub struct LSPClient {
     diagnostics: Arc<Mutex<HashMap<PathBuf, Diagnostic>>>,
     responses: Arc<Mutex<HashMap<i64, Response>>>,
     channel: UnboundedSender<Payload>,
     id_gen: MonoID,
+    // can handle some requests, syntax and autocomplete
+    local_lsp: Option<JoinHandle<JoinHandle<LSPResult<()>>>>,
     pub capabilities: ServerCapabilities,
+}
+
+impl Clone for LSPClient {
+    fn clone(&self) -> Self {
+        Self {
+            diagnostics: Arc::clone(&self.diagnostics),
+            responses: Arc::clone(&self.responses),
+            channel: self.channel.clone(),
+            id_gen: self.id_gen.clone(),
+            local_lsp: None,
+            capabilities: self.capabilities.clone(),
+        }
+    }
 }
 
 impl LSPClient {
@@ -119,7 +133,10 @@ impl LSPClient {
 
         let notification: LSPNotification<Initialized> = LSPNotification::with(InitializedParams {});
         channel.send(notification.stringify()?.into())?;
-        Ok((lsp_send_handler, Self { diagnostics, responses, channel, id_gen: MonoID::default(), capabilities }))
+        Ok((
+            lsp_send_handler,
+            Self { diagnostics, responses, channel, id_gen: MonoID::default(), capabilities, local_lsp: None },
+        ))
     }
 
     pub fn placeholder() -> Self {
@@ -129,6 +146,7 @@ impl LSPClient {
             responses: Arc::default(),
             channel,
             id_gen: MonoID::default(),
+            local_lsp: None,
             capabilities: ServerCapabilities::default(),
         }
     }
@@ -257,6 +275,15 @@ impl LSPClient {
             let _ = self.channel.send(Payload::Direct(text));
         }
         *self = Self::placeholder();
+    }
+}
+
+impl Drop for LSPClient {
+    fn drop(&mut self) {
+        // if pseudo lsp is running ensure it is dropped on editor destruction
+        if let Some(pseudo_lsp) = self.local_lsp.take() {
+            pseudo_lsp.abort();
+        }
     }
 }
 

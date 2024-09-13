@@ -271,8 +271,8 @@ impl Workspace {
             Some(cmd) => cmd,
         };
         match self.lsp_servers.entry(new.file_type) {
-            Entry::Vacant(entry) => {
-                if let Ok(lsp) = LSP::new(lsp_cmd).await {
+            Entry::Vacant(entry) => match LSP::new(lsp_cmd).await {
+                Ok(lsp) => {
                     let client = lsp.aquire_client();
                     new.lexer.set_lsp_client(client, new.stringify(), gs);
                     for editor in self.editors.iter_mut().filter(|e| e.file_type == new.file_type) {
@@ -280,7 +280,8 @@ impl Workspace {
                     }
                     entry.insert(lsp);
                 }
-            }
+                Err(err) => gs.error(err.to_string()),
+            },
             Entry::Occupied(entry) => {
                 new.lexer.set_lsp_client(entry.get().aquire_client(), new.stringify(), gs);
             }

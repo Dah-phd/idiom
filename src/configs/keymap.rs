@@ -78,7 +78,6 @@ pub enum EditorAction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct EditorUserKeyMap {
     new_line_or_select: String,
     indent: String,
@@ -252,7 +251,6 @@ pub enum GeneralAction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct GeneralUserKeyMap {
     go_to_editor_tabs: String,
     select_open_editor: String,
@@ -346,7 +344,6 @@ pub enum TreeAction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct TreeUserKeyMap {
     select_up: String,
     select_down: String,
