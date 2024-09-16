@@ -1,6 +1,6 @@
 use logos::Logos;
 
-use super::{Definitions, Func, LangStream, PositionedToken, Struct, Var};
+use super::{Definitions, Func, LangStream, Struct, Var};
 
 #[derive(Logos, Debug, PartialEq)]
 #[logos(skip r" ")]
@@ -133,7 +133,7 @@ pub enum PyToken {
 // SemanticTokenType::DECORATOR,      // 15
 
 impl LangStream for PyToken {
-    fn parse(_defs: &mut Definitions, text: &Vec<String>, tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
+    fn parse(_defs: &mut Definitions, text: &[String], tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
         tokens.clear();
         for line in text.iter() {
             let mut token_line = Vec::new();
@@ -145,24 +145,24 @@ impl LangStream for PyToken {
                 };
                 match pytoken {
                     Self::DeclareFn => {
-                        token_line.push(pytoken.to_postioned(logos.span()));
+                        token_line.push(pytoken.to_postioned(logos.span(), line.as_str()));
                         if let Some(Ok(next_pytoken)) = logos.next() {
                             match next_pytoken {
                                 Self::Name(name) => {
-                                    token_line.push(Self::Function(name).to_postioned(logos.span()));
+                                    token_line.push(Self::Function(name).to_postioned(logos.span(), line.as_str()));
                                 }
-                                _ => token_line.push(next_pytoken.to_postioned(logos.span())),
+                                _ => token_line.push(next_pytoken.to_postioned(logos.span(), line.as_str())),
                             }
                         }
                     }
                     Self::DeclareStruct => {
-                        token_line.push(pytoken.to_postioned(logos.span()));
+                        token_line.push(pytoken.to_postioned(logos.span(), line.as_str()));
                         if let Some(Ok(next_pytoken)) = logos.next() {
                             match next_pytoken {
                                 Self::Name(name) => {
-                                    token_line.push(Self::Type(name).to_postioned(logos.span()));
+                                    token_line.push(Self::Type(name).to_postioned(logos.span(), line.as_str()));
                                 }
-                                _ => token_line.push(next_pytoken.to_postioned(logos.span())),
+                                _ => token_line.push(next_pytoken.to_postioned(logos.span(), line.as_str())),
                             }
                         }
                     }
@@ -173,55 +173,7 @@ impl LangStream for PyToken {
                         }
                     }
                     _ => {
-                        token_line.push(pytoken.to_postioned(logos.span()));
-                    }
-                }
-            }
-            tokens.push(token_line);
-        }
-    }
-
-    fn parse_semantics(text: &Vec<String>, tokens: &mut Vec<Vec<PositionedToken<Self>>>) {
-        tokens.clear();
-        for line in text.iter() {
-            let mut token_line = Vec::new();
-            let mut logos = PyToken::lexer(line);
-            while let Some(token_result) = logos.next() {
-                let pytoken = match token_result {
-                    Ok(pytoken) => pytoken,
-                    Err(_) => continue,
-                };
-                match pytoken {
-                    Self::DeclareFn => {
-                        token_line.push(pytoken.to_postioned(logos.span()));
-                        if let Some(Ok(next_pytoken)) = logos.next() {
-                            match next_pytoken {
-                                Self::Name(name) => {
-                                    token_line.push(Self::Function(name).to_postioned(logos.span()));
-                                }
-                                _ => token_line.push(next_pytoken.to_postioned(logos.span())),
-                            }
-                        }
-                    }
-                    Self::DeclareStruct => {
-                        token_line.push(pytoken.to_postioned(logos.span()));
-                        if let Some(Ok(next_pytoken)) = logos.next() {
-                            match next_pytoken {
-                                Self::Name(name) => {
-                                    token_line.push(Self::Type(name).to_postioned(logos.span()));
-                                }
-                                _ => token_line.push(next_pytoken.to_postioned(logos.span())),
-                            }
-                        }
-                    }
-                    Self::LBrack => {
-                        if let Some(pos_token) = token_line.last_mut() {
-                            pos_token.lang_token.name_to_func();
-                            pos_token.refresh_type();
-                        }
-                    }
-                    _ => {
-                        token_line.push(pytoken.to_postioned(logos.span()));
+                        token_line.push(pytoken.to_postioned(logos.span(), line.as_str()));
                     }
                 }
             }
@@ -276,11 +228,14 @@ impl LangStream for PyToken {
                 Func { name: "any".to_owned(), args: vec![], returns: Some(7) },
                 Func { name: "anext".to_owned(), ..Default::default() },
                 Func { name: "ascii".to_owned(), ..Default::default() },
+                Func { name: "open".to_owned(), args: vec![4, 4], returns: Some(0) },
+                Func { name: "print".to_owned(), args: vec![4], ..Default::default() },
             ],
             variables: vec![
                 Var { name: "True".to_owned(), var_type: 0 },
                 Var { name: "False".to_owned(), var_type: 0 },
             ],
+            keywords: vec!["def", "class", "with", "for", "while", "not", "except", "raise", "try"],
         }
     }
 }

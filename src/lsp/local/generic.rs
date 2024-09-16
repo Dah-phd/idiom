@@ -103,9 +103,9 @@ pub enum GenericToken {
 
 impl LangStream for GenericToken {
     fn init_definitions() -> super::Definitions {
-        super::Definitions { structs: vec![], function: vec![], variables: vec![] }
+        super::Definitions { structs: vec![], function: vec![], variables: vec![], keywords: vec![] }
     }
-    fn parse(defs: &mut super::Definitions, text: &Vec<String>, tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
+    fn parse(defs: &mut super::Definitions, text: &[String], tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
         todo!()
     }
 
@@ -115,9 +115,5 @@ impl LangStream for GenericToken {
 
     fn modifier(&self) -> u32 {
         0
-    }
-
-    fn parse_semantics(text: &Vec<String>, tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
-        todo!()
     }
 }

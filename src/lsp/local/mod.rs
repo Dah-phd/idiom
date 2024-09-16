@@ -3,39 +3,37 @@ mod js;
 mod python;
 mod rust;
 mod ts;
+mod utils;
 
 use crate::lsp::local::{generic::GenericToken, python::PyToken};
 use crate::lsp::{messages::Response, Diagnostics, LSPError, LSPResult, Responses};
+use crate::render::UTF8Safe;
 use crate::utils::force_lock;
 use crate::{configs::FileType, lsp::client::Payload, workspace::CursorPosition};
 use logos::Span;
-use lsp_types::SemanticTokenType;
 use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification},
     Range, SemanticToken, SemanticTokens, SemanticTokensRangeResult, SemanticTokensResult,
 };
+use lsp_types::{CompletionItem, CompletionResponse, SemanticTokenType};
 use serde_json::{from_str, to_value, Value};
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::task::JoinHandle;
+use utils::swap_content;
 
 /// Trait to be implemented on the lang specific token, allowing parsing and deriving builtins
 trait LangStream: Sized {
     fn init_definitions() -> Definitions;
     fn type_id(&self) -> u32;
     fn modifier(&self) -> u32;
-    fn to_postioned(self, span: Span) -> PositionedToken<Self> {
-        PositionedToken {
-            from: span.start,
-            to: span.end,
-            len: span.len(),
-            token_type: self.type_id(),
-            modifier: self.modifier(),
-            lang_token: self,
-        }
+    fn to_postioned(self, span: Span, text: &str) -> PositionedToken<Self> {
+        // utf32 encoding
+        let from = text[..span.start].char_len();
+        let len = text[span.start..span.end].char_len();
+        PositionedToken { from, len, token_type: self.type_id(), modifier: self.modifier(), lang_token: self }
     }
-    fn parse(defs: &mut Definitions, text: &Vec<String>, tokens: &mut Vec<Vec<PositionedToken<Self>>>);
-    fn parse_semantics(text: &Vec<String>, tokens: &mut Vec<Vec<PositionedToken<Self>>>);
+    fn parse(definitions: &mut Definitions, text: &[String], tokens: &mut Vec<Vec<PositionedToken<Self>>>);
 }
 
 /// Not fully blowns LSP - but struct processing tokens better, giving basic utils, like semantics, autocomplete, rename
@@ -90,6 +88,43 @@ impl<T: LangStream> LocalLSP<T> {
                 };
                 force_lock(&self.responses).insert(id, response);
             }
+            Payload::Sync(.., change_event) => {
+                for change in change_event {
+                    let range = change.range.unwrap();
+                    let from = CursorPosition::from(range.start);
+                    let to = CursorPosition::from(range.end);
+                    let clip = change.text;
+                    swap_content(&mut self.text, &clip, from, to);
+                }
+                T::parse(&mut self.definitions, &self.text, &mut self.tokens);
+            }
+            Payload::FullSync(.., full_text) => {
+                self.text = full_text.split('\n').map(ToOwned::to_owned).collect();
+                T::parse(&mut self.definitions, &self.text, &mut self.tokens);
+            }
+            Payload::Completion(_, _c, id) => {
+                let mut items = self
+                    .definitions
+                    .keywords
+                    .iter()
+                    .map(|kward| CompletionItem::new_simple((*kward).to_owned(), String::from("Keyword")))
+                    .collect::<Vec<_>>();
+
+                for func in self.definitions.function.iter() {
+                    items.push(CompletionItem::new_simple(func.name.to_owned(), "Function".to_owned()));
+                }
+
+                for var in self.definitions.variables.iter() {
+                    items.push(CompletionItem::new_simple(var.name.to_owned(), "Variable".to_owned()));
+                }
+
+                let completion_response = CompletionResponse::Array(items);
+                let response = match to_value(completion_response) {
+                    Ok(value) => Response { id, result: Some(value), error: None },
+                    Err(err) => Response { id, result: None, error: Some(Value::String(err.to_string())) },
+                };
+                force_lock(&self.responses).insert(id, response);
+            }
             Payload::PartialTokens(_, range, id, ..) => {
                 let tokens = SemanticTokensRangeResult::Tokens(SemanticTokens {
                     result_id: None,
@@ -97,11 +132,11 @@ impl<T: LangStream> LocalLSP<T> {
                 });
                 let response = match to_value(tokens) {
                     Ok(value) => Response { id, result: Some(value), error: None },
-                    Err(error) => Response { id, result: None, error: Some(Value::String(error.to_string())) },
+                    Err(err) => Response { id, result: None, error: Some(Value::String(err.to_string())) },
                 };
                 force_lock(&self.responses).insert(id, response);
             }
-            _ => todo!(),
+            _ => {}
         };
         Ok(())
     }
@@ -140,13 +175,7 @@ impl<T: LangStream> LocalLSP<T> {
         for token_line in self.tokens.iter() {
             let mut at_char = 0;
             for token in token_line.iter().filter(stylable_tokens) {
-                tokens.push(SemanticToken {
-                    delta_line: std::mem::take(&mut last_delta),
-                    length: token.len as u32,
-                    delta_start: (token.from - at_char) as u32,
-                    token_type: token.token_type,
-                    token_modifiers_bitset: token.modifier,
-                });
+                tokens.push(token.semantic_token(std::mem::take(&mut last_delta), at_char));
                 at_char = token.from;
             }
             last_delta += 1;
@@ -164,14 +193,8 @@ impl<T: LangStream> LocalLSP<T> {
             let mut at_char = 0;
             for token in self.tokens[start.line].iter().filter(stylable_tokens) {
                 if token.from >= start.char && token.from <= end.char {
-                    tokens.push(SemanticToken {
-                        delta_line: std::mem::take(&mut last_delta),
-                        length: (token.to - token.from) as u32,
-                        delta_start: (token.from - at_char) as u32,
-                        token_type: token.token_type,
-                        token_modifiers_bitset: token.modifier,
-                    });
-                    at_char += token.to;
+                    tokens.push(token.semantic_token(std::mem::take(&mut last_delta), at_char));
+                    at_char = token.from;
                 }
             }
             return tokens;
@@ -181,14 +204,8 @@ impl<T: LangStream> LocalLSP<T> {
             Some(token_line) => {
                 let mut at_char = 0;
                 for token in token_line.iter().filter(stylable_tokens).filter(|t| t.from >= start.char) {
-                    tokens.push(SemanticToken {
-                        delta_line: std::mem::take(&mut last_delta),
-                        length: (token.to - token.from) as u32,
-                        delta_start: (token.from - at_char) as u32,
-                        token_type: token.token_type,
-                        token_modifiers_bitset: token.modifier,
-                    });
-                    at_char += token.to;
+                    tokens.push(token.semantic_token(std::mem::take(&mut last_delta), at_char));
+                    at_char = token.from;
                 }
                 last_delta += 1;
             }
@@ -200,14 +217,8 @@ impl<T: LangStream> LocalLSP<T> {
                 Some(token_line) => {
                     let mut at_char = 0;
                     for token in token_line.iter().filter(stylable_tokens) {
-                        tokens.push(SemanticToken {
-                            delta_line: std::mem::take(&mut last_delta),
-                            length: (token.to - token.from) as u32,
-                            delta_start: (token.from - at_char) as u32,
-                            token_type: token.token_type,
-                            token_modifiers_bitset: token.modifier,
-                        });
-                        at_char += token.to;
+                        tokens.push(token.semantic_token(std::mem::take(&mut last_delta), at_char));
+                        at_char = token.from;
                     }
                     last_delta += 1;
                 }
@@ -219,16 +230,9 @@ impl<T: LangStream> LocalLSP<T> {
             Some(token_line) => {
                 let mut at_char = 0;
                 for token in token_line.iter().filter(stylable_tokens).filter(|t| t.from <= end.char) {
-                    tokens.push(SemanticToken {
-                        delta_line: std::mem::take(&mut last_delta),
-                        length: (token.to - token.from) as u32,
-                        delta_start: (token.from - at_char) as u32,
-                        token_type: token.token_type,
-                        token_modifiers_bitset: token.modifier,
-                    });
-                    at_char += token.to;
+                    tokens.push(token.semantic_token(std::mem::take(&mut last_delta), at_char));
+                    at_char = token.from;
                 }
-                last_delta += 1;
             }
             None => return tokens,
         }
@@ -238,7 +242,6 @@ impl<T: LangStream> LocalLSP<T> {
 
 struct PositionedToken<T> {
     from: usize,
-    to: usize,
     len: usize,
     token_type: u32,
     modifier: u32,
@@ -250,6 +253,17 @@ impl<T: LangStream> PositionedToken<T> {
     pub fn refresh_type(&mut self) {
         self.token_type = self.lang_token.type_id();
         self.modifier = self.lang_token.modifier();
+    }
+
+    #[inline]
+    pub fn semantic_token(&self, delta_line: u32, at_char: usize) -> SemanticToken {
+        SemanticToken {
+            delta_line,
+            length: self.len as u32,
+            delta_start: (self.from - at_char) as u32,
+            token_type: self.token_type,
+            token_modifiers_bitset: self.modifier,
+        }
     }
 }
 
@@ -283,6 +297,7 @@ struct Definitions {
     structs: Vec<Struct>,
     function: Vec<Func>,
     variables: Vec<Var>,
+    keywords: Vec<&'static str>,
 }
 
 struct Struct {
