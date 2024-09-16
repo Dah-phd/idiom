@@ -267,7 +267,10 @@ impl Workspace {
         };
         let mut new = Editor::from_path(file_path, file_type, &self.base_config, gs)?;
         let lsp_cmd = match self.base_config.derive_lsp(&new.file_type) {
-            None => return Ok(new),
+            None => {
+                new.lexer.local_lsp(file_type, new.stringify(), gs);
+                return Ok(new);
+            }
             Some(cmd) => cmd,
         };
         match self.lsp_servers.entry(new.file_type) {
@@ -280,7 +283,10 @@ impl Workspace {
                     }
                     entry.insert(lsp);
                 }
-                Err(err) => gs.error(err.to_string()),
+                Err(err) => {
+                    gs.error(err.to_string());
+                    new.lexer.local_lsp(file_type, new.stringify(), gs);
+                }
             },
             Entry::Occupied(entry) => {
                 new.lexer.set_lsp_client(entry.get().aquire_client(), new.stringify(), gs);

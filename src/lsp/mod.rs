@@ -6,7 +6,7 @@ mod messages;
 mod notification;
 mod request;
 mod servers;
-use crate::utils::{force_lock, split_arc_mutex};
+use crate::utils::{force_lock, split_arc};
 pub use client::LSPClient;
 pub use error::{LSPError, LSPResult};
 use lsp_stream::JsonRCP;
@@ -18,17 +18,18 @@ use lsp_types::{request::Initialize, InitializeResult, Uri};
 use serde_json::from_value;
 use std::{
     collections::HashMap,
-    path::Path,
+    path::{Path, PathBuf},
     process::Stdio,
     str::FromStr,
-    // sync::{Arc, Mutex},
+    sync::Mutex,
 };
 use tokio::{io::AsyncWriteExt, process::Child, task::JoinHandle};
 
+pub type Responses = Mutex<HashMap<i64, Response>>;
+pub type Diagnostics = Mutex<HashMap<PathBuf, Diagnostic>>;
+
 #[allow(clippy::upper_case_acronyms)]
 pub struct LSP {
-    // pub notifications: Arc<Mutex<Vec<GeneralNotification>>>,
-    // pub requests: Arc<tokio::sync::Mutex<Vec<Request>>>,
     lsp_cmd: String,
     inner: Child,
     client: LSPClient,
@@ -48,10 +49,8 @@ impl LSP {
             inner.stdin.take().ok_or(LSPError::InternalError("Failed to take stdin of JsonRCP (LSP)".to_owned()))?;
 
         // setting up storage
-        let (responses, responses_handler) = split_arc_mutex(HashMap::new());
-        // let (notifications, notifications_handler) = split_arc_mutex(Vec::new());
-        // let (requests, requests_handler) = split_arc_mutex_async(Vec::new());
-        let (diagnostics, diagnostics_handler) = split_arc_mutex(HashMap::new());
+        let (responses, responses_handler) = split_arc::<Responses>();
+        let (diagnostics, diagnostics_handler) = split_arc::<Diagnostics>();
 
         // sending init requests
         stdin.write_all(LSPRequest::<Initialize>::init_request()?.stringify()?.as_bytes()).await?;

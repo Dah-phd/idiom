@@ -139,6 +139,27 @@ pub fn map(lexer: &mut Lexer, client: LSPClient) {
     lexer.client = client;
 }
 
+pub fn remove_lsp(lexer: &mut Lexer) {
+    lexer.lsp = false;
+    lexer.client = LSPClient::placeholder();
+    lexer.context = context_local;
+    lexer.completable = completable_dead;
+    lexer.autocomplete = get_autocomplete_dead;
+    lexer.tokens = tokens_dead;
+    lexer.tokens_partial = tokens_partial_dead;
+    lexer.references = info_position_dead;
+    lexer.definitions = info_position_dead;
+    lexer.declarations = info_position_dead;
+    lexer.hover = info_position_dead;
+    lexer.signatures = info_position_dead;
+    lexer.start_renames = start_renames_dead;
+    lexer.renames = renames_dead;
+    lexer.sync = sync_edits_local;
+    lexer.sync_rev = sync_edits_local_rev;
+    lexer.encode_position = encode_pos_utf32;
+    lexer.char_lsp_pos = char_lsp_pos;
+}
+
 pub fn context_local(_: &mut Editor, _: &mut GlobalState) {}
 
 pub fn context(editor: &mut Editor, gs: &mut GlobalState) {

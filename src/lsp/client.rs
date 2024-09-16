@@ -1,5 +1,8 @@
-use super::{Diagnostic, LSPNotification, LSPRequest, LSPResult, Response};
-use crate::{configs::FileType, lsp::LSPError, syntax::DiagnosticLine, workspace::CursorPosition};
+use super::{
+    local::{get_local_legend, start_lsp_handler},
+    Diagnostic, Diagnostics, LSPNotification, LSPRequest, LSPResult, Response, Responses,
+};
+use crate::{configs::FileType, lsp::LSPError, syntax::DiagnosticLine, utils::split_arc, workspace::CursorPosition};
 use lsp_types::{
     notification::{
         DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidRenameFiles, DidSaveTextDocument, Exit,
@@ -9,7 +12,8 @@ use lsp_types::{
         Completion, GotoDeclaration, GotoDefinition, HoverRequest, References, Rename, SemanticTokensFullRequest,
         SemanticTokensRangeRequest, Shutdown, SignatureHelpRequest,
     },
-    InitializedParams, Range, ServerCapabilities, TextDocumentContentChangeEvent, Uri,
+    CompletionOptions, InitializedParams, PositionEncodingKind, Range, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentContentChangeEvent, TextDocumentSyncKind, Uri,
 };
 use std::{
     cell::RefCell,
@@ -94,7 +98,7 @@ pub struct LSPClient {
     channel: UnboundedSender<Payload>,
     id_gen: MonoID,
     // can handle some requests, syntax and autocomplete
-    local_lsp: Option<JoinHandle<JoinHandle<LSPResult<()>>>>,
+    local_lsp: Option<JoinHandle<LSPResult<()>>>,
     pub capabilities: ServerCapabilities,
 }
 
@@ -114,8 +118,8 @@ impl Clone for LSPClient {
 impl LSPClient {
     pub fn new(
         mut stdin: ChildStdin,
-        diagnostics: Arc<Mutex<HashMap<PathBuf, Diagnostic>>>,
-        responses: Arc<Mutex<HashMap<i64, Response>>>,
+        diagnostics: Arc<Diagnostics>,
+        responses: Arc<Responses>,
         capabilities: ServerCapabilities,
     ) -> LSPResult<(JoinHandle<LSPResult<()>>, Self)> {
         let (channel, mut rx) = unbounded_channel::<Payload>();
@@ -137,6 +141,46 @@ impl LSPClient {
             lsp_send_handler,
             Self { diagnostics, responses, channel, id_gen: MonoID::default(), capabilities, local_lsp: None },
         ))
+    }
+
+    // pub fn enriched_lsp(
+    //     mut stdin: ChildStdin,
+    //     diagnostics: Arc<Mutex<HashMap<PathBuf, Diagnostic>>>,
+    //     responses: Arc<Mutex<HashMap<i64, Response>>>,
+    //     capabilities: ServerCapabilities,
+    // ) -> LSPResult<(JoinHandle<LSPResult<()>>, Self)> {
+    //     todo!()
+    // }
+
+    pub fn local_lsp(file_type: FileType) -> Self {
+        let (channel, rx) = unbounded_channel::<Payload>();
+
+        let (diagnostics, diagnostic_handler) = split_arc::<Diagnostics>();
+        let (responses, response_handler) = split_arc::<Responses>();
+        let capabilities = ServerCapabilities {
+            semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
+                SemanticTokensOptions {
+                    legend: SemanticTokensLegend { token_types: get_local_legend(), token_modifiers: vec![] },
+                    range: Some(true),
+                    ..Default::default()
+                },
+            )),
+            text_document_sync: Some(lsp_types::TextDocumentSyncCapability::Kind(TextDocumentSyncKind::INCREMENTAL)),
+            completion_provider: Some(CompletionOptions::default()),
+            position_encoding: Some(PositionEncodingKind::UTF32),
+            ..Default::default()
+        };
+
+        // starting local lsp /parsing + generating tokens/
+        let lsp_send_handler = start_lsp_handler(rx, file_type, response_handler, diagnostic_handler);
+        Self {
+            diagnostics,
+            responses,
+            channel,
+            id_gen: MonoID::default(),
+            capabilities,
+            local_lsp: Some(lsp_send_handler),
+        }
     }
 
     pub fn placeholder() -> Self {

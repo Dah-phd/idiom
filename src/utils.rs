@@ -17,8 +17,8 @@ pub fn trim_start_inplace(line: &mut EditorLine) -> usize {
     0
 }
 
-pub fn split_arc_mutex<T>(inner: T) -> (Arc<Mutex<T>>, Arc<Mutex<T>>) {
-    let arc = Arc::new(Mutex::new(inner));
+pub fn split_arc<T: Default>() -> (Arc<T>, Arc<T>) {
+    let arc = Arc::default();
     let clone = Arc::clone(&arc);
     (arc, clone)
 }

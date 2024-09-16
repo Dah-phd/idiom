@@ -8,7 +8,6 @@ use dirs::config_dir;
 pub use editor_config::{EditorConfigs, IndentConfigs};
 pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap, TreeAction, TreeUserKeyMap};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::Error;
 use std::collections::HashMap;
 pub use theme_ui::UITheme;
 pub use types::FileType;

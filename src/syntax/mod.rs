@@ -21,7 +21,8 @@ pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
     as_url, char_lsp_pos, completable_dead, context_local, encode_pos_utf32, get_autocomplete_dead, info_position_dead,
-    map, renames_dead, start_renames_dead, sync_edits_local, sync_edits_local_rev, tokens_dead, tokens_partial_dead,
+    map, remove_lsp, renames_dead, start_renames_dead, sync_edits_local, sync_edits_local_rev, tokens_dead,
+    tokens_partial_dead,
 };
 use lsp_types::{PublishDiagnosticsParams, Range, Uri};
 use modal::{LSPModal, ModalMessage};
@@ -235,14 +236,34 @@ impl Lexer {
     }
 
     pub fn set_lsp_client(&mut self, mut client: LSPClient, content: String, gs: &mut GlobalState) {
-        if client.file_did_open(self.uri.clone(), self.lang.file_type, content).is_err() {
+        if let Err(error) = client.file_did_open(self.uri.clone(), self.lang.file_type, content) {
+            gs.error(error.to_string());
             return;
         }
         map(self, client);
         gs.success("LSP mapped!");
         match (self.tokens)(self) {
             Ok(request) => self.requests.push(request),
-            Err(error) => gs.send_error(error, self.lang.file_type),
+            Err(err) => gs.send_error(err, self.lang.file_type),
+        };
+    }
+
+    pub fn local_lsp(&mut self, file_type: FileType, content: String, gs: &mut GlobalState) {
+        let client = LSPClient::local_lsp(file_type);
+        map(self, client);
+        match self.client.file_did_open(self.uri.clone(), file_type, content) {
+            Ok(_) => {
+                gs.success("Starting local LSP - internal system to provide basic language feature");
+                match (self.tokens)(self) {
+                    Ok(request) => self.requests.push(request),
+                    Err(err) => gs.send_error(err, file_type),
+                }
+            }
+            // can be reached only due to internal code issue
+            Err(error) => {
+                gs.error(error.to_string());
+                remove_lsp(self);
+            }
         };
     }
 

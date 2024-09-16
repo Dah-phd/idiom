@@ -48,7 +48,6 @@ impl Legend {
                         continue;
                     }
                     match token_type {
-                        "decorator" => self.legend.push(ColorResult::Final(theme.functions)),
                         "bitwise" => self.legend.push(ColorResult::Final(theme.key_words)),
                         "arithmetic" => self.legend.push(ColorResult::default()),
                         "boolean" => self.legend.push(ColorResult::Final(theme.key_words)),
