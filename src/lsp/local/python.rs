@@ -1,6 +1,6 @@
-use logos::Logos;
+use logos::{Lexer, Logos};
 
-use super::{Definitions, Func, LangStream, Struct, Var};
+use super::{Definitions, Func, LangStream, PositionedToken, Struct, Var};
 
 #[derive(Logos, Debug, PartialEq)]
 #[logos(skip r" ")]
@@ -8,12 +8,12 @@ pub enum PyToken {
     #[regex("class")]
     DeclareStruct,
 
-    #[token("def ")]
+    #[token("def")]
     DeclareFn,
 
     #[token("import")]
     #[token("from")]
-    NameSpace,
+    NameSpaceKeyWord,
 
     #[regex(r#""([^"\\]|\\["\\bnfrt]|u[a-fA-F0-9]{4})*""#)]
     #[regex(r#"'([^'\\]|\\["\\bnfrt]|u[a-fA-F0-9]{4})*'"#)]
@@ -25,20 +25,21 @@ pub enum PyToken {
     #[regex("@[a-zA-Z_]+")]
     Decorator,
 
-    #[regex("#*")]
+    #[regex("#(.)*")]
     Comment,
 
-    #[token("while ")]
-    #[token("for ")]
+    #[token("while")]
+    #[token("for")]
     #[token("async ")]
     #[token("break")]
     #[token("return")]
-    #[token("in ")]
+    #[token("in")]
     #[token("continue")]
-    #[token("if ")]
-    #[token("elif ")]
+    #[token("if")]
+    #[token("elif")]
     #[token("else:")]
-    #[token("case ")]
+    #[token("case")]
+    #[token("raise")]
     FlowControl,
 
     #[token("    ")]
@@ -113,6 +114,8 @@ pub enum PyToken {
     Type(String),
 
     Function(String),
+
+    NameSpace(String),
 }
 
 // SemanticTokenType::NAMESPACE,      // 0
@@ -135,10 +138,18 @@ pub enum PyToken {
 impl LangStream for PyToken {
     fn parse(_defs: &mut Definitions, text: &[String], tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
         tokens.clear();
+        let mut is_multistring = false;
         for line in text.iter() {
             let mut token_line = Vec::new();
             let mut logos = PyToken::lexer(line);
             while let Some(token_result) = logos.next() {
+                if is_multistring {
+                    token_line.push(Self::MultiString.to_postioned(logos.span(), line));
+                    if matches!(token_result, Ok(Self::MultiString)) {
+                        is_multistring = false;
+                    }
+                    continue;
+                }
                 let pytoken = match token_result {
                     Ok(pytoken) => pytoken,
                     Err(_) => continue,
@@ -146,31 +157,30 @@ impl LangStream for PyToken {
                 match pytoken {
                     Self::DeclareFn => {
                         token_line.push(pytoken.to_postioned(logos.span(), line.as_str()));
-                        if let Some(Ok(next_pytoken)) = logos.next() {
-                            match next_pytoken {
-                                Self::Name(name) => {
-                                    token_line.push(Self::Function(name).to_postioned(logos.span(), line.as_str()));
-                                }
-                                _ => token_line.push(next_pytoken.to_postioned(logos.span(), line.as_str())),
-                            }
+                        if let Some(Ok(mut next_pytoken)) = logos.next() {
+                            next_pytoken.name_to_func();
+                            token_line.push(next_pytoken.to_postioned(logos.span(), line.as_str()));
                         }
                     }
                     Self::DeclareStruct => {
                         token_line.push(pytoken.to_postioned(logos.span(), line.as_str()));
-                        if let Some(Ok(next_pytoken)) = logos.next() {
-                            match next_pytoken {
-                                Self::Name(name) => {
-                                    token_line.push(Self::Type(name).to_postioned(logos.span(), line.as_str()));
-                                }
-                                _ => token_line.push(next_pytoken.to_postioned(logos.span(), line.as_str())),
-                            }
+                        if let Some(Ok(mut next_pytoken)) = logos.next() {
+                            next_pytoken.name_to_class();
+                            token_line.push(next_pytoken.to_postioned(logos.span(), line.as_str()));
                         }
                     }
                     Self::LBrack => {
                         if let Some(pos_token) = token_line.last_mut() {
-                            pos_token.lang_token.name_to_func();
+                            pos_token.lang_token.derive_from_name();
                             pos_token.refresh_type();
                         }
+                    }
+                    Self::MultiString => {
+                        token_line.push(pytoken.to_postioned(logos.span(), line.as_str()));
+                        is_multistring = true;
+                    }
+                    Self::NameSpaceKeyWord => {
+                        drain_import(line, &mut logos, &mut token_line);
                     }
                     _ => {
                         token_line.push(pytoken.to_postioned(logos.span(), line.as_str()));
@@ -183,7 +193,7 @@ impl LangStream for PyToken {
 
     fn type_id(&self) -> u32 {
         match self {
-            Self::NameSpace => 0,
+            Self::NameSpace(..) => 0,
             Self::Type(..) => 1,
             Self::TypeHint(..) => 6,
             Self::Name(..) => 8,
@@ -194,7 +204,9 @@ impl LangStream for PyToken {
             | Self::FlowControl
             | Self::Context
             | Self::SelfRef
-            | Self::ClassRef => 11,
+            | Self::ClassRef
+            | Self::NameSpaceKeyWord => 11,
+            Self::Comment => 12,
             Self::String | Self::MultiString => 13,
             Self::Int | Self::Float => 14,
             Self::Decorator => 15,
@@ -241,6 +253,15 @@ impl LangStream for PyToken {
 }
 
 impl PyToken {
+    fn derive_from_name(&mut self) {
+        if let Self::Name(name) = self {
+            match name.chars().find(|ch| *ch != '_').map(|ch| ch.is_uppercase()).unwrap_or_default() {
+                true => self.name_to_class(),
+                false => self.name_to_func(),
+            }
+        }
+    }
+
     fn name_to_func(&mut self) {
         if let Self::Name(name) = self {
             *self = Self::Function(std::mem::take(name));
@@ -252,10 +273,34 @@ impl PyToken {
             *self = Self::Type(std::mem::take(name));
         }
     }
+
+    fn name_to_namespace(&mut self) {
+        if let Self::Name(name) = self {
+            *self = Self::NameSpace(std::mem::take(name));
+        }
+    }
+}
+
+fn drain_import(line: &str, logos: &mut Lexer<'_, PyToken>, token_line: &mut Vec<PositionedToken<PyToken>>) {
+    token_line.push(PyToken::NameSpaceKeyWord.to_postioned(logos.span(), line));
+    while let Some(token_result) = logos.next() {
+        let mut pytoken = match token_result {
+            Ok(pytoken) => pytoken,
+            Err(_) => continue,
+        };
+        pytoken.name_to_namespace();
+        token_line.push(pytoken.to_postioned(logos.span(), line));
+    }
 }
 
 #[cfg(test)]
 mod test {
+    use std::fmt::Debug;
+
+    use crate::lsp::local::Definitions;
+    use crate::lsp::local::LangStream;
+    use crate::lsp::local::PositionedToken;
+
     use super::PyToken;
     use logos::Logos;
     use logos::Span;
@@ -274,7 +319,8 @@ mod test {
         let txt = "# hello world 'asd' and \"text\"";
         let mut lex = PyToken::lexer(txt);
         assert_eq!(Some(Ok(PyToken::Comment)), lex.next());
-        // assert_eq!(Some(Ok(PyToken::Comment)), lex.next());
+        assert_eq!(Span { start: 0, end: 30 }, lex.span());
+        assert_eq!(None, lex.next());
     }
 
     #[test]
@@ -288,5 +334,47 @@ mod test {
         assert_eq!(Some(Ok(PyToken::OpenScope)), lex.next());
         assert_eq!(lex.span(), Span { start: 22, end: 23 });
         assert!(lex.next().is_none());
+    }
+
+    #[test]
+    fn test_scope() {
+        let text = vec!["class Test:".to_owned(), "    value = 3".to_owned()];
+        let mut definitions = Definitions::default();
+        let mut tokens = vec![];
+        PyToken::parse(&mut definitions, &text, &mut tokens);
+        assert_eq!(
+            tokens,
+            vec![
+                vec![
+                    PositionedToken {
+                        from: 0,
+                        len: 5,
+                        token_type: 11,
+                        modifier: 0,
+                        lang_token: PyToken::DeclareStruct
+                    },
+                    PositionedToken {
+                        from: 6,
+                        len: 4,
+                        token_type: 1,
+                        modifier: 0,
+                        lang_token: PyToken::Type("Test".to_owned())
+                    },
+                    PositionedToken { from: 10, len: 1, token_type: 20, modifier: 0, lang_token: PyToken::OpenScope }
+                ],
+                vec![
+                    PositionedToken { from: 0, len: 4, token_type: 20, modifier: 0, lang_token: PyToken::Scope },
+                    PositionedToken {
+                        from: 4,
+                        len: 5,
+                        token_type: 8,
+                        modifier: 0,
+                        lang_token: PyToken::Name("value".to_owned())
+                    },
+                    PositionedToken { from: 10, len: 1, token_type: 20, modifier: 0, lang_token: PyToken::Assign },
+                    PositionedToken { from: 12, len: 1, token_type: 14, modifier: 0, lang_token: PyToken::Int }
+                ]
+            ]
+        );
     }
 }

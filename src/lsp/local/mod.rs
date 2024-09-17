@@ -17,13 +17,14 @@ use lsp_types::{
 };
 use lsp_types::{CompletionItem, CompletionResponse, SemanticTokenType};
 use serde_json::{from_str, to_value, Value};
+use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::task::JoinHandle;
 use utils::swap_content;
 
 /// Trait to be implemented on the lang specific token, allowing parsing and deriving builtins
-trait LangStream: Sized {
+trait LangStream: Sized + Debug + PartialEq {
     fn init_definitions() -> Definitions;
     fn type_id(&self) -> u32;
     fn modifier(&self) -> u32;
@@ -240,7 +241,8 @@ impl<T: LangStream> LocalLSP<T> {
     }
 }
 
-struct PositionedToken<T> {
+#[derive(Debug, PartialEq)]
+struct PositionedToken<T: LangStream> {
     from: usize,
     len: usize,
     token_type: u32,
