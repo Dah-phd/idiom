@@ -1,8 +1,8 @@
 mod generic;
-mod js;
+mod lobster;
 mod python;
 mod rust;
-mod ts;
+mod ts; // support TS and JS
 mod utils;
 
 use crate::lsp::local::{generic::GenericToken, python::PyToken};
@@ -10,6 +10,7 @@ use crate::lsp::{messages::Response, Diagnostics, LSPError, LSPResult, Responses
 use crate::render::UTF8Safe;
 use crate::utils::force_lock;
 use crate::{configs::FileType, lsp::client::Payload, workspace::CursorPosition};
+use lobster::Pincer;
 use logos::Span;
 use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification},
@@ -56,6 +57,13 @@ pub fn start_lsp_handler(
     match file_type {
         FileType::Python => tokio::task::spawn(async move {
             let mut lsp = LocalLSP::<PyToken>::init(responses, diagnostics);
+            while let Some(payload) = rx.recv().await {
+                lsp.parase_payload(payload)?;
+            }
+            Ok(())
+        }),
+        FileType::Lobster => tokio::task::spawn(async move {
+            let mut lsp = LocalLSP::<Pincer>::init(responses, diagnostics);
             while let Some(payload) = rx.recv().await {
                 lsp.parase_payload(payload)?;
             }

@@ -22,7 +22,7 @@ impl IndentConfigs {
     pub fn update_by_file_type(mut self, file_type: &FileType) -> Self {
         #[allow(clippy::single_match)]
         match file_type {
-            FileType::Python | FileType::Nim => self.indent_after.push(':'),
+            FileType::Python | FileType::Nim | FileType::Lobster => self.indent_after.push(':'),
             _ => (),
         }
         self

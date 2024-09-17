@@ -5,7 +5,9 @@ use super::LangStream;
 #[derive(Logos, Debug, PartialEq)]
 #[logos(skip r" ")]
 pub enum GenericToken {
-    #[token("def ")]
+    #[token("def")]
+    #[token("function")]
+    #[token("fn")]
     DeclareFn,
 
     #[regex(r#""([^"\\]|\\["\\bnfrt]|u[a-fA-F0-9]{4})*""#)]
@@ -19,15 +21,15 @@ pub enum GenericToken {
     #[regex("@[a-zA-Z_]+")]
     Decorator,
 
-    #[token("while ")]
-    #[token("for ")]
+    #[token("while")]
+    #[token("for")]
     #[token("async ")]
     #[token("break")]
     #[token("return")]
-    #[token(" in ")]
+    #[token("in")]
     #[token("continue")]
-    #[token("if ")]
-    #[token("elif ")]
+    #[token("if")]
+    #[token("elif")]
     #[token("else:")]
     FlowControl,
 
@@ -74,8 +76,6 @@ pub enum GenericToken {
     #[regex(r#": ?[a-zA-Z]+"#, |lex| lex.slice().to_owned())]
     TypeHint(String),
 
-    Type(String),
-
     #[token("->")]
     ReturnHint,
 
@@ -91,14 +91,19 @@ pub enum GenericToken {
     #[token(">")]
     Greater,
 
-    #[regex("[0-9]+.?[0-9]+")]
+    #[regex("-?[0-9]+\\.[0-9]+")]
     Float,
 
-    #[regex("[0-9]+")]
+    #[regex("-?[0-9]+")]
     Int,
 
     #[regex(r#"[a-zA-Z_][a-zA-Z_0-9]*"#, |lex| lex.slice().to_owned())]
     Name(String),
+
+    // convertible types
+    Type(String),
+    Function(String),
+    NameSpace(String),
 }
 
 impl LangStream for GenericToken {
