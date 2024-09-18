@@ -8,7 +8,6 @@ use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 use crate::{
     configs::IndentConfigs,
     render::UTF8Safe,
-    syntax::Lexer,
     utils::Offset,
     workspace::{
         cursor::Cursor,
@@ -389,13 +388,6 @@ impl EditMetaData {
     #[inline]
     pub const fn line_changed(start_line: usize) -> Self {
         Self { start_line, from: 1, to: 1 }
-    }
-
-    #[inline]
-    pub fn update_tokens(&self, content: &mut [EditorLine], lexer: &Lexer) {
-        for line in content.iter_mut().skip(self.start_line).take(self.to) {
-            line.rebuild_tokens(lexer);
-        }
     }
 
     #[inline]

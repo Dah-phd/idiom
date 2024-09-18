@@ -50,6 +50,7 @@ pub enum GenericToken {
     SelfRef,
 
     #[token("=")]
+    #[token(":=")]
     Assign,
 
     #[token(".")]

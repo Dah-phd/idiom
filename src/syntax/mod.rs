@@ -21,7 +21,7 @@ pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
     as_url, char_lsp_pos, completable_dead, context_local, encode_pos_utf32, get_autocomplete_dead, info_position_dead,
-    map, remove_lsp, renames_dead, start_renames_dead, sync_edits_local, sync_edits_local_rev, tokens_dead,
+    map, remove_lsp, renames_dead, start_renames_dead, sync_edits_dead, sync_edits_dead_rev, tokens_dead,
     tokens_partial_dead,
 };
 use lsp_types::{PublishDiagnosticsParams, Range, Uri};
@@ -31,13 +31,12 @@ use std::{
     time::Instant,
 };
 use theme::Theme;
-pub use tokens::{Token, TokensType};
+pub use tokens::Token;
 
 pub struct Lexer {
     pub lang: Lang,
     pub legend: Legend,
     pub theme: Theme,
-    pub token_producer: TokensType,
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub lsp: bool,
     pub uri: Uri,
@@ -73,7 +72,6 @@ impl Lexer {
             lang: Lang::from(file_type),
             legend: Legend::default(),
             theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
-            token_producer: TokensType::Internal,
             clock: Instant::now(),
             modal: None,
             modal_rect: None,
@@ -97,8 +95,8 @@ impl Lexer {
             signatures: info_position_dead,
             start_renames: start_renames_dead,
             renames: renames_dead,
-            sync: sync_edits_local,
-            sync_rev: sync_edits_local_rev,
+            sync: sync_edits_dead,
+            sync_rev: sync_edits_dead_rev,
             encode_position: encode_pos_utf32,
             char_lsp_pos,
         }
@@ -109,7 +107,6 @@ impl Lexer {
             lang: Lang::default(),
             legend: Legend::default(),
             theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
-            token_producer: TokensType::Internal,
             clock: Instant::now(),
             modal: None,
             modal_rect: None,
@@ -133,8 +130,8 @@ impl Lexer {
             signatures: info_position_dead,
             start_renames: start_renames_dead,
             renames: renames_dead,
-            sync: sync_edits_local,
-            sync_rev: sync_edits_local_rev,
+            sync: sync_edits_dead,
+            sync_rev: sync_edits_dead_rev,
             encode_position: encode_pos_utf32,
             char_lsp_pos,
         }
@@ -145,7 +142,6 @@ impl Lexer {
             lang: Lang::default(),
             legend: Legend::default(),
             theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
-            token_producer: TokensType::Internal,
             clock: Instant::now(),
             modal: None,
             modal_rect: None,
@@ -169,8 +165,8 @@ impl Lexer {
             signatures: info_position_dead,
             start_renames: start_renames_dead,
             renames: renames_dead,
-            sync: sync_edits_local,
-            sync_rev: sync_edits_local_rev,
+            sync: sync_edits_dead,
+            sync_rev: sync_edits_dead_rev,
             encode_position: encode_pos_utf32,
             char_lsp_pos,
         }

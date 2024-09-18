@@ -19,7 +19,6 @@ use super::{
     modal::LSPModal,
     set_diganostics,
     tokens::{set_tokens, set_tokens_partial},
-    TokensType,
 };
 
 /// timeout before remapping all tokens
@@ -117,8 +116,8 @@ pub fn map(lexer: &mut Lexer, client: LSPClient) {
             }
         }
     } else {
-        lexer.sync = sync_edits_local;
-        lexer.sync_rev = sync_edits_local_rev;
+        lexer.sync = sync_edits_dead;
+        lexer.sync_rev = sync_edits_dead_rev;
     }
 
     match client.capabilities.position_encoding.as_ref().map(|encode| encode.as_str()) {
@@ -154,8 +153,8 @@ pub fn remove_lsp(lexer: &mut Lexer) {
     lexer.signatures = info_position_dead;
     lexer.start_renames = start_renames_dead;
     lexer.renames = renames_dead;
-    lexer.sync = sync_edits_local;
-    lexer.sync_rev = sync_edits_local_rev;
+    lexer.sync = sync_edits_dead;
+    lexer.sync_rev = sync_edits_dead_rev;
     lexer.encode_position = encode_pos_utf32;
     lexer.char_lsp_pos = char_lsp_pos;
 }
@@ -208,7 +207,6 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
                                 lexer.meta = None;
                                 if !data.data.is_empty() {
                                     set_tokens(data.data, &lexer.legend, &lexer.theme, content);
-                                    lexer.token_producer = TokensType::LSP;
                                     gs.success("LSP tokens mapped!");
                                 } else if let Ok(id) = client.request_full_tokens(lexer.uri.clone()) {
                                     unresolved_requests.push(LSPResponseType::Tokens(id));
@@ -344,20 +342,12 @@ pub fn sync_edits_full_rev(lexer: &mut Lexer, action: &EditType, content: &mut [
 }
 
 #[inline(always)]
-pub fn sync_edits_local(lexer: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
-    let meta = action.map_to_meta();
-    for line in content.iter_mut().skip(meta.start_line).take(meta.to) {
-        line.rebuild_tokens(lexer);
-    }
+pub fn sync_edits_dead(_lexer: &mut Lexer, _action: &EditType, _content: &mut [EditorLine]) -> LSPResult<()> {
     Ok(())
 }
 
 #[inline(always)]
-pub fn sync_edits_local_rev(lexer: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
-    let meta = action.map_to_meta_rev();
-    for line in content.iter_mut().skip(meta.start_line).take(meta.to) {
-        line.rebuild_tokens(lexer);
-    }
+pub fn sync_edits_dead_rev(_lexer: &mut Lexer, _action: &EditType, _content: &mut [EditorLine]) -> LSPResult<()> {
     Ok(())
 }
 

@@ -8,14 +8,6 @@ use lsp_types::SemanticToken;
 
 pub use token::{calc_wrap_line, calc_wrap_line_capped, calc_wraps, Token, TokenLine};
 
-#[derive(Default)]
-#[allow(clippy::upper_case_acronyms)]
-pub enum TokensType {
-    LSP,
-    #[default]
-    Internal,
-}
-
 pub fn set_tokens(tokens: Vec<SemanticToken>, legend: &Legend, theme: &Theme, content: &mut [EditorLine]) {
     let mut tokens = tokens.into_iter();
 

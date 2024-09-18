@@ -60,6 +60,30 @@ impl<T: LangStream> EnrichedLSP<T> {
         Ok(())
     }
 
+    async fn run_with_sync_coersion(
+        mut rx: UnboundedReceiver<Payload>,
+        mut lsp_stdin: ChildStdin,
+        responses: Arc<Responses>,
+    ) -> LSPResult<()> {
+        Ok(())
+    }
+
+    async fn run_with_autocomplete(
+        mut rx: UnboundedReceiver<Payload>,
+        mut lsp_stdin: ChildStdin,
+        responses: Arc<Responses>,
+    ) -> LSPResult<()> {
+        Ok(())
+    }
+
+    async fn run_full(
+        mut rx: UnboundedReceiver<Payload>,
+        mut lsp_stdin: ChildStdin,
+        responses: Arc<Responses>,
+    ) -> LSPResult<()> {
+        Ok(())
+    }
+
     fn new(responses: Arc<Responses>) -> Self {
         Self { documents: HashMap::new(), definitions: T::init_definitions(), responses }
     }

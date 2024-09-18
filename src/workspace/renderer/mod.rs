@@ -46,12 +46,6 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
         if let Some(line) = lines.next() {
             if editor.cursor.line == line_idx {
-                if text.tokens.is_empty() {
-                    text.tokens.internal_rebase(&text.content, &ctx.lexer.lang, &ctx.lexer.theme);
-                    if !text.tokens.is_empty() {
-                        text.cached.reset();
-                    }
-                };
                 code::cursor_fast(text, &mut ctx, line, backend);
             } else {
                 let select = ctx.get_select(line.width);
@@ -83,9 +77,6 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
         if let Some(line) = lines.next() {
             if editor.cursor.line == line_idx {
-                if text.tokens.is_empty() {
-                    text.tokens.internal_rebase(&text.content, &ctx.lexer.lang, &ctx.lexer.theme);
-                };
                 code::cursor(text, &mut ctx, line, backend);
             } else {
                 let select = ctx.get_select(line.width);
