@@ -1,9 +1,12 @@
+mod enriched;
 mod generic;
 mod lobster;
 mod python;
 mod rust;
 mod ts; // support TS and JS
 mod utils;
+
+pub use enriched::enrich_with_semantics;
 
 use crate::lsp::local::{generic::GenericToken, python::PyToken};
 use crate::lsp::{messages::Response, Diagnostics, LSPError, LSPResult, Responses};
@@ -16,7 +19,10 @@ use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification},
     Range, SemanticToken, SemanticTokens, SemanticTokensRangeResult, SemanticTokensResult,
 };
-use lsp_types::{CompletionItem, CompletionResponse, SemanticTokenType};
+use lsp_types::{
+    CompletionItem, CompletionResponse, SemanticTokenType, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensServerCapabilities,
+};
 use serde_json::{from_str, to_value, Value};
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -35,7 +41,7 @@ trait LangStream: Sized + Debug + PartialEq {
         let len = text[span.start..span.end].char_len();
         PositionedToken { from, len, token_type: self.type_id(), modifier: self.modifier(), lang_token: self }
     }
-    fn parse(definitions: &mut Definitions, text: &[String], tokens: &mut Vec<Vec<PositionedToken<Self>>>);
+    fn parse(text: &[String], tokens: &mut Vec<Vec<PositionedToken<Self>>>);
 }
 
 /// Not fully blowns LSP - but struct processing tokens better, giving basic utils, like semantics, autocomplete, rename
@@ -49,38 +55,36 @@ struct LocalLSP<T: LangStream> {
 }
 
 pub fn start_lsp_handler(
-    mut rx: UnboundedReceiver<Payload>,
+    rx: UnboundedReceiver<Payload>,
     file_type: FileType,
     responses: Arc<Responses>,
     diagnostics: Arc<Diagnostics>,
 ) -> JoinHandle<LSPResult<()>> {
     match file_type {
-        FileType::Python => tokio::task::spawn(async move {
-            let mut lsp = LocalLSP::<PyToken>::init(responses, diagnostics);
-            while let Some(payload) = rx.recv().await {
-                lsp.parase_payload(payload)?;
-            }
-            Ok(())
-        }),
-        FileType::Lobster => tokio::task::spawn(async move {
-            let mut lsp = LocalLSP::<Pincer>::init(responses, diagnostics);
-            while let Some(payload) = rx.recv().await {
-                lsp.parase_payload(payload)?;
-            }
-            Ok(())
-        }),
-        _ => tokio::task::spawn(async move {
-            let mut lsp = LocalLSP::<GenericToken>::init(responses, diagnostics);
-            while let Some(payload) = rx.recv().await {
-                lsp.parase_payload(payload)?;
-            }
-            Ok(())
-        }),
+        FileType::Python => {
+            tokio::task::spawn(async move { LocalLSP::<PyToken>::run(rx, responses, diagnostics).await })
+        }
+        FileType::Lobster => {
+            tokio::task::spawn(async move { LocalLSP::<Pincer>::run(rx, responses, diagnostics).await })
+        }
+        _ => tokio::task::spawn(async move { LocalLSP::<GenericToken>::run(rx, responses, diagnostics).await }),
     }
 }
 
 impl<T: LangStream> LocalLSP<T> {
-    fn init(responses: Arc<Responses>, diagnostics: Arc<Diagnostics>) -> Self {
+    async fn run(
+        mut rx: UnboundedReceiver<Payload>,
+        responses: Arc<Responses>,
+        diagnostics: Arc<Diagnostics>,
+    ) -> LSPResult<()> {
+        let mut lsp = Self::new(responses, diagnostics);
+        while let Some(payload) = rx.recv().await {
+            lsp.parase_payload(payload)?;
+        }
+        Ok(())
+    }
+
+    fn new(responses: Arc<Responses>, diagnostics: Arc<Diagnostics>) -> Self {
         Self { definitions: T::init_definitions(), text: Vec::new(), tokens: Vec::new(), diagnostics, responses }
     }
 
@@ -105,11 +109,11 @@ impl<T: LangStream> LocalLSP<T> {
                     let clip = change.text;
                     swap_content(&mut self.text, &clip, from, to);
                 }
-                T::parse(&mut self.definitions, &self.text, &mut self.tokens);
+                T::parse(&self.text, &mut self.tokens);
             }
             Payload::FullSync(.., full_text) => {
                 self.text = full_text.split('\n').map(ToOwned::to_owned).collect();
-                T::parse(&mut self.definitions, &self.text, &mut self.tokens);
+                T::parse(&self.text, &mut self.tokens);
             }
             Payload::Completion(_, _c, id) => {
                 let mut items = self
@@ -173,8 +177,8 @@ impl<T: LangStream> LocalLSP<T> {
         let params = val.as_object_mut()?.get_mut("params")?;
         let documet = params.as_object_mut()?.get_mut("textDocument")?;
         let text = documet.as_object_mut()?.get("text")?.as_str()?;
-        self.text.extend(text.split('\n').map(ToOwned::to_owned));
-        T::parse(&mut self.definitions, &self.text, &mut self.tokens);
+        self.text = text.split('\n').map(ToOwned::to_owned).collect();
+        T::parse(&self.text, &mut self.tokens);
         Some(())
     }
 
@@ -277,6 +281,14 @@ impl<T: LangStream> PositionedToken<T> {
     }
 }
 
+pub fn create_semantic_capabilities() -> SemanticTokensServerCapabilities {
+    SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
+        legend: SemanticTokensLegend { token_types: get_local_legend(), token_modifiers: vec![] },
+        range: Some(true),
+        ..Default::default()
+    })
+}
+
 pub fn get_local_legend() -> Vec<SemanticTokenType> {
     vec![
         SemanticTokenType::NAMESPACE,      // 0
@@ -361,9 +373,9 @@ mod test {
 
     #[test]
     fn test_with_pytoken() {
-        let mut pylsp = LocalLSP::<PyToken>::init(Arc::default(), Arc::default());
+        let mut pylsp = LocalLSP::<PyToken>::new(Arc::default(), Arc::default());
         pylsp.text.push(String::from("class WorkingDirectory:"));
-        PyToken::parse(&mut pylsp.definitions, &pylsp.text, &mut pylsp.tokens);
+        PyToken::parse(&pylsp.text, &mut pylsp.tokens);
         let tokens = pylsp.full_tokens();
         assert_eq!(
             tokens,

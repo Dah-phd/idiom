@@ -212,8 +212,8 @@ where
                     general: Some(lsp::GeneralClientCapabilities {
                         position_encodings: Some(vec![
                             lsp::PositionEncodingKind::UTF32, // preffered - but all are supported
-                            lsp::PositionEncodingKind::UTF16,
-                            lsp::PositionEncodingKind::UTF8,
+                                                              // lsp::PositionEncodingKind::UTF16,
+                                                              // lsp::PositionEncodingKind::UTF8,
                         ]),
                         ..Default::default()
                     }),

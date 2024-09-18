@@ -136,7 +136,7 @@ pub enum PyToken {
 // SemanticTokenType::DECORATOR,      // 15
 
 impl LangStream for PyToken {
-    fn parse(_defs: &mut Definitions, text: &[String], tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
+    fn parse(text: &[String], tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
         tokens.clear();
         let mut is_multistring = false;
         for line in text.iter() {
@@ -295,7 +295,6 @@ fn drain_import(line: &str, logos: &mut Lexer<'_, PyToken>, token_line: &mut Vec
 
 #[cfg(test)]
 mod test {
-    use crate::lsp::local::Definitions;
     use crate::lsp::local::LangStream;
     use crate::lsp::local::PositionedToken;
 
@@ -337,9 +336,8 @@ mod test {
     #[test]
     fn test_scope() {
         let text = vec!["class Test:".to_owned(), "    value = 3".to_owned()];
-        let mut definitions = Definitions::default();
         let mut tokens = vec![];
-        PyToken::parse(&mut definitions, &text, &mut tokens);
+        PyToken::parse(&text, &mut tokens);
         assert_eq!(
             tokens,
             vec![

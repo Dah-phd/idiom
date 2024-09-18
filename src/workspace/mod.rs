@@ -38,7 +38,7 @@ impl Workspace {
         let mut lsp_servers = HashMap::new();
         for (ft, lsp_cmd) in base_config.derive_lsp_preloads(base_tree_paths, gs) {
             gs.success(format!("Preloading {lsp_cmd}"));
-            if let Ok(lsp) = LSP::new(lsp_cmd).await {
+            if let Ok(lsp) = LSP::new(lsp_cmd, ft).await {
                 lsp_servers.insert(ft, lsp);
             };
         }
@@ -274,7 +274,7 @@ impl Workspace {
             Some(cmd) => cmd,
         };
         match self.lsp_servers.entry(new.file_type) {
-            Entry::Vacant(entry) => match LSP::new(lsp_cmd).await {
+            Entry::Vacant(entry) => match LSP::new(lsp_cmd, new.file_type).await {
                 Ok(lsp) => {
                     let client = lsp.aquire_client();
                     new.lexer.set_lsp_client(client, new.stringify(), gs);
@@ -336,7 +336,7 @@ impl Workspace {
     #[inline]
     pub async fn check_lsp(&mut self, ft: FileType, gs: &mut GlobalState) {
         if let Some(lsp) = self.lsp_servers.get_mut(&ft) {
-            match lsp.check_status().await {
+            match lsp.check_status(ft).await {
                 Ok(data) => match data {
                     None => gs.success("LSP function is normal".to_owned()),
                     Some(err) => {

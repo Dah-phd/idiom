@@ -6,6 +6,7 @@ mod messages;
 mod notification;
 mod request;
 mod servers;
+use crate::configs::FileType;
 use crate::utils::{force_lock, split_arc};
 pub use client::LSPClient;
 pub use error::{LSPError, LSPResult};
@@ -39,7 +40,7 @@ pub struct LSP {
 }
 
 impl LSP {
-    pub async fn new(lsp_cmd: String) -> LSPResult<Self> {
+    pub async fn new(lsp_cmd: String, file_type: FileType) -> LSPResult<Self> {
         let mut server = servers::server_cmd(&lsp_cmd)?;
         let mut inner = server.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::piped()).spawn()?;
 
@@ -85,17 +86,17 @@ impl LSP {
             }
         });
 
-        let (lsp_send_handler, client) = LSPClient::new(stdin, diagnostics, responses, capabilities)?;
+        let (lsp_send_handler, client) = LSPClient::new(stdin, file_type, diagnostics, responses, capabilities)?;
 
         Ok(Self { client, lsp_cmd, inner, lsp_json_handler, lsp_send_handler, attempts: 5 })
     }
 
-    pub async fn check_status(&mut self) -> LSPResult<Option<LSPError>> {
+    pub async fn check_status(&mut self, file_type: FileType) -> LSPResult<Option<LSPError>> {
         if self.lsp_json_handler.is_finished() || self.lsp_send_handler.is_finished() {
             if self.attempts == 0 {
                 return Err(LSPError::internal("Json RCP unable to recover after 5 attempts!"));
             }
-            match Self::new(self.lsp_cmd.to_owned()).await {
+            match Self::new(self.lsp_cmd.to_owned(), file_type).await {
                 Ok(lsp) => {
                     let mut broken = std::mem::replace(self, lsp);
                     let _ = broken.dash_nine().await; // ensure old lsp is dead!

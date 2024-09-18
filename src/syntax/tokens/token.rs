@@ -144,37 +144,12 @@ impl Token {
         Self { delta_start: delta_start as usize, len: length as usize, style }
     }
 
-    pub fn enrich(mut delta_start: usize, lang: &Lang, theme: &Theme, snippet: &str, buf: &mut TokenLine) {
-        let mut last_word = String::new();
-        for ch in snippet.chars() {
-            if ch.is_alphabetic() || "_\"'\\".contains(ch) {
-                last_word.push(ch);
-                continue;
-            };
-            if last_word.is_empty() {
-                delta_start += 1;
-                continue;
-            };
-            let token_base = std::mem::take(&mut last_word);
-            let len = token_base.len();
-            if lang.is_keyword(token_base.as_str()) {
-                buf.push(Token { len, delta_start, style: Style::fg(theme.key_words) });
-                delta_start = len;
-            } else if lang.is_string(token_base.as_str()) {
-                buf.push(Token { len, delta_start, style: Style::fg(theme.string) });
-                delta_start = len;
-            } else {
-                buf.push(Token { len, delta_start, style: Style::fg(theme.default) });
-                delta_start = len;
-            };
-        }
-    }
-
     pub fn drop_diagstic(&mut self) {
         self.style.reset_mods();
     }
 
     fn parse_to_buf(lang: &Lang, theme: &Theme, snippet: &str, buf: &mut TokenLine) {
+        return;
         if lang.is_comment(snippet) {
             buf.push(Token { len: snippet.len(), delta_start: 0, style: Style::fg(theme.comment) });
             return;

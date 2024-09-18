@@ -1,5 +1,5 @@
 use super::{
-    local::{get_local_legend, start_lsp_handler},
+    local::{create_semantic_capabilities, enrich_with_semantics, start_lsp_handler},
     Diagnostic, Diagnostics, LSPNotification, LSPRequest, LSPResult, Response, Responses,
 };
 use crate::{configs::FileType, lsp::LSPError, syntax::DiagnosticLine, utils::split_arc, workspace::CursorPosition};
@@ -12,8 +12,8 @@ use lsp_types::{
         Completion, GotoDeclaration, GotoDefinition, HoverRequest, References, Rename, SemanticTokensFullRequest,
         SemanticTokensRangeRequest, Shutdown, SignatureHelpRequest,
     },
-    CompletionOptions, InitializedParams, PositionEncodingKind, Range, SemanticTokensLegend, SemanticTokensOptions,
-    SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentContentChangeEvent, TextDocumentSyncKind, Uri,
+    CompletionOptions, InitializedParams, PositionEncodingKind, Range, ServerCapabilities,
+    TextDocumentContentChangeEvent, TextDocumentSyncKind, Uri,
 };
 use std::{
     cell::RefCell,
@@ -48,7 +48,7 @@ pub enum Payload {
 }
 
 impl Payload {
-    fn try_stringify(self) -> Result<String, LSPError> {
+    pub fn try_stringify(self) -> Result<String, LSPError> {
         match self {
             // Direct sending of serialized message
             Payload::Direct(msg) => Ok(msg),
@@ -118,22 +118,27 @@ impl Clone for LSPClient {
 impl LSPClient {
     pub fn new(
         mut stdin: ChildStdin,
+        file_type: FileType,
         diagnostics: Arc<Diagnostics>,
         responses: Arc<Responses>,
-        capabilities: ServerCapabilities,
+        mut capabilities: ServerCapabilities,
     ) -> LSPResult<(JoinHandle<LSPResult<()>>, Self)> {
         let (channel, mut rx) = unbounded_channel::<Payload>();
 
-        // starting send handler
-        let lsp_send_handler = tokio::task::spawn(async move {
-            while let Some(msg) = rx.recv().await {
-                if let Ok(lsp_msg_text) = msg.try_stringify() {
-                    stdin.write_all(lsp_msg_text.as_bytes()).await?;
-                    stdin.flush().await?;
+        let lsp_send_handler = if capabilities.semantic_tokens_provider.is_none() {
+            capabilities.semantic_tokens_provider.replace(create_semantic_capabilities());
+            enrich_with_semantics(rx, stdin, file_type, Arc::clone(&responses))
+        } else {
+            tokio::task::spawn(async move {
+                while let Some(msg) = rx.recv().await {
+                    if let Ok(lsp_msg_text) = msg.try_stringify() {
+                        stdin.write_all(lsp_msg_text.as_bytes()).await?;
+                        stdin.flush().await?;
+                    }
                 }
-            }
-            Ok(())
-        });
+                Ok(())
+            })
+        };
 
         let notification: LSPNotification<Initialized> = LSPNotification::with(InitializedParams {});
         channel.send(notification.stringify()?.into())?;
@@ -143,28 +148,13 @@ impl LSPClient {
         ))
     }
 
-    // pub fn enriched_lsp(
-    //     mut stdin: ChildStdin,
-    //     diagnostics: Arc<Mutex<HashMap<PathBuf, Diagnostic>>>,
-    //     responses: Arc<Mutex<HashMap<i64, Response>>>,
-    //     capabilities: ServerCapabilities,
-    // ) -> LSPResult<(JoinHandle<LSPResult<()>>, Self)> {
-    //     todo!()
-    // }
-
     pub fn local_lsp(file_type: FileType) -> Self {
         let (channel, rx) = unbounded_channel::<Payload>();
 
         let (diagnostics, diagnostic_handler) = split_arc::<Diagnostics>();
         let (responses, response_handler) = split_arc::<Responses>();
         let capabilities = ServerCapabilities {
-            semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensOptions(
-                SemanticTokensOptions {
-                    legend: SemanticTokensLegend { token_types: get_local_legend(), token_modifiers: vec![] },
-                    range: Some(true),
-                    ..Default::default()
-                },
-            )),
+            semantic_tokens_provider: Some(create_semantic_capabilities()),
             text_document_sync: Some(lsp_types::TextDocumentSyncCapability::Kind(TextDocumentSyncKind::INCREMENTAL)),
             completion_provider: Some(CompletionOptions::default()),
             position_encoding: Some(PositionEncodingKind::UTF32),

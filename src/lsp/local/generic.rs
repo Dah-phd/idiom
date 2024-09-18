@@ -110,7 +110,7 @@ impl LangStream for GenericToken {
     fn init_definitions() -> super::Definitions {
         super::Definitions { structs: vec![], function: vec![], variables: vec![], keywords: vec![] }
     }
-    fn parse(defs: &mut super::Definitions, text: &[String], tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
+    fn parse(text: &[String], tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
         todo!()
     }
 
