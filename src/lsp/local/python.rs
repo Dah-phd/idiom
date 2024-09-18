@@ -28,6 +28,8 @@ pub enum PyToken {
     #[regex("#(.)*")]
     Comment,
 
+    #[token("...")]
+    #[token("pass")]
     #[token("while")]
     #[token("for")]
     #[token("async ")]
