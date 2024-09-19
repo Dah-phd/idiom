@@ -39,7 +39,7 @@ pub enum PyToken {
     #[token("continue")]
     #[token("if")]
     #[token("elif")]
-    #[token("else:")]
+    #[token("else")]
     #[token("case")]
     #[token("raise")]
     FlowControl,
@@ -52,34 +52,27 @@ pub enum PyToken {
 
     #[token("cls")]
     ClassRef,
-
     #[token("self")]
     SelfRef,
+    #[token(".")]
+    InstanceInvoked,
 
     #[token("=")]
     Assign,
-
-    #[token(".")]
-    InstanceInvoked,
 
     #[token(":")]
     OpenScope,
 
     #[token("(")]
     LBrack,
-
     #[token(")")]
     RBrack,
-
     #[token("{")]
     DOpen,
-
     #[token("}")]
     DClose,
-
     #[token("[")]
     LOpen,
-
     #[token("]")]
     LClose,
 
@@ -88,24 +81,24 @@ pub enum PyToken {
 
     #[token("not ")]
     Negate,
-
+    #[token("==")]
+    Equals,
     #[token("<=")]
     GreatEq,
-
     #[token(">=")]
     LesssEq,
-
     #[token("<")]
     Lesser,
-
     #[token(">")]
     Greater,
 
     #[regex("-?[0-9]+\\.[0-9]+")]
     Float,
-
     #[regex("-?[0-9]+")]
     Int,
+    #[token("True")]
+    #[token("False")]
+    Bool,
 
     #[regex(r#"[a-zA-Z_][a-zA-Z_0-9]*"#, |lex| lex.slice().to_owned())]
     Name(String),
@@ -114,28 +107,9 @@ pub enum PyToken {
     TypeHint(String),
 
     Type(String),
-
     Function(String),
-
     NameSpace(String),
 }
-
-// SemanticTokenType::NAMESPACE,      // 0
-// SemanticTokenType::TYPE,           // 1
-// SemanticTokenType::CLASS,          // 2
-// SemanticTokenType::ENUM,           // 3
-// SemanticTokenType::INTERFACE,      // 4
-// SemanticTokenType::STRUCT,         // 5
-// SemanticTokenType::TYPE_PARAMETER, // 6
-// SemanticTokenType::PARAMETER,      // 7
-// SemanticTokenType::VARIABLE,       // 8
-// SemanticTokenType::PROPERTY,       // 9
-// SemanticTokenType::FUNCTION,       // 10
-// SemanticTokenType::KEYWORD,        // 11
-// SemanticTokenType::COMMENT,        // 12
-// SemanticTokenType::STRING,         // 13
-// SemanticTokenType::NUMBER,         // 14
-// SemanticTokenType::DECORATOR,      // 15
 
 impl LangStream for PyToken {
     fn parse(text: &[String], tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
@@ -207,6 +181,7 @@ impl LangStream for PyToken {
             | Self::Context
             | Self::SelfRef
             | Self::ClassRef
+            | Self::Bool
             | Self::NameSpaceKeyWord => 11,
             Self::Comment => 12,
             Self::String | Self::MultiString => 13,

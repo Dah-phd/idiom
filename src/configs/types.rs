@@ -15,6 +15,7 @@ pub enum FileType {
     Cpp,
     Yml,
     Toml,
+    Json,
     Nim,
 }
 
@@ -35,6 +36,7 @@ impl FileType {
             "toml" => Some(Self::Toml),
             "html" => Some(Self::Html),
             "lobster" => Some(Self::Lobster),
+            "json" => Some(Self::Json),
             _ => None,
         }
     }
@@ -63,6 +65,7 @@ impl From<FileType> for &'static str {
             FileType::Yml => "yaml",
             FileType::Toml => "toml",
             FileType::Lobster => "lobster",
+            FileType::Json => "json",
         }
     }
 }

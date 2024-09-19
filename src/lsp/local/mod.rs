@@ -1,5 +1,6 @@
 mod enriched;
 mod generic;
+mod json;
 mod lobster;
 mod python;
 mod rust;
@@ -7,14 +8,16 @@ mod ts; // support TS and JS
 mod utils;
 
 pub use enriched::enrich_with_semantics;
+use rust::Rustacean;
 
 use crate::lsp::local::{generic::GenericToken, python::PyToken};
 use crate::lsp::{messages::Response, Diagnostics, LSPError, LSPResult, Responses};
 use crate::render::UTF8Safe;
 use crate::utils::force_lock;
 use crate::{configs::FileType, lsp::client::Payload, workspace::CursorPosition};
+use json::JsonValue;
 use lobster::Pincer;
-use logos::Span;
+use logos::{Logos, Span};
 use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification},
     Range, SemanticToken, SemanticTokens, SemanticTokensRangeResult, SemanticTokensResult,
@@ -31,8 +34,10 @@ use tokio::task::JoinHandle;
 use utils::swap_content;
 
 /// Trait to be implemented on the lang specific token, allowing parsing and deriving builtins
-trait LangStream: Sized + Debug + PartialEq {
-    fn init_definitions() -> Definitions;
+trait LangStream: Sized + Debug + PartialEq + Logos<'static> {
+    fn init_definitions() -> Definitions {
+        Definitions::default()
+    }
     fn type_id(&self) -> u32;
     fn modifier(&self) -> u32;
     fn to_postioned(self, span: Span, text: &str) -> PositionedToken<Self> {
@@ -66,6 +71,12 @@ pub fn start_lsp_handler(
         }
         FileType::Lobster => {
             tokio::task::spawn(async move { LocalLSP::<Pincer>::run(rx, responses, diagnostics).await })
+        }
+        FileType::Json => {
+            tokio::task::spawn(async move { LocalLSP::<JsonValue>::run(rx, responses, diagnostics).await })
+        }
+        FileType::Rust => {
+            tokio::task::spawn(async move { LocalLSP::<Rustacean>::run(rx, responses, diagnostics).await })
         }
         _ => tokio::task::spawn(async move { LocalLSP::<GenericToken>::run(rx, responses, diagnostics).await }),
     }
