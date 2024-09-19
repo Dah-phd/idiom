@@ -46,7 +46,7 @@ pub enum Rustacean {
     #[token("else")]
     FlowControl,
 
-    #[token("'\\\\'")]
+    #[token(r#"'\\'"#)]
     #[regex("'.'")]
     #[regex(r#""([^"\\]|\\["\\bnfrt]|u[a-fA-F0-9]{4})*""#)]
     String,
@@ -54,7 +54,7 @@ pub enum Rustacean {
     // #[token("\"")]
     MultiString,
 
-    #[regex("#[[a-zA-Z_]+]")]
+    #[regex(r#"#\[[^\]]*\]"#)]
     Decorator,
 
     #[regex("//(.)*")]
@@ -97,6 +97,12 @@ pub enum Rustacean {
     #[regex("<[a-zA-Z_]+, ?[a-zA-Z_]+>")]
     TypeInner,
 
+    #[regex("<'[a-z_]+>")]
+    LifeTime,
+
+    #[regex("&'[a-z_]+")]
+    LifeTimeAnnotation,
+
     #[token("->")]
     Return,
 
@@ -119,7 +125,7 @@ pub enum Rustacean {
     #[token(">")]
     Greater,
 
-    #[regex("-?[0-9]+\\.[0-9]+")]
+    #[regex(r#"-?[0-9]+\.[0-9]+"#)]
     Float,
     #[regex("-?[0-9]+")]
     Int,
@@ -160,59 +166,66 @@ impl LangStream for Rustacean {
                 };
                 match rustacean {
                     Self::DeclareFn => {
-                        token_line.push(rustacean.to_postioned(logos.span(), line.as_str()));
+                        token_line.push(rustacean.to_postioned(logos.span(), line));
                         if let Some(Ok(mut next_rustacean)) = logos.next() {
                             next_rustacean.name_to_func();
-                            token_line.push(next_rustacean.to_postioned(logos.span(), line.as_str()));
+                            token_line.push(next_rustacean.to_postioned(logos.span(), line));
                         }
                     }
                     Self::DeclareEnum => {
-                        token_line.push(rustacean.to_postioned(logos.span(), line.as_str()));
+                        token_line.push(rustacean.to_postioned(logos.span(), line));
                         if let Some(Ok(mut next_rustacean)) = logos.next() {
                             next_rustacean.name_to_enum();
-                            token_line.push(next_rustacean.to_postioned(logos.span(), line.as_str()));
+                            token_line.push(next_rustacean.to_postioned(logos.span(), line));
                         }
                     }
                     Self::DeclareUnion => {
-                        token_line.push(rustacean.to_postioned(logos.span(), line.as_str()));
+                        token_line.push(rustacean.to_postioned(logos.span(), line));
                         if let Some(Ok(mut next_rustacean)) = logos.next() {
                             next_rustacean.name_to_union();
-                            token_line.push(next_rustacean.to_postioned(logos.span(), line.as_str()));
+                            token_line.push(next_rustacean.to_postioned(logos.span(), line));
                         }
                     }
                     Self::DeclareType => {
                         drain_type_declare(line, &mut logos, &mut token_line);
                     }
                     Self::DeclareStruct => {
-                        token_line.push(rustacean.to_postioned(logos.span(), line.as_str()));
+                        token_line.push(rustacean.to_postioned(logos.span(), line));
                         if let Some(Ok(mut next_rustacean)) = logos.next() {
                             next_rustacean.name_to_struct();
-                            token_line.push(next_rustacean.to_postioned(logos.span(), line.as_str()));
+                            token_line.push(next_rustacean.to_postioned(logos.span(), line));
                         }
                     }
                     Self::StaticDispatch => {
                         let mut span = logos.span();
-                        if span.len() > 1 {
-                            span.start += 1;
-                        }
-                        token_line.push(rustacean.to_postioned(span, line.as_str()));
+                        span.start += 1;
+                        token_line.push(rustacean.to_postioned(span, line));
                         if let Some(Ok(Self::Name(name))) = logos.next() {
                             token_line.push(Self::Type(name).to_postioned(logos.span(), line));
                         }
                     }
                     Self::TypeAssign => {
                         let mut span = logos.span();
-                        if span.len() > 1 {
-                            span.start += 1;
-                        }
-                        token_line.push(rustacean.to_postioned(span, line.as_str()));
+                        span.start += 1;
+                        token_line.push(rustacean.to_postioned(span, line));
+                    }
+                    Self::LifeTime => {
+                        let mut span = logos.span();
+                        span.start += 2;
+                        span.end -= 1;
+                        token_line.push(rustacean.to_postioned(span, line));
+                    }
+                    Self::LifeTimeAnnotation => {
+                        let mut span = logos.span();
+                        span.start += 2;
+                        token_line.push(rustacean.to_postioned(span, line));
                     }
                     Self::Macros => {
                         let mut span = logos.span();
                         if span.len() > 1 {
                             span.end -= 1;
                         }
-                        token_line.push(rustacean.to_postioned(span, line.as_str()));
+                        token_line.push(rustacean.to_postioned(span, line));
                     }
                     Self::TypeInner => {
                         if let Some(prev_token) = token_line.last_mut() {
@@ -224,16 +237,17 @@ impl LangStream for Rustacean {
                             span.start += 1;
                             span.end -= 1;
                         }
-                        token_line.push(rustacean.to_postioned(span, line.as_str()));
+                        token_line.push(rustacean.to_postioned(span, line));
                     }
                     Self::LBrack => {
                         if let Some(pos_token) = token_line.last_mut() {
-                            pos_token.lang_token.name_to_struct();
+                            pos_token.lang_token.name_to_func();
                             pos_token.refresh_type();
                         }
+                        token_line.push(rustacean.to_postioned(logos.span(), line));
                     }
                     Self::ImplementInterface => {
-                        token_line.push(rustacean.to_postioned(logos.span(), line.as_str()));
+                        token_line.push(rustacean.to_postioned(logos.span(), line));
                         drain_impl(line, &mut logos, &mut token_line);
                     }
                     Self::ParantInvoked => {
@@ -243,14 +257,14 @@ impl LangStream for Rustacean {
                         }
                     }
                     Self::MultiString => {
-                        token_line.push(rustacean.to_postioned(logos.span(), line.as_str()));
+                        token_line.push(rustacean.to_postioned(logos.span(), line));
                         is_multistring = true;
                     }
                     Self::NameSpaceKeyWord => {
                         drain_import(line, &mut logos, &mut token_line);
                     }
                     _ => {
-                        token_line.push(rustacean.to_postioned(logos.span(), line.as_str()));
+                        token_line.push(rustacean.to_postioned(logos.span(), line));
                     }
                 }
             }
@@ -281,6 +295,8 @@ impl LangStream for Rustacean {
             | Self::StaticDispatch
             | Self::ImplementInterface
             | Self::Public
+            | Self::LifeTime
+            | Self::LifeTimeAnnotation
             | Self::NameSpaceKeyWord => 11,
             Self::Comment => 12,
             Self::String | Self::MultiString => 13,
@@ -450,6 +466,10 @@ mod test {
         assert_eq!(logos.next(), Some(Ok(Rustacean::EndLine)));
         assert_eq!(logos.span(), Span { start: 11, end: 12 });
         assert_eq!(logos.next(), None);
+        let txt = "'\\\\'";
+        let mut logos = Rustacean::lexer(txt);
+        assert_eq!(logos.next(), Some(Ok(Rustacean::String)));
+        assert_eq!(logos.next(), None);
     }
 
     #[test]
@@ -501,5 +521,39 @@ mod test {
     }
 
     #[test]
-    fn test_decorator() {}
+    fn test_decorator() {
+        let mut tokens = vec![];
+        let txt = "#[derive(Logos, Debug, PartialEq)]";
+        Rustacean::parse(&[txt.to_owned()], &mut tokens);
+        assert_eq!(
+            tokens,
+            vec![[PositionedToken { from: 0, len: 34, token_type: 15, modifier: 0, lang_token: Rustacean::Decorator }]]
+        );
+
+        let mut tokens = vec![];
+        let txt = "LSP(#[from] LSPError)";
+        Rustacean::parse(&[txt.to_owned()], &mut tokens);
+        assert_eq!(
+            tokens,
+            vec![[
+                PositionedToken {
+                    from: 0,
+                    len: 3,
+                    token_type: 10,
+                    modifier: 0,
+                    lang_token: Rustacean::Function("LSP".to_owned())
+                },
+                PositionedToken { from: 3, len: 1, token_type: 20, modifier: 0, lang_token: Rustacean::LBrack },
+                PositionedToken { from: 4, len: 7, token_type: 15, modifier: 0, lang_token: Rustacean::Decorator },
+                PositionedToken {
+                    from: 12,
+                    len: 8,
+                    token_type: 8,
+                    modifier: 0,
+                    lang_token: Rustacean::Name("LSPError".to_owned())
+                },
+                PositionedToken { from: 20, len: 1, token_type: 20, modifier: 0, lang_token: Rustacean::RBrack }
+            ]]
+        );
+    }
 }
