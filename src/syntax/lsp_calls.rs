@@ -201,7 +201,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
                                 lexer.meta = None;
                                 if !data.data.is_empty() {
                                     set_tokens(data.data, &lexer.legend, &lexer.theme, content);
-                                    gs.success("LSP tokens mapped!");
+                                    gs.success("LSP tokens mapped! Refresh UI to remove artifacts (default F5)");
                                 } else if let Ok(id) = client.request_full_tokens(lexer.uri.clone()) {
                                     unresolved_requests.push(LSPResponseType::Tokens(id));
                                 };

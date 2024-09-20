@@ -129,7 +129,8 @@ impl Editor {
     }
 
     #[inline(always)]
-    pub fn clear_screen_cache(&mut self) {
+    pub fn clear_screen_cache(&mut self, gs: &mut GlobalState) {
+        self.lexer.refresh_tokens(gs);
         self.last_render_at_line = None;
     }
 

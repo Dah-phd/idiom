@@ -135,7 +135,7 @@ impl Workspace {
     pub fn activate_editor(&mut self, idx: usize, gs: &mut GlobalState) {
         if idx < self.editors.len() {
             let mut editor = self.editors.remove(idx);
-            editor.clear_screen_cache();
+            editor.clear_screen_cache(gs);
             gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
             if editor.update_status.collect() {
                 gs.popup(file_updated(editor.path.clone()))
@@ -299,7 +299,7 @@ impl Workspace {
         let file_path = file_path.canonicalize()?;
         if let Some(idx) = self.editors.iter().position(|e| e.path == file_path) {
             let mut editor = self.editors.remove(idx);
-            editor.clear_screen_cache();
+            editor.clear_screen_cache(gs);
             if editor.update_status.collect() {
                 gs.popup(file_updated(editor.path.clone()));
             }
@@ -382,7 +382,7 @@ impl Workspace {
                 gs.select_mode();
             }
             Some(editor) => {
-                editor.clear_screen_cache();
+                editor.clear_screen_cache(gs);
                 if editor.update_status.collect() {
                     gs.popup(file_updated(editor.path.clone()));
                 }
@@ -411,7 +411,7 @@ impl Workspace {
         let mut editor =
             if idx >= self.editors.len() { self.editors.pop().expect("garded") } else { self.editors.remove(idx) };
         gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
-        editor.clear_screen_cache();
+        editor.clear_screen_cache(gs);
         if editor.update_status.collect() {
             gs.popup(file_updated(editor.path.clone()));
         }
@@ -487,7 +487,7 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
                 let editor = ws.editors.remove(0);
                 ws.editors.push(editor);
                 let editor = &mut ws.editors.inner_mut_no_update()[0];
-                editor.clear_screen_cache();
+                editor.clear_screen_cache(gs);
                 if editor.update_status.collect() {
                     gs.popup(file_updated(editor.path.clone()));
                 }
@@ -496,7 +496,7 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
             EditorAction::Left | EditorAction::Unintent => {
                 if let Some(mut editor) = ws.editors.pop() {
                     gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
-                    editor.clear_screen_cache();
+                    editor.clear_screen_cache(gs);
                     if editor.update_status.collect() {
                         gs.popup(file_updated(editor.path.clone()));
                     }
