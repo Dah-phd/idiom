@@ -329,7 +329,7 @@ impl Lexer {
         };
         if self.lsp {
             if let Some(capabilities) = &self.client.capabilities.semantic_tokens_provider {
-                self.legend.map_styles(&self.lang.file_type, &self.theme, capabilities);
+                self.legend.map_styles(self.lang.file_type, &self.theme, capabilities);
             }
             match (self.tokens)(self) {
                 Ok(request) => self.requests.push(request),

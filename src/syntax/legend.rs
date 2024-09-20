@@ -33,7 +33,7 @@ impl Legend {
         }
     }
 
-    pub fn map_styles(&mut self, file_type: &FileType, theme: &Theme, tc: &SemanticTokensServerCapabilities) {
+    pub fn map_styles(&mut self, file_type: FileType, theme: &Theme, tc: &SemanticTokensServerCapabilities) {
         let legend = match tc {
             SemanticTokensServerCapabilities::SemanticTokensOptions(opt) => &opt.legend,
             SemanticTokensServerCapabilities::SemanticTokensRegistrationOptions(opt) => {

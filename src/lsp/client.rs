@@ -20,7 +20,7 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     rc::Rc,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard},
 };
 use tokio::{
     io::AsyncWriteExt,
@@ -184,9 +184,8 @@ impl LSPClient {
         }
     }
 
-    pub fn get(&self, id: &i64) -> Option<Response> {
-        let mut que = self.responses.try_lock().ok()?;
-        que.remove(id)
+    pub fn get_responses(&self) -> Option<MutexGuard<'_, HashMap<i64, Response>>> {
+        self.responses.lock().ok()
     }
 
     pub fn get_lsp_registration(&self) -> Arc<Mutex<HashMap<PathBuf, Diagnostic>>> {

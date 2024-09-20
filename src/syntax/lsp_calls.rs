@@ -40,7 +40,7 @@ pub fn map(lexer: &mut Lexer, client: LSPClient) {
 
     // tokens
     if let Some(tc) = client.capabilities.semantic_tokens_provider.as_ref() {
-        lexer.legend.map_styles(&lexer.lang.file_type, &lexer.theme, tc);
+        lexer.legend.map_styles(lexer.lang.file_type, &lexer.theme, tc);
         lexer.tokens = tokens;
         if client.capabilities.semantic_tokens_provider.as_ref().map(range_tokens_are_supported).unwrap_or_default() {
             lexer.tokens_partial = tokens_partial;
@@ -165,82 +165,84 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
         set_diganostics(content, diagnostics);
     }
     // responses
-    let unresolved_requests = &mut lexer.requests;
-    for request in std::mem::take(unresolved_requests) {
-        if let Some(response) = client.get(request.id()) {
-            match request.parse(response.result) {
-                Some(result) => match result {
-                    LSPResponse::Completion(completions, line, c) => {
-                        if editor.cursor.line == c.line {
-                            lexer.modal = LSPModal::auto_complete(completions, line, c);
-                        }
-                    }
-                    LSPResponse::Hover(hover) => {
-                        if let Some(modal) = lexer.modal.as_mut() {
-                            modal.hover_map(hover, &lexer.lang, &lexer.theme);
-                        } else {
-                            lexer.modal.replace(LSPModal::from_hover(hover, &lexer.lang, &lexer.theme));
-                        }
-                    }
-                    LSPResponse::SignatureHelp(signature) => {
-                        if let Some(modal) = lexer.modal.as_mut() {
-                            modal.signature_map(signature, &lexer.lang, &lexer.theme);
-                        } else {
-                            lexer.modal.replace(LSPModal::from_signature(signature, &lexer.lang, &lexer.theme));
-                        }
-                    }
-                    LSPResponse::Renames(workspace_edit) => {
-                        gs.event.push(workspace_edit.into());
-                    }
-                    LSPResponse::Tokens(tokens) => {
-                        match tokens {
-                            SemanticTokensResult::Partial(data) => {
-                                set_tokens(data.data, &lexer.legend, &lexer.theme, content);
+    if let Some(mut responses) = client.get_responses() {
+        let unresolved_requests = &mut lexer.requests;
+        for request in std::mem::take(unresolved_requests) {
+            if let Some(response) = responses.remove(request.id()) {
+                match request.parse(response.result) {
+                    Some(result) => match result {
+                        LSPResponse::Completion(completions, line, c) => {
+                            if editor.cursor.line == c.line {
+                                lexer.modal = LSPModal::auto_complete(completions, line, c);
                             }
-                            SemanticTokensResult::Tokens(data) => {
-                                lexer.meta = None;
-                                if !data.data.is_empty() {
+                        }
+                        LSPResponse::Hover(hover) => {
+                            if let Some(modal) = lexer.modal.as_mut() {
+                                modal.hover_map(hover, &lexer.lang, &lexer.theme);
+                            } else {
+                                lexer.modal.replace(LSPModal::from_hover(hover, &lexer.lang, &lexer.theme));
+                            }
+                        }
+                        LSPResponse::SignatureHelp(signature) => {
+                            if let Some(modal) = lexer.modal.as_mut() {
+                                modal.signature_map(signature, &lexer.lang, &lexer.theme);
+                            } else {
+                                lexer.modal.replace(LSPModal::from_signature(signature, &lexer.lang, &lexer.theme));
+                            }
+                        }
+                        LSPResponse::Renames(workspace_edit) => {
+                            gs.event.push(workspace_edit.into());
+                        }
+                        LSPResponse::Tokens(tokens) => {
+                            match tokens {
+                                SemanticTokensResult::Partial(data) => {
+                                    set_tokens(data.data, &lexer.legend, &lexer.theme, content);
+                                }
+                                SemanticTokensResult::Tokens(data) => {
                                     set_tokens(data.data, &lexer.legend, &lexer.theme, content);
                                     gs.success("LSP tokens mapped! Refresh UI to remove artifacts (default F5)");
-                                } else if let Ok(id) = client.request_full_tokens(lexer.uri.clone()) {
-                                    unresolved_requests.push(LSPResponseType::Tokens(id));
-                                };
-                            }
-                        };
-                    }
-                    LSPResponse::TokensPartial { result, max_lines } => {
-                        let tokens = match result {
-                            SemanticTokensRangeResult::Partial(data) => data.data,
-                            SemanticTokensRangeResult::Tokens(data) => data.data,
-                        };
-                        set_tokens_partial(tokens, max_lines, &lexer.legend, &lexer.theme, content);
-                    }
-                    LSPResponse::References(locations) => {
-                        if let Some(mut locations) = locations {
-                            if locations.len() == 1 {
-                                gs.event.push(locations.remove(0).into());
-                            } else {
-                                gs.popup(refrence_selector(locations));
+                                }
+                            };
+                        }
+                        LSPResponse::TokensPartial { result, max_lines } => {
+                            let tokens = match result {
+                                SemanticTokensRangeResult::Partial(data) => data.data,
+                                SemanticTokensRangeResult::Tokens(data) => data.data,
+                            };
+                            set_tokens_partial(tokens, max_lines, &lexer.legend, &lexer.theme, content);
+                        }
+                        LSPResponse::References(locations) => {
+                            if let Some(mut locations) = locations {
+                                if locations.len() == 1 {
+                                    gs.event.push(locations.remove(0).into());
+                                } else {
+                                    gs.popup(refrence_selector(locations));
+                                }
                             }
                         }
-                    }
-                    LSPResponse::Declaration(declaration) => {
-                        gs.try_tree_event(declaration);
-                    }
-                    LSPResponse::Definition(definition) => {
-                        gs.try_tree_event(definition);
-                    }
-                },
-                None => {
-                    if let Some(err) = response.error {
-                        gs.error(format!("{request}: {err}"));
+                        LSPResponse::Declaration(declaration) => {
+                            gs.try_tree_event(declaration);
+                        }
+                        LSPResponse::Definition(definition) => {
+                            gs.try_tree_event(definition);
+                        }
+                    },
+                    None => {
+                        if let Some(err) = response.error {
+                            gs.error(format!("{request}: {err}"));
+                        }
                     }
                 }
+            } else {
+                if matches!(request, LSPResponseType::Tokens(..)) {
+                    lexer.meta = None;
+                    crate::lsp::init_local_tokens(editor.file_type, content, &lexer.theme);
+                }
+                unresolved_requests.push(request);
             }
-        } else {
-            unresolved_requests.push(request);
         }
     }
+
     if let Some(meta) = lexer.meta.take() {
         let max_lines = (meta.start_line + meta.to) - 1;
         if max_lines >= content.len() {

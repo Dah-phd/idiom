@@ -10,6 +10,7 @@ use crate::configs::FileType;
 use crate::utils::{force_lock, split_arc};
 pub use client::LSPClient;
 pub use error::{LSPError, LSPResult};
+pub use local::init_local_tokens;
 use lsp_stream::JsonRCP;
 pub use messages::{Diagnostic, LSPMessage, LSPResponse, LSPResponseType, Response};
 pub use notification::LSPNotification;

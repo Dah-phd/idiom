@@ -1,5 +1,10 @@
+use crate::lsp::local::{LangStream, PositionedToken};
 use crate::render::utils::{UTF8Safe, UTF8SafeStringExt};
 use crate::workspace::CursorPosition;
+use lsp_types::{
+    Range, SemanticToken, SemanticTokenType, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensServerCapabilities,
+};
 
 // !TODO Dobule check utf8 complience
 pub fn swap_content(content: &mut Vec<String>, clip: &str, from: CursorPosition, to: CursorPosition) {
@@ -45,5 +50,133 @@ pub fn insert_clip(clip: &str, content: &mut Vec<String>, mut cursor: CursorPosi
     for new_line in lines {
         content.insert(cursor.line, new_line.to_owned());
         cursor.line += 1;
+    }
+}
+
+pub fn full_tokens<T: LangStream>(lsp_tokens: &[Vec<PositionedToken<T>>]) -> Vec<SemanticToken> {
+    let mut tokens = Vec::new();
+    let mut last_delta = 0;
+    for token_line in lsp_tokens.iter() {
+        let mut at_char = 0;
+        for token in token_line.iter().filter(stylable_tokens) {
+            tokens.push(token.semantic_token(std::mem::take(&mut last_delta), at_char));
+            at_char = token.from;
+        }
+        last_delta += 1;
+    }
+    tokens
+}
+
+pub fn partial_tokens<T: LangStream>(lsp_tokens: &[Vec<PositionedToken<T>>], range: Range) -> Vec<SemanticToken> {
+    let start = CursorPosition::from(range.start);
+    let end = CursorPosition::from(range.end);
+    let mut tokens = Vec::new();
+    let mut last_delta = start.line as u32;
+    let mut remaining = end.line - start.line;
+    if remaining == 0 {
+        let mut at_char = 0;
+        for token in lsp_tokens[start.line].iter().filter(stylable_tokens) {
+            if token.from >= start.char && token.from <= end.char {
+                tokens.push(token.semantic_token(std::mem::take(&mut last_delta), at_char));
+                at_char = token.from;
+            }
+        }
+        return tokens;
+    }
+    let mut iter = lsp_tokens[start.line..=end.line].iter();
+    match iter.next() {
+        Some(token_line) => {
+            let mut at_char = 0;
+            for token in token_line.iter().filter(stylable_tokens).filter(|t| t.from >= start.char) {
+                tokens.push(token.semantic_token(std::mem::take(&mut last_delta), at_char));
+                at_char = token.from;
+            }
+            last_delta += 1;
+        }
+        None => return tokens,
+    }
+    remaining -= 1;
+    while remaining > 0 {
+        match iter.next() {
+            Some(token_line) => {
+                let mut at_char = 0;
+                for token in token_line.iter().filter(stylable_tokens) {
+                    tokens.push(token.semantic_token(std::mem::take(&mut last_delta), at_char));
+                    at_char = token.from;
+                }
+                last_delta += 1;
+            }
+            None => return tokens,
+        }
+        remaining -= 1;
+    }
+    match iter.next() {
+        Some(token_line) => {
+            let mut at_char = 0;
+            for token in token_line.iter().filter(stylable_tokens).filter(|t| t.from <= end.char) {
+                tokens.push(token.semantic_token(std::mem::take(&mut last_delta), at_char));
+                at_char = token.from;
+            }
+        }
+        None => return tokens,
+    }
+    tokens
+}
+
+fn stylable_tokens<T: LangStream>(token: &&PositionedToken<T>) -> bool {
+    token.token_type < 16
+}
+
+pub fn create_semantic_capabilities() -> SemanticTokensServerCapabilities {
+    SemanticTokensServerCapabilities::SemanticTokensOptions(SemanticTokensOptions {
+        legend: SemanticTokensLegend { token_types: get_local_legend(), token_modifiers: vec![] },
+        range: Some(true),
+        ..Default::default()
+    })
+}
+
+pub fn get_local_legend() -> Vec<SemanticTokenType> {
+    vec![
+        SemanticTokenType::NAMESPACE,      // 0
+        SemanticTokenType::TYPE,           // 1
+        SemanticTokenType::CLASS,          // 2
+        SemanticTokenType::ENUM,           // 3
+        SemanticTokenType::INTERFACE,      // 4
+        SemanticTokenType::STRUCT,         // 5
+        SemanticTokenType::TYPE_PARAMETER, // 6
+        SemanticTokenType::PARAMETER,      // 7
+        SemanticTokenType::VARIABLE,       // 8
+        SemanticTokenType::PROPERTY,       // 9
+        SemanticTokenType::FUNCTION,       // 10
+        SemanticTokenType::KEYWORD,        // 11
+        SemanticTokenType::COMMENT,        // 12
+        SemanticTokenType::STRING,         // 13
+        SemanticTokenType::NUMBER,         // 14
+        SemanticTokenType::DECORATOR,      // 15
+    ]
+}
+
+#[cfg(test)]
+mod test {
+    use lsp_types::SemanticToken;
+
+    use crate::lsp::local::{python::PyToken, LangStream, LocalLSP};
+
+    use super::full_tokens;
+    use std::sync::Arc;
+
+    #[test]
+    fn test_with_pytoken() {
+        let mut pylsp = LocalLSP::<PyToken>::new(Arc::default());
+        pylsp.text.push(String::from("class WorkingDirectory:"));
+        PyToken::parse(&pylsp.text, &mut pylsp.tokens);
+        let tokens = full_tokens(&pylsp.tokens);
+        assert_eq!(
+            tokens,
+            vec![
+                SemanticToken { delta_line: 0, delta_start: 0, length: 5, token_type: 11, token_modifiers_bitset: 0 },
+                SemanticToken { delta_line: 0, delta_start: 6, length: 16, token_type: 1, token_modifiers_bitset: 0 }
+            ]
+        );
     }
 }
