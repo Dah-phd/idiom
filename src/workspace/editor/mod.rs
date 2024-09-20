@@ -221,6 +221,7 @@ impl Editor {
                 let token_range = token_range_at(line, self.cursor.char);
                 self.lexer.start_rename((&self.cursor).into(), &line[token_range]);
             }
+            EditorAction::RefreshUI => self.lexer.refresh_tokens(gs),
             EditorAction::CommentOut => self.actions.comment_out(
                 self.file_type.comment_start(),
                 &mut self.cursor,

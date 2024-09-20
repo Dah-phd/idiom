@@ -1,6 +1,6 @@
 use logos::{Lexer, Logos};
 
-use super::{Definitions, Func, LangStream, PositionedToken, Struct, Var};
+use crate::lsp::local::{Definitions, Func, LangStream, ObjType, PositionedToken, Struct, Var};
 
 #[derive(Logos, Debug, PartialEq)]
 #[logos(skip r" ")]
@@ -198,32 +198,38 @@ impl LangStream for PyToken {
         }
     }
 
+    fn objectify(&self) -> super::ObjType {
+        match self {
+            Self::Name(name) => ObjType::Var(name),
+            Self::Type(name) | Self::TypeHint(name) => ObjType::Struct(name),
+            Self::Function(name) => ObjType::Fn(name),
+            _ => ObjType::None,
+        }
+    }
+
     fn init_definitions() -> Definitions {
         Definitions {
-            structs: vec![
-                Struct::new("None"),                                                                      // 0
-                Struct::new("tuple"),                                                                     // 1
-                Struct::new("dict").meth("get").meth("remove").meth("keys").meth("items").meth("values"), // 2
-                Struct::new("list").meth("pop").meth("remove").meth("insert"),                            // 3
-                Struct::new("str"),                                                                       // 4
-                Struct::new("int"),                                                                       // 5
-                Struct::new("float"),                                                                     // 6
-                Struct::new("bool"),                                                                      // 7
+            types: vec![
+                Struct::new("None"),  // 0
+                Struct::new("tuple"), // 1
+                Struct::new("dict"),  // 2
+                Struct::new("list"),  // 3
+                Struct::new("str"),   // 4
+                Struct::new("int"),   // 5
+                Struct::new("float"), // 6
+                Struct::new("bool"),  // 7
             ],
             function: vec![
-                Func { name: "abs".to_owned(), args: vec![5], returns: Some(5) },
-                Func { name: "aiter".to_owned(), ..Default::default() },
-                Func { name: "all".to_owned(), args: vec![], returns: Some(7) },
-                Func { name: "any".to_owned(), args: vec![], returns: Some(7) },
-                Func { name: "anext".to_owned(), ..Default::default() },
-                Func { name: "ascii".to_owned(), ..Default::default() },
-                Func { name: "open".to_owned(), args: vec![4, 4], returns: Some(0) },
-                Func { name: "print".to_owned(), args: vec![4], ..Default::default() },
+                Func { name: "abs".to_owned() },
+                Func { name: "aiter".to_owned() },
+                Func { name: "all".to_owned() },
+                Func { name: "any".to_owned() },
+                Func { name: "anext".to_owned() },
+                Func { name: "ascii".to_owned() },
+                Func { name: "open".to_owned() },
+                Func { name: "print".to_owned() },
             ],
-            variables: vec![
-                Var { name: "True".to_owned(), var_type: 0 },
-                Var { name: "False".to_owned(), var_type: 0 },
-            ],
+            variables: vec![Var { name: "True".to_owned() }, Var { name: "False".to_owned() }],
             keywords: vec!["def", "class", "with", "for", "while", "not", "except", "raise", "try"],
         }
     }

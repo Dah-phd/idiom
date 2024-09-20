@@ -26,10 +26,7 @@ use lsp_calls::{
 };
 use lsp_types::{PublishDiagnosticsParams, Range, Uri};
 use modal::{LSPModal, ModalMessage};
-use std::{
-    path::{Path, PathBuf},
-    time::Instant,
-};
+use std::path::{Path, PathBuf};
 use theme::Theme;
 pub use tokens::Token;
 
@@ -42,7 +39,6 @@ pub struct Lexer {
     pub uri: Uri,
     pub path: PathBuf,
     version: i32,
-    clock: Instant,
     modal: Option<LSPModal>,
     modal_rect: Option<Rect>,
     requests: Vec<LSPResponseType>,
@@ -72,7 +68,6 @@ impl Lexer {
             lang: Lang::from(file_type),
             legend: Legend::default(),
             theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
-            clock: Instant::now(),
             modal: None,
             modal_rect: None,
             uri: as_url(path),
@@ -107,7 +102,6 @@ impl Lexer {
             lang: Lang::default(),
             legend: Legend::default(),
             theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
-            clock: Instant::now(),
             modal: None,
             modal_rect: None,
             uri: as_url(path),
@@ -142,7 +136,6 @@ impl Lexer {
             lang: Lang::default(),
             legend: Legend::default(),
             theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
-            clock: Instant::now(),
             modal: None,
             modal_rect: None,
             uri: as_url(path),
@@ -175,6 +168,14 @@ impl Lexer {
     #[inline]
     pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
         (editor.lexer.context)(editor, gs);
+    }
+
+    #[inline]
+    pub fn refresh_tokens(&mut self, gs: &mut GlobalState) {
+        match (self.tokens)(self) {
+            Ok(request) => self.requests.push(request),
+            Err(err) => gs.error(err.to_string()),
+        }
     }
 
     /// sync event

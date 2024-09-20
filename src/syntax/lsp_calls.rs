@@ -10,19 +10,13 @@ use lsp_types::{
     Range, SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions, Uri,
 };
-use std::{
-    path::Path,
-    time::{Duration, Instant},
-};
+use std::path::Path;
 
 use super::{
     modal::LSPModal,
     set_diganostics,
     tokens::{set_tokens, set_tokens_partial},
 };
-
-/// timeout before remapping all tokens
-const FULL_TOKENS: Duration = Duration::from_secs(10);
 
 /// maps LSP state without runtime checks
 #[inline]
@@ -263,13 +257,6 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
 pub fn sync_edits(lexer: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
     lexer.version += 1;
     let (meta, change_events) = action.change_event(lexer.encode_position, lexer.char_lsp_pos, content);
-    if lexer.clock.elapsed() > FULL_TOKENS && lexer.modal.is_none() {
-        lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
-        let request = (lexer.tokens)(lexer)?;
-        lexer.requests.push(request);
-        lexer.clock = Instant::now();
-        return Ok(());
-    }
     lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
     match lexer.meta.take() {
         Some(meta) => lexer.meta.replace(meta + meta),
@@ -281,13 +268,6 @@ pub fn sync_edits(lexer: &mut Lexer, action: &EditType, content: &mut [EditorLin
 pub fn sync_edits_rev(lexer: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
     lexer.version += 1;
     let (meta, change_events) = action.change_event_rev(lexer.encode_position, lexer.char_lsp_pos, content);
-    if lexer.clock.elapsed() > FULL_TOKENS && lexer.modal.is_none() {
-        lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
-        let request = (lexer.tokens)(lexer)?;
-        lexer.requests.push(request);
-        lexer.clock = Instant::now();
-        return Ok(());
-    }
     lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
     match lexer.meta.take() {
         Some(meta) => lexer.meta.replace(meta + meta),
@@ -306,12 +286,6 @@ pub fn sync_edits_full(lexer: &mut Lexer, action: &EditType, content: &mut [Edit
     }
     text.push('\n');
     lexer.client.full_sync(lexer.uri.clone(), lexer.version, text)?;
-    if lexer.clock.elapsed() > FULL_TOKENS && lexer.modal.is_none() {
-        let request = (lexer.tokens)(lexer)?;
-        lexer.requests.push(request);
-        lexer.clock = Instant::now();
-        return Ok(());
-    };
     match lexer.meta.take() {
         Some(meta) => lexer.meta.replace(meta + action.map_to_meta()),
         None => lexer.meta.replace(action.map_to_meta()),
@@ -328,12 +302,6 @@ pub fn sync_edits_full_rev(lexer: &mut Lexer, action: &EditType, content: &mut [
     }
     text.push('\n');
     lexer.client.full_sync(lexer.uri.clone(), lexer.version, text)?;
-    if lexer.clock.elapsed() > FULL_TOKENS && lexer.modal.is_none() {
-        let request = (lexer.tokens)(lexer)?;
-        lexer.requests.push(request);
-        lexer.clock = Instant::now();
-        return Ok(());
-    };
     match lexer.meta.take() {
         Some(meta) => lexer.meta.replace(meta + action.map_to_meta_rev()),
         None => lexer.meta.replace(action.map_to_meta_rev()),

@@ -10,12 +10,21 @@ pub enum GenericToken {
     #[token("fn")]
     DeclareFn,
 
+    #[token("const")]
+    #[token("let")]
+    #[token("var")]
+    DeclareVar,
+
+    #[token("class")]
+    #[token("struct")]
+    DeclareStruct,
+
+    #[token("enum")]
+    DeclareEnum,
+
     #[regex(r#""([^"\\]|\\["\\bnfrt]|u[a-fA-F0-9]{4})*""#)]
     #[regex(r#"'([^'\\]|\\["\\bnfrt]|u[a-fA-F0-9]{4})*'"#)]
     String,
-
-    #[token("\"\"\"")]
-    MultiString,
 
     #[regex("#[a-zA-Z_]+")]
     #[regex("@[a-zA-Z_]+")]
@@ -30,7 +39,8 @@ pub enum GenericToken {
     #[token("continue")]
     #[token("if")]
     #[token("elif")]
-    #[token("else:")]
+    #[token("else")]
+    #[token("loop")]
     FlowControl,
 
     #[token("    ")]
@@ -43,8 +53,9 @@ pub enum GenericToken {
     #[token("not ")]
     Negate,
 
-    #[regex("class")]
-    DeclareStruct,
+    #[token("Self")]
+    #[token("cls")]
+    ClassRef,
 
     #[token("self")]
     SelfRef,
@@ -63,10 +74,10 @@ pub enum GenericToken {
     RBrack,
 
     #[token("{")]
-    DOpen,
+    ScopeOpen,
 
     #[token("}")]
-    DClose,
+    ScopeClose,
 
     #[token("[")]
     LOpen,
@@ -74,7 +85,7 @@ pub enum GenericToken {
     #[token("]")]
     LClose,
 
-    #[regex(r#": ?[a-zA-Z]+"#, |lex| lex.slice().to_owned())]
+    #[regex(r#": ?[a-zA-Z_]+"#, |lex| lex.slice().to_owned())]
     TypeHint(String),
 
     #[token("->")]
@@ -104,12 +115,14 @@ pub enum GenericToken {
     // convertible types
     Type(String),
     Function(String),
+    Enum(String),
+    Struct(String),
     NameSpace(String),
 }
 
 impl LangStream for GenericToken {
     fn init_definitions() -> super::Definitions {
-        super::Definitions { structs: vec![], function: vec![], variables: vec![], keywords: vec![] }
+        super::Definitions { types: vec![], function: vec![], variables: vec![], keywords: vec![] }
     }
     fn parse(text: &[String], tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
         todo!()

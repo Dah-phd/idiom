@@ -11,7 +11,7 @@ pub use enriched::enrich_with_semantics;
 use rust::Rustacean;
 
 use crate::lsp::local::{generic::GenericToken, python::PyToken};
-use crate::lsp::{messages::Response, Diagnostics, LSPError, LSPResult, Responses};
+use crate::lsp::{messages::Response, LSPError, LSPResult, Responses};
 use crate::render::UTF8Safe;
 use crate::utils::force_lock;
 use crate::{configs::FileType, lsp::client::Payload, workspace::CursorPosition};
@@ -46,6 +46,9 @@ trait LangStream: Sized + Debug + PartialEq + Logos<'static> {
         let len = text[span.start..span.end].char_len();
         PositionedToken { from, len, token_type: self.type_id(), modifier: self.modifier(), lang_token: self }
     }
+    fn objectify(&self) -> ObjType {
+        ObjType::None
+    }
     fn parse(text: &[String], tokens: &mut Vec<Vec<PositionedToken<Self>>>);
 }
 
@@ -56,47 +59,33 @@ struct LocalLSP<T: LangStream> {
     text: Vec<String>,
     tokens: Vec<Vec<PositionedToken<T>>>,
     responses: Arc<Responses>,
-    diagnostics: Arc<Diagnostics>,
 }
 
 pub fn start_lsp_handler(
     rx: UnboundedReceiver<Payload>,
     file_type: FileType,
     responses: Arc<Responses>,
-    diagnostics: Arc<Diagnostics>,
 ) -> JoinHandle<LSPResult<()>> {
     match file_type {
-        FileType::Python => {
-            tokio::task::spawn(async move { LocalLSP::<PyToken>::run(rx, responses, diagnostics).await })
-        }
-        FileType::Lobster => {
-            tokio::task::spawn(async move { LocalLSP::<Pincer>::run(rx, responses, diagnostics).await })
-        }
-        FileType::Json => {
-            tokio::task::spawn(async move { LocalLSP::<JsonValue>::run(rx, responses, diagnostics).await })
-        }
-        FileType::Rust => {
-            tokio::task::spawn(async move { LocalLSP::<Rustacean>::run(rx, responses, diagnostics).await })
-        }
-        _ => tokio::task::spawn(async move { LocalLSP::<GenericToken>::run(rx, responses, diagnostics).await }),
+        FileType::Python => tokio::task::spawn(async move { LocalLSP::<PyToken>::run(rx, responses).await }),
+        FileType::Lobster => tokio::task::spawn(async move { LocalLSP::<Pincer>::run(rx, responses).await }),
+        FileType::Json => tokio::task::spawn(async move { LocalLSP::<JsonValue>::run(rx, responses).await }),
+        FileType::Rust => tokio::task::spawn(async move { LocalLSP::<Rustacean>::run(rx, responses).await }),
+        _ => tokio::task::spawn(async move { LocalLSP::<GenericToken>::run(rx, responses).await }),
     }
 }
 
 impl<T: LangStream> LocalLSP<T> {
-    async fn run(
-        mut rx: UnboundedReceiver<Payload>,
-        responses: Arc<Responses>,
-        diagnostics: Arc<Diagnostics>,
-    ) -> LSPResult<()> {
-        let mut lsp = Self::new(responses, diagnostics);
+    async fn run(mut rx: UnboundedReceiver<Payload>, responses: Arc<Responses>) -> LSPResult<()> {
+        let mut lsp = Self::new(responses);
         while let Some(payload) = rx.recv().await {
             lsp.parase_payload(payload)?;
         }
         Ok(())
     }
 
-    fn new(responses: Arc<Responses>, diagnostics: Arc<Diagnostics>) -> Self {
-        Self { definitions: T::init_definitions(), text: Vec::new(), tokens: Vec::new(), diagnostics, responses }
+    fn new(responses: Arc<Responses>) -> Self {
+        Self { definitions: T::init_definitions(), text: Vec::new(), tokens: Vec::new(), responses }
     }
 
     fn parase_payload(&mut self, payload: Payload) -> LSPResult<()> {
@@ -127,21 +116,7 @@ impl<T: LangStream> LocalLSP<T> {
                 T::parse(&self.text, &mut self.tokens);
             }
             Payload::Completion(_, _c, id) => {
-                let mut items = self
-                    .definitions
-                    .keywords
-                    .iter()
-                    .map(|kward| CompletionItem::new_simple((*kward).to_owned(), String::from("Keyword")))
-                    .collect::<Vec<_>>();
-
-                for func in self.definitions.function.iter() {
-                    items.push(CompletionItem::new_simple(func.name.to_owned(), "Function".to_owned()));
-                }
-
-                for var in self.definitions.variables.iter() {
-                    items.push(CompletionItem::new_simple(var.name.to_owned(), "Variable".to_owned()));
-                }
-
+                let items = self.definitions.to_completions(&self.tokens);
                 let completion_response = CompletionResponse::Array(items);
                 let response = match to_value(completion_response) {
                     Ok(value) => Response { id, result: Some(value), error: None },
@@ -327,50 +302,69 @@ fn stylable_tokens<T: LangStream>(token: &&PositionedToken<T>) -> bool {
 
 #[derive(Default)]
 struct Definitions {
-    structs: Vec<Struct>,
+    types: Vec<Struct>,
     function: Vec<Func>,
     variables: Vec<Var>,
     keywords: Vec<&'static str>,
 }
 
+impl Definitions {
+    fn to_completions<T: LangStream>(&self, tokens: &[Vec<PositionedToken<T>>]) -> Vec<CompletionItem> {
+        let mut items = self
+            .keywords
+            .iter()
+            .map(|kward| CompletionItem::new_simple((*kward).to_owned(), String::from("Keyword")))
+            .collect::<Vec<_>>();
+
+        for func in self.function.iter() {
+            items.push(CompletionItem::new_simple(format!("{}()", func.name), "Callable".to_owned()));
+        }
+
+        for var in self.variables.iter() {
+            items.push(CompletionItem::new_simple(var.name.to_owned(), "Variable".to_owned()));
+        }
+
+        for type_name in self.types.iter() {
+            items.push(CompletionItem::new_simple(type_name.name.to_owned(), "Type".to_owned()));
+        }
+
+        for tok in tokens.iter().flatten() {
+            match tok.lang_token.objectify() {
+                ObjType::Var(name) => items.push(CompletionItem::new_simple(name.to_owned(), "Variable".to_owned())),
+                ObjType::Fn(name) => items.push(CompletionItem::new_simple(format!("{name}()"), "Callable".to_owned())),
+                ObjType::Struct(name) => items.push(CompletionItem::new_simple(name.to_owned(), "Type".to_owned())),
+                _ => (),
+            }
+        }
+
+        items
+    }
+}
+
+enum ObjType<'a> {
+    Fn(&'a str),
+    Var(&'a str),
+    Struct(&'a str),
+    None,
+}
+
 struct Struct {
     name: String,
-    parent: usize,
-    attribute: Vec<String>,
-    methods: Vec<String>,
 }
 
 impl Struct {
     fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into(), parent: 0, methods: vec![], attribute: vec![] }
-    }
-
-    const fn parent(mut self, parent_id: usize) -> Self {
-        self.parent = parent_id;
-        self
-    }
-
-    fn attr(mut self, name: impl Into<String>) -> Self {
-        self.attribute.push(name.into());
-        self
-    }
-
-    fn meth(mut self, name: impl Into<String>) -> Self {
-        self.methods.push(name.into());
-        self
+        Self { name: name.into() }
     }
 }
 
 #[derive(Default)]
 struct Func {
     name: String,
-    args: Vec<usize>,
-    returns: Option<usize>,
 }
 
 struct Var {
     name: String,
-    var_type: usize,
 }
 
 #[cfg(test)]
@@ -384,7 +378,7 @@ mod test {
 
     #[test]
     fn test_with_pytoken() {
-        let mut pylsp = LocalLSP::<PyToken>::new(Arc::default(), Arc::default());
+        let mut pylsp = LocalLSP::<PyToken>::new(Arc::default());
         pylsp.text.push(String::from("class WorkingDirectory:"));
         PyToken::parse(&pylsp.text, &mut pylsp.tokens);
         let tokens = pylsp.full_tokens();

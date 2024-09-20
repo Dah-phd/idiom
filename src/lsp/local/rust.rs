@@ -1,4 +1,4 @@
-use crate::lsp::local::{Definitions, Func, LangStream, PositionedToken, Struct, Var};
+use crate::lsp::local::{Definitions, Func, LangStream, ObjType, PositionedToken, Struct, Var};
 use logos::{Lexer, Logos};
 
 #[derive(Logos, Debug, PartialEq)]
@@ -51,9 +51,6 @@ pub enum Rustacean {
     #[regex(r#""([^"\\]|\\["\\bnfrt]|u[a-fA-F0-9]{4})*""#)]
     String,
 
-    // #[token("\"")]
-    MultiString,
-
     #[regex(r#"#\[[^\]]*\]"#)]
     Decorator,
 
@@ -82,6 +79,8 @@ pub enum Rustacean {
     EndLine,
     #[token("=")]
     Assign,
+    #[token(",")]
+    Comma,
 
     #[token("|")]
     ClosureArgs,
@@ -148,18 +147,12 @@ pub enum Rustacean {
 impl LangStream for Rustacean {
     fn parse(text: &[String], tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
         tokens.clear();
-        let mut is_multistring = false;
-        for line in text.iter() {
+        let mut lines = text.iter();
+        while let Some(mut line) = lines.next() {
+            // for line in text.iter() {
             let mut token_line = Vec::new();
             let mut logos = Rustacean::lexer(line);
             while let Some(token_result) = logos.next() {
-                if is_multistring {
-                    token_line.push(Self::MultiString.to_postioned(logos.span(), line));
-                    if matches!(token_result, Ok(Self::MultiString)) {
-                        is_multistring = false;
-                    }
-                    continue;
-                }
                 let rustacean = match token_result {
                     Ok(rustacean) => rustacean,
                     Err(_) => continue,
@@ -194,6 +187,7 @@ impl LangStream for Rustacean {
                         if let Some(Ok(mut next_rustacean)) = logos.next() {
                             next_rustacean.name_to_struct();
                             token_line.push(next_rustacean.to_postioned(logos.span(), line));
+                            // line = parse_struct(logos, line, lines, token_line, tokens);
                         }
                     }
                     Self::StaticDispatch => {
@@ -222,9 +216,7 @@ impl LangStream for Rustacean {
                     }
                     Self::Macros => {
                         let mut span = logos.span();
-                        if span.len() > 1 {
-                            span.end -= 1;
-                        }
+                        span.end -= 1;
                         token_line.push(rustacean.to_postioned(span, line));
                     }
                     Self::TypeInner => {
@@ -233,10 +225,8 @@ impl LangStream for Rustacean {
                             prev_token.refresh_type();
                         }
                         let mut span = logos.span();
-                        if span.len() > 2 {
-                            span.start += 1;
-                            span.end -= 1;
-                        }
+                        span.start += 1;
+                        span.end -= 1;
                         token_line.push(rustacean.to_postioned(span, line));
                     }
                     Self::LBrack => {
@@ -256,12 +246,9 @@ impl LangStream for Rustacean {
                             pos_token.refresh_type();
                         }
                     }
-                    Self::MultiString => {
-                        token_line.push(rustacean.to_postioned(logos.span(), line));
-                        is_multistring = true;
-                    }
                     Self::NameSpaceKeyWord => {
-                        drain_import(line, &mut logos, &mut token_line);
+                        token_line.push(rustacean.to_postioned(logos.span(), line));
+                        line = parse_import(&mut logos, line, &mut lines, &mut token_line, tokens);
                     }
                     _ => {
                         token_line.push(rustacean.to_postioned(logos.span(), line));
@@ -299,7 +286,7 @@ impl LangStream for Rustacean {
             | Self::LifeTimeAnnotation
             | Self::NameSpaceKeyWord => 11,
             Self::Comment => 12,
-            Self::String | Self::MultiString => 13,
+            Self::String => 13,
             Self::Int | Self::Float => 14,
             Self::Decorator => 15,
             _ => 20,
@@ -313,13 +300,24 @@ impl LangStream for Rustacean {
         }
     }
 
+    fn objectify(&self) -> super::ObjType {
+        match self {
+            Self::Name(name) => ObjType::Var(name),
+            Self::Type(name) | Self::Trait(name) | Self::Union(name) | Self::Enum(name) | Self::Struct(name) => {
+                ObjType::Struct(name)
+            }
+            Self::Function(name) => ObjType::Fn(name),
+            _ => ObjType::None,
+        }
+    }
+
     fn init_definitions() -> Definitions {
         Definitions {
-            structs: vec![
-                Struct::new("None"),                                                                      // 0
-                Struct::new("tuple"),                                                                     // 1
-                Struct::new("bool").meth("get").meth("remove").meth("keys").meth("items").meth("values"), // 2
-                Struct::new("Vec").meth("pop").meth("remove").meth("insert"),                             // 3
+            types: vec![
+                Struct::new("None"),  // 0
+                Struct::new("tuple"), // 1
+                Struct::new("bool"),  // 2
+                Struct::new("Vec"),   // 3
                 Struct::new("usize"),
                 Struct::new("fsize"),  // 4
                 Struct::new("isize"),  // 5
@@ -327,19 +325,16 @@ impl LangStream for Rustacean {
                 Struct::new("Result"), // 7
             ],
             function: vec![
-                Func { name: "vec!".to_owned(), args: vec![5], returns: Some(5) },
-                Func { name: "aiter".to_owned(), ..Default::default() },
-                Func { name: "all".to_owned(), args: vec![], returns: Some(7) },
-                Func { name: "any".to_owned(), args: vec![], returns: Some(7) },
-                Func { name: "anext".to_owned(), ..Default::default() },
-                Func { name: "ascii".to_owned(), ..Default::default() },
-                Func { name: "open".to_owned(), args: vec![4, 4], returns: Some(0) },
-                Func { name: "println!".to_owned(), args: vec![4], ..Default::default() },
+                Func { name: "vec!".to_owned() },
+                Func { name: "aiter".to_owned() },
+                Func { name: "all".to_owned() },
+                Func { name: "any".to_owned() },
+                Func { name: "anext".to_owned() },
+                Func { name: "ascii".to_owned() },
+                Func { name: "open".to_owned() },
+                Func { name: "println!".to_owned() },
             ],
-            variables: vec![
-                Var { name: "true".to_owned(), var_type: 0 },
-                Var { name: "false".to_owned(), var_type: 0 },
-            ],
+            variables: vec![Var { name: "true".to_owned() }, Var { name: "false".to_owned() }],
             keywords: vec![
                 "let", "mut", "for", "while", "pub", "crate", "enum", "struct", "union", "fn",
             ],
@@ -383,12 +378,129 @@ impl Rustacean {
             *self = Self::Union(std::mem::take(name));
         }
     }
+}
 
-    fn name_to_namespace(&mut self) {
-        if let Self::Name(name) = self {
-            *self = Self::NameSpace(std::mem::take(name));
+fn parse_enum<'a>(
+    logos: &mut Lexer<'a, Rustacean>,
+    mut line: &'a str,
+    lines: &mut impl Iterator<Item = &'a String>,
+    token_line: &mut Vec<PositionedToken<Rustacean>>,
+    tokens: &mut Vec<Vec<PositionedToken<Rustacean>>>,
+) -> &'a str {
+    let mut scope: usize = 0;
+    loop {
+        while let Some(token_result) = logos.next() {
+            if let Ok(rustacean) = token_result {
+                match rustacean {
+                    Rustacean::Name(name) => {
+                        token_line.push(Rustacean::NameSpace(name).to_postioned(logos.span(), line));
+                    }
+                    Rustacean::OpenScope => {
+                        scope += 1;
+                    }
+                    Rustacean::CloseScope => {
+                        scope = scope.saturating_sub(1);
+                        if scope == 0 {
+                            return line;
+                        }
+                    }
+                    _ => token_line.push(rustacean.to_postioned(logos.span(), line)),
+                }
+            }
         }
+        if scope == 0 {
+            break;
+        }
+        match lines.next() {
+            None => break,
+            Some(next_line) => line = next_line,
+        }
+        tokens.push(std::mem::take(token_line));
+        *logos = Rustacean::lexer(line);
     }
+    line
+}
+
+fn parse_struct<'a>(
+    logos: &mut Lexer<'a, Rustacean>,
+    mut line: &'a str,
+    lines: &mut impl Iterator<Item = &'a String>,
+    token_line: &mut Vec<PositionedToken<Rustacean>>,
+    tokens: &mut Vec<Vec<PositionedToken<Rustacean>>>,
+) -> &'a str {
+    let mut scope: usize = 0;
+    loop {
+        while let Some(token_result) = logos.next() {
+            if let Ok(rustacean) = token_result {
+                match rustacean {
+                    Rustacean::Name(name) => {
+                        token_line.push(Rustacean::NameSpace(name).to_postioned(logos.span(), line));
+                    }
+                    Rustacean::OpenScope => {
+                        scope += 1;
+                    }
+                    Rustacean::CloseScope => {
+                        scope = scope.saturating_sub(1);
+                        if scope == 0 {
+                            return line;
+                        }
+                    }
+                    _ => token_line.push(rustacean.to_postioned(logos.span(), line)),
+                }
+            }
+        }
+        if scope == 0 {
+            break;
+        }
+        match lines.next() {
+            None => break,
+            Some(next_line) => line = next_line,
+        }
+        tokens.push(std::mem::take(token_line));
+        *logos = Rustacean::lexer(line);
+    }
+    line
+}
+
+fn parse_import<'a>(
+    logos: &mut Lexer<'a, Rustacean>,
+    mut line: &'a String,
+    lines: &mut impl Iterator<Item = &'a String>,
+    token_line: &mut Vec<PositionedToken<Rustacean>>,
+    tokens: &mut Vec<Vec<PositionedToken<Rustacean>>>,
+) -> &'a String {
+    let mut scope: usize = 0;
+    loop {
+        while let Some(token_result) = logos.next() {
+            if let Ok(rustacean) = token_result {
+                match rustacean {
+                    Rustacean::Name(name) => {
+                        token_line.push(Rustacean::NameSpace(name).to_postioned(logos.span(), line));
+                    }
+                    Rustacean::OpenScope => {
+                        scope += 1;
+                    }
+                    Rustacean::CloseScope => {
+                        scope = scope.saturating_sub(1);
+                        if scope == 0 {
+                            return line;
+                        }
+                    }
+                    _ => token_line.push(rustacean.to_postioned(logos.span(), line)),
+                }
+            }
+        }
+        if scope == 0 {
+            break;
+        }
+        match lines.next() {
+            None => break,
+            Some(next_line) => line = next_line,
+        }
+        tokens.push(std::mem::take(token_line));
+        *logos = Rustacean::lexer(line);
+    }
+    line
 }
 
 fn drain_impl(line: &str, logos: &mut Lexer<'_, Rustacean>, token_line: &mut Vec<PositionedToken<Rustacean>>) {
@@ -429,18 +541,6 @@ fn drain_type_declare(line: &str, logos: &mut Lexer<'_, Rustacean>, token_line: 
             }
             _ => token_line.push(rustacean.to_postioned(logos.span(), line)),
         }
-    }
-}
-
-fn drain_import(line: &str, logos: &mut Lexer<'_, Rustacean>, token_line: &mut Vec<PositionedToken<Rustacean>>) {
-    token_line.push(Rustacean::NameSpaceKeyWord.to_postioned(logos.span(), line));
-    while let Some(token_result) = logos.next() {
-        let mut rustacean = match token_result {
-            Ok(pytoken) => pytoken,
-            Err(_) => continue,
-        };
-        rustacean.name_to_namespace();
-        token_line.push(rustacean.to_postioned(logos.span(), line));
     }
 }
 
@@ -555,5 +655,24 @@ mod test {
                 PositionedToken { from: 20, len: 1, token_type: 20, modifier: 0, lang_token: Rustacean::RBrack }
             ]]
         );
+    }
+
+    #[test]
+    fn test_commas() {
+        let txt = "let b = (1, 2, 3, 4);";
+        let mut logos = Rustacean::lexer(txt);
+        assert_eq!(Some(Ok(Rustacean::DeclareVar)), logos.next());
+        assert_eq!(Some(Ok(Rustacean::Name("b".to_owned()))), logos.next());
+        assert_eq!(Some(Ok(Rustacean::Assign)), logos.next());
+        assert_eq!(Some(Ok(Rustacean::LBrack)), logos.next());
+        assert_eq!(Some(Ok(Rustacean::Int)), logos.next());
+        assert_eq!(Some(Ok(Rustacean::Comma)), logos.next());
+        assert_eq!(Some(Ok(Rustacean::Int)), logos.next());
+        assert_eq!(Some(Ok(Rustacean::Comma)), logos.next());
+        assert_eq!(Some(Ok(Rustacean::Int)), logos.next());
+        assert_eq!(Some(Ok(Rustacean::Comma)), logos.next());
+        assert_eq!(Some(Ok(Rustacean::Int)), logos.next());
+        assert_eq!(Some(Ok(Rustacean::RBrack)), logos.next());
+        assert_eq!(Some(Ok(Rustacean::EndLine)), logos.next());
     }
 }

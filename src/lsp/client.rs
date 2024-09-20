@@ -151,7 +151,6 @@ impl LSPClient {
     pub fn local_lsp(file_type: FileType) -> Self {
         let (channel, rx) = unbounded_channel::<Payload>();
 
-        let (diagnostics, diagnostic_handler) = split_arc::<Diagnostics>();
         let (responses, response_handler) = split_arc::<Responses>();
         let capabilities = ServerCapabilities {
             semantic_tokens_provider: Some(create_semantic_capabilities()),
@@ -162,9 +161,9 @@ impl LSPClient {
         };
 
         // starting local lsp /parsing + generating tokens/
-        let lsp_send_handler = start_lsp_handler(rx, file_type, response_handler, diagnostic_handler);
+        let lsp_send_handler = start_lsp_handler(rx, file_type, response_handler);
         Self {
-            diagnostics,
+            diagnostics: Arc::default(),
             responses,
             channel,
             id_gen: MonoID::default(),
