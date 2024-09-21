@@ -242,13 +242,13 @@ impl Definitions {
 
         for tok in tokens.iter().flatten() {
             match tok.lang_token.objectify() {
-                ObjType::Var(name) => {
+                ObjType::Var(name) if name.len() > 2 => {
                     var_set.insert(name.to_owned());
                 }
-                ObjType::Fn(name) => {
+                ObjType::Fn(name) if name.len() > 2 => {
                     fn_set.insert(name.to_owned());
                 }
-                ObjType::Struct(name) => {
+                ObjType::Struct(name) if name.len() > 2 => {
                     type_set.insert(name.to_owned());
                 }
                 _ => (),
