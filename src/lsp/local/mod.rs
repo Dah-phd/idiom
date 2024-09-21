@@ -1,3 +1,4 @@
+use lsp_types::InsertTextFormat;
 mod enriched;
 mod generic;
 mod json;
@@ -235,7 +236,7 @@ impl Definitions {
             .map(|kward| CompletionItem::new_simple((*kward).to_owned(), String::from("Keyword")))
             .collect::<Vec<_>>();
 
-        let mut fn_set = self.function.iter().map(|func| format!("{}()", func.name)).collect::<HashSet<_>>();
+        let mut fn_set = self.function.iter().map(|func| func.name.to_owned()).collect::<HashSet<_>>();
         let mut var_set = self.variables.iter().map(|var| var.name.to_owned()).collect::<HashSet<_>>();
         let mut type_set = self.types.iter().map(|obj_type| obj_type.name.to_owned()).collect::<HashSet<_>>();
 
@@ -245,7 +246,7 @@ impl Definitions {
                     var_set.insert(name.to_owned());
                 }
                 ObjType::Fn(name) => {
-                    fn_set.insert(format!("{name}()"));
+                    fn_set.insert(name.to_owned());
                 }
                 ObjType::Struct(name) => {
                     type_set.insert(name.to_owned());
@@ -255,7 +256,13 @@ impl Definitions {
         }
 
         for func in fn_set.into_iter() {
-            items.push(CompletionItem::new_simple(func, "Callable".to_owned()));
+            items.push(CompletionItem {
+                insert_text_format: Some(InsertTextFormat::SNIPPET),
+                insert_text: Some(format!("{}($0)", func)),
+                label: func,
+                detail: Some("Function".to_owned()),
+                ..Default::default()
+            });
         }
 
         for var in var_set.into_iter() {
