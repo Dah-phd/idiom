@@ -23,13 +23,6 @@ pub fn split_arc<T: Default>() -> (Arc<T>, Arc<T>) {
     (arc, clone)
 }
 
-pub fn force_lock<T>(mutex: &Mutex<T>) -> MutexGuard<T> {
-    match mutex.lock() {
-        Ok(guard) => guard,
-        Err(poisoned) => poisoned.into_inner(),
-    }
-}
-
 pub fn get_nested_paths(path: &PathBuf) -> impl Iterator<Item = PathBuf> {
     match std::fs::read_dir(path) {
         Ok(iter) => iter.flatten().map(|p| p.path()),

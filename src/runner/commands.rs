@@ -16,7 +16,7 @@ const SHELL: &str = "cmd";
 
 use crate::error::{IdiomError, IdiomResult};
 use crate::global_state::IdiomEvent;
-use crate::{configs::CONFIG_FOLDER, global_state::GlobalState, utils::force_lock};
+use crate::{configs::CONFIG_FOLDER, global_state::GlobalState};
 use dirs::config_dir;
 
 pub struct Terminal {
@@ -38,9 +38,9 @@ impl Terminal {
         let child = pair.slave.spawn_command(cmd).map_err(|err| IdiomError::any(err.to_string()))?;
         let writer = pair.master.take_writer().map_err(|err| IdiomError::any(err.to_string()))?;
         let reader = pair.master.try_clone_reader().map_err(|err| IdiomError::any(err.to_string()))?;
-        let output = Arc::default();
+        let output: Arc<Mutex<Vec<String>>> = Arc::default();
         let buffer = Arc::clone(&output);
-        let prompt = Arc::default();
+        let prompt: Arc<Mutex<String>> = Arc::default();
         let prompt_writer = Arc::clone(&prompt);
         Ok((
             Self {
@@ -60,10 +60,10 @@ impl Terminal {
                                         l.push_str(data);
                                         let cleaned = strip_str(&l);
                                         if cleaned.ends_with('\n') {
-                                            force_lock(&buffer).push(cleaned);
+                                            buffer.lock().unwrap().push(cleaned);
                                             l.clear();
                                         } else {
-                                            *force_lock(&prompt_writer) = cleaned;
+                                            *prompt_writer.lock().unwrap() = cleaned;
                                         }
                                         bytes.clear();
                                     }

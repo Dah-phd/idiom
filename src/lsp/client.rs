@@ -185,17 +185,14 @@ impl LSPClient {
         }
     }
 
+    #[inline]
     pub fn get_responses(&self) -> Option<MutexGuard<'_, HashMap<i64, Response>>> {
         self.responses.try_lock().ok()
     }
 
     /// ensures old requests that may not have been handled due to tab change are cleared
     pub fn clear_requests(&self) {
-        let mut guard = match self.responses.lock() {
-            Ok(guard) => guard,
-            Err(inner) => inner.into_inner(),
-        };
-        guard.clear();
+        self.responses.lock().unwrap().clear();
     }
 
     pub fn get_lsp_registration(&self) -> Arc<Mutex<HashMap<PathBuf, Diagnostic>>> {

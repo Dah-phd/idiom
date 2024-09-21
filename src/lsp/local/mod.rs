@@ -17,7 +17,6 @@ use crate::render::UTF8Safe;
 use crate::syntax::theme::Theme;
 use crate::syntax::tokens::set_tokens;
 use crate::syntax::Legend;
-use crate::utils::force_lock;
 use crate::workspace::line::EditorLine;
 use crate::{configs::FileType, lsp::client::Payload, workspace::CursorPosition};
 use json::JsonValue;
@@ -121,7 +120,7 @@ impl<T: LangStream> LocalLSP<T> {
                     Ok(value) => Response { id, result: Some(value), error: None },
                     Err(error) => Response { id, result: None, error: Some(Value::String(error.to_string())) },
                 };
-                force_lock(&self.responses).insert(id, response);
+                self.responses.lock().unwrap().insert(id, response);
             }
             Payload::PartialTokens(_, range, id, ..) => {
                 let tokens = SemanticTokensRangeResult::Tokens(SemanticTokens {
@@ -132,7 +131,7 @@ impl<T: LangStream> LocalLSP<T> {
                     Ok(value) => Response { id, result: Some(value), error: None },
                     Err(err) => Response { id, result: None, error: Some(Value::String(err.to_string())) },
                 };
-                force_lock(&self.responses).insert(id, response);
+                self.responses.lock().unwrap().insert(id, response);
             }
             Payload::Sync(.., change_event) => {
                 for change in change_event {
@@ -155,7 +154,7 @@ impl<T: LangStream> LocalLSP<T> {
                     Ok(value) => Response { id, result: Some(value), error: None },
                     Err(err) => Response { id, result: None, error: Some(Value::String(err.to_string())) },
                 };
-                force_lock(&self.responses).insert(id, response);
+                self.responses.lock().unwrap().insert(id, response);
             }
             _ => {}
         };

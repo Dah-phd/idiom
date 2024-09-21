@@ -7,13 +7,12 @@ use crate::{
         local::{Definitions, LangStream, PositionedToken, Responses},
         LSPError, LSPResult, Response,
     },
-    utils::force_lock,
     workspace::CursorPosition,
 };
 use lsp_types::{
     notification::{DidOpenTextDocument, Notification},
     DidOpenTextDocumentParams, Range, SemanticToken, SemanticTokens, SemanticTokensRangeResult, SemanticTokensResult,
-    ServerCapabilities, TextDocumentContentChangeEvent, TextDocumentItem, Uri,
+    TextDocumentContentChangeEvent, TextDocumentItem, Uri,
 };
 use serde_json::{from_str, from_value, to_value, Value};
 use tokio::{io::AsyncWriteExt, process::ChildStdin, sync::mpsc::UnboundedReceiver, task::JoinHandle};
@@ -104,7 +103,7 @@ impl<T: LangStream> EnrichedLSP<T> {
                     Ok(value) => Response { id, result: Some(value), error: None },
                     Err(error) => Response { id, result: None, error: Some(Value::String(error.to_string())) },
                 };
-                force_lock(&self.responses).insert(id, response);
+                self.responses.lock().unwrap().insert(id, response);
                 Ok(None)
             }
             Payload::PartialTokens(uri, range, id, ..) => {
@@ -117,7 +116,7 @@ impl<T: LangStream> EnrichedLSP<T> {
                     Ok(value) => Response { id, result: Some(value), error: None },
                     Err(err) => Response { id, result: None, error: Some(Value::String(err.to_string())) },
                 };
-                force_lock(&self.responses).insert(id, response);
+                self.responses.lock().unwrap().insert(id, response);
                 Ok(None)
             }
             Payload::Sync(uri, version, change_event) => {

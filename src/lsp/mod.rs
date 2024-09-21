@@ -7,7 +7,7 @@ mod notification;
 mod request;
 mod servers;
 use crate::configs::FileType;
-use crate::utils::{force_lock, split_arc};
+use crate::utils::split_arc;
 pub use client::LSPClient;
 pub use error::{LSPError, LSPResult};
 pub use local::init_local_tokens;
@@ -68,10 +68,10 @@ impl LSP {
             loop {
                 match json_rpc.next().await? {
                     LSPMessage::Response(inner) => {
-                        force_lock(&responses_handler).insert(inner.id, inner);
+                        responses_handler.lock().unwrap().insert(inner.id, inner);
                     }
                     LSPMessage::Diagnostic(uri, params) => {
-                        force_lock(&diagnostics_handler).insert(uri, params);
+                        diagnostics_handler.lock().unwrap().insert(uri, params);
                     }
                     LSPMessage::Request(_inner) => {
                         // TODO: investigate handle
