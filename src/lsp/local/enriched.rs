@@ -4,7 +4,7 @@ use crate::lsp::local::{
     generic::GenericToken,
     lobster::Pincer,
     python::PyToken,
-    utils::{full_tokens, partial_tokens, stylable_tokens, swap_content},
+    utils::{full_tokens, partial_tokens, swap_content},
 };
 use crate::{
     configs::FileType,
@@ -17,7 +17,7 @@ use crate::{
 };
 use lsp_types::{
     notification::{DidOpenTextDocument, Notification},
-    DidOpenTextDocumentParams, Range, SemanticToken, SemanticTokens, SemanticTokensRangeResult, SemanticTokensResult,
+    DidOpenTextDocumentParams, SemanticTokens, SemanticTokensRangeResult, SemanticTokensResult,
     TextDocumentContentChangeEvent, TextDocumentItem, Uri,
 };
 use serde_json::{from_str, from_value, to_value, Value};

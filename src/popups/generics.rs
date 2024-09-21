@@ -99,13 +99,6 @@ impl Popup {
         Self { message, title, message_as_buffer_builder, buttons, size, state: 0, updated: true }
     }
 
-    pub fn with_state(mut self, idx: usize) -> Self {
-        if self.buttons.len() > idx {
-            self.state = idx;
-        }
-        self
-    }
-
     fn p_from_message(&self, line: Line, backend: &mut Backend) {
         if self.message_as_buffer_builder.is_none() {
             return line.render_centered(&self.message, backend);
@@ -192,10 +185,5 @@ impl<T> PopupSelector<T> {
     ) -> Self {
         let size = size.unwrap_or((20, 120));
         Self { options, display, command, state: State::new(), size, updated: true }
-    }
-
-    pub fn with_state(mut self, idx: usize) -> Self {
-        self.state.select(idx, 1);
-        self
     }
 }
