@@ -1,6 +1,6 @@
 use logos::{Lexer, Logos};
 
-use super::{Definitions, Func, LangStream, ObjType, PositionedToken, Struct, Var};
+use super::{utils::NON_TOKEN_ID, Definitions, Func, LangStream, ObjType, PositionedToken, Struct, Var};
 
 #[derive(Logos, Debug, PartialEq)]
 #[logos(skip r" ")]
@@ -219,7 +219,7 @@ impl LangStream for Pincer {
             Self::String | Self::MultiString => 13,
             Self::Int | Self::Float => 14,
             Self::Decorator => 15,
-            _ => 20,
+            _ => NON_TOKEN_ID,
         }
     }
 
@@ -365,10 +365,10 @@ mod test {
                         modifier: 0,
                         lang_token: Pincer::Type("Test".to_owned())
                     },
-                    PositionedToken { from: 10, len: 1, token_type: 20, modifier: 0, lang_token: Pincer::OpenScope }
+                    PositionedToken { from: 10, len: 1, token_type: 17, modifier: 0, lang_token: Pincer::OpenScope }
                 ],
                 vec![
-                    PositionedToken { from: 0, len: 4, token_type: 20, modifier: 0, lang_token: Pincer::Scope },
+                    PositionedToken { from: 0, len: 4, token_type: 17, modifier: 0, lang_token: Pincer::Scope },
                     PositionedToken {
                         from: 4,
                         len: 5,
@@ -376,7 +376,7 @@ mod test {
                         modifier: 0,
                         lang_token: Pincer::Name("value".to_owned())
                     },
-                    PositionedToken { from: 10, len: 1, token_type: 20, modifier: 0, lang_token: Pincer::Assign },
+                    PositionedToken { from: 10, len: 1, token_type: 17, modifier: 0, lang_token: Pincer::Assign },
                     PositionedToken { from: 12, len: 1, token_type: 14, modifier: 0, lang_token: Pincer::Int }
                 ]
             ]

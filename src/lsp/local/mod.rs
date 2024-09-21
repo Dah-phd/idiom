@@ -33,7 +33,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::task::JoinHandle;
 pub use utils::create_semantic_capabilities;
-use utils::{full_tokens, partial_tokens, swap_content};
+use utils::{full_tokens, partial_tokens, swap_content, NON_TOKEN_ID};
 
 /// Trait to be implemented on the lang specific token, allowing parsing and deriving builtins
 trait LangStream: Sized + Debug + PartialEq + Logos<'static> {

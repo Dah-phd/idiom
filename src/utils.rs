@@ -1,7 +1,7 @@
 use std::{
     ops::{Add, Sub},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex, MutexGuard},
+    sync::Arc,
 };
 
 use crate::{

@@ -1,6 +1,6 @@
 use logos::Logos;
 
-use super::LangStream;
+use super::{utils::NON_TOKEN_ID, LangStream};
 
 #[derive(Debug, Logos, PartialEq)]
 #[logos(skip r"[ \t\r\n\f]+")]
@@ -57,7 +57,7 @@ impl LangStream for JsonValue {
             Self::Bool | Self::Null => 11,
             Self::String => 13,
             Self::Number => 14,
-            _ => 16,
+            _ => NON_TOKEN_ID,
         }
     }
 

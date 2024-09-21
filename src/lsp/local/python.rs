@@ -2,6 +2,8 @@ use logos::{Lexer, Logos};
 
 use crate::lsp::local::{Definitions, Func, LangStream, ObjType, PositionedToken, Struct, Var};
 
+use super::utils::NON_TOKEN_ID;
+
 #[derive(Logos, Debug, PartialEq)]
 #[logos(skip r" ")]
 pub enum PyToken {
@@ -187,7 +189,7 @@ impl LangStream for PyToken {
             Self::String | Self::MultiString => 13,
             Self::Int | Self::Float => 14,
             Self::Decorator => 15,
-            _ => 20,
+            _ => NON_TOKEN_ID,
         }
     }
 
@@ -339,10 +341,10 @@ mod test {
                         modifier: 0,
                         lang_token: PyToken::Type("Test".to_owned())
                     },
-                    PositionedToken { from: 10, len: 1, token_type: 20, modifier: 0, lang_token: PyToken::OpenScope }
+                    PositionedToken { from: 10, len: 1, token_type: 17, modifier: 0, lang_token: PyToken::OpenScope }
                 ],
                 vec![
-                    PositionedToken { from: 0, len: 4, token_type: 20, modifier: 0, lang_token: PyToken::Scope },
+                    PositionedToken { from: 0, len: 4, token_type: 17, modifier: 0, lang_token: PyToken::Scope },
                     PositionedToken {
                         from: 4,
                         len: 5,
@@ -350,7 +352,7 @@ mod test {
                         modifier: 0,
                         lang_token: PyToken::Name("value".to_owned())
                     },
-                    PositionedToken { from: 10, len: 1, token_type: 20, modifier: 0, lang_token: PyToken::Assign },
+                    PositionedToken { from: 10, len: 1, token_type: 17, modifier: 0, lang_token: PyToken::Assign },
                     PositionedToken { from: 12, len: 1, token_type: 14, modifier: 0, lang_token: PyToken::Int }
                 ]
             ]

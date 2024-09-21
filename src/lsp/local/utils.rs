@@ -6,6 +6,8 @@ use lsp_types::{
     SemanticTokensServerCapabilities,
 };
 
+pub const NON_TOKEN_ID: u32 = 17;
+
 // !TODO Dobule check utf8 complience
 pub fn swap_content(content: &mut Vec<String>, clip: &str, from: CursorPosition, to: CursorPosition) {
     remove_content(from, to, content);
@@ -123,8 +125,8 @@ pub fn partial_tokens<T: LangStream>(lsp_tokens: &[Vec<PositionedToken<T>>], ran
     tokens
 }
 
-fn stylable_tokens<T: LangStream>(token: &&PositionedToken<T>) -> bool {
-    token.token_type < 16
+pub fn stylable_tokens<T: LangStream>(token: &&PositionedToken<T>) -> bool {
+    token.token_type < NON_TOKEN_ID
 }
 
 pub fn create_semantic_capabilities() -> SemanticTokensServerCapabilities {
@@ -153,6 +155,7 @@ pub fn get_local_legend() -> Vec<SemanticTokenType> {
         SemanticTokenType::STRING,         // 13
         SemanticTokenType::NUMBER,         // 14
         SemanticTokenType::DECORATOR,      // 15
+        SemanticTokenType::ENUM_MEMBER,    // 16
     ]
 }
 
