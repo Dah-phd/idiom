@@ -4,6 +4,7 @@ mod json;
 mod lobster;
 mod python;
 mod rust;
+mod text_editor;
 mod ts; // support TS and JS
 mod utils;
 

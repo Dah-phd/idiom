@@ -171,7 +171,9 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn refresh_tokens(&mut self, gs: &mut GlobalState) {
+    pub fn refresh_lsp(&mut self, gs: &mut GlobalState) {
+        self.requests.clear();
+        self.client.clear_requests();
         match (self.tokens)(self) {
             Ok(request) => self.requests.push(request),
             Err(err) => gs.error(err.to_string()),

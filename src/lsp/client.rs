@@ -172,6 +172,7 @@ impl LSPClient {
         }
     }
 
+    /// instead of haveing checks all over the place this will simply do nothing with LSP request
     pub fn placeholder() -> Self {
         let (channel, _) = tokio::sync::mpsc::unbounded_channel::<Payload>();
         Self {
@@ -185,7 +186,16 @@ impl LSPClient {
     }
 
     pub fn get_responses(&self) -> Option<MutexGuard<'_, HashMap<i64, Response>>> {
-        self.responses.lock().ok()
+        self.responses.try_lock().ok()
+    }
+
+    /// ensures old requests that may not have been handled due to tab change are cleared
+    pub fn clear_requests(&self) {
+        let mut guard = match self.responses.lock() {
+            Ok(guard) => guard,
+            Err(inner) => inner.into_inner(),
+        };
+        guard.clear();
     }
 
     pub fn get_lsp_registration(&self) -> Arc<Mutex<HashMap<PathBuf, Diagnostic>>> {
