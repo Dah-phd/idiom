@@ -111,9 +111,13 @@ pub enum GenericToken {
 
     #[regex("-?[0-9]+\\.[0-9]+")]
     Float,
-
     #[regex("-?[0-9]+")]
     Int,
+    #[token("True")]
+    #[token("False")]
+    #[token("true")]
+    #[token("false")]
+    Bool,
 
     #[regex(r#"[a-zA-Z_][a-zA-Z_0-9]*"#, |lex| lex.slice().to_owned())]
     Name(String),
@@ -192,6 +196,7 @@ impl LangStream for GenericToken {
             | Self::FlowControl
             | Self::SelfRef
             | Self::ClassRef
+            | Self::Bool
             | Self::NameSpaceKeyWord => 11,
             Self::String => 13,
             Self::Int | Self::Float => 14,

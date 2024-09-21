@@ -208,6 +208,18 @@ impl LangStream for Rustacean {
                             token_line.push(Self::Type(name).to_postioned(logos.span(), line));
                         }
                     }
+                    Self::Return => {
+                        token_line.push(rustacean.to_postioned(logos.span(), line));
+                        match logos.next() {
+                            Some(Ok(Rustacean::Name(name))) => {
+                                token_line.push(Rustacean::Type(name).to_postioned(logos.span(), line));
+                            }
+                            Some(Ok(next_rustation)) => {
+                                token_line.push(next_rustation.to_postioned(logos.span(), line));
+                            }
+                            _ => (),
+                        }
+                    }
                     Self::TypeAssign => {
                         let mut span = logos.span();
                         span.start += 1;
@@ -523,17 +535,25 @@ fn drain_impl(line: &str, logos: &mut Lexer<'_, Rustacean>, token_line: &mut Vec
         Some(Ok(Rustacean::Name(name))) => token_line.push(Rustacean::Type(name).to_postioned(logos.span(), line)),
         _ => return,
     }
-    match logos.next() {
-        Some(Ok(Rustacean::FlowControl)) => {
-            let prev = token_line.last_mut().expect("pushed above");
-            prev.lang_token.type_to_trait();
-            prev.refresh_type();
-            token_line.push(Rustacean::ImplementInterface.to_postioned(logos.span(), line))
+    while let Some(rustacean) = logos.next() {
+        match rustacean {
+            Ok(Rustacean::FlowControl) => {
+                let prev = token_line.last_mut().expect("pushed above");
+                prev.lang_token.type_to_trait();
+                prev.refresh_type();
+                token_line.push(Rustacean::ImplementInterface.to_postioned(logos.span(), line))
+            }
+            Ok(Rustacean::Name(name)) => {
+                token_line.push(Rustacean::Type(name).to_postioned(logos.span(), line));
+            }
+            Ok(Rustacean::TypeInner) => {
+                let mut span = logos.span();
+                span.start += 1;
+                span.end -= 1;
+                token_line.push(Rustacean::TypeInner.to_postioned(span, line));
+            }
+            _ => return,
         }
-        _ => return,
-    }
-    if let Some(Ok(Rustacean::Name(name))) = logos.next() {
-        token_line.push(Rustacean::Type(name).to_postioned(logos.span(), line));
     }
 }
 
