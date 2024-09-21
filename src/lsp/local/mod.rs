@@ -28,7 +28,8 @@ use lsp_types::{
 };
 use lsp_types::{CompletionItem, CompletionResponse};
 use serde_json::{from_str, to_value, Value};
-use std::fmt::Debug;
+use std::collections::HashSet;
+use std::fmt::{format, Debug};
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::task::JoinHandle;
@@ -234,25 +235,35 @@ impl Definitions {
             .map(|kward| CompletionItem::new_simple((*kward).to_owned(), String::from("Keyword")))
             .collect::<Vec<_>>();
 
-        for func in self.function.iter() {
-            items.push(CompletionItem::new_simple(format!("{}()", func.name), "Callable".to_owned()));
-        }
-
-        for var in self.variables.iter() {
-            items.push(CompletionItem::new_simple(var.name.to_owned(), "Variable".to_owned()));
-        }
-
-        for type_name in self.types.iter() {
-            items.push(CompletionItem::new_simple(type_name.name.to_owned(), "Type".to_owned()));
-        }
+        let mut fn_set = self.function.iter().map(|func| format!("{}()", func.name)).collect::<HashSet<_>>();
+        let mut var_set = self.variables.iter().map(|var| var.name.to_owned()).collect::<HashSet<_>>();
+        let mut type_set = self.types.iter().map(|obj_type| obj_type.name.to_owned()).collect::<HashSet<_>>();
 
         for tok in tokens.iter().flatten() {
             match tok.lang_token.objectify() {
-                ObjType::Var(name) => items.push(CompletionItem::new_simple(name.to_owned(), "Variable".to_owned())),
-                ObjType::Fn(name) => items.push(CompletionItem::new_simple(format!("{name}()"), "Callable".to_owned())),
-                ObjType::Struct(name) => items.push(CompletionItem::new_simple(name.to_owned(), "Type".to_owned())),
+                ObjType::Var(name) => {
+                    var_set.insert(name.to_owned());
+                }
+                ObjType::Fn(name) => {
+                    fn_set.insert(format!("{name}()"));
+                }
+                ObjType::Struct(name) => {
+                    type_set.insert(name.to_owned());
+                }
                 _ => (),
             }
+        }
+
+        for func in fn_set.into_iter() {
+            items.push(CompletionItem::new_simple(func, "Callable".to_owned()));
+        }
+
+        for var in var_set.into_iter() {
+            items.push(CompletionItem::new_simple(var, "Variable".to_owned()));
+        }
+
+        for type_name in type_set.into_iter() {
+            items.push(CompletionItem::new_simple(type_name, "Type".to_owned()));
         }
 
         items
