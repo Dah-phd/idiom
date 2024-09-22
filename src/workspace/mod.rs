@@ -273,6 +273,9 @@ impl Workspace {
             }
             Some(cmd) => cmd,
         };
+
+        // set initial tokens while LSP is indexing
+        crate::lsp::init_local_tokens(file_type, &mut new.content, &new.lexer.theme);
         match self.lsp_servers.entry(new.file_type) {
             Entry::Vacant(entry) => match LSP::new(lsp_cmd, new.file_type).await {
                 Ok(lsp) => {

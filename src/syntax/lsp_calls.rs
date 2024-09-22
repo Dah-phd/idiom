@@ -20,7 +20,7 @@ use super::{
 
 /// maps LSP state without runtime checks
 #[inline]
-pub fn map(lexer: &mut Lexer, client: LSPClient) {
+pub fn map_lsp(lexer: &mut Lexer, client: LSPClient) {
     lexer.lsp = true;
 
     lexer.context = context;
@@ -163,6 +163,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     // diagnostics
     if let Some(diagnostics) = client.get_diagnostics(&editor.path) {
         set_diganostics(content, diagnostics);
+        lexer.modal_rect.take();
     }
     // responses
     if let Some(mut responses) = client.get_responses() {
@@ -236,7 +237,6 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
             } else {
                 if matches!(request, LSPResponseType::Tokens(..)) {
                     lexer.meta = None;
-                    crate::lsp::init_local_tokens(editor.file_type, content, &lexer.theme);
                 }
                 unresolved_requests.push(request);
             }

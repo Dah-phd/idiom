@@ -21,7 +21,7 @@ pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
     as_url, char_lsp_pos, completable_dead, context_local, encode_pos_utf32, get_autocomplete_dead, info_position_dead,
-    map, remove_lsp, renames_dead, start_renames_dead, sync_edits_dead, sync_edits_dead_rev, tokens_dead,
+    map_lsp, remove_lsp, renames_dead, start_renames_dead, sync_edits_dead, sync_edits_dead_rev, tokens_dead,
     tokens_partial_dead,
 };
 use lsp_types::{PublishDiagnosticsParams, Range, Uri};
@@ -239,7 +239,7 @@ impl Lexer {
             gs.error(error.to_string());
             return;
         }
-        map(self, client);
+        map_lsp(self, client);
         gs.success("LSP mapped!");
         match (self.tokens)(self) {
             Ok(request) => self.requests.push(request),
@@ -249,7 +249,7 @@ impl Lexer {
 
     pub fn local_lsp(&mut self, file_type: FileType, content: String, gs: &mut GlobalState) {
         let client = LSPClient::local_lsp(file_type);
-        map(self, client);
+        map_lsp(self, client);
         match self.client.file_did_open(self.uri.clone(), file_type, content) {
             Ok(_) => {
                 gs.success("Starting local LSP - internal system to provide basic language feature");
