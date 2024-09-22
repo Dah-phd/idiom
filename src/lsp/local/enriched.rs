@@ -9,8 +9,8 @@ use crate::lsp::local::{
 use crate::{
     configs::FileType,
     lsp::{
-        client::Payload,
         local::{Definitions, LangStream, PositionedToken, Responses},
+        payload::Payload,
         LSPError, LSPResult, Response,
     },
     workspace::CursorPosition,

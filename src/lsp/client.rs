@@ -2,16 +2,16 @@ use super::{
     local::{create_semantic_capabilities, enrich_with_semantics, start_lsp_handler},
     Diagnostic, Diagnostics, LSPNotification, LSPRequest, LSPResult, Response, Responses,
 };
-use crate::{configs::FileType, lsp::LSPError, syntax::DiagnosticLine, utils::split_arc, workspace::CursorPosition};
+use crate::{
+    configs::FileType,
+    lsp::{payload::Payload, LSPError},
+    syntax::DiagnosticLine,
+    utils::split_arc,
+    workspace::CursorPosition,
+};
 use lsp_types::{
-    notification::{
-        DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument, DidRenameFiles, DidSaveTextDocument, Exit,
-        Initialized,
-    },
-    request::{
-        Completion, GotoDeclaration, GotoDefinition, HoverRequest, References, Rename, SemanticTokensFullRequest,
-        SemanticTokensRangeRequest, Shutdown, SignatureHelpRequest,
-    },
+    notification::{DidCloseTextDocument, DidOpenTextDocument, DidRenameFiles, DidSaveTextDocument, Exit, Initialized},
+    request::Shutdown,
     CompletionOptions, InitializedParams, PositionEncodingKind, Range, ServerCapabilities,
     TextDocumentContentChangeEvent, TextDocumentSyncKind, Uri,
 };
@@ -28,62 +28,6 @@ use tokio::{
     sync::mpsc::{unbounded_channel, UnboundedSender},
     task::JoinHandle,
 };
-
-pub enum Payload {
-    /// Notifications
-    Sync(Uri, i32, Vec<TextDocumentContentChangeEvent>),
-    FullSync(Uri, i32, String),
-    /// Requests
-    Tokens(Uri, i64),
-    PartialTokens(Uri, Range, i64),
-    Completion(Uri, CursorPosition, i64),
-    Rename(Uri, CursorPosition, String, i64),
-    References(Uri, CursorPosition, i64),
-    Definition(Uri, CursorPosition, i64),
-    Declaration(Uri, CursorPosition, i64),
-    Hover(Uri, CursorPosition, i64),
-    SignatureHelp(Uri, CursorPosition, i64),
-    /// Send serialized
-    Direct(String),
-}
-
-impl Payload {
-    pub fn try_stringify(self) -> Result<String, LSPError> {
-        match self {
-            // Direct sending of serialized message
-            Payload::Direct(msg) => Ok(msg),
-            // Create and stringify notification
-            Payload::Sync(uri, version, events) => {
-                LSPNotification::<DidChangeTextDocument>::file_did_change(uri, version, events).stringify()
-            }
-            Payload::FullSync(uri, version, text) => {
-                let full_changes = vec![TextDocumentContentChangeEvent { range: None, range_length: None, text }];
-                LSPNotification::<DidChangeTextDocument>::file_did_change(uri, version, full_changes).stringify()
-            }
-            // Create and send request
-            Payload::References(uri, c, id) => LSPRequest::<References>::references(uri, c, id).stringify(),
-            Payload::Definition(uri, c, id) => LSPRequest::<GotoDefinition>::definition(uri, c, id).stringify(),
-            Payload::Declaration(uri, c, id) => LSPRequest::<GotoDeclaration>::declaration(uri, c, id).stringify(),
-            Payload::Completion(uri, c, id) => LSPRequest::<Completion>::completion(uri, c, id).stringify(),
-            Payload::Tokens(uri, id) => LSPRequest::<SemanticTokensFullRequest>::semantics_full(uri, id).stringify(),
-            Payload::PartialTokens(uri, range, id) => {
-                LSPRequest::<SemanticTokensRangeRequest>::semantics_range(uri, range, id).stringify()
-            }
-            Payload::Rename(uri, c, new_name, id) => LSPRequest::<Rename>::rename(uri, c, new_name, id).stringify(),
-            Payload::Hover(uri, c, id) => LSPRequest::<HoverRequest>::hover(uri, c, id).stringify(),
-            Payload::SignatureHelp(uri, c, id) => {
-                LSPRequest::<SignatureHelpRequest>::signature_help(uri, c, id).stringify()
-            }
-        }
-    }
-}
-
-impl From<String> for Payload {
-    #[inline]
-    fn from(value: String) -> Self {
-        Self::Direct(value)
-    }
-}
 
 /// LSPClient
 /// Receives and sends messages to the LSP server running.

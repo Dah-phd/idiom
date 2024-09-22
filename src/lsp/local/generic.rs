@@ -1,3 +1,4 @@
+use super::Func;
 use logos::{Lexer, Logos};
 
 use super::{utils::NON_TOKEN_ID, LangStream, PositionedToken};
@@ -26,6 +27,8 @@ pub enum GenericToken {
     #[token("import")]
     #[token("from")]
     #[token("require")]
+    #[token("using")]
+    #[token("#include")]
     NameSpaceKeyWord,
 
     #[regex(r#""([^"\\]|\\["\\bnfrt]|u[a-fA-F0-9]{4})*""#)]
@@ -49,6 +52,10 @@ pub enum GenericToken {
     #[token("loop")]
     FlowControl,
 
+    #[token("auto")]
+    #[token("void")]
+    KeyWords,
+
     #[token("    ")]
     Scope,
 
@@ -69,6 +76,9 @@ pub enum GenericToken {
     #[token("=")]
     #[token(":=")]
     Assign,
+
+    #[token("::")]
+    ParentInvoke,
 
     #[token(".")]
     InstanceInvoked,
@@ -131,7 +141,19 @@ pub enum GenericToken {
 
 impl LangStream for GenericToken {
     fn init_definitions() -> super::Definitions {
-        super::Definitions { types: vec![], function: vec![], variables: vec![], keywords: vec![] }
+        super::Definitions {
+            types: vec![],
+            function: vec![
+                Func { name: "print".to_owned() },
+                Func { name: "println".to_owned() },
+                Func { name: "println!".to_owned() },
+                Func { name: "printf".to_owned() },
+                Func { name: "malloc".to_owned() },
+                Func { name: "free".to_owned() },
+            ],
+            variables: vec![],
+            keywords: vec![],
+        }
     }
     fn parse(text: &[String], tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
         tokens.clear();
@@ -145,24 +167,24 @@ impl LangStream for GenericToken {
                 };
                 match gen_token {
                     Self::DeclareFn => {
-                        token_line.push(gen_token.to_postioned(logos.span(), line.as_str()));
+                        token_line.push(gen_token.to_postioned(logos.span(), line));
                         if let Some(Ok(mut next_gentoken)) = logos.next() {
                             next_gentoken.name_to_func();
-                            token_line.push(next_gentoken.to_postioned(logos.span(), line.as_str()));
+                            token_line.push(next_gentoken.to_postioned(logos.span(), line));
                         }
                     }
                     Self::DeclareStruct => {
-                        token_line.push(gen_token.to_postioned(logos.span(), line.as_str()));
+                        token_line.push(gen_token.to_postioned(logos.span(), line));
                         if let Some(Ok(mut next_gentoken)) = logos.next() {
                             next_gentoken.name_to_class();
-                            token_line.push(next_gentoken.to_postioned(logos.span(), line.as_str()));
+                            token_line.push(next_gentoken.to_postioned(logos.span(), line));
                         }
                     }
                     Self::DeclareEnum => {
                         token_line.push(gen_token.to_postioned(logos.span(), line));
                         if let Some(Ok(mut next_gentoken)) = logos.next() {
                             next_gentoken.name_to_enum();
-                            token_line.push(next_gentoken.to_postioned(logos.span(), line.as_str()));
+                            token_line.push(next_gentoken.to_postioned(logos.span(), line));
                         }
                     }
                     Self::LBrack => {
@@ -170,12 +192,20 @@ impl LangStream for GenericToken {
                             pos_token.lang_token.derive_from_name();
                             pos_token.refresh_type();
                         }
+                        token_line.push(gen_token.to_postioned(logos.span(), line));
+                    }
+                    Self::ParentInvoke => {
+                        if let Some(pos_token) = token_line.last_mut() {
+                            pos_token.lang_token.name_to_namespace();
+                            pos_token.refresh_type();
+                        }
+                        token_line.push(gen_token.to_postioned(logos.span(), line));
                     }
                     Self::NameSpaceKeyWord => {
                         drain_import(line, &mut logos, &mut token_line);
                     }
                     _ => {
-                        token_line.push(gen_token.to_postioned(logos.span(), line.as_str()));
+                        token_line.push(gen_token.to_postioned(logos.span(), line));
                     }
                 }
             }
@@ -196,6 +226,7 @@ impl LangStream for GenericToken {
             | Self::FlowControl
             | Self::SelfRef
             | Self::ClassRef
+            | Self::KeyWords
             | Self::Bool
             | Self::NameSpaceKeyWord => 11,
             Self::String => 13,

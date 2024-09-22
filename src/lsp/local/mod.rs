@@ -1,4 +1,3 @@
-use lsp_types::InsertTextFormat;
 mod enriched;
 mod generic;
 mod json;
@@ -10,6 +9,7 @@ mod ts; // support TS and JS
 mod utils;
 
 pub use enriched::enrich_with_semantics;
+use lsp_types::InsertTextFormat;
 use rust::Rustacean;
 
 use crate::lsp::local::{generic::GenericToken, python::PyToken};
@@ -19,7 +19,7 @@ use crate::syntax::theme::Theme;
 use crate::syntax::tokens::set_tokens;
 use crate::syntax::Legend;
 use crate::workspace::line::EditorLine;
-use crate::{configs::FileType, lsp::client::Payload, workspace::CursorPosition};
+use crate::{configs::FileType, lsp::payload::Payload, workspace::CursorPosition};
 use json::JsonValue;
 use lobster::Pincer;
 use logos::{Logos, Span};
@@ -30,7 +30,7 @@ use lsp_types::{
 use lsp_types::{CompletionItem, CompletionResponse};
 use serde_json::{from_str, to_value, Value};
 use std::collections::HashSet;
-use std::fmt::{format, Debug};
+use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::task::JoinHandle;

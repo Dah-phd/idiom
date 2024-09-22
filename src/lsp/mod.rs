@@ -4,6 +4,7 @@ mod local;
 mod lsp_stream;
 mod messages;
 mod notification;
+mod payload;
 mod request;
 mod servers;
 use crate::configs::FileType;

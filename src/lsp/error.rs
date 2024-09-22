@@ -1,9 +1,8 @@
 use std::fmt::Display;
 use thiserror::Error;
 
-use crate::lsp::lsp_stream;
+use crate::lsp::{lsp_stream, payload::Payload};
 
-use super::client::Payload;
 pub type LSPResult<T> = Result<T, LSPError>;
 
 #[derive(Error, Debug)]
