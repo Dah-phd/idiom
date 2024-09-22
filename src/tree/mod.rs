@@ -91,8 +91,8 @@ impl Tree {
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         if let Some(action) = self.key_map.map(key) {
             match action {
-                TreeAction::Up => self.select_up(),
-                TreeAction::Down => self.select_down(),
+                TreeAction::Up => self.select_up(gs),
+                TreeAction::Down => self.select_down(gs),
                 TreeAction::Shrink => self.shrink(),
                 TreeAction::Expand => {
                     if let Some(path) = self.expand_dir_or_get_path() {
@@ -100,7 +100,7 @@ impl Tree {
                     }
                 }
                 TreeAction::Delete => {
-                    let _ = self.delete_file();
+                    let _ = self.delete_file(gs);
                 }
                 TreeAction::NewFile => gs.popup(create_file_popup(self.get_first_selected_folder_display())),
                 TreeAction::Rename => {
@@ -156,21 +156,23 @@ impl Tree {
         None
     }
 
-    fn select_up(&mut self) {
+    fn select_up(&mut self, gs: &mut GlobalState) {
         let tree_len = self.tree.len() - 1;
         if tree_len == 0 {
             return;
         }
         self.state.prev(tree_len);
+        self.state.update_at_line(gs.tree_area.height as usize);
         self.unsafe_set_path();
     }
 
-    fn select_down(&mut self) {
+    fn select_down(&mut self, gs: &mut GlobalState) {
         let tree_len = self.tree.len() - 1;
         if tree_len == 0 {
             return;
         }
         self.state.next(tree_len);
+        self.state.update_at_line(gs.tree_area.height as usize);
         self.unsafe_set_path();
     }
 
@@ -186,13 +188,13 @@ impl Tree {
         Ok(path)
     }
 
-    fn delete_file(&mut self) -> IdiomResult<()> {
+    fn delete_file(&mut self, gs: &mut GlobalState) -> IdiomResult<()> {
         if self.selected_path.is_file() {
             std::fs::remove_file(&self.selected_path)?
         } else {
             std::fs::remove_dir_all(&self.selected_path)?
         };
-        self.select_up();
+        self.select_up(gs);
         self.rebuild = true;
         Ok(())
     }
