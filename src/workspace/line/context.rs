@@ -1,3 +1,5 @@
+use super::status::RenderStatus;
+use super::EditorLine;
 use crate::{
     global_state::GlobalState,
     render::{
@@ -23,6 +25,25 @@ impl<'a> LineContext<'a> {
         let line_number = cursor.at_line;
         let select = cursor.select_get();
         Self { line: cursor.line - line_number, char: cursor.char, select, lexer, line_number, line_number_offset }
+    }
+
+    /// Ensures during deletion of lines, if scrolling has happened that last line will be rendered
+    /// not the most elegant solution - probably should revisit at some point, but good enough
+    /// it does not poison other parts of the logic, except fast render
+    pub fn correct_last_line_match(&self, content: &mut Vec<EditorLine>, screen_hight: usize) {
+        let last_line = self.line_number + screen_hight;
+        if last_line < 1 {
+            return;
+        }
+        let dissallowed_rendered_line = match content.get(last_line - 1).map(|el| &el.cached) {
+            Some(RenderStatus::Line { line, .. }) => *line,
+            _ => return,
+        };
+        if let Some(last_line) = content.get_mut(last_line) {
+            if matches!(last_line.cached, RenderStatus::Line { line, .. } if line == dissallowed_rendered_line) {
+                last_line.clear_cache();
+            }
+        }
     }
 
     #[inline(always)]

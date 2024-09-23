@@ -42,6 +42,7 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     }
     let mut lines = gs.editor_area.into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
+    ctx.correct_last_line_match(&mut editor.content, lines.len());
     let backend = &mut gs.writer;
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
         if let Some(line) = lines.next() {
