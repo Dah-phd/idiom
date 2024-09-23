@@ -45,7 +45,7 @@ impl FileType {
 
     pub fn comment_start(&self) -> &str {
         match self {
-            Self::Python => "#",
+            Self::Python | Self::Toml | Self::Shell => "#",
             _ => "//",
         }
     }
