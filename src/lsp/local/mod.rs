@@ -1,3 +1,4 @@
+mod bash;
 mod enriched;
 mod generic;
 mod json;

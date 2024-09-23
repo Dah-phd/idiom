@@ -17,6 +17,7 @@ pub enum FileType {
     Toml,
     Json,
     Nim,
+    Shell,
 }
 
 impl FileType {
@@ -37,6 +38,7 @@ impl FileType {
             "html" => Some(Self::Html),
             "lobster" => Some(Self::Lobster),
             "json" => Some(Self::Json),
+            "sh" => Some(Self::Shell),
             _ => None,
         }
     }
@@ -66,6 +68,7 @@ impl From<FileType> for &'static str {
             FileType::Toml => "toml",
             FileType::Lobster => "lobster",
             FileType::Json => "json",
+            FileType::Shell => "shellscript",
         }
     }
 }
