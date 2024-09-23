@@ -144,6 +144,18 @@ impl GlobalState {
         }
     }
 
+    pub fn clear_stats(&mut self) {
+        if let Some(mut line) = self.footer_area.get_line(0) {
+            let accent_style = self.theme.accent_style;
+            line += INSERT_SPAN.len();
+            self.writer.set_style(accent_style);
+            self.writer.go_to(line.row, line.col);
+            self.writer.clear_to_eol();
+            self.writer.reset_style();
+            self.messages.render(accent_style, &mut self.writer);
+        }
+    }
+
     #[inline]
     pub fn map_key(
         &mut self,

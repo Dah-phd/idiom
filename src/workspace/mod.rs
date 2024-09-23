@@ -381,6 +381,7 @@ impl Workspace {
         drop(editor);
         match self.get_active() {
             None => {
+                gs.clear_stats();
                 gs.editor_area.clear(&mut gs.writer);
                 gs.select_mode();
             }
