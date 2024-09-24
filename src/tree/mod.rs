@@ -10,7 +10,10 @@ use crate::{
     utils::{build_file_or_folder, to_canon_path, to_relative_path},
 };
 use crossterm::event::KeyEvent;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    path::{Path, PathBuf},
+};
 pub use tree_paths::TreePath;
 use watcher::TreeWatcher;
 
@@ -20,7 +23,7 @@ pub struct Tree {
     pub key_map: TreeKeyMap,
     pub watcher: TreeWatcher,
     state: State,
-    diagnostics_state: Vec<(PathBuf, DiagnosticType)>,
+    diagnostics_state: HashMap<PathBuf, DiagnosticType>,
     selected_path: PathBuf,
     tree: TreePath,
     display_offset: usize,
@@ -44,7 +47,7 @@ impl Tree {
                     selected_path,
                     tree,
                     rebuild: true,
-                    diagnostics_state: Vec::new(),
+                    diagnostics_state: HashMap::new(),
                 }
             }
             Err(..) => {
@@ -58,7 +61,7 @@ impl Tree {
                     selected_path: PathBuf::from("./"),
                     tree,
                     rebuild: true,
-                    diagnostics_state: Vec::new(),
+                    diagnostics_state: HashMap::new(),
                 }
             }
         }
@@ -189,18 +192,21 @@ impl Tree {
     }
 
     pub fn push_diagnostics(&mut self, new: TreeDiagnostics) {
+        self.rebuild = true;
         for (path, new_diagnostic) in new {
             if let Ok(d_path) = (self.path_parser)(&path) {
                 self.tree.map_diagnostics_base(&d_path, new_diagnostic);
                 if matches!(new_diagnostic, DiagnosticType::None) {
-                    self.diagnostics_state.retain(|(p, ..)| p.as_path() != d_path);
+                    self.diagnostics_state.remove(&d_path);
                     continue;
                 }
-                match self.diagnostics_state.iter().position(|(p, ..)| p == &d_path) {
-                    Some(idx) => {
-                        self.diagnostics_state[idx] = (d_path, new_diagnostic);
+                match self.diagnostics_state.entry(d_path) {
+                    Entry::Occupied(mut entry) => {
+                        entry.insert(new_diagnostic);
                     }
-                    None => self.diagnostics_state.push((d_path, new_diagnostic)),
+                    Entry::Vacant(entry) => {
+                        entry.insert(new_diagnostic);
+                    }
                 }
             }
         }
