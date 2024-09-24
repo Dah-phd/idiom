@@ -19,17 +19,11 @@ pub use request::LSPRequest;
 
 use lsp_types::{request::Initialize, InitializeResult, Uri};
 use serde_json::from_value;
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-    process::Stdio,
-    str::FromStr,
-    sync::Mutex,
-};
+use std::{collections::HashMap, path::Path, process::Stdio, str::FromStr, sync::Mutex};
 use tokio::{io::AsyncWriteExt, process::Child, task::JoinHandle};
 
 pub type Responses = Mutex<HashMap<i64, Response>>;
-pub type Diagnostics = Mutex<HashMap<PathBuf, Diagnostic>>;
+pub type Diagnostics = Mutex<HashMap<Uri, Diagnostic>>;
 
 #[allow(clippy::upper_case_acronyms)]
 pub struct LSP {

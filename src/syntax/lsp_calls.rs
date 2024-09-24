@@ -161,9 +161,9 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     let content = &mut editor.content;
 
     // diagnostics
-    if let Some(diagnostics) = client.get_diagnostics(&editor.path) {
+    if let Some(diagnostics) = client.get_diagnostics(&lexer.uri) {
         set_diganostics(content, diagnostics);
-        lexer.modal_rect.take();
+        lexer.modal_rect.take(); // force rebuild
     }
     // responses
     if let Some(mut responses) = client.get_responses() {

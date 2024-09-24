@@ -1,6 +1,6 @@
 use super::{
     local::{create_semantic_capabilities, enrich_with_semantics, start_lsp_handler},
-    Diagnostic, Diagnostics, LSPNotification, LSPRequest, LSPResult, Response, Responses,
+    Diagnostics, LSPNotification, LSPRequest, LSPResult, Response, Responses,
 };
 use crate::{
     configs::FileType,
@@ -18,7 +18,6 @@ use lsp_types::{
 use std::{
     cell::RefCell,
     collections::HashMap,
-    path::{Path, PathBuf},
     rc::Rc,
     sync::{Arc, Mutex, MutexGuard},
 };
@@ -37,7 +36,7 @@ use tokio::{
 /// Failure on broken LSP server.
 /// Diagnostics are received from Diagnostic objec stored in hashmap based on path.
 pub struct LSPClient {
-    diagnostics: Arc<Mutex<HashMap<PathBuf, Diagnostic>>>,
+    diagnostics: Arc<Diagnostics>,
     responses: Arc<Mutex<HashMap<i64, Response>>>,
     channel: UnboundedSender<Payload>,
     id_gen: MonoID,
@@ -139,13 +138,9 @@ impl LSPClient {
         self.responses.lock().unwrap().clear();
     }
 
-    pub fn get_lsp_registration(&self) -> Arc<Mutex<HashMap<PathBuf, Diagnostic>>> {
-        Arc::clone(&self.diagnostics)
-    }
-
     #[inline]
-    pub fn get_diagnostics(&self, path: &Path) -> Option<Vec<(usize, DiagnosticLine)>> {
-        self.diagnostics.try_lock().ok()?.get_mut(path)?.lines.take()
+    pub fn get_diagnostics(&self, uri: &Uri) -> Option<Vec<(usize, DiagnosticLine)>> {
+        self.diagnostics.try_lock().ok()?.get_mut(uri)?.lines.take()
     }
 
     #[inline]

@@ -2,10 +2,10 @@ use lsp_types::{
     notification::{Notification, PublishDiagnostics},
     request::GotoDeclarationResponse,
     CompletionItem, CompletionResponse, DiagnosticSeverity, GotoDefinitionResponse, Hover, Location,
-    PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, WorkspaceEdit,
+    PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, Uri, WorkspaceEdit,
 };
 use serde_json::{from_value, Value};
-use std::{fmt::Display, path::PathBuf};
+use std::fmt::Display;
 
 use crate::{
     lsp::{LSPError, LSPResult},
@@ -18,7 +18,7 @@ use super::lsp_stream::StdErrMessage;
 pub enum LSPMessage {
     Request(Request),
     Response(Response),
-    Diagnostic(PathBuf, Diagnostic),
+    Diagnostic(Uri, Diagnostic),
     Unknown(Value),
     Error(String),
 }
@@ -64,9 +64,13 @@ impl From<Value> for LSPMessage {
         }
         if let Some(method) = obj.get("method") {
             if method == PublishDiagnostics::METHOD {
-                let params = obj.get_mut("params").map(|p| p.take()).unwrap();
-                let diagnostics = from_value::<PublishDiagnosticsParams>(params).unwrap();
-                return LSPMessage::Diagnostic(diagnostics.uri.as_str()[7..].into(), Diagnostic::new(diagnostics));
+                if let Some(PublishDiagnosticsParams { uri, diagnostics, .. }) = obj
+                    .get_mut("params")
+                    .map(Value::take)
+                    .and_then(|params| from_value::<PublishDiagnosticsParams>(params).ok())
+                {
+                    return LSPMessage::Diagnostic(uri, Diagnostic::new(diagnostics));
+                }
             }
         };
         LSPMessage::Unknown(obj)
@@ -102,11 +106,11 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
-    fn new(params: PublishDiagnosticsParams) -> Self {
+    fn new(diagnostics: Vec<lsp_types::Diagnostic>) -> Self {
         let mut diagnostic_lines: Vec<(usize, DiagnosticLine)> = Vec::new();
         let mut errors = 0;
         let mut warnings = 0;
-        for d in params.diagnostics {
+        for d in diagnostics {
             match d.severity {
                 Some(DiagnosticSeverity::ERROR) => errors += 1,
                 Some(DiagnosticSeverity::WARNING) => warnings += 1,
