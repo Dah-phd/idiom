@@ -38,9 +38,12 @@ impl Workspace {
         let mut lsp_servers = HashMap::new();
         for (ft, lsp_cmd) in base_config.derive_lsp_preloads(base_tree_paths, gs) {
             gs.success(format!("Preloading {lsp_cmd}"));
-            if let Ok(lsp) = LSP::new(lsp_cmd, ft).await {
-                lsp_servers.insert(ft, lsp);
-            };
+            match LSP::new(lsp_cmd, ft).await {
+                Ok(lsp) => {
+                    lsp_servers.insert(ft, lsp);
+                }
+                Err(err) => gs.error(format!("Preload filed: {err}")),
+            }
         }
         let tab_style = Style::fg(color::dark_yellow());
         Self { editors: TrackedList::new(), base_config, key_map, lsp_servers, map_callback: map_editor, tab_style }
