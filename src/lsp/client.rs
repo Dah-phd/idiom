@@ -1,14 +1,10 @@
 use super::{
     local::{create_semantic_capabilities, enrich_with_semantics, start_lsp_handler},
-    Diagnostics, LSPNotification, LSPRequest, LSPResult, Response, Responses,
+    messages::DiagnosticHandle,
+    payload::Payload,
+    EditorDiagnostics, LSPError, LSPNotification, LSPRequest, LSPResult, Response, Responses, TreeDiagnostics,
 };
-use crate::{
-    configs::FileType,
-    lsp::{payload::Payload, LSPError},
-    syntax::DiagnosticLine,
-    utils::split_arc,
-    workspace::CursorPosition,
-};
+use crate::{configs::FileType, utils::split_arc, workspace::CursorPosition};
 use lsp_types::{
     notification::{DidCloseTextDocument, DidOpenTextDocument, DidRenameFiles, DidSaveTextDocument, Exit, Initialized},
     request::Shutdown,
@@ -36,7 +32,7 @@ use tokio::{
 /// Failure on broken LSP server.
 /// Diagnostics are received from Diagnostic objec stored in hashmap based on path.
 pub struct LSPClient {
-    diagnostics: Arc<Diagnostics>,
+    diagnostics: Arc<Mutex<DiagnosticHandle>>,
     responses: Arc<Mutex<HashMap<i64, Response>>>,
     channel: UnboundedSender<Payload>,
     id_gen: MonoID,
@@ -62,7 +58,7 @@ impl LSPClient {
     pub fn new(
         mut stdin: ChildStdin,
         file_type: FileType,
-        diagnostics: Arc<Diagnostics>,
+        diagnostics: Arc<Mutex<DiagnosticHandle>>,
         responses: Arc<Responses>,
         mut capabilities: ServerCapabilities,
     ) -> LSPResult<(JoinHandle<LSPResult<()>>, Self)> {
@@ -139,8 +135,11 @@ impl LSPClient {
     }
 
     #[inline]
-    pub fn get_diagnostics(&self, uri: &Uri) -> Option<Vec<(usize, DiagnosticLine)>> {
-        self.diagnostics.try_lock().ok()?.get_mut(uri)?.lines.take()
+    pub fn get_diagnostics(&self, uri: &Uri) -> (Option<EditorDiagnostics>, Option<TreeDiagnostics>) {
+        match self.diagnostics.try_lock() {
+            Ok(mut guard) => guard.collect(uri),
+            _ => (None, None),
+        }
     }
 
     #[inline]

@@ -1,5 +1,5 @@
 use crate::{
-    global_state::GlobalState,
+    global_state::{GlobalState, IdiomEvent},
     lsp::{LSPClient, LSPResponse, LSPResponseType, LSPResult},
     popups::popups_tree::refrence_selector,
     syntax::Lexer,
@@ -167,9 +167,14 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     }
 
     // diagnostics
-    if let Some(diagnostics) = client.get_diagnostics(&lexer.uri) {
+    let (editor_diagnostics, tree_diagnostics) = client.get_diagnostics(&lexer.uri);
+    if let Some(diagnostics) = editor_diagnostics {
         set_diganostics(content, diagnostics);
         lexer.modal_rect.take(); // force rebuild
+    }
+
+    if let Some(tree_diagnostics) = tree_diagnostics {
+        gs.event.push(IdiomEvent::TreeDiagnostics(tree_diagnostics));
     }
 
     // responses

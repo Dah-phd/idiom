@@ -4,6 +4,7 @@ use crate::{
     configs::{TreeAction, TreeKeyMap},
     error::{IdiomError, IdiomResult},
     global_state::{GlobalState, IdiomEvent},
+    lsp::{DiagnosticType, TreeDiagnostics},
     popups::popups_tree::{create_file_popup, rename_file_popup},
     render::state::State,
     utils::{build_file_or_folder, to_canon_path, to_relative_path},
@@ -19,6 +20,7 @@ pub struct Tree {
     pub key_map: TreeKeyMap,
     pub watcher: TreeWatcher,
     state: State,
+    diagnostics_state: Vec<(PathBuf, DiagnosticType)>,
     selected_path: PathBuf,
     tree: TreePath,
     display_offset: usize,
@@ -42,6 +44,7 @@ impl Tree {
                     selected_path,
                     tree,
                     rebuild: true,
+                    diagnostics_state: Vec::new(),
                 }
             }
             Err(..) => {
@@ -55,6 +58,7 @@ impl Tree {
                     selected_path: PathBuf::from("./"),
                     tree,
                     rebuild: true,
+                    diagnostics_state: Vec::new(),
                 }
             }
         }
@@ -120,6 +124,9 @@ impl Tree {
         let tree_path = self.tree.get_mut_from_inner(self.state.selected)?;
         if tree_path.path().is_dir() {
             tree_path.expand();
+            for (d_path, new_diagnostic) in self.diagnostics_state.iter() {
+                tree_path.map_diagnostics_base(d_path, *new_diagnostic);
+            }
             self.rebuild = true;
             None
         } else {
@@ -142,7 +149,12 @@ impl Tree {
                     TreePath::Folder { tree: Some(..), .. } => {
                         selected.take_tree();
                     }
-                    TreePath::Folder { tree: None, .. } => selected.expand(),
+                    TreePath::Folder { tree: None, .. } => {
+                        selected.expand();
+                        for (d_path, new_diagnostic) in self.diagnostics_state.iter() {
+                            selected.map_diagnostics_base(d_path, *new_diagnostic);
+                        }
+                    }
                     TreePath::File { path, .. } => {
                         self.selected_path = path.clone();
                         self.rebuild = true;
@@ -174,6 +186,30 @@ impl Tree {
         self.state.next(tree_len);
         self.state.update_at_line(gs.tree_area.height as usize);
         self.unsafe_set_path();
+    }
+
+    pub fn push_diagnostics(&mut self, new: TreeDiagnostics) {
+        for (path, new_diagnostic) in new {
+            if let Ok(d_path) = (self.path_parser)(&path) {
+                self.tree.map_diagnostics_base(&d_path, new_diagnostic);
+                if matches!(new_diagnostic, DiagnosticType::None) {
+                    self.diagnostics_state.retain(|(p, ..)| p.as_path() != d_path);
+                    continue;
+                }
+                match self.diagnostics_state.iter().position(|(p, ..)| p == &d_path) {
+                    Some(idx) => {
+                        self.diagnostics_state[idx] = (d_path, new_diagnostic);
+                    }
+                    None => self.diagnostics_state.push((d_path, new_diagnostic)),
+                }
+            }
+        }
+    }
+
+    fn rebuild_diagnostics(&mut self) {
+        for (d_path, new_diagnostic) in self.diagnostics_state.iter() {
+            self.tree.map_diagnostics_base(d_path, *new_diagnostic);
+        }
     }
 
     pub fn create_file_or_folder(&mut self, name: String) -> IdiomResult<PathBuf> {
@@ -245,6 +281,7 @@ impl Tree {
         if self.tree.expand_contained(path) {
             self.selected_path.clone_from(path);
             self.state.selected = self.tree.iter().skip(1).position(|tp| tp.path() == path).unwrap_or_default();
+            self.rebuild_diagnostics();
             self.rebuild = true;
         }
     }

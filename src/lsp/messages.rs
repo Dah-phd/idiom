@@ -5,7 +5,11 @@ use lsp_types::{
     PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, Uri, WorkspaceEdit,
 };
 use serde_json::{from_value, Value};
-use std::fmt::Display;
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    fmt::Display,
+    path::PathBuf,
+};
 
 use crate::{
     lsp::{LSPError, LSPResult},
@@ -95,6 +99,61 @@ pub struct Response {
     pub id: i64,
     pub result: Option<Value>,
     pub error: Option<Value>,
+}
+
+pub type EditorDiagnostics = Vec<(usize, DiagnosticLine)>;
+pub type TreeDiagnostics = Vec<(PathBuf, DiagnosticType)>;
+
+#[derive(Default)]
+pub struct DiagnosticHandle {
+    meta: HashMap<PathBuf, DiagnosticType>,
+    diffs: Vec<(PathBuf, DiagnosticType)>,
+    files: HashMap<Uri, crate::lsp::Diagnostic>,
+}
+
+impl DiagnosticHandle {
+    pub fn collect(&mut self, uri: &Uri) -> (Option<EditorDiagnostics>, Option<TreeDiagnostics>) {
+        (
+            self.files.get_mut(uri).and_then(|d| d.lines.take()),
+            if self.meta.is_empty() { None } else { Some(std::mem::take(&mut self.diffs)) },
+        )
+    }
+
+    pub fn insert(&mut self, k: Uri, v: crate::lsp::Diagnostic) {
+        if v.errors != 0 {
+            self.push_meta(k.as_str(), DiagnosticType::Err);
+        } else if v.warnings != 0 {
+            self.push_meta(k.as_str(), DiagnosticType::Warn);
+        } else {
+            self.push_meta(k.as_str(), DiagnosticType::None);
+        }
+        self.files.insert(k, v);
+    }
+
+    #[inline]
+    fn push_meta(&mut self, uri_text: &str, diagnostic_type: DiagnosticType) {
+        if let Some(path) = uri_text.get(7..).map(PathBuf::from).and_then(|p| p.canonicalize().ok()) {
+            match self.meta.entry(path.clone()) {
+                Entry::Occupied(mut entry) => {
+                    if entry.insert(diagnostic_type) == diagnostic_type {
+                        return;
+                    }
+                    self.diffs.push((path, diagnostic_type));
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(diagnostic_type);
+                    self.diffs.push((path, diagnostic_type));
+                }
+            }
+        }
+    }
+}
+
+#[derive(PartialEq, Clone, Copy, Debug)]
+pub enum DiagnosticType {
+    Err,
+    Warn,
+    None,
 }
 
 /// Stores Diagnostics and metadata - to be used in editor to gain access to diagnostic params objects.

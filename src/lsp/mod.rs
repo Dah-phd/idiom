@@ -13,7 +13,10 @@ pub use client::LSPClient;
 pub use error::{LSPError, LSPResult};
 pub use local::init_local_tokens;
 use lsp_stream::JsonRCP;
-pub use messages::{Diagnostic, LSPMessage, LSPResponse, LSPResponseType, Response};
+pub use messages::{
+    Diagnostic, DiagnosticHandle, DiagnosticType, EditorDiagnostics, LSPMessage, LSPResponse, LSPResponseType,
+    Response, TreeDiagnostics,
+};
 pub use notification::LSPNotification;
 pub use request::LSPRequest;
 
@@ -23,7 +26,6 @@ use std::{collections::HashMap, path::Path, process::Stdio, str::FromStr, sync::
 use tokio::{io::AsyncWriteExt, process::Child, task::JoinHandle};
 
 pub type Responses = Mutex<HashMap<i64, Response>>;
-pub type Diagnostics = Mutex<HashMap<Uri, Diagnostic>>;
 
 #[allow(clippy::upper_case_acronyms)]
 pub struct LSP {
@@ -47,7 +49,7 @@ impl LSP {
 
         // setting up storage
         let (responses, responses_handler) = split_arc::<Responses>();
-        let (diagnostics, diagnostics_handler) = split_arc::<Diagnostics>();
+        let (diagnostics, diagnostics_handler) = split_arc::<Mutex<DiagnosticHandle>>();
 
         // sending init requests
         stdin.write_all(LSPRequest::<Initialize>::init_request()?.stringify()?.as_bytes()).await?;
