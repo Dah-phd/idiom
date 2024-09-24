@@ -51,16 +51,6 @@ impl Lang {
         false
     }
 
-    pub fn is_string(&self, snipped: &str) -> bool {
-        if snipped.len() < 2 {
-            return false;
-        }
-        let mut chars = snipped.chars();
-        let open = chars.next().expect("Checked");
-        let close = chars.next_back().expect("Checked");
-        open == close && self.string_markers.contains(open)
-    }
-
     pub fn is_import_start(&self, line: &str) -> bool {
         let trimmed = line.trim_start();
         self.mod_import.iter().any(|pat| trimmed.starts_with(pat))

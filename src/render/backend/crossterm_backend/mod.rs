@@ -251,6 +251,12 @@ impl Drop for Backend {
 }
 
 fn init_terminal() -> std::io::Result<()> {
+    // Ensures panics are retported
+    std::panic::set_hook(Box::new(|info| {
+        let _ = graceful_exit();
+        eprintln!("{info}");
+    }));
+    // Init terminal
     crossterm::terminal::enable_raw_mode()?;
     crossterm::execute!(
         std::io::stdout(),

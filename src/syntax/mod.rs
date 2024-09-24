@@ -38,6 +38,7 @@ pub struct Lexer {
     pub lsp: bool,
     pub uri: Uri,
     pub path: PathBuf,
+    question_lsp: bool,
     version: i32,
     modal: Option<LSPModal>,
     modal_rect: Option<Rect>,
@@ -94,6 +95,7 @@ impl Lexer {
             sync_rev: sync_edits_dead_rev,
             encode_position: encode_pos_utf32,
             char_lsp_pos,
+            question_lsp: false,
         }
     }
 
@@ -128,6 +130,7 @@ impl Lexer {
             sync_rev: sync_edits_dead_rev,
             encode_position: encode_pos_utf32,
             char_lsp_pos,
+            question_lsp: false,
         }
     }
 
@@ -162,6 +165,7 @@ impl Lexer {
             sync_rev: sync_edits_dead_rev,
             encode_position: encode_pos_utf32,
             char_lsp_pos,
+            question_lsp: false,
         }
     }
 
@@ -183,12 +187,13 @@ impl Lexer {
     /// sync event
     #[inline(always)]
     pub fn sync(&mut self, action: &EditType, content: &mut [EditorLine]) {
-        (self.sync)(self, action, content).unwrap();
+        self.question_lsp = (self.sync)(self, action, content).is_err();
     }
 
     /// sync reverse event
+    #[inline(always)]
     pub fn sync_rev(&mut self, action: &EditType, content: &mut [EditorLine]) {
-        (self.sync_rev)(self, action, content).unwrap();
+        self.question_lsp = (self.sync_rev)(self, action, content).is_err();
     }
 
     #[inline]
