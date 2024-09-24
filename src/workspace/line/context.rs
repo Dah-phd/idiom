@@ -30,7 +30,7 @@ impl<'a> LineContext<'a> {
     /// Ensures during deletion of lines, if scrolling has happened that last line will be rendered
     /// not the most elegant solution - probably should revisit at some point, but good enough
     /// it does not poison other parts of the logic, except fast render
-    pub fn correct_last_line_match(&self, content: &mut Vec<EditorLine>, screen_hight: usize) {
+    pub fn correct_last_line_match(&self, content: &mut [EditorLine], screen_hight: usize) {
         let last_line = self.line_number + screen_hight;
         if last_line < 1 {
             return;
