@@ -105,6 +105,7 @@ impl<T> TrackedList<T> {
         Self { inner: Vec::new(), updated: true }
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     pub fn first(&self) -> Option<&T> {
         self.inner.first()
@@ -137,6 +138,7 @@ impl<T> TrackedList<T> {
         std::mem::take(&mut self.updated)
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     pub fn check_status(&self) -> bool {
         self.updated

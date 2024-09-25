@@ -9,6 +9,7 @@ mod text_editor;
 mod ts; // support TS and JS
 mod utils;
 
+use bash::BashToken;
 pub use enriched::enrich_with_semantics;
 use lsp_types::InsertTextFormat;
 use rust::Rustacean;
@@ -40,21 +41,24 @@ use utils::{full_tokens, partial_tokens, swap_content, NON_TOKEN_ID};
 
 /// Trait to be implemented on the lang specific token, allowing parsing and deriving builtins
 trait LangStream: Sized + Debug + PartialEq + Logos<'static> {
+    fn type_id(&self) -> u32;
+    fn modifier(&self) -> u32;
+    fn parse(text: &[String], tokens: &mut Vec<Vec<PositionedToken<Self>>>);
+
     fn init_definitions() -> Definitions {
         Definitions::default()
     }
-    fn type_id(&self) -> u32;
-    fn modifier(&self) -> u32;
+
+    fn objectify(&self) -> ObjType {
+        ObjType::None
+    }
+
     fn to_postioned(self, span: Span, text: &str) -> PositionedToken<Self> {
         // utf32 encoding
         let from = text[..span.start].char_len();
         let len = text[span.start..span.end].char_len();
         PositionedToken { from, len, token_type: self.type_id(), modifier: self.modifier(), lang_token: self }
     }
-    fn objectify(&self) -> ObjType {
-        ObjType::None
-    }
-    fn parse(text: &[String], tokens: &mut Vec<Vec<PositionedToken<Self>>>);
 
     fn init_tokens(content: &mut Vec<EditorLine>, theme: &Theme, file_type: FileType) {
         let text = content.iter().map(|l| l.content.to_string()).collect::<Vec<_>>();
@@ -94,6 +98,7 @@ pub fn start_lsp_handler(
         FileType::Lobster => tokio::task::spawn(async move { LocalLSP::<Pincer>::run(rx, responses).await }),
         FileType::Json => tokio::task::spawn(async move { LocalLSP::<JsonValue>::run(rx, responses).await }),
         FileType::Rust => tokio::task::spawn(async move { LocalLSP::<Rustacean>::run(rx, responses).await }),
+        FileType::Shell => tokio::task::spawn(async move { LocalLSP::<BashToken>::run(rx, responses).await }),
         _ => tokio::task::spawn(async move { LocalLSP::<GenericToken>::run(rx, responses).await }),
     }
 }

@@ -117,6 +117,7 @@ impl LSP {
         self.client.clone()
     }
 
+    #[allow(dead_code)]
     pub fn borrow_client(&self) -> &LSPClient {
         &self.client
     }

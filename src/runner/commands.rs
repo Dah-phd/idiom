@@ -101,9 +101,9 @@ impl Terminal {
     pub fn push_command(&mut self, cmd: String) -> std::io::Result<()> {
         self.writer.write_all(cmd.as_bytes())?;
         #[cfg(unix)]
-        self.writer.write_all(&[b'\n'])?;
+        self.writer.write_all(b"\n")?;
         #[cfg(windows)]
-        self.writer.write_all(&[b'\r', b'\n'])?;
+        self.writer.write_all(b"\r\n")?;
         self.writer.flush()?;
         Ok(())
     }
