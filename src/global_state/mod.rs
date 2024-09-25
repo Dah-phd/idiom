@@ -18,7 +18,6 @@ use crate::{
     workspace::{CursorPosition, Workspace},
 };
 pub use clipboard::Clipboard;
-use controls::map_term;
 use crossterm::event::{KeyEvent, MouseEvent};
 pub use events::IdiomEvent;
 
@@ -172,11 +171,32 @@ impl GlobalState {
         (self.mouse_mapper)(self, event, tree, workspace)
     }
 
+    fn config_controls(&mut self) {
+        if self.components.contains(Components::POPUP) {
+            self.key_mapper = controls::map_popup;
+            self.mouse_mapper = controls::disable_mouse;
+            return;
+        }
+        if self.components.contains(Components::TERM) {
+            self.key_mapper = controls::map_term;
+            self.mouse_mapper = controls::disable_mouse;
+            return;
+        }
+        match self.mode {
+            Mode::Insert => {
+                self.key_mapper = controls::map_editor;
+                self.mouse_mapper = controls::mouse_handler;
+            }
+            Mode::Select => {
+                self.key_mapper = controls::map_tree;
+                self.mouse_mapper = controls::mouse_handler;
+            }
+        }
+    }
+
     pub fn select_mode(&mut self) {
         self.mode = Mode::Select;
-        if !self.components.contains(Components::POPUP) {
-            self.key_mapper = controls::map_tree;
-        }
+        self.config_controls();
         if !self.components.contains(Components::TREE) {
             self.draw_callback = draw::full_rebuild;
         };
@@ -187,9 +207,7 @@ impl GlobalState {
 
     pub fn insert_mode(&mut self) {
         self.mode = Mode::Insert;
-        if !self.components.contains(Components::POPUP) {
-            self.key_mapper = controls::map_editor;
-        }
+        self.config_controls();
         if !self.components.contains(Components::TREE) {
             self.draw_callback = draw::full_rebuild;
         };
@@ -217,24 +235,16 @@ impl GlobalState {
 
     pub fn popup(&mut self, popup: Box<dyn PopupInterface>) {
         self.components.insert(Components::POPUP);
-        self.key_mapper = controls::map_popup;
+        self.config_controls();
         self.draw_callback = draw::full_rebuild;
         self.mouse_mapper = controls::disable_mouse;
         self.popup = popup;
     }
 
     pub fn clear_popup(&mut self) {
-        match self.mode {
-            Mode::Select => {
-                self.key_mapper = controls::map_tree;
-            }
-            Mode::Insert => {
-                self.key_mapper = controls::map_editor;
-            }
-        }
         self.components.remove(Components::POPUP);
+        self.config_controls();
         self.draw_callback = draw::full_rebuild;
-        self.mouse_mapper = controls::mouse_handler;
         self.editor_area.clear(&mut self.writer);
         self.tree_area.clear(&mut self.writer);
         self.popup = placeholder();
@@ -247,6 +257,7 @@ impl GlobalState {
 
     pub fn expand_tree_size(&mut self) {
         self.tree_size = std::cmp::min(75, self.tree_size + 1);
+
         self.draw_callback = draw::full_rebuild;
     }
 
@@ -259,21 +270,11 @@ impl GlobalState {
         self.draw_callback = draw::full_rebuild;
         if self.components.contains(Components::TERM) {
             self.components.remove(Components::TERM);
-            match self.mode {
-                Mode::Select => {
-                    self.key_mapper = controls::map_tree;
-                }
-                Mode::Insert => {
-                    self.key_mapper = controls::map_editor;
-                }
-            }
-            self.mouse_mapper = controls::mouse_handler;
         } else {
             self.components.insert(Components::TERM);
             runner.activate();
-            self.key_mapper = map_term;
-            self.mouse_mapper = controls::disable_mouse;
         }
+        self.config_controls();
     }
 
     pub fn map_popup_if_exists(&mut self, key: &KeyEvent) -> bool {
