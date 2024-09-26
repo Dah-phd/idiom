@@ -291,20 +291,20 @@ fn add_meta_data() {
 fn add_assign_meta_data() {
     let mut edit = EditMetaData::line_changed(1);
     edit += EditMetaData::line_changed(1);
-    assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 0 });
+    assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 1 });
     let mut edit = EditMetaData::line_changed(1);
     edit += EditMetaData { start_line: 1, from: 1, to: 2 };
-    assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 1 });
+    assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 2 });
     let mut edit = EditMetaData { start_line: 1, from: 2, to: 0 };
     edit += EditMetaData { start_line: 1, from: 1, to: 3 };
-    assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 2 });
+    assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 3 });
     let mut edit = EditMetaData { start_line: 1, from: 1, to: 2 };
     edit += EditMetaData { start_line: 1, from: 1, to: 3 };
-    assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 2 });
+    assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 3 });
     let mut edit = EditMetaData { start_line: 2, from: 1, to: 3 };
     edit += EditMetaData { start_line: 0, from: 3, to: 1 };
-    assert_eq!(edit, EditMetaData { start_line: 0, from: 0, to: 2 });
+    assert_eq!(edit, EditMetaData { start_line: 0, from: 0, to: 3 });
     let mut edit = EditMetaData { start_line: 0, from: 1, to: 10 };
     edit += EditMetaData { start_line: 2, from: 2, to: 1 };
-    assert_eq!(edit, EditMetaData { start_line: 0, from: 0, to: 8 },);
+    assert_eq!(edit, EditMetaData { start_line: 0, from: 0, to: 9 },);
 }

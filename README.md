@@ -28,6 +28,7 @@ Python should work for the most part with jedi, but the interaction is not well 
 
 ## TODO
 - bug when line swap + undo
+- check on meta sums (add / add assign)
 - write tests
 - tree watcher cold start
 - lsp server cold start, maybe? "jedi-language server" starts slow

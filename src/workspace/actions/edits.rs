@@ -366,8 +366,8 @@ impl Add for EditMetaData {
 
 impl AddAssign for EditMetaData {
     fn add_assign(&mut self, other: Self) {
-        let self_end_line = self.end_line();
-        let other_end_line = other.end_line();
+        let self_end_line = self.start_line + self.to;
+        let other_end_line = other.start_line + other.to;
         self.start_line = std::cmp::min(self.start_line, other.start_line);
         if self_end_line > other_end_line {
             self.to = self_end_line - self.start_line;
