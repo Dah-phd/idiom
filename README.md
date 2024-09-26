@@ -27,6 +27,7 @@ Python should work for the most part with jedi, but the interaction is not well 
 - Linux Mint
 
 ## TODO
+- bug when line swap + undo
 - write tests
 - tree watcher cold start
 - lsp server cold start, maybe? "jedi-language server" starts slow

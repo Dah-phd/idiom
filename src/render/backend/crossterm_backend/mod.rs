@@ -261,8 +261,10 @@ fn init_terminal() -> std::io::Result<()> {
     crossterm::execute!(
         std::io::stdout(),
         crossterm::terminal::EnterAlternateScreen,
+        crossterm::terminal::DisableLineWrap,
         crossterm::style::ResetColor,
         crossterm::event::EnableMouseCapture,
+        crossterm::cursor::Hide,
     )
 }
 
@@ -270,6 +272,8 @@ fn graceful_exit() -> std::io::Result<()> {
     crossterm::execute!(
         std::io::stdout(),
         crossterm::terminal::LeaveAlternateScreen,
+        crossterm::event::PopKeyboardEnhancementFlags,
+        crossterm::terminal::EnableLineWrap,
         crossterm::style::ResetColor,
         crossterm::event::DisableMouseCapture,
         crossterm::cursor::Show,

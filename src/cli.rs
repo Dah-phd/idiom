@@ -63,7 +63,6 @@ impl TreeSeletor {
         let home = dirs::home_dir().ok_or(IdiomError::io_err("Filed to find home dir!"))?.canonicalize()?;
         std::env::set_current_dir(&home)?;
         let config = KeyMap::new().unwrap_or_default();
-        backend.hide_cursor();
         let rect = Backend::screen()?;
         let path_str = home.display().to_string();
         let display_offset = path_str.split(std::path::MAIN_SEPARATOR).count() * 2;

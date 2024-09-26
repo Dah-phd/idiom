@@ -57,13 +57,12 @@ impl Terminal {
                                 bytes.push(byte);
                                 match std::str::from_utf8(&bytes) {
                                     Ok(data) => {
-                                        l.push_str(data);
-                                        let cleaned = strip_str(&l);
-                                        if cleaned.ends_with('\n') {
-                                            buffer.lock().unwrap().push(cleaned);
+                                        if data == "\n" {
+                                            buffer.lock().unwrap().push(strip_str(&l));
                                             l.clear();
                                         } else {
-                                            *prompt_writer.lock().unwrap() = cleaned;
+                                            l.push_str(data);
+                                            *prompt_writer.lock().unwrap() = strip_str(&l);
                                         }
                                         bytes.clear();
                                     }
