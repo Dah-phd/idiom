@@ -273,7 +273,7 @@ pub fn sync_edits(lexer: &mut Lexer, action: &EditType, content: &mut [EditorLin
     let (meta, change_events) = action.change_event(lexer.encode_position, lexer.char_lsp_pos, content);
     lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
     match lexer.meta.take() {
-        Some(meta) => lexer.meta.replace(meta + meta),
+        Some(existing_meta) => lexer.meta.replace(existing_meta + meta),
         None => lexer.meta.replace(meta),
     };
     Ok(())
@@ -284,7 +284,7 @@ pub fn sync_edits_rev(lexer: &mut Lexer, action: &EditType, content: &mut [Edito
     let (meta, change_events) = action.change_event_rev(lexer.encode_position, lexer.char_lsp_pos, content);
     lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
     match lexer.meta.take() {
-        Some(meta) => lexer.meta.replace(meta + meta),
+        Some(existing_meta) => lexer.meta.replace(existing_meta + meta),
         None => lexer.meta.replace(meta),
     };
     Ok(())
