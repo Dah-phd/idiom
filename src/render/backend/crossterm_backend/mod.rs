@@ -272,7 +272,6 @@ fn graceful_exit() -> std::io::Result<()> {
     crossterm::execute!(
         std::io::stdout(),
         crossterm::terminal::LeaveAlternateScreen,
-        crossterm::event::PopKeyboardEnhancementFlags,
         crossterm::terminal::EnableLineWrap,
         crossterm::style::ResetColor,
         crossterm::event::DisableMouseCapture,
