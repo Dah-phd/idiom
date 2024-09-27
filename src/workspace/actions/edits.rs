@@ -47,7 +47,7 @@ impl Edit {
         let down_offset = cfg.indent_line(to, content);
         let text = format!("{}\n{}\n", content[up_line], content[to]);
         let cursor = CursorPosition { line: up_line, char: 0 };
-        (up_offset, down_offset, Self::without_select(cursor, 2, 2, text, reverse))
+        (up_offset, down_offset, Self::without_select(cursor, 3, 3, text, reverse))
     }
 
     pub fn merge_next_line(line: usize, content: &mut Vec<EditorLine>) -> Self {
