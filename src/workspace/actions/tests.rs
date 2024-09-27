@@ -100,15 +100,19 @@ fn test_swap_lines() {
     let (.., edit) = Edit::swap_down(7, &cfg, &mut content);
     match_line(&content[7], &"}");
     match_line(&content[8], &"    this is the first scope");
+    match_line(&content[9], &"scope is closed!");
     edit.apply_rev(&mut content);
     match_line(&content[7], &"    this is the first scope");
     match_line(&content[8], &"}");
+    match_line(&content[9], &"scope is closed!");
     let (.., edit) = Edit::swap_down(6, &cfg, &mut content);
     match_line(&content[6], &"    this is the first scope");
     match_line(&content[7], &"    i will have to have some scopes {");
+    match_line(&content[8], &"}");
     edit.apply_rev(&mut content);
     match_line(&content[6], &"i will have to have some scopes {");
     match_line(&content[7], &"    this is the first scope");
+    match_line(&content[8], &"}");
 }
 
 #[test]
