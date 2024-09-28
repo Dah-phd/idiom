@@ -1,5 +1,6 @@
 mod action_buffer;
 mod edits;
+mod meta;
 use crate::{
     configs::IndentConfigs,
     syntax::Lexer,
@@ -11,8 +12,9 @@ use crate::{
     },
 };
 use action_buffer::ActionBuffer;
-pub use edits::{Edit, EditMetaData};
+pub use edits::Edit;
 use lsp_types::{TextDocumentContentChangeEvent, TextEdit};
+pub use meta::EditMetaData;
 
 #[derive(Default)]
 pub struct Actions {
