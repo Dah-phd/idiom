@@ -33,7 +33,7 @@ impl Legend {
         }
     }
 
-    pub fn map_styles(&mut self, file_type: &FileType, theme: &Theme, tc: &SemanticTokensServerCapabilities) {
+    pub fn map_styles(&mut self, file_type: FileType, theme: &Theme, tc: &SemanticTokensServerCapabilities) {
         let legend = match tc {
             SemanticTokensServerCapabilities::SemanticTokensOptions(opt) => &opt.legend,
             SemanticTokensServerCapabilities::SemanticTokensRegistrationOptions(opt) => {
@@ -48,7 +48,6 @@ impl Legend {
                         continue;
                     }
                     match token_type {
-                        "decorator" => self.legend.push(ColorResult::Final(theme.functions)),
                         "bitwise" => self.legend.push(ColorResult::Final(theme.key_words)),
                         "arithmetic" => self.legend.push(ColorResult::default()),
                         "boolean" => self.legend.push(ColorResult::Final(theme.key_words)),

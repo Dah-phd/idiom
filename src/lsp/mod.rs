@@ -1,33 +1,34 @@
 mod client;
 mod error;
+mod local;
 mod lsp_stream;
 mod messages;
 mod notification;
+mod payload;
 mod request;
 mod servers;
-use crate::utils::{force_lock, split_arc_mutex};
+use crate::configs::FileType;
+use crate::utils::split_arc;
 pub use client::LSPClient;
 pub use error::{LSPError, LSPResult};
+pub use local::init_local_tokens;
 use lsp_stream::JsonRCP;
-pub use messages::{Diagnostic, LSPMessage, LSPResponse, LSPResponseType, Response};
+pub use messages::{
+    Diagnostic, DiagnosticHandle, DiagnosticType, EditorDiagnostics, LSPMessage, LSPResponse, LSPResponseType,
+    Response, TreeDiagnostics,
+};
 pub use notification::LSPNotification;
 pub use request::LSPRequest;
 
 use lsp_types::{request::Initialize, InitializeResult, Uri};
 use serde_json::from_value;
-use std::{
-    collections::HashMap,
-    path::Path,
-    process::Stdio,
-    str::FromStr,
-    // sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, path::Path, process::Stdio, str::FromStr, sync::Mutex};
 use tokio::{io::AsyncWriteExt, process::Child, task::JoinHandle};
+
+pub type Responses = Mutex<HashMap<i64, Response>>;
 
 #[allow(clippy::upper_case_acronyms)]
 pub struct LSP {
-    // pub notifications: Arc<Mutex<Vec<GeneralNotification>>>,
-    // pub requests: Arc<tokio::sync::Mutex<Vec<Request>>>,
     lsp_cmd: String,
     inner: Child,
     client: LSPClient,
@@ -37,7 +38,7 @@ pub struct LSP {
 }
 
 impl LSP {
-    pub async fn new(lsp_cmd: String) -> LSPResult<Self> {
+    pub async fn new(lsp_cmd: String, file_type: FileType) -> LSPResult<Self> {
         let mut server = servers::server_cmd(&lsp_cmd)?;
         let mut inner = server.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::piped()).spawn()?;
 
@@ -47,10 +48,8 @@ impl LSP {
             inner.stdin.take().ok_or(LSPError::InternalError("Failed to take stdin of JsonRCP (LSP)".to_owned()))?;
 
         // setting up storage
-        let (responses, responses_handler) = split_arc_mutex(HashMap::new());
-        // let (notifications, notifications_handler) = split_arc_mutex(Vec::new());
-        // let (requests, requests_handler) = split_arc_mutex_async(Vec::new());
-        let (diagnostics, diagnostics_handler) = split_arc_mutex(HashMap::new());
+        let (responses, responses_handler) = split_arc::<Responses>();
+        let (diagnostics, diagnostics_handler) = split_arc::<Mutex<DiagnosticHandle>>();
 
         // sending init requests
         stdin.write_all(LSPRequest::<Initialize>::init_request()?.stringify()?.as_bytes()).await?;
@@ -66,10 +65,10 @@ impl LSP {
             loop {
                 match json_rpc.next().await? {
                     LSPMessage::Response(inner) => {
-                        force_lock(&responses_handler).insert(inner.id, inner);
+                        responses_handler.lock().unwrap().insert(inner.id, inner);
                     }
                     LSPMessage::Diagnostic(uri, params) => {
-                        force_lock(&diagnostics_handler).insert(uri, params);
+                        diagnostics_handler.lock().unwrap().insert(uri, params);
                     }
                     LSPMessage::Request(_inner) => {
                         // TODO: investigate handle
@@ -85,17 +84,17 @@ impl LSP {
             }
         });
 
-        let (lsp_send_handler, client) = LSPClient::new(stdin, diagnostics, responses, capabilities)?;
+        let (lsp_send_handler, client) = LSPClient::new(stdin, file_type, diagnostics, responses, capabilities)?;
 
         Ok(Self { client, lsp_cmd, inner, lsp_json_handler, lsp_send_handler, attempts: 5 })
     }
 
-    pub async fn check_status(&mut self) -> LSPResult<Option<LSPError>> {
+    pub async fn check_status(&mut self, file_type: FileType) -> LSPResult<Option<LSPError>> {
         if self.lsp_json_handler.is_finished() || self.lsp_send_handler.is_finished() {
             if self.attempts == 0 {
                 return Err(LSPError::internal("Json RCP unable to recover after 5 attempts!"));
             }
-            match Self::new(self.lsp_cmd.to_owned()).await {
+            match Self::new(self.lsp_cmd.to_owned(), file_type).await {
                 Ok(lsp) => {
                     let mut broken = std::mem::replace(self, lsp);
                     let _ = broken.dash_nine().await; // ensure old lsp is dead!
@@ -118,6 +117,7 @@ impl LSP {
         self.client.clone()
     }
 
+    #[allow(dead_code)]
     pub fn borrow_client(&self) -> &LSPClient {
         &self.client
     }

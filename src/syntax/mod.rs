@@ -21,28 +21,25 @@ pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
     as_url, char_lsp_pos, completable_dead, context_local, encode_pos_utf32, get_autocomplete_dead, info_position_dead,
-    map, renames_dead, start_renames_dead, sync_edits_local, sync_edits_local_rev, tokens_dead, tokens_partial_dead,
+    map_lsp, remove_lsp, renames_dead, start_renames_dead, sync_edits_dead, sync_edits_dead_rev, tokens_dead,
+    tokens_partial_dead,
 };
 use lsp_types::{PublishDiagnosticsParams, Range, Uri};
 use modal::{LSPModal, ModalMessage};
-use std::{
-    path::{Path, PathBuf},
-    time::Instant,
-};
+use std::path::{Path, PathBuf};
 use theme::Theme;
-pub use tokens::{Token, TokensType};
+pub use tokens::Token;
 
 pub struct Lexer {
     pub lang: Lang,
     pub legend: Legend,
     pub theme: Theme,
-    pub token_producer: TokensType,
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub lsp: bool,
     pub uri: Uri,
     pub path: PathBuf,
+    question_lsp: bool,
     version: i32,
-    clock: Instant,
     modal: Option<LSPModal>,
     modal_rect: Option<Rect>,
     requests: Vec<LSPResponseType>,
@@ -72,8 +69,6 @@ impl Lexer {
             lang: Lang::from(file_type),
             legend: Legend::default(),
             theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
-            token_producer: TokensType::Internal,
-            clock: Instant::now(),
             modal: None,
             modal_rect: None,
             uri: as_url(path),
@@ -96,10 +91,11 @@ impl Lexer {
             signatures: info_position_dead,
             start_renames: start_renames_dead,
             renames: renames_dead,
-            sync: sync_edits_local,
-            sync_rev: sync_edits_local_rev,
+            sync: sync_edits_dead,
+            sync_rev: sync_edits_dead_rev,
             encode_position: encode_pos_utf32,
             char_lsp_pos,
+            question_lsp: false,
         }
     }
 
@@ -108,8 +104,6 @@ impl Lexer {
             lang: Lang::default(),
             legend: Legend::default(),
             theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
-            token_producer: TokensType::Internal,
-            clock: Instant::now(),
             modal: None,
             modal_rect: None,
             uri: as_url(path),
@@ -132,10 +126,11 @@ impl Lexer {
             signatures: info_position_dead,
             start_renames: start_renames_dead,
             renames: renames_dead,
-            sync: sync_edits_local,
-            sync_rev: sync_edits_local_rev,
+            sync: sync_edits_dead,
+            sync_rev: sync_edits_dead_rev,
             encode_position: encode_pos_utf32,
             char_lsp_pos,
+            question_lsp: false,
         }
     }
 
@@ -144,8 +139,6 @@ impl Lexer {
             lang: Lang::default(),
             legend: Legend::default(),
             theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
-            token_producer: TokensType::Internal,
-            clock: Instant::now(),
             modal: None,
             modal_rect: None,
             uri: as_url(path),
@@ -168,10 +161,11 @@ impl Lexer {
             signatures: info_position_dead,
             start_renames: start_renames_dead,
             renames: renames_dead,
-            sync: sync_edits_local,
-            sync_rev: sync_edits_local_rev,
+            sync: sync_edits_dead,
+            sync_rev: sync_edits_dead_rev,
             encode_position: encode_pos_utf32,
             char_lsp_pos,
+            question_lsp: false,
         }
     }
 
@@ -180,15 +174,26 @@ impl Lexer {
         (editor.lexer.context)(editor, gs);
     }
 
+    #[inline]
+    pub fn refresh_lsp(&mut self, gs: &mut GlobalState) {
+        self.requests.clear();
+        self.client.clear_requests();
+        match (self.tokens)(self) {
+            Ok(request) => self.requests.push(request),
+            Err(err) => gs.error(err.to_string()),
+        }
+    }
+
     /// sync event
     #[inline(always)]
     pub fn sync(&mut self, action: &EditType, content: &mut [EditorLine]) {
-        (self.sync)(self, action, content).unwrap();
+        self.question_lsp = (self.sync)(self, action, content).is_err();
     }
 
     /// sync reverse event
+    #[inline(always)]
     pub fn sync_rev(&mut self, action: &EditType, content: &mut [EditorLine]) {
-        (self.sync_rev)(self, action, content).unwrap();
+        self.question_lsp = (self.sync_rev)(self, action, content).is_err();
     }
 
     #[inline]
@@ -235,14 +240,34 @@ impl Lexer {
     }
 
     pub fn set_lsp_client(&mut self, mut client: LSPClient, content: String, gs: &mut GlobalState) {
-        if client.file_did_open(self.uri.clone(), self.lang.file_type, content).is_err() {
+        if let Err(error) = client.file_did_open(self.uri.clone(), self.lang.file_type, content) {
+            gs.error(error.to_string());
             return;
         }
-        map(self, client);
+        map_lsp(self, client);
         gs.success("LSP mapped!");
         match (self.tokens)(self) {
             Ok(request) => self.requests.push(request),
-            Err(error) => gs.send_error(error, self.lang.file_type),
+            Err(err) => gs.send_error(err, self.lang.file_type),
+        };
+    }
+
+    pub fn local_lsp(&mut self, file_type: FileType, content: String, gs: &mut GlobalState) {
+        let client = LSPClient::local_lsp(file_type);
+        map_lsp(self, client);
+        match self.client.file_did_open(self.uri.clone(), file_type, content) {
+            Ok(_) => {
+                gs.success("Starting local LSP - internal system to provide basic language feature");
+                match (self.tokens)(self) {
+                    Ok(request) => self.requests.push(request),
+                    Err(err) => gs.send_error(err, file_type),
+                }
+            }
+            // can be reached only due to internal code issue
+            Err(error) => {
+                gs.error(error.to_string());
+                remove_lsp(self);
+            }
         };
     }
 
@@ -311,7 +336,7 @@ impl Lexer {
         };
         if self.lsp {
             if let Some(capabilities) = &self.client.capabilities.semantic_tokens_provider {
-                self.legend.map_styles(&self.lang.file_type, &self.theme, capabilities);
+                self.legend.map_styles(self.lang.file_type, &self.theme, capabilities);
             }
             match (self.tokens)(self) {
                 Ok(request) => self.requests.push(request),

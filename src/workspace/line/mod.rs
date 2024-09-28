@@ -5,7 +5,7 @@ use status::RenderStatus;
 
 use crate::{
     render::{utils::UTF8SafeStringExt, UTF8Safe},
-    syntax::{tokens::TokenLine, DiagnosticLine, Lang, Lexer, Token},
+    syntax::{tokens::TokenLine, DiagnosticLine, Lang, Token},
     // workspace::line::EditorLine,
 };
 pub use context::LineContext;
@@ -343,12 +343,6 @@ impl EditorLine {
                 self.tokens.mark_diagnostics(diagnostic);
             }
         };
-    }
-
-    #[inline]
-    pub fn rebuild_tokens(&mut self, lexer: &Lexer) {
-        self.cached.reset();
-        self.tokens.internal_rebase(&self.content, &lexer.lang, &lexer.theme)
     }
 
     #[inline]

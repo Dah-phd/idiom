@@ -15,7 +15,9 @@ pub enum FileType {
     Cpp,
     Yml,
     Toml,
+    Json,
     Nim,
+    Shell,
 }
 
 impl FileType {
@@ -35,13 +37,15 @@ impl FileType {
             "toml" => Some(Self::Toml),
             "html" => Some(Self::Html),
             "lobster" => Some(Self::Lobster),
+            "json" => Some(Self::Json),
+            "sh" => Some(Self::Shell),
             _ => None,
         }
     }
 
     pub fn comment_start(&self) -> &str {
         match self {
-            Self::Python => "#",
+            Self::Python | Self::Toml | Self::Shell => "#",
             _ => "//",
         }
     }
@@ -63,6 +67,8 @@ impl From<FileType> for &'static str {
             FileType::Yml => "yaml",
             FileType::Toml => "toml",
             FileType::Lobster => "lobster",
+            FileType::Json => "json",
+            FileType::Shell => "shellscript",
         }
     }
 }

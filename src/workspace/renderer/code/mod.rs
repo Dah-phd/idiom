@@ -55,9 +55,6 @@ pub fn inner_render(
     select: Option<Range<usize>>,
     backend: &mut Backend,
 ) {
-    if code.tokens.is_empty() {
-        code.tokens.internal_rebase(&code.content, &ctx.lexer.lang, &ctx.lexer.theme);
-    };
     let cache_line = line.row;
     let line_width = ctx.setup_line(line, backend);
     code.cached.line(cache_line, select.clone());

@@ -8,9 +8,6 @@ use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
 const ELS_COLOR: Color = color::dark_grey();
 const ERR_COLOR: Color = color::red();
 const WAR_COLOR: Color = color::yellow();
-// const ERR_STYLE: Style = Style::new().fg(ERR_COLOR);
-// const WAR_STYLE: Style = Style::new().fg(WAR_COLOR);
-// const ELS_STYLE: Style = Style::new().fg(ELS_COLOR);
 
 #[derive(Default)]
 pub struct DiagnosticInfo {

@@ -66,6 +66,7 @@ pub enum EditorAction {
     GoToDeclaration,
     Help,
     LSPRename,
+    RefreshUI,
     Cut,
     Copy,
     Paste,
@@ -78,7 +79,6 @@ pub enum EditorAction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct EditorUserKeyMap {
     new_line_or_select: String,
     indent: String,
@@ -113,6 +113,7 @@ pub struct EditorUserKeyMap {
     find_references: String,
     go_to_declaration: String,
     help: String,
+    refresh_ui: String,
     lsp_rename: String,
     cut: String,
     copy: String,
@@ -200,10 +201,10 @@ impl Default for EditorUserKeyMap {
             scroll_down: format!("{CTRL} && {DOWN} || {PAGEDOWN}"),
             swap_up: format!("{ALT} && {UP}"),
             swap_down: format!("{ALT} && {DOWN}"),
-            jump_left: format!("{CTRL} && {LEFT}"),
-            jump_left_select: format!("{CTRL} && {SHIFT} && {LEFT}"),
-            jump_right: format!("{CTRL} && {RIGHT}"),
-            jump_right_select: format!("{CTRL} && {SHIFT} && {RIGHT}"),
+            jump_left: format!("{CTRL} && {LEFT} || {ALT} && {LEFT}"),
+            jump_left_select: format!("{CTRL} && {SHIFT} && {LEFT} || {ALT} && {SHIFT} && {LEFT}"),
+            jump_right: format!("{CTRL} && {RIGHT} || {ALT} && {RIGHT}"),
+            jump_right_select: format!("{CTRL} && {SHIFT} && {RIGHT} || {ALT} && {SHIFT} && {RIGHT}"),
             end_of_line: String::from(END),
             end_of_file: format!("{CTRL} && {END}"),
             start_of_line: String::from(HOME),
@@ -212,6 +213,7 @@ impl Default for EditorUserKeyMap {
             go_to_declaration: format!("{F}12"),
             help: format!("{F}1"),
             lsp_rename: format!("{F}2"),
+            refresh_ui: format!("{F}5"),
             cut: format!("{CTRL} && x"),
             copy: format!("{CTRL} && c"),
             paste: format!("{CTRL} && v"),
@@ -252,7 +254,6 @@ pub enum GeneralAction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct GeneralUserKeyMap {
     go_to_editor_tabs: String,
     select_open_editor: String,
@@ -346,7 +347,6 @@ pub enum TreeAction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct TreeUserKeyMap {
     select_up: String,
     select_down: String,

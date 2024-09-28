@@ -8,16 +8,15 @@ use dirs::config_dir;
 pub use editor_config::{EditorConfigs, IndentConfigs};
 pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap, TreeAction, TreeUserKeyMap};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_json::Error;
 use std::collections::HashMap;
 pub use theme_ui::UITheme;
 pub use types::FileType;
 
 pub const CONFIG_FOLDER: &str = "idiom";
-pub const EDITOR_CFG_FILE: &str = ".editor";
-pub const KEY_MAP: &str = ".keys";
-pub const THEME_FILE: &str = "theme.json";
-pub const THEME_UI: &str = "theme_ui.json";
+pub const EDITOR_CFG_FILE: &str = "editor.toml";
+pub const KEY_MAP: &str = "keys.toml";
+pub const THEME_FILE: &str = "theme.toml";
+pub const THEME_UI: &str = "theme_ui.toml";
 
 #[derive(Debug)]
 pub struct EditorKeyMap {
@@ -56,7 +55,6 @@ impl TreeKeyMap {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
 pub struct KeyMap {
     general_key_map: GeneralUserKeyMap,
     editor_key_map: EditorUserKeyMap,
@@ -64,7 +62,7 @@ pub struct KeyMap {
 }
 
 impl KeyMap {
-    pub fn new() -> Result<Self, Error> {
+    pub fn new() -> Result<Self, toml::de::Error> {
         load_or_create_config(KEY_MAP)
     }
 
@@ -83,9 +81,9 @@ impl KeyMap {
 
 /// ensures creation of config files on first load
 /// if value is removed from a theme config the default value will be put in place
-pub fn load_or_create_config<T: Default + DeserializeOwned + Serialize>(path: &str) -> Result<T, Error> {
+pub fn load_or_create_config<T: Default + DeserializeOwned + Serialize>(path: &str) -> Result<T, toml::de::Error> {
     if let Some(config_json) = read_config_file(path) {
-        Ok(serde_json::from_slice::<T>(&config_json)?)
+        Ok(toml::from_str::<T>(&config_json)?)
     } else {
         write_config_file(path, &T::default());
         Ok(T::default())
@@ -99,11 +97,11 @@ pub fn get_config_dir() -> Option<PathBuf> {
     Some(config_path)
 }
 
-fn read_config_file(path: &str) -> Option<Vec<u8>> {
+fn read_config_file(path: &str) -> Option<String> {
     let mut config_file = config_dir()?;
     config_file.push(CONFIG_FOLDER);
     config_file.push(path);
-    std::fs::read(config_file).ok()
+    std::fs::read_to_string(config_file).ok()
 }
 
 fn write_config_file<T: Serialize>(path: &str, configs: &T) -> Option<()> {
@@ -113,7 +111,7 @@ fn write_config_file<T: Serialize>(path: &str, configs: &T) -> Option<()> {
         std::fs::create_dir(&config_file).ok()?;
     }
     config_file.push(path);
-    let serialized = serde_json::to_string_pretty(configs).ok()?;
+    let serialized = toml::to_string_pretty(configs).ok()?;
     std::fs::write(config_file, serialized).ok()
 }
 

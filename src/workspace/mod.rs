@@ -38,9 +38,12 @@ impl Workspace {
         let mut lsp_servers = HashMap::new();
         for (ft, lsp_cmd) in base_config.derive_lsp_preloads(base_tree_paths, gs) {
             gs.success(format!("Preloading {lsp_cmd}"));
-            if let Ok(lsp) = LSP::new(lsp_cmd).await {
-                lsp_servers.insert(ft, lsp);
-            };
+            match LSP::new(lsp_cmd, ft).await {
+                Ok(lsp) => {
+                    lsp_servers.insert(ft, lsp);
+                }
+                Err(err) => gs.error(format!("Preload filed: {err}")),
+            }
         }
         let tab_style = Style::fg(color::dark_yellow());
         Self { editors: TrackedList::new(), base_config, key_map, lsp_servers, map_callback: map_editor, tab_style }
@@ -135,7 +138,7 @@ impl Workspace {
     pub fn activate_editor(&mut self, idx: usize, gs: &mut GlobalState) {
         if idx < self.editors.len() {
             let mut editor = self.editors.remove(idx);
-            editor.clear_screen_cache();
+            editor.clear_screen_cache(gs);
             gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
             if editor.update_status.collect() {
                 gs.popup(file_updated(editor.path.clone()))
@@ -267,12 +270,18 @@ impl Workspace {
         };
         let mut new = Editor::from_path(file_path, file_type, &self.base_config, gs)?;
         let lsp_cmd = match self.base_config.derive_lsp(&new.file_type) {
-            None => return Ok(new),
+            None => {
+                new.lexer.local_lsp(file_type, new.stringify(), gs);
+                return Ok(new);
+            }
             Some(cmd) => cmd,
         };
+
+        // set initial tokens while LSP is indexing
+        crate::lsp::init_local_tokens(file_type, &mut new.content, &new.lexer.theme);
         match self.lsp_servers.entry(new.file_type) {
-            Entry::Vacant(entry) => {
-                if let Ok(lsp) = LSP::new(lsp_cmd).await {
+            Entry::Vacant(entry) => match LSP::new(lsp_cmd, new.file_type).await {
+                Ok(lsp) => {
                     let client = lsp.aquire_client();
                     new.lexer.set_lsp_client(client, new.stringify(), gs);
                     for editor in self.editors.iter_mut().filter(|e| e.file_type == new.file_type) {
@@ -280,7 +289,11 @@ impl Workspace {
                     }
                     entry.insert(lsp);
                 }
-            }
+                Err(err) => {
+                    gs.error(err.to_string());
+                    new.lexer.local_lsp(file_type, new.stringify(), gs);
+                }
+            },
             Entry::Occupied(entry) => {
                 new.lexer.set_lsp_client(entry.get().aquire_client(), new.stringify(), gs);
             }
@@ -292,7 +305,7 @@ impl Workspace {
         let file_path = file_path.canonicalize()?;
         if let Some(idx) = self.editors.iter().position(|e| e.path == file_path) {
             let mut editor = self.editors.remove(idx);
-            editor.clear_screen_cache();
+            editor.clear_screen_cache(gs);
             if editor.update_status.collect() {
                 gs.popup(file_updated(editor.path.clone()));
             }
@@ -329,7 +342,7 @@ impl Workspace {
     #[inline]
     pub async fn check_lsp(&mut self, ft: FileType, gs: &mut GlobalState) {
         if let Some(lsp) = self.lsp_servers.get_mut(&ft) {
-            match lsp.check_status().await {
+            match lsp.check_status(ft).await {
                 Ok(data) => match data {
                     None => gs.success("LSP function is normal".to_owned()),
                     Some(err) => {
@@ -371,11 +384,12 @@ impl Workspace {
         drop(editor);
         match self.get_active() {
             None => {
+                gs.clear_stats();
                 gs.editor_area.clear(&mut gs.writer);
                 gs.select_mode();
             }
             Some(editor) => {
-                editor.clear_screen_cache();
+                editor.clear_screen_cache(gs);
                 if editor.update_status.collect() {
                     gs.popup(file_updated(editor.path.clone()));
                 }
@@ -404,7 +418,7 @@ impl Workspace {
         let mut editor =
             if idx >= self.editors.len() { self.editors.pop().expect("garded") } else { self.editors.remove(idx) };
         gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
-        editor.clear_screen_cache();
+        editor.clear_screen_cache(gs);
         if editor.update_status.collect() {
             gs.popup(file_updated(editor.path.clone()));
         }
@@ -480,7 +494,7 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
                 let editor = ws.editors.remove(0);
                 ws.editors.push(editor);
                 let editor = &mut ws.editors.inner_mut_no_update()[0];
-                editor.clear_screen_cache();
+                editor.clear_screen_cache(gs);
                 if editor.update_status.collect() {
                     gs.popup(file_updated(editor.path.clone()));
                 }
@@ -489,7 +503,7 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
             EditorAction::Left | EditorAction::Unintent => {
                 if let Some(mut editor) = ws.editors.pop() {
                     gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
-                    editor.clear_screen_cache();
+                    editor.clear_screen_cache(gs);
                     if editor.update_status.collect() {
                         gs.popup(file_updated(editor.path.clone()));
                     }

@@ -2,10 +2,14 @@ use lsp_types::{
     notification::{Notification, PublishDiagnostics},
     request::GotoDeclarationResponse,
     CompletionItem, CompletionResponse, DiagnosticSeverity, GotoDefinitionResponse, Hover, Location,
-    PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, WorkspaceEdit,
+    PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, Uri, WorkspaceEdit,
 };
 use serde_json::{from_value, Value};
-use std::{fmt::Display, path::PathBuf};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    fmt::Display,
+    path::PathBuf,
+};
 
 use crate::{
     lsp::{LSPError, LSPResult},
@@ -18,7 +22,7 @@ use super::lsp_stream::StdErrMessage;
 pub enum LSPMessage {
     Request(Request),
     Response(Response),
-    Diagnostic(PathBuf, Diagnostic),
+    Diagnostic(Uri, Diagnostic),
     Unknown(Value),
     Error(String),
 }
@@ -64,9 +68,13 @@ impl From<Value> for LSPMessage {
         }
         if let Some(method) = obj.get("method") {
             if method == PublishDiagnostics::METHOD {
-                let params = obj.get_mut("params").map(|p| p.take()).unwrap();
-                let diagnostics = from_value::<PublishDiagnosticsParams>(params).unwrap();
-                return LSPMessage::Diagnostic(diagnostics.uri.as_str()[7..].into(), Diagnostic::new(diagnostics));
+                if let Some(PublishDiagnosticsParams { uri, diagnostics, .. }) = obj
+                    .get_mut("params")
+                    .map(Value::take)
+                    .and_then(|params| from_value::<PublishDiagnosticsParams>(params).ok())
+                {
+                    return LSPMessage::Diagnostic(uri, Diagnostic::new(diagnostics));
+                }
             }
         };
         LSPMessage::Unknown(obj)
@@ -93,6 +101,61 @@ pub struct Response {
     pub error: Option<Value>,
 }
 
+pub type EditorDiagnostics = Vec<(usize, DiagnosticLine)>;
+pub type TreeDiagnostics = Vec<(PathBuf, DiagnosticType)>;
+
+#[derive(Default)]
+pub struct DiagnosticHandle {
+    meta: HashMap<PathBuf, DiagnosticType>,
+    diffs: Vec<(PathBuf, DiagnosticType)>,
+    files: HashMap<Uri, crate::lsp::Diagnostic>,
+}
+
+impl DiagnosticHandle {
+    pub fn collect(&mut self, uri: &Uri) -> (Option<EditorDiagnostics>, Option<TreeDiagnostics>) {
+        (
+            self.files.get_mut(uri).and_then(|d| d.lines.take()),
+            if self.meta.is_empty() { None } else { Some(std::mem::take(&mut self.diffs)) },
+        )
+    }
+
+    pub fn insert(&mut self, k: Uri, v: crate::lsp::Diagnostic) {
+        if v.errors != 0 {
+            self.push_meta(k.as_str(), DiagnosticType::Err);
+        } else if v.warnings != 0 {
+            self.push_meta(k.as_str(), DiagnosticType::Warn);
+        } else {
+            self.push_meta(k.as_str(), DiagnosticType::None);
+        }
+        self.files.insert(k, v);
+    }
+
+    #[inline]
+    fn push_meta(&mut self, uri_text: &str, diagnostic_type: DiagnosticType) {
+        if let Some(path) = uri_text.get(7..).map(PathBuf::from).and_then(|p| p.canonicalize().ok()) {
+            match self.meta.entry(path.clone()) {
+                Entry::Occupied(mut entry) => {
+                    if entry.insert(diagnostic_type) == diagnostic_type {
+                        return;
+                    }
+                    self.diffs.push((path, diagnostic_type));
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(diagnostic_type);
+                    self.diffs.push((path, diagnostic_type));
+                }
+            }
+        }
+    }
+}
+
+#[derive(PartialEq, Clone, Copy, Debug)]
+pub enum DiagnosticType {
+    Err,
+    Warn,
+    None,
+}
+
 /// Stores Diagnostics and metadata - to be used in editor to gain access to diagnostic params objects.
 /// updated flag is used to ensure only updated diagnostics are sent.
 pub struct Diagnostic {
@@ -102,11 +165,11 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
-    fn new(params: PublishDiagnosticsParams) -> Self {
+    fn new(diagnostics: Vec<lsp_types::Diagnostic>) -> Self {
         let mut diagnostic_lines: Vec<(usize, DiagnosticLine)> = Vec::new();
         let mut errors = 0;
         let mut warnings = 0;
-        for d in params.diagnostics {
+        for d in diagnostics {
             match d.severity {
                 Some(DiagnosticSeverity::ERROR) => errors += 1,
                 Some(DiagnosticSeverity::WARNING) => warnings += 1,

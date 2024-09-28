@@ -129,7 +129,8 @@ impl Editor {
     }
 
     #[inline(always)]
-    pub fn clear_screen_cache(&mut self) {
+    pub fn clear_screen_cache(&mut self, gs: &mut GlobalState) {
+        self.lexer.refresh_lsp(gs);
         self.last_render_at_line = None;
     }
 
@@ -221,6 +222,7 @@ impl Editor {
                 let token_range = token_range_at(line, self.cursor.char);
                 self.lexer.start_rename((&self.cursor).into(), &line[token_range]);
             }
+            EditorAction::RefreshUI => self.lexer.refresh_lsp(gs),
             EditorAction::CommentOut => self.actions.comment_out(
                 self.file_type.comment_start(),
                 &mut self.cursor,

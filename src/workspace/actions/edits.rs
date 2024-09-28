@@ -1,14 +1,10 @@
-use std::{
-    fmt::Debug,
-    ops::{Add, AddAssign},
-};
-
+use super::meta::EditMetaData;
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
+use std::fmt::Debug;
 
 use crate::{
     configs::IndentConfigs,
     render::UTF8Safe,
-    syntax::Lexer,
     utils::Offset,
     workspace::{
         cursor::Cursor,
@@ -48,7 +44,7 @@ impl Edit {
         let down_offset = cfg.indent_line(to, content);
         let text = format!("{}\n{}\n", content[up_line], content[to]);
         let cursor = CursorPosition { line: up_line, char: 0 };
-        (up_offset, down_offset, Self::without_select(cursor, 2, 2, text, reverse))
+        (up_offset, down_offset, Self::without_select(cursor, 3, 3, text, reverse))
     }
 
     pub fn merge_next_line(line: usize, content: &mut Vec<EditorLine>) -> Self {
@@ -332,93 +328,5 @@ impl Edit {
         let end = Position::new((cursor.line + changed) as u32, char as u32);
         let start = Position::from(cursor);
         (rev_meta, TextDocumentContentChangeEvent { range: Some(Range::new(start, end)), text, range_length: None })
-    }
-}
-
-#[derive(Clone, Copy, PartialEq)]
-pub struct EditMetaData {
-    pub start_line: usize,
-    pub from: usize, // ignored after Add - is set to 0;
-    pub to: usize,
-}
-
-impl Add for EditMetaData {
-    type Output = Self;
-
-    fn add(mut self, other: Self) -> Self::Output {
-        let self_end_line = self.start_line + self.to;
-        let other_end_line = other.start_line + other.to;
-        self.start_line = std::cmp::min(self.start_line, other.start_line);
-        if self_end_line > other_end_line {
-            self.to = self_end_line - self.start_line;
-            if other.from > other.to {
-                self.to -= other.from - other.to;
-            } else {
-                self.to += other.to - other.from;
-            }
-        } else {
-            // previous offset does not matter because we need the info for the last changed line
-            self.to = other_end_line - self.start_line;
-        };
-        self.from = 0;
-        self
-    }
-}
-
-impl AddAssign for EditMetaData {
-    fn add_assign(&mut self, other: Self) {
-        let self_end_line = self.end_line();
-        let other_end_line = other.end_line();
-        self.start_line = std::cmp::min(self.start_line, other.start_line);
-        if self_end_line > other_end_line {
-            self.to = self_end_line - self.start_line;
-            if other.from > other.to {
-                self.to -= other.from - other.to;
-            } else {
-                self.to += other.to - other.from;
-            }
-        } else {
-            // previous offset does not matter because we need the info for the last changed line
-            self.to = other_end_line - self.start_line;
-        };
-        self.from = 0;
-    }
-}
-
-impl EditMetaData {
-    #[inline]
-    pub const fn line_changed(start_line: usize) -> Self {
-        Self { start_line, from: 1, to: 1 }
-    }
-
-    #[inline]
-    pub fn update_tokens(&self, content: &mut [EditorLine], lexer: &Lexer) {
-        for line in content.iter_mut().skip(self.start_line).take(self.to) {
-            line.rebuild_tokens(lexer);
-        }
-    }
-
-    #[inline]
-    pub const fn end_line(&self) -> usize {
-        self.start_line + self.to - 1
-    }
-
-    #[inline]
-    pub const fn rev(&self) -> Self {
-        EditMetaData { start_line: self.start_line, from: self.to, to: self.from }
-    }
-}
-
-impl Debug for EditMetaData {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&format!("{} >> {}", self.from, self.to))
-    }
-}
-
-impl From<EditMetaData> for lsp_types::Range {
-    fn from(meta: EditMetaData) -> Self {
-        let start = lsp_types::Position::new(meta.start_line as u32, 0);
-        let end = lsp_types::Position::new((meta.start_line + meta.to) as u32, 0);
-        lsp_types::Range::new(start, end)
     }
 }

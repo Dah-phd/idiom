@@ -135,10 +135,10 @@ impl Message {
     }
 
     const fn success(message: String) -> Self {
-        Self::Success(message) //, Style { fg: Some(Color::Blue), ..Default::default() }))
+        Self::Success(message)
     }
 
     const fn err(message: String) -> Self {
-        Self::Error(message) //, Style { fg: Some(Color::Red), ..Default::default() }))
+        Self::Error(message)
     }
 }

@@ -22,7 +22,7 @@ impl IndentConfigs {
     pub fn update_by_file_type(mut self, file_type: &FileType) -> Self {
         #[allow(clippy::single_match)]
         match file_type {
-            FileType::Python | FileType::Nim => self.indent_after.push(':'),
+            FileType::Python | FileType::Nim | FileType::Lobster => self.indent_after.push(':'),
             _ => (),
         }
         self
@@ -75,7 +75,6 @@ impl IndentConfigs {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct EditorConfigs {
     pub format_on_save: bool,
     pub indent_spaces: usize,
@@ -143,7 +142,7 @@ impl Default for EditorConfigs {
 }
 
 impl EditorConfigs {
-    pub fn new() -> Result<Self, serde_json::Error> {
+    pub fn new() -> Result<Self, toml::de::Error> {
         load_or_create_config(EDITOR_CFG_FILE)
     }
 
@@ -162,8 +161,7 @@ impl EditorConfigs {
 
     pub fn derive_lsp(&self, file_type: &FileType) -> Option<String> {
         match file_type {
-            FileType::Ignored => None,
-            FileType::Lobster => None, // no LSP available as far as I know
+            FileType::Ignored | FileType::Lobster | FileType::Json | FileType::Shell => None,
             FileType::Rust => self.rust_lsp.to_owned(),
             FileType::Zig => self.zig_lsp.to_owned(),
             FileType::Python => self.python_lsp.to_owned(),
@@ -197,7 +195,7 @@ impl EditorConfigs {
         .collect()
     }
 
-    pub fn refresh(&mut self) -> Result<(), serde_json::Error> {
+    pub fn refresh(&mut self) -> Result<(), toml::de::Error> {
         (*self) = Self::new()?;
         Ok(())
     }

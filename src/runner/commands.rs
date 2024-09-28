@@ -16,7 +16,7 @@ const SHELL: &str = "cmd";
 
 use crate::error::{IdiomError, IdiomResult};
 use crate::global_state::IdiomEvent;
-use crate::{configs::CONFIG_FOLDER, global_state::GlobalState, utils::force_lock};
+use crate::{configs::CONFIG_FOLDER, global_state::GlobalState};
 use dirs::config_dir;
 
 pub struct Terminal {
@@ -38,9 +38,9 @@ impl Terminal {
         let child = pair.slave.spawn_command(cmd).map_err(|err| IdiomError::any(err.to_string()))?;
         let writer = pair.master.take_writer().map_err(|err| IdiomError::any(err.to_string()))?;
         let reader = pair.master.try_clone_reader().map_err(|err| IdiomError::any(err.to_string()))?;
-        let output = Arc::default();
+        let output: Arc<Mutex<Vec<String>>> = Arc::default();
         let buffer = Arc::clone(&output);
-        let prompt = Arc::default();
+        let prompt: Arc<Mutex<String>> = Arc::default();
         let prompt_writer = Arc::clone(&prompt);
         Ok((
             Self {
@@ -57,13 +57,12 @@ impl Terminal {
                                 bytes.push(byte);
                                 match std::str::from_utf8(&bytes) {
                                     Ok(data) => {
-                                        l.push_str(data);
-                                        let cleaned = strip_str(&l);
-                                        if cleaned.ends_with('\n') {
-                                            force_lock(&buffer).push(cleaned);
+                                        if data == "\n" {
+                                            buffer.lock().unwrap().push(strip_str(&l));
                                             l.clear();
                                         } else {
-                                            *force_lock(&prompt_writer) = cleaned;
+                                            l.push_str(data);
+                                            *prompt_writer.lock().unwrap() = strip_str(&l);
                                         }
                                         bytes.clear();
                                     }
@@ -101,9 +100,9 @@ impl Terminal {
     pub fn push_command(&mut self, cmd: String) -> std::io::Result<()> {
         self.writer.write_all(cmd.as_bytes())?;
         #[cfg(unix)]
-        self.writer.write_all(&[b'\n'])?;
+        self.writer.write_all(b"\n")?;
         #[cfg(windows)]
-        self.writer.write_all(&[b'\r', b'\n'])?;
+        self.writer.write_all(b"\r\n")?;
         self.writer.flush()?;
         Ok(())
     }

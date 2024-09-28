@@ -1,7 +1,7 @@
 use std::{
     ops::{Add, Sub},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex, MutexGuard},
+    sync::Arc,
 };
 
 use crate::{
@@ -17,17 +17,10 @@ pub fn trim_start_inplace(line: &mut EditorLine) -> usize {
     0
 }
 
-pub fn split_arc_mutex<T>(inner: T) -> (Arc<Mutex<T>>, Arc<Mutex<T>>) {
-    let arc = Arc::new(Mutex::new(inner));
+pub fn split_arc<T: Default>() -> (Arc<T>, Arc<T>) {
+    let arc = Arc::default();
     let clone = Arc::clone(&arc);
     (arc, clone)
-}
-
-pub fn force_lock<T>(mutex: &Mutex<T>) -> MutexGuard<T> {
-    match mutex.lock() {
-        Ok(guard) => guard,
-        Err(poisoned) => poisoned.into_inner(),
-    }
 }
 
 pub fn get_nested_paths(path: &PathBuf) -> impl Iterator<Item = PathBuf> {
@@ -112,6 +105,7 @@ impl<T> TrackedList<T> {
         Self { inner: Vec::new(), updated: true }
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     pub fn first(&self) -> Option<&T> {
         self.inner.first()
@@ -144,6 +138,7 @@ impl<T> TrackedList<T> {
         std::mem::take(&mut self.updated)
     }
 
+    #[allow(dead_code)]
     #[inline(always)]
     pub fn check_status(&self) -> bool {
         self.updated

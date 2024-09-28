@@ -8,7 +8,7 @@ use crate::{
         popup_tree_search::ActivePathSearch,
         popups_editor::{save_all_popup, selector_editors},
     },
-    render::backend::{Backend, BackendProtocol},
+    render::backend::Backend,
     runner::EditorTerminal,
     tree::Tree,
     workspace::Workspace,
@@ -18,9 +18,8 @@ use std::{path::PathBuf, time::Duration};
 
 const MIN_FRAMERATE: Duration = Duration::from_millis(8);
 
-pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResult<()> {
+pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()> {
     // builtin cursor is not used - cursor is positioned during render
-    backend.hide_cursor();
 
     let mut gs = GlobalState::new(backend)?;
     let configs = gs.unwrap_or_default(KeyMap::new(), ".keys: ");

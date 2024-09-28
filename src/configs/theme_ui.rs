@@ -47,7 +47,7 @@ impl Default for UITheme {
 }
 
 impl UITheme {
-    pub fn new() -> Result<Self, serde_json::Error> {
+    pub fn new() -> Result<Self, toml::de::Error> {
         load_or_create_config(THEME_UI)
     }
 }

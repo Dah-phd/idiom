@@ -3,11 +3,12 @@ use ignore::Match;
 use tokio::task::JoinSet;
 
 use crate::{
+    lsp::DiagnosticType,
     render::{
         backend::{color, Backend, Color, Style},
         layout::Line,
     },
-    utils::{get_nested_paths, to_relative_path},
+    utils::get_nested_paths,
 };
 use std::{
     cmp::Ordering,
@@ -23,50 +24,51 @@ const WAR: Color = color::dark_yellow();
 
 #[derive(Debug, Clone)]
 pub enum TreePath {
-    Folder { path: PathBuf, tree: Option<Vec<TreePath>>, display: String, errors: usize, warnings: usize },
-    File { path: PathBuf, display: String, errors: usize, warnings: usize },
+    Folder { path: PathBuf, tree: Option<Vec<TreePath>>, display: String, diagnostic: DiagnosticType },
+    File { path: PathBuf, display: String, diagnostic: DiagnosticType },
 }
 
 #[allow(dead_code)]
 impl TreePath {
     pub fn from_path(path: PathBuf) -> Self {
         if !path.is_dir() {
-            return Self::File { display: get_path_display(&path), path, errors: 0, warnings: 0 };
+            return Self::File { display: get_path_display(&path), path, diagnostic: DiagnosticType::None };
         }
         let mut tree_buffer = get_nested_paths(&path)
             .filter_map(|p| if is_git_dir(&p) { None } else { Some(p.into()) })
             .collect::<Vec<Self>>();
         tree_buffer.sort_by(order_tree_paths);
-        Self::Folder { display: get_path_display(&path), path, tree: Some(tree_buffer), errors: 0, warnings: 0 }
+        Self::Folder {
+            display: get_path_display(&path),
+            path,
+            tree: Some(tree_buffer),
+            diagnostic: DiagnosticType::None,
+        }
     }
 
     pub fn render_styled(&self, char_offset: usize, line: Line, mut style: Style, backend: &mut Backend) {
-        let (display, errs, wars) = match self {
-            TreePath::File { display, errors, warnings, .. } => (&display[char_offset..], *errors, *warnings),
-            TreePath::Folder { display, errors, warnings, .. } => (&display[char_offset..], *errors, *warnings),
+        let (display, diagnostic) = match self {
+            TreePath::File { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
+            TreePath::Folder { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
         };
-        if errs != 0 {
-            style.set_fg(Some(ERR));
-        } else if wars != 0 {
-            style.set_fg(Some(WAR));
+        match diagnostic {
+            DiagnosticType::Err => style.set_fg(Some(ERR)),
+            DiagnosticType::Warn => style.set_fg(Some(WAR)),
+            _ => (),
         }
         line.render_styled(display, style, backend);
     }
 
     pub fn render(&self, char_offset: usize, line: Line, backend: &mut Backend) {
-        let (display, errs, wars) = match self {
-            TreePath::File { display, errors, warnings, .. } => (&display[char_offset..], *errors, *warnings),
-            TreePath::Folder { display, errors, warnings, .. } => (&display[char_offset..], *errors, *warnings),
+        let (display, diagnostic) = match self {
+            TreePath::File { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
+            TreePath::Folder { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
         };
-        if errs != 0 {
-            line.render_styled(display, Style::fg(ERR), backend);
-            return;
-        }
-        if wars != 0 {
-            line.render_styled(display, Style::fg(WAR), backend);
-            return;
-        }
-        line.render(display, backend);
+        match diagnostic {
+            DiagnosticType::Err => line.render_styled(display, Style::fg(ERR), backend),
+            DiagnosticType::Warn => line.render_styled(display, Style::fg(WAR), backend),
+            DiagnosticType::None => line.render(display, backend),
+        };
     }
 
     pub fn len(&self) -> usize {
@@ -161,9 +163,12 @@ impl TreePath {
     pub fn shallow_copy(&self) -> Self {
         match self {
             Self::File { .. } => self.clone(),
-            Self::Folder { path, display, .. } => {
-                Self::Folder { path: path.clone(), tree: None, display: display.clone(), errors: 0, warnings: 0 }
-            }
+            Self::Folder { path, display, .. } => Self::Folder {
+                path: path.clone(),
+                tree: None,
+                display: display.clone(),
+                diagnostic: DiagnosticType::None,
+            },
         }
     }
 
@@ -339,39 +344,32 @@ impl TreePath {
 
     /// Diagnostics
 
-    pub fn map_diagnostics_base(&mut self, path: &Path, d_errors: usize, d_warnings: usize) {
-        if d_errors == 0 && d_warnings == 0 {
-            return;
-        }
-        if let Ok(d_path) = to_relative_path(path) {
-            if let Self::Folder { tree: Some(tree), .. } = self {
-                for tree_path in tree {
-                    tree_path.map_diagnostics(&d_path, d_errors, d_warnings);
-                }
+    pub fn map_diagnostics_base(&mut self, d_path: &PathBuf, new_diagnostic: DiagnosticType) {
+        if let Self::Folder { tree: Some(tree), .. } = self {
+            for tree_path in tree {
+                tree_path.map_diagnostics(d_path, new_diagnostic);
             }
-        };
+        }
     }
 
-    fn map_diagnostics(&mut self, d_path: &PathBuf, d_errors: usize, d_warnings: usize) -> bool {
+    fn map_diagnostics(&mut self, d_path: &PathBuf, new_diagnostic: DiagnosticType) -> bool {
         match self {
-            Self::Folder { path, tree, errors, warnings, .. } => {
+            Self::Folder { path, tree, diagnostic, .. } => {
                 if !d_path.starts_with(path) {
                     return false;
                 }
+                *diagnostic = new_diagnostic;
                 if let Some(tree) = tree {
                     for tree_path in tree.iter_mut() {
-                        if tree_path.map_diagnostics(d_path, d_errors, d_warnings) {
+                        if tree_path.map_diagnostics(d_path, new_diagnostic) {
                             return true;
                         }
                     }
                 }
-                *errors = d_errors;
-                *warnings = d_warnings;
             }
-            Self::File { path, errors, warnings, .. } => {
+            Self::File { path, diagnostic, .. } => {
                 if path == d_path {
-                    *errors = d_errors;
-                    *warnings = d_warnings;
+                    *diagnostic = new_diagnostic;
                     return true;
                 }
             }
@@ -379,18 +377,7 @@ impl TreePath {
         false
     }
 
-    fn reset_diagnostic(&mut self) {
-        match self {
-            Self::Folder { errors, warnings, .. } => {
-                *errors = 0;
-                *warnings = 0;
-            }
-            Self::File { errors, warnings, .. } => {
-                *errors = 0;
-                *warnings = 0;
-            }
-        }
-    }
+    fn reset_diagnostic(&mut self) {}
 
     pub fn iter(&self) -> TreeIter {
         TreeIter { holder: vec![self] }
@@ -401,9 +388,9 @@ impl From<PathBuf> for TreePath {
     fn from(value: PathBuf) -> Self {
         let display = get_path_display(&value);
         if value.is_dir() {
-            Self::Folder { path: value, tree: None, display, errors: 0, warnings: 0 }
+            Self::Folder { path: value, tree: None, display, diagnostic: DiagnosticType::None }
         } else {
-            Self::File { path: value, display, errors: 0, warnings: 0 }
+            Self::File { path: value, display, diagnostic: DiagnosticType::None }
         }
     }
 }

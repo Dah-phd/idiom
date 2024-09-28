@@ -251,31 +251,31 @@ impl Drop for Backend {
 }
 
 fn init_terminal() -> std::io::Result<()> {
+    // Ensures panics are retported
+    std::panic::set_hook(Box::new(|info| {
+        let _ = graceful_exit();
+        eprintln!("{info}");
+    }));
+    // Init terminal
     crossterm::terminal::enable_raw_mode()?;
     crossterm::execute!(
         std::io::stdout(),
         crossterm::terminal::EnterAlternateScreen,
+        crossterm::terminal::DisableLineWrap,
         crossterm::style::ResetColor,
         crossterm::event::EnableMouseCapture,
-    )?;
-
-    // loading panic
-    let original_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |panic| {
-        graceful_exit().unwrap();
-        original_hook(panic);
-    }));
-    Ok(())
+        crossterm::cursor::Hide,
+    )
 }
 
 fn graceful_exit() -> std::io::Result<()> {
     crossterm::execute!(
         std::io::stdout(),
         crossterm::terminal::LeaveAlternateScreen,
+        crossterm::terminal::EnableLineWrap,
         crossterm::style::ResetColor,
         crossterm::event::DisableMouseCapture,
         crossterm::cursor::Show,
     )?;
-    crossterm::terminal::disable_raw_mode()?;
-    Ok(())
+    crossterm::terminal::disable_raw_mode()
 }

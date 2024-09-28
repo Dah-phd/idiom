@@ -42,9 +42,9 @@ impl Serialize for Theme {
     {
         let mut s = serializer.serialize_struct("Theme", 13)?;
         s.serialize_field("imports", &serialize_rgb(112, 199, 176))?;
-        s.serialize_field("keyWords", &serialize_rgb(79, 106, 214))?;
-        s.serialize_field("flowControl", "lightmagenta")?;
-        s.serialize_field("classOrStruct", &serialize_rgb(112, 199, 176))?;
+        s.serialize_field("key_words", &serialize_rgb(79, 106, 214))?;
+        s.serialize_field("flow_control", "lightmagenta")?;
+        s.serialize_field("class_or_struct", &serialize_rgb(112, 199, 176))?;
         s.serialize_field("constant", &serialize_rgb(73, 162, 215))?;
         s.serialize_field("blank", "reset")?;
         s.serialize_field("comment", &serialize_rgb(82, 113, 67))?;
@@ -53,7 +53,7 @@ impl Serialize for Theme {
         s.serialize_field("numeric", &serialize_rgb(153, 173, 142))?;
         s.serialize_field("selected", &serialize_rgb(72, 72, 72))?;
         s.serialize_field("string", "yellow")?;
-        s.serialize_field("stringEscape", "lightyellow")?;
+        s.serialize_field("string_escape", "lightyellow")?;
         s.end()
     }
 }
@@ -66,13 +66,13 @@ impl<'de> serde::Deserialize<'de> for Theme {
         match Value::deserialize(deserializer)? {
             Value::Object(mut map) => Ok(Self {
                 imports: pull_color(&mut map, "imports").unwrap_or(Ok(IMPORTS)).map_err(serde::de::Error::custom)?,
-                key_words: pull_color(&mut map, "keyWords")
+                key_words: pull_color(&mut map, "key_words")
                     .unwrap_or(Ok(KEY_WORDS))
                     .map_err(serde::de::Error::custom)?,
-                flow_control: pull_color(&mut map, "flowControl")
+                flow_control: pull_color(&mut map, "flow_control")
                     .unwrap_or(Ok(FLOW_CONTROL))
                     .map_err(serde::de::Error::custom)?,
-                class_or_struct: pull_color(&mut map, "classOrStruct")
+                class_or_struct: pull_color(&mut map, "class_or_struct")
                     .unwrap_or(Ok(CLASS_OR_STRUCT))
                     .map_err(serde::de::Error::custom)?,
                 constant: pull_color(&mut map, "constant").unwrap_or(Ok(CONSTANT)).map_err(serde::de::Error::custom)?,
@@ -85,7 +85,7 @@ impl<'de> serde::Deserialize<'de> for Theme {
                 numeric: pull_color(&mut map, "numeric").unwrap_or(Ok(NUMERIC)).map_err(serde::de::Error::custom)?,
                 selected: pull_color(&mut map, "selected").unwrap_or(Ok(SELECTED)).map_err(serde::de::Error::custom)?,
                 string: pull_color(&mut map, "string").unwrap_or(Ok(STRING)).map_err(serde::de::Error::custom)?,
-                string_escape: pull_color(&mut map, "stringEscape")
+                string_escape: pull_color(&mut map, "string_escape")
                     .unwrap_or(Ok(STRING_ESCAPE))
                     .map_err(serde::de::Error::custom)?,
             }),
@@ -115,7 +115,7 @@ impl Default for Theme {
 }
 
 impl Theme {
-    pub fn new() -> Result<Self, serde_json::Error> {
+    pub fn new() -> Result<Self, toml::de::Error> {
         load_or_create_config(THEME_FILE)
     }
 }

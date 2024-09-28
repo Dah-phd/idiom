@@ -17,6 +17,8 @@ impl<'a> ByteChunks<'a> {
         Self { text, width }
     }
 
+    #[allow(dead_code)]
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.width == 0
     }
@@ -52,6 +54,8 @@ impl<'a> WriteChunks<'a> {
         Self { inner: text.char_indices(), text, at_byte: 0, width, width_offset: 0 }
     }
 
+    #[allow(dead_code)]
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.width == 0
     }

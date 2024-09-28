@@ -1,4 +1,5 @@
 use super::{GlobalState, PopupMessage};
+use crate::lsp::TreeDiagnostics;
 use crate::popups::popup_replace::ReplacePopup;
 use crate::popups::popups_editor::selector_ranges;
 use crate::popups::{popup_tree_search::ActiveFileSearch, PopupInterface};
@@ -22,6 +23,7 @@ pub enum IdiomEvent {
     SearchFiles(String),
     FileUpdated(PathBuf),
     CheckLSP(FileType),
+    TreeDiagnostics(TreeDiagnostics),
     AutoComplete(String),
     Snippet(String, Option<(usize, usize)>),
     InsertText(String),
@@ -109,6 +111,9 @@ impl IdiomEvent {
             }
             IdiomEvent::SelectPath(path) => {
                 tree.select_by_path(&path);
+            }
+            IdiomEvent::TreeDiagnostics(new) => {
+                tree.push_diagnostics(new);
             }
             IdiomEvent::CreateFileOrFolder(name) => {
                 if let Ok(new_path) = tree.create_file_or_folder(name) {

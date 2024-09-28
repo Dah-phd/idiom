@@ -63,7 +63,6 @@ impl TreeSeletor {
         let home = dirs::home_dir().ok_or(IdiomError::io_err("Filed to find home dir!"))?.canonicalize()?;
         std::env::set_current_dir(&home)?;
         let config = KeyMap::new().unwrap_or_default();
-        backend.hide_cursor();
         let rect = Backend::screen()?;
         let path_str = home.display().to_string();
         let display_offset = path_str.split(std::path::MAIN_SEPARATOR).count() * 2;
@@ -77,6 +76,7 @@ impl TreeSeletor {
             rebuild: true,
         };
         tree.render_stateless(rect, backend);
+        let limit = rect.height as usize;
         loop {
             if crossterm::event::poll(MIN_FRAMERATE)? {
                 match crossterm::event::read()? {
@@ -94,7 +94,7 @@ impl TreeSeletor {
                         return Ok(Some(tree.selected_path));
                     }
                     Event::Key(key) => {
-                        tree.map_stateless(&key);
+                        tree.map_stateless(&key, limit);
                     }
                     _ => {}
                 }
@@ -148,21 +148,23 @@ impl TreeSeletor {
         };
     }
 
-    fn select_up(&mut self) {
+    fn select_up(&mut self, limit: usize) {
         let tree_len = self.tree.len() - 1;
         if tree_len == 0 {
             return;
         }
         self.state.prev(tree_len);
+        self.state.update_at_line(limit);
         self.unsafe_set_path();
     }
 
-    fn select_down(&mut self) {
+    fn select_down(&mut self, limit: usize) {
         let tree_len = self.tree.len() - 1;
         if tree_len == 0 {
             return;
         }
         self.state.next(tree_len);
+        self.state.update_at_line(limit);
         self.unsafe_set_path();
     }
 
@@ -173,11 +175,11 @@ impl TreeSeletor {
         }
     }
 
-    fn map_stateless(&mut self, key: &KeyEvent) -> bool {
+    fn map_stateless(&mut self, key: &KeyEvent, limit: usize) -> bool {
         if let Some(action) = self.key_map.map(key) {
             match action {
-                TreeAction::Up => self.select_up(),
-                TreeAction::Down => self.select_down(),
+                TreeAction::Up => self.select_up(limit),
+                TreeAction::Down => self.select_down(limit),
                 TreeAction::Shrink => self.shrink(),
                 TreeAction::Expand => {
                     let _ = self.expand_dir_or_get_path();

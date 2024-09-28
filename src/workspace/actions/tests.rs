@@ -1,5 +1,5 @@
+use super::meta::EditMetaData;
 use crate::configs::IndentConfigs;
-use crate::workspace::actions::edits::EditMetaData;
 use crate::workspace::actions::Edit;
 use crate::workspace::cursor::Cursor;
 use crate::workspace::line::EditorLine;
@@ -100,15 +100,19 @@ fn test_swap_lines() {
     let (.., edit) = Edit::swap_down(7, &cfg, &mut content);
     match_line(&content[7], &"}");
     match_line(&content[8], &"    this is the first scope");
+    match_line(&content[9], &"scope is closed!");
     edit.apply_rev(&mut content);
     match_line(&content[7], &"    this is the first scope");
     match_line(&content[8], &"}");
+    match_line(&content[9], &"scope is closed!");
     let (.., edit) = Edit::swap_down(6, &cfg, &mut content);
     match_line(&content[6], &"    this is the first scope");
     match_line(&content[7], &"    i will have to have some scopes {");
+    match_line(&content[8], &"}");
     edit.apply_rev(&mut content);
     match_line(&content[6], &"i will have to have some scopes {");
     match_line(&content[7], &"    this is the first scope");
+    match_line(&content[8], &"}");
 }
 
 #[test]
@@ -263,27 +267,27 @@ fn test_insert_snippet() {
 fn add_meta_data() {
     assert_eq!(
         EditMetaData::line_changed(1) + EditMetaData::line_changed(1),
-        EditMetaData { start_line: 1, from: 0, to: 1 }
+        EditMetaData { start_line: 1, from: 1, to: 1 }
     );
     assert_eq!(
         EditMetaData::line_changed(1) + EditMetaData { start_line: 1, from: 1, to: 3 },
-        EditMetaData { start_line: 1, from: 0, to: 3 }
+        EditMetaData { start_line: 1, from: 1, to: 3 }
     );
     assert_eq!(
         EditMetaData { start_line: 1, from: 2, to: 1 } + EditMetaData { start_line: 1, from: 1, to: 3 },
-        EditMetaData { start_line: 1, from: 0, to: 3 }
+        EditMetaData { start_line: 1, from: 2, to: 3 }
     );
     assert_eq!(
         EditMetaData { start_line: 1, from: 1, to: 2 } + EditMetaData { start_line: 1, from: 1, to: 3 },
-        EditMetaData { start_line: 1, from: 0, to: 3 }
+        EditMetaData { start_line: 1, from: 1, to: 4 }
     );
     assert_eq!(
         EditMetaData { start_line: 2, from: 1, to: 3 } + EditMetaData { start_line: 0, from: 3, to: 1 },
-        EditMetaData { start_line: 0, from: 0, to: 3 }
+        EditMetaData { start_line: 0, from: 3, to: 3 }
     );
     assert_eq!(
         EditMetaData { start_line: 0, from: 1, to: 10 } + EditMetaData { start_line: 2, from: 2, to: 1 },
-        EditMetaData { start_line: 0, from: 0, to: 9 },
+        EditMetaData { start_line: 0, from: 1, to: 9 },
     );
 }
 
@@ -291,20 +295,85 @@ fn add_meta_data() {
 fn add_assign_meta_data() {
     let mut edit = EditMetaData::line_changed(1);
     edit += EditMetaData::line_changed(1);
-    assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 0 });
+    assert_eq!(edit, EditMetaData { start_line: 1, from: 1, to: 1 });
+
     let mut edit = EditMetaData::line_changed(1);
     edit += EditMetaData { start_line: 1, from: 1, to: 2 };
-    assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 1 });
-    let mut edit = EditMetaData { start_line: 1, from: 2, to: 0 };
+    assert_eq!(edit, EditMetaData { start_line: 1, from: 1, to: 2 });
+
+    let mut edit = EditMetaData { start_line: 1, from: 2, to: 1 };
     edit += EditMetaData { start_line: 1, from: 1, to: 3 };
-    assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 2 });
+    assert_eq!(edit, EditMetaData { start_line: 1, from: 2, to: 3 });
+
     let mut edit = EditMetaData { start_line: 1, from: 1, to: 2 };
     edit += EditMetaData { start_line: 1, from: 1, to: 3 };
-    assert_eq!(edit, EditMetaData { start_line: 1, from: 0, to: 2 });
+    assert_eq!(edit, EditMetaData { start_line: 1, from: 1, to: 4 });
+
     let mut edit = EditMetaData { start_line: 2, from: 1, to: 3 };
     edit += EditMetaData { start_line: 0, from: 3, to: 1 };
-    assert_eq!(edit, EditMetaData { start_line: 0, from: 0, to: 2 });
+    assert_eq!(edit, EditMetaData { start_line: 0, from: 3, to: 3 });
+
     let mut edit = EditMetaData { start_line: 0, from: 1, to: 10 };
     edit += EditMetaData { start_line: 2, from: 2, to: 1 };
-    assert_eq!(edit, EditMetaData { start_line: 0, from: 0, to: 8 },);
+    assert_eq!(edit, EditMetaData { start_line: 0, from: 1, to: 9 },);
+}
+
+#[test]
+fn test_meta_ls_dec_dec() {
+    let mut m1 = EditMetaData { start_line: 1, from: 3, to: 1 };
+    let m2 = EditMetaData { start_line: 0, from: 2, to: 1 };
+    let expect = EditMetaData { start_line: 0, from: 4, to: 1 };
+    assert_eq!(m1 + m2, expect);
+    m1 += m2;
+    assert_eq!(m1, expect);
+}
+
+#[test]
+fn test_meta_gr_inc_dec() {
+    let mut m1 = EditMetaData { start_line: 0, from: 1, to: 3 };
+    let m2 = EditMetaData { start_line: 2, from: 3, to: 1 };
+    let expect = EditMetaData { start_line: 0, from: 3, to: 3 };
+    assert_eq!(m1 + m2, expect);
+    m1 += m2;
+    assert_eq!(m1, expect);
+}
+
+#[test]
+fn test_meta_dec_inc_noover() {
+    let mut m1 = EditMetaData { start_line: 0, from: 1, to: 3 };
+    let m2 = EditMetaData { start_line: 3, from: 3, to: 1 };
+    let expect = EditMetaData { start_line: 0, from: 4, to: 4 };
+    assert_eq!(m1 + m2, expect);
+    m1 += m2;
+    assert_eq!(m1, expect);
+}
+
+#[test]
+fn test_meta_eq_inc_dec() {
+    let mut m1 = EditMetaData { start_line: 1, from: 2, to: 1 };
+    let m2 = EditMetaData { start_line: 1, from: 1, to: 3 };
+    let expect = EditMetaData { start_line: 1, from: 2, to: 3 };
+    assert_eq!(m1 + m2, expect);
+    m1 += m2;
+    assert_eq!(m1, expect);
+}
+
+#[test]
+fn test_meta_eq_inc_inc() {
+    let mut m1 = EditMetaData { start_line: 1, from: 2, to: 1 };
+    let m2 = EditMetaData { start_line: 1, from: 3, to: 1 };
+    let expect = EditMetaData { start_line: 1, from: 4, to: 1 };
+    assert_eq!(m1 + m2, expect);
+    m1 += m2;
+    assert_eq!(m1, expect);
+}
+
+#[test]
+fn test_meta_eq_inc_stat() {
+    let mut m1 = EditMetaData { start_line: 1, from: 1, to: 2 };
+    let m2 = EditMetaData { start_line: 1, from: 3, to: 3 };
+    let expect = EditMetaData { start_line: 1, from: 2, to: 3 };
+    assert_eq!(m1 + m2, expect);
+    m1 += m2;
+    assert_eq!(m1, expect);
 }

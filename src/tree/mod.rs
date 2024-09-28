@@ -4,12 +4,16 @@ use crate::{
     configs::{TreeAction, TreeKeyMap},
     error::{IdiomError, IdiomResult},
     global_state::{GlobalState, IdiomEvent},
+    lsp::{DiagnosticType, TreeDiagnostics},
     popups::popups_tree::{create_file_popup, rename_file_popup},
     render::state::State,
     utils::{build_file_or_folder, to_canon_path, to_relative_path},
 };
 use crossterm::event::KeyEvent;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    path::{Path, PathBuf},
+};
 pub use tree_paths::TreePath;
 use watcher::TreeWatcher;
 
@@ -19,6 +23,7 @@ pub struct Tree {
     pub key_map: TreeKeyMap,
     pub watcher: TreeWatcher,
     state: State,
+    diagnostics_state: HashMap<PathBuf, DiagnosticType>,
     selected_path: PathBuf,
     tree: TreePath,
     display_offset: usize,
@@ -42,6 +47,7 @@ impl Tree {
                     selected_path,
                     tree,
                     rebuild: true,
+                    diagnostics_state: HashMap::new(),
                 }
             }
             Err(..) => {
@@ -55,6 +61,7 @@ impl Tree {
                     selected_path: PathBuf::from("./"),
                     tree,
                     rebuild: true,
+                    diagnostics_state: HashMap::new(),
                 }
             }
         }
@@ -91,8 +98,8 @@ impl Tree {
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         if let Some(action) = self.key_map.map(key) {
             match action {
-                TreeAction::Up => self.select_up(),
-                TreeAction::Down => self.select_down(),
+                TreeAction::Up => self.select_up(gs),
+                TreeAction::Down => self.select_down(gs),
                 TreeAction::Shrink => self.shrink(),
                 TreeAction::Expand => {
                     if let Some(path) = self.expand_dir_or_get_path() {
@@ -100,7 +107,7 @@ impl Tree {
                     }
                 }
                 TreeAction::Delete => {
-                    let _ = self.delete_file();
+                    let _ = self.delete_file(gs);
                 }
                 TreeAction::NewFile => gs.popup(create_file_popup(self.get_first_selected_folder_display())),
                 TreeAction::Rename => {
@@ -120,6 +127,9 @@ impl Tree {
         let tree_path = self.tree.get_mut_from_inner(self.state.selected)?;
         if tree_path.path().is_dir() {
             tree_path.expand();
+            for (d_path, new_diagnostic) in self.diagnostics_state.iter() {
+                tree_path.map_diagnostics_base(d_path, *new_diagnostic);
+            }
             self.rebuild = true;
             None
         } else {
@@ -142,7 +152,12 @@ impl Tree {
                     TreePath::Folder { tree: Some(..), .. } => {
                         selected.take_tree();
                     }
-                    TreePath::Folder { tree: None, .. } => selected.expand(),
+                    TreePath::Folder { tree: None, .. } => {
+                        selected.expand();
+                        for (d_path, new_diagnostic) in self.diagnostics_state.iter() {
+                            selected.map_diagnostics_base(d_path, *new_diagnostic);
+                        }
+                    }
                     TreePath::File { path, .. } => {
                         self.selected_path = path.clone();
                         self.rebuild = true;
@@ -156,22 +171,51 @@ impl Tree {
         None
     }
 
-    fn select_up(&mut self) {
+    fn select_up(&mut self, gs: &mut GlobalState) {
         let tree_len = self.tree.len() - 1;
         if tree_len == 0 {
             return;
         }
         self.state.prev(tree_len);
+        self.state.update_at_line(gs.tree_area.height as usize);
         self.unsafe_set_path();
     }
 
-    fn select_down(&mut self) {
+    fn select_down(&mut self, gs: &mut GlobalState) {
         let tree_len = self.tree.len() - 1;
         if tree_len == 0 {
             return;
         }
         self.state.next(tree_len);
+        self.state.update_at_line(gs.tree_area.height as usize);
         self.unsafe_set_path();
+    }
+
+    pub fn push_diagnostics(&mut self, new: TreeDiagnostics) {
+        self.rebuild = true;
+        for (path, new_diagnostic) in new {
+            if let Ok(d_path) = (self.path_parser)(&path) {
+                self.tree.map_diagnostics_base(&d_path, new_diagnostic);
+                if matches!(new_diagnostic, DiagnosticType::None) {
+                    self.diagnostics_state.remove(&d_path);
+                    continue;
+                }
+                match self.diagnostics_state.entry(d_path) {
+                    Entry::Occupied(mut entry) => {
+                        entry.insert(new_diagnostic);
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert(new_diagnostic);
+                    }
+                }
+            }
+        }
+    }
+
+    fn rebuild_diagnostics(&mut self) {
+        for (d_path, new_diagnostic) in self.diagnostics_state.iter() {
+            self.tree.map_diagnostics_base(d_path, *new_diagnostic);
+        }
     }
 
     pub fn create_file_or_folder(&mut self, name: String) -> IdiomResult<PathBuf> {
@@ -186,13 +230,13 @@ impl Tree {
         Ok(path)
     }
 
-    fn delete_file(&mut self) -> IdiomResult<()> {
+    fn delete_file(&mut self, gs: &mut GlobalState) -> IdiomResult<()> {
         if self.selected_path.is_file() {
             std::fs::remove_file(&self.selected_path)?
         } else {
             std::fs::remove_dir_all(&self.selected_path)?
         };
-        self.select_up();
+        self.select_up(gs);
         self.rebuild = true;
         Ok(())
     }
@@ -243,6 +287,7 @@ impl Tree {
         if self.tree.expand_contained(path) {
             self.selected_path.clone_from(path);
             self.state.selected = self.tree.iter().skip(1).position(|tp| tp.path() == path).unwrap_or_default();
+            self.rebuild_diagnostics();
             self.rebuild = true;
         }
     }

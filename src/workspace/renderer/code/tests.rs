@@ -405,9 +405,6 @@ fn test_line_wrapping_utf8() {
     inner_render(&mut content[0], &mut ctx, line, select, &mut gs.writer);
     let line = lines.next().unwrap();
     let text = &mut content[1];
-    if text.tokens.is_empty() {
-        text.tokens.internal_rebase(&text.content, &ctx.lexer.lang, &ctx.lexer.theme);
-    };
     rend_cursor(text, &mut ctx, line, &mut gs.writer);
 
     test_line_wrap(gs.writer.drain());
@@ -433,9 +430,6 @@ fn test_line_wrapping_utf16() {
     inner_render(&mut content[0], &mut ctx, line, select, &mut gs.writer);
     let line = lines.next().unwrap();
     let text = &mut content[1];
-    if text.tokens.is_empty() {
-        text.tokens.internal_rebase(&text.content, &ctx.lexer.lang, &ctx.lexer.theme);
-    };
     rend_cursor(text, &mut ctx, line, &mut gs.writer);
 
     test_line_wrap(gs.writer.drain());
@@ -461,9 +455,6 @@ fn test_line_wrapping_utf32() {
     inner_render(&mut content[0], &mut ctx, line, select, &mut gs.writer);
     let line = lines.next().unwrap();
     let text = &mut content[1];
-    if text.tokens.is_empty() {
-        text.tokens.internal_rebase(&text.content, &ctx.lexer.lang, &ctx.lexer.theme);
-    };
     rend_cursor(text, &mut ctx, line, &mut gs.writer);
 
     test_line_wrap(gs.writer.drain());
@@ -518,7 +509,8 @@ fn test_content(mut render_data: Vec<(Style, String)>) {
     assert_eq!(line, vec!["use", " ", "super", "::", "EditorLine", ";"]);
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(3));
-    assert_eq!(line, vec![""]);
+    let expect: Vec<&str> = vec![];
+    assert_eq!(line, expect);
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(4));
     assert_eq!(line, vec!["#", "[", "test", "]"]);
@@ -581,7 +573,7 @@ fn test_content(mut render_data: Vec<(Style, String)>) {
     );
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(16));
-    assert_eq!(line, vec!["}", ""]);
+    assert_eq!(line, vec!["}"]);
 }
 
 #[inline]
@@ -659,7 +651,7 @@ fn test_content_select(mut render_data: Vec<(Style, String)>) {
     );
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(16));
-    assert_eq!(line, vec!["}", ""]);
+    assert_eq!(line, vec!["}"]);
 }
 
 #[inline]
@@ -672,7 +664,8 @@ fn test_content_shrunk(mut render_data: Vec<(Style, String)>) {
     assert_eq!(line, vec!["use", " ", "super", "::", "EditorLine", ";"]);
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(3));
-    assert_eq!(line, vec![""]);
+    let expect: Vec<&str> = vec![];
+    assert_eq!(line, expect);
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(4));
     assert_eq!(line, vec!["#", "[", "test", "]"]);
@@ -732,7 +725,7 @@ fn test_content_shrunk(mut render_data: Vec<(Style, String)>) {
     );
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(16));
-    assert_eq!(line, vec!["}", ""]);
+    assert_eq!(line, vec!["}"]);
 }
 
 fn test_line_wrap(mut render_data: Vec<(Style, String)>) {
