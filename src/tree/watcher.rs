@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use super::PathParser;
 use crate::error::IdiomResult;
 use crate::global_state::IdiomEvent;
 use crate::{global_state::GlobalState, tree::TreePath};
@@ -9,8 +10,6 @@ use notify::{
     event::{AccessKind, AccessMode, ModifyKind},
     Config, Error, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
 };
-
-use super::PathParser;
 
 const TICK: Duration = Duration::from_secs(1);
 
