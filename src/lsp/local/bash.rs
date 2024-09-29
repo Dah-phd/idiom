@@ -1,7 +1,6 @@
-use crate::lsp::local::LangStream;
 use logos::Logos;
 
-use super::{utils::NON_TOKEN_ID, Definitions};
+use super::{utils::NON_TOKEN_ID, Definitions, LangStream};
 
 #[derive(Debug, Logos, PartialEq)]
 #[logos(skip r" ")]
@@ -146,23 +145,6 @@ impl LangStream for BashToken {
         }
     }
 
-    // SemanticTokenType::NAMESPACE,      // 0
-    // SemanticTokenType::TYPE,           // 1
-    // SemanticTokenType::CLASS,          // 2
-    // SemanticTokenType::ENUM,           // 3
-    // SemanticTokenType::INTERFACE,      // 4
-    // SemanticTokenType::STRUCT,         // 5
-    // SemanticTokenType::TYPE_PARAMETER, // 6
-    // SemanticTokenType::PARAMETER,      // 7
-    // SemanticTokenType::VARIABLE,       // 8
-    // SemanticTokenType::PROPERTY,       // 9
-    // SemanticTokenType::FUNCTION,       // 10
-    // SemanticTokenType::KEYWORD,        // 11
-    // SemanticTokenType::COMMENT,        // 12
-    // SemanticTokenType::STRING,         // 13
-    // SemanticTokenType::NUMBER,         // 14
-    // SemanticTokenType::DECORATOR,      // 15
-    // SemanticTokenType::ENUM_MEMBER,    // 16
     fn type_id(&self) -> u32 {
         match self {
             Self::Bins => 2,

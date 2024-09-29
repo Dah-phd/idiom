@@ -12,19 +12,17 @@ mod utils;
 use bash::BashToken;
 pub use enriched::enrich_with_semantics;
 use lsp_types::InsertTextFormat;
-use rust::Rustacean;
+pub use utils::create_semantic_capabilities;
 
-use crate::lsp::local::{generic::GenericToken, python::PyToken};
-use crate::lsp::{messages::Response, LSPError, LSPResult, Responses};
+use super::{messages::Response, payload::Payload, LSPError, LSPResult, Responses};
 use crate::render::UTF8Safe;
-use crate::syntax::tokens::set_tokens;
-use crate::syntax::Legend;
+use crate::syntax::{tokens::set_tokens, Legend};
 use crate::workspace::line::EditorLine;
 use crate::{
     configs::{FileType, Theme},
-    lsp::payload::Payload,
     workspace::CursorPosition,
 };
+use generic::GenericToken;
 use json::JsonValue;
 use lobster::Pincer;
 use logos::{Logos, Span};
@@ -33,13 +31,12 @@ use lsp_types::{
     SemanticToken, SemanticTokens, SemanticTokensRangeResult, SemanticTokensResult,
 };
 use lsp_types::{CompletionItem, CompletionResponse};
+use python::PyToken;
+use rust::Rustacean;
 use serde_json::{from_str, to_value, Value};
-use std::collections::HashSet;
-use std::fmt::Debug;
-use std::sync::Arc;
+use std::{collections::HashSet, fmt::Debug, sync::Arc};
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::task::JoinHandle;
-pub use utils::create_semantic_capabilities;
 use utils::{full_tokens, partial_tokens, swap_content, NON_TOKEN_ID};
 
 /// Trait to be implemented on the lang specific token, allowing parsing and deriving builtins

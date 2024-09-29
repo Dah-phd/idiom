@@ -21,7 +21,8 @@ pub use clipboard::Clipboard;
 use crossterm::event::{KeyEvent, MouseEvent};
 pub use events::IdiomEvent;
 
-use self::{draw::Components, message::Messages};
+use draw::Components;
+use message::Messages;
 
 const INSERT_SPAN: &str = "  --INSERT--   ";
 const SELECT_SPAN: &str = "  --SELECT--   ";

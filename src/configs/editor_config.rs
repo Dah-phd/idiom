@@ -1,5 +1,4 @@
-use super::types::FileType;
-use super::{load_or_create_config, EDITOR_CFG_FILE};
+use super::{load_or_create_config, types::FileType, EDITOR_CFG_FILE};
 use crate::global_state::GlobalState;
 use crate::utils::{trim_start_inplace, Offset};
 use crate::workspace::line::EditorLine;

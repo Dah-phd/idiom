@@ -1,4 +1,4 @@
-use crate::lsp::local::{Definitions, Func, LangStream, ObjType, PositionedToken, Struct, Var, NON_TOKEN_ID};
+use super::{Definitions, Func, LangStream, ObjType, PositionedToken, Struct, Var, NON_TOKEN_ID};
 use logos::{Lexer, Logos};
 
 #[derive(Logos, Debug, PartialEq)]

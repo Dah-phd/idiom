@@ -1,4 +1,4 @@
-use crate::lsp::local::{LangStream, PositionedToken};
+use super::{LangStream, PositionedToken};
 use crate::render::utils::{UTF8Safe, UTF8SafeStringExt};
 use crate::workspace::CursorPosition;
 use lsp_types::{

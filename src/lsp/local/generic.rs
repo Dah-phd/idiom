@@ -1,7 +1,6 @@
-use super::Func;
 use logos::{Lexer, Logos};
 
-use super::{utils::NON_TOKEN_ID, LangStream, PositionedToken};
+use super::{utils::NON_TOKEN_ID, Func, LangStream, PositionedToken};
 
 #[derive(Logos, Debug, PartialEq)]
 #[logos(skip r" ")]

@@ -1,4 +1,5 @@
-use crate::{global_state::GlobalState, runner::EditorTerminal, tree::Tree, workspace::Workspace};
+use super::GlobalState;
+use crate::{runner::EditorTerminal, tree::Tree, workspace::Workspace};
 use bitflags::bitflags;
 use std::io::{Result, Write};
 

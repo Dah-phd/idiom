@@ -1,10 +1,5 @@
-use crate::{
-    global_state::{GlobalState, IdiomEvent, Mode},
-    render::layout::Rect,
-    runner::EditorTerminal,
-    tree::Tree,
-    workspace::Workspace,
-};
+use super::{GlobalState, IdiomEvent, Mode};
+use crate::{render::layout::Rect, runner::EditorTerminal, tree::Tree, workspace::Workspace};
 use crossterm::event::KeyEvent;
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 

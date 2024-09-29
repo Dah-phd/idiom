@@ -1,13 +1,15 @@
 use super::{GlobalState, PopupMessage};
 use crate::lsp::TreeDiagnostics;
-use crate::popups::popup_replace::ReplacePopup;
-use crate::popups::popups_editor::selector_ranges;
-use crate::popups::{popup_tree_search::ActiveFileSearch, PopupInterface};
+use crate::popups::{
+    popup_replace::ReplacePopup, popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges, PopupInterface,
+};
 use crate::tree::Tree;
 use crate::workspace::Workspace;
 use crate::{configs::FileType, workspace::CursorPosition};
-use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, WorkspaceEdit};
-use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat};
+use lsp_types::{
+    request::GotoDeclarationResponse, CompletionItem, CompletionTextEdit, InsertTextFormat, Location, LocationLink,
+    WorkspaceEdit,
+};
 use std::path::PathBuf;
 
 #[derive(Clone)]

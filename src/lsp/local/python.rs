@@ -1,8 +1,6 @@
 use logos::{Lexer, Logos};
 
-use crate::lsp::local::{Definitions, Func, LangStream, ObjType, PositionedToken, Struct, Var};
-
-use super::utils::NON_TOKEN_ID;
+use super::{utils::NON_TOKEN_ID, Definitions, Func, LangStream, ObjType, PositionedToken, Struct, Var};
 
 #[derive(Logos, Debug, PartialEq)]
 #[logos(skip r" ")]
