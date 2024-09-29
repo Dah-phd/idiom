@@ -1,12 +1,10 @@
 mod context;
-// mod render;
 mod status;
 use status::RenderStatus;
 
 use crate::{
     render::{utils::UTF8SafeStringExt, UTF8Safe},
     syntax::{tokens::TokenLine, DiagnosticLine, Lang, Token},
-    // workspace::line::EditorLine,
 };
 pub use context::LineContext;
 use std::{

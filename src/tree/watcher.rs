@@ -2,9 +2,11 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use super::PathParser;
-use crate::error::IdiomResult;
-use crate::global_state::IdiomEvent;
-use crate::{global_state::GlobalState, tree::TreePath};
+use crate::{
+    error::IdiomResult,
+    global_state::{GlobalState, IdiomEvent},
+    tree::TreePath,
+};
 use bitflags::bitflags;
 use notify::{
     event::{AccessKind, AccessMode, ModifyKind},

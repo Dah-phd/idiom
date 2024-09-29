@@ -1,8 +1,6 @@
-use crate::render::layout::Rect;
-
-use crate::render::{
+use super::{
     backend::{Backend, BackendProtocol, Style},
-    layout::LineBuilder,
+    layout::{LineBuilder, Rect},
 };
 
 pub struct State {

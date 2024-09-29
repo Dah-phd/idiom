@@ -1,12 +1,13 @@
 mod rust;
-use crate::global_state::IdiomEvent;
-use crate::render::backend::Style;
-use crate::render::widgets::{StyledLine, Text};
-use crate::syntax::{Action, GlobalState};
-use crate::workspace::line::EditorLine;
+use super::{Action, GlobalState};
 use crate::{
     configs::{FileType, Theme},
-    render::backend::Color,
+    global_state::IdiomEvent,
+    render::{
+        backend::{Color, Style},
+        widgets::{StyledLine, Text},
+    },
+    workspace::line::EditorLine,
 };
 use lsp_types::DiagnosticRelatedInformation;
 use rust::{rust_process_related_info, rust_specific_handler};

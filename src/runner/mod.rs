@@ -1,13 +1,14 @@
-use self::autocomplete::try_autocomplete;
-use crate::error::IdiomResult;
-use crate::render::layout::BORDERS;
-use crate::render::TextField;
-use crate::runner::commands::load_file;
 mod autocomplete;
 mod commands;
 mod components;
+
 use crate::configs::{EditorConfigs, KeyMap, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE};
+use crate::error::IdiomResult;
 use crate::global_state::GlobalState;
+use crate::render::layout::BORDERS;
+use crate::render::TextField;
+use crate::runner::commands::load_file;
+use autocomplete::try_autocomplete;
 use commands::{load_cfg, overwrite_cfg, Terminal};
 use components::CmdHistory;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};

@@ -1,7 +1,7 @@
+use super::backend::{color, Backend, Style};
 use crate::{
     configs::EditorAction,
     global_state::{Clipboard, IdiomEvent, PopupMessage},
-    render::backend::{color, Backend, Style},
 };
 use core::ops::Range;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};

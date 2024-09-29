@@ -1,17 +1,15 @@
 mod crossterm_backend;
-use std::{
-    fmt::Display,
-    io::{Result, Write},
-};
-
+use super::layout::Rect;
 #[cfg(not(test))]
 pub use crossterm_backend::Backend;
 pub use crossterm_backend::{
     color::{self, pull_color, serialize_rgb},
     Color, Style,
 };
-
-use crate::render::layout::Rect;
+use std::{
+    fmt::Display,
+    io::{Result, Write},
+};
 
 /// If stdout is returning errors the program should crash -> use expect
 #[allow(dead_code)] // impl all utilities although not all are used

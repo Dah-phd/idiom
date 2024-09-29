@@ -1,16 +1,13 @@
 mod action_buffer;
 mod edits;
 mod meta;
-use crate::{
-    configs::IndentConfigs,
-    syntax::Lexer,
-    utils::Offset,
-    workspace::{
-        cursor::{Cursor, CursorPosition, Select},
-        line::EditorLine,
-        utils::{get_closing_char, is_closing_repeat},
-    },
+
+use super::{
+    cursor::{Cursor, CursorPosition, Select},
+    line::EditorLine,
+    utils::{get_closing_char, is_closing_repeat},
 };
+use crate::{configs::IndentConfigs, syntax::Lexer, utils::Offset};
 use action_buffer::ActionBuffer;
 pub use edits::Edit;
 use lsp_types::{TextDocumentContentChangeEvent, TextEdit};

@@ -27,7 +27,6 @@ use lsp_calls::{
 use lsp_types::{PublishDiagnosticsParams, Range, Uri};
 use modal::{LSPModal, ModalMessage};
 use std::path::{Path, PathBuf};
-// use theme::Theme;
 pub use tokens::Token;
 
 pub struct Lexer {

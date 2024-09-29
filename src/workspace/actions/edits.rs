@@ -1,18 +1,14 @@
+use super::super::{
+    cursor::Cursor,
+    line::EditorLine,
+    utils::{clip_content, insert_clip, is_scope, remove_content, token_range_at},
+    CursorPosition,
+};
 use super::meta::EditMetaData;
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 use std::fmt::Debug;
 
-use crate::{
-    configs::IndentConfigs,
-    render::UTF8Safe,
-    utils::Offset,
-    workspace::{
-        cursor::Cursor,
-        line::EditorLine,
-        utils::{clip_content, insert_clip, is_scope, remove_content, token_range_at},
-        CursorPosition,
-    },
-};
+use crate::{configs::IndentConfigs, render::UTF8Safe, utils::Offset};
 
 #[derive(Debug)]
 pub struct Edit {

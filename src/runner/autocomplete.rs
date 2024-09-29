@@ -1,6 +1,5 @@
 use dirs::executable_dir;
-use std::path::PathBuf;
-use std::path::MAIN_SEPARATOR;
+use std::path::{PathBuf, MAIN_SEPARATOR};
 
 pub fn try_autocomplete(cmd: &str) -> Option<String> {
     path_finder(cmd)

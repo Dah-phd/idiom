@@ -1,5 +1,4 @@
-use ignore::gitignore::Gitignore;
-use ignore::Match;
+use ignore::{gitignore::Gitignore, Match};
 use tokio::task::JoinSet;
 
 use crate::{

@@ -1,4 +1,12 @@
 mod utils;
+
+use super::{
+    actions::Actions,
+    cursor::{Cursor, CursorPosition},
+    line::EditorLine,
+    renderer::Renderer,
+    utils::{copy_content, find_line_start, token_range_at},
+};
 use crate::{
     configs::{EditorAction, EditorConfigs, FileType},
     error::{IdiomError, IdiomResult},
@@ -6,13 +14,6 @@ use crate::{
     lsp::LSPError,
     render::layout::Rect,
     syntax::{tokens::calc_wraps, Lexer},
-    workspace::{
-        actions::Actions,
-        cursor::{Cursor, CursorPosition},
-        line::EditorLine,
-        renderer::Renderer,
-        utils::{copy_content, find_line_start, token_range_at},
-    },
 };
 use lsp_types::TextEdit;
 use std::{cmp::Ordering, path::PathBuf};

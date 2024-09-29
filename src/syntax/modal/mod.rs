@@ -1,11 +1,14 @@
-use crate::configs::{EditorAction, Theme};
-use crate::render::{backend::BackendProtocol, layout::Rect};
-use crate::syntax::{DiagnosticInfo, Lang};
 mod completion;
 mod info;
 mod rename;
 
-use crate::{global_state::GlobalState, workspace::CursorPosition};
+use crate::{
+    configs::{EditorAction, Theme},
+    global_state::GlobalState,
+    render::{backend::BackendProtocol, layout::Rect},
+    syntax::{DiagnosticInfo, Lang},
+    workspace::CursorPosition,
+};
 use completion::AutoComplete;
 use info::Info;
 use lsp_types::{CompletionItem, Hover, SignatureHelp};
