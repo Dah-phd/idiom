@@ -1,5 +1,6 @@
+use crate::configs::Theme;
 use crate::render::backend::Color;
-use crate::syntax::{theme::Theme, Action, Lang};
+use crate::syntax::{Action, Lang};
 use lsp_types::DiagnosticRelatedInformation;
 
 pub fn rust_process_related_info(

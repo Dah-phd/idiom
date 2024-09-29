@@ -1,6 +1,6 @@
 use super::ModalMessage;
 use crate::{
-    configs::EditorAction,
+    configs::{EditorAction, Theme},
     global_state::GlobalState,
     render::{
         backend::Style,
@@ -8,7 +8,7 @@ use crate::{
         state::State,
         widgets::{StyledLine, Writable},
     },
-    syntax::{theme::Theme, Action, DiagnosticInfo, Lang},
+    syntax::{Action, DiagnosticInfo, Lang},
 };
 use lsp_types::{Documentation, Hover, HoverContents, MarkedString, SignatureHelp, SignatureInformation};
 use std::cmp::Ordering;

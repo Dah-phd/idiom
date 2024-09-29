@@ -206,7 +206,7 @@ impl EditorTerminal {
             match match cfg.trim() {
                 "keymap" => overwrite_cfg::<KeyMap>(KEY_MAP),
                 "config" => overwrite_cfg::<EditorConfigs>(EDITOR_CFG_FILE),
-                "theme" => overwrite_cfg::<crate::syntax::theme::Theme>(THEME_FILE),
+                "theme" => overwrite_cfg::<crate::configs::Theme>(THEME_FILE),
                 _ => return Ok(()),
             } {
                 Ok(msg) => gs.success(msg),

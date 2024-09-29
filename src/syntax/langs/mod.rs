@@ -2,9 +2,12 @@ mod rust;
 use crate::global_state::IdiomEvent;
 use crate::render::backend::Style;
 use crate::render::widgets::{StyledLine, Text};
-use crate::syntax::{theme::Theme, Action, GlobalState};
+use crate::syntax::{Action, GlobalState};
 use crate::workspace::line::EditorLine;
-use crate::{configs::FileType, render::backend::Color};
+use crate::{
+    configs::{FileType, Theme},
+    render::backend::Color,
+};
 use lsp_types::DiagnosticRelatedInformation;
 use rust::{rust_process_related_info, rust_specific_handler};
 use serde_json::Value;

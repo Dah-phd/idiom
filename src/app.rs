@@ -1,5 +1,5 @@
 use crate::{
-    configs::{GeneralAction, KeyMap},
+    configs::{GeneralAction, KeyMap, KEY_MAP},
     error::IdiomResult,
     global_state::{GlobalState, IdiomEvent},
     popups::{
@@ -22,7 +22,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
     // builtin cursor is not used - cursor is positioned during render
 
     let mut gs = GlobalState::new(backend)?;
-    let configs = gs.unwrap_or_default(KeyMap::new(), ".keys: ");
+    let configs = gs.unwrap_or_default(KeyMap::new(), KEY_MAP);
     let mut general_key_map = configs.general_key_map();
 
     // COMPONENTS

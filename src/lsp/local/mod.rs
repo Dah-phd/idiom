@@ -17,11 +17,14 @@ use rust::Rustacean;
 use crate::lsp::local::{generic::GenericToken, python::PyToken};
 use crate::lsp::{messages::Response, LSPError, LSPResult, Responses};
 use crate::render::UTF8Safe;
-use crate::syntax::theme::Theme;
 use crate::syntax::tokens::set_tokens;
 use crate::syntax::Legend;
 use crate::workspace::line::EditorLine;
-use crate::{configs::FileType, lsp::payload::Payload, workspace::CursorPosition};
+use crate::{
+    configs::{FileType, Theme},
+    lsp::payload::Payload,
+    workspace::CursorPosition,
+};
 use json::JsonValue;
 use lobster::Pincer;
 use logos::{Logos, Span};

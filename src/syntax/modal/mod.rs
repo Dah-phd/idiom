@@ -1,4 +1,4 @@
-use crate::configs::EditorAction;
+use crate::configs::{EditorAction, Theme};
 use crate::render::{backend::BackendProtocol, layout::Rect};
 use crate::syntax::{DiagnosticInfo, Lang};
 mod completion;
@@ -10,8 +10,6 @@ use completion::AutoComplete;
 use info::Info;
 use lsp_types::{CompletionItem, Hover, SignatureHelp};
 use rename::RenameVariable;
-
-use super::theme::Theme;
 
 pub enum LSPModal {
     AutoComplete(AutoComplete),

@@ -2,13 +2,18 @@ use std::path::PathBuf;
 
 use lsp_types::SemanticToken;
 
-use crate::{configs::FileType, global_state::GlobalState, workspace::line::EditorLine};
+use crate::{
+    configs::{FileType, Theme},
+    global_state::GlobalState,
+    workspace::line::EditorLine,
+};
 
 use super::{
     lsp_calls::{char_lsp_utf16, char_lsp_utf8, encode_pos_utf16, encode_pos_utf8},
-    theme::Theme,
+    // theme::Theme,
     tokens::set_tokens,
-    Legend, Lexer,
+    Legend,
+    Lexer,
 };
 
 fn get_text() -> Vec<String> {

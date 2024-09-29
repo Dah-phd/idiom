@@ -1,7 +1,6 @@
 use crate::{
-    configs::FileType,
+    configs::{FileType, Theme},
     render::{widgets::Writable, UTF8Safe},
-    syntax::theme::Theme,
     workspace::line::EditorLine,
 };
 

@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 mod editor_config;
 mod keymap;
+mod theme;
 mod theme_ui;
 mod types;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -9,6 +10,7 @@ pub use editor_config::{EditorConfigs, IndentConfigs};
 pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap, TreeAction, TreeUserKeyMap};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::HashMap;
+pub use theme::Theme;
 pub use theme_ui::UITheme;
 pub use types::FileType;
 

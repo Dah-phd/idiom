@@ -81,7 +81,9 @@ impl Messages {
         match result {
             Ok(value) => value,
             Err(err) => {
-                self.error(format!("{prefix}: {err}"));
+                if let Some(first_line) = err.to_string().lines().next() {
+                    self.error(format!("{prefix} (run with defaults): {first_line}"));
+                }
                 T::default()
             }
         }

@@ -1,8 +1,5 @@
+use crate::{configs::Theme, syntax::Legend, workspace::line::EditorLine};
 use crate::{render::backend::Style, syntax::diagnostics::DiagnosticData, workspace::cursor::Cursor};
-use crate::{
-    syntax::{theme::Theme, Legend},
-    workspace::line::EditorLine,
-};
 use lsp_types::SemanticToken;
 use unicode_width::UnicodeWidthChar;
 

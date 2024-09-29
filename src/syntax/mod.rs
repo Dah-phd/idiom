@@ -3,10 +3,10 @@ pub mod langs;
 pub mod legend;
 mod lsp_calls;
 pub mod modal;
-pub mod theme;
+// pub mod theme;
 pub mod tokens;
 use crate::{
-    configs::{EditorAction, FileType},
+    configs::{EditorAction, FileType, Theme},
     global_state::{GlobalState, IdiomEvent},
     lsp::{LSPClient, LSPError, LSPResponseType, LSPResult},
     render::layout::Rect,
@@ -27,7 +27,7 @@ use lsp_calls::{
 use lsp_types::{PublishDiagnosticsParams, Range, Uri};
 use modal::{LSPModal, ModalMessage};
 use std::path::{Path, PathBuf};
-use theme::Theme;
+// use theme::Theme;
 pub use tokens::Token;
 
 pub struct Lexer {
