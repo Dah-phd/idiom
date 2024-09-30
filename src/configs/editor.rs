@@ -5,74 +5,6 @@ use crate::workspace::line::EditorLine;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-pub struct IndentConfigs {
-    pub indent: String,
-    pub indent_after: String,
-    pub unindent_before: String,
-}
-
-impl Default for IndentConfigs {
-    fn default() -> Self {
-        Self { indent: "    ".to_owned(), unindent_before: get_unident_before(), indent_after: get_indent_after() }
-    }
-}
-
-impl IndentConfigs {
-    pub fn update_by_file_type(mut self, file_type: &FileType) -> Self {
-        #[allow(clippy::single_match)]
-        match file_type {
-            FileType::Python | FileType::Nim | FileType::Lobster => self.indent_after.push(':'),
-            _ => (),
-        }
-        self
-    }
-
-    pub fn unindent_if_before_base_pattern(&self, line: &mut EditorLine) -> usize {
-        if line.starts_with(&self.indent)
-            && matches!(line.trim_start().chars().next(), Some(first) if self.unindent_before.contains(first))
-        {
-            line.replace_till(self.indent.len(), "");
-            return self.indent.len();
-        }
-        0
-    }
-
-    pub fn derive_indent_from(&self, prev_line: &EditorLine) -> String {
-        let mut indent = prev_line.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
-        if let Some(last) = prev_line.trim_end().chars().last() {
-            if self.indent_after.contains(last) {
-                indent.insert_str(0, &self.indent);
-            }
-        };
-        indent
-    }
-
-    pub fn derive_indent_from_lines(&self, prev_lines: &[EditorLine]) -> String {
-        for prev_line in prev_lines.iter().rev() {
-            if !prev_line.chars().all(|c| c.is_whitespace()) {
-                return self.derive_indent_from(prev_line);
-            }
-        }
-        String::new()
-    }
-
-    pub fn indent_line(&self, line_idx: usize, content: &mut [EditorLine]) -> Offset {
-        if line_idx > 0 {
-            let indent = self.derive_indent_from_lines(&content[..line_idx]);
-            if indent.is_empty() {
-                return Offset::Pos(0);
-            }
-            let line = &mut content[line_idx];
-            let offset = Offset::Pos(indent.len()) - trim_start_inplace(line);
-            line.insert_str(0, &indent);
-            offset - self.unindent_if_before_base_pattern(line)
-        } else {
-            let line = &mut content[line_idx];
-            Offset::Neg(trim_start_inplace(line))
-        }
-    }
-}
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EditorConfigs {
     pub format_on_save: bool,
@@ -197,6 +129,74 @@ impl EditorConfigs {
     pub fn refresh(&mut self) -> Result<(), toml::de::Error> {
         (*self) = Self::new()?;
         Ok(())
+    }
+}
+
+pub struct IndentConfigs {
+    pub indent: String,
+    pub indent_after: String,
+    pub unindent_before: String,
+}
+
+impl Default for IndentConfigs {
+    fn default() -> Self {
+        Self { indent: "    ".to_owned(), unindent_before: get_unident_before(), indent_after: get_indent_after() }
+    }
+}
+
+impl IndentConfigs {
+    pub fn update_by_file_type(mut self, file_type: &FileType) -> Self {
+        #[allow(clippy::single_match)]
+        match file_type {
+            FileType::Python | FileType::Nim | FileType::Lobster => self.indent_after.push(':'),
+            _ => (),
+        }
+        self
+    }
+
+    pub fn unindent_if_before_base_pattern(&self, line: &mut EditorLine) -> usize {
+        if line.starts_with(&self.indent)
+            && matches!(line.trim_start().chars().next(), Some(first) if self.unindent_before.contains(first))
+        {
+            line.replace_till(self.indent.len(), "");
+            return self.indent.len();
+        }
+        0
+    }
+
+    pub fn derive_indent_from(&self, prev_line: &EditorLine) -> String {
+        let mut indent = prev_line.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
+        if let Some(last) = prev_line.trim_end().chars().last() {
+            if self.indent_after.contains(last) {
+                indent.insert_str(0, &self.indent);
+            }
+        };
+        indent
+    }
+
+    pub fn derive_indent_from_lines(&self, prev_lines: &[EditorLine]) -> String {
+        for prev_line in prev_lines.iter().rev() {
+            if !prev_line.chars().all(|c| c.is_whitespace()) {
+                return self.derive_indent_from(prev_line);
+            }
+        }
+        String::new()
+    }
+
+    pub fn indent_line(&self, line_idx: usize, content: &mut [EditorLine]) -> Offset {
+        if line_idx > 0 {
+            let indent = self.derive_indent_from_lines(&content[..line_idx]);
+            if indent.is_empty() {
+                return Offset::Pos(0);
+            }
+            let line = &mut content[line_idx];
+            let offset = Offset::Pos(indent.len()) - trim_start_inplace(line);
+            line.insert_str(0, &indent);
+            offset - self.unindent_if_before_base_pattern(line)
+        } else {
+            let line = &mut content[line_idx];
+            Offset::Neg(trim_start_inplace(line))
+        }
     }
 }
 
