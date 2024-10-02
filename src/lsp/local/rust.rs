@@ -8,6 +8,7 @@ pub enum Rustacean {
     #[token("fn")]
     DeclareFn,
     #[token("let")]
+    #[token("const")]
     DeclareVar,
     #[token("struct")]
     DeclareStruct,
@@ -44,6 +45,7 @@ pub enum Rustacean {
     #[token("continue")]
     #[token("if")]
     #[token("else")]
+    #[token("loop")]
     FlowControl,
 
     #[token(r#"'\\'"#)]
@@ -146,11 +148,9 @@ pub enum Rustacean {
 }
 
 impl LangStream for Rustacean {
-    fn parse(text: &[String], tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
+    fn parse<'a>(mut text: impl Iterator<Item = &'a str>, tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
         tokens.clear();
-        let mut lines = text.iter();
-        while let Some(mut line) = lines.next() {
-            // for line in text.iter() {
+        while let Some(mut line) = text.next() {
             let mut token_line = Vec::new();
             let mut logos = Rustacean::lexer(line);
             while let Some(token_result) = logos.next() {
@@ -172,7 +172,7 @@ impl LangStream for Rustacean {
                             match next_rustacean {
                                 Rustacean::Name(name) => {
                                     token_line.push(Rustacean::Enum(name).to_postioned(logos.span(), line));
-                                    line = parse_enum(&mut logos, line, &mut lines, &mut token_line, tokens);
+                                    line = parse_enum(&mut logos, line, &mut text, &mut token_line, tokens);
                                 }
                                 _ => token_line.push(next_rustacean.to_postioned(logos.span(), line)),
                             }
@@ -194,7 +194,7 @@ impl LangStream for Rustacean {
                             match next_rustacean {
                                 Rustacean::Name(name) => {
                                     token_line.push(Rustacean::Struct(name).to_postioned(logos.span(), line));
-                                    line = parse_struct(&mut logos, line, &mut lines, &mut token_line, tokens);
+                                    line = parse_struct(&mut logos, line, &mut text, &mut token_line, tokens);
                                 }
                                 _ => token_line.push(next_rustacean.to_postioned(logos.span(), line)),
                             }
@@ -270,7 +270,7 @@ impl LangStream for Rustacean {
                     }
                     Self::NameSpaceKeyWord => {
                         token_line.push(rustacean.to_postioned(logos.span(), line));
-                        line = parse_import(&mut logos, line, &mut lines, &mut token_line, tokens);
+                        line = parse_import(&mut logos, line, &mut text, &mut token_line, tokens);
                     }
                     _ => {
                         token_line.push(rustacean.to_postioned(logos.span(), line));
@@ -399,11 +399,11 @@ impl Rustacean {
 
 fn parse_enum<'a>(
     logos: &mut Lexer<'a, Rustacean>,
-    mut line: &'a String,
-    lines: &mut impl Iterator<Item = &'a String>,
+    mut line: &'a str,
+    lines: &mut impl Iterator<Item = &'a str>,
     token_line: &mut Vec<PositionedToken<Rustacean>>,
     tokens: &mut Vec<Vec<PositionedToken<Rustacean>>>,
-) -> &'a String {
+) -> &'a str {
     let mut scope: usize = 0;
     let mut tuple_member: usize = 0;
     loop {
@@ -453,11 +453,11 @@ fn parse_enum<'a>(
 
 fn parse_struct<'a>(
     logos: &mut Lexer<'a, Rustacean>,
-    mut line: &'a String,
-    lines: &mut impl Iterator<Item = &'a String>,
+    mut line: &'a str,
+    lines: &mut impl Iterator<Item = &'a str>,
     token_line: &mut Vec<PositionedToken<Rustacean>>,
     tokens: &mut Vec<Vec<PositionedToken<Rustacean>>>,
-) -> &'a String {
+) -> &'a str {
     let mut scope: usize = 0;
     loop {
         while let Some(token_result) = logos.next() {
@@ -491,11 +491,11 @@ fn parse_struct<'a>(
 
 fn parse_import<'a>(
     logos: &mut Lexer<'a, Rustacean>,
-    mut line: &'a String,
-    lines: &mut impl Iterator<Item = &'a String>,
+    mut line: &'a str,
+    lines: &mut impl Iterator<Item = &'a str>,
     token_line: &mut Vec<PositionedToken<Rustacean>>,
     tokens: &mut Vec<Vec<PositionedToken<Rustacean>>>,
-) -> &'a String {
+) -> &'a str {
     let mut scope: usize = 0;
     loop {
         while let Some(token_result) = logos.next() {
@@ -611,7 +611,7 @@ mod test {
     fn test_declare_type() {
         let mut tokens = vec![];
         let txt = "pub type IdiomResult<T> = Result<T, IdiomError>;";
-        Rustacean::parse(&[txt.to_owned()], &mut tokens);
+        Rustacean::parse([txt].into_iter(), &mut tokens);
         assert_eq!(
             tokens,
             vec![[
@@ -659,7 +659,7 @@ mod test {
     fn test_decorator() {
         let mut tokens = vec![];
         let txt = "#[derive(Logos, Debug, PartialEq)]";
-        Rustacean::parse(&[txt.to_owned()], &mut tokens);
+        Rustacean::parse([txt].into_iter(), &mut tokens);
         assert_eq!(
             tokens,
             vec![[PositionedToken { from: 0, len: 34, token_type: 15, modifier: 0, lang_token: Rustacean::Decorator }]]
@@ -667,7 +667,7 @@ mod test {
 
         let mut tokens = vec![];
         let txt = "LSP(#[from] LSPError)";
-        Rustacean::parse(&[txt.to_owned()], &mut tokens);
+        Rustacean::parse([txt].into_iter(), &mut tokens);
         assert_eq!(
             tokens,
             vec![[

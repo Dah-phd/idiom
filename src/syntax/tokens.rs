@@ -1,9 +1,9 @@
 use super::{diagnostics::DiagnosticData, Legend};
-use crate::{configs::Theme, render::backend::Style, workspace::cursor::Cursor, workspace::line::EditorLine};
+use crate::{render::backend::Style, workspace::cursor::Cursor, workspace::line::EditorLine};
 use lsp_types::SemanticToken;
 use unicode_width::UnicodeWidthChar;
 
-pub fn set_tokens(tokens: Vec<SemanticToken>, legend: &Legend, theme: &Theme, content: &mut [EditorLine]) {
+pub fn set_tokens(tokens: Vec<SemanticToken>, legend: &Legend, content: &mut [EditorLine]) {
     let mut tokens = tokens.into_iter();
 
     let token = match tokens.next() {
@@ -13,7 +13,7 @@ pub fn set_tokens(tokens: Vec<SemanticToken>, legend: &Legend, theme: &Theme, co
     let mut line_idx = token.delta_line as usize;
     let mut token_line = content[line_idx].tokens_mut();
     token_line.clear();
-    token_line.push(Token::parse(token, legend, theme));
+    token_line.push(Token::parse(token, legend));
 
     for token in tokens {
         if token.delta_line != 0 {
@@ -21,17 +21,11 @@ pub fn set_tokens(tokens: Vec<SemanticToken>, legend: &Legend, theme: &Theme, co
             token_line = content[line_idx].tokens_mut();
             token_line.clear();
         };
-        token_line.push(Token::parse(token, legend, theme));
+        token_line.push(Token::parse(token, legend));
     }
 }
 
-pub fn set_tokens_partial(
-    tokens: Vec<SemanticToken>,
-    max_lines: usize,
-    legend: &Legend,
-    theme: &Theme,
-    content: &mut [EditorLine],
-) {
+pub fn set_tokens_partial(tokens: Vec<SemanticToken>, max_lines: usize, legend: &Legend, content: &mut [EditorLine]) {
     let mut tokens = tokens.into_iter();
 
     let token = match tokens.next() {
@@ -44,7 +38,7 @@ pub fn set_tokens_partial(
     }
     let mut token_line = content[line_idx].tokens_mut();
     token_line.clear();
-    token_line.push(Token::parse(token, legend, theme));
+    token_line.push(Token::parse(token, legend));
 
     for token in tokens {
         if token.delta_line != 0 {
@@ -55,7 +49,7 @@ pub fn set_tokens_partial(
             token_line = content[line_idx].tokens_mut();
             token_line.clear();
         };
-        token_line.push(Token::parse(token, legend, theme));
+        token_line.push(Token::parse(token, legend));
     }
 }
 
@@ -184,9 +178,9 @@ pub struct Token {
 }
 
 impl Token {
-    pub fn parse(token: SemanticToken, legend: &Legend, theme: &Theme) -> Self {
+    pub fn parse(token: SemanticToken, legend: &Legend) -> Self {
         let SemanticToken { delta_start, length, token_type, token_modifiers_bitset, .. } = token;
-        let style = Style::fg(legend.parse_to_color(token_type as usize, token_modifiers_bitset, theme));
+        let style = Style::fg(legend.parse_to_color(token_type as usize, token_modifiers_bitset));
         Self { delta_start: delta_start as usize, len: length as usize, style }
     }
 

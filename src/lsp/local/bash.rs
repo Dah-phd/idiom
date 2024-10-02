@@ -80,10 +80,10 @@ pub enum BashToken {
 }
 
 impl LangStream for BashToken {
-    fn parse(text: &[String], tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
+    fn parse<'a>(text: impl Iterator<Item = &'a str>, tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
         tokens.clear();
         let mut is_multistring = false;
-        for line in text.iter() {
+        for line in text {
             let mut token_line = Vec::new();
             let mut logos = BashToken::lexer(line);
             while let Some(token_result) = logos.next() {
@@ -202,9 +202,9 @@ mod test {
 
     #[test]
     fn test_comment_and_env() {
-        let ctxt = "# this is comment";
+        let ctxt = ["# this is comment"];
         let mut tokens = vec![];
-        BashToken::parse(&[ctxt.to_owned()], &mut tokens);
+        BashToken::parse(ctxt.into_iter(), &mut tokens);
         assert_eq!(
             tokens,
             [[
@@ -215,8 +215,8 @@ mod test {
             ]]
         );
         tokens.clear();
-        let etxt = "#! usr";
-        BashToken::parse(&[etxt.to_owned()], &mut tokens);
+        let etxt = ["#! usr"];
+        BashToken::parse(etxt.into_iter(), &mut tokens);
         assert_eq!(
             tokens,
             [[

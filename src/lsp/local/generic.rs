@@ -154,9 +154,9 @@ impl LangStream for GenericToken {
             keywords: vec![],
         }
     }
-    fn parse(text: &[String], tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
+    fn parse<'a>(text: impl Iterator<Item = &'a str>, tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
         tokens.clear();
-        for line in text.iter() {
+        for line in text {
             let mut token_line = Vec::new();
             let mut logos = GenericToken::lexer(line);
             while let Some(token_result) = logos.next() {

@@ -112,10 +112,10 @@ pub enum PyToken {
 }
 
 impl LangStream for PyToken {
-    fn parse(text: &[String], tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
+    fn parse<'a>(text: impl Iterator<Item = &'a str>, tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
         tokens.clear();
         let mut is_multistring = false;
-        for line in text.iter() {
+        for line in text {
             let mut token_line = Vec::new();
             let mut logos = PyToken::lexer(line);
             while let Some(token_result) = logos.next() {
@@ -132,17 +132,17 @@ impl LangStream for PyToken {
                 };
                 match pytoken {
                     Self::DeclareFn => {
-                        token_line.push(pytoken.to_postioned(logos.span(), line.as_str()));
+                        token_line.push(pytoken.to_postioned(logos.span(), line));
                         if let Some(Ok(mut next_pytoken)) = logos.next() {
                             next_pytoken.name_to_func();
-                            token_line.push(next_pytoken.to_postioned(logos.span(), line.as_str()));
+                            token_line.push(next_pytoken.to_postioned(logos.span(), line));
                         }
                     }
                     Self::DeclareStruct => {
-                        token_line.push(pytoken.to_postioned(logos.span(), line.as_str()));
+                        token_line.push(pytoken.to_postioned(logos.span(), line));
                         if let Some(Ok(mut next_pytoken)) = logos.next() {
                             next_pytoken.name_to_class();
-                            token_line.push(next_pytoken.to_postioned(logos.span(), line.as_str()));
+                            token_line.push(next_pytoken.to_postioned(logos.span(), line));
                         }
                     }
                     Self::LBrack => {
@@ -152,14 +152,14 @@ impl LangStream for PyToken {
                         }
                     }
                     Self::MultiString => {
-                        token_line.push(pytoken.to_postioned(logos.span(), line.as_str()));
+                        token_line.push(pytoken.to_postioned(logos.span(), line));
                         is_multistring = true;
                     }
                     Self::NameSpaceKeyWord => {
                         drain_import(line, &mut logos, &mut token_line);
                     }
                     _ => {
-                        token_line.push(pytoken.to_postioned(logos.span(), line.as_str()));
+                        token_line.push(pytoken.to_postioned(logos.span(), line));
                     }
                 }
             }
@@ -318,9 +318,9 @@ mod test {
 
     #[test]
     fn test_scope() {
-        let text = vec!["class Test:".to_owned(), "    value = 3".to_owned()];
+        let text = vec!["class Test:", "    value = 3"];
         let mut tokens = vec![];
-        PyToken::parse(&text, &mut tokens);
+        PyToken::parse(text.into_iter(), &mut tokens);
         assert_eq!(
             tokens,
             vec![

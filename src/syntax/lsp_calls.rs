@@ -209,10 +209,10 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
                         LSPResponse::Tokens(tokens) => {
                             match tokens {
                                 SemanticTokensResult::Partial(data) => {
-                                    set_tokens(data.data, &lexer.legend, &lexer.theme, content);
+                                    set_tokens(data.data, &lexer.legend, content);
                                 }
                                 SemanticTokensResult::Tokens(data) => {
-                                    set_tokens(data.data, &lexer.legend, &lexer.theme, content);
+                                    set_tokens(data.data, &lexer.legend, content);
                                     gs.success("LSP tokens mapped! Refresh UI to remove artifacts (default F5)");
                                 }
                             };
@@ -222,7 +222,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
                                 SemanticTokensRangeResult::Partial(data) => data.data,
                                 SemanticTokensRangeResult::Tokens(data) => data.data,
                             };
-                            set_tokens_partial(tokens, max_lines, &lexer.legend, &lexer.theme, content);
+                            set_tokens_partial(tokens, max_lines, &lexer.legend, content);
                         }
                         LSPResponse::References(locations) => {
                             if let Some(mut locations) = locations {

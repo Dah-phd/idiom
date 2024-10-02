@@ -172,7 +172,7 @@ mod test {
     fn test_with_pytoken() {
         let mut pylsp = LocalLSP::<PyToken>::new(Arc::default());
         pylsp.text.push(String::from("class WorkingDirectory:"));
-        PyToken::parse(&pylsp.text, &mut pylsp.tokens);
+        PyToken::parse(pylsp.text.iter().map(|t| t.as_str()), &mut pylsp.tokens);
         let tokens = full_tokens(&pylsp.tokens);
         assert_eq!(
             tokens,

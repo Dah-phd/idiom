@@ -5,9 +5,10 @@ mod json;
 mod lobster;
 mod python;
 mod rust;
+mod styler;
 mod text_editor;
-mod ts; // support TS and JS
-mod utils;
+mod ts;
+mod utils; // support TS and JS
 
 use bash::BashToken;
 pub use enriched::enrich_with_semantics;
@@ -43,7 +44,7 @@ use utils::{full_tokens, partial_tokens, swap_content, NON_TOKEN_ID};
 trait LangStream: Sized + Debug + PartialEq + Logos<'static> {
     fn type_id(&self) -> u32;
     fn modifier(&self) -> u32;
-    fn parse(text: &[String], tokens: &mut Vec<Vec<PositionedToken<Self>>>);
+    fn parse<'a>(text: impl Iterator<Item = &'a str>, tokens: &mut Vec<Vec<PositionedToken<Self>>>);
 
     fn init_definitions() -> Definitions {
         Definitions::default()
@@ -63,10 +64,10 @@ trait LangStream: Sized + Debug + PartialEq + Logos<'static> {
     fn init_tokens(content: &mut Vec<EditorLine>, theme: &Theme, file_type: FileType) {
         let text = content.iter().map(|l| l.content.to_string()).collect::<Vec<_>>();
         let mut tokens = Vec::new();
-        Self::parse(&text, &mut tokens);
+        Self::parse(text.iter().map(|t| t.as_str()), &mut tokens);
         let mut legend = Legend::default();
         legend.map_styles(file_type, theme, &create_semantic_capabilities());
-        set_tokens(full_tokens(&tokens), &legend, theme, content);
+        set_tokens(full_tokens(&tokens), &legend, content);
     }
 }
 
@@ -149,11 +150,11 @@ impl<T: LangStream> LocalLSP<T> {
                     let clip = change.text;
                     swap_content(&mut self.text, &clip, from, to);
                 }
-                T::parse(&self.text, &mut self.tokens);
+                T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens);
             }
             Payload::FullSync(.., full_text) => {
                 self.text = full_text.split('\n').map(ToOwned::to_owned).collect();
-                T::parse(&self.text, &mut self.tokens);
+                T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens);
             }
             Payload::Completion(_, _c, id) => {
                 let items = self.definitions.to_completions(&self.tokens);
@@ -193,7 +194,7 @@ impl<T: LangStream> LocalLSP<T> {
         let documet = params.as_object_mut()?.get_mut("textDocument")?;
         let text = documet.as_object_mut()?.get("text")?.as_str()?;
         self.text = text.split('\n').map(ToOwned::to_owned).collect();
-        T::parse(&self.text, &mut self.tokens);
+        T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens);
         Some(())
     }
 }
