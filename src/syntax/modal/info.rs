@@ -2,13 +2,14 @@ use super::ModalMessage;
 use crate::{
     configs::{EditorAction, Theme},
     global_state::GlobalState,
+    lsp::Highlighter,
     render::{
         backend::Style,
         layout::Rect,
         state::State,
         widgets::{StyledLine, Writable},
     },
-    syntax::{Action, DiagnosticInfo, Lang},
+    syntax::{Action, DiagnosticInfo},
 };
 use lsp_types::{Documentation, Hover, HoverContents, MarkedString, SignatureHelp, SignatureInformation};
 use std::cmp::Ordering;
@@ -42,16 +43,18 @@ impl Info {
         Self { actions: info.actions, text, mode, ..Default::default() }
     }
 
-    pub fn from_hover(hover: Hover, lang: &Lang, theme: &Theme) -> Self {
+    pub fn from_hover(hover: Hover, theme: &Theme) -> Self {
         let mut lines = Vec::new();
-        parse_hover(hover, lang, theme, &mut lines);
+        let mut sty = Highlighter::new(theme);
+        parse_hover(hover, &mut sty, &mut lines);
         Self { text: lines, ..Default::default() }
     }
 
-    pub fn from_signature(signature: SignatureHelp, lang: &Lang, theme: &Theme) -> Self {
+    pub fn from_signature(signature: SignatureHelp, theme: &Theme) -> Self {
         let mut lines = Vec::new();
+        let mut sty = Highlighter::new(theme);
         for info in signature.signatures {
-            parse_sig_info(info, lang, theme, &mut lines);
+            parse_sig_info(info, &mut sty, &mut lines);
         }
         Self { text: lines, ..Default::default() }
     }
@@ -124,14 +127,16 @@ impl Info {
         ModalMessage::Taken
     }
 
-    pub fn push_hover(&mut self, hover: Hover, lang: &Lang, theme: &Theme) {
-        parse_hover(hover, lang, theme, &mut self.text);
+    pub fn push_hover(&mut self, hover: Hover, theme: &Theme) {
+        let mut sty = Highlighter::new(theme);
+        parse_hover(hover, &mut sty, &mut self.text);
         self.state.selected = 0;
     }
 
-    pub fn push_signature(&mut self, signature: SignatureHelp, lang: &Lang, theme: &Theme) {
+    pub fn push_signature(&mut self, signature: SignatureHelp, theme: &Theme) {
+        let mut sty = Highlighter::new(theme);
         for info in signature.signatures {
-            parse_sig_info(info, lang, theme, &mut self.text);
+            parse_sig_info(info, &mut sty, &mut self.text);
         }
         self.state.selected = 0;
     }
@@ -173,8 +178,8 @@ impl From<DiagnosticInfo> for Info {
     }
 }
 
-fn parse_sig_info(info: SignatureInformation, lang: &Lang, theme: &Theme, lines: &mut Vec<StyledLine>) {
-    lines.push(lang.stylize(&info.label, theme));
+fn parse_sig_info(info: SignatureInformation, sty: &mut Highlighter, lines: &mut Vec<StyledLine>) {
+    lines.push(sty.parse_line(&info.label));
     if let Some(text) = info.documentation {
         match text {
             Documentation::MarkupContent(c) => {
@@ -186,47 +191,47 @@ fn parse_sig_info(info: SignatureInformation, lang: &Lang, theme: &Theme, lines:
                             continue;
                         }
                         if is_code {
-                            lines.push(lang.stylize(line, theme));
+                            lines.push(sty.parse_line(line));
                         } else {
                             lines.push(line.to_owned().into());
                         }
                     }
                 } else {
                     for line in c.value.split("\n") {
-                        lines.push(lang.stylize(line, theme));
+                        lines.push(sty.parse_line(line));
                     }
                 }
             }
             Documentation::String(s) => {
                 for line in s.split("\n") {
-                    lines.push(lang.stylize(line, theme));
+                    lines.push(sty.parse_line(line));
                 }
             }
         }
     }
 }
 
-fn parse_hover(hover: Hover, lang: &Lang, theme: &Theme, lines: &mut Vec<StyledLine>) {
+fn parse_hover(hover: Hover, sty: &mut Highlighter, lines: &mut Vec<StyledLine>) {
     match hover.contents {
         HoverContents::Array(arr) => {
             // let mut ctx = LineBuilderContext::default();
             for value in arr {
-                parse_markedstr(value, lang, theme, lines);
+                parse_markedstr(value, sty, lines);
             }
         }
         HoverContents::Markup(markup) => {
-            handle_markup(markup, lang, theme, lines);
+            handle_markup(markup, sty, lines);
         }
         HoverContents::Scalar(value) => {
-            parse_markedstr(value, lang, theme, lines);
+            parse_markedstr(value, sty, lines);
         }
     }
 }
 
-fn handle_markup(markup: lsp_types::MarkupContent, lang: &Lang, theme: &Theme, lines: &mut Vec<StyledLine>) {
+fn handle_markup(markup: lsp_types::MarkupContent, sty: &mut Highlighter, lines: &mut Vec<StyledLine>) {
     if !matches!(markup.kind, lsp_types::MarkupKind::Markdown) {
         for line in markup.value.split("\n") {
-            lines.push(lang.stylize(line, theme));
+            lines.push(sty.parse_line(line));
         }
         return;
     }
@@ -237,7 +242,7 @@ fn handle_markup(markup: lsp_types::MarkupContent, lang: &Lang, theme: &Theme, l
             continue;
         }
         if is_code {
-            lines.push(lang.stylize(line, theme));
+            lines.push(sty.parse_line(line));
         } else if line.trim().starts_with('#') {
             lines.push(line.to_owned().into());
         } else {
@@ -246,11 +251,11 @@ fn handle_markup(markup: lsp_types::MarkupContent, lang: &Lang, theme: &Theme, l
     }
 }
 
-fn parse_markedstr(value: MarkedString, lang: &Lang, theme: &Theme, lines: &mut Vec<StyledLine>) {
+fn parse_markedstr(value: MarkedString, sty: &mut Highlighter, lines: &mut Vec<StyledLine>) {
     match value {
         MarkedString::LanguageString(data) => {
             for text_line in data.value.split("\n") {
-                lines.push(lang.stylize(text_line, theme))
+                lines.push(sty.parse_line(text_line));
             }
         }
         MarkedString::String(value) => {

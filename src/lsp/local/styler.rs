@@ -16,13 +16,13 @@ pub struct Highlighter {
 }
 
 impl Highlighter {
-    fn new(theme: &Theme) -> Self {
+    pub fn new(theme: &Theme) -> Self {
         let mut legend = Legend::default();
         legend.map_styles(crate::configs::FileType::Ignored, theme, &create_semantic_capabilities());
         Self { legend, tokens: vec![] }
     }
 
-    fn parse_line(&mut self, text: &str) -> StyledLine {
+    pub fn parse_line(&mut self, text: &str) -> StyledLine {
         GenericToken::parse([text].into_iter(), &mut self.tokens);
         let text = text.to_owned();
         let mut styled_line = vec![];

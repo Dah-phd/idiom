@@ -11,7 +11,7 @@ use crate::configs::FileType;
 use crate::utils::split_arc;
 pub use client::LSPClient;
 pub use error::{LSPError, LSPResult};
-pub use local::init_local_tokens;
+pub use local::{init_local_tokens, Highlighter};
 use lsp_stream::JsonRCP;
 pub use messages::{
     Diagnostic, DiagnosticHandle, DiagnosticType, EditorDiagnostics, LSPMessage, LSPResponse, LSPResponseType,

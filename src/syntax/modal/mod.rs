@@ -99,25 +99,25 @@ impl LSPModal {
         Self::Info(Info::from_info(actions))
     }
 
-    pub fn from_hover(hover: Hover, lang: &Lang, theme: &Theme) -> Self {
-        Self::Info(Info::from_hover(hover, lang, theme))
+    pub fn from_hover(hover: Hover, theme: &Theme) -> Self {
+        Self::Info(Info::from_hover(hover, theme))
     }
 
-    pub fn hover_map(&mut self, hover: Hover, lang: &Lang, theme: &Theme) {
+    pub fn hover_map(&mut self, hover: Hover, theme: &Theme) {
         match self {
-            Self::Info(modal) => modal.push_hover(hover, lang, theme),
-            _ => *self = Self::Info(Info::from_hover(hover, lang, theme)),
+            Self::Info(modal) => modal.push_hover(hover, theme),
+            _ => *self = Self::Info(Info::from_hover(hover, theme)),
         }
     }
 
-    pub fn from_signature(signature: SignatureHelp, lang: &Lang, theme: &Theme) -> Self {
-        Self::Info(Info::from_signature(signature, lang, theme))
+    pub fn from_signature(signature: SignatureHelp, theme: &Theme) -> Self {
+        Self::Info(Info::from_signature(signature, theme))
     }
 
-    pub fn signature_map(&mut self, signature: SignatureHelp, lang: &Lang, theme: &Theme) {
+    pub fn signature_map(&mut self, signature: SignatureHelp, theme: &Theme) {
         match self {
-            Self::Info(modal) => modal.push_signature(signature, lang, theme),
-            _ => *self = Self::Info(Info::from_signature(signature, lang, theme)),
+            Self::Info(modal) => modal.push_signature(signature, theme),
+            _ => *self = Self::Info(Info::from_signature(signature, theme)),
         }
     }
 

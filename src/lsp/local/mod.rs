@@ -10,35 +10,36 @@ mod text_editor;
 mod ts;
 mod utils; // support TS and JS
 
+/// tokens
 use bash::BashToken;
-pub use enriched::enrich_with_semantics;
-use lsp_types::InsertTextFormat;
-pub use utils::create_semantic_capabilities;
-
-use super::{messages::Response, payload::Payload, LSPError, LSPResult, Responses};
-use crate::render::UTF8Safe;
-use crate::syntax::{tokens::set_tokens, Legend};
-use crate::workspace::line::EditorLine;
-use crate::{
-    configs::{FileType, Theme},
-    workspace::CursorPosition,
-};
 use generic::GenericToken;
 use json::JsonValue;
 use lobster::Pincer;
+use python::PyToken;
+use rust::Rustacean;
+
+pub use enriched::enrich_with_semantics;
+pub use styler::Highlighter;
+pub use utils::create_semantic_capabilities;
+use utils::{full_tokens, partial_tokens, swap_content, NON_TOKEN_ID};
+
+use super::{messages::Response, payload::Payload, LSPError, LSPResult, Responses};
+use crate::{
+    configs::{FileType, Theme},
+    render::UTF8Safe,
+    syntax::{tokens::set_tokens, Legend},
+    workspace::{line::EditorLine, CursorPosition},
+};
+
 use logos::{Logos, Span};
 use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification},
-    SemanticToken, SemanticTokens, SemanticTokensRangeResult, SemanticTokensResult,
+    CompletionItem, CompletionResponse, InsertTextFormat, SemanticToken, SemanticTokens, SemanticTokensRangeResult,
+    SemanticTokensResult,
 };
-use lsp_types::{CompletionItem, CompletionResponse};
-use python::PyToken;
-use rust::Rustacean;
 use serde_json::{from_str, to_value, Value};
 use std::{collections::HashSet, fmt::Debug, sync::Arc};
-use tokio::sync::mpsc::UnboundedReceiver;
-use tokio::task::JoinHandle;
-use utils::{full_tokens, partial_tokens, swap_content, NON_TOKEN_ID};
+use tokio::{sync::mpsc::UnboundedReceiver, task::JoinHandle};
 
 /// Trait to be implemented on the lang specific token, allowing parsing and deriving builtins
 trait LangStream: Sized + Debug + PartialEq + Logos<'static> {

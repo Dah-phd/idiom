@@ -191,16 +191,16 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
                         }
                         LSPResponse::Hover(hover) => {
                             if let Some(modal) = lexer.modal.as_mut() {
-                                modal.hover_map(hover, &lexer.lang, &lexer.theme);
+                                modal.hover_map(hover, &lexer.theme);
                             } else {
-                                lexer.modal.replace(LSPModal::from_hover(hover, &lexer.lang, &lexer.theme));
+                                lexer.modal.replace(LSPModal::from_hover(hover, &lexer.theme));
                             }
                         }
                         LSPResponse::SignatureHelp(signature) => {
                             if let Some(modal) = lexer.modal.as_mut() {
-                                modal.signature_map(signature, &lexer.lang, &lexer.theme);
+                                modal.signature_map(signature, &lexer.theme);
                             } else {
-                                lexer.modal.replace(LSPModal::from_signature(signature, &lexer.lang, &lexer.theme));
+                                lexer.modal.replace(LSPModal::from_signature(signature, &lexer.theme));
                             }
                         }
                         LSPResponse::Renames(workspace_edit) => {
