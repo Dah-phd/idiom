@@ -23,6 +23,7 @@ enum Mode {
 
 #[derive(Default)]
 pub struct Info {
+    style_builder: Option<Highlighter>,
     actions: Option<Vec<Action>>,
     text: Vec<StyledLine>,
     state: State,
@@ -47,7 +48,7 @@ impl Info {
         let mut lines = Vec::new();
         let mut sty = Highlighter::new(theme);
         parse_hover(hover, &mut sty, &mut lines);
-        Self { text: lines, ..Default::default() }
+        Self { text: lines, style_builder: Some(sty), ..Default::default() }
     }
 
     pub fn from_signature(signature: SignatureHelp, theme: &Theme) -> Self {
@@ -56,7 +57,7 @@ impl Info {
         for info in signature.signatures {
             parse_sig_info(info, &mut sty, &mut lines);
         }
-        Self { text: lines, ..Default::default() }
+        Self { text: lines, style_builder: Some(sty), ..Default::default() }
     }
 
     #[inline]
@@ -128,15 +129,31 @@ impl Info {
     }
 
     pub fn push_hover(&mut self, hover: Hover, theme: &Theme) {
-        let mut sty = Highlighter::new(theme);
-        parse_hover(hover, &mut sty, &mut self.text);
+        match self.style_builder.as_mut() {
+            Some(sty) => parse_hover(hover, sty, &mut self.text),
+            None => {
+                let mut sty = Highlighter::new(theme);
+                parse_hover(hover, &mut sty, &mut self.text);
+                self.style_builder.replace(sty);
+            }
+        }
         self.state.selected = 0;
     }
 
     pub fn push_signature(&mut self, signature: SignatureHelp, theme: &Theme) {
-        let mut sty = Highlighter::new(theme);
-        for info in signature.signatures {
-            parse_sig_info(info, &mut sty, &mut self.text);
+        match self.style_builder.as_mut() {
+            Some(sty) => {
+                for info in signature.signatures {
+                    parse_sig_info(info, sty, &mut self.text);
+                }
+            }
+            None => {
+                let mut sty = Highlighter::new(theme);
+                for info in signature.signatures {
+                    parse_sig_info(info, &mut sty, &mut self.text);
+                }
+                self.style_builder.replace(sty);
+            }
         }
         self.state.selected = 0;
     }
