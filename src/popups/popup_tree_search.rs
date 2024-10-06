@@ -3,7 +3,7 @@ use crate::{
     global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::{
         backend::{color, Style},
-        layout::{LineBuilder, BORDERS},
+        layout::{IterLines, LineBuilder, BORDERS},
         state::State,
         TextField,
     },

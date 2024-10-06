@@ -4,7 +4,10 @@ mod complex;
 use std::ops::Range;
 
 use crate::{
-    render::{backend::Backend, layout::RectIter},
+    render::{
+        backend::Backend,
+        layout::{IterLines, RectIter},
+    },
     syntax::tokens::{calc_wrap_line, calc_wrap_line_capped},
     workspace::{
         cursor::Cursor,

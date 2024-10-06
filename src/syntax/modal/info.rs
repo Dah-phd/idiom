@@ -5,7 +5,7 @@ use crate::{
     lsp::Highlighter,
     render::{
         backend::Style,
-        layout::Rect,
+        layout::{IterLines, Rect},
         state::State,
         widgets::{StyledLine, Writable},
     },
@@ -161,31 +161,32 @@ impl Info {
     #[inline]
     pub fn render(&mut self, area: Rect, gs: &mut GlobalState) {
         match self.mode {
-            Mode::Select => {
-                if let Some(actions) = self.actions.as_ref() {
-                    let actions = actions.iter().map(|a| a.to_string()).collect::<Vec<_>>();
-                    let options = actions.iter().map(|s| s.as_str());
-                    if !self.text.is_empty() {
-                        self.state.render_list(options.chain(["Information"]), &area, &mut gs.writer);
-                    } else {
-                        self.state.render_list(options, &area, &mut gs.writer);
-                    };
-                }
-            }
-            Mode::Text => {
-                let mut lines = area.into_iter();
-                let mut text = self.text.iter().skip(self.text_state);
-                while lines.len() > 0 {
-                    match text.next() {
-                        Some(text) => text.wrap(&mut lines, &mut gs.writer),
-                        None => break,
-                    }
-                }
-                for line in lines {
-                    line.render_empty(&mut gs.writer);
-                }
+            Mode::Select => self.render_select(area, gs),
+            Mode::Text => self.render_text(area, gs),
+        }
+    }
+
+    fn render_select(&mut self, area: Rect, gs: &mut GlobalState) {
+        if let Some(actions) = self.actions.as_ref() {
+            let actions = actions.iter().map(|a| a.to_string()).collect::<Vec<_>>();
+            let options = actions.iter().map(|s| s.as_str());
+            match self.text.is_empty() {
+                true => self.state.render_list(options, &area, &mut gs.writer),
+                false => self.state.render_list(options.chain(["Information"]), &area, &mut gs.writer),
+            };
+        }
+    }
+
+    fn render_text(&mut self, area: Rect, gs: &mut GlobalState) {
+        let mut lines = area.iter_padded(1);
+        let mut text = self.text.iter().skip(self.text_state);
+        while lines.len() > 0 {
+            match text.next() {
+                Some(text) => text.wrap(&mut lines, &mut gs.writer),
+                None => break,
             }
         }
+        lines.clear_to_end(&mut gs.writer);
     }
 }
 

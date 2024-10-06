@@ -3,7 +3,6 @@ use crate::render::{
     layout::{BorderSet, Borders, Line, BORDERS},
     utils::UTF8Safe,
 };
-use std::ops::Range;
 
 #[derive(Default, Clone, Copy, Debug)]
 pub struct Rect {
@@ -11,7 +10,7 @@ pub struct Rect {
     pub col: u16,
     pub width: usize,
     pub height: u16,
-    borders: Borders,
+    pub borders: Borders,
 }
 
 impl Rect {
@@ -335,79 +334,5 @@ impl Rect {
 impl From<(u16, u16)> for Rect {
     fn from((width, height): (u16, u16)) -> Self {
         Self { row: 0, col: 0, width: width as usize, height, borders: Borders::empty() }
-    }
-}
-
-pub struct RectIter {
-    rect: Rect,
-    row_range: Range<u16>,
-}
-
-impl RectIter {
-    /// return the number of lines remaining
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.row_range.len()
-    }
-
-    /// returns the text width within the lines
-    #[inline]
-    pub fn width(&self) -> usize {
-        self.rect.width
-    }
-
-    /// moves to next line and returns width if success
-    #[inline]
-    pub fn move_cursor(&mut self, backend: &mut Backend) -> Option<usize> {
-        self.next().map(|Line { row, col, width }| {
-            backend.go_to(row, col);
-            width
-        })
-    }
-
-    /// returns the remaining lines as rect (None if all lines are used)
-    #[inline]
-    pub fn into_rect(mut self) -> Option<Rect> {
-        let height = self.row_range.len() as u16;
-        self.row_range.next().map(|row| Rect {
-            row,
-            col: self.rect.col,
-            width: self.rect.width,
-            height,
-            ..Default::default()
-        })
-    }
-
-    #[inline]
-    pub fn forward(&mut self, mut steps: usize) {
-        while steps != 0 {
-            steps -= 1;
-            self.row_range.next();
-        }
-    }
-
-    #[inline]
-    pub fn is_finished(&self) -> bool {
-        self.row_range.is_empty()
-    }
-
-    #[inline]
-    pub fn next_line_idx(&self) -> u16 {
-        self.row_range.start
-    }
-}
-
-impl Iterator for RectIter {
-    type Item = Line;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.row_range.next().map(|row| Line { col: self.rect.col, row, width: self.rect.width })
-    }
-}
-
-impl IntoIterator for Rect {
-    type IntoIter = RectIter;
-    type Item = Line;
-    fn into_iter(self) -> Self::IntoIter {
-        RectIter { row_range: self.row..self.row + self.height, rect: self }
     }
 }
