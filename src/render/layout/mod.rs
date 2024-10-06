@@ -7,4 +7,4 @@ pub use borders::{BorderSet, Borders, BORDERS, DOUBLE_BORDERS};
 #[allow(unused_imports)]
 pub use line::{Line, LineBuilder, LineBuilderRev};
 pub use rect::Rect;
-pub use rect_iter::{IterLines, RectIter};
+pub use rect_iter::{DoublePaddedRectIter, IterLines, RectIter};

@@ -64,7 +64,8 @@ impl Info {
     pub fn len(&self) -> usize {
         match self.mode {
             Mode::Text => self.text.len(),
-            Mode::Select => self.actions.as_ref().map(|i| i.len()).unwrap_or_default() + self.text.len(),
+            Mode::Select if self.text.is_empty() => self.actions.as_ref().map(Vec::len).unwrap_or_default(),
+            Mode::Select => self.actions.as_ref().map(Vec::len).unwrap_or_default() + 1,
         }
     }
 
@@ -167,14 +168,18 @@ impl Info {
     }
 
     fn render_select(&mut self, area: Rect, gs: &mut GlobalState) {
-        if let Some(actions) = self.actions.as_ref() {
-            let actions = actions.iter().map(|a| a.to_string()).collect::<Vec<_>>();
-            let options = actions.iter().map(|s| s.as_str());
-            match self.text.is_empty() {
-                true => self.state.render_list(options, &area, &mut gs.writer),
-                false => self.state.render_list(options.chain(["Information"]), &area, &mut gs.writer),
-            };
-        }
+        let actions = match self.actions.as_ref() {
+            None => return,
+            Some(actions) => actions.iter().map(|a| a.to_string()).collect::<Vec<_>>(),
+        };
+
+        let options = actions.iter().map(String::as_str);
+        let lines = area.iter_padded(1);
+
+        match self.text.is_empty() {
+            true => self.state.render_list_padded(options, lines, &mut gs.writer),
+            false => self.state.render_list_padded(options.chain(["Information"]), lines, &mut gs.writer),
+        };
     }
 
     fn render_text(&mut self, area: Rect, gs: &mut GlobalState) {

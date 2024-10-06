@@ -176,20 +176,19 @@ impl IterLines for DoublePaddedRectIter {
 impl DoublePaddedRectIter {
     fn new(rect: Rect, padding: usize) -> Self {
         let two_way_pad = padding * 2;
-        if rect.width > two_way_pad {
-            return Self {
-                row_range: rect.row..rect.row + rect.height,
-                padded_col: rect.col + padding as u16,
-                padded_width: rect.width - two_way_pad,
-                padding,
-                rect,
-            };
+        if rect.width <= two_way_pad {
+            return Self { row_range: rect.row..rect.row, padded_col: rect.col, padded_width: 0, padding, rect };
         }
-        Self { row_range: rect.row..rect.row, padded_col: rect.col, padded_width: 0, padding, rect }
+        Self {
+            row_range: rect.row..rect.row + rect.height,
+            padded_col: rect.col + padding as u16,
+            padded_width: rect.width - two_way_pad,
+            padding,
+            rect,
+        }
     }
 
-    #[allow(dead_code)]
-    fn next_padded(&mut self, backend: &mut Backend) -> Option<Line> {
+    pub fn next_padded(&mut self, backend: &mut Backend) -> Option<Line> {
         let row = self.row_range.next()?;
         backend.go_to(row, self.padded_col + self.padded_width as u16);
         backend.pad(self.padding);

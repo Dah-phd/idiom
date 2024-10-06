@@ -1,6 +1,6 @@
 use super::{
     backend::{Backend, BackendProtocol, Style},
-    layout::{LineBuilder, Rect},
+    layout::{DoublePaddedRectIter, IterLines, LineBuilder, Rect},
 };
 
 pub struct State {
@@ -102,7 +102,7 @@ impl State {
         &mut self,
         options: impl Iterator<Item = (&'a str, Style)>,
         rect: &Rect,
-        writer: &mut Backend,
+        backend: &mut Backend,
     ) {
         self.update_at_line(rect.height as usize);
         let mut lines = rect.into_iter();
@@ -114,14 +114,12 @@ impl State {
             if idx == self.selected {
                 style.update(self.highlight);
             }
-            line.render_styled(text, style, writer);
+            line.render_styled(text, style, backend);
         }
-        for line in lines {
-            line.render_empty(writer);
-        }
+        lines.clear_to_end(backend);
     }
 
-    pub fn render_list<'a>(&mut self, options: impl Iterator<Item = &'a str>, rect: &Rect, writer: &mut Backend) {
+    pub fn render_list<'a>(&mut self, options: impl Iterator<Item = &'a str>, rect: &Rect, backend: &mut Backend) {
         self.update_at_line(rect.height as usize);
         let mut lines = rect.into_iter();
         for (idx, text) in options.enumerate().skip(self.at_line) {
@@ -129,14 +127,31 @@ impl State {
                 Some(line) => line,
                 None => break,
             };
-            if idx == self.selected {
-                line.render_styled(text, self.highlight, writer);
-            } else {
-                line.render(text, writer);
+            match idx == self.selected {
+                true => line.render_styled(text, self.highlight, backend),
+                false => line.render(text, backend),
+            }
+        }
+        lines.clear_to_end(backend);
+    }
+
+    pub fn render_list_padded<'a>(
+        &mut self,
+        options: impl Iterator<Item = &'a str>,
+        mut lines: DoublePaddedRectIter,
+        backend: &mut Backend,
+    ) {
+        self.update_at_line(lines.len());
+        for (idx, text) in options.enumerate().skip(self.at_line) {
+            let line = match lines.next_padded(backend) {
+                Some(line) => line,
+                None => break,
+            };
+            match idx == self.selected {
+                true => line.render_styled(text, self.highlight, backend),
+                false => line.render(text, backend),
             };
         }
-        for line in lines {
-            line.render_empty(writer);
-        }
+        lines.clear_to_end(backend);
     }
 }
