@@ -1,16 +1,15 @@
-use crate::lsp::{LSPError, LSPNotification, LSPRequest};
-use crate::workspace::CursorPosition;
-use lsp_types::notification::DidChangeTextDocument;
-use lsp_types::request::Completion;
-use lsp_types::request::GotoDeclaration;
-use lsp_types::request::GotoDefinition;
-use lsp_types::request::HoverRequest;
-use lsp_types::request::References;
-use lsp_types::request::Rename;
-use lsp_types::request::SemanticTokensFullRequest;
-use lsp_types::request::SemanticTokensRangeRequest;
-use lsp_types::request::SignatureHelpRequest;
-use lsp_types::{Range, TextDocumentContentChangeEvent, Uri};
+use crate::{
+    lsp::{LSPError, LSPNotification, LSPRequest},
+    workspace::CursorPosition,
+};
+use lsp_types::{
+    notification::DidChangeTextDocument,
+    request::{
+        Completion, GotoDeclaration, GotoDefinition, HoverRequest, References, Rename, SemanticTokensFullRequest,
+        SemanticTokensRangeRequest, SignatureHelpRequest,
+    },
+    Range, TextDocumentContentChangeEvent, Uri,
+};
 
 pub enum Payload {
     /// Notifications

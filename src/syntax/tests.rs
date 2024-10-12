@@ -2,14 +2,15 @@ use std::path::PathBuf;
 
 use lsp_types::SemanticToken;
 
-use crate::{configs::FileType, global_state::GlobalState, workspace::line::EditorLine};
+use crate::{configs::FileType, global_state::GlobalState, render::backend::Style, workspace::line::EditorLine};
 
 use super::{
     lsp_calls::{char_lsp_utf16, char_lsp_utf8, encode_pos_utf16, encode_pos_utf8},
     // theme::Theme,
-    tokens::set_tokens,
+    tokens::{set_tokens, TokenLine},
     Legend,
     Lexer,
+    Token,
 };
 
 fn get_text() -> Vec<String> {
@@ -463,4 +464,54 @@ pub fn mock_utf16_lexer(gs: &mut GlobalState, file_type: FileType) -> Lexer {
 
 pub fn mock_utf32_lexer(gs: &mut GlobalState, file_type: FileType) -> Lexer {
     Lexer::with_context(file_type, PathBuf::new().as_path(), gs)
+}
+
+// test tokens
+fn create_tokens() -> TokenLine {
+    let mut token_line = TokenLine::default();
+    token_line.push(Token { len: 3, delta_start: 0, style: Style::default() });
+    token_line.push(Token { len: 4, delta_start: 4, style: Style::default() });
+    token_line
+}
+
+#[test]
+fn test_token_inc() {
+    let mut tl = create_tokens();
+    let mut token_line = TokenLine::default();
+    token_line.push(Token { len: 3, delta_start: 0, style: Style::default() });
+    token_line.push(Token { len: 4, delta_start: 5, style: Style::default() });
+    tl.increment_at(3);
+    assert_eq!(tl, token_line);
+    tl.increment_end();
+    let mut token_line = TokenLine::default();
+    token_line.push(Token { len: 3, delta_start: 0, style: Style::default() });
+    token_line.push(Token { len: 5, delta_start: 5, style: Style::default() });
+    assert_eq!(tl, token_line);
+}
+
+#[test]
+fn test_token_dec() {
+    let mut tl = create_tokens();
+    let mut token_line = TokenLine::default();
+    token_line.push(Token { len: 3, delta_start: 0, style: Style::default() });
+    token_line.push(Token { len: 4, delta_start: 3, style: Style::default() });
+    tl.decrement_at(3);
+    assert_eq!(tl, token_line);
+
+    let mut token_line = TokenLine::default();
+    token_line.push(Token { len: 3, delta_start: 0, style: Style::default() });
+    token_line.push(Token { len: 0, delta_start: 3, style: Style::default() });
+    tl.decrement_at(3);
+    tl.decrement_at(3);
+    tl.decrement_at(3);
+    tl.decrement_at(3);
+    tl.decrement_at(3);
+    assert_eq!(tl, token_line);
+
+    let mut token_line = TokenLine::default();
+    token_line.push(Token { len: 1, delta_start: 0, style: Style::default() });
+    token_line.push(Token { len: 0, delta_start: 1, style: Style::default() });
+    tl.decrement_at(1);
+    tl.decrement_at(1);
+    assert_eq!(tl, token_line);
 }

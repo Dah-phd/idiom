@@ -140,9 +140,7 @@ impl EditorLine {
     #[inline]
     pub fn push(&mut self, ch: char) {
         self.cached.reset();
-        if self.char_len == self.tokens.char_len() {
-            self.tokens.increment_end();
-        }
+        self.tokens.increment_at(self.char_len);
         self.char_len += 1;
         self.content.push(ch);
     }
