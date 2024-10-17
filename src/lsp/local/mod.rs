@@ -17,6 +17,7 @@ use json::JsonValue;
 use lobster::Pincer;
 use python::PyToken;
 use rust::Rustacean;
+use ts::TSToken;
 
 pub use enriched::enrich_with_semantics;
 pub use styler::Highlighter;
@@ -77,6 +78,7 @@ pub fn init_local_tokens(file_type: FileType, content: &mut Vec<EditorLine>, the
         FileType::Rust => Rustacean::init_tokens(content, theme, file_type),
         FileType::Python => PyToken::init_tokens(content, theme, file_type),
         FileType::Lobster => Pincer::init_tokens(content, theme, file_type),
+        FileType::JavaScript | FileType::TypeScript => TSToken::init_tokens(content, theme, file_type),
         _ => GenericToken::init_tokens(content, theme, file_type),
     }
 }

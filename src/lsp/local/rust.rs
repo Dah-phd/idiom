@@ -2,9 +2,8 @@ use super::{Definitions, Func, LangStream, ObjType, PositionedToken, Struct, Var
 use logos::{Lexer, Logos};
 
 #[derive(Logos, Debug, PartialEq)]
-#[logos(skip r" ")] // Ignore this regex pattern between tokens
+#[logos(skip r" ")]
 pub enum Rustacean {
-    // Tokens can be literal strings, of any length.
     #[token("fn")]
     DeclareFn,
     #[token("let")]
