@@ -146,6 +146,54 @@ impl<T: LangStream> EnrichedLSP<T> {
         }
     }
 
+    fn pre_process_coerse(&mut self, payload: Payload) -> LSPResult<Option<String>> {
+        match payload {
+            Payload::Direct(data) => {
+                self.direct_parsing(&data)?;
+                Ok(Some(data))
+            }
+            Payload::Tokens(uri, id) => {
+                let data = match self.documents.get(&uri) {
+                    Some(doc) => full_tokens(&doc.tokens),
+                    None => vec![],
+                };
+                let tokens = SemanticTokensResult::Tokens(SemanticTokens { result_id: None, data });
+                let response = match to_value(tokens) {
+                    Ok(value) => Response { id, result: Some(value), error: None },
+                    Err(error) => Response { id, result: None, error: Some(Value::String(error.to_string())) },
+                };
+                self.responses.lock().unwrap().insert(id, response);
+                Ok(None)
+            }
+            Payload::PartialTokens(uri, range, id, ..) => {
+                let data = match self.documents.get(&uri) {
+                    Some(doc) => partial_tokens(&doc.tokens, range),
+                    None => vec![],
+                };
+                let tokens = SemanticTokensRangeResult::Tokens(SemanticTokens { result_id: None, data });
+                let response = match to_value(tokens) {
+                    Ok(value) => Response { id, result: Some(value), error: None },
+                    Err(err) => Response { id, result: None, error: Some(Value::String(err.to_string())) },
+                };
+                self.responses.lock().unwrap().insert(id, response);
+                Ok(None)
+            }
+            Payload::Sync(uri, version, change_event) => {
+                if let Some(doc) = self.documents.get_mut(&uri) {
+                    doc.sync(&change_event);
+                };
+                Ok(Payload::Sync(uri, version, change_event).try_stringify().ok())
+            }
+            Payload::FullSync(uri, version, full_text) => {
+                if let Some(doc) = self.documents.get_mut(&uri) {
+                    doc.full_sync(&full_text);
+                };
+                Ok(Payload::FullSync(uri, version, full_text).try_stringify().ok())
+            }
+            _ => Ok(payload.try_stringify().ok()),
+        }
+    }
+
     fn pre_process_sync_coersion(&mut self, payload: Payload) -> LSPResult<Option<String>> {
         match payload {
             Payload::Direct(data) => {

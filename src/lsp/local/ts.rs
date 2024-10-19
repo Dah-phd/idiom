@@ -1,4 +1,4 @@
-use super::{LangStream, ObjType, PositionedToken, NON_TOKEN_ID};
+use super::{Definitions, Func, LangStream, ObjType, PositionedToken, Struct, Var, NON_TOKEN_ID};
 use logos::{Lexer, Logos};
 
 #[derive(Logos, Debug, PartialEq)]
@@ -137,23 +137,23 @@ impl LangStream for TSToken {
             let mut token_line = Vec::new();
             let mut logos = Self::lexer(line);
             while let Some(token_result) = logos.next() {
-                let pytoken = match token_result {
-                    Ok(pytoken) => pytoken,
+                let tstoken = match token_result {
+                    Ok(tstoken) => tstoken,
                     Err(_) => continue,
                 };
-                match pytoken {
+                match tstoken {
                     Self::DeclareFn => {
-                        token_line.push(pytoken.to_postioned(logos.span(), line));
-                        if let Some(Ok(mut next_pytoken)) = logos.next() {
-                            next_pytoken.name_to_func();
-                            token_line.push(next_pytoken.to_postioned(logos.span(), line));
+                        token_line.push(tstoken.to_postioned(logos.span(), line));
+                        if let Some(Ok(mut next_tstoken)) = logos.next() {
+                            next_tstoken.name_to_func();
+                            token_line.push(next_tstoken.to_postioned(logos.span(), line));
                         }
                     }
                     Self::DeclareStruct => {
-                        token_line.push(pytoken.to_postioned(logos.span(), line));
-                        if let Some(Ok(mut next_pytoken)) = logos.next() {
-                            next_pytoken.name_to_class();
-                            token_line.push(next_pytoken.to_postioned(logos.span(), line));
+                        token_line.push(tstoken.to_postioned(logos.span(), line));
+                        if let Some(Ok(mut next_tstoken)) = logos.next() {
+                            next_tstoken.name_to_class();
+                            token_line.push(next_tstoken.to_postioned(logos.span(), line));
                         }
                     }
                     Self::LBrack => {
@@ -166,7 +166,7 @@ impl LangStream for TSToken {
                         drain_import(line, &mut logos, &mut token_line);
                     }
                     _ => {
-                        token_line.push(pytoken.to_postioned(logos.span(), line));
+                        token_line.push(tstoken.to_postioned(logos.span(), line));
                     }
                 }
             }
@@ -186,6 +186,9 @@ impl LangStream for TSToken {
             | Self::FlowControl
             | Self::Constructor
             | Self::SelfRef
+            | Self::Keyword
+            | Self::Opeque
+            | Self::Null
             | Self::Bool
             | Self::NameSpaceKeyWord => 11,
             Self::Comment => 12,
@@ -208,6 +211,30 @@ impl LangStream for TSToken {
             Self::Type(name) | Self::TypeHint(name) => ObjType::Struct(name),
             Self::Function(name) => ObjType::Fn(name),
             _ => ObjType::None,
+        }
+    }
+
+    fn init_definitions() -> Definitions {
+        Definitions {
+            types: vec![Struct::new("Date")],
+            function: vec![Func { name: "fetch".to_owned() }],
+            variables: vec![Var { name: "console".to_owned() }],
+            keywords: vec![
+                "new",
+                "class",
+                "for",
+                "while",
+                "try",
+                "catch",
+                "extends",
+                "true",
+                "false",
+                "null",
+                "void",
+                "undefined",
+                "async",
+                "await",
+            ],
         }
     }
 }

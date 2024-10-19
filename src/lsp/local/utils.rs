@@ -8,7 +8,34 @@ use lsp_types::{
 
 pub const NON_TOKEN_ID: u32 = 17;
 
-// !TODO Dobule check utf8 complience
+pub fn utf8_reposition_cursor(cursor: CursorPosition, content: &[String]) -> CursorPosition {
+    let CursorPosition { line, char: mut old_char } = cursor;
+    let mut line_chars = content[line].chars();
+    let mut char = 0;
+    while let Some(ch_len) = line_chars.next().map(|ch| ch.len_utf8()) {
+        if ch_len > old_char {
+            break;
+        }
+        old_char -= ch_len;
+        char += 1;
+    }
+    CursorPosition { line, char }
+}
+
+pub fn utf16_reposition_cursor(cursor: CursorPosition, content: &[String]) -> CursorPosition {
+    let CursorPosition { line, char: mut old_char } = cursor;
+    let mut line_chars = content[line].chars();
+    let mut char = 0;
+    while let Some(ch_len) = line_chars.next().map(|ch| ch.len_utf8().div_ceil(2)) {
+        if ch_len > old_char {
+            break;
+        }
+        old_char -= ch_len;
+        char += 1;
+    }
+    CursorPosition { line, char }
+}
+
 pub fn swap_content(content: &mut Vec<String>, clip: &str, from: CursorPosition, to: CursorPosition) {
     remove_content(from, to, content);
     insert_clip(clip, content, from);
@@ -163,9 +190,12 @@ pub fn get_local_legend() -> Vec<SemanticTokenType> {
 mod test {
     use lsp_types::SemanticToken;
 
-    use crate::lsp::local::{python::PyToken, LangStream, LocalLSP};
+    use crate::{
+        lsp::local::{python::PyToken, LangStream, LocalLSP},
+        workspace::CursorPosition,
+    };
 
-    use super::full_tokens;
+    use super::{full_tokens, utf16_reposition_cursor, utf8_reposition_cursor};
     use std::sync::Arc;
 
     #[test]
@@ -181,5 +211,19 @@ mod test {
                 SemanticToken { delta_line: 0, delta_start: 6, length: 16, token_type: 1, token_modifiers_bitset: 0 }
             ]
         );
+    }
+
+    #[test]
+    fn test_utf8_reposition() {
+        let content = vec![String::new(), "t🔥xt".to_owned()];
+        let cursor = CursorPosition { line: 1, char: 5 };
+        assert_eq!(utf8_reposition_cursor(cursor, &content), CursorPosition { line: 1, char: 2 })
+    }
+
+    #[test]
+    fn test_utf16_reposition() {
+        let content = vec![String::new(), String::new(), "t🔥xt".to_owned()];
+        let cursor = CursorPosition { line: 2, char: 3 };
+        assert_eq!(utf16_reposition_cursor(cursor, &content), CursorPosition { line: 2, char: 2 })
     }
 }
