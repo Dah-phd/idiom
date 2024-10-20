@@ -42,11 +42,17 @@ use serde_json::{from_str, to_value, Value};
 use std::{collections::HashSet, fmt::Debug, sync::Arc};
 use tokio::{sync::mpsc::UnboundedReceiver, task::JoinHandle};
 
+pub type PositionedTokenParser<T: LangStream> = fn(T, Span, &str) -> PositionedToken<T>;
+
 /// Trait to be implemented on the lang specific token, allowing parsing and deriving builtins
 trait LangStream: Sized + Debug + PartialEq + Logos<'static> {
     fn type_id(&self) -> u32;
     fn modifier(&self) -> u32;
-    fn parse<'a>(text: impl Iterator<Item = &'a str>, tokens: &mut Vec<Vec<PositionedToken<Self>>>);
+    fn parse<'a>(
+        text: impl Iterator<Item = &'a str>,
+        tokens: &mut Vec<Vec<PositionedToken<Self>>>,
+        parser: PositionedTokenParser<Self>,
+    );
 
     fn init_definitions() -> Definitions {
         Definitions::default()
@@ -56,17 +62,10 @@ trait LangStream: Sized + Debug + PartialEq + Logos<'static> {
         ObjType::None
     }
 
-    fn to_postioned(self, span: Span, text: &str) -> PositionedToken<Self> {
-        // utf32 encoding
-        let from = text[..span.start].char_len();
-        let len = text[span.start..span.end].char_len();
-        PositionedToken { from, len, token_type: self.type_id(), modifier: self.modifier(), lang_token: self }
-    }
-
     fn init_tokens(content: &mut Vec<EditorLine>, theme: &Theme, file_type: FileType) {
         let text = content.iter().map(|l| l.content.to_string()).collect::<Vec<_>>();
         let mut tokens = Vec::new();
-        Self::parse(text.iter().map(|t| t.as_str()), &mut tokens);
+        Self::parse(text.iter().map(|t| t.as_str()), &mut tokens, PositionedToken::<Self>::utf32);
         let mut legend = Legend::default();
         legend.map_styles(file_type, theme, &create_semantic_capabilities());
         set_tokens(full_tokens(&tokens), &legend, content);
@@ -157,11 +156,11 @@ impl<T: LangStream> LocalLSP<T> {
                     let clip = change.text;
                     swap_content(&mut self.text, &clip, from, to);
                 }
-                T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens);
+                T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens, PositionedToken::<T>::utf32);
             }
             Payload::FullSync(.., full_text) => {
                 self.text = full_text.split('\n').map(ToOwned::to_owned).collect();
-                T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens);
+                T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens, PositionedToken::<T>::utf32);
             }
             Payload::Completion(_, _c, id) => {
                 let items = self.definitions.to_completions(&self.tokens);
@@ -201,7 +200,7 @@ impl<T: LangStream> LocalLSP<T> {
         let documet = params.as_object_mut()?.get_mut("textDocument")?;
         let text = documet.as_object_mut()?.get("text")?.as_str()?;
         self.text = text.split('\n').map(ToOwned::to_owned).collect();
-        T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens);
+        T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens, PositionedToken::<T>::utf32);
         Some(())
     }
 }
@@ -216,6 +215,29 @@ struct PositionedToken<T: LangStream> {
 }
 
 impl<T: LangStream> PositionedToken<T> {
+    pub fn utf32(token: T, span: Span, text: &str) -> PositionedToken<T> {
+        // utf32 encodingT
+        let from = text[..span.start].char_len();
+        let len = text[span.start..span.end].char_len();
+        PositionedToken { from, len, token_type: token.type_id(), modifier: token.modifier(), lang_token: token }
+    }
+
+    pub fn utf8(token: T, span: Span, _text: &str) -> PositionedToken<T> {
+        PositionedToken {
+            len: span.len(),
+            from: span.start,
+            token_type: token.type_id(),
+            modifier: token.modifier(),
+            lang_token: token,
+        }
+    }
+
+    pub fn utf16(token: T, span: Span, text: &str) -> PositionedToken<T> {
+        let from = text[..span.start].utf16_len();
+        let len = text[span.start..span.end].utf16_len();
+        PositionedToken { from, len, token_type: token.type_id(), modifier: token.modifier(), lang_token: token }
+    }
+
     #[inline]
     pub fn refresh_type(&mut self) {
         self.token_type = self.lang_token.type_id();

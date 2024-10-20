@@ -1,4 +1,6 @@
-use super::{Definitions, Func, LangStream, ObjType, PositionedToken, Struct, Var, NON_TOKEN_ID};
+use super::{
+    Definitions, Func, LangStream, ObjType, PositionedToken, PositionedTokenParser, Struct, Var, NON_TOKEN_ID,
+};
 use logos::{Lexer, Logos};
 
 #[derive(Logos, Debug, PartialEq)]
@@ -147,7 +149,11 @@ pub enum Rustacean {
 }
 
 impl LangStream for Rustacean {
-    fn parse<'a>(mut text: impl Iterator<Item = &'a str>, tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
+    fn parse<'a>(
+        mut text: impl Iterator<Item = &'a str>,
+        tokens: &mut Vec<Vec<super::PositionedToken<Self>>>,
+        parser: PositionedTokenParser<Self>,
+    ) {
         tokens.clear();
         while let Some(mut line) = text.next() {
             let mut token_line = Vec::new();
@@ -159,62 +165,62 @@ impl LangStream for Rustacean {
                 };
                 match rustacean {
                     Self::DeclareFn => {
-                        token_line.push(rustacean.to_postioned(logos.span(), line));
+                        token_line.push(parser(rustacean, logos.span(), line));
                         if let Some(Ok(mut next_rustacean)) = logos.next() {
                             next_rustacean.name_to_func();
-                            token_line.push(next_rustacean.to_postioned(logos.span(), line));
+                            token_line.push(parser(next_rustacean, logos.span(), line));
                         }
                     }
                     Self::DeclareEnum => {
-                        token_line.push(rustacean.to_postioned(logos.span(), line));
+                        token_line.push(parser(rustacean, logos.span(), line));
                         if let Some(Ok(next_rustacean)) = logos.next() {
                             match next_rustacean {
                                 Rustacean::Name(name) => {
-                                    token_line.push(Rustacean::Enum(name).to_postioned(logos.span(), line));
-                                    line = parse_enum(&mut logos, line, &mut text, &mut token_line, tokens);
+                                    token_line.push(parser(Rustacean::Enum(name), logos.span(), line));
+                                    line = parse_enum(&mut logos, line, &mut text, &mut token_line, tokens, parser);
                                 }
-                                _ => token_line.push(next_rustacean.to_postioned(logos.span(), line)),
+                                _ => token_line.push(parser(next_rustacean, logos.span(), line)),
                             }
                         }
                     }
                     Self::DeclareUnion => {
-                        token_line.push(rustacean.to_postioned(logos.span(), line));
+                        token_line.push(parser(rustacean, logos.span(), line));
                         if let Some(Ok(mut next_rustacean)) = logos.next() {
                             next_rustacean.name_to_union();
-                            token_line.push(next_rustacean.to_postioned(logos.span(), line));
+                            token_line.push(parser(next_rustacean, logos.span(), line));
                         }
                     }
                     Self::DeclareType => {
-                        drain_type_declare(line, &mut logos, &mut token_line);
+                        drain_type_declare(line, &mut logos, &mut token_line, parser);
                     }
                     Self::DeclareStruct => {
-                        token_line.push(rustacean.to_postioned(logos.span(), line));
+                        token_line.push(parser(rustacean, logos.span(), line));
                         if let Some(Ok(next_rustacean)) = logos.next() {
                             match next_rustacean {
                                 Rustacean::Name(name) => {
-                                    token_line.push(Rustacean::Struct(name).to_postioned(logos.span(), line));
-                                    line = parse_struct(&mut logos, line, &mut text, &mut token_line, tokens);
+                                    token_line.push(parser(Rustacean::Struct(name), logos.span(), line));
+                                    line = parse_struct(&mut logos, line, &mut text, &mut token_line, tokens, parser);
                                 }
-                                _ => token_line.push(next_rustacean.to_postioned(logos.span(), line)),
+                                _ => token_line.push(parser(next_rustacean, logos.span(), line)),
                             }
                         }
                     }
                     Self::StaticDispatch => {
                         let mut span = logos.span();
                         span.start += 1;
-                        token_line.push(rustacean.to_postioned(span, line));
+                        token_line.push(parser(rustacean, span, line));
                         if let Some(Ok(Self::Name(name))) = logos.next() {
-                            token_line.push(Self::Type(name).to_postioned(logos.span(), line));
+                            token_line.push(parser(Self::Type(name), logos.span(), line));
                         }
                     }
                     Self::Return => {
-                        token_line.push(rustacean.to_postioned(logos.span(), line));
+                        token_line.push(parser(rustacean, logos.span(), line));
                         match logos.next() {
                             Some(Ok(Rustacean::Name(name))) => {
-                                token_line.push(Rustacean::Type(name).to_postioned(logos.span(), line));
+                                token_line.push(parser(Rustacean::Type(name), logos.span(), line));
                             }
                             Some(Ok(next_rustation)) => {
-                                token_line.push(next_rustation.to_postioned(logos.span(), line));
+                                token_line.push(parser(next_rustation, logos.span(), line));
                             }
                             _ => (),
                         }
@@ -222,23 +228,23 @@ impl LangStream for Rustacean {
                     Self::TypeAssign => {
                         let mut span = logos.span();
                         span.start += 1;
-                        token_line.push(rustacean.to_postioned(span, line));
+                        token_line.push(parser(rustacean, span, line));
                     }
                     Self::LifeTime => {
                         let mut span = logos.span();
                         span.start += 2;
                         span.end -= 1;
-                        token_line.push(rustacean.to_postioned(span, line));
+                        token_line.push(parser(rustacean, span, line));
                     }
                     Self::LifeTimeAnnotation => {
                         let mut span = logos.span();
                         span.start += 2;
-                        token_line.push(rustacean.to_postioned(span, line));
+                        token_line.push(parser(rustacean, span, line));
                     }
                     Self::Macros => {
                         let mut span = logos.span();
                         span.end -= 1;
-                        token_line.push(rustacean.to_postioned(span, line));
+                        token_line.push(parser(rustacean, span, line));
                     }
                     Self::TypeInner => {
                         if let Some(prev_token) = token_line.last_mut() {
@@ -248,18 +254,18 @@ impl LangStream for Rustacean {
                         let mut span = logos.span();
                         span.start += 1;
                         span.end -= 1;
-                        token_line.push(rustacean.to_postioned(span, line));
+                        token_line.push(parser(rustacean, span, line));
                     }
                     Self::LBrack => {
                         if let Some(pos_token) = token_line.last_mut() {
                             pos_token.lang_token.name_to_func();
                             pos_token.refresh_type();
                         }
-                        token_line.push(rustacean.to_postioned(logos.span(), line));
+                        token_line.push(parser(rustacean, logos.span(), line));
                     }
                     Self::ImplementInterface => {
-                        token_line.push(rustacean.to_postioned(logos.span(), line));
-                        drain_impl(line, &mut logos, &mut token_line);
+                        token_line.push(parser(rustacean, logos.span(), line));
+                        drain_impl(line, &mut logos, &mut token_line, parser);
                     }
                     Self::ParantInvoked => {
                         if let Some(pos_token) = token_line.last_mut() {
@@ -268,11 +274,11 @@ impl LangStream for Rustacean {
                         }
                     }
                     Self::NameSpaceKeyWord => {
-                        token_line.push(rustacean.to_postioned(logos.span(), line));
-                        line = parse_import(&mut logos, line, &mut text, &mut token_line, tokens);
+                        token_line.push(parser(rustacean, logos.span(), line));
+                        line = parse_import(&mut logos, line, &mut text, &mut token_line, tokens, parser);
                     }
                     _ => {
-                        token_line.push(rustacean.to_postioned(logos.span(), line));
+                        token_line.push(parser(rustacean, logos.span(), line));
                     }
                 }
             }
@@ -402,6 +408,7 @@ fn parse_enum<'a>(
     lines: &mut impl Iterator<Item = &'a str>,
     token_line: &mut Vec<PositionedToken<Rustacean>>,
     tokens: &mut Vec<Vec<PositionedToken<Rustacean>>>,
+    parser: PositionedTokenParser<Rustacean>,
 ) -> &'a str {
     let mut scope: usize = 0;
     let mut tuple_member: usize = 0;
@@ -410,10 +417,10 @@ fn parse_enum<'a>(
             if let Ok(rustacean) = token_result {
                 match rustacean {
                     Rustacean::Name(name) if tuple_member != 0 => {
-                        token_line.push(Rustacean::Type(name).to_postioned(logos.span(), line));
+                        token_line.push(parser(Rustacean::Type(name), logos.span(), line));
                     }
                     Rustacean::Name(name) => {
-                        token_line.push(Rustacean::EnumMember(name).to_postioned(logos.span(), line));
+                        token_line.push(parser(Rustacean::EnumMember(name), logos.span(), line));
                     }
                     Rustacean::LBrack => {
                         tuple_member += 1;
@@ -424,7 +431,7 @@ fn parse_enum<'a>(
                     Rustacean::OpenScope => {
                         scope += 1;
                         if scope > 1 {
-                            line = parse_struct(logos, line, lines, token_line, tokens);
+                            line = parse_struct(logos, line, lines, token_line, tokens, parser);
                         }
                     }
                     Rustacean::CloseScope => {
@@ -433,7 +440,7 @@ fn parse_enum<'a>(
                             return line;
                         }
                     }
-                    _ => token_line.push(rustacean.to_postioned(logos.span(), line)),
+                    _ => token_line.push(parser(rustacean, logos.span(), line)),
                 }
             }
         }
@@ -456,6 +463,7 @@ fn parse_struct<'a>(
     lines: &mut impl Iterator<Item = &'a str>,
     token_line: &mut Vec<PositionedToken<Rustacean>>,
     tokens: &mut Vec<Vec<PositionedToken<Rustacean>>>,
+    parser: PositionedTokenParser<Rustacean>,
 ) -> &'a str {
     let mut scope: usize = 0;
     loop {
@@ -471,7 +479,7 @@ fn parse_struct<'a>(
                             return line;
                         }
                     }
-                    _ => token_line.push(rustacean.to_postioned(logos.span(), line)),
+                    _ => token_line.push(parser(rustacean, logos.span(), line)),
                 }
             }
         }
@@ -494,6 +502,7 @@ fn parse_import<'a>(
     lines: &mut impl Iterator<Item = &'a str>,
     token_line: &mut Vec<PositionedToken<Rustacean>>,
     tokens: &mut Vec<Vec<PositionedToken<Rustacean>>>,
+    parser: PositionedTokenParser<Rustacean>,
 ) -> &'a str {
     let mut scope: usize = 0;
     loop {
@@ -501,7 +510,7 @@ fn parse_import<'a>(
             if let Ok(rustacean) = token_result {
                 match rustacean {
                     Rustacean::Name(name) => {
-                        token_line.push(Rustacean::NameSpace(name).to_postioned(logos.span(), line));
+                        token_line.push(parser(Rustacean::NameSpace(name), logos.span(), line));
                     }
                     Rustacean::OpenScope => {
                         scope += 1;
@@ -512,7 +521,7 @@ fn parse_import<'a>(
                             return line;
                         }
                     }
-                    _ => token_line.push(rustacean.to_postioned(logos.span(), line)),
+                    _ => token_line.push(parser(rustacean, logos.span(), line)),
                 }
             }
         }
@@ -529,9 +538,14 @@ fn parse_import<'a>(
     line
 }
 
-fn drain_impl(line: &str, logos: &mut Lexer<'_, Rustacean>, token_line: &mut Vec<PositionedToken<Rustacean>>) {
+fn drain_impl(
+    line: &str,
+    logos: &mut Lexer<'_, Rustacean>,
+    token_line: &mut Vec<PositionedToken<Rustacean>>,
+    parser: PositionedTokenParser<Rustacean>,
+) {
     match logos.next() {
-        Some(Ok(Rustacean::Name(name))) => token_line.push(Rustacean::Type(name).to_postioned(logos.span(), line)),
+        Some(Ok(Rustacean::Name(name))) => token_line.push(parser(Rustacean::Type(name), logos.span(), line)),
         _ => return,
     }
     while let Some(rustacean) = logos.next() {
@@ -540,40 +554,45 @@ fn drain_impl(line: &str, logos: &mut Lexer<'_, Rustacean>, token_line: &mut Vec
                 let prev = token_line.last_mut().expect("pushed above");
                 prev.lang_token.type_to_trait();
                 prev.refresh_type();
-                token_line.push(Rustacean::ImplementInterface.to_postioned(logos.span(), line))
+                token_line.push(parser(Rustacean::ImplementInterface, logos.span(), line))
             }
             Ok(Rustacean::Name(name)) => {
-                token_line.push(Rustacean::Type(name).to_postioned(logos.span(), line));
+                token_line.push(parser(Rustacean::Type(name), logos.span(), line));
             }
             Ok(Rustacean::TypeInner) => {
                 let mut span = logos.span();
                 span.start += 1;
                 span.end -= 1;
-                token_line.push(Rustacean::TypeInner.to_postioned(span, line));
+                token_line.push(parser(Rustacean::TypeInner, span, line));
             }
             _ => return,
         }
     }
 }
 
-fn drain_type_declare(line: &str, logos: &mut Lexer<'_, Rustacean>, token_line: &mut Vec<PositionedToken<Rustacean>>) {
-    token_line.push(Rustacean::DeclareType.to_postioned(logos.span(), line));
+fn drain_type_declare(
+    line: &str,
+    logos: &mut Lexer<'_, Rustacean>,
+    token_line: &mut Vec<PositionedToken<Rustacean>>,
+    parser: PositionedTokenParser<Rustacean>,
+) {
+    token_line.push(parser(Rustacean::DeclareType, logos.span(), line));
     while let Some(token_result) = logos.next() {
         let rustacean = match token_result {
             Ok(rustacean) => rustacean,
             Err(_) => continue,
         };
         match rustacean {
-            Rustacean::Name(name) => token_line.push(Rustacean::Type(name).to_postioned(logos.span(), line)),
+            Rustacean::Name(name) => token_line.push(parser(Rustacean::Type(name), logos.span(), line)),
             Rustacean::TypeInner => {
                 let mut span = logos.span();
                 if span.len() > 2 {
                     span.start += 1;
                     span.end -= 1;
                 };
-                token_line.push(rustacean.to_postioned(span, line))
+                token_line.push(parser(rustacean, span, line))
             }
-            _ => token_line.push(rustacean.to_postioned(logos.span(), line)),
+            _ => token_line.push(parser(rustacean, logos.span(), line)),
         }
     }
 }
@@ -610,7 +629,7 @@ mod test {
     fn test_declare_type() {
         let mut tokens = vec![];
         let txt = "pub type IdiomResult<T> = Result<T, IdiomError>;";
-        Rustacean::parse([txt].into_iter(), &mut tokens);
+        Rustacean::parse([txt].into_iter(), &mut tokens, PositionedToken::<Rustacean>::utf32);
         assert_eq!(
             tokens,
             vec![[
@@ -658,7 +677,7 @@ mod test {
     fn test_decorator() {
         let mut tokens = vec![];
         let txt = "#[derive(Logos, Debug, PartialEq)]";
-        Rustacean::parse([txt].into_iter(), &mut tokens);
+        Rustacean::parse([txt].into_iter(), &mut tokens, PositionedToken::<Rustacean>::utf32);
         assert_eq!(
             tokens,
             vec![[PositionedToken { from: 0, len: 34, token_type: 15, modifier: 0, lang_token: Rustacean::Decorator }]]
@@ -666,7 +685,7 @@ mod test {
 
         let mut tokens = vec![];
         let txt = "LSP(#[from] LSPError)";
-        Rustacean::parse([txt].into_iter(), &mut tokens);
+        Rustacean::parse([txt].into_iter(), &mut tokens, PositionedToken::<Rustacean>::utf32);
         assert_eq!(
             tokens,
             vec![[

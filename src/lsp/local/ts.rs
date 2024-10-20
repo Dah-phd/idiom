@@ -1,4 +1,6 @@
-use super::{Definitions, Func, LangStream, ObjType, PositionedToken, Struct, Var, NON_TOKEN_ID};
+use super::{
+    Definitions, Func, LangStream, ObjType, PositionedToken, PositionedTokenParser, Struct, Var, NON_TOKEN_ID,
+};
 use logos::{Lexer, Logos};
 
 #[derive(Logos, Debug, PartialEq)]
@@ -131,7 +133,11 @@ pub enum TSToken {
 }
 
 impl LangStream for TSToken {
-    fn parse<'a>(text: impl Iterator<Item = &'a str>, tokens: &mut Vec<Vec<PositionedToken<Self>>>) {
+    fn parse<'a>(
+        text: impl Iterator<Item = &'a str>,
+        tokens: &mut Vec<Vec<PositionedToken<Self>>>,
+        parser: PositionedTokenParser<Self>,
+    ) {
         tokens.clear();
         for line in text {
             let mut token_line = Vec::new();
@@ -143,17 +149,17 @@ impl LangStream for TSToken {
                 };
                 match tstoken {
                     Self::DeclareFn => {
-                        token_line.push(tstoken.to_postioned(logos.span(), line));
+                        token_line.push(parser(tstoken, logos.span(), line));
                         if let Some(Ok(mut next_tstoken)) = logos.next() {
                             next_tstoken.name_to_func();
-                            token_line.push(next_tstoken.to_postioned(logos.span(), line));
+                            token_line.push(parser(next_tstoken, logos.span(), line));
                         }
                     }
                     Self::DeclareStruct => {
-                        token_line.push(tstoken.to_postioned(logos.span(), line));
+                        token_line.push(parser(tstoken, logos.span(), line));
                         if let Some(Ok(mut next_tstoken)) = logos.next() {
                             next_tstoken.name_to_class();
-                            token_line.push(next_tstoken.to_postioned(logos.span(), line));
+                            token_line.push(parser(next_tstoken, logos.span(), line));
                         }
                     }
                     Self::LBrack => {
@@ -163,10 +169,10 @@ impl LangStream for TSToken {
                         }
                     }
                     Self::NameSpaceKeyWord => {
-                        drain_import(line, &mut logos, &mut token_line);
+                        drain_import(line, &mut logos, &mut token_line, parser);
                     }
                     _ => {
-                        token_line.push(tstoken.to_postioned(logos.span(), line));
+                        token_line.push(parser(tstoken, logos.span(), line));
                     }
                 }
             }
@@ -269,14 +275,19 @@ impl TSToken {
     }
 }
 
-fn drain_import(line: &str, logos: &mut Lexer<'_, TSToken>, token_line: &mut Vec<PositionedToken<TSToken>>) {
-    token_line.push(TSToken::NameSpaceKeyWord.to_postioned(logos.span(), line));
+fn drain_import(
+    line: &str,
+    logos: &mut Lexer<'_, TSToken>,
+    token_line: &mut Vec<PositionedToken<TSToken>>,
+    parser: PositionedTokenParser<TSToken>,
+) {
+    token_line.push(parser(TSToken::NameSpaceKeyWord, logos.span(), line));
     while let Some(token_result) = logos.next() {
-        let mut pytoken = match token_result {
+        let mut tstoken = match token_result {
             Ok(pytoken) => pytoken,
             Err(_) => continue,
         };
-        pytoken.name_to_namespace();
-        token_line.push(pytoken.to_postioned(logos.span(), line));
+        tstoken.name_to_namespace();
+        token_line.push(parser(tstoken, logos.span(), line));
     }
 }

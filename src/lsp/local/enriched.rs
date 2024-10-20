@@ -378,7 +378,7 @@ impl<T: LangStream> DocumentData<T> {
     fn open(text: String) -> Self {
         let text = text.split('\n').map(ToOwned::to_owned).collect();
         let mut doc = Self { text, tokens: vec![] };
-        T::parse(doc.text.iter().map(|t| t.as_str()), &mut doc.tokens);
+        T::parse(doc.text.iter().map(|t| t.as_str()), &mut doc.tokens, PositionedToken::<T>::utf32);
         doc
     }
 
@@ -389,7 +389,7 @@ impl<T: LangStream> DocumentData<T> {
             let to = CursorPosition::from(range.end);
             swap_content(&mut self.text, &change.text, from, to);
         }
-        T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens);
+        T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens, PositionedToken::<T>::utf32);
     }
 
     fn sync_utf8(&mut self, change_event: &[TextDocumentContentChangeEvent]) {
@@ -399,7 +399,7 @@ impl<T: LangStream> DocumentData<T> {
             let to = utf8_reposition_cursor(range.end, &self.text);
             swap_content(&mut self.text, &change.text, from, to);
         }
-        T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens);
+        T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens, PositionedToken::<T>::utf32);
     }
 
     fn sync_utf16(&mut self, change_event: &[TextDocumentContentChangeEvent]) {
@@ -409,7 +409,7 @@ impl<T: LangStream> DocumentData<T> {
             let to = utf16_reposition_cursor(range.end, &self.text);
             swap_content(&mut self.text, &change.text, from, to);
         }
-        T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens);
+        T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens, PositionedToken::<T>::utf32);
     }
 
     fn sync_to_full_sync(&mut self, change_event: &[TextDocumentContentChangeEvent]) -> String {
@@ -429,7 +429,7 @@ impl<T: LangStream> DocumentData<T> {
 
     fn full_sync(&mut self, new_text: &str) {
         self.text = new_text.split('\n').map(ToOwned::to_owned).collect();
-        T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens);
+        T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens, PositionedToken::<T>::utf32);
     }
 
     #[inline]

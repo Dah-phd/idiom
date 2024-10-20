@@ -1,6 +1,6 @@
 use logos::{Lexer, Logos};
 
-use super::{utils::NON_TOKEN_ID, Func, LangStream, PositionedToken};
+use super::{utils::NON_TOKEN_ID, Func, LangStream, PositionedToken, PositionedTokenParser};
 
 #[derive(Logos, Debug, PartialEq)]
 #[logos(skip r" ")]
@@ -154,7 +154,11 @@ impl LangStream for GenericToken {
             keywords: vec![],
         }
     }
-    fn parse<'a>(text: impl Iterator<Item = &'a str>, tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
+    fn parse<'a>(
+        text: impl Iterator<Item = &'a str>,
+        tokens: &mut Vec<Vec<super::PositionedToken<Self>>>,
+        parser: PositionedTokenParser<Self>,
+    ) {
         tokens.clear();
         for line in text {
             let mut token_line = Vec::new();
@@ -166,24 +170,24 @@ impl LangStream for GenericToken {
                 };
                 match gen_token {
                     Self::DeclareFn => {
-                        token_line.push(gen_token.to_postioned(logos.span(), line));
+                        token_line.push(parser(gen_token, logos.span(), line));
                         if let Some(Ok(mut next_gentoken)) = logos.next() {
                             next_gentoken.name_to_func();
-                            token_line.push(next_gentoken.to_postioned(logos.span(), line));
+                            token_line.push(parser(next_gentoken, logos.span(), line));
                         }
                     }
                     Self::DeclareStruct => {
-                        token_line.push(gen_token.to_postioned(logos.span(), line));
+                        token_line.push(parser(gen_token, logos.span(), line));
                         if let Some(Ok(mut next_gentoken)) = logos.next() {
                             next_gentoken.name_to_class();
-                            token_line.push(next_gentoken.to_postioned(logos.span(), line));
+                            token_line.push(parser(next_gentoken, logos.span(), line));
                         }
                     }
                     Self::DeclareEnum => {
-                        token_line.push(gen_token.to_postioned(logos.span(), line));
+                        token_line.push(parser(gen_token, logos.span(), line));
                         if let Some(Ok(mut next_gentoken)) = logos.next() {
                             next_gentoken.name_to_enum();
-                            token_line.push(next_gentoken.to_postioned(logos.span(), line));
+                            token_line.push(parser(next_gentoken, logos.span(), line));
                         }
                     }
                     Self::LBrack => {
@@ -191,20 +195,20 @@ impl LangStream for GenericToken {
                             pos_token.lang_token.derive_from_name();
                             pos_token.refresh_type();
                         }
-                        token_line.push(gen_token.to_postioned(logos.span(), line));
+                        token_line.push(parser(gen_token, logos.span(), line));
                     }
                     Self::ParentInvoke => {
                         if let Some(pos_token) = token_line.last_mut() {
                             pos_token.lang_token.name_to_namespace();
                             pos_token.refresh_type();
                         }
-                        token_line.push(gen_token.to_postioned(logos.span(), line));
+                        token_line.push(parser(gen_token, logos.span(), line));
                     }
                     Self::NameSpaceKeyWord => {
-                        drain_import(line, &mut logos, &mut token_line);
+                        drain_import(line, &mut logos, &mut token_line, parser);
                     }
                     _ => {
-                        token_line.push(gen_token.to_postioned(logos.span(), line));
+                        token_line.push(parser(gen_token, logos.span(), line));
                     }
                 }
             }
@@ -278,14 +282,19 @@ impl GenericToken {
     }
 }
 
-fn drain_import(line: &str, logos: &mut Lexer<'_, GenericToken>, token_line: &mut Vec<PositionedToken<GenericToken>>) {
-    token_line.push(GenericToken::NameSpaceKeyWord.to_postioned(logos.span(), line));
+fn drain_import(
+    line: &str,
+    logos: &mut Lexer<'_, GenericToken>,
+    token_line: &mut Vec<PositionedToken<GenericToken>>,
+    parser: PositionedTokenParser<GenericToken>,
+) {
+    token_line.push(parser(GenericToken::NameSpaceKeyWord, logos.span(), line));
     while let Some(token_result) = logos.next() {
         let mut pytoken = match token_result {
             Ok(gen_token) => gen_token,
             Err(_) => continue,
         };
         pytoken.name_to_namespace();
-        token_line.push(pytoken.to_postioned(logos.span(), line));
+        token_line.push(parser(pytoken, logos.span(), line));
     }
 }

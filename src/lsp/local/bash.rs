@@ -1,6 +1,6 @@
 use logos::Logos;
 
-use super::{utils::NON_TOKEN_ID, Definitions, LangStream};
+use super::{utils::NON_TOKEN_ID, Definitions, LangStream, PositionedTokenParser};
 
 #[derive(Debug, Logos, PartialEq)]
 #[logos(skip r" ")]
@@ -80,7 +80,11 @@ pub enum BashToken {
 }
 
 impl LangStream for BashToken {
-    fn parse<'a>(text: impl Iterator<Item = &'a str>, tokens: &mut Vec<Vec<super::PositionedToken<Self>>>) {
+    fn parse<'a>(
+        text: impl Iterator<Item = &'a str>,
+        tokens: &mut Vec<Vec<super::PositionedToken<Self>>>,
+        parser: PositionedTokenParser<Self>,
+    ) {
         tokens.clear();
         let mut is_multistring = false;
         for line in text {
@@ -90,14 +94,14 @@ impl LangStream for BashToken {
                 if is_multistring {
                     match token_result {
                         Ok(Self::VariableRef(name)) => {
-                            token_line.push(Self::VariableRef(name).to_postioned(logos.span(), line));
+                            token_line.push(parser(Self::VariableRef(name), logos.span(), line));
                         }
                         Ok(Self::StringMarker) => {
-                            token_line.push(Self::String.to_postioned(logos.span(), line));
+                            token_line.push(parser(Self::String, logos.span(), line));
                             is_multistring = false;
                         }
                         _ => {
-                            token_line.push(Self::String.to_postioned(logos.span(), line));
+                            token_line.push(parser(Self::String, logos.span(), line));
                         }
                     }
                     continue;
@@ -108,36 +112,36 @@ impl LangStream for BashToken {
                 };
                 match shtoken {
                     Self::DeclareFn => {
-                        token_line.push(shtoken.to_postioned(logos.span(), line));
+                        token_line.push(parser(shtoken, logos.span(), line));
                         if let Some(Ok(mut next_shtoken)) = logos.next() {
                             next_shtoken.name_to_func();
-                            token_line.push(next_shtoken.to_postioned(logos.span(), line));
+                            token_line.push(parser(next_shtoken, logos.span(), line));
                         }
                     }
                     Self::StringMarker => {
-                        token_line.push(Self::String.to_postioned(logos.span(), line));
+                        token_line.push(parser(Self::String, logos.span(), line));
                         is_multistring = true;
                     }
                     Self::Variable(mut name) => {
                         name.pop();
                         let mut span = logos.span();
                         span.end -= 1;
-                        token_line.push(Self::Variable(name).to_postioned(span, line))
+                        token_line.push(parser(Self::Variable(name), span, line))
                     }
                     Self::Comment => {
-                        token_line.push(Self::Comment.to_postioned(logos.span(), line));
+                        token_line.push(parser(Self::Comment, logos.span(), line));
                         while let Some(_) = logos.next() {
-                            token_line.push(Self::Comment.to_postioned(logos.span(), line));
+                            token_line.push(parser(Self::Comment, logos.span(), line));
                         }
                     }
                     Self::Env => {
-                        token_line.push(Self::Env.to_postioned(logos.span(), line));
+                        token_line.push(parser(Self::Env, logos.span(), line));
                         while let Some(_) = logos.next() {
-                            token_line.push(Self::Env.to_postioned(logos.span(), line));
+                            token_line.push(parser(Self::Env, logos.span(), line));
                         }
                     }
                     _ => {
-                        token_line.push(shtoken.to_postioned(logos.span(), line));
+                        token_line.push(parser(shtoken, logos.span(), line));
                     }
                 }
             }
@@ -204,7 +208,7 @@ mod test {
     fn test_comment_and_env() {
         let ctxt = ["# this is comment"];
         let mut tokens = vec![];
-        BashToken::parse(ctxt.into_iter(), &mut tokens);
+        BashToken::parse(ctxt.into_iter(), &mut tokens, PositionedToken::<BashToken>::utf32);
         assert_eq!(
             tokens,
             [[
@@ -216,7 +220,7 @@ mod test {
         );
         tokens.clear();
         let etxt = ["#! usr"];
-        BashToken::parse(etxt.into_iter(), &mut tokens);
+        BashToken::parse(etxt.into_iter(), &mut tokens, PositionedToken::<BashToken>::utf32);
         assert_eq!(
             tokens,
             [[

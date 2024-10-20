@@ -37,6 +37,10 @@ pub fn utf16_reposition_cursor(cursor: lsp_types::Position, content: &[String]) 
     CursorPosition { line, char }
 }
 
+pub fn utf32_reposition_cursor(cursor: lsp_types::Position, _content: &[String]) -> CursorPosition {
+    CursorPosition::from(cursor)
+}
+
 pub fn swap_content(content: &mut Vec<String>, clip: &str, from: CursorPosition, to: CursorPosition) {
     remove_content(from, to, content);
     insert_clip(clip, content, from);
@@ -194,7 +198,7 @@ mod test {
     use lsp_types::SemanticToken;
 
     use crate::{
-        lsp::local::{python::PyToken, LangStream, LocalLSP},
+        lsp::local::{python::PyToken, LangStream, LocalLSP, PositionedToken},
         workspace::CursorPosition,
     };
 
@@ -205,7 +209,7 @@ mod test {
     fn test_with_pytoken() {
         let mut pylsp = LocalLSP::<PyToken>::new(Arc::default());
         pylsp.text.push(String::from("class WorkingDirectory:"));
-        PyToken::parse(pylsp.text.iter().map(|t| t.as_str()), &mut pylsp.tokens);
+        PyToken::parse(pylsp.text.iter().map(|t| t.as_str()), &mut pylsp.tokens, PositionedToken::<PyToken>::utf32);
         let tokens = full_tokens(&pylsp.tokens);
         assert_eq!(
             tokens,

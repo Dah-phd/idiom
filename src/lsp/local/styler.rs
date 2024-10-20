@@ -23,7 +23,7 @@ impl Highlighter {
     }
 
     pub fn parse_line(&mut self, text: &str) -> StyledLine {
-        GenericToken::parse([text].into_iter(), &mut self.tokens);
+        GenericToken::parse([text].into_iter(), &mut self.tokens, PositionedToken::<GenericToken>::utf32);
         let text = text.to_owned();
         let mut styled_line = vec![];
         let mut end = 0;
