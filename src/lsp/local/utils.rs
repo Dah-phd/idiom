@@ -7,9 +7,10 @@ use lsp_types::{
 
 pub const NON_TOKEN_ID: u32 = 17;
 
-pub fn utf8_reposition_cursor(cursor: CursorPosition, content: &[String]) -> CursorPosition {
-    let CursorPosition { line, char: mut old_char } = cursor;
+pub fn utf8_reposition_cursor(cursor: lsp_types::Position, content: &[String]) -> CursorPosition {
+    let line = cursor.line as usize;
     let mut line_chars = content[line].chars();
+    let mut old_char = cursor.character as usize;
     let mut char = 0;
     while let Some(ch_len) = line_chars.next().map(|ch| ch.len_utf8()) {
         if ch_len > old_char {
@@ -21,9 +22,10 @@ pub fn utf8_reposition_cursor(cursor: CursorPosition, content: &[String]) -> Cur
     CursorPosition { line, char }
 }
 
-pub fn utf16_reposition_cursor(cursor: CursorPosition, content: &[String]) -> CursorPosition {
-    let CursorPosition { line, char: mut old_char } = cursor;
+pub fn utf16_reposition_cursor(cursor: lsp_types::Position, content: &[String]) -> CursorPosition {
+    let line = cursor.line as usize;
     let mut line_chars = content[line].chars();
+    let mut old_char = cursor.character as usize;
     let mut char = 0;
     while let Some(ch_len) = line_chars.next().map(|ch| ch.len_utf8().div_ceil(2)) {
         if ch_len > old_char {
@@ -217,14 +219,14 @@ mod test {
     #[test]
     fn test_utf8_reposition() {
         let content = vec![String::new(), "t🔥xt".to_owned()];
-        let cursor = CursorPosition { line: 1, char: 5 };
+        let cursor = lsp_types::Position { line: 1, character: 5 };
         assert_eq!(utf8_reposition_cursor(cursor, &content), CursorPosition { line: 1, char: 2 })
     }
 
     #[test]
     fn test_utf16_reposition() {
         let content = vec![String::new(), String::new(), "t🔥xt".to_owned()];
-        let cursor = CursorPosition { line: 2, char: 3 };
+        let cursor = lsp_types::Position { line: 2, character: 3 };
         assert_eq!(utf16_reposition_cursor(cursor, &content), CursorPosition { line: 2, char: 2 })
     }
 }

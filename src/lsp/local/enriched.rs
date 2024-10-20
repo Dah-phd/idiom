@@ -4,7 +4,9 @@ use crate::lsp::local::{
     generic::GenericToken,
     lobster::Pincer,
     python::PyToken,
-    utils::{full_tokens, partial_tokens, swap_content},
+    rust::Rustacean,
+    ts::TSToken,
+    utils::{full_tokens, partial_tokens, swap_content, utf16_reposition_cursor, utf8_reposition_cursor},
 };
 use crate::{
     configs::FileType,
@@ -36,7 +38,67 @@ pub fn enrich_with_semantics(
         FileType::Lobster => {
             tokio::task::spawn(async move { EnrichedLSP::<Pincer>::run_tokens(rx, lsp_stdin, responses).await })
         }
+        FileType::Rust => {
+            tokio::task::spawn(async move { EnrichedLSP::<Rustacean>::run_tokens(rx, lsp_stdin, responses).await })
+        }
+        FileType::JavaScript | FileType::TypeScript => {
+            tokio::task::spawn(async move { EnrichedLSP::<TSToken>::run_tokens(rx, lsp_stdin, responses).await })
+        }
         _ => tokio::task::spawn(async move { EnrichedLSP::<GenericToken>::run_tokens(rx, lsp_stdin, responses).await }),
+    }
+}
+
+pub fn enrich_with_semantics_utf8(
+    rx: UnboundedReceiver<Payload>,
+    lsp_stdin: ChildStdin,
+    file_type: FileType,
+    responses: Arc<Responses>,
+) -> JoinHandle<LSPResult<()>> {
+    match file_type {
+        FileType::Python => {
+            tokio::task::spawn(async move { EnrichedLSP::<PyToken>::run_tokens_utf8(rx, lsp_stdin, responses).await })
+        }
+        FileType::Lobster => {
+            tokio::task::spawn(async move { EnrichedLSP::<Pincer>::run_tokens_utf8(rx, lsp_stdin, responses).await })
+        }
+        FileType::Rust => {
+            tokio::task::spawn(async move { EnrichedLSP::<Rustacean>::run_tokens_utf8(rx, lsp_stdin, responses).await })
+        }
+        FileType::JavaScript | FileType::TypeScript => {
+            tokio::task::spawn(async move { EnrichedLSP::<TSToken>::run_tokens_utf8(rx, lsp_stdin, responses).await })
+        }
+        _ => tokio::task::spawn(
+            async move { EnrichedLSP::<GenericToken>::run_tokens_utf8(rx, lsp_stdin, responses).await },
+        ),
+    }
+}
+
+pub fn enrich_with_semantics_utf16(
+    rx: UnboundedReceiver<Payload>,
+    lsp_stdin: ChildStdin,
+    file_type: FileType,
+    responses: Arc<Responses>,
+) -> JoinHandle<LSPResult<()>> {
+    match file_type {
+        FileType::Python => {
+            tokio::task::spawn(async move { EnrichedLSP::<PyToken>::run_tokens_utf16(rx, lsp_stdin, responses).await })
+        }
+        FileType::Lobster => {
+            tokio::task::spawn(async move { EnrichedLSP::<Pincer>::run_tokens_utf16(rx, lsp_stdin, responses).await })
+        }
+        FileType::Rust => {
+            tokio::task::spawn(
+                async move { EnrichedLSP::<Rustacean>::run_tokens_utf16(rx, lsp_stdin, responses).await },
+            )
+        }
+        FileType::JavaScript | FileType::TypeScript => {
+            tokio::task::spawn(async move { EnrichedLSP::<TSToken>::run_tokens_utf16(rx, lsp_stdin, responses).await })
+        }
+        _ => {
+            tokio::task::spawn(
+                async move { EnrichedLSP::<GenericToken>::run_tokens_utf16(rx, lsp_stdin, responses).await },
+            )
+        }
     }
 }
 
@@ -56,6 +118,36 @@ impl<T: LangStream> EnrichedLSP<T> {
         let mut lsp_wrapper = Self::new(responses);
         while let Some(payload) = rx.recv().await {
             if let Some(msg) = lsp_wrapper.pre_process(payload)? {
+                lsp_stdin.write_all(msg.as_bytes()).await?;
+                lsp_stdin.flush().await?;
+            };
+        }
+        Ok(())
+    }
+
+    async fn run_tokens_utf8(
+        mut rx: UnboundedReceiver<Payload>,
+        mut lsp_stdin: ChildStdin,
+        responses: Arc<Responses>,
+    ) -> LSPResult<()> {
+        let mut lsp_wrapper = Self::new(responses);
+        while let Some(payload) = rx.recv().await {
+            if let Some(msg) = lsp_wrapper.pre_process_utf8(payload)? {
+                lsp_stdin.write_all(msg.as_bytes()).await?;
+                lsp_stdin.flush().await?;
+            };
+        }
+        Ok(())
+    }
+
+    async fn run_tokens_utf16(
+        mut rx: UnboundedReceiver<Payload>,
+        mut lsp_stdin: ChildStdin,
+        responses: Arc<Responses>,
+    ) -> LSPResult<()> {
+        let mut lsp_wrapper = Self::new(responses);
+        while let Some(payload) = rx.recv().await {
+            if let Some(msg) = lsp_wrapper.pre_process_utf16(payload)? {
                 lsp_stdin.write_all(msg.as_bytes()).await?;
                 lsp_stdin.flush().await?;
             };
@@ -148,7 +240,7 @@ impl<T: LangStream> EnrichedLSP<T> {
         }
     }
 
-    fn pre_process_coerse(&mut self, payload: Payload) -> LSPResult<Option<String>> {
+    fn pre_process_utf8(&mut self, payload: Payload) -> LSPResult<Option<String>> {
         match payload {
             Payload::Direct(data) => {
                 self.direct_parsing(&data)?;
@@ -168,10 +260,12 @@ impl<T: LangStream> EnrichedLSP<T> {
                 Ok(None)
             }
             Payload::PartialTokens(uri, range, id, ..) => {
-                let start = CursorPosition::from(range.start);
-                let end = CursorPosition::from(range.end);
                 let data = match self.documents.get(&uri) {
-                    Some(doc) => partial_tokens(&doc.tokens, start, end),
+                    Some(doc) => {
+                        let start = utf8_reposition_cursor(range.start, &doc.text);
+                        let end = utf8_reposition_cursor(range.end, &doc.text);
+                        partial_tokens(&doc.tokens, start, end)
+                    }
                     None => vec![],
                 };
                 let tokens = SemanticTokensRangeResult::Tokens(SemanticTokens { result_id: None, data });
@@ -184,7 +278,7 @@ impl<T: LangStream> EnrichedLSP<T> {
             }
             Payload::Sync(uri, version, change_event) => {
                 if let Some(doc) = self.documents.get_mut(&uri) {
-                    doc.sync(&change_event);
+                    doc.sync_utf8(&change_event);
                 };
                 Ok(Payload::Sync(uri, version, change_event).try_stringify().ok())
             }
@@ -198,7 +292,7 @@ impl<T: LangStream> EnrichedLSP<T> {
         }
     }
 
-    fn pre_process_sync_coersion(&mut self, payload: Payload) -> LSPResult<Option<String>> {
+    fn pre_process_utf16(&mut self, payload: Payload) -> LSPResult<Option<String>> {
         match payload {
             Payload::Direct(data) => {
                 self.direct_parsing(&data)?;
@@ -218,10 +312,12 @@ impl<T: LangStream> EnrichedLSP<T> {
                 Ok(None)
             }
             Payload::PartialTokens(uri, range, id, ..) => {
-                let start = CursorPosition::from(range.start);
-                let end = CursorPosition::from(range.end);
                 let data = match self.documents.get(&uri) {
-                    Some(doc) => partial_tokens(&doc.tokens, start, end),
+                    Some(doc) => {
+                        let start = utf16_reposition_cursor(range.start, &doc.text);
+                        let end = utf16_reposition_cursor(range.end, &doc.text);
+                        partial_tokens(&doc.tokens, start, end)
+                    }
                     None => vec![],
                 };
                 let tokens = SemanticTokensRangeResult::Tokens(SemanticTokens { result_id: None, data });
@@ -234,11 +330,9 @@ impl<T: LangStream> EnrichedLSP<T> {
             }
             Payload::Sync(uri, version, change_event) => {
                 if let Some(doc) = self.documents.get_mut(&uri) {
-                    let full_text = doc.sync_to_full_sync(&change_event);
-                    Ok(Payload::FullSync(uri, version, full_text).try_stringify().ok())
-                } else {
-                    Ok(Payload::Sync(uri, version, change_event).try_stringify().ok())
-                }
+                    doc.sync_utf16(&change_event);
+                };
+                Ok(Payload::Sync(uri, version, change_event).try_stringify().ok())
             }
             Payload::FullSync(uri, version, full_text) => {
                 if let Some(doc) = self.documents.get_mut(&uri) {
@@ -298,8 +392,38 @@ impl<T: LangStream> DocumentData<T> {
         T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens);
     }
 
+    fn sync_utf8(&mut self, change_event: &[TextDocumentContentChangeEvent]) {
+        for change in change_event {
+            let range = change.range.unwrap();
+            let from = utf8_reposition_cursor(range.start, &self.text);
+            let to = utf8_reposition_cursor(range.end, &self.text);
+            swap_content(&mut self.text, &change.text, from, to);
+        }
+        T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens);
+    }
+
+    fn sync_utf16(&mut self, change_event: &[TextDocumentContentChangeEvent]) {
+        for change in change_event {
+            let range = change.range.unwrap();
+            let from = utf16_reposition_cursor(range.start, &self.text);
+            let to = utf16_reposition_cursor(range.end, &self.text);
+            swap_content(&mut self.text, &change.text, from, to);
+        }
+        T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens);
+    }
+
     fn sync_to_full_sync(&mut self, change_event: &[TextDocumentContentChangeEvent]) -> String {
         self.sync(change_event);
+        self.stringify()
+    }
+
+    fn sync_to_full_sync_utf8(&mut self, change_event: &[TextDocumentContentChangeEvent]) -> String {
+        self.sync_utf8(change_event);
+        self.stringify()
+    }
+
+    fn sync_to_full_sync_utf16(&mut self, change_event: &[TextDocumentContentChangeEvent]) -> String {
+        self.sync_utf16(change_event);
         self.stringify()
     }
 

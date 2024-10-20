@@ -1,5 +1,8 @@
 use super::{
-    local::{create_semantic_capabilities, enrich_with_semantics, start_lsp_handler},
+    local::{
+        create_semantic_capabilities, enrich_with_semantics, enrich_with_semantics_utf16, enrich_with_semantics_utf8,
+        start_lsp_handler,
+    },
     messages::DiagnosticHandle,
     payload::Payload,
     EditorDiagnostics, LSPError, LSPNotification, LSPRequest, LSPResult, Response, Responses, TreeDiagnostics,
@@ -66,7 +69,12 @@ impl LSPClient {
 
         let lsp_send_handler = if capabilities.semantic_tokens_provider.is_none() {
             capabilities.semantic_tokens_provider.replace(create_semantic_capabilities());
-            enrich_with_semantics(rx, stdin, file_type, Arc::clone(&responses))
+            let enrich = match capabilities.position_encoding.as_ref().map(|encode| encode.as_str()) {
+                Some("utf-8") => enrich_with_semantics_utf8,
+                Some("utf-32") => enrich_with_semantics,
+                _ => enrich_with_semantics_utf16,
+            };
+            enrich(rx, stdin, file_type, Arc::clone(&responses))
         } else {
             tokio::task::spawn(async move {
                 while let Some(msg) = rx.recv().await {

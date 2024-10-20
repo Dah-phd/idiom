@@ -19,7 +19,7 @@ use python::PyToken;
 use rust::Rustacean;
 use ts::TSToken;
 
-pub use enriched::enrich_with_semantics;
+pub use enriched::{enrich_with_semantics, enrich_with_semantics_utf16, enrich_with_semantics_utf8};
 pub use styler::Highlighter;
 pub use utils::create_semantic_capabilities;
 use utils::{full_tokens, partial_tokens, swap_content, NON_TOKEN_ID};
@@ -100,11 +100,11 @@ pub fn start_lsp_handler(
     match file_type {
         FileType::Python => tokio::task::spawn(async move { LocalLSP::<PyToken>::run(rx, responses).await }),
         FileType::Lobster => tokio::task::spawn(async move { LocalLSP::<Pincer>::run(rx, responses).await }),
-        FileType::Json => tokio::task::spawn(async move { LocalLSP::<JsonValue>::run(rx, responses).await }),
         FileType::Rust => tokio::task::spawn(async move { LocalLSP::<Rustacean>::run(rx, responses).await }),
-        FileType::Shell => tokio::task::spawn(async move { LocalLSP::<BashToken>::run(rx, responses).await }),
         FileType::JavaScript => tokio::task::spawn(async move { LocalLSP::<TSToken>::run(rx, responses).await }),
         FileType::TypeScript => tokio::task::spawn(async move { LocalLSP::<TSToken>::run(rx, responses).await }),
+        FileType::Json => tokio::task::spawn(async move { LocalLSP::<JsonValue>::run(rx, responses).await }),
+        FileType::Shell => tokio::task::spawn(async move { LocalLSP::<BashToken>::run(rx, responses).await }),
         _ => tokio::task::spawn(async move { LocalLSP::<GenericToken>::run(rx, responses).await }),
     }
 }
