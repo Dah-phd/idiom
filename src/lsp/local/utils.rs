@@ -2,8 +2,7 @@ use super::{LangStream, PositionedToken};
 use crate::render::utils::{UTF8Safe, UTF8SafeStringExt};
 use crate::workspace::CursorPosition;
 use lsp_types::{
-    Range, SemanticToken, SemanticTokenType, SemanticTokensLegend, SemanticTokensOptions,
-    SemanticTokensServerCapabilities,
+    SemanticToken, SemanticTokenType, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
 };
 
 pub const NON_TOKEN_ID: u32 = 17;
@@ -96,9 +95,11 @@ pub fn full_tokens<T: LangStream>(lsp_tokens: &[Vec<PositionedToken<T>>]) -> Vec
     tokens
 }
 
-pub fn partial_tokens<T: LangStream>(lsp_tokens: &[Vec<PositionedToken<T>>], range: Range) -> Vec<SemanticToken> {
-    let start = CursorPosition::from(range.start);
-    let end = CursorPosition::from(range.end);
+pub fn partial_tokens<T: LangStream>(
+    lsp_tokens: &[Vec<PositionedToken<T>>],
+    start: CursorPosition,
+    end: CursorPosition,
+) -> Vec<SemanticToken> {
     let mut tokens = Vec::new();
     let mut last_delta = start.line as u32;
     let mut remaining = end.line - start.line;

@@ -103,6 +103,8 @@ pub fn start_lsp_handler(
         FileType::Json => tokio::task::spawn(async move { LocalLSP::<JsonValue>::run(rx, responses).await }),
         FileType::Rust => tokio::task::spawn(async move { LocalLSP::<Rustacean>::run(rx, responses).await }),
         FileType::Shell => tokio::task::spawn(async move { LocalLSP::<BashToken>::run(rx, responses).await }),
+        FileType::JavaScript => tokio::task::spawn(async move { LocalLSP::<TSToken>::run(rx, responses).await }),
+        FileType::TypeScript => tokio::task::spawn(async move { LocalLSP::<TSToken>::run(rx, responses).await }),
         _ => tokio::task::spawn(async move { LocalLSP::<GenericToken>::run(rx, responses).await }),
     }
 }
@@ -135,9 +137,11 @@ impl<T: LangStream> LocalLSP<T> {
                 self.responses.lock().unwrap().insert(id, response);
             }
             Payload::PartialTokens(_, range, id, ..) => {
+                let start = CursorPosition::from(range.start);
+                let end = CursorPosition::from(range.end);
                 let tokens = SemanticTokensRangeResult::Tokens(SemanticTokens {
                     result_id: None,
-                    data: partial_tokens(&self.tokens, range),
+                    data: partial_tokens(&self.tokens, start, end),
                 });
                 let response = match to_value(tokens) {
                     Ok(value) => Response { id, result: Some(value), error: None },

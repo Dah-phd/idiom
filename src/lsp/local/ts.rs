@@ -183,6 +183,7 @@ impl LangStream for TSToken {
             Self::Function(..) => 10,
             Self::DeclareFn
             | Self::DeclareStruct
+            | Self::DeclareVar
             | Self::FlowControl
             | Self::Constructor
             | Self::SelfRef

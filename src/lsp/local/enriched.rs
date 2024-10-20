@@ -118,8 +118,10 @@ impl<T: LangStream> EnrichedLSP<T> {
                 Ok(None)
             }
             Payload::PartialTokens(uri, range, id, ..) => {
+                let start = CursorPosition::from(range.start);
+                let end = CursorPosition::from(range.end);
                 let data = match self.documents.get(&uri) {
-                    Some(doc) => partial_tokens(&doc.tokens, range),
+                    Some(doc) => partial_tokens(&doc.tokens, start, end),
                     None => vec![],
                 };
                 let tokens = SemanticTokensRangeResult::Tokens(SemanticTokens { result_id: None, data });
@@ -166,8 +168,10 @@ impl<T: LangStream> EnrichedLSP<T> {
                 Ok(None)
             }
             Payload::PartialTokens(uri, range, id, ..) => {
+                let start = CursorPosition::from(range.start);
+                let end = CursorPosition::from(range.end);
                 let data = match self.documents.get(&uri) {
-                    Some(doc) => partial_tokens(&doc.tokens, range),
+                    Some(doc) => partial_tokens(&doc.tokens, start, end),
                     None => vec![],
                 };
                 let tokens = SemanticTokensRangeResult::Tokens(SemanticTokens { result_id: None, data });
@@ -214,8 +218,10 @@ impl<T: LangStream> EnrichedLSP<T> {
                 Ok(None)
             }
             Payload::PartialTokens(uri, range, id, ..) => {
+                let start = CursorPosition::from(range.start);
+                let end = CursorPosition::from(range.end);
                 let data = match self.documents.get(&uri) {
-                    Some(doc) => partial_tokens(&doc.tokens, range),
+                    Some(doc) => partial_tokens(&doc.tokens, start, end),
                     None => vec![],
                 };
                 let tokens = SemanticTokensRangeResult::Tokens(SemanticTokens { result_id: None, data });
