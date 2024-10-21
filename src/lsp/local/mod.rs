@@ -19,7 +19,7 @@ use python::PyToken;
 use rust::Rustacean;
 use ts::TSToken;
 
-pub use enriched::{enrich_with_semantics, enrich_with_semantics_utf16, enrich_with_semantics_utf8};
+pub use enriched::enrich_with_semantics;
 pub use styler::Highlighter;
 pub use utils::create_semantic_capabilities;
 use utils::{full_tokens, partial_tokens, swap_content, NON_TOKEN_ID};
@@ -42,7 +42,7 @@ use serde_json::{from_str, to_value, Value};
 use std::{collections::HashSet, fmt::Debug, sync::Arc};
 use tokio::{sync::mpsc::UnboundedReceiver, task::JoinHandle};
 
-pub type PositionedTokenParser<T: LangStream> = fn(T, Span, &str) -> PositionedToken<T>;
+type PositionedTokenParser<T> = fn(T, Span, &str) -> PositionedToken<T>;
 
 /// Trait to be implemented on the lang specific token, allowing parsing and deriving builtins
 trait LangStream: Sized + Debug + PartialEq + Logos<'static> {
