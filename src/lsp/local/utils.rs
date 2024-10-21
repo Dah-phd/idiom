@@ -7,7 +7,7 @@ use lsp_types::{
 
 pub const NON_TOKEN_ID: u32 = 17;
 
-pub fn utf8_reposition_cursor(cursor: lsp_types::Position, content: &[String]) -> CursorPosition {
+pub fn utf8_encoder(cursor: lsp_types::Position, content: &[String]) -> CursorPosition {
     let line = cursor.line as usize;
     let mut line_chars = content[line].chars();
     let mut old_char = cursor.character as usize;
@@ -22,7 +22,7 @@ pub fn utf8_reposition_cursor(cursor: lsp_types::Position, content: &[String]) -
     CursorPosition { line, char }
 }
 
-pub fn utf16_reposition_cursor(cursor: lsp_types::Position, content: &[String]) -> CursorPosition {
+pub fn utf16_encoder(cursor: lsp_types::Position, content: &[String]) -> CursorPosition {
     let line = cursor.line as usize;
     let mut line_chars = content[line].chars();
     let mut old_char = cursor.character as usize;
@@ -37,7 +37,7 @@ pub fn utf16_reposition_cursor(cursor: lsp_types::Position, content: &[String]) 
     CursorPosition { line, char }
 }
 
-pub fn utf32_reposition_cursor(cursor: lsp_types::Position, _content: &[String]) -> CursorPosition {
+pub fn utf32_encoder(cursor: lsp_types::Position, _content: &[String]) -> CursorPosition {
     CursorPosition::from(cursor)
 }
 
@@ -202,7 +202,7 @@ mod test {
         workspace::CursorPosition,
     };
 
-    use super::{full_tokens, utf16_reposition_cursor, utf8_reposition_cursor};
+    use super::{full_tokens, utf16_encoder, utf8_encoder};
     use std::sync::Arc;
 
     #[test]
@@ -224,13 +224,13 @@ mod test {
     fn test_utf8_reposition() {
         let content = vec![String::new(), "t🔥xt".to_owned()];
         let cursor = lsp_types::Position { line: 1, character: 5 };
-        assert_eq!(utf8_reposition_cursor(cursor, &content), CursorPosition { line: 1, char: 2 })
+        assert_eq!(utf8_encoder(cursor, &content), CursorPosition { line: 1, char: 2 })
     }
 
     #[test]
     fn test_utf16_reposition() {
         let content = vec![String::new(), String::new(), "t🔥xt".to_owned()];
         let cursor = lsp_types::Position { line: 2, character: 3 };
-        assert_eq!(utf16_reposition_cursor(cursor, &content), CursorPosition { line: 2, char: 2 })
+        assert_eq!(utf16_encoder(cursor, &content), CursorPosition { line: 2, char: 2 })
     }
 }

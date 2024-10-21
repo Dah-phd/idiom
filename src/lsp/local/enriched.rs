@@ -1,15 +1,12 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::lsp::local::{
+use super::{
     generic::GenericToken,
     lobster::Pincer,
     python::PyToken,
     rust::Rustacean,
     ts::TSToken,
-    utils::{
-        full_tokens, partial_tokens, swap_content, utf16_reposition_cursor, utf32_reposition_cursor,
-        utf8_reposition_cursor,
-    },
+    utils::{full_tokens, partial_tokens, swap_content, utf16_encoder, utf32_encoder, utf8_encoder},
     PositionedTokenParser,
 };
 use crate::{
@@ -28,6 +25,8 @@ use lsp_types::{
 };
 use serde_json::{from_str, from_value, to_value, Value};
 use tokio::{io::AsyncWriteExt, process::ChildStdin, sync::mpsc::UnboundedReceiver, task::JoinHandle};
+
+type UtfEncoder = fn(lsp_types::Position, &[String]) -> CursorPosition;
 
 pub fn enrich_with_semantics(
     rx: UnboundedReceiver<Payload>,
@@ -69,7 +68,7 @@ struct EnrichedLSP<T: LangStream> {
     definitions: Definitions,
     responses: Arc<Responses>,
     parser: PositionedTokenParser<T>,
-    utf_position: fn(lsp_types::Position, &[String]) -> CursorPosition,
+    utf_position: UtfEncoder,
 }
 
 impl<T: LangStream> EnrichedLSP<T> {
@@ -96,21 +95,21 @@ impl<T: LangStream> EnrichedLSP<T> {
                 definitions: T::init_definitions(),
                 responses,
                 parser: PositionedToken::<T>::utf8,
-                utf_position: utf8_reposition_cursor,
+                utf_position: utf8_encoder,
             },
             Some("utf-32") => Self {
                 documents: HashMap::new(),
                 definitions: T::init_definitions(),
                 responses,
                 parser: PositionedToken::<T>::utf32,
-                utf_position: utf32_reposition_cursor,
+                utf_position: utf32_encoder,
             },
             _ => Self {
                 documents: HashMap::new(),
                 definitions: T::init_definitions(),
                 responses,
                 parser: PositionedToken::<T>::utf16,
-                utf_position: utf16_reposition_cursor,
+                utf_position: utf16_encoder,
             },
         }
     }
@@ -214,7 +213,7 @@ impl<T: LangStream> EnrichedLSP<T> {
     fn file_did_open(&mut self, val: Value) -> Option<()> {
         let DidOpenTextDocumentParams { text_document: TextDocumentItem { uri, text, .. } } =
             from_value::<DidOpenTextDocumentParams>(val.get("params").cloned()?).ok()?;
-        self.documents.insert(uri, DocumentData::open(text));
+        self.documents.insert(uri, DocumentData::open(text, self.parser, self.utf_position));
         Some(())
     }
 }
@@ -222,21 +221,22 @@ impl<T: LangStream> EnrichedLSP<T> {
 pub struct DocumentData<T: LangStream> {
     text: Vec<String>,
     tokens: Vec<Vec<PositionedToken<T>>>,
+    utf_position: UtfEncoder,
 }
 
 impl<T: LangStream> DocumentData<T> {
-    fn open(text: String) -> Self {
+    fn open(text: String, parser: PositionedTokenParser<T>, utf_position: UtfEncoder) -> Self {
         let text = text.split('\n').map(ToOwned::to_owned).collect();
-        let mut doc = Self { text, tokens: vec![] };
-        T::parse(doc.text.iter().map(|t| t.as_str()), &mut doc.tokens, PositionedToken::<T>::utf32);
+        let mut doc = Self { text, tokens: vec![], utf_position };
+        T::parse(doc.text.iter().map(|t| t.as_str()), &mut doc.tokens, parser);
         doc
     }
 
     fn sync(&mut self, change_event: &[TextDocumentContentChangeEvent], parser: PositionedTokenParser<T>) {
         for change in change_event {
             let range = change.range.unwrap();
-            let from = CursorPosition::from(range.start);
-            let to = CursorPosition::from(range.end);
+            let from = (self.utf_position)(range.start, &self.text);
+            let to = (self.utf_position)(range.end, &self.text);
             swap_content(&mut self.text, &change.text, from, to);
         }
         T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens, parser);
