@@ -263,3 +263,229 @@ impl<T: LangStream> DocumentData<T> {
         text
     }
 }
+
+#[cfg(test)]
+mod test {
+    use std::{path::PathBuf, sync::Arc};
+
+    use crate::{
+        configs::FileType,
+        lsp::{
+            as_url,
+            local::{python::PyToken, LangStream, Payload},
+            LSPNotification, LSPResponse, LSPResponseType,
+        },
+    };
+
+    use super::EnrichedLSP;
+    use lsp_types::{
+        notification::DidOpenTextDocument, Position, PositionEncodingKind, Range, SemanticToken,
+        TextDocumentContentChangeEvent, Uri,
+    };
+
+    fn create_lsp<T: LangStream>(text: &str, encoding: Option<PositionEncodingKind>) -> (Uri, EnrichedLSP<T>) {
+        let key = as_url(PathBuf::from("/home/test.py").as_path());
+        let notification =
+            LSPNotification::<DidOpenTextDocument>::file_did_open(key.to_owned(), FileType::Python, text.to_owned())
+                .stringify()
+                .unwrap();
+        let mut enriched = EnrichedLSP::<T>::from_encoding(Arc::default(), encoding);
+        enriched.pre_process(Payload::Direct(notification)).unwrap();
+        (key, enriched)
+    }
+
+    #[test]
+    fn test_utf32() {
+        let (key, mut lsp) =
+            create_lsp::<PyToken>("def main()\n    print(\"hello 🚀\")", Some(PositionEncodingKind::UTF32));
+
+        let doc = lsp.documents.get(&key).unwrap();
+        assert_eq!(doc.text, ["def main()", "    print(\"hello 🚀\")"]);
+
+        lsp.pre_process(Payload::Tokens(key.to_owned(), 0)).unwrap();
+
+        let full_tokens =
+            match LSPResponseType::Tokens(0).parse(lsp.responses.lock().unwrap().remove(&0).unwrap().result).unwrap() {
+                LSPResponse::Tokens(lsp_types::SemanticTokensResult::Tokens(data)) => data.data,
+                _ => panic!("Expected Tokens response"),
+            };
+
+        assert_eq!(
+            full_tokens,
+            [
+                SemanticToken { delta_line: 0, delta_start: 0, length: 3, token_type: 11, token_modifiers_bitset: 0 },
+                SemanticToken { delta_line: 0, delta_start: 4, length: 4, token_type: 10, token_modifiers_bitset: 0 },
+                SemanticToken { delta_line: 1, delta_start: 4, length: 5, token_type: 10, token_modifiers_bitset: 0 },
+                SemanticToken { delta_line: 0, delta_start: 6, length: 9, token_type: 13, token_modifiers_bitset: 0 }
+            ]
+        );
+
+        lsp.pre_process(Payload::Sync(
+            key.to_owned(),
+            0,
+            vec![TextDocumentContentChangeEvent {
+                text: String::from(" fast world"),
+                range: Some(Range::new(Position::new(1, 18), Position::new(1, 18))),
+                range_length: None,
+            }],
+        ))
+        .unwrap();
+
+        let doc = lsp.documents.get(&key).unwrap();
+        assert_eq!(doc.text, ["def main()", "    print(\"hello 🚀 fast world\")"]);
+
+        lsp.pre_process(Payload::PartialTokens(
+            key.to_owned(),
+            Range::new(Position::new(0, 4), Position::new(1, 18)),
+            1,
+        ))
+        .unwrap();
+
+        let partial_tokens = match (LSPResponseType::TokensPartial { id: 1, max_lines: 5 })
+            .parse(lsp.responses.lock().unwrap().remove(&1).unwrap().result)
+            .unwrap()
+        {
+            LSPResponse::TokensPartial { result: lsp_types::SemanticTokensRangeResult::Tokens(data), .. } => data.data,
+            _ => panic!("Expected Tokens response"),
+        };
+
+        assert_eq!(
+            partial_tokens,
+            [
+                SemanticToken { delta_line: 0, delta_start: 4, length: 4, token_type: 10, token_modifiers_bitset: 0 },
+                SemanticToken { delta_line: 1, delta_start: 4, length: 5, token_type: 10, token_modifiers_bitset: 0 },
+                SemanticToken { delta_line: 0, delta_start: 6, length: 20, token_type: 13, token_modifiers_bitset: 0 }
+            ]
+        );
+    }
+
+    #[test]
+    fn test_utf16() {
+        let (key, mut lsp) =
+            create_lsp::<PyToken>("def main()\n    print(\"hello 🚀\")", Some(PositionEncodingKind::UTF16));
+
+        let doc = lsp.documents.get(&key).unwrap();
+        assert_eq!(doc.text, ["def main()", "    print(\"hello 🚀\")"]);
+
+        lsp.pre_process(Payload::Tokens(key.to_owned(), 0)).unwrap();
+
+        let full_tokens =
+            match LSPResponseType::Tokens(0).parse(lsp.responses.lock().unwrap().remove(&0).unwrap().result).unwrap() {
+                LSPResponse::Tokens(lsp_types::SemanticTokensResult::Tokens(data)) => data.data,
+                _ => panic!("Expected Tokens response"),
+            };
+
+        assert_eq!(
+            full_tokens,
+            [
+                SemanticToken { delta_line: 0, delta_start: 0, length: 3, token_type: 11, token_modifiers_bitset: 0 },
+                SemanticToken { delta_line: 0, delta_start: 4, length: 4, token_type: 10, token_modifiers_bitset: 0 },
+                SemanticToken { delta_line: 1, delta_start: 4, length: 5, token_type: 10, token_modifiers_bitset: 0 },
+                SemanticToken { delta_line: 0, delta_start: 6, length: 10, token_type: 13, token_modifiers_bitset: 0 }
+            ]
+        );
+
+        lsp.pre_process(Payload::Sync(
+            key.to_owned(),
+            0,
+            vec![TextDocumentContentChangeEvent {
+                text: String::from(" fast world"),
+                range: Some(Range::new(Position::new(1, 19), Position::new(1, 19))),
+                range_length: None,
+            }],
+        ))
+        .unwrap();
+
+        let doc = lsp.documents.get(&key).unwrap();
+        assert_eq!(doc.text, ["def main()", "    print(\"hello 🚀 fast world\")"]);
+
+        lsp.pre_process(Payload::PartialTokens(
+            key.to_owned(),
+            Range::new(Position::new(0, 4), Position::new(1, 18)),
+            1,
+        ))
+        .unwrap();
+
+        let partial_tokens = match (LSPResponseType::TokensPartial { id: 1, max_lines: 5 })
+            .parse(lsp.responses.lock().unwrap().remove(&1).unwrap().result)
+            .unwrap()
+        {
+            LSPResponse::TokensPartial { result: lsp_types::SemanticTokensRangeResult::Tokens(data), .. } => data.data,
+            _ => panic!("Expected Tokens response"),
+        };
+
+        assert_eq!(
+            partial_tokens,
+            [
+                SemanticToken { delta_line: 0, delta_start: 4, length: 4, token_type: 10, token_modifiers_bitset: 0 },
+                SemanticToken { delta_line: 1, delta_start: 4, length: 5, token_type: 10, token_modifiers_bitset: 0 },
+                SemanticToken { delta_line: 0, delta_start: 6, length: 21, token_type: 13, token_modifiers_bitset: 0 }
+            ]
+        );
+    }
+
+    #[test]
+    fn test_utf8() {
+        let (key, mut lsp) =
+            create_lsp::<PyToken>("def main()\n    print(\"hello 🚀\")", Some(PositionEncodingKind::UTF8));
+
+        let doc = lsp.documents.get(&key).unwrap();
+        assert_eq!(doc.text, ["def main()", "    print(\"hello 🚀\")"]);
+
+        lsp.pre_process(Payload::Tokens(key.to_owned(), 0)).unwrap();
+
+        let full_tokens =
+            match LSPResponseType::Tokens(0).parse(lsp.responses.lock().unwrap().remove(&0).unwrap().result).unwrap() {
+                LSPResponse::Tokens(lsp_types::SemanticTokensResult::Tokens(data)) => data.data,
+                _ => panic!("Expected Tokens response"),
+            };
+
+        assert_eq!(
+            full_tokens,
+            [
+                SemanticToken { delta_line: 0, delta_start: 0, length: 3, token_type: 11, token_modifiers_bitset: 0 },
+                SemanticToken { delta_line: 0, delta_start: 4, length: 4, token_type: 10, token_modifiers_bitset: 0 },
+                SemanticToken { delta_line: 1, delta_start: 4, length: 5, token_type: 10, token_modifiers_bitset: 0 },
+                SemanticToken { delta_line: 0, delta_start: 6, length: 12, token_type: 13, token_modifiers_bitset: 0 }
+            ]
+        );
+
+        lsp.pre_process(Payload::Sync(
+            key.to_owned(),
+            0,
+            vec![TextDocumentContentChangeEvent {
+                text: String::from(" fast world"),
+                range: Some(Range::new(Position::new(1, 21), Position::new(1, 21))),
+                range_length: None,
+            }],
+        ))
+        .unwrap();
+
+        let doc = lsp.documents.get(&key).unwrap();
+        assert_eq!(doc.text, ["def main()", "    print(\"hello 🚀 fast world\")"]);
+
+        lsp.pre_process(Payload::PartialTokens(
+            key.to_owned(),
+            Range::new(Position::new(0, 4), Position::new(1, 18)),
+            1,
+        ))
+        .unwrap();
+
+        let partial_tokens = match (LSPResponseType::TokensPartial { id: 1, max_lines: 5 })
+            .parse(lsp.responses.lock().unwrap().remove(&1).unwrap().result)
+            .unwrap()
+        {
+            LSPResponse::TokensPartial { result: lsp_types::SemanticTokensRangeResult::Tokens(data), .. } => data.data,
+            _ => panic!("Expected Tokens response"),
+        };
+
+        assert_eq!(
+            partial_tokens,
+            [
+                SemanticToken { delta_line: 0, delta_start: 4, length: 4, token_type: 10, token_modifiers_bitset: 0 },
+                SemanticToken { delta_line: 1, delta_start: 4, length: 5, token_type: 10, token_modifiers_bitset: 0 },
+                SemanticToken { delta_line: 0, delta_start: 6, length: 23, token_type: 13, token_modifiers_bitset: 0 }
+            ]
+        );
+    }
+}
