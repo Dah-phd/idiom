@@ -1,5 +1,3 @@
-use std::{collections::HashMap, sync::Arc};
-
 use super::{
     generic::GenericToken,
     lobster::Pincer,
@@ -24,6 +22,7 @@ use lsp_types::{
     TextDocumentContentChangeEvent, TextDocumentItem, Uri,
 };
 use serde_json::{from_str, from_value, to_value, Value};
+use std::{collections::HashMap, sync::Arc};
 use tokio::{io::AsyncWriteExt, process::ChildStdin, sync::mpsc::UnboundedReceiver, task::JoinHandle};
 
 type UtfEncoder = fn(lsp_types::Position, &[String]) -> CursorPosition;
@@ -72,22 +71,6 @@ struct EnrichedLSP<T: LangStream> {
 }
 
 impl<T: LangStream> EnrichedLSP<T> {
-    async fn run_tokens(
-        mut rx: UnboundedReceiver<Payload>,
-        mut lsp_stdin: ChildStdin,
-        responses: Arc<Responses>,
-        encoding: Option<PositionEncodingKind>,
-    ) -> LSPResult<()> {
-        let mut lsp_wrapper = Self::from_encoding(responses, encoding);
-        while let Some(payload) = rx.recv().await {
-            if let Some(msg) = lsp_wrapper.pre_process(payload)? {
-                lsp_stdin.write_all(msg.as_bytes()).await?;
-                lsp_stdin.flush().await?;
-            };
-        }
-        Ok(())
-    }
-
     fn from_encoding(responses: Arc<Responses>, encoding: Option<PositionEncodingKind>) -> Self {
         match encoding.as_ref().map(|e| e.as_str()) {
             Some("utf-8") => Self {
@@ -114,12 +97,19 @@ impl<T: LangStream> EnrichedLSP<T> {
         }
     }
 
-    async fn run_with_sync_coersion(
+    async fn run_tokens(
         mut rx: UnboundedReceiver<Payload>,
         mut lsp_stdin: ChildStdin,
         responses: Arc<Responses>,
         encoding: Option<PositionEncodingKind>,
     ) -> LSPResult<()> {
+        let mut local_lsp = Self::from_encoding(responses, encoding);
+        while let Some(payload) = rx.recv().await {
+            if let Some(msg) = local_lsp.pre_process(payload)? {
+                lsp_stdin.write_all(msg.as_bytes()).await?;
+                lsp_stdin.flush().await?;
+            };
+        }
         Ok(())
     }
 
@@ -129,15 +119,70 @@ impl<T: LangStream> EnrichedLSP<T> {
         responses: Arc<Responses>,
         encoding: Option<PositionEncodingKind>,
     ) -> LSPResult<()> {
+        let mut local_lsp = Self::from_encoding(responses, encoding);
+        local_lsp.definitions = T::init_definitions();
+        while let Some(payload) = rx.recv().await {
+            if let Payload::Completion(uri, cursor, id) = payload {
+                local_lsp.autocomplete(uri, cursor, id);
+            } else if let Some(msg) = local_lsp.pre_process(payload)? {
+                lsp_stdin.write_all(msg.as_bytes()).await?;
+                lsp_stdin.flush().await?;
+            }
+        }
         Ok(())
     }
 
-    async fn run_full(
+    async fn run_with_sync_coersion(
         mut rx: UnboundedReceiver<Payload>,
         mut lsp_stdin: ChildStdin,
         responses: Arc<Responses>,
         encoding: Option<PositionEncodingKind>,
     ) -> LSPResult<()> {
+        let mut local_lsp = Self::from_encoding(responses, encoding);
+        local_lsp.definitions = T::init_definitions();
+        while let Some(payload) = rx.recv().await {
+            if let Payload::Sync(uri, version, change_events) = payload {
+                let doc = local_lsp
+                    .documents
+                    .get_mut(&uri)
+                    .ok_or_else(|| LSPError::internal("Unable to find document during sync coersion!"))?;
+                let full_text = doc.sync_to_full_sync(&change_events, local_lsp.parser);
+                let msg = Payload::FullSync(uri, version, full_text).try_stringify()?;
+                lsp_stdin.write_all(msg.as_bytes()).await?;
+                lsp_stdin.flush().await?;
+            } else if let Some(msg) = local_lsp.pre_process(payload)? {
+                lsp_stdin.write_all(msg.as_bytes()).await?;
+                lsp_stdin.flush().await?;
+            }
+        }
+        Ok(())
+    }
+
+    async fn run_with_sync_coersion_and_autocomplete(
+        mut rx: UnboundedReceiver<Payload>,
+        mut lsp_stdin: ChildStdin,
+        responses: Arc<Responses>,
+        encoding: Option<PositionEncodingKind>,
+    ) -> LSPResult<()> {
+        let mut local_lsp = Self::from_encoding(responses, encoding);
+        local_lsp.definitions = T::init_definitions();
+        while let Some(payload) = rx.recv().await {
+            if let Payload::Completion(uri, cursor, id) = payload {
+                local_lsp.autocomplete(uri, cursor, id);
+            } else if let Payload::Sync(uri, version, change_events) = payload {
+                let doc = local_lsp
+                    .documents
+                    .get_mut(&uri)
+                    .ok_or_else(|| LSPError::internal("Unable to find document during sync coersion!"))?;
+                let full_text = doc.sync_to_full_sync(&change_events, local_lsp.parser);
+                let msg = Payload::FullSync(uri, version, full_text).try_stringify()?;
+                lsp_stdin.write_all(msg.as_bytes()).await?;
+                lsp_stdin.flush().await?;
+            } else if let Some(msg) = local_lsp.pre_process(payload)? {
+                lsp_stdin.write_all(msg.as_bytes()).await?;
+                lsp_stdin.flush().await?;
+            }
+        }
         Ok(())
     }
 
@@ -177,11 +222,11 @@ impl<T: LangStream> EnrichedLSP<T> {
                 self.responses.lock().unwrap().insert(id, response);
                 Ok(None)
             }
-            Payload::Sync(uri, version, change_event) => {
+            Payload::Sync(uri, version, change_events) => {
                 if let Some(doc) = self.documents.get_mut(&uri) {
-                    doc.sync(&change_event, self.parser);
+                    doc.sync(&change_events, self.parser);
                 };
-                Ok(Payload::Sync(uri, version, change_event).try_stringify().ok())
+                Ok(Payload::Sync(uri, version, change_events).try_stringify().ok())
             }
             Payload::FullSync(uri, version, full_text) => {
                 if let Some(doc) = self.documents.get_mut(&uri) {
@@ -191,6 +236,18 @@ impl<T: LangStream> EnrichedLSP<T> {
             }
             _ => Ok(payload.try_stringify().ok()),
         }
+    }
+
+    fn autocomplete(&mut self, uri: Uri, _cursor: CursorPosition, id: i64) {
+        let completion_response = match self.documents.get(&uri) {
+            Some(doc) => self.definitions.to_completions(&doc.tokens),
+            None => vec![],
+        };
+        let response = match to_value(completion_response) {
+            Ok(value) => Response { id, result: Some(value), error: None },
+            Err(err) => Response { id, result: None, error: Some(Value::String(err.to_string())) },
+        };
+        self.responses.lock().unwrap().insert(id, response);
     }
 
     fn direct_parsing(&mut self, data: &str) -> Result<(), LSPError> {
@@ -232,8 +289,8 @@ impl<T: LangStream> DocumentData<T> {
         doc
     }
 
-    fn sync(&mut self, change_event: &[TextDocumentContentChangeEvent], parser: PositionedTokenParser<T>) {
-        for change in change_event {
+    fn sync(&mut self, change_events: &[TextDocumentContentChangeEvent], parser: PositionedTokenParser<T>) {
+        for change in change_events {
             let range = change.range.unwrap();
             let from = (self.utf_position)(range.start, &self.text);
             let to = (self.utf_position)(range.end, &self.text);
@@ -244,10 +301,10 @@ impl<T: LangStream> DocumentData<T> {
 
     fn sync_to_full_sync(
         &mut self,
-        change_event: &[TextDocumentContentChangeEvent],
+        change_events: &[TextDocumentContentChangeEvent],
         parser: PositionedTokenParser<T>,
     ) -> String {
-        self.sync(change_event, parser);
+        self.sync(change_events, parser);
         self.stringify()
     }
 
