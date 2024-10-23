@@ -1,4 +1,5 @@
 use super::{
+    create_semantic_capabilities,
     generic::GenericToken,
     lobster::Pincer,
     python::PyToken,
@@ -18,8 +19,9 @@ use crate::{
 };
 use lsp_types::{
     notification::{DidOpenTextDocument, Notification},
-    DidOpenTextDocumentParams, PositionEncodingKind, SemanticTokens, SemanticTokensRangeResult, SemanticTokensResult,
-    TextDocumentContentChangeEvent, TextDocumentItem, Uri,
+    CompletionOptions, DidOpenTextDocumentParams, PositionEncodingKind, SemanticTokens, SemanticTokensRangeResult,
+    SemanticTokensResult, ServerCapabilities, TextDocumentContentChangeEvent, TextDocumentItem,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions, Uri,
 };
 use serde_json::{from_str, from_value, to_value, Value};
 use std::{collections::HashMap, sync::Arc};
@@ -27,7 +29,85 @@ use tokio::{io::AsyncWriteExt, process::ChildStdin, sync::mpsc::UnboundedReceive
 
 type UtfEncoder = fn(lsp_types::Position, &[String]) -> CursorPosition;
 
-pub fn enrich_with_semantics(
+pub fn build_with_enrichment(
+    mut rx: UnboundedReceiver<Payload>,
+    mut lsp_stdin: ChildStdin,
+    file_type: FileType,
+    responses: Arc<Responses>,
+    capabilities: &mut ServerCapabilities,
+) -> JoinHandle<LSPResult<()>> {
+    let has_tokens = capabilities.semantic_tokens_provider.is_some();
+    let has_autocomplete = capabilities.completion_provider.is_some();
+    let has_increment_sync = matches!(
+        capabilities.text_document_sync,
+        Some(
+            TextDocumentSyncCapability::Kind(TextDocumentSyncKind::INCREMENTAL)
+                | TextDocumentSyncCapability::Options(TextDocumentSyncOptions {
+                    change: Some(TextDocumentSyncKind::INCREMENTAL),
+                    ..
+                })
+        )
+    );
+    match (has_tokens, has_autocomplete, has_increment_sync) {
+        (false, false, false) => {
+            let encoding = capabilities.position_encoding.to_owned();
+            capabilities.semantic_tokens_provider.replace(create_semantic_capabilities());
+            capabilities
+                .text_document_sync
+                .replace(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::INCREMENTAL));
+            capabilities.completion_provider.replace(CompletionOptions::default());
+            enrich_lsp_and_sync_and_autocomplete(rx, lsp_stdin, file_type, responses, encoding)
+        }
+        (false, false, true) => {
+            let encoding = capabilities.position_encoding.to_owned();
+            capabilities.semantic_tokens_provider.replace(create_semantic_capabilities());
+            capabilities.completion_provider.replace(CompletionOptions::default());
+            enrich_lsp_and_autocomplete(rx, lsp_stdin, file_type, responses, encoding)
+        }
+        (false, true, false) => {
+            let encoding = capabilities.position_encoding.to_owned();
+            capabilities
+                .text_document_sync
+                .replace(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::INCREMENTAL));
+            capabilities.semantic_tokens_provider.replace(create_semantic_capabilities());
+            enrich_lsp_and_sync(rx, lsp_stdin, file_type, responses, encoding)
+        }
+        (false, true, true) => {
+            let encoding = capabilities.position_encoding.to_owned();
+            capabilities.semantic_tokens_provider.replace(create_semantic_capabilities());
+            enrich_lsp(rx, lsp_stdin, file_type, responses, encoding)
+        }
+        _ => tokio::task::spawn(async move {
+            while let Some(msg) = rx.recv().await {
+                if let Ok(lsp_msg_text) = msg.try_stringify() {
+                    lsp_stdin.write_all(lsp_msg_text.as_bytes()).await?;
+                    lsp_stdin.flush().await?;
+                }
+            }
+            Ok(())
+        }),
+    }
+}
+
+fn enrich_lsp(
+    rx: UnboundedReceiver<Payload>,
+    lsp_stdin: ChildStdin,
+    file_type: FileType,
+    responses: Arc<Responses>,
+    encoding: Option<PositionEncodingKind>,
+) -> JoinHandle<LSPResult<()>> {
+    match file_type {
+        FileType::Python => tokio::task::spawn(EnrichedLSP::<PyToken>::run_tokens(rx, lsp_stdin, responses, encoding)),
+        FileType::Lobster => tokio::task::spawn(EnrichedLSP::<Pincer>::run_tokens(rx, lsp_stdin, responses, encoding)),
+        FileType::Rust => tokio::task::spawn(EnrichedLSP::<Rustacean>::run_tokens(rx, lsp_stdin, responses, encoding)),
+        FileType::JavaScript | FileType::TypeScript => {
+            tokio::task::spawn(EnrichedLSP::<TSToken>::run_tokens(rx, lsp_stdin, responses, encoding))
+        }
+        _ => tokio::task::spawn(EnrichedLSP::<GenericToken>::run_tokens(rx, lsp_stdin, responses, encoding)),
+    }
+}
+
+fn enrich_lsp_and_autocomplete(
     rx: UnboundedReceiver<Payload>,
     lsp_stdin: ChildStdin,
     file_type: FileType,
@@ -36,28 +116,70 @@ pub fn enrich_with_semantics(
 ) -> JoinHandle<LSPResult<()>> {
     match file_type {
         FileType::Python => {
-            tokio::task::spawn(
-                async move { EnrichedLSP::<PyToken>::run_tokens(rx, lsp_stdin, responses, encoding).await },
-            )
+            tokio::task::spawn(EnrichedLSP::<PyToken>::run_with_autocomplete(rx, lsp_stdin, responses, encoding))
         }
         FileType::Lobster => {
-            tokio::task::spawn(
-                async move { EnrichedLSP::<Pincer>::run_tokens(rx, lsp_stdin, responses, encoding).await },
-            )
+            tokio::task::spawn(EnrichedLSP::<Pincer>::run_with_autocomplete(rx, lsp_stdin, responses, encoding))
         }
         FileType::Rust => {
-            tokio::task::spawn(
-                async move { EnrichedLSP::<Rustacean>::run_tokens(rx, lsp_stdin, responses, encoding).await },
-            )
+            tokio::task::spawn(EnrichedLSP::<Rustacean>::run_with_autocomplete(rx, lsp_stdin, responses, encoding))
         }
         FileType::JavaScript | FileType::TypeScript => {
-            tokio::task::spawn(
-                async move { EnrichedLSP::<TSToken>::run_tokens(rx, lsp_stdin, responses, encoding).await },
-            )
+            tokio::task::spawn(EnrichedLSP::<TSToken>::run_with_autocomplete(rx, lsp_stdin, responses, encoding))
         }
-        _ => tokio::task::spawn(async move {
-            EnrichedLSP::<GenericToken>::run_tokens(rx, lsp_stdin, responses, encoding).await
-        }),
+        _ => tokio::task::spawn(EnrichedLSP::<GenericToken>::run_with_autocomplete(rx, lsp_stdin, responses, encoding)),
+    }
+}
+
+fn enrich_lsp_and_sync(
+    rx: UnboundedReceiver<Payload>,
+    lsp_stdin: ChildStdin,
+    file_type: FileType,
+    responses: Arc<Responses>,
+    encoding: Option<PositionEncodingKind>,
+) -> JoinHandle<LSPResult<()>> {
+    match file_type {
+        FileType::Python => {
+            tokio::task::spawn(EnrichedLSP::<PyToken>::run_with_sync_coersion(rx, lsp_stdin, responses, encoding))
+        }
+        FileType::Lobster => {
+            tokio::task::spawn(EnrichedLSP::<Pincer>::run_with_sync_coersion(rx, lsp_stdin, responses, encoding))
+        }
+        FileType::Rust => {
+            tokio::task::spawn(EnrichedLSP::<Rustacean>::run_with_sync_coersion(rx, lsp_stdin, responses, encoding))
+        }
+        FileType::JavaScript | FileType::TypeScript => {
+            tokio::task::spawn(EnrichedLSP::<TSToken>::run_with_sync_coersion(rx, lsp_stdin, responses, encoding))
+        }
+        _ => {
+            tokio::task::spawn(EnrichedLSP::<GenericToken>::run_with_sync_coersion(rx, lsp_stdin, responses, encoding))
+        }
+    }
+}
+
+fn enrich_lsp_and_sync_and_autocomplete(
+    rx: UnboundedReceiver<Payload>,
+    lsp_stdin: ChildStdin,
+    file_type: FileType,
+    responses: Arc<Responses>,
+    encoding: Option<PositionEncodingKind>,
+) -> JoinHandle<LSPResult<()>> {
+    match file_type {
+        FileType::Python => tokio::task::spawn(EnrichedLSP::<PyToken>::run_with_sync_coersion_and_autocomplete(
+            rx, lsp_stdin, responses, encoding,
+        )),
+        FileType::Lobster => tokio::task::spawn(EnrichedLSP::<Pincer>::run_with_sync_coersion_and_autocomplete(
+            rx, lsp_stdin, responses, encoding,
+        )),
+        FileType::Rust => tokio::task::spawn(EnrichedLSP::<Rustacean>::run_with_sync_coersion_and_autocomplete(
+            rx, lsp_stdin, responses, encoding,
+        )),
+        FileType::JavaScript | FileType::TypeScript => tokio::task::spawn(
+            EnrichedLSP::<TSToken>::run_with_sync_coersion_and_autocomplete(rx, lsp_stdin, responses, encoding),
+        ),
+        _ => tokio::task::spawn(EnrichedLSP::<GenericToken>::run_with_sync_coersion_and_autocomplete(
+            rx, lsp_stdin, responses, encoding,
+        )),
     }
 }
 

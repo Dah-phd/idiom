@@ -19,7 +19,7 @@ use python::PyToken;
 use rust::Rustacean;
 use ts::TSToken;
 
-pub use enriched::enrich_with_semantics;
+pub use enriched::build_with_enrichment;
 pub use styler::Highlighter;
 pub use utils::create_semantic_capabilities;
 use utils::{full_tokens, partial_tokens, swap_content, NON_TOKEN_ID};

@@ -1,5 +1,5 @@
 use super::{
-    local::{create_semantic_capabilities, enrich_with_semantics, start_lsp_handler},
+    local::{build_with_enrichment, create_semantic_capabilities, start_lsp_handler},
     messages::DiagnosticHandle,
     payload::Payload,
     EditorDiagnostics, LSPError, LSPNotification, LSPRequest, LSPResult, Response, Responses, TreeDiagnostics,
@@ -18,7 +18,6 @@ use std::{
     sync::{Arc, Mutex, MutexGuard},
 };
 use tokio::{
-    io::AsyncWriteExt,
     process::ChildStdin,
     sync::mpsc::{unbounded_channel, UnboundedSender},
     task::JoinHandle,
@@ -56,28 +55,15 @@ impl Clone for LSPClient {
 
 impl LSPClient {
     pub fn new(
-        mut stdin: ChildStdin,
+        stdin: ChildStdin,
         file_type: FileType,
         diagnostics: Arc<Mutex<DiagnosticHandle>>,
         responses: Arc<Responses>,
         mut capabilities: ServerCapabilities,
     ) -> LSPResult<(JoinHandle<LSPResult<()>>, Self)> {
-        let (channel, mut rx) = unbounded_channel::<Payload>();
+        let (channel, rx) = unbounded_channel::<Payload>();
 
-        let lsp_send_handler = if capabilities.semantic_tokens_provider.is_none() {
-            capabilities.semantic_tokens_provider.replace(create_semantic_capabilities());
-            enrich_with_semantics(rx, stdin, file_type, Arc::clone(&responses), capabilities.position_encoding.clone())
-        } else {
-            tokio::task::spawn(async move {
-                while let Some(msg) = rx.recv().await {
-                    if let Ok(lsp_msg_text) = msg.try_stringify() {
-                        stdin.write_all(lsp_msg_text.as_bytes()).await?;
-                        stdin.flush().await?;
-                    }
-                }
-                Ok(())
-            })
-        };
+        let lsp_send_handler = build_with_enrichment(rx, stdin, file_type, Arc::clone(&responses), &mut capabilities);
 
         let notification: LSPNotification<Initialized> = LSPNotification::with(InitializedParams {});
         channel.send(notification.stringify()?.into())?;
