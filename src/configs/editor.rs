@@ -1,4 +1,9 @@
-use super::{load_or_create_config, types::FileType, EDITOR_CFG_FILE};
+use super::{
+    defaults::{get_indent_after, get_indent_spaces, get_unident_before},
+    load_or_create_config,
+    types::FileType,
+    EDITOR_CFG_FILE,
+};
 use crate::global_state::GlobalState;
 use crate::utils::{trim_start_inplace, Offset};
 use crate::workspace::line::EditorLine;
@@ -7,11 +12,13 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EditorConfigs {
+    #[serde(default)]
     pub format_on_save: bool,
+    #[serde(default = "get_indent_spaces")]
     pub indent_spaces: usize,
-    #[serde(skip, default = "get_indent_after")]
+    #[serde(default = "get_indent_after")]
     pub indent_after: String,
-    #[serde(skip, default = "get_unident_before")]
+    #[serde(default = "get_unident_before")]
     pub unindent_before: String,
     /// LSP
     rust_lsp: Option<String>,
@@ -42,7 +49,7 @@ impl Default for EditorConfigs {
     fn default() -> Self {
         Self {
             format_on_save: true,
-            indent_spaces: 4, // only spaces are allowed as indent
+            indent_spaces: get_indent_spaces(),
             indent_after: get_indent_after(),
             unindent_before: get_unident_before(),
             // lsp
@@ -198,14 +205,6 @@ impl IndentConfigs {
             Offset::Neg(trim_start_inplace(line))
         }
     }
-}
-
-fn get_indent_after() -> String {
-    String::from("({[")
-}
-
-fn get_unident_before() -> String {
-    String::from("]})")
 }
 
 fn map_preload(

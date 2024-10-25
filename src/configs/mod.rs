@@ -1,3 +1,4 @@
+mod defaults;
 mod editor;
 mod keymap;
 mod theme;
