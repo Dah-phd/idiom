@@ -160,7 +160,7 @@ pub fn refresh() -> String {
     format!("{F}5")
 }
 
-pub fn lsp_rename() -> String {
+pub fn rename() -> String {
     format!("{F}2")
 }
 
@@ -250,6 +250,38 @@ pub fn tab8() -> String {
 }
 pub fn tab9() -> String {
     format!("{ALT} && 9")
+}
+
+pub fn expand() -> String {
+    format!("{RIGHT} || d || {ENTER}")
+}
+
+pub fn shrink() -> String {
+    format!("{LEFT} || a")
+}
+
+pub fn tree_up() -> String {
+    format!("{UP} || w")
+}
+
+pub fn tree_down() -> String {
+    format!("{DOWN} || d")
+}
+
+pub fn tree_delete() -> String {
+    format!("{SHIFT} && {DELETE}")
+}
+
+pub fn new_file() -> String {
+    format!("{CTRL} && n")
+}
+
+pub fn tree_size_inc() -> String {
+    format!("{CTRL} && {RIGHT}")
+}
+
+pub fn tree_size_dec() -> String {
+    format!("{CTRL} && {LEFT}")
 }
 
 pub const fn get_indent_spaces() -> usize {

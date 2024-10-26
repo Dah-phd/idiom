@@ -123,7 +123,7 @@ pub struct EditorUserKeyMap {
     help: String,
     #[serde(default = "refresh")]
     refresh_ui: String,
-    #[serde(default = "lsp_rename")]
+    #[serde(default = "rename")]
     lsp_rename: String,
     #[serde(default = "cut")]
     cut: String,
@@ -232,7 +232,7 @@ impl Default for EditorUserKeyMap {
             go_to_declaration: go_to_declaration(),
             help: help(),
             refresh_ui: refresh(),
-            lsp_rename: lsp_rename(),
+            lsp_rename: rename(),
             cut: cut(),
             copy: copy(),
             paste: paste(),
@@ -388,29 +388,38 @@ pub enum TreeAction {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TreeUserKeyMap {
+    #[serde(default = "tree_up")]
     select_up: String,
+    #[serde(default = "tree_down")]
     select_down: String,
+    #[serde(default = "expand")]
     expand: String,
+    #[serde(default = "shrink")]
     shrink: String,
+    #[serde(default = "tree_delete")]
     delete: String,
+    #[serde(default = "rename")]
     rename: String,
+    #[serde(default = "new_file")]
     new_file: String,
+    #[serde(default = "tree_size_inc")]
     increase_size: String,
+    #[serde(default = "tree_size_dec")]
     decrease_size: String,
 }
 
 impl Default for TreeUserKeyMap {
     fn default() -> Self {
         Self {
-            select_up: format!("{UP} || w"),
-            select_down: format!("{DOWN} || d"),
-            expand: format!("{RIGHT} || d || {ENTER}"),
-            shrink: format!("{LEFT} || a"),
-            delete: format!("{SHIFT} && {DELETE}"),
-            rename: format!("{F}2"),
-            new_file: format!("{CTRL} && n"),
-            increase_size: format!("{CTRL} && {RIGHT}"),
-            decrease_size: format!("{CTRL} && {LEFT}"),
+            select_up: tree_up(),
+            select_down: tree_down(),
+            expand: expand(),
+            shrink: shrink(),
+            delete: tree_delete(),
+            rename: rename(),
+            new_file: new_file(),
+            increase_size: tree_size_inc(),
+            decrease_size: tree_size_dec(),
         }
     }
 }
