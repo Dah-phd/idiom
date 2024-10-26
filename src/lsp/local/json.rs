@@ -64,8 +64,4 @@ impl LangStream for JsonValue {
             _ => NON_TOKEN_ID,
         }
     }
-
-    fn modifier(&self) -> u32 {
-        0
-    }
 }

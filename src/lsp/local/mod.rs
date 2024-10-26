@@ -47,7 +47,9 @@ type PositionedTokenParser<T> = fn(T, Span, &str) -> PositionedToken<T>;
 /// Trait to be implemented on the lang specific token, allowing parsing and deriving builtins
 trait LangStream: Sized + Debug + PartialEq + Logos<'static> {
     fn type_id(&self) -> u32;
-    fn modifier(&self) -> u32;
+    fn modifier(&self) -> u32 {
+        0
+    }
     fn parse<'a>(
         text: impl Iterator<Item = &'a str>,
         tokens: &mut Vec<Vec<PositionedToken<Self>>>,
