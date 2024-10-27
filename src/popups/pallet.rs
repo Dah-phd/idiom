@@ -1,12 +1,13 @@
 use super::PopupInterface;
 use crate::{
     configs::{CONFIG_FOLDER, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
-    global_state::{Clipboard, GlobalState, PopupMessage},
+    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::{state::State, TextField},
     tree::Tree,
     workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent};
+use dirs::config_dir;
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 
 pub struct Pallet {
@@ -26,6 +27,13 @@ struct Command {
 impl Command {
     fn execute(self) -> CommandResult {
         CommandResult::Simple(self.result)
+    }
+
+    fn cfg_open(f: &'static str) -> Option<Self> {
+        let mut path = config_dir()?;
+        path.push(CONFIG_FOLDER);
+        path.push(f);
+        Some(Command { label: f, direct_call: None, result: IdiomEvent::Open(path).into() })
     }
 }
 
@@ -100,7 +108,16 @@ impl PopupInterface for Pallet {
 impl Pallet {
     pub fn new() -> Box<Self> {
         Box::new(Pallet {
-            commands: vec![],
+            commands: [
+                Command::cfg_open(EDITOR_CFG_FILE),
+                Command::cfg_open(KEY_MAP),
+                Command::cfg_open(THEME_FILE),
+                Command::cfg_open(THEME_UI),
+            ]
+            .into_iter()
+            .flatten()
+            .map(|cmd| (0, cmd))
+            .collect(),
             pattern: TextField::new(String::new(), Some(true)),
             matcher: SkimMatcherV2::default(),
             updated: true,
@@ -110,7 +127,4 @@ impl Pallet {
 }
 
 #[cfg(test)]
-mod test {
-    #[test]
-    fn check_cmds() {}
-}
+mod test {}

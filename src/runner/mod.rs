@@ -67,11 +67,12 @@ impl EditorTerminal {
     pub fn activate(&mut self) {
         match self.terminal.as_mut() {
             Some(terminal) => {
-                if !terminal.is_running() {
-                    if let Ok((terminal, prompt)) = Terminal::new(self.width) {
-                        self.terminal.replace(terminal).map(|t| t.kill());
-                        self.prompt.replace(prompt);
-                    }
+                if terminal.is_running() {
+                    return;
+                }
+                if let Ok((terminal, prompt)) = Terminal::new(self.width) {
+                    self.terminal.replace(terminal).map(|t| t.kill());
+                    self.prompt.replace(prompt);
                 }
             }
             None => {
