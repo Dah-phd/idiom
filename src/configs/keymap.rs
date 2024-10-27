@@ -251,6 +251,7 @@ impl Default for EditorUserKeyMap {
 #[derive(Debug, Clone, Copy)]
 pub enum GeneralAction {
     GoToTabs,
+    InvokePallet,
     SelectOpenEditor,
     SaveAll,
     FileTreeModeOrCancelInput,
@@ -276,6 +277,8 @@ pub enum GeneralAction {
 pub struct GeneralUserKeyMap {
     #[serde(default = "tab")]
     go_to_editor_tabs: String,
+    #[serde(default = "pallet")]
+    invoke_pallet: String,
     #[serde(default = "select_open_editor")]
     select_open_editor: String,
     #[serde(default = "save")]
@@ -322,6 +325,7 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
     fn from(val: GeneralUserKeyMap) -> Self {
         let mut hash = HashMap::default();
         insert_key_event(&mut hash, &val.go_to_editor_tabs, GeneralAction::GoToTabs);
+        insert_key_event(&mut hash, &val.invoke_pallet, GeneralAction::InvokePallet);
         insert_key_event(&mut hash, &val.select_open_editor, GeneralAction::SelectOpenEditor);
         insert_key_event(&mut hash, &val.save_all, GeneralAction::SaveAll);
         insert_key_event(&mut hash, &val.cancel, GeneralAction::FileTreeModeOrCancelInput);
@@ -349,6 +353,7 @@ impl Default for GeneralUserKeyMap {
     fn default() -> Self {
         Self {
             go_to_editor_tabs: tab(),
+            invoke_pallet: pallet(),
             select_open_editor: select_open_editor(),
             save_all: save(),
             cancel: esc(),

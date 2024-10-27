@@ -295,3 +295,7 @@ pub fn get_indent_after() -> String {
 pub fn get_unident_before() -> String {
     String::from("]})")
 }
+
+pub fn pallet() -> String {
+    format!("{CTRL} && p")
+}
