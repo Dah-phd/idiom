@@ -119,7 +119,7 @@ impl State {
         lines.clear_to_end(backend);
     }
 
-    pub fn render_list<'a>(&mut self, options: impl Iterator<Item = &'a str>, rect: &Rect, backend: &mut Backend) {
+    pub fn render_list<'a>(&mut self, options: impl Iterator<Item = &'a str>, rect: Rect, backend: &mut Backend) {
         self.update_at_line(rect.height as usize);
         let mut lines = rect.into_iter();
         for (idx, text) in options.enumerate().skip(self.at_line) {

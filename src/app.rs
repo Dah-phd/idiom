@@ -3,6 +3,7 @@ use crate::{
     error::IdiomResult,
     global_state::{GlobalState, IdiomEvent},
     popups::{
+        pallet::Pallet,
         popup_find::{FindPopup, GoToLinePopup},
         popup_replace::ReplacePopup,
         popup_tree_search::ActivePathSearch,
@@ -71,7 +72,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
                                         gs.insert_mode();
                                     };
                                 }
-                                GeneralAction::InvokePallet => {}
+                                GeneralAction::InvokePallet => gs.popup(Pallet::new()),
                                 GeneralAction::Exit => {
                                     if workspace.are_updates_saved() && !gs.has_popup() {
                                         gs.exit = true;

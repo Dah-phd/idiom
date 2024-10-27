@@ -73,7 +73,7 @@ impl PopupInterface for ActivePathSearch {
         }
         if let Some(list_rect) = lines.into_rect() {
             if self.options.is_empty() {
-                self.state.render_list(["No results found!"].into_iter(), &list_rect, &mut gs.writer);
+                self.state.render_list(["No results found!"].into_iter(), list_rect, &mut gs.writer);
             } else {
                 self.state.render_list_complex(
                     &self.options,
@@ -178,7 +178,7 @@ impl PopupInterface for ActiveFileSearch {
         }
         if let Some(list_rect) = lines.into_rect() {
             if self.options.is_empty() {
-                self.state.render_list(["No results found!"].into_iter(), &list_rect, &mut gs.writer);
+                self.state.render_list(["No results found!"].into_iter(), list_rect, &mut gs.writer);
             } else {
                 self.state.render_list_complex(
                     &self.options,

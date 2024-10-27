@@ -120,12 +120,28 @@ impl Rect {
         Some(Line { row: self.row + rel_idx, col: self.col, width: self.width })
     }
 
+    pub fn next_line(&mut self) -> Option<Line> {
+        if self.height == 0 {
+            return None;
+        }
+        let line = Line { row: self.row, col: self.col, width: self.width };
+        self.height -= 1;
+        self.row += 1;
+        Some(line)
+    }
+
     pub fn center(&self, mut height: u16, mut width: usize) -> Self {
         height = std::cmp::min(self.height, height);
         let row = self.row + ((self.height - height) / 2);
         width = std::cmp::min(self.width, width);
         let col = self.col + ((self.width - width) / 2) as u16;
         Self { row, col, width, height, ..Default::default() }
+    }
+
+    pub fn vcenter(self, mut width: usize) -> Self {
+        width = std::cmp::min(self.width, width);
+        let col = (self.width - width) as u16 / 2 + self.col;
+        Self { row: self.row, col, width, height: self.height, ..Default::default() }
     }
 
     pub fn left(&self, cols: usize) -> Self {

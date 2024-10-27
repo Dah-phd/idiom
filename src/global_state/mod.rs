@@ -119,6 +119,11 @@ impl GlobalState {
         })
     }
 
+    #[inline(always)]
+    pub fn backend(&mut self) -> &mut Backend {
+        &mut self.writer
+    }
+
     #[inline]
     pub fn draw(
         &mut self,

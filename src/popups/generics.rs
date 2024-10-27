@@ -143,9 +143,9 @@ impl<T> PopupInterface for PopupSelector<T> {
         rect.bordered();
         rect.draw_borders(None, None, &mut gs.writer);
         if self.options.is_empty() {
-            self.state.render_list(["No results found!"].into_iter(), &rect, &mut gs.writer);
+            self.state.render_list(["No results found!"].into_iter(), rect, &mut gs.writer);
         } else {
-            self.state.render_list(self.options.iter().map(|opt| (self.display)(opt)), &rect, &mut gs.writer);
+            self.state.render_list(self.options.iter().map(|opt| (self.display)(opt)), rect, &mut gs.writer);
         };
     }
 
