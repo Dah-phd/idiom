@@ -383,11 +383,11 @@ pub fn arg_range_at(line: &str, idx: usize) -> Range<usize> {
 
 impl TextField<PopupMessage> {
     pub fn with_tree_access(text: String) -> Self {
-        Self::new(text, Some(PopupMessage::Tree(IdiomEvent::PopupAccess)))
+        Self::new(text, Some(PopupMessage::Event(IdiomEvent::PopupAccess)))
     }
 
     pub fn with_editor_access(text: String) -> Self {
-        Self::new(text, Some(PopupMessage::Tree(IdiomEvent::PopupAccess)))
+        Self::new(text, Some(PopupMessage::Event(IdiomEvent::PopupAccess)))
     }
 }
 

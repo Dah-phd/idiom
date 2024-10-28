@@ -47,7 +47,7 @@ pub fn full_rebuild(
     }
     if gs.components.contains(Components::POPUP) {
         gs.draw_callback = draw_popup;
-        gs.render_popup();
+        gs.popup_render();
     }
     gs.writer.flush()
 }
@@ -93,7 +93,7 @@ pub fn draw_popup(
     _term: &mut EditorTerminal,
 ) -> Result<()> {
     gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
-    gs.render_popup();
+    gs.popup_render();
     gs.writer.flush()
 }
 

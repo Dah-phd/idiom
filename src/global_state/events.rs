@@ -15,12 +15,14 @@ use std::path::PathBuf;
 #[derive(Clone)]
 pub enum IdiomEvent {
     PopupAccess,
-    Open(PathBuf),
+    PopupAccessOnce,
     OpenAtLine(PathBuf, usize),
     OpenAtSelect(PathBuf, (CursorPosition, CursorPosition)),
     SelectPath(PathBuf),
-    CreateFileOrFolder(String),
-    CreateFileOrFolderBase(String),
+    CreateFileOrFolder {
+        name: String,
+        from_base: bool,
+    },
     RenameFile(String),
     SearchFiles(String),
     FileUpdated(PathBuf),
@@ -39,11 +41,14 @@ pub enum IdiomEvent {
         select: (CursorPosition, CursorPosition),
         next_select: Option<(CursorPosition, CursorPosition)>,
     },
+    GoToLine {
+        line: usize,
+        clear_popup: bool,
+    },
     GoToSelect {
         select: (CursorPosition, CursorPosition),
         clear_popup: bool,
     },
-    GoToLine(usize),
     Resize,
     Save,
     Rebase,
@@ -57,6 +62,10 @@ impl IdiomEvent {
             IdiomEvent::PopupAccess => {
                 gs.popup.component_access(ws, tree);
             }
+            IdiomEvent::PopupAccessOnce => {
+                gs.popup.component_access(ws, tree);
+                gs.clear_popup();
+            }
             IdiomEvent::SearchFiles(pattern) => {
                 if pattern.len() > 1 {
                     let mut new_popup = ActiveFileSearch::new(pattern);
@@ -64,18 +73,6 @@ impl IdiomEvent {
                     gs.popup(new_popup);
                 } else {
                     gs.popup(ActiveFileSearch::new(pattern));
-                }
-            }
-            IdiomEvent::Open(path) => {
-                tree.select_by_path(&path);
-                gs.clear_popup();
-                if path.is_dir() {
-                    gs.select_mode();
-                } else {
-                    match ws.new_from(path, gs).await {
-                        Ok(..) => gs.insert_mode(),
-                        Err(error) => gs.error(error.to_string()),
-                    }
                 }
             }
             IdiomEvent::OpenAtLine(path, line) => {
@@ -99,42 +96,42 @@ impl IdiomEvent {
                     Err(error) => gs.error(error.to_string()),
                 }
             }
-            IdiomEvent::GoToSelect { select: (from, to), clear_popup } => {
-                if let Some(editor) = ws.get_active() {
-                    editor.go_to_select(from, to);
-                    if clear_popup {
-                        gs.clear_popup();
-                    } else {
-                        editor.render(gs);
+            IdiomEvent::GoToLine { line, clear_popup } => match ws.get_active() {
+                Some(editor) => {
+                    editor.go_to(line);
+                    match clear_popup {
+                        true => gs.clear_popup(),
+                        false => {
+                            editor.render(gs);
+                            gs.popup.mark_as_updated();
+                        }
                     }
-                } else {
-                    gs.clear_popup();
                 }
-            }
+                None => gs.clear_popup(),
+            },
+            IdiomEvent::GoToSelect { select: (from, to), clear_popup } => match ws.get_active() {
+                Some(editor) => {
+                    editor.go_to_select(from, to);
+                    match clear_popup {
+                        true => gs.clear_popup(),
+                        false => {
+                            editor.render(gs);
+                            gs.popup.mark_as_updated();
+                        }
+                    }
+                }
+                None => gs.clear_popup(),
+            },
             IdiomEvent::SelectPath(path) => {
                 tree.select_by_path(&path);
             }
             IdiomEvent::TreeDiagnostics(new) => {
                 tree.push_diagnostics(new);
             }
-            IdiomEvent::CreateFileOrFolder(name) => {
-                if let Ok(new_path) = tree.create_file_or_folder(name) {
-                    if !new_path.is_dir() {
-                        match ws.new_at_line(new_path, 0, gs).await {
-                            Ok(..) => {
-                                gs.insert_mode();
-                                if let Some(editor) = ws.get_active() {
-                                    editor.update_status.deny();
-                                }
-                            }
-                            Err(error) => gs.error(error.to_string()),
-                        };
-                    }
-                }
-                gs.clear_popup();
-            }
-            IdiomEvent::CreateFileOrFolderBase(name) => {
-                if let Ok(new_path) = tree.create_file_or_folder_base(name) {
+            IdiomEvent::CreateFileOrFolder { name, from_base } => {
+                if let Ok(new_path) =
+                    if from_base { tree.create_file_or_folder_base(name) } else { tree.create_file_or_folder(name) }
+                {
                     if !new_path.is_dir() {
                         match ws.new_at_line(new_path, 0, gs).await {
                             Ok(..) => {
@@ -218,12 +215,6 @@ impl IdiomEvent {
             IdiomEvent::FindToReplace(pattern, options) => {
                 gs.popup(ReplacePopup::from_search(pattern, options));
             }
-            IdiomEvent::GoToLine(idx) => {
-                if let Some(editor) = ws.get_active() {
-                    editor.go_to(idx);
-                }
-                gs.clear_popup();
-            }
             IdiomEvent::ReplaceAll(clip, ranges) => {
                 if let Some(editor) = ws.get_active() {
                     editor.mass_replace(ranges, clip);
@@ -290,7 +281,7 @@ fn parse_snippet(snippet: String) -> IdiomEvent {
 
 impl From<IdiomEvent> for PopupMessage {
     fn from(event: IdiomEvent) -> Self {
-        PopupMessage::Tree(event)
+        PopupMessage::Event(event)
     }
 }
 

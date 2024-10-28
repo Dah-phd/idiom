@@ -31,7 +31,7 @@ const SELECT_SPAN: &str = "  --SELECT--   ";
 pub enum PopupMessage {
     #[default]
     None,
-    Tree(IdiomEvent),
+    Event(IdiomEvent),
     Clear,
 }
 
@@ -233,7 +233,7 @@ impl GlobalState {
     }
 
     #[inline]
-    pub fn render_popup(&mut self) {
+    pub fn popup_render(&mut self) {
         // popups do not mutate during render
         let gs = unsafe { &mut *(self as *mut GlobalState) };
         self.popup.fast_render(gs);
@@ -289,7 +289,7 @@ impl GlobalState {
                 self.clear_popup();
             }
             PopupMessage::None => {}
-            PopupMessage::Tree(event) => {
+            PopupMessage::Event(event) => {
                 self.event.push(event);
             }
         }

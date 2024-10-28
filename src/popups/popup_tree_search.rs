@@ -47,10 +47,10 @@ impl PopupInterface for ActivePathSearch {
         match key.code {
             KeyCode::Up => self.state.prev(self.options.len()),
             KeyCode::Down => self.state.next(self.options.len()),
-            KeyCode::Tab => return PopupMessage::Tree(IdiomEvent::SearchFiles(self.pattern.text.to_owned())),
+            KeyCode::Tab => return PopupMessage::Event(IdiomEvent::SearchFiles(self.pattern.text.to_owned())),
             KeyCode::Enter => {
                 if self.options.len() > self.state.selected {
-                    return IdiomEvent::Open(self.options.remove(self.state.selected)).into();
+                    return IdiomEvent::OpenAtLine(self.options.remove(self.state.selected), 0).into();
                 }
                 return PopupMessage::Clear;
             }
@@ -147,7 +147,7 @@ impl PopupInterface for ActiveFileSearch {
                     return PopupMessage::Clear;
                 }
                 self.mode = Mode::Full;
-                return PopupMessage::Tree(IdiomEvent::PopupAccess);
+                return PopupMessage::Event(IdiomEvent::PopupAccess);
             }
             KeyCode::Enter => {
                 if self.options.len() > self.state.selected {

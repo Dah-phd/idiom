@@ -12,6 +12,7 @@ use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 
 pub struct Pallet {
     commands: Vec<(i64, Command)>,
+    access_cb: Option<fn(&mut Workspace, &mut Tree)>,
     pattern: TextField<bool>,
     matcher: SkimMatcherV2,
     updated: bool,
@@ -33,13 +34,17 @@ impl Command {
         let mut path = config_dir()?;
         path.push(CONFIG_FOLDER);
         path.push(f);
-        Some(Command { label: f, direct_call: None, result: IdiomEvent::Open(path).into() })
+        Some(Command { label: f, direct_call: None, result: IdiomEvent::OpenAtLine(path, 0).into() })
+    }
+
+    fn pass_event(label: &'static str, event: IdiomEvent) -> Self {
+        Command { label, direct_call: None, result: event.into() }
     }
 }
 
 enum CommandResult {
     Simple(PopupMessage),
-    Complex {},
+    Complex(fn(&mut Workspace, &mut Tree)),
 }
 
 impl PopupInterface for Pallet {
@@ -53,7 +58,11 @@ impl PopupInterface for Pallet {
         }
     }
 
-    fn component_access(&mut self, _ws: &mut Workspace, _tree: &mut Tree) {}
+    fn component_access(&mut self, ws: &mut Workspace, tree: &mut Tree) {
+        if let Some(cb) = self.access_cb.take() {
+            cb(ws, tree);
+        }
+    }
 
     fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {
         if self.commands.is_empty() {
@@ -74,7 +83,10 @@ impl PopupInterface for Pallet {
         match key.code {
             KeyCode::Enter => match self.commands.remove(self.state.selected).1.execute() {
                 CommandResult::Simple(msg) => msg,
-                _ => todo!(),
+                CommandResult::Complex(cb) => {
+                    self.access_cb.replace(cb);
+                    PopupMessage::Event(IdiomEvent::PopupAccessOnce)
+                }
             },
             KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
                 self.state.prev(self.commands.len());
@@ -118,6 +130,7 @@ impl Pallet {
             .flatten()
             .map(|cmd| (0, cmd))
             .collect(),
+            access_cb: None,
             pattern: TextField::new(String::new(), Some(true)),
             matcher: SkimMatcherV2::default(),
             updated: true,

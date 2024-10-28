@@ -40,7 +40,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
             }
             if let Some((line_idx, _)) = contained_position(gs.tree_area, event.row, event.column) {
                 if let Some(path) = tree.mouse_select(line_idx + 1) {
-                    gs.event.push(IdiomEvent::Open(path));
+                    gs.event.push(IdiomEvent::OpenAtLine(path, 0));
                     return;
                 };
                 gs.select_mode();
