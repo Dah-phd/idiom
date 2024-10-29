@@ -6,7 +6,10 @@ use crate::{
     workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent};
-use std::path::{PathBuf, MAIN_SEPARATOR};
+use std::{
+    fs::DirEntry,
+    path::{PathBuf, MAIN_SEPARATOR},
+};
 
 pub struct OpenFileSelector {
     pattern: TextField<bool>,
@@ -17,10 +20,13 @@ pub struct OpenFileSelector {
 
 impl OpenFileSelector {
     pub fn boxed() -> Box<dyn PopupInterface> {
-        let folder =
-            dirs::home_dir().unwrap_or(std::env::current_dir().unwrap_or(PathBuf::from("./"))).display().to_string();
-        let mut new =
-            Self { updated: true, pattern: TextField::new(folder, Some(true)), state: State::new(), paths: vec![] };
+        let path = dirs::home_dir().unwrap_or(std::env::current_dir().unwrap_or(PathBuf::from("./")));
+        let mut text = path.display().to_string();
+        if path.is_dir() && !text.ends_with(MAIN_SEPARATOR) {
+            text.push(MAIN_SEPARATOR)
+        }
+        let pattern = TextField::new(text, Some(true));
+        let mut new = Self { updated: true, pattern, state: State::new(), paths: vec![] };
         new.solve_comletions();
         Box::new(new)
     }
@@ -29,20 +35,17 @@ impl OpenFileSelector {
         self.paths.clear();
         self.state.select(0, 1);
         let path = PathBuf::from(&self.pattern.text);
-        if !path.is_dir() {
-            if let Some(entries) = path.parent().and_then(|parent| parent.read_dir().ok()) {
-                self.paths.extend(entries.flatten().filter_map(|p| {
-                    let new_path = p.path().display().to_string();
-                    match new_path.starts_with(&self.pattern.text) {
-                        true => Some(new_path),
-                        false => None,
-                    }
-                }));
+        match path.is_dir() {
+            true => {
+                if let Ok(entries) = path.read_dir() {
+                    self.paths.extend(entries.flatten().map(|de| de.path().display().to_string()));
+                }
             }
-            return;
-        }
-        if let Ok(entries) = path.read_dir() {
-            self.paths.extend(entries.flatten().map(|p| p.path().display().to_string()));
+            false => {
+                if let Some(entries) = path.parent().and_then(|parent| parent.read_dir().ok()) {
+                    self.paths.extend(entries.flatten().filter_map(|de| checked_string(de, &self.pattern.text)));
+                }
+            }
         }
     }
 
@@ -127,5 +130,13 @@ impl PopupInterface for OpenFileSelector {
 
     fn mark_as_updated(&mut self) {
         self.updated = true;
+    }
+}
+
+fn checked_string(de: DirEntry, pattern: &str) -> Option<String> {
+    let new_path = de.path().display().to_string();
+    match new_path.starts_with(pattern) {
+        true => Some(new_path),
+        false => None,
     }
 }
