@@ -16,6 +16,7 @@ use std::path::PathBuf;
 pub enum IdiomEvent {
     PopupAccess,
     PopupAccessOnce,
+    NewPopup(fn() -> Box<dyn PopupInterface>),
     OpenAtLine(PathBuf, usize),
     OpenAtSelect(PathBuf, (CursorPosition, CursorPosition)),
     SelectPath(PathBuf),
@@ -65,6 +66,10 @@ impl IdiomEvent {
             IdiomEvent::PopupAccessOnce => {
                 gs.popup.component_access(ws, tree);
                 gs.clear_popup();
+            }
+            IdiomEvent::NewPopup(builder) => {
+                gs.clear_popup();
+                gs.popup(builder());
             }
             IdiomEvent::SearchFiles(pattern) => {
                 if pattern.len() > 1 {

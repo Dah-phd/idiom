@@ -1,5 +1,6 @@
 mod generics;
 pub mod pallet;
+pub mod popup_file_open;
 pub mod popup_find;
 pub mod popup_replace;
 pub mod popup_tree_search;

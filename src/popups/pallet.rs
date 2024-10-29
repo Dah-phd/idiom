@@ -1,4 +1,4 @@
-use super::PopupInterface;
+use super::{popup_file_open::OpenFileSelector, PopupInterface};
 use crate::{
     configs::{CONFIG_FOLDER, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
     global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
@@ -119,8 +119,9 @@ impl PopupInterface for Pallet {
 
 impl Pallet {
     pub fn new() -> Box<Self> {
-        Box::new(Pallet {
-            commands: [
+        let mut commands = vec![(0, Command::pass_event("Open file", IdiomEvent::NewPopup(OpenFileSelector::boxed)))];
+        commands.extend(
+            [
                 Command::cfg_open(EDITOR_CFG_FILE),
                 Command::cfg_open(KEY_MAP),
                 Command::cfg_open(THEME_FILE),
@@ -128,8 +129,10 @@ impl Pallet {
             ]
             .into_iter()
             .flatten()
-            .map(|cmd| (0, cmd))
-            .collect(),
+            .map(|cmd| (0, cmd)),
+        );
+        Box::new(Pallet {
+            commands,
             access_cb: None,
             pattern: TextField::new(String::new(), Some(true)),
             matcher: SkimMatcherV2::default(),
