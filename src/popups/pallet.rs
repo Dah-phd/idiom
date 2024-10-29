@@ -21,24 +21,27 @@ pub struct Pallet {
 
 struct Command {
     label: &'static str,
-    direct_call: Option<char>,
-    result: PopupMessage,
+    result: CommandResult,
 }
 
 impl Command {
     fn execute(self) -> CommandResult {
-        CommandResult::Simple(self.result)
+        self.result
     }
 
     fn cfg_open(f: &'static str) -> Option<Self> {
         let mut path = config_dir()?;
         path.push(CONFIG_FOLDER);
         path.push(f);
-        Some(Command { label: f, direct_call: None, result: IdiomEvent::OpenAtLine(path, 0).into() })
+        Some(Command { label: f, result: CommandResult::Simple(IdiomEvent::OpenAtLine(path, 0).into()) })
     }
 
     fn pass_event(label: &'static str, event: IdiomEvent) -> Self {
-        Command { label, direct_call: None, result: event.into() }
+        Command { label, result: CommandResult::Simple(event.into()) }
+    }
+
+    fn access_edit(label: &'static str, cb: fn(&mut Workspace, &mut Tree)) -> Self {
+        Command { label, result: CommandResult::Complex(cb) }
     }
 }
 
@@ -77,7 +80,7 @@ impl PopupInterface for Pallet {
                     None => i64::MAX,
                 };
             }
-            self.commands.sort_by(|(score, _), (rhscore, _)| rhscore.cmp(score));
+            self.commands.sort_by(|(score, _), (rhscore, _)| score.cmp(rhscore));
             return PopupMessage::None;
         }
         match key.code {
@@ -119,7 +122,11 @@ impl PopupInterface for Pallet {
 
 impl Pallet {
     pub fn new() -> Box<Self> {
-        let mut commands = vec![(0, Command::pass_event("Open file", IdiomEvent::NewPopup(OpenFileSelector::boxed)))];
+        let mut commands = vec![
+            (0, Command::pass_event("Open file", IdiomEvent::NewPopup(OpenFileSelector::boxed))),
+            (0, Command::access_edit("UPPERCASE", uppercase)),
+            (0, Command::access_edit("LOWERCASE", lowercase)),
+        ];
         commands.extend(
             [
                 Command::cfg_open(EDITOR_CFG_FILE),
@@ -139,6 +146,34 @@ impl Pallet {
             updated: true,
             state: State::new(),
         })
+    }
+}
+
+fn uppercase(ws: &mut Workspace, _tree: &mut Tree) {
+    if let Some(editor) = ws.get_active() {
+        if editor.cursor.select_is_none() {
+            editor.select_token();
+        }
+        if editor.cursor.select_is_none() {
+            return;
+        }
+        if let Some(clip) = editor.copy() {
+            editor.insert_snippet(clip.to_uppercase(), None);
+        }
+    }
+}
+
+fn lowercase(ws: &mut Workspace, _tree: &mut Tree) {
+    if let Some(editor) = ws.get_active() {
+        if editor.cursor.select_is_none() {
+            editor.select_token();
+        }
+        if editor.cursor.select_is_none() {
+            return;
+        }
+        if let Some(clip) = editor.copy() {
+            editor.insert_snippet(clip.to_lowercase(), None);
+        }
     }
 }
 
