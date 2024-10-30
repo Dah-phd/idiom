@@ -1,19 +1,62 @@
-use super::{GlobalState, IdiomEvent, Mode};
-use crate::{render::layout::Rect, runner::EditorTerminal, tree::Tree, workspace::Workspace};
+use super::{GlobalState, IdiomEvent};
+use crate::render::backend::{color, Backend, Style};
+use crate::render::layout::Line;
+use crate::{runner::EditorTerminal, tree::Tree, workspace::Workspace};
 use crossterm::event::KeyEvent;
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
-type Row = usize;
-type Col = usize;
+const INSERT_SPAN: &str = "  --INSERT--   ";
+const SELECT_SPAN: &str = "  --SELECT--   ";
+const MODE_LEN: usize = INSERT_SPAN.len();
 
-pub fn contained_position(rect: Rect, row: u16, column: u16) -> Option<(Row, Col)> {
-    if rect.col <= column && column <= rect.width as u16 && rect.row <= row && row <= rect.height {
-        return Some(((row - rect.row) as usize, (column - rect.col) as usize));
-    }
-    None
+#[derive(Default, Clone)]
+pub enum PopupMessage {
+    #[default]
+    None,
+    Event(IdiomEvent),
+    Clear,
 }
 
-#[allow(clippy::needless_return)]
+#[derive(Default)]
+pub enum Mode {
+    #[default]
+    Select,
+    Insert,
+}
+
+impl Mode {
+    #[inline]
+    pub fn render(&self, line: Line, accent_style: Style, backend: &mut Backend) {
+        match self {
+            Self::Insert => Self::render_insert_mode(line, accent_style, backend),
+            Self::Select => Self::render_select_mode(line, accent_style, backend),
+        };
+    }
+
+    #[inline]
+    pub fn render_select_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) {
+        line.width = std::cmp::min(MODE_LEN, line.width);
+        accent_style.add_bold();
+        accent_style.set_fg(Some(color::cyan()));
+        line.render_styled(SELECT_SPAN, accent_style, backend);
+    }
+
+    #[inline]
+    pub fn render_insert_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) {
+        line.width = std::cmp::min(MODE_LEN, line.width);
+        accent_style.add_bold();
+        accent_style.set_fg(Some(color::rgb(255, 0, 0)));
+        line.render_styled(INSERT_SPAN, accent_style, backend);
+    }
+
+    #[inline]
+    pub const fn len() -> usize {
+        MODE_LEN
+    }
+}
+
+pub fn disable_mouse(_gs: &mut GlobalState, _event: MouseEvent, _tree: &mut Tree, _workspace: &mut Workspace) {}
+
 pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, workspace: &mut Workspace) {
     match event.kind {
         MouseEventKind::ScrollUp if matches!(gs.mode, Mode::Insert) => {
@@ -29,7 +72,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
             }
         }
         MouseEventKind::Down(MouseButton::Left) => {
-            if let Some(position) = contained_position(gs.editor_area, event.row, event.column) {
+            if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = workspace.get_active() {
                     editor.mouse_cursor(position.into());
                     gs.insert_mode();
@@ -38,14 +81,14 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                 }
                 return;
             }
-            if let Some((line_idx, _)) = contained_position(gs.tree_area, event.row, event.column) {
+            if let Some((line_idx, _)) = gs.tree_area.relative_position(event.row, event.column) {
                 if let Some(path) = tree.mouse_select(line_idx + 1) {
                     gs.event.push(IdiomEvent::OpenAtLine(path, 0));
                     return;
                 };
                 gs.select_mode();
             }
-            if let Some((_, col_idx)) = contained_position(gs.tab_area, event.row, event.column) {
+            if let Some((_, col_idx)) = gs.tab_area.relative_position(event.row, event.column) {
                 if !workspace.is_empty() {
                     gs.insert_mode();
                     if let Some(idx) = workspace.select_tab_mouse(col_idx) {
@@ -55,7 +98,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
             }
         }
         MouseEventKind::Down(MouseButton::Right) => {
-            if let Some((_, col_idx)) = contained_position(gs.tab_area, event.row, event.column) {
+            if let Some((_, col_idx)) = gs.tab_area.relative_position(event.row, event.column) {
                 if !workspace.is_empty() {
                     gs.insert_mode();
                     if let Some(idx) = workspace.select_tab_mouse(col_idx) {
@@ -64,7 +107,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                     }
                 }
             }
-            if let Some(position) = contained_position(gs.editor_area, event.row, event.column) {
+            if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = workspace.get_active() {
                     if let Some(clip) = editor.mouse_copy_paste(position.into(), gs.clipboard.pull()) {
                         gs.clipboard.push(clip);
@@ -75,7 +118,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
             }
         }
         MouseEventKind::Drag(MouseButton::Left) => {
-            if let Some(position) = contained_position(gs.editor_area, event.row, event.column) {
+            if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = workspace.get_active() {
                     editor.mouse_select(position.into());
                     gs.insert_mode();
@@ -87,7 +130,17 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
     }
 }
 
-pub fn disable_mouse(_gs: &mut GlobalState, _event: MouseEvent, _tree: &mut Tree, _workspace: &mut Workspace) {}
+pub fn mouse_popup_handler(gs: &mut GlobalState, event: MouseEvent, _tree: &mut Tree, _workspace: &mut Workspace) {
+    match gs.popup.mouse_map(event) {
+        PopupMessage::None => {}
+        PopupMessage::Clear => {
+            gs.clear_popup();
+        }
+        PopupMessage::Event(event) => {
+            gs.event.push(event);
+        }
+    };
+}
 
 pub fn map_editor(
     gs: &mut GlobalState,
@@ -127,4 +180,15 @@ pub fn map_term(
     runner: &mut EditorTerminal,
 ) -> bool {
     runner.map(key, gs)
+}
+
+#[cfg(test)]
+mod test {
+    use super::{INSERT_SPAN, MODE_LEN, SELECT_SPAN};
+
+    #[test]
+    fn ensure_mode_len_match() {
+        assert_eq!(INSERT_SPAN.len(), SELECT_SPAN.len());
+        assert_eq!(INSERT_SPAN.len(), MODE_LEN);
+    }
 }

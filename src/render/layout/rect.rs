@@ -4,6 +4,9 @@ use crate::render::{
     utils::UTF8Safe,
 };
 
+type Row = usize;
+type Col = usize;
+
 #[derive(Default, Clone, Copy, Debug)]
 pub struct Rect {
     pub row: u16,
@@ -24,6 +27,13 @@ impl Rect {
         width -= 2;
         height -= 2;
         Self { row, col, width, height, borders: Borders::all() }
+    }
+
+    pub fn relative_position(&self, row: u16, column: u16) -> Option<(Row, Col)> {
+        if self.col <= column && column <= self.width as u16 && self.row <= row && row <= self.height {
+            return Some(((row - self.row) as usize, (column - self.col) as usize));
+        }
+        None
     }
 
     /// Creates floating modal around position (the row within it);

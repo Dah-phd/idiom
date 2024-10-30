@@ -1,11 +1,9 @@
 use super::PopupInterface;
 use crate::{
     global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
-    render::{state::State, TextField},
-    tree::Tree,
-    workspace::Workspace,
+    render::{layout::Rect, state::State, TextField},
 };
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use std::{
     fs::DirEntry,
     path::{PathBuf, MAIN_SEPARATOR},
@@ -15,6 +13,7 @@ pub struct OpenFileSelector {
     pattern: TextField<bool>,
     updated: bool,
     state: State,
+    rect: Option<Rect>,
     paths: Vec<String>,
 }
 
@@ -26,7 +25,7 @@ impl OpenFileSelector {
             text.push(MAIN_SEPARATOR)
         }
         let pattern = TextField::new(text, Some(true));
-        let mut new = Self { updated: true, pattern, state: State::new(), paths: vec![] };
+        let mut new = Self { updated: true, pattern, state: State::new(), paths: vec![], rect: None };
         new.solve_comletions();
         Box::new(new)
     }
@@ -63,15 +62,30 @@ impl OpenFileSelector {
 }
 
 impl PopupInterface for OpenFileSelector {
-    fn collect_update_status(&mut self) -> bool {
-        std::mem::take(&mut self.updated)
+    fn render(&mut self, gs: &mut GlobalState) {
+        let mut rect = gs.screen_rect.top(15).vcenter(100);
+        rect.bordered();
+        self.rect.replace(rect);
+        rect.draw_borders(None, None, gs.backend());
+        match rect.next_line() {
+            Some(line) => self.pattern.widget(line, gs.backend()),
+            None => return,
+        }
+        match self.paths.is_empty() {
+            true => {
+                self.state.render_list(["No child paths found!"].into_iter(), rect, gs.backend());
+            }
+            false => {
+                self.state.render_list(self.paths.iter().map(String::as_str), rect, gs.backend());
+            }
+        };
     }
 
     fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {
         if self.state.selected != 0 {
             if let KeyEvent { code: KeyCode::Enter | KeyCode::Tab, .. } = key {
                 let mut text = self.paths.remove(self.state.selected);
-                if PathBuf::from(&text).is_dir() {
+                if PathBuf::from(&text).is_dir() && !text.ends_with(MAIN_SEPARATOR) {
                     text.push(MAIN_SEPARATOR);
                 }
                 self.pattern.text_set(text);
@@ -80,8 +94,7 @@ impl PopupInterface for OpenFileSelector {
             }
         }
         if let Some(updated) = self.pattern.map(key, clipboard) {
-            self.updated = updated;
-            if self.updated {
+            if updated {
                 self.solve_comletions();
             }
             return PopupMessage::None;
@@ -108,28 +121,52 @@ impl PopupInterface for OpenFileSelector {
         PopupMessage::None
     }
 
-    fn component_access(&mut self, _ws: &mut Workspace, _tree: &mut Tree) {}
-
-    fn render(&mut self, gs: &mut GlobalState) {
-        let mut rect = gs.screen_rect.top(15).vcenter(100);
-        rect.bordered();
-        rect.draw_borders(None, None, gs.backend());
-        match rect.next_line() {
-            Some(line) => self.pattern.widget(line, gs.backend()),
-            None => return,
-        }
-        match self.paths.is_empty() {
-            true => {
-                self.state.render_list(["No child paths found!"].into_iter(), rect, gs.backend());
+    fn mouse_map(&mut self, event: crossterm::event::MouseEvent) -> PopupMessage {
+        let (row, column) = match event {
+            MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } => (row, column),
+            MouseEvent { kind: MouseEventKind::ScrollUp, .. } => {
+                self.state.prev(self.paths.len());
+                self.mark_as_updated();
+                return PopupMessage::None;
             }
-            false => {
-                self.state.render_list(self.paths.iter().map(String::as_str), rect, gs.backend());
+            MouseEvent { kind: MouseEventKind::ScrollDown, .. } => {
+                self.state.next(self.paths.len());
+                self.mark_as_updated();
+                return PopupMessage::None;
             }
+            _ => return PopupMessage::None,
         };
+        let relative_row = match self.rect.as_ref().and_then(|rect| rect.relative_position(row, column)) {
+            Some((row, ..)) => row,
+            None => return PopupMessage::None,
+        };
+        if relative_row < 1 {
+            return PopupMessage::None;
+        }
+        let path_index = self.state.at_line + (relative_row - 1);
+        if self.paths.len() <= path_index {
+            return PopupMessage::None;
+        }
+        let mut text = self.paths.remove(path_index);
+        let path = PathBuf::from(&text);
+        if path.is_file() {
+            return IdiomEvent::OpenAtLine(path, 0).into();
+        }
+        if path.is_dir() && !text.ends_with(MAIN_SEPARATOR) {
+            text.push(MAIN_SEPARATOR);
+        }
+        self.pattern.text_set(text);
+        self.solve_comletions();
+        self.mark_as_updated();
+        PopupMessage::None
     }
 
     fn mark_as_updated(&mut self) {
         self.updated = true;
+    }
+
+    fn collect_update_status(&mut self) -> bool {
+        std::mem::take(&mut self.updated)
     }
 }
 

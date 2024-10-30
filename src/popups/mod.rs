@@ -13,7 +13,7 @@ use crate::{
     tree::Tree,
     workspace::Workspace,
 };
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
 pub use generics::{Popup, PopupSelector};
 
 pub const NULL_POPUP: PlaceHolderPopup = PlaceHolderPopup();
@@ -27,6 +27,10 @@ pub trait PopupInterface {
         if self.collect_update_status() {
             self.render(gs);
         }
+    }
+
+    fn mouse_map(&mut self, _event: MouseEvent) -> PopupMessage {
+        PopupMessage::None
     }
 
     fn map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {

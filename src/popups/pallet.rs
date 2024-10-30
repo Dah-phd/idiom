@@ -2,11 +2,11 @@ use super::{popup_file_open::OpenFileSelector, PopupInterface};
 use crate::{
     configs::{CONFIG_FOLDER, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
     global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
-    render::{state::State, TextField},
+    render::{layout::Rect, state::State, TextField},
     tree::Tree,
     workspace::Workspace,
 };
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use dirs::config_dir;
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 
@@ -16,6 +16,7 @@ pub struct Pallet {
     pattern: TextField<bool>,
     matcher: SkimMatcherV2,
     updated: bool,
+    rect: Option<Rect>,
     state: State,
 }
 
@@ -51,20 +52,17 @@ enum CommandResult {
 }
 
 impl PopupInterface for Pallet {
-    fn collect_update_status(&mut self) -> bool {
-        std::mem::take(&mut self.updated)
-    }
-
-    fn fast_render(&mut self, gs: &mut GlobalState) {
-        if self.collect_update_status() {
-            self.render(gs);
+    fn render(&mut self, gs: &mut GlobalState) {
+        let mut rect = gs.screen_rect.top(15).vcenter(100);
+        rect.bordered();
+        self.rect.replace(rect);
+        rect.draw_borders(None, None, gs.backend());
+        match rect.next_line() {
+            Some(line) => self.pattern.widget(line, gs.backend()),
+            None => return,
         }
-    }
-
-    fn component_access(&mut self, ws: &mut Workspace, tree: &mut Tree) {
-        if let Some(cb) = self.access_cb.take() {
-            cb(ws, tree);
-        }
+        let options = self.commands.iter().map(|cmd| cmd.1.label);
+        self.state.render_list(options, rect, gs.backend());
     }
 
     fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {
@@ -73,14 +71,15 @@ impl PopupInterface for Pallet {
         }
 
         if let Some(updated) = self.pattern.map(key, clipboard) {
-            self.updated = updated;
-            for (score, cmd) in self.commands.iter_mut() {
-                *score = match self.matcher.fuzzy_match(cmd.label, &self.pattern.text) {
-                    Some(new_score) => new_score,
-                    None => i64::MAX,
-                };
+            if updated {
+                for (score, cmd) in self.commands.iter_mut() {
+                    *score = match self.matcher.fuzzy_match(cmd.label, &self.pattern.text) {
+                        Some(new_score) => new_score,
+                        None => i64::MAX,
+                    };
+                }
+                self.commands.sort_by(|(score, _), (rhscore, _)| score.cmp(rhscore));
             }
-            self.commands.sort_by(|(score, _), (rhscore, _)| score.cmp(rhscore));
             return PopupMessage::None;
         }
         match key.code {
@@ -103,20 +102,53 @@ impl PopupInterface for Pallet {
         }
     }
 
+    fn mouse_map(&mut self, event: crossterm::event::MouseEvent) -> PopupMessage {
+        let (row, column) = match event {
+            MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } => (row, column),
+            MouseEvent { kind: MouseEventKind::ScrollUp, .. } => {
+                self.state.prev(self.commands.len());
+                self.mark_as_updated();
+                return PopupMessage::None;
+            }
+            MouseEvent { kind: MouseEventKind::ScrollDown, .. } => {
+                self.state.next(self.commands.len());
+                self.mark_as_updated();
+                return PopupMessage::None;
+            }
+            _ => return PopupMessage::None,
+        };
+        let relative_row = match self.rect.as_ref().and_then(|rect| rect.relative_position(row, column)) {
+            Some((row, ..)) => row,
+            None => return PopupMessage::None,
+        };
+        if relative_row < 1 {
+            return PopupMessage::None;
+        }
+        let command_index = self.state.at_line + (relative_row - 1);
+        if self.commands.len() <= command_index {
+            return PopupMessage::None;
+        }
+        match self.commands.remove(command_index).1.execute() {
+            CommandResult::Simple(msg) => msg,
+            CommandResult::Complex(cb) => {
+                self.access_cb.replace(cb);
+                PopupMessage::Event(IdiomEvent::PopupAccessOnce)
+            }
+        }
+    }
+
     fn mark_as_updated(&mut self) {
         self.updated = true
     }
 
-    fn render(&mut self, gs: &mut GlobalState) {
-        let mut rect = gs.screen_rect.top(15).vcenter(100);
-        rect.bordered();
-        rect.draw_borders(None, None, gs.backend());
-        match rect.next_line() {
-            Some(line) => self.pattern.widget(line, gs.backend()),
-            None => return,
+    fn collect_update_status(&mut self) -> bool {
+        std::mem::take(&mut self.updated)
+    }
+
+    fn component_access(&mut self, ws: &mut Workspace, tree: &mut Tree) {
+        if let Some(cb) = self.access_cb.take() {
+            cb(ws, tree);
         }
-        let options = self.commands.iter().map(|cmd| cmd.1.label);
-        self.state.render_list(options, rect, gs.backend());
     }
 }
 
@@ -144,6 +176,7 @@ impl Pallet {
             pattern: TextField::new(String::new(), Some(true)),
             matcher: SkimMatcherV2::default(),
             updated: true,
+            rect: None,
             state: State::new(),
         })
     }
