@@ -31,9 +31,9 @@ impl Rect {
 
     pub fn relative_position(&self, row: u16, column: u16) -> Option<CursorPosition> {
         match self.col <= column
-            && column <= self.col + self.width as u16
             && self.row <= row
             && row <= self.row + self.height
+            && column <= self.col + self.width as u16
         {
             true => Some(CursorPosition { line: (row - self.row) as usize, char: (column - self.col) as usize }),
             false => None,
@@ -292,7 +292,7 @@ impl Rect {
         }
     }
 
-    pub fn draw_borders(&self, set: Option<BorderSet>, fg: Option<Color>, writer: &mut Backend) {
+    pub fn draw_borders(&self, set: Option<BorderSet>, fg: Option<Color>, backend: &mut Backend) {
         let top = self.borders.contains(Borders::TOP);
         let bot = self.borders.contains(Borders::BOTTOM);
         let left = self.borders.contains(Borders::LEFT);
@@ -311,52 +311,52 @@ impl Rect {
         };
 
         let set = set.unwrap_or(BORDERS);
-        writer.save_cursor();
+        backend.save_cursor();
         if let Some(color) = fg {
-            writer.set_style(Style::fg(color));
+            backend.set_style(Style::fg(color));
         };
         if top {
             for col_idx in col..last_col {
-                writer.go_to(row, col_idx);
-                writer.print(set.horizontal);
+                backend.go_to(row, col_idx);
+                backend.print(set.horizontal);
             }
         }
         if bot {
             for col_idx in col..last_col {
-                writer.go_to(last_row, col_idx);
-                writer.print(set.horizontal);
+                backend.go_to(last_row, col_idx);
+                backend.print(set.horizontal);
             }
         }
         if left {
             for row_idx in row..last_row {
-                writer.go_to(row_idx, col);
-                writer.print(set.vertical);
+                backend.go_to(row_idx, col);
+                backend.print(set.vertical);
             }
         }
         if right {
             for row_idx in row..last_row {
-                writer.go_to(row_idx, last_col);
-                writer.print(set.vertical);
+                backend.go_to(row_idx, last_col);
+                backend.print(set.vertical);
             }
         }
         if self.borders.contains(Borders::TOP | Borders::LEFT) {
-            writer.go_to(row, col);
-            writer.print(set.top_left_qorner);
+            backend.go_to(row, col);
+            backend.print(set.top_left_qorner);
         }
         if self.borders.contains(Borders::TOP | Borders::RIGHT) {
-            writer.go_to(row, last_col);
-            writer.print(set.top_right_qorner);
+            backend.go_to(row, last_col);
+            backend.print(set.top_right_qorner);
         }
         if self.borders.contains(Borders::BOTTOM | Borders::LEFT) {
-            writer.go_to(last_row, col);
-            writer.print(set.bot_left_qorner);
+            backend.go_to(last_row, col);
+            backend.print(set.bot_left_qorner);
         }
         if self.borders.contains(Borders::BOTTOM | Borders::RIGHT) {
-            writer.go_to(last_row, last_col);
-            writer.print(set.bot_right_qorner);
+            backend.go_to(last_row, last_col);
+            backend.print(set.bot_right_qorner);
         }
         if fg.is_some() {
-            writer.reset_style();
+            backend.reset_style();
         }
     }
 }

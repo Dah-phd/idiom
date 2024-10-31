@@ -25,11 +25,11 @@ impl PopupInterface for Popup {
         let (height, width) = self.size;
         let mut area = gs.screen_rect.center(height, width);
         area.bordered();
-        area.draw_borders(None, None, &mut gs.writer);
-        area.border_title(&self.title, &mut gs.writer);
+        area.draw_borders(None, None, gs.backend());
+        area.border_title(&self.title, gs.backend());
         let mut lines = area.into_iter();
         if let Some(first_line) = lines.next() {
-            self.p_from_message(first_line, &mut gs.writer);
+            self.p_from_message(first_line, gs.backend());
         }
         if let Some(second_line) = lines.next() {
             self.spans_from_buttons(second_line, &mut gs.writer);
