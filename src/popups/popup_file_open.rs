@@ -137,7 +137,7 @@ impl PopupInterface for OpenFileSelector {
             _ => return PopupMessage::None,
         };
         let relative_row = match self.rect.as_ref().and_then(|rect| rect.relative_position(row, column)) {
-            Some((row, ..)) => row,
+            Some(pos) => pos.line,
             None => return PopupMessage::None,
         };
         if relative_row < 1 {

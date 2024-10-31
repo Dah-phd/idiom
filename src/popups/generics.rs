@@ -3,12 +3,12 @@ use crate::{
     global_state::{Clipboard, GlobalState, PopupMessage},
     render::{
         backend::{Backend, Style},
-        layout::Line,
+        layout::{Line, Rect},
         state::State,
         Button,
     },
 };
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 
 pub struct Popup {
     pub message: String,
@@ -134,6 +134,7 @@ pub struct PopupSelector<T> {
     command: fn(&mut PopupSelector<T>) -> PopupMessage,
     size: (u16, usize),
     updated: bool,
+    rect: Option<Rect>,
 }
 
 impl<T> PopupInterface for PopupSelector<T> {
@@ -141,6 +142,7 @@ impl<T> PopupInterface for PopupSelector<T> {
         let (height, width) = self.size;
         let mut rect = gs.screen_rect.center(height, width);
         rect.bordered();
+        self.rect.replace(rect);
         rect.draw_borders(None, None, &mut gs.writer);
         if self.options.is_empty() {
             self.state.render_list(["No results found!"].into_iter(), rect, &mut gs.writer);
@@ -167,6 +169,32 @@ impl<T> PopupInterface for PopupSelector<T> {
         }
     }
 
+    fn mouse_map(&mut self, event: MouseEvent) -> PopupMessage {
+        match event {
+            MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), row, column, .. } => {
+                if let Some(pos) = self.rect.and_then(|rect| rect.relative_position(row, column)) {
+                    let option_idx = pos.line + self.state.at_line;
+                    if option_idx >= self.options.len() {
+                        return PopupMessage::None;
+                    }
+                    self.state.select(option_idx, self.options.len());
+                    self.mark_as_updated();
+                    return (self.command)(self);
+                }
+            }
+            MouseEvent { kind: MouseEventKind::ScrollUp, .. } => {
+                self.state.prev(self.options.len());
+                self.mark_as_updated();
+            }
+            MouseEvent { kind: MouseEventKind::ScrollDown, .. } => {
+                self.state.next(self.options.len());
+                self.mark_as_updated();
+            }
+            _ => (),
+        }
+        PopupMessage::None
+    }
+
     fn mark_as_updated(&mut self) {
         self.updated = true;
     }
@@ -184,6 +212,6 @@ impl<T> PopupSelector<T> {
         size: Option<(u16, usize)>,
     ) -> Self {
         let size = size.unwrap_or((20, 120));
-        Self { options, display, command, state: State::new(), size, updated: true }
+        Self { options, display, command, state: State::new(), size, updated: true, rect: None }
     }
 }

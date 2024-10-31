@@ -74,34 +74,34 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
         MouseEventKind::Down(MouseButton::Left) => {
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = workspace.get_active() {
-                    editor.mouse_cursor(position.into());
+                    editor.mouse_cursor(position);
                     gs.insert_mode();
                     tree.select_by_path(&editor.path);
                     workspace.toggle_editor();
                 }
                 return;
             }
-            if let Some((line_idx, _)) = gs.tree_area.relative_position(event.row, event.column) {
-                if let Some(path) = tree.mouse_select(line_idx + 1) {
+            if let Some(pos) = gs.tree_area.relative_position(event.row, event.column) {
+                if let Some(path) = tree.mouse_select(pos.line + 1) {
                     gs.event.push(IdiomEvent::OpenAtLine(path, 0));
                     return;
                 };
                 gs.select_mode();
             }
-            if let Some((_, col_idx)) = gs.tab_area.relative_position(event.row, event.column) {
+            if let Some(pos) = gs.tab_area.relative_position(event.row, event.column) {
                 if !workspace.is_empty() {
                     gs.insert_mode();
-                    if let Some(idx) = workspace.select_tab_mouse(col_idx) {
+                    if let Some(idx) = workspace.select_tab_mouse(pos.char) {
                         workspace.activate_editor(idx, gs);
                     };
                 }
             }
         }
         MouseEventKind::Down(MouseButton::Right) => {
-            if let Some((_, col_idx)) = gs.tab_area.relative_position(event.row, event.column) {
+            if let Some(pos) = gs.tab_area.relative_position(event.row, event.column) {
                 if !workspace.is_empty() {
                     gs.insert_mode();
-                    if let Some(idx) = workspace.select_tab_mouse(col_idx) {
+                    if let Some(idx) = workspace.select_tab_mouse(pos.char) {
                         workspace.activate_editor(idx, gs);
                         workspace.close_active(gs);
                     }
@@ -109,7 +109,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
             }
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = workspace.get_active() {
-                    if let Some(clip) = editor.mouse_copy_paste(position.into(), gs.clipboard.pull()) {
+                    if let Some(clip) = editor.mouse_copy_paste(position, gs.clipboard.pull()) {
                         gs.clipboard.push(clip);
                         gs.success("Copied select!");
                     };
@@ -120,7 +120,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
         MouseEventKind::Drag(MouseButton::Left) => {
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = workspace.get_active() {
-                    editor.mouse_select(position.into());
+                    editor.mouse_select(position);
                     gs.insert_mode();
                     workspace.toggle_editor();
                 }
