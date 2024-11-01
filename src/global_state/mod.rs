@@ -10,8 +10,8 @@ use crate::{
     lsp::{LSPError, LSPResult},
     popups::{self, PopupInterface},
     render::{
-        backend::{color, Backend, BackendProtocol},
-        layout::{Rect, DOUBLE_BORDERS},
+        backend::{Backend, BackendProtocol},
+        layout::Rect,
     },
     runner::EditorTerminal,
     tree::Tree,
@@ -279,26 +279,6 @@ impl GlobalState {
         self.screen_rect = (width, height).into();
         self.draw_callback = draw::full_rebuild;
         self.event.push(IdiomEvent::Resize);
-    }
-
-    pub fn recalc_draw_size(&mut self) {
-        self.tree_area = self.screen_rect;
-        self.footer_area = self.tree_area.splitoff_rows(1);
-        if let Some(mut line) = self.footer_area.get_line(0) {
-            line += Mode::len();
-            self.messages.set_line(line);
-        };
-        if matches!(self.mode, Mode::Select) || self.components.contains(Components::TREE) {
-            self.tab_area = self.tree_area.keep_col((self.tree_size * self.screen_rect.width) / 100);
-            self.tree_area.top_border().right_border().draw_borders(
-                Some(DOUBLE_BORDERS),
-                Some(color::dark_grey()),
-                &mut self.writer,
-            );
-        } else {
-            self.tab_area = self.tree_area.keep_col(0);
-        };
-        self.editor_area = self.tab_area.keep_rows(1);
     }
 
     /// unwrap or default with logged error

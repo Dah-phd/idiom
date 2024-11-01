@@ -1,9 +1,10 @@
 use super::{GlobalState, IdiomEvent};
+use crate::popups::pallet::Pallet;
 use crate::render::backend::{color, Backend, Style};
 use crate::render::layout::Line;
 use crate::{runner::EditorTerminal, tree::Tree, workspace::Workspace};
-use crossterm::event::KeyEvent;
-use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::style::Color;
 
 const INSERT_SPAN: &str = "  --INSERT--   ";
 const SELECT_SPAN: &str = "  --SELECT--   ";
@@ -37,7 +38,7 @@ impl Mode {
     pub fn render_select_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) {
         line.width = std::cmp::min(MODE_LEN, line.width);
         accent_style.add_bold();
-        accent_style.set_fg(Some(color::cyan()));
+        accent_style.set_fg(Some(Self::select_color()));
         line.render_styled(SELECT_SPAN, accent_style, backend);
     }
 
@@ -45,8 +46,16 @@ impl Mode {
     pub fn render_insert_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) {
         line.width = std::cmp::min(MODE_LEN, line.width);
         accent_style.add_bold();
-        accent_style.set_fg(Some(color::rgb(255, 0, 0)));
+        accent_style.set_fg(Some(Self::insert_color()));
         line.render_styled(INSERT_SPAN, accent_style, backend);
+    }
+
+    pub const fn select_color() -> Color {
+        color::cyan()
+    }
+
+    pub const fn insert_color() -> Color {
+        color::rgb(255, 0, 0)
     }
 
     #[inline]
@@ -71,7 +80,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                 editor.map(crate::configs::EditorAction::ScrollDown, gs);
             }
         }
-        MouseEventKind::Down(MouseButton::Left) => {
+        MouseEventKind::Up(MouseButton::Left) => {
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = workspace.get_active() {
                     editor.mouse_cursor(position);
@@ -87,7 +96,8 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                     return;
                 };
                 gs.select_mode();
-            }
+                return;
+            };
             if let Some(pos) = gs.tab_area.relative_position(event.row, event.column) {
                 if !workspace.is_empty() {
                     gs.insert_mode();
@@ -95,9 +105,13 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                         workspace.activate_editor(idx, gs);
                     };
                 }
+                return;
+            }
+            if gs.tree_area.relative_position(event.row + 2, event.column).is_some() {
+                gs.popup(Pallet::new());
             }
         }
-        MouseEventKind::Down(MouseButton::Right) => {
+        MouseEventKind::Up(MouseButton::Right) => {
             if let Some(pos) = gs.tab_area.relative_position(event.row, event.column) {
                 if !workspace.is_empty() {
                     gs.insert_mode();

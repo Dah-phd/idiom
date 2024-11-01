@@ -134,6 +134,7 @@ impl Rect {
         Some(Line { row: self.row + rel_idx, col: self.col, width: self.width })
     }
 
+    /// takes top line
     pub fn next_line(&mut self) -> Option<Line> {
         if self.height == 0 {
             return None;
@@ -141,6 +142,16 @@ impl Rect {
         let line = Line { row: self.row, col: self.col, width: self.width };
         self.height -= 1;
         self.row += 1;
+        Some(line)
+    }
+
+    /// takes bot line
+    pub fn next_line_back(&mut self) -> Option<Line> {
+        if self.height == 0 {
+            return None;
+        }
+        let line = Line { row: self.row + self.height, col: self.col, width: self.width };
+        self.height -= 1;
         Some(line)
     }
 
