@@ -309,7 +309,7 @@ impl GlobalState {
     }
 
     pub async fn exchange_should_exit(&mut self, tree: &mut Tree, ws: &mut Workspace) -> bool {
-        tree.finish_sync(self);
+        tree.sync(self);
         while let Some(event) = self.event.pop() {
             event.handle(self, ws, tree).await
         }

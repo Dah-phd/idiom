@@ -27,7 +27,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
     let mut general_key_map = configs.general_key_map();
 
     // COMPONENTS
-    let mut tree = Tree::new(configs.tree_key_map());
+    let mut tree = Tree::new(configs.tree_key_map(), &mut gs);
     let mut workspace = Workspace::new(configs.editor_key_map(), tree.get_base_file_names(), &mut gs).await;
     let mut term = EditorTerminal::new(gs.editor_area.width as u16);
 

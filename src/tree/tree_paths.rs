@@ -16,7 +16,7 @@ use std::{
     sync::Arc,
 };
 
-use super::PathParser;
+use super::{watcher::TreeWatcher, PathParser};
 
 const ERR: Color = color::red();
 const WAR: Color = color::dark_yellow();
@@ -125,7 +125,7 @@ impl TreePath {
         }
     }
 
-    pub fn expand_contained(&mut self, rel_path: &Path) -> bool {
+    pub fn expand_contained(&mut self, rel_path: &Path, watcher: &mut TreeWatcher) -> bool {
         if self.path() == rel_path {
             return true;
         }
@@ -134,7 +134,8 @@ impl TreePath {
             self.expand();
             if let Some(nested_tree) = self.tree_mut() {
                 for tree_path in nested_tree {
-                    if tree_path.expand_contained(rel_path) {
+                    if tree_path.expand_contained(rel_path, watcher) {
+                        let _ = watcher.watch(tree_path.path());
                         return true;
                     }
                 }
