@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use super::PopupInterface;
 use crate::{
     global_state::{Clipboard, GlobalState, PopupMessage},
@@ -15,6 +17,8 @@ pub struct Popup {
     title: String,
     message_as_buffer_builder: Option<fn(char) -> Option<char>>,
     buttons: Vec<Button>,
+    button_line: u16,
+    button_ranges: Vec<Range<u16>>,
     size: (u16, usize),
     state: usize,
     updated: bool,
@@ -55,26 +59,38 @@ impl PopupInterface for Popup {
                 self.message.pop();
                 PopupMessage::None
             }
-            KeyCode::Enter => (self.buttons[self.state].command)(self),
+            KeyCode::Enter => self.call_button(self.state),
             KeyCode::Left => {
-                if self.state > 0 {
-                    self.state -= 1;
-                } else {
-                    self.state = self.buttons.len() - 1;
-                }
+                self.prev();
                 PopupMessage::None
             }
             KeyCode::Right => {
-                if self.state < self.buttons.len() - 1 {
-                    self.state += 1;
-                } else {
-                    self.state = 0;
-                }
+                self.next();
                 PopupMessage::None
             }
             KeyCode::Esc => PopupMessage::Clear,
             _ => PopupMessage::None,
         }
+    }
+
+    fn mouse_map(&mut self, event: MouseEvent) -> PopupMessage {
+        match event {
+            MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } if row == self.button_line => {
+                if let Some(position) = self.button_ranges.iter().position(|btn_range| btn_range.contains(&column)) {
+                    return self.call_button(position);
+                }
+            }
+            MouseEvent { kind: MouseEventKind::ScrollUp, .. } => {
+                self.mark_as_updated();
+                self.prev();
+            }
+            MouseEvent { kind: MouseEventKind::ScrollDown, .. } => {
+                self.mark_as_updated();
+                self.next();
+            }
+            _ => (),
+        }
+        PopupMessage::None
     }
 
     fn mark_as_updated(&mut self) {
@@ -96,7 +112,42 @@ impl Popup {
     ) -> Self {
         let size = size.unwrap_or((6, 40));
         let title = title.unwrap_or("Prompt".to_owned());
-        Self { message, title, message_as_buffer_builder, buttons, size, state: 0, updated: true }
+        Self {
+            message,
+            title,
+            message_as_buffer_builder,
+            buttons,
+            button_line: 0,
+            button_ranges: vec![],
+            size,
+            state: 0,
+            updated: true,
+        }
+    }
+
+    fn next(&mut self) {
+        if self.state < self.buttons.len() - 1 {
+            self.state += 1;
+        } else {
+            self.state = 0;
+        }
+    }
+
+    fn prev(&mut self) {
+        if self.state > 0 {
+            self.state -= 1;
+        } else {
+            self.state = self.buttons.len() - 1;
+        }
+    }
+
+    fn call_button(&mut self, position: usize) -> PopupMessage {
+        if self.message_as_buffer_builder.is_some() && self.message.is_empty() {
+            self.state = position;
+            self.mark_as_updated();
+            return PopupMessage::None;
+        }
+        (self.buttons[position].command)(self)
     }
 
     fn p_from_message(&self, line: Line, backend: &mut Backend) {
@@ -109,7 +160,11 @@ impl Popup {
         builder.push_styled("|", Style::slowblink());
     }
 
-    fn spans_from_buttons(&self, line: Line, backend: &mut Backend) {
+    fn spans_from_buttons(&mut self, line: Line, backend: &mut Backend) {
+        let mut last_btn_end = line.col;
+        self.button_line = line.row;
+        self.button_ranges.clear();
+
         let btn_count = self.buttons.len();
         let sum_btn_names_len: usize = self.buttons.iter().map(|b| b.name.len()).sum();
         let padding = line.width.saturating_sub(sum_btn_names_len) / btn_count;
@@ -123,6 +178,10 @@ impl Popup {
             } else if !builder.push(text.as_str()) {
                 break;
             };
+            let btn_end = last_btn_end + text.len() as u16;
+            let but_range = last_btn_end..btn_end;
+            last_btn_end = btn_end;
+            self.button_ranges.push(but_range)
         }
     }
 }
