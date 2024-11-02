@@ -1,4 +1,10 @@
-## Includes only major changes
+## Includes only major changes (manual updates)
+# Version 0.4.4
+* Added proper FileWatcher
+* Added LocalLSP -> non-lsp functionallity
+* imporved rendering and performance
+* added command pallet
+* added mouse support to popups
 
 # Version 0.3.0
 * dropped ratatui (slugishness on some terminal emulators) - time for normal functioning (frame generation) brough down from ~2 milisec to ~200 nanosecs

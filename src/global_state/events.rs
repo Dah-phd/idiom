@@ -12,7 +12,7 @@ use lsp_types::{
 };
 use std::path::PathBuf;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum IdiomEvent {
     PopupAccess,
     PopupAccessOnce,
