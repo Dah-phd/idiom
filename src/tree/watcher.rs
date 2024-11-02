@@ -95,11 +95,7 @@ impl EventHandles {
             match kind {
                 Access(AccessKind::Close(AccessMode::Write)) => {
                     for path in paths {
-                        let idiom_event = IdiomEvent::FileUpdated(path);
-                        if gs.event.contains(&idiom_event) {
-                            continue;
-                        }
-                        gs.event.push(idiom_event);
+                        gs.event.push(IdiomEvent::FileUpdated(path));
                     }
                     if self.contains(Self::CONTENT) {
                         self.remove(Self::CONTENT);
