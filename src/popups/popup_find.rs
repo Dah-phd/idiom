@@ -28,24 +28,27 @@ impl GoToLinePopup {
     pub fn new() -> Box<Self> {
         Box::default()
     }
+
+    fn parse(&mut self) -> PopupMessage {
+        if self.line_idx.is_empty() {
+            return PopupMessage::None;
+        }
+        match self.line_idx.parse::<usize>() {
+            Ok(idx) => PopupMessage::Event(IdiomEvent::GoToLine { line: idx.saturating_sub(1), clear_popup: false }),
+            _ => PopupMessage::None,
+        }
+    }
 }
 
 impl PopupInterface for GoToLinePopup {
     fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard) -> PopupMessage {
         match key.code {
-            KeyCode::Char(ch) => {
-                if ch.is_numeric() {
-                    self.line_idx.push(ch);
-                    return IdiomEvent::PopupAccess.into();
-                };
-                PopupMessage::None
+            KeyCode::Char(ch) if ch.is_numeric() => {
+                self.line_idx.push(ch);
+                self.parse()
             }
-            KeyCode::Backspace => {
-                if self.line_idx.pop().is_some() {
-                    return IdiomEvent::PopupAccess.into();
-                };
-                PopupMessage::None
-            }
+            KeyCode::Backspace if self.line_idx.pop().is_some() => self.parse(),
+            KeyCode::Backspace => PopupMessage::None,
             _ => PopupMessage::Clear,
         }
     }
@@ -53,22 +56,14 @@ impl PopupInterface for GoToLinePopup {
     fn render(&mut self, gs: &mut GlobalState) {
         if let Some(line) = gs.editor_area.right_top_corner(1, 50).into_iter().next() {
             gs.writer.set_style(gs.theme.accent_style);
-            let mut builder = line.unsafe_builder(&mut gs.writer);
-            builder.push(" Go to >> ");
-            builder.push(&self.line_idx);
-            builder.push_styled("|", Style::slowblink());
-            drop(builder);
+            {
+                let mut builder = line.unsafe_builder(&mut gs.writer);
+                builder.push(" Go to >> ");
+                builder.push(&self.line_idx);
+                builder.push_styled("|", Style::slowblink());
+            }
             gs.writer.reset_style();
         };
-    }
-
-    fn component_access(&mut self, ws: &mut Workspace, _tree: &mut Tree) {
-        if let Some(editor) = ws.get_active() {
-            self.updated = true;
-            if let Ok(idx) = self.line_idx.parse::<usize>() {
-                editor.go_to(idx.saturating_sub(1));
-            }
-        }
     }
 
     fn mark_as_updated(&mut self) {

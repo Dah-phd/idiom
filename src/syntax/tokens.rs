@@ -1,12 +1,9 @@
-use crate::{render::backend::Style, syntax::diagnostics::DiagnosticData, workspace::cursor::Cursor};
-use crate::{
-    syntax::{theme::Theme, Legend},
-    workspace::line::EditorLine,
-};
+use super::{diagnostics::DiagnosticData, Legend};
+use crate::{render::backend::Style, workspace::cursor::Cursor, workspace::line::EditorLine};
 use lsp_types::SemanticToken;
 use unicode_width::UnicodeWidthChar;
 
-pub fn set_tokens(tokens: Vec<SemanticToken>, legend: &Legend, theme: &Theme, content: &mut [EditorLine]) {
+pub fn set_tokens(tokens: Vec<SemanticToken>, legend: &Legend, content: &mut [EditorLine]) {
     let mut tokens = tokens.into_iter();
 
     let token = match tokens.next() {
@@ -16,7 +13,7 @@ pub fn set_tokens(tokens: Vec<SemanticToken>, legend: &Legend, theme: &Theme, co
     let mut line_idx = token.delta_line as usize;
     let mut token_line = content[line_idx].tokens_mut();
     token_line.clear();
-    token_line.push(Token::parse(token, legend, theme));
+    token_line.push(Token::parse(token, legend));
 
     for token in tokens {
         if token.delta_line != 0 {
@@ -24,17 +21,11 @@ pub fn set_tokens(tokens: Vec<SemanticToken>, legend: &Legend, theme: &Theme, co
             token_line = content[line_idx].tokens_mut();
             token_line.clear();
         };
-        token_line.push(Token::parse(token, legend, theme));
+        token_line.push(Token::parse(token, legend));
     }
 }
 
-pub fn set_tokens_partial(
-    tokens: Vec<SemanticToken>,
-    max_lines: usize,
-    legend: &Legend,
-    theme: &Theme,
-    content: &mut [EditorLine],
-) {
+pub fn set_tokens_partial(tokens: Vec<SemanticToken>, max_lines: usize, legend: &Legend, content: &mut [EditorLine]) {
     let mut tokens = tokens.into_iter();
 
     let token = match tokens.next() {
@@ -47,7 +38,7 @@ pub fn set_tokens_partial(
     }
     let mut token_line = content[line_idx].tokens_mut();
     token_line.clear();
-    token_line.push(Token::parse(token, legend, theme));
+    token_line.push(Token::parse(token, legend));
 
     for token in tokens {
         if token.delta_line != 0 {
@@ -58,26 +49,25 @@ pub fn set_tokens_partial(
             token_line = content[line_idx].tokens_mut();
             token_line.clear();
         };
-        token_line.push(Token::parse(token, legend, theme));
+        token_line.push(Token::parse(token, legend));
     }
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq, Debug)]
 pub struct TokenLine {
     inner: Vec<Token>,
-    char_len: usize,
 }
 
 impl TokenLine {
     #[inline]
     pub fn clear(&mut self) {
         self.inner.clear();
-        self.char_len = 0;
     }
 
     #[inline]
     pub fn char_len(&self) -> usize {
-        self.char_len
+        self.inner.iter().map(|token| token.delta_start).sum::<usize>()
+            + self.inner.last().map(|t| t.len).unwrap_or_default()
     }
 
     #[inline]
@@ -93,37 +83,40 @@ impl TokenLine {
     pub fn increment_end(&mut self) {
         if let Some(last) = self.inner.last_mut() {
             last.len += 1;
-            self.char_len += 1;
         }
     }
 
     pub fn increment_at(&mut self, mut idx: usize) {
-        let mut increment = 1;
-        for token in self.inner.iter_mut() {
+        let mut token_iter = self.inner.iter_mut();
+        while let Some(token) = token_iter.next() {
             if idx < token.delta_start {
                 token.delta_start += 1;
-                self.char_len += increment;
-                break;
-            } else if idx <= token.delta_start + token.len {
+                return;
+            };
+            if idx < token.delta_start + token.len {
                 token.len += 1;
-                self.char_len += increment;
-                increment = 0;
+                if let Some(next_token) = token_iter.next() {
+                    next_token.delta_start += 1;
+                }
+                return;
             }
             idx -= token.delta_start;
         }
     }
 
     pub fn decrement_at(&mut self, mut idx: usize) {
-        let mut decrement = 1;
-        for token in self.inner.iter_mut() {
+        let mut token_iter = self.inner.iter_mut();
+        while let Some(token) = token_iter.next() {
             if idx < token.delta_start {
-                token.delta_start += 1;
-                self.char_len -= decrement;
-                break;
-            } else if idx <= token.delta_start + token.len {
-                token.len += 1;
-                self.char_len += decrement;
-                decrement = 0;
+                token.delta_start -= 1;
+                return;
+            }
+            if idx < token.delta_start + token.len {
+                token.len -= 1;
+                if let Some(next_token) = token_iter.next() {
+                    next_token.delta_start -= 1;
+                }
+                return;
             }
             idx -= token.delta_start;
         }
@@ -155,31 +148,19 @@ impl TokenLine {
     }
 
     pub fn push(&mut self, token: Token) {
-        if self.char_len == 0 && !self.is_empty() {
-            self.calc_char_len();
-        }
-        self.char_len += token.delta_start + token.len;
         self.inner.push(token);
     }
 
     pub fn insert(&mut self, index: usize, token: Token) {
         self.inner.insert(index, token);
-        self.calc_char_len();
     }
 
     pub fn iter(&self) -> std::slice::Iter<'_, Token> {
         self.inner.iter()
     }
-
-    #[inline]
-    fn calc_char_len(&mut self) {
-        self.char_len = self.inner.iter().map(|token| token.delta_start).sum();
-        if let Some(last_len) = self.inner.last().map(|t| t.len) {
-            self.char_len += last_len;
-        }
-    }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Token {
     pub len: usize,
     pub delta_start: usize,
@@ -187,9 +168,9 @@ pub struct Token {
 }
 
 impl Token {
-    pub fn parse(token: SemanticToken, legend: &Legend, theme: &Theme) -> Self {
+    pub fn parse(token: SemanticToken, legend: &Legend) -> Self {
         let SemanticToken { delta_start, length, token_type, token_modifiers_bitset, .. } = token;
-        let style = Style::fg(legend.parse_to_color(token_type as usize, token_modifiers_bitset, theme));
+        let style = Style::fg(legend.parse_to_color(token_type as usize, token_modifiers_bitset));
         Self { delta_start: delta_start as usize, len: length as usize, style }
     }
 
@@ -207,46 +188,50 @@ pub fn calc_wraps(content: &mut [EditorLine], text_width: usize) {
 
 pub fn calc_wrap_line(text: &mut EditorLine, text_width: usize) -> usize {
     if text.is_simple() {
-        text.tokens.char_len = text.content.len() / text_width;
+        text.tokens.clear();
+        text.tokens.push(Token { len: 0, delta_start: text.content.len() / text_width, style: Style::default() });
     } else {
         complex_wrap_calc(text, text_width);
     }
-    text.tokens.char_len
+    text.tokens.char_len()
 }
 
 pub fn complex_wrap_calc(text: &mut EditorLine, text_width: usize) {
-    text.tokens.char_len = 0;
+    text.tokens.clear();
     let mut counter = text_width;
+    let mut wraps = Token { delta_start: 0, len: 0, style: Style::default() };
     for ch in text.content.chars() {
         let w = UnicodeWidthChar::width(ch).unwrap_or_default();
         if w > counter {
             counter = text_width;
-            text.tokens.char_len += 1;
+            wraps.delta_start += 1;
         }
         counter -= w;
     }
+    text.tokens.push(wraps);
 }
 
 pub fn calc_wrap_line_capped(text: &mut EditorLine, cursor: &Cursor) -> Option<usize> {
     let text_width = cursor.text_width;
     let cursor_char = cursor.char;
     let max_rows = cursor.max_rows;
+    text.tokens.clear();
     if text.is_simple() {
-        text.tokens.char_len = text.content.len() / text_width;
+        text.tokens.push(Token { len: 0, delta_start: text.content.len() / text_width, style: Style::default() });
         let cursor_at_row = 2 + cursor_char / text_width;
         if cursor_at_row > max_rows {
             return Some(cursor_at_row - max_rows);
         }
     } else {
-        text.tokens.char_len = 0;
         let mut counter = text_width;
         let mut cursor_at_row = 1;
         let mut prev_idx_break = 0;
+        let mut wraps = Token { delta_start: 0, len: 0, style: Style::default() };
         for (idx, ch) in text.content.chars().enumerate() {
             let w = UnicodeWidthChar::width(ch).unwrap_or_default();
             if w > counter {
                 counter = text_width;
-                text.tokens.char_len += 1;
+                wraps.delta_start += 1;
                 if prev_idx_break < cursor_char {
                     cursor_at_row += 1;
                 }
@@ -254,6 +239,7 @@ pub fn calc_wrap_line_capped(text: &mut EditorLine, cursor: &Cursor) -> Option<u
             }
             counter -= w;
         }
+        text.tokens.push(wraps);
         if prev_idx_break < cursor_char {
             cursor_at_row += 1;
         }

@@ -2,9 +2,12 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use super::PathParser;
-use crate::error::IdiomResult;
-use crate::global_state::IdiomEvent;
-use crate::{global_state::GlobalState, tree::TreePath};
+use crate::error::IdiomError;
+use crate::{
+    error::IdiomResult,
+    global_state::{GlobalState, IdiomEvent},
+    tree::TreePath,
+};
 use bitflags::bitflags;
 use notify::{
     event::{AccessKind, AccessMode, ModifyKind},
@@ -14,17 +17,31 @@ use notify::{
 const TICK: Duration = Duration::from_secs(1);
 
 pub enum TreeWatcher {
-    System { _inner: RecommendedWatcher, receiver: std::sync::mpsc::Receiver<Result<Event, Error>> },
+    System { inner: RecommendedWatcher, receiver: std::sync::mpsc::Receiver<Result<Event, Error>> },
     Manual { clock: Instant },
 }
 
 impl TreeWatcher {
-    pub fn root() -> Self {
+    pub fn root(path: &Path) -> Self {
         let (tx, receiver) = std::sync::mpsc::channel();
         RecommendedWatcher::new(tx, Config::default())
-            .and_then(|mut inner| inner.watch(&PathBuf::from("."), RecursiveMode::Recursive).map(|_| inner))
-            .map(|_inner| Self::System { _inner, receiver })
+            .and_then(|mut inner| inner.watch(path, RecursiveMode::NonRecursive).map(|_| inner))
+            .map(|inner| Self::System { inner, receiver })
             .unwrap_or(Self::Manual { clock: Instant::now() })
+    }
+
+    pub fn watch(&mut self, path: &Path) -> IdiomResult<()> {
+        if let Self::System { inner: _inner, .. } = self {
+            _inner.watch(path, RecursiveMode::NonRecursive).map_err(|err| IdiomError::IOError(err.to_string()))?;
+        }
+        Ok(())
+    }
+
+    pub fn stop_watch(&mut self, path: &Path) -> IdiomResult<()> {
+        if let Self::System { inner: _inner, .. } = self {
+            _inner.unwatch(path).map_err(|err| IdiomError::IOError(err.to_string()))?;
+        }
+        Ok(())
     }
 
     pub fn poll(&mut self, tree: &mut TreePath, path_parser: PathParser, gs: &mut GlobalState) -> bool {

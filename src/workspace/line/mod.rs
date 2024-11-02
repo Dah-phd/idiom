@@ -1,12 +1,10 @@
 mod context;
-// mod render;
 mod status;
 use status::RenderStatus;
 
 use crate::{
     render::{utils::UTF8SafeStringExt, UTF8Safe},
     syntax::{tokens::TokenLine, DiagnosticLine, Lang, Token},
-    // workspace::line::EditorLine,
 };
 pub use context::LineContext;
 use std::{
@@ -142,9 +140,7 @@ impl EditorLine {
     #[inline]
     pub fn push(&mut self, ch: char) {
         self.cached.reset();
-        if self.char_len == self.tokens.char_len() {
-            self.tokens.increment_end();
-        }
+        self.tokens.increment_at(self.char_len);
         self.char_len += 1;
         self.content.push(ch);
     }

@@ -5,7 +5,7 @@ use crate::{
 
 pub fn into_message(maybe_position: Option<(CursorPosition, CursorPosition)>) -> PopupMessage {
     if let Some(select) = maybe_position {
-        PopupMessage::Tree(IdiomEvent::GoToSelect { select, clear_popup: false })
+        PopupMessage::Event(IdiomEvent::GoToSelect { select, clear_popup: false })
     } else {
         PopupMessage::None
     }

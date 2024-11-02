@@ -1,7 +1,7 @@
+use super::backend::{color, Backend, Style};
 use crate::{
     configs::EditorAction,
     global_state::{Clipboard, IdiomEvent, PopupMessage},
-    render::backend::{color, Backend, Style},
 };
 use core::ops::Range;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -383,11 +383,11 @@ pub fn arg_range_at(line: &str, idx: usize) -> Range<usize> {
 
 impl TextField<PopupMessage> {
     pub fn with_tree_access(text: String) -> Self {
-        Self::new(text, Some(PopupMessage::Tree(IdiomEvent::PopupAccess)))
+        Self::new(text, Some(PopupMessage::Event(IdiomEvent::PopupAccess)))
     }
 
     pub fn with_editor_access(text: String) -> Self {
-        Self::new(text, Some(PopupMessage::Tree(IdiomEvent::PopupAccess)))
+        Self::new(text, Some(PopupMessage::Event(IdiomEvent::PopupAccess)))
     }
 }
 

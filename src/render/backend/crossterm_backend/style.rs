@@ -21,6 +21,12 @@ impl Style {
     }
 
     #[inline]
+    pub fn with_fg(mut self, color: Color) -> Self {
+        self.0.foreground_color = Some(color);
+        self
+    }
+
+    #[inline]
     pub fn set_fg(&mut self, color: Option<Color>) {
         self.0.foreground_color = color;
     }
@@ -33,6 +39,12 @@ impl Style {
             underline_color: None,
             attributes: Attributes::default(),
         })
+    }
+
+    #[inline]
+    pub fn with_bg(mut self, color: Color) -> Self {
+        self.0.background_color = Some(color);
+        self
     }
 
     #[inline]

@@ -1,20 +1,25 @@
+use std::ops::Range;
+
 use super::PopupInterface;
 use crate::{
     global_state::{Clipboard, GlobalState, PopupMessage},
     render::{
         backend::{Backend, Style},
-        layout::Line,
+        layout::{Line, Rect},
         state::State,
         Button,
     },
 };
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 
 pub struct Popup {
     pub message: String,
+    title_prefix: Option<&'static str>,
     title: String,
     message_as_buffer_builder: Option<fn(char) -> Option<char>>,
     buttons: Vec<Button>,
+    button_line: u16,
+    button_ranges: Vec<Range<u16>>,
     size: (u16, usize),
     state: usize,
     updated: bool,
@@ -25,11 +30,14 @@ impl PopupInterface for Popup {
         let (height, width) = self.size;
         let mut area = gs.screen_rect.center(height, width);
         area.bordered();
-        area.draw_borders(None, None, &mut gs.writer);
-        area.border_title(&self.title, &mut gs.writer);
+        area.draw_borders(None, None, gs.backend());
+        match self.title_prefix {
+            Some(prefix) => area.border_title_prefixed(prefix, &self.title, gs.backend()),
+            None => area.border_title(&self.title, gs.backend()),
+        };
         let mut lines = area.into_iter();
         if let Some(first_line) = lines.next() {
-            self.p_from_message(first_line, &mut gs.writer);
+            self.p_from_message(first_line, gs.backend());
         }
         if let Some(second_line) = lines.next() {
             self.spans_from_buttons(second_line, &mut gs.writer);
@@ -57,24 +65,36 @@ impl PopupInterface for Popup {
             }
             KeyCode::Enter => (self.buttons[self.state].command)(self),
             KeyCode::Left => {
-                if self.state > 0 {
-                    self.state -= 1;
-                } else {
-                    self.state = self.buttons.len() - 1;
-                }
+                self.prev();
                 PopupMessage::None
             }
             KeyCode::Right => {
-                if self.state < self.buttons.len() - 1 {
-                    self.state += 1;
-                } else {
-                    self.state = 0;
-                }
+                self.next();
                 PopupMessage::None
             }
             KeyCode::Esc => PopupMessage::Clear,
             _ => PopupMessage::None,
         }
+    }
+
+    fn mouse_map(&mut self, event: MouseEvent) -> PopupMessage {
+        match event {
+            MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } if row == self.button_line => {
+                if let Some(position) = self.button_ranges.iter().position(|btn_range| btn_range.contains(&column)) {
+                    return (self.buttons[position].command)(self);
+                }
+            }
+            MouseEvent { kind: MouseEventKind::ScrollUp, .. } => {
+                self.mark_as_updated();
+                self.prev();
+            }
+            MouseEvent { kind: MouseEventKind::ScrollDown, .. } => {
+                self.mark_as_updated();
+                self.next();
+            }
+            _ => (),
+        }
+        PopupMessage::None
     }
 
     fn mark_as_updated(&mut self) {
@@ -89,6 +109,7 @@ impl PopupInterface for Popup {
 impl Popup {
     pub fn new(
         message: String,
+        title_prefix: Option<&'static str>,
         title: Option<String>,
         message_as_buffer_builder: Option<fn(char) -> Option<char>>,
         buttons: Vec<Button>,
@@ -96,7 +117,34 @@ impl Popup {
     ) -> Self {
         let size = size.unwrap_or((6, 40));
         let title = title.unwrap_or("Prompt".to_owned());
-        Self { message, title, message_as_buffer_builder, buttons, size, state: 0, updated: true }
+        Self {
+            message,
+            title_prefix,
+            title,
+            message_as_buffer_builder,
+            buttons,
+            button_line: 0,
+            button_ranges: vec![],
+            size,
+            state: 0,
+            updated: true,
+        }
+    }
+
+    fn next(&mut self) {
+        if self.state < self.buttons.len() - 1 {
+            self.state += 1;
+        } else {
+            self.state = 0;
+        }
+    }
+
+    fn prev(&mut self) {
+        if self.state > 0 {
+            self.state -= 1;
+        } else {
+            self.state = self.buttons.len() - 1;
+        }
     }
 
     fn p_from_message(&self, line: Line, backend: &mut Backend) {
@@ -109,7 +157,11 @@ impl Popup {
         builder.push_styled("|", Style::slowblink());
     }
 
-    fn spans_from_buttons(&self, line: Line, backend: &mut Backend) {
+    fn spans_from_buttons(&mut self, line: Line, backend: &mut Backend) {
+        let mut last_btn_end = line.col;
+        self.button_line = line.row;
+        self.button_ranges.clear();
+
         let btn_count = self.buttons.len();
         let sum_btn_names_len: usize = self.buttons.iter().map(|b| b.name.len()).sum();
         let padding = line.width.saturating_sub(sum_btn_names_len) / btn_count;
@@ -123,6 +175,10 @@ impl Popup {
             } else if !builder.push(text.as_str()) {
                 break;
             };
+            let btn_end = last_btn_end + text.len() as u16;
+            let but_range = last_btn_end..btn_end;
+            last_btn_end = btn_end;
+            self.button_ranges.push(but_range)
         }
     }
 }
@@ -134,6 +190,7 @@ pub struct PopupSelector<T> {
     command: fn(&mut PopupSelector<T>) -> PopupMessage,
     size: (u16, usize),
     updated: bool,
+    rect: Option<Rect>,
 }
 
 impl<T> PopupInterface for PopupSelector<T> {
@@ -141,11 +198,12 @@ impl<T> PopupInterface for PopupSelector<T> {
         let (height, width) = self.size;
         let mut rect = gs.screen_rect.center(height, width);
         rect.bordered();
+        self.rect.replace(rect);
         rect.draw_borders(None, None, &mut gs.writer);
         if self.options.is_empty() {
-            self.state.render_list(["No results found!"].into_iter(), &rect, &mut gs.writer);
+            self.state.render_list(["No results found!"].into_iter(), rect, &mut gs.writer);
         } else {
-            self.state.render_list(self.options.iter().map(|opt| (self.display)(opt)), &rect, &mut gs.writer);
+            self.state.render_list(self.options.iter().map(|opt| (self.display)(opt)), rect, &mut gs.writer);
         };
     }
 
@@ -167,6 +225,32 @@ impl<T> PopupInterface for PopupSelector<T> {
         }
     }
 
+    fn mouse_map(&mut self, event: MouseEvent) -> PopupMessage {
+        match event {
+            MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), row, column, .. } => {
+                if let Some(pos) = self.rect.and_then(|rect| rect.relative_position(row, column)) {
+                    let option_idx = pos.line + self.state.at_line;
+                    if option_idx >= self.options.len() {
+                        return PopupMessage::None;
+                    }
+                    self.state.select(option_idx, self.options.len());
+                    self.mark_as_updated();
+                    return (self.command)(self);
+                }
+            }
+            MouseEvent { kind: MouseEventKind::ScrollUp, .. } => {
+                self.state.prev(self.options.len());
+                self.mark_as_updated();
+            }
+            MouseEvent { kind: MouseEventKind::ScrollDown, .. } => {
+                self.state.next(self.options.len());
+                self.mark_as_updated();
+            }
+            _ => (),
+        }
+        PopupMessage::None
+    }
+
     fn mark_as_updated(&mut self) {
         self.updated = true;
     }
@@ -184,6 +268,6 @@ impl<T> PopupSelector<T> {
         size: Option<(u16, usize)>,
     ) -> Self {
         let size = size.unwrap_or((20, 120));
-        Self { options, display, command, state: State::new(), size, updated: true }
+        Self { options, display, command, state: State::new(), size, updated: true, rect: None }
     }
 }

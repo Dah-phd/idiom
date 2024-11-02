@@ -1,8 +1,8 @@
 mod code;
 mod text;
 
-use super::line::LineContext;
-use crate::{global_state::GlobalState, syntax::Lexer, workspace::Editor};
+use super::{line::LineContext, Editor};
+use crate::{global_state::GlobalState, render::layout::IterLines, syntax::Lexer};
 
 /// Component containing logic regarding rendering
 /// In order to escape complicated state machines and any form on polymorphism,

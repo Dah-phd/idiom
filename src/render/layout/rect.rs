@@ -1,9 +1,11 @@
-use crate::render::{
-    backend::{Backend, BackendProtocol, Color, Style},
-    layout::{BorderSet, Borders, Line, BORDERS},
-    utils::UTF8Safe,
+use crate::{
+    render::{
+        backend::{Backend, BackendProtocol, Color, Style},
+        layout::{BorderSet, Borders, Line, BORDERS},
+        utils::UTF8Safe,
+    },
+    workspace::CursorPosition,
 };
-use std::ops::Range;
 
 #[derive(Default, Clone, Copy, Debug)]
 pub struct Rect {
@@ -11,7 +13,7 @@ pub struct Rect {
     pub col: u16,
     pub width: usize,
     pub height: u16,
-    borders: Borders,
+    pub borders: Borders,
 }
 
 impl Rect {
@@ -25,6 +27,17 @@ impl Rect {
         width -= 2;
         height -= 2;
         Self { row, col, width, height, borders: Borders::all() }
+    }
+
+    pub fn relative_position(&self, row: u16, column: u16) -> Option<CursorPosition> {
+        match self.col <= column
+            && self.row <= row
+            && row <= self.row + self.height
+            && column <= self.col + self.width as u16
+        {
+            true => Some(CursorPosition { line: (row - self.row) as usize, char: (column - self.col) as usize }),
+            false => None,
+        }
     }
 
     /// Creates floating modal around position (the row within it);
@@ -121,12 +134,39 @@ impl Rect {
         Some(Line { row: self.row + rel_idx, col: self.col, width: self.width })
     }
 
+    /// takes top line
+    pub fn next_line(&mut self) -> Option<Line> {
+        if self.height == 0 {
+            return None;
+        }
+        let line = Line { row: self.row, col: self.col, width: self.width };
+        self.height -= 1;
+        self.row += 1;
+        Some(line)
+    }
+
+    /// takes bot line
+    pub fn next_line_back(&mut self) -> Option<Line> {
+        if self.height == 0 {
+            return None;
+        }
+        let line = Line { row: self.row + self.height, col: self.col, width: self.width };
+        self.height -= 1;
+        Some(line)
+    }
+
     pub fn center(&self, mut height: u16, mut width: usize) -> Self {
         height = std::cmp::min(self.height, height);
         let row = self.row + ((self.height - height) / 2);
         width = std::cmp::min(self.width, width);
         let col = self.col + ((self.width - width) / 2) as u16;
         Self { row, col, width, height, ..Default::default() }
+    }
+
+    pub fn vcenter(self, mut width: usize) -> Self {
+        width = std::cmp::min(self.width, width);
+        let col = (self.width - width) as u16 / 2 + self.col;
+        Self { row: self.row, col, width, height: self.height, ..Default::default() }
     }
 
     pub fn left(&self, cols: usize) -> Self {
@@ -228,8 +268,25 @@ impl Rect {
     /// !!! this needs to happen after border rendering
     #[inline]
     pub fn border_title(&self, text: &str, backend: &mut Backend) {
-        if self.borders.contains(Borders::TOP) {
-            backend.print_at(self.row - 1, self.col, text.truncate_width(self.width).1);
+        if !self.borders.contains(Borders::TOP) {
+            return;
+        };
+        backend.print_at(self.row - 1, self.col, text.truncate_width(self.width).1);
+    }
+
+    #[inline]
+    pub fn border_title_prefixed(&self, prefix: &str, suffix: &str, backend: &mut Backend) {
+        if !self.borders.contains(Borders::TOP) {
+            return;
+        }
+        let (remaining, text) = prefix.truncate_width(self.width);
+        backend.print_at(self.row - 1, self.col, text);
+        match remaining > 3 {
+            true => {
+                backend.print("..");
+                backend.print(suffix.truncate_width_start(remaining - 2).1)
+            }
+            false => backend.print(suffix.truncate_width_start(remaining).1),
         };
     }
 
@@ -263,7 +320,7 @@ impl Rect {
         }
     }
 
-    pub fn draw_borders(&self, set: Option<BorderSet>, fg: Option<Color>, writer: &mut Backend) {
+    pub fn draw_borders(&self, set: Option<BorderSet>, fg: Option<Color>, backend: &mut Backend) {
         let top = self.borders.contains(Borders::TOP);
         let bot = self.borders.contains(Borders::BOTTOM);
         let left = self.borders.contains(Borders::LEFT);
@@ -282,52 +339,52 @@ impl Rect {
         };
 
         let set = set.unwrap_or(BORDERS);
-        writer.save_cursor();
+        backend.save_cursor();
         if let Some(color) = fg {
-            writer.set_style(Style::fg(color));
+            backend.set_style(Style::fg(color));
         };
         if top {
             for col_idx in col..last_col {
-                writer.go_to(row, col_idx);
-                writer.print(set.horizontal);
+                backend.go_to(row, col_idx);
+                backend.print(set.horizontal);
             }
         }
         if bot {
             for col_idx in col..last_col {
-                writer.go_to(last_row, col_idx);
-                writer.print(set.horizontal);
+                backend.go_to(last_row, col_idx);
+                backend.print(set.horizontal);
             }
         }
         if left {
             for row_idx in row..last_row {
-                writer.go_to(row_idx, col);
-                writer.print(set.vertical);
+                backend.go_to(row_idx, col);
+                backend.print(set.vertical);
             }
         }
         if right {
             for row_idx in row..last_row {
-                writer.go_to(row_idx, last_col);
-                writer.print(set.vertical);
+                backend.go_to(row_idx, last_col);
+                backend.print(set.vertical);
             }
         }
         if self.borders.contains(Borders::TOP | Borders::LEFT) {
-            writer.go_to(row, col);
-            writer.print(set.top_left_qorner);
+            backend.go_to(row, col);
+            backend.print(set.top_left_qorner);
         }
         if self.borders.contains(Borders::TOP | Borders::RIGHT) {
-            writer.go_to(row, last_col);
-            writer.print(set.top_right_qorner);
+            backend.go_to(row, last_col);
+            backend.print(set.top_right_qorner);
         }
         if self.borders.contains(Borders::BOTTOM | Borders::LEFT) {
-            writer.go_to(last_row, col);
-            writer.print(set.bot_left_qorner);
+            backend.go_to(last_row, col);
+            backend.print(set.bot_left_qorner);
         }
         if self.borders.contains(Borders::BOTTOM | Borders::RIGHT) {
-            writer.go_to(last_row, last_col);
-            writer.print(set.bot_right_qorner);
+            backend.go_to(last_row, last_col);
+            backend.print(set.bot_right_qorner);
         }
         if fg.is_some() {
-            writer.reset_style();
+            backend.reset_style();
         }
     }
 }
@@ -335,79 +392,5 @@ impl Rect {
 impl From<(u16, u16)> for Rect {
     fn from((width, height): (u16, u16)) -> Self {
         Self { row: 0, col: 0, width: width as usize, height, borders: Borders::empty() }
-    }
-}
-
-pub struct RectIter {
-    rect: Rect,
-    row_range: Range<u16>,
-}
-
-impl RectIter {
-    /// return the number of lines remaining
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.row_range.len()
-    }
-
-    /// returns the text width within the lines
-    #[inline]
-    pub fn width(&self) -> usize {
-        self.rect.width
-    }
-
-    /// moves to next line and returns width if success
-    #[inline]
-    pub fn move_cursor(&mut self, backend: &mut Backend) -> Option<usize> {
-        self.next().map(|Line { row, col, width }| {
-            backend.go_to(row, col);
-            width
-        })
-    }
-
-    /// returns the remaining lines as rect (None if all lines are used)
-    #[inline]
-    pub fn into_rect(mut self) -> Option<Rect> {
-        let height = self.row_range.len() as u16;
-        self.row_range.next().map(|row| Rect {
-            row,
-            col: self.rect.col,
-            width: self.rect.width,
-            height,
-            ..Default::default()
-        })
-    }
-
-    #[inline]
-    pub fn forward(&mut self, mut steps: usize) {
-        while steps != 0 {
-            steps -= 1;
-            self.row_range.next();
-        }
-    }
-
-    #[inline]
-    pub fn is_finished(&self) -> bool {
-        self.row_range.is_empty()
-    }
-
-    #[inline]
-    pub fn next_line_idx(&self) -> u16 {
-        self.row_range.start
-    }
-}
-
-impl Iterator for RectIter {
-    type Item = Line;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.row_range.next().map(|row| Line { col: self.rect.col, row, width: self.rect.width })
-    }
-}
-
-impl IntoIterator for Rect {
-    type IntoIter = RectIter;
-    type Item = Line;
-    fn into_iter(self) -> Self::IntoIter {
-        RectIter { row_range: self.row..self.row + self.height, rect: self }
     }
 }

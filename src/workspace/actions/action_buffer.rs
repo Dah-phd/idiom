@@ -1,4 +1,4 @@
-use crate::workspace::{actions::Edit, line::EditorLine, CursorPosition};
+use super::super::{actions::Edit, line::EditorLine, CursorPosition};
 
 #[derive(Default, Debug)]
 pub enum ActionBuffer {

@@ -1,6 +1,6 @@
 use super::{
     backend::BackendProtocol,
-    layout::RectIter,
+    layout::{IterLines, RectIter},
     utils::{StrChunks, WriteChunks},
 };
 use crate::render::{
@@ -24,7 +24,7 @@ pub trait Writable: Display {
     /// prints bounded by line
     fn print_at(&self, line: Line, backend: &mut Backend);
     /// wraps within rect
-    fn wrap(&self, lines: &mut RectIter, backend: &mut Backend);
+    fn wrap(&self, lines: &mut impl IterLines, backend: &mut Backend);
     /// print truncated
     unsafe fn print_truncated(&self, width: usize, backend: &mut Backend);
     /// print truncated start
@@ -113,7 +113,7 @@ impl Text {
     }
 
     #[inline]
-    fn wrap_with_remainder(&self, lines: &mut RectIter, backend: &mut Backend) -> Option<usize> {
+    fn wrap_with_remainder(&self, lines: &mut impl IterLines, backend: &mut Backend) -> Option<usize> {
         if self.is_simple() {
             self.wrap_with_remainder_simple(lines, backend)
         } else {
@@ -122,7 +122,7 @@ impl Text {
     }
 
     #[inline]
-    pub fn wrap_with_remainder_simple(&self, lines: &mut RectIter, backend: &mut Backend) -> Option<usize> {
+    pub fn wrap_with_remainder_simple(&self, lines: &mut impl IterLines, backend: &mut Backend) -> Option<usize> {
         let max_width = lines.move_cursor(backend)?;
         if max_width > self.width {
             match self.style {
@@ -161,7 +161,7 @@ impl Text {
     }
 
     #[inline]
-    pub fn wrap_with_remainder_complex(&self, lines: &mut RectIter, backend: &mut Backend) -> Option<usize> {
+    pub fn wrap_with_remainder_complex(&self, lines: &mut impl IterLines, backend: &mut Backend) -> Option<usize> {
         let max_width = lines.width();
         let mut chunks = WriteChunks::new(&self.text, max_width);
         let StrChunks { mut width, mut text } = chunks.next()?;
@@ -278,7 +278,7 @@ impl Writable for Text {
         }
     }
 
-    fn wrap(&self, lines: &mut RectIter, backend: &mut Backend) {
+    fn wrap(&self, lines: &mut impl IterLines, backend: &mut Backend) {
         match self.wrap_with_remainder(lines, backend) {
             Some(pad_width) if pad_width != 0 => backend.pad(pad_width),
             _ => (),
@@ -360,7 +360,7 @@ impl Writable for StyledLine {
         }
     }
 
-    fn wrap(&self, lines: &mut RectIter, backend: &mut Backend) {
+    fn wrap(&self, lines: &mut impl IterLines, backend: &mut Backend) {
         let mut width = match lines.move_cursor(backend) {
             Some(width) => width,
             None => return,

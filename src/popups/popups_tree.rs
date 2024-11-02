@@ -8,24 +8,25 @@ use std::path::PathBuf;
 
 pub fn create_file_popup(path: String) -> Box<Popup> {
     let mut buttons = vec![Button {
-        command: |popup| IdiomEvent::CreateFileOrFolder(popup.message.to_owned()).into(),
+        command: |popup| IdiomEvent::CreateFileOrFolder { name: popup.message.to_owned(), from_base: false }.into(),
         name: "Create",
         key: None,
     }];
     if path != "./" {
         buttons.push(Button {
-            command: |popup| IdiomEvent::CreateFileOrFolderBase(popup.message.to_owned()).into(),
+            command: |popup| IdiomEvent::CreateFileOrFolder { name: popup.message.to_owned(), from_base: true }.into(),
             name: "Create in ./",
             key: None,
         })
     }
-    Box::new(Popup::new(String::new(), Some(format!("New in {}", path)), Some(Some), buttons, Some((4, 40))))
+    Box::new(Popup::new(String::new(), Some("New in "), Some(path), Some(Some), buttons, Some((4, 40))))
 }
 
 pub fn rename_file_popup(path: String) -> Box<Popup> {
     Box::new(Popup::new(
         String::new(),
-        Some(format!("Rename: {path}")),
+        Some("Rename: "),
+        Some(path),
         Some(Some),
         vec![Button {
             command: |popup| IdiomEvent::RenameFile(popup.message.to_owned()).into(),

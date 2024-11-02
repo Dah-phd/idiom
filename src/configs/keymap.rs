@@ -1,32 +1,7 @@
+use super::defaults::*;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-// MODS
-const SHIFT: &str = "shift";
-const CTRL: &str = "ctrl";
-const ALT: &str = "alt";
-const SUPER: &str = "super";
-const HYPER: &str = "hyper";
-const META: &str = "meta";
-
-// KEYS
-const BACKSPACE: &str = "backspace";
-const ENTER: &str = "enter";
-const LEFT: &str = "left";
-const RIGHT: &str = "right";
-const UP: &str = "up";
-const DOWN: &str = "down";
-const HOME: &str = "home";
-const END: &str = "end";
-const PAGEUP: &str = "pageup";
-const PAGEDOWN: &str = "pagedown";
-const TAB: &str = "tab";
-const BACKTAB: &str = "backtab";
-const DELETE: &str = "delete";
-const INSERT: &str = "insert";
-const F: &str = "f";
-const ESC: &str = "esc";
 
 // EDITOR
 #[derive(Debug, Clone, Copy)]
@@ -80,49 +55,93 @@ pub enum EditorAction {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EditorUserKeyMap {
+    #[serde(default = "new_line")]
     new_line_or_select: String,
+    #[serde(default = "tab")]
     indent: String,
+    #[serde(default = "backspace")]
     backspace: String,
+    #[serde(default = "delete")]
     delete: String,
+    #[serde(default = "remove_line")]
     remove_line: String,
+    #[serde(default = "indent_start")]
     indent_start: String,
+    #[serde(default = "unindent")]
     unindent: String,
+    #[serde(default = "up")]
     up: String,
+    #[serde(default = "down")]
     down: String,
+    #[serde(default = "left")]
     left: String,
+    #[serde(default = "right")]
     right: String,
+    #[serde(default = "select_up")]
     select_up: String,
+    #[serde(default = "select_down")]
     select_down: String,
+    #[serde(default = "select_left")]
     select_left: String,
+    #[serde(default = "select_right")]
     select_right: String,
+    #[serde(default = "select_token")]
     select_token: String,
+    #[serde(default = "select_line")]
     select_line: String,
+    #[serde(default = "select_all")]
     select_all: String,
+    #[serde(default = "scroll_up")]
     scroll_up: String,
+    #[serde(default = "scroll_down")]
     scroll_down: String,
+    #[serde(default = "swap_up")]
     swap_up: String,
+    #[serde(default = "swap_down")]
     swap_down: String,
+    #[serde(default = "jump_left")]
     jump_left: String,
+    #[serde(default = "jump_left_select")]
     jump_left_select: String,
+    #[serde(default = "jump_right")]
     jump_right: String,
+    #[serde(default = "jump_right_select")]
     jump_right_select: String,
+    #[serde(default = "end")]
     end_of_line: String,
+    #[serde(default = "end_of_file")]
     end_of_file: String,
+    #[serde(default = "home")]
     start_of_line: String,
+    #[serde(default = "start_of_file")]
     start_of_file: String,
+    #[serde(default = "find_references")]
     find_references: String,
+    #[serde(default = "go_to_declaration")]
     go_to_declaration: String,
+    #[serde(default = "help")]
     help: String,
+    #[serde(default = "refresh")]
     refresh_ui: String,
+    #[serde(default = "rename")]
     lsp_rename: String,
+    #[serde(default = "cut")]
     cut: String,
+    #[serde(default = "copy")]
     copy: String,
+    #[serde(default = "paste")]
     paste: String,
+    #[serde(default = "undo")]
     undo: String,
+    #[serde(default = "redo")]
     redo: String,
+    #[serde(default = "save")]
     save: String,
+    #[serde(default = "esc")]
     cancel: String,
+    #[serde(default = "close")]
     close: String,
+    #[serde(default = "comment_out")]
     comment_out: String,
 }
 
@@ -179,50 +198,50 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
 impl Default for EditorUserKeyMap {
     fn default() -> Self {
         Self {
-            new_line_or_select: String::from(ENTER),
-            indent: String::from(TAB),
-            backspace: String::from(BACKSPACE),
-            delete: String::from(DELETE),
-            remove_line: format!("{CTRL} && {DELETE} || {CTRL} && h || {CTRL} && {BACKSPACE}"),
-            indent_start: format!("{CTRL} && ]"),
-            unindent: format!("{SHIFT} && {TAB}"),
-            up: String::from(UP),
-            down: String::from(DOWN),
-            left: String::from(LEFT),
-            right: String::from(RIGHT),
-            select_up: format!("{SHIFT} && {UP}"),
-            select_down: format!("{SHIFT} && {DOWN}"),
-            select_left: format!("{SHIFT} && {LEFT}"),
-            select_right: format!("{SHIFT} && {RIGHT}"),
-            select_token: format!("{CTRL} && w"),
-            select_line: format!("{CTRL} && l"),
-            select_all: format!("{CTRL} && a"),
-            scroll_up: format!("{CTRL} && {UP} || {PAGEUP}"),
-            scroll_down: format!("{CTRL} && {DOWN} || {PAGEDOWN}"),
-            swap_up: format!("{ALT} && {UP}"),
-            swap_down: format!("{ALT} && {DOWN}"),
-            jump_left: format!("{CTRL} && {LEFT} || {ALT} && {LEFT}"),
-            jump_left_select: format!("{CTRL} && {SHIFT} && {LEFT} || {ALT} && {SHIFT} && {LEFT}"),
-            jump_right: format!("{CTRL} && {RIGHT} || {ALT} && {RIGHT}"),
-            jump_right_select: format!("{CTRL} && {SHIFT} && {RIGHT} || {ALT} && {SHIFT} && {RIGHT}"),
-            end_of_line: String::from(END),
-            end_of_file: format!("{CTRL} && {END}"),
-            start_of_line: String::from(HOME),
-            start_of_file: format!("{CTRL} && {HOME}"),
-            find_references: format!("{F}9"),
-            go_to_declaration: format!("{F}12"),
-            help: format!("{F}1"),
-            lsp_rename: format!("{F}2"),
-            refresh_ui: format!("{F}5"),
-            cut: format!("{CTRL} && x"),
-            copy: format!("{CTRL} && c"),
-            paste: format!("{CTRL} && v"),
-            undo: format!("{CTRL} && z"),
-            redo: format!("{CTRL} && y"),
-            save: format!("{CTRL} && s"),
-            cancel: String::from(ESC),
-            close: format!("{CTRL} && q || {CTRL} && d"),
-            comment_out: format!("{CTRL} && /"),
+            new_line_or_select: new_line(),
+            indent: tab(),
+            backspace: backspace(),
+            delete: delete(),
+            remove_line: remove_line(),
+            indent_start: indent_start(),
+            unindent: unindent(),
+            up: up(),
+            down: down(),
+            left: left(),
+            right: right(),
+            select_up: select_up(),
+            select_down: select_down(),
+            select_left: select_left(),
+            select_right: select_right(),
+            select_token: select_token(),
+            select_line: select_line(),
+            select_all: select_all(),
+            scroll_up: scroll_up(),
+            scroll_down: scroll_down(),
+            swap_up: swap_up(),
+            swap_down: swap_down(),
+            jump_left: jump_left(),
+            jump_left_select: jump_left_select(),
+            jump_right: jump_right(),
+            jump_right_select: jump_right_select(),
+            end_of_line: end(),
+            end_of_file: end_of_file(),
+            start_of_line: home(),
+            start_of_file: start_of_file(),
+            find_references: find_references(),
+            go_to_declaration: go_to_declaration(),
+            help: help(),
+            refresh_ui: refresh(),
+            lsp_rename: rename(),
+            cut: cut(),
+            copy: copy(),
+            paste: paste(),
+            undo: undo(),
+            redo: redo(),
+            save: save(),
+            cancel: esc(),
+            close: close(),
+            comment_out: comment_out(),
         }
     }
 }
@@ -232,6 +251,7 @@ impl Default for EditorUserKeyMap {
 #[derive(Debug, Clone, Copy)]
 pub enum GeneralAction {
     GoToTabs,
+    InvokePallet,
     SelectOpenEditor,
     SaveAll,
     FileTreeModeOrCancelInput,
@@ -255,26 +275,49 @@ pub enum GeneralAction {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeneralUserKeyMap {
+    #[serde(default = "tab")]
     go_to_editor_tabs: String,
+    #[serde(default = "pallet")]
+    invoke_pallet: String,
+    #[serde(default = "select_open_editor")]
     select_open_editor: String,
+    #[serde(default = "save")]
     save_all: String,
+    #[serde(default = "esc")]
     cancel: String,
+    #[serde(default = "find")]
     find: String,
+    #[serde(default = "replace")]
     replace: String,
+    #[serde(default = "backspace")]
     backspace_tree_input: String,
+    #[serde(default = "close")]
     exit: String,
+    #[serde(default = "hide_file_tree")]
     hide_file_tree: String,
+    #[serde(default = "refresh")]
     refresh_settings: String,
+    #[serde(default = "go_to")]
     go_to_line: String,
+    #[serde(default = "terminal")]
     toggle_terminal: String,
+    #[serde(default = "tab1")]
     go_to_tab_1: String,
+    #[serde(default = "tab2")]
     go_to_tab_2: String,
+    #[serde(default = "tab3")]
     go_to_tab_3: String,
+    #[serde(default = "tab4")]
     go_to_tab_4: String,
+    #[serde(default = "tab5")]
     go_to_tab_5: String,
+    #[serde(default = "tab6")]
     go_to_tab_6: String,
+    #[serde(default = "tab7")]
     go_to_tab_7: String,
+    #[serde(default = "tab8")]
     go_to_tab_8: String,
+    #[serde(default = "tab9")]
     go_to_tab_9: String,
 }
 
@@ -282,6 +325,7 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
     fn from(val: GeneralUserKeyMap) -> Self {
         let mut hash = HashMap::default();
         insert_key_event(&mut hash, &val.go_to_editor_tabs, GeneralAction::GoToTabs);
+        insert_key_event(&mut hash, &val.invoke_pallet, GeneralAction::InvokePallet);
         insert_key_event(&mut hash, &val.select_open_editor, GeneralAction::SelectOpenEditor);
         insert_key_event(&mut hash, &val.save_all, GeneralAction::SaveAll);
         insert_key_event(&mut hash, &val.cancel, GeneralAction::FileTreeModeOrCancelInput);
@@ -308,27 +352,28 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
 impl Default for GeneralUserKeyMap {
     fn default() -> Self {
         Self {
-            go_to_editor_tabs: String::from(TAB),
-            select_open_editor: format!("{CTRL} && {UP} || {CTRL} && {DOWN}"),
-            save_all: format!("{CTRL} && s"),
-            cancel: String::from(ESC),
-            find: format!("{CTRL} && f"),
-            replace: format!("{CTRL} && h"),
-            backspace_tree_input: String::from(BACKSPACE),
-            exit: format!("{CTRL} && d || {CTRL} && q"),
-            hide_file_tree: format!("{CTRL} && e"),
-            refresh_settings: format!("{F}5"),
-            go_to_line: format!("{CTRL} && g"),
-            toggle_terminal: format!("{CTRL} && `"),
-            go_to_tab_1: format!("{ALT} && 1"),
-            go_to_tab_2: format!("{ALT} && 2"),
-            go_to_tab_3: format!("{ALT} && 3"),
-            go_to_tab_4: format!("{ALT} && 4"),
-            go_to_tab_5: format!("{ALT} && 5"),
-            go_to_tab_6: format!("{ALT} && 6"),
-            go_to_tab_7: format!("{ALT} && 7"),
-            go_to_tab_8: format!("{ALT} && 8"),
-            go_to_tab_9: format!("{ALT} && 9"),
+            go_to_editor_tabs: tab(),
+            invoke_pallet: pallet(),
+            select_open_editor: select_open_editor(),
+            save_all: save(),
+            cancel: esc(),
+            find: find(),
+            replace: replace(),
+            backspace_tree_input: backspace(),
+            exit: close(),
+            hide_file_tree: hide_file_tree(),
+            refresh_settings: refresh(),
+            go_to_line: go_to(),
+            toggle_terminal: terminal(),
+            go_to_tab_1: tab1(),
+            go_to_tab_2: tab2(),
+            go_to_tab_3: tab3(),
+            go_to_tab_4: tab4(),
+            go_to_tab_5: tab5(),
+            go_to_tab_6: tab6(),
+            go_to_tab_7: tab7(),
+            go_to_tab_8: tab8(),
+            go_to_tab_9: tab9(),
         }
     }
 }
@@ -348,29 +393,38 @@ pub enum TreeAction {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TreeUserKeyMap {
+    #[serde(default = "tree_up")]
     select_up: String,
+    #[serde(default = "tree_down")]
     select_down: String,
+    #[serde(default = "expand")]
     expand: String,
+    #[serde(default = "shrink")]
     shrink: String,
+    #[serde(default = "tree_delete")]
     delete: String,
+    #[serde(default = "rename")]
     rename: String,
+    #[serde(default = "new_file")]
     new_file: String,
+    #[serde(default = "tree_size_inc")]
     increase_size: String,
+    #[serde(default = "tree_size_dec")]
     decrease_size: String,
 }
 
 impl Default for TreeUserKeyMap {
     fn default() -> Self {
         Self {
-            select_up: format!("{UP} || w"),
-            select_down: format!("{DOWN} || d"),
-            expand: format!("{RIGHT} || d || {ENTER}"),
-            shrink: format!("{LEFT} || a"),
-            delete: format!("{SHIFT} && {DELETE}"),
-            rename: format!("{F}2"),
-            new_file: format!("{CTRL} && n"),
-            increase_size: format!("{CTRL} && {RIGHT}"),
-            decrease_size: format!("{CTRL} && {LEFT}"),
+            select_up: tree_up(),
+            select_down: tree_down(),
+            expand: expand(),
+            shrink: shrink(),
+            delete: tree_delete(),
+            rename: rename(),
+            new_file: new_file(),
+            increase_size: tree_size_inc(),
+            decrease_size: tree_size_dec(),
         }
     }
 }

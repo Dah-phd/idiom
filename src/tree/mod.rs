@@ -32,14 +32,14 @@ pub struct Tree {
 }
 
 impl Tree {
-    pub fn new(key_map: TreeKeyMap) -> Self {
+    pub fn new(key_map: TreeKeyMap, gs: &mut GlobalState) -> Self {
         match PathBuf::from("./").canonicalize() {
             Ok(selected_path) => {
                 let path_str = selected_path.display().to_string();
                 let display_offset = path_str.split(std::path::MAIN_SEPARATOR).count() * 2;
                 let tree = TreePath::from_path(selected_path.clone());
                 Self {
-                    watcher: TreeWatcher::root(),
+                    watcher: TreeWatcher::root(&selected_path),
                     state: State::new(),
                     key_map,
                     display_offset,
@@ -50,15 +50,17 @@ impl Tree {
                     diagnostics_state: HashMap::new(),
                 }
             }
-            Err(..) => {
-                let tree = TreePath::from_path(PathBuf::from("./"));
+            Err(err) => {
+                gs.error(err.to_string());
+                let selected_path = PathBuf::from("./");
+                let tree = TreePath::from_path(selected_path.clone());
                 Self {
-                    watcher: TreeWatcher::root(),
+                    watcher: TreeWatcher::root(&selected_path),
                     state: State::new(),
                     key_map,
                     display_offset: 2,
                     path_parser: to_relative_path,
-                    selected_path: PathBuf::from("./"),
+                    selected_path,
                     tree,
                     rebuild: true,
                     diagnostics_state: HashMap::new(),
@@ -100,9 +102,9 @@ impl Tree {
             match action {
                 TreeAction::Up => self.select_up(gs),
                 TreeAction::Down => self.select_down(gs),
-                TreeAction::Shrink => self.shrink(),
+                TreeAction::Shrink => self.shrink(gs),
                 TreeAction::Expand => {
-                    if let Some(path) = self.expand_dir_or_get_path() {
+                    if let Some(path) = self.expand_dir_or_get_path(gs) {
                         gs.event.push(IdiomEvent::OpenAtLine(path, 0));
                     }
                 }
@@ -123,9 +125,13 @@ impl Tree {
         false
     }
 
-    pub fn expand_dir_or_get_path(&mut self) -> Option<PathBuf> {
+    pub fn expand_dir_or_get_path(&mut self, gs: &mut GlobalState) -> Option<PathBuf> {
         let tree_path = self.tree.get_mut_from_inner(self.state.selected)?;
-        if tree_path.path().is_dir() {
+        let path = tree_path.path();
+        if path.is_dir() {
+            if let Err(err) = self.watcher.watch(path) {
+                gs.error(err.to_string());
+            };
             tree_path.expand();
             for (d_path, new_diagnostic) in self.diagnostics_state.iter() {
                 tree_path.map_diagnostics_base(d_path, *new_diagnostic);
@@ -137,8 +143,11 @@ impl Tree {
         }
     }
 
-    fn shrink(&mut self) {
+    fn shrink(&mut self, gs: &mut GlobalState) {
         if let Some(tree_path) = self.tree.get_mut_from_inner(self.state.selected) {
+            if let Err(err) = self.watcher.stop_watch(tree_path.path()) {
+                gs.error(err.to_string());
+            };
             tree_path.take_tree();
             self.rebuild = true;
         }
@@ -220,13 +229,11 @@ impl Tree {
 
     pub fn create_file_or_folder(&mut self, name: String) -> IdiomResult<PathBuf> {
         let path = build_file_or_folder(self.selected_path.clone(), &name)?;
-        self.select_by_path(&path);
         Ok(path)
     }
 
     pub fn create_file_or_folder_base(&mut self, name: String) -> IdiomResult<PathBuf> {
         let path = build_file_or_folder(PathBuf::from("./"), &name)?;
-        self.select_by_path(&path);
         Ok(path)
     }
 
@@ -284,7 +291,7 @@ impl Tree {
     pub fn select_by_path(&mut self, path: &PathBuf) {
         let rel_result = (self.path_parser)(path);
         let path = rel_result.as_ref().unwrap_or(path);
-        if self.tree.expand_contained(path) {
+        if self.tree.expand_contained(path, &mut self.watcher) {
             self.selected_path.clone_from(path);
             self.state.selected = self.tree.iter().skip(1).position(|tp| tp.path() == path).unwrap_or_default();
             self.rebuild_diagnostics();
@@ -308,7 +315,7 @@ impl Tree {
         self.tree.tree_file_names()
     }
 
-    pub fn finish_sync(&mut self, gs: &mut GlobalState) {
+    pub fn sync(&mut self, gs: &mut GlobalState) {
         self.rebuild = self.watcher.poll(&mut self.tree, self.path_parser, gs);
         if !self.rebuild {
             return;

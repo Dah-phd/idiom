@@ -11,6 +11,7 @@ pub fn save_all_popup() -> Box<Popup> {
         "Not all opened editors are saved!".into(),
         None,
         None,
+        None,
         vec![
             Button {
                 command: |_| IdiomEvent::SaveAndExit.into(),
@@ -51,6 +52,7 @@ pub fn selector_editors(options: Vec<String>) -> Box<PopupSelector<String>> {
 pub fn file_updated(path: PathBuf) -> Box<Popup> {
     Box::new(Popup::new(
         "File updated! (Use cancel/close to do nothing)".into(),
+        None,
         Some(path.display().to_string()),
         None,
         vec![

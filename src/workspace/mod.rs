@@ -367,11 +367,14 @@ impl Workspace {
     pub fn notify_update(&mut self, path: PathBuf, gs: &mut GlobalState) {
         for (idx, editor) in self.editors.iter_mut().enumerate() {
             if editor.path == path {
+                if editor.is_saved() {
+                    return;
+                }
                 editor.update_status.mark_updated();
                 if idx == 0 && editor.update_status.collect() {
                     gs.popup(file_updated(path));
                 }
-                break;
+                return;
             }
         }
     }

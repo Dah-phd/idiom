@@ -5,45 +5,56 @@ mod json;
 mod lobster;
 mod python;
 mod rust;
+mod styler;
 mod text_editor;
-mod ts; // support TS and JS
-mod utils;
+mod ts;
+mod utils; // support TS and JS
 
+/// tokens
 use bash::BashToken;
-pub use enriched::enrich_with_semantics;
-use lsp_types::InsertTextFormat;
-use rust::Rustacean;
-
-use crate::lsp::local::{generic::GenericToken, python::PyToken};
-use crate::lsp::{messages::Response, LSPError, LSPResult, Responses};
-use crate::render::UTF8Safe;
-use crate::syntax::theme::Theme;
-use crate::syntax::tokens::set_tokens;
-use crate::syntax::Legend;
-use crate::workspace::line::EditorLine;
-use crate::{configs::FileType, lsp::payload::Payload, workspace::CursorPosition};
+use generic::GenericToken;
 use json::JsonValue;
 use lobster::Pincer;
+use python::PyToken;
+use rust::Rustacean;
+use ts::TSToken;
+
+pub use enriched::build_with_enrichment;
+pub use styler::Highlighter;
+pub use utils::create_semantic_capabilities;
+use utils::{full_tokens, partial_tokens, swap_content, NON_TOKEN_ID};
+
+use super::{messages::Response, payload::Payload, LSPError, LSPResult, Responses};
+use crate::{
+    configs::{FileType, Theme},
+    render::UTF8Safe,
+    syntax::{tokens::set_tokens, Legend},
+    workspace::{line::EditorLine, CursorPosition},
+};
+
 use logos::{Logos, Span};
 use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification},
-    SemanticToken, SemanticTokens, SemanticTokensRangeResult, SemanticTokensResult,
+    CompletionItem, CompletionResponse, InsertTextFormat, SemanticToken, SemanticTokens, SemanticTokensRangeResult,
+    SemanticTokensResult,
 };
-use lsp_types::{CompletionItem, CompletionResponse};
 use serde_json::{from_str, to_value, Value};
-use std::collections::HashSet;
-use std::fmt::Debug;
-use std::sync::Arc;
-use tokio::sync::mpsc::UnboundedReceiver;
-use tokio::task::JoinHandle;
-pub use utils::create_semantic_capabilities;
-use utils::{full_tokens, partial_tokens, swap_content, NON_TOKEN_ID};
+use std::{collections::HashSet, fmt::Debug, sync::Arc};
+use tokio::{sync::mpsc::UnboundedReceiver, task::JoinHandle};
+
+type PositionedTokenParser<T> = fn(T, Span, &str) -> PositionedToken<T>;
 
 /// Trait to be implemented on the lang specific token, allowing parsing and deriving builtins
 trait LangStream: Sized + Debug + PartialEq + Logos<'static> {
     fn type_id(&self) -> u32;
-    fn modifier(&self) -> u32;
-    fn parse(text: &[String], tokens: &mut Vec<Vec<PositionedToken<Self>>>);
+    fn modifier(&self) -> u32 {
+        0
+    }
+    fn parse<'a>(
+        text: impl Iterator<Item = &'a str>,
+        tokens: &mut Vec<Vec<PositionedToken<Self>>>,
+        parser: PositionedTokenParser<Self>,
+    );
 
     fn init_definitions() -> Definitions {
         Definitions::default()
@@ -53,20 +64,13 @@ trait LangStream: Sized + Debug + PartialEq + Logos<'static> {
         ObjType::None
     }
 
-    fn to_postioned(self, span: Span, text: &str) -> PositionedToken<Self> {
-        // utf32 encoding
-        let from = text[..span.start].char_len();
-        let len = text[span.start..span.end].char_len();
-        PositionedToken { from, len, token_type: self.type_id(), modifier: self.modifier(), lang_token: self }
-    }
-
     fn init_tokens(content: &mut Vec<EditorLine>, theme: &Theme, file_type: FileType) {
         let text = content.iter().map(|l| l.content.to_string()).collect::<Vec<_>>();
         let mut tokens = Vec::new();
-        Self::parse(&text, &mut tokens);
+        Self::parse(text.iter().map(|t| t.as_str()), &mut tokens, PositionedToken::<Self>::utf32);
         let mut legend = Legend::default();
         legend.map_styles(file_type, theme, &create_semantic_capabilities());
-        set_tokens(full_tokens(&tokens), &legend, theme, content);
+        set_tokens(full_tokens(&tokens), &legend, content);
     }
 }
 
@@ -75,6 +79,7 @@ pub fn init_local_tokens(file_type: FileType, content: &mut Vec<EditorLine>, the
         FileType::Rust => Rustacean::init_tokens(content, theme, file_type),
         FileType::Python => PyToken::init_tokens(content, theme, file_type),
         FileType::Lobster => Pincer::init_tokens(content, theme, file_type),
+        FileType::JavaScript | FileType::TypeScript => TSToken::init_tokens(content, theme, file_type),
         _ => GenericToken::init_tokens(content, theme, file_type),
     }
 }
@@ -96,8 +101,10 @@ pub fn start_lsp_handler(
     match file_type {
         FileType::Python => tokio::task::spawn(async move { LocalLSP::<PyToken>::run(rx, responses).await }),
         FileType::Lobster => tokio::task::spawn(async move { LocalLSP::<Pincer>::run(rx, responses).await }),
-        FileType::Json => tokio::task::spawn(async move { LocalLSP::<JsonValue>::run(rx, responses).await }),
         FileType::Rust => tokio::task::spawn(async move { LocalLSP::<Rustacean>::run(rx, responses).await }),
+        FileType::JavaScript => tokio::task::spawn(async move { LocalLSP::<TSToken>::run(rx, responses).await }),
+        FileType::TypeScript => tokio::task::spawn(async move { LocalLSP::<TSToken>::run(rx, responses).await }),
+        FileType::Json => tokio::task::spawn(async move { LocalLSP::<JsonValue>::run(rx, responses).await }),
         FileType::Shell => tokio::task::spawn(async move { LocalLSP::<BashToken>::run(rx, responses).await }),
         _ => tokio::task::spawn(async move { LocalLSP::<GenericToken>::run(rx, responses).await }),
     }
@@ -131,9 +138,11 @@ impl<T: LangStream> LocalLSP<T> {
                 self.responses.lock().unwrap().insert(id, response);
             }
             Payload::PartialTokens(_, range, id, ..) => {
+                let start = CursorPosition::from(range.start);
+                let end = CursorPosition::from(range.end);
                 let tokens = SemanticTokensRangeResult::Tokens(SemanticTokens {
                     result_id: None,
-                    data: partial_tokens(&self.tokens, range),
+                    data: partial_tokens(&self.tokens, start, end),
                 });
                 let response = match to_value(tokens) {
                     Ok(value) => Response { id, result: Some(value), error: None },
@@ -149,11 +158,11 @@ impl<T: LangStream> LocalLSP<T> {
                     let clip = change.text;
                     swap_content(&mut self.text, &clip, from, to);
                 }
-                T::parse(&self.text, &mut self.tokens);
+                T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens, PositionedToken::<T>::utf32);
             }
             Payload::FullSync(.., full_text) => {
                 self.text = full_text.split('\n').map(ToOwned::to_owned).collect();
-                T::parse(&self.text, &mut self.tokens);
+                T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens, PositionedToken::<T>::utf32);
             }
             Payload::Completion(_, _c, id) => {
                 let items = self.definitions.to_completions(&self.tokens);
@@ -193,7 +202,7 @@ impl<T: LangStream> LocalLSP<T> {
         let documet = params.as_object_mut()?.get_mut("textDocument")?;
         let text = documet.as_object_mut()?.get("text")?.as_str()?;
         self.text = text.split('\n').map(ToOwned::to_owned).collect();
-        T::parse(&self.text, &mut self.tokens);
+        T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens, PositionedToken::<T>::utf32);
         Some(())
     }
 }
@@ -208,6 +217,29 @@ struct PositionedToken<T: LangStream> {
 }
 
 impl<T: LangStream> PositionedToken<T> {
+    pub fn utf32(token: T, span: Span, text: &str) -> PositionedToken<T> {
+        // utf32 encodingT
+        let from = text[..span.start].char_len();
+        let len = text[span.start..span.end].char_len();
+        PositionedToken { from, len, token_type: token.type_id(), modifier: token.modifier(), lang_token: token }
+    }
+
+    pub fn utf8(token: T, span: Span, _text: &str) -> PositionedToken<T> {
+        PositionedToken {
+            len: span.len(),
+            from: span.start,
+            token_type: token.type_id(),
+            modifier: token.modifier(),
+            lang_token: token,
+        }
+    }
+
+    pub fn utf16(token: T, span: Span, text: &str) -> PositionedToken<T> {
+        let from = text[..span.start].utf16_len();
+        let len = text[span.start..span.end].utf16_len();
+        PositionedToken { from, len, token_type: token.type_id(), modifier: token.modifier(), lang_token: token }
+    }
+
     #[inline]
     pub fn refresh_type(&mut self) {
         self.token_type = self.lang_token.type_id();

@@ -1,4 +1,4 @@
-use crate::configs::{load_or_create_config, THEME_FILE};
+use super::{load_or_create_config, THEME_FILE};
 use crate::error::IdiomError;
 use crate::render::backend::{color, pull_color, serialize_rgb, Color};
 use serde::ser::{Serialize, SerializeStruct};

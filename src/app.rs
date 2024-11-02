@@ -1,8 +1,9 @@
 use crate::{
-    configs::{GeneralAction, KeyMap},
+    configs::{GeneralAction, KeyMap, KEY_MAP},
     error::IdiomResult,
     global_state::{GlobalState, IdiomEvent},
     popups::{
+        pallet::Pallet,
         popup_find::{FindPopup, GoToLinePopup},
         popup_replace::ReplacePopup,
         popup_tree_search::ActivePathSearch,
@@ -22,18 +23,18 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
     // builtin cursor is not used - cursor is positioned during render
 
     let mut gs = GlobalState::new(backend)?;
-    let configs = gs.unwrap_or_default(KeyMap::new(), ".keys: ");
+    let configs = gs.unwrap_or_default(KeyMap::new(), KEY_MAP);
     let mut general_key_map = configs.general_key_map();
 
     // COMPONENTS
-    let mut tree = Tree::new(configs.tree_key_map());
+    let mut tree = Tree::new(configs.tree_key_map(), &mut gs);
     let mut workspace = Workspace::new(configs.editor_key_map(), tree.get_base_file_names(), &mut gs).await;
     let mut term = EditorTerminal::new(gs.editor_area.width as u16);
 
     // CLI SETUP
     if let Some(path) = open_file {
         tree.select_by_path(&path);
-        gs.event.push(IdiomEvent::Open(path));
+        gs.event.push(IdiomEvent::OpenAtLine(path, 0));
         gs.toggle_tree();
     }
 
@@ -71,6 +72,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
                                         gs.insert_mode();
                                     };
                                 }
+                                GeneralAction::InvokePallet => gs.popup(Pallet::new()),
                                 GeneralAction::Exit => {
                                     if workspace.are_updates_saved() && !gs.has_popup() {
                                         gs.exit = true;
@@ -125,8 +127,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
         // do event exchanges
         if gs.exchange_should_exit(&mut tree, &mut workspace).await {
             workspace.graceful_exit().await;
-            break;
+            return Ok(());
         };
     }
-    Ok(())
 }

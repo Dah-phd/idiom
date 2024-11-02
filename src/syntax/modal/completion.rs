@@ -59,7 +59,7 @@ impl AutoComplete {
 
     #[inline]
     pub fn render(&mut self, area: &Rect, gs: &mut GlobalState) {
-        self.state.render_list(self.filtered.iter().map(|(c, ..)| c.as_str()), area, &mut gs.writer);
+        self.state.render_list(self.filtered.iter().map(|(c, ..)| c.as_str()), *area, &mut gs.writer);
     }
 
     #[inline]
@@ -95,9 +95,9 @@ impl AutoComplete {
                 self.matcher.fuzzy_match(item.filter_text.as_ref().unwrap_or(&item.label), &self.filter).map(|score| {
                     let divisor = item.label.len().abs_diff(self.filter.len()) as i64;
                     let new_score = if divisor != 0 { score / divisor } else { score };
-                    let mut line = format!(" {}", item.label);
-                    if let Some(info) = item.detail.as_ref() {
-                        line = format!("{line}  {info}");
+                    let line = match item.detail.as_ref() {
+                        Some(info) => format!(" {}  {info}", item.label),
+                        None => format!(" {}", item.label),
                     };
                     (line, new_score, item_idx)
                 })

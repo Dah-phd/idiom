@@ -1,13 +1,14 @@
-use self::autocomplete::try_autocomplete;
-use crate::error::IdiomResult;
-use crate::render::layout::BORDERS;
-use crate::render::TextField;
-use crate::runner::commands::load_file;
 mod autocomplete;
 mod commands;
 mod components;
+
 use crate::configs::{EditorConfigs, KeyMap, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE};
+use crate::error::IdiomResult;
 use crate::global_state::GlobalState;
+use crate::render::layout::BORDERS;
+use crate::render::TextField;
+use crate::runner::commands::load_file;
+use autocomplete::try_autocomplete;
 use commands::{load_cfg, overwrite_cfg, Terminal};
 use components::CmdHistory;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -66,11 +67,12 @@ impl EditorTerminal {
     pub fn activate(&mut self) {
         match self.terminal.as_mut() {
             Some(terminal) => {
-                if !terminal.is_running() {
-                    if let Ok((terminal, prompt)) = Terminal::new(self.width) {
-                        self.terminal.replace(terminal).map(|t| t.kill());
-                        self.prompt.replace(prompt);
-                    }
+                if terminal.is_running() {
+                    return;
+                }
+                if let Ok((terminal, prompt)) = Terminal::new(self.width) {
+                    self.terminal.replace(terminal).map(|t| t.kill());
+                    self.prompt.replace(prompt);
                 }
             }
             None => {
@@ -206,7 +208,7 @@ impl EditorTerminal {
             match match cfg.trim() {
                 "keymap" => overwrite_cfg::<KeyMap>(KEY_MAP),
                 "config" => overwrite_cfg::<EditorConfigs>(EDITOR_CFG_FILE),
-                "theme" => overwrite_cfg::<crate::syntax::theme::Theme>(THEME_FILE),
+                "theme" => overwrite_cfg::<crate::configs::Theme>(THEME_FILE),
                 _ => return Ok(()),
             } {
                 Ok(msg) => gs.success(msg),

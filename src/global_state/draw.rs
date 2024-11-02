@@ -1,4 +1,13 @@
-use crate::{global_state::GlobalState, runner::EditorTerminal, tree::Tree, workspace::Workspace};
+use super::{GlobalState, Mode};
+use crate::{
+    render::{
+        backend::{color, BackendProtocol, Style},
+        layout::{Line, DOUBLE_BORDERS},
+    },
+    runner::EditorTerminal,
+    tree::Tree,
+    workspace::Workspace,
+};
 use bitflags::bitflags;
 use std::io::{Result, Write};
 
@@ -26,32 +35,54 @@ pub fn full_rebuild(
     term: &mut EditorTerminal,
 ) -> Result<()> {
     gs.screen_rect.clear(&mut gs.writer);
-    gs.recalc_draw_size();
-    if let Some(line) = gs.footer_area.get_line(0) {
-        gs.mode.render(line, gs.theme.accent_style, &mut gs.writer);
+    let mut tree_area = gs.screen_rect;
+    gs.footer_area = tree_area.splitoff_rows(1);
+    if let Some(mut line) = gs.footer_area.get_line(0) {
+        gs.mode.render(line.clone(), gs.theme.accent_style, &mut gs.writer);
+        line += Mode::len();
+        gs.messages.set_line(line);
     };
     gs.messages.render(gs.theme.accent_style, &mut gs.writer);
+
+    if gs.components.contains(Components::TREE) || !gs.is_insert() {
+        gs.draw_callback = draw_with_tree;
+        gs.tab_area = tree_area.keep_col((gs.tree_size * gs.screen_rect.width) / 100);
+        if let Some(line) = tree_area.next_line() {
+            render_logo(line, gs);
+        }
+        tree_area.top_border().right_border().draw_borders(
+            Some(DOUBLE_BORDERS),
+            Some(color::dark_grey()),
+            gs.backend(),
+        );
+        gs.tree_area = tree_area;
+        tree.render(gs);
+    } else {
+        gs.draw_callback = draw;
+        gs.tree_area = tree_area;
+        gs.tab_area = gs.tree_area.keep_col(0);
+    }
+
+    gs.editor_area = gs.tab_area.keep_rows(1);
     workspace.render(gs);
     if let Some(editor) = workspace.get_active() {
         editor.render(gs);
     }
-    gs.draw_callback = draw;
-    if gs.components.contains(Components::TREE) || !gs.is_insert() {
-        gs.draw_callback = draw_with_tree;
-        tree.render(gs);
-    }
+
+    // term override
     if gs.components.contains(Components::TERM) {
         gs.draw_callback = draw_term;
         term.render(gs);
     }
+    // popup override
     if gs.components.contains(Components::POPUP) {
         gs.draw_callback = draw_popup;
-        gs.render_popup();
+        gs.popup_render();
     }
+
     gs.writer.flush()
 }
 
-#[inline]
 pub fn draw(
     gs: &mut GlobalState,
     workspace: &mut Workspace,
@@ -67,7 +98,6 @@ pub fn draw(
     gs.writer.flush()
 }
 
-#[inline]
 pub fn draw_with_tree(
     gs: &mut GlobalState,
     workspace: &mut Workspace,
@@ -84,7 +114,6 @@ pub fn draw_with_tree(
     gs.writer.flush()
 }
 
-#[inline]
 pub fn draw_popup(
     gs: &mut GlobalState,
     _workspace: &mut Workspace,
@@ -92,11 +121,10 @@ pub fn draw_popup(
     _term: &mut EditorTerminal,
 ) -> Result<()> {
     gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
-    gs.render_popup();
+    gs.popup_render();
     gs.writer.flush()
 }
 
-#[inline]
 pub fn draw_term(
     gs: &mut GlobalState,
     _workspace: &mut Workspace,
@@ -106,4 +134,22 @@ pub fn draw_term(
     gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
     term.render(gs);
     gs.writer.flush()
+}
+
+fn render_logo(line: Line, gs: &mut GlobalState) {
+    if line.width < 9 {
+        return;
+    };
+    let pad = line.width - 9;
+    if pad == 0 {
+        return;
+    }
+    let l_pad = pad / 2;
+    let r_pad = pad - l_pad;
+    let backend = gs.backend();
+    backend.go_to(line.row, line.col);
+    backend.pad(l_pad);
+    backend.print('<');
+    backend.print_styled("/idiom>", Style::fg(Mode::insert_color()));
+    backend.pad(r_pad);
 }

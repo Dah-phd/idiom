@@ -3,7 +3,7 @@ use crate::{
     global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::{
         backend::{color, Style},
-        layout::{LineBuilder, BORDERS},
+        layout::{IterLines, LineBuilder, BORDERS},
         state::State,
         TextField,
     },
@@ -47,10 +47,10 @@ impl PopupInterface for ActivePathSearch {
         match key.code {
             KeyCode::Up => self.state.prev(self.options.len()),
             KeyCode::Down => self.state.next(self.options.len()),
-            KeyCode::Tab => return PopupMessage::Tree(IdiomEvent::SearchFiles(self.pattern.text.to_owned())),
+            KeyCode::Tab => return PopupMessage::Event(IdiomEvent::SearchFiles(self.pattern.text.to_owned())),
             KeyCode::Enter => {
                 if self.options.len() > self.state.selected {
-                    return IdiomEvent::Open(self.options.remove(self.state.selected)).into();
+                    return IdiomEvent::OpenAtLine(self.options.remove(self.state.selected), 0).into();
                 }
                 return PopupMessage::Clear;
             }
@@ -73,7 +73,7 @@ impl PopupInterface for ActivePathSearch {
         }
         if let Some(list_rect) = lines.into_rect() {
             if self.options.is_empty() {
-                self.state.render_list(["No results found!"].into_iter(), &list_rect, &mut gs.writer);
+                self.state.render_list(["No results found!"].into_iter(), list_rect, &mut gs.writer);
             } else {
                 self.state.render_list_complex(
                     &self.options,
@@ -147,7 +147,7 @@ impl PopupInterface for ActiveFileSearch {
                     return PopupMessage::Clear;
                 }
                 self.mode = Mode::Full;
-                return PopupMessage::Tree(IdiomEvent::PopupAccess);
+                return PopupMessage::Event(IdiomEvent::PopupAccess);
             }
             KeyCode::Enter => {
                 if self.options.len() > self.state.selected {
@@ -178,7 +178,7 @@ impl PopupInterface for ActiveFileSearch {
         }
         if let Some(list_rect) = lines.into_rect() {
             if self.options.is_empty() {
-                self.state.render_list(["No results found!"].into_iter(), &list_rect, &mut gs.writer);
+                self.state.render_list(["No results found!"].into_iter(), list_rect, &mut gs.writer);
             } else {
                 self.state.render_list_complex(
                     &self.options,

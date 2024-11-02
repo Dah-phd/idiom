@@ -1,14 +1,46 @@
-use crate::lsp::local::{LangStream, PositionedToken};
+use super::{LangStream, PositionedToken};
 use crate::render::utils::{UTF8Safe, UTF8SafeStringExt};
 use crate::workspace::CursorPosition;
 use lsp_types::{
-    Range, SemanticToken, SemanticTokenType, SemanticTokensLegend, SemanticTokensOptions,
-    SemanticTokensServerCapabilities,
+    SemanticToken, SemanticTokenType, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
 };
 
 pub const NON_TOKEN_ID: u32 = 17;
 
-// !TODO Dobule check utf8 complience
+pub fn utf8_encoder(cursor: lsp_types::Position, content: &[String]) -> CursorPosition {
+    let line = cursor.line as usize;
+    let mut line_chars = content[line].chars();
+    let mut old_char = cursor.character as usize;
+    let mut char = 0;
+    while let Some(ch_len) = line_chars.next().map(|ch| ch.len_utf8()) {
+        if ch_len > old_char {
+            break;
+        }
+        old_char -= ch_len;
+        char += 1;
+    }
+    CursorPosition { line, char }
+}
+
+pub fn utf16_encoder(cursor: lsp_types::Position, content: &[String]) -> CursorPosition {
+    let line = cursor.line as usize;
+    let mut line_chars = content[line].chars();
+    let mut old_char = cursor.character as usize;
+    let mut char = 0;
+    while let Some(ch_len) = line_chars.next().map(|ch| ch.len_utf8().div_ceil(2)) {
+        if ch_len > old_char {
+            break;
+        }
+        old_char -= ch_len;
+        char += 1;
+    }
+    CursorPosition { line, char }
+}
+
+pub fn utf32_encoder(cursor: lsp_types::Position, _content: &[String]) -> CursorPosition {
+    CursorPosition::from(cursor)
+}
+
 pub fn swap_content(content: &mut Vec<String>, clip: &str, from: CursorPosition, to: CursorPosition) {
     remove_content(from, to, content);
     insert_clip(clip, content, from);
@@ -69,9 +101,11 @@ pub fn full_tokens<T: LangStream>(lsp_tokens: &[Vec<PositionedToken<T>>]) -> Vec
     tokens
 }
 
-pub fn partial_tokens<T: LangStream>(lsp_tokens: &[Vec<PositionedToken<T>>], range: Range) -> Vec<SemanticToken> {
-    let start = CursorPosition::from(range.start);
-    let end = CursorPosition::from(range.end);
+pub fn partial_tokens<T: LangStream>(
+    lsp_tokens: &[Vec<PositionedToken<T>>],
+    start: CursorPosition,
+    end: CursorPosition,
+) -> Vec<SemanticToken> {
     let mut tokens = Vec::new();
     let mut last_delta = start.line as u32;
     let mut remaining = end.line - start.line;
@@ -163,16 +197,19 @@ pub fn get_local_legend() -> Vec<SemanticTokenType> {
 mod test {
     use lsp_types::SemanticToken;
 
-    use crate::lsp::local::{python::PyToken, LangStream, LocalLSP};
+    use crate::{
+        lsp::local::{python::PyToken, LangStream, LocalLSP, PositionedToken},
+        workspace::CursorPosition,
+    };
 
-    use super::full_tokens;
+    use super::{full_tokens, utf16_encoder, utf8_encoder};
     use std::sync::Arc;
 
     #[test]
     fn test_with_pytoken() {
         let mut pylsp = LocalLSP::<PyToken>::new(Arc::default());
         pylsp.text.push(String::from("class WorkingDirectory:"));
-        PyToken::parse(&pylsp.text, &mut pylsp.tokens);
+        PyToken::parse(pylsp.text.iter().map(|t| t.as_str()), &mut pylsp.tokens, PositionedToken::<PyToken>::utf32);
         let tokens = full_tokens(&pylsp.tokens);
         assert_eq!(
             tokens,
@@ -181,5 +218,19 @@ mod test {
                 SemanticToken { delta_line: 0, delta_start: 6, length: 16, token_type: 1, token_modifiers_bitset: 0 }
             ]
         );
+    }
+
+    #[test]
+    fn test_utf8_reposition() {
+        let content = vec![String::new(), "t🔥xt".to_owned()];
+        let cursor = lsp_types::Position { line: 1, character: 5 };
+        assert_eq!(utf8_encoder(cursor, &content), CursorPosition { line: 1, char: 2 })
+    }
+
+    #[test]
+    fn test_utf16_reposition() {
+        let content = vec![String::new(), String::new(), "t🔥xt".to_owned()];
+        let cursor = lsp_types::Position { line: 2, character: 3 };
+        assert_eq!(utf16_encoder(cursor, &content), CursorPosition { line: 2, char: 2 })
     }
 }

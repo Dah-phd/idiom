@@ -1,9 +1,8 @@
-use portable_pty::PtyPair;
-use portable_pty::{native_pty_system, Child, CommandBuilder, PtySize};
+use portable_pty::{native_pty_system, Child, CommandBuilder, PtyPair, PtySize};
 use serde::Serialize;
-use std::path::PathBuf;
 use std::{
     io::{BufReader, Read, Write},
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 use strip_ansi_escapes::strip_str;

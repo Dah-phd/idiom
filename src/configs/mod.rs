@@ -1,14 +1,17 @@
-use std::path::PathBuf;
-mod editor_config;
+mod defaults;
+mod editor;
 mod keymap;
+mod theme;
 mod theme_ui;
 mod types;
+
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use dirs::config_dir;
-pub use editor_config::{EditorConfigs, IndentConfigs};
+pub use editor::{EditorConfigs, IndentConfigs};
 pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap, TreeAction, TreeUserKeyMap};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
+pub use theme::Theme;
 pub use theme_ui::UITheme;
 pub use types::FileType;
 

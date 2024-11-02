@@ -31,7 +31,10 @@ impl From<Action> for IdiomEvent {
 impl std::fmt::Display for Action {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Import(text) => write!(f, "import {text}"),
+            Self::Import(text) => match text.strip_suffix('\n') {
+                Some(stripped_text) => write!(f, "import {stripped_text}"),
+                None => write!(f, "import {text}"),
+            },
         }
     }
 }

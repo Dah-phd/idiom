@@ -8,64 +8,22 @@ mod message;
 use crate::{
     configs::{FileType, UITheme},
     lsp::{LSPError, LSPResult},
-    popups::{placeholder, PopupInterface},
+    popups::{self, PopupInterface},
     render::{
-        backend::{color, Backend, BackendProtocol, Style},
-        layout::{Line, Rect, DOUBLE_BORDERS},
+        backend::{Backend, BackendProtocol},
+        layout::Rect,
     },
     runner::EditorTerminal,
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
 pub use clipboard::Clipboard;
+pub use controls::{Mode, PopupMessage};
 use crossterm::event::{KeyEvent, MouseEvent};
 pub use events::IdiomEvent;
 
-use self::{draw::Components, message::Messages};
-
-const INSERT_SPAN: &str = "  --INSERT--   ";
-const SELECT_SPAN: &str = "  --SELECT--   ";
-
-#[derive(Default, Clone)]
-pub enum PopupMessage {
-    #[default]
-    None,
-    Tree(IdiomEvent),
-    Clear,
-}
-
-#[derive(Default)]
-enum Mode {
-    #[default]
-    Select,
-    Insert,
-}
-
-impl Mode {
-    #[inline]
-    fn render(&self, line: Line, accent_style: Style, backend: &mut Backend) {
-        match self {
-            Self::Insert => Self::render_insert_mode(line, accent_style, backend),
-            Self::Select => Self::render_select_mode(line, accent_style, backend),
-        };
-    }
-
-    #[inline]
-    fn render_select_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) {
-        line.width = std::cmp::min(SELECT_SPAN.len(), line.width);
-        accent_style.add_bold();
-        accent_style.set_fg(Some(color::cyan()));
-        line.render_styled(SELECT_SPAN, accent_style, backend);
-    }
-
-    #[inline]
-    fn render_insert_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) {
-        line.width = std::cmp::min(INSERT_SPAN.len(), line.width);
-        accent_style.add_bold();
-        accent_style.set_fg(Some(color::rgb(255, 0, 0)));
-        line.render_styled(INSERT_SPAN, accent_style, backend);
-    }
-}
+use draw::Components;
+use message::Messages;
 
 type KeyMapCallback = fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool;
 type MouseMapCallback = fn(&mut GlobalState, MouseEvent, &mut Tree, &mut Workspace);
@@ -104,7 +62,7 @@ impl GlobalState {
             draw_callback: draw::full_rebuild,
             theme,
             writer: backend,
-            popup: placeholder(),
+            popup: popups::placeholder(),
             event: Vec::default(),
             clipboard: Clipboard::default(),
             exit: false,
@@ -116,6 +74,11 @@ impl GlobalState {
             messages,
             components: Components::default(),
         })
+    }
+
+    #[inline(always)]
+    pub fn backend(&mut self) -> &mut Backend {
+        &mut self.writer
     }
 
     #[inline]
@@ -130,7 +93,7 @@ impl GlobalState {
 
     pub fn render_stats(&mut self, len: usize, select_len: usize, cursor: CursorPosition) {
         if let Some(mut line) = self.footer_area.get_line(0) {
-            line += INSERT_SPAN.len();
+            line += Mode::len();
             self.writer.set_style(self.theme.accent_style);
             let mut rev_builder = line.unsafe_builder_rev(&mut self.writer);
             if select_len != 0 {
@@ -146,7 +109,7 @@ impl GlobalState {
     pub fn clear_stats(&mut self) {
         if let Some(mut line) = self.footer_area.get_line(0) {
             let accent_style = self.theme.accent_style;
-            line += INSERT_SPAN.len();
+            line += Mode::len();
             self.writer.set_style(accent_style);
             self.writer.go_to(line.row, line.col);
             self.writer.clear_to_eol();
@@ -227,7 +190,7 @@ impl GlobalState {
     }
 
     #[inline]
-    pub fn render_popup(&mut self) {
+    pub fn popup_render(&mut self) {
         // popups do not mutate during render
         let gs = unsafe { &mut *(self as *mut GlobalState) };
         self.popup.fast_render(gs);
@@ -237,7 +200,7 @@ impl GlobalState {
         self.components.insert(Components::POPUP);
         self.config_controls();
         self.draw_callback = draw::full_rebuild;
-        self.mouse_mapper = controls::disable_mouse;
+        self.mouse_mapper = controls::mouse_popup_handler;
         self.popup = popup;
     }
 
@@ -247,7 +210,7 @@ impl GlobalState {
         self.draw_callback = draw::full_rebuild;
         self.editor_area.clear(&mut self.writer);
         self.tree_area.clear(&mut self.writer);
-        self.popup = placeholder();
+        self.popup = popups::placeholder();
     }
 
     pub fn toggle_tree(&mut self) {
@@ -283,7 +246,7 @@ impl GlobalState {
                 self.clear_popup();
             }
             PopupMessage::None => {}
-            PopupMessage::Tree(event) => {
+            PopupMessage::Event(event) => {
                 self.event.push(event);
             }
         }
@@ -318,26 +281,6 @@ impl GlobalState {
         self.event.push(IdiomEvent::Resize);
     }
 
-    pub fn recalc_draw_size(&mut self) {
-        self.tree_area = self.screen_rect;
-        self.footer_area = self.tree_area.splitoff_rows(1);
-        if let Some(mut line) = self.footer_area.get_line(0) {
-            line += SELECT_SPAN.len();
-            self.messages.set_line(line);
-        };
-        if matches!(self.mode, Mode::Select) || self.components.contains(Components::TREE) {
-            self.tab_area = self.tree_area.keep_col((self.tree_size * self.screen_rect.width) / 100);
-            self.tree_area.top_border().right_border().draw_borders(
-                Some(DOUBLE_BORDERS),
-                Some(color::dark_grey()),
-                &mut self.writer,
-            );
-        } else {
-            self.tab_area = self.tree_area.keep_col(0);
-        };
-        self.editor_area = self.tab_area.keep_rows(1);
-    }
-
     /// unwrap or default with logged error
     #[inline]
     pub fn unwrap_or_default<T: Default, E: Error>(&mut self, result: Result<T, E>, prefix: &str) -> T {
@@ -366,7 +309,7 @@ impl GlobalState {
     }
 
     pub async fn exchange_should_exit(&mut self, tree: &mut Tree, ws: &mut Workspace) -> bool {
-        tree.finish_sync(self);
+        tree.sync(self);
         while let Some(event) = self.event.pop() {
             event.handle(self, ws, tree).await
         }
