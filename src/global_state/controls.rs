@@ -80,7 +80,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                 editor.map(crate::configs::EditorAction::ScrollDown, gs);
             }
         }
-        MouseEventKind::Up(MouseButton::Left) => {
+        MouseEventKind::Down(MouseButton::Left) => {
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = workspace.get_active() {
                     editor.mouse_cursor(position);
@@ -111,7 +111,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                 gs.popup(Pallet::new());
             }
         }
-        MouseEventKind::Up(MouseButton::Right) => {
+        MouseEventKind::Down(MouseButton::Right) => {
             if let Some(pos) = gs.tab_area.relative_position(event.row, event.column) {
                 if !workspace.is_empty() {
                     gs.insert_mode();
