@@ -14,6 +14,7 @@ use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKin
 
 pub struct Popup {
     pub message: String,
+    title_prefix: Option<&'static str>,
     title: String,
     message_as_buffer_builder: Option<fn(char) -> Option<char>>,
     buttons: Vec<Button>,
@@ -30,7 +31,10 @@ impl PopupInterface for Popup {
         let mut area = gs.screen_rect.center(height, width);
         area.bordered();
         area.draw_borders(None, None, gs.backend());
-        area.border_title(&self.title, gs.backend());
+        match self.title_prefix {
+            Some(prefix) => area.border_title_prefixed(prefix, &self.title, gs.backend()),
+            None => area.border_title(&self.title, gs.backend()),
+        };
         let mut lines = area.into_iter();
         if let Some(first_line) = lines.next() {
             self.p_from_message(first_line, gs.backend());
@@ -59,7 +63,7 @@ impl PopupInterface for Popup {
                 self.message.pop();
                 PopupMessage::None
             }
-            KeyCode::Enter => self.call_button(self.state),
+            KeyCode::Enter => (self.buttons[self.state].command)(self),
             KeyCode::Left => {
                 self.prev();
                 PopupMessage::None
@@ -77,7 +81,7 @@ impl PopupInterface for Popup {
         match event {
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } if row == self.button_line => {
                 if let Some(position) = self.button_ranges.iter().position(|btn_range| btn_range.contains(&column)) {
-                    return self.call_button(position);
+                    return (self.buttons[position].command)(self);
                 }
             }
             MouseEvent { kind: MouseEventKind::ScrollUp, .. } => {
@@ -105,6 +109,7 @@ impl PopupInterface for Popup {
 impl Popup {
     pub fn new(
         message: String,
+        title_prefix: Option<&'static str>,
         title: Option<String>,
         message_as_buffer_builder: Option<fn(char) -> Option<char>>,
         buttons: Vec<Button>,
@@ -114,6 +119,7 @@ impl Popup {
         let title = title.unwrap_or("Prompt".to_owned());
         Self {
             message,
+            title_prefix,
             title,
             message_as_buffer_builder,
             buttons,
@@ -139,15 +145,6 @@ impl Popup {
         } else {
             self.state = self.buttons.len() - 1;
         }
-    }
-
-    fn call_button(&mut self, position: usize) -> PopupMessage {
-        if self.message_as_buffer_builder.is_some() && self.message.is_empty() {
-            self.state = position;
-            self.mark_as_updated();
-            return PopupMessage::None;
-        }
-        (self.buttons[position].command)(self)
     }
 
     fn p_from_message(&self, line: Line, backend: &mut Backend) {

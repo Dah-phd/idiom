@@ -134,7 +134,9 @@ impl IdiomEvent {
                 tree.push_diagnostics(new);
             }
             IdiomEvent::CreateFileOrFolder { name, from_base } => {
-                if let Ok(new_path) =
+                if name.is_empty() {
+                    gs.error("File creation requires input!");
+                } else if let Ok(new_path) =
                     if from_base { tree.create_file_or_folder_base(name) } else { tree.create_file_or_folder(name) }
                 {
                     if !new_path.is_dir() {
@@ -152,7 +154,9 @@ impl IdiomEvent {
                 gs.clear_popup();
             }
             IdiomEvent::RenameFile(name) => {
-                if let Some(result) = tree.rename_path(name) {
+                if name.is_empty() {
+                    gs.error("Rename requires input!");
+                } else if let Some(result) = tree.rename_path(name) {
                     match result {
                         Ok((old, new_path)) => ws.rename_editors(old, new_path, gs),
                         Err(err) => gs.messages.error(err.to_string()),

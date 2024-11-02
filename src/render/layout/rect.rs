@@ -268,8 +268,25 @@ impl Rect {
     /// !!! this needs to happen after border rendering
     #[inline]
     pub fn border_title(&self, text: &str, backend: &mut Backend) {
-        if self.borders.contains(Borders::TOP) {
-            backend.print_at(self.row - 1, self.col, text.truncate_width(self.width).1);
+        if !self.borders.contains(Borders::TOP) {
+            return;
+        };
+        backend.print_at(self.row - 1, self.col, text.truncate_width(self.width).1);
+    }
+
+    #[inline]
+    pub fn border_title_prefixed(&self, prefix: &str, suffix: &str, backend: &mut Backend) {
+        if !self.borders.contains(Borders::TOP) {
+            return;
+        }
+        let (remaining, text) = prefix.truncate_width(self.width);
+        backend.print_at(self.row - 1, self.col, text);
+        match remaining > 3 {
+            true => {
+                backend.print("..");
+                backend.print(suffix.truncate_width_start(remaining - 2).1)
+            }
+            false => backend.print(suffix.truncate_width_start(remaining).1),
         };
     }
 
