@@ -294,7 +294,7 @@ impl Editor {
         let mut idx = 0;
         for line_read in file_reader.lines() {
             match line_read {
-                Ok(line) if self.content[idx].content == line => {}
+                Ok(line) if matches!(self.content.get(idx), Some(editor_line) if editor_line.content == line) => {}
                 _ => return false,
             }
             idx += 1;
