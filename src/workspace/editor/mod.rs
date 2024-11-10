@@ -16,7 +16,7 @@ use crate::{
     syntax::{tokens::calc_wraps, Lexer},
 };
 use lsp_types::TextEdit;
-use std::{cmp::Ordering, io::BufRead, path::PathBuf};
+use std::{cmp::Ordering, path::PathBuf};
 use utils::{big_file_protection, build_display, FileUpdate};
 
 #[allow(dead_code)]
@@ -287,19 +287,14 @@ impl Editor {
     }
 
     pub fn is_saved(&self) -> bool {
-        let file_reader = match std::fs::File::open(&self.path).map(std::io::BufReader::new) {
-            Ok(file_reader) => file_reader,
-            _ => return false,
+        if let Ok(file_content) = std::fs::read_to_string(&self.path) {
+            return self
+                .content
+                .iter()
+                .map(|l| l.to_string())
+                .eq(file_content.split('\n').map(String::from).collect::<Vec<_>>());
         };
-        let mut idx = 0;
-        for line_read in file_reader.lines() {
-            match line_read {
-                Ok(line) if matches!(self.content.get(idx), Some(editor_line) if editor_line.content == line) => {}
-                _ => return false,
-            }
-            idx += 1;
-        }
-        self.content.len() == idx + 1
+        false
     }
 
     #[inline(always)]
