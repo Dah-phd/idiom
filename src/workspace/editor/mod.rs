@@ -286,15 +286,19 @@ impl Editor {
         };
     }
 
-    pub fn is_saved(&self) -> bool {
-        if let Ok(file_content) = std::fs::read_to_string(&self.path) {
-            return self
-                .content
-                .iter()
-                .map(|l| l.to_string())
-                .eq(file_content.split('\n').map(String::from).collect::<Vec<_>>());
-        };
-        false
+    pub fn is_saved(&self) -> IdiomResult<bool> {
+        let file_content = std::fs::read_to_string(&self.path)?;
+
+        let mut counter = 0_usize;
+        for expected in file_content.split('\n') {
+            match self.content.get(counter) {
+                Some(eline) if eline.content.as_str() == expected => {
+                    counter += 1;
+                }
+                _ => return Ok(false),
+            }
+        }
+        Ok(self.content.len() == counter)
     }
 
     #[inline(always)]

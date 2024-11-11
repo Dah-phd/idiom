@@ -22,6 +22,8 @@ use std::{
     path::PathBuf,
 };
 
+const FILE_STATUS_ERR: &str = "File status ERR";
+
 /// implement Drop to attempt keep state upon close/crash
 pub struct Workspace {
     editors: TrackedList<Editor>,
@@ -367,7 +369,8 @@ impl Workspace {
     pub fn notify_update(&mut self, path: PathBuf, gs: &mut GlobalState) {
         for (idx, editor) in self.editors.iter_mut().enumerate() {
             if editor.path == path {
-                if editor.is_saved() {
+                let save_status_result = editor.is_saved();
+                if gs.unwrap_or_default(save_status_result, FILE_STATUS_ERR) {
                     return;
                 }
                 editor.update_status.mark_updated();
@@ -400,9 +403,10 @@ impl Workspace {
         }
     }
 
-    pub fn are_updates_saved(&self) -> bool {
+    pub fn are_updates_saved(&self, gs: &mut GlobalState) -> bool {
         for editor in self.editors.iter() {
-            if !editor.is_saved() {
+            let save_status_result = editor.is_saved();
+            if !gs.unwrap_or_default(save_status_result, FILE_STATUS_ERR) {
                 return false;
             }
         }
