@@ -4,6 +4,7 @@ use crate::{
     render::{layout::Rect, state::State, TextField},
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use fuzzy_matcher::skim::SkimMatcherV2;
 use std::{
     fs::DirEntry,
     path::{PathBuf, MAIN_SEPARATOR},
@@ -81,7 +82,7 @@ impl PopupInterface for OpenFileSelector {
         };
     }
 
-    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         if self.state.selected != 0 {
             if let KeyEvent { code: KeyCode::Enter | KeyCode::Tab, .. } = key {
                 let mut text = self.paths.remove(self.state.selected);

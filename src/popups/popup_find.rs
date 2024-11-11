@@ -12,6 +12,7 @@ use crate::{
     workspace::{CursorPosition, Workspace},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use fuzzy_matcher::skim::SkimMatcherV2;
 
 pub struct GoToLinePopup {
     line_idx: String,
@@ -41,7 +42,7 @@ impl GoToLinePopup {
 }
 
 impl PopupInterface for GoToLinePopup {
-    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         match key.code {
             KeyCode::Char(ch) if ch.is_numeric() => {
                 self.line_idx.push(ch);
@@ -88,7 +89,7 @@ impl FindPopup {
 }
 
 impl PopupInterface for FindPopup {
-    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         if matches!(key.code, KeyCode::Char('h' | 'H') if key.modifiers.contains(KeyModifiers::CONTROL)) {
             return IdiomEvent::FindToReplace(self.pattern.text.to_owned(), self.options.clone()).into();
         }

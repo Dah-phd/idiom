@@ -11,6 +11,7 @@ use crate::{
     },
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use fuzzy_matcher::skim::SkimMatcherV2;
 
 pub struct Popup {
     pub message: String,
@@ -44,7 +45,7 @@ impl PopupInterface for Popup {
         }
     }
 
-    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         if let Some(button) =
             self.buttons.iter().find(|button| matches!(&button.key, Some(key_code) if key_code.contains(&key.code)))
         {
@@ -207,7 +208,7 @@ impl<T> PopupInterface for PopupSelector<T> {
         };
     }
 
-    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         if self.options.is_empty() {
             return PopupMessage::Clear;
         }

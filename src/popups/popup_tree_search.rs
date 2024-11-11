@@ -11,6 +11,7 @@ use crate::{
     workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent};
+use fuzzy_matcher::skim::SkimMatcherV2;
 use std::{path::PathBuf, sync::Arc};
 use tokio::{sync::Mutex, task::JoinHandle};
 
@@ -39,7 +40,7 @@ impl ActivePathSearch {
 }
 
 impl PopupInterface for ActivePathSearch {
-    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         if let Some(msg) = self.pattern.map(key, clipboard) {
             return msg;
         }
@@ -134,7 +135,7 @@ impl ActiveFileSearch {
 }
 
 impl PopupInterface for ActiveFileSearch {
-    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         if let Some(msg) = self.pattern.map(key, clipboard) {
             return msg;
         }

@@ -5,6 +5,7 @@ use crate::{
     workspace::{CursorPosition, Workspace},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use fuzzy_matcher::skim::SkimMatcherV2;
 
 use super::{
     utils::{count_as_string, into_message, next_option, prev_option},
@@ -59,7 +60,7 @@ impl ReplacePopup {
 }
 
 impl PopupInterface for ReplacePopup {
-    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         match key.code {
             KeyCode::Char('h' | 'H') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 if self.options.is_empty() {

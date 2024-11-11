@@ -244,7 +244,7 @@ impl GlobalState {
     }
 
     pub fn map_popup_if_exists(&mut self, key: &KeyEvent) -> bool {
-        match self.popup.map(key, &mut self.clipboard) {
+        match self.popup.map(key, &mut self.clipboard, &self.matcher) {
             PopupMessage::Clear => {
                 self.clear_popup();
             }
