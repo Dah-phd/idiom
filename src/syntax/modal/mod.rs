@@ -10,6 +10,7 @@ use crate::{
     workspace::CursorPosition,
 };
 use completion::AutoComplete;
+use fuzzy_matcher::skim::SkimMatcherV2;
 use info::Info;
 use lsp_types::{CompletionItem, Hover, SignatureHelp};
 use rename::RenameVariable;
@@ -87,8 +88,13 @@ impl LSPModal {
         None
     }
 
-    pub fn auto_complete(completions: Vec<CompletionItem>, line: String, c: CursorPosition) -> Option<Self> {
-        let modal = AutoComplete::new(completions, line, c);
+    pub fn auto_complete(
+        completions: Vec<CompletionItem>,
+        line: String,
+        c: CursorPosition,
+        matcher: &SkimMatcherV2,
+    ) -> Option<Self> {
+        let modal = AutoComplete::new(completions, line, c, matcher);
         if modal.len() != 0 {
             return Some(LSPModal::AutoComplete(modal));
         }

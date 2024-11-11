@@ -23,6 +23,7 @@ use crossterm::event::{KeyEvent, MouseEvent};
 pub use events::IdiomEvent;
 
 use draw::Components;
+use fuzzy_matcher::skim::SkimMatcherV2;
 use message::Messages;
 
 type KeyMapCallback = fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool;
@@ -46,6 +47,7 @@ pub struct GlobalState {
     pub tab_area: Rect,
     pub editor_area: Rect,
     pub footer_area: Rect,
+    pub matcher: SkimMatcherV2,
     messages: Messages,
     components: Components,
 }
@@ -71,6 +73,7 @@ impl GlobalState {
             tab_area: Rect::default(),
             editor_area: Rect::default(),
             footer_area: Rect::default(),
+            matcher: SkimMatcherV2::default(),
             messages,
             components: Components::default(),
         })

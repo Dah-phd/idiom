@@ -186,7 +186,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
                     Some(result) => match result {
                         LSPResponse::Completion(completions, line, c) => {
                             if editor.cursor.line == c.line {
-                                lexer.modal = LSPModal::auto_complete(completions, line, c);
+                                lexer.modal = LSPModal::auto_complete(completions, line, c, &gs.matcher);
                             }
                         }
                         LSPResponse::Hover(hover) => {
