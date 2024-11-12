@@ -80,11 +80,11 @@ impl TokenLine {
         self.inner.is_empty()
     }
 
-    pub fn increment_end(&mut self) {
-        if let Some(last) = self.inner.last_mut() {
-            last.len += 1;
-        }
-    }
+    // pub fn increment_end(&mut self) {
+    //     if let Some(last) = self.inner.last_mut() {
+    //         last.len += 1;
+    //     }
+    // }
 
     pub fn increment_at(&mut self, mut idx: usize) {
         let mut token_iter = self.inner.iter_mut();

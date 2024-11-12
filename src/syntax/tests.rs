@@ -476,17 +476,17 @@ fn create_tokens() -> TokenLine {
 
 #[test]
 fn test_token_inc() {
-    let mut tl = create_tokens();
-    let mut token_line = TokenLine::default();
-    token_line.push(Token { len: 3, delta_start: 0, style: Style::default() });
-    token_line.push(Token { len: 4, delta_start: 5, style: Style::default() });
-    tl.increment_at(3);
-    assert_eq!(tl, token_line);
-    tl.increment_end();
+    let mut token_line = create_tokens();
+    let mut expected = TokenLine::default();
+    expected.push(Token { len: 3, delta_start: 0, style: Style::default() });
+    expected.push(Token { len: 4, delta_start: 5, style: Style::default() });
+    token_line.increment_at(3);
+    assert_eq!(token_line, expected);
+    token_line.increment_at(5);
     let mut token_line = TokenLine::default();
     token_line.push(Token { len: 3, delta_start: 0, style: Style::default() });
     token_line.push(Token { len: 5, delta_start: 5, style: Style::default() });
-    assert_eq!(tl, token_line);
+    assert_eq!(token_line, token_line);
 }
 
 #[test]
