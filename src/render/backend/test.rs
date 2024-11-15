@@ -8,6 +8,14 @@ pub struct Backend {
 }
 
 impl BackendProtocol for Backend {
+    fn init() -> Self {
+        Self { data: Vec::new(), default_style: Style::default() }
+    }
+
+    fn exit() -> std::io::Result<()> {
+        Ok(())
+    }
+
     fn clear_all(&mut self) {
         self.data.push((Style::default(), String::from("<<clear all>>")));
     }
@@ -16,10 +24,6 @@ impl BackendProtocol for Backend {
     }
     fn clear_to_eol(&mut self) {
         self.data.push((Style::default(), String::from("<<clear EOL>>")));
-    }
-
-    fn exit() -> std::io::Result<()> {
-        Ok(())
     }
 
     fn get_style(&mut self) -> Style {
@@ -32,10 +36,6 @@ impl BackendProtocol for Backend {
 
     fn hide_cursor(&mut self) {
         self.data.push((Style::default(), String::from("<<hide cursor>>")));
-    }
-
-    fn init() -> Self {
-        Self { data: Vec::new(), default_style: Style::default() }
     }
 
     fn print<D: std::fmt::Display>(&mut self, text: D) {

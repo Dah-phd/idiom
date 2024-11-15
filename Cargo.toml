@@ -33,7 +33,7 @@ portable-pty = "0.8.1"
 strip-ansi-escapes = "0.2.0"
 bitflags = "2.6.0"
 regex = "1.11.1"
-thiserror = "2.0.2"
+thiserror = "2.0.3"
 unicode-width = "0.2.0"
 copypasta = "0.10.1"
 notify = { version = "7.0.0", default-features = false, features = ["macos_kqueue"] }
