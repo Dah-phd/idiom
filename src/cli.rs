@@ -60,7 +60,7 @@ pub struct TreeSeletor {
 /// Stateless calls
 impl TreeSeletor {
     pub fn select(backend: &mut Backend) -> IdiomResult<Option<PathBuf>> {
-        let home = dirs::home_dir().ok_or(IdiomError::io_err("Filed to find home dir!"))?.canonicalize()?;
+        let home = dirs::home_dir().ok_or(IdiomError::io_not_found("Filed to find home dir!"))?.canonicalize()?;
         std::env::set_current_dir(&home)?;
         let config = KeyMap::new().unwrap_or_default();
         let rect = Backend::screen()?;

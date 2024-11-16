@@ -110,7 +110,7 @@ impl Terminal {
         self.pair
             .master
             .resize(PtySize { rows: 24, cols, pixel_width: 0, pixel_height: 0 })
-            .map_err(|err| IdiomError::io_err(format!("Term Resize Err: {err}")))
+            .map_err(|err| IdiomError::io_other(format!("Term Resize Err: {err}")))
     }
 }
 
@@ -149,12 +149,12 @@ pub fn overwrite_cfg<T: Default + Serialize>(f: &str) -> IdiomResult<String> {
     let mut path = match config_dir() {
         Some(path) => path,
         None => {
-            return Err(IdiomError::io_err("Filed to derive config dir!"));
+            return Err(IdiomError::io_not_found("Filed to derive config dir!"));
         }
     };
     path.push(f);
-    let data =
-        serde_json::to_string_pretty(&T::default()).map_err(|err| IdiomError::io_err(format!("Parsing Err: {err}")))?;
+    let data = serde_json::to_string_pretty(&T::default())
+        .map_err(|err| IdiomError::io_other(format!("Parsing Err: {err}")))?;
     std::fs::write(&path, data)?;
     Ok(path.display().to_string())
 }

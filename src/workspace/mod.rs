@@ -225,7 +225,7 @@ impl Workspace {
                         if matches!(options.overwrite, Some(overwrite) if !overwrite)
                             || matches!(options.ignore_if_exists, Some(ignore) if ignore)
                         {
-                            return Err(IdiomError::io_err(format!("File {path:?} already exists!")));
+                            return Err(IdiomError::io_exists(format!("File {path:?} already exists!")));
                         }
                     }
                 };

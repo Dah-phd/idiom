@@ -44,7 +44,7 @@ impl<'de> serde::Deserialize<'de> for UITheme {
                 };
                 Ok(Self { accent_style: Style::bg(accent_background), accent_background })
             }
-            _ => Err(serde::de::Error::custom(IdiomError::io_err("theme_ui.toml in not an Object!"))),
+            _ => Err(serde::de::Error::custom(IdiomError::any("theme_ui.toml in not an Object!"))),
         }
     }
 }

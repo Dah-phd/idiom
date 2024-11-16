@@ -51,7 +51,7 @@ pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> IdiomResult<PathBu
         if let Some(file_name) = file_name {
             path.push(file_name);
             if path.exists() {
-                return Err(IdiomError::io_err("File already exists!"));
+                return Err(IdiomError::io_exists("File already exists!"));
             }
         }
         std::fs::write(&path, "")?;
@@ -79,7 +79,7 @@ pub fn to_relative_path(target_dir: &Path) -> IdiomResult<PathBuf> {
         }
     }
     if result.to_string_lossy().is_empty() {
-        Err(IdiomError::io_err("Empty buffer!"))
+        Err(IdiomError::io_other("Empty buffer!"))
     } else {
         Ok(result)
     }

@@ -89,7 +89,7 @@ impl<'de> serde::Deserialize<'de> for Theme {
                     .unwrap_or(Ok(STRING_ESCAPE))
                     .map_err(serde::de::Error::custom)?,
             }),
-            _ => Err(serde::de::Error::custom(IdiomError::io_err("theme.json in not an Object!"))),
+            _ => Err(serde::de::Error::custom(IdiomError::any("theme.json in not an Object!"))),
         }
     }
 }
