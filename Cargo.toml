@@ -38,6 +38,10 @@ unicode-width = "0.2.0"
 copypasta = "0.10.1"
 notify = { version = "7.0.0", default-features = false, features = ["macos_kqueue"] }
 logos = "0.14.2"
+coolor = "1.0.0"
+
+[target.'cfg(unix)'.dependencies]
+xterm-query = "0.5.0"
 
 [profile.dev]
 debug = true

@@ -1,108 +1,152 @@
 use std::collections::HashMap;
 
-use super::Color;
-use crossterm::style::Color as CTColor;
+use crossterm::style::Color;
 use serde_json::{Map, Value};
 
 #[inline]
 pub const fn reset() -> Color {
-    CTColor::Reset
+    Color::Reset
 }
 
 #[inline]
 pub const fn rgb(r: u8, g: u8, b: u8) -> Color {
-    CTColor::Rgb { r, g, b }
+    Color::Rgb { r, g, b }
 }
 
 #[inline]
 pub const fn ansi(val: u8) -> Color {
-    CTColor::AnsiValue(val)
+    Color::AnsiValue(val)
 }
 
 #[allow(dead_code)]
 #[inline]
 pub fn parse_ansi(code: &str) -> Option<Color> {
-    CTColor::parse_ansi(code)
+    Color::parse_ansi(code)
 }
 
 #[inline]
 pub const fn red() -> Color {
-    CTColor::Red
+    Color::Red
 }
 
 #[inline]
 pub const fn dark_red() -> Color {
-    CTColor::DarkRed
+    Color::DarkRed
 }
 
 #[inline]
 pub const fn yellow() -> Color {
-    CTColor::Yellow
+    Color::Yellow
 }
 
 #[inline]
 pub const fn dark_yellow() -> Color {
-    CTColor::DarkYellow
+    Color::DarkYellow
 }
 
 #[inline]
 pub const fn cyan() -> Color {
-    CTColor::Cyan
+    Color::Cyan
 }
 
 #[inline]
 pub const fn dark_cyan() -> Color {
-    CTColor::DarkCyan
+    Color::DarkCyan
 }
 
 #[inline]
 pub const fn magenta() -> Color {
-    CTColor::Magenta
+    Color::Magenta
 }
 
 #[inline]
 pub const fn dark_magenta() -> Color {
-    CTColor::DarkMagenta
+    Color::DarkMagenta
 }
 
 #[inline]
 pub const fn grey() -> Color {
-    CTColor::Grey
+    Color::Grey
 }
 
 #[inline]
 pub const fn dark_grey() -> Color {
-    CTColor::DarkGrey
+    Color::DarkGrey
 }
 
 #[inline]
 pub const fn black() -> Color {
-    CTColor::Black
+    Color::Black
 }
 
 #[inline]
 pub const fn white() -> Color {
-    CTColor::White
+    Color::White
 }
 
 #[inline]
 pub const fn green() -> Color {
-    CTColor::Green
+    Color::Green
 }
 
 #[inline]
 pub const fn dark_green() -> Color {
-    CTColor::DarkGreen
+    Color::DarkGreen
 }
 
 #[inline]
 pub const fn blue() -> Color {
-    CTColor::Blue
+    Color::Blue
 }
 
 #[inline]
 pub const fn dark_blue() -> Color {
-    CTColor::DarkBlue
+    Color::DarkBlue
+}
+
+#[cfg(not(test))]
+#[inline]
+pub fn background_rgb() -> Option<(u8, u8, u8)> {
+    #[cfg(unix)]
+    if let Some(result) = query_bg_color() {
+        return Some(result);
+    }
+    env_rgb_color()
+}
+
+#[cfg(test)]
+pub fn background_rgb() -> Option<(u8, u8, u8)> {
+    None
+}
+
+#[allow(dead_code)] // test setup causes the function to be detected as unused
+#[cfg(unix)]
+fn query_bg_color() -> Option<(u8, u8, u8)> {
+    let s = xterm_query::query_osc("\x1b]11;?\x07", 100_u16).ok()?;
+    match s.strip_prefix("]11;rgb:") {
+        Some(raw_color) if raw_color.len() >= 14 => Some((
+            u8::from_str_radix(&raw_color[0..2], 16).ok()?,
+            u8::from_str_radix(&raw_color[5..7], 16).ok()?,
+            u8::from_str_radix(&raw_color[10..12], 16).ok()?,
+        )),
+        _ => None,
+    }
+}
+
+#[allow(dead_code)] // test setup causes the function to be detected as unused
+fn env_rgb_color() -> Option<(u8, u8, u8)> {
+    let color_config = std::env::var("COLORFGBG").ok()?;
+    let token: Vec<&str> = color_config.split(';').collect();
+    let bg = match token.len() {
+        2 => token[1],
+        3 => token[2],
+        _ => {
+            return None;
+        }
+    };
+    let code = bg.parse().ok()?;
+    let coolor::Rgb { r, g, b } = coolor::AnsiColor { code }.to_rgb();
+    Some((r, g, b))
 }
 
 pub fn serialize_rgb(r: u8, g: u8, b: u8) -> HashMap<&'static str, [u8; 3]> {
@@ -132,6 +176,18 @@ pub fn parse_color(obj: Value) -> Result<Color, String> {
         }
         _ => Err(String::from("Color definition should be String or Object!")),
     }
+}
+
+pub fn parse_raw_rgb(map: Value) -> Result<(u8, u8, u8), String> {
+    if let Some(Value::Array(rgb_value)) = map.get("rgb").or(map.get("Rgb").or(map.get("RGB"))) {
+        if rgb_value.len() == 3 {
+            let b = object_to_u8(rgb_value[2].clone()).ok_or("Failed to parse B in RGB color")?;
+            let g = object_to_u8(rgb_value[1].clone()).ok_or("Failed to parse G in RGB color")?;
+            let r = object_to_u8(rgb_value[0].clone()).ok_or("Failed to parse R in RGB color")?;
+            return Ok((r, g, b));
+        }
+    };
+    Err(String::from("When representing Color as Object(Map) - should be {\"rgb\": [number, number, number]}!"))
 }
 
 pub fn object_to_u8(obj: Value) -> Option<u8> {
@@ -206,3 +262,6 @@ impl std::fmt::Display for ParseColorError {
 }
 
 impl std::error::Error for ParseColorError {}
+
+#[cfg(test)]
+mod tests {}

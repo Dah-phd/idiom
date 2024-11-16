@@ -1,15 +1,16 @@
 pub mod color;
 mod style;
+pub use crossterm::style::Color;
 use crossterm::{
     cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show},
     execute, queue,
-    style::{Color as CTColor, Print, ResetColor, SetStyle},
+    style::{Print, ResetColor, SetStyle},
     terminal::{size, Clear, ClearType},
 };
 #[allow(unused_imports)]
 use std::{
     fmt::Display,
-    io::{Stdout, Write},
+    io::{StderrLock, Stdout, Write},
 };
 
 const ERR_MSG: &str = "Rendering (Stdout) Err:";
@@ -19,7 +20,6 @@ pub use style::Style;
 use crate::render::layout::Rect;
 
 use super::BackendProtocol;
-pub type Color = CTColor;
 
 /// Thin wrapper around rendering framework, allowing easy switching of backend
 /// If stdout gets an error Backend will crash the program as rendering is to priority
@@ -27,10 +27,7 @@ pub type Color = CTColor;
 /// Main reason is to clear out the issue with PrintStyled on CrossTerm
 /// TODO: add termios & wezterm
 pub struct Backend {
-    // #[cfg(not(test))]
     writer: Stdout, // could be moved to locked state for performance but current frame generation is about 200 µs
-    // #[cfg(test)]
-    // writer: DummyOut,
     default_styled: Option<Style>,
 }
 

@@ -55,7 +55,7 @@ pub struct GlobalState {
 impl GlobalState {
     pub fn new(backend: Backend) -> std::io::Result<Self> {
         let mut messages = Messages::new();
-        let theme = messages.unwrap_or_default(UITheme::new(), "Failed to load theme_ui.json");
+        let theme = messages.unwrap_or_default(UITheme::new(), "Failed to load theme_ui.toml");
         Backend::screen().map(|screen_rect| Self {
             mode: Mode::default(),
             tree_size: 15,
