@@ -5,8 +5,10 @@ pub const BORDERS: BorderSet = BorderSet {
     top_right_qorner: '┐',
     bot_left_qorner: '└',
     bot_right_qorner: '┘',
-    vertical: '│',
-    horizontal: '─',
+    vertical_left: '│',
+    vertical_right: '│',
+    horizontal_top: '─',
+    horizontal_bot: '─',
 };
 
 pub const DOUBLE_BORDERS: BorderSet = BorderSet {
@@ -14,8 +16,65 @@ pub const DOUBLE_BORDERS: BorderSet = BorderSet {
     top_right_qorner: '╗',
     bot_left_qorner: '╚',
     bot_right_qorner: '╝',
-    vertical: '║',
-    horizontal: '═',
+    vertical_left: '║',
+    vertical_right: '║',
+    horizontal_top: '═',
+    horizontal_bot: '═',
+};
+
+pub const THICK_BORDERS: BorderSet = BorderSet {
+    top_left_qorner: '┏',
+    top_right_qorner: '┓',
+    bot_left_qorner: '┗',
+    bot_right_qorner: '┛',
+    vertical_left: '┃',
+    vertical_right: '┃',
+    horizontal_top: '━',
+    horizontal_bot: '━',
+};
+
+pub const HAVED_WIDE_BORDERS: BorderSet = BorderSet {
+    top_left_qorner: '▛',
+    top_right_qorner: '▜',
+    bot_left_qorner: '▙',
+    bot_right_qorner: '▟',
+    vertical_left: '▌',
+    vertical_right: '▐',
+    horizontal_top: '▀',
+    horizontal_bot: '▄',
+};
+
+pub const HAVED_THIN_BORDERS: BorderSet = BorderSet {
+    top_left_qorner: '▗',
+    top_right_qorner: '▖',
+    bot_left_qorner: '▝',
+    bot_right_qorner: '▘',
+    vertical_left: '▐',
+    vertical_right: '▌',
+    horizontal_top: '▄',
+    horizontal_bot: '▀',
+};
+
+pub const FULL_BORDERS: BorderSet = BorderSet {
+    top_left_qorner: '█',
+    top_right_qorner: '█',
+    bot_left_qorner: '█',
+    bot_right_qorner: '█',
+    vertical_left: '█',
+    vertical_right: '█',
+    horizontal_top: '█',
+    horizontal_bot: '█',
+};
+
+pub const HAVLED_BALANCED_BORDERS: BorderSet = BorderSet {
+    top_left_qorner: '▄',
+    top_right_qorner: '▄',
+    bot_left_qorner: '▀',
+    bot_right_qorner: '▀',
+    vertical_left: '█',
+    vertical_right: '█',
+    horizontal_top: '▄',
+    horizontal_bot: '▀',
 };
 
 bitflags! {
@@ -42,8 +101,10 @@ pub struct BorderSet {
     pub top_right_qorner: char,
     pub bot_left_qorner: char,
     pub bot_right_qorner: char,
-    pub vertical: char,
-    pub horizontal: char,
+    pub vertical_left: char,
+    pub vertical_right: char,
+    pub horizontal_top: char,
+    pub horizontal_bot: char,
 }
 
 impl BorderSet {

@@ -346,25 +346,25 @@ impl Rect {
         if top {
             for col_idx in col..last_col {
                 backend.go_to(row, col_idx);
-                backend.print(set.horizontal);
+                backend.print(set.horizontal_top);
             }
         }
         if bot {
             for col_idx in col..last_col {
                 backend.go_to(last_row, col_idx);
-                backend.print(set.horizontal);
+                backend.print(set.horizontal_bot);
             }
         }
         if left {
             for row_idx in row..last_row {
                 backend.go_to(row_idx, col);
-                backend.print(set.vertical);
+                backend.print(set.vertical_left);
             }
         }
         if right {
             for row_idx in row..last_row {
                 backend.go_to(row_idx, last_col);
-                backend.print(set.vertical);
+                backend.print(set.vertical_right);
             }
         }
         if self.borders.contains(Borders::TOP | Borders::LEFT) {

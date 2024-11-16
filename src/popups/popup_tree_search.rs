@@ -70,7 +70,7 @@ impl PopupInterface for ActivePathSearch {
             self.pattern.widget(line, &mut gs.writer);
         }
         if let Some(line) = lines.next() {
-            line.fill(BORDERS.horizontal, &mut gs.writer);
+            line.fill(BORDERS.horizontal_top, &mut gs.writer);
         }
         if let Some(list_rect) = lines.into_rect() {
             if self.options.is_empty() {
@@ -175,7 +175,7 @@ impl PopupInterface for ActiveFileSearch {
             self.pattern.widget(line, &mut gs.writer);
         }
         if let Some(line) = lines.next() {
-            line.fill(BORDERS.horizontal, &mut gs.writer);
+            line.fill(BORDERS.horizontal_top, &mut gs.writer);
         }
         if let Some(list_rect) = lines.into_rect() {
             if self.options.is_empty() {

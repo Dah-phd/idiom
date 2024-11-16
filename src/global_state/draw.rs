@@ -1,8 +1,8 @@
 use super::{GlobalState, Mode};
 use crate::{
     render::{
-        backend::{color, BackendProtocol, Style},
-        layout::{Line, DOUBLE_BORDERS},
+        backend::{BackendProtocol, Style},
+        layout::{Line, HAVLED_BALANCED_BORDERS},
     },
     runner::EditorTerminal,
     tree::Tree,
@@ -51,8 +51,8 @@ pub fn full_rebuild(
             render_logo(line, gs);
         }
         tree_area.top_border().right_border().draw_borders(
-            Some(DOUBLE_BORDERS),
-            Some(color::dark_grey()),
+            Some(HAVLED_BALANCED_BORDERS),
+            Some(gs.theme.accent_background),
             gs.backend(),
         );
         gs.tree_area = tree_area;
