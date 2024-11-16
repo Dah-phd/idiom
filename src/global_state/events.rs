@@ -136,24 +136,30 @@ impl IdiomEvent {
             IdiomEvent::CreateFileOrFolder { name, from_base } => {
                 if name.is_empty() {
                     gs.error("File creation requires input!");
-                } else if let Ok(new_path) = match from_base {
-                    true => tree.create_file_or_folder_base(name),
-                    false => tree.create_file_or_folder(name),
-                } {
-                    tree.sync(gs);
-                    if !new_path.is_dir() {
-                        match ws.new_at_line(new_path.clone(), 0, gs).await {
-                            Ok(..) => {
-                                gs.insert_mode();
-                                if let Some(editor) = ws.get_active() {
-                                    editor.update_status.deny();
-                                }
+                } else {
+                    let result = match from_base {
+                        true => tree.create_file_or_folder_base(name),
+                        false => tree.create_file_or_folder(name),
+                    };
+                    match result {
+                        Ok(new_path) => {
+                            tree.sync(gs);
+                            if !new_path.is_dir() {
+                                match ws.new_at_line(new_path.clone(), 0, gs).await {
+                                    Ok(..) => {
+                                        gs.insert_mode();
+                                        if let Some(editor) = ws.get_active() {
+                                            editor.update_status.deny();
+                                        }
+                                    }
+                                    Err(error) => gs.error(error.to_string()),
+                                };
                             }
-                            Err(error) => gs.error(error.to_string()),
-                        };
+                            tree.sync(gs);
+                            tree.select_by_path(&new_path);
+                        }
+                        Err(error) => gs.error(error.to_string()),
                     }
-                    tree.sync(gs);
-                    tree.select_by_path(&new_path);
                 }
                 gs.clear_popup();
             }

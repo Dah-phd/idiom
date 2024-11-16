@@ -262,6 +262,12 @@ impl Tree {
                 let mut abs_new_path = old_path.clone();
                 abs_new_path.pop();
                 abs_new_path.push(&name);
+                if abs_new_path.exists() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::AlreadyExists,
+                        "Unable to rename to already existing path!",
+                    ));
+                }
                 std::fs::rename(&old_path, &abs_new_path).map(|_| (old_path, abs_new_path))
             })
             .map_err(IdiomError::from);
