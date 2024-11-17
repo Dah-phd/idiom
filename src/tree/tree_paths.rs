@@ -132,19 +132,16 @@ impl TreePath {
             return Ok(true);
         }
         if rel_path.starts_with(self.path()) {
-            let should_shrink = self.tree_mut().is_none();
             self.expand()?;
             if let Some(nested_tree) = self.tree_mut() {
                 for tree_path in nested_tree {
                     let result = tree_path.expand_contained(rel_path, watcher);
                     if matches!(result, Ok(false)) {
                         continue;
-                    };
+                    }
+                    let _ = watcher.watch(self.path());
                     return result;
                 }
-            }
-            if should_shrink {
-                let _ = self.take_tree();
             }
         }
         Ok(false)
