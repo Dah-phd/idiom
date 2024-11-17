@@ -6,7 +6,7 @@ use crate::{
     error::{IdiomError, IdiomResult},
     global_state::{GlobalState, IdiomEvent},
     lsp::{DiagnosticType, TreeDiagnostics},
-    popups::popups_tree::{create_file_popup, rename_file_popup},
+    popups::popups_tree::{create_file_popup, create_root_file_popup, rename_file_popup},
     render::state::State,
     utils::{build_file_or_folder, to_canon_path, to_relative_path},
 };
@@ -112,7 +112,35 @@ impl Tree {
                 TreeAction::Delete => {
                     let _ = self.delete_file(gs);
                 }
-                TreeAction::NewFile => gs.popup(create_file_popup(self.get_first_selected_folder_display())),
+                TreeAction::NewFile => {
+                    let root = self.tree.path().to_owned();
+                    match self.tree.get_mut_from_inner(self.state.selected) {
+                        // root cannot be file
+                        Some(TreePath::File { path, .. }) => match path.parent() {
+                            Some(parent) if parent != &root => gs.popup(create_file_popup(parent.to_owned())),
+                            _ => gs.popup(create_root_file_popup()),
+                        },
+                        // in case folder is not expanded create in parant
+                        Some(TreePath::Folder { path, tree: None, .. }) => {
+                            // should be unreachable
+                            if &root == path {
+                                gs.popup(create_root_file_popup());
+                            } else {
+                                match path.parent() {
+                                    Some(parent) if parent != &root => gs.popup(create_file_popup(parent.to_owned())),
+                                    _ => gs.popup(create_root_file_popup()),
+                                }
+                            }
+                        }
+                        // create in selected dir (root check)
+                        Some(TreePath::Folder { path, tree: Some(..), .. }) => match path == &root {
+                            true => gs.popup(create_root_file_popup()),
+                            false => gs.popup(create_file_popup(path.to_owned())),
+                        },
+                        // nothing is selected
+                        None => gs.popup(create_root_file_popup()),
+                    };
+                }
                 TreeAction::Rename => {
                     if let Some(tree_path) = self.tree.get_mut_from_inner(self.state.selected) {
                         gs.popup(rename_file_popup(tree_path.path().display().to_string()));
@@ -237,12 +265,22 @@ impl Tree {
     }
 
     pub fn create_file_or_folder(&mut self, name: String) -> IdiomResult<PathBuf> {
-        let path = build_file_or_folder(self.selected_path.clone(), &name)?;
+        let path = match self.tree.get_mut_from_inner(self.state.selected) {
+            Some(TreePath::Folder { path, tree: Some(..), .. }) | Some(TreePath::File { path, .. }) => {
+                build_file_or_folder(path.to_owned(), &name)?
+            }
+            Some(TreePath::Folder { path, tree: None, .. }) => match path.parent() {
+                Some(parent) => build_file_or_folder(parent.to_owned(), &name)?,
+                None => return Err(IdiomError::io_not_found("Unable to determine parent of not expanded dir!")),
+            },
+            // build file where wanted
+            None => build_file_or_folder(self.selected_path.clone(), &name)?,
+        };
         Ok(path)
     }
 
     pub fn create_file_or_folder_base(&mut self, name: String) -> IdiomResult<PathBuf> {
-        let path = build_file_or_folder(PathBuf::from("./"), &name)?;
+        let path = build_file_or_folder(self.tree.path().to_owned(), &name)?;
         Ok(path)
     }
 
@@ -320,18 +358,6 @@ impl Tree {
                 Err(err)
             }
         }
-    }
-
-    pub fn get_first_selected_folder_display(&mut self) -> String {
-        if let Some(tree_path) = self.tree.get_mut_from_inner(self.state.selected) {
-            if tree_path.path().is_dir() {
-                return tree_path.path().as_path().display().to_string();
-            }
-            if let Some(parent) = tree_path.path().parent() {
-                return parent.display().to_string();
-            }
-        }
-        "./".to_owned()
     }
 
     pub fn get_base_file_names(&self) -> Vec<String> {

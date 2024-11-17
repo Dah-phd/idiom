@@ -6,20 +6,36 @@ use crate::{
 use lsp_types::{Location, Range};
 use std::path::PathBuf;
 
-pub fn create_file_popup(path: String) -> Box<Popup> {
-    let mut buttons = vec![Button {
-        command: |popup| IdiomEvent::CreateFileOrFolder { name: popup.message.to_owned(), from_base: false }.into(),
-        name: "Create",
-        key: None,
-    }];
-    if path != "./" {
-        buttons.push(Button {
+pub fn create_file_popup(path: PathBuf) -> Box<Popup> {
+    let buttons = vec![
+        Button {
+            command: |popup| IdiomEvent::CreateFileOrFolder { name: popup.message.to_owned(), from_base: false }.into(),
+            name: "Create",
+            key: None,
+        },
+        Button {
             command: |popup| IdiomEvent::CreateFileOrFolder { name: popup.message.to_owned(), from_base: true }.into(),
             name: "Create in ./",
             key: None,
-        })
-    }
-    Box::new(Popup::new(String::new(), Some("New in "), Some(path), Some(Some), buttons, Some((4, 40))))
+        },
+    ];
+    Box::new(Popup::new(
+        String::new(),
+        Some("New in "),
+        Some(path.display().to_string()),
+        Some(Some),
+        buttons,
+        Some((4, 40)),
+    ))
+}
+
+pub fn create_root_file_popup() -> Box<Popup> {
+    let buttons = vec![Button {
+        command: |popup| IdiomEvent::CreateFileOrFolder { name: popup.message.to_owned(), from_base: true }.into(),
+        name: "Create",
+        key: None,
+    }];
+    Box::new(Popup::new(String::new(), Some("New in root dir"), None, Some(Some), buttons, Some((4, 40))))
 }
 
 pub fn rename_file_popup(path: String) -> Box<Popup> {
