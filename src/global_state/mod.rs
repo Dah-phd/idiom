@@ -7,6 +7,7 @@ mod message;
 
 use crate::{
     configs::{FileType, UITheme},
+    error::IdiomResult,
     lsp::{LSPError, LSPResult},
     popups::{self, PopupInterface},
     render::{
@@ -288,6 +289,14 @@ impl GlobalState {
     #[inline]
     pub fn unwrap_or_default<T: Default, E: Error>(&mut self, result: Result<T, E>, prefix: &str) -> T {
         self.messages.unwrap_or_default(result, prefix)
+    }
+
+    /// logs IdiomError and drops the result
+    #[inline]
+    pub fn log_if_error<Any>(&mut self, result: IdiomResult<Any>) {
+        if let Err(error) = result {
+            self.message(error.to_string());
+        }
     }
 
     /// unwrap LSP error and check status

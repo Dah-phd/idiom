@@ -106,7 +106,10 @@ impl EventHandles {
                         match path.parent().and_then(|path| tree.find_by_path_skip_root(path, path_parser)) {
                             Some(inner_tree) => {
                                 self.remove(Self::TREE_PARTIAL);
-                                inner_tree.sync();
+                                if inner_tree.sync().is_err() {
+                                    tree.sync_base();
+                                    return;
+                                };
                             }
                             None => {
                                 tree.sync_base();

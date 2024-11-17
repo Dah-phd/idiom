@@ -33,7 +33,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
 
     // CLI SETUP
     if let Some(path) = open_file {
-        tree.select_by_path(&path);
+        tree.select_by_path(&path).unwrap();
         gs.event.push(IdiomEvent::OpenAtLine(path, 0));
         gs.toggle_tree();
     }

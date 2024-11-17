@@ -81,7 +81,8 @@ impl IdiomEvent {
                 }
             }
             IdiomEvent::OpenAtLine(path, line) => {
-                tree.select_by_path(&path);
+                let select_result = tree.select_by_path(&path);
+                gs.log_if_error(select_result);
                 gs.clear_popup();
                 match ws.new_at_line(path, line, gs).await {
                     Ok(..) => gs.insert_mode(),
@@ -89,7 +90,8 @@ impl IdiomEvent {
                 }
             }
             IdiomEvent::OpenAtSelect(path, (from, to)) => {
-                tree.select_by_path(&path);
+                let select_result = tree.select_by_path(&path);
+                gs.log_if_error(select_result);
                 match ws.new_from(path, gs).await {
                     Ok(..) => {
                         gs.insert_mode();
@@ -99,7 +101,7 @@ impl IdiomEvent {
                         gs.clear_popup();
                     }
                     Err(error) => gs.error(error.to_string()),
-                }
+                };
             }
             IdiomEvent::GoToLine { line, clear_popup } => match ws.get_active() {
                 Some(editor) => {
@@ -128,7 +130,8 @@ impl IdiomEvent {
                 None => gs.clear_popup(),
             },
             IdiomEvent::SelectPath(path) => {
-                tree.select_by_path(&path);
+                let result = tree.select_by_path(&path);
+                gs.log_if_error(result);
             }
             IdiomEvent::TreeDiagnostics(new) => {
                 tree.push_diagnostics(new);
@@ -156,7 +159,8 @@ impl IdiomEvent {
                                 };
                             }
                             tree.sync(gs);
-                            tree.select_by_path(&new_path);
+                            let result = tree.select_by_path(&new_path);
+                            gs.log_if_error(result);
                         }
                         Err(error) => gs.error(error.to_string()),
                     }

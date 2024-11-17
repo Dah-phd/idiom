@@ -1,3 +1,4 @@
+mod file_clipboard;
 mod tree_paths;
 mod watcher;
 use crate::{
@@ -37,7 +38,7 @@ impl Tree {
             Ok(selected_path) => {
                 let path_str = selected_path.display().to_string();
                 let display_offset = path_str.split(std::path::MAIN_SEPARATOR).count() * 2;
-                let tree = TreePath::from_path(selected_path.clone());
+                let tree = TreePath::from_path(selected_path.clone()).unwrap();
                 Self {
                     watcher: TreeWatcher::root(&selected_path),
                     state: State::new(),
@@ -53,7 +54,7 @@ impl Tree {
             Err(err) => {
                 gs.error(err.to_string());
                 let selected_path = PathBuf::from("./");
-                let tree = TreePath::from_path(selected_path.clone());
+                let tree = TreePath::from_path(selected_path.clone()).unwrap();
                 Self {
                     watcher: TreeWatcher::root(&selected_path),
                     state: State::new(),
@@ -132,10 +133,16 @@ impl Tree {
             if let Err(err) = self.watcher.watch(path) {
                 gs.error(err.to_string());
             };
-            tree_path.expand();
-            for (d_path, new_diagnostic) in self.diagnostics_state.iter() {
-                tree_path.map_diagnostics_base(d_path, *new_diagnostic);
-            }
+            match tree_path.expand() {
+                Ok(..) => {
+                    for (d_path, new_diagnostic) in self.diagnostics_state.iter() {
+                        tree_path.map_diagnostics_base(d_path, *new_diagnostic);
+                    }
+                }
+                Err(error) => {
+                    gs.error(error.to_string());
+                }
+            };
             self.rebuild = true;
             None
         } else {
@@ -153,7 +160,7 @@ impl Tree {
         }
     }
 
-    pub fn mouse_select(&mut self, idx: usize) -> Option<PathBuf> {
+    pub fn mouse_select(&mut self, idx: usize, gs: &mut GlobalState) -> Option<PathBuf> {
         if self.tree.len() > idx {
             self.state.selected = idx.saturating_sub(1);
             if let Some(selected) = self.tree.get_mut_from_inner(self.state.selected) {
@@ -161,12 +168,14 @@ impl Tree {
                     TreePath::Folder { tree: Some(..), .. } => {
                         selected.take_tree();
                     }
-                    TreePath::Folder { tree: None, .. } => {
-                        selected.expand();
-                        for (d_path, new_diagnostic) in self.diagnostics_state.iter() {
-                            selected.map_diagnostics_base(d_path, *new_diagnostic);
+                    TreePath::Folder { tree: None, .. } => match selected.expand() {
+                        Ok(..) => {
+                            for (d_path, new_diagnostic) in self.diagnostics_state.iter() {
+                                selected.map_diagnostics_base(d_path, *new_diagnostic);
+                            }
                         }
-                    }
+                        Err(error) => gs.error(error.to_string()),
+                    },
                     TreePath::File { path, .. } => {
                         self.selected_path = path.clone();
                         self.rebuild = true;
@@ -280,7 +289,7 @@ impl Tree {
     }
 
     pub fn search_paths(&self, pattern: &str) -> Vec<PathBuf> {
-        self.tree.shallow_copy().search_tree_paths(pattern)
+        self.tree.shallow_copy().search_tree_paths(pattern).unwrap()
     }
 
     pub fn shallow_copy_root_tree_path(&self) -> TreePath {
@@ -294,14 +303,22 @@ impl Tree {
         }
     }
 
-    pub fn select_by_path(&mut self, path: &PathBuf) {
+    pub fn select_by_path(&mut self, path: &PathBuf) -> IdiomResult<()> {
         let rel_result = (self.path_parser)(path);
         let path = rel_result.as_ref().unwrap_or(path);
-        if self.tree.expand_contained(path, &mut self.watcher) {
-            self.selected_path.clone_from(path);
-            self.state.selected = self.tree.iter().skip(1).position(|tp| tp.path() == path).unwrap_or_default();
-            self.rebuild_diagnostics();
-            self.rebuild = true;
+        match self.tree.expand_contained(path, &mut self.watcher) {
+            Ok(true) => {
+                self.selected_path.clone_from(path);
+                self.state.selected = self.tree.iter().skip(1).position(|tp| tp.path() == path).unwrap_or_default();
+                self.rebuild_diagnostics();
+                self.rebuild = true;
+                Ok(())
+            }
+            Ok(false) => Err(IdiomError::io_not_found("Unable to select file!")),
+            Err(err) => {
+                self.tree.sync_base();
+                Err(err)
+            }
         }
     }
 

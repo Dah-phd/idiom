@@ -23,11 +23,8 @@ pub fn split_arc<T: Default>() -> (Arc<T>, Arc<T>) {
     (arc, clone)
 }
 
-pub fn get_nested_paths(path: &PathBuf) -> impl Iterator<Item = PathBuf> {
-    match std::fs::read_dir(path) {
-        Ok(iter) => iter.flatten().map(|p| p.path()),
-        Err(_) => todo!(),
-    }
+pub fn get_nested_paths(path: &PathBuf) -> IdiomResult<impl Iterator<Item = PathBuf>> {
+    Ok(std::fs::read_dir(path)?.flatten().map(|p| p.path()))
 }
 
 pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> IdiomResult<PathBuf> {
@@ -58,6 +55,20 @@ pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> IdiomResult<PathBu
     }
 
     Ok(path)
+}
+
+fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
+    std::fs::create_dir_all(&dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        } else {
+            std::fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
+        }
+    }
+    Ok(())
 }
 
 pub fn to_relative_path(target_dir: &Path) -> IdiomResult<PathBuf> {

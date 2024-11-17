@@ -85,13 +85,15 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                 if let Some(editor) = workspace.get_active() {
                     editor.mouse_cursor(position);
                     gs.insert_mode();
-                    tree.select_by_path(&editor.path);
-                    workspace.toggle_editor();
+                    match tree.select_by_path(&editor.path) {
+                        Ok(..) => workspace.toggle_editor(),
+                        Err(error) => gs.error(error.to_string()),
+                    };
                 }
                 return;
             }
             if let Some(pos) = gs.tree_area.relative_position(event.row, event.column) {
-                if let Some(path) = tree.mouse_select(pos.line + 1) {
+                if let Some(path) = tree.mouse_select(pos.line + 1, gs) {
                     gs.event.push(IdiomEvent::OpenAtLine(path, 0));
                     return;
                 };
