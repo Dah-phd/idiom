@@ -7,10 +7,11 @@ use crate::{
     global_state::{GlobalState, IdiomEvent},
     lsp::{DiagnosticType, TreeDiagnostics},
     popups::popups_tree::{create_file_popup, create_root_file_popup, rename_file_popup},
-    render::state::State,
+    render::{backend::BackendProtocol, state::State},
     utils::{build_file_or_folder, to_canon_path, to_relative_path},
 };
 use crossterm::event::KeyEvent;
+use file_clipboard::FileClipboard;
 use std::{
     collections::{hash_map::Entry, HashMap},
     path::{Path, PathBuf},
@@ -23,6 +24,7 @@ type PathParser = fn(&Path) -> IdiomResult<PathBuf>;
 pub struct Tree {
     pub key_map: TreeKeyMap,
     pub watcher: TreeWatcher,
+    tree_clipboard: FileClipboard,
     state: State,
     diagnostics_state: HashMap<PathBuf, DiagnosticType>,
     selected_path: PathBuf,
@@ -42,6 +44,7 @@ impl Tree {
                 Self {
                     watcher: TreeWatcher::root(&selected_path),
                     state: State::new(),
+                    tree_clipboard: FileClipboard::default(),
                     key_map,
                     display_offset,
                     path_parser: to_canon_path,
@@ -58,6 +61,7 @@ impl Tree {
                 Self {
                     watcher: TreeWatcher::root(&selected_path),
                     state: State::new(),
+                    tree_clipboard: FileClipboard::default(),
                     key_map,
                     display_offset: 2,
                     path_parser: to_relative_path,
@@ -75,13 +79,25 @@ impl Tree {
         iter.next();
         let mut lines = gs.tree_area.into_iter();
         for (idx, tree_path) in iter.enumerate().skip(self.state.at_line) {
-            let line = match lines.next() {
+            let mut line = match lines.next() {
                 Some(line) => line,
                 None => return,
             };
             if idx == self.state.selected {
+                if let Some(mark) = self.tree_clipboard.get_mark(tree_path.path()) {
+                    if mark.len() + 10 < line.width {
+                        line.width -= mark.len();
+                        gs.writer.print_styled_at(line.row, line.col + line.width as u16, mark, self.state.highlight);
+                    }
+                }
                 tree_path.render_styled(self.display_offset, line, self.state.highlight, &mut gs.writer);
             } else {
+                if let Some(mark) = self.tree_clipboard.get_mark(tree_path.path()) {
+                    if mark.len() + 10 < line.width {
+                        line.width -= mark.len();
+                        gs.writer.print_at(line.row, line.col + line.width as u16, mark);
+                    }
+                }
                 tree_path.render(self.display_offset, line, &mut gs.writer);
             }
         }
@@ -141,6 +157,31 @@ impl Tree {
                         None => gs.popup(create_root_file_popup()),
                     };
                 }
+                TreeAction::CopyFile => {
+                    if self.tree.path() != &self.selected_path {
+                        self.tree_clipboard.force_copy(self.selected_path.to_owned());
+                        self.rebuild = true;
+                    }
+                }
+                TreeAction::MarkCopyFile => {
+                    if self.tree.path() != &self.selected_path {
+                        self.tree_clipboard.copy(self.selected_path.to_owned());
+                        self.rebuild = true;
+                    }
+                }
+                TreeAction::CutFile => {
+                    if self.tree.path() != &self.selected_path {
+                        self.tree_clipboard.force_cut(self.selected_path.to_owned());
+                        self.rebuild = true;
+                    }
+                }
+                TreeAction::MarkCutFile => {
+                    if self.tree.path() != &self.selected_path {
+                        self.tree_clipboard.cut(self.selected_path.to_owned());
+                        self.rebuild = true;
+                    }
+                }
+                TreeAction::Paste => self.tree_clipboard.paste(&self.selected_path),
                 TreeAction::Rename => {
                     if let Some(tree_path) = self.tree.get_mut_from_inner(self.state.selected) {
                         gs.popup(rename_file_popup(tree_path.path().display().to_string()));

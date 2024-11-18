@@ -387,6 +387,11 @@ pub enum TreeAction {
     Delete,
     Rename,
     NewFile,
+    CopyFile,
+    MarkCopyFile,
+    CutFile,
+    MarkCutFile,
+    Paste,
     IncreaseSize,
     DecreaseSize,
 }
@@ -407,6 +412,16 @@ pub struct TreeUserKeyMap {
     rename: String,
     #[serde(default = "new_file")]
     new_file: String,
+    #[serde(default = "copy")]
+    copy_file: String,
+    #[serde(default = "char_c")]
+    mark_copy_file: String,
+    #[serde(default = "cut")]
+    cut_file: String,
+    #[serde(default = "char_x")]
+    mark_cut_file: String,
+    #[serde(default = "paste")]
+    paste: String,
     #[serde(default = "tree_size_inc")]
     increase_size: String,
     #[serde(default = "tree_size_dec")]
@@ -423,6 +438,11 @@ impl Default for TreeUserKeyMap {
             delete: tree_delete(),
             rename: rename(),
             new_file: new_file(),
+            copy_file: copy(),
+            mark_copy_file: char_c(),
+            cut_file: cut(),
+            mark_cut_file: char_x(),
+            paste: paste(),
             increase_size: tree_size_inc(),
             decrease_size: tree_size_dec(),
         }
@@ -439,6 +459,11 @@ impl From<TreeUserKeyMap> for HashMap<KeyEvent, TreeAction> {
         insert_key_event(&mut hash, &val.delete, TreeAction::Delete);
         insert_key_event(&mut hash, &val.rename, TreeAction::Rename);
         insert_key_event(&mut hash, &val.new_file, TreeAction::NewFile);
+        insert_key_event(&mut hash, &val.copy_file, TreeAction::CopyFile);
+        insert_key_event(&mut hash, &val.mark_copy_file, TreeAction::MarkCopyFile);
+        insert_key_event(&mut hash, &val.cut_file, TreeAction::CutFile);
+        insert_key_event(&mut hash, &val.mark_cut_file, TreeAction::MarkCutFile);
+        insert_key_event(&mut hash, &val.paste, TreeAction::Paste);
         insert_key_event(&mut hash, &val.increase_size, TreeAction::IncreaseSize);
         insert_key_event(&mut hash, &val.decrease_size, TreeAction::DecreaseSize);
         hash
