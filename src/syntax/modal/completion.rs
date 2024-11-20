@@ -102,6 +102,6 @@ impl AutoComplete {
             })
             .collect();
         self.filtered.sort_by(|(_, idx, _), (_, rhidx, _)| rhidx.cmp(idx));
-        self.state.select(0, self.filtered.len());
+        self.state.reset();
     }
 }

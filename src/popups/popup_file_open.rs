@@ -33,7 +33,7 @@ impl OpenFileSelector {
 
     fn solve_comletions(&mut self) {
         self.paths.clear();
-        self.state.select(0, 1);
+        self.state.reset();
         let path = PathBuf::from(&self.pattern.text);
         match path.is_dir() {
             true => {

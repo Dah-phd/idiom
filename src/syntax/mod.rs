@@ -179,7 +179,7 @@ impl Lexer {
         self.client.clear_requests();
         match (self.tokens)(self) {
             Ok(request) => self.requests.push(request),
-            Err(err) => gs.error(err.to_string()),
+            Err(error) => gs.error(error),
         }
     }
 
@@ -240,7 +240,7 @@ impl Lexer {
 
     pub fn set_lsp_client(&mut self, mut client: LSPClient, content: String, gs: &mut GlobalState) {
         if let Err(error) = client.file_did_open(self.uri.clone(), self.lang.file_type, content) {
-            gs.error(error.to_string());
+            gs.error(error);
             return;
         }
         map_lsp(self, client);
@@ -264,7 +264,7 @@ impl Lexer {
             }
             // can be reached only due to internal code issue
             Err(error) => {
-                gs.error(error.to_string());
+                gs.error(error);
                 remove_lsp(self);
             }
         };

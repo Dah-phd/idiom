@@ -39,8 +39,9 @@ pub fn create_root_file_popup() -> Box<Popup> {
 }
 
 pub fn rename_file_popup(path: String) -> Box<Popup> {
+    let message = path.split(std::path::MAIN_SEPARATOR).last().map(ToOwned::to_owned).unwrap_or_default();
     Box::new(Popup::new(
-        String::new(),
+        message,
         Some("Rename: "),
         Some(path),
         Some(Some),

@@ -269,8 +269,8 @@ impl GlobalState {
     }
 
     #[inline]
-    pub fn error(&mut self, msg: impl Into<String>) {
-        self.messages.error(msg.into());
+    pub fn error(&mut self, error: impl ToString) {
+        self.messages.error(error.to_string());
     }
 
     #[inline]
@@ -295,7 +295,7 @@ impl GlobalState {
     #[inline]
     pub fn log_if_error<Any>(&mut self, result: IdiomResult<Any>) {
         if let Err(error) = result {
-            self.message(error.to_string());
+            self.error(error);
         }
     }
 
@@ -316,7 +316,7 @@ impl GlobalState {
                 self.messages.error(message);
                 self.event.push(IdiomEvent::CheckLSP(file_type));
             }
-            _ => self.error(err.to_string()),
+            _ => self.error(err),
         }
     }
 

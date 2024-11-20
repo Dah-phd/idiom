@@ -1,6 +1,7 @@
 use crate::lsp::LSPError;
 use std::fmt::Display;
 use std::io::ErrorKind;
+use std::path::Path;
 use thiserror::Error;
 pub type IdiomResult<T> = Result<T, IdiomError>;
 
@@ -13,8 +14,8 @@ pub enum IdiomError {
 }
 
 impl IdiomError {
-    pub fn any(message: impl Into<String>) -> Self {
-        Self::GeneralError(message.into())
+    pub fn any(error: impl ToString) -> Self {
+        Self::GeneralError(error.to_string())
     }
 
     pub fn io_exists(message: impl Into<String>) -> Self {
@@ -27,6 +28,10 @@ impl IdiomError {
 
     pub fn io_not_found(message: impl Into<String>) -> Self {
         Self::IOError(std::io::Error::new(ErrorKind::NotFound, message.into()))
+    }
+
+    pub fn io_parent_not_found(path: &Path) -> Self {
+        Self::IOError(std::io::Error::new(ErrorKind::NotFound, format!("Unable to determine parent of {path:?}")))
     }
 }
 

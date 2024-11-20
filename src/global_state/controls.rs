@@ -87,7 +87,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                     gs.insert_mode();
                     match tree.select_by_path(&editor.path) {
                         Ok(..) => workspace.toggle_editor(),
-                        Err(error) => gs.error(error.to_string()),
+                        Err(error) => gs.error(error),
                     };
                 }
                 return;

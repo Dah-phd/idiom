@@ -181,11 +181,23 @@ impl Tree {
                         self.rebuild = true;
                     }
                 }
-                TreeAction::Paste => self.tree_clipboard.paste(&self.selected_path),
-                TreeAction::Rename => {
-                    if let Some(tree_path) = self.tree.get_mut_from_inner(self.state.selected) {
-                        gs.popup(rename_file_popup(tree_path.path().display().to_string()));
+                TreeAction::Paste => match self.tree.get_mut_from_inner(self.state.selected) {
+                    Some(TreePath::Folder { path, tree: Some(..), .. }) => {
+                        self.tree_clipboard.paste(path.to_owned());
                     }
+                    Some(TreePath::Folder { path, tree: None, .. }) | Some(TreePath::File { path, .. }) => {
+                        match path.parent() {
+                            Some(parent) => self.tree_clipboard.paste(parent.to_owned()),
+                            None => gs.error(IdiomError::io_parent_not_found(path)),
+                        }
+                    }
+                    None => {
+                        gs.error("Unable to find selected path ... dropping clipboard and rebasing");
+                        self.error_reset();
+                    }
+                },
+                TreeAction::Rename => {
+                    gs.popup(rename_file_popup(self.selected_path.display().to_string()));
                 }
                 TreeAction::IncreaseSize => gs.expand_tree_size(),
                 TreeAction::DecreaseSize => gs.shrink_tree_size(),
@@ -209,7 +221,7 @@ impl Tree {
                     }
                 }
                 Err(error) => {
-                    gs.error(error.to_string());
+                    gs.error(error);
                 }
             };
             self.rebuild = true;
@@ -231,7 +243,7 @@ impl Tree {
 
     pub fn mouse_select(&mut self, idx: usize, gs: &mut GlobalState) -> Option<PathBuf> {
         if self.tree.len() > idx {
-            self.state.selected = idx.saturating_sub(1);
+            self.state.selected = idx.saturating_sub(1) + self.state.at_line;
             if let Some(selected) = self.tree.get_mut_from_inner(self.state.selected) {
                 match selected {
                     TreePath::Folder { tree: Some(..), .. } => {
@@ -243,7 +255,7 @@ impl Tree {
                                 selected.map_diagnostics_base(d_path, *new_diagnostic);
                             }
                         }
-                        Err(error) => gs.error(error.to_string()),
+                        Err(error) => gs.error(error),
                     },
                     TreePath::File { path, .. } => {
                         self.selected_path = path.clone();
@@ -312,7 +324,7 @@ impl Tree {
             }
             Some(TreePath::Folder { path, tree: None, .. }) => match path.parent() {
                 Some(parent) => build_file_or_folder(parent.to_owned(), &name)?,
-                None => return Err(IdiomError::io_not_found("Unable to determine parent of not expanded dir!")),
+                None => return Err(IdiomError::io_parent_not_found(path)),
             },
             // build file where wanted
             None => build_file_or_folder(self.selected_path.clone(), &name)?,
@@ -393,9 +405,12 @@ impl Tree {
                 self.rebuild = true;
                 Ok(())
             }
-            Ok(false) => Err(IdiomError::io_not_found("Unable to select file!")),
+            Ok(false) => {
+                self.state.reset();
+                Err(IdiomError::io_not_found("Unable to select file! Setting first as selected"))
+            }
             Err(err) => {
-                self.tree.sync_base();
+                self.error_reset();
                 Err(err)
             }
         }
@@ -413,15 +428,24 @@ impl Tree {
         for (idx, tree_path) in self.tree.iter().skip(1).enumerate() {
             if tree_path.path() == &self.selected_path {
                 self.state.selected = idx;
-                break;
+                return;
             }
         }
+        gs.error("IO NotFound: Unable to find selected path .. setting to first path");
+        self.error_reset();
     }
 
+    #[inline]
+    fn error_reset(&mut self) {
+        self.tree.sync_base();
+        self.unsafe_set_path();
+    }
+
+    /// sets path from idx without checking if it is correct
     fn unsafe_set_path(&mut self) {
         self.rebuild = true;
         if let Some(selected) = self.tree.get_mut_from_inner(self.state.selected) {
-            self.selected_path = selected.path().clone();
+            self.selected_path = selected.path().to_owned();
         }
     }
 }

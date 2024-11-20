@@ -26,6 +26,12 @@ impl State {
         Self { at_line: 0, selected: 0, highlight }
     }
 
+    #[inline]
+    pub fn reset(&mut self) {
+        self.at_line = 0;
+        self.selected = 0;
+    }
+
     pub fn select(&mut self, idx: usize, option_len: usize) {
         if option_len > idx {
             self.at_line = idx;

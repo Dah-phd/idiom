@@ -31,12 +31,12 @@ impl Terminal {
         let system = native_pty_system();
         let pair = system
             .openpty(PtySize { rows: 24, cols: width, ..Default::default() })
-            .map_err(|err| IdiomError::any(err.to_string()))?;
+            .map_err(|err| IdiomError::any(err))?;
         let mut cmd = CommandBuilder::new(SHELL);
         cmd.cwd("./");
-        let child = pair.slave.spawn_command(cmd).map_err(|err| IdiomError::any(err.to_string()))?;
-        let writer = pair.master.take_writer().map_err(|err| IdiomError::any(err.to_string()))?;
-        let reader = pair.master.try_clone_reader().map_err(|err| IdiomError::any(err.to_string()))?;
+        let child = pair.slave.spawn_command(cmd).map_err(|error| IdiomError::any(error))?;
+        let writer = pair.master.take_writer().map_err(|error| IdiomError::any(error))?;
+        let reader = pair.master.try_clone_reader().map_err(|error| IdiomError::any(error))?;
         let output: Arc<Mutex<Vec<String>>> = Arc::default();
         let buffer = Arc::clone(&output);
         let prompt: Arc<Mutex<String>> = Arc::default();

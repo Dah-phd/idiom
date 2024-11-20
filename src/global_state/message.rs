@@ -68,8 +68,10 @@ impl Messages {
         self.active = true;
     }
 
-    pub fn error(&mut self, message: String) {
-        self.push_ahead(Message::err(message));
+    pub fn error(&mut self, error: String) {
+        if let Some(msg) = Message::err(error) {
+            self.push_ahead(msg);
+        }
     }
 
     pub fn success(&mut self, message: String) {
@@ -82,7 +84,7 @@ impl Messages {
             Ok(value) => value,
             Err(err) => {
                 if let Some(first_line) = err.to_string().lines().next() {
-                    self.error(format!("{prefix} (run with defaults): {first_line}"));
+                    self.push_ahead(Message::Error(format!("{prefix} (run with defaults): {first_line}")));
                 }
                 T::default()
             }
@@ -140,7 +142,8 @@ impl Message {
         Self::Success(message)
     }
 
-    const fn err(message: String) -> Self {
-        Self::Error(message)
+    fn err(error: String) -> Option<Self> {
+        let first_line = error.lines().next()?.to_owned();
+        Some(Self::Error(first_line))
     }
 }

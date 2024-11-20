@@ -57,20 +57,6 @@ pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> IdiomResult<PathBu
     Ok(path)
 }
 
-fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
-    std::fs::create_dir_all(&dst)?;
-    for entry in std::fs::read_dir(src)? {
-        let entry = entry?;
-        let ty = entry.file_type()?;
-        if ty.is_dir() {
-            copy_dir_all(entry.path(), dst.as_ref().join(entry.file_name()))?;
-        } else {
-            std::fs::copy(entry.path(), dst.as_ref().join(entry.file_name()))?;
-        }
-    }
-    Ok(())
-}
-
 pub fn to_relative_path(target_dir: &Path) -> IdiomResult<PathBuf> {
     let cd = std::env::current_dir()?;
     if target_dir.is_relative() {

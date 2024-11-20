@@ -95,7 +95,7 @@ impl PopupInterface for ActivePathSearch {
             self.options = tree.search_paths(&self.pattern.text);
         };
         self.updated = true;
-        self.state.select(0, self.options.len());
+        self.state.reset();
     }
 
     fn collect_update_status(&mut self) -> bool {
@@ -210,7 +210,7 @@ impl PopupInterface for ActiveFileSearch {
             return;
         };
         self.options.clear();
-        self.state.select(0, 1);
+        self.state.reset();
         let tree_path = match self.mode {
             Mode::Full => file_tree.shallow_copy_root_tree_path(),
             Mode::Select => file_tree.shallow_copy_selected_tree_path(),

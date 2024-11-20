@@ -86,7 +86,7 @@ impl IdiomEvent {
                 gs.clear_popup();
                 match ws.new_at_line(path, line, gs).await {
                     Ok(..) => gs.insert_mode(),
-                    Err(error) => gs.error(error.to_string()),
+                    Err(error) => gs.error(error),
                 }
             }
             IdiomEvent::OpenAtSelect(path, (from, to)) => {
@@ -100,7 +100,7 @@ impl IdiomEvent {
                         };
                         gs.clear_popup();
                     }
-                    Err(error) => gs.error(error.to_string()),
+                    Err(error) => gs.error(error),
                 };
             }
             IdiomEvent::GoToLine { line, clear_popup } => match ws.get_active() {
@@ -155,14 +155,14 @@ impl IdiomEvent {
                                             editor.update_status.deny();
                                         }
                                     }
-                                    Err(error) => gs.error(error.to_string()),
+                                    Err(error) => gs.error(error),
                                 };
                             }
                             tree.sync(gs);
                             let result = tree.select_by_path(&new_path);
                             gs.log_if_error(result);
                         }
-                        Err(error) => gs.error(error.to_string()),
+                        Err(error) => gs.error(error),
                     }
                 }
                 gs.clear_popup();
@@ -173,7 +173,7 @@ impl IdiomEvent {
                 } else if let Some(result) = tree.rename_path(name) {
                     match result {
                         Ok((old, new_path)) => ws.rename_editors(old, new_path, gs),
-                        Err(err) => gs.messages.error(err.to_string()),
+                        Err(error) => gs.error(error),
                     }
                 };
                 gs.clear_popup();
