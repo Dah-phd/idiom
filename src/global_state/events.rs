@@ -13,6 +13,9 @@ use lsp_types::{
 use std::path::PathBuf;
 
 #[derive(Clone, PartialEq)]
+pub enum IdiEv {}
+
+#[derive(Clone, PartialEq)]
 pub enum IdiomEvent {
     PopupAccess,
     PopupAccessOnce,
@@ -25,6 +28,10 @@ pub enum IdiomEvent {
         from_base: bool,
     },
     RenameFile(String),
+    RenamedFile {
+        from_path: PathBuf,
+        to_path: PathBuf,
+    },
     SearchFiles(String),
     FileUpdated(PathBuf),
     CheckLSP(FileType),
@@ -172,11 +179,14 @@ impl IdiomEvent {
                     gs.error("Rename requires input!");
                 } else if let Some(result) = tree.rename_path(name) {
                     match result {
-                        Ok((old, new_path)) => ws.rename_editors(old, new_path, gs),
+                        Ok((from_path, to_path)) => ws.rename_editors(from_path, to_path, gs),
                         Err(error) => gs.error(error),
                     }
                 };
                 gs.clear_popup();
+            }
+            IdiomEvent::RenamedFile { from_path, to_path } => {
+                ws.rename_editors(from_path, to_path, gs);
             }
             IdiomEvent::AutoComplete(completion) => {
                 if let Some(editor) = ws.get_active() {

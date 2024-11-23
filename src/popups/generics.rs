@@ -132,6 +132,22 @@ impl Popup {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn message(message: String) -> Box<Self> {
+        Box::new(Self {
+            message,
+            title_prefix: None,
+            title: "Info".to_owned(),
+            message_as_buffer_builder: None,
+            buttons: vec![Button { command: |_| PopupMessage::Clear, name: "Ok", key: None }],
+            button_line: 0,
+            button_ranges: vec![],
+            size: (6, 40),
+            state: 0,
+            updated: true,
+        })
+    }
+
     fn next(&mut self) {
         if self.state < self.buttons.len() - 1 {
             self.state += 1;
@@ -201,10 +217,9 @@ impl<T> PopupInterface for PopupSelector<T> {
         rect.bordered();
         self.rect.replace(rect);
         rect.draw_borders(None, None, &mut gs.writer);
-        if self.options.is_empty() {
-            self.state.render_list(["No results found!"].into_iter(), rect, &mut gs.writer);
-        } else {
-            self.state.render_list(self.options.iter().map(|opt| (self.display)(opt)), rect, &mut gs.writer);
+        match self.options.is_empty() {
+            true => self.state.render_list(["No results found!"].into_iter(), rect, &mut gs.writer),
+            false => self.state.render_list(self.options.iter().map(|opt| (self.display)(opt)), rect, &mut gs.writer),
         };
     }
 
@@ -270,5 +285,22 @@ impl<T> PopupSelector<T> {
     ) -> Self {
         let size = size.unwrap_or((20, 120));
         Self { options, display, command, state: State::new(), size, updated: true, rect: None }
+    }
+}
+
+impl PopupSelector<String> {
+    #[allow(dead_code)]
+    pub fn message_list<T: ToString>(list: Vec<T>) -> Box<Self> {
+        let options = list.into_iter().map(|el| el.to_string()).collect();
+        let size = (20, 120);
+        Box::new(Self {
+            options,
+            display: |el| el.as_str(),
+            command: |_| PopupMessage::Clear,
+            state: State::new(),
+            size,
+            updated: true,
+            rect: None,
+        })
     }
 }

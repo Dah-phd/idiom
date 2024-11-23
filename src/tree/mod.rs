@@ -183,11 +183,11 @@ impl Tree {
                 }
                 TreeAction::Paste => match self.tree.get_mut_from_inner(self.state.selected) {
                     Some(TreePath::Folder { path, tree: Some(..), .. }) => {
-                        self.tree_clipboard.paste(path.to_owned());
+                        self.tree_clipboard.paste(path.to_owned(), gs);
                     }
                     Some(TreePath::Folder { path, tree: None, .. }) | Some(TreePath::File { path, .. }) => {
                         match path.parent() {
-                            Some(parent) => self.tree_clipboard.paste(parent.to_owned()),
+                            Some(parent) => self.tree_clipboard.paste(parent.to_owned(), gs),
                             None => gs.error(IdiomError::io_parent_not_found(path)),
                         }
                     }
@@ -437,6 +437,7 @@ impl Tree {
 
     #[inline]
     fn error_reset(&mut self) {
+        self.tree_clipboard.clear();
         self.tree.sync_base();
         self.unsafe_set_path();
     }

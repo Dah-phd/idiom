@@ -49,6 +49,9 @@ impl TreePath {
     pub fn render_styled(&self, char_offset: usize, line: Line, mut style: Style, backend: &mut Backend) {
         let (display, diagnostic) = match self {
             TreePath::File { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
+            TreePath::Folder { display, diagnostic, tree: Some(..), .. } => {
+                (&display[char_offset..display.len() - 2], *diagnostic)
+            }
             TreePath::Folder { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
         };
         match diagnostic {
@@ -62,6 +65,9 @@ impl TreePath {
     pub fn render(&self, char_offset: usize, line: Line, backend: &mut Backend) {
         let (display, diagnostic) = match self {
             TreePath::File { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
+            TreePath::Folder { display, diagnostic, tree: Some(..), .. } => {
+                (&display[char_offset..display.len() - 2], *diagnostic)
+            }
             TreePath::Folder { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
         };
         match diagnostic {
