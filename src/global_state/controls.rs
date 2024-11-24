@@ -68,18 +68,24 @@ pub fn disable_mouse(_gs: &mut GlobalState, _event: MouseEvent, _tree: &mut Tree
 
 pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, workspace: &mut Workspace) {
     match event.kind {
-        MouseEventKind::ScrollUp if matches!(gs.mode, Mode::Insert) => {
-            if let Some(editor) = workspace.get_active() {
-                editor.map(crate::configs::EditorAction::ScrollUp, gs);
-                editor.map(crate::configs::EditorAction::ScrollUp, gs);
+        MouseEventKind::ScrollUp => match gs.mode {
+            Mode::Insert => {
+                if let Some(editor) = workspace.get_active() {
+                    editor.map(crate::configs::EditorAction::ScrollUp, gs);
+                    editor.map(crate::configs::EditorAction::ScrollUp, gs);
+                }
             }
-        }
-        MouseEventKind::ScrollDown if matches!(gs.mode, Mode::Insert) => {
-            if let Some(editor) = workspace.get_active() {
-                editor.map(crate::configs::EditorAction::ScrollDown, gs);
-                editor.map(crate::configs::EditorAction::ScrollDown, gs);
+            Mode::Select => tree.select_up(gs),
+        },
+        MouseEventKind::ScrollDown => match gs.mode {
+            Mode::Insert => {
+                if let Some(editor) = workspace.get_active() {
+                    editor.map(crate::configs::EditorAction::ScrollDown, gs);
+                    editor.map(crate::configs::EditorAction::ScrollDown, gs);
+                }
             }
-        }
+            Mode::Select => tree.select_down(gs),
+        },
         MouseEventKind::Down(MouseButton::Left) => {
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = workspace.get_active() {

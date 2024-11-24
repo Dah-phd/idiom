@@ -270,7 +270,7 @@ impl Tree {
         None
     }
 
-    fn select_up(&mut self, gs: &mut GlobalState) {
+    pub fn select_up(&mut self, gs: &mut GlobalState) {
         let tree_len = self.tree.len() - 1;
         if tree_len == 0 {
             return;
@@ -280,7 +280,7 @@ impl Tree {
         self.unsafe_set_path();
     }
 
-    fn select_down(&mut self, gs: &mut GlobalState) {
+    pub fn select_down(&mut self, gs: &mut GlobalState) {
         let tree_len = self.tree.len() - 1;
         if tree_len == 0 {
             return;
