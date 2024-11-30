@@ -80,12 +80,6 @@ impl TokenLine {
         self.inner.is_empty()
     }
 
-    // pub fn increment_end(&mut self) {
-    //     if let Some(last) = self.inner.last_mut() {
-    //         last.len += 1;
-    //     }
-    // }
-
     pub fn increment_at(&mut self, mut idx: usize) {
         let mut token_iter = self.inner.iter_mut();
         while let Some(token) = token_iter.next() {
@@ -104,21 +98,31 @@ impl TokenLine {
         }
     }
 
-    pub fn decrement_at(&mut self, mut idx: usize) {
+    pub fn decrement_at(&mut self, mut char_idx: usize) {
         let mut token_iter = self.inner.iter_mut();
+        let mut token_idx = 0;
         while let Some(token) = token_iter.next() {
-            if idx < token.delta_start {
+            if char_idx < token.delta_start {
                 token.delta_start -= 1;
                 return;
             }
-            if idx < token.delta_start + token.len {
+            if char_idx < token.delta_start + token.len {
                 token.len -= 1;
                 if let Some(next_token) = token_iter.next() {
                     next_token.delta_start -= 1;
                 }
+                match token.len > 1 {
+                    true => {
+                        token.len -= 1;
+                    }
+                    false => {
+                        self.inner.remove(token_idx);
+                    }
+                }
                 return;
             }
-            idx -= token.delta_start;
+            char_idx -= token.delta_start;
+            token_idx += 1;
         }
     }
 
