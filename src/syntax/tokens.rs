@@ -107,11 +107,11 @@ impl TokenLine {
                 return;
             }
             if char_idx < token.delta_start + token.len {
-                if let Some(next_token) = token_iter.next() {
-                    next_token.delta_start -= 1;
-                }
                 match token.len > 1 {
                     true => {
+                        if let Some(next_token) = token_iter.next() {
+                            next_token.delta_start -= 1;
+                        }
                         token.len -= 1;
                     }
                     // should allways be 1, considering lsp working normally
@@ -119,6 +119,7 @@ impl TokenLine {
                         let start_offset = self.inner.remove(token_idx).delta_start;
                         if let Some(next_token) = self.inner.get_mut(token_idx) {
                             next_token.delta_start += start_offset;
+                            next_token.delta_start -= 1;
                         }
                     }
                 }
