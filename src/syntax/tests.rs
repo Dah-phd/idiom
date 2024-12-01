@@ -498,8 +498,10 @@ fn test_token_dec() {
     tl.decrement_at(3);
     assert_eq!(tl, token_line);
 
+    tl.push(Token { len: 4, delta_start: 5, style: Style::reversed() });
     let mut token_line = TokenLine::default();
     token_line.push(Token { len: 3, delta_start: 0, style: Style::default() });
+    token_line.push(Token { len: 4, delta_start: 3, style: Style::reversed() });
     tl.decrement_at(3);
     tl.decrement_at(3);
     tl.decrement_at(3);
@@ -509,6 +511,7 @@ fn test_token_dec() {
 
     let mut token_line = TokenLine::default();
     token_line.push(Token { len: 1, delta_start: 0, style: Style::default() });
+    token_line.push(Token { len: 4, delta_start: 1, style: Style::reversed() });
     tl.decrement_at(1);
     tl.decrement_at(1);
     assert_eq!(tl, token_line);

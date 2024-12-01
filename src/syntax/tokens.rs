@@ -107,7 +107,6 @@ impl TokenLine {
                 return;
             }
             if char_idx < token.delta_start + token.len {
-                token.len -= 1;
                 if let Some(next_token) = token_iter.next() {
                     next_token.delta_start -= 1;
                 }
@@ -116,7 +115,10 @@ impl TokenLine {
                         token.len -= 1;
                     }
                     false => {
-                        self.inner.remove(token_idx);
+                        let start_offset = self.inner.remove(token_idx).delta_start;
+                        if let Some(next_token) = self.inner.get_mut(token_idx) {
+                            next_token.delta_start += start_offset;
+                        }
                     }
                 }
                 return;

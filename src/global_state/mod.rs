@@ -328,3 +328,6 @@ impl GlobalState {
         self.exit
     }
 }
+
+#[cfg(test)]
+mod tests;

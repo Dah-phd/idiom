@@ -71,7 +71,7 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut Backend) {
                 },
             }
         }
-        counter -= 1;
+        counter = counter.saturating_sub(1);
 
         if cursor_idx == idx {
             backend.print_styled(text, Style::reversed())
@@ -140,7 +140,7 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backen
                 },
             }
         }
-        counter -= 1;
+        counter = counter.saturating_sub(1);
 
         if cursor_idx == idx {
             backend.print_styled(text, Style::reversed())
@@ -209,7 +209,7 @@ pub fn partial(line: &mut EditorLine, ctx: &LineContext, line_width: usize, back
                 },
             }
         }
-        counter -= 1;
+        counter = counter.saturating_sub(1);
 
         if cursor_idx == idx {
             backend.print_styled(text, Style::reversed())
@@ -301,7 +301,7 @@ pub fn partial_select(
                 },
             }
         }
-        counter -= 1;
+        counter = counter.saturating_sub(1);
 
         if cursor_idx == idx {
             backend.print_styled(text, Style::reversed());

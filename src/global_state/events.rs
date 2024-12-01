@@ -12,10 +12,7 @@ use lsp_types::{
 };
 use std::path::PathBuf;
 
-#[derive(Clone, PartialEq)]
-pub enum IdiEv {}
-
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum IdiomEvent {
     PopupAccess,
     PopupAccessOnce,
@@ -267,47 +264,105 @@ impl IdiomEvent {
     }
 }
 
+/// Example:
+/// "push(${1:value})$0"
 fn parse_snippet(snippet: String) -> IdiomEvent {
     let mut cursor_offset = None;
-    let mut named = false;
     let mut text = String::default();
-    let mut is_expr = false;
     let mut line_offset = 0;
     let mut char_offset = 0;
-    for ch in snippet.chars() {
-        if ch == '\n' {
-            line_offset += 1;
-            char_offset = 0;
-            text.push(ch);
-        } else {
-            if named {
-                if ch == '}' {
-                    named = false;
-                    continue;
+    let mut chars = snippet.chars();
+    while let Some(ch) = chars.next() {
+        match ch {
+            // new line
+            '\n' => {
+                line_offset += 1;
+                char_offset = 0;
+                text.push(ch);
+            }
+            // expression
+            '$' => {
+                let next_ch = match chars.next() {
+                    Some(next_ch) => next_ch,
+                    None => {
+                        text.push(ch);
+                        break;
+                    }
                 };
-                if ch == ':' || ch.is_numeric() {
-                    continue;
-                };
-            } else if is_expr {
-                if ch.is_numeric() {
-                    continue;
-                };
-                if ch == '{' {
-                    named = true;
-                    cursor_offset = None;
-                    continue;
-                };
-                is_expr = false;
-            } else if ch == '$' {
-                is_expr = true;
-                if cursor_offset.is_none() {
-                    cursor_offset.replace((line_offset, char_offset));
-                };
-                continue;
-            };
-            char_offset += 1;
-            text.push(ch);
-        };
+                // positional args
+                if next_ch.is_numeric() {
+                    let mut number = next_ch.to_string();
+                    while let Some(maybe_num) = chars.next() {
+                        if !maybe_num.is_numeric() {
+                            if number.is_empty() {
+                                text.push(ch);
+                                char_offset += 1;
+                            }
+                            text.push(maybe_num);
+                            break;
+                        }
+                        number.push(maybe_num);
+                    }
+                    match number.as_str() {
+                        "1" => {
+                            cursor_offset.replace((line_offset, char_offset));
+                        }
+                        "0" if cursor_offset.is_none() => {
+                            cursor_offset.replace((line_offset, char_offset));
+                        }
+                        _ => {}
+                    }
+                    char_offset += 1; // offset last text push
+
+                // named args
+                } else if next_ch == '{' {
+                    let mut number = String::new();
+                    while let Some(maybe_num) = chars.next() {
+                        if maybe_num.is_numeric() {
+                            number.push(maybe_num);
+                            continue;
+                        }
+                        if maybe_num != ':' {
+                            text.push(ch);
+                            text.push(next_ch);
+                            char_offset += number.len() + 2;
+                            text.extend(number.drain(..));
+                        } else if number.is_empty() {
+                            text.push(ch);
+                            text.push(next_ch);
+                            char_offset += 2;
+                        }
+                        break;
+                    }
+                    if !number.is_empty() {
+                        while let Some(ch) = chars.next() {
+                            if ch == '}' {
+                                break;
+                            }
+                            text.push(ch);
+                            char_offset += 1;
+                        }
+                    }
+
+                // unexpected continue as normal
+                } else {
+                    if ch == '\n' {
+                        text.push(ch);
+                        text.push(next_ch);
+                        line_offset += 1;
+                        char_offset = 0;
+                    } else {
+                        text.push(ch);
+                        text.push(next_ch);
+                        char_offset += 2;
+                    }
+                }
+            }
+            _ => {
+                char_offset += 1;
+                text.push(ch);
+            }
+        }
     }
     IdiomEvent::Snippet(text, cursor_offset)
 }

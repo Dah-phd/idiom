@@ -102,7 +102,7 @@ pub fn ascii_line_with_select(
                 },
             }
         }
-        counter -= 1;
+        counter = counter.saturating_sub(1);
 
         backend.print(text);
     }
