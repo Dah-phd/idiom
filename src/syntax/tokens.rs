@@ -114,6 +114,7 @@ impl TokenLine {
                     true => {
                         token.len -= 1;
                     }
+                    // should allways be 1, considering lsp working normally
                     false => {
                         let start_offset = self.inner.remove(token_idx).delta_start;
                         if let Some(next_token) = self.inner.get_mut(token_idx) {
