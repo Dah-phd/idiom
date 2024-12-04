@@ -324,6 +324,18 @@ impl Editor {
         self.actions.insert_snippet(&mut self.cursor, snippet, cursor_offset, &mut self.content, &mut self.lexer);
     }
 
+    #[inline(always)]
+    pub fn insert_snippet_with_select(&mut self, snippet: String, cursor_offset: (usize, usize), len: usize) {
+        self.actions.insert_snippet_with_select(
+            &mut self.cursor,
+            snippet,
+            cursor_offset,
+            len,
+            &mut self.content,
+            &mut self.lexer,
+        );
+    }
+
     pub fn mass_replace(&mut self, mut ranges: Vec<(CursorPosition, CursorPosition)>, clip: String) {
         ranges.sort_by(|a, b| {
             let line_ord = b.0.line.cmp(&a.0.line);

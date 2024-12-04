@@ -1,3 +1,4 @@
+mod snippets;
 use super::ModalMessage;
 use crate::{
     configs::EditorAction,
@@ -8,6 +9,7 @@ use crate::{
 };
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use lsp_types::CompletionItem;
+use snippets::parse_completion_item;
 
 pub struct AutoComplete {
     state: State,
@@ -34,11 +36,11 @@ impl AutoComplete {
     pub fn map(&mut self, action: EditorAction, lang: &Lang, gs: &mut GlobalState) -> ModalMessage {
         match action {
             EditorAction::NewLine | EditorAction::Indent => {
-                let mut filtered_completion = self.completions.remove(self.filtered.remove(self.state.selected).2);
-                if let Some(data) = filtered_completion.data.take() {
+                let mut completion_item = self.completions.remove(self.filtered.remove(self.state.selected).2);
+                if let Some(data) = completion_item.data.take() {
                     lang.handle_completion_data(data, gs);
                 };
-                gs.event.push(filtered_completion.into());
+                gs.event.push(parse_completion_item(completion_item));
                 ModalMessage::TakenDone
             }
             EditorAction::Char(ch) => self.push_filter(ch, &gs.matcher),
@@ -105,3 +107,6 @@ impl AutoComplete {
         self.state.reset();
     }
 }
+
+#[cfg(test)]
+mod tests;

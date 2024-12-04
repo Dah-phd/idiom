@@ -244,7 +244,7 @@ impl<T> From<Vec<T>> for TrackedList<T> {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Offset {
     Pos(usize),
     Neg(usize),
