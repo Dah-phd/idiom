@@ -110,3 +110,23 @@ fn test_hard_snippet() {
         insert_replace_completion_event("echo \"$DATA\" + ${something}$0")
     );
 }
+
+#[test]
+fn bad_input_snippets() {
+    assert_eq!(
+        IdiomEvent::Snippet {
+            snippet: String::from("vary bad ${3:imp\n    }went wrong\n end"),
+            cursor_offset: Some((1, 15)),
+            relative_select: None
+        },
+        insert_replace_completion_event("vary bad ${3:imp\n    }went wrong$0\n end"),
+    );
+    assert_eq!(
+        IdiomEvent::Snippet {
+            snippet: String::from("vary bad ${3:imp\n    }went wrongana\n end"),
+            cursor_offset: None,
+            relative_select: Some(((1, 15), 3)),
+        },
+        insert_text_completion_event("vary bad ${3:imp\n    }went wrong${1:ana}\n end"),
+    );
+}
