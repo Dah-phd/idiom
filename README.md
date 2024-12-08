@@ -28,8 +28,8 @@ Python should work for the most part with jedi, but the interaction is not well 
 
 ## TODO
 - write tests
+- check if you can make new imputs color faster better token insert
 - lsp server cold start, maybe? "jedi-language server" starts slow
-- see if you can fill in $1value on snippeds
 
 ## Initial target langs
 
