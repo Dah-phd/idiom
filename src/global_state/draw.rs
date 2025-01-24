@@ -1,7 +1,7 @@
 use super::{GlobalState, Mode};
 use crate::{
     render::{
-        backend::{BackendProtocol, Style},
+        backend::{BackendProtocol, StyleExt},
         layout::{Line, HAVLED_BALANCED_BORDERS},
     },
     runner::EditorTerminal,
@@ -9,6 +9,7 @@ use crate::{
     workspace::Workspace,
 };
 use bitflags::bitflags;
+use crossterm::style::ContentStyle;
 use std::io::{Result, Write};
 
 bitflags! {
@@ -150,6 +151,6 @@ fn render_logo(line: Line, gs: &mut GlobalState) {
     backend.go_to(line.row, line.col);
     backend.pad(l_pad);
     backend.print('<');
-    backend.print_styled("/idiom>", Style::fg(Mode::insert_color()));
+    backend.print_styled("/idiom>", ContentStyle::fg(Mode::insert_color()));
     backend.pad(r_pad);
 }

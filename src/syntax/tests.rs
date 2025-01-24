@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use lsp_types::SemanticToken;
 
-use crate::{configs::FileType, global_state::GlobalState, render::backend::Style, workspace::line::EditorLine};
+use crate::{configs::FileType, global_state::GlobalState, render::backend::StyleExt, workspace::line::EditorLine};
+use crossterm::style::ContentStyle;
 
 use super::{
     lsp_calls::{char_lsp_utf16, char_lsp_utf8, encode_pos_utf16, encode_pos_utf8},
@@ -469,8 +470,8 @@ pub fn mock_utf32_lexer(gs: &mut GlobalState, file_type: FileType) -> Lexer {
 // test tokens
 fn create_tokens() -> TokenLine {
     let mut token_line = TokenLine::default();
-    token_line.push(Token { len: 3, delta_start: 0, style: Style::default() });
-    token_line.push(Token { len: 4, delta_start: 4, style: Style::default() });
+    token_line.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() });
+    token_line.push(Token { len: 4, delta_start: 4, style: ContentStyle::default() });
     token_line
 }
 
@@ -478,14 +479,14 @@ fn create_tokens() -> TokenLine {
 fn test_token_inc() {
     let mut token_line = create_tokens();
     let mut expected = TokenLine::default();
-    expected.push(Token { len: 3, delta_start: 0, style: Style::default() });
-    expected.push(Token { len: 4, delta_start: 5, style: Style::default() });
+    expected.push(Token { len: 4, delta_start: 0, style: ContentStyle::default() });
+    expected.push(Token { len: 4, delta_start: 5, style: ContentStyle::default() });
     token_line.increment_at(3);
     assert_eq!(token_line, expected);
     token_line.increment_at(5);
     let mut token_line = TokenLine::default();
-    token_line.push(Token { len: 3, delta_start: 0, style: Style::default() });
-    token_line.push(Token { len: 5, delta_start: 5, style: Style::default() });
+    token_line.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() });
+    token_line.push(Token { len: 5, delta_start: 5, style: ContentStyle::default() });
     assert_eq!(token_line, token_line);
 }
 
@@ -493,15 +494,15 @@ fn test_token_inc() {
 fn test_token_dec() {
     let mut tl = create_tokens();
     let mut token_line = TokenLine::default();
-    token_line.push(Token { len: 3, delta_start: 0, style: Style::default() });
-    token_line.push(Token { len: 4, delta_start: 3, style: Style::default() });
+    token_line.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() });
+    token_line.push(Token { len: 4, delta_start: 3, style: ContentStyle::default() });
     tl.decrement_at(3);
     assert_eq!(tl, token_line);
 
-    tl.push(Token { len: 4, delta_start: 5, style: Style::reversed() });
+    tl.push(Token { len: 4, delta_start: 5, style: ContentStyle::reversed() });
     let mut token_line = TokenLine::default();
-    token_line.push(Token { len: 3, delta_start: 0, style: Style::default() });
-    token_line.push(Token { len: 4, delta_start: 3, style: Style::reversed() });
+    token_line.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() });
+    token_line.push(Token { len: 4, delta_start: 3, style: ContentStyle::reversed() });
     tl.decrement_at(3);
     tl.decrement_at(3);
     tl.decrement_at(3);
@@ -510,8 +511,8 @@ fn test_token_dec() {
     assert_eq!(tl, token_line);
 
     let mut token_line = TokenLine::default();
-    token_line.push(Token { len: 1, delta_start: 0, style: Style::default() });
-    token_line.push(Token { len: 4, delta_start: 1, style: Style::reversed() });
+    token_line.push(Token { len: 1, delta_start: 0, style: ContentStyle::default() });
+    token_line.push(Token { len: 4, delta_start: 1, style: ContentStyle::reversed() });
     tl.decrement_at(1);
     tl.decrement_at(1);
     assert_eq!(tl, token_line);

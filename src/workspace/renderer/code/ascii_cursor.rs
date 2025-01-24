@@ -1,8 +1,9 @@
 use super::{WRAP_CLOSE, WRAP_OPEN};
 use crate::{
-    render::backend::{Backend, BackendProtocol, Style},
+    render::backend::{Backend, BackendProtocol, StyleExt},
     workspace::line::{EditorLine, LineContext},
 };
+use crossterm::style::ContentStyle;
 use std::ops::Range;
 
 pub fn render(
@@ -74,14 +75,14 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut Backend) {
         counter = counter.saturating_sub(1);
 
         if cursor_idx == idx {
-            backend.print_styled(text, Style::reversed())
+            backend.print_styled(text, ContentStyle::reversed())
         } else {
             backend.print(text);
         }
         idx += 1;
     }
     if idx <= cursor_idx {
-        backend.print_styled(" ", Style::reversed());
+        backend.print_styled(" ", ContentStyle::reversed());
     }
     backend.reset_style();
 }
@@ -89,7 +90,7 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut Backend) {
 #[inline]
 pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backend: &mut Backend) {
     let select_color = ctx.lexer.theme.selected;
-    let mut reset_style = Style::default();
+    let mut reset_style = ContentStyle::default();
     let mut iter_tokens = line.iter_tokens();
     let mut counter = 0;
     let mut last_len = 0;
@@ -143,14 +144,14 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backen
         counter = counter.saturating_sub(1);
 
         if cursor_idx == idx {
-            backend.print_styled(text, Style::reversed())
+            backend.print_styled(text, ContentStyle::reversed())
         } else {
             backend.print(text);
         }
         idx += 1;
     }
     if idx <= cursor_idx {
-        backend.print_styled(" ", Style::reversed());
+        backend.print_styled(" ", ContentStyle::reversed());
     }
     backend.reset_style();
 }
@@ -160,7 +161,7 @@ pub fn partial(line: &mut EditorLine, ctx: &LineContext, line_width: usize, back
     let cursor_idx = ctx.cursor_char();
     let (mut idx, reduction) = line.cached.generate_skipped_chars_simple(cursor_idx, line_width);
     if idx != 0 {
-        backend.print_styled(WRAP_OPEN, Style::reversed());
+        backend.print_styled(WRAP_OPEN, ContentStyle::reversed());
     }
     let mut counter = 0;
     let mut last_len = 0;
@@ -212,17 +213,17 @@ pub fn partial(line: &mut EditorLine, ctx: &LineContext, line_width: usize, back
         counter = counter.saturating_sub(1);
 
         if cursor_idx == idx {
-            backend.print_styled(text, Style::reversed())
+            backend.print_styled(text, ContentStyle::reversed())
         } else {
             backend.print(text);
         }
         idx += 1;
     }
     if idx <= cursor_idx {
-        backend.print_styled(" ", Style::reversed());
+        backend.print_styled(" ", ContentStyle::reversed());
     } else if line.char_len() > idx {
         backend.reset_style();
-        backend.print_styled(WRAP_CLOSE, Style::reversed());
+        backend.print_styled(WRAP_CLOSE, ContentStyle::reversed());
     }
 }
 
@@ -236,7 +237,7 @@ pub fn partial_select(
     let cursor_idx = ctx.cursor_char();
     let (mut idx, reduction) = line.cached.generate_skipped_chars_simple(cursor_idx, line_width);
     if idx != 0 {
-        backend.print_styled(WRAP_OPEN, Style::reversed());
+        backend.print_styled(WRAP_OPEN, ContentStyle::reversed());
     }
     let mut counter = 0;
     let mut last_len = 0;
@@ -244,7 +245,7 @@ pub fn partial_select(
     let mut tokens = line.iter_tokens();
     let mut cursor = idx;
     let select_color = ctx.lexer.theme.selected;
-    let mut reset_style = Style::default();
+    let mut reset_style = ContentStyle::default();
     if select.start <= idx && idx < select.end {
         reset_style.set_bg(Some(select_color));
         backend.set_bg(Some(select_color));
@@ -304,16 +305,16 @@ pub fn partial_select(
         counter = counter.saturating_sub(1);
 
         if cursor_idx == idx {
-            backend.print_styled(text, Style::reversed());
+            backend.print_styled(text, ContentStyle::reversed());
         } else {
             backend.print(text);
         }
         idx += 1;
     }
     if idx <= cursor_idx {
-        backend.print_styled(" ", Style::reversed());
+        backend.print_styled(" ", ContentStyle::reversed());
     } else if line.char_len() > idx {
         backend.reset_style();
-        backend.print_styled(WRAP_CLOSE, Style::reversed());
+        backend.print_styled(WRAP_CLOSE, ContentStyle::reversed());
     }
 }

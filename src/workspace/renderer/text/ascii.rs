@@ -1,11 +1,12 @@
 use crate::{
     render::{
-        backend::{Backend, BackendProtocol, Style},
+        backend::{Backend, BackendProtocol, StyleExt},
         layout::RectIter,
         utils::ByteChunks,
     },
     workspace::line::{EditorLine, LineContext},
 };
+use crossterm::style::ContentStyle;
 use std::ops::Range;
 
 pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut impl BackendProtocol) {
@@ -41,7 +42,7 @@ pub fn line_with_select(
         None => return,
     };
     if text.char_len == 0 {
-        backend.print_styled(" ", Style::bg(ctx.lexer.theme.selected));
+        backend.print_styled(" ", ContentStyle::bg(ctx.lexer.theme.selected));
         return;
     }
     let mut line_end = line_width;
@@ -103,14 +104,14 @@ pub fn basic(text: &mut EditorLine, skip: usize, lines: &mut RectIter, ctx: &mut
             }
         }
         if cursor_idx == idx {
-            backend.print_styled(text, Style::reversed())
+            backend.print_styled(text, ContentStyle::reversed())
         } else {
             backend.print(text);
         }
         idx += 1;
     }
     if idx <= cursor_idx {
-        backend.print_styled(" ", Style::reversed());
+        backend.print_styled(" ", ContentStyle::reversed());
     }
     backend.reset_style();
 }
@@ -156,14 +157,14 @@ pub fn select(
         }
 
         if cursor_idx == idx {
-            backend.print_styled(text, Style::reversed())
+            backend.print_styled(text, ContentStyle::reversed())
         } else {
             backend.print(text);
         }
         idx += 1;
     }
     if idx <= cursor_idx {
-        backend.print_styled(" ", Style::reversed());
+        backend.print_styled(" ", ContentStyle::reversed());
     }
     backend.reset_style();
 }

@@ -5,11 +5,12 @@ use crate::{
     error::IdiomResult,
     lsp::DiagnosticType,
     render::{
-        backend::{color, Backend, Color, Style},
+        backend::{Backend, StyleExt},
         layout::Line,
     },
     utils::get_nested_paths,
 };
+use crossterm::style::{Color, ContentStyle};
 use std::{
     cmp::Ordering,
     collections::HashSet,
@@ -19,8 +20,8 @@ use std::{
 
 use super::{watcher::TreeWatcher, PathParser};
 
-const ERR: Color = color::red();
-const WAR: Color = color::dark_yellow();
+const ERR: Color = Color::Red;
+const WAR: Color = Color::DarkYellow;
 
 #[derive(Debug, Clone)]
 pub enum TreePath {
@@ -46,7 +47,7 @@ impl TreePath {
         })
     }
 
-    pub fn render_styled(&self, char_offset: usize, line: Line, mut style: Style, backend: &mut Backend) {
+    pub fn render_styled(&self, char_offset: usize, line: Line, mut style: ContentStyle, backend: &mut Backend) {
         let (display, diagnostic) = match self {
             TreePath::File { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
             TreePath::Folder { display, diagnostic, tree: Some(..), .. } => {
@@ -71,8 +72,8 @@ impl TreePath {
             TreePath::Folder { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
         };
         match diagnostic {
-            DiagnosticType::Err => line.render_styled(display, Style::fg(ERR), backend),
-            DiagnosticType::Warn => line.render_styled(display, Style::fg(WAR), backend),
+            DiagnosticType::Err => line.render_styled(display, ContentStyle::fg(ERR), backend),
+            DiagnosticType::Warn => line.render_styled(display, ContentStyle::fg(WAR), backend),
             DiagnosticType::None => line.render(display, backend),
         };
     }

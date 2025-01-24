@@ -4,13 +4,14 @@ use super::PopupInterface;
 use crate::{
     global_state::{Clipboard, GlobalState, PopupMessage},
     render::{
-        backend::{Backend, Style},
+        backend::{Backend, StyleExt},
         layout::{Line, Rect},
         state::State,
         Button,
     },
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::style::ContentStyle;
 use fuzzy_matcher::skim::SkimMatcherV2;
 
 pub struct Popup {
@@ -171,7 +172,7 @@ impl Popup {
         let mut builder = line.unsafe_builder(backend);
         builder.push(" >> ");
         builder.push(&self.message);
-        builder.push_styled("|", Style::slowblink());
+        builder.push_styled("|", ContentStyle::slowblink());
     }
 
     fn spans_from_buttons(&mut self, line: Line, backend: &mut Backend) {
@@ -186,7 +187,7 @@ impl Popup {
         for (idx, btn) in self.buttons.iter().enumerate() {
             let text = format!("{name:^width$}", name = btn.name, width = padding + btn.name.len());
             if idx == self.state {
-                if !builder.push_styled(text.as_str(), Style::reversed()) {
+                if !builder.push_styled(text.as_str(), ContentStyle::reversed()) {
                     break;
                 }
             } else if !builder.push(text.as_str()) {

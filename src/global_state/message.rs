@@ -1,7 +1,8 @@
 use crate::render::{
-    backend::{color, Backend, BackendProtocol, Style},
+    backend::{Backend, BackendProtocol, StyleExt},
     layout::Line,
 };
+use crossterm::style::{Color, ContentStyle};
 use std::{
     error::Error,
     time::{Duration, Instant},
@@ -29,7 +30,7 @@ impl Messages {
         }
     }
 
-    pub fn render(&mut self, accent_style: Style, backend: &mut Backend) {
+    pub fn render(&mut self, accent_style: ContentStyle, backend: &mut Backend) {
         if self.is_expaired() {
             match self.messages.pop() {
                 Some(message) => {
@@ -49,7 +50,7 @@ impl Messages {
         }
     }
 
-    pub fn fast_render(&mut self, accent_style: Style, backend: &mut Backend) {
+    pub fn fast_render(&mut self, accent_style: ContentStyle, backend: &mut Backend) {
         if !self.active {
             return;
         }
@@ -112,14 +113,14 @@ enum Message {
 
 impl Message {
     #[inline]
-    fn render(&self, line: Line, mut accent_style: Style, backend: &mut Backend) {
+    fn render(&self, line: Line, mut accent_style: ContentStyle, backend: &mut Backend) {
         match self {
             Message::Error(text) => {
-                accent_style.set_fg(Some(color::red()));
+                accent_style.set_fg(Some(Color::Red));
                 line.render_styled(text, accent_style, backend)
             }
             Message::Success(text) => {
-                accent_style.set_fg(Some(color::blue()));
+                accent_style.set_fg(Some(Color::Blue));
                 line.render_styled(text, accent_style, backend)
             }
             Message::Text(text) => line.render_styled(text, accent_style, backend),

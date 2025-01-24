@@ -3,12 +3,13 @@ use super::EditorLine;
 use crate::{
     global_state::GlobalState,
     render::{
-        backend::{color, BackendProtocol, Style},
+        backend::{BackendProtocol, StyleExt},
         layout::Line,
     },
     syntax::Lexer,
     workspace::{cursor::Cursor, CursorPosition},
 };
+use crossterm::style::{Color, ContentStyle};
 use std::{cmp::Ordering, ops::Range};
 
 pub struct LineContext<'a> {
@@ -66,7 +67,7 @@ impl<'a> LineContext<'a> {
         self.line_number += 1;
         let text = format!("{: >1$} ", self.line_number, self.line_number_offset);
         let remaining_width = line.width - text.len();
-        backend.print_styled_at(line.row, line.col, text, Style::fg(color::dark_grey()));
+        backend.print_styled_at(line.row, line.col, text, ContentStyle::fg(Color::DarkGrey));
         backend.clear_to_eol();
         remaining_width
     }
@@ -74,7 +75,7 @@ impl<'a> LineContext<'a> {
     #[inline]
     pub fn wrap_line(&mut self, line: Line, backend: &mut impl BackendProtocol) {
         let text = format!("{: >1$} ", "", self.line_number_offset);
-        backend.print_styled_at(line.row, line.col, text, Style::fg(color::dark_grey()));
+        backend.print_styled_at(line.row, line.col, text, ContentStyle::fg(Color::DarkGrey));
         backend.clear_to_eol();
     }
 

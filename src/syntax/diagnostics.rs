@@ -1,13 +1,14 @@
 use crate::global_state::IdiomEvent;
-use crate::render::backend::{color, BackendProtocol, Color, Style};
+use crate::render::backend::{BackendProtocol, StyleExt};
 use crate::render::UTF8Safe;
 use crate::syntax::Lang;
 use crate::workspace::line::EditorLine;
+use crossterm::style::{Color, ContentStyle};
 use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
 
-const ELS_COLOR: Color = color::dark_grey();
-const ERR_COLOR: Color = color::red();
-const WAR_COLOR: Color = color::yellow();
+const ELS_COLOR: Color = Color::DarkGrey;
+const ERR_COLOR: Color = Color::Red;
+const WAR_COLOR: Color = Color::Yellow;
 
 #[derive(Default)]
 pub struct DiagnosticInfo {
@@ -72,8 +73,8 @@ impl DiagnosticData {
     }
 
     #[inline]
-    pub fn text_style(&self) -> Style {
-        Style::fg(self.color)
+    pub fn text_style(&self) -> ContentStyle {
+        ContentStyle::fg(self.color)
     }
 }
 

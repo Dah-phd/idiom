@@ -1,9 +1,10 @@
 use std::ops::Range;
 
 use crate::{
-    render::backend::{BackendProtocol, Style},
+    render::backend::{BackendProtocol, StyleExt},
     syntax::{tokens::TokenLine, Lexer},
 };
+use crossterm::style::ContentStyle;
 
 pub fn complex_line(
     content: impl Iterator<Item = char>,
@@ -67,7 +68,7 @@ pub fn complex_line_with_select(
     backend: &mut impl BackendProtocol,
 ) {
     let select_color = lexer.theme.selected;
-    let mut reset_style = Style::default();
+    let mut reset_style = ContentStyle::default();
     let mut iter_tokens = tokens.iter();
     let mut counter = 0;
     let mut last_len = 0;

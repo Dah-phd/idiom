@@ -1,11 +1,12 @@
 use crate::{
     render::{
-        backend::{Backend, BackendProtocol, Color, Style},
+        backend::{Backend, BackendProtocol, StyleExt},
         layout::{BorderSet, Borders, Line, BORDERS},
         utils::UTF8Safe,
     },
     workspace::CursorPosition,
 };
+use crossterm::style::{Color, ContentStyle};
 
 #[derive(Default, Clone, Copy, Debug)]
 pub struct Rect {
@@ -292,7 +293,7 @@ impl Rect {
 
     /// border_title with style
     #[inline]
-    pub fn border_title_styled(&self, text: &str, style: Style, backend: &mut Backend) {
+    pub fn border_title_styled(&self, text: &str, style: ContentStyle, backend: &mut Backend) {
         if self.borders.contains(Borders::TOP) {
             backend.print_styled_at(self.row - 1, self.col, text.truncate_width(self.width).1, style);
         };
@@ -309,7 +310,7 @@ impl Rect {
 
     /// border_title_bot with style
     #[inline]
-    pub fn border_title_bot_styled(&self, text: &str, style: Style, backend: &mut Backend) {
+    pub fn border_title_bot_styled(&self, text: &str, style: ContentStyle, backend: &mut Backend) {
         if self.borders.contains(Borders::BOTTOM) {
             return backend.print_styled_at(
                 self.row + self.height + 1,
@@ -341,7 +342,7 @@ impl Rect {
         let set = set.unwrap_or(BORDERS);
         backend.save_cursor();
         if let Some(color) = fg {
-            backend.set_style(Style::fg(color));
+            backend.set_style(ContentStyle::fg(color));
         };
         if top {
             for col_idx in col..last_col {

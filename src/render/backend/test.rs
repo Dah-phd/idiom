@@ -1,15 +1,17 @@
 use std::io::Write;
 
-use super::{BackendProtocol, Style};
+use crossterm::style::ContentStyle;
+
+use super::{style::StyleExt, BackendProtocol};
 
 pub struct Backend {
-    pub data: Vec<(Style, String)>,
-    pub default_style: Style,
+    pub data: Vec<(ContentStyle, String)>,
+    pub default_style: ContentStyle,
 }
 
 impl BackendProtocol for Backend {
     fn init() -> Self {
-        Self { data: Vec::new(), default_style: Style::default() }
+        Self { data: Vec::new(), default_style: ContentStyle::default() }
     }
 
     fn exit() -> std::io::Result<()> {
@@ -17,25 +19,25 @@ impl BackendProtocol for Backend {
     }
 
     fn clear_all(&mut self) {
-        self.data.push((Style::default(), String::from("<<clear all>>")));
+        self.data.push((ContentStyle::default(), String::from("<<clear all>>")));
     }
     fn clear_line(&mut self) {
-        self.data.push((Style::default(), String::from("<<clear line>>")));
+        self.data.push((ContentStyle::default(), String::from("<<clear line>>")));
     }
     fn clear_to_eol(&mut self) {
-        self.data.push((Style::default(), String::from("<<clear EOL>>")));
+        self.data.push((ContentStyle::default(), String::from("<<clear EOL>>")));
     }
 
-    fn get_style(&mut self) -> Style {
+    fn get_style(&mut self) -> ContentStyle {
         self.default_style
     }
 
     fn go_to(&mut self, row: u16, col: u16) {
-        self.data.push((Style::default(), format!("<<go to row: {row} col: {col}>>")))
+        self.data.push((ContentStyle::default(), format!("<<go to row: {row} col: {col}>>")))
     }
 
     fn hide_cursor(&mut self) {
-        self.data.push((Style::default(), String::from("<<hide cursor>>")));
+        self.data.push((ContentStyle::default(), String::from("<<hide cursor>>")));
     }
 
     fn print<D: std::fmt::Display>(&mut self, text: D) {
@@ -46,11 +48,11 @@ impl BackendProtocol for Backend {
         self.go_to(row, col);
         self.print(text)
     }
-    fn print_styled<D: std::fmt::Display>(&mut self, text: D, style: Style) {
+    fn print_styled<D: std::fmt::Display>(&mut self, text: D, style: ContentStyle) {
         self.data.push((style, text.to_string()));
     }
 
-    fn print_styled_at<D: std::fmt::Display>(&mut self, row: u16, col: u16, text: D, style: Style) {
+    fn print_styled_at<D: std::fmt::Display>(&mut self, row: u16, col: u16, text: D, style: ContentStyle) {
         self.go_to(row, col);
         self.print_styled(text, style);
     }
@@ -60,7 +62,7 @@ impl BackendProtocol for Backend {
     }
 
     fn reset_style(&mut self) {
-        self.default_style = Style::default();
+        self.default_style = ContentStyle::default();
         self.data.push((self.default_style, String::from("<<reset style>>")));
     }
 
@@ -86,7 +88,7 @@ impl BackendProtocol for Backend {
         self.data.push((self.default_style, format!("<<set fg {:?}>>", color)));
     }
 
-    fn set_style(&mut self, style: Style) {
+    fn set_style(&mut self, style: ContentStyle) {
         self.default_style = style;
         self.data.push((self.default_style, format!("<<style set to {:?}>>", self.default_style)))
     }
@@ -99,7 +101,7 @@ impl BackendProtocol for Backend {
         self.data.push((self.default_style, String::from("<<set style>>")));
     }
 
-    fn update_style(&mut self, style: Style) {
+    fn update_style(&mut self, style: ContentStyle) {
         self.default_style.update(style);
         self.data.push((self.default_style, String::from("<<updated style>>")))
     }
@@ -131,11 +133,11 @@ impl Write for Backend {
 }
 
 impl Backend {
-    pub fn unwrap(self) -> Vec<(Style, String)> {
+    pub fn unwrap(self) -> Vec<(ContentStyle, String)> {
         self.data
     }
 
-    pub fn drain(&mut self) -> Vec<(Style, String)> {
+    pub fn drain(&mut self) -> Vec<(ContentStyle, String)> {
         std::mem::take(&mut self.data)
     }
 }

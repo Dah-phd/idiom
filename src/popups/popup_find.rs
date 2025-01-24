@@ -5,13 +5,14 @@ use super::{
 use crate::{
     global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::{
-        backend::{BackendProtocol, Style},
+        backend::{BackendProtocol, StyleExt},
         count_as_string, TextField,
     },
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::style::ContentStyle;
 use fuzzy_matcher::skim::SkimMatcherV2;
 
 pub struct GoToLinePopup {
@@ -61,7 +62,7 @@ impl PopupInterface for GoToLinePopup {
                 let mut builder = line.unsafe_builder(&mut gs.writer);
                 builder.push(" Go to >> ");
                 builder.push(&self.line_idx);
-                builder.push_styled("|", Style::slowblink());
+                builder.push_styled("|", ContentStyle::slowblink());
             }
             gs.writer.reset_style();
         };

@@ -1,10 +1,11 @@
-use super::backend::{color, Backend, Style};
+use super::backend::{Backend, StyleExt};
 use crate::{
     configs::EditorAction,
     global_state::{Clipboard, IdiomEvent, PopupMessage},
 };
 use core::ops::Range;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::style::{Color, ContentStyle};
 
 use super::{
     count_as_string,
@@ -74,10 +75,10 @@ impl<T: Default + Clone> TextField<T> {
     fn text_cursor(&self, mut builder: LineBuilder) {
         if self.char == self.text.len() {
             builder.push(&self.text);
-            builder.push_styled(" ", Style::reversed());
+            builder.push_styled(" ", ContentStyle::reversed());
         } else {
             builder.push(self.text[..self.char].as_ref());
-            builder.push_styled(self.text[self.char..=self.char].as_ref(), Style::reversed());
+            builder.push_styled(self.text[self.char..=self.char].as_ref(), ContentStyle::reversed());
             builder.push(self.text[self.char + 1..].as_ref());
         };
     }
@@ -85,16 +86,16 @@ impl<T: Default + Clone> TextField<T> {
     fn text_cursor_select(&self, from: usize, to: usize, mut builder: LineBuilder) {
         builder.push(self.text[..from].as_ref());
         if from == self.char {
-            builder.push_styled(self.text[self.char..=self.char].as_ref(), Style::reversed());
-            builder.push_styled(self.text[from + 1..to].as_ref(), Style::bg(color::rgb(72, 72, 72)));
+            builder.push_styled(self.text[self.char..=self.char].as_ref(), ContentStyle::reversed());
+            builder.push_styled(self.text[from + 1..to].as_ref(), ContentStyle::bg(Color::Rgb { r: 72, g: 72, b: 72 }));
             builder.push(self.text[to..].as_ref());
         } else if self.char == self.text.len() {
-            builder.push_styled(self.text[from..to].as_ref(), Style::bg(color::rgb(72, 72, 72)));
+            builder.push_styled(self.text[from..to].as_ref(), ContentStyle::bg(Color::Rgb { r: 72, g: 72, b: 72 }));
             builder.push(self.text[to..].as_ref());
-            builder.push_styled(" ", Style::reversed());
+            builder.push_styled(" ", ContentStyle::reversed());
         } else {
-            builder.push_styled(self.text[from..to].as_ref(), Style::bg(color::rgb(72, 72, 72)));
-            builder.push_styled(self.text[to..=to].as_ref(), Style::reversed());
+            builder.push_styled(self.text[from..to].as_ref(), ContentStyle::bg(Color::Rgb { r: 72, g: 72, b: 72 }));
+            builder.push_styled(self.text[to..=to].as_ref(), ContentStyle::reversed());
             builder.push(self.text[to + 1..].as_ref());
         }
     }

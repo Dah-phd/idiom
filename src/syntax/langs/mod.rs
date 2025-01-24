@@ -4,11 +4,12 @@ use crate::{
     configs::{FileType, Theme},
     global_state::IdiomEvent,
     render::{
-        backend::{Color, Style},
+        backend::StyleExt,
         widgets::{StyledLine, Text},
     },
     workspace::line::EditorLine,
 };
+use crossterm::style::{Color, ContentStyle};
 use lsp_types::DiagnosticRelatedInformation;
 use rust::{rust_process_related_info, rust_specific_handler};
 use serde_json::Value;
@@ -119,10 +120,10 @@ impl Lang {
 
     pub fn stylize(&self, text_line: &str, theme: &Theme) -> StyledLine {
         if self.is_comment(text_line) {
-            return vec![Text::new(text_line.to_owned(), Some(Style::fg(theme.comment)))].into();
+            return vec![Text::new(text_line.to_owned(), Some(ContentStyle::fg(theme.comment)))].into();
         }
         if self.is_import_start(text_line) {
-            return vec![Text::new(text_line.to_owned(), Some(Style::fg(theme.imports)))].into();
+            return vec![Text::new(text_line.to_owned(), Some(ContentStyle::fg(theme.imports)))].into();
         }
         let mut buffer = vec![];
         let mut word = String::new();
@@ -137,13 +138,13 @@ impl Lang {
                 }
                 '(' => {
                     if !word.is_empty() {
-                        buffer.push(Text::new(std::mem::take(&mut word), Some(Style::fg(theme.functions))));
+                        buffer.push(Text::new(std::mem::take(&mut word), Some(ContentStyle::fg(theme.functions))));
                     }
                     buffer.push(Text::new(ch.to_string(), None));
                 }
                 '.' => {
                     if !word.is_empty() {
-                        buffer.push(Text::new(std::mem::take(&mut word), Some(Style::fg(theme.default))));
+                        buffer.push(Text::new(std::mem::take(&mut word), Some(ContentStyle::fg(theme.default))));
                     }
                     buffer.push(ch.into());
                 }
@@ -176,15 +177,15 @@ impl Lang {
     }
 
     #[inline(always)]
-    fn map_style(&self, token: &str, theme: &Theme) -> Style {
+    fn map_style(&self, token: &str, theme: &Theme) -> ContentStyle {
         if self.is_flow(token) {
-            Style::fg(theme.flow_control)
+            ContentStyle::fg(theme.flow_control)
         } else if self.is_keyword(token) {
-            Style::fg(theme.key_words)
+            ContentStyle::fg(theme.key_words)
         } else if token.chars().next().map(|f| f.is_uppercase()).unwrap_or_default() {
-            Style::fg(theme.class_or_struct)
+            ContentStyle::fg(theme.class_or_struct)
         } else {
-            Style::fg(theme.default)
+            ContentStyle::fg(theme.default)
         }
     }
 }

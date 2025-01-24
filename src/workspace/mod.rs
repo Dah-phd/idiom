@@ -10,10 +10,11 @@ use crate::{
     global_state::{GlobalState, IdiomEvent},
     lsp::LSP,
     popups::popups_editor::file_updated,
-    render::backend::{color, BackendProtocol, Style},
+    render::backend::{BackendProtocol, StyleExt},
     utils::TrackedList,
 };
 use crossterm::event::KeyEvent;
+use crossterm::style::{Color, ContentStyle};
 pub use cursor::CursorPosition;
 pub use editor::Editor;
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
@@ -29,7 +30,7 @@ pub struct Workspace {
     editors: TrackedList<Editor>,
     base_config: EditorConfigs,
     key_map: EditorKeyMap,
-    tab_style: Style,
+    tab_style: ContentStyle,
     lsp_servers: HashMap<FileType, LSP>,
     map_callback: fn(&mut Self, &KeyEvent, &mut GlobalState) -> bool,
 }
@@ -47,7 +48,7 @@ impl Workspace {
                 Err(err) => gs.error(format!("Preload filed: {err}")),
             }
         }
-        let tab_style = Style::fg(color::dark_yellow());
+        let tab_style = ContentStyle::fg(Color::DarkYellow);
         Self { editors: TrackedList::new(), base_config, key_map, lsp_servers, map_callback: map_editor, tab_style }
     }
 
@@ -57,7 +58,7 @@ impl Workspace {
                 Some(line) => line,
                 None => return,
             };
-            gs.writer.set_style(Style::underlined(None));
+            gs.writer.set_style(ContentStyle::underlined(None));
             {
                 let mut builder = line.unsafe_builder(&mut gs.writer);
                 builder.push_styled(&editor.display, self.tab_style);
@@ -86,13 +87,13 @@ impl Workspace {
     pub fn toggle_tabs(&mut self) {
         self.editors.mark_updated();
         self.map_callback = map_tabs;
-        self.tab_style = Style::reversed();
+        self.tab_style = ContentStyle::reversed();
     }
 
     pub fn toggle_editor(&mut self) {
         self.editors.mark_updated();
         self.map_callback = map_editor;
-        self.tab_style = Style::fg(color::dark_yellow());
+        self.tab_style = ContentStyle::fg(Color::DarkYellow);
     }
 
     #[inline]

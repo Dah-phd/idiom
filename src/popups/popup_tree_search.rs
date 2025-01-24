@@ -2,7 +2,7 @@ use super::PopupInterface;
 use crate::{
     global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::{
-        backend::{color, Style},
+        backend::StyleExt,
         layout::{IterLines, LineBuilder, BORDERS},
         state::State,
         TextField,
@@ -11,6 +11,7 @@ use crate::{
     workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::style::{Color, ContentStyle};
 use fuzzy_matcher::skim::SkimMatcherV2;
 use std::{path::PathBuf, sync::Arc};
 use tokio::{sync::Mutex, task::JoinHandle};
@@ -64,7 +65,7 @@ impl PopupInterface for ActivePathSearch {
         let mut area = gs.screen_rect.center(20, 120);
         area.bordered();
         area.draw_borders(None, None, &mut gs.writer);
-        area.border_title_styled(PATH_SEARCH_TITLE, Style::fg(color::blue()), &mut gs.writer);
+        area.border_title_styled(PATH_SEARCH_TITLE, ContentStyle::fg(Color::Blue), &mut gs.writer);
         let mut lines = area.into_iter();
         if let Some(line) = lines.next() {
             self.pattern.widget(line, &mut gs.writer);
@@ -167,8 +168,10 @@ impl PopupInterface for ActiveFileSearch {
         area.bordered();
         area.draw_borders(None, None, &mut gs.writer);
         match self.mode {
-            Mode::Full => area.border_title_styled(FULL_SEARCH_TITLE, Style::fg(color::red()), &mut gs.writer),
-            Mode::Select => area.border_title_styled(FILE_SEARCH_TITLE, Style::fg(color::yellow()), &mut gs.writer),
+            Mode::Full => area.border_title_styled(FULL_SEARCH_TITLE, ContentStyle::fg(Color::Red), &mut gs.writer),
+            Mode::Select => {
+                area.border_title_styled(FILE_SEARCH_TITLE, ContentStyle::fg(Color::Yellow), &mut gs.writer)
+            }
         }
         let mut lines = area.into_iter();
         if let Some(line) = lines.next() {

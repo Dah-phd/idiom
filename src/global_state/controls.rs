@@ -1,10 +1,10 @@
 use super::{GlobalState, IdiomEvent};
 use crate::popups::pallet::Pallet;
-use crate::render::backend::{color, Backend, Style};
+use crate::render::backend::{Backend, StyleExt};
 use crate::render::layout::Line;
 use crate::{runner::EditorTerminal, tree::Tree, workspace::Workspace};
 use crossterm::event::{KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use crossterm::style::Color;
+use crossterm::style::{Color, ContentStyle};
 
 const INSERT_SPAN: &str = "  --INSERT--   ";
 const SELECT_SPAN: &str = "  --SELECT--   ";
@@ -27,7 +27,7 @@ pub enum Mode {
 
 impl Mode {
     #[inline]
-    pub fn render(&self, line: Line, accent_style: Style, backend: &mut Backend) {
+    pub fn render(&self, line: Line, accent_style: ContentStyle, backend: &mut Backend) {
         match self {
             Self::Insert => Self::render_insert_mode(line, accent_style, backend),
             Self::Select => Self::render_select_mode(line, accent_style, backend),
@@ -35,7 +35,7 @@ impl Mode {
     }
 
     #[inline]
-    pub fn render_select_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) {
+    pub fn render_select_mode(mut line: Line, mut accent_style: ContentStyle, backend: &mut Backend) {
         line.width = std::cmp::min(MODE_LEN, line.width);
         accent_style.add_bold();
         accent_style.set_fg(Some(Self::select_color()));
@@ -43,7 +43,7 @@ impl Mode {
     }
 
     #[inline]
-    pub fn render_insert_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) {
+    pub fn render_insert_mode(mut line: Line, mut accent_style: ContentStyle, backend: &mut Backend) {
         line.width = std::cmp::min(MODE_LEN, line.width);
         accent_style.add_bold();
         accent_style.set_fg(Some(Self::insert_color()));
@@ -51,11 +51,11 @@ impl Mode {
     }
 
     pub const fn select_color() -> Color {
-        color::cyan()
+        Color::Cyan
     }
 
     pub const fn insert_color() -> Color {
-        color::rgb(255, 0, 0)
+        Color::Rgb { r: 255, g: 0, b: 0 }
     }
 
     #[inline]

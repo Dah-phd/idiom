@@ -1,7 +1,7 @@
 use super::{cursor as rend_cursor, inner_render};
 use crate::configs::FileType;
 use crate::global_state::GlobalState;
-use crate::render::backend::{Backend, BackendProtocol, Style};
+use crate::render::backend::{Backend, BackendProtocol};
 use crate::render::layout::{Line, Rect};
 use crate::syntax::tests::{
     create_token_pairs_utf16, create_token_pairs_utf32, create_token_pairs_utf8, longline_token_pair_utf16,
@@ -11,6 +11,7 @@ use crate::syntax::tests::{
 use crate::workspace::cursor::Cursor;
 use crate::workspace::line::{EditorLine, LineContext};
 use crate::workspace::CursorPosition;
+use crossterm::style::ContentStyle;
 
 #[test]
 fn test_insert() {
@@ -460,7 +461,7 @@ fn test_line_wrapping_utf32() {
     test_line_wrap(gs.writer.drain());
 }
 
-fn parse_simple_line(rendered: &mut Vec<(Style, String)>) -> (Option<usize>, Vec<String>) {
+fn parse_simple_line(rendered: &mut Vec<(ContentStyle, String)>) -> (Option<usize>, Vec<String>) {
     let mut line_idx = None;
     for (idx, (_, txt)) in rendered.iter().enumerate() {
         if !txt.starts_with("<<go to row") {
@@ -477,7 +478,7 @@ fn parse_simple_line(rendered: &mut Vec<(Style, String)>) -> (Option<usize>, Vec
     (line_idx, rendered.drain(..).map(|(_, t)| t).collect())
 }
 
-fn parse_complex_line(rendered: &mut Vec<(Style, String)>) -> (Option<usize>, Vec<String>) {
+fn parse_complex_line(rendered: &mut Vec<(ContentStyle, String)>) -> (Option<usize>, Vec<String>) {
     let (line_idx, raw_data) = parse_simple_line(rendered);
     let mut parsed = vec![];
     let mut current = String::new();
@@ -500,7 +501,7 @@ fn parse_complex_line(rendered: &mut Vec<(Style, String)>) -> (Option<usize>, Ve
 }
 
 #[inline]
-fn test_content(mut render_data: Vec<(Style, String)>) {
+fn test_content(mut render_data: Vec<(ContentStyle, String)>) {
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(1));
     assert_eq!(line, vec!["use", " ", "super", "::", "code", "::", "CodeLine", ";"]);
@@ -577,7 +578,7 @@ fn test_content(mut render_data: Vec<(Style, String)>) {
 }
 
 #[inline]
-fn test_content_select(mut render_data: Vec<(Style, String)>) {
+fn test_content_select(mut render_data: Vec<(ContentStyle, String)>) {
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(1));
     assert_eq!(line, vec!["use", " ", "super", "::", "code", "::", "CodeLine", ";"]);
@@ -655,7 +656,7 @@ fn test_content_select(mut render_data: Vec<(Style, String)>) {
 }
 
 #[inline]
-fn test_content_shrunk(mut render_data: Vec<(Style, String)>) {
+fn test_content_shrunk(mut render_data: Vec<(ContentStyle, String)>) {
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(1));
     assert_eq!(line, vec!["use", " ", "super", "::", "code", "::", "CodeLine", ";"]);
@@ -728,7 +729,7 @@ fn test_content_shrunk(mut render_data: Vec<(Style, String)>) {
     assert_eq!(line, vec!["}"]);
 }
 
-fn test_line_wrap(mut render_data: Vec<(Style, String)>) {
+fn test_line_wrap(mut render_data: Vec<(ContentStyle, String)>) {
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(1));
     assert_eq!(line, vec!["fn", " ", "get_long_line", "() ", "->", " ", "String", " {"]);

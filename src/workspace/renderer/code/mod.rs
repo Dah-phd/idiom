@@ -3,7 +3,7 @@ pub mod ascii_line;
 pub mod complex_cursor;
 pub mod complex_line;
 
-use crate::render::backend::Style;
+use crate::render::backend::StyleExt;
 use crate::render::{
     backend::{Backend, BackendProtocol},
     layout::Line,
@@ -13,6 +13,7 @@ use crate::workspace::{
     cursor::Cursor,
     line::{EditorLine, LineContext},
 };
+use crossterm::style::ContentStyle;
 use std::ops::Range;
 use unicode_width::UnicodeWidthChar;
 
@@ -73,7 +74,7 @@ fn render_with_select(
     backend: &mut impl BackendProtocol,
 ) {
     if code.char_len == 0 && select.end != 0 {
-        backend.print_styled(" ", Style::bg(ctx.lexer.theme.selected));
+        backend.print_styled(" ", ContentStyle::bg(ctx.lexer.theme.selected));
         return;
     }
     if code.is_simple() {
@@ -86,7 +87,7 @@ fn render_with_select(
         } else {
             let content = code.content.chars().take(line_width.saturating_sub(2));
             ascii_line::ascii_line_with_select(content, &code.tokens, select, ctx.lexer, backend);
-            backend.print_styled(">>", Style::reversed());
+            backend.print_styled(">>", ContentStyle::reversed());
         }
     // handles non ascii shrunk lines
     } else if let Ok(truncated) = code.content.truncate_if_wider(line_width) {
@@ -97,7 +98,7 @@ fn render_with_select(
             }
         };
         complex_line::complex_line_with_select(content, &code.tokens, select, ctx.lexer, backend);
-        backend.print_styled(">>", Style::reversed());
+        backend.print_styled(">>", ContentStyle::reversed());
     } else {
         complex_line::complex_line_with_select(code.content.chars(), &code.tokens, select, ctx.lexer, backend);
         if let Some(diagnostic) = code.diagnostics.as_ref() {
@@ -121,7 +122,7 @@ fn render_no_select(
             }
         } else {
             ascii_line::ascii_line(&code.content[..line_width.saturating_sub(2)], &code.tokens, backend);
-            backend.print_styled(">>", Style::reversed());
+            backend.print_styled(">>", ContentStyle::reversed());
         }
     // handles non ascii shrunk lines
     } else if let Ok(truncated) = code.content.truncate_if_wider(line_width) {
@@ -132,7 +133,7 @@ fn render_no_select(
             }
         };
         complex_line::complex_line(content, &code.tokens, ctx.lexer, backend);
-        backend.print_styled(">>", Style::reversed());
+        backend.print_styled(">>", ContentStyle::reversed());
     } else {
         complex_line::complex_line(code.content.chars(), &code.tokens, ctx.lexer, backend);
         if let Some(diagnostic) = code.diagnostics.as_ref() {

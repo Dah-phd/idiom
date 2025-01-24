@@ -1,10 +1,11 @@
 use crate::{
     global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
-    render::backend::{BackendProtocol, Style},
+    render::backend::{BackendProtocol, StyleExt},
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::style::ContentStyle;
 use fuzzy_matcher::skim::SkimMatcherV2;
 
 use super::{
@@ -111,7 +112,7 @@ impl PopupInterface for ReplacePopup {
             find_builder.push(" > ");
             find_builder.push(&self.pattern);
             if !self.on_text {
-                find_builder.push_styled("|", Style::slowblink());
+                find_builder.push_styled("|", ContentStyle::slowblink());
             };
         };
         if let Some(line) = lines.next() {
@@ -119,7 +120,7 @@ impl PopupInterface for ReplacePopup {
             repl_builder.push("Rep > ");
             repl_builder.push(&self.new_text);
             if self.on_text {
-                repl_builder.push_styled("|", Style::slowblink());
+                repl_builder.push_styled("|", ContentStyle::slowblink());
             }
         }
         gs.writer.reset_style();

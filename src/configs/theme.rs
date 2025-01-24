@@ -1,22 +1,23 @@
 use super::{load_or_create_config, THEME_FILE};
 use crate::error::IdiomError;
-use crate::render::backend::{color, pull_color, serialize_rgb, Color};
+use crate::render::backend::{pull_color, serialize_rgb};
+use crossterm::style::Color;
 use serde::ser::{Serialize, SerializeStruct};
 use serde_json::Value;
 
-const IMPORTS: Color = color::rgb(112, 199, 176);
-const KEY_WORDS: Color = color::rgb(79, 106, 214);
-const FLOW_CONTROL: Color = color::magenta();
-const CLASS_OR_STRUCT: Color = color::rgb(112, 199, 176);
-const CONSTANT: Color = color::rgb(73, 162, 215);
-const BLANK: Color = color::reset();
-const COMMENT: Color = color::rgb(82, 113, 67);
-const DEFAULT: Color = color::rgb(157, 221, 254);
-const FUNCTIONS: Color = color::rgb(218, 223, 170);
-const NUMERIC: Color = color::rgb(153, 173, 142);
-const SELECTED: Color = color::rgb(72, 72, 72);
-const STRING: Color = color::dark_yellow();
-const STRING_ESCAPE: Color = color::yellow();
+const IMPORTS: Color = Color::Rgb { r: 112, g: 199, b: 176 };
+const KEY_WORDS: Color = Color::Rgb { r: 79, g: 106, b: 214 };
+const FLOW_CONTROL: Color = Color::Magenta;
+const CLASS_OR_STRUCT: Color = Color::Rgb { r: 112, g: 199, b: 176 };
+const CONSTANT: Color = Color::Rgb { r: 73, g: 162, b: 215 };
+const BLANK: Color = Color::Reset;
+const COMMENT: Color = Color::Rgb { r: 82, g: 113, b: 67 };
+const DEFAULT: Color = Color::Rgb { r: 157, g: 221, b: 254 };
+const FUNCTIONS: Color = Color::Rgb { r: 218, g: 223, b: 170 };
+const NUMERIC: Color = Color::Rgb { r: 153, g: 173, b: 142 };
+const SELECTED: Color = Color::Rgb { r: 72, g: 72, b: 72 };
+const STRING: Color = Color::DarkYellow;
+const STRING_ESCAPE: Color = Color::Yellow;
 
 #[derive(Debug, Clone)]
 pub struct Theme {
