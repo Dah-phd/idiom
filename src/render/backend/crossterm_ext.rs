@@ -110,7 +110,7 @@ impl BackendProtocol for Backend {
     #[inline]
     fn set_style(&mut self, style: ContentStyle) {
         self.default_styled.replace(style);
-        queue!(self, ResetColor, SetStyle(style.into())).expect(ERR_MSG);
+        queue!(self, ResetColor, SetStyle(style)).expect(ERR_MSG);
     }
 
     #[inline]
@@ -121,7 +121,7 @@ impl BackendProtocol for Backend {
     #[inline]
     fn to_set_style(&mut self) {
         match self.default_styled {
-            Some(style) => queue!(self, ResetColor, SetStyle(style.into())),
+            Some(style) => queue!(self, ResetColor, SetStyle(style)),
             None => queue!(self, ResetColor),
         }
         .expect(ERR_MSG);
@@ -208,9 +208,9 @@ impl BackendProtocol for Backend {
     #[inline]
     fn print_styled<D: Display>(&mut self, text: D, style: ContentStyle) {
         if let Some(restore_style) = self.default_styled {
-            queue!(self, SetStyle(style.into()), Print(text), ResetColor, SetStyle(restore_style.into()),)
+            queue!(self, SetStyle(style), Print(text), ResetColor, SetStyle(restore_style),)
         } else {
-            queue!(self, SetStyle(style.into()), Print(text), ResetColor,)
+            queue!(self, SetStyle(style), Print(text), ResetColor,)
         }
         .expect(ERR_MSG);
     }
@@ -219,16 +219,9 @@ impl BackendProtocol for Backend {
     #[inline]
     fn print_styled_at<D: Display>(&mut self, row: u16, col: u16, text: D, style: ContentStyle) {
         if let Some(restore_style) = self.default_styled {
-            queue!(
-                self,
-                SetStyle(style.into()),
-                MoveTo(col, row),
-                Print(text),
-                ResetColor,
-                SetStyle(restore_style.into()),
-            )
+            queue!(self, SetStyle(style), MoveTo(col, row), Print(text), ResetColor, SetStyle(restore_style),)
         } else {
-            queue!(self, SetStyle(style.into()), MoveTo(col, row), Print(text), ResetColor,)
+            queue!(self, SetStyle(style), MoveTo(col, row), Print(text), ResetColor,)
         }
         .expect(ERR_MSG);
     }

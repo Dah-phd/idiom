@@ -30,10 +30,10 @@ Python should work for the most part with jedi, but the interaction is not well 
 - write tests
 - check if you can make new imputs color faster better token insert
 - lsp server cold start, maybe? "jedi-language server" starts slow
+- add _md parser_ that **can** *show*__some__ formats
 
 ## Initial target langs
-
-- RUST
-- Python
-- JS/TS
-- HTML/JSON/TOML/{YAML/YML}
+1. RUST
+2. Python
+3. JS/TS
+4. HTML/JSON/TOML/{YAML/YML}

@@ -517,3 +517,32 @@ fn test_token_dec() {
     tl.decrement_at(1);
     assert_eq!(tl, token_line);
 }
+
+#[test]
+fn test_token_motions() {
+    let mut token_line = TokenLine::default();
+    // let text = String::from("tex")
+    token_line.push(Token { delta_start: 0, len: 3, style: ContentStyle::default() });
+    token_line.push(Token { delta_start: 4, len: 4, style: ContentStyle::default() });
+    token_line.push(Token { delta_start: 7, len: 6, style: ContentStyle::reversed() });
+    token_line.push(Token { delta_start: 8, len: 4, style: ContentStyle::slowblink() });
+    token_line.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
+    token_line.decrement_at(29);
+    token_line.decrement_at(28);
+    token_line.decrement_at(27);
+    token_line.decrement_at(26);
+    token_line.decrement_at(25);
+    token_line.decrement_at(24);
+    // whole token deleted
+    assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 4, style: ContentStyle::slowblink() });
+    token_line.decrement_at(23);
+    // reaching prev token
+    assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 4, style: ContentStyle::slowblink() });
+    token_line.increment_at(23);
+    // increased last prev token size
+    assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 5, style: ContentStyle::slowblink() });
+    token_line.increment_at(25);
+    token_line.increment_at(26);
+    // increments passed prev token - so no size change
+    assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 5, style: ContentStyle::slowblink() });
+}

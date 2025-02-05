@@ -39,6 +39,7 @@ copypasta = "0.10.1"
 notify = { version = "8.0.0", default-features = false, features = ["macos_kqueue"] }
 logos = "0.15.0"
 coolor = "1.0.0"
+markdown = "0.3.0"
 
 [target.'cfg(unix)'.dependencies]
 xterm-query = "0.5.0"

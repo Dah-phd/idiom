@@ -1,8 +1,9 @@
 mod ascii;
 mod complex;
-mod parser;
 
 use std::ops::Range;
+
+use crossterm::style::{Attribute, Attributes, Color, ContentStyle};
 
 use crate::{
     render::{
@@ -14,6 +15,34 @@ use crate::{
         cursor::Cursor,
         line::{EditorLine, LineContext},
     },
+};
+
+const HEADING: ContentStyle = ContentStyle {
+    foreground_color: Some(Color::DarkRed),
+    background_color: None,
+    underline_color: Some(Color::DarkRed),
+    attributes: Attributes::none().with(Attribute::Bold).with(Attribute::Italic).with(Attribute::Underlined),
+};
+
+const HEADING_2: ContentStyle = ContentStyle {
+    foreground_color: Some(Color::DarkBlue),
+    background_color: None,
+    underline_color: Some(Color::DarkBlue),
+    attributes: Attributes::none().with(Attribute::Bold).with(Attribute::Italic).with(Attribute::Underlined),
+};
+
+const HEADING_3: ContentStyle = ContentStyle {
+    foreground_color: Some(Color::DarkGreen),
+    background_color: None,
+    underline_color: Some(Color::DarkGreen),
+    attributes: Attributes::none().with(Attribute::Bold).with(Attribute::Italic).with(Attribute::Underlined),
+};
+
+const HEADING_NEXT: ContentStyle = ContentStyle {
+    foreground_color: None,
+    background_color: None,
+    underline_color: None,
+    attributes: Attributes::none().with(Attribute::Bold).with(Attribute::Italic).with(Attribute::Underlined),
 };
 
 pub fn repositioning(cursor: &mut Cursor, content: &mut [EditorLine]) -> Option<usize> {
@@ -85,3 +114,6 @@ pub fn line(
         },
     }
 }
+
+#[cfg(test)]
+mod tests;
