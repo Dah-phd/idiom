@@ -27,10 +27,9 @@ Python should work for the most part with jedi, but the interaction is not well 
 - Linux Mint
 
 ## TODO
+- try to print special char instead of strange chars >> big w or unknown width
 - write tests
-- check if you can make new imputs color faster better token insert
 - lsp server cold start, maybe? "jedi-language server" starts slow
-- add _md parser_ that **can** *show*__some__ formats
 
 ## Initial target langs
 1. RUST

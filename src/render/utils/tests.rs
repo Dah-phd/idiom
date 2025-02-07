@@ -42,6 +42,28 @@ fn test_truncate_utf8() {
 }
 
 #[test]
+fn test_width_split() {
+    assert_eq!("🚀13".width_split(2), ("🚀", Some("13")));
+    assert_eq!("🚀13".width_split(1), ("", Some("🚀13")));
+    assert_eq!("🚀13".width_split(4), ("🚀13", None));
+    assert_eq!("🚀13".width_split(0), ("", Some("🚀13")));
+    assert_eq!("🚀13".width_split(3000), ("🚀13", None));
+    assert_eq!("🚀13🚀13".width_split(5), ("🚀13", Some("🚀13")));
+    assert_eq!("🚀13🚀13".width_split(6), ("🚀13🚀", Some("13")));
+}
+
+#[test]
+fn test_width_split_string() {
+    assert_eq!(String::from("🚀13").width_split(2), ("🚀", Some("13")));
+    assert_eq!(String::from("🚀13").width_split(1), ("", Some("🚀13")));
+    assert_eq!(String::from("🚀13").width_split(4), ("🚀13", None));
+    assert_eq!(String::from("🚀13").width_split(0), ("", Some("🚀13")));
+    assert_eq!(String::from("🚀13").width_split(3000), ("🚀13", None));
+    assert_eq!(String::from("🚀13🚀13").width_split(5), ("🚀13", Some("🚀13")));
+    assert_eq!(String::from("🚀13🚀13").width_split(6), ("🚀13🚀", Some("13")));
+}
+
+#[test]
 #[should_panic]
 fn test_split_std() {
     let _ = TEXT.split_at(4);

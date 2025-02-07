@@ -1,35 +1,202 @@
-use unicode_width::UnicodeWidthChar;
-
+use super::{HEADING, HEADING_2, HEADING_3, HEADING_NEXT};
 use crate::{
     render::{
         backend::{Backend, BackendProtocol, StyleExt},
         layout::RectIter,
-        utils::WriteChunks,
     },
     workspace::line::{EditorLine, LineContext},
 };
-use crossterm::style::ContentStyle;
+use markdown::{tokenize, Block, ListItem, Span};
+use unicode_width::UnicodeWidthChar;
+
+use crossterm::style::{ContentStyle, Stylize};
 use std::ops::Range;
+
+fn print_block(
+    block: Block,
+    lines: &mut RectIter,
+    mut limit: usize,
+    line_width: usize,
+    ctx: &mut LineContext,
+    backend: &mut impl BackendProtocol,
+) -> Option<usize> {
+    match block {
+        Block::Header(header, level) => {
+            for span in header {
+                match level {
+                    1 => backend.set_style(HEADING),
+                    2 => backend.set_style(HEADING_2),
+                    3 => backend.set_style(HEADING_3),
+                    _ => backend.set_style(HEADING_NEXT),
+                }
+                limit = print_span(span, lines, limit, line_width, ctx, backend)?;
+            }
+        }
+        Block::Paragraph(parag) => {
+            for span in parag {
+                limit = print_span(span, lines, limit, line_width, ctx, backend)?;
+            }
+        }
+        Block::Hr => {
+            backend.print((0..limit).map(|_| '-').collect::<String>());
+            limit = 0;
+        }
+        Block::CodeBlock(x, y) => {
+            limit = print_split(&format!(" X X X {x:?} {y}"), limit, line_width, lines, ctx, backend)?;
+        }
+        Block::Raw(text) => {
+            limit = print_split(&text, limit, line_width, lines, ctx, backend)?;
+        }
+        Block::OrderedList(items, list_type) => {
+            limit = print_split(&format!(" {}.", list_type.0), limit, line_width, lines, ctx, backend)?;
+            for item in items {
+                limit = print_list_item(item, lines, limit, line_width, ctx, backend)?;
+            }
+        }
+        Block::UnorderedList(items) => {
+            limit = print_split(" > ", limit, line_width, lines, ctx, backend)?;
+            for item in items {
+                limit = print_list_item(item, lines, limit, line_width, ctx, backend)?;
+            }
+        }
+        Block::Blockquote(blocks) => {
+            for block in blocks {
+                limit = print_block(block, lines, limit, line_width, ctx, backend)?;
+            }
+        }
+    }
+    Some(limit)
+}
+
+fn print_list_item(
+    item: ListItem,
+    lines: &mut RectIter,
+    mut limit: usize,
+    line_width: usize,
+    ctx: &mut LineContext,
+    backend: &mut impl BackendProtocol,
+) -> Option<usize> {
+    match item {
+        ListItem::Simple(spans) => {
+            for span in spans {
+                limit = print_span(span, lines, limit, line_width, ctx, backend)?;
+            }
+        }
+        ListItem::Paragraph(parag) => {
+            for block in parag {
+                limit = print_block(block, lines, limit, line_width, ctx, backend)?;
+            }
+        }
+    }
+    Some(limit)
+}
+
+fn print_span(
+    span: Span,
+    lines: &mut RectIter,
+    mut limit: usize,
+    line_width: usize,
+    ctx: &mut LineContext,
+    backend: &mut impl BackendProtocol,
+) -> Option<usize> {
+    match span {
+        Span::Emphasis(spans) => {
+            let style = backend.get_style();
+            backend.set_style(style.italic());
+            for span in spans {
+                limit = print_span(span, lines, limit, line_width, ctx, backend)?;
+            }
+            backend.set_style(style);
+        }
+        Span::Text(text) => limit = print_split(&text, limit, line_width, lines, ctx, backend)?,
+        Span::Strong(spans) => {
+            let style = backend.get_style();
+            backend.set_style(style.bold());
+            for span in spans {
+                limit = print_span(span, lines, limit, line_width, ctx, backend)?;
+            }
+            backend.set_style(style);
+        }
+        Span::Code(text) => {
+            limit = match text.as_str() {
+                "`" => print_split(">>> ", limit, line_width, lines, ctx, backend)?,
+                _ => print_split(&text, limit, line_width, lines, ctx, backend)?,
+            }
+        }
+        Span::Image(name, path, _) => {
+            limit = match name.is_empty() {
+                true => print_split("Image", limit, line_width, lines, ctx, backend)?,
+                false => print_split(&name, limit, line_width, lines, ctx, backend)?,
+            };
+            limit = print_split(" > ", limit, line_width, lines, ctx, backend)?;
+            limit = print_split(&path, limit, line_width, lines, ctx, backend)?;
+        }
+        Span::Link(name, link, _) => {
+            limit = match name.is_empty() {
+                true => print_split("Link", limit, line_width, lines, ctx, backend)?,
+                false => print_split(&name, limit, line_width, lines, ctx, backend)?,
+            };
+            limit = print_split(" > ", limit, line_width, lines, ctx, backend)?;
+            limit = print_split(&link, limit, line_width, lines, ctx, backend)?;
+        }
+        Span::Break => {
+            let line = lines.next()?;
+            ctx.wrap_line(line, backend);
+            limit = line_width;
+        }
+    }
+    Some(limit)
+}
+
+pub fn print_split(
+    text: &str,
+    mut limit: usize,
+    line_width: usize,
+    lines: &mut RectIter,
+    ctx: &mut LineContext,
+    backend: &mut impl BackendProtocol,
+) -> Option<usize> {
+    for ch in text.chars() {
+        if let Some(ch_width) = ch.width() {
+            match ch_width > limit {
+                true => {
+                    if ch_width > line_width {
+                        continue; // ensure no strange chars are printed
+                    }
+                    let line = lines.next()?;
+                    ctx.wrap_line(line, backend);
+                    backend.print(ch);
+                    limit = line_width - ch_width;
+                }
+                false => {
+                    backend.print(ch);
+                    limit -= ch_width;
+                }
+            }
+        }
+    }
+    Some(limit)
+}
 
 pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut impl BackendProtocol) {
     let line_width = match lines.next() {
         Some(line) => ctx.setup_line(line, backend),
         None => return,
     };
-    let mut chunks = WriteChunks::new(&text.content, line_width);
-    match chunks.next() {
-        Some(chunk) => backend.print(chunk.text),
-        None => return,
-    }
-    for chunk in chunks {
-        match lines.next() {
-            None => return,
-            Some(line) => {
-                ctx.wrap_line(line, backend);
+    let mut limit = line_width;
+    let blocks = tokenize(&text.content);
+    for block in blocks {
+        match print_block(block, lines, limit, line_width, ctx, backend) {
+            None => {
+                backend.reset_style();
+                return;
+            }
+            Some(remainig_limit) => {
+                limit = remainig_limit;
             }
         }
-        backend.print(chunk.text);
     }
+    backend.reset_style();
 }
 
 pub fn line_with_select(

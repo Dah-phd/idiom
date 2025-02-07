@@ -13,6 +13,8 @@ pub trait UTF8Safe {
     fn truncate_if_wider(&self, width: usize) -> Result<&str, usize>;
     /// return Some(&str) truncated from start if wider than allowed width
     fn truncate_if_wider_start(&self, width: usize) -> Result<&str, usize>;
+    /// split on width
+    fn width_split(&self, width: usize) -> (&str, Option<&str>);
     /// returns display len of the str
     fn width(&self) -> usize;
     /// calcs the width at position
@@ -111,6 +113,23 @@ impl UTF8Safe for str {
     }
 
     #[inline(always)]
+    fn width_split(&self, mut width: usize) -> (&str, Option<&str>) {
+        for (current_mid, ch) in self.char_indices() {
+            let ch_width = ch.width().unwrap_or(0);
+            match ch_width > width {
+                true => {
+                    let (current, remaining) = self.split_at(current_mid);
+                    return (current, Some(remaining));
+                }
+                false => {
+                    width -= ch_width;
+                }
+            }
+        }
+        (self, None)
+    }
+
+    #[inline(always)]
     fn width(&self) -> usize {
         UnicodeWidthStr::width(self)
     }
@@ -195,6 +214,11 @@ impl UTF8Safe for String {
     #[inline(always)]
     fn truncate_if_wider_start(&self, width: usize) -> Result<&str, usize> {
         self.as_str().truncate_if_wider_start(width)
+    }
+
+    #[inline(always)]
+    fn width_split(&self, width: usize) -> (&str, Option<&str>) {
+        self.as_str().width_split(width)
     }
 
     #[inline(always)]
