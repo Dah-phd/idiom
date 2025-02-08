@@ -46,20 +46,20 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     ctx.correct_last_line_match(&mut editor.content, lines.len());
     let backend = &mut gs.writer;
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
-        if let Some(line) = lines.next() {
-            if editor.cursor.line == line_idx {
-                code::cursor_fast(text, &mut ctx, line, backend);
-            } else {
-                let select = ctx.get_select(line.width);
-                if text.cached.should_render_line(line.row, &select) {
-                    code::inner_render(text, &mut ctx, line, select, backend);
-                } else {
-                    ctx.skip_line();
-                }
-            }
-        } else {
-            break;
+        let line = match lines.next() {
+            None => break,
+            Some(line) => line,
         };
+        if editor.cursor.line == line_idx {
+            code::cursor_fast(text, &mut ctx, line, backend);
+        } else {
+            let select = ctx.get_select(line.width);
+            if text.cached.should_render_line(line.row, &select) {
+                code::inner_render(text, &mut ctx, line, select, backend);
+            } else {
+                ctx.skip_line();
+            }
+        }
     }
     if !ctx.lexer.modal_is_rendered() {
         for line in lines {
@@ -77,16 +77,16 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
     let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
     let backend = &mut gs.writer;
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
-        if let Some(line) = lines.next() {
-            if editor.cursor.line == line_idx {
-                code::cursor(text, &mut ctx, line, backend);
-            } else {
-                let select = ctx.get_select(line.width);
-                code::inner_render(text, &mut ctx, line, select, backend);
-            }
-        } else {
-            break;
+        let line = match lines.next() {
+            None => break,
+            Some(line) => line,
         };
+        if editor.cursor.line == line_idx {
+            code::cursor(text, &mut ctx, line, backend);
+        } else {
+            let select = ctx.get_select(line.width);
+            code::inner_render(text, &mut ctx, line, select, backend);
+        }
     }
     for line in lines {
         line.render_empty(&mut gs.writer);

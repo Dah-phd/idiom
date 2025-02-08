@@ -1,10 +1,8 @@
-use unicode_width::UnicodeWidthChar;
-
 use crate::{
     render::{
         backend::{Backend, BackendProtocol, StyleExt},
         layout::RectIter,
-        utils::WriteChunks,
+        utils::{CharLimitedWidths, WriteChunks},
     },
     workspace::line::{EditorLine, LineContext},
 };
@@ -45,8 +43,7 @@ pub fn line_with_select(
     };
     let mut remaining_width = line_width;
     let select_color = ctx.lexer.theme.selected;
-    for (idx, text) in text.content.chars().enumerate() {
-        let current_width = UnicodeWidthChar::width(text).unwrap_or_default();
+    for (idx, (text, current_width)) in CharLimitedWidths::new(&text.content, 3).enumerate() {
         if remaining_width < current_width {
             remaining_width = line_width;
             match lines.next() {
@@ -97,14 +94,13 @@ pub fn basic(
         Some(line) => ctx.setup_line(line, backend),
         None => return,
     };
-    let mut content = text.content.chars();
+    let mut content = CharLimitedWidths::new(&text.content, 3);
     let mut idx = 0;
     let mut remaining_width = line_width;
 
     if skip != 0 {
-        for ch in content.by_ref() {
+        for (ch, char_w) in content.by_ref() {
             idx += 1;
-            let char_w = UnicodeWidthChar::width(ch).unwrap_or_default();
             if remaining_width < char_w {
                 remaining_width = line_width - char_w;
                 skip -= 1;
@@ -118,8 +114,7 @@ pub fn basic(
         }
     };
 
-    for text in content {
-        let current_width = UnicodeWidthChar::width(text).unwrap_or_default();
+    for (text, current_width) in content {
         if remaining_width < current_width {
             remaining_width = line_width;
             match lines.next() {
@@ -156,14 +151,13 @@ pub fn select(
         None => return,
     };
     let select_color = ctx.lexer.theme.selected;
-    let mut content = text.content.chars();
+    let mut content = CharLimitedWidths::new(&text.content, 3);
     let mut idx = 0;
     let mut remaining_width = line_width;
 
     if skip != 0 {
-        for ch in content.by_ref() {
+        for (ch, char_w) in content.by_ref() {
             idx += 1;
-            let char_w = UnicodeWidthChar::width(ch).unwrap_or_default();
             if remaining_width < char_w {
                 remaining_width = line_width - char_w;
                 skip -= 1;
@@ -180,8 +174,7 @@ pub fn select(
         }
     }
 
-    for text in content {
-        let current_width = UnicodeWidthChar::width(text).unwrap_or_default();
+    for (text, current_width) in content {
         if remaining_width < current_width {
             remaining_width = line_width;
             match lines.next() {

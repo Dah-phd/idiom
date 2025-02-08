@@ -5,12 +5,12 @@ use std::ops::Range;
 
 use crossterm::style::{Attribute, Attributes, Color, ContentStyle, Stylize};
 use markdown::{tokenize, Block, ListItem, Span};
-use unicode_width::UnicodeWidthChar;
 
 use crate::{
     render::{
         backend::{Backend, BackendProtocol},
         layout::{IterLines, RectIter},
+        utils::CharLimitedWidths,
     },
     syntax::tokens::{calc_wrap_line, calc_wrap_line_capped},
     workspace::{
@@ -101,35 +101,19 @@ impl<'a, 'b> StyledParser<'a, 'b> {
                 limit = 0;
             }
             Block::CodeBlock(x, y) => {
-                limit = (self.wrap_printer)(
-                    self,
-                    &format!(" X X X {x:?} {y}"),
-                    limit,
-                    // self.line_width,
-                    // self.lines,
-                    // self.ctx,
-                    // self.backend,
-                )?;
+                limit = (self.wrap_printer)(self, &format!(" X X X {x:?} {y}"), limit)?;
             }
             Block::Raw(text) => {
-                limit = (self.wrap_printer)(self, &text, limit)?; //, self.line_width, self.lines, self.ctx, self.backend)?;
+                limit = (self.wrap_printer)(self, &text, limit)?;
             }
             Block::OrderedList(items, list_type) => {
-                limit = (self.wrap_printer)(
-                    self,
-                    &format!(" {}.", list_type.0),
-                    limit,
-                    // self.line_width,
-                    // self.lines,
-                    // self.ctx,
-                    // self.backend,
-                )?;
+                limit = (self.wrap_printer)(self, &format!(" {}.", list_type.0), limit)?;
                 for item in items {
                     limit = self.print_list_item(item, limit)?;
                 }
             }
             Block::UnorderedList(items) => {
-                limit = (self.wrap_printer)(self, " > ", limit)?; //, limit, self.line_width, self.lines, self.ctx, self.backend)?;
+                limit = (self.wrap_printer)(self, " > ", limit)?;
                 for item in items {
                     limit = self.print_list_item(item, limit)?;
                 }
@@ -239,22 +223,17 @@ fn print_split(parser: &mut StyledParser, text: &str, limit: usize) -> Option<us
 }
 
 fn print_split_comp(parser: &mut StyledParser, text: &str, mut limit: usize) -> Option<usize> {
-    for ch in text.chars() {
-        if let Some(ch_width) = ch.width() {
-            match ch_width > limit {
-                true => {
-                    if ch_width > parser.line_width {
-                        continue; // ensure no strange chars are printed
-                    }
-                    let line = parser.lines.next()?;
-                    parser.ctx.wrap_line(line, parser.backend);
-                    parser.backend.print(ch);
-                    limit = parser.line_width - ch_width;
-                }
-                false => {
-                    parser.backend.print(ch);
-                    limit -= ch_width;
-                }
+    for (ch, ch_width) in CharLimitedWidths::new(text, 3) {
+        match ch_width > limit {
+            true => {
+                let line = parser.lines.next()?;
+                parser.ctx.wrap_line(line, parser.backend);
+                parser.backend.print(ch);
+                limit = parser.line_width - ch_width;
+            }
+            false => {
+                parser.backend.print(ch);
+                limit -= ch_width;
             }
         }
     }

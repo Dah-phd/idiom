@@ -677,7 +677,7 @@ fn test_content_shrunk(mut render_data: Vec<(ContentStyle, String)>) {
     assert_eq!(line_num, Some(6));
     assert_eq!(
         line,
-        vec!["    ", "let", " ", "mut", " ", "line", " ", "=", " ", "CodeLine", "::", "new", "(", "\"tex", ">>",]
+        vec!["    ", "let", " ", "mut", " ", "line", " ", "=", " ", "CodeLine", "::", "new", "(", "\"text", ">",]
     );
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(7));
@@ -720,8 +720,8 @@ fn test_content_shrunk(mut render_data: Vec<(ContentStyle, String)>) {
             "=",
             "=",
             " ",
-            "\"te",
-            ">>"
+            "\"te🚀",
+            ">"
         ]
     );
     let (line_num, line) = parse_simple_line(&mut render_data);
@@ -745,8 +745,8 @@ fn test_line_wrap(mut render_data: Vec<(ContentStyle, String)>) {
             " ",
             "=",
             " ",
-            "\"text🚀text🚀text🚀text🚀text🚀tex",
-            ">>"
+            "\"text🚀text🚀text🚀text🚀text🚀text",
+            ">"
         ]
     );
     assert!(render_data.is_empty());

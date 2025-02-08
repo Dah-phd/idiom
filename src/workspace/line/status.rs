@@ -1,5 +1,5 @@
-use std::{ops::Range, str::Chars};
-use unicode_width::UnicodeWidthChar;
+use crate::render::utils::CharLimitedWidths;
+use std::ops::Range;
 
 #[derive(Default)]
 pub enum RenderStatus {
@@ -76,10 +76,10 @@ impl RenderStatus {
 
     pub fn generate_skipped_chars_simple(&mut self, cursor_idx: usize, line_width: usize) -> (usize, usize) {
         let mut idx = self.skipped_chars();
-        let mut reduction = if idx == 0 { 2 } else { 4 };
+        let mut reduction = if idx == 0 { 1 } else { 2 };
         if cursor_idx > idx + line_width.saturating_sub(reduction + 1) {
             if idx == 0 {
-                reduction += 2;
+                reduction += 1;
             }
             idx = cursor_idx - line_width.saturating_sub(reduction + 1);
             self.set_skipped_chars(idx);
@@ -90,7 +90,7 @@ impl RenderStatus {
                 idx = cursor_idx;
             }
             if idx == 0 {
-                reduction -= 2;
+                reduction -= 1;
             }
             self.set_skipped_chars(idx);
         }
@@ -99,9 +99,10 @@ impl RenderStatus {
 
     pub fn generate_skipped_chars_complex(
         &mut self,
+        text: &str,
+        char_len: usize,
         cursor_idx: usize,
         mut line_width: usize,
-        content: Chars<'_>,
     ) -> usize {
         line_width -= 3;
         let mut idx = self.skipped_chars();
@@ -116,9 +117,14 @@ impl RenderStatus {
             self.set_skipped_chars(cursor_idx);
             return cursor_idx;
         }
-        let widths =
-            content.take(cursor_idx).skip(idx).map(|ch| UnicodeWidthChar::width(ch).unwrap_or(1)).collect::<Vec<_>>();
-        for ch_width in widths.into_iter().rev() {
+
+        let widths = CharLimitedWidths::new(text, 3)
+            .rev()
+            .map(|(.., w)| w)
+            .skip(char_len - cursor_idx)
+            .take(cursor_idx.saturating_sub(idx));
+
+        for ch_width in widths {
             if ch_width > line_width {
                 idx += 1;
                 line_width = 0;

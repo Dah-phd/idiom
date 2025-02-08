@@ -219,10 +219,12 @@ pub fn partial(line: &mut EditorLine, ctx: &LineContext, line_width: usize, back
         }
         idx += 1;
     }
+
+    backend.reset_style();
+
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
     } else if line.char_len() > idx {
-        backend.reset_style();
         backend.print_styled(WRAP_CLOSE, ContentStyle::reversed());
     }
 }
@@ -311,10 +313,10 @@ pub fn partial_select(
         }
         idx += 1;
     }
+    backend.reset_style();
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
     } else if line.char_len() > idx {
-        backend.reset_style();
         backend.print_styled(WRAP_CLOSE, ContentStyle::reversed());
     }
 }

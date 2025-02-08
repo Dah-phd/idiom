@@ -207,10 +207,9 @@ impl BackendProtocol for Backend {
     /// prints styled text without affecting the writer set style
     #[inline]
     fn print_styled<D: Display>(&mut self, text: D, style: ContentStyle) {
-        if let Some(restore_style) = self.default_styled {
-            queue!(self, SetStyle(style), Print(text), ResetColor, SetStyle(restore_style),)
-        } else {
-            queue!(self, SetStyle(style), Print(text), ResetColor,)
+        match self.default_styled {
+            Some(restore_style) => queue!(self, SetStyle(style), Print(text), ResetColor, SetStyle(restore_style),),
+            None => queue!(self, SetStyle(style), Print(text), ResetColor,),
         }
         .expect(ERR_MSG);
     }

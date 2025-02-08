@@ -138,19 +138,29 @@ pub fn draw_term(
 }
 
 fn render_logo(line: Line, gs: &mut GlobalState) {
-    if line.width < 9 {
-        return;
-    };
-    let pad = line.width - 9;
-    if pad == 0 {
-        return;
+    match line.width {
+        ..5 => {}
+        5..10 => {
+            let pad = line.width - 4;
+            let l_pad = pad / 2;
+            let r_pad = pad - l_pad;
+            let backend = gs.backend();
+            backend.go_to(line.row, line.col);
+            backend.pad(l_pad);
+            backend.print('<');
+            backend.print_styled("/i>", ContentStyle::fg(Mode::insert_color()));
+            backend.pad(r_pad);
+        }
+        10.. => {
+            let pad = line.width - 8;
+            let l_pad = pad / 2;
+            let r_pad = pad - l_pad;
+            let backend = gs.backend();
+            backend.go_to(line.row, line.col);
+            backend.pad(l_pad);
+            backend.print('<');
+            backend.print_styled("/idiom>", ContentStyle::fg(Mode::insert_color()));
+            backend.pad(r_pad);
+        }
     }
-    let l_pad = pad / 2;
-    let r_pad = pad - l_pad;
-    let backend = gs.backend();
-    backend.go_to(line.row, line.col);
-    backend.pad(l_pad);
-    backend.print('<');
-    backend.print_styled("/idiom>", ContentStyle::fg(Mode::insert_color()));
-    backend.pad(r_pad);
 }

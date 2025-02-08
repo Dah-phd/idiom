@@ -1,5 +1,40 @@
-use std::str::CharIndices;
+use std::str::{CharIndices, Chars};
 use unicode_width::UnicodeWidthChar;
+
+/// Iterate over str getting chars and corresponding widths
+/// in case char has no width or exceeds provided limit returns error char with 1 width
+pub struct CharLimitedWidths<'a> {
+    chars: Chars<'a>,
+    limit: usize,
+}
+
+impl<'a> CharLimitedWidths<'a> {
+    pub fn new(text: &'a str, width_limit: usize) -> Self {
+        let chars = text.chars();
+        Self { chars, limit: width_limit }
+    }
+}
+
+impl<'a> Iterator for CharLimitedWidths<'a> {
+    type Item = (char, usize);
+    fn next(&mut self) -> Option<Self::Item> {
+        let ch = self.chars.next()?;
+        match ch.width() {
+            Some(width) if width <= self.limit => Some((ch, width)),
+            _ => Some(('⚠', 1)),
+        }
+    }
+}
+
+impl<'a> DoubleEndedIterator for CharLimitedWidths<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let ch = self.chars.next_back()?;
+        match ch.width() {
+            Some(width) if width <= self.limit => Some((ch, width)),
+            _ => Some(('⚠', 1)),
+        }
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub struct StrChunks<'a> {

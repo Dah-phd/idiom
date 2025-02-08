@@ -1,5 +1,5 @@
 mod chunks;
-pub use chunks::{ByteChunks, StrChunks, WriteChunks};
+pub use chunks::{ByteChunks, CharLimitedWidths, StrChunks, WriteChunks};
 use std::ops::Range;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
