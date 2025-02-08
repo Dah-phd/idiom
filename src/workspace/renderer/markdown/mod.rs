@@ -52,7 +52,7 @@ struct StyledParser<'a, 'b> {
     ctx: &'a mut LineContext<'b>,
     line_width: usize,
     backend: &'a mut Backend,
-    wrap_printer: fn(&str, usize, usize, &mut RectIter, &mut LineContext, &mut Backend) -> Option<usize>,
+    wrap_printer: fn(&mut Self, &str, usize) -> Option<usize>, //,usize, &mut RectIter, &mut LineContext, &mut Backend) -> Option<usize>,
 }
 
 impl<'a, 'b> StyledParser<'a, 'b> {
@@ -102,32 +102,34 @@ impl<'a, 'b> StyledParser<'a, 'b> {
             }
             Block::CodeBlock(x, y) => {
                 limit = (self.wrap_printer)(
+                    self,
                     &format!(" X X X {x:?} {y}"),
                     limit,
-                    self.line_width,
-                    self.lines,
-                    self.ctx,
-                    self.backend,
+                    // self.line_width,
+                    // self.lines,
+                    // self.ctx,
+                    // self.backend,
                 )?;
             }
             Block::Raw(text) => {
-                limit = (self.wrap_printer)(&text, limit, self.line_width, self.lines, self.ctx, self.backend)?;
+                limit = (self.wrap_printer)(self, &text, limit)?; //, self.line_width, self.lines, self.ctx, self.backend)?;
             }
             Block::OrderedList(items, list_type) => {
                 limit = (self.wrap_printer)(
+                    self,
                     &format!(" {}.", list_type.0),
                     limit,
-                    self.line_width,
-                    self.lines,
-                    self.ctx,
-                    self.backend,
+                    // self.line_width,
+                    // self.lines,
+                    // self.ctx,
+                    // self.backend,
                 )?;
                 for item in items {
                     limit = self.print_list_item(item, limit)?;
                 }
             }
             Block::UnorderedList(items) => {
-                limit = (self.wrap_printer)(" > ", limit, self.line_width, self.lines, self.ctx, self.backend)?;
+                limit = (self.wrap_printer)(self, " > ", limit)?; //, limit, self.line_width, self.lines, self.ctx, self.backend)?;
                 for item in items {
                     limit = self.print_list_item(item, limit)?;
                 }
@@ -167,9 +169,7 @@ impl<'a, 'b> StyledParser<'a, 'b> {
                 }
                 self.backend.set_style(style);
             }
-            Span::Text(text) => {
-                limit = (self.wrap_printer)(&text, limit, self.line_width, self.lines, self.ctx, self.backend)?
-            }
+            Span::Text(text) => limit = (self.wrap_printer)(self, &text, limit)?,
             Span::Strong(spans) => {
                 let style = self.backend.get_style();
                 self.backend.set_style(style.bold());
@@ -180,25 +180,25 @@ impl<'a, 'b> StyledParser<'a, 'b> {
             }
             Span::Code(text) => {
                 limit = match text.as_str() {
-                    "`" => (self.wrap_printer)(">>> ", limit, self.line_width, self.lines, self.ctx, self.backend)?,
-                    _ => (self.wrap_printer)(&text, limit, self.line_width, self.lines, self.ctx, self.backend)?,
+                    "`" => (self.wrap_printer)(self, ">>> ", limit)?,
+                    _ => (self.wrap_printer)(self, &text, limit)?,
                 }
             }
             Span::Image(name, path, _) => {
                 limit = match name.is_empty() {
-                    true => (self.wrap_printer)("Image", limit, self.line_width, self.lines, self.ctx, self.backend)?,
-                    false => (self.wrap_printer)(&name, limit, self.line_width, self.lines, self.ctx, self.backend)?,
+                    true => (self.wrap_printer)(self, "Image", limit)?,
+                    false => (self.wrap_printer)(self, &name, limit)?,
                 };
-                limit = (self.wrap_printer)(" > ", limit, self.line_width, self.lines, self.ctx, self.backend)?;
-                limit = (self.wrap_printer)(&path, limit, self.line_width, self.lines, self.ctx, self.backend)?;
+                limit = (self.wrap_printer)(self, " > ", limit)?;
+                limit = (self.wrap_printer)(self, &path, limit)?;
             }
             Span::Link(name, link, _) => {
                 limit = match name.is_empty() {
-                    true => (self.wrap_printer)("Link", limit, self.line_width, self.lines, self.ctx, self.backend)?,
-                    false => (self.wrap_printer)(&name, limit, self.line_width, self.lines, self.ctx, self.backend)?,
+                    true => (self.wrap_printer)(self, "Link", limit)?,
+                    false => (self.wrap_printer)(self, &name, limit)?,
                 };
-                limit = (self.wrap_printer)(" > ", limit, self.line_width, self.lines, self.ctx, self.backend)?;
-                limit = (self.wrap_printer)(&link, limit, self.line_width, self.lines, self.ctx, self.backend)?;
+                limit = (self.wrap_printer)(self, " > ", limit)?;
+                limit = (self.wrap_printer)(self, &link, limit)?;
             }
             Span::Break => {
                 let line = self.lines.next()?;
@@ -210,63 +210,49 @@ impl<'a, 'b> StyledParser<'a, 'b> {
     }
 }
 
-fn print_split(
-    text: &str,
-    limit: usize,
-    line_width: usize,
-    lines: &mut RectIter,
-    ctx: &mut LineContext,
-    backend: &mut impl BackendProtocol,
-) -> Option<usize> {
+fn print_split(parser: &mut StyledParser, text: &str, limit: usize) -> Option<usize> {
     match text.len() > limit {
         true => {
             let (first, mut text) = text.split_at(limit);
-            backend.print(first);
+            parser.backend.print(first);
             loop {
-                let next_line = lines.next()?;
-                ctx.wrap_line(next_line, backend);
-                match text.len() > line_width {
+                let next_line = parser.lines.next()?;
+                parser.ctx.wrap_line(next_line, parser.backend);
+                match text.len() > parser.line_width {
                     true => {
-                        let (part, remaining) = text.split_at(line_width);
+                        let (part, remaining) = text.split_at(parser.line_width);
                         text = remaining;
-                        backend.print(part);
+                        parser.backend.print(part);
                     }
                     false => {
-                        backend.print(text);
-                        return Some(line_width - text.len());
+                        parser.backend.print(text);
+                        return Some(parser.line_width - text.len());
                     }
                 }
             }
         }
         false => {
-            backend.print(text);
+            parser.backend.print(text);
             Some(limit - text.len())
         }
     }
 }
 
-pub fn print_split_comp(
-    text: &str,
-    mut limit: usize,
-    line_width: usize,
-    lines: &mut RectIter,
-    ctx: &mut LineContext,
-    backend: &mut impl BackendProtocol,
-) -> Option<usize> {
+fn print_split_comp(parser: &mut StyledParser, text: &str, mut limit: usize) -> Option<usize> {
     for ch in text.chars() {
         if let Some(ch_width) = ch.width() {
             match ch_width > limit {
                 true => {
-                    if ch_width > line_width {
+                    if ch_width > parser.line_width {
                         continue; // ensure no strange chars are printed
                     }
-                    let line = lines.next()?;
-                    ctx.wrap_line(line, backend);
-                    backend.print(ch);
-                    limit = line_width - ch_width;
+                    let line = parser.lines.next()?;
+                    parser.ctx.wrap_line(line, parser.backend);
+                    parser.backend.print(ch);
+                    limit = parser.line_width - ch_width;
                 }
                 false => {
-                    backend.print(ch);
+                    parser.backend.print(ch);
                     limit -= ch_width;
                 }
             }
