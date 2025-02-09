@@ -3,6 +3,7 @@ use unicode_width::UnicodeWidthChar;
 
 /// Iterate over str getting chars and corresponding widths
 /// in case char has no width or exceeds provided limit returns error char with 1 width
+#[derive(Clone)]
 pub struct CharLimitedWidths<'a> {
     chars: Chars<'a>,
     limit: usize,

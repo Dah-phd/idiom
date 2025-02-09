@@ -1,6 +1,8 @@
 use crate::render::utils::CharLimitedWidths;
 use std::ops::Range;
 
+type Reduction = usize;
+
 #[derive(Default)]
 pub enum RenderStatus {
     Cursor {
@@ -74,7 +76,7 @@ impl RenderStatus {
         }
     }
 
-    pub fn generate_skipped_chars_simple(&mut self, cursor_idx: usize, line_width: usize) -> (usize, usize) {
+    pub fn generate_skipped_chars_simple(&mut self, cursor_idx: usize, line_width: usize) -> (usize, Reduction) {
         let mut idx = self.skipped_chars();
         let mut reduction = if idx == 0 { 1 } else { 2 };
         if cursor_idx > idx + line_width.saturating_sub(reduction + 1) {
@@ -82,9 +84,8 @@ impl RenderStatus {
                 reduction += 1;
             }
             idx = cursor_idx - line_width.saturating_sub(reduction + 1);
-            self.set_skipped_chars(idx);
         } else if idx > cursor_idx {
-            if cursor_idx == 2 {
+            if cursor_idx < 2 {
                 idx = 0;
             } else {
                 idx = cursor_idx;
@@ -92,8 +93,8 @@ impl RenderStatus {
             if idx == 0 {
                 reduction -= 1;
             }
-            self.set_skipped_chars(idx);
         }
+        self.set_skipped_chars(idx);
         (idx, reduction)
     }
 
@@ -104,13 +105,16 @@ impl RenderStatus {
         cursor_idx: usize,
         mut line_width: usize,
     ) -> usize {
-        line_width -= 3;
         let mut idx = self.skipped_chars();
+
+        // edge case if cursor == skipped just return
         if idx == cursor_idx {
             return idx;
         }
+
+        // cursor is within skipped chars
         if idx > cursor_idx {
-            if cursor_idx < 3 {
+            if cursor_idx < 2 {
                 self.set_skipped_chars(0);
                 return 0;
             };
@@ -118,24 +122,26 @@ impl RenderStatus {
             return cursor_idx;
         }
 
-        let widths = CharLimitedWidths::new(text, 3)
-            .rev()
-            .map(|(.., w)| w)
-            .skip(char_len - cursor_idx)
-            .take(cursor_idx.saturating_sub(idx));
+        let widths = CharLimitedWidths::new(text, 3).rev().map(|(.., w)| w).skip(char_len - cursor_idx);
+
+        let mut new_idx = cursor_idx;
+        line_width -= 3;
 
         for ch_width in widths {
-            if ch_width > line_width {
-                idx += 1;
-                line_width = 0;
-            } else {
-                line_width -= ch_width;
+            if ch_width >= line_width {
+                break;
             }
+            line_width -= ch_width;
+            new_idx -= ch_width;
         }
-        if idx < 3 {
+
+        idx = std::cmp::max(idx, new_idx);
+
+        if idx < 2 {
             self.set_skipped_chars(0);
             return 0;
         }
+
         self.set_skipped_chars(idx);
         idx
     }

@@ -4,23 +4,22 @@ use crate::{
         backend::{BackendProtocol, StyleExt},
         utils::CharLimitedWidths,
     },
-    syntax::Lexer,
-    workspace::line::EditorLine,
+    workspace::line::{EditorLine, LineContext},
 };
-use crossterm::style::ContentStyle;
+use crossterm::style::{ContentStyle, Stylize};
 use std::ops::Range;
 
 pub fn complex_line(
     code: &EditorLine,
     mut line_width: usize,
-    lexer: &Lexer,
+    ctx: &mut LineContext,
     backend: &mut impl BackendProtocol,
 ) -> Option<usize> {
     let mut iter_tokens = code.iter_tokens();
     let mut counter = 0;
     let mut last_len = 0;
     let mut lined_up = None;
-    let char_position = lexer.char_lsp_pos;
+    let char_position = ctx.lexer.char_lsp_pos;
     if let Some(token) = iter_tokens.next() {
         if token.delta_start == 0 {
             counter = token.len;
@@ -34,7 +33,7 @@ pub fn complex_line(
     for (text, width) in CharLimitedWidths::new(&code.content, 3) {
         if line_width <= width {
             backend.reset_style();
-            backend.print_styled(WRAP_CLOSE, ContentStyle::reversed());
+            backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
             return None;
         } else {
             line_width -= width;
@@ -76,11 +75,11 @@ pub fn complex_line_with_select(
     code: &EditorLine,
     mut line_width: usize,
     select: Range<usize>,
-    lexer: &Lexer,
+    ctx: &mut LineContext,
     backend: &mut impl BackendProtocol,
 ) -> Option<usize> {
-    let char_position = lexer.char_lsp_pos;
-    let select_color = lexer.theme.selected;
+    let char_position = ctx.lexer.char_lsp_pos;
+    let select_color = ctx.lexer.theme.selected;
     let mut reset_style = ContentStyle::default();
     let mut iter_tokens = code.iter_tokens();
     let mut counter = 0;
@@ -99,7 +98,7 @@ pub fn complex_line_with_select(
     for (idx, (text, width)) in CharLimitedWidths::new(&code.content, 3).enumerate() {
         if line_width <= width {
             backend.reset_style();
-            backend.print_styled(WRAP_CLOSE, ContentStyle::reversed());
+            backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
             return None;
         } else {
             line_width -= width;

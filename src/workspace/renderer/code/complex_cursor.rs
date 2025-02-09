@@ -5,7 +5,7 @@ use crate::{
     },
     workspace::line::{EditorLine, LineContext},
 };
-use crossterm::style::ContentStyle;
+use crossterm::style::{ContentStyle, Stylize};
 use std::ops::Range;
 
 use super::{width_remainder, WRAP_CLOSE, WRAP_OPEN};
@@ -169,12 +169,10 @@ pub fn partial(code: &mut EditorLine, ctx: &mut LineContext, mut line_width: usi
     let char_position = ctx.lexer.char_lsp_pos;
     let mut idx = code.cached.generate_skipped_chars_complex(&code.content, code.char_len(), cursor_idx, line_width);
     let mut content = CharLimitedWidths::new(&code.content, 3);
-
     let mut cursor = 0;
-    let mut counter_to_idx = idx;
-    while counter_to_idx != 0 {
+
+    for _ in 0..idx {
         cursor += content.next().map(|(ch, ..)| char_position(ch)).unwrap_or_default();
-        counter_to_idx -= 1;
     }
 
     let mut tokens = code.iter_tokens();
@@ -198,8 +196,8 @@ pub fn partial(code: &mut EditorLine, ctx: &mut LineContext, mut line_width: usi
     }
 
     if idx != 0 {
-        backend.print_styled(WRAP_OPEN, ContentStyle::reversed());
-        line_width -= 2;
+        backend.print_styled(WRAP_OPEN, ctx.accent_style.reverse());
+        line_width -= 1;
     }
 
     for (text, char_width) in content {
@@ -250,7 +248,7 @@ pub fn partial(code: &mut EditorLine, ctx: &mut LineContext, mut line_width: usi
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
     } else if code.char_len() > idx {
-        backend.print_styled(WRAP_CLOSE, ContentStyle::reversed());
+        backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
     }
 }
 
@@ -267,10 +265,8 @@ pub fn partial_select(
     let mut content = CharLimitedWidths::new(&code.content, 3);
 
     let mut cursor = 0;
-    let mut counter_to_idx = idx;
-    while counter_to_idx != 0 {
+    for _ in 0..idx {
         cursor += content.next().map(|(ch, ..)| char_position(ch)).unwrap_or_default();
-        counter_to_idx -= 1;
     }
 
     let select_color = ctx.lexer.theme.selected;
@@ -301,8 +297,8 @@ pub fn partial_select(
     }
 
     if idx != 0 {
-        backend.print_styled(WRAP_OPEN, ContentStyle::reversed());
-        line_width -= 2;
+        backend.print_styled(WRAP_OPEN, ctx.accent_style.reverse());
+        line_width -= 1;
     };
 
     for (text, char_width) in content {
@@ -360,6 +356,6 @@ pub fn partial_select(
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
     } else if code.char_len() > idx {
-        backend.print_styled(WRAP_CLOSE, ContentStyle::reversed());
+        backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
     }
 }

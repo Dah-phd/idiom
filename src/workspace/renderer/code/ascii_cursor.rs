@@ -3,7 +3,7 @@ use crate::{
     render::backend::{Backend, BackendProtocol, StyleExt},
     workspace::line::{EditorLine, LineContext},
 };
-use crossterm::style::ContentStyle;
+use crossterm::style::{ContentStyle, Stylize};
 use std::ops::Range;
 
 pub fn render(
@@ -161,7 +161,7 @@ pub fn partial(line: &mut EditorLine, ctx: &LineContext, line_width: usize, back
     let cursor_idx = ctx.cursor_char();
     let (mut idx, reduction) = line.cached.generate_skipped_chars_simple(cursor_idx, line_width);
     if idx != 0 {
-        backend.print_styled(WRAP_OPEN, ContentStyle::reversed());
+        backend.print_styled(WRAP_OPEN, ctx.accent_style.reverse());
     }
     let mut counter = 0;
     let mut last_len = 0;
@@ -225,7 +225,7 @@ pub fn partial(line: &mut EditorLine, ctx: &LineContext, line_width: usize, back
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
     } else if line.char_len() > idx {
-        backend.print_styled(WRAP_CLOSE, ContentStyle::reversed());
+        backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
     }
 }
 
@@ -239,7 +239,7 @@ pub fn partial_select(
     let cursor_idx = ctx.cursor_char();
     let (mut idx, reduction) = line.cached.generate_skipped_chars_simple(cursor_idx, line_width);
     if idx != 0 {
-        backend.print_styled(WRAP_OPEN, ContentStyle::reversed());
+        backend.print_styled(WRAP_OPEN, ctx.accent_style.reverse());
     }
     let mut counter = 0;
     let mut last_len = 0;
@@ -317,6 +317,6 @@ pub fn partial_select(
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
     } else if line.char_len() > idx {
-        backend.print_styled(WRAP_CLOSE, ContentStyle::reversed());
+        backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
     }
 }

@@ -13,7 +13,7 @@ use crate::workspace::{
     cursor::Cursor,
     line::{EditorLine, LineContext},
 };
-use crossterm::style::ContentStyle;
+use crossterm::style::{ContentStyle, Stylize};
 use std::ops::Range;
 
 const WRAP_OPEN: char = '<';
@@ -84,12 +84,12 @@ fn render_with_select(
         } else {
             let content = code.content.chars().take(line_width.saturating_sub(1));
             ascii_line::ascii_line_with_select(content, &code.tokens, select, ctx.lexer, backend);
-            backend.print_styled(WRAP_CLOSE, ContentStyle::reversed());
+            backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
         }
         return;
     }
 
-    let max_width = match complex_line::complex_line_with_select(code, line_width, select, &ctx.lexer, backend) {
+    let max_width = match complex_line::complex_line_with_select(code, line_width, select, ctx, backend) {
         Some(remaining) => remaining,
         None => return,
     };
@@ -117,13 +117,13 @@ fn render_no_select(
             }
             false => {
                 ascii_line::ascii_line(&code.content[..line_width.saturating_sub(1)], &code.tokens, backend);
-                backend.print_styled(WRAP_CLOSE, ContentStyle::reversed());
+                backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
             }
         }
         return;
     }
 
-    let max_width = match complex_line::complex_line(code, line_width, &ctx.lexer, backend) {
+    let max_width = match complex_line::complex_line(code, line_width, ctx, backend) {
         Some(remaining) => remaining,
         None => return,
     };
