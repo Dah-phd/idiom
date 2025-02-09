@@ -27,7 +27,7 @@ Python should work for the most part with jedi, but the interaction is not well 
 - Linux Mint
 
 ## TODO
-- try to print special char instead of strange chars >> big w or unknown width
+- make wrapped complex stable, when emoji downstream width is not correct
 - write tests
 - lsp server cold start, maybe? "jedi-language server" starts slow
 
