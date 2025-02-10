@@ -1,4 +1,4 @@
-use crate::render::{utils::CharLimitedWidths, UTF8Safe};
+use crate::render::utils::CharLimitedWidths;
 use std::ops::Range;
 
 type Reduction = usize;
