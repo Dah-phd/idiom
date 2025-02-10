@@ -1,4 +1,4 @@
-use crate::render::utils::CharLimitedWidths;
+use crate::render::{utils::CharLimitedWidths, UTF8Safe};
 use std::ops::Range;
 
 type Reduction = usize;
@@ -122,17 +122,19 @@ impl RenderStatus {
             return cursor_idx;
         }
 
-        let widths = CharLimitedWidths::new(text, 3).rev().map(|(.., w)| w).skip(char_len - cursor_idx);
+        // setting up offsets and idx
+        let skip = char_len.saturating_sub(cursor_idx + 1);
+        let mut new_idx = cursor_idx + 1;
+        line_width -= 2;
 
-        let mut new_idx = cursor_idx;
-        line_width -= 3;
+        let widths = CharLimitedWidths::new(text, 3).rev().map(|(.., w)| w).skip(skip);
 
         for ch_width in widths {
-            if ch_width >= line_width {
+            if ch_width > line_width {
                 break;
             }
             line_width -= ch_width;
-            new_idx -= ch_width;
+            new_idx -= 1;
         }
 
         idx = std::cmp::max(idx, new_idx);

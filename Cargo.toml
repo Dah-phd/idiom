@@ -17,12 +17,12 @@ categories = ["development-tools", "text-editors"]
 authors = ["Daniel Nikolaev <toolsproed@gmail.com>"]
 
 [dependencies]
-clap = {version = "4.5.27", features = ["derive"]}
+clap = {version = "4.5.28", features = ["derive"]}
 crossterm = "0.28.1"
 lsp-types = "0.97.0"
 serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.137"
-toml = "0.8.19"
+serde_json = "1.0.138"
+toml = "0.8.20"
 tokio = { version="1.43.0", features=["rt", "macros", "rt-multi-thread", "process", "io-util"] }
 tokio-util = { version="0.7.13", features = ["codec", "io"] }
 tokio-stream = "0.1.17"
