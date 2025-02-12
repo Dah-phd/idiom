@@ -2,8 +2,14 @@ mod code;
 mod markdown;
 mod text;
 
+use crossterm::style::ContentStyle;
+
 use super::{line::LineContext, Editor};
-use crate::{global_state::GlobalState, render::layout::IterLines, syntax::Lexer};
+use crate::{
+    global_state::GlobalState,
+    render::{backend::StyleExt, layout::IterLines},
+    syntax::Lexer,
+};
 
 /// Component containing logic regarding rendering
 /// In order to escape complicated state machines and any form on polymorphism,
@@ -42,7 +48,9 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
         return code_render_full(editor, gs);
     }
     let mut lines = gs.editor_area.into_iter();
-    let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
+    let accent_style = ContentStyle::fg(gs.theme.accent_background);
+    let mut ctx =
+        LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset, accent_style);
     ctx.correct_last_line_match(&mut editor.content, lines.len());
     let backend = &mut gs.writer;
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
@@ -74,7 +82,9 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
 fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
     editor.last_render_at_line.replace(editor.cursor.at_line);
     let mut lines = gs.editor_area.into_iter();
-    let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
+    let accent_style = ContentStyle::fg(gs.theme.accent_background);
+    let mut ctx =
+        LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset, accent_style);
     let backend = &mut gs.writer;
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
         let line = match lines.next() {
@@ -109,7 +119,9 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
     }
     editor.last_render_at_line.replace(editor.cursor.at_line);
     let mut lines = gs.editor_area.into_iter();
-    let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
+    let accent_style = ContentStyle::fg(gs.theme.accent_background);
+    let mut ctx =
+        LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset, accent_style);
     let backend = &mut gs.writer;
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
         if lines.is_finished() {
@@ -142,7 +154,9 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
 fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     editor.last_render_at_line.replace(editor.cursor.at_line);
     let mut lines = gs.editor_area.into_iter();
-    let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
+    let accent_style = ContentStyle::fg(gs.theme.accent_background);
+    let mut ctx =
+        LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset, accent_style);
     let backend = &mut gs.writer;
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
         if lines.is_finished() {
@@ -171,7 +185,9 @@ fn md_render(editor: &mut Editor, gs: &mut GlobalState) {
 fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     editor.last_render_at_line.replace(editor.cursor.at_line);
     let mut lines = gs.editor_area.into_iter();
-    let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
+    let accent_style = ContentStyle::fg(gs.theme.accent_background);
+    let mut ctx =
+        LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset, accent_style);
     let backend = &mut gs.writer;
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
         if lines.is_finished() {
@@ -197,7 +213,9 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
     }
     editor.last_render_at_line.replace(editor.cursor.at_line);
     let mut lines = gs.editor_area.into_iter();
-    let mut ctx = LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset);
+    let accent_style = ContentStyle::fg(gs.theme.accent_background);
+    let mut ctx =
+        LineContext::collect_context(&mut editor.lexer, &editor.cursor, editor.line_number_offset, accent_style);
     let backend = &mut gs.writer;
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(editor.cursor.at_line) {
         if lines.is_finished() {

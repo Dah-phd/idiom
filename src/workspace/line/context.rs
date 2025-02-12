@@ -2,14 +2,11 @@ use super::status::RenderStatus;
 use super::EditorLine;
 use crate::{
     global_state::GlobalState,
-    render::{
-        backend::{BackendProtocol, StyleExt},
-        layout::Line,
-    },
+    render::{backend::BackendProtocol, layout::Line},
     syntax::Lexer,
     workspace::{cursor::Cursor, CursorPosition},
 };
-use crossterm::style::{Color, ContentStyle};
+use crossterm::style::ContentStyle;
 use std::{cmp::Ordering, ops::Range};
 
 pub struct LineContext<'a> {
@@ -23,10 +20,15 @@ pub struct LineContext<'a> {
 }
 
 impl<'a> LineContext<'a> {
-    pub fn collect_context(lexer: &'a mut Lexer, cursor: &Cursor, line_number_offset: usize) -> Self {
+    pub fn collect_context(
+        lexer: &'a mut Lexer,
+        cursor: &Cursor,
+        line_number_offset: usize,
+        accent_style: ContentStyle,
+    ) -> Self {
         let line_number = cursor.at_line;
         let select = cursor.select_get();
-        let accent_style = ContentStyle::fg(Color::DarkGrey);
+        // let accent_style = ContentStyle::fg(Color::DarkGrey);
         Self {
             line: cursor.line - line_number,
             char: cursor.char,
