@@ -1,4 +1,7 @@
-use super::{GlobalState, Mode};
+use super::{
+    controls::{disable_mouse, map_small_rect},
+    GlobalState, Mode, MIN_HEIGHT, MIN_WIDTH,
+};
 use crate::{
     render::{
         backend::{BackendProtocol, StyleExt},
@@ -9,7 +12,7 @@ use crate::{
     workspace::Workspace,
 };
 use bitflags::bitflags;
-use crossterm::style::ContentStyle;
+use crossterm::style::{Color, ContentStyle};
 use std::io::{Result, Write};
 
 bitflags! {
@@ -36,13 +39,23 @@ pub fn full_rebuild(
     term: &mut EditorTerminal,
 ) -> Result<()> {
     gs.screen_rect.clear(&mut gs.writer);
+
+    if gs.screen_rect.width < MIN_WIDTH || gs.screen_rect.height < MIN_HEIGHT {
+        gs.draw_callback = draw_small_rect;
+        gs.key_mapper = map_small_rect;
+        gs.mouse_mapper = disable_mouse;
+        return Ok(());
+    }
+
     let mut tree_area = gs.screen_rect;
     gs.footer_area = tree_area.splitoff_rows(1);
+
     if let Some(mut line) = gs.footer_area.get_line(0) {
         gs.mode.render(line.clone(), gs.theme.accent_style, &mut gs.writer);
         line += Mode::len();
         gs.messages.set_line(line);
     };
+
     gs.messages.render(gs.theme.accent_style, &mut gs.writer);
 
     if gs.components.contains(Components::TREE) || !gs.is_insert() {
@@ -81,6 +94,22 @@ pub fn full_rebuild(
         gs.popup_render();
     }
 
+    gs.writer.flush()
+}
+
+pub fn draw_small_rect(
+    gs: &mut GlobalState,
+    _workspace: &mut Workspace,
+    _tree: &mut Tree,
+    _term: &mut EditorTerminal,
+) -> Result<()> {
+    if let Some(line) = gs.screen_rect.get_line(0) {
+        line.render_centered_styled(
+            "Terminal size too small!",
+            ContentStyle::bold().with_fg(Color::DarkRed),
+            gs.backend(),
+        );
+    }
     gs.writer.flush()
 }
 

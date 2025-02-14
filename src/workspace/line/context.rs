@@ -28,7 +28,6 @@ impl<'a> LineContext<'a> {
     ) -> Self {
         let line_number = cursor.at_line;
         let select = cursor.select_get();
-        // let accent_style = ContentStyle::fg(Color::DarkGrey);
         Self {
             line: cursor.line - line_number,
             char: cursor.char,

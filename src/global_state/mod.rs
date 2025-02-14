@@ -27,6 +27,9 @@ use draw::Components;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use message::Messages;
 
+const MIN_HEIGHT: u16 = 4;
+const MIN_WIDTH: usize = 22;
+
 type KeyMapCallback = fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool;
 type MouseMapCallback = fn(&mut GlobalState, MouseEvent, &mut Tree, &mut Workspace);
 type DrawCallback = fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal) -> std::io::Result<()>;

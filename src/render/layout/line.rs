@@ -40,7 +40,7 @@ impl Line {
     #[inline]
     pub fn render_centered_styled(self, text: &str, style: ContentStyle, backend: &mut Backend) {
         let text = text.truncate_width(self.width).1;
-        backend.print_styled_at(self.row, self.col, format!("{text:>width$}", width = self.width), style);
+        backend.print_styled_at(self.row, self.col, format!("{text:^width$}", width = self.width), style);
     }
 
     #[inline]

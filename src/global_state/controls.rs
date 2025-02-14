@@ -1,4 +1,4 @@
-use super::{GlobalState, IdiomEvent};
+use super::{GlobalState, IdiomEvent, MIN_HEIGHT, MIN_WIDTH};
 use crate::popups::pallet::Pallet;
 use crate::render::backend::{Backend, StyleExt};
 use crate::render::layout::Line;
@@ -202,6 +202,20 @@ pub fn map_term(
     runner: &mut EditorTerminal,
 ) -> bool {
     runner.map(key, gs)
+}
+
+pub fn map_small_rect(
+    gs: &mut GlobalState,
+    event: &KeyEvent,
+    workspace: &mut Workspace,
+    tree: &mut Tree,
+    tmux: &mut EditorTerminal,
+) -> bool {
+    if gs.screen_rect.width < MIN_WIDTH || gs.screen_rect.height < MIN_HEIGHT {
+        return true;
+    }
+    gs.config_controls();
+    gs.map_key(event, workspace, tree, tmux)
 }
 
 #[cfg(test)]
