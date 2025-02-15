@@ -103,12 +103,10 @@ pub fn draw_small_rect(
     _tree: &mut Tree,
     _term: &mut EditorTerminal,
 ) -> Result<()> {
-    if let Some(line) = gs.screen_rect.get_line(0) {
-        line.render_centered_styled(
-            "Terminal size too small!",
-            ContentStyle::bold().with_fg(Color::DarkRed),
-            gs.backend(),
-        );
+    let error_text = ["Terminal size too small!", "Press Q or D to exit ..."];
+    let style = ContentStyle::bold().with_fg(Color::DarkRed);
+    for (line, text) in gs.screen_rect.into_iter().zip(error_text) {
+        line.render_centered_styled(text, style, gs.backend());
     }
     gs.writer.flush()
 }

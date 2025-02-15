@@ -3,7 +3,7 @@ use crate::popups::pallet::Pallet;
 use crate::render::backend::{Backend, StyleExt};
 use crate::render::layout::Line;
 use crate::{runner::EditorTerminal, tree::Tree, workspace::Workspace};
-use crossterm::event::{KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::{Color, ContentStyle};
 
 const INSERT_SPAN: &str = "  --INSERT--   ";
@@ -212,6 +212,12 @@ pub fn map_small_rect(
     tmux: &mut EditorTerminal,
 ) -> bool {
     if gs.screen_rect.width < MIN_WIDTH || gs.screen_rect.height < MIN_HEIGHT {
+        match event {
+            KeyEvent { code: KeyCode::Char('q' | 'd' | 'Q' | 'D'), .. } => {
+                gs.exit = true;
+            }
+            _ => (),
+        }
         return true;
     }
     gs.config_controls();
