@@ -214,7 +214,33 @@ fn simple_line() {
 }
 
 #[test]
-fn simple_line_select() {}
+fn simple_line_select() {
+    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let mut cursor = Cursor::default();
+    cursor.select_set((1, 7).into(), (2, 60).into());
+
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut lines = Rect { row: 0, col: 0, width: 40, height: 5, borders: Borders::empty() }.into_iter();
+    let mut texts = generate_lines();
+
+    for text in texts.iter_mut() {
+        let select = ctx.get_select_full_line(text.char_len());
+        line(text, select, &mut ctx, &mut lines, gs.backend());
+    }
+
+    let mut rendered = gs.backend().drain();
+    let style_select = ctx.lexer.theme.selected;
+    assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["TODO".into()]));
+    expect_select(7, 13, style_select, ctx.accent_style, &rendered);
+    assert_eq!(
+        parse_complex_line(&mut rendered),
+        (Some(2), ["- write", " tests"].into_iter().map(String::from).collect())
+    );
+    expect_select(0, 37, style_select, ctx.accent_style, &rendered);
+    assert_eq!(parse_complex_line(&mut rendered), (Some(3), vec!["- lsp server cold start, maybe? \"jedi".into()]));
+    expect_select(0, 23, style_select, ctx.accent_style, &rendered);
+}
 
 #[test]
 fn complex_line() {
@@ -263,11 +289,14 @@ fn complex_line_select() {
 
     let mut rendered = gs.backend().drain();
     let style_select = ctx.lexer.theme.selected;
-    parse_complex_line(&mut rendered);
+    assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["🔥TODO🔥".into()]));
     expect_select(7, 13, style_select, ctx.accent_style, &rendered);
-    parse_complex_line(&mut rendered);
+    assert_eq!(
+        parse_complex_line(&mut rendered),
+        (Some(2), ["- write", " tests"].into_iter().map(String::from).collect())
+    );
     expect_select(0, 36, style_select, ctx.accent_style, &rendered);
-    parse_complex_line(&mut rendered);
+    assert_eq!(parse_complex_line(&mut rendered), (Some(3), vec!["- lsp server cold start, maybe? \"j🔥d".into()]));
     expect_select(0, 24, style_select, ctx.accent_style, &rendered);
 }
 
