@@ -14,32 +14,38 @@ use crate::{
 };
 
 use super::super::tests::parse_complex_line;
-use super::{ascii, complex};
+use super::{ascii, complex, line};
 use crossterm::style::{Color, ContentStyle};
 use markdown::{tokenize, Block, ListItem, Span};
 
-fn expect_select(start_char: usize, end_char: usize, accent: ContentStyle, rendered: &[(ContentStyle, String)]) {
-    let mut counter = start_char;
-    let mut start_found = false;
-    for (_, text) in rendered.iter().filter(|(c, ..)| *c != accent) {
-        if text.starts_with("<<") {
-            if counter == 0 && text.contains("<<set bg ") {
-                if start_found {
-                    return;
-                };
-                start_found = true;
-                counter = end_char;
-            }
-            continue;
+fn expect_select(
+    mut start_char: usize,
+    end_char: usize,
+    select: Color,
+    accent: ContentStyle,
+    rendered: &[(ContentStyle, String)],
+) {
+    let mut count_to_end = end_char - start_char;
+    let tokens = rendered
+        .iter()
+        .skip_while(|(.., t)| t != "<<clear EOL>>")
+        .take_while(|(.., t)| !t.starts_with("<<go to row"))
+        .filter(|(c, t)| {
+            let is_ui = *c == accent;
+            let is_control = t.starts_with("<<") && t.ends_with(">>");
+            !is_ui && !is_control
+        });
+
+    for (style, text) in tokens {
+        if start_char != 0 {
+            assert_eq!(style.background_color, None);
+            start_char -= text.chars().count();
+        } else if count_to_end != 0 {
+            assert_eq!(style.background_color, Some(select));
+            count_to_end -= text.chars().count();
+        } else {
+            assert_eq!(style.background_color, None)
         }
-        let current_count = text.chars().count();
-        if counter < current_count {
-            match start_found {
-                true => panic!("Unable to find select end at {end_char} {text}!\ntext {text}\n{rendered:?}"),
-                false => panic!("Unable to find select start at {start_char}\ntext {text}\n{rendered:?}!"),
-            }
-        }
-        counter -= text.chars().count();
     }
 }
 
@@ -58,6 +64,22 @@ fn expect_cursor(mut char_idx: usize, rendered: &[(ContentStyle, String)]) {
         assert_eq!(*style, ContentStyle::reversed());
         return;
     }
+}
+
+fn generate_lines() -> Vec<EditorLine> {
+    [
+        "## TODO",
+        "- write tests",
+        "- lsp server cold start, maybe? \"jedi-language server\" _starts slow_, but __once__ it starts *it* should **continue** end",
+    ].into_iter().map(EditorLine::from).collect()
+}
+
+fn generate_complex_lines() -> Vec<EditorLine> {
+    [
+        "## 🔥TODO🔥",
+        "- write tests",
+        "- lsp server cold start, maybe? \"j🔥di-language server\" _starts slow_, but __once__ it starts *it* should **continue** end",
+    ].into_iter().map(EditorLine::from).collect()
 }
 
 #[test]
@@ -120,9 +142,11 @@ fn cursor_select() {
     assert!(text.is_simple());
     let select = ctx.get_select_full_line(text.char_len());
     ascii::cursor(&mut text, select, 0, &mut lines, &mut ctx, gs.backend());
+
     let mut rendered = gs.backend().drain();
     let first_line = "**The project is currently in develop";
-    expect_select(0, 39, ctx.accent_style, &rendered);
+    let style_select = ctx.lexer.theme.selected;
+    expect_select(0, 39, style_select, ctx.accent_style, &rendered);
     assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec![first_line.into()]));
     assert_eq!(
         parse_complex_line(&mut rendered),
@@ -149,7 +173,8 @@ fn cursor_complex_select() {
     let mut rendered = gs.backend().drain();
 
     let first_line = "**The project is currently in devel🔥";
-    expect_select(0, 39, ctx.accent_style, &rendered);
+    let style_select = ctx.lexer.theme.selected;
+    expect_select(0, 39, style_select, ctx.accent_style, &rendered);
     assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec![first_line.into()],));
     assert_eq!(
         parse_complex_line(&mut rendered),
@@ -157,6 +182,93 @@ fn cursor_complex_select() {
     );
     assert_eq!(parse_complex_line(&mut rendered), (None, vec!["t with caution.**".into()]));
     assert!(rendered.is_empty())
+}
+
+#[test]
+fn simple_line() {
+    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let cursor = Cursor::default();
+
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut lines = Rect { row: 0, col: 0, width: 40, height: 5, borders: Borders::empty() }.into_iter();
+    let mut texts = generate_lines();
+
+    for text in texts.iter_mut() {
+        line(text, None, &mut ctx, &mut lines, gs.backend());
+    }
+
+    let mut rendered = gs.backend().drain();
+    assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["TODO".into()]));
+    assert_eq!(parse_complex_line(&mut rendered), (Some(2), vec![" > write tests".into()]));
+    assert_eq!(parse_complex_line(&mut rendered), (Some(3), vec![" > lsp server cold start, maybe? \"jed".into()]));
+    assert_eq!(
+        parse_complex_line(&mut rendered),
+        (None, ["i-language server\" ", "starts slow", ", but ", "o"].into_iter().map(String::from).collect())
+    );
+    assert_eq!(
+        parse_complex_line(&mut rendered),
+        (None, ["nce", " it starts ", "it", " should ", "continue", " end"].into_iter().map(String::from).collect())
+    );
+    assert!(rendered.is_empty())
+}
+
+#[test]
+fn simple_line_select() {}
+
+#[test]
+fn complex_line() {
+    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let cursor = Cursor::default();
+
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut lines = Rect { row: 0, col: 0, width: 40, height: 5, borders: Borders::empty() }.into_iter();
+    let mut texts = generate_complex_lines();
+
+    for text in texts.iter_mut() {
+        line(text, None, &mut ctx, &mut lines, gs.backend());
+    }
+
+    let mut rendered = gs.backend().drain();
+    assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["🔥TODO🔥".into()]));
+    assert_eq!(parse_complex_line(&mut rendered), (Some(2), vec![" > write tests".into()]));
+    assert_eq!(parse_complex_line(&mut rendered), (Some(3), vec![" > lsp server cold start, maybe? \"j🔥".into()]));
+    assert_eq!(
+        parse_complex_line(&mut rendered),
+        (None, ["di-language server\" ", "starts slow", ", but "].into_iter().map(String::from).collect())
+    );
+    assert_eq!(
+        parse_complex_line(&mut rendered),
+        (None, ["once", " it starts ", "it", " should ", "continue", " end"].into_iter().map(String::from).collect())
+    );
+    assert!(rendered.is_empty())
+}
+
+#[test]
+fn complex_line_select() {
+    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let mut cursor = Cursor::default();
+    cursor.select_set((1, 7).into(), (2, 60).into());
+
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut lines = Rect { row: 0, col: 0, width: 40, height: 5, borders: Borders::empty() }.into_iter();
+    let mut texts = generate_complex_lines();
+
+    for text in texts.iter_mut() {
+        let select = ctx.get_select_full_line(text.char_len());
+        line(text, select, &mut ctx, &mut lines, gs.backend());
+    }
+
+    let mut rendered = gs.backend().drain();
+    let style_select = ctx.lexer.theme.selected;
+    parse_complex_line(&mut rendered);
+    expect_select(7, 13, style_select, ctx.accent_style, &rendered);
+    parse_complex_line(&mut rendered);
+    expect_select(0, 36, style_select, ctx.accent_style, &rendered);
+    parse_complex_line(&mut rendered);
+    expect_select(0, 24, style_select, ctx.accent_style, &rendered);
 }
 
 // DEPENDENCY TEST
