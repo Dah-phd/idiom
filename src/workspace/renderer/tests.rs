@@ -32,11 +32,11 @@ pub fn expect_select(
     }
 }
 
-pub fn expect_cursor(mut char_idx: usize, rendered: &[(ContentStyle, String)]) {
+pub fn expect_cursor(mut char_idx: usize, skip_until: &str, rendered: &[(ContentStyle, String)]) {
     let mut skip = true;
     for (style, text) in rendered.iter() {
         if skip {
-            skip = text != "<<clear EOL>>";
+            skip = text != skip_until;
             continue;
         }
 
@@ -47,7 +47,21 @@ pub fn expect_cursor(mut char_idx: usize, rendered: &[(ContentStyle, String)]) {
         assert_eq!(*style, ContentStyle::reversed());
         return;
     }
-    panic!("Cursor not found!")
+    panic!("Cursor not found!\n{rendered:?}")
+}
+
+pub fn count_to_cursor(accent_style: ContentStyle, rendered: &[(ContentStyle, String)]) -> usize {
+    let mut cursor = 0;
+    for (style, text) in rendered.iter().skip_while(|(c, t)| t != "<<clear EOL>>") {
+        if accent_style == *style || (text.starts_with("<<") && text.ends_with(">>")) {
+            continue;
+        }
+        if *style == ContentStyle::reversed() {
+            return cursor;
+        }
+        cursor += text.chars().count();
+    }
+    panic!("Unable to find cursor!")
 }
 
 pub fn parse_simple_line(rendered: &mut Vec<(ContentStyle, String)>) -> (Option<usize>, Vec<String>) {

@@ -1,10 +1,7 @@
 use super::{
-    super::tests::{parse_complex_line, parse_simple_line},
+    super::tests::{expect_cursor, expect_select, parse_complex_line, parse_simple_line},
     cursor as rend_cursor, inner_render,
 };
-use crate::configs::FileType;
-use crate::global_state::GlobalState;
-use crate::render::backend::{Backend, BackendProtocol};
 use crate::render::layout::{Line, Rect};
 use crate::syntax::tests::{
     create_token_pairs_utf16, create_token_pairs_utf32, create_token_pairs_utf8, longline_token_pair_utf16,
@@ -14,7 +11,111 @@ use crate::syntax::tests::{
 use crate::workspace::cursor::Cursor;
 use crate::workspace::line::LineContext;
 use crate::workspace::CursorPosition;
-use crossterm::style::ContentStyle;
+use crate::{configs::FileType, workspace::line::EditorLine};
+use crate::{global_state::GlobalState, render::backend::StyleExt};
+use crate::{
+    render::backend::{Backend, BackendProtocol},
+    workspace::renderer::tests::count_to_cursor,
+};
+use crossterm::style::{Color, ContentStyle};
+
+/// BASIC CURSOR TEST
+
+#[test]
+fn test_cursor() {
+    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let mut cursor = Cursor::default();
+    cursor.set_position((0, 12).into());
+
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut code = EditorLine::from("let mut gs = GlobalState::new(Backend::init()).unwrap();");
+
+    let line = Line { row: 0, col: 0, width: 40 };
+    rend_cursor(&mut code, &mut ctx, line, gs.backend());
+    let mut rendered = gs.backend().drain();
+    expect_cursor(cursor.char, "<<reset style>>", &rendered);
+    assert_eq!(
+        parse_complex_line(&mut rendered),
+        (Some(1), ["let mut gs = GlobalState::new(Backen", ">"].into_iter().map(String::from).collect())
+    );
+}
+
+#[test]
+fn test_cursor_complex() {
+    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let mut cursor = Cursor::default();
+    cursor.set_position((0, 12).into());
+
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut code = EditorLine::from("let mut gs🧛 = GlobalState::new(Backend::init()).unwrap();");
+
+    let line = Line { row: 0, col: 0, width: 40 };
+    rend_cursor(&mut code, &mut ctx, line, gs.backend());
+    let mut rendered = gs.backend().drain();
+    expect_cursor(cursor.char, "<<reset style>>", &rendered);
+    assert_eq!(
+        parse_complex_line(&mut rendered),
+        (Some(1), ["let mut gs🧛 = GlobalState::new(Backe", ">"].into_iter().map(String::from).collect())
+    );
+}
+
+#[test]
+fn test_cursor_select() {
+    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let mut cursor = Cursor::default();
+    cursor.select_set((0, 4).into(), (0, 15).into());
+
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut code = EditorLine::from("let mut gs = GlobalState::new(Backend::init()).unwrap();");
+    let line = Line { row: 0, col: 0, width: 40 };
+    rend_cursor(&mut code, &mut ctx, line, gs.backend());
+
+    let mut rendered = gs.backend().drain();
+    assert_eq!(count_to_cursor(ctx.accent_style, &rendered), cursor.char);
+    let style_select = ctx.lexer.theme.selected;
+    expect_select(4, 15, style_select, ctx.accent_style, &rendered);
+
+    assert_eq!(
+        parse_complex_line(&mut rendered),
+        (Some(1), ["let ", "mut gs = Gl", "obalState::new(Backen", ">"].into_iter().map(String::from).collect())
+    );
+}
+
+#[test]
+fn test_cursor_select_complex() {
+    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let mut cursor = Cursor::default();
+    cursor.select_set((0, 4).into(), (0, 15).into());
+
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut code = EditorLine::from("let mut gs🧛 = GlobalState::new(Backend::init()).unwrap();");
+    let line = Line { row: 0, col: 0, width: 40 };
+    rend_cursor(&mut code, &mut ctx, line, gs.backend());
+
+    let mut rendered = gs.backend().drain();
+    assert_eq!(count_to_cursor(ctx.accent_style, &rendered), cursor.char);
+    let style_select = ctx.lexer.theme.selected;
+    expect_select(4, 15, style_select, ctx.accent_style, &rendered);
+
+    assert_eq!(
+        parse_complex_line(&mut rendered),
+        (Some(1), ["let ", "mut gs🧛 = G", "lobalState::new(Backe", ">"].into_iter().map(String::from).collect())
+    );
+}
+
+#[test]
+fn wrap_cursor() {
+    todo!()
+}
+
+#[test]
+fn wrap_cursor_complex() {
+    todo!()
+}
 
 /// LINE RENDER
 

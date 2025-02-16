@@ -50,7 +50,7 @@ fn cursor_render() {
 
     let first_line = "**The project is currently in develop";
     assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec![first_line.into()]));
-    expect_cursor(cursor.char - first_line.chars().count(), &rendered);
+    expect_cursor(cursor.char - first_line.chars().count(), "<<clear EOL>>", &rendered);
     assert_eq!(parse_complex_line(&mut rendered), (None, vec!["ment - so if you want to try it do it".into()]));
     assert_eq!(parse_complex_line(&mut rendered), (None, vec![" with caution.**".into()]));
     assert!(rendered.is_empty())
@@ -73,7 +73,7 @@ fn cursor_complex_render() {
 
     let first_line = "**The project is currently in devel🔥";
     assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec![first_line.into()],));
-    expect_cursor(cursor.char - first_line.chars().count(), &rendered);
+    expect_cursor(cursor.char - first_line.chars().count(), "<<clear EOL>>", &rendered);
     assert_eq!(parse_complex_line(&mut rendered), (None, vec!["pment - so if you want to try it do i".into()]));
     assert_eq!(parse_complex_line(&mut rendered), (None, vec!["t with caution.**".into()]));
     assert!(rendered.is_empty())
