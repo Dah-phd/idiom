@@ -151,6 +151,7 @@ pub fn cursor_fast(code: &mut EditorLine, ctx: &mut LineContext, line: Line, bac
 }
 
 // ensures cursor is rendered
+#[inline]
 pub fn repositioning(cursor: &mut Cursor) {
     if cursor.line < cursor.at_line {
         cursor.at_line = cursor.line;
