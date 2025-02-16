@@ -109,12 +109,48 @@ fn test_cursor_select_complex() {
 
 #[test]
 fn wrap_cursor() {
-    todo!()
+    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let mut cursor = Cursor::default();
+    cursor.select_set((0, 20).into(), (0, 35).into());
+
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut code = EditorLine::from("let mut gs = GlobalState::new(Backend::init()).unwrap();");
+    let line = Line { row: 0, col: 0, width: 20 };
+    rend_cursor(&mut code, &mut ctx, line, gs.backend());
+
+    let mut rendered = gs.backend().drain();
+    assert_eq!(count_to_cursor(ctx.accent_style, &rendered), cursor.char - 20);
+    let style_select = ctx.lexer.theme.selected;
+    expect_select(1, 15, style_select, ctx.accent_style, &rendered);
+
+    assert_eq!(
+        parse_complex_line(&mut rendered),
+        (Some(1), ["<", "", "ate::new(Backe", "n", ">"].into_iter().map(String::from).collect())
+    );
 }
 
 #[test]
 fn wrap_cursor_complex() {
-    todo!()
+    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let mut cursor = Cursor::default();
+    cursor.select_set((0, 20).into(), (0, 35).into());
+
+    let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut code = EditorLine::from("let mut gsormandaaseaseaeas🧛fda🧛 = GlobalState::new(Backend::init()).unwrap();");
+    let line = Line { row: 0, col: 0, width: 20 };
+    rend_cursor(&mut code, &mut ctx, line, gs.backend());
+
+    let mut rendered = gs.backend().drain();
+    assert_eq!(count_to_cursor(ctx.accent_style, &rendered), cursor.char - 22); // 21 (20 + 2 due to width of emojieS)
+    let style_select = ctx.lexer.theme.selected;
+    expect_select(1, 13, style_select, ctx.accent_style, &rendered);
+
+    assert_eq!(
+        parse_complex_line(&mut rendered),
+        (Some(1), ["<", "aeas🧛fda🧛 = ", "Gl", ">"].into_iter().map(String::from).collect())
+    );
 }
 
 /// LINE RENDER

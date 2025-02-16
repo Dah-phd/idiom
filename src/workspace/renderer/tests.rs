@@ -52,7 +52,7 @@ pub fn expect_cursor(mut char_idx: usize, skip_until: &str, rendered: &[(Content
 
 pub fn count_to_cursor(accent_style: ContentStyle, rendered: &[(ContentStyle, String)]) -> usize {
     let mut cursor = 0;
-    for (style, text) in rendered.iter().skip_while(|(c, t)| t != "<<clear EOL>>") {
+    for (style, text) in rendered.iter().skip_while(|(.., t)| t != "<<clear EOL>>") {
         if accent_style == *style || (text.starts_with("<<") && text.ends_with(">>")) {
             continue;
         }
