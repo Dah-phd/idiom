@@ -1,6 +1,6 @@
 use crate::render::utils::chunks::ByteChunks;
 
-use super::{StrChunks, UTF8Safe, UTF8SafeStringExt, WriteChunks};
+use super::{CharLimitedWidths, StrChunks, UTF8Safe, UTF8SafeStringExt, WriteChunks};
 const TEXT: &str = "123🚀13";
 
 #[test]
@@ -39,6 +39,28 @@ fn test_truncate_utf8() {
     assert_eq!(4, TEXT.truncate_width(5).1.chars().count());
     assert_eq!((0, "🚀13"), TEXT.truncate_width_start(4));
     assert_eq!((1, "13"), TEXT.truncate_width_start(3));
+}
+
+#[test]
+fn test_width_split() {
+    assert_eq!("🚀13".width_split(2), ("🚀", Some("13")));
+    assert_eq!("🚀13".width_split(1), ("", Some("🚀13")));
+    assert_eq!("🚀13".width_split(4), ("🚀13", None));
+    assert_eq!("🚀13".width_split(0), ("", Some("🚀13")));
+    assert_eq!("🚀13".width_split(3000), ("🚀13", None));
+    assert_eq!("🚀13🚀13".width_split(5), ("🚀13", Some("🚀13")));
+    assert_eq!("🚀13🚀13".width_split(6), ("🚀13🚀", Some("13")));
+}
+
+#[test]
+fn test_width_split_string() {
+    assert_eq!(String::from("🚀13").width_split(2), ("🚀", Some("13")));
+    assert_eq!(String::from("🚀13").width_split(1), ("", Some("🚀13")));
+    assert_eq!(String::from("🚀13").width_split(4), ("🚀13", None));
+    assert_eq!(String::from("🚀13").width_split(0), ("", Some("🚀13")));
+    assert_eq!(String::from("🚀13").width_split(3000), ("🚀13", None));
+    assert_eq!(String::from("🚀13🚀13").width_split(5), ("🚀13", Some("🚀13")));
+    assert_eq!(String::from("🚀13🚀13").width_split(6), ("🚀13🚀", Some("13")));
 }
 
 #[test]
@@ -228,5 +250,18 @@ fn test_chunks_byte_short() {
     let text = "123";
     let mut chunks = ByteChunks::new(text, 5);
     assert_eq!(chunks.next(), Some(StrChunks { width: 3, text: "123" }));
+    assert_eq!(chunks.next(), None);
+}
+
+#[test]
+fn test_char_limited_chunk() {
+    let text = "🚀a";
+    let mut chunks = CharLimitedWidths::new(text, 2);
+    assert_eq!(chunks.next(), Some(('🚀', 2)));
+    assert_eq!(chunks.next(), Some(('a', 1)));
+    assert_eq!(chunks.next(), None);
+    let mut chunks = CharLimitedWidths::new(text, 1);
+    assert_eq!(chunks.next(), Some(('⚠', 1)));
+    assert_eq!(chunks.next(), Some(('a', 1)));
     assert_eq!(chunks.next(), None);
 }

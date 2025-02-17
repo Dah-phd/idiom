@@ -51,7 +51,7 @@ pub fn build_display(path: &Path) -> String {
 pub fn big_file_protection(path: &Path) -> IdiomResult<()> {
     let meta = std::fs::metadata(path)?;
     if meta.size() > 50 * 1024 * 1024 {
-        return Err(IdiomError::IOError("File over 50MB".to_owned()));
+        return Err(IdiomError::io_other("File over 50MB"));
     }
     Ok(())
 }

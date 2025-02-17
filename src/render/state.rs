@@ -1,12 +1,13 @@
 use super::{
-    backend::{Backend, BackendProtocol, Style},
+    backend::{Backend, BackendProtocol, StyleExt},
     layout::{DoublePaddedRectIter, IterLines, LineBuilder, Rect},
 };
+use crossterm::style::ContentStyle;
 
 pub struct State {
     pub at_line: usize,
     pub selected: usize,
-    pub highlight: Style,
+    pub highlight: ContentStyle,
 }
 
 impl Default for State {
@@ -18,12 +19,18 @@ impl Default for State {
 #[allow(dead_code)]
 impl State {
     pub fn new() -> Self {
-        let highlight = Style::reversed();
+        let highlight = ContentStyle::reversed();
         Self { at_line: 0, selected: 0, highlight }
     }
 
-    pub fn with_highlight(highlight: Style) -> Self {
+    pub fn with_highlight(highlight: ContentStyle) -> Self {
         Self { at_line: 0, selected: 0, highlight }
+    }
+
+    #[inline]
+    pub fn reset(&mut self) {
+        self.at_line = 0;
+        self.selected = 0;
     }
 
     pub fn select(&mut self, idx: usize, option_len: usize) {
@@ -100,7 +107,7 @@ impl State {
     #[inline]
     pub fn render_list_styled<'a>(
         &mut self,
-        options: impl Iterator<Item = (&'a str, Style)>,
+        options: impl Iterator<Item = (&'a str, ContentStyle)>,
         rect: &Rect,
         backend: &mut Backend,
     ) {

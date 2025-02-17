@@ -10,10 +10,11 @@ use crate::{
     global_state::{GlobalState, IdiomEvent},
     lsp::LSP,
     popups::popups_editor::file_updated,
-    render::backend::{color, BackendProtocol, Style},
+    render::backend::{BackendProtocol, StyleExt},
     utils::TrackedList,
 };
 use crossterm::event::KeyEvent;
+use crossterm::style::{Color, ContentStyle};
 pub use cursor::CursorPosition;
 pub use editor::Editor;
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
@@ -22,12 +23,14 @@ use std::{
     path::PathBuf,
 };
 
+const FILE_STATUS_ERR: &str = "File status ERR";
+
 /// implement Drop to attempt keep state upon close/crash
 pub struct Workspace {
     editors: TrackedList<Editor>,
     base_config: EditorConfigs,
     key_map: EditorKeyMap,
-    tab_style: Style,
+    tab_style: ContentStyle,
     lsp_servers: HashMap<FileType, LSP>,
     map_callback: fn(&mut Self, &KeyEvent, &mut GlobalState) -> bool,
 }
@@ -45,7 +48,7 @@ impl Workspace {
                 Err(err) => gs.error(format!("Preload filed: {err}")),
             }
         }
-        let tab_style = Style::fg(color::dark_yellow());
+        let tab_style = ContentStyle::fg(Color::DarkYellow);
         Self { editors: TrackedList::new(), base_config, key_map, lsp_servers, map_callback: map_editor, tab_style }
     }
 
@@ -55,7 +58,7 @@ impl Workspace {
                 Some(line) => line,
                 None => return,
             };
-            gs.writer.set_style(Style::underlined(None));
+            gs.writer.set_style(ContentStyle::underlined(None));
             {
                 let mut builder = line.unsafe_builder(&mut gs.writer);
                 builder.push_styled(&editor.display, self.tab_style);
@@ -84,13 +87,13 @@ impl Workspace {
     pub fn toggle_tabs(&mut self) {
         self.editors.mark_updated();
         self.map_callback = map_tabs;
-        self.tab_style = Style::reversed();
+        self.tab_style = ContentStyle::reversed();
     }
 
     pub fn toggle_editor(&mut self) {
         self.editors.mark_updated();
         self.map_callback = map_editor;
-        self.tab_style = Style::fg(color::dark_yellow());
+        self.tab_style = ContentStyle::fg(Color::DarkYellow);
     }
 
     #[inline]
@@ -115,13 +118,13 @@ impl Workspace {
     }
 
     #[inline]
-    pub fn rename_editors(&mut self, old: PathBuf, new_path: PathBuf, gs: &mut GlobalState) {
-        if new_path.is_dir() {
+    pub fn rename_editors(&mut self, from_path: PathBuf, to_path: PathBuf, gs: &mut GlobalState) {
+        if to_path.is_dir() {
             for editor in self.editors.iter_mut() {
-                if editor.path.starts_with(&old) {
+                if editor.path.starts_with(&from_path) {
                     let mut updated_path = PathBuf::new();
                     let mut old = editor.path.iter();
-                    for (new_part, ..) in new_path.iter().zip(&mut old) {
+                    for (new_part, ..) in to_path.iter().zip(&mut old) {
                         updated_path.push(new_part);
                     }
                     for remaining_part in old {
@@ -130,8 +133,8 @@ impl Workspace {
                     gs.log_if_lsp_error(editor.update_path(updated_path), editor.file_type);
                 }
             }
-        } else if let Some(editor) = self.editors.find(|e| e.path == old) {
-            gs.log_if_lsp_error(editor.update_path(new_path), editor.file_type);
+        } else if let Some(editor) = self.editors.find(|e| e.path == from_path) {
+            gs.log_if_lsp_error(editor.update_path(to_path), editor.file_type);
         }
     }
 
@@ -223,7 +226,7 @@ impl Workspace {
                         if matches!(options.overwrite, Some(overwrite) if !overwrite)
                             || matches!(options.ignore_if_exists, Some(ignore) if ignore)
                         {
-                            return Err(IdiomError::io_err(format!("File {path:?} already exists!")));
+                            return Err(IdiomError::io_exists(format!("File {path:?} already exists!")));
                         }
                     }
                 };
@@ -367,7 +370,8 @@ impl Workspace {
     pub fn notify_update(&mut self, path: PathBuf, gs: &mut GlobalState) {
         for (idx, editor) in self.editors.iter_mut().enumerate() {
             if editor.path == path {
-                if editor.is_saved() {
+                let save_status_result = editor.is_saved();
+                if gs.unwrap_or_default(save_status_result, FILE_STATUS_ERR) {
                     return;
                 }
                 editor.update_status.mark_updated();
@@ -400,9 +404,10 @@ impl Workspace {
         }
     }
 
-    pub fn are_updates_saved(&self) -> bool {
+    pub fn are_updates_saved(&self, gs: &mut GlobalState) -> bool {
         for editor in self.editors.iter() {
-            if !editor.is_saved() {
+            let save_status_result = editor.is_saved();
+            if !gs.unwrap_or_default(save_status_result, FILE_STATUS_ERR) {
                 return false;
             }
         }

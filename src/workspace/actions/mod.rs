@@ -104,6 +104,22 @@ impl Actions {
         self.push_done(action, lexer, content);
     }
 
+    pub fn insert_snippet_with_select(
+        &mut self,
+        c: &mut Cursor,
+        snippet: String,
+        cursor_offset: (usize, usize),
+        select_len: usize,
+        content: &mut Vec<EditorLine>,
+        lexer: &mut Lexer,
+    ) {
+        self.push_buffer(content, lexer);
+        let (position, action) = Edit::insert_snippet(c, snippet, Some(cursor_offset), &self.cfg, content);
+        let to = CursorPosition { line: position.line, char: position.char + select_len };
+        c.select_set(position, to);
+        self.push_done(action, lexer, content);
+    }
+
     pub fn mass_replace(
         &mut self,
         cursor: &mut Cursor,

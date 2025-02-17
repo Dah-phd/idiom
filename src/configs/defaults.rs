@@ -68,6 +68,14 @@ pub fn right() -> String {
     RIGHT.to_owned()
 }
 
+pub fn char_c() -> String {
+    String::from('c')
+}
+
+pub fn char_x() -> String {
+    String::from('x')
+}
+
 pub fn select_up() -> String {
     format!("{SHIFT} && {UP}")
 }

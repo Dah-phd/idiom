@@ -8,7 +8,7 @@ use super::{
 use crate::{
     configs::{test::mock_editor_key_map, EditorConfigs},
     global_state::GlobalState,
-    render::backend::{Backend, BackendProtocol, Style},
+    render::backend::{Backend, BackendProtocol},
     workspace::{
         actions::tests::create_content,
         editor::code_tests::{mock_editor, pull_line, select_eq},
@@ -16,6 +16,7 @@ use crate::{
     },
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::style::ContentStyle;
 use std::collections::HashMap;
 
 pub fn mock_ws(content: Vec<String>) -> Workspace {
@@ -25,7 +26,7 @@ pub fn mock_ws(content: Vec<String>) -> Workspace {
         key_map: mock_editor_key_map(),
         lsp_servers: HashMap::default(),
         map_callback: map_editor,
-        tab_style: Style::default(),
+        tab_style: ContentStyle::default(),
     };
     ws.resize_all(60, 90);
     ws

@@ -4,13 +4,15 @@ use super::PopupInterface;
 use crate::{
     global_state::{Clipboard, GlobalState, PopupMessage},
     render::{
-        backend::{Backend, Style},
+        backend::{Backend, StyleExt},
         layout::{Line, Rect},
         state::State,
         Button,
     },
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::style::ContentStyle;
+use fuzzy_matcher::skim::SkimMatcherV2;
 
 pub struct Popup {
     pub message: String,
@@ -44,7 +46,7 @@ impl PopupInterface for Popup {
         }
     }
 
-    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         if let Some(button) =
             self.buttons.iter().find(|button| matches!(&button.key, Some(key_code) if key_code.contains(&key.code)))
         {
@@ -131,6 +133,22 @@ impl Popup {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn message(message: String) -> Box<Self> {
+        Box::new(Self {
+            message,
+            title_prefix: None,
+            title: "Info".to_owned(),
+            message_as_buffer_builder: None,
+            buttons: vec![Button { command: |_| PopupMessage::Clear, name: "Ok", key: None }],
+            button_line: 0,
+            button_ranges: vec![],
+            size: (6, 40),
+            state: 0,
+            updated: true,
+        })
+    }
+
     fn next(&mut self) {
         if self.state < self.buttons.len() - 1 {
             self.state += 1;
@@ -154,7 +172,7 @@ impl Popup {
         let mut builder = line.unsafe_builder(backend);
         builder.push(" >> ");
         builder.push(&self.message);
-        builder.push_styled("|", Style::slowblink());
+        builder.push_styled("|", ContentStyle::slowblink());
     }
 
     fn spans_from_buttons(&mut self, line: Line, backend: &mut Backend) {
@@ -169,7 +187,7 @@ impl Popup {
         for (idx, btn) in self.buttons.iter().enumerate() {
             let text = format!("{name:^width$}", name = btn.name, width = padding + btn.name.len());
             if idx == self.state {
-                if !builder.push_styled(text.as_str(), Style::reversed()) {
+                if !builder.push_styled(text.as_str(), ContentStyle::reversed()) {
                     break;
                 }
             } else if !builder.push(text.as_str()) {
@@ -200,14 +218,13 @@ impl<T> PopupInterface for PopupSelector<T> {
         rect.bordered();
         self.rect.replace(rect);
         rect.draw_borders(None, None, &mut gs.writer);
-        if self.options.is_empty() {
-            self.state.render_list(["No results found!"].into_iter(), rect, &mut gs.writer);
-        } else {
-            self.state.render_list(self.options.iter().map(|opt| (self.display)(opt)), rect, &mut gs.writer);
+        match self.options.is_empty() {
+            true => self.state.render_list(["No results found!"].into_iter(), rect, &mut gs.writer),
+            false => self.state.render_list(self.options.iter().map(|opt| (self.display)(opt)), rect, &mut gs.writer),
         };
     }
 
-    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         if self.options.is_empty() {
             return PopupMessage::Clear;
         }
@@ -269,5 +286,22 @@ impl<T> PopupSelector<T> {
     ) -> Self {
         let size = size.unwrap_or((20, 120));
         Self { options, display, command, state: State::new(), size, updated: true, rect: None }
+    }
+}
+
+impl PopupSelector<String> {
+    #[allow(dead_code)]
+    pub fn message_list<T: ToString>(list: Vec<T>) -> Box<Self> {
+        let options = list.into_iter().map(|el| el.to_string()).collect();
+        let size = (20, 120);
+        Box::new(Self {
+            options,
+            display: |el| el.as_str(),
+            command: |_| PopupMessage::Clear,
+            state: State::new(),
+            size,
+            updated: true,
+            rect: None,
+        })
     }
 }

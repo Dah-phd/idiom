@@ -1,5 +1,5 @@
 use crate::configs::Theme;
-use crate::render::backend::Style;
+use crate::render::backend::StyleExt;
 use crate::render::widgets::StyledLine;
 use crate::render::widgets::Text;
 use crate::render::UTF8Safe;
@@ -9,6 +9,8 @@ use super::create_semantic_capabilities;
 use super::GenericToken;
 use super::LangStream;
 use super::PositionedToken;
+
+use crossterm::style::ContentStyle;
 
 pub struct Highlighter {
     legend: Legend,
@@ -44,12 +46,12 @@ impl Highlighter {
             let color = self.legend.parse_to_color(pos_token.token_type as usize, pos_token.modifier);
             match text.utf8_get(pos_token.from, pos_token.from + pos_token.len) {
                 Some(chunk) => {
-                    styled_line.push(Text::new(chunk.to_string(), Some(Style::fg(color))));
+                    styled_line.push(Text::new(chunk.to_string(), Some(ContentStyle::fg(color))));
                     end = pos_token.from + pos_token.len;
                 }
                 None => {
                     if let Some(chunk) = text.utf8_get_from(pos_token.from) {
-                        styled_line.push(Text::new(chunk.to_string(), Some(Style::fg(color))));
+                        styled_line.push(Text::new(chunk.to_string(), Some(ContentStyle::fg(color))));
                     }
                     return styled_line.into();
                 }

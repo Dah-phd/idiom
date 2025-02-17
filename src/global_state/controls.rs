@@ -1,10 +1,10 @@
-use super::{GlobalState, IdiomEvent};
+use super::{GlobalState, IdiomEvent, MIN_HEIGHT, MIN_WIDTH};
 use crate::popups::pallet::Pallet;
-use crate::render::backend::{color, Backend, Style};
+use crate::render::backend::{Backend, StyleExt};
 use crate::render::layout::Line;
 use crate::{runner::EditorTerminal, tree::Tree, workspace::Workspace};
-use crossterm::event::{KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use crossterm::style::Color;
+use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::style::{Color, ContentStyle};
 
 const INSERT_SPAN: &str = "  --INSERT--   ";
 const SELECT_SPAN: &str = "  --SELECT--   ";
@@ -27,7 +27,7 @@ pub enum Mode {
 
 impl Mode {
     #[inline]
-    pub fn render(&self, line: Line, accent_style: Style, backend: &mut Backend) {
+    pub fn render(&self, line: Line, accent_style: ContentStyle, backend: &mut Backend) {
         match self {
             Self::Insert => Self::render_insert_mode(line, accent_style, backend),
             Self::Select => Self::render_select_mode(line, accent_style, backend),
@@ -35,7 +35,7 @@ impl Mode {
     }
 
     #[inline]
-    pub fn render_select_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) {
+    pub fn render_select_mode(mut line: Line, mut accent_style: ContentStyle, backend: &mut Backend) {
         line.width = std::cmp::min(MODE_LEN, line.width);
         accent_style.add_bold();
         accent_style.set_fg(Some(Self::select_color()));
@@ -43,7 +43,7 @@ impl Mode {
     }
 
     #[inline]
-    pub fn render_insert_mode(mut line: Line, mut accent_style: Style, backend: &mut Backend) {
+    pub fn render_insert_mode(mut line: Line, mut accent_style: ContentStyle, backend: &mut Backend) {
         line.width = std::cmp::min(MODE_LEN, line.width);
         accent_style.add_bold();
         accent_style.set_fg(Some(Self::insert_color()));
@@ -51,11 +51,11 @@ impl Mode {
     }
 
     pub const fn select_color() -> Color {
-        color::cyan()
+        Color::Cyan
     }
 
     pub const fn insert_color() -> Color {
-        color::rgb(255, 0, 0)
+        Color::Rgb { r: 255, g: 0, b: 0 }
     }
 
     #[inline]
@@ -68,30 +68,38 @@ pub fn disable_mouse(_gs: &mut GlobalState, _event: MouseEvent, _tree: &mut Tree
 
 pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, workspace: &mut Workspace) {
     match event.kind {
-        MouseEventKind::ScrollUp if matches!(gs.mode, Mode::Insert) => {
-            if let Some(editor) = workspace.get_active() {
-                editor.map(crate::configs::EditorAction::ScrollUp, gs);
-                editor.map(crate::configs::EditorAction::ScrollUp, gs);
+        MouseEventKind::ScrollUp => match gs.mode {
+            Mode::Insert => {
+                if let Some(editor) = workspace.get_active() {
+                    editor.map(crate::configs::EditorAction::ScrollUp, gs);
+                    editor.map(crate::configs::EditorAction::ScrollUp, gs);
+                }
             }
-        }
-        MouseEventKind::ScrollDown if matches!(gs.mode, Mode::Insert) => {
-            if let Some(editor) = workspace.get_active() {
-                editor.map(crate::configs::EditorAction::ScrollDown, gs);
-                editor.map(crate::configs::EditorAction::ScrollDown, gs);
+            Mode::Select => tree.select_up(gs),
+        },
+        MouseEventKind::ScrollDown => match gs.mode {
+            Mode::Insert => {
+                if let Some(editor) = workspace.get_active() {
+                    editor.map(crate::configs::EditorAction::ScrollDown, gs);
+                    editor.map(crate::configs::EditorAction::ScrollDown, gs);
+                }
             }
-        }
+            Mode::Select => tree.select_down(gs),
+        },
         MouseEventKind::Down(MouseButton::Left) => {
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = workspace.get_active() {
                     editor.mouse_cursor(position);
                     gs.insert_mode();
-                    tree.select_by_path(&editor.path);
-                    workspace.toggle_editor();
+                    match tree.select_by_path(&editor.path) {
+                        Ok(..) => workspace.toggle_editor(),
+                        Err(error) => gs.error(error),
+                    };
                 }
                 return;
             }
             if let Some(pos) = gs.tree_area.relative_position(event.row, event.column) {
-                if let Some(path) = tree.mouse_select(pos.line + 1) {
+                if let Some(path) = tree.mouse_select(pos.line + 1, gs) {
                     gs.event.push(IdiomEvent::OpenAtLine(path, 0));
                     return;
                 };
@@ -194,6 +202,26 @@ pub fn map_term(
     runner: &mut EditorTerminal,
 ) -> bool {
     runner.map(key, gs)
+}
+
+pub fn map_small_rect(
+    gs: &mut GlobalState,
+    event: &KeyEvent,
+    workspace: &mut Workspace,
+    tree: &mut Tree,
+    tmux: &mut EditorTerminal,
+) -> bool {
+    if gs.screen_rect.width < MIN_WIDTH || gs.screen_rect.height < MIN_HEIGHT {
+        match event {
+            KeyEvent { code: KeyCode::Char('q' | 'd' | 'Q' | 'D'), .. } => {
+                gs.exit = true;
+            }
+            _ => (),
+        }
+        return true;
+    }
+    gs.config_controls();
+    gs.map_key(event, workspace, tree, tmux)
 }
 
 #[cfg(test)]

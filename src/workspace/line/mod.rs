@@ -447,3 +447,6 @@ impl From<EditorLine> for String {
         val.content
     }
 }
+
+#[cfg(test)]
+mod tests;

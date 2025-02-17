@@ -3,11 +3,8 @@ use super::{
     layout::{IterLines, RectIter},
     utils::{StrChunks, WriteChunks},
 };
-use crate::render::{
-    backend::{Backend, Style},
-    layout::Line,
-    UTF8Safe,
-};
+use crate::render::{backend::Backend, layout::Line, UTF8Safe};
+use crossterm::style::ContentStyle;
 use std::fmt::Display;
 use unicode_width::UnicodeWidthChar;
 
@@ -37,12 +34,12 @@ pub struct Text {
     text: String,
     char_len: usize,
     width: usize,
-    style: Option<Style>,
+    style: Option<ContentStyle>,
 }
 
 impl Text {
     #[inline]
-    pub fn new(text: String, style: Option<Style>) -> Self {
+    pub fn new(text: String, style: Option<ContentStyle>) -> Self {
         Self { char_len: text.char_len(), width: text.width(), style, text }
     }
 
@@ -52,12 +49,12 @@ impl Text {
     }
 
     #[inline]
-    pub fn style(&self) -> Option<Style> {
+    pub fn style(&self) -> Option<ContentStyle> {
         self.style
     }
 
     #[inline]
-    pub fn set_style(&mut self, style: Option<Style>) {
+    pub fn set_style(&mut self, style: Option<ContentStyle>) {
         self.style = style;
     }
 
@@ -502,16 +499,16 @@ impl From<char> for Text {
     }
 }
 
-impl From<(String, Style)> for Text {
+impl From<(String, ContentStyle)> for Text {
     #[inline]
-    fn from((text, style): (String, Style)) -> Self {
+    fn from((text, style): (String, ContentStyle)) -> Self {
         Self { char_len: text.char_len(), width: text.width(), text, style: Some(style) }
     }
 }
 
-impl From<(Style, String)> for Text {
+impl From<(ContentStyle, String)> for Text {
     #[inline]
-    fn from((style, text): (Style, String)) -> Self {
+    fn from((style, text): (ContentStyle, String)) -> Self {
         Self { char_len: text.char_len(), width: text.width(), text, style: Some(style) }
     }
 }
@@ -537,14 +534,14 @@ impl From<String> for StyledLine {
     }
 }
 
-impl From<(String, Style)> for StyledLine {
-    fn from(text: (String, Style)) -> Self {
+impl From<(String, ContentStyle)> for StyledLine {
+    fn from(text: (String, ContentStyle)) -> Self {
         Self { inner: vec![text.into()] }
     }
 }
 
-impl From<(Style, String)> for StyledLine {
-    fn from(text: (Style, String)) -> Self {
+impl From<(ContentStyle, String)> for StyledLine {
+    fn from(text: (ContentStyle, String)) -> Self {
         Self { inner: vec![text.into()] }
     }
 }

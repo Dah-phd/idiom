@@ -5,13 +5,15 @@ use super::{
 use crate::{
     global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::{
-        backend::{BackendProtocol, Style},
+        backend::{BackendProtocol, StyleExt},
         count_as_string, TextField,
     },
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::style::ContentStyle;
+use fuzzy_matcher::skim::SkimMatcherV2;
 
 pub struct GoToLinePopup {
     line_idx: String,
@@ -41,7 +43,7 @@ impl GoToLinePopup {
 }
 
 impl PopupInterface for GoToLinePopup {
-    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         match key.code {
             KeyCode::Char(ch) if ch.is_numeric() => {
                 self.line_idx.push(ch);
@@ -60,7 +62,7 @@ impl PopupInterface for GoToLinePopup {
                 let mut builder = line.unsafe_builder(&mut gs.writer);
                 builder.push(" Go to >> ");
                 builder.push(&self.line_idx);
-                builder.push_styled("|", Style::slowblink());
+                builder.push_styled("|", ContentStyle::slowblink());
             }
             gs.writer.reset_style();
         };
@@ -88,7 +90,7 @@ impl FindPopup {
 }
 
 impl PopupInterface for FindPopup {
-    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         if matches!(key.code, KeyCode::Char('h' | 'H') if key.modifiers.contains(KeyModifiers::CONTROL)) {
             return IdiomEvent::FindToReplace(self.pattern.text.to_owned(), self.options.clone()).into();
         }

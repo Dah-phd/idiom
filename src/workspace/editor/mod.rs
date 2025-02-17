@@ -170,10 +170,13 @@ impl Editor {
                 }
                 return true;
             }
+            EditorAction::Backspace => {
+                self.actions.backspace(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
+            }
+            EditorAction::Delete => self.actions.del(&mut self.cursor, &mut self.content, &mut self.lexer),
             EditorAction::NewLine => self.actions.new_line(&mut self.cursor, &mut self.content, &mut self.lexer),
             EditorAction::Indent => self.actions.indent(&mut self.cursor, &mut self.content, &mut self.lexer),
-            EditorAction::Backspace => self.actions.backspace(&mut self.cursor, &mut self.content, &mut self.lexer),
-            EditorAction::Delete => self.actions.del(&mut self.cursor, &mut self.content, &mut self.lexer),
             EditorAction::RemoveLine => {
                 self.select_line();
                 if !self.cursor.select_is_none() {
@@ -286,15 +289,19 @@ impl Editor {
         };
     }
 
-    pub fn is_saved(&self) -> bool {
-        if let Ok(file_content) = std::fs::read_to_string(&self.path) {
-            return self
-                .content
-                .iter()
-                .map(|l| l.to_string())
-                .eq(file_content.split('\n').map(String::from).collect::<Vec<_>>());
-        };
-        false
+    pub fn is_saved(&self) -> IdiomResult<bool> {
+        let file_content = std::fs::read_to_string(&self.path)?;
+
+        let mut counter = 0_usize;
+        for expected in file_content.split('\n') {
+            match self.content.get(counter) {
+                Some(eline) if eline.content.as_str() == expected => {
+                    counter += 1;
+                }
+                _ => return Ok(false),
+            }
+        }
+        Ok(self.content.len() == counter)
     }
 
     #[inline(always)]
@@ -315,6 +322,18 @@ impl Editor {
     #[inline(always)]
     pub fn insert_snippet(&mut self, snippet: String, cursor_offset: Option<(usize, usize)>) {
         self.actions.insert_snippet(&mut self.cursor, snippet, cursor_offset, &mut self.content, &mut self.lexer);
+    }
+
+    #[inline(always)]
+    pub fn insert_snippet_with_select(&mut self, snippet: String, cursor_offset: (usize, usize), len: usize) {
+        self.actions.insert_snippet_with_select(
+            &mut self.cursor,
+            snippet,
+            cursor_offset,
+            len,
+            &mut self.content,
+            &mut self.lexer,
+        );
     }
 
     pub fn mass_replace(&mut self, mut ranges: Vec<(CursorPosition, CursorPosition)>, clip: String) {
@@ -469,7 +488,7 @@ impl Editor {
     pub fn try_write_file(&self, gs: &mut GlobalState) -> Option<String> {
         let content = self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n");
         if let Err(error) = std::fs::write(&self.path, &content) {
-            gs.error(error.to_string());
+            gs.error(error);
             return None;
         }
         Some(content)

@@ -1,25 +1,23 @@
-pub mod color;
-mod style;
+// pub mod color;
+use super::style::StyleExt;
+use crossterm::style::Color;
 use crossterm::{
     cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show},
     execute, queue,
-    style::{Color as CTColor, Print, ResetColor, SetStyle},
+    style::{ContentStyle, Print, ResetColor, SetStyle},
     terminal::{size, Clear, ClearType},
 };
 #[allow(unused_imports)]
 use std::{
     fmt::Display,
-    io::{Stdout, Write},
+    io::{StderrLock, Stdout, Write},
 };
 
 const ERR_MSG: &str = "Rendering (Stdout) Err:";
 
-pub use style::Style;
-
 use crate::render::layout::Rect;
 
 use super::BackendProtocol;
-pub type Color = CTColor;
 
 /// Thin wrapper around rendering framework, allowing easy switching of backend
 /// If stdout gets an error Backend will crash the program as rendering is to priority
@@ -27,11 +25,8 @@ pub type Color = CTColor;
 /// Main reason is to clear out the issue with PrintStyled on CrossTerm
 /// TODO: add termios & wezterm
 pub struct Backend {
-    // #[cfg(not(test))]
     writer: Stdout, // could be moved to locked state for performance but current frame generation is about 200 µs
-    // #[cfg(test)]
-    // writer: DummyOut,
-    default_styled: Option<Style>,
+    default_styled: Option<ContentStyle>,
 }
 
 impl Write for Backend {
@@ -113,20 +108,20 @@ impl BackendProtocol for Backend {
 
     /// sets the style for the print/print at
     #[inline]
-    fn set_style(&mut self, style: Style) {
+    fn set_style(&mut self, style: ContentStyle) {
         self.default_styled.replace(style);
-        queue!(self, ResetColor, SetStyle(style.into())).expect(ERR_MSG);
+        queue!(self, ResetColor, SetStyle(style)).expect(ERR_MSG);
     }
 
     #[inline]
-    fn get_style(&mut self) -> Style {
+    fn get_style(&mut self) -> ContentStyle {
         self.default_styled.unwrap_or_default()
     }
 
     #[inline]
     fn to_set_style(&mut self) {
         match self.default_styled {
-            Some(style) => queue!(self, ResetColor, SetStyle(style.into())),
+            Some(style) => queue!(self, ResetColor, SetStyle(style)),
             None => queue!(self, ResetColor),
         }
         .expect(ERR_MSG);
@@ -135,7 +130,7 @@ impl BackendProtocol for Backend {
     /// update existing style if exists otherwise sets it to the new one
     /// mods will be taken from updating and will replace fg and bg if present
     #[inline]
-    fn update_style(&mut self, style: Style) {
+    fn update_style(&mut self, style: ContentStyle) {
         if let Some(current) = self.default_styled.as_mut() {
             current.update(style);
         } else {
@@ -150,7 +145,7 @@ impl BackendProtocol for Backend {
         if let Some(current) = self.default_styled.as_mut() {
             current.set_fg(color);
         } else if let Some(color) = color {
-            self.default_styled.replace(Style::fg(color));
+            self.default_styled.replace(ContentStyle::fg(color));
         };
         self.to_set_style()
     }
@@ -161,7 +156,7 @@ impl BackendProtocol for Backend {
         if let Some(current) = self.default_styled.as_mut() {
             current.set_bg(color);
         } else if let Some(color) = color {
-            let style = Style::bg(color);
+            let style = ContentStyle::bg(color);
             self.default_styled.replace(style);
         }
         self.to_set_style();
@@ -211,29 +206,21 @@ impl BackendProtocol for Backend {
 
     /// prints styled text without affecting the writer set style
     #[inline]
-    fn print_styled<D: Display>(&mut self, text: D, style: Style) {
-        if let Some(restore_style) = self.default_styled {
-            queue!(self, SetStyle(style.into()), Print(text), ResetColor, SetStyle(restore_style.into()),)
-        } else {
-            queue!(self, SetStyle(style.into()), Print(text), ResetColor,)
+    fn print_styled<D: Display>(&mut self, text: D, style: ContentStyle) {
+        match self.default_styled {
+            Some(restore_style) => queue!(self, SetStyle(style), Print(text), ResetColor, SetStyle(restore_style),),
+            None => queue!(self, SetStyle(style), Print(text), ResetColor,),
         }
         .expect(ERR_MSG);
     }
 
     /// goes to location and prints styled text without affecting the writer set style
     #[inline]
-    fn print_styled_at<D: Display>(&mut self, row: u16, col: u16, text: D, style: Style) {
+    fn print_styled_at<D: Display>(&mut self, row: u16, col: u16, text: D, style: ContentStyle) {
         if let Some(restore_style) = self.default_styled {
-            queue!(
-                self,
-                SetStyle(style.into()),
-                MoveTo(col, row),
-                Print(text),
-                ResetColor,
-                SetStyle(restore_style.into()),
-            )
+            queue!(self, SetStyle(style), MoveTo(col, row), Print(text), ResetColor, SetStyle(restore_style),)
         } else {
-            queue!(self, SetStyle(style.into()), MoveTo(col, row), Print(text), ResetColor,)
+            queue!(self, SetStyle(style), MoveTo(col, row), Print(text), ResetColor,)
         }
         .expect(ERR_MSG);
     }

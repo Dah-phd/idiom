@@ -15,6 +15,7 @@ use crate::{
     },
 };
 
+#[inline]
 pub fn repositioning(cursor: &mut Cursor, content: &mut [EditorLine]) -> Option<usize> {
     if let Some(skipped) = calc_wrap_line_capped(&mut content[cursor.line], cursor) {
         cursor.at_line = cursor.line;
@@ -84,3 +85,6 @@ pub fn line(
         },
     }
 }
+
+#[cfg(test)]
+mod tests;

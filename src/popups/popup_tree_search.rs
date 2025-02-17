@@ -2,7 +2,7 @@ use super::PopupInterface;
 use crate::{
     global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::{
-        backend::{color, Style},
+        backend::StyleExt,
         layout::{IterLines, LineBuilder, BORDERS},
         state::State,
         TextField,
@@ -11,6 +11,8 @@ use crate::{
     workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::style::{Color, ContentStyle};
+use fuzzy_matcher::skim::SkimMatcherV2;
 use std::{path::PathBuf, sync::Arc};
 use tokio::{sync::Mutex, task::JoinHandle};
 
@@ -39,7 +41,7 @@ impl ActivePathSearch {
 }
 
 impl PopupInterface for ActivePathSearch {
-    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         if let Some(msg) = self.pattern.map(key, clipboard) {
             return msg;
         }
@@ -63,13 +65,13 @@ impl PopupInterface for ActivePathSearch {
         let mut area = gs.screen_rect.center(20, 120);
         area.bordered();
         area.draw_borders(None, None, &mut gs.writer);
-        area.border_title_styled(PATH_SEARCH_TITLE, Style::fg(color::blue()), &mut gs.writer);
+        area.border_title_styled(PATH_SEARCH_TITLE, ContentStyle::fg(Color::Blue), &mut gs.writer);
         let mut lines = area.into_iter();
         if let Some(line) = lines.next() {
             self.pattern.widget(line, &mut gs.writer);
         }
         if let Some(line) = lines.next() {
-            line.fill(BORDERS.horizontal, &mut gs.writer);
+            line.fill(BORDERS.horizontal_top, &mut gs.writer);
         }
         if let Some(list_rect) = lines.into_rect() {
             if self.options.is_empty() {
@@ -94,7 +96,7 @@ impl PopupInterface for ActivePathSearch {
             self.options = tree.search_paths(&self.pattern.text);
         };
         self.updated = true;
-        self.state.select(0, self.options.len());
+        self.state.reset();
     }
 
     fn collect_update_status(&mut self) -> bool {
@@ -134,7 +136,7 @@ impl ActiveFileSearch {
 }
 
 impl PopupInterface for ActiveFileSearch {
-    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         if let Some(msg) = self.pattern.map(key, clipboard) {
             return msg;
         }
@@ -166,15 +168,17 @@ impl PopupInterface for ActiveFileSearch {
         area.bordered();
         area.draw_borders(None, None, &mut gs.writer);
         match self.mode {
-            Mode::Full => area.border_title_styled(FULL_SEARCH_TITLE, Style::fg(color::red()), &mut gs.writer),
-            Mode::Select => area.border_title_styled(FILE_SEARCH_TITLE, Style::fg(color::yellow()), &mut gs.writer),
+            Mode::Full => area.border_title_styled(FULL_SEARCH_TITLE, ContentStyle::fg(Color::Red), &mut gs.writer),
+            Mode::Select => {
+                area.border_title_styled(FILE_SEARCH_TITLE, ContentStyle::fg(Color::Yellow), &mut gs.writer)
+            }
         }
         let mut lines = area.into_iter();
         if let Some(line) = lines.next() {
             self.pattern.widget(line, &mut gs.writer);
         }
         if let Some(line) = lines.next() {
-            line.fill(BORDERS.horizontal, &mut gs.writer);
+            line.fill(BORDERS.horizontal_top, &mut gs.writer);
         }
         if let Some(list_rect) = lines.into_rect() {
             if self.options.is_empty() {
@@ -209,7 +213,7 @@ impl PopupInterface for ActiveFileSearch {
             return;
         };
         self.options.clear();
-        self.state.select(0, 1);
+        self.state.reset();
         let tree_path = match self.mode {
             Mode::Full => file_tree.shallow_copy_root_tree_path(),
             Mode::Select => file_tree.shallow_copy_selected_tree_path(),

@@ -32,14 +32,14 @@ impl TreeWatcher {
 
     pub fn watch(&mut self, path: &Path) -> IdiomResult<()> {
         if let Self::System { inner: _inner, .. } = self {
-            _inner.watch(path, RecursiveMode::NonRecursive).map_err(|err| IdiomError::IOError(err.to_string()))?;
+            _inner.watch(path, RecursiveMode::NonRecursive).map_err(|err| IdiomError::any(err.to_string()))?;
         }
         Ok(())
     }
 
     pub fn stop_watch(&mut self, path: &Path) -> IdiomResult<()> {
         if let Self::System { inner: _inner, .. } = self {
-            _inner.unwatch(path).map_err(|err| IdiomError::IOError(err.to_string()))?;
+            _inner.unwatch(path).map_err(|err| IdiomError::any(err.to_string()))?;
         }
         Ok(())
     }
@@ -106,7 +106,10 @@ impl EventHandles {
                         match path.parent().and_then(|path| tree.find_by_path_skip_root(path, path_parser)) {
                             Some(inner_tree) => {
                                 self.remove(Self::TREE_PARTIAL);
-                                inner_tree.sync();
+                                if inner_tree.sync().is_err() {
+                                    tree.sync_base();
+                                    return;
+                                };
                             }
                             None => {
                                 tree.sync_base();

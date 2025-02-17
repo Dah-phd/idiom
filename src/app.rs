@@ -33,7 +33,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
 
     // CLI SETUP
     if let Some(path) = open_file {
-        tree.select_by_path(&path);
+        tree.select_by_path(&path).unwrap();
         gs.event.push(IdiomEvent::OpenAtLine(path, 0));
         gs.toggle_tree();
     }
@@ -74,7 +74,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
                                 }
                                 GeneralAction::InvokePallet => gs.popup(Pallet::new()),
                                 GeneralAction::Exit => {
-                                    if workspace.are_updates_saved() && !gs.has_popup() {
+                                    if workspace.are_updates_saved(&mut gs) && !gs.has_popup() {
                                         gs.exit = true;
                                     } else {
                                         gs.popup(save_all_popup());

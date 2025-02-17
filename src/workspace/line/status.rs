@@ -1,5 +1,7 @@
-use std::{ops::Range, str::Chars};
-use unicode_width::UnicodeWidthChar;
+use crate::render::utils::CharLimitedWidths;
+use std::ops::Range;
+
+type Reduction = usize;
 
 #[derive(Default)]
 pub enum RenderStatus {
@@ -74,62 +76,74 @@ impl RenderStatus {
         }
     }
 
-    pub fn generate_skipped_chars_simple(&mut self, cursor_idx: usize, line_width: usize) -> (usize, usize) {
+    pub fn generate_skipped_chars_simple(&mut self, cursor_idx: usize, line_width: usize) -> (usize, Reduction) {
         let mut idx = self.skipped_chars();
-        let mut reduction = if idx == 0 { 2 } else { 4 };
+        let mut reduction = if idx == 0 { 1 } else { 2 };
         if cursor_idx > idx + line_width.saturating_sub(reduction + 1) {
             if idx == 0 {
-                reduction += 2;
+                reduction += 1;
             }
             idx = cursor_idx - line_width.saturating_sub(reduction + 1);
-            self.set_skipped_chars(idx);
         } else if idx > cursor_idx {
-            if cursor_idx == 2 {
+            if cursor_idx < 2 {
                 idx = 0;
             } else {
                 idx = cursor_idx;
             }
             if idx == 0 {
-                reduction -= 2;
+                reduction -= 1;
             }
-            self.set_skipped_chars(idx);
         }
+        self.set_skipped_chars(idx);
         (idx, reduction)
     }
 
     pub fn generate_skipped_chars_complex(
         &mut self,
+        text: &str,
+        char_len: usize,
         cursor_idx: usize,
         mut line_width: usize,
-        content: Chars<'_>,
     ) -> usize {
-        line_width -= 3;
         let mut idx = self.skipped_chars();
+
+        // edge case if cursor == skipped just return
         if idx == cursor_idx {
             return idx;
         }
+
+        // cursor is within skipped chars
         if idx > cursor_idx {
-            if cursor_idx < 3 {
+            if cursor_idx < 2 {
                 self.set_skipped_chars(0);
                 return 0;
             };
             self.set_skipped_chars(cursor_idx);
             return cursor_idx;
         }
-        let widths =
-            content.take(cursor_idx).skip(idx).map(|ch| UnicodeWidthChar::width(ch).unwrap_or(1)).collect::<Vec<_>>();
-        for ch_width in widths.into_iter().rev() {
+
+        // setting up offsets and idx
+        let skip = char_len.saturating_sub(cursor_idx + 1);
+        let mut new_idx = cursor_idx + 1;
+        line_width -= 2;
+
+        let widths = CharLimitedWidths::new(text, 3).rev().map(|(.., w)| w).skip(skip);
+
+        for ch_width in widths {
             if ch_width > line_width {
-                idx += 1;
-                line_width = 0;
-            } else {
-                line_width -= ch_width;
+                break;
             }
+            line_width -= ch_width;
+            new_idx -= 1;
         }
-        if idx < 3 {
+
+        idx = std::cmp::max(idx, new_idx);
+
+        if idx < 2 {
             self.set_skipped_chars(0);
             return 0;
         }
+
         self.set_skipped_chars(idx);
         idx
     }

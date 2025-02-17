@@ -14,7 +14,6 @@ pub struct Pallet {
     commands: Vec<(i64, Command)>,
     access_cb: Option<fn(&mut Workspace, &mut Tree)>,
     pattern: TextField<bool>,
-    matcher: SkimMatcherV2,
     updated: bool,
     rect: Option<Rect>,
     state: State,
@@ -65,7 +64,7 @@ impl PopupInterface for Pallet {
         self.state.render_list(options, rect, gs.backend());
     }
 
-    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, matcher: &SkimMatcherV2) -> PopupMessage {
         if self.commands.is_empty() {
             return PopupMessage::Clear;
         }
@@ -73,7 +72,7 @@ impl PopupInterface for Pallet {
         if let Some(updated) = self.pattern.map(key, clipboard) {
             if updated {
                 for (score, cmd) in self.commands.iter_mut() {
-                    *score = match self.matcher.fuzzy_match(cmd.label, &self.pattern.text) {
+                    *score = match matcher.fuzzy_match(cmd.label, &self.pattern.text) {
                         Some(new_score) => new_score,
                         None => i64::MAX,
                     };
@@ -174,7 +173,6 @@ impl Pallet {
             commands,
             access_cb: None,
             pattern: TextField::new(String::new(), Some(true)),
-            matcher: SkimMatcherV2::default(),
             updated: true,
             rect: None,
             state: State::new(),

@@ -14,7 +14,7 @@ mod workspace;
 
 use app::app;
 use clap::Parser;
-use cli::{Args, TreeSeletor};
+use cli::Args;
 use error::IdiomResult;
 use render::backend::{Backend, BackendProtocol};
 
@@ -22,9 +22,6 @@ use render::backend::{Backend, BackendProtocol};
 async fn main() -> IdiomResult<()> {
     let args = Args::parse();
     let mut backend = Backend::init();
-    let open_file = match args.select {
-        false => args.get_path()?,
-        true => TreeSeletor::select(&mut backend)?,
-    };
+    let open_file = args.collect(&mut backend)?;
     app(open_file, backend).await
 }

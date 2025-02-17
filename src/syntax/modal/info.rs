@@ -4,13 +4,14 @@ use crate::{
     global_state::GlobalState,
     lsp::Highlighter,
     render::{
-        backend::Style,
+        backend::StyleExt,
         layout::{IterLines, Rect},
         state::State,
         widgets::{StyledLine, Writable},
     },
     syntax::{Action, DiagnosticInfo},
 };
+use crossterm::style::ContentStyle;
 use lsp_types::{Documentation, Hover, HoverContents, MarkedString, SignatureHelp, SignatureInformation};
 use std::cmp::Ordering;
 
@@ -36,7 +37,7 @@ impl Info {
         let mode = if info.actions.is_some() { Mode::Select } else { Mode::Text };
         let mut text = Vec::new();
         for (msg, color) in info.messages.into_iter() {
-            let style = Style::fg(color);
+            let style = ContentStyle::fg(color);
             for line in msg.split("\n") {
                 text.push((String::from(line), style).into());
             }

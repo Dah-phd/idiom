@@ -221,7 +221,7 @@ fn map_preload(
                         return Some(cmd.to_owned());
                     }
                 }
-                Err(error) => gs.error(error.to_string()),
+                Err(error) => gs.error(error),
             }
         }
     }

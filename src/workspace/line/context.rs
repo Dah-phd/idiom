@@ -2,17 +2,16 @@ use super::status::RenderStatus;
 use super::EditorLine;
 use crate::{
     global_state::GlobalState,
-    render::{
-        backend::{color, BackendProtocol, Style},
-        layout::Line,
-    },
+    render::{backend::BackendProtocol, layout::Line},
     syntax::Lexer,
     workspace::{cursor::Cursor, CursorPosition},
 };
+use crossterm::style::ContentStyle;
 use std::{cmp::Ordering, ops::Range};
 
 pub struct LineContext<'a> {
     pub lexer: &'a mut Lexer,
+    pub accent_style: ContentStyle,
     line_number: usize,
     line_number_offset: usize,
     line: usize,
@@ -21,10 +20,23 @@ pub struct LineContext<'a> {
 }
 
 impl<'a> LineContext<'a> {
-    pub fn collect_context(lexer: &'a mut Lexer, cursor: &Cursor, line_number_offset: usize) -> Self {
+    pub fn collect_context(
+        lexer: &'a mut Lexer,
+        cursor: &Cursor,
+        line_number_offset: usize,
+        accent_style: ContentStyle,
+    ) -> Self {
         let line_number = cursor.at_line;
         let select = cursor.select_get();
-        Self { line: cursor.line - line_number, char: cursor.char, select, lexer, line_number, line_number_offset }
+        Self {
+            line: cursor.line - line_number,
+            char: cursor.char,
+            select,
+            lexer,
+            line_number,
+            line_number_offset,
+            accent_style,
+        }
     }
 
     /// Ensures during deletion of lines, if scrolling has happened that last line will be rendered
@@ -66,7 +78,7 @@ impl<'a> LineContext<'a> {
         self.line_number += 1;
         let text = format!("{: >1$} ", self.line_number, self.line_number_offset);
         let remaining_width = line.width - text.len();
-        backend.print_styled_at(line.row, line.col, text, Style::fg(color::dark_grey()));
+        backend.print_styled_at(line.row, line.col, text, self.accent_style);
         backend.clear_to_eol();
         remaining_width
     }
@@ -74,7 +86,7 @@ impl<'a> LineContext<'a> {
     #[inline]
     pub fn wrap_line(&mut self, line: Line, backend: &mut impl BackendProtocol) {
         let text = format!("{: >1$} ", "", self.line_number_offset);
-        backend.print_styled_at(line.row, line.col, text, Style::fg(color::dark_grey()));
+        backend.print_styled_at(line.row, line.col, text, self.accent_style);
         backend.clear_to_eol();
     }
 

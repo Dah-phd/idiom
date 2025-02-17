@@ -1,33 +1,23 @@
+use super::StyledParser;
 use crate::{
     render::{
         backend::{Backend, BackendProtocol, StyleExt},
         layout::RectIter,
-        utils::{CharLimitedWidths, WriteChunks},
+        utils::CharLimitedWidths,
     },
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::ContentStyle;
 use std::ops::Range;
 
-pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut impl BackendProtocol) {
-    let line_width = match lines.next() {
-        Some(line) => ctx.setup_line(line, backend),
-        None => return,
-    };
-    let mut chunks = WriteChunks::new(&text.content, line_width);
-    match chunks.next() {
-        Some(chunk) => backend.print(chunk.text),
-        None => return,
-    }
-    for chunk in chunks {
-        match lines.next() {
-            None => return,
-            Some(line) => {
-                ctx.wrap_line(line, backend);
-            }
+pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut Backend) {
+    match StyledParser::new_complex(lines, ctx, backend) {
+        Some(parser) => {
+            parser.render(&text.content);
         }
-        backend.print(chunk.text);
+        None => (),
     }
+    backend.reset_style();
 }
 
 pub fn line_with_select(

@@ -28,13 +28,10 @@ Python should work for the most part with jedi, but the interaction is not well 
 
 ## TODO
 - write tests
-- tree watcher cold start
 - lsp server cold start, maybe? "jedi-language server" starts slow
-- see if you can fill in $1value on snippeds
 
 ## Initial target langs
-
-- RUST
-- Python
-- JS/TS
-- HTML/JSON/TOML/{YAML/YML}
+1. RUST
+2. Python
+3. JS/TS
+4. HTML/JSON/TOML/{YAML/YML}

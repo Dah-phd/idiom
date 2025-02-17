@@ -1,3 +1,4 @@
+mod file_clipboard;
 mod tree_paths;
 mod watcher;
 use crate::{
@@ -5,11 +6,12 @@ use crate::{
     error::{IdiomError, IdiomResult},
     global_state::{GlobalState, IdiomEvent},
     lsp::{DiagnosticType, TreeDiagnostics},
-    popups::popups_tree::{create_file_popup, rename_file_popup},
-    render::state::State,
+    popups::popups_tree::{create_file_popup, create_root_file_popup, rename_file_popup},
+    render::{backend::BackendProtocol, state::State},
     utils::{build_file_or_folder, to_canon_path, to_relative_path},
 };
 use crossterm::event::KeyEvent;
+use file_clipboard::FileClipboard;
 use std::{
     collections::{hash_map::Entry, HashMap},
     path::{Path, PathBuf},
@@ -22,6 +24,7 @@ type PathParser = fn(&Path) -> IdiomResult<PathBuf>;
 pub struct Tree {
     pub key_map: TreeKeyMap,
     pub watcher: TreeWatcher,
+    tree_clipboard: FileClipboard,
     state: State,
     diagnostics_state: HashMap<PathBuf, DiagnosticType>,
     selected_path: PathBuf,
@@ -37,10 +40,11 @@ impl Tree {
             Ok(selected_path) => {
                 let path_str = selected_path.display().to_string();
                 let display_offset = path_str.split(std::path::MAIN_SEPARATOR).count() * 2;
-                let tree = TreePath::from_path(selected_path.clone());
+                let tree = TreePath::from_path(selected_path.clone()).unwrap();
                 Self {
                     watcher: TreeWatcher::root(&selected_path),
                     state: State::new(),
+                    tree_clipboard: FileClipboard::default(),
                     key_map,
                     display_offset,
                     path_parser: to_canon_path,
@@ -53,10 +57,11 @@ impl Tree {
             Err(err) => {
                 gs.error(err.to_string());
                 let selected_path = PathBuf::from("./");
-                let tree = TreePath::from_path(selected_path.clone());
+                let tree = TreePath::from_path(selected_path.clone()).unwrap();
                 Self {
                     watcher: TreeWatcher::root(&selected_path),
                     state: State::new(),
+                    tree_clipboard: FileClipboard::default(),
                     key_map,
                     display_offset: 2,
                     path_parser: to_relative_path,
@@ -74,13 +79,25 @@ impl Tree {
         iter.next();
         let mut lines = gs.tree_area.into_iter();
         for (idx, tree_path) in iter.enumerate().skip(self.state.at_line) {
-            let line = match lines.next() {
+            let mut line = match lines.next() {
                 Some(line) => line,
                 None => return,
             };
             if idx == self.state.selected {
+                if let Some(mark) = self.tree_clipboard.get_mark(tree_path.path()) {
+                    if mark.len() + 10 < line.width {
+                        line.width -= mark.len();
+                        gs.writer.print_styled_at(line.row, line.col + line.width as u16, mark, self.state.highlight);
+                    }
+                }
                 tree_path.render_styled(self.display_offset, line, self.state.highlight, &mut gs.writer);
             } else {
+                if let Some(mark) = self.tree_clipboard.get_mark(tree_path.path()) {
+                    if mark.len() + 10 < line.width {
+                        line.width -= mark.len();
+                        gs.writer.print_at(line.row, line.col + line.width as u16, mark);
+                    }
+                }
                 tree_path.render(self.display_offset, line, &mut gs.writer);
             }
         }
@@ -111,11 +128,76 @@ impl Tree {
                 TreeAction::Delete => {
                     let _ = self.delete_file(gs);
                 }
-                TreeAction::NewFile => gs.popup(create_file_popup(self.get_first_selected_folder_display())),
-                TreeAction::Rename => {
-                    if let Some(tree_path) = self.tree.get_mut_from_inner(self.state.selected) {
-                        gs.popup(rename_file_popup(tree_path.path().display().to_string()));
+                TreeAction::NewFile => {
+                    let root = self.tree.path().to_owned();
+                    match self.tree.get_mut_from_inner(self.state.selected) {
+                        // root cannot be file
+                        Some(TreePath::File { path, .. }) => match path.parent() {
+                            Some(parent) if parent != &root => gs.popup(create_file_popup(parent.to_owned())),
+                            _ => gs.popup(create_root_file_popup()),
+                        },
+                        // in case folder is not expanded create in parant
+                        Some(TreePath::Folder { path, tree: None, .. }) => {
+                            // should be unreachable
+                            if &root == path {
+                                gs.popup(create_root_file_popup());
+                            } else {
+                                match path.parent() {
+                                    Some(parent) if parent != &root => gs.popup(create_file_popup(parent.to_owned())),
+                                    _ => gs.popup(create_root_file_popup()),
+                                }
+                            }
+                        }
+                        // create in selected dir (root check)
+                        Some(TreePath::Folder { path, tree: Some(..), .. }) => match path == &root {
+                            true => gs.popup(create_root_file_popup()),
+                            false => gs.popup(create_file_popup(path.to_owned())),
+                        },
+                        // nothing is selected
+                        None => gs.popup(create_root_file_popup()),
+                    };
+                }
+                TreeAction::CopyFile => {
+                    if self.tree.path() != &self.selected_path {
+                        self.tree_clipboard.force_copy(self.selected_path.to_owned());
+                        self.rebuild = true;
                     }
+                }
+                TreeAction::MarkCopyFile => {
+                    if self.tree.path() != &self.selected_path {
+                        self.tree_clipboard.copy(self.selected_path.to_owned());
+                        self.rebuild = true;
+                    }
+                }
+                TreeAction::CutFile => {
+                    if self.tree.path() != &self.selected_path {
+                        self.tree_clipboard.force_cut(self.selected_path.to_owned());
+                        self.rebuild = true;
+                    }
+                }
+                TreeAction::MarkCutFile => {
+                    if self.tree.path() != &self.selected_path {
+                        self.tree_clipboard.cut(self.selected_path.to_owned());
+                        self.rebuild = true;
+                    }
+                }
+                TreeAction::Paste => match self.tree.get_mut_from_inner(self.state.selected) {
+                    Some(TreePath::Folder { path, tree: Some(..), .. }) => {
+                        self.tree_clipboard.paste(path.to_owned(), gs);
+                    }
+                    Some(TreePath::Folder { path, tree: None, .. }) | Some(TreePath::File { path, .. }) => {
+                        match path.parent() {
+                            Some(parent) => self.tree_clipboard.paste(parent.to_owned(), gs),
+                            None => gs.error(IdiomError::io_parent_not_found(path)),
+                        }
+                    }
+                    None => {
+                        gs.error("Unable to find selected path ... dropping clipboard and rebasing");
+                        self.error_reset();
+                    }
+                },
+                TreeAction::Rename => {
+                    gs.popup(rename_file_popup(self.selected_path.display().to_string()));
                 }
                 TreeAction::IncreaseSize => gs.expand_tree_size(),
                 TreeAction::DecreaseSize => gs.shrink_tree_size(),
@@ -132,10 +214,16 @@ impl Tree {
             if let Err(err) = self.watcher.watch(path) {
                 gs.error(err.to_string());
             };
-            tree_path.expand();
-            for (d_path, new_diagnostic) in self.diagnostics_state.iter() {
-                tree_path.map_diagnostics_base(d_path, *new_diagnostic);
-            }
+            match tree_path.expand() {
+                Ok(..) => {
+                    for (d_path, new_diagnostic) in self.diagnostics_state.iter() {
+                        tree_path.map_diagnostics_base(d_path, *new_diagnostic);
+                    }
+                }
+                Err(error) => {
+                    gs.error(error);
+                }
+            };
             self.rebuild = true;
             None
         } else {
@@ -153,20 +241,22 @@ impl Tree {
         }
     }
 
-    pub fn mouse_select(&mut self, idx: usize) -> Option<PathBuf> {
+    pub fn mouse_select(&mut self, idx: usize, gs: &mut GlobalState) -> Option<PathBuf> {
         if self.tree.len() > idx {
-            self.state.selected = idx.saturating_sub(1);
+            self.state.selected = idx.saturating_sub(1) + self.state.at_line;
             if let Some(selected) = self.tree.get_mut_from_inner(self.state.selected) {
                 match selected {
                     TreePath::Folder { tree: Some(..), .. } => {
                         selected.take_tree();
                     }
-                    TreePath::Folder { tree: None, .. } => {
-                        selected.expand();
-                        for (d_path, new_diagnostic) in self.diagnostics_state.iter() {
-                            selected.map_diagnostics_base(d_path, *new_diagnostic);
+                    TreePath::Folder { tree: None, .. } => match selected.expand() {
+                        Ok(..) => {
+                            for (d_path, new_diagnostic) in self.diagnostics_state.iter() {
+                                selected.map_diagnostics_base(d_path, *new_diagnostic);
+                            }
                         }
-                    }
+                        Err(error) => gs.error(error),
+                    },
                     TreePath::File { path, .. } => {
                         self.selected_path = path.clone();
                         self.rebuild = true;
@@ -180,7 +270,7 @@ impl Tree {
         None
     }
 
-    fn select_up(&mut self, gs: &mut GlobalState) {
+    pub fn select_up(&mut self, gs: &mut GlobalState) {
         let tree_len = self.tree.len() - 1;
         if tree_len == 0 {
             return;
@@ -190,7 +280,7 @@ impl Tree {
         self.unsafe_set_path();
     }
 
-    fn select_down(&mut self, gs: &mut GlobalState) {
+    pub fn select_down(&mut self, gs: &mut GlobalState) {
         let tree_len = self.tree.len() - 1;
         if tree_len == 0 {
             return;
@@ -228,12 +318,22 @@ impl Tree {
     }
 
     pub fn create_file_or_folder(&mut self, name: String) -> IdiomResult<PathBuf> {
-        let path = build_file_or_folder(self.selected_path.clone(), &name)?;
+        let path = match self.tree.get_mut_from_inner(self.state.selected) {
+            Some(TreePath::Folder { path, tree: Some(..), .. }) | Some(TreePath::File { path, .. }) => {
+                build_file_or_folder(path.to_owned(), &name)?
+            }
+            Some(TreePath::Folder { path, tree: None, .. }) => match path.parent() {
+                Some(parent) => build_file_or_folder(parent.to_owned(), &name)?,
+                None => return Err(IdiomError::io_parent_not_found(path)),
+            },
+            // build file where wanted
+            None => build_file_or_folder(self.selected_path.clone(), &name)?,
+        };
         Ok(path)
     }
 
     pub fn create_file_or_folder_base(&mut self, name: String) -> IdiomResult<PathBuf> {
-        let path = build_file_or_folder(PathBuf::from("./"), &name)?;
+        let path = build_file_or_folder(self.tree.path().to_owned(), &name)?;
         Ok(path)
     }
 
@@ -262,6 +362,12 @@ impl Tree {
                 let mut abs_new_path = old_path.clone();
                 abs_new_path.pop();
                 abs_new_path.push(&name);
+                if abs_new_path.exists() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::AlreadyExists,
+                        "Unable to rename to already existing path!",
+                    ));
+                }
                 std::fs::rename(&old_path, &abs_new_path).map(|_| (old_path, abs_new_path))
             })
             .map_err(IdiomError::from);
@@ -274,7 +380,7 @@ impl Tree {
     }
 
     pub fn search_paths(&self, pattern: &str) -> Vec<PathBuf> {
-        self.tree.shallow_copy().search_tree_paths(pattern)
+        self.tree.shallow_copy().search_tree_paths(pattern).unwrap()
     }
 
     pub fn shallow_copy_root_tree_path(&self) -> TreePath {
@@ -288,27 +394,26 @@ impl Tree {
         }
     }
 
-    pub fn select_by_path(&mut self, path: &PathBuf) {
+    pub fn select_by_path(&mut self, path: &PathBuf) -> IdiomResult<()> {
         let rel_result = (self.path_parser)(path);
         let path = rel_result.as_ref().unwrap_or(path);
-        if self.tree.expand_contained(path, &mut self.watcher) {
-            self.selected_path.clone_from(path);
-            self.state.selected = self.tree.iter().skip(1).position(|tp| tp.path() == path).unwrap_or_default();
-            self.rebuild_diagnostics();
-            self.rebuild = true;
-        }
-    }
-
-    pub fn get_first_selected_folder_display(&mut self) -> String {
-        if let Some(tree_path) = self.tree.get_mut_from_inner(self.state.selected) {
-            if tree_path.path().is_dir() {
-                return tree_path.path().as_path().display().to_string();
+        match self.tree.expand_contained(path, &mut self.watcher) {
+            Ok(true) => {
+                self.selected_path.clone_from(path);
+                self.state.selected = self.tree.iter().skip(1).position(|tp| tp.path() == path).unwrap_or_default();
+                self.rebuild_diagnostics();
+                self.rebuild = true;
+                Ok(())
             }
-            if let Some(parent) = tree_path.path().parent() {
-                return parent.display().to_string();
+            Ok(false) => {
+                self.state.reset();
+                Err(IdiomError::io_not_found("Unable to select file! Setting first as selected"))
+            }
+            Err(err) => {
+                self.error_reset();
+                Err(err)
             }
         }
-        "./".to_owned()
     }
 
     pub fn get_base_file_names(&self) -> Vec<String> {
@@ -323,15 +428,25 @@ impl Tree {
         for (idx, tree_path) in self.tree.iter().skip(1).enumerate() {
             if tree_path.path() == &self.selected_path {
                 self.state.selected = idx;
-                break;
+                return;
             }
         }
+        gs.error("IO NotFound: Unable to find selected path .. setting to first path");
+        self.error_reset();
     }
 
+    #[inline]
+    fn error_reset(&mut self) {
+        self.tree_clipboard.clear();
+        self.tree.sync_base();
+        self.unsafe_set_path();
+    }
+
+    /// sets path from idx without checking if it is correct
     fn unsafe_set_path(&mut self) {
         self.rebuild = true;
         if let Some(selected) = self.tree.get_mut_from_inner(self.state.selected) {
-            self.selected_path = selected.path().clone();
+            self.selected_path = selected.path().to_owned();
         }
     }
 }

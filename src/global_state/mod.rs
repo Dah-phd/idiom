@@ -7,6 +7,7 @@ mod message;
 
 use crate::{
     configs::{FileType, UITheme},
+    error::IdiomResult,
     lsp::{LSPError, LSPResult},
     popups::{self, PopupInterface},
     render::{
@@ -23,7 +24,11 @@ use crossterm::event::{KeyEvent, MouseEvent};
 pub use events::IdiomEvent;
 
 use draw::Components;
+use fuzzy_matcher::skim::SkimMatcherV2;
 use message::Messages;
+
+const MIN_HEIGHT: u16 = 4;
+const MIN_WIDTH: usize = 40;
 
 type KeyMapCallback = fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool;
 type MouseMapCallback = fn(&mut GlobalState, MouseEvent, &mut Tree, &mut Workspace);
@@ -46,6 +51,7 @@ pub struct GlobalState {
     pub tab_area: Rect,
     pub editor_area: Rect,
     pub footer_area: Rect,
+    pub matcher: SkimMatcherV2,
     messages: Messages,
     components: Components,
 }
@@ -53,7 +59,7 @@ pub struct GlobalState {
 impl GlobalState {
     pub fn new(backend: Backend) -> std::io::Result<Self> {
         let mut messages = Messages::new();
-        let theme = messages.unwrap_or_default(UITheme::new(), "Failed to load theme_ui.json");
+        let theme = messages.unwrap_or_default(UITheme::new(), "Failed to load theme_ui.toml");
         Backend::screen().map(|screen_rect| Self {
             mode: Mode::default(),
             tree_size: 15,
@@ -71,6 +77,7 @@ impl GlobalState {
             tab_area: Rect::default(),
             editor_area: Rect::default(),
             footer_area: Rect::default(),
+            matcher: SkimMatcherV2::default(),
             messages,
             components: Components::default(),
         })
@@ -241,7 +248,7 @@ impl GlobalState {
     }
 
     pub fn map_popup_if_exists(&mut self, key: &KeyEvent) -> bool {
-        match self.popup.map(key, &mut self.clipboard) {
+        match self.popup.map(key, &mut self.clipboard, &self.matcher) {
             PopupMessage::Clear => {
                 self.clear_popup();
             }
@@ -265,8 +272,8 @@ impl GlobalState {
     }
 
     #[inline]
-    pub fn error(&mut self, msg: impl Into<String>) {
-        self.messages.error(msg.into());
+    pub fn error(&mut self, error: impl ToString) {
+        self.messages.error(error.to_string());
     }
 
     #[inline]
@@ -287,6 +294,14 @@ impl GlobalState {
         self.messages.unwrap_or_default(result, prefix)
     }
 
+    /// logs IdiomError and drops the result
+    #[inline]
+    pub fn log_if_error<Any>(&mut self, result: IdiomResult<Any>) {
+        if let Err(error) = result {
+            self.error(error);
+        }
+    }
+
     /// unwrap LSP error and check status
     #[inline]
     pub fn log_if_lsp_error(&mut self, result: LSPResult<()>, file_type: FileType) {
@@ -304,7 +319,7 @@ impl GlobalState {
                 self.messages.error(message);
                 self.event.push(IdiomEvent::CheckLSP(file_type));
             }
-            _ => self.error(err.to_string()),
+            _ => self.error(err),
         }
     }
 

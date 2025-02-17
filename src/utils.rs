@@ -23,11 +23,8 @@ pub fn split_arc<T: Default>() -> (Arc<T>, Arc<T>) {
     (arc, clone)
 }
 
-pub fn get_nested_paths(path: &PathBuf) -> impl Iterator<Item = PathBuf> {
-    match std::fs::read_dir(path) {
-        Ok(iter) => iter.flatten().map(|p| p.path()),
-        Err(_) => todo!(),
-    }
+pub fn get_nested_paths(path: &PathBuf) -> IdiomResult<impl Iterator<Item = PathBuf>> {
+    Ok(std::fs::read_dir(path)?.flatten().map(|p| p.path()))
 }
 
 pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> IdiomResult<PathBuf> {
@@ -51,7 +48,7 @@ pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> IdiomResult<PathBu
         if let Some(file_name) = file_name {
             path.push(file_name);
             if path.exists() {
-                return Err(IdiomError::io_err("File already exists!"));
+                return Err(IdiomError::io_exists("File already exists!"));
             }
         }
         std::fs::write(&path, "")?;
@@ -79,7 +76,7 @@ pub fn to_relative_path(target_dir: &Path) -> IdiomResult<PathBuf> {
         }
     }
     if result.to_string_lossy().is_empty() {
-        Err(IdiomError::io_err("Empty buffer!"))
+        Err(IdiomError::io_other("Empty buffer!"))
     } else {
         Ok(result)
     }
@@ -247,7 +244,7 @@ impl<T> From<Vec<T>> for TrackedList<T> {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Offset {
     Pos(usize),
     Neg(usize),

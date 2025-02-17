@@ -1,21 +1,25 @@
+use super::WRAP_CLOSE;
+use crate::{
+    render::{
+        backend::{BackendProtocol, StyleExt},
+        utils::CharLimitedWidths,
+    },
+    workspace::line::{EditorLine, LineContext},
+};
+use crossterm::style::{ContentStyle, Stylize};
 use std::ops::Range;
 
-use crate::{
-    render::backend::{BackendProtocol, Style},
-    syntax::{tokens::TokenLine, Lexer},
-};
-
 pub fn complex_line(
-    content: impl Iterator<Item = char>,
-    tokens: &TokenLine,
-    lexer: &Lexer,
+    code: &EditorLine,
+    mut line_width: usize,
+    ctx: &mut LineContext,
     backend: &mut impl BackendProtocol,
-) {
-    let mut iter_tokens = tokens.iter();
+) -> Option<usize> {
+    let mut iter_tokens = code.iter_tokens();
     let mut counter = 0;
     let mut last_len = 0;
     let mut lined_up = None;
-    let char_position = lexer.char_lsp_pos;
+    let char_position = ctx.lexer.char_lsp_pos;
     if let Some(token) = iter_tokens.next() {
         if token.delta_start == 0 {
             counter = token.len;
@@ -26,7 +30,14 @@ pub fn complex_line(
         }
         last_len = token.len;
     };
-    for text in content {
+    for (text, width) in CharLimitedWidths::new(&code.content, 3) {
+        if line_width <= width {
+            backend.reset_style();
+            backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
+            return None;
+        } else {
+            line_width -= width;
+        }
         if counter == 0 {
             match lined_up.take() {
                 Some(style) => {
@@ -57,18 +68,20 @@ pub fn complex_line(
         backend.print(text);
     }
     backend.reset_style();
+    Some(line_width)
 }
 
 pub fn complex_line_with_select(
-    content: impl Iterator<Item = char>,
-    tokens: &TokenLine,
+    code: &EditorLine,
+    mut line_width: usize,
     select: Range<usize>,
-    lexer: &Lexer,
+    ctx: &mut LineContext,
     backend: &mut impl BackendProtocol,
-) {
-    let select_color = lexer.theme.selected;
-    let mut reset_style = Style::default();
-    let mut iter_tokens = tokens.iter();
+) -> Option<usize> {
+    let char_position = ctx.lexer.char_lsp_pos;
+    let select_color = ctx.lexer.theme.selected;
+    let mut reset_style = ContentStyle::default();
+    let mut iter_tokens = code.iter_tokens();
     let mut counter = 0;
     let mut last_len = 0;
     let mut lined_up = None;
@@ -82,7 +95,14 @@ pub fn complex_line_with_select(
         }
         last_len = token.len;
     };
-    for (idx, text) in content.enumerate() {
+    for (idx, (text, width)) in CharLimitedWidths::new(&code.content, 3).enumerate() {
+        if line_width <= width {
+            backend.reset_style();
+            backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
+            return None;
+        } else {
+            line_width -= width;
+        }
         if select.start == idx {
             backend.set_bg(Some(select_color));
             reset_style.set_bg(Some(select_color));
@@ -116,9 +136,10 @@ pub fn complex_line_with_select(
                 },
             }
         }
-        counter -= 1;
+        counter = counter.saturating_sub(char_position(text));
 
         backend.print(text);
     }
     backend.reset_style();
+    Some(line_width)
 }

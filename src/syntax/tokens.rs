@@ -1,5 +1,6 @@
 use super::{diagnostics::DiagnosticData, Legend};
-use crate::{render::backend::Style, workspace::cursor::Cursor, workspace::line::EditorLine};
+use crate::{render::backend::StyleExt, workspace::cursor::Cursor, workspace::line::EditorLine};
+use crossterm::style::ContentStyle;
 use lsp_types::SemanticToken;
 use unicode_width::UnicodeWidthChar;
 
@@ -80,20 +81,14 @@ impl TokenLine {
         self.inner.is_empty()
     }
 
-    pub fn increment_end(&mut self) {
-        if let Some(last) = self.inner.last_mut() {
-            last.len += 1;
-        }
-    }
-
     pub fn increment_at(&mut self, mut idx: usize) {
         let mut token_iter = self.inner.iter_mut();
         while let Some(token) = token_iter.next() {
-            if idx < token.delta_start {
+            if idx <= token.delta_start {
                 token.delta_start += 1;
                 return;
             };
-            if idx < token.delta_start + token.len {
+            if idx <= token.delta_start + token.len {
                 token.len += 1;
                 if let Some(next_token) = token_iter.next() {
                     next_token.delta_start += 1;
@@ -104,21 +99,35 @@ impl TokenLine {
         }
     }
 
-    pub fn decrement_at(&mut self, mut idx: usize) {
+    pub fn decrement_at(&mut self, mut char_idx: usize) {
         let mut token_iter = self.inner.iter_mut();
+        let mut token_idx = 0;
         while let Some(token) = token_iter.next() {
-            if idx < token.delta_start {
+            if char_idx < token.delta_start {
                 token.delta_start -= 1;
                 return;
             }
-            if idx < token.delta_start + token.len {
-                token.len -= 1;
-                if let Some(next_token) = token_iter.next() {
-                    next_token.delta_start -= 1;
+            if char_idx < token.delta_start + token.len {
+                match token.len > 1 {
+                    true => {
+                        if let Some(next_token) = token_iter.next() {
+                            next_token.delta_start -= 1;
+                        }
+                        token.len -= 1;
+                    }
+                    // should allways be 1, considering lsp working normally
+                    false => {
+                        let start_offset = self.inner.remove(token_idx).delta_start;
+                        if let Some(next_token) = self.inner.get_mut(token_idx) {
+                            next_token.delta_start += start_offset;
+                            next_token.delta_start -= 1;
+                        }
+                    }
                 }
                 return;
             }
-            idx -= token.delta_start;
+            char_idx -= token.delta_start;
+            token_idx += 1;
         }
     }
 
@@ -164,13 +173,13 @@ impl TokenLine {
 pub struct Token {
     pub len: usize,
     pub delta_start: usize,
-    pub style: Style,
+    pub style: ContentStyle,
 }
 
 impl Token {
     pub fn parse(token: SemanticToken, legend: &Legend) -> Self {
         let SemanticToken { delta_start, length, token_type, token_modifiers_bitset, .. } = token;
-        let style = Style::fg(legend.parse_to_color(token_type as usize, token_modifiers_bitset));
+        let style = ContentStyle::fg(legend.parse_to_color(token_type as usize, token_modifiers_bitset));
         Self { delta_start: delta_start as usize, len: length as usize, style }
     }
 
@@ -189,7 +198,11 @@ pub fn calc_wraps(content: &mut [EditorLine], text_width: usize) {
 pub fn calc_wrap_line(text: &mut EditorLine, text_width: usize) -> usize {
     if text.is_simple() {
         text.tokens.clear();
-        text.tokens.push(Token { len: 0, delta_start: text.content.len() / text_width, style: Style::default() });
+        text.tokens.push(Token {
+            len: 0,
+            delta_start: text.content.len() / text_width,
+            style: ContentStyle::default(),
+        });
     } else {
         complex_wrap_calc(text, text_width);
     }
@@ -199,7 +212,7 @@ pub fn calc_wrap_line(text: &mut EditorLine, text_width: usize) -> usize {
 pub fn complex_wrap_calc(text: &mut EditorLine, text_width: usize) {
     text.tokens.clear();
     let mut counter = text_width;
-    let mut wraps = Token { delta_start: 0, len: 0, style: Style::default() };
+    let mut wraps = Token { delta_start: 0, len: 0, style: ContentStyle::default() };
     for ch in text.content.chars() {
         let w = UnicodeWidthChar::width(ch).unwrap_or_default();
         if w > counter {
@@ -217,7 +230,11 @@ pub fn calc_wrap_line_capped(text: &mut EditorLine, cursor: &Cursor) -> Option<u
     let max_rows = cursor.max_rows;
     text.tokens.clear();
     if text.is_simple() {
-        text.tokens.push(Token { len: 0, delta_start: text.content.len() / text_width, style: Style::default() });
+        text.tokens.push(Token {
+            len: 0,
+            delta_start: text.content.len() / text_width,
+            style: ContentStyle::default(),
+        });
         let cursor_at_row = 2 + cursor_char / text_width;
         if cursor_at_row > max_rows {
             return Some(cursor_at_row - max_rows);
@@ -226,7 +243,7 @@ pub fn calc_wrap_line_capped(text: &mut EditorLine, cursor: &Cursor) -> Option<u
         let mut counter = text_width;
         let mut cursor_at_row = 1;
         let mut prev_idx_break = 0;
-        let mut wraps = Token { delta_start: 0, len: 0, style: Style::default() };
+        let mut wraps = Token { delta_start: 0, len: 0, style: ContentStyle::default() };
         for (idx, ch) in text.content.chars().enumerate() {
             let w = UnicodeWidthChar::width(ch).unwrap_or_default();
             if w > counter {

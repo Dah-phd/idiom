@@ -1,9 +1,11 @@
-use unicode_width::UnicodeWidthChar;
-
 use crate::{
-    render::backend::{Backend, BackendProtocol, Style},
+    render::{
+        backend::{Backend, BackendProtocol, StyleExt},
+        utils::CharLimitedWidths,
+    },
     workspace::line::{EditorLine, LineContext},
 };
+use crossterm::style::{ContentStyle, Stylize};
 use std::ops::Range;
 
 use super::{width_remainder, WRAP_CLOSE, WRAP_OPEN};
@@ -79,14 +81,14 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut Backend) {
         }
 
         if cursor_idx == idx {
-            backend.print_styled(text, Style::reversed())
+            backend.print_styled(text, ContentStyle::reversed())
         } else {
             backend.print(text);
         }
         idx += 1;
     }
     if idx <= cursor_idx {
-        backend.print_styled(" ", Style::reversed());
+        backend.print_styled(" ", ContentStyle::reversed());
     }
     backend.reset_style();
 }
@@ -94,7 +96,7 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut Backend) {
 pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backend: &mut Backend) {
     let char_position = ctx.lexer.char_lsp_pos;
     let select_color = ctx.lexer.theme.selected;
-    let mut reset_style = Style::default();
+    let mut reset_style = ContentStyle::default();
     let mut tokens = line.iter_tokens();
     let mut counter = 0;
     let mut last_len = 0;
@@ -149,7 +151,7 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backen
         }
 
         if cursor_idx == idx {
-            backend.print_styled(text, Style::reversed())
+            backend.print_styled(text, ContentStyle::reversed())
         } else {
             backend.print(text);
         }
@@ -157,27 +159,23 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backen
         idx += 1;
     }
     if idx <= cursor_idx {
-        backend.print_styled(" ", Style::reversed());
+        backend.print_styled(" ", ContentStyle::reversed());
     }
     backend.reset_style();
 }
 
-pub fn partial(line: &mut EditorLine, ctx: &mut LineContext, mut line_width: usize, backend: &mut Backend) {
-    line_width -= 2;
-
+pub fn partial(code: &mut EditorLine, ctx: &mut LineContext, mut line_width: usize, backend: &mut Backend) {
     let cursor_idx = ctx.cursor_char();
     let char_position = ctx.lexer.char_lsp_pos;
-    let mut idx = line.cached.generate_skipped_chars_complex(cursor_idx, line_width, line.content.chars());
-    let mut content = line.chars();
-
+    let mut idx = code.cached.generate_skipped_chars_complex(&code.content, code.char_len(), cursor_idx, line_width);
+    let mut content = CharLimitedWidths::new(&code.content, 3);
     let mut cursor = 0;
-    let mut counter_to_idx = idx;
-    while counter_to_idx != 0 {
-        cursor += content.next().map(char_position).unwrap_or_default();
-        counter_to_idx -= 1;
+
+    for _ in 0..idx {
+        cursor += content.next().map(|(ch, ..)| char_position(ch)).unwrap_or_default();
     }
 
-    let mut tokens = line.iter_tokens();
+    let mut tokens = code.iter_tokens();
     let mut counter = 0;
     let mut last_len = 0;
     let mut lined_up = None;
@@ -198,11 +196,11 @@ pub fn partial(line: &mut EditorLine, ctx: &mut LineContext, mut line_width: usi
     }
 
     if idx != 0 {
-        backend.print_styled(WRAP_OPEN, Style::reversed());
-        line_width -= 2;
+        backend.print_styled(WRAP_OPEN, ctx.accent_style.reverse());
+        line_width -= 1;
     }
 
-    for text in content {
+    for (text, char_width) in content {
         if counter == 0 {
             match lined_up.take() {
                 Some(style) => {
@@ -231,9 +229,6 @@ pub fn partial(line: &mut EditorLine, ctx: &mut LineContext, mut line_width: usi
             counter = counter.saturating_sub(char_position(text));
         }
 
-        // handle width
-        let char_width = UnicodeWidthChar::width(text).unwrap_or(1);
-
         if char_width > line_width {
             break;
         } else {
@@ -241,50 +236,47 @@ pub fn partial(line: &mut EditorLine, ctx: &mut LineContext, mut line_width: usi
         }
 
         if cursor_idx == idx {
-            backend.print_styled(text, Style::reversed());
+            backend.print_styled(text, ContentStyle::reversed());
         } else {
             backend.print(text);
         }
 
         idx += 1;
     }
+
+    backend.reset_style();
     if idx <= cursor_idx {
-        backend.print_styled(" ", Style::reversed());
-    } else if line.char_len() > idx {
-        backend.reset_style();
-        backend.print_styled(WRAP_CLOSE, Style::reversed());
+        backend.print_styled(" ", ContentStyle::reversed());
+    } else if code.char_len() > idx {
+        backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
     }
 }
 
 pub fn partial_select(
-    line: &mut EditorLine,
+    code: &mut EditorLine,
     ctx: &mut LineContext,
     select: Range<usize>,
     mut line_width: usize,
     backend: &mut Backend,
 ) {
-    line_width -= 2;
-
     let cursor_idx = ctx.cursor_char();
     let char_position = ctx.lexer.char_lsp_pos;
-    let mut idx = line.cached.generate_skipped_chars_complex(cursor_idx, line_width, line.content.chars());
-    let mut content = line.chars();
+    let mut idx = code.cached.generate_skipped_chars_complex(&code.content, code.char_len(), cursor_idx, line_width);
+    let mut content = CharLimitedWidths::new(&code.content, 3);
 
     let mut cursor = 0;
-    let mut counter_to_idx = idx;
-    while counter_to_idx != 0 {
-        cursor += content.next().map(char_position).unwrap_or_default();
-        counter_to_idx -= 1;
+    for _ in 0..idx {
+        cursor += content.next().map(|(ch, ..)| char_position(ch)).unwrap_or_default();
     }
 
     let select_color = ctx.lexer.theme.selected;
-    let mut reset_style = Style::default();
+    let mut reset_style = ContentStyle::default();
     if select.start <= idx && idx < select.end {
         reset_style.set_bg(Some(select_color));
         backend.set_bg(Some(select_color));
     }
 
-    let mut tokens = line.iter_tokens();
+    let mut tokens = code.iter_tokens();
     let mut counter = 0;
     let mut last_len = 0;
     let mut lined_up = None;
@@ -305,11 +297,11 @@ pub fn partial_select(
     }
 
     if idx != 0 {
-        backend.print_styled(WRAP_OPEN, Style::reversed());
-        line_width -= 2;
+        backend.print_styled(WRAP_OPEN, ctx.accent_style.reverse());
+        line_width -= 1;
     };
 
-    for text in content {
+    for (text, char_width) in content {
         if select.start == idx {
             backend.set_bg(Some(select_color));
             reset_style.set_bg(Some(select_color));
@@ -346,9 +338,6 @@ pub fn partial_select(
             counter = counter.saturating_sub(char_position(text));
         }
 
-        // handle width
-        let char_width = UnicodeWidthChar::width(text).unwrap_or(1);
-
         if char_width > line_width {
             break;
         } else {
@@ -356,16 +345,17 @@ pub fn partial_select(
         }
 
         if cursor_idx == idx {
-            backend.print_styled(text, Style::reversed());
+            backend.print_styled(text, ContentStyle::reversed());
         } else {
             backend.print(text);
         }
         idx += 1;
     }
+
+    backend.reset_style();
     if idx <= cursor_idx {
-        backend.print_styled(" ", Style::reversed());
-    } else if line.char_len() > idx {
-        backend.reset_style();
-        backend.print_styled(WRAP_CLOSE, Style::reversed());
+        backend.print_styled(" ", ContentStyle::reversed());
+    } else if code.char_len() > idx {
+        backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
     }
 }

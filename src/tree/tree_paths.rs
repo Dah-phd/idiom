@@ -2,13 +2,15 @@ use ignore::{gitignore::Gitignore, Match};
 use tokio::task::JoinSet;
 
 use crate::{
+    error::IdiomResult,
     lsp::DiagnosticType,
     render::{
-        backend::{color, Backend, Color, Style},
+        backend::{Backend, StyleExt},
         layout::Line,
     },
     utils::get_nested_paths,
 };
+use crossterm::style::{Color, ContentStyle};
 use std::{
     cmp::Ordering,
     collections::HashSet,
@@ -18,8 +20,8 @@ use std::{
 
 use super::{watcher::TreeWatcher, PathParser};
 
-const ERR: Color = color::red();
-const WAR: Color = color::dark_yellow();
+const ERR: Color = Color::Red;
+const WAR: Color = Color::DarkYellow;
 
 #[derive(Debug, Clone)]
 pub enum TreePath {
@@ -29,25 +31,28 @@ pub enum TreePath {
 
 #[allow(dead_code)]
 impl TreePath {
-    pub fn from_path(path: PathBuf) -> Self {
+    pub fn from_path(path: PathBuf) -> IdiomResult<Self> {
         if !path.is_dir() {
-            return Self::File { display: get_path_display(&path), path, diagnostic: DiagnosticType::None };
+            return Ok(Self::File { display: get_path_display(&path), path, diagnostic: DiagnosticType::None });
         }
-        let mut tree_buffer = get_nested_paths(&path)
+        let mut tree_buffer = get_nested_paths(&path)?
             .filter_map(|p| if is_git_dir(&p) { None } else { Some(p.into()) })
             .collect::<Vec<Self>>();
         tree_buffer.sort_by(order_tree_paths);
-        Self::Folder {
+        Ok(Self::Folder {
             display: get_path_display(&path),
             path,
             tree: Some(tree_buffer),
             diagnostic: DiagnosticType::None,
-        }
+        })
     }
 
-    pub fn render_styled(&self, char_offset: usize, line: Line, mut style: Style, backend: &mut Backend) {
+    pub fn render_styled(&self, char_offset: usize, line: Line, mut style: ContentStyle, backend: &mut Backend) {
         let (display, diagnostic) = match self {
             TreePath::File { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
+            TreePath::Folder { display, diagnostic, tree: Some(..), .. } => {
+                (&display[char_offset..display.len() - 2], *diagnostic)
+            }
             TreePath::Folder { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
         };
         match diagnostic {
@@ -61,11 +66,14 @@ impl TreePath {
     pub fn render(&self, char_offset: usize, line: Line, backend: &mut Backend) {
         let (display, diagnostic) = match self {
             TreePath::File { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
+            TreePath::Folder { display, diagnostic, tree: Some(..), .. } => {
+                (&display[char_offset..display.len() - 2], *diagnostic)
+            }
             TreePath::Folder { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
         };
         match diagnostic {
-            DiagnosticType::Err => line.render_styled(display, Style::fg(ERR), backend),
-            DiagnosticType::Warn => line.render_styled(display, Style::fg(WAR), backend),
+            DiagnosticType::Err => line.render_styled(display, ContentStyle::fg(ERR), backend),
+            DiagnosticType::Warn => line.render_styled(display, ContentStyle::fg(WAR), backend),
             DiagnosticType::None => line.render(display, backend),
         };
     }
@@ -111,40 +119,39 @@ impl TreePath {
         None
     }
 
-    pub fn expand(&mut self) {
+    pub fn expand(&mut self) -> IdiomResult<()> {
         if let Self::Folder { tree, path, .. } = self {
             if tree.is_some() {
-                return;
+                return Ok(());
             }
             let mut buffer = Vec::new();
-            for nested_path in get_nested_paths(path) {
+            for nested_path in get_nested_paths(path)? {
                 buffer.push(nested_path.into())
             }
             buffer.sort_by(order_tree_paths);
             tree.replace(buffer);
         }
+        Ok(())
     }
 
-    pub fn expand_contained(&mut self, rel_path: &Path, watcher: &mut TreeWatcher) -> bool {
+    pub fn expand_contained(&mut self, rel_path: &Path, watcher: &mut TreeWatcher) -> IdiomResult<bool> {
         if self.path() == rel_path {
-            return true;
+            return Ok(true);
         }
         if rel_path.starts_with(self.path()) {
-            let should_shrink = self.tree_mut().is_none();
-            self.expand();
+            self.expand()?;
             if let Some(nested_tree) = self.tree_mut() {
                 for tree_path in nested_tree {
-                    if tree_path.expand_contained(rel_path, watcher) {
-                        let _ = watcher.watch(tree_path.path());
-                        return true;
+                    let result = tree_path.expand_contained(rel_path, watcher);
+                    if matches!(result, Ok(false)) {
+                        continue;
                     }
+                    let _ = watcher.watch(self.path());
+                    return result;
                 }
             }
-            if should_shrink {
-                let _ = self.take_tree();
-            }
         }
-        false
+        Ok(false)
     }
 
     pub fn update_path(&mut self, new_path: PathBuf) {
@@ -172,19 +179,19 @@ impl TreePath {
         }
     }
 
-    /// SYNC with real tree
-
+    /// SYNC with real tree >> should always be possible
     pub fn sync_base(&mut self) {
         if let Self::Folder { path, tree: Some(tree), .. } = self {
-            merge_trees(tree, get_nested_paths(path).filter(|p| !is_git_dir(p)).collect());
+            merge_trees(tree, get_nested_paths(path).unwrap().filter(|p| !is_git_dir(p)).collect());
         }
     }
 
-    pub fn sync(&mut self) {
+    pub fn sync(&mut self) -> IdiomResult<()> {
         self.reset_diagnostic();
         if let Self::Folder { path, tree: Some(tree), .. } = self {
-            merge_trees(tree, get_nested_paths(path).collect());
+            merge_trees(tree, get_nested_paths(path)?.collect());
         }
+        Ok(())
     }
 
     /// Search utils
@@ -223,7 +230,7 @@ impl TreePath {
         if matches!(gitignore.matched(path, path.is_dir()), Match::Ignore(..)) {
             return;
         };
-        self.expand();
+        let _ = self.expand(); // ignored for now
         match self {
             Self::File { path, .. } => {
                 buffer.spawn(async move {
@@ -251,11 +258,11 @@ impl TreePath {
         }
     }
 
-    pub fn search_tree_paths(self, pattern: &str) -> Vec<PathBuf> {
+    pub fn search_tree_paths(self, pattern: &str) -> IdiomResult<Vec<PathBuf>> {
         let mut buffer = Vec::new();
         let gitignore = Gitignore::new("./.gitignore").0;
-        self.search_in_paths(pattern, &mut buffer, &gitignore);
-        buffer
+        self.search_in_paths(pattern, &mut buffer, &gitignore)?;
+        Ok(buffer)
     }
 
     pub fn find_by_path_skip_root(&mut self, search_path: &Path, path_parser: PathParser) -> Option<&mut Self> {
@@ -288,12 +295,17 @@ impl TreePath {
         }
     }
 
-    pub fn search_in_paths(mut self, pattern: &str, buffer: &mut Vec<PathBuf>, gitignore: &Gitignore) {
+    pub fn search_in_paths(
+        mut self,
+        pattern: &str,
+        buffer: &mut Vec<PathBuf>,
+        gitignore: &Gitignore,
+    ) -> IdiomResult<()> {
         let path = self.path();
         if matches!(gitignore.matched(path, path.is_dir()), Match::Ignore(..)) {
-            return;
+            return Ok(());
         }
-        self.expand();
+        self.expand()?;
         match self {
             Self::File { path, display, .. } => {
                 if display.contains(pattern) {
@@ -305,7 +317,7 @@ impl TreePath {
                     buffer.push(path);
                     if let Some(tree) = tree {
                         for tree_path in tree {
-                            tree_path.collect_all_paths(buffer);
+                            tree_path.collect_all_paths(buffer)?;
                         }
                     }
                 } else if let Some(tree) = tree {
@@ -313,26 +325,28 @@ impl TreePath {
                         if is_git_dir(tree_path.path()) {
                             continue;
                         }
-                        tree_path.search_in_paths(pattern, buffer, gitignore);
+                        tree_path.search_in_paths(pattern, buffer, gitignore)?;
                     }
                 }
             }
         }
+        Ok(())
     }
 
-    fn collect_all_paths(mut self, buffer: &mut Vec<PathBuf>) {
-        self.expand();
+    fn collect_all_paths(mut self, buffer: &mut Vec<PathBuf>) -> IdiomResult<()> {
+        self.expand()?;
         match self {
             Self::File { path, .. } => buffer.push(path),
             Self::Folder { path, tree, .. } => {
                 buffer.push(path);
                 if let Some(tree) = tree {
                     for tree_path in tree {
-                        tree_path.collect_all_paths(buffer);
+                        tree_path.collect_all_paths(buffer)?;
                     }
                 }
             }
         }
+        Ok(())
     }
 
     pub fn search_files_join_set(self, pattern: String) -> JoinSet<Vec<(PathBuf, String, usize)>> {
@@ -466,7 +480,7 @@ fn merge_trees(tree: &mut Vec<TreePath>, new_tree_set: HashSet<PathBuf>) {
     }
     tree.retain_mut(|tree_path| {
         if new_tree_set.contains(tree_path.path()) {
-            tree_path.sync();
+            let _ = tree_path.sync();
             return true;
         }
         false

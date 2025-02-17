@@ -1,8 +1,9 @@
 use crate::render::{
-    backend::{Backend, BackendProtocol, Style},
+    backend::{Backend, BackendProtocol},
     utils::UTF8Safe,
     widgets::Writable,
 };
+use crossterm::style::ContentStyle;
 use std::ops::{AddAssign, SubAssign};
 
 #[derive(Debug, Default, Clone)]
@@ -24,7 +25,7 @@ impl Line {
     }
 
     #[inline]
-    pub fn fill_styled(self, symbol: char, style: Style, backend: &mut Backend) {
+    pub fn fill_styled(self, symbol: char, style: ContentStyle, backend: &mut Backend) {
         let text = (0..self.width).map(|_| symbol).collect::<String>();
         backend.print_styled_at(self.row, self.col, text, style)
     }
@@ -37,9 +38,9 @@ impl Line {
     }
 
     #[inline]
-    pub fn render_centered_styled(self, text: &str, style: Style, backend: &mut Backend) {
+    pub fn render_centered_styled(self, text: &str, style: ContentStyle, backend: &mut Backend) {
         let text = text.truncate_width(self.width).1;
-        backend.print_styled_at(self.row, self.col, format!("{text:>width$}", width = self.width), style);
+        backend.print_styled_at(self.row, self.col, format!("{text:^width$}", width = self.width), style);
     }
 
     #[inline]
@@ -53,7 +54,7 @@ impl Line {
     }
 
     #[inline]
-    pub fn render_left_styled(self, text: &str, style: Style, backend: &mut Backend) {
+    pub fn render_left_styled(self, text: &str, style: ContentStyle, backend: &mut Backend) {
         let (pad_width, text) = text.truncate_width_start(self.width);
         backend.go_to(self.row, self.col);
         if pad_width != 0 {
@@ -80,7 +81,7 @@ impl Line {
     }
 
     #[inline]
-    pub fn render_styled(self, text: &str, style: Style, backend: &mut Backend) {
+    pub fn render_styled(self, text: &str, style: ContentStyle, backend: &mut Backend) {
         let Line { width, row, col } = self;
         let (pad_width, text) = text.truncate_width(width);
         let reset_style = backend.get_style();
@@ -172,7 +173,7 @@ impl<'a> LineBuilder<'a> {
     }
 
     /// push with style
-    pub fn push_styled(&mut self, text: &str, style: Style) -> bool {
+    pub fn push_styled(&mut self, text: &str, style: ContentStyle) -> bool {
         match text.truncate_if_wider(self.remaining) {
             Ok(truncated_text) => {
                 self.backend.print_styled(truncated_text, style);
@@ -231,7 +232,7 @@ impl<'a> LineBuilderRev<'a> {
     }
 
     /// push with style
-    pub fn push_styled(&mut self, text: &str, style: Style) -> bool {
+    pub fn push_styled(&mut self, text: &str, style: ContentStyle) -> bool {
         match text.truncate_if_wider_start(self.remaining) {
             Ok(truncated_text) => {
                 self.remaining = 0;

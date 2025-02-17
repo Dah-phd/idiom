@@ -6,13 +6,10 @@ use crate::popups::{
 use crate::tree::Tree;
 use crate::workspace::Workspace;
 use crate::{configs::FileType, workspace::CursorPosition};
-use lsp_types::{
-    request::GotoDeclarationResponse, CompletionItem, CompletionTextEdit, InsertTextFormat, Location, LocationLink,
-    WorkspaceEdit,
-};
+use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, WorkspaceEdit};
 use std::path::PathBuf;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum IdiomEvent {
     PopupAccess,
     PopupAccessOnce,
@@ -25,12 +22,20 @@ pub enum IdiomEvent {
         from_base: bool,
     },
     RenameFile(String),
+    RenamedFile {
+        from_path: PathBuf,
+        to_path: PathBuf,
+    },
     SearchFiles(String),
     FileUpdated(PathBuf),
     CheckLSP(FileType),
     TreeDiagnostics(TreeDiagnostics),
     AutoComplete(String),
-    Snippet(String, Option<(usize, usize)>),
+    Snippet {
+        snippet: String,
+        cursor_offset: Option<(usize, usize)>,
+        relative_select: Option<((usize, usize), usize)>,
+    },
     InsertText(String),
     WorkspaceEdit(WorkspaceEdit),
     FindSelector(String),
@@ -81,15 +86,17 @@ impl IdiomEvent {
                 }
             }
             IdiomEvent::OpenAtLine(path, line) => {
-                tree.select_by_path(&path);
+                let select_result = tree.select_by_path(&path);
+                gs.log_if_error(select_result);
                 gs.clear_popup();
                 match ws.new_at_line(path, line, gs).await {
                     Ok(..) => gs.insert_mode(),
-                    Err(error) => gs.error(error.to_string()),
+                    Err(error) => gs.error(error),
                 }
             }
             IdiomEvent::OpenAtSelect(path, (from, to)) => {
-                tree.select_by_path(&path);
+                let select_result = tree.select_by_path(&path);
+                gs.log_if_error(select_result);
                 match ws.new_from(path, gs).await {
                     Ok(..) => {
                         gs.insert_mode();
@@ -98,8 +105,8 @@ impl IdiomEvent {
                         };
                         gs.clear_popup();
                     }
-                    Err(error) => gs.error(error.to_string()),
-                }
+                    Err(error) => gs.error(error),
+                };
             }
             IdiomEvent::GoToLine { line, clear_popup } => match ws.get_active() {
                 Some(editor) => {
@@ -128,7 +135,8 @@ impl IdiomEvent {
                 None => gs.clear_popup(),
             },
             IdiomEvent::SelectPath(path) => {
-                tree.select_by_path(&path);
+                let result = tree.select_by_path(&path);
+                gs.log_if_error(result);
             }
             IdiomEvent::TreeDiagnostics(new) => {
                 tree.push_diagnostics(new);
@@ -136,24 +144,31 @@ impl IdiomEvent {
             IdiomEvent::CreateFileOrFolder { name, from_base } => {
                 if name.is_empty() {
                     gs.error("File creation requires input!");
-                } else if let Ok(new_path) = match from_base {
-                    true => tree.create_file_or_folder_base(name),
-                    false => tree.create_file_or_folder(name),
-                } {
-                    tree.sync(gs);
-                    if !new_path.is_dir() {
-                        match ws.new_at_line(new_path.clone(), 0, gs).await {
-                            Ok(..) => {
-                                gs.insert_mode();
-                                if let Some(editor) = ws.get_active() {
-                                    editor.update_status.deny();
-                                }
+                } else {
+                    let result = match from_base {
+                        true => tree.create_file_or_folder_base(name),
+                        false => tree.create_file_or_folder(name),
+                    };
+                    match result {
+                        Ok(new_path) => {
+                            tree.sync(gs);
+                            if !new_path.is_dir() {
+                                match ws.new_at_line(new_path.clone(), 0, gs).await {
+                                    Ok(..) => {
+                                        gs.insert_mode();
+                                        if let Some(editor) = ws.get_active() {
+                                            editor.update_status.deny();
+                                        }
+                                    }
+                                    Err(error) => gs.error(error),
+                                };
                             }
-                            Err(error) => gs.error(error.to_string()),
-                        };
+                            tree.sync(gs);
+                            let result = tree.select_by_path(&new_path);
+                            gs.log_if_error(result);
+                        }
+                        Err(error) => gs.error(error),
                     }
-                    tree.sync(gs);
-                    tree.select_by_path(&new_path);
                 }
                 gs.clear_popup();
             }
@@ -162,20 +177,28 @@ impl IdiomEvent {
                     gs.error("Rename requires input!");
                 } else if let Some(result) = tree.rename_path(name) {
                     match result {
-                        Ok((old, new_path)) => ws.rename_editors(old, new_path, gs),
-                        Err(err) => gs.messages.error(err.to_string()),
+                        Ok((from_path, to_path)) => ws.rename_editors(from_path, to_path, gs),
+                        Err(error) => gs.error(error),
                     }
                 };
                 gs.clear_popup();
+            }
+            IdiomEvent::RenamedFile { from_path, to_path } => {
+                ws.rename_editors(from_path, to_path, gs);
             }
             IdiomEvent::AutoComplete(completion) => {
                 if let Some(editor) = ws.get_active() {
                     editor.replace_token(completion);
                 }
             }
-            IdiomEvent::Snippet(snippet, cursor_offset) => {
+            IdiomEvent::Snippet { snippet, cursor_offset, relative_select } => {
                 if let Some(editor) = ws.get_active() {
-                    editor.insert_snippet(snippet, cursor_offset);
+                    match relative_select {
+                        Some((cursor_offset, len)) => {
+                            editor.insert_snippet_with_select(snippet, cursor_offset, len);
+                        }
+                        None => editor.insert_snippet(snippet, cursor_offset),
+                    }
                 };
             }
             IdiomEvent::WorkspaceEdit(edits) => ws.apply_edits(edits, gs),
@@ -247,51 +270,6 @@ impl IdiomEvent {
     }
 }
 
-fn parse_snippet(snippet: String) -> IdiomEvent {
-    let mut cursor_offset = None;
-    let mut named = false;
-    let mut text = String::default();
-    let mut is_expr = false;
-    let mut line_offset = 0;
-    let mut char_offset = 0;
-    for ch in snippet.chars() {
-        if ch == '\n' {
-            line_offset += 1;
-            char_offset = 0;
-            text.push(ch);
-        } else {
-            if named {
-                if ch == '}' {
-                    named = false;
-                    continue;
-                };
-                if ch == ':' || ch.is_numeric() {
-                    continue;
-                };
-            } else if is_expr {
-                if ch.is_numeric() {
-                    continue;
-                };
-                if ch == '{' {
-                    named = true;
-                    cursor_offset = None;
-                    continue;
-                };
-                is_expr = false;
-            } else if ch == '$' {
-                is_expr = true;
-                if cursor_offset.is_none() {
-                    cursor_offset.replace((line_offset, char_offset));
-                };
-                continue;
-            };
-            char_offset += 1;
-            text.push(ch);
-        };
-    }
-    IdiomEvent::Snippet(text, cursor_offset)
-}
-
 impl From<IdiomEvent> for PopupMessage {
     fn from(event: IdiomEvent) -> Self {
         PopupMessage::Event(event)
@@ -316,29 +294,6 @@ impl From<LocationLink> for IdiomEvent {
 impl From<WorkspaceEdit> for IdiomEvent {
     fn from(value: WorkspaceEdit) -> Self {
         Self::WorkspaceEdit(value)
-    }
-}
-
-impl From<CompletionItem> for IdiomEvent {
-    fn from(item: CompletionItem) -> Self {
-        let parser = match item.insert_text_format {
-            Some(InsertTextFormat::SNIPPET) => parse_snippet,
-            _ => IdiomEvent::AutoComplete,
-        };
-        if let Some(text) = item.insert_text {
-            return (parser)(text);
-        }
-        if let Some(edit) = item.text_edit {
-            match edit {
-                CompletionTextEdit::Edit(edit) => {
-                    return (parser)(edit.new_text);
-                }
-                CompletionTextEdit::InsertAndReplace(edit) => {
-                    return (parser)(edit.new_text);
-                }
-            };
-        }
-        IdiomEvent::AutoComplete(item.label)
     }
 }
 

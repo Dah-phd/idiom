@@ -25,25 +25,44 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn get_path(self) -> IdiomResult<Option<PathBuf>> {
+    pub fn collect(self, backend: &mut Backend) -> IdiomResult<Option<PathBuf>> {
         match self.path {
             Some(rel_path) => {
                 let path = rel_path.canonicalize()?;
-
-                match path.is_dir() {
-                    true => {
-                        std::env::set_current_dir(path)?;
-                        Ok(None)
-                    }
-                    false => {
-                        if let Some(path) = path.parent() {
-                            std::env::set_current_dir(path)?;
+                match self.select {
+                    true => match path.is_dir() {
+                        true => TreeSeletor::select(backend, path),
+                        false => {
+                            let parent_path = match path.parent() {
+                                None => {
+                                    return Err(IdiomError::io_not_found(format!(
+                                        "Unable to derive parent directory of {:?}!",
+                                        path
+                                    )))
+                                }
+                                Some(path) => path.to_owned(),
+                            };
+                            TreeSeletor::select(backend, parent_path)
                         }
-                        Ok(Some(path))
-                    }
+                    },
+                    false => match path.is_dir() {
+                        true => {
+                            std::env::set_current_dir(&path)?;
+                            Ok(None)
+                        }
+                        false => {
+                            if let Some(path) = path.parent() {
+                                std::env::set_current_dir(path)?;
+                            }
+                            Ok(Some(path))
+                        }
+                    },
                 }
             }
-            None => Ok(None),
+            None => match self.select {
+                true => TreeSeletor::select_home(backend),
+                false => Ok(None),
+            },
         }
     }
 }
@@ -59,23 +78,35 @@ pub struct TreeSeletor {
 
 /// Stateless calls
 impl TreeSeletor {
-    pub fn select(backend: &mut Backend) -> IdiomResult<Option<PathBuf>> {
-        let home = dirs::home_dir().ok_or(IdiomError::io_err("Filed to find home dir!"))?.canonicalize()?;
-        std::env::set_current_dir(&home)?;
+    pub fn new(selected_path: PathBuf) -> IdiomResult<Self> {
+        std::env::set_current_dir(&selected_path)?;
         let config = KeyMap::new().unwrap_or_default();
-        let rect = Backend::screen()?;
-        let path_str = home.display().to_string();
+        let path_str = selected_path.display().to_string();
         let display_offset = path_str.split(std::path::MAIN_SEPARATOR).count() * 2;
-        let tree = TreePath::from_path(home.clone());
-        let mut tree = Self {
+        let tree = TreePath::from_path(selected_path.clone()).unwrap();
+        Ok(Self {
             state: State::new(),
             key_map: config.tree_key_map(),
             display_offset,
-            selected_path: home,
+            selected_path,
             tree,
             rebuild: true,
-        };
-        tree.render_stateless(rect, backend);
+        })
+    }
+
+    pub fn select(backend: &mut Backend, path: PathBuf) -> IdiomResult<Option<PathBuf>> {
+        let tree_selector = Self::new(path)?;
+        tree_selector.run(backend)
+    }
+
+    pub fn select_home(backend: &mut Backend) -> IdiomResult<Option<PathBuf>> {
+        let home_path = dirs::home_dir().ok_or(IdiomError::io_not_found("Filed to find home dir!"))?.canonicalize()?;
+        Self::select(backend, home_path)
+    }
+
+    fn run(mut self, backend: &mut Backend) -> IdiomResult<Option<PathBuf>> {
+        let rect = Backend::screen()?;
+        self.render_stateless(rect, backend);
         let limit = rect.height as usize;
         loop {
             if crossterm::event::poll(MIN_FRAMERATE)? {
@@ -84,29 +115,29 @@ impl TreeSeletor {
                         return Err(IdiomError::any("Exit during tree select!"));
                     }
                     Event::Key(KeyEvent { code: KeyCode::Char(' '), .. }) => {
-                        if tree.selected_path.is_dir() {
-                            std::env::set_current_dir(&tree.selected_path)?;
+                        if self.selected_path.is_dir() {
+                            std::env::set_current_dir(&self.selected_path)?;
                             return Ok(None);
                         }
-                        if let Some(parent) = tree.selected_path.parent() {
+                        if let Some(parent) = self.selected_path.parent() {
                             std::env::set_current_dir(parent)?;
                         }
-                        return Ok(Some(tree.selected_path));
+                        return Ok(Some(self.selected_path));
                     }
                     Event::Key(key) => {
-                        tree.map_stateless(&key, limit);
+                        self.map_stateless(&key, limit);
                     }
                     _ => {}
                 }
             }
-            tree.fast_render_stateless(rect, backend);
+            self.fast_render_stateless(rect, backend);
         }
     }
 
     pub fn expand_dir_or_get_path(&mut self) -> Option<PathBuf> {
         let tree_path = self.tree.get_mut_from_inner(self.state.selected)?;
         if tree_path.path().is_dir() {
-            tree_path.expand();
+            let _ = tree_path.expand();
             self.rebuild = true;
             None
         } else {

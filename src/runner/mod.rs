@@ -41,7 +41,7 @@ impl EditorTerminal {
         let mut logs = self.logs.iter().skip(self.at_log).take(self.max_rows);
         let mut lines = area.into_iter();
         if let Some(line) = lines.next() {
-            line.fill(BORDERS.horizontal, &mut gs.writer);
+            line.fill(BORDERS.horizontal_top, &mut gs.writer);
         }
         for line in &mut lines {
             match logs.next() {

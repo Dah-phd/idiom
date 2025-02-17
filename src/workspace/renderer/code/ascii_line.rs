@@ -1,10 +1,11 @@
 use std::ops::Range;
 
 use crate::{
-    render::backend::Style,
+    render::backend::StyleExt,
     syntax::{tokens::TokenLine, Lexer},
     BackendProtocol,
 };
+use crossterm::style::ContentStyle;
 
 pub fn ascii_line(content: &str, tokens: &TokenLine, backend: &mut impl BackendProtocol) {
     let mut cursor = 0;
@@ -53,7 +54,7 @@ pub fn ascii_line_with_select(
     backend: &mut impl BackendProtocol,
 ) {
     let select_color = lexer.theme.selected;
-    let mut reset_style = Style::default();
+    let mut reset_style = ContentStyle::default();
     let mut iter_tokens = tokens.iter();
     let mut counter = 0;
     let mut last_len = 0;
@@ -102,7 +103,7 @@ pub fn ascii_line_with_select(
                 },
             }
         }
-        counter -= 1;
+        counter = counter.saturating_sub(1);
 
         backend.print(text);
     }
