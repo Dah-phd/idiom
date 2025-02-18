@@ -139,7 +139,7 @@ impl Editor {
     pub fn updated_rect(&mut self, rect: Rect, gs: &GlobalState) {
         let skip_offset = rect.row.saturating_sub(gs.editor_area.row) as usize;
         for line in self.content.iter_mut().skip(self.cursor.at_line + skip_offset).take(rect.width) {
-            line.clear_cache();
+            line.cached.reset();
         }
     }
 
