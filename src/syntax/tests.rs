@@ -494,15 +494,16 @@ fn test_token_inc() {
 fn test_token_dec() {
     let mut tl = create_tokens();
     let mut token_line = TokenLine::default();
-    token_line.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() });
+    token_line.push(Token { len: 2, delta_start: 0, style: ContentStyle::default() });
     token_line.push(Token { len: 4, delta_start: 3, style: ContentStyle::default() });
     tl.decrement_at(3);
     assert_eq!(tl, token_line);
 
     tl.push(Token { len: 4, delta_start: 5, style: ContentStyle::reversed() });
     let mut token_line = TokenLine::default();
-    token_line.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() });
+    token_line.push(Token { len: 2, delta_start: 0, style: ContentStyle::default() });
     token_line.push(Token { len: 4, delta_start: 3, style: ContentStyle::reversed() });
+    // panic!("{:?}", tl);
     tl.decrement_at(3);
     tl.decrement_at(3);
     tl.decrement_at(3);
@@ -511,7 +512,6 @@ fn test_token_dec() {
     assert_eq!(tl, token_line);
 
     let mut token_line = TokenLine::default();
-    token_line.push(Token { len: 1, delta_start: 0, style: ContentStyle::default() });
     token_line.push(Token { len: 4, delta_start: 1, style: ContentStyle::reversed() });
     tl.decrement_at(1);
     tl.decrement_at(1);
@@ -537,12 +537,28 @@ fn test_token_motions() {
     assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 4, style: ContentStyle::slowblink() });
     token_line.decrement_at(23);
     // reaching prev token
+    assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 3, style: ContentStyle::slowblink() });
+    token_line.increment_at(22);
+    // increased last prev token size
     assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 4, style: ContentStyle::slowblink() });
     token_line.increment_at(23);
-    // increased last prev token size
-    assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 5, style: ContentStyle::slowblink() });
     token_line.increment_at(25);
-    token_line.increment_at(26);
     // increments passed prev token - so no size change
     assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 5, style: ContentStyle::slowblink() });
+}
+
+#[test]
+fn test_token_insert() {
+    let mut token_line = create_tokens();
+    token_line.increment_at(0);
+    assert_eq!(token_line.iter().next(), Some(&Token { len: 3, delta_start: 1, style: ContentStyle::default() }));
+    token_line.decrement_at(1);
+    assert_eq!(token_line, create_tokens());
+    token_line.increment_at(4);
+    let mut expect = TokenLine::default();
+    expect.push(Token { delta_start: 0, len: 3, style: ContentStyle::default() });
+    expect.push(Token { delta_start: 5, len: 4, style: ContentStyle::default() });
+    assert_eq!(token_line, expect);
+    token_line.decrement_at(5);
+    assert_eq!(token_line, create_tokens());
 }
