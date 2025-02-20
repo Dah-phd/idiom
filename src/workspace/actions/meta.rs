@@ -4,6 +4,126 @@ use std::{
     ops::{Add, AddAssign},
 };
 
+use lsp_types::TextDocumentContentChangeEvent;
+
+use crate::workspace::{cursor::Select, line::EditorLine, CursorPosition};
+
+use super::Edit;
+
+#[derive(Debug)]
+pub enum EditType {
+    Single(Edit),
+    Multi(Vec<Edit>),
+}
+
+impl EditType {
+    pub fn apply_rev(&self, content: &mut Vec<EditorLine>) -> (CursorPosition, Option<Select>) {
+        match self {
+            Self::Single(action) => action.apply_rev(content),
+            Self::Multi(actions) => actions.iter().rev().map(|a| a.apply_rev(content)).last().unwrap_or_default(),
+        }
+    }
+
+    pub fn apply(&self, content: &mut Vec<EditorLine>) -> (CursorPosition, Option<Select>) {
+        match self {
+            Self::Single(action) => action.apply(content),
+            Self::Multi(actions) => actions.iter().map(|a| a.apply(content)).last().unwrap_or_default(),
+        }
+    }
+
+    #[inline(always)]
+    pub fn map_to_meta(&self) -> EditMetaData {
+        match self {
+            Self::Single(edit) => edit.meta,
+            Self::Multi(edits) => {
+                edits.iter().map(|edit| edit.meta).reduce(|curr, next| curr + next).expect("EditMeta should exist")
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub fn map_to_meta_rev(&self) -> EditMetaData {
+        match self {
+            Self::Single(edit) => edit.meta.rev(),
+            Self::Multi(edits) => edits
+                .iter()
+                .rev()
+                .map(|edit| edit.meta.rev())
+                .reduce(|curr, next| curr + next)
+                .expect("EditMeta should exist"),
+        }
+    }
+
+    #[inline(always)]
+    pub fn change_event(
+        &self,
+        encoding: fn(usize, &str) -> usize,
+        char_lsp: fn(char) -> usize,
+        content: &[EditorLine],
+    ) -> (EditMetaData, Vec<TextDocumentContentChangeEvent>) {
+        match self {
+            Self::Single(edit) => {
+                let (meta, event) = edit.text_change(encoding, char_lsp, content);
+                (meta, vec![event])
+            }
+            Self::Multi(edits) => {
+                let mut events = vec![];
+                let meta = edits
+                    .iter()
+                    .map(|e| {
+                        let (meta, event) = e.text_change(encoding, char_lsp, content);
+                        events.push(event);
+                        meta
+                    })
+                    .reduce(|curr, next| curr + next)
+                    .expect("EditMeta should exist");
+                (meta, events)
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub fn change_event_rev(
+        &self,
+        encoding: fn(usize, &str) -> usize,
+        char_lsp: fn(char) -> usize,
+        content: &[EditorLine],
+    ) -> (EditMetaData, Vec<TextDocumentContentChangeEvent>) {
+        match self {
+            Self::Single(edit) => {
+                let (meta, event) = edit.text_change_rev(encoding, char_lsp, content);
+                (meta, vec![event])
+            }
+            Self::Multi(edits) => {
+                let mut events = vec![];
+                let meta = edits
+                    .iter()
+                    .rev()
+                    .map(|e| {
+                        let (meta, event) = e.text_change_rev(encoding, char_lsp, content);
+                        events.push(event);
+                        meta
+                    })
+                    .reduce(|curr, next| curr + next)
+                    .expect("EditMeta should exist");
+                (meta, events)
+            }
+        }
+    }
+}
+
+impl From<Edit> for EditType {
+    fn from(value: Edit) -> Self {
+        Self::Single(value)
+    }
+}
+
+impl From<Vec<Edit>> for EditType {
+    fn from(value: Vec<Edit>) -> Self {
+        Self::Multi(value)
+    }
+}
+
 #[derive(Clone, Copy, PartialEq)]
 pub struct EditMetaData {
     pub start_line: usize,

@@ -4,7 +4,7 @@ use super::super::{
     utils::{clip_content, insert_clip, is_scope, remove_content, token_range_at},
     CursorPosition,
 };
-use super::meta::EditMetaData;
+use super::EditMetaData;
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 use std::fmt::Debug;
 

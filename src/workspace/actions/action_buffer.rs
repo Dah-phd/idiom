@@ -142,14 +142,14 @@ impl From<BackspaceBuffer> for Option<Edit> {
 #[derive(Debug, Clone)]
 pub struct TextBuffer {
     line: usize,
-    char: u32,
+    char: usize,
     last: usize,
     text: String,
 }
 
 impl TextBuffer {
     fn new(line: usize, char: usize, text: String) -> Self {
-        Self { line, last: char + 1, char: char as u32, text }
+        Self { line, last: char + 1, char, text }
     }
 
     fn push(&mut self, line: usize, char: usize, ch: char) -> Option<Edit> {
@@ -167,7 +167,7 @@ impl From<TextBuffer> for Option<Edit> {
         if buf.text.is_empty() {
             return None;
         }
-        Some(Edit::single_line(CursorPosition { line: buf.line, char: buf.char as usize }, buf.text, String::new()))
+        Some(Edit::single_line(CursorPosition { line: buf.line, char: buf.char }, buf.text, String::new()))
     }
 }
 

@@ -165,7 +165,7 @@ impl Editor {
                 let line = &self.content[self.cursor.line];
                 if self.lexer.should_autocomplete(self.cursor.char, line) {
                     let line = line.to_string();
-                    self.actions.push_buffer(&mut self.content, &mut self.lexer);
+                    self.actions.push_buffer();
                     self.lexer.get_autocomplete((&self.cursor).into(), line, gs);
                 }
                 return true;
@@ -238,7 +238,7 @@ impl Editor {
             EditorAction::Save => self.save(gs),
             EditorAction::Cancel => {
                 if self.cursor.select_take().is_none() {
-                    self.actions.push_buffer(&mut self.content, &mut self.lexer);
+                    self.actions.push_buffer();
                     return false;
                 }
             }
@@ -259,7 +259,7 @@ impl Editor {
             }
             EditorAction::Close => return false,
         }
-        self.actions.push_buffer(&mut self.content, &mut self.lexer);
+        self.actions.push_buffer();
         true
     }
 
