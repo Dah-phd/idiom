@@ -81,6 +81,8 @@ impl TokenLine {
         self.inner.is_empty()
     }
 
+    // likely to be removed in future iteration
+    #[allow(dead_code)]
     pub fn increment_at(&mut self, mut idx: usize) {
         let mut token_iter = self.inner.iter_mut();
         while let Some(token) = token_iter.next() {
@@ -99,6 +101,8 @@ impl TokenLine {
         }
     }
 
+    // likely to be removed in future iteration
+    #[allow(dead_code)]
     pub fn decrement_at(&mut self, mut char_idx: usize) {
         let mut token_iter = self.inner.iter_mut().enumerate();
         while let Some((token_idx, token)) = token_iter.next() {
