@@ -198,7 +198,7 @@ mod test {
     use lsp_types::SemanticToken;
 
     use crate::{
-        lsp::local::{python::PyToken, LangStream, LocalLSP, PositionedToken},
+        lsp::local::{tokens::python::PyToken, LangStream, LocalLSP, PositionedToken},
         workspace::CursorPosition,
     };
 

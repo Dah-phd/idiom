@@ -1,21 +1,18 @@
 use logos::{Lexer, Logos};
 
 use super::{
-    utils::NON_TOKEN_ID, Definitions, Func, LangStream, ObjType, PositionedToken, PositionedTokenParser, Struct, Var,
+    super::utils::NON_TOKEN_ID, Definitions, Func, LangStream, ObjType, PositionedToken, PositionedTokenParser, Struct,
+    Var,
 };
 
 #[derive(Logos, Debug, PartialEq)]
 #[logos(skip r" ")]
-pub enum Pincer {
+pub enum PyToken {
     #[regex("class")]
     DeclareStruct,
 
     #[token("def")]
     DeclareFn,
-
-    #[token("let")]
-    #[token("var")]
-    DeclareVar,
 
     #[token("import")]
     #[token("from")]
@@ -31,9 +28,11 @@ pub enum Pincer {
     #[regex("@[a-zA-Z_]+")]
     Decorator,
 
-    #[regex("//(.)*")]
+    #[regex("#(.)*")]
     Comment,
 
+    #[token("...")]
+    #[token("pass")]
     #[token("while")]
     #[token("for")]
     #[token("async ")]
@@ -43,7 +42,7 @@ pub enum Pincer {
     #[token("continue")]
     #[token("if")]
     #[token("elif")]
-    #[token("else:")]
+    #[token("else")]
     #[token("case")]
     #[token("raise")]
     FlowControl,
@@ -56,34 +55,27 @@ pub enum Pincer {
 
     #[token("cls")]
     ClassRef,
-
     #[token("self")]
     SelfRef,
+    #[token(".")]
+    InstanceInvoked,
 
     #[token("=")]
     Assign,
-
-    #[token(".")]
-    InstanceInvoked,
 
     #[token(":")]
     OpenScope,
 
     #[token("(")]
     LBrack,
-
     #[token(")")]
     RBrack,
-
     #[token("{")]
     DOpen,
-
     #[token("}")]
     DClose,
-
     #[token("[")]
     LOpen,
-
     #[token("]")]
     LClose,
 
@@ -92,24 +84,24 @@ pub enum Pincer {
 
     #[token("not ")]
     Negate,
-
+    #[token("==")]
+    Equals,
     #[token("<=")]
     GreatEq,
-
     #[token(">=")]
     LesssEq,
-
     #[token("<")]
     Lesser,
-
     #[token(">")]
     Greater,
 
     #[regex("-?[0-9]+\\.[0-9]+")]
     Float,
-
     #[regex("-?[0-9]+")]
     Int,
+    #[token("True")]
+    #[token("False")]
+    Bool,
 
     #[regex(r#"[a-zA-Z_][a-zA-Z_0-9]*"#, |lex| lex.slice().to_owned())]
     Name(String),
@@ -122,7 +114,7 @@ pub enum Pincer {
     NameSpace(String),
 }
 
-impl LangStream for Pincer {
+impl LangStream for PyToken {
     fn parse<'a>(
         text: impl Iterator<Item = &'a str>,
         tokens: &mut Vec<Vec<super::PositionedToken<Self>>>,
@@ -132,7 +124,7 @@ impl LangStream for Pincer {
         let mut is_multistring = false;
         for line in text {
             let mut token_line = Vec::new();
-            let mut logos = Pincer::lexer(line);
+            let mut logos = PyToken::lexer(line);
             while let Some(token_result) = logos.next() {
                 if is_multistring {
                     token_line.push(parser(Self::MultiString, logos.span(), line));
@@ -141,29 +133,23 @@ impl LangStream for Pincer {
                     }
                     continue;
                 }
-                let pincer = match token_result {
+                let pytoken = match token_result {
                     Ok(pytoken) => pytoken,
                     Err(_) => continue,
                 };
-                match pincer {
+                match pytoken {
                     Self::DeclareFn => {
-                        token_line.push(parser(pincer, logos.span(), line));
-                        if let Some(Ok(mut next_pincer)) = logos.next() {
-                            next_pincer.name_to_func();
-                            token_line.push(parser(next_pincer, logos.span(), line));
+                        token_line.push(parser(pytoken, logos.span(), line));
+                        if let Some(Ok(mut next_pytoken)) = logos.next() {
+                            next_pytoken.name_to_func();
+                            token_line.push(parser(next_pytoken, logos.span(), line));
                         }
                     }
                     Self::DeclareStruct => {
-                        token_line.push(parser(pincer, logos.span(), line));
-                        if let Some(Ok(mut next_pincer)) = logos.next() {
-                            next_pincer.name_to_class();
-                            token_line.push(parser(next_pincer, logos.span(), line));
-                        }
-                    }
-                    Self::DeclareVar => {
-                        token_line.push(parser(pincer, logos.span(), line));
-                        if let Some(Ok(next_pincer)) = logos.next() {
-                            token_line.push(parser(next_pincer, logos.span(), line));
+                        token_line.push(parser(pytoken, logos.span(), line));
+                        if let Some(Ok(mut next_pytoken)) = logos.next() {
+                            next_pytoken.name_to_class();
+                            token_line.push(parser(next_pytoken, logos.span(), line));
                         }
                     }
                     Self::LBrack => {
@@ -173,14 +159,14 @@ impl LangStream for Pincer {
                         }
                     }
                     Self::MultiString => {
-                        token_line.push(parser(pincer, logos.span(), line));
+                        token_line.push(parser(pytoken, logos.span(), line));
                         is_multistring = true;
                     }
                     Self::NameSpaceKeyWord => {
                         drain_import(line, &mut logos, &mut token_line, parser);
                     }
                     _ => {
-                        token_line.push(parser(pincer, logos.span(), line));
+                        token_line.push(parser(pytoken, logos.span(), line));
                     }
                 }
             }
@@ -196,13 +182,13 @@ impl LangStream for Pincer {
             Self::Name(..) => 8,
             Self::Function(..) => 10,
             Self::DeclareFn
-            | Self::DeclareVar
             | Self::DeclareStruct
             | Self::Negate
             | Self::FlowControl
             | Self::Context
             | Self::SelfRef
             | Self::ClassRef
+            | Self::Bool
             | Self::NameSpaceKeyWord => 11,
             Self::Comment => 12,
             Self::String | Self::MultiString => 13,
@@ -250,13 +236,13 @@ impl LangStream for Pincer {
                 Func { name: "open".to_owned() },
                 Func { name: "print".to_owned() },
             ],
-            variables: vec![Var { name: "true".to_owned() }, Var { name: "false".to_owned() }],
+            variables: vec![Var { name: "True".to_owned() }, Var { name: "False".to_owned() }],
             keywords: vec!["def", "class", "with", "for", "while", "not", "except", "raise", "try"],
         }
     }
 }
 
-impl Pincer {
+impl PyToken {
     fn derive_from_name(&mut self) {
         if let Self::Name(name) = self {
             match name.chars().find(|ch| *ch != '_').map(|ch| ch.is_uppercase()).unwrap_or_default() {
@@ -287,11 +273,11 @@ impl Pincer {
 
 fn drain_import(
     line: &str,
-    logos: &mut Lexer<'_, Pincer>,
-    token_line: &mut Vec<PositionedToken<Pincer>>,
-    parser: PositionedTokenParser<Pincer>,
+    logos: &mut Lexer<'_, PyToken>,
+    token_line: &mut Vec<PositionedToken<PyToken>>,
+    parser: PositionedTokenParser<PyToken>,
 ) {
-    token_line.push(parser(Pincer::NameSpaceKeyWord, logos.span(), line));
+    token_line.push(parser(PyToken::NameSpaceKeyWord, logos.span(), line));
     while let Some(token_result) = logos.next() {
         let mut pytoken = match token_result {
             Ok(pytoken) => pytoken,
@@ -304,40 +290,39 @@ fn drain_import(
 
 #[cfg(test)]
 mod test {
-    use crate::lsp::local::LangStream;
-    use crate::lsp::local::PositionedToken;
-
-    use super::Pincer;
+    use super::super::LangStream;
+    use super::super::PositionedToken;
+    use super::PyToken;
     use logos::Logos;
     use logos::Span;
 
     #[test]
     fn test_decor() {
         let txt = "@staticmethod";
-        let mut lex = Pincer::lexer(txt);
-        assert_eq!(Some(Ok(Pincer::Decorator)), lex.next());
+        let mut lex = PyToken::lexer(txt);
+        assert_eq!(Some(Ok(PyToken::Decorator)), lex.next());
         assert_eq!(lex.span(), Span { start: 0, end: 13 });
         assert!(lex.next().is_none());
     }
 
     #[test]
     fn test_comment() {
-        let txt = "// hello world 'asd' and \"text\"";
-        let mut lex = Pincer::lexer(txt);
-        assert_eq!(Some(Ok(Pincer::Comment)), lex.next());
-        assert_eq!(Span { start: 0, end: 31 }, lex.span());
+        let txt = "# hello world 'asd' and \"text\"";
+        let mut lex = PyToken::lexer(txt);
+        assert_eq!(Some(Ok(PyToken::Comment)), lex.next());
+        assert_eq!(Span { start: 0, end: 30 }, lex.span());
         assert_eq!(None, lex.next());
     }
 
     #[test]
     fn test_class() {
         let txt = "class WorkingDirectory:";
-        let mut lex = Pincer::lexer(txt);
-        assert_eq!(Some(Ok(Pincer::DeclareStruct)), lex.next());
+        let mut lex = PyToken::lexer(txt);
+        assert_eq!(Some(Ok(PyToken::DeclareStruct)), lex.next());
         assert_eq!(lex.span(), Span { start: 0, end: 5 });
-        assert_eq!(Some(Ok(Pincer::Name("WorkingDirectory".to_owned()))), lex.next());
+        assert_eq!(Some(Ok(PyToken::Name("WorkingDirectory".to_owned()))), lex.next());
         assert_eq!(lex.span(), Span { start: 6, end: 22 });
-        assert_eq!(Some(Ok(Pincer::OpenScope)), lex.next());
+        assert_eq!(Some(Ok(PyToken::OpenScope)), lex.next());
         assert_eq!(lex.span(), Span { start: 22, end: 23 });
         assert!(lex.next().is_none());
     }
@@ -346,32 +331,38 @@ mod test {
     fn test_scope() {
         let text = vec!["class Test:", "    value = 3"];
         let mut tokens = vec![];
-        Pincer::parse(text.into_iter(), &mut tokens, PositionedToken::<Pincer>::utf32);
+        PyToken::parse(text.into_iter(), &mut tokens, PositionedToken::<PyToken>::utf32);
         assert_eq!(
             tokens,
             vec![
                 vec![
-                    PositionedToken { from: 0, len: 5, token_type: 11, modifier: 0, lang_token: Pincer::DeclareStruct },
+                    PositionedToken {
+                        from: 0,
+                        len: 5,
+                        token_type: 11,
+                        modifier: 0,
+                        lang_token: PyToken::DeclareStruct
+                    },
                     PositionedToken {
                         from: 6,
                         len: 4,
                         token_type: 1,
                         modifier: 0,
-                        lang_token: Pincer::Type("Test".to_owned())
+                        lang_token: PyToken::Type("Test".to_owned())
                     },
-                    PositionedToken { from: 10, len: 1, token_type: 17, modifier: 0, lang_token: Pincer::OpenScope }
+                    PositionedToken { from: 10, len: 1, token_type: 17, modifier: 0, lang_token: PyToken::OpenScope }
                 ],
                 vec![
-                    PositionedToken { from: 0, len: 4, token_type: 17, modifier: 0, lang_token: Pincer::Scope },
+                    PositionedToken { from: 0, len: 4, token_type: 17, modifier: 0, lang_token: PyToken::Scope },
                     PositionedToken {
                         from: 4,
                         len: 5,
                         token_type: 8,
                         modifier: 0,
-                        lang_token: Pincer::Name("value".to_owned())
+                        lang_token: PyToken::Name("value".to_owned())
                     },
-                    PositionedToken { from: 10, len: 1, token_type: 17, modifier: 0, lang_token: Pincer::Assign },
-                    PositionedToken { from: 12, len: 1, token_type: 14, modifier: 0, lang_token: Pincer::Int }
+                    PositionedToken { from: 10, len: 1, token_type: 17, modifier: 0, lang_token: PyToken::Assign },
+                    PositionedToken { from: 12, len: 1, token_type: 14, modifier: 0, lang_token: PyToken::Int }
                 ]
             ]
         );

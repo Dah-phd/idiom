@@ -599,7 +599,7 @@ fn drain_type_declare(
 
 #[cfg(test)]
 mod test {
-    use crate::lsp::local::{LangStream, PositionedToken};
+    use super::super::{LangStream, PositionedToken};
 
     use super::Rustacean;
     use logos::{Logos, Span};
