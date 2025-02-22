@@ -134,6 +134,28 @@ impl TokenLine {
     }
 
     #[inline]
+    pub fn remove_tokens_till(&mut self, mut till: usize) {
+        while !self.inner.is_empty() {
+            let token = &mut self.inner[0];
+            if till <= token.delta_start {
+                token.delta_start -= till;
+                return;
+            }
+            if till < token.delta_start + token.len {
+                till -= token.delta_start;
+                token.len -= till;
+                token.delta_start = 0;
+                return;
+            }
+            if till >= token.delta_start + token.len {
+                till -= token.delta_start;
+                self.inner.remove(0);
+                continue;
+            }
+        }
+    }
+
+    #[inline]
     pub fn mark_diagnostics(&mut self, diagnostic: &DiagnosticData) {
         let mut cursor = 0;
 

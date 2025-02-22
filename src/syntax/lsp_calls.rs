@@ -3,12 +3,16 @@ use crate::{
     lsp::{LSPClient, LSPResponse, LSPResponseType, LSPResult},
     popups::popups_tree::refrence_selector,
     syntax::Lexer,
-    workspace::{actions::EditType, line::EditorLine, CursorPosition, Editor},
+    workspace::{
+        actions::{EditMetaData, EditType},
+        line::EditorLine,
+        CursorPosition, Editor,
+    },
 };
 use core::str::FromStr;
 use lsp_types::{
     Range, SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions, Uri,
+    TextDocumentContentChangeEvent, Uri,
 };
 use std::path::Path;
 
@@ -93,23 +97,15 @@ pub fn map_lsp(lexer: &mut Lexer, client: LSPClient) {
         lexer.signatures = signatures;
     }
 
-    // document syncing
-    if let Some(sync) = client.capabilities.text_document_sync.as_ref() {
-        match sync {
-            TextDocumentSyncCapability::Kind(TextDocumentSyncKind::INCREMENTAL)
-            | TextDocumentSyncCapability::Options(TextDocumentSyncOptions {
-                change: Some(TextDocumentSyncKind::INCREMENTAL),
-                ..
-            }) => {
-                lexer.sync = sync_edits;
-                lexer.sync_rev = sync_edits_rev;
-            }
-            _ => {
-                lexer.sync = sync_edits_full;
-                lexer.sync = sync_edits_full_rev;
-            }
-        }
+    // document syncing - only incremental is handled, in case of full wrapper of stdout will handle full sync in separate thread
+    if client.capabilities.text_document_sync.is_some() {
+        lexer.sync_tokens = sync_tokens;
+        lexer.sync_changes = sync_changes;
+        lexer.sync = sync_edits;
+        lexer.sync_rev = sync_edits_rev;
     } else {
+        lexer.sync_changes = sync_changes_dead;
+        lexer.sync_tokens = sync_tokens_dead;
         lexer.sync = sync_edits_dead;
         lexer.sync_rev = sync_edits_dead_rev;
     }
@@ -267,7 +263,18 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     }
 }
 
-#[inline(always)]
+pub fn sync_tokens(lexer: &mut Lexer, meta: EditMetaData) {
+    match lexer.meta.take() {
+        Some(existing_meta) => lexer.meta.replace(existing_meta + meta),
+        None => lexer.meta.replace(meta),
+    };
+}
+
+pub fn sync_changes(lexer: &mut Lexer, change_events: Vec<TextDocumentContentChangeEvent>) -> LSPResult<()> {
+    lexer.version += 1;
+    lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)
+}
+
 pub fn sync_edits(lexer: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
     lexer.version += 1;
     let (meta, change_events) = action.change_event(lexer.encode_position, lexer.char_lsp_pos, content);
@@ -291,35 +298,10 @@ pub fn sync_edits_rev(lexer: &mut Lexer, action: &EditType, content: &mut [Edito
 }
 
 #[inline(always)]
-pub fn sync_edits_full(lexer: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
-    lexer.version += 1;
-    let mut text = String::new();
-    for editor_line in content.iter() {
-        editor_line.push_content_to_buffer(&mut text);
-        text.push('\n');
-    }
-    text.push('\n');
-    lexer.client.full_sync(lexer.uri.clone(), lexer.version, text)?;
-    match lexer.meta.take() {
-        Some(meta) => lexer.meta.replace(meta + action.map_to_meta()),
-        None => lexer.meta.replace(action.map_to_meta()),
-    };
-    Ok(())
-}
+pub fn sync_tokens_dead(_lexer: &mut Lexer, _meta: EditMetaData) {}
 
-pub fn sync_edits_full_rev(lexer: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
-    lexer.version += 1;
-    let mut text = String::new();
-    for editor_line in content.iter() {
-        editor_line.push_content_to_buffer(&mut text);
-        text.push('\n');
-    }
-    text.push('\n');
-    lexer.client.full_sync(lexer.uri.clone(), lexer.version, text)?;
-    match lexer.meta.take() {
-        Some(meta) => lexer.meta.replace(meta + action.map_to_meta_rev()),
-        None => lexer.meta.replace(action.map_to_meta_rev()),
-    };
+#[inline(always)]
+pub fn sync_changes_dead(_lexer: &mut Lexer, _change_events: Vec<TextDocumentContentChangeEvent>) -> LSPResult<()> {
     Ok(())
 }
 

@@ -30,64 +30,6 @@ use tokio::{io::AsyncWriteExt, process::ChildStdin, sync::mpsc::UnboundedReceive
 
 type UtfEncoder = fn(lsp_types::Position, &[String]) -> CursorPosition;
 
-enum EnrichType {
-    Sync,
-    Tokens,
-    TokensSync,
-    TokensAutocomplete,
-    TokensSyncAutocomplete,
-}
-
-impl EnrichType {
-    fn determine_and_updated(capabilities: &mut ServerCapabilities) -> Option<Self> {
-        let has_tokens = capabilities.semantic_tokens_provider.is_some();
-        let has_autocomplete = capabilities.completion_provider.is_some();
-        let has_increment_sync = matches!(
-            capabilities.text_document_sync,
-            Some(
-                TextDocumentSyncCapability::Kind(TextDocumentSyncKind::INCREMENTAL)
-                    | TextDocumentSyncCapability::Options(TextDocumentSyncOptions {
-                        change: Some(TextDocumentSyncKind::INCREMENTAL),
-                        ..
-                    })
-            )
-        );
-        match (has_tokens, has_autocomplete, has_increment_sync) {
-            (false, false, false) => {
-                capabilities.semantic_tokens_provider.replace(create_semantic_capabilities());
-                capabilities
-                    .text_document_sync
-                    .replace(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::INCREMENTAL));
-                capabilities.completion_provider.replace(CompletionOptions::default());
-                Some(Self::TokensSyncAutocomplete)
-            }
-            (false, false, true) => {
-                capabilities.semantic_tokens_provider.replace(create_semantic_capabilities());
-                capabilities.completion_provider.replace(CompletionOptions::default());
-                Some(Self::TokensAutocomplete)
-            }
-            (false, true, false) => {
-                capabilities
-                    .text_document_sync
-                    .replace(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::INCREMENTAL));
-                capabilities.semantic_tokens_provider.replace(create_semantic_capabilities());
-                Some(Self::TokensSync)
-            }
-            (false, true, true) => {
-                capabilities.semantic_tokens_provider.replace(create_semantic_capabilities());
-                Some(Self::Tokens)
-            }
-            (true, true, false) => {
-                capabilities
-                    .text_document_sync
-                    .replace(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::INCREMENTAL));
-                Some(Self::Sync)
-            }
-            _ => None,
-        }
-    }
-}
-
 pub fn build_with_enrichment(
     mut rx: UnboundedReceiver<Payload>,
     mut lsp_stdin: ChildStdin,
@@ -172,6 +114,64 @@ pub fn build_with_enrichment(
         }
         (.., EnrichType::TokensSyncAutocomplete) => {
             tokio::spawn(EnrichedLSP::<GenericToken>::run_with_sync_and_completion(rx, lsp_stdin, responses, encoding))
+        }
+    }
+}
+
+enum EnrichType {
+    Sync,
+    Tokens,
+    TokensSync,
+    TokensAutocomplete,
+    TokensSyncAutocomplete,
+}
+
+impl EnrichType {
+    fn determine_and_updated(capabilities: &mut ServerCapabilities) -> Option<Self> {
+        let has_tokens = capabilities.semantic_tokens_provider.is_some();
+        let has_autocomplete = capabilities.completion_provider.is_some();
+        let has_increment_sync = matches!(
+            capabilities.text_document_sync,
+            Some(
+                TextDocumentSyncCapability::Kind(TextDocumentSyncKind::INCREMENTAL)
+                    | TextDocumentSyncCapability::Options(TextDocumentSyncOptions {
+                        change: Some(TextDocumentSyncKind::INCREMENTAL),
+                        ..
+                    })
+            )
+        );
+        match (has_tokens, has_autocomplete, has_increment_sync) {
+            (false, false, false) => {
+                capabilities.semantic_tokens_provider.replace(create_semantic_capabilities());
+                capabilities
+                    .text_document_sync
+                    .replace(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::INCREMENTAL));
+                capabilities.completion_provider.replace(CompletionOptions::default());
+                Some(Self::TokensSyncAutocomplete)
+            }
+            (false, false, true) => {
+                capabilities.semantic_tokens_provider.replace(create_semantic_capabilities());
+                capabilities.completion_provider.replace(CompletionOptions::default());
+                Some(Self::TokensAutocomplete)
+            }
+            (false, true, false) => {
+                capabilities
+                    .text_document_sync
+                    .replace(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::INCREMENTAL));
+                capabilities.semantic_tokens_provider.replace(create_semantic_capabilities());
+                Some(Self::TokensSync)
+            }
+            (false, true, true) => {
+                capabilities.semantic_tokens_provider.replace(create_semantic_capabilities());
+                Some(Self::Tokens)
+            }
+            (true, true, false) => {
+                capabilities
+                    .text_document_sync
+                    .replace(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::INCREMENTAL));
+                Some(Self::Sync)
+            }
+            _ => None,
         }
     }
 }

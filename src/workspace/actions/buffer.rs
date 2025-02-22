@@ -29,11 +29,11 @@ impl ActionBuffer {
         std::mem::replace(self, Self::Text(TextBuffer::new(line, char, ch.into()))).into()
     }
 
-    pub fn del(&mut self, line: usize, char: usize, text: &mut EditorLine) -> Option<Edit> {
+    pub fn del(&mut self, line: usize, char: usize, removed: char) -> Option<Edit> {
         if let Self::Del(buf) = self {
-            return buf.del(line, char, text);
+            return buf.del(line, char, removed);
         }
-        std::mem::replace(self, Self::Del(DelBuffer::new(line, char, text))).into()
+        std::mem::replace(self, Self::Del(DelBuffer::new(line, char, removed))).into()
     }
 
     pub fn backspace(&mut self, line: usize, char: usize, text: &mut EditorLine, indent: &str) -> Option<Edit> {
@@ -63,16 +63,16 @@ pub struct DelBuffer {
 }
 
 impl DelBuffer {
-    fn new(line: usize, char: usize, text: &mut EditorLine) -> Self {
-        Self { line, char, text: text.remove(char).into() }
+    fn new(line: usize, char: usize, removed: char) -> Self {
+        Self { line, char, text: String::from(removed) }
     }
 
-    fn del(&mut self, line: usize, char: usize, text: &mut EditorLine) -> Option<Edit> {
+    fn del(&mut self, line: usize, char: usize, removed: char) -> Option<Edit> {
         if line == self.line && char == self.char {
-            self.text.push(text.remove(char));
+            self.text.push(removed);
             return None;
         }
-        std::mem::replace(self, Self::new(line, char, text)).into()
+        std::mem::replace(self, Self::new(line, char, removed)).into()
     }
 }
 
@@ -111,14 +111,17 @@ impl BackspaceBuffer {
         let chars_after_indent = text[..char].trim_start_matches(indent);
         if chars_after_indent.is_empty() {
             self.text.push_str(indent);
+            text.tokens.remove_tokens_till(indent.len());
             text.replace_till(indent.len(), "");
             self.last -= indent.len();
             return;
         }
         if chars_after_indent.chars().all(|c| c.is_whitespace()) {
-            self.last -= chars_after_indent.len();
+            let removed_count = chars_after_indent.len();
+            self.last -= removed_count;
             self.text.push_str(&text[self.last..char]);
-            text.replace_range(self.last..char, "");
+            text.tokens.remove_tokens_till(removed_count);
+            text.replace_till(removed_count, "");
             return;
         }
         self.text.push(text.remove(char - 1));
@@ -183,15 +186,16 @@ mod tests {
     fn test_del() {
         let mut code_line = EditorLine::new("0123456789".to_owned());
         let mut buf = ActionBuffer::None;
-        buf.del(0, 7, &mut code_line);
-        buf.del(0, 7, &mut code_line);
-        buf.del(0, 7, &mut code_line);
+        let cursor_char = 7;
+        buf.del(0, cursor_char, code_line.remove(cursor_char));
+        buf.del(0, cursor_char, code_line.remove(cursor_char));
+        buf.del(0, cursor_char, code_line.remove(cursor_char));
         if let ActionBuffer::Del(buf) = buf {
             let m_edit: Option<Edit> = buf.clone().into();
             let edit = m_edit.unwrap();
             assert!(edit.text.is_empty());
             assert_eq!(edit.reverse, "789");
-            assert_eq!(edit.cursor, CursorPosition { line: 0, char: 7 });
+            assert_eq!(edit.cursor, CursorPosition { line: 0, char: cursor_char });
             return;
         }
         panic!("Expected Del buf!")
