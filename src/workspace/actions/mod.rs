@@ -415,8 +415,8 @@ impl Actions {
                 self.push_done(edit, lexer, content);
             }
             None => {
-                let data = self.buffer.backspace(cursor, &mut content[cursor.line], lexer, &self.cfg.indent);
-                let (maybe_edit, event) = data;
+                let text = &mut content[cursor.line];
+                let (maybe_edit, event) = self.buffer.backspace(cursor, text, lexer, &self.cfg.indent);
                 lexer.sync_changes(vec![event]);
                 if let Some(edit) = maybe_edit {
                     lexer.sync_tokens(edit.meta);
