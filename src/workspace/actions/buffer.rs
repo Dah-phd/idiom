@@ -16,14 +16,6 @@ impl ActionBuffer {
         std::mem::take(self).into()
     }
 
-    pub fn last_char(&self) -> usize {
-        match self {
-            Self::Backspace(buf) => buf.last,
-            Self::Text(buf) => buf.last,
-            _ => 0,
-        }
-    }
-
     pub fn push(
         &mut self,
         cursor: &mut Cursor,
@@ -208,9 +200,9 @@ impl BackspaceBuffer {
             self.last -= 1;
             let last =
                 if text.is_simple() { self.last } else { (lexer.encode_position)(self.last, text.content.as_str()) };
-            let start = lsp_types::Position::new(line, last as u32);
+            let start = Position::new(line, last as u32);
             let end_character = last + (lexer.char_lsp_pos)(ch);
-            let end = lsp_types::Position::new(line, end_character as u32);
+            let end = Position::new(line, end_character as u32);
             self.text.push(ch);
             Range::new(start, end)
         };
@@ -372,9 +364,13 @@ mod tests {
         );
         assert!(edit.is_none());
 
-        assert!(matches!(
-            buf, ActionBuffer::Del(DelBuffer { text, change_start, ..}) if text == "789" && change_start == Position::new(0, 7)
-        ));
+        let edit = buf.collect().unwrap();
+        let mut content = vec![code_text];
+        edit.apply_rev(&mut content);
+        assert_eq!(content[0].content, "0123456789");
+        assert_eq!(edit.text, "");
+        assert_eq!(edit.reverse, "789");
+        assert_eq!(edit.cursor, CursorPosition { line: 0, char: 7 })
     }
 
     #[test]

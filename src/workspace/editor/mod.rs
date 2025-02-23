@@ -174,7 +174,10 @@ impl Editor {
                 self.actions.backspace(&mut self.cursor, &mut self.content, &mut self.lexer);
                 return true;
             }
-            EditorAction::Delete => self.actions.del(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::Delete => {
+                self.actions.del(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
+            }
             EditorAction::NewLine => self.actions.new_line(&mut self.cursor, &mut self.content, &mut self.lexer),
             EditorAction::Indent => self.actions.indent(&mut self.cursor, &mut self.content, &mut self.lexer),
             EditorAction::RemoveLine => {
