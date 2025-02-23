@@ -370,7 +370,7 @@ mod tests {
         assert_eq!(content[0].content, "0123456789");
         assert_eq!(edit.text, "");
         assert_eq!(edit.reverse, "789");
-        assert_eq!(edit.cursor, CursorPosition { line: 0, char: 7 })
+        assert_eq!(edit.cursor, CursorPosition { line: 0, char: 7 });
     }
 
     #[test]
