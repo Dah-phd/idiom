@@ -306,9 +306,6 @@ impl From<TextBuffer> for Option<Edit> {
 
 #[cfg(test)]
 mod tests {
-    use crossterm::event;
-    use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
-
     use super::super::edits::Edit;
     use super::ActionBuffer;
     use crate::configs::FileType;
@@ -321,6 +318,7 @@ mod tests {
     use crate::workspace::actions::buffer::DelBuffer;
     use crate::workspace::line::EditorLine;
     use crate::workspace::{cursor::Cursor, CursorPosition};
+    use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
     use std::path::PathBuf;
 
     fn create_lexer() -> Lexer {
