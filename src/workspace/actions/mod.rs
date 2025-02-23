@@ -10,7 +10,7 @@ use super::{
 use crate::{configs::IndentConfigs, syntax::Lexer, utils::Offset};
 use buffer::ActionBuffer;
 pub use edits::Edit;
-use lsp_types::{TextDocumentContentChangeEvent, TextEdit};
+use lsp_types::TextEdit;
 pub use meta::{EditMetaData, EditType};
 
 #[derive(Default)]
@@ -351,31 +351,21 @@ impl Actions {
     fn push_char_simple(&mut self, ch: char, cursor: &mut Cursor, content: &mut [EditorLine], lexer: &mut Lexer) {
         if let Some(line) = content.get_mut(cursor.line) {
             if is_closing_repeat(line, ch, cursor.char) {
+                cursor.add_to_char(1);
             } else if let Some(closing) = get_closing_char(ch) {
                 let new_text = format!("{ch}{closing}");
                 line.insert_str(cursor.char, &new_text);
                 self.push_buffer(lexer);
                 self.push_done(Edit::record_in_line_insertion(cursor.into(), new_text), lexer, content);
+                cursor.add_to_char(1);
             } else {
-                line.insert(cursor.char, ch);
-                if let Some(edit) = self.buffer.push(cursor.line, cursor.char, ch) {
+                let (maybe_edit, event) = self.buffer.push(cursor, ch, line, lexer);
+                lexer.sync_changes(vec![event]);
+                if let Some(edit) = maybe_edit {
                     lexer.sync_tokens(edit.meta);
                     self.done.push(edit.into());
                 }
-
-                let position = if cursor.char != 0 && !line.is_simple() {
-                    lsp_types::Position::new(cursor.line as u32, (lexer.encode_position)(cursor.char, &line[..]) as u32)
-                } else {
-                    cursor.into()
-                };
-
-                lexer.sync_changes(vec![TextDocumentContentChangeEvent {
-                    text: String::from(ch),
-                    range: Some(lsp_types::Range::new(position, position)),
-                    range_length: None,
-                }]);
             }
-            cursor.add_to_char(1);
         }
     }
 
@@ -396,27 +386,13 @@ impl Actions {
                 }
             }
             None => {
-                let line = &mut content[cursor.line];
-                let removed_char = line.remove(cursor.char);
-                if let Some(edit) = self.buffer.del(cursor.line, cursor.char, removed_char) {
+                let code_text = &mut content[cursor.line];
+                let (maybe_edit, event) = self.buffer.del(cursor, code_text, lexer);
+                lexer.sync_changes(vec![event]);
+                if let Some(edit) = maybe_edit {
                     lexer.sync_tokens(edit.meta);
                     self.done.push(edit.into());
                 }
-
-                let (line_idx, char_idx) = if cursor.char != 0 && !line.is_simple() {
-                    (cursor.line, (lexer.encode_position)(cursor.char, &line[..]))
-                } else {
-                    (cursor.line, cursor.char)
-                };
-
-                let start = lsp_types::Position::new(line_idx as u32, char_idx as u32);
-                let end_char = char_idx + (lexer.char_lsp_pos)(removed_char);
-                let end = lsp_types::Position::new(line_idx as u32, end_char as u32);
-                lexer.sync_changes(vec![TextDocumentContentChangeEvent {
-                    text: String::new(),
-                    range: Some(lsp_types::Range { start, end }),
-                    range_length: None,
-                }]);
             }
         }
     }
@@ -439,17 +415,13 @@ impl Actions {
                 self.push_done(edit, lexer, content);
             }
             None => {
-                if let Some(edit) =
-                    self.buffer.backspace(cursor.line, cursor.char, &mut content[cursor.line], &self.cfg.indent)
-                {
+                let data = self.buffer.backspace(cursor, &mut content[cursor.line], lexer, &self.cfg.indent);
+                let (maybe_edit, event) = data;
+                lexer.sync_changes(vec![event]);
+                if let Some(edit) = maybe_edit {
                     lexer.sync_tokens(edit.meta);
                     self.done.push(edit.into());
-                }
-                let new_char = self.buffer.last_char();
-                let tmp_reverse = format!("{:width$}", "", width = cursor.char - new_char);
-                cursor.set_char(new_char);
-                let edit = Edit::single_line(cursor.into(), String::new(), tmp_reverse);
-                lexer.sync_changes(vec![edit.text_change(lexer.encode_position, lexer.char_lsp_pos, content).1]);
+                };
             }
         }
     }

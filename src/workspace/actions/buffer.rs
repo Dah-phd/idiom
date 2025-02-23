@@ -1,4 +1,6 @@
 use super::super::{actions::Edit, line::EditorLine, CursorPosition};
+use crate::{syntax::Lexer, workspace::cursor::Cursor};
+use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 
 #[derive(Default, Debug)]
 pub enum ActionBuffer {
@@ -22,25 +24,45 @@ impl ActionBuffer {
         }
     }
 
-    pub fn push(&mut self, line: usize, char: usize, ch: char) -> Option<Edit> {
+    pub fn push(
+        &mut self,
+        cursor: &mut Cursor,
+        ch: char,
+        code_text: &mut EditorLine,
+        lexer: &Lexer,
+    ) -> (Option<Edit>, TextDocumentContentChangeEvent) {
         if let Self::Text(buf) = self {
-            return buf.push(line, char, ch);
+            return buf.push(cursor, ch, code_text, lexer);
         }
-        std::mem::replace(self, Self::Text(TextBuffer::new(line, char, ch.into()))).into()
+        let (new, event) = TextBuffer::new(cursor, ch, code_text, lexer);
+        (std::mem::replace(self, Self::Text(new)).into(), event)
     }
 
-    pub fn del(&mut self, line: usize, char: usize, removed: char) -> Option<Edit> {
+    pub fn del(
+        &mut self,
+        cursor: &Cursor,
+        code_text: &mut EditorLine,
+        lexer: &Lexer,
+    ) -> (Option<Edit>, TextDocumentContentChangeEvent) {
         if let Self::Del(buf) = self {
-            return buf.del(line, char, removed);
+            return buf.del(cursor, code_text, lexer);
         }
-        std::mem::replace(self, Self::Del(DelBuffer::new(line, char, removed))).into()
+        let (new, event) = DelBuffer::new(cursor, code_text, lexer);
+        (std::mem::replace(self, Self::Del(new)).into(), event)
     }
 
-    pub fn backspace(&mut self, line: usize, char: usize, text: &mut EditorLine, indent: &str) -> Option<Edit> {
+    pub fn backspace(
+        &mut self,
+        cursor: &mut Cursor,
+        text: &mut EditorLine,
+        lexer: &Lexer,
+        indent: &str,
+    ) -> (Option<Edit>, TextDocumentContentChangeEvent) {
         if let Self::Backspace(buf) = self {
-            return buf.backspace(line, char, text, indent);
+            return buf.backspace(cursor, text, lexer, indent);
         }
-        std::mem::replace(self, Self::Backspace(BackspaceBuffer::new(line, char, text, indent))).into()
+        let (new, event) = BackspaceBuffer::new(cursor, text, lexer, indent);
+        (std::mem::replace(self, Self::Backspace(new)).into(), event)
     }
 }
 
@@ -57,22 +79,57 @@ impl From<ActionBuffer> for Option<Edit> {
 
 #[derive(Debug, Clone)]
 pub struct DelBuffer {
+    text: String,
     line: usize,
     char: usize,
-    text: String,
+    change_start: Position,
 }
 
 impl DelBuffer {
-    fn new(line: usize, char: usize, removed: char) -> Self {
-        Self { line, char, text: String::from(removed) }
+    fn new(cursor: &Cursor, code_text: &mut EditorLine, lexer: &Lexer) -> (Self, TextDocumentContentChangeEvent) {
+        let line = cursor.line;
+        let char = cursor.char;
+        let change_start = if code_text.is_simple() {
+            Position::new(line as u32, cursor.char as u32)
+        } else {
+            Position::new(line as u32, (lexer.encode_position)(cursor.char, &code_text[..]) as u32)
+        };
+        let removed = code_text.remove(char);
+        let end = Position::new(change_start.line, change_start.character + ((lexer.char_lsp_pos)(removed)) as u32);
+        (
+            Self { line, char, change_start, text: String::from(removed) },
+            TextDocumentContentChangeEvent {
+                text: String::from(removed),
+                range: Some(Range::new(change_start, end)),
+                range_length: None,
+            },
+        )
     }
 
-    fn del(&mut self, line: usize, char: usize, removed: char) -> Option<Edit> {
-        if line == self.line && char == self.char {
+    fn del(
+        &mut self,
+        cursor: &Cursor,
+        code_text: &mut EditorLine,
+        lexer: &Lexer,
+    ) -> (Option<Edit>, TextDocumentContentChangeEvent) {
+        if cursor.line == self.line && cursor.char == self.char {
+            let removed = code_text.remove(cursor.char);
+            let end = Position::new(
+                self.change_start.line,
+                self.change_start.character + ((lexer.char_lsp_pos)(removed)) as u32,
+            );
             self.text.push(removed);
-            return None;
+            return (
+                None,
+                TextDocumentContentChangeEvent {
+                    text: String::from(removed),
+                    range: Some(Range::new(self.change_start, end)),
+                    range_length: None,
+                },
+            );
         }
-        std::mem::replace(self, Self::new(line, char, removed)).into()
+        let (new, event) = Self::new(cursor, code_text, lexer);
+        (std::mem::replace(self, new).into(), event)
     }
 }
 
@@ -93,39 +150,71 @@ pub struct BackspaceBuffer {
 }
 
 impl BackspaceBuffer {
-    fn new(line: usize, char: usize, text: &mut EditorLine, indent: &str) -> Self {
-        let mut new = Self { line, last: char, text: String::new() };
-        new.backspace_indent_handler(char, text, indent);
-        new
+    fn new(
+        cursor: &mut Cursor,
+        text: &mut EditorLine,
+        lexer: &Lexer,
+        indent: &str,
+    ) -> (Self, TextDocumentContentChangeEvent) {
+        let mut new = Self { line: cursor.line, last: cursor.char, text: String::new() };
+        let event = new.backspace_indent_handler(cursor, text, lexer, indent);
+        cursor.set_char(new.last);
+        (new, event)
     }
 
-    fn backspace(&mut self, line: usize, char: usize, text: &mut EditorLine, indent: &str) -> Option<Edit> {
-        if line == self.line && self.last == char {
-            self.backspace_indent_handler(char, text, indent);
-            return None;
+    fn backspace(
+        &mut self,
+        cursor: &mut Cursor,
+        text: &mut EditorLine,
+        lexer: &Lexer,
+        indent: &str,
+    ) -> (Option<Edit>, TextDocumentContentChangeEvent) {
+        if cursor.line == self.line && self.last == cursor.char {
+            let event = self.backspace_indent_handler(cursor, text, lexer, indent);
+            cursor.set_char(self.last);
+            return (None, event);
         }
-        std::mem::replace(self, Self::new(line, char, text, indent)).into()
+        let (new, event) = Self::new(cursor, text, lexer, indent);
+        (std::mem::replace(self, new).into(), event)
     }
 
-    fn backspace_indent_handler(&mut self, char: usize, text: &mut EditorLine, indent: &str) {
+    /// handles only whitespace logic - no encoding needed
+    fn backspace_indent_handler(
+        &mut self,
+        cursor: &mut Cursor,
+        text: &mut EditorLine,
+        lexer: &Lexer,
+        indent: &str,
+    ) -> TextDocumentContentChangeEvent {
+        let char = cursor.char;
+        let line = cursor.line as u32;
         let chars_after_indent = text[..char].trim_start_matches(indent);
-        if chars_after_indent.is_empty() {
+
+        let range = if chars_after_indent.is_empty() {
+            self.last -= indent.len();
             self.text.push_str(indent);
             text.tokens.remove_tokens_till(indent.len());
             text.replace_till(indent.len(), "");
-            self.last -= indent.len();
-            return;
-        }
-        if chars_after_indent.chars().all(|c| c.is_whitespace()) {
+            Range::new(Position::new(line, self.last as u32), Position::new(line, char as u32))
+        } else if chars_after_indent.chars().all(|c| c.is_whitespace()) {
             let removed_count = chars_after_indent.len();
             self.last -= removed_count;
             self.text.push_str(&text[self.last..char]);
             text.tokens.remove_tokens_till(removed_count);
             text.replace_till(removed_count, "");
-            return;
-        }
-        self.text.push(text.remove(char - 1));
-        self.last -= 1;
+            Range::new(Position::new(line, self.last as u32), Position::new(line, char as u32))
+        } else {
+            let ch = text.remove(char - 1);
+            self.last -= 1;
+            let last =
+                if text.is_simple() { self.last } else { (lexer.encode_position)(self.last, text.content.as_str()) };
+            let start = lsp_types::Position::new(line, last as u32);
+            let end_character = last + (lexer.char_lsp_pos)(ch);
+            let end = lsp_types::Position::new(line, end_character as u32);
+            self.text.push(ch);
+            Range::new(start, end)
+        };
+        TextDocumentContentChangeEvent { text: String::new(), range: Some(range), range_length: None }
     }
 }
 
@@ -144,24 +233,65 @@ impl From<BackspaceBuffer> for Option<Edit> {
 
 #[derive(Debug, Clone)]
 pub struct TextBuffer {
+    last: usize,
     line: usize,
     char: usize,
-    last: usize,
     text: String,
 }
 
 impl TextBuffer {
-    fn new(line: usize, char: usize, text: String) -> Self {
-        Self { line, last: char + 1, char, text }
+    fn new(
+        cursor: &mut Cursor,
+        ch: char,
+        code_text: &mut EditorLine,
+        lexer: &Lexer,
+    ) -> (Self, TextDocumentContentChangeEvent) {
+        let char = cursor.char;
+        let pos = if cursor.char != 0 && !code_text.is_simple() {
+            Position::new(cursor.line as u32, (lexer.encode_position)(cursor.char, &code_text[..]) as u32)
+        } else {
+            cursor.into()
+        };
+        code_text.insert(cursor.char, ch);
+        cursor.add_to_char(1);
+        (
+            Self { line: cursor.line, last: cursor.char, char, text: String::from(ch) },
+            TextDocumentContentChangeEvent {
+                text: String::from(ch),
+                range: Some(Range::new(pos, pos)),
+                range_length: None,
+            },
+        )
     }
 
-    fn push(&mut self, line: usize, char: usize, ch: char) -> Option<Edit> {
-        if line == self.line && char == self.last && (ch.is_alphabetic() || ch == '_') {
-            self.last += 1;
+    fn push(
+        &mut self,
+        cursor: &mut Cursor,
+        ch: char,
+        code_text: &mut EditorLine,
+        lexer: &Lexer,
+    ) -> (Option<Edit>, TextDocumentContentChangeEvent) {
+        if cursor.line == self.line && cursor.char == self.last && (ch.is_alphabetic() || ch == '_') {
+            let pos = if cursor.char != 0 && !code_text.is_simple() {
+                Position::new(cursor.line as u32, (lexer.encode_position)(cursor.char, &code_text[..]) as u32)
+            } else {
+                cursor.into()
+            };
             self.text.push(ch);
-            return None;
+            code_text.insert(cursor.char, ch);
+            cursor.add_to_char(1);
+            self.last = cursor.char;
+            return (
+                None,
+                TextDocumentContentChangeEvent {
+                    text: String::from(ch),
+                    range: Some(Range::new(pos, pos)),
+                    range_length: None,
+                },
+            );
         }
-        std::mem::replace(self, Self::new(line, char, ch.into())).into()
+        let (new, event) = Self::new(cursor, ch, code_text, lexer);
+        (std::mem::replace(self, new).into(), event)
     }
 }
 
@@ -176,45 +306,139 @@ impl From<TextBuffer> for Option<Edit> {
 
 #[cfg(test)]
 mod tests {
+    use crossterm::event;
+    use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
+
     use super::super::edits::Edit;
-    use crate::workspace::line::EditorLine;
-    use crate::workspace::CursorPosition;
-
     use super::ActionBuffer;
+    use crate::configs::FileType;
+    use crate::global_state::GlobalState;
+    use crate::render::backend::{Backend, BackendProtocol};
+    use crate::syntax::{
+        tests::{char_lsp_utf8, encode_pos_utf8},
+        Lexer,
+    };
+    use crate::workspace::actions::buffer::DelBuffer;
+    use crate::workspace::line::EditorLine;
+    use crate::workspace::{cursor::Cursor, CursorPosition};
+    use std::path::PathBuf;
 
-    #[test]
-    fn test_del() {
-        let mut code_line = EditorLine::new("0123456789".to_owned());
-        let mut buf = ActionBuffer::None;
-        let cursor_char = 7;
-        buf.del(0, cursor_char, code_line.remove(cursor_char));
-        buf.del(0, cursor_char, code_line.remove(cursor_char));
-        buf.del(0, cursor_char, code_line.remove(cursor_char));
-        if let ActionBuffer::Del(buf) = buf {
-            let m_edit: Option<Edit> = buf.clone().into();
-            let edit = m_edit.unwrap();
-            assert!(edit.text.is_empty());
-            assert_eq!(edit.reverse, "789");
-            assert_eq!(edit.cursor, CursorPosition { line: 0, char: cursor_char });
-            return;
-        }
-        panic!("Expected Del buf!")
+    fn create_lexer() -> Lexer {
+        let mut gs = GlobalState::new(Backend::init()).unwrap();
+        let path = PathBuf::new();
+        Lexer::with_context(FileType::Rust, &path, &mut gs)
+    }
+
+    fn create_lexer_utf8() -> Lexer {
+        let mut lexer = create_lexer();
+        lexer.encode_position = encode_pos_utf8;
+        lexer.char_lsp_pos = char_lsp_utf8;
+        lexer
     }
 
     #[test]
-    fn test_backspace() {
-        let mut code_line = EditorLine::new("          1".to_owned());
+    fn del() {
+        let lexer = create_lexer();
+        let mut code_text = EditorLine::new("0123456789".to_owned());
+        let mut buf = ActionBuffer::None;
+        let mut cursor = Cursor::default();
+        cursor.set_char(7);
+        let (edit, event) = buf.del(&cursor, &mut code_text, &lexer);
+        assert_eq!(
+            event,
+            TextDocumentContentChangeEvent {
+                text: String::from('7'),
+                range: Some(Range::new(Position::new(0, 7), Position::new(0, 8))),
+                range_length: None,
+            }
+        );
+        assert!(edit.is_none());
+        let (edit, event) = buf.del(&cursor, &mut code_text, &lexer);
+        assert_eq!(
+            event,
+            TextDocumentContentChangeEvent {
+                text: String::from('8'),
+                range: Some(Range::new(Position::new(0, 7), Position::new(0, 8))),
+                range_length: None,
+            }
+        );
+        assert!(edit.is_none());
+        let (edit, event) = buf.del(&cursor, &mut code_text, &lexer);
+        assert_eq!(
+            event,
+            TextDocumentContentChangeEvent {
+                text: String::from('9'),
+                range: Some(Range::new(Position::new(0, 7), Position::new(0, 8))),
+                range_length: None,
+            }
+        );
+        assert!(edit.is_none());
+
+        assert!(matches!(
+            buf, ActionBuffer::Del(DelBuffer { text, change_start, ..}) if text == "789" && change_start == Position::new(0, 7)
+        ));
+    }
+
+    #[test]
+    fn del_complx() {
+        let lexer = create_lexer_utf8();
+        let mut code_text = EditorLine::new("012🙀4567🙀9".to_owned());
+        let mut buf = ActionBuffer::None;
+        let mut cursor = Cursor::default();
+        cursor.set_char(7);
+        let (edit, event) = buf.del(&cursor, &mut code_text, &lexer);
+        assert_eq!(
+            event,
+            TextDocumentContentChangeEvent {
+                text: String::from('7'),
+                range: Some(Range::new(Position::new(0, 10), Position::new(0, 11))),
+                range_length: None,
+            }
+        );
+        assert!(edit.is_none());
+        let (edit, event) = buf.del(&cursor, &mut code_text, &lexer);
+        assert_eq!(
+            event,
+            TextDocumentContentChangeEvent {
+                text: String::from('🙀'),
+                range: Some(Range::new(Position::new(0, 10), Position::new(0, 14))),
+                range_length: None,
+            }
+        );
+        assert!(edit.is_none());
+        let (edit, event) = buf.del(&cursor, &mut code_text, &lexer);
+        assert_eq!(
+            event,
+            TextDocumentContentChangeEvent {
+                text: String::from('9'),
+                range: Some(Range::new(Position::new(0, 10), Position::new(0, 11))),
+                range_length: None,
+            }
+        );
+        assert!(edit.is_none());
+
+        assert!(matches!(
+            buf, ActionBuffer::Del(DelBuffer { text, change_start, ..}) if text == "7🙀9" && change_start == Position::new(0, 10)
+        ));
+    }
+
+    #[test]
+    fn backspace() {
+        let lexer = create_lexer();
+        let mut code_text = EditorLine::new("          1".to_owned());
         let indent = "    ";
         let mut buf = ActionBuffer::None;
-        buf.backspace(0, 11, &mut code_line, indent);
-        buf.backspace(0, 10, &mut code_line, indent);
-        buf.backspace(0, 8, &mut code_line, indent);
+        let mut cursor = Cursor::default();
+        cursor.set_position((0, 11).into());
+        buf.backspace(&mut cursor, &mut code_text, &lexer, indent);
+        buf.backspace(&mut cursor, &mut code_text, &lexer, indent);
+        buf.backspace(&mut cursor, &mut code_text, &lexer, indent);
         if let ActionBuffer::Backspace(buf) = buf {
             let m_edit: Option<Edit> = buf.clone().into();
             let edit = m_edit.unwrap();
             assert!(edit.text.is_empty());
             assert_eq!(edit.reverse, "      1");
-            assert_eq!(code_line.unwrap(), indent);
+            assert_eq!(code_text.unwrap(), indent);
             assert_eq!(edit.cursor, CursorPosition { line: 0, char: 4 });
             return;
         }
@@ -222,26 +446,169 @@ mod tests {
     }
 
     #[test]
-    fn test_text() {
+    fn backspace_indent() {
+        let lexer = create_lexer_utf8();
+        let mut code_text = EditorLine::new("          🙀".to_owned());
+        let indent = "    ";
         let mut buf = ActionBuffer::None;
-        buf.push(0, 0, 'a');
-        buf.push(0, 1, 'b');
-        buf.push(0, 2, 'c');
-        if let Some(edit) = buf.push(0, 3, ' ') {
-            assert!(edit.reverse.is_empty());
-            assert_eq!(edit.text, "abc");
-            assert_eq!(edit.cursor, CursorPosition { line: 0, char: 0 });
-        } else {
-            panic!("Expected edit!")
-        }
-        buf.push(0, 4, 'a');
-        buf.push(0, 5, '_');
-        if let Some(edit) = buf.push(0, 6, '1') {
-            assert!(edit.reverse.is_empty());
-            assert_eq!(edit.text, " a_");
-            assert_eq!(edit.cursor, CursorPosition { line: 0, char: 3 });
-        } else {
-            panic!("Expected edit!")
-        }
+        let mut cursor = Cursor::default();
+        cursor.set_position((0, 10).into());
+        let (edit, event) = buf.backspace(&mut cursor, &mut code_text, &lexer, indent);
+        assert_eq!(
+            event,
+            TextDocumentContentChangeEvent {
+                text: String::new(),
+                range: Some(Range::new(Position::new(0, 8), Position::new(0, 10))),
+                range_length: None
+            }
+        );
+        assert_eq!(code_text.content.as_str(), "        🙀");
+        assert_eq!(cursor.char, 8);
+        assert!(edit.is_none());
+        let (edit, event) = buf.backspace(&mut cursor, &mut code_text, &lexer, indent);
+        assert_eq!(
+            event,
+            TextDocumentContentChangeEvent {
+                text: String::new(),
+                range: Some(Range::new(Position::new(0, 4), Position::new(0, 8))),
+                range_length: None
+            }
+        );
+        assert_eq!(code_text.content.as_str(), "    🙀");
+        assert_eq!(cursor.char, 4);
+        assert!(edit.is_none());
+        assert!(matches!(buf, ActionBuffer::Backspace(..)));
+    }
+
+    #[test]
+    fn backspace_complex() {
+        let lexer = create_lexer_utf8();
+        let mut code_text = EditorLine::new("        🙀🙀1🙀2".to_owned());
+        let indent = "    ";
+        let mut buf = ActionBuffer::None;
+        let mut cursor = Cursor::default();
+        cursor.set_position((0, 12).into());
+        let (edit, event) = buf.backspace(&mut cursor, &mut code_text, &lexer, indent);
+        assert_eq!("        🙀🙀12", code_text.content);
+        assert_eq!(
+            event,
+            TextDocumentContentChangeEvent {
+                text: String::new(),
+                range: Some(Range::new(Position::new(0, 17), Position::new(0, 21))),
+                range_length: None,
+            }
+        );
+        assert!(edit.is_none());
+        cursor.set_position((0, 9).into());
+        let (edit, event) = buf.backspace(&mut cursor, &mut code_text, &lexer, indent);
+        assert_eq!("        🙀12", code_text.content);
+        assert_eq!(
+            event,
+            TextDocumentContentChangeEvent {
+                text: String::new(),
+                range: Some(Range::new(Position::new(0, 8), Position::new(0, 12))),
+                range_length: None,
+            }
+        );
+        assert!(edit.is_some());
+        let (edit, event) = buf.backspace(&mut cursor, &mut code_text, &lexer, indent);
+        assert_eq!("    🙀12", code_text.content);
+        assert_eq!(
+            event,
+            TextDocumentContentChangeEvent {
+                text: String::new(),
+                range: Some(Range::new(Position::new(0, 4), Position::new(0, 8))),
+                range_length: None,
+            }
+        );
+        assert!(edit.is_none());
+        assert!(matches!(buf, ActionBuffer::Backspace(..)));
+    }
+
+    #[test]
+    fn text() {
+        let lexer = create_lexer();
+        let mut buf = ActionBuffer::None;
+        let mut cursor = Cursor::default();
+        let mut code_text = EditorLine::from("");
+        let (edit, event) = buf.push(&mut cursor, 'a', &mut code_text, &lexer);
+        let range = Some(Range::new(Position::new(0, 0), Position::new(0, 0)));
+        assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('a'), range, range_length: None });
+        assert!(edit.is_none());
+
+        let (edit, event) = buf.push(&mut cursor, 'b', &mut code_text, &lexer);
+        let range = Some(Range::new(Position::new(0, 1), Position::new(0, 1)));
+        assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('b'), range, range_length: None });
+        assert!(edit.is_none());
+
+        let (edit, event) = buf.push(&mut cursor, 'c', &mut code_text, &lexer);
+        let range = Some(Range::new(Position::new(0, 2), Position::new(0, 2)));
+        assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('c'), range, range_length: None });
+        assert!(edit.is_none());
+
+        let (maybe_edit, event) = buf.push(&mut cursor, ' ', &mut code_text, &lexer);
+        let range = Some(Range::new(Position::new(0, 3), Position::new(0, 3)));
+        assert_eq!(event, TextDocumentContentChangeEvent { text: String::from(' '), range, range_length: None });
+        assert!(
+            matches!(maybe_edit, Some(edit) if edit.reverse.is_empty() && edit.text == "abc" && edit.cursor == CursorPosition { line: 0, char: 0 })
+        );
+
+        let (edit, event) = buf.push(&mut cursor, 'a', &mut code_text, &lexer);
+        let range = Some(Range::new(Position::new(0, 4), Position::new(0, 4)));
+        assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('a'), range, range_length: None });
+        assert!(edit.is_none());
+
+        let (edit, event) = buf.push(&mut cursor, '_', &mut code_text, &lexer);
+        let range = Some(Range::new(Position::new(0, 5), Position::new(0, 5)));
+        assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('_'), range, range_length: None });
+        assert!(edit.is_none());
+
+        let (maybe_edit, event) = buf.push(&mut cursor, '1', &mut code_text, &lexer);
+        let range = Some(Range::new(Position::new(0, 6), Position::new(0, 6)));
+        assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('1'), range, range_length: None });
+        assert!(
+            matches!(maybe_edit, Some(edit) if edit.reverse.is_empty() && edit.text == " a_" && edit.cursor == CursorPosition { line: 0, char: 3 })
+        );
+
+        assert!(
+            matches!(buf, ActionBuffer::Text(buffer) if buffer.text == "1" && buffer.line == 0 && buffer.char == 6)
+        );
+    }
+
+    #[test]
+    fn test_complex() {
+        let lexer = create_lexer_utf8();
+        let mut buf = ActionBuffer::None;
+        let mut cursor = Cursor::default();
+        cursor.set_position((0, 6).into());
+        let mut code_text = EditorLine::from("tesxt🙀asd32ra 🙀dw");
+        let (no_edit, event) = buf.push(&mut cursor, 'b', &mut code_text, &lexer);
+        let range = Some(Range::new(Position::new(0, 9), Position::new(0, 9)));
+        assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('b'), range, range_length: None });
+        assert!(no_edit.is_none());
+
+        let (no_edit, event) = buf.push(&mut cursor, 'b', &mut code_text, &lexer);
+        let range = Some(Range::new(Position::new(0, 10), Position::new(0, 10)));
+        assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('b'), range, range_length: None });
+        assert!(no_edit.is_none());
+        assert_eq!(code_text.content, "tesxt🙀bbasd32ra 🙀dw");
+
+        let (edit, event) = buf.push(&mut cursor, '🙀', &mut code_text, &lexer);
+        let range = Some(Range::new(Position::new(0, 11), Position::new(0, 11)));
+        assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('🙀'), range, range_length: None });
+        assert!(
+            matches!(edit, Some(edit) if edit.reverse.is_empty() && edit.text == "bb" && edit.cursor == CursorPosition {line: 0, char: 6})
+        );
+        assert_eq!(code_text.content, "tesxt🙀bb🙀asd32ra 🙀dw");
+
+        cursor.set_char(8);
+        let (edit, event) = buf.push(&mut cursor, 'x', &mut code_text, &lexer);
+        assert!(edit.is_some());
+        assert_eq!(code_text.content, "tesxt🙀bbx🙀asd32ra 🙀dw");
+        let range = Some(Range::new(Position::new(0, 11), Position::new(0, 11)));
+        assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('x'), range, range_length: None });
+        assert!(
+            matches!(buf, ActionBuffer::Text(text) if text.text == "x" && text.line == 0 && text.char == 8 && text.last == 9)
+        );
     }
 }

@@ -423,7 +423,7 @@ fn range_tokens_are_supported(provider: &SemanticTokensServerCapabilities) -> bo
 
 #[inline]
 pub fn encode_pos_utf8(char_idx: usize, from_str: &str) -> usize {
-    from_str.char_indices().take(char_idx).last().map(|(idx, _)| idx).unwrap_or_default()
+    from_str.chars().take(char_idx).fold(0, |sum, ch| sum + ch.len_utf8())
 }
 
 #[inline]
