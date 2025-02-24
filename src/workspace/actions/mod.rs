@@ -333,16 +333,16 @@ impl Actions {
     }
 
     fn push_char_simple(&mut self, ch: char, cursor: &mut Cursor, content: &mut [EditorLine], lexer: &mut Lexer) {
-        if let Some(line) = content.get_mut(cursor.line) {
-            if is_closing_repeat(line, ch, cursor.char) {
+        if let Some(text) = content.get_mut(cursor.line) {
+            if is_closing_repeat(text, ch, cursor.char) {
                 cursor.add_to_char(1);
             } else if let Some(closing) = get_closing_char(ch) {
                 let new_text = format!("{ch}{closing}");
-                line.insert_str(cursor.char, &new_text);
+                text.insert_str(cursor.char, &new_text);
                 self.push_done(Edit::record_in_line_insertion(cursor.into(), new_text), lexer, content);
                 cursor.add_to_char(1);
             } else {
-                let (maybe_edit, event) = self.buffer.push(cursor, ch, line, lexer);
+                let (maybe_edit, event) = self.buffer.push(cursor, ch, text, lexer);
                 lexer.sync_changes(vec![event]);
                 if let Some(edit) = maybe_edit {
                     lexer.sync_tokens(edit.meta);
@@ -369,8 +369,8 @@ impl Actions {
                 }
             }
             None => {
-                let code_text = &mut content[cursor.line];
-                let (maybe_edit, event) = self.buffer.del(cursor, code_text, lexer);
+                let text = &mut content[cursor.line];
+                let (maybe_edit, event) = self.buffer.del(cursor, text, lexer);
                 lexer.sync_changes(vec![event]);
                 if let Some(edit) = maybe_edit {
                     lexer.sync_tokens(edit.meta);

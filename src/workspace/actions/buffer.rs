@@ -78,15 +78,15 @@ pub struct DelBuffer {
 }
 
 impl DelBuffer {
-    fn new(cursor: &Cursor, code_text: &mut EditorLine, lexer: &Lexer) -> (Self, TextDocumentContentChangeEvent) {
+    fn new(cursor: &Cursor, text: &mut EditorLine, lexer: &Lexer) -> (Self, TextDocumentContentChangeEvent) {
         let line = cursor.line;
         let char = cursor.char;
-        let change_start = if code_text.is_simple() {
+        let change_start = if text.is_simple() {
             Position::new(line as u32, cursor.char as u32)
         } else {
-            Position::new(line as u32, (lexer.encode_position)(cursor.char, &code_text[..]) as u32)
+            Position::new(line as u32, (lexer.encode_position)(cursor.char, &text[..]) as u32)
         };
-        let removed = code_text.remove(char);
+        let removed = text.remove(char);
         let end = Position::new(change_start.line, change_start.character + ((lexer.char_lsp_pos)(removed)) as u32);
         (
             Self { line, char, change_start, text: String::from(removed) },
@@ -101,15 +101,13 @@ impl DelBuffer {
     fn del(
         &mut self,
         cursor: &Cursor,
-        code_text: &mut EditorLine,
+        text: &mut EditorLine,
         lexer: &Lexer,
     ) -> (Option<Edit>, TextDocumentContentChangeEvent) {
         if cursor.line == self.line && cursor.char == self.char {
-            let removed = code_text.remove(cursor.char);
-            let end = Position::new(
-                self.change_start.line,
-                self.change_start.character + ((lexer.char_lsp_pos)(removed)) as u32,
-            );
+            let removed = text.remove(cursor.char);
+            let end_character = self.change_start.character + ((lexer.char_lsp_pos)(removed)) as u32;
+            let end = Position::new(self.change_start.line, end_character);
             self.text.push(removed);
             return (
                 None,
@@ -120,7 +118,7 @@ impl DelBuffer {
                 },
             );
         }
-        let (new, event) = Self::new(cursor, code_text, lexer);
+        let (new, event) = Self::new(cursor, text, lexer);
         (std::mem::replace(self, new).into(), event)
     }
 }
@@ -196,14 +194,15 @@ impl BackspaceBuffer {
             text.replace_till(removed_count, "");
             Range::new(Position::new(line, self.last as u32), Position::new(line, char as u32))
         } else {
-            let ch = text.remove(char - 1);
             self.last -= 1;
-            let last =
-                if text.is_simple() { self.last } else { (lexer.encode_position)(self.last, text.content.as_str()) };
-            let start = Position::new(line, last as u32);
-            let end_character = last + (lexer.char_lsp_pos)(ch);
-            let end = Position::new(line, end_character as u32);
+            let ch = text.remove(self.last);
             self.text.push(ch);
+            let character = match text.is_simple() {
+                true => self.last,
+                false => (lexer.encode_position)(self.last, text.content.as_str()),
+            };
+            let start = Position::new(line, character as u32);
+            let end = Position::new(line, (character + (lexer.char_lsp_pos)(ch)) as u32);
             Range::new(start, end)
         };
         TextDocumentContentChangeEvent { text: String::new(), range: Some(range), range_length: None }
@@ -215,11 +214,8 @@ impl From<BackspaceBuffer> for Option<Edit> {
         if buf.text.is_empty() {
             return None;
         }
-        Some(Edit::single_line(
-            CursorPosition { line: buf.line, char: buf.last },
-            String::new(),
-            buf.text.chars().rev().collect(),
-        ))
+        let cursor = CursorPosition { line: buf.line, char: buf.last };
+        Some(Edit::single_line(cursor, String::new(), buf.text.chars().rev().collect()))
     }
 }
 
@@ -235,16 +231,16 @@ impl TextBuffer {
     fn new(
         cursor: &mut Cursor,
         ch: char,
-        code_text: &mut EditorLine,
+        text: &mut EditorLine,
         lexer: &Lexer,
     ) -> (Self, TextDocumentContentChangeEvent) {
         let char = cursor.char;
-        let pos = if cursor.char != 0 && !code_text.is_simple() {
-            Position::new(cursor.line as u32, (lexer.encode_position)(cursor.char, &code_text[..]) as u32)
+        let pos = if cursor.char != 0 && !text.is_simple() {
+            Position::new(cursor.line as u32, (lexer.encode_position)(cursor.char, &text[..]) as u32)
         } else {
             cursor.into()
         };
-        code_text.insert(cursor.char, ch);
+        text.insert(cursor.char, ch);
         cursor.add_to_char(1);
         (
             Self { line: cursor.line, last: cursor.char, char, text: String::from(ch) },
@@ -260,17 +256,16 @@ impl TextBuffer {
         &mut self,
         cursor: &mut Cursor,
         ch: char,
-        code_text: &mut EditorLine,
+        text: &mut EditorLine,
         lexer: &Lexer,
     ) -> (Option<Edit>, TextDocumentContentChangeEvent) {
         if cursor.line == self.line && cursor.char == self.last && (ch.is_alphabetic() || ch == '_') {
-            let pos = if cursor.char != 0 && !code_text.is_simple() {
-                Position::new(cursor.line as u32, (lexer.encode_position)(cursor.char, &code_text[..]) as u32)
-            } else {
-                cursor.into()
+            let pos = match cursor.char != 0 && !text.is_simple() {
+                true => Position::new(cursor.line as u32, (lexer.encode_position)(cursor.char, &text[..]) as u32),
+                false => cursor.into(),
             };
             self.text.push(ch);
-            code_text.insert(cursor.char, ch);
+            text.insert(cursor.char, ch);
             cursor.add_to_char(1);
             self.last = cursor.char;
             return (
@@ -282,7 +277,7 @@ impl TextBuffer {
                 },
             );
         }
-        let (new, event) = Self::new(cursor, ch, code_text, lexer);
+        let (new, event) = Self::new(cursor, ch, text, lexer);
         (std::mem::replace(self, new).into(), event)
     }
 }
