@@ -33,13 +33,13 @@ impl ActionBuffer {
     pub fn del(
         &mut self,
         cursor: &Cursor,
-        code_text: &mut EditorLine,
+        text: &mut EditorLine,
         lexer: &Lexer,
     ) -> (Option<Edit>, TextDocumentContentChangeEvent) {
         if let Self::Del(buf) = self {
-            return buf.del(cursor, code_text, lexer);
+            return buf.del(cursor, text, lexer);
         }
-        let (new, event) = DelBuffer::new(cursor, code_text, lexer);
+        let (new, event) = DelBuffer::new(cursor, text, lexer);
         (std::mem::replace(self, Self::Del(new)).into(), event)
     }
 
@@ -91,7 +91,7 @@ impl DelBuffer {
         (
             Self { line, char, change_start, text: String::from(removed) },
             TextDocumentContentChangeEvent {
-                text: String::from(removed),
+                text: String::new(),
                 range: Some(Range::new(change_start, end)),
                 range_length: None,
             },
@@ -112,7 +112,7 @@ impl DelBuffer {
             return (
                 None,
                 TextDocumentContentChangeEvent {
-                    text: String::from(removed),
+                    text: String::new(),
                     range: Some(Range::new(self.change_start, end)),
                     range_length: None,
                 },
@@ -332,7 +332,7 @@ mod tests {
         assert_eq!(
             event,
             TextDocumentContentChangeEvent {
-                text: String::from('7'),
+                text: String::new(),
                 range: Some(Range::new(Position::new(0, 7), Position::new(0, 8))),
                 range_length: None,
             }
@@ -342,7 +342,7 @@ mod tests {
         assert_eq!(
             event,
             TextDocumentContentChangeEvent {
-                text: String::from('8'),
+                text: String::new(),
                 range: Some(Range::new(Position::new(0, 7), Position::new(0, 8))),
                 range_length: None,
             }
@@ -352,7 +352,7 @@ mod tests {
         assert_eq!(
             event,
             TextDocumentContentChangeEvent {
-                text: String::from('9'),
+                text: String::new(),
                 range: Some(Range::new(Position::new(0, 7), Position::new(0, 8))),
                 range_length: None,
             }
@@ -379,7 +379,7 @@ mod tests {
         assert_eq!(
             event,
             TextDocumentContentChangeEvent {
-                text: String::from('7'),
+                text: String::new(),
                 range: Some(Range::new(Position::new(0, 10), Position::new(0, 11))),
                 range_length: None,
             }
@@ -389,7 +389,7 @@ mod tests {
         assert_eq!(
             event,
             TextDocumentContentChangeEvent {
-                text: String::from('🙀'),
+                text: String::new(),
                 range: Some(Range::new(Position::new(0, 10), Position::new(0, 14))),
                 range_length: None,
             }
@@ -399,7 +399,7 @@ mod tests {
         assert_eq!(
             event,
             TextDocumentContentChangeEvent {
-                text: String::from('9'),
+                text: String::new(),
                 range: Some(Range::new(Position::new(0, 10), Position::new(0, 11))),
                 range_length: None,
             }
