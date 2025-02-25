@@ -1,4 +1,9 @@
 ## Includes only major changes (manual updates)
+# Version 0.4.6
+* fixed issue with local token modifications
+* updates sent to LSP per char
+* tokens requested on buffer push
+
 # Version 0.4.4
 * Added proper FileWatcher
 * Added LocalLSP -> non-lsp functionallity
