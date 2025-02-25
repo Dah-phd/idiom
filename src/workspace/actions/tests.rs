@@ -51,7 +51,7 @@ fn assert_edits_applicable(mut content: Vec<EditorLine>, edits: Vec<Edit>) {
 /// Edits
 
 #[test]
-fn test_new_line() {
+fn new_line() {
     let cfg = IndentConfigs::default();
 
     let mut content = vec![EditorLine::new("        ".to_owned())];
@@ -94,7 +94,7 @@ fn test_new_line() {
 }
 
 #[test]
-fn test_swap_lines() {
+fn swap_lines() {
     let mut content = create_content();
     let cfg = IndentConfigs::default();
     let (.., edit) = Edit::swap_down(7, &cfg, &mut content);
@@ -116,7 +116,7 @@ fn test_swap_lines() {
 }
 
 #[test]
-fn test_merge_next_line() {
+fn merge_next_line() {
     let mut content = create_content();
     let mut edits = vec![];
     edits.push(Edit::merge_next_line(0, &mut content));
@@ -128,7 +128,7 @@ fn test_merge_next_line() {
 }
 
 #[test]
-fn test_indent_unindent() {
+fn indent_unindent() {
     let mut content = create_content();
     let cfg = IndentConfigs::default();
     Edit::unindent(7, &mut content[7], &cfg.indent);
@@ -139,7 +139,7 @@ fn test_indent_unindent() {
 }
 
 #[test]
-fn test_record_inline_insert() {
+fn record_inline_insert() {
     let this_line: EditorLine = "text".into();
     let mut content = vec![this_line];
     let test_ins = String::from("    ");
@@ -156,7 +156,7 @@ fn test_record_inline_insert() {
 }
 
 #[test]
-fn test_remove_from_line() {
+fn remove_from_line() {
     let mut content = create_content();
     let mut edits = vec![Edit::remove_from_line(5, 2, 4, &mut content[5])];
     match_line(&content[5], &"the will be 🚀 everywhere in the end");
@@ -168,7 +168,7 @@ fn test_remove_from_line() {
 }
 
 #[test]
-fn test_insert_clip() {
+fn insert_clip() {
     let mut content = create_content();
     let clippy = "text".to_owned();
     let big_clippy = "text\n\ntext\n".to_owned();
@@ -184,7 +184,7 @@ fn test_insert_clip() {
 }
 
 #[test]
-fn test_remove_line() {
+fn remove_line() {
     let mut content = create_content();
     let edits = vec![Edit::remove_line(4, &mut content), Edit::remove_line(4, &mut content)];
     match_line(&content[4], &"i will have to have some scopes {");
@@ -192,7 +192,7 @@ fn test_remove_line() {
 }
 
 #[test]
-fn test_remove_select() {
+fn remove_select() {
     let mut content = create_content();
     let edits = vec![
         Edit::remove_select(CursorPosition { line: 0, char: 0 }, CursorPosition { line: 0, char: 6 }, &mut content),
@@ -204,7 +204,7 @@ fn test_remove_select() {
 }
 
 #[test]
-fn test_replace_select() {
+fn replace_select() {
     let mut content = create_content();
     let edits = vec![
         Edit::replace_select(
@@ -228,7 +228,7 @@ fn test_replace_select() {
 }
 
 #[test]
-fn test_replace_token() {
+fn replace_token() {
     let mut content = create_content();
     let edits = vec![
         Edit::replace_token(0, 1, "bumba".to_owned(), &mut content),
@@ -240,7 +240,7 @@ fn test_replace_token() {
 }
 
 #[test]
-fn test_insert_snippet() {
+fn insert_snippet() {
     let mut content = create_content();
     let cfg = IndentConfigs::default();
     let mut cursor = Cursor::default();
@@ -319,7 +319,7 @@ fn add_assign_meta_data() {
 }
 
 #[test]
-fn test_meta_ls_dec_dec() {
+fn meta_ls_dec_dec() {
     let mut m1 = EditMetaData { start_line: 1, from: 3, to: 1 };
     let m2 = EditMetaData { start_line: 0, from: 2, to: 1 };
     let expect = EditMetaData { start_line: 0, from: 4, to: 1 };
@@ -329,7 +329,7 @@ fn test_meta_ls_dec_dec() {
 }
 
 #[test]
-fn test_meta_gr_inc_dec() {
+fn meta_gr_inc_dec() {
     let mut m1 = EditMetaData { start_line: 0, from: 1, to: 3 };
     let m2 = EditMetaData { start_line: 2, from: 3, to: 1 };
     let expect = EditMetaData { start_line: 0, from: 3, to: 3 };
@@ -339,7 +339,7 @@ fn test_meta_gr_inc_dec() {
 }
 
 #[test]
-fn test_meta_dec_inc_noover() {
+fn meta_dec_inc_noover() {
     let mut m1 = EditMetaData { start_line: 0, from: 1, to: 3 };
     let m2 = EditMetaData { start_line: 3, from: 3, to: 1 };
     let expect = EditMetaData { start_line: 0, from: 4, to: 4 };
@@ -349,7 +349,7 @@ fn test_meta_dec_inc_noover() {
 }
 
 #[test]
-fn test_meta_eq_inc_dec() {
+fn meta_eq_inc_dec() {
     let mut m1 = EditMetaData { start_line: 1, from: 2, to: 1 };
     let m2 = EditMetaData { start_line: 1, from: 1, to: 3 };
     let expect = EditMetaData { start_line: 1, from: 2, to: 3 };
@@ -359,7 +359,7 @@ fn test_meta_eq_inc_dec() {
 }
 
 #[test]
-fn test_meta_eq_inc_inc() {
+fn meta_eq_inc_inc() {
     let mut m1 = EditMetaData { start_line: 1, from: 2, to: 1 };
     let m2 = EditMetaData { start_line: 1, from: 3, to: 1 };
     let expect = EditMetaData { start_line: 1, from: 4, to: 1 };
@@ -369,7 +369,7 @@ fn test_meta_eq_inc_inc() {
 }
 
 #[test]
-fn test_meta_eq_inc_stat() {
+fn meta_eq_inc_stat() {
     let mut m1 = EditMetaData { start_line: 1, from: 1, to: 2 };
     let m2 = EditMetaData { start_line: 1, from: 3, to: 3 };
     let expect = EditMetaData { start_line: 1, from: 2, to: 3 };

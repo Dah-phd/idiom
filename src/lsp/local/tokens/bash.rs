@@ -1,6 +1,6 @@
 use logos::Logos;
 
-use super::{utils::NON_TOKEN_ID, Definitions, LangStream, PositionedTokenParser};
+use super::{super::utils::NON_TOKEN_ID, Definitions, LangStream, PositionedTokenParser};
 
 #[derive(Debug, Logos, PartialEq)]
 #[logos(skip r" ")]
@@ -184,11 +184,11 @@ impl BashToken {
 
 #[cfg(test)]
 mod test {
+    use super::super::PositionedToken;
     use logos::Logos;
 
-    use crate::lsp::local::{LangStream, PositionedToken};
-
     use super::BashToken;
+    use super::LangStream;
 
     #[test]
     fn test_multistring() {

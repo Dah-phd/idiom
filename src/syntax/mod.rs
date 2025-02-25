@@ -21,10 +21,10 @@ pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
     as_url, char_lsp_pos, completable_dead, context_local, encode_pos_utf32, get_autocomplete_dead, info_position_dead,
-    map_lsp, remove_lsp, renames_dead, start_renames_dead, sync_edits_dead, sync_edits_dead_rev, tokens_dead,
-    tokens_partial_dead,
+    map_lsp, remove_lsp, renames_dead, start_renames_dead, sync_changes_dead, sync_edits_dead, sync_edits_dead_rev,
+    sync_tokens_dead, tokens_dead, tokens_partial_dead,
 };
-use lsp_types::{PublishDiagnosticsParams, Range, Uri};
+use lsp_types::{PublishDiagnosticsParams, Range, TextDocumentContentChangeEvent, Uri};
 use modal::{LSPModal, ModalMessage};
 use std::path::{Path, PathBuf};
 pub use tokens::Token;
@@ -55,6 +55,8 @@ pub struct Lexer {
     signatures: fn(&mut Self, CursorPosition, &mut GlobalState),
     start_renames: fn(&mut Self, CursorPosition, &str),
     renames: fn(&mut Self, CursorPosition, String, &mut GlobalState),
+    sync_tokens: fn(&mut Self, EditMetaData),
+    sync_changes: fn(&mut Self, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
     sync: fn(&mut Self, &EditType, &mut [EditorLine]) -> LSPResult<()>,
     sync_rev: fn(&mut Self, &EditType, &mut [EditorLine]) -> LSPResult<()>,
     meta: Option<EditMetaData>,
@@ -90,6 +92,8 @@ impl Lexer {
             signatures: info_position_dead,
             start_renames: start_renames_dead,
             renames: renames_dead,
+            sync_tokens: sync_tokens_dead,
+            sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
             sync_rev: sync_edits_dead_rev,
             encode_position: encode_pos_utf32,
@@ -125,6 +129,8 @@ impl Lexer {
             signatures: info_position_dead,
             start_renames: start_renames_dead,
             renames: renames_dead,
+            sync_tokens: sync_tokens_dead,
+            sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
             sync_rev: sync_edits_dead_rev,
             encode_position: encode_pos_utf32,
@@ -160,6 +166,8 @@ impl Lexer {
             signatures: info_position_dead,
             start_renames: start_renames_dead,
             renames: renames_dead,
+            sync_tokens: sync_tokens_dead,
+            sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
             sync_rev: sync_edits_dead_rev,
             encode_position: encode_pos_utf32,
@@ -181,6 +189,15 @@ impl Lexer {
             Ok(request) => self.requests.push(request),
             Err(error) => gs.error(error),
         }
+    }
+
+    /// sync tokens from LSP shorthand for request call
+    pub fn sync_tokens(&mut self, meta: EditMetaData) {
+        (self.sync_tokens)(self, meta);
+    }
+
+    pub fn sync_changes(&mut self, change_events: Vec<TextDocumentContentChangeEvent>) {
+        self.question_lsp = (self.sync_changes)(self, change_events).is_err();
     }
 
     /// sync event

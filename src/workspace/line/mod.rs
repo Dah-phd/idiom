@@ -352,7 +352,7 @@ impl EditorLine {
 
     #[inline(always)]
     pub fn tokens_mut(&mut self) -> &mut TokenLine {
-        self.clear_cache();
+        self.cached.reset();
         &mut self.tokens
     }
 
@@ -372,11 +372,6 @@ impl EditorLine {
             self.tokens.drop_diagnostics();
             self.cached.reset();
         };
-    }
-
-    #[inline]
-    pub fn clear_cache(&mut self) {
-        self.cached.reset();
     }
 }
 

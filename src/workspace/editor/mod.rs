@@ -139,7 +139,7 @@ impl Editor {
     pub fn updated_rect(&mut self, rect: Rect, gs: &GlobalState) {
         let skip_offset = rect.row.saturating_sub(gs.editor_area.row) as usize;
         for line in self.content.iter_mut().skip(self.cursor.at_line + skip_offset).take(rect.width) {
-            line.clear_cache();
+            line.cached.reset();
         }
     }
 
@@ -165,7 +165,7 @@ impl Editor {
                 let line = &self.content[self.cursor.line];
                 if self.lexer.should_autocomplete(self.cursor.char, line) {
                     let line = line.to_string();
-                    self.actions.push_buffer(&mut self.content, &mut self.lexer);
+                    self.actions.push_buffer(&mut self.lexer);
                     self.lexer.get_autocomplete((&self.cursor).into(), line, gs);
                 }
                 return true;
@@ -174,7 +174,10 @@ impl Editor {
                 self.actions.backspace(&mut self.cursor, &mut self.content, &mut self.lexer);
                 return true;
             }
-            EditorAction::Delete => self.actions.del(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::Delete => {
+                self.actions.del(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
+            }
             EditorAction::NewLine => self.actions.new_line(&mut self.cursor, &mut self.content, &mut self.lexer),
             EditorAction::Indent => self.actions.indent(&mut self.cursor, &mut self.content, &mut self.lexer),
             EditorAction::RemoveLine => {
@@ -238,7 +241,7 @@ impl Editor {
             EditorAction::Save => self.save(gs),
             EditorAction::Cancel => {
                 if self.cursor.select_take().is_none() {
-                    self.actions.push_buffer(&mut self.content, &mut self.lexer);
+                    self.actions.push_buffer(&mut self.lexer);
                     return false;
                 }
             }
@@ -259,7 +262,7 @@ impl Editor {
             }
             EditorAction::Close => return false,
         }
-        self.actions.push_buffer(&mut self.content, &mut self.lexer);
+        self.actions.push_buffer(&mut self.lexer);
         true
     }
 

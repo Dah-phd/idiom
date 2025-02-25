@@ -81,6 +81,8 @@ impl TokenLine {
         self.inner.is_empty()
     }
 
+    // likely to be removed in future iteration
+    #[allow(dead_code)]
     pub fn increment_at(&mut self, mut idx: usize) {
         let mut token_iter = self.inner.iter_mut();
         while let Some(token) = token_iter.next() {
@@ -99,18 +101,19 @@ impl TokenLine {
         }
     }
 
+    // likely to be removed in future iteration
+    #[allow(dead_code)]
     pub fn decrement_at(&mut self, mut char_idx: usize) {
-        let mut token_iter = self.inner.iter_mut();
-        let mut token_idx = 0;
-        while let Some(token) = token_iter.next() {
+        let mut token_iter = self.inner.iter_mut().enumerate();
+        while let Some((token_idx, token)) = token_iter.next() {
             if char_idx < token.delta_start {
                 token.delta_start -= 1;
                 return;
             }
-            if char_idx < token.delta_start + token.len {
+            if char_idx <= token.delta_start + token.len {
                 match token.len > 1 {
                     true => {
-                        if let Some(next_token) = token_iter.next() {
+                        if let Some((.., next_token)) = token_iter.next() {
                             next_token.delta_start -= 1;
                         }
                         token.len -= 1;
@@ -127,7 +130,28 @@ impl TokenLine {
                 return;
             }
             char_idx -= token.delta_start;
-            token_idx += 1;
+        }
+    }
+
+    #[inline]
+    pub fn remove_tokens_till(&mut self, mut till: usize) {
+        while !self.inner.is_empty() {
+            let token = &mut self.inner[0];
+            if till <= token.delta_start {
+                token.delta_start -= till;
+                return;
+            }
+            if till < token.delta_start + token.len {
+                till -= token.delta_start;
+                token.len -= till;
+                token.delta_start = 0;
+                return;
+            }
+            if till >= token.delta_start + token.len {
+                till -= token.delta_start;
+                self.inner.remove(0);
+                continue;
+            }
         }
     }
 

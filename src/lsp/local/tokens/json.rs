@@ -1,6 +1,6 @@
 use logos::Logos;
 
-use super::{utils::NON_TOKEN_ID, LangStream, PositionedTokenParser};
+use super::{super::utils::NON_TOKEN_ID, LangStream, PositionedTokenParser};
 
 #[derive(Debug, Logos, PartialEq)]
 #[logos(skip r"[ \t\r\n\f]+")]

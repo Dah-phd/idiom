@@ -1,18 +1,12 @@
-use std::path::PathBuf;
-
-use lsp_types::SemanticToken;
-
+pub use super::{
+    lsp_calls::{char_lsp_utf16, char_lsp_utf8, encode_pos_utf16, encode_pos_utf8},
+    tokens::{set_tokens, TokenLine},
+    Legend, Lexer, Token,
+};
 use crate::{configs::FileType, global_state::GlobalState, render::backend::StyleExt, workspace::line::EditorLine};
 use crossterm::style::ContentStyle;
-
-use super::{
-    lsp_calls::{char_lsp_utf16, char_lsp_utf8, encode_pos_utf16, encode_pos_utf8},
-    // theme::Theme,
-    tokens::{set_tokens, TokenLine},
-    Legend,
-    Lexer,
-    Token,
-};
+use lsp_types::SemanticToken;
+use std::path::PathBuf;
 
 fn get_text() -> Vec<String> {
     vec![
@@ -476,7 +470,7 @@ fn create_tokens() -> TokenLine {
 }
 
 #[test]
-fn test_token_inc() {
+fn token_inc() {
     let mut token_line = create_tokens();
     let mut expected = TokenLine::default();
     expected.push(Token { len: 4, delta_start: 0, style: ContentStyle::default() });
@@ -491,18 +485,19 @@ fn test_token_inc() {
 }
 
 #[test]
-fn test_token_dec() {
+fn token_dec() {
     let mut tl = create_tokens();
     let mut token_line = TokenLine::default();
-    token_line.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() });
+    token_line.push(Token { len: 2, delta_start: 0, style: ContentStyle::default() });
     token_line.push(Token { len: 4, delta_start: 3, style: ContentStyle::default() });
     tl.decrement_at(3);
     assert_eq!(tl, token_line);
 
     tl.push(Token { len: 4, delta_start: 5, style: ContentStyle::reversed() });
     let mut token_line = TokenLine::default();
-    token_line.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() });
+    token_line.push(Token { len: 2, delta_start: 0, style: ContentStyle::default() });
     token_line.push(Token { len: 4, delta_start: 3, style: ContentStyle::reversed() });
+    // panic!("{:?}", tl);
     tl.decrement_at(3);
     tl.decrement_at(3);
     tl.decrement_at(3);
@@ -511,7 +506,6 @@ fn test_token_dec() {
     assert_eq!(tl, token_line);
 
     let mut token_line = TokenLine::default();
-    token_line.push(Token { len: 1, delta_start: 0, style: ContentStyle::default() });
     token_line.push(Token { len: 4, delta_start: 1, style: ContentStyle::reversed() });
     tl.decrement_at(1);
     tl.decrement_at(1);
@@ -519,7 +513,7 @@ fn test_token_dec() {
 }
 
 #[test]
-fn test_token_motions() {
+fn token_motions() {
     let mut token_line = TokenLine::default();
     // let text = String::from("tex")
     token_line.push(Token { delta_start: 0, len: 3, style: ContentStyle::default() });
@@ -537,12 +531,53 @@ fn test_token_motions() {
     assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 4, style: ContentStyle::slowblink() });
     token_line.decrement_at(23);
     // reaching prev token
+    assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 3, style: ContentStyle::slowblink() });
+    token_line.increment_at(22);
+    // increased last prev token size
     assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 4, style: ContentStyle::slowblink() });
     token_line.increment_at(23);
-    // increased last prev token size
-    assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 5, style: ContentStyle::slowblink() });
     token_line.increment_at(25);
-    token_line.increment_at(26);
     // increments passed prev token - so no size change
     assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 5, style: ContentStyle::slowblink() });
 }
+
+#[test]
+fn token_insert() {
+    let mut token_line = create_tokens();
+    token_line.increment_at(0);
+    assert_eq!(token_line.iter().next(), Some(&Token { len: 3, delta_start: 1, style: ContentStyle::default() }));
+    token_line.decrement_at(0);
+    assert_eq!(token_line, create_tokens());
+    token_line.increment_at(4);
+    let mut expect = TokenLine::default();
+    expect.push(Token { delta_start: 0, len: 3, style: ContentStyle::default() });
+    expect.push(Token { delta_start: 5, len: 4, style: ContentStyle::default() });
+    assert_eq!(token_line, expect);
+    token_line.decrement_at(4);
+    assert_eq!(token_line, create_tokens());
+}
+
+#[test]
+fn token_replace_till() {
+    let mut token_line = create_tokens();
+    token_line.remove_tokens_till(3);
+    let mut expected = TokenLine::default();
+    expected.push(Token { len: 4, delta_start: 1, style: ContentStyle::default() });
+    assert_eq!(token_line, expected);
+
+    token_line.insert(0, Token { len: 3, delta_start: 4, style: ContentStyle::default() });
+    expected = TokenLine::default();
+    expected.push(Token { len: 3, delta_start: 2, style: ContentStyle::default() });
+    expected.push(Token { len: 4, delta_start: 1, style: ContentStyle::default() });
+    token_line.remove_tokens_till(2);
+    assert_eq!(token_line, expected);
+
+    expected = TokenLine::default();
+    expected.push(Token { len: 1, delta_start: 0, style: ContentStyle::default() });
+    expected.push(Token { len: 4, delta_start: 1, style: ContentStyle::default() });
+    token_line.remove_tokens_till(4);
+    assert_eq!(token_line, expected);
+}
+
+#[test]
+fn token_replace_range() {}

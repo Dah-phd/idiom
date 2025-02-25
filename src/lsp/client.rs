@@ -269,9 +269,9 @@ mod test {
 
     #[test]
     fn test_gen_id() {
-        let mut gen = MonoID::default();
-        assert_eq!(1, gen.next_id());
-        assert_eq!(2, gen.next_id());
+        let mut id_gen = MonoID::default();
+        assert_eq!(1, id_gen.next_id());
+        assert_eq!(2, id_gen.next_id());
     }
 
     #[test]

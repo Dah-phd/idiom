@@ -1,88 +1,34 @@
-mod bash;
 mod enriched;
-mod generic;
-mod json;
-mod lobster;
-mod python;
-mod rust;
 mod styler;
-mod text_editor;
-mod ts;
+mod tokens;
 mod utils; // support TS and JS
 
+use tokens::bash::BashToken;
+use tokens::generic::GenericToken;
 /// tokens
-use bash::BashToken;
-use generic::GenericToken;
-use json::JsonValue;
-use lobster::Pincer;
-use python::PyToken;
-use rust::Rustacean;
-use ts::TSToken;
+pub use tokens::init_local_tokens;
+use tokens::json::JsonValue;
+use tokens::lobster::Pincer;
+use tokens::python::PyToken;
+use tokens::rust::Rustacean;
+use tokens::ts::TSToken;
+use tokens::{Definitions, LangStream, PositionedToken};
 
 pub use enriched::build_with_enrichment;
 pub use styler::Highlighter;
 pub use utils::create_semantic_capabilities;
-use utils::{full_tokens, partial_tokens, swap_content, NON_TOKEN_ID};
+use utils::{full_tokens, partial_tokens, swap_content};
 
 use super::{messages::Response, payload::Payload, LSPError, LSPResult, Responses};
-use crate::{
-    configs::{FileType, Theme},
-    render::UTF8Safe,
-    syntax::{tokens::set_tokens, Legend},
-    workspace::{line::EditorLine, CursorPosition},
-};
+use crate::{configs::FileType, workspace::CursorPosition};
 
-use logos::{Logos, Span};
 use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification},
-    CompletionItem, CompletionResponse, InsertTextFormat, SemanticToken, SemanticTokens, SemanticTokensRangeResult,
-    SemanticTokensResult,
+    CompletionResponse, SemanticTokens, SemanticTokensRangeResult, SemanticTokensResult,
 };
 use serde_json::{from_str, to_value, Value};
-use std::{collections::HashSet, fmt::Debug, sync::Arc};
+use std::sync::Arc;
 use tokio::{sync::mpsc::UnboundedReceiver, task::JoinHandle};
-
-type PositionedTokenParser<T> = fn(T, Span, &str) -> PositionedToken<T>;
-
-/// Trait to be implemented on the lang specific token, allowing parsing and deriving builtins
-trait LangStream: Sized + Debug + PartialEq + Logos<'static> {
-    fn type_id(&self) -> u32;
-    fn modifier(&self) -> u32 {
-        0
-    }
-    fn parse<'a>(
-        text: impl Iterator<Item = &'a str>,
-        tokens: &mut Vec<Vec<PositionedToken<Self>>>,
-        parser: PositionedTokenParser<Self>,
-    );
-
-    fn init_definitions() -> Definitions {
-        Definitions::default()
-    }
-
-    fn objectify(&self) -> ObjType {
-        ObjType::None
-    }
-
-    fn init_tokens(content: &mut Vec<EditorLine>, theme: &Theme, file_type: FileType) {
-        let text = content.iter().map(|l| l.content.to_string()).collect::<Vec<_>>();
-        let mut tokens = Vec::new();
-        Self::parse(text.iter().map(|t| t.as_str()), &mut tokens, PositionedToken::<Self>::utf32);
-        let mut legend = Legend::default();
-        legend.map_styles(file_type, theme, &create_semantic_capabilities());
-        set_tokens(full_tokens(&tokens), &legend, content);
-    }
-}
-
-pub fn init_local_tokens(file_type: FileType, content: &mut Vec<EditorLine>, theme: &Theme) {
-    match file_type {
-        FileType::Rust => Rustacean::init_tokens(content, theme, file_type),
-        FileType::Python => PyToken::init_tokens(content, theme, file_type),
-        FileType::Lobster => Pincer::init_tokens(content, theme, file_type),
-        FileType::JavaScript | FileType::TypeScript => TSToken::init_tokens(content, theme, file_type),
-        _ => GenericToken::init_tokens(content, theme, file_type),
-    }
-}
 
 /// Not fully blowns LSP - but struct processing tokens better, giving basic utils, like semantics, autocomplete, rename
 #[derive(Default)]
@@ -205,138 +151,4 @@ impl<T: LangStream> LocalLSP<T> {
         T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens, PositionedToken::<T>::utf32);
         Some(())
     }
-}
-
-#[derive(Debug, PartialEq)]
-struct PositionedToken<T: LangStream> {
-    from: usize,
-    len: usize,
-    token_type: u32,
-    modifier: u32,
-    lang_token: T,
-}
-
-impl<T: LangStream> PositionedToken<T> {
-    pub fn utf32(token: T, span: Span, text: &str) -> PositionedToken<T> {
-        // utf32 encodingT
-        let from = text[..span.start].char_len();
-        let len = text[span.start..span.end].char_len();
-        PositionedToken { from, len, token_type: token.type_id(), modifier: token.modifier(), lang_token: token }
-    }
-
-    pub fn utf8(token: T, span: Span, _text: &str) -> PositionedToken<T> {
-        PositionedToken {
-            len: span.len(),
-            from: span.start,
-            token_type: token.type_id(),
-            modifier: token.modifier(),
-            lang_token: token,
-        }
-    }
-
-    pub fn utf16(token: T, span: Span, text: &str) -> PositionedToken<T> {
-        let from = text[..span.start].utf16_len();
-        let len = text[span.start..span.end].utf16_len();
-        PositionedToken { from, len, token_type: token.type_id(), modifier: token.modifier(), lang_token: token }
-    }
-
-    #[inline]
-    pub fn refresh_type(&mut self) {
-        self.token_type = self.lang_token.type_id();
-        self.modifier = self.lang_token.modifier();
-    }
-
-    #[inline]
-    pub fn semantic_token(&self, delta_line: u32, at_char: usize) -> SemanticToken {
-        SemanticToken {
-            delta_line,
-            length: self.len as u32,
-            delta_start: (self.from - at_char) as u32,
-            token_type: self.token_type,
-            token_modifiers_bitset: self.modifier,
-        }
-    }
-}
-
-#[derive(Default)]
-struct Definitions {
-    types: Vec<Struct>,
-    function: Vec<Func>,
-    variables: Vec<Var>,
-    keywords: Vec<&'static str>,
-}
-
-impl Definitions {
-    fn to_completions<T: LangStream>(&self, tokens: &[Vec<PositionedToken<T>>]) -> Vec<CompletionItem> {
-        let mut items = self
-            .keywords
-            .iter()
-            .map(|kward| CompletionItem::new_simple((*kward).to_owned(), String::from("Keyword")))
-            .collect::<Vec<_>>();
-
-        let mut fn_set = self.function.iter().map(|func| func.name.to_owned()).collect::<HashSet<_>>();
-        let mut var_set = self.variables.iter().map(|var| var.name.to_owned()).collect::<HashSet<_>>();
-        let mut type_set = self.types.iter().map(|obj_type| obj_type.name.to_owned()).collect::<HashSet<_>>();
-
-        for tok in tokens.iter().flatten() {
-            match tok.lang_token.objectify() {
-                ObjType::Var(name) if name.len() > 2 => {
-                    var_set.insert(name.to_owned());
-                }
-                ObjType::Fn(name) if name.len() > 2 => {
-                    fn_set.insert(name.to_owned());
-                }
-                ObjType::Struct(name) if name.len() > 2 => {
-                    type_set.insert(name.to_owned());
-                }
-                _ => (),
-            }
-        }
-
-        for func in fn_set.into_iter() {
-            items.push(CompletionItem {
-                insert_text_format: Some(InsertTextFormat::SNIPPET),
-                insert_text: Some(format!("{}($0)", func)),
-                label: func,
-                detail: Some("Function".to_owned()),
-                ..Default::default()
-            });
-        }
-
-        for var in var_set.into_iter() {
-            items.push(CompletionItem::new_simple(var, "Variable".to_owned()));
-        }
-
-        for type_name in type_set.into_iter() {
-            items.push(CompletionItem::new_simple(type_name, "Type".to_owned()));
-        }
-
-        items
-    }
-}
-
-enum ObjType<'a> {
-    Fn(&'a str),
-    Var(&'a str),
-    Struct(&'a str),
-    None,
-}
-
-struct Struct {
-    name: String,
-}
-
-impl Struct {
-    fn new(name: impl Into<String>) -> Self {
-        Self { name: name.into() }
-    }
-}
-
-#[derive(Default)]
-struct Func {
-    name: String,
-}
-
-struct Var {
-    name: String,
 }

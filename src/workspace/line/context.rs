@@ -53,7 +53,7 @@ impl<'a> LineContext<'a> {
         };
         if let Some(last_line) = content.get_mut(last_line) {
             if matches!(last_line.cached, RenderStatus::Line { line, .. } if line == dissallowed_rendered_line) {
-                last_line.clear_cache();
+                last_line.cached.reset();
             }
         }
     }
