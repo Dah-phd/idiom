@@ -342,7 +342,7 @@ impl Actions {
                 self.push_done(Edit::record_in_line_insertion(cursor.into(), new_text), lexer, content);
                 cursor.add_to_char(1);
             } else {
-                let (maybe_edit, event) = self.buffer.push(cursor, ch, text, lexer);
+                let (maybe_edit, event) = self.buffer.push(ch, cursor, text, lexer);
                 lexer.sync_changes(vec![event]);
                 if let Some(edit) = maybe_edit {
                     lexer.sync_tokens(edit.meta);
@@ -397,7 +397,7 @@ impl Actions {
             }
             None => {
                 let text = &mut content[cursor.line];
-                let (maybe_edit, event) = self.buffer.backspace(cursor, text, lexer, &self.cfg.indent);
+                let (maybe_edit, event) = self.buffer.backspace(&self.cfg.indent, cursor, text, lexer);
                 lexer.sync_changes(vec![event]);
                 if let Some(edit) = maybe_edit {
                     lexer.sync_tokens(edit.meta);

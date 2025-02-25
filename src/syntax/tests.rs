@@ -546,14 +546,14 @@ fn token_insert() {
     let mut token_line = create_tokens();
     token_line.increment_at(0);
     assert_eq!(token_line.iter().next(), Some(&Token { len: 3, delta_start: 1, style: ContentStyle::default() }));
-    token_line.decrement_at(1);
+    token_line.decrement_at(0);
     assert_eq!(token_line, create_tokens());
     token_line.increment_at(4);
     let mut expect = TokenLine::default();
     expect.push(Token { delta_start: 0, len: 3, style: ContentStyle::default() });
     expect.push(Token { delta_start: 5, len: 4, style: ContentStyle::default() });
     assert_eq!(token_line, expect);
-    token_line.decrement_at(5);
+    token_line.decrement_at(4);
     assert_eq!(token_line, create_tokens());
 }
 

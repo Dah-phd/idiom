@@ -106,7 +106,7 @@ impl TokenLine {
     pub fn decrement_at(&mut self, mut char_idx: usize) {
         let mut token_iter = self.inner.iter_mut().enumerate();
         while let Some((token_idx, token)) = token_iter.next() {
-            if char_idx <= token.delta_start {
+            if char_idx < token.delta_start {
                 token.delta_start -= 1;
                 return;
             }

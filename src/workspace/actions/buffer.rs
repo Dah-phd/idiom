@@ -18,15 +18,15 @@ impl ActionBuffer {
 
     pub fn push(
         &mut self,
-        cursor: &mut Cursor,
         ch: char,
-        code_text: &mut EditorLine,
+        cursor: &mut Cursor,
+        text: &mut EditorLine,
         lexer: &Lexer,
     ) -> (Option<Edit>, TextDocumentContentChangeEvent) {
         if let Self::Text(buf) = self {
-            return buf.push(cursor, ch, code_text, lexer);
+            return buf.push(cursor, ch, text, lexer);
         }
-        let (new, event) = TextBuffer::new(cursor, ch, code_text, lexer);
+        let (new, event) = TextBuffer::new(cursor, ch, text, lexer);
         (std::mem::replace(self, Self::Text(new)).into(), event)
     }
 
@@ -45,10 +45,10 @@ impl ActionBuffer {
 
     pub fn backspace(
         &mut self,
+        indent: &str,
         cursor: &mut Cursor,
         text: &mut EditorLine,
         lexer: &Lexer,
-        indent: &str,
     ) -> (Option<Edit>, TextDocumentContentChangeEvent) {
         if let Self::Backspace(buf) = self {
             return buf.backspace(cursor, text, lexer, indent);
@@ -419,9 +419,9 @@ mod tests {
         let mut buf = ActionBuffer::None;
         let mut cursor = Cursor::default();
         cursor.set_position((0, 11).into());
-        buf.backspace(&mut cursor, &mut code_text, &lexer, indent);
-        buf.backspace(&mut cursor, &mut code_text, &lexer, indent);
-        buf.backspace(&mut cursor, &mut code_text, &lexer, indent);
+        buf.backspace(indent, &mut cursor, &mut code_text, &lexer);
+        buf.backspace(indent, &mut cursor, &mut code_text, &lexer);
+        buf.backspace(indent, &mut cursor, &mut code_text, &lexer);
         if let ActionBuffer::Backspace(buf) = buf {
             let m_edit: Option<Edit> = buf.clone().into();
             let edit = m_edit.unwrap();
@@ -442,7 +442,7 @@ mod tests {
         let mut buf = ActionBuffer::None;
         let mut cursor = Cursor::default();
         cursor.set_position((0, 10).into());
-        let (edit, event) = buf.backspace(&mut cursor, &mut code_text, &lexer, indent);
+        let (edit, event) = buf.backspace(indent, &mut cursor, &mut code_text, &lexer);
         assert_eq!(
             event,
             TextDocumentContentChangeEvent {
@@ -454,7 +454,7 @@ mod tests {
         assert_eq!(code_text.content.as_str(), "        🙀");
         assert_eq!(cursor.char, 8);
         assert!(edit.is_none());
-        let (edit, event) = buf.backspace(&mut cursor, &mut code_text, &lexer, indent);
+        let (edit, event) = buf.backspace(indent, &mut cursor, &mut code_text, &lexer);
         assert_eq!(
             event,
             TextDocumentContentChangeEvent {
@@ -477,7 +477,7 @@ mod tests {
         let mut buf = ActionBuffer::None;
         let mut cursor = Cursor::default();
         cursor.set_position((0, 12).into());
-        let (edit, event) = buf.backspace(&mut cursor, &mut code_text, &lexer, indent);
+        let (edit, event) = buf.backspace(indent, &mut cursor, &mut code_text, &lexer);
         assert_eq!("        🙀🙀12", code_text.content);
         assert_eq!(
             event,
@@ -489,7 +489,7 @@ mod tests {
         );
         assert!(edit.is_none());
         cursor.set_position((0, 9).into());
-        let (edit, event) = buf.backspace(&mut cursor, &mut code_text, &lexer, indent);
+        let (edit, event) = buf.backspace(indent, &mut cursor, &mut code_text, &lexer);
         assert_eq!("        🙀12", code_text.content);
         assert_eq!(
             event,
@@ -500,7 +500,7 @@ mod tests {
             }
         );
         assert!(edit.is_some());
-        let (edit, event) = buf.backspace(&mut cursor, &mut code_text, &lexer, indent);
+        let (edit, event) = buf.backspace(indent, &mut cursor, &mut code_text, &lexer);
         assert_eq!("    🙀12", code_text.content);
         assert_eq!(
             event,
@@ -520,39 +520,39 @@ mod tests {
         let mut buf = ActionBuffer::None;
         let mut cursor = Cursor::default();
         let mut code_text = EditorLine::from("");
-        let (edit, event) = buf.push(&mut cursor, 'a', &mut code_text, &lexer);
+        let (edit, event) = buf.push('a', &mut cursor, &mut code_text, &lexer);
         let range = Some(Range::new(Position::new(0, 0), Position::new(0, 0)));
         assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('a'), range, range_length: None });
         assert!(edit.is_none());
 
-        let (edit, event) = buf.push(&mut cursor, 'b', &mut code_text, &lexer);
+        let (edit, event) = buf.push('b', &mut cursor, &mut code_text, &lexer);
         let range = Some(Range::new(Position::new(0, 1), Position::new(0, 1)));
         assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('b'), range, range_length: None });
         assert!(edit.is_none());
 
-        let (edit, event) = buf.push(&mut cursor, 'c', &mut code_text, &lexer);
+        let (edit, event) = buf.push('c', &mut cursor, &mut code_text, &lexer);
         let range = Some(Range::new(Position::new(0, 2), Position::new(0, 2)));
         assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('c'), range, range_length: None });
         assert!(edit.is_none());
 
-        let (maybe_edit, event) = buf.push(&mut cursor, ' ', &mut code_text, &lexer);
+        let (maybe_edit, event) = buf.push(' ', &mut cursor, &mut code_text, &lexer);
         let range = Some(Range::new(Position::new(0, 3), Position::new(0, 3)));
         assert_eq!(event, TextDocumentContentChangeEvent { text: String::from(' '), range, range_length: None });
         assert!(
             matches!(maybe_edit, Some(edit) if edit.reverse.is_empty() && edit.text == "abc" && edit.cursor == CursorPosition { line: 0, char: 0 })
         );
 
-        let (edit, event) = buf.push(&mut cursor, 'a', &mut code_text, &lexer);
+        let (edit, event) = buf.push('a', &mut cursor, &mut code_text, &lexer);
         let range = Some(Range::new(Position::new(0, 4), Position::new(0, 4)));
         assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('a'), range, range_length: None });
         assert!(edit.is_none());
 
-        let (edit, event) = buf.push(&mut cursor, '_', &mut code_text, &lexer);
+        let (edit, event) = buf.push('_', &mut cursor, &mut code_text, &lexer);
         let range = Some(Range::new(Position::new(0, 5), Position::new(0, 5)));
         assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('_'), range, range_length: None });
         assert!(edit.is_none());
 
-        let (maybe_edit, event) = buf.push(&mut cursor, '1', &mut code_text, &lexer);
+        let (maybe_edit, event) = buf.push('1', &mut cursor, &mut code_text, &lexer);
         let range = Some(Range::new(Position::new(0, 6), Position::new(0, 6)));
         assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('1'), range, range_length: None });
         assert!(
@@ -571,18 +571,18 @@ mod tests {
         let mut cursor = Cursor::default();
         cursor.set_position((0, 6).into());
         let mut code_text = EditorLine::from("tesxt🙀asd32ra 🙀dw");
-        let (no_edit, event) = buf.push(&mut cursor, 'b', &mut code_text, &lexer);
+        let (no_edit, event) = buf.push('b', &mut cursor, &mut code_text, &lexer);
         let range = Some(Range::new(Position::new(0, 9), Position::new(0, 9)));
         assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('b'), range, range_length: None });
         assert!(no_edit.is_none());
 
-        let (no_edit, event) = buf.push(&mut cursor, 'b', &mut code_text, &lexer);
+        let (no_edit, event) = buf.push('b', &mut cursor, &mut code_text, &lexer);
         let range = Some(Range::new(Position::new(0, 10), Position::new(0, 10)));
         assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('b'), range, range_length: None });
         assert!(no_edit.is_none());
         assert_eq!(code_text.content, "tesxt🙀bbasd32ra 🙀dw");
 
-        let (edit, event) = buf.push(&mut cursor, '🙀', &mut code_text, &lexer);
+        let (edit, event) = buf.push('🙀', &mut cursor, &mut code_text, &lexer);
         let range = Some(Range::new(Position::new(0, 11), Position::new(0, 11)));
         assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('🙀'), range, range_length: None });
         assert!(
@@ -591,7 +591,7 @@ mod tests {
         assert_eq!(code_text.content, "tesxt🙀bb🙀asd32ra 🙀dw");
 
         cursor.set_char(8);
-        let (edit, event) = buf.push(&mut cursor, 'x', &mut code_text, &lexer);
+        let (edit, event) = buf.push('x', &mut cursor, &mut code_text, &lexer);
         assert!(edit.is_some());
         assert_eq!(code_text.content, "tesxt🙀bbx🙀asd32ra 🙀dw");
         let range = Some(Range::new(Position::new(0, 11), Position::new(0, 11)));
