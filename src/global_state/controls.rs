@@ -236,7 +236,15 @@ pub fn paste_passthrough_editor(
 }
 
 pub fn paste_passthrough_popup(gs: &mut GlobalState, clip: String, _ws: &mut Workspace, _t: &mut EditorTerminal) {
-    gs.popup.paste_passthrough(clip, &gs.matcher);
+    match gs.popup.paste_passthrough(clip, &gs.matcher) {
+        PopupMessage::None => {}
+        PopupMessage::Clear => {
+            gs.clear_popup();
+        }
+        PopupMessage::Event(event) => {
+            gs.event.push(event);
+        }
+    };
 }
 
 pub fn paste_passthrough_term(_gs: &mut GlobalState, clip: String, _ws: &mut Workspace, term: &mut EditorTerminal) {

@@ -45,7 +45,6 @@ impl PopupInterface for ActivePathSearch {
         if let Some(msg) = self.pattern.map(key, clipboard) {
             return msg;
         }
-        self.updated = true;
         match key.code {
             KeyCode::Up => self.state.prev(self.options.len()),
             KeyCode::Down => self.state.next(self.options.len()),
@@ -95,7 +94,7 @@ impl PopupInterface for ActivePathSearch {
         } else {
             self.options = tree.search_paths(&self.pattern.text);
         };
-        self.updated = true;
+        self.mark_as_updated();
         self.state.reset();
     }
 
@@ -107,7 +106,9 @@ impl PopupInterface for ActivePathSearch {
         std::mem::take(&mut self.updated)
     }
 
-    fn mark_as_updated(&mut self) {}
+    fn mark_as_updated(&mut self) {
+        self.updated = true;
+    }
 }
 
 enum Mode {
@@ -144,7 +145,6 @@ impl PopupInterface for ActiveFileSearch {
         if let Some(msg) = self.pattern.map(key, clipboard) {
             return msg;
         }
-        self.updated = true;
         match key.code {
             KeyCode::Up => self.state.prev(self.options.len()),
             KeyCode::Down => self.state.next(self.options.len()),
@@ -211,7 +211,7 @@ impl PopupInterface for ActiveFileSearch {
     }
 
     fn component_access(&mut self, _ws: &mut Workspace, file_tree: &mut Tree) {
-        self.updated = true;
+        self.mark_as_updated();
         if self.pattern.text.len() < 2 {
             self.options.clear();
             return;
@@ -247,7 +247,9 @@ impl PopupInterface for ActiveFileSearch {
         std::mem::take(&mut self.updated)
     }
 
-    fn mark_as_updated(&mut self) {}
+    fn mark_as_updated(&mut self) {
+        self.updated = true;
+    }
 }
 
 fn build_path_line((path, ..): &SearchResult, mut builder: LineBuilder) {
