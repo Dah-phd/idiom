@@ -99,6 +99,10 @@ impl PopupInterface for ActivePathSearch {
         self.state.reset();
     }
 
+    fn paste_passthrough(&mut self, clip: String, _: &SkimMatcherV2) -> PopupMessage {
+        self.pattern.paste_passthrough(clip)
+    }
+
     fn collect_update_status(&mut self) -> bool {
         std::mem::take(&mut self.updated)
     }
@@ -233,6 +237,10 @@ impl PopupInterface for ActiveFileSearch {
                 old_handle.abort();
             }
         }
+    }
+
+    fn paste_passthrough(&mut self, clip: String, _: &SkimMatcherV2) -> PopupMessage {
+        self.pattern.paste_passthrough(clip)
     }
 
     fn collect_update_status(&mut self) -> bool {

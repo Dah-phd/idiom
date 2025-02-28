@@ -101,6 +101,20 @@ impl PopupInterface for Pallet {
         }
     }
 
+    fn paste_passthrough(&mut self, clip: String, matcher: &SkimMatcherV2) -> PopupMessage {
+        if self.pattern.paste_passthrough(clip) {
+            self.mark_as_updated();
+            for (score, cmd) in self.commands.iter_mut() {
+                *score = match matcher.fuzzy_match(cmd.label, &self.pattern.text) {
+                    Some(new_score) => new_score,
+                    None => i64::MAX,
+                };
+            }
+            self.commands.sort_by(|(score, _), (rhscore, _)| score.cmp(rhscore));
+        }
+        PopupMessage::None
+    }
+
     fn mouse_map(&mut self, event: crossterm::event::MouseEvent) -> PopupMessage {
         let (row, column) = match event {
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } => (row, column),
@@ -207,6 +221,3 @@ fn lowercase(ws: &mut Workspace, _tree: &mut Tree) {
         }
     }
 }
-
-#[cfg(test)]
-mod test {}

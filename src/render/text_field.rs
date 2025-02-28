@@ -100,9 +100,22 @@ impl<T: Default + Clone> TextField<T> {
         }
     }
 
+    pub fn paste_passthrough(&mut self, clip: String) -> T {
+        if !clip.contains('\n') {
+            self.take_selected();
+            self.text.insert_str(self.char, clip.as_str());
+            self.char += clip.len();
+            return self.on_text_update.clone().unwrap_or_default();
+        };
+        T::default()
+    }
+
     pub fn map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> Option<T> {
         match key.code {
-            KeyCode::Char('c' | 'C') if key.modifiers == KeyModifiers::CONTROL => {
+            KeyCode::Char('c' | 'C')
+                if key.modifiers == KeyModifiers::CONTROL
+                    || key.modifiers == KeyModifiers::CONTROL | KeyModifiers::SHIFT =>
+            {
                 if let Some(clip) = self.get_selected() {
                     clipboard.push(clip);
                 };

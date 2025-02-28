@@ -160,6 +160,7 @@ impl Editor {
             return true;
         };
         match action {
+            // EDITS:
             EditorAction::Char(ch) => {
                 self.actions.push_char(ch, &mut self.cursor, &mut self.content, &mut self.lexer);
                 let line = &self.content[self.cursor.line];
@@ -178,18 +179,73 @@ impl Editor {
                 self.actions.del(&mut self.cursor, &mut self.content, &mut self.lexer);
                 return true;
             }
-            EditorAction::NewLine => self.actions.new_line(&mut self.cursor, &mut self.content, &mut self.lexer),
-            EditorAction::Indent => self.actions.indent(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::NewLine => {
+                self.actions.new_line(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
+            }
+            EditorAction::Indent => {
+                self.actions.indent(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
+            }
             EditorAction::RemoveLine => {
                 self.select_line();
                 if !self.cursor.select_is_none() {
                     self.actions.del(&mut self.cursor, &mut self.content, &mut self.lexer);
+                    return true;
                 };
             }
             EditorAction::IndentStart => {
-                self.actions.indent_start(&mut self.cursor, &mut self.content, &mut self.lexer)
+                self.actions.indent_start(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
             }
-            EditorAction::Unintent => self.actions.unindent(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::Unintent => {
+                self.actions.unindent(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
+            }
+            EditorAction::SwapUp => {
+                self.actions.swap_up(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
+            }
+            EditorAction::SwapDown => {
+                self.actions.swap_down(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
+            }
+            EditorAction::Undo => {
+                self.actions.undo(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
+            }
+            EditorAction::Redo => {
+                self.actions.redo(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
+            }
+            EditorAction::CommentOut => {
+                self.actions.comment_out(
+                    self.file_type.comment_start(),
+                    &mut self.cursor,
+                    &mut self.content,
+                    &mut self.lexer,
+                );
+                return true;
+            }
+            EditorAction::Paste => {
+                if let Some(clip) = gs.clipboard.pull() {
+                    self.actions.paste(clip, &mut self.cursor, &mut self.content, &mut self.lexer);
+                    return true;
+                }
+            }
+            EditorAction::Cut => {
+                if let Some(clip) = self.cut() {
+                    gs.clipboard.push(clip);
+                    return true;
+                }
+            }
+            EditorAction::Copy => {
+                if let Some(clip) = self.copy() {
+                    gs.clipboard.push(clip);
+                    return true;
+                }
+            }
+            // CURSOR:
             EditorAction::Up => self.cursor.up(&self.content),
             EditorAction::Down => self.cursor.down(&self.content),
             EditorAction::Left => self.cursor.left(&self.content),
@@ -211,8 +267,6 @@ impl Editor {
             EditorAction::SelectAll => self.select_all(),
             EditorAction::ScrollUp => self.cursor.scroll_up(&self.content),
             EditorAction::ScrollDown => self.cursor.scroll_down(&self.content),
-            EditorAction::SwapUp => self.actions.swap_up(&mut self.cursor, &mut self.content, &mut self.lexer),
-            EditorAction::SwapDown => self.actions.swap_down(&mut self.cursor, &mut self.content, &mut self.lexer),
             EditorAction::JumpLeft => self.cursor.jump_left(&self.content),
             EditorAction::JumpLeftSelect => self.cursor.jump_left_select(&self.content),
             EditorAction::JumpRight => self.cursor.jump_right(&self.content),
@@ -230,34 +284,11 @@ impl Editor {
                 self.lexer.start_rename((&self.cursor).into(), &line[token_range]);
             }
             EditorAction::RefreshUI => self.lexer.refresh_lsp(gs),
-            EditorAction::CommentOut => self.actions.comment_out(
-                self.file_type.comment_start(),
-                &mut self.cursor,
-                &mut self.content,
-                &mut self.lexer,
-            ),
-            EditorAction::Undo => self.actions.undo(&mut self.cursor, &mut self.content, &mut self.lexer),
-            EditorAction::Redo => self.actions.redo(&mut self.cursor, &mut self.content, &mut self.lexer),
             EditorAction::Save => self.save(gs),
             EditorAction::Cancel => {
                 if self.cursor.select_take().is_none() {
                     self.actions.push_buffer(&mut self.lexer);
                     return false;
-                }
-            }
-            EditorAction::Paste => {
-                if let Some(clip) = gs.clipboard.pull() {
-                    self.actions.paste(clip, &mut self.cursor, &mut self.content, &mut self.lexer);
-                }
-            }
-            EditorAction::Cut => {
-                if let Some(clip) = self.cut() {
-                    gs.clipboard.push(clip);
-                }
-            }
-            EditorAction::Copy => {
-                if let Some(clip) = self.copy() {
-                    gs.clipboard.push(clip);
                 }
             }
             EditorAction::Close => return false,
@@ -421,6 +452,10 @@ impl Editor {
         } else {
             Some(format!("{}\n", &self.content[self.cursor.line]))
         }
+    }
+
+    pub fn paste(&mut self, clip: String) {
+        self.actions.paste(clip, &mut self.cursor, &mut self.content, &mut self.lexer);
     }
 
     #[inline(always)]

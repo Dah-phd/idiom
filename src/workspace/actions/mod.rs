@@ -28,6 +28,7 @@ impl Actions {
 
     pub fn swap_up(&mut self, cursor: &mut Cursor, content: &mut [EditorLine], lexer: &mut Lexer) {
         if cursor.line == 0 {
+            self.push_buffer(lexer);
             return;
         }
         cursor.select_drop();
@@ -39,6 +40,7 @@ impl Actions {
 
     pub fn swap_down(&mut self, cursor: &mut Cursor, content: &mut [EditorLine], lexer: &mut Lexer) {
         if content.is_empty() || content.len() - 1 <= cursor.line {
+            self.push_buffer(lexer);
             return;
         }
         cursor.select_drop();
@@ -227,13 +229,14 @@ impl Actions {
                 self.push_done(edits, lexer, content);
             }
             None => {
-                let _ = content
-                    .get_mut(cursor.line)
-                    .and_then(|text| Edit::unindent(cursor.line, text, &self.cfg.indent))
-                    .map(|(offset, edit)| {
+                let line = cursor.line;
+                match content.get_mut(line).and_then(|text| Edit::unindent(line, text, &self.cfg.indent)) {
+                    Some((offset, edit)) => {
                         self.push_done(edit, lexer, content);
                         cursor.char = offset.offset(cursor.char);
-                    });
+                    }
+                    None => self.push_buffer(lexer),
+                }
             }
         }
     }
@@ -301,6 +304,8 @@ impl Actions {
                 } else if let Some((offset, edit)) = into_comment(pat, line, cursor.into()) {
                     self.push_done(edit, lexer, content);
                     cursor.char = offset.offset(cursor.char);
+                } else {
+                    self.push_buffer(lexer);
                 }
             }
         }
