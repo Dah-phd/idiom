@@ -1,3 +1,4 @@
+mod formatting;
 use super::{popup_file_open::OpenFileSelector, PopupInterface};
 use crate::{
     configs::{CONFIG_FOLDER, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
@@ -40,7 +41,7 @@ impl Command {
         Command { label, result: CommandResult::Simple(event.into()) }
     }
 
-    fn access_edit(label: &'static str, cb: fn(&mut Workspace, &mut Tree)) -> Self {
+    const fn access_edit(label: &'static str, cb: fn(&mut Workspace, &mut Tree)) -> Self {
         Command { label, result: CommandResult::Complex(cb) }
     }
 }
@@ -169,8 +170,8 @@ impl Pallet {
     pub fn new() -> Box<Self> {
         let mut commands = vec![
             (0, Command::pass_event("Open file", IdiomEvent::NewPopup(OpenFileSelector::boxed))),
-            (0, Command::access_edit("UPPERCASE", uppercase)),
-            (0, Command::access_edit("LOWERCASE", lowercase)),
+            (0, Command::access_edit("UPPERCASE", formatting::uppercase)),
+            (0, Command::access_edit("LOWERCASE", formatting::lowercase)),
         ];
         commands.extend(
             [
@@ -194,30 +195,5 @@ impl Pallet {
     }
 }
 
-fn uppercase(ws: &mut Workspace, _tree: &mut Tree) {
-    if let Some(editor) = ws.get_active() {
-        if editor.cursor.select_is_none() {
-            editor.select_token();
-        }
-        if editor.cursor.select_is_none() {
-            return;
-        }
-        if let Some(clip) = editor.copy() {
-            editor.insert_snippet(clip.to_uppercase(), None);
-        }
-    }
-}
-
-fn lowercase(ws: &mut Workspace, _tree: &mut Tree) {
-    if let Some(editor) = ws.get_active() {
-        if editor.cursor.select_is_none() {
-            editor.select_token();
-        }
-        if editor.cursor.select_is_none() {
-            return;
-        }
-        if let Some(clip) = editor.copy() {
-            editor.insert_snippet(clip.to_lowercase(), None);
-        }
-    }
-}
+#[cfg(test)]
+mod tests;
