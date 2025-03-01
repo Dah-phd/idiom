@@ -29,11 +29,11 @@ impl Command {
         self.result
     }
 
-    fn cfg_open(f: &'static str) -> Option<Self> {
+    fn cfg_open(label: &'static str, file_path: &'static str) -> Option<Self> {
         let mut path = config_dir()?;
         path.push(CONFIG_FOLDER);
-        path.push(f);
-        Some(Command { label: f, result: CommandResult::Simple(IdiomEvent::OpenAtLine(path, 0).into()) })
+        path.push(file_path);
+        Some(Command { label, result: CommandResult::Simple(IdiomEvent::OpenAtLine(path, 0).into()) })
     }
 
     fn pass_event(label: &'static str, event: IdiomEvent) -> Self {
@@ -174,10 +174,10 @@ impl Pallet {
         ];
         commands.extend(
             [
-                Command::cfg_open(EDITOR_CFG_FILE),
-                Command::cfg_open(KEY_MAP),
-                Command::cfg_open(THEME_FILE),
-                Command::cfg_open(THEME_UI),
+                Command::cfg_open("open editor configs", EDITOR_CFG_FILE),
+                Command::cfg_open("open keymap config", KEY_MAP),
+                Command::cfg_open("open theme config", THEME_FILE),
+                Command::cfg_open("open UI theme config", THEME_UI),
             ]
             .into_iter()
             .flatten()
