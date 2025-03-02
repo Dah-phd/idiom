@@ -1,5 +1,4 @@
 mod utils;
-
 use super::{
     actions::Actions,
     cursor::{Cursor, CursorPosition},
@@ -17,7 +16,7 @@ use crate::{
 };
 use lsp_types::TextEdit;
 use std::{cmp::Ordering, path::PathBuf};
-use utils::{big_file_protection, build_display, FileUpdate};
+use utils::{big_file_protection, build_display, calc_line_number_offset, FileUpdate};
 
 #[allow(dead_code)]
 pub struct Editor {
@@ -44,7 +43,7 @@ impl Editor {
         big_file_protection(&path)?;
         let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
-        let line_number_offset = if content.is_empty() { 1 } else { (content.len().ilog10() + 1) as usize };
+        let line_number_offset = calc_line_number_offset(content.len());
         Ok(Self {
             cursor: Cursor::sized(gs, line_number_offset),
             line_number_offset,
@@ -67,7 +66,7 @@ impl Editor {
         );
         let mut content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
-        let line_number_offset = if content.is_empty() { 1 } else { (content.len().ilog10() + 1) as usize };
+        let line_number_offset = calc_line_number_offset(content.len());
         let cursor = Cursor::sized(gs, line_number_offset);
         calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
@@ -90,7 +89,7 @@ impl Editor {
         gs.message("The file is opened in MD mode, beware idiom is not designed with MD performance in mind!");
         let mut content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
-        let line_number_offset = if content.is_empty() { 1 } else { (content.len().ilog10() + 1) as usize };
+        let line_number_offset = calc_line_number_offset(content.len());
         let cursor = Cursor::sized(gs, line_number_offset);
         calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
@@ -110,7 +109,7 @@ impl Editor {
 
     #[inline]
     pub fn render(&mut self, gs: &mut GlobalState) {
-        let new_offset = if self.content.is_empty() { 1 } else { (self.content.len().ilog10() + 1) as usize };
+        let new_offset = calc_line_number_offset(self.content.len());
         if new_offset != self.line_number_offset {
             self.line_number_offset = new_offset;
             self.last_render_at_line.take();
@@ -121,7 +120,7 @@ impl Editor {
     /// renders only updated lines
     #[inline]
     pub fn fast_render(&mut self, gs: &mut GlobalState) {
-        let new_offset = if self.content.is_empty() { 1 } else { (self.content.len().ilog10() + 1) as usize };
+        let new_offset = calc_line_number_offset(self.content.len());
         if new_offset != self.line_number_offset {
             self.line_number_offset = new_offset;
             self.last_render_at_line.take();
@@ -535,7 +534,7 @@ impl Editor {
 
     pub fn resize(&mut self, width: usize, height: usize) {
         self.cursor.max_rows = height;
-        self.line_number_offset = if self.content.is_empty() { 1 } else { (self.content.len().ilog10() + 1) as usize };
+        self.line_number_offset = calc_line_number_offset(self.content.len());
         self.cursor.text_width = width.saturating_sub(self.line_number_offset + 1);
     }
 }

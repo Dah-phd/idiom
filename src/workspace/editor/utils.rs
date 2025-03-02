@@ -48,10 +48,21 @@ pub fn build_display(path: &Path) -> String {
     buffer.join(MAIN_SEPARATOR_STR)
 }
 
+/// reject files over 50mb
 pub fn big_file_protection(path: &Path) -> IdiomResult<()> {
     let meta = std::fs::metadata(path)?;
     if meta.size() > 50 * 1024 * 1024 {
         return Err(IdiomError::io_other("File over 50MB"));
     }
     Ok(())
+}
+
+/// calculates the max digits for line number
+#[inline(always)]
+pub const fn calc_line_number_offset(len: usize) -> usize {
+    if len == 0 {
+        1
+    } else {
+        (len.ilog10() + 1) as usize
+    }
 }
