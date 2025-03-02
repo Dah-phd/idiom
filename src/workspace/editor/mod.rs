@@ -1,5 +1,4 @@
 mod utils;
-
 use super::{
     actions::Actions,
     cursor::{Cursor, CursorPosition},
@@ -17,7 +16,7 @@ use crate::{
 };
 use lsp_types::TextEdit;
 use std::{cmp::Ordering, path::PathBuf};
-use utils::{big_file_protection, build_display, FileUpdate};
+use utils::{big_file_protection, build_display, calc_line_number_offset, FileUpdate};
 
 #[allow(dead_code)]
 pub struct Editor {
@@ -44,7 +43,7 @@ impl Editor {
         big_file_protection(&path)?;
         let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
-        let line_number_offset = if content.is_empty() { 1 } else { (content.len().ilog10() + 1) as usize };
+        let line_number_offset = calc_line_number_offset(content.len());
         Ok(Self {
             cursor: Cursor::sized(gs, line_number_offset),
             line_number_offset,
@@ -67,7 +66,7 @@ impl Editor {
         );
         let mut content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
-        let line_number_offset = if content.is_empty() { 1 } else { (content.len().ilog10() + 1) as usize };
+        let line_number_offset = calc_line_number_offset(content.len());
         let cursor = Cursor::sized(gs, line_number_offset);
         calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
@@ -90,7 +89,7 @@ impl Editor {
         gs.message("The file is opened in MD mode, beware idiom is not designed with MD performance in mind!");
         let mut content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
-        let line_number_offset = if content.is_empty() { 1 } else { (content.len().ilog10() + 1) as usize };
+        let line_number_offset = calc_line_number_offset(content.len());
         let cursor = Cursor::sized(gs, line_number_offset);
         calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
@@ -110,7 +109,7 @@ impl Editor {
 
     #[inline]
     pub fn render(&mut self, gs: &mut GlobalState) {
-        let new_offset = if self.content.is_empty() { 1 } else { (self.content.len().ilog10() + 1) as usize };
+        let new_offset = calc_line_number_offset(self.content.len());
         if new_offset != self.line_number_offset {
             self.line_number_offset = new_offset;
             self.last_render_at_line.take();
@@ -121,7 +120,7 @@ impl Editor {
     /// renders only updated lines
     #[inline]
     pub fn fast_render(&mut self, gs: &mut GlobalState) {
-        let new_offset = if self.content.is_empty() { 1 } else { (self.content.len().ilog10() + 1) as usize };
+        let new_offset = calc_line_number_offset(self.content.len());
         if new_offset != self.line_number_offset {
             self.line_number_offset = new_offset;
             self.last_render_at_line.take();
@@ -135,7 +134,6 @@ impl Editor {
         self.last_render_at_line = None;
     }
 
-    #[inline]
     pub fn updated_rect(&mut self, rect: Rect, gs: &GlobalState) {
         let skip_offset = rect.row.saturating_sub(gs.editor_area.row) as usize;
         for line in self.content.iter_mut().skip(self.cursor.at_line + skip_offset).take(rect.width) {
@@ -143,14 +141,12 @@ impl Editor {
         }
     }
 
-    #[inline(always)]
     pub fn update_path(&mut self, new_path: PathBuf) -> Result<(), LSPError> {
         self.display = build_display(&new_path);
         self.path = new_path;
         self.lexer.update_path(&self.path)
     }
 
-    #[inline]
     pub fn map(&mut self, action: EditorAction, gs: &mut GlobalState) -> bool {
         let (taken, render_update) = self.lexer.map_modal_if_exists(action, gs);
         if let Some(modal_rect) = render_update {
@@ -160,6 +156,7 @@ impl Editor {
             return true;
         };
         match action {
+            // EDITS:
             EditorAction::Char(ch) => {
                 self.actions.push_char(ch, &mut self.cursor, &mut self.content, &mut self.lexer);
                 let line = &self.content[self.cursor.line];
@@ -178,18 +175,73 @@ impl Editor {
                 self.actions.del(&mut self.cursor, &mut self.content, &mut self.lexer);
                 return true;
             }
-            EditorAction::NewLine => self.actions.new_line(&mut self.cursor, &mut self.content, &mut self.lexer),
-            EditorAction::Indent => self.actions.indent(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::NewLine => {
+                self.actions.new_line(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
+            }
+            EditorAction::Indent => {
+                self.actions.indent(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
+            }
             EditorAction::RemoveLine => {
                 self.select_line();
                 if !self.cursor.select_is_none() {
                     self.actions.del(&mut self.cursor, &mut self.content, &mut self.lexer);
+                    return true;
                 };
             }
             EditorAction::IndentStart => {
-                self.actions.indent_start(&mut self.cursor, &mut self.content, &mut self.lexer)
+                self.actions.indent_start(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
             }
-            EditorAction::Unintent => self.actions.unindent(&mut self.cursor, &mut self.content, &mut self.lexer),
+            EditorAction::Unintent => {
+                self.actions.unindent(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
+            }
+            EditorAction::SwapUp => {
+                self.actions.swap_up(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
+            }
+            EditorAction::SwapDown => {
+                self.actions.swap_down(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
+            }
+            EditorAction::Undo => {
+                self.actions.undo(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
+            }
+            EditorAction::Redo => {
+                self.actions.redo(&mut self.cursor, &mut self.content, &mut self.lexer);
+                return true;
+            }
+            EditorAction::CommentOut => {
+                self.actions.comment_out(
+                    self.file_type.comment_start(),
+                    &mut self.cursor,
+                    &mut self.content,
+                    &mut self.lexer,
+                );
+                return true;
+            }
+            EditorAction::Paste => {
+                if let Some(clip) = gs.clipboard.pull() {
+                    self.actions.paste(clip, &mut self.cursor, &mut self.content, &mut self.lexer);
+                    return true;
+                }
+            }
+            EditorAction::Cut => {
+                if let Some(clip) = self.cut() {
+                    gs.clipboard.push(clip);
+                    return true;
+                }
+            }
+            EditorAction::Copy => {
+                if let Some(clip) = self.copy() {
+                    gs.clipboard.push(clip);
+                    return true;
+                }
+            }
+            // CURSOR:
             EditorAction::Up => self.cursor.up(&self.content),
             EditorAction::Down => self.cursor.down(&self.content),
             EditorAction::Left => self.cursor.left(&self.content),
@@ -211,8 +263,6 @@ impl Editor {
             EditorAction::SelectAll => self.select_all(),
             EditorAction::ScrollUp => self.cursor.scroll_up(&self.content),
             EditorAction::ScrollDown => self.cursor.scroll_down(&self.content),
-            EditorAction::SwapUp => self.actions.swap_up(&mut self.cursor, &mut self.content, &mut self.lexer),
-            EditorAction::SwapDown => self.actions.swap_down(&mut self.cursor, &mut self.content, &mut self.lexer),
             EditorAction::JumpLeft => self.cursor.jump_left(&self.content),
             EditorAction::JumpLeftSelect => self.cursor.jump_left_select(&self.content),
             EditorAction::JumpRight => self.cursor.jump_right(&self.content),
@@ -230,34 +280,11 @@ impl Editor {
                 self.lexer.start_rename((&self.cursor).into(), &line[token_range]);
             }
             EditorAction::RefreshUI => self.lexer.refresh_lsp(gs),
-            EditorAction::CommentOut => self.actions.comment_out(
-                self.file_type.comment_start(),
-                &mut self.cursor,
-                &mut self.content,
-                &mut self.lexer,
-            ),
-            EditorAction::Undo => self.actions.undo(&mut self.cursor, &mut self.content, &mut self.lexer),
-            EditorAction::Redo => self.actions.redo(&mut self.cursor, &mut self.content, &mut self.lexer),
             EditorAction::Save => self.save(gs),
             EditorAction::Cancel => {
                 if self.cursor.select_take().is_none() {
                     self.actions.push_buffer(&mut self.lexer);
                     return false;
-                }
-            }
-            EditorAction::Paste => {
-                if let Some(clip) = gs.clipboard.pull() {
-                    self.actions.paste(clip, &mut self.cursor, &mut self.content, &mut self.lexer);
-                }
-            }
-            EditorAction::Cut => {
-                if let Some(clip) = self.cut() {
-                    gs.clipboard.push(clip);
-                }
-            }
-            EditorAction::Copy => {
-                if let Some(clip) = self.copy() {
-                    gs.clipboard.push(clip);
                 }
             }
             EditorAction::Close => return false,
@@ -266,7 +293,6 @@ impl Editor {
         true
     }
 
-    #[inline(always)]
     pub fn select_token(&mut self) {
         let range = token_range_at(&self.content[self.cursor.line], self.cursor.char);
         if !range.is_empty() {
@@ -277,7 +303,6 @@ impl Editor {
         }
     }
 
-    #[inline(always)]
     pub fn select_line(&mut self) {
         let start = CursorPosition { line: self.cursor.line, char: 0 };
         let next_line = self.cursor.line + 1;
@@ -307,12 +332,10 @@ impl Editor {
         Ok(self.content.len() == counter)
     }
 
-    #[inline(always)]
     pub fn insert_text_with_relative_offset(&mut self, insert: String) {
         self.actions.insert_top_cursor_relative_offset(insert, &mut self.cursor, &mut self.content, &mut self.lexer);
     }
 
-    #[inline(always)]
     pub fn replace_select(&mut self, from: CursorPosition, to: CursorPosition, new_clip: &str) {
         self.actions.replace_select(from, to, new_clip, &mut self.cursor, &mut self.content, &mut self.lexer);
     }
@@ -361,7 +384,6 @@ impl Editor {
         self.actions.apply_edits(edits, &mut self.content, &mut self.lexer);
     }
 
-    #[inline(always)]
     pub fn go_to(&mut self, line: usize) {
         self.cursor.select_drop();
         if self.content.len() >= line {
@@ -371,7 +393,6 @@ impl Editor {
         }
     }
 
-    #[inline(always)]
     pub fn go_to_select(&mut self, from: CursorPosition, to: CursorPosition) {
         self.cursor.at_line = to.line.saturating_sub(self.cursor.max_rows / 2);
         self.cursor.select_set(from, to);
@@ -421,6 +442,10 @@ impl Editor {
         } else {
             Some(format!("{}\n", &self.content[self.cursor.line]))
         }
+    }
+
+    pub fn paste(&mut self, clip: String) {
+        self.actions.paste(clip, &mut self.cursor, &mut self.content, &mut self.lexer);
     }
 
     #[inline(always)]
@@ -501,7 +526,6 @@ impl Editor {
         self.actions.cfg = new_cfg.get_indent_cfg(&self.file_type);
     }
 
-    #[inline]
     pub fn stringify(&self) -> String {
         let mut text = self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n");
         text.push('\n');
@@ -510,7 +534,7 @@ impl Editor {
 
     pub fn resize(&mut self, width: usize, height: usize) {
         self.cursor.max_rows = height;
-        self.line_number_offset = if self.content.is_empty() { 1 } else { (self.content.len().ilog10() + 1) as usize };
+        self.line_number_offset = calc_line_number_offset(self.content.len());
         self.cursor.text_width = width.saturating_sub(self.line_number_offset + 1);
     }
 }
@@ -518,6 +542,39 @@ impl Editor {
 impl Drop for Editor {
     fn drop(&mut self) {
         self.lexer.close();
+    }
+}
+
+/// This is not a normal constructor for Editor
+/// it should be used in cases where the content is present
+/// or real file does not exists
+pub fn editor_from_data(
+    path: PathBuf,
+    mut content: Vec<EditorLine>,
+    file_type: FileType,
+    cfg: &EditorConfigs,
+    gs: &mut GlobalState,
+) -> Editor {
+    let lexer = match file_type {
+        FileType::Ignored => Lexer::text_lexer(&path, gs),
+        code_file_type => Lexer::with_context(code_file_type, &path, gs),
+    };
+    let display = build_display(&path);
+    let line_number_offset = calc_line_number_offset(content.len());
+    let cursor = Cursor::sized(gs, line_number_offset);
+    calc_wraps(&mut content, cursor.text_width);
+    Editor {
+        actions: Actions::new(cfg.default_indent_cfg()),
+        update_status: FileUpdate::None,
+        renderer: Renderer::text(),
+        last_render_at_line: None,
+        cursor,
+        line_number_offset,
+        lexer,
+        content,
+        file_type,
+        display,
+        path,
     }
 }
 

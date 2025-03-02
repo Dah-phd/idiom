@@ -177,7 +177,7 @@ pub fn cut() -> String {
 }
 
 pub fn copy() -> String {
-    format!("{CTRL} && c")
+    format!("{CTRL} && c || {CTRL} && {SHIFT} && c")
 }
 
 pub fn paste() -> String {

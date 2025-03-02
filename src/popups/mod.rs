@@ -49,6 +49,9 @@ pub trait PopupInterface {
     fn component_access(&mut self, _ws: &mut Workspace, _tree: &mut Tree) {}
     fn mark_as_updated(&mut self);
     fn collect_update_status(&mut self) -> bool;
+    fn paste_passthrough(&mut self, _clip: String, _matcher: &SkimMatcherV2) -> PopupMessage {
+        PopupMessage::None
+    }
 }
 
 // syntactic sugar for popups used instead of Option<popup>

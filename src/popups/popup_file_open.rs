@@ -162,6 +162,14 @@ impl PopupInterface for OpenFileSelector {
         PopupMessage::None
     }
 
+    fn paste_passthrough(&mut self, clip: String, _: &SkimMatcherV2) -> PopupMessage {
+        if self.pattern.paste_passthrough(clip) {
+            self.mark_as_updated();
+            self.solve_comletions();
+        }
+        PopupMessage::None
+    }
+
     fn mark_as_updated(&mut self) {
         self.updated = true;
     }

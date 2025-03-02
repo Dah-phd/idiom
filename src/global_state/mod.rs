@@ -31,6 +31,7 @@ const MIN_HEIGHT: u16 = 4;
 const MIN_WIDTH: usize = 40;
 
 type KeyMapCallback = fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool;
+type PastePassthroughCallback = fn(&mut GlobalState, String, &mut Workspace, &mut EditorTerminal);
 type MouseMapCallback = fn(&mut GlobalState, MouseEvent, &mut Tree, &mut Workspace);
 type DrawCallback = fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal) -> std::io::Result<()>;
 
@@ -38,6 +39,7 @@ pub struct GlobalState {
     mode: Mode,
     tree_size: usize,
     key_mapper: KeyMapCallback,
+    paste_passthrough: PastePassthroughCallback,
     mouse_mapper: MouseMapCallback,
     draw_callback: DrawCallback,
     pub theme: UITheme,
@@ -64,6 +66,7 @@ impl GlobalState {
             mode: Mode::default(),
             tree_size: 15,
             key_mapper: controls::map_tree,
+            paste_passthrough: controls::paste_passthrough_ignore,
             mouse_mapper: controls::mouse_handler,
             draw_callback: draw::full_rebuild,
             theme,
@@ -131,9 +134,9 @@ impl GlobalState {
         event: &KeyEvent,
         workspace: &mut Workspace,
         tree: &mut Tree,
-        tmux: &mut EditorTerminal,
+        term: &mut EditorTerminal,
     ) -> bool {
-        (self.key_mapper)(self, event, workspace, tree, tmux)
+        (self.key_mapper)(self, event, workspace, tree, term)
     }
 
     #[inline]
@@ -141,27 +144,34 @@ impl GlobalState {
         (self.mouse_mapper)(self, event, tree, workspace)
     }
 
+    pub fn passthrough_paste(&mut self, clip: String, workspace: &mut Workspace, term: &mut EditorTerminal) {
+        (self.paste_passthrough)(self, clip, workspace, term);
+    }
+
     fn config_controls(&mut self) {
         if self.components.contains(Components::POPUP) {
             self.key_mapper = controls::map_popup;
             self.mouse_mapper = controls::disable_mouse;
+            self.paste_passthrough = controls::paste_passthrough_popup;
             return;
         }
         if self.components.contains(Components::TERM) {
             self.key_mapper = controls::map_term;
             self.mouse_mapper = controls::disable_mouse;
+            self.paste_passthrough = controls::paste_passthrough_term;
             return;
         }
         match self.mode {
             Mode::Insert => {
                 self.key_mapper = controls::map_editor;
-                self.mouse_mapper = controls::mouse_handler;
+                self.paste_passthrough = controls::paste_passthrough_editor;
             }
             Mode::Select => {
                 self.key_mapper = controls::map_tree;
-                self.mouse_mapper = controls::mouse_handler;
+                self.paste_passthrough = controls::paste_passthrough_ignore;
             }
         }
+        self.mouse_mapper = controls::mouse_handler;
     }
 
     pub fn select_mode(&mut self) {

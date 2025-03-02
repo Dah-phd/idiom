@@ -1,3 +1,4 @@
+mod formatting;
 use super::{popup_file_open::OpenFileSelector, PopupInterface};
 use crate::{
     configs::{CONFIG_FOLDER, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
@@ -29,18 +30,18 @@ impl Command {
         self.result
     }
 
-    fn cfg_open(f: &'static str) -> Option<Self> {
+    fn cfg_open(label: &'static str, file_path: &'static str) -> Option<Self> {
         let mut path = config_dir()?;
         path.push(CONFIG_FOLDER);
-        path.push(f);
-        Some(Command { label: f, result: CommandResult::Simple(IdiomEvent::OpenAtLine(path, 0).into()) })
+        path.push(file_path);
+        Some(Command { label, result: CommandResult::Simple(IdiomEvent::OpenAtLine(path, 0).into()) })
     }
 
     fn pass_event(label: &'static str, event: IdiomEvent) -> Self {
         Command { label, result: CommandResult::Simple(event.into()) }
     }
 
-    fn access_edit(label: &'static str, cb: fn(&mut Workspace, &mut Tree)) -> Self {
+    const fn access_edit(label: &'static str, cb: fn(&mut Workspace, &mut Tree)) -> Self {
         Command { label, result: CommandResult::Complex(cb) }
     }
 }
@@ -101,6 +102,20 @@ impl PopupInterface for Pallet {
         }
     }
 
+    fn paste_passthrough(&mut self, clip: String, matcher: &SkimMatcherV2) -> PopupMessage {
+        if self.pattern.paste_passthrough(clip) {
+            self.mark_as_updated();
+            for (score, cmd) in self.commands.iter_mut() {
+                *score = match matcher.fuzzy_match(cmd.label, &self.pattern.text) {
+                    Some(new_score) => new_score,
+                    None => i64::MAX,
+                };
+            }
+            self.commands.sort_by(|(score, _), (rhscore, _)| score.cmp(rhscore));
+        }
+        PopupMessage::None
+    }
+
     fn mouse_map(&mut self, event: crossterm::event::MouseEvent) -> PopupMessage {
         let (row, column) = match event {
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } => (row, column),
@@ -155,15 +170,16 @@ impl Pallet {
     pub fn new() -> Box<Self> {
         let mut commands = vec![
             (0, Command::pass_event("Open file", IdiomEvent::NewPopup(OpenFileSelector::boxed))),
-            (0, Command::access_edit("UPPERCASE", uppercase)),
-            (0, Command::access_edit("LOWERCASE", lowercase)),
+            (0, Command::access_edit("UPPERCASE", formatting::uppercase)),
+            (0, Command::access_edit("LOWERCASE", formatting::lowercase)),
+            (0, Command::pass_event("Open editor error log", IdiomEvent::OpenLSPErrors)),
         ];
         commands.extend(
             [
-                Command::cfg_open(EDITOR_CFG_FILE),
-                Command::cfg_open(KEY_MAP),
-                Command::cfg_open(THEME_FILE),
-                Command::cfg_open(THEME_UI),
+                Command::cfg_open("open editor configs", EDITOR_CFG_FILE),
+                Command::cfg_open("open keymap config", KEY_MAP),
+                Command::cfg_open("open theme config", THEME_FILE),
+                Command::cfg_open("open UI theme config", THEME_UI),
             ]
             .into_iter()
             .flatten()
@@ -180,33 +196,5 @@ impl Pallet {
     }
 }
 
-fn uppercase(ws: &mut Workspace, _tree: &mut Tree) {
-    if let Some(editor) = ws.get_active() {
-        if editor.cursor.select_is_none() {
-            editor.select_token();
-        }
-        if editor.cursor.select_is_none() {
-            return;
-        }
-        if let Some(clip) = editor.copy() {
-            editor.insert_snippet(clip.to_uppercase(), None);
-        }
-    }
-}
-
-fn lowercase(ws: &mut Workspace, _tree: &mut Tree) {
-    if let Some(editor) = ws.get_active() {
-        if editor.cursor.select_is_none() {
-            editor.select_token();
-        }
-        if editor.cursor.select_is_none() {
-            return;
-        }
-        if let Some(clip) = editor.copy() {
-            editor.insert_snippet(clip.to_lowercase(), None);
-        }
-    }
-}
-
 #[cfg(test)]
-mod test {}
+mod tests;

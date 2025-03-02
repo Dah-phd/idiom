@@ -3,6 +3,7 @@ use super::super::{
     editor::{utils::build_display, FileUpdate},
     Editor,
 };
+use super::calc_line_number_offset;
 use crate::global_state::GlobalState;
 use crate::render::backend::{Backend, BackendProtocol};
 use crate::syntax::Lexer;
@@ -54,4 +55,18 @@ fn test_display() {
     let buf = PathBuf::from("./src/workspace/editor/mod.rs").canonicalize().unwrap();
     assert_eq!(build_display(buf.as_path()), "editor/mod.rs");
     assert_eq!(build_display(PathBuf::from("bumba").as_path()), "bumba");
+}
+
+#[test]
+fn test_line_number_calcs() {
+    let content = (0..3).collect::<Vec<_>>();
+    let expect = if content.is_empty() { 1 } else { (content.len().ilog10() + 1) as usize }; // 1
+    let result = calc_line_number_offset(content.len());
+    assert_eq!(result, 1);
+    assert_eq!(result, expect);
+    let bigger_content = (0..10).collect::<Vec<_>>(); // over 10 elements
+    let expect = if bigger_content.is_empty() { 1 } else { (bigger_content.len().ilog10() + 1) as usize }; // 2
+    let result = calc_line_number_offset(bigger_content.len());
+    assert_eq!(result, 2);
+    assert_eq!(result, expect);
 }

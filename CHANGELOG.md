@@ -1,4 +1,9 @@
 ## Includes only major changes (manual updates)
+# Version 0.4.7
+* popups fixes
+* cleanup copy paste going through the terminal
+* added editor error logs option to pallet
+
 # Version 0.4.6
 * fixed issue with local token modifications
 * updates sent to LSP per char

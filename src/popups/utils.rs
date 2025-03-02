@@ -12,6 +12,10 @@ pub fn into_message(maybe_position: Option<(CursorPosition, CursorPosition)>) ->
 }
 
 pub fn next_option<T: Clone>(options: &[T], state: &mut usize) -> Option<T> {
+    if options.is_empty() {
+        *state = 0;
+        return None;
+    }
     if options.len() - 1 > *state {
         *state += 1;
     } else {
@@ -21,6 +25,10 @@ pub fn next_option<T: Clone>(options: &[T], state: &mut usize) -> Option<T> {
 }
 
 pub fn prev_option<T: Clone>(options: &[T], state: &mut usize) -> Option<T> {
+    if options.is_empty() {
+        *state = 0;
+        return None;
+    }
     if *state > 0 {
         *state -= 1;
     } else {

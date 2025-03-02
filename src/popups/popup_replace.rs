@@ -1,11 +1,10 @@
 use crate::{
     global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
-    render::backend::{BackendProtocol, StyleExt},
+    render::{backend::BackendProtocol, TextField},
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use crossterm::style::ContentStyle;
 use fuzzy_matcher::skim::SkimMatcherV2;
 
 use super::{
@@ -16,8 +15,8 @@ use super::{
 #[derive(Default)]
 pub struct ReplacePopup {
     pub options: Vec<(CursorPosition, CursorPosition)>,
-    pub pattern: String,
-    pub new_text: String,
+    pub pattern: TextField<PopupMessage>,
+    pub new_text: TextField<PopupMessage>,
     pub on_text: bool,
     pub state: usize,
 }
@@ -28,7 +27,13 @@ impl ReplacePopup {
     }
 
     pub fn from_search(pattern: String, options: Vec<(CursorPosition, CursorPosition)>) -> Box<Self> {
-        Box::new(Self { on_text: true, pattern, options, ..Default::default() })
+        Box::new(Self {
+            on_text: true,
+            pattern: TextField::with_editor_access(pattern),
+            new_text: TextField::with_editor_access(String::new()),
+            options,
+            ..Default::default()
+        })
     }
 
     fn drain_next(&mut self) -> (CursorPosition, CursorPosition) {
@@ -42,33 +47,17 @@ impl ReplacePopup {
     fn get_state(&self) -> Option<(CursorPosition, CursorPosition)> {
         self.options.get(self.state).cloned()
     }
-
-    fn push(&mut self, ch: char) {
-        if self.on_text {
-            self.new_text.push(ch);
-        } else {
-            self.pattern.push(ch);
-        };
-    }
-
-    fn backspace(&mut self) {
-        if self.on_text {
-            self.new_text.pop();
-        } else {
-            self.pattern.pop();
-        };
-    }
 }
 
 impl PopupInterface for ReplacePopup {
-    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
+    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         match key.code {
             KeyCode::Char('h' | 'H') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 if self.options.is_empty() {
                     return PopupMessage::None;
                 }
                 IdiomEvent::ReplaceNextSelect {
-                    new_text: self.new_text.to_owned(),
+                    new_text: self.new_text.text.to_owned(),
                     select: self.drain_next(),
                     next_select: self.get_state(),
                 }
@@ -76,17 +65,9 @@ impl PopupInterface for ReplacePopup {
             }
             KeyCode::Char('a' | 'A') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 if self.options.is_empty() {
-                    return PopupMessage::None;
+                    return PopupMessage::Clear;
                 }
-                IdiomEvent::ReplaceAll(self.new_text.to_owned(), self.options.clone()).into()
-            }
-            KeyCode::Char(ch) => {
-                self.push(ch);
-                IdiomEvent::PopupAccess.into()
-            }
-            KeyCode::Backspace => {
-                self.backspace();
-                IdiomEvent::PopupAccess.into()
+                IdiomEvent::ReplaceAll(self.new_text.text.to_owned(), self.options.clone()).into()
             }
             KeyCode::Tab => {
                 self.on_text = !self.on_text;
@@ -94,8 +75,12 @@ impl PopupInterface for ReplacePopup {
             }
             KeyCode::Down | KeyCode::Enter => into_message(next_option(&self.options, &mut self.state)),
             KeyCode::Up => into_message(prev_option(&self.options, &mut self.state)),
-            KeyCode::Esc | KeyCode::Left => PopupMessage::Clear,
-            _ => PopupMessage::None,
+            KeyCode::Esc => PopupMessage::Clear,
+            _ => match self.on_text {
+                true => self.new_text.map(key, clipboard),
+                false => self.pattern.map(key, clipboard),
+            }
+            .unwrap_or_default(),
         }
     }
 
@@ -110,17 +95,21 @@ impl PopupInterface for ReplacePopup {
             let mut find_builder = line.unsafe_builder(&mut gs.writer);
             find_builder.push(count_as_string(&self.options).as_str());
             find_builder.push(" > ");
-            find_builder.push(&self.pattern);
-            if !self.on_text {
-                find_builder.push_styled("|", ContentStyle::slowblink());
-            };
+            match self.on_text {
+                false => self.pattern.insert_formatted_text(find_builder),
+                true => {
+                    find_builder.push(&self.pattern.text);
+                }
+            }
         };
         if let Some(line) = lines.next() {
             let mut repl_builder = line.unsafe_builder(&mut gs.writer);
             repl_builder.push("Rep > ");
-            repl_builder.push(&self.new_text);
-            if self.on_text {
-                repl_builder.push_styled("|", ContentStyle::slowblink());
+            match self.on_text {
+                false => {
+                    repl_builder.push(&self.new_text.text);
+                }
+                true => self.new_text.insert_formatted_text(repl_builder),
             }
         }
         gs.writer.reset_style();
@@ -133,9 +122,16 @@ impl PopupInterface for ReplacePopup {
     fn component_access(&mut self, ws: &mut Workspace, _tree: &mut Tree) {
         if let Some(editor) = ws.get_active() {
             self.options.clear();
-            editor.find(&self.pattern, &mut self.options);
+            editor.find(&self.pattern.text, &mut self.options);
         }
         self.state = self.options.len().saturating_sub(1);
+    }
+
+    fn paste_passthrough(&mut self, clip: String, _: &SkimMatcherV2) -> PopupMessage {
+        match self.on_text {
+            true => self.new_text.paste_passthrough(clip),
+            false => self.pattern.paste_passthrough(clip),
+        }
     }
 
     fn collect_update_status(&mut self) -> bool {

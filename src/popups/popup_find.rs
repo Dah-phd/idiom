@@ -135,4 +135,8 @@ impl PopupInterface for FindPopup {
     fn collect_update_status(&mut self) -> bool {
         true
     }
+
+    fn paste_passthrough(&mut self, clip: String, _: &SkimMatcherV2) -> PopupMessage {
+        self.pattern.paste_passthrough(clip)
+    }
 }

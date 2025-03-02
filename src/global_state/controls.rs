@@ -224,6 +224,36 @@ pub fn map_small_rect(
     gs.map_key(event, workspace, tree, tmux)
 }
 
+pub fn paste_passthrough_editor(
+    _gs: &mut GlobalState,
+    clip: String,
+    workspace: &mut Workspace,
+    _tmux: &mut EditorTerminal,
+) {
+    if let Some(editor) = workspace.get_active() {
+        editor.paste(clip);
+    }
+}
+
+pub fn paste_passthrough_popup(gs: &mut GlobalState, clip: String, _ws: &mut Workspace, _t: &mut EditorTerminal) {
+    match gs.popup.paste_passthrough(clip, &gs.matcher) {
+        PopupMessage::None => {}
+        PopupMessage::Clear => {
+            gs.clear_popup();
+        }
+        PopupMessage::Event(event) => {
+            gs.event.push(event);
+        }
+    };
+}
+
+pub fn paste_passthrough_term(_gs: &mut GlobalState, clip: String, _ws: &mut Workspace, term: &mut EditorTerminal) {
+    term.paste_passthrough(clip);
+}
+
+pub fn paste_passthrough_ignore(_gs: &mut GlobalState, _clip: String, _ws: &mut Workspace, _term: &mut EditorTerminal) {
+}
+
 #[cfg(test)]
 mod test {
     use super::{INSERT_SPAN, MODE_LEN, SELECT_SPAN};

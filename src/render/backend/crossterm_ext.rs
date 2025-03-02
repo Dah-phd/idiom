@@ -251,6 +251,7 @@ fn init_terminal() -> std::io::Result<()> {
         crossterm::terminal::DisableLineWrap,
         crossterm::style::ResetColor,
         crossterm::event::EnableMouseCapture,
+        crossterm::event::EnableBracketedPaste,
         crossterm::cursor::Hide,
     )
 }
@@ -262,6 +263,7 @@ fn graceful_exit() -> std::io::Result<()> {
         crossterm::terminal::EnableLineWrap,
         crossterm::style::ResetColor,
         crossterm::event::DisableMouseCapture,
+        crossterm::event::DisableBracketedPaste,
         crossterm::cursor::Show,
     )?;
     crossterm::terminal::disable_raw_mode()

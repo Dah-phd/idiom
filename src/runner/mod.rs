@@ -154,6 +154,11 @@ impl EditorTerminal {
         true
     }
 
+    pub fn paste_passthrough(&mut self, clip: String) {
+        self.cmd.paste_passthrough(clip);
+        self.go_to_last_log();
+    }
+
     fn poll_results(&mut self) {
         if let Some(logs) = self.terminal.as_mut().and_then(|t| t.pull_logs()) {
             self.logs.extend(logs);

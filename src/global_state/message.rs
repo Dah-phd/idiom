@@ -4,11 +4,13 @@ use crate::render::{
 };
 use crossterm::style::{Color, ContentStyle};
 use std::{
+    collections::VecDeque,
     error::Error,
     time::{Duration, Instant},
 };
 
 const MSG_DURATION: Duration = Duration::from_secs(2);
+const ERR_LOG_LIMIT: usize = 100;
 
 #[derive(Debug)]
 pub struct Messages {
@@ -17,6 +19,7 @@ pub struct Messages {
     messages: Vec<Message>,
     last_message: Message,
     line: Line,
+    error_log: VecDeque<String>,
 }
 
 impl Messages {
@@ -27,6 +30,7 @@ impl Messages {
             messages: Vec::new(),
             last_message: Message::empty(),
             line: Line::empty(),
+            error_log: VecDeque::new(),
         }
     }
 
@@ -57,6 +61,10 @@ impl Messages {
         self.render(accent_style, backend);
     }
 
+    pub fn get_logs(&self) -> impl Iterator<Item = &String> {
+        self.error_log.iter()
+    }
+
     pub fn set_line(&mut self, line: Line) {
         if line.width != self.line.width || line.col != self.line.col {
             self.active = true;
@@ -70,6 +78,10 @@ impl Messages {
     }
 
     pub fn error(&mut self, error: String) {
+        self.error_log.push_back(error.clone());
+        if self.error_log.len() > ERR_LOG_LIMIT {
+            self.error_log.pop_front();
+        }
         if let Some(msg) = Message::err(error) {
             self.push_ahead(msg);
         }
