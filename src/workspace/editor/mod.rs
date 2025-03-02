@@ -135,7 +135,6 @@ impl Editor {
         self.last_render_at_line = None;
     }
 
-    #[inline]
     pub fn updated_rect(&mut self, rect: Rect, gs: &GlobalState) {
         let skip_offset = rect.row.saturating_sub(gs.editor_area.row) as usize;
         for line in self.content.iter_mut().skip(self.cursor.at_line + skip_offset).take(rect.width) {
@@ -143,14 +142,12 @@ impl Editor {
         }
     }
 
-    #[inline(always)]
     pub fn update_path(&mut self, new_path: PathBuf) -> Result<(), LSPError> {
         self.display = build_display(&new_path);
         self.path = new_path;
         self.lexer.update_path(&self.path)
     }
 
-    #[inline]
     pub fn map(&mut self, action: EditorAction, gs: &mut GlobalState) -> bool {
         let (taken, render_update) = self.lexer.map_modal_if_exists(action, gs);
         if let Some(modal_rect) = render_update {
@@ -297,7 +294,6 @@ impl Editor {
         true
     }
 
-    #[inline(always)]
     pub fn select_token(&mut self) {
         let range = token_range_at(&self.content[self.cursor.line], self.cursor.char);
         if !range.is_empty() {
@@ -308,7 +304,6 @@ impl Editor {
         }
     }
 
-    #[inline(always)]
     pub fn select_line(&mut self) {
         let start = CursorPosition { line: self.cursor.line, char: 0 };
         let next_line = self.cursor.line + 1;
@@ -338,12 +333,10 @@ impl Editor {
         Ok(self.content.len() == counter)
     }
 
-    #[inline(always)]
     pub fn insert_text_with_relative_offset(&mut self, insert: String) {
         self.actions.insert_top_cursor_relative_offset(insert, &mut self.cursor, &mut self.content, &mut self.lexer);
     }
 
-    #[inline(always)]
     pub fn replace_select(&mut self, from: CursorPosition, to: CursorPosition, new_clip: &str) {
         self.actions.replace_select(from, to, new_clip, &mut self.cursor, &mut self.content, &mut self.lexer);
     }
@@ -392,7 +385,6 @@ impl Editor {
         self.actions.apply_edits(edits, &mut self.content, &mut self.lexer);
     }
 
-    #[inline(always)]
     pub fn go_to(&mut self, line: usize) {
         self.cursor.select_drop();
         if self.content.len() >= line {
@@ -402,7 +394,6 @@ impl Editor {
         }
     }
 
-    #[inline(always)]
     pub fn go_to_select(&mut self, from: CursorPosition, to: CursorPosition) {
         self.cursor.at_line = to.line.saturating_sub(self.cursor.max_rows / 2);
         self.cursor.select_set(from, to);
@@ -536,7 +527,6 @@ impl Editor {
         self.actions.cfg = new_cfg.get_indent_cfg(&self.file_type);
     }
 
-    #[inline]
     pub fn stringify(&self) -> String {
         let mut text = self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n");
         text.push('\n');
