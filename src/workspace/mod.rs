@@ -16,7 +16,8 @@ use crate::{
 use crossterm::event::KeyEvent;
 use crossterm::style::{Color, ContentStyle};
 pub use cursor::CursorPosition;
-pub use editor::Editor;
+pub use editor::{editor_from_data, Editor};
+use line::EditorLine;
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -530,6 +531,17 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         return true;
     }
     false
+}
+
+pub fn add_editor_from_data(
+    workspace: &mut Workspace,
+    path: PathBuf,
+    content: Vec<EditorLine>,
+    file_type: FileType,
+    gs: &mut GlobalState,
+) {
+    let editor = editor_from_data(path, content, file_type, &workspace.base_config, gs);
+    workspace.editors.insert(0, editor);
 }
 
 #[cfg(test)]

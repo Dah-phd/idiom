@@ -172,6 +172,7 @@ impl Pallet {
             (0, Command::pass_event("Open file", IdiomEvent::NewPopup(OpenFileSelector::boxed))),
             (0, Command::access_edit("UPPERCASE", formatting::uppercase)),
             (0, Command::access_edit("LOWERCASE", formatting::lowercase)),
+            (0, Command::pass_event("Open editor error log", IdiomEvent::OpenLSPErrors)),
         ];
         commands.extend(
             [

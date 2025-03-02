@@ -4,7 +4,8 @@ use crate::popups::{
     popup_replace::ReplacePopup, popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges, PopupInterface,
 };
 use crate::tree::Tree;
-use crate::workspace::Workspace;
+use crate::workspace::line::EditorLine;
+use crate::workspace::{add_editor_from_data, Workspace};
 use crate::{configs::FileType, workspace::CursorPosition};
 use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, WorkspaceEdit};
 use std::path::PathBuf;
@@ -16,6 +17,7 @@ pub enum IdiomEvent {
     NewPopup(fn() -> Box<dyn PopupInterface>),
     OpenAtLine(PathBuf, usize),
     OpenAtSelect(PathBuf, (CursorPosition, CursorPosition)),
+    OpenLSPErrors,
     SelectPath(PathBuf),
     CreateFileOrFolder {
         name: String,
@@ -96,6 +98,7 @@ impl IdiomEvent {
             }
             IdiomEvent::OpenAtSelect(path, (from, to)) => {
                 let select_result = tree.select_by_path(&path);
+                gs.clear_popup();
                 gs.log_if_error(select_result);
                 match ws.new_from(path, gs).await {
                     Ok(..) => {
@@ -103,10 +106,33 @@ impl IdiomEvent {
                         if let Some(editor) = ws.get_active() {
                             editor.go_to_select(from, to);
                         };
-                        gs.clear_popup();
                     }
                     Err(error) => gs.error(error),
                 };
+            }
+            IdiomEvent::OpenLSPErrors => {
+                gs.clear_popup();
+                match PathBuf::from("./").canonicalize() {
+                    Ok(base_path) => {
+                        let mut path = base_path.clone();
+                        path.push("editor_error.log");
+                        let mut id = 0_usize;
+                        while path.exists() {
+                            path = base_path.clone();
+                            path.push(&format!("editor_error_{id}.log"));
+                            id += 1;
+                        }
+                        let file_type = FileType::Ignored;
+                        let content: Vec<EditorLine> =
+                            gs.messages.get_logs().map(ToOwned::to_owned).map(EditorLine::from).collect();
+                        if !content.is_empty() {
+                            add_editor_from_data(ws, path, content, file_type, gs);
+                        } else {
+                            gs.success(" >> no error logs found!");
+                        }
+                    }
+                    Err(error) => gs.error(error),
+                }
             }
             IdiomEvent::GoToLine { line, clear_popup } => match ws.get_active() {
                 Some(editor) => {

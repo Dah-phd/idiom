@@ -61,6 +61,10 @@ impl Messages {
         self.render(accent_style, backend);
     }
 
+    pub fn get_logs(&self) -> impl Iterator<Item = &String> {
+        self.error_log.iter()
+    }
+
     pub fn set_line(&mut self, line: Line) {
         if line.width != self.line.width || line.col != self.line.col {
             self.active = true;
