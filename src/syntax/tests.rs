@@ -493,9 +493,6 @@ fn token_dec() {
     tl.decrement_at(3);
     assert_eq!(tl, token_line);
 
-    //    tl.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() });
-    //    tl.push(Token { len: 4, delta_start: 3, style: ContentStyle::default() });
-    //    tl.push(Token { len: 4, delta_start: 5, style: ContentStyle::reversed() });
     tl.push(Token { len: 4, delta_start: 5, style: ContentStyle::reversed() });
     let mut token_line = TokenLine::default();
     token_line.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() });
