@@ -475,9 +475,9 @@ fn token_inc() {
     let mut expected = TokenLine::default();
     expected.push(Token { len: 4, delta_start: 0, style: ContentStyle::default() });
     expected.push(Token { len: 4, delta_start: 5, style: ContentStyle::default() });
-    token_line.increment_at(3);
+    token_line.increment_before(3);
     assert_eq!(token_line, expected);
-    token_line.increment_at(5);
+    token_line.increment_before(5);
     let mut token_line = TokenLine::default();
     token_line.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() });
     token_line.push(Token { len: 5, delta_start: 5, style: ContentStyle::default() });
@@ -488,16 +488,15 @@ fn token_inc() {
 fn token_dec() {
     let mut tl = create_tokens();
     let mut token_line = TokenLine::default();
-    token_line.push(Token { len: 2, delta_start: 0, style: ContentStyle::default() });
+    token_line.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() });
     token_line.push(Token { len: 4, delta_start: 3, style: ContentStyle::default() });
     tl.decrement_at(3);
     assert_eq!(tl, token_line);
 
     tl.push(Token { len: 4, delta_start: 5, style: ContentStyle::reversed() });
     let mut token_line = TokenLine::default();
-    token_line.push(Token { len: 2, delta_start: 0, style: ContentStyle::default() });
+    token_line.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() });
     token_line.push(Token { len: 4, delta_start: 3, style: ContentStyle::reversed() });
-    // panic!("{:?}", tl);
     tl.decrement_at(3);
     tl.decrement_at(3);
     tl.decrement_at(3);
@@ -506,49 +505,49 @@ fn token_dec() {
     assert_eq!(tl, token_line);
 
     let mut token_line = TokenLine::default();
-    token_line.push(Token { len: 4, delta_start: 1, style: ContentStyle::reversed() });
-    tl.decrement_at(1);
-    tl.decrement_at(1);
+    token_line.push(Token { len: 4, delta_start: 0, style: ContentStyle::reversed() });
+    tl.decrement_at(0);
+    tl.decrement_at(0);
+    tl.decrement_at(0);
     assert_eq!(tl, token_line);
 }
 
 #[test]
 fn token_motions() {
     let mut token_line = TokenLine::default();
-    // let text = String::from("tex")
     token_line.push(Token { delta_start: 0, len: 3, style: ContentStyle::default() });
     token_line.push(Token { delta_start: 4, len: 4, style: ContentStyle::default() });
     token_line.push(Token { delta_start: 7, len: 6, style: ContentStyle::reversed() });
     token_line.push(Token { delta_start: 8, len: 4, style: ContentStyle::slowblink() });
     token_line.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
-    token_line.decrement_at(29);
     token_line.decrement_at(28);
     token_line.decrement_at(27);
     token_line.decrement_at(26);
     token_line.decrement_at(25);
     token_line.decrement_at(24);
+    token_line.decrement_at(23);
     // whole token deleted
     assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 4, style: ContentStyle::slowblink() });
-    token_line.decrement_at(23);
+    token_line.decrement_at(22);
     // reaching prev token
     assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 3, style: ContentStyle::slowblink() });
-    token_line.increment_at(22);
-    // increased last prev token size
+    token_line.increment_before(21);
+    // increased last prev token size on dec we remove char pos, on inc we inc after the position so 22 becomes 23
     assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 4, style: ContentStyle::slowblink() });
-    token_line.increment_at(23);
-    token_line.increment_at(25);
+    token_line.increment_before(24);
+    token_line.increment_before(25);
     // increments passed prev token - so no size change
-    assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 5, style: ContentStyle::slowblink() });
+    assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 4, style: ContentStyle::slowblink() });
 }
 
 #[test]
 fn token_insert() {
     let mut token_line = create_tokens();
-    token_line.increment_at(0);
+    token_line.increment_before(0);
     assert_eq!(token_line.iter().next(), Some(&Token { len: 3, delta_start: 1, style: ContentStyle::default() }));
     token_line.decrement_at(0);
     assert_eq!(token_line, create_tokens());
-    token_line.increment_at(4);
+    token_line.increment_before(4);
     let mut expect = TokenLine::default();
     expect.push(Token { delta_start: 0, len: 3, style: ContentStyle::default() });
     expect.push(Token { delta_start: 5, len: 4, style: ContentStyle::default() });

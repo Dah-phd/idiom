@@ -1,4 +1,7 @@
 ## Includes only major changes (manual updates)
+# Version 0.4.8
+* fixed Token::decrement_at - remove before postion (inc is postion after, dec is postion at (not before))
+
 # Version 0.4.7
 * popups fixes
 * cleanup copy paste going through the terminal
