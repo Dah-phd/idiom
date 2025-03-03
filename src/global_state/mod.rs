@@ -107,9 +107,9 @@ impl GlobalState {
             self.writer.set_style(self.theme.accent_style);
             let mut rev_builder = line.unsafe_builder_rev(&mut self.writer);
             if select_len != 0 {
-                rev_builder.push(&format!(" ({select_len} selected)"));
+                rev_builder.push(&format!("({select_len} selected) "));
             }
-            rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {}", cursor.line + 1, cursor.char + 1));
+            rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {} ", cursor.line + 1, cursor.char + 1));
             self.messages.set_line(rev_builder.into_line());
             self.messages.fast_render(self.theme.accent_style, &mut self.writer);
             self.writer.reset_style();
