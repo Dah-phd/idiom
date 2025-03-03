@@ -83,7 +83,7 @@ impl TokenLine {
 
     // likely to be removed in future iteration
     #[allow(dead_code)]
-    pub fn increment_at(&mut self, mut idx: usize) {
+    pub fn increment_before(&mut self, mut idx: usize) {
         let mut token_iter = self.inner.iter_mut();
         while let Some(token) = token_iter.next() {
             if idx <= token.delta_start {
@@ -110,7 +110,7 @@ impl TokenLine {
                 token.delta_start -= 1;
                 return;
             }
-            if char_idx <= token.delta_start + token.len {
+            if char_idx < token.delta_start + token.len {
                 match token.len > 1 {
                     true => {
                         if let Some((.., next_token)) = token_iter.next() {

@@ -126,7 +126,7 @@ impl EditorLine {
     #[inline]
     pub fn insert(&mut self, idx: usize, ch: char) {
         self.cached.reset();
-        self.tokens.increment_at(idx);
+        self.tokens.increment_before(idx);
         if self.char_len == self.content.len() {
             // base update on delta start
             self.char_len += 1;
@@ -140,7 +140,7 @@ impl EditorLine {
     #[inline]
     pub fn push(&mut self, ch: char) {
         self.cached.reset();
-        self.tokens.increment_at(self.char_len);
+        self.tokens.increment_before(self.char_len);
         self.char_len += 1;
         self.content.push(ch);
     }
