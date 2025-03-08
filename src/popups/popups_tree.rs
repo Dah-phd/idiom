@@ -54,9 +54,9 @@ pub fn rename_file_popup(path: String) -> Box<Popup> {
     ))
 }
 
-pub fn refrence_selector(options: Vec<Location>) -> Box<PopupSelector<(String, PathBuf, Range)>> {
+pub fn refrence_selector(locations: Vec<Location>) -> Box<PopupSelector<(String, PathBuf, Range)>> {
     Box::new(PopupSelector::new(
-        options.into_iter().map(location_with_display).collect(),
+        locations.into_iter().map(location_with_display).collect(),
         |(display, ..)| display,
         |popup| {
             if let Some((_, path, range)) = popup.options.get(popup.state.selected) {
@@ -72,4 +72,51 @@ fn location_with_display(loc: Location) -> (String, PathBuf, Range) {
     let path = PathBuf::from(loc.uri.path().as_str());
     let range = loc.range;
     (format!("{} ({})", path.display(), range.start.line + 1), path, range)
+}
+
+#[cfg(test)]
+mod test {
+    use super::refrence_selector;
+    use crate::lsp::as_url;
+    use lsp_types::{Location, Position, Range};
+    use std::path::PathBuf;
+
+    #[test]
+    fn reference_selector_test() {
+        let pop = refrence_selector(vec![
+            Location {
+                uri: as_url(&PathBuf::from("build/test.txt")),
+                range: Range::new(Position::new(0, 0), Position::new(0, 10)),
+            },
+            Location {
+                uri: as_url(&PathBuf::from("build/test_f1.txt")),
+                range: Range::new(Position::new(1, 0), Position::new(1, 10)),
+            },
+            Location {
+                uri: as_url(&PathBuf::from("build/test_f2.txt")),
+                range: Range::new(Position::new(2, 0), Position::new(2, 10)),
+            },
+        ]);
+
+        assert_eq!(
+            pop.options,
+            [
+                (
+                    "/test.txt (1)".to_owned(),
+                    PathBuf::from("/test.txt"),
+                    Range::new(Position::new(0, 0), Position::new(0, 10)),
+                ),
+                (
+                    "/test_f1.txt (2)".to_owned(),
+                    PathBuf::from("/test_f1.txt"),
+                    Range::new(Position::new(1, 0), Position::new(1, 10)),
+                ),
+                (
+                    "/test_f2.txt (3)".to_owned(),
+                    PathBuf::from("/test_f2.txt"),
+                    Range::new(Position::new(2, 0), Position::new(2, 10)),
+                ),
+            ]
+        );
+    }
 }
