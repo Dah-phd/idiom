@@ -33,14 +33,43 @@ impl Line {
     // !TODO fix
     #[inline]
     pub fn render_centered(self, text: &str, backend: &mut Backend) {
-        let text = text.truncate_width(self.width).1;
-        backend.print_at(self.row, self.col, format!("{text:^width$}", width = self.width))
+        let (remaining_width, text) = text.truncate_width(self.width);
+        backend.go_to(self.row, self.col);
+        match remaining_width {
+            0 => backend.print(text),
+            1 => {
+                backend.print(text);
+                backend.pad(1);
+            }
+            pad => {
+                let right_pad = pad / 2;
+                backend.pad(right_pad + (pad % 2));
+                backend.print(text);
+                backend.pad(right_pad);
+            }
+        }
     }
 
     #[inline]
     pub fn render_centered_styled(self, text: &str, style: ContentStyle, backend: &mut Backend) {
-        let text = text.truncate_width(self.width).1;
-        backend.print_styled_at(self.row, self.col, format!("{text:^width$}", width = self.width), style);
+        let (remaining_width, text) = text.truncate_width(self.width);
+        let restore_style = backend.get_style();
+        backend.set_style(style);
+        backend.go_to(self.row, self.col);
+        match remaining_width {
+            0 => backend.print(text),
+            1 => {
+                backend.print(text);
+                backend.pad(1);
+            }
+            pad => {
+                let right_pad = pad / 2;
+                backend.pad(right_pad + (pad % 2));
+                backend.print(text);
+                backend.pad(right_pad);
+            }
+        }
+        backend.set_style(restore_style);
     }
 
     #[inline]

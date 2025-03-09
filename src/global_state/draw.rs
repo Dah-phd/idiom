@@ -41,7 +41,7 @@ pub fn full_rebuild(
     gs.screen_rect.clear(&mut gs.writer);
 
     if gs.screen_rect.width < MIN_WIDTH || gs.screen_rect.height < MIN_HEIGHT {
-        gs.draw_callback = draw_small_rect;
+        gs.draw_callback = draw_too_small_rect;
         gs.key_mapper = map_small_rect;
         gs.mouse_mapper = disable_mouse;
         return Ok(());
@@ -97,7 +97,7 @@ pub fn full_rebuild(
     gs.writer.flush()
 }
 
-pub fn draw_small_rect(
+pub fn draw_too_small_rect(
     gs: &mut GlobalState,
     _workspace: &mut Workspace,
     _tree: &mut Tree,
