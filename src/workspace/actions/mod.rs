@@ -283,6 +283,8 @@ impl Actions {
                         })
                     })
                     .collect::<Vec<Edit>>();
+
+                // apply modified select
                 if from.line == to.line {
                     if from_char == cursor.char {
                         cursor.select_set(to, from);
@@ -511,12 +513,13 @@ fn into_comment(pat: &str, line: &mut EditorLine, cursor: CursorPosition) -> Opt
 
 #[inline]
 fn uncomment(pat: &str, line: &mut EditorLine, cursor: CursorPosition) -> Option<(Offset, Edit)> {
-    if !line.trim_start().starts_with(pat) {
+    // ensure that the whole line is commented out
+    let (idx, trimmed) = line.trim_start_counted();
+    if !trimmed.starts_with(pat) {
         return None;
     }
-    let idx = line.find(pat)?;
     let mut end_idx = idx + pat.len();
-    end_idx += line[idx + pat.len()..].chars().take_while(|c| c.is_whitespace()).count();
+    end_idx += trimmed[pat.len()..].chars().take_while(|c| c.is_whitespace()).count();
     let offset = if cursor.char >= idx { Offset::Neg(end_idx - idx) } else { Offset::Neg(0) };
     Some((offset, Edit::remove_from_line(cursor.line, idx, end_idx, line)))
 }

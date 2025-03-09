@@ -199,6 +199,12 @@ impl EditorLine {
     }
 
     #[inline]
+    pub fn trim_start_counted(&self) -> (usize, &str) {
+        let count = self.content.chars().take_while(|c| c.is_whitespace()).count();
+        (count, &self.content[count..])
+    }
+
+    #[inline]
     pub fn trim_end(&self) -> &str {
         self.content.trim_end()
     }
