@@ -9,7 +9,10 @@ use crate::{
     tree::TreePath,
 };
 use clap::Parser;
-use crossterm::event::{Event, KeyCode, KeyEvent};
+use crossterm::{
+    event::{Event, KeyCode, KeyEvent},
+    style::ContentStyle,
+};
 use std::{path::PathBuf, time::Duration};
 
 const MIN_FRAMERATE: Duration = Duration::from_millis(8);
@@ -162,9 +165,9 @@ impl TreeSeletor {
                 None => return,
             };
             if idx == self.state.selected {
-                tree_path.render_styled(self.display_offset, line, self.state.highlight, backend);
+                tree_path.render(self.display_offset, line, self.state.highlight, backend);
             } else {
-                tree_path.render(self.display_offset, line, backend);
+                tree_path.render(self.display_offset, line, ContentStyle::default(), backend);
             }
         }
         for line in lines {

@@ -15,7 +15,7 @@ use crate::{
     workspace::Workspace,
 };
 use crossterm::event::Event;
-use std::{path::PathBuf, time::Duration};
+use std::{io::Write, path::PathBuf, time::Duration};
 
 const MIN_FRAMERATE: Duration = Duration::from_millis(8);
 
@@ -125,7 +125,8 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
         }
 
         // render updates
-        gs.draw(&mut workspace, &mut tree, &mut term)?;
+        gs.draw(&mut workspace, &mut tree, &mut term);
+        gs.backend().flush()?;
 
         // do event exchanges
         if gs.exchange_should_exit(&mut tree, &mut workspace).await {

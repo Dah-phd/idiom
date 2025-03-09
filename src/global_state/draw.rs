@@ -13,7 +13,6 @@ use crate::{
 };
 use bitflags::bitflags;
 use crossterm::style::{Color, ContentStyle};
-use std::io::{Result, Write};
 
 bitflags! {
     /// Workspace and Footer are always drawn
@@ -32,19 +31,14 @@ impl Default for Components {
 }
 
 // transition
-pub fn full_rebuild(
-    gs: &mut GlobalState,
-    workspace: &mut Workspace,
-    tree: &mut Tree,
-    term: &mut EditorTerminal,
-) -> Result<()> {
+pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
     gs.screen_rect.clear(&mut gs.writer);
 
     if gs.screen_rect.width < MIN_WIDTH || gs.screen_rect.height < MIN_HEIGHT {
         gs.draw_callback = draw_too_small_rect;
         gs.key_mapper = map_small_rect;
         gs.mouse_mapper = disable_mouse;
-        return Ok(());
+        return;
     }
 
     let mut tree_area = gs.screen_rect;
@@ -93,8 +87,6 @@ pub fn full_rebuild(
         gs.draw_callback = draw_popup;
         gs.popup_render();
     }
-
-    gs.writer.flush()
 }
 
 pub fn draw_too_small_rect(
@@ -102,36 +94,24 @@ pub fn draw_too_small_rect(
     _workspace: &mut Workspace,
     _tree: &mut Tree,
     _term: &mut EditorTerminal,
-) -> Result<()> {
+) {
     let error_text = ["Terminal size too small!", "Press Q or D to exit ..."];
     let style = ContentStyle::bold().with_fg(Color::DarkRed);
     for (line, text) in gs.screen_rect.into_iter().zip(error_text) {
         line.render_centered_styled(text, style, gs.backend());
     }
-    gs.writer.flush()
 }
 
-pub fn draw(
-    gs: &mut GlobalState,
-    workspace: &mut Workspace,
-    _tree: &mut Tree,
-    _term: &mut EditorTerminal,
-) -> Result<()> {
+pub fn draw(gs: &mut GlobalState, workspace: &mut Workspace, _tree: &mut Tree, _term: &mut EditorTerminal) {
     workspace.render(gs);
     if let Some(editor) = workspace.get_active() {
         editor.fast_render(gs);
     } else {
         gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
     };
-    gs.writer.flush()
 }
 
-pub fn draw_with_tree(
-    gs: &mut GlobalState,
-    workspace: &mut Workspace,
-    tree: &mut Tree,
-    _term: &mut EditorTerminal,
-) -> Result<()> {
+pub fn draw_with_tree(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, _term: &mut EditorTerminal) {
     tree.fast_render(gs);
     workspace.render(gs);
     if let Some(editor) = workspace.get_active() {
@@ -139,29 +119,16 @@ pub fn draw_with_tree(
     } else {
         gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
     };
-    gs.writer.flush()
 }
 
-pub fn draw_popup(
-    gs: &mut GlobalState,
-    _workspace: &mut Workspace,
-    _tree: &mut Tree,
-    _term: &mut EditorTerminal,
-) -> Result<()> {
+pub fn draw_popup(gs: &mut GlobalState, _workspace: &mut Workspace, _tree: &mut Tree, _term: &mut EditorTerminal) {
     gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
     gs.popup_render();
-    gs.writer.flush()
 }
 
-pub fn draw_term(
-    gs: &mut GlobalState,
-    _workspace: &mut Workspace,
-    _tree: &mut Tree,
-    term: &mut EditorTerminal,
-) -> Result<()> {
+pub fn draw_term(gs: &mut GlobalState, _workspace: &mut Workspace, _tree: &mut Tree, term: &mut EditorTerminal) {
     gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
     term.render(gs);
-    gs.writer.flush()
 }
 
 fn render_logo(line: Line, gs: &mut GlobalState) {

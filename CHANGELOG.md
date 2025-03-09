@@ -1,4 +1,8 @@
 ## Includes only major changes (manual updates)
+# Version 0.4.9
+* added background color to tree
+* fixed line render_centered
+
 # Version 0.4.8
 * fixed Token::decrement_at - remove before postion (inc is postion after, dec is postion at (not before))
 

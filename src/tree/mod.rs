@@ -7,7 +7,10 @@ use crate::{
     global_state::{GlobalState, IdiomEvent},
     lsp::{DiagnosticType, TreeDiagnostics},
     popups::popups_tree::{create_file_popup, create_root_file_popup, rename_file_popup},
-    render::{backend::BackendProtocol, state::State},
+    render::{
+        backend::{BackendProtocol, StyleExt},
+        state::State,
+    },
     utils::{build_file_or_folder, to_canon_path, to_relative_path},
 };
 use crossterm::event::KeyEvent;
@@ -78,31 +81,27 @@ impl Tree {
         let mut iter = self.tree.iter();
         iter.next();
         let mut lines = gs.tree_area.into_iter();
+        let base_style = gs.theme.accent_style;
+        let select_base_style = self.state.highlight.with_bg(gs.theme.accent_background);
         for (idx, tree_path) in iter.enumerate().skip(self.state.at_line) {
             let mut line = match lines.next() {
                 Some(line) => line,
                 None => return,
             };
-            if idx == self.state.selected {
-                if let Some(mark) = self.tree_clipboard.get_mark(tree_path.path()) {
-                    if mark.len() + 10 < line.width {
-                        line.width -= mark.len();
-                        gs.writer.print_styled_at(line.row, line.col + line.width as u16, mark, self.state.highlight);
-                    }
+            let style = match idx == self.state.selected {
+                true => select_base_style,
+                false => base_style,
+            };
+            if let Some(mark) = self.tree_clipboard.get_mark(tree_path.path()) {
+                if mark.len() + 10 < line.width {
+                    line.width -= mark.len();
+                    gs.writer.print_styled_at(line.row, line.col + line.width as u16, mark, style);
                 }
-                tree_path.render_styled(self.display_offset, line, self.state.highlight, &mut gs.writer);
-            } else {
-                if let Some(mark) = self.tree_clipboard.get_mark(tree_path.path()) {
-                    if mark.len() + 10 < line.width {
-                        line.width -= mark.len();
-                        gs.writer.print_at(line.row, line.col + line.width as u16, mark);
-                    }
-                }
-                tree_path.render(self.display_offset, line, &mut gs.writer);
             }
+            tree_path.render(self.display_offset, line, style, &mut gs.writer);
         }
         for line in lines {
-            line.render_empty(&mut gs.writer);
+            line.fill_styled(' ', base_style, &mut gs.writer);
         }
     }
 
@@ -110,7 +109,10 @@ impl Tree {
     pub fn fast_render(&mut self, gs: &mut GlobalState) {
         if self.rebuild {
             self.rebuild = false;
+            let accent = Some(gs.theme.accent_background);
+            gs.backend().set_bg(accent);
             self.render(gs);
+            gs.backend().reset_style();
         };
     }
 

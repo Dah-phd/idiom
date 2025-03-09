@@ -33,7 +33,7 @@ const MIN_WIDTH: usize = 40;
 type KeyMapCallback = fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool;
 type PastePassthroughCallback = fn(&mut GlobalState, String, &mut Workspace, &mut EditorTerminal);
 type MouseMapCallback = fn(&mut GlobalState, MouseEvent, &mut Tree, &mut Workspace);
-type DrawCallback = fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal) -> std::io::Result<()>;
+type DrawCallback = fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal);
 
 pub struct GlobalState {
     mode: Mode,
@@ -92,13 +92,8 @@ impl GlobalState {
     }
 
     #[inline]
-    pub fn draw(
-        &mut self,
-        workspace: &mut Workspace,
-        tree: &mut Tree,
-        term: &mut EditorTerminal,
-    ) -> std::io::Result<()> {
-        (self.draw_callback)(self, workspace, tree, term)
+    pub fn draw(&mut self, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
+        (self.draw_callback)(self, workspace, tree, term);
     }
 
     pub fn render_stats(&mut self, len: usize, select_len: usize, cursor: CursorPosition) {
