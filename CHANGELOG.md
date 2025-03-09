@@ -1,7 +1,8 @@
 ## Includes only major changes (manual updates)
 # Version 0.4.9
+* idiom mark linked to file tree
 * editor mode linked to file tree
-* added background color to tree
+* added background color to tree instead of borders
 * fixed line render_centered
 
 # Version 0.4.8
