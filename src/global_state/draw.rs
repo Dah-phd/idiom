@@ -42,23 +42,18 @@ pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut 
     }
 
     let mut tree_area = gs.screen_rect;
-    gs.footer_area = tree_area.splitoff_rows(1);
-
-    if let Some(mut line) = gs.footer_area.get_line(0) {
-        gs.mode.render(line.clone(), gs.theme.accent_style, &mut gs.writer);
-        line += Mode::len();
-        gs.messages.set_line(line);
-    };
-
-    gs.messages.render(gs.theme.accent_style, &mut gs.writer);
+    gs.footer_line = tree_area.pop_line();
 
     if gs.components.contains(Components::TREE) || !gs.is_insert() {
+        let (mode_line, msg_line) = gs.footer_line.clone().split_at(gs.tree_size);
+        gs.mode.render(mode_line, &mut gs.writer);
+        gs.messages.set_line(msg_line);
         gs.draw_callback = draw_with_tree;
-        gs.tab_area = tree_area.keep_col((gs.tree_size * gs.screen_rect.width) / 100);
+        gs.tab_area = tree_area.keep_col(gs.tree_size);
         if let Some(line) = tree_area.next_line() {
             render_logo(line, gs);
         }
-        tree_area.top_border().right_border().draw_borders(
+        tree_area.top_border().right_border().left_border().draw_borders(
             Some(HAVLED_BALANCED_BORDERS),
             Some(gs.theme.accent_background),
             gs.backend(),
@@ -66,10 +61,15 @@ pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut 
         gs.tree_area = tree_area;
         tree.render(gs);
     } else {
+        let (mode_line, msg_line) = gs.footer_line.clone().split_at(Mode::len());
+        gs.mode.render(mode_line, &mut gs.writer);
+        gs.messages.set_line(msg_line);
         gs.draw_callback = draw;
         gs.tree_area = tree_area;
         gs.tab_area = gs.tree_area.keep_col(0);
     }
+
+    gs.messages.render(gs.theme.accent_style, &mut gs.writer);
 
     gs.editor_area = gs.tab_area.keep_rows(1);
     workspace.render(gs);

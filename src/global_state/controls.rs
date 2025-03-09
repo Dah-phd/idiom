@@ -6,8 +6,8 @@ use crate::{runner::EditorTerminal, tree::Tree, workspace::Workspace};
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::{Color, ContentStyle};
 
-const INSERT_SPAN: &str = "  --INSERT--   ";
-const SELECT_SPAN: &str = "  --SELECT--   ";
+const INSERT_SPAN: &str = "  --INSERT--  ";
+const SELECT_SPAN: &str = "  --SELECT--  ";
 const MODE_LEN: usize = INSERT_SPAN.len();
 
 #[derive(Default, Clone)]
@@ -27,27 +27,27 @@ pub enum Mode {
 
 impl Mode {
     #[inline]
-    pub fn render(&self, line: Line, accent_style: ContentStyle, backend: &mut Backend) {
+    pub fn render(&self, line: Line, backend: &mut Backend) {
         match self {
-            Self::Insert => Self::render_insert_mode(line, accent_style, backend),
-            Self::Select => Self::render_select_mode(line, accent_style, backend),
+            Self::Insert => Self::render_insert_mode(line, backend),
+            Self::Select => Self::render_select_mode(line, backend),
         };
     }
 
     #[inline]
-    pub fn render_select_mode(mut line: Line, mut accent_style: ContentStyle, backend: &mut Backend) {
-        line.width = std::cmp::min(MODE_LEN, line.width);
-        accent_style.add_bold();
-        accent_style.set_fg(Some(Self::select_color()));
-        line.render_styled(SELECT_SPAN, accent_style, backend);
+    pub fn render_select_mode(line: Line, backend: &mut Backend) {
+        let mut style = ContentStyle::reversed();
+        style.add_bold();
+        style.set_fg(Some(Self::select_color()));
+        line.render_centered_styled(SELECT_SPAN, style, backend);
     }
 
     #[inline]
-    pub fn render_insert_mode(mut line: Line, mut accent_style: ContentStyle, backend: &mut Backend) {
-        line.width = std::cmp::min(MODE_LEN, line.width);
-        accent_style.add_bold();
-        accent_style.set_fg(Some(Self::insert_color()));
-        line.render_styled(INSERT_SPAN, accent_style, backend);
+    pub fn render_insert_mode(line: Line, backend: &mut Backend) {
+        let mut style = ContentStyle::reversed();
+        style.add_bold();
+        style.set_fg(Some(Self::insert_color()));
+        line.render_centered_styled(INSERT_SPAN, style, backend);
     }
 
     pub const fn select_color() -> Color {

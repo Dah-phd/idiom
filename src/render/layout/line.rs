@@ -122,6 +122,18 @@ impl Line {
         backend.set_style(reset_style);
     }
 
+    pub const fn split_at(mut self, idx: usize) -> (Self, Self) {
+        let new = match idx < self.width {
+            true => {
+                let remaining_width = self.width - idx;
+                self.width = idx;
+                Self { row: self.row, col: self.width as u16 + self.col, width: remaining_width }
+            }
+            false => Self { row: self.row, col: self.col + self.width as u16, width: 0 },
+        };
+        (self, new)
+    }
+
     /// creates line builder from Line
     /// push/push_styled can be used to add to line
     /// on drop pads the line to end

@@ -57,7 +57,6 @@ pub enum IdiomEvent {
         select: (CursorPosition, CursorPosition),
         clear_popup: bool,
     },
-    Resize,
     Save,
     Rebase,
     Exit,
@@ -228,9 +227,6 @@ impl IdiomEvent {
                 };
             }
             IdiomEvent::WorkspaceEdit(edits) => ws.apply_edits(edits, gs),
-            IdiomEvent::Resize => {
-                ws.resize_all(gs.editor_area.width, gs.editor_area.height as usize);
-            }
             IdiomEvent::Rebase => {
                 if let Some(editor) = ws.get_active() {
                     editor.rebase(gs);

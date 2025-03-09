@@ -12,7 +12,7 @@ use crate::{
     popups::{self, PopupInterface},
     render::{
         backend::{Backend, BackendProtocol},
-        layout::Rect,
+        layout::{Line, Rect},
     },
     runner::EditorTerminal,
     tree::Tree,
@@ -27,7 +27,7 @@ use draw::Components;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use message::Messages;
 
-const MIN_HEIGHT: u16 = 4;
+const MIN_HEIGHT: u16 = 6;
 const MIN_WIDTH: usize = 40;
 
 type KeyMapCallback = fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool;
@@ -52,7 +52,7 @@ pub struct GlobalState {
     pub tree_area: Rect,
     pub tab_area: Rect,
     pub editor_area: Rect,
-    pub footer_area: Rect,
+    pub footer_line: Line,
     pub matcher: SkimMatcherV2,
     messages: Messages,
     components: Components,
@@ -64,7 +64,7 @@ impl GlobalState {
         let theme = messages.unwrap_or_default(UITheme::new(), "Failed to load theme_ui.toml");
         Backend::screen().map(|screen_rect| Self {
             mode: Mode::default(),
-            tree_size: 15,
+            tree_size: std::cmp::max((15 * screen_rect.width) / 100, Mode::len()),
             key_mapper: controls::map_tree,
             paste_passthrough: controls::paste_passthrough_ignore,
             mouse_mapper: controls::mouse_handler,
@@ -79,7 +79,7 @@ impl GlobalState {
             tree_area: Rect::default(),
             tab_area: Rect::default(),
             editor_area: Rect::default(),
-            footer_area: Rect::default(),
+            footer_line: Line::default(),
             matcher: SkimMatcherV2::default(),
             messages,
             components: Components::default(),
@@ -97,30 +97,36 @@ impl GlobalState {
     }
 
     pub fn render_stats(&mut self, len: usize, select_len: usize, cursor: CursorPosition) {
-        if let Some(mut line) = self.footer_area.get_line(0) {
+        let mut line = self.footer_line.clone();
+        if self.components.contains(Components::TREE) {
+            line += self.tree_size;
+        } else {
             line += Mode::len();
-            self.writer.set_style(self.theme.accent_style);
-            let mut rev_builder = line.unsafe_builder_rev(&mut self.writer);
-            if select_len != 0 {
-                rev_builder.push(&format!("({select_len} selected) "));
-            }
-            rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {} ", cursor.line + 1, cursor.char + 1));
-            self.messages.set_line(rev_builder.into_line());
-            self.messages.fast_render(self.theme.accent_style, &mut self.writer);
-            self.writer.reset_style();
         }
+        self.writer.set_style(self.theme.accent_style);
+        let mut rev_builder = line.unsafe_builder_rev(&mut self.writer);
+        if select_len != 0 {
+            rev_builder.push(&format!("({select_len} selected) "));
+        }
+        rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {} ", cursor.line + 1, cursor.char + 1));
+        self.messages.set_line(rev_builder.into_line());
+        self.messages.fast_render(self.theme.accent_style, &mut self.writer);
+        self.writer.reset_style();
     }
 
     pub fn clear_stats(&mut self) {
-        if let Some(mut line) = self.footer_area.get_line(0) {
-            let accent_style = self.theme.accent_style;
+        let mut line = self.footer_line.clone();
+        let accent_style = self.theme.accent_style;
+        if self.components.contains(Components::TREE) {
+            line += self.tree_size;
+        } else {
             line += Mode::len();
-            self.writer.set_style(accent_style);
-            self.writer.go_to(line.row, line.col);
-            self.writer.clear_to_eol();
-            self.writer.reset_style();
-            self.messages.render(accent_style, &mut self.writer);
         }
+        self.writer.set_style(accent_style);
+        self.writer.go_to(line.row, line.col);
+        self.writer.clear_to_eol();
+        self.writer.reset_style();
+        self.messages.render(accent_style, &mut self.writer);
     }
 
     #[inline]
@@ -175,9 +181,9 @@ impl GlobalState {
         if !self.components.contains(Components::TREE) {
             self.draw_callback = draw::full_rebuild;
         };
-        if let Some(line) = self.footer_area.get_line(0) {
-            Mode::render_select_mode(line, self.theme.accent_style, &mut self.writer);
-        };
+        let mut line = self.footer_line.clone();
+        line.width = self.tree_size;
+        Mode::render_select_mode(line, &mut self.writer);
     }
 
     pub fn insert_mode(&mut self) {
@@ -186,9 +192,9 @@ impl GlobalState {
         if !self.components.contains(Components::TREE) {
             self.draw_callback = draw::full_rebuild;
         };
-        if let Some(line) = self.footer_area.get_line(0) {
-            Mode::render_insert_mode(line, self.theme.accent_style, &mut self.writer);
-        };
+        let mut line = self.footer_line.clone();
+        line.width = self.tree_size;
+        Mode::render_insert_mode(line, &mut self.writer);
     }
 
     #[inline]
@@ -231,13 +237,14 @@ impl GlobalState {
     }
 
     pub fn expand_tree_size(&mut self) {
-        self.tree_size = std::cmp::min(75, self.tree_size + 1);
-
+        let max_size = self.screen_rect.width / 2;
+        self.tree_size = std::cmp::min(max_size, self.tree_size + 1);
         self.draw_callback = draw::full_rebuild;
     }
 
     pub fn shrink_tree_size(&mut self) {
-        self.tree_size = std::cmp::max(15, self.tree_size - 1);
+        let min_size = std::cmp::max((15 * self.screen_rect.width) / 100, Mode::len());
+        self.tree_size = std::cmp::max(min_size, self.tree_size - 1);
         self.draw_callback = draw::full_rebuild;
     }
 
@@ -288,9 +295,10 @@ impl GlobalState {
 
     #[inline]
     pub fn full_resize(&mut self, height: u16, width: u16) {
+        let tree_rate = self.tree_size * 100 / self.screen_rect.width;
         self.screen_rect = (width, height).into();
+        self.tree_size = std::cmp::max((tree_rate * self.screen_rect.width) / 100, Mode::len());
         self.draw_callback = draw::full_rebuild;
-        self.event.push(IdiomEvent::Resize);
     }
 
     /// unwrap or default with logged error

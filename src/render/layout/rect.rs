@@ -89,6 +89,16 @@ impl Rect {
         }
     }
 
+    /// Pops last line from rect
+    pub fn pop_line(&mut self) -> Line {
+        if self.height == 0 {
+            return Line { row: self.row + self.height, col: self.col, width: 0 };
+        }
+        let row = self.row + self.height;
+        self.height -= 1;
+        Line { row, col: self.col, width: self.width }
+    }
+
     /// Splitoff cols into Rect from current Rect - mutating it in place
     pub fn splitoff_cols(&mut self, cols: usize) -> Self {
         let old_width = self.width;
