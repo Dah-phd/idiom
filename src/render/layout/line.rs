@@ -30,7 +30,6 @@ impl Line {
         backend.print_styled_at(self.row, self.col, text, style)
     }
 
-    // !TODO fix
     #[inline]
     pub fn render_centered(self, text: &str, backend: &mut Backend) {
         let (remaining_width, text) = text.truncate_width(self.width);
