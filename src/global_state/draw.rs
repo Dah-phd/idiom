@@ -53,7 +53,7 @@ pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut 
         if let Some(line) = tree_area.next_line() {
             render_logo(line, gs);
         }
-        tree_area.top_border().right_border().left_border().draw_borders(
+        tree_area.right_border().left_border().draw_borders(
             Some(HAVLED_BALANCED_BORDERS),
             Some(gs.theme.accent_background),
             gs.backend(),
@@ -132,29 +132,33 @@ pub fn draw_term(gs: &mut GlobalState, _workspace: &mut Workspace, _tree: &mut T
 }
 
 fn render_logo(line: Line, gs: &mut GlobalState) {
+    let style = gs.theme.accent_style;
+    let backend = gs.backend();
+    let reset_style = backend.get_style();
+    backend.set_style(style);
     match line.width {
-        ..5 => {}
-        5..10 => {
+        ..10 => {
             let pad = line.width - 4;
             let l_pad = pad / 2;
             let r_pad = pad - l_pad;
-            let backend = gs.backend();
             backend.go_to(line.row, line.col);
             backend.pad(l_pad);
             backend.print('<');
-            backend.print_styled("/i>", ContentStyle::fg(Mode::insert_color()));
+            backend.set_style(style.with_fg(Mode::insert_color()));
+            backend.print("/i>");
             backend.pad(r_pad);
         }
         10.. => {
             let pad = line.width - 8;
             let l_pad = pad / 2;
             let r_pad = pad - l_pad;
-            let backend = gs.backend();
             backend.go_to(line.row, line.col);
             backend.pad(l_pad);
             backend.print('<');
-            backend.print_styled("/idiom>", ContentStyle::fg(Mode::insert_color()));
+            backend.set_style(style.with_fg(Mode::insert_color()));
+            backend.print("/idiom>");
             backend.pad(r_pad);
         }
     }
+    backend.set_style(reset_style);
 }
