@@ -1,5 +1,6 @@
 ## Includes only major changes (manual updates)
 # Version 0.4.9
+* editor mode linked to file tree
 * added background color to tree
 * fixed line render_centered
 
