@@ -295,9 +295,19 @@ impl GlobalState {
 
     #[inline]
     pub fn full_resize(&mut self, height: u16, width: u16) {
-        let tree_rate = self.tree_size * 100 / self.screen_rect.width;
+        let tree_rate = (self.tree_size * 100) / self.screen_rect.width;
         self.screen_rect = (width, height).into();
         self.tree_size = std::cmp::max((tree_rate * self.screen_rect.width) / 100, Mode::len());
+
+        self.tree_area = self.screen_rect;
+        self.tree_area.pop_line();
+        if self.components.contains(Components::TREE) || !self.is_insert() {
+            self.tab_area = self.tree_area.keep_col(self.tree_size)
+        } else {
+            self.tab_area = self.tree_area.keep_col(0);
+        }
+        self.editor_area = self.tab_area.keep_rows(1);
+
         self.draw_callback = draw::full_rebuild;
     }
 
