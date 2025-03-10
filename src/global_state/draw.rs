@@ -103,22 +103,20 @@ pub fn draw_too_small_rect(
 }
 
 pub fn draw(gs: &mut GlobalState, workspace: &mut Workspace, _tree: &mut Tree, _term: &mut EditorTerminal) {
-    workspace.render(gs);
-    if let Some(editor) = workspace.get_active() {
-        editor.fast_render(gs);
-    } else {
-        gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
-    };
+    workspace.fast_render(gs);
+    match workspace.get_active() {
+        Some(editor) => editor.fast_render(gs),
+        None => gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer),
+    }
 }
 
 pub fn draw_with_tree(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, _term: &mut EditorTerminal) {
     tree.fast_render(gs);
-    workspace.render(gs);
-    if let Some(editor) = workspace.get_active() {
-        editor.fast_render(gs);
-    } else {
-        gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
-    };
+    workspace.fast_render(gs);
+    match workspace.get_active() {
+        Some(editor) => editor.fast_render(gs),
+        None => gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer),
+    }
 }
 
 pub fn draw_popup(gs: &mut GlobalState, _workspace: &mut Workspace, _tree: &mut Tree, _term: &mut EditorTerminal) {
@@ -132,33 +130,23 @@ pub fn draw_term(gs: &mut GlobalState, _workspace: &mut Workspace, _tree: &mut T
 }
 
 fn render_logo(line: Line, gs: &mut GlobalState) {
+    if line.width < 10 {
+        // should not be reachable
+        gs.error(format!("Unexpected tree width: {}", line.width));
+        return;
+    }
     let style = gs.theme.accent_style;
     let backend = gs.backend();
     let reset_style = backend.get_style();
     backend.set_style(style);
-    match line.width {
-        ..10 => {
-            let pad = line.width - 4;
-            let l_pad = pad / 2;
-            let r_pad = pad - l_pad;
-            backend.go_to(line.row, line.col);
-            backend.pad(l_pad);
-            backend.print('<');
-            backend.set_style(style.with_fg(Mode::insert_color()));
-            backend.print("/i>");
-            backend.pad(r_pad);
-        }
-        10.. => {
-            let pad = line.width - 8;
-            let l_pad = pad / 2;
-            let r_pad = pad - l_pad;
-            backend.go_to(line.row, line.col);
-            backend.pad(l_pad);
-            backend.print('<');
-            backend.set_style(style.with_fg(Mode::insert_color()));
-            backend.print("/idiom>");
-            backend.pad(r_pad);
-        }
-    }
+    let pad = line.width - 8;
+    let l_pad = pad / 2;
+    let r_pad = pad - l_pad;
+    backend.go_to(line.row, line.col);
+    backend.pad(l_pad);
+    backend.print('<');
+    backend.set_style(style.with_fg(Mode::insert_color()));
+    backend.print("/idiom>");
+    backend.pad(r_pad);
     backend.set_style(reset_style);
 }
