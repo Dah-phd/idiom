@@ -45,7 +45,7 @@ pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut 
     gs.footer_line = tree_area.pop_line();
 
     if gs.components.contains(Components::TREE) || !gs.is_insert() {
-        let (mode_line, msg_line) = gs.footer_line.clone().split_at(gs.tree_size);
+        let (mode_line, msg_line) = gs.footer_line.clone().split_rel(gs.tree_size);
         gs.mode.render(mode_line, &mut gs.writer);
         gs.messages.set_line(msg_line);
         gs.draw_callback = draw_with_tree;
@@ -61,7 +61,7 @@ pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut 
         gs.tree_area = tree_area;
         tree.render(gs);
     } else {
-        let (mode_line, msg_line) = gs.footer_line.clone().split_at(Mode::len());
+        let (mode_line, msg_line) = gs.footer_line.clone().split_rel(Mode::len());
         gs.mode.render(mode_line, &mut gs.writer);
         gs.messages.set_line(msg_line);
         gs.draw_callback = draw;

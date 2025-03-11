@@ -8,7 +8,7 @@ use crate::{
 };
 use crossterm::style::{Color, ContentStyle};
 
-#[derive(Default, Clone, Copy, Debug)]
+#[derive(Default, Clone, Copy, Debug, PartialEq)]
 pub struct Rect {
     pub row: u16,
     pub col: u16,
@@ -74,6 +74,36 @@ impl Rect {
             };
         };
         Rect::new(row, col, width, height)
+    }
+
+    pub fn split_horizont_rel(mut self, width: usize) -> (Self, Self) {
+        let taken_width = self.width.saturating_sub(width);
+        self.width -= taken_width;
+        (
+            self,
+            Self {
+                row: self.row,
+                col: self.col + self.width as u16,
+                height: self.height,
+                width: taken_width,
+                borders: self.borders,
+            },
+        )
+    }
+
+    pub fn split_vertical_rel(mut self, height: u16) -> (Self, Self) {
+        let remaining_height = self.height.saturating_sub(height);
+        self.height -= remaining_height;
+        (
+            self,
+            Self {
+                row: self.row + self.height,
+                col: self.col,
+                height: remaining_height,
+                width: self.width,
+                borders: self.borders,
+            },
+        )
     }
 
     /// Splitoff rows into Rect from current Rect - mutating it in place

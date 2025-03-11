@@ -1,6 +1,57 @@
-use super::Line;
-use crate::render::backend::{Backend, BackendProtocol, StyleExt};
+use super::{Line, Rect};
+use crate::render::{
+    backend::{Backend, BackendProtocol, StyleExt},
+    layout::Borders,
+};
 use crossterm::style::ContentStyle;
+
+#[test]
+fn split_horizont_rel() {
+    let rect: Rect = (20, 30).into();
+    assert_eq!(
+        rect.split_horizont_rel(12),
+        (
+            Rect { row: 0, col: 0, width: 12, height: 30, borders: Borders::empty() },
+            Rect { row: 0, col: 12, width: 8, height: 30, borders: Borders::empty() }
+        )
+    );
+}
+
+#[test]
+fn split_horizont_rel_overflow() {
+    let rect: Rect = (10, 30).into();
+    assert_eq!(
+        rect.split_horizont_rel(12),
+        (
+            Rect { row: 0, col: 0, width: 10, height: 30, borders: Borders::empty() },
+            Rect { row: 0, col: 10, width: 0, height: 30, borders: Borders::empty() }
+        )
+    );
+}
+
+#[test]
+fn split_vertical_rel() {
+    let rect = Rect::from((20, 30));
+    assert_eq!(
+        rect.split_vertical_rel(12),
+        (
+            Rect { row: 0, col: 0, width: 20, height: 12, borders: Borders::empty() },
+            Rect { row: 12, col: 0, width: 20, height: 18, borders: Borders::empty() }
+        )
+    );
+}
+
+#[test]
+fn split_vertical_rel_overflow() {
+    let rect = Rect::from((20, 10));
+    assert_eq!(
+        rect.split_vertical_rel(12),
+        (
+            Rect { row: 0, col: 0, width: 20, height: 10, borders: Borders::empty() },
+            Rect { row: 10, col: 0, width: 20, height: 0, borders: Borders::empty() }
+        )
+    );
+}
 
 #[test]
 fn render_centered() {

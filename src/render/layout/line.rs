@@ -122,7 +122,7 @@ impl Line {
         backend.set_style(reset_style);
     }
 
-    pub const fn split_at(mut self, idx: usize) -> (Self, Self) {
+    pub const fn split_rel(mut self, idx: usize) -> (Self, Self) {
         let new = match idx < self.width {
             true => {
                 let remaining_width = self.width - idx;
