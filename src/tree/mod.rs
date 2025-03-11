@@ -452,3 +452,6 @@ impl Tree {
         }
     }
 }
+
+#[cfg(test)]
+pub mod tests;

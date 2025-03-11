@@ -545,4 +545,4 @@ pub fn add_editor_from_data(
 }
 
 #[cfg(test)]
-mod tests;
+pub mod tests;

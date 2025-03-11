@@ -6,7 +6,7 @@ use crate::render::{
 use crossterm::style::ContentStyle;
 use std::ops::{AddAssign, SubAssign};
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Line {
     pub row: u16,
     pub col: u16,
