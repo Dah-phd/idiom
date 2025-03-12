@@ -31,7 +31,7 @@ impl Default for Components {
 }
 
 // solve split components
-fn solve_components(gs: &mut GlobalState) {
+pub fn solve_components(gs: &mut GlobalState) {
     let mut screen = gs.screen_rect;
     gs.footer_line = screen.pop_line();
     screen = if gs.components.contains(Components::TREE) || !gs.is_insert() {
