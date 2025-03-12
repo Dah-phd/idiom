@@ -67,10 +67,11 @@ impl Messages {
     }
 
     pub fn set_line(&mut self, line: Line) {
-        if line.width != self.line.width || line.col != self.line.col {
-            self.active = true;
-            self.line = line;
+        if self.line == line {
+            return;
         }
+        self.active = true;
+        self.line = line;
     }
 
     pub fn message(&mut self, message: String) {

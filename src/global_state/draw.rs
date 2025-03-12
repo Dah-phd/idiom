@@ -30,6 +30,31 @@ impl Default for Components {
     }
 }
 
+// solve split components
+fn solve_components(gs: &mut GlobalState) {
+    let mut screen = gs.screen_rect;
+    gs.footer_line = screen.pop_line();
+    screen = if gs.components.contains(Components::TREE) || !gs.is_insert() {
+        let (mut tree_area, screen) = screen.split_horizont_rel(gs.tree_size);
+        if let Some(line) = tree_area.next_line() {
+            render_logo(line, gs);
+        }
+        tree_area.right_border().left_border().draw_borders(
+            Some(HAVLED_BALANCED_BORDERS),
+            Some(gs.theme.accent_background),
+            gs.backend(),
+        );
+        gs.tree_area = tree_area;
+        screen
+    } else {
+        let (tree_area, sceen) = screen.split_horizont_rel(0);
+        gs.tree_area = tree_area;
+        sceen
+    };
+
+    (gs.tab_area, gs.editor_area) = screen.split_vertical_rel(1);
+}
+
 // transition
 pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
     gs.screen_rect.clear(&mut gs.writer);
@@ -41,15 +66,16 @@ pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut 
         return;
     }
 
-    let mut tree_area = gs.screen_rect;
-    gs.footer_line = tree_area.pop_line();
+    let mut screen = gs.screen_rect;
+    gs.footer_line = screen.pop_line();
 
-    if gs.components.contains(Components::TREE) || !gs.is_insert() {
+    let screen = if gs.components.contains(Components::TREE) || gs.is_select() {
+        gs.draw_callback = draw_with_tree;
+
         let (mode_line, msg_line) = gs.footer_line.clone().split_rel(gs.tree_size);
         gs.mode.render(mode_line, &mut gs.writer);
         gs.messages.set_line(msg_line);
-        gs.draw_callback = draw_with_tree;
-        gs.tab_area = tree_area.keep_col(gs.tree_size);
+        let (mut tree_area, tab_area) = screen.split_horizont_rel(gs.tree_size);
         if let Some(line) = tree_area.next_line() {
             render_logo(line, gs);
         }
@@ -60,18 +86,21 @@ pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut 
         );
         gs.tree_area = tree_area;
         tree.render(gs);
+        tab_area
     } else {
+        gs.draw_callback = draw;
+
         let (mode_line, msg_line) = gs.footer_line.clone().split_rel(Mode::len());
         gs.mode.render(mode_line, &mut gs.writer);
         gs.messages.set_line(msg_line);
-        gs.draw_callback = draw;
+        let (tree_area, tab_area) = screen.split_horizont_rel(0);
         gs.tree_area = tree_area;
-        gs.tab_area = gs.tree_area.keep_col(0);
-    }
+        tab_area
+    };
 
     gs.messages.render(gs.theme.accent_style, &mut gs.writer);
+    (gs.tab_area, gs.editor_area) = screen.split_vertical_rel(1);
 
-    gs.editor_area = gs.tab_area.keep_rows(1);
     workspace.render(gs);
     if let Some(editor) = workspace.get_active() {
         editor.render(gs);

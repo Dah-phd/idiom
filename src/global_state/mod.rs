@@ -98,7 +98,7 @@ impl GlobalState {
 
     pub fn render_stats(&mut self, len: usize, select_len: usize, cursor: CursorPosition) {
         let mut line = self.footer_line.clone();
-        if self.components.contains(Components::TREE) {
+        if self.components.contains(Components::TREE) || self.is_select() {
             line += self.tree_size;
         } else {
             line += Mode::len();
@@ -117,7 +117,7 @@ impl GlobalState {
     pub fn clear_stats(&mut self) {
         let mut line = self.footer_line.clone();
         let accent_style = self.theme.accent_style;
-        if self.components.contains(Components::TREE) {
+        if self.components.contains(Components::TREE) || self.is_select() {
             line += self.tree_size;
         } else {
             line += Mode::len();
@@ -178,28 +178,35 @@ impl GlobalState {
     pub fn select_mode(&mut self) {
         self.mode = Mode::Select;
         self.config_controls();
-        if !self.components.contains(Components::TREE) {
+        if self.components.contains(Components::TREE) {
+            let mut line = self.footer_line.clone();
+            line.width = self.tree_size;
+            Mode::render_select_mode(line, &mut self.writer);
+        } else {
             self.draw_callback = draw::full_rebuild;
         };
-        let mut line = self.footer_line.clone();
-        line.width = self.tree_size;
-        Mode::render_select_mode(line, &mut self.writer);
     }
 
     pub fn insert_mode(&mut self) {
         self.mode = Mode::Insert;
         self.config_controls();
-        if !self.components.contains(Components::TREE) {
+        if self.components.contains(Components::TREE) {
+            let mut line = self.footer_line.clone();
+            line.width = self.tree_size;
+            Mode::render_insert_mode(line, &mut self.writer);
+        } else {
             self.draw_callback = draw::full_rebuild;
         };
-        let mut line = self.footer_line.clone();
-        line.width = self.tree_size;
-        Mode::render_insert_mode(line, &mut self.writer);
     }
 
     #[inline]
     pub fn is_insert(&self) -> bool {
         matches!(self.mode, Mode::Insert)
+    }
+
+    #[inline]
+    pub fn is_select(&self) -> bool {
+        matches!(self.mode, Mode::Select)
     }
 
     #[inline]
@@ -299,14 +306,15 @@ impl GlobalState {
         self.screen_rect = (width, height).into();
         self.tree_size = std::cmp::max((tree_rate * self.screen_rect.width) / 100, Mode::len());
 
-        self.tree_area = self.screen_rect;
-        self.tree_area.pop_line();
-        if self.components.contains(Components::TREE) || !self.is_insert() {
-            self.tab_area = self.tree_area.keep_col(self.tree_size)
+        let mut screen = self.screen_rect;
+        screen.pop_line();
+        let (tree_area, screen) = if self.components.contains(Components::TREE) || !self.is_insert() {
+            screen.split_horizont_rel(self.tree_size)
         } else {
-            self.tab_area = self.tree_area.keep_col(0);
-        }
-        self.editor_area = self.tab_area.keep_rows(1);
+            screen.split_horizont_rel(self.tree_size)
+        };
+        self.tree_area = tree_area;
+        (self.tab_area, self.editor_area) = screen.split_vertical_rel(1);
 
         self.draw_callback = draw::full_rebuild;
     }

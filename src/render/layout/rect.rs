@@ -106,19 +106,6 @@ impl Rect {
         )
     }
 
-    /// Splitoff rows into Rect from current Rect - mutating it in place
-    pub fn splitoff_rows(&mut self, rows: u16) -> Self {
-        let old_height = self.height;
-        self.height = self.height.saturating_sub(rows);
-        Self {
-            row: self.row + self.height,
-            col: self.col,
-            height: old_height - self.height,
-            width: self.width,
-            borders: self.borders,
-        }
-    }
-
     /// Pops last line from rect
     pub fn pop_line(&mut self) -> Line {
         if self.height == 0 {
@@ -127,45 +114,6 @@ impl Rect {
         let row = self.row + self.height;
         self.height -= 1;
         Line { row, col: self.col, width: self.width }
-    }
-
-    /// Splitoff cols into Rect from current Rect - mutating it in place
-    pub fn splitoff_cols(&mut self, cols: usize) -> Self {
-        let old_width = self.width;
-        self.width = self.width.saturating_sub(cols);
-        Self {
-            row: self.row,
-            col: self.width as u16 + self.col,
-            height: self.height,
-            width: old_width - self.width,
-            borders: self.borders,
-        }
-    }
-
-    /// Keep rows splitting the remaining into Rect
-    pub fn keep_rows(&mut self, rows: u16) -> Self {
-        let remaining_height = self.height.saturating_sub(rows);
-        self.height -= remaining_height;
-        Self {
-            row: self.row + self.height,
-            col: self.col,
-            height: remaining_height,
-            width: self.width,
-            borders: self.borders,
-        }
-    }
-
-    /// Keep cols splitting the remaining into Rect
-    pub fn keep_col(&mut self, cols: usize) -> Self {
-        let taken_width = self.width.saturating_sub(cols);
-        self.width -= taken_width;
-        Self {
-            row: self.row,
-            col: self.col + self.width as u16,
-            height: self.height,
-            width: taken_width,
-            borders: self.borders,
-        }
     }
 
     pub fn get_line(&self, rel_idx: u16) -> Option<Line> {
