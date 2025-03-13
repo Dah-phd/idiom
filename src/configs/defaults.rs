@@ -24,6 +24,16 @@ pub const INSERT: &str = "insert";
 pub const F: &str = "f";
 pub const ESC: &str = "esc";
 
+#[cfg(not(windows))]
+pub fn get_shell() -> String {
+    "bash".to_owned()
+}
+
+#[cfg(windows)]
+pub fn get_shell() -> String {
+    "cmd".to_owned()
+}
+
 pub fn new_line() -> String {
     ENTER.to_owned()
 }

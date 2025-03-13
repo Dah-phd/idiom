@@ -1,5 +1,5 @@
 use super::{
-    defaults::{get_indent_after, get_indent_spaces, get_unident_before},
+    defaults::{get_indent_after, get_indent_spaces, get_shell, get_unident_before},
     load_or_create_config,
     types::FileType,
     EDITOR_CFG_FILE,
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EditorConfigs {
-    #[serde(default)]
+    #[serde(default, skip)]
     pub format_on_save: bool,
     #[serde(default = "get_indent_spaces")]
     pub indent_spaces: usize,
@@ -20,6 +20,9 @@ pub struct EditorConfigs {
     pub indent_after: String,
     #[serde(default = "get_unident_before")]
     pub unindent_before: String,
+    /// SHELL
+    #[serde(default = "get_shell", skip)]
+    pub shell: String,
     /// LSP
     rust_lsp: Option<String>,
     rust_lsp_preload_if_present: Option<Vec<String>>,
@@ -52,6 +55,8 @@ impl Default for EditorConfigs {
             indent_spaces: get_indent_spaces(),
             indent_after: get_indent_after(),
             unindent_before: get_unident_before(),
+            // shell
+            shell: get_shell(),
             // lsp
             rust_lsp: Some(String::from("rust-analyzer")),
             rust_lsp_preload_if_present: Some(vec!["Cargo.toml".to_owned(), "Cargo.lock".to_owned()]),
