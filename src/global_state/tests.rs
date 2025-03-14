@@ -18,7 +18,7 @@ fn full_rebuild_draw() {
             .collect(),
     );
     let mut tree = mock_tree();
-    let mut term = EditorTerminal::new(80);
+    let mut term = EditorTerminal::new(String::new(), 80);
     gs.screen_rect = (80, 80).into();
     full_rebuild(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(gs.screen_rect, Rect::from((80, 80)));
@@ -41,7 +41,7 @@ fn full_rebuild_draw_insert() {
             .collect(),
     );
     let mut tree = mock_tree();
-    let mut term = EditorTerminal::new(80);
+    let mut term = EditorTerminal::new(String::new(), 80);
     gs.screen_rect = (80, 80).into();
     full_rebuild(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(gs.screen_rect, Rect::from((80, 80)));

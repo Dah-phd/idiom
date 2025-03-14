@@ -26,11 +26,12 @@ pub struct EditorTerminal {
     terminal: Option<Terminal>,
     prompt: Option<Arc<Mutex<String>>>,
     max_rows: usize,
+    shell: String,
 }
 
 impl EditorTerminal {
-    pub fn new(width: u16) -> Self {
-        Self { width, ..Default::default() }
+    pub fn new(shell: String, width: u16) -> Self {
+        Self { shell, width, ..Default::default() }
     }
 
     pub fn render(&mut self, gs: &mut GlobalState) {
@@ -70,13 +71,13 @@ impl EditorTerminal {
                 if terminal.is_running() {
                     return;
                 }
-                if let Ok((terminal, prompt)) = Terminal::new(self.width) {
+                if let Ok((terminal, prompt)) = Terminal::new(&self.shell, self.width) {
                     self.terminal.replace(terminal).map(|t| t.kill());
                     self.prompt.replace(prompt);
                 }
             }
             None => {
-                if let Ok((terminal, prompt)) = Terminal::new(self.width) {
+                if let Ok((terminal, prompt)) = Terminal::new(&self.shell, self.width) {
                     self.terminal.replace(terminal);
                     self.prompt.replace(prompt);
                 }
@@ -130,7 +131,7 @@ impl EditorTerminal {
                 self.kill(gs);
                 self.at_log = self.logs.len();
                 self.logs.push("SIGKILL!".to_owned());
-                if let Ok((terminal, prompt)) = Terminal::new(self.width) {
+                if let Ok((terminal, prompt)) = Terminal::new(&self.shell, self.width) {
                     self.terminal.replace(terminal).map(|t| t.kill());
                     self.prompt.replace(prompt);
                 }

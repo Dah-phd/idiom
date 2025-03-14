@@ -8,11 +8,6 @@ use std::{
 use strip_ansi_escapes::strip_str;
 use tokio::task::JoinHandle;
 
-#[cfg(unix)]
-const SHELL: &str = "bash";
-#[cfg(windows)]
-const SHELL: &str = "cmd";
-
 use crate::error::{IdiomError, IdiomResult};
 use crate::global_state::IdiomEvent;
 use crate::{configs::CONFIG_FOLDER, global_state::GlobalState};
@@ -27,12 +22,12 @@ pub struct Terminal {
 }
 
 impl Terminal {
-    pub fn new(width: u16) -> IdiomResult<(Self, Arc<Mutex<String>>)> {
+    pub fn new(shell: &str, width: u16) -> IdiomResult<(Self, Arc<Mutex<String>>)> {
         let system = native_pty_system();
         let pair = system
             .openpty(PtySize { rows: 24, cols: width, ..Default::default() })
             .map_err(|err| IdiomError::any(err))?;
-        let mut cmd = CommandBuilder::new(SHELL);
+        let mut cmd = CommandBuilder::new(shell);
         cmd.cwd("./");
         let child = pair.slave.spawn_command(cmd).map_err(|error| IdiomError::any(error))?;
         let writer = pair.master.take_writer().map_err(|error| IdiomError::any(error))?;

@@ -1,5 +1,5 @@
 use crate::{
-    configs::{GeneralAction, KeyMap, KEY_MAP},
+    configs::{EditorConfigs, GeneralAction, KeyMap, KEY_MAP},
     error::IdiomResult,
     global_state::{GlobalState, IdiomEvent},
     popups::{
@@ -25,11 +25,14 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
     let mut gs = GlobalState::new(backend)?;
     let configs = gs.unwrap_or_default(KeyMap::new(), KEY_MAP);
     let mut general_key_map = configs.general_key_map();
+    let mut editor_base_config = gs.unwrap_or_default(EditorConfigs::new(), "editor.toml: ");
+    let integrated_shell = editor_base_config.shell.to_owned();
 
-    // COMPONENTS
+    // INIT COMPONENTS
     let mut tree = Tree::new(configs.tree_key_map(), &mut gs);
-    let mut workspace = Workspace::new(configs.editor_key_map(), tree.get_base_file_names(), &mut gs).await;
-    let mut term = EditorTerminal::new(gs.editor_area.width as u16);
+    let mut term = EditorTerminal::new(integrated_shell, gs.editor_area.width as u16);
+    let lsp_servers = editor_base_config.init_preloaded_lsp_servers(tree.get_base_file_names(), &mut gs).await;
+    let mut workspace = Workspace::new(configs.editor_key_map(), editor_base_config, lsp_servers).await;
 
     // CLI SETUP
     if let Some(path) = open_file {
