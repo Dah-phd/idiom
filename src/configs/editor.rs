@@ -164,6 +164,26 @@ impl EditorConfigs {
     }
 }
 
+fn map_preload(
+    base_tree: &[String],
+    expected: Option<Vec<String>>,
+    cmd: Option<&String>,
+    gs: &mut GlobalState,
+) -> Option<String> {
+    let cmd = cmd?;
+    for try_re in expected?.iter().map(|re| Regex::new(re)) {
+        match try_re {
+            Ok(file_re) => {
+                if base_tree.iter().any(|path| file_re.is_match(path)) {
+                    return Some(cmd.to_owned());
+                }
+            }
+            Err(error) => gs.error(error),
+        }
+    }
+    None
+}
+
 pub struct IndentConfigs {
     pub indent: String,
     pub indent_after: String,
@@ -230,25 +250,4 @@ impl IndentConfigs {
             Offset::Neg(trim_start_inplace(line))
         }
     }
-}
-
-fn map_preload(
-    base_tree: &[String],
-    expected: Option<Vec<String>>,
-    cmd: Option<&String>,
-    gs: &mut GlobalState,
-) -> Option<String> {
-    if let Some(cmd) = cmd {
-        for try_re in expected?.iter().map(|re| Regex::new(re)) {
-            match try_re {
-                Ok(file_re) => {
-                    if base_tree.iter().any(|path| file_re.is_match(path)) {
-                        return Some(cmd.to_owned());
-                    }
-                }
-                Err(error) => gs.error(error),
-            }
-        }
-    }
-    None
 }
