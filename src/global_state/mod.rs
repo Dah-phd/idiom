@@ -305,18 +305,17 @@ impl GlobalState {
         let tree_rate = (self.tree_size * 100) / self.screen_rect.width;
         self.screen_rect = (width, height).into();
         self.tree_size = std::cmp::max((tree_rate * self.screen_rect.width) / 100, Mode::len());
-
-        let mut screen = self.screen_rect;
-        screen.pop_line();
-        let (tree_area, screen) = if self.components.contains(Components::TREE) || !self.is_insert() {
-            screen.split_horizont_rel(self.tree_size)
-        } else {
-            screen.split_horizont_rel(self.tree_size)
-        };
-        self.tree_area = tree_area;
-        (self.tab_area, self.editor_area) = screen.split_vertical_rel(1);
-
         self.draw_callback = draw::full_rebuild;
+    }
+
+    pub fn resized_editor_rect(&self) -> Rect {
+        let mut base_screen = if self.components.contains(Components::TREE) || self.is_select() {
+            self.screen_rect.split_horizont_rel(self.tree_size).1
+        } else {
+            self.screen_rect
+        };
+        base_screen.pop_line();
+        base_screen.split_vertical_rel(1).1
     }
 
     /// unwrap or default with logged error

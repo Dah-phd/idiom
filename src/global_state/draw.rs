@@ -30,31 +30,6 @@ impl Default for Components {
     }
 }
 
-// solve split components
-pub fn solve_components(gs: &mut GlobalState) {
-    let mut screen = gs.screen_rect;
-    gs.footer_line = screen.pop_line();
-    screen = if gs.components.contains(Components::TREE) || !gs.is_insert() {
-        let (mut tree_area, screen) = screen.split_horizont_rel(gs.tree_size);
-        if let Some(line) = tree_area.next_line() {
-            render_logo(line, gs);
-        }
-        tree_area.right_border().left_border().draw_borders(
-            Some(HAVLED_BALANCED_BORDERS),
-            Some(gs.theme.accent_background),
-            gs.backend(),
-        );
-        gs.tree_area = tree_area;
-        screen
-    } else {
-        let (tree_area, sceen) = screen.split_horizont_rel(0);
-        gs.tree_area = tree_area;
-        sceen
-    };
-
-    (gs.tab_area, gs.editor_area) = screen.split_vertical_rel(1);
-}
-
 // transition
 pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
     gs.screen_rect.clear(&mut gs.writer);
