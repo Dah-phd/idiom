@@ -117,7 +117,8 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
                 }
                 Event::Resize(width, height) => {
                     gs.full_resize(height, width);
-                    workspace.resize_all(gs.editor_area.width, gs.editor_area.height as usize);
+                    let editor_rect = gs.resized_editor_rect();
+                    workspace.resize_all(editor_rect.width, editor_rect.height as usize);
                     term.resize(gs.editor_area.width as u16);
                 }
                 Event::Mouse(event) => gs.map_mouse(event, &mut tree, &mut workspace),
