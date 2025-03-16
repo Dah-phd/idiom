@@ -308,7 +308,7 @@ impl GlobalState {
         self.draw_callback = draw::full_rebuild;
     }
 
-    pub fn resized_editor_rect(&self) -> Rect {
+    pub fn calc_editor_rect(&self) -> Rect {
         let mut base_screen = if self.components.contains(Components::TREE) || self.is_select() {
             self.screen_rect.split_horizont_rel(self.tree_size).1
         } else {
