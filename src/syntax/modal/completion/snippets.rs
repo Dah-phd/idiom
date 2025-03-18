@@ -58,6 +58,7 @@ impl WrappedBuffer {
 
 /// Example:
 /// "push(${1:value})$0"
+/// TODO refactor
 fn parse_snippet(snippet: String) -> IdiomEvent {
     let mut cursor_offset = None;
     let mut relative_select = None;
@@ -194,7 +195,7 @@ fn collect_numbers(chars: &mut Chars) -> (String, Option<char>) {
 fn collect_name(chars: &mut Chars) -> (String, Option<char>) {
     let mut name = String::new();
     while let Some(ch) = chars.next() {
-        if ch.is_alphabetic() || ch.is_numeric() || ch == '_' {
+        if ch.is_alphabetic() || ch.is_numeric() || " _&".contains(ch) {
             name.push(ch);
             continue;
         }
