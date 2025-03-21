@@ -94,7 +94,7 @@ impl EditorTerminal {
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         match key {
             KeyEvent { code: KeyCode::Esc, .. }
-            | KeyEvent { code: KeyCode::Char('`'), modifiers: KeyModifiers::CONTROL, .. } => {
+            | KeyEvent { code: KeyCode::Char('`' | ' '), modifiers: KeyModifiers::CONTROL, .. } => {
                 gs.message("Term: PTY active in background ... (CTRL + d/q) can be used to kill the process!");
                 gs.toggle_terminal(self);
             }

@@ -55,8 +55,8 @@ impl Default for EditorConfigs {
         Self {
             format_on_save: true,
             indent_spaces: get_indent_spaces(),
-            indent_after: get_indent_after(),
-            unindent_before: get_unident_before(),
+            indent_after: String::from("({["),
+            unindent_before: String::from("]})"),
             // shell
             shell: get_shell(),
             // lsp
@@ -192,7 +192,7 @@ pub struct IndentConfigs {
 
 impl Default for IndentConfigs {
     fn default() -> Self {
-        Self { indent: "    ".to_owned(), unindent_before: get_unident_before(), indent_after: get_indent_after() }
+        Self { indent: "    ".to_owned(), unindent_before: String::from("]})"), indent_after: String::from("({[") }
     }
 }
 
