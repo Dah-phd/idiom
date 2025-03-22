@@ -83,18 +83,11 @@ pub struct TreeSeletor {
 impl TreeSeletor {
     pub fn new(selected_path: PathBuf) -> IdiomResult<Self> {
         std::env::set_current_dir(&selected_path)?;
-        let config = KeyMap::new().unwrap_or_default();
+        let key_map = KeyMap::new().unwrap_or_default().tree_key_map();
         let path_str = selected_path.display().to_string();
         let display_offset = path_str.split(std::path::MAIN_SEPARATOR).count() * 2;
         let tree = TreePath::from_path(selected_path.clone()).unwrap();
-        Ok(Self {
-            state: State::new(),
-            key_map: config.tree_key_map(),
-            display_offset,
-            selected_path,
-            tree,
-            rebuild: true,
-        })
+        Ok(Self { state: State::new(), key_map, display_offset, selected_path, tree, rebuild: true })
     }
 
     pub fn select(backend: &mut Backend, path: PathBuf) -> IdiomResult<Option<PathBuf>> {

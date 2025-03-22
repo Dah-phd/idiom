@@ -59,9 +59,9 @@ impl TreeKeyMap {
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct KeyMap {
-    general_key_map: GeneralUserKeyMap,
-    editor_key_map: EditorUserKeyMap,
-    tree_key_map: TreeUserKeyMap,
+    general_key_map: Option<GeneralUserKeyMap>,
+    editor_key_map: Option<EditorUserKeyMap>,
+    tree_key_map: Option<TreeUserKeyMap>,
 }
 
 impl KeyMap {
@@ -69,16 +69,17 @@ impl KeyMap {
         load_or_create_config(KEY_MAP)
     }
 
-    pub fn editor_key_map(&self) -> EditorKeyMap {
-        EditorKeyMap { key_map: self.editor_key_map.clone().into() }
+    pub fn unpack(self) -> (GeneralKeyMap, EditorKeyMap, TreeKeyMap) {
+        let Self { general_key_map, editor_key_map, tree_key_map } = self;
+        (
+            GeneralKeyMap { key_map: general_key_map.unwrap_or_default().into() },
+            EditorKeyMap { key_map: editor_key_map.unwrap_or_default().into() },
+            TreeKeyMap { key_map: tree_key_map.unwrap_or_default().into() },
+        )
     }
 
-    pub fn general_key_map(&self) -> GeneralKeyMap {
-        GeneralKeyMap { key_map: self.general_key_map.clone().into() }
-    }
-
-    pub fn tree_key_map(&self) -> TreeKeyMap {
-        TreeKeyMap { key_map: self.tree_key_map.clone().into() }
+    pub fn tree_key_map(self) -> TreeKeyMap {
+        TreeKeyMap { key_map: self.tree_key_map.unwrap_or_default().into() }
     }
 }
 

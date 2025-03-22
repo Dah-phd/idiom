@@ -23,16 +23,15 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
     // builtin cursor is not used - cursor is positioned during render
 
     let mut gs = GlobalState::new(backend)?;
-    let configs = gs.unwrap_or_default(KeyMap::new(), KEY_MAP);
-    let mut general_key_map = configs.general_key_map();
+    let (mut general_key_map, editor_key_map, tree_key_map) = gs.unwrap_or_default(KeyMap::new(), KEY_MAP).unpack();
     let mut editor_base_config = gs.unwrap_or_default(EditorConfigs::new(), "editor.toml: ");
     let integrated_shell = editor_base_config.shell.to_owned();
 
     // INIT COMPONENTS
-    let mut tree = Tree::new(configs.tree_key_map(), &mut gs);
+    let mut tree = Tree::new(tree_key_map, &mut gs);
     let mut term = EditorTerminal::new(integrated_shell, gs.editor_area.width as u16);
     let lsp_servers = editor_base_config.init_preloaded_lsp_servers(tree.get_base_file_names(), &mut gs).await;
-    let mut workspace = Workspace::new(configs.editor_key_map(), editor_base_config, lsp_servers).await;
+    let mut workspace = Workspace::new(editor_key_map, editor_base_config, lsp_servers).await;
 
     // CLI SETUP
     if let Some(path) = open_file {
@@ -40,8 +39,6 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
         gs.event.push(IdiomEvent::OpenAtLine(path, 0));
         gs.toggle_tree();
     }
-
-    drop(configs);
 
     loop {
         // handle input events
@@ -89,10 +86,11 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
                                     gs.toggle_tree();
                                 }
                                 GeneralAction::RefreshSettings => {
-                                    let new_key_map = gs.unwrap_or_default(KeyMap::new(), ".keys: ");
-                                    general_key_map = new_key_map.general_key_map();
-                                    tree.key_map = new_key_map.tree_key_map();
-                                    workspace.refresh_cfg(new_key_map.editor_key_map(), &mut gs);
+                                    let (new_general, new_editor_key_map, new_tree_key_map) =
+                                        gs.unwrap_or_default(KeyMap::new(), KEY_MAP).unpack();
+                                    general_key_map = new_general;
+                                    tree.key_map = new_tree_key_map;
+                                    workspace.refresh_cfg(new_editor_key_map, &mut gs);
                                 }
                                 GeneralAction::GoToLinePopup => {
                                     if gs.is_insert() {
