@@ -44,7 +44,7 @@ impl Rect {
     /// Creates floating modal around position (the row within it);
     /// Modal will float around the row (above or below - below is preffered) within Rect;
     /// Minimum height is 3 otherwise the modal will appear above the location;
-    /// Minumum width is 40 otherwise the modal will appear before the location;
+    /// Minumum width is 30 otherwise the modal will appear before the location;
     /// If there is not enough space the rect will be without space height/width = 0;
     #[inline]
     pub fn modal_relative(&self, row_offset: u16, col_offset: u16, mut width: usize, mut height: u16) -> Self {
@@ -63,17 +63,30 @@ impl Rect {
             };
         };
         if (self.width + self.col as usize) < (width + col as usize) {
-            if self.width > 40 + col as usize {
+            if self.width > 30 + col as usize {
                 width = self.width - col as usize;
-            } else if self.width > 40 {
-                col = (self.col + self.width as u16) - 40;
-                width = 40;
+            } else if self.width > 30 {
+                col = (self.col + self.width as u16) - 30;
+                width = 30;
             } else {
                 width = 0;
                 height = 0;
             };
         };
         Rect::new(row, col, width, height)
+    }
+
+    /// Creates floating modal around position (the row within it);
+    /// Modal will float around the row (above or below - below is preffered) within Rect;
+    /// Minimum height is 3 otherwise the modal will appear above the location;
+    /// Minumum width is 30 otherwise the modal will appear before the location;
+    /// If there is not enough space the rect will be without space height/width = 0;
+    #[inline]
+    pub fn modal_absolute(&self, row: u16, col: u16, width: usize, height: u16) -> Self {
+        if row < self.row || col < self.col {
+            return Self { row, col, ..Default::default() };
+        }
+        self.modal_relative(row - self.row, col - self.col, width, height)
     }
 
     pub fn split_horizont_rel(mut self, width: usize) -> (Self, Self) {

@@ -1,14 +1,13 @@
 mod formatting;
-use super::{popup_file_open::OpenFileSelector, PopupInterface};
+use super::{popup_file_open::OpenFileSelector, Command, CommandResult, PopupInterface};
 use crate::{
-    configs::{CONFIG_FOLDER, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
+    configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
     global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::{layout::Rect, state::State, TextField},
     tree::Tree,
     workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use dirs::config_dir;
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 
 pub struct Pallet {
@@ -18,37 +17,6 @@ pub struct Pallet {
     updated: bool,
     rect: Option<Rect>,
     state: State,
-}
-
-struct Command {
-    label: &'static str,
-    result: CommandResult,
-}
-
-impl Command {
-    fn execute(self) -> CommandResult {
-        self.result
-    }
-
-    fn cfg_open(label: &'static str, file_path: &'static str) -> Option<Self> {
-        let mut path = config_dir()?;
-        path.push(CONFIG_FOLDER);
-        path.push(file_path);
-        Some(Command { label, result: CommandResult::Simple(IdiomEvent::OpenAtLine(path, 0).into()) })
-    }
-
-    fn pass_event(label: &'static str, event: IdiomEvent) -> Self {
-        Command { label, result: CommandResult::Simple(event.into()) }
-    }
-
-    const fn access_edit(label: &'static str, cb: fn(&mut Workspace, &mut Tree)) -> Self {
-        Command { label, result: CommandResult::Complex(cb) }
-    }
-}
-
-enum CommandResult {
-    Simple(PopupMessage),
-    Complex(fn(&mut Workspace, &mut Tree)),
 }
 
 impl PopupInterface for Pallet {

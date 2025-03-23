@@ -1,4 +1,5 @@
 use super::{GlobalState, PopupMessage};
+use crate::configs::{EditorAction, TreeAction};
 use crate::lsp::TreeDiagnostics;
 use crate::popups::{
     popup_replace::ReplacePopup, popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges, PopupInterface,
@@ -14,6 +15,10 @@ use std::path::PathBuf;
 pub enum IdiomEvent {
     PopupAccess,
     PopupAccessOnce,
+    EditorActionCall(EditorAction),
+    EditorActionCallOnce(EditorAction),
+    TreeActionCall(TreeAction),
+    TreeActionCallOnce(TreeAction),
     NewPopup(fn() -> Box<dyn PopupInterface>),
     OpenAtLine(PathBuf, usize),
     OpenAtSelect(PathBuf, (CursorPosition, CursorPosition)),
@@ -72,6 +77,24 @@ impl IdiomEvent {
             IdiomEvent::PopupAccessOnce => {
                 gs.popup.component_access(ws, tree);
                 gs.clear_popup();
+            }
+            IdiomEvent::EditorActionCall(action) => {
+                if let Some(editor) = ws.get_active() {
+                    let _ = editor.map(action, gs);
+                }
+            }
+            IdiomEvent::EditorActionCallOnce(action) => {
+                gs.clear_popup();
+                if let Some(editor) = ws.get_active() {
+                    editor.map(action, gs);
+                }
+            }
+            IdiomEvent::TreeActionCall(action) => {
+                tree.map_action(action, gs);
+            }
+            IdiomEvent::TreeActionCallOnce(action) => {
+                gs.clear_popup();
+                tree.map_action(action, gs);
             }
             IdiomEvent::NewPopup(builder) => {
                 gs.clear_popup();

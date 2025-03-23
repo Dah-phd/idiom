@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // EDITOR
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EditorAction {
     Char(char),
     NewLine,
@@ -314,7 +314,7 @@ impl Default for GeneralUserKeyMap {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TreeAction {
     Up,
     Down,

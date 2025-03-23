@@ -460,9 +460,26 @@ impl Editor {
     }
 
     pub fn mouse_cursor(&mut self, mut position: CursorPosition) {
-        self.cursor.select_drop();
         position.line += self.cursor.at_line;
         position.char = position.char.saturating_sub(self.line_number_offset + 1);
+        if self.cursor.select_is_none() && self.cursor == position {
+            self.select_token();
+            return;
+        }
+        self.cursor.select_drop();
+        self.cursor.set_cursor_checked(position, &self.content);
+    }
+
+    pub fn mouse_menu_setup(&mut self, mut position: CursorPosition) {
+        position.line += self.cursor.at_line;
+        position.char = position.char.saturating_sub(self.line_number_offset + 1);
+        match self.cursor.select_get() {
+            Some((from, to)) if from >= position && position >= to => {
+                return;
+            }
+            Some(..) => self.cursor.select_drop(),
+            None => (),
+        }
         self.cursor.set_cursor_checked(position, &self.content);
     }
 
