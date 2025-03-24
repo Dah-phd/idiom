@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use crate::configs::{EditorAction, TreeAction};
 use crate::global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage};
 use crate::popups::{Command, CommandResult, PopupInterface};
@@ -47,27 +45,18 @@ pub fn menu_context_editor(
     Box::new(menu)
 }
 
-// TODO implement all fields
-// TODO use the derived path to push it to clipboard
-// Cut
-// Copy
-// Paste
-// Copy Path
-// Copy Relative Path
-// Rename
-// Delete
-pub fn menu_context_tree(position: CursorPosition, screen: Rect, _path: Option<PathBuf>) -> Box<ContextMenuTree<5>> {
+pub fn menu_context_tree(position: CursorPosition, screen: Rect) -> Box<ContextMenuTree<7>> {
     let row_offset = position.line as u16;
     let col_offset = position.char as u16;
-    let modal_screen = screen.modal_relative(row_offset, col_offset, 30, 5);
+    let modal_screen = screen.modal_relative(row_offset, col_offset, 30, 7);
 
     let menu = ContextMenuTree {
         commands: [
             Command::pass_event("Cut", IdiomEvent::TreeActionCallOnce(TreeAction::CutFile)),
             Command::pass_event("Copy", IdiomEvent::TreeActionCallOnce(TreeAction::CopyFile)),
             Command::pass_event("Paste", IdiomEvent::TreeActionCallOnce(TreeAction::Paste)),
-            // Command::pass_event("Copy Path", IdiomEvent::TreeActionCallOnce(TreeAction::Paste)),
-            // Command::pass_event("Copy Relative Path", IdiomEvent::TreeActionCallOnce(TreeAction::CopyFile)),
+            Command::pass_event("Copy Path", IdiomEvent::TreeActionCallOnce(TreeAction::CopyPath)),
+            Command::pass_event("Copy Relative Path", IdiomEvent::TreeActionCallOnce(TreeAction::CopyPathRelative)),
             Command::pass_event("Rename", IdiomEvent::TreeActionCallOnce(TreeAction::Rename)),
             Command::pass_event("Delete", IdiomEvent::TreeActionCallOnce(TreeAction::Delete)),
         ],

@@ -323,6 +323,8 @@ pub enum TreeAction {
     Delete,
     Rename,
     NewFile,
+    CopyPath,
+    CopyPathRelative,
     CopyFile,
     MarkCopyFile,
     CutFile,
@@ -342,6 +344,8 @@ pub struct TreeUserKeyMap {
     delete: String,
     rename: String,
     new_file: String,
+    copy_path: String,
+    copy_path_relative: String,
     copy_file: String,
     mark_copy_file: String,
     cut_file: String,
@@ -361,6 +365,8 @@ impl Default for TreeUserKeyMap {
             delete: format!("{SHIFT} && {DELETE}"),
             rename: format!("{F}2"),
             new_file: format!("{CTRL} && n"),
+            copy_path: format!("{ALT} && c"),
+            copy_path_relative: format!("{ALT} && {SHIFT} && c"),
             copy_file: format!("{CTRL} && c || {CTRL} && {SHIFT} && c"),
             mark_copy_file: String::from('c'),
             cut_file: format!("{CTRL} && x"),
@@ -382,6 +388,8 @@ impl From<TreeUserKeyMap> for HashMap<KeyEvent, TreeAction> {
         insert_key_event(&mut hash, &val.delete, TreeAction::Delete);
         insert_key_event(&mut hash, &val.rename, TreeAction::Rename);
         insert_key_event(&mut hash, &val.new_file, TreeAction::NewFile);
+        insert_key_event(&mut hash, &val.copy_path_relative, TreeAction::CopyPathRelative);
+        insert_key_event(&mut hash, &val.copy_path, TreeAction::CopyPath);
         insert_key_event(&mut hash, &val.copy_file, TreeAction::CopyFile);
         insert_key_event(&mut hash, &val.mark_copy_file, TreeAction::MarkCopyFile);
         insert_key_event(&mut hash, &val.cut_file, TreeAction::CutFile);

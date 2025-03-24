@@ -139,8 +139,9 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
             }
             if let Some(mut position) = gs.tree_area.relative_position(event.row, event.column) {
                 position.line += 1;
-                let path = tree.mouse_menu_setup(position.line);
-                gs.popup(menu_context_tree(position, gs.screen_rect, path));
+                if tree.mouse_menu_setup_select(position.line) {
+                    gs.popup(menu_context_tree(position, gs.screen_rect));
+                }
             }
         }
         MouseEventKind::Drag(MouseButton::Left) => {

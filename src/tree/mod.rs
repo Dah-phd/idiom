@@ -163,6 +163,24 @@ impl Tree {
                     None => gs.popup(create_root_file_popup()),
                 };
             }
+            TreeAction::CopyPath => match self.selected_path.canonicalize() {
+                Ok(path) => {
+                    gs.success("Copied path ...");
+                    gs.clipboard.push(path.display().to_string());
+                }
+                Err(error) => {
+                    gs.error(format!("COPIED AS IS (Path resolution error): {error}"));
+                }
+            },
+            TreeAction::CopyPathRelative => match to_relative_path(&self.selected_path) {
+                Ok(path) => {
+                    gs.success("Copied relative path ...");
+                    gs.clipboard.push(path.display().to_string());
+                }
+                Err(error) => {
+                    gs.error(format!("COPIED AS IS (Path resolution error): {error}"));
+                }
+            },
             TreeAction::CopyFile => {
                 if self.tree.path() != &self.selected_path {
                     self.tree_clipboard.force_copy(self.selected_path.to_owned());
@@ -274,16 +292,16 @@ impl Tree {
         None
     }
 
-    pub fn mouse_menu_setup(&mut self, idx: usize) -> Option<PathBuf> {
+    pub fn mouse_menu_setup_select(&mut self, idx: usize) -> bool {
         if self.tree.len() > idx {
             self.state.selected = idx.saturating_sub(1) + self.state.at_line;
             if let Some(selected) = self.tree.get_mut_from_inner(self.state.selected) {
                 self.rebuild = true;
                 self.selected_path = selected.path().to_owned();
-                return Some(self.selected_path.clone());
+                return true;
             };
         }
-        None
+        false
     }
 
     pub fn select_up(&mut self, gs: &mut GlobalState) {
