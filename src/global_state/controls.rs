@@ -137,8 +137,9 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                     gs.popup(menu_context_editor(position, gs.editor_area, accent_style));
                 }
             }
-            if let Some(position) = gs.tree_area.relative_position(event.row, event.column) {
-                let path = tree.mouse_menu_setup(position.line + 1);
+            if let Some(mut position) = gs.tree_area.relative_position(event.row, event.column) {
+                position.line += 1;
+                let path = tree.mouse_menu_setup(position.line);
                 gs.popup(menu_context_tree(position, gs.screen_rect, path));
             }
         }
