@@ -474,7 +474,7 @@ impl Editor {
         position.line += self.cursor.at_line;
         position.char = position.char.saturating_sub(self.line_number_offset + 1);
         match self.cursor.select_get() {
-            Some((from, to)) if from >= position && position >= to => {
+            Some((from, to)) if from <= position && position <= to => {
                 return;
             }
             Some(..) => self.cursor.select_drop(),
