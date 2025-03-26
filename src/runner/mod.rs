@@ -2,7 +2,7 @@ mod autocomplete;
 mod commands;
 mod components;
 
-use crate::configs::{EditorConfigs, KeyMap, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE};
+use crate::configs::{EditorConfigs, KeyMap, Theme, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE};
 use crate::error::IdiomResult;
 use crate::global_state::GlobalState;
 use crate::render::layout::BORDERS;
@@ -211,12 +211,13 @@ impl EditorTerminal {
             }
         }
         if let Some(cfg) = arg.trim().strip_prefix("default") {
-            match match cfg.trim() {
+            let default_restore = match cfg.trim() {
                 "keymap" => overwrite_cfg::<KeyMap>(KEY_MAP),
                 "config" => overwrite_cfg::<EditorConfigs>(EDITOR_CFG_FILE),
-                "theme" => overwrite_cfg::<crate::configs::Theme>(THEME_FILE),
+                "theme" => overwrite_cfg::<Theme>(THEME_FILE),
                 _ => return Ok(()),
-            } {
+            };
+            match default_restore {
                 Ok(msg) => gs.success(msg),
                 Err(err) => gs.error(err.to_string()),
             };

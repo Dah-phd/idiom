@@ -27,24 +27,19 @@ pub fn line_with_select(
     ctx: &mut LineContext,
     backend: &mut impl BackendProtocol,
 ) {
-    let line_width = match lines.next() {
-        Some(line) => ctx.setup_line(line, backend),
-        None => return,
-    };
+    let Some(line) = lines.next() else { return };
+    let line_width = ctx.setup_line(line, backend);
     let mut remaining_width = line_width;
     let select_color = ctx.lexer.theme.selected;
+
     for (idx, (text, current_width)) in CharLimitedWidths::new(&text.content, 3).enumerate() {
         if remaining_width < current_width {
+            let Some(line) = lines.next() else { return };
+            let reset_style = backend.get_style();
+            backend.reset_style();
+            ctx.wrap_line(line, backend);
+            backend.set_style(reset_style);
             remaining_width = line_width;
-            match lines.next() {
-                Some(line) => {
-                    let reset_style = backend.get_style();
-                    backend.reset_style();
-                    ctx.wrap_line(line, backend);
-                    backend.set_style(reset_style)
-                }
-                None => return,
-            }
         }
         remaining_width -= current_width;
         if select.start == idx {
@@ -79,11 +74,9 @@ pub fn basic(
     ctx: &mut LineContext,
     backend: &mut Backend,
 ) {
+    let Some(line) = lines.next() else { return };
+    let line_width = ctx.setup_line(line, backend);
     let cursor_idx = ctx.cursor_char();
-    let line_width = match lines.next() {
-        Some(line) => ctx.setup_line(line, backend),
-        None => return,
-    };
     let mut content = CharLimitedWidths::new(&text.content, 3);
     let mut idx = 0;
     let mut remaining_width = line_width;
@@ -106,11 +99,9 @@ pub fn basic(
 
     for (text, current_width) in content {
         if remaining_width < current_width {
+            let Some(line) = lines.next() else { break };
+            ctx.wrap_line(line, backend);
             remaining_width = line_width;
-            match lines.next() {
-                Some(line) => ctx.wrap_line(line, backend),
-                None => break,
-            }
         }
         remaining_width -= current_width;
         if cursor_idx == idx {
@@ -135,11 +126,9 @@ pub fn select(
     ctx: &mut LineContext,
     backend: &mut Backend,
 ) {
+    let Some(line) = lines.next() else { return };
+    let line_width = ctx.setup_line(line, backend);
     let cursor_idx = ctx.cursor_char();
-    let line_width = match lines.next() {
-        Some(line) => ctx.setup_line(line, backend),
-        None => return,
-    };
     let select_color = ctx.lexer.theme.selected;
     let mut content = CharLimitedWidths::new(&text.content, 3);
     let mut idx = 0;
@@ -166,18 +155,16 @@ pub fn select(
 
     for (text, current_width) in content {
         if remaining_width < current_width {
+            let Some(line) = lines.next() else { break };
+            let reset_style = backend.get_style();
+            backend.reset_style();
+            ctx.wrap_line(line, backend);
+            backend.set_style(reset_style);
             remaining_width = line_width;
-            match lines.next() {
-                Some(line) => {
-                    let reset_style = backend.get_style();
-                    backend.reset_style();
-                    ctx.wrap_line(line, backend);
-                    backend.set_style(reset_style)
-                }
-                None => break,
-            }
         }
+
         remaining_width -= current_width;
+
         if select.start == idx {
             backend.set_bg(Some(select_color));
         }
