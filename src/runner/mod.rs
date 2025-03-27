@@ -7,9 +7,8 @@ use crate::error::IdiomResult;
 use crate::global_state::GlobalState;
 use crate::render::layout::BORDERS;
 use crate::render::TextField;
-use crate::runner::commands::load_file;
 use autocomplete::try_autocomplete;
-use commands::{load_cfg, overwrite_cfg, Terminal};
+use commands::{overwrite_cfg, Terminal};
 use components::CmdHistory;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::sync::{Arc, Mutex};
@@ -182,13 +181,6 @@ impl EditorTerminal {
 
     pub fn idiom_command_handler(&mut self, arg: &str, gs: &mut GlobalState) -> IdiomResult<()> {
         if arg.trim() == "help" {
-            self.logs.push("load => load config files, available options:".to_owned());
-            self.logs.push("    keymap => open keymap config file.".to_owned());
-            self.logs.push("    config => open editor config file.".to_owned());
-            self.logs.push("    theme => open theme config file.".to_owned());
-            self.logs.push("    ${file_path} => loads path into editor.".to_owned());
-            self.logs.push("Example: &i load keymap".to_owned());
-            self.logs.push("".to_owned());
             self.logs.push("default => returns config file to default".to_owned());
             self.logs.push("    possible files keymap, config".to_owned());
             self.logs.push("Example: &i default keymap".to_owned());
@@ -196,18 +188,6 @@ impl EditorTerminal {
         if arg.trim() == "loc" {
             if let Some(terminal) = self.terminal.as_mut() {
                 terminal.push_command(String::from("git ls-files | xargs wc -l"))?;
-            }
-        }
-        if let Some(cfg) = arg.trim().strip_prefix("load") {
-            if let Some(msg) = match cfg.trim() {
-                "keymap" => load_cfg(KEY_MAP, gs),
-                "config" => load_cfg(EDITOR_CFG_FILE, gs),
-                "theme" => load_cfg(THEME_FILE, gs),
-                any => load_file(any, gs),
-            } {
-                self.logs.push(msg);
-            } else {
-                gs.toggle_terminal(self);
             }
         }
         if let Some(cfg) = arg.trim().strip_prefix("default") {

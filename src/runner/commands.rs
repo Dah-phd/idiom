@@ -2,15 +2,12 @@ use portable_pty::{native_pty_system, Child, CommandBuilder, PtyPair, PtySize};
 use serde::Serialize;
 use std::{
     io::{BufReader, Read, Write},
-    path::PathBuf,
     sync::{Arc, Mutex},
 };
 use strip_ansi_escapes::strip_str;
 use tokio::task::JoinHandle;
 
 use crate::error::{IdiomError, IdiomResult};
-use crate::global_state::IdiomEvent;
-use crate::{configs::CONFIG_FOLDER, global_state::GlobalState};
 use dirs::config_dir;
 
 pub struct Terminal {
@@ -114,30 +111,6 @@ impl Drop for Terminal {
         self.output_handler.abort();
         let _ = self.child.kill();
     }
-}
-
-pub fn load_file(f: &str, gs: &mut GlobalState) -> Option<String> {
-    let path = PathBuf::from(f);
-    match path.canonicalize() {
-        Ok(path) => {
-            gs.event.push(IdiomEvent::OpenAtLine(path, 0));
-            None
-        }
-        Err(err) => Some(err.to_string()),
-    }
-}
-
-pub fn load_cfg(f: &str, gs: &mut GlobalState) -> Option<String> {
-    let mut path = match config_dir() {
-        Some(path) => path,
-        None => {
-            return Some("Unable to resolve config dir".to_owned());
-        }
-    };
-    path.push(CONFIG_FOLDER);
-    path.push(f);
-    gs.event.push(IdiomEvent::OpenAtLine(path, 0));
-    None
 }
 
 pub fn overwrite_cfg<T: Default + Serialize>(f: &str) -> IdiomResult<String> {
