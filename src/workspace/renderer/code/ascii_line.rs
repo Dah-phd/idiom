@@ -86,8 +86,8 @@ pub fn ascii_line_with_select(
                 }
                 None => match iter_tokens.next() {
                     None => {
-                        counter = usize::MAX;
                         backend.set_style(reset_style);
+                        counter = usize::MAX;
                     }
                     Some(token) => {
                         if token.delta_start > last_len {

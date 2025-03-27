@@ -49,10 +49,6 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut Backend) {
     for text in line.chars() {
         if counter == 0 {
             match lined_up.take() {
-                Some(style) => {
-                    backend.set_style(style);
-                    counter = last_len;
-                }
                 None => match iter_tokens.next() {
                     None => {
                         backend.reset_style();
@@ -70,6 +66,10 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut Backend) {
                         last_len = token.len;
                     }
                 },
+                Some(style) => {
+                    backend.set_style(style);
+                    counter = last_len;
+                }
             }
         }
         counter = counter.saturating_sub(1);
@@ -118,10 +118,6 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backen
         }
         if counter == 0 {
             match lined_up.take() {
-                Some(style) => {
-                    backend.update_style(style);
-                    counter = last_len;
-                }
                 None => match iter_tokens.next() {
                     None => {
                         backend.set_style(reset_style);
@@ -139,6 +135,10 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backen
                         last_len = token.len;
                     }
                 },
+                Some(style) => {
+                    backend.update_style(style);
+                    counter = last_len;
+                }
             }
         }
         counter = counter.saturating_sub(1);
@@ -187,10 +187,6 @@ pub fn partial(line: &mut EditorLine, ctx: &LineContext, line_width: usize, back
     for text in content.chars().take(line_width.saturating_sub(reduction)) {
         if counter == 0 {
             match lined_up.take() {
-                Some(style) => {
-                    backend.set_style(style);
-                    counter = last_len;
-                }
                 None => match tokens.next() {
                     None => {
                         backend.reset_style();
@@ -208,6 +204,10 @@ pub fn partial(line: &mut EditorLine, ctx: &LineContext, line_width: usize, back
                         last_len = token.len;
                     }
                 },
+                Some(style) => {
+                    backend.set_style(style);
+                    counter = last_len;
+                }
             }
         }
         counter = counter.saturating_sub(1);
@@ -281,10 +281,6 @@ pub fn partial_select(
 
         if counter == 0 {
             match lined_up.take() {
-                Some(style) => {
-                    backend.update_style(style);
-                    counter = last_len;
-                }
                 None => match tokens.next() {
                     None => {
                         counter = usize::MAX;
@@ -302,6 +298,10 @@ pub fn partial_select(
                         last_len = token.len;
                     }
                 },
+                Some(style) => {
+                    backend.update_style(style);
+                    counter = last_len;
+                }
             }
         }
         counter = counter.saturating_sub(1);

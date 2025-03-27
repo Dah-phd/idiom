@@ -89,9 +89,8 @@ fn render_with_select(
         return;
     }
 
-    let max_width = match complex_line::complex_line_with_select(code, line_width, select, ctx, backend) {
-        Some(remaining) => remaining,
-        None => return,
+    let Some(max_width) = complex_line::complex_line_with_select(code, line_width, select, ctx, backend) else {
+        return;
     };
 
     if let Some(diagnostics) = code.diagnostics.as_ref() {
@@ -123,9 +122,8 @@ fn render_no_select(
         return;
     }
 
-    let max_width = match complex_line::complex_line(code, line_width, ctx, backend) {
-        Some(remaining) => remaining,
-        None => return,
+    let Some(max_width) = complex_line::complex_line(code, line_width, ctx, backend) else {
+        return;
     };
 
     if let Some(diagnostics) = code.diagnostics.as_ref() {

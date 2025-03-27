@@ -54,10 +54,6 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut Backend) {
     for text in line.chars() {
         if counter == 0 {
             match lined_up.take() {
-                Some(style) => {
-                    backend.set_style(style);
-                    counter = last_len - 1;
-                }
                 None => match tokens.next() {
                     None => {
                         backend.reset_style();
@@ -75,6 +71,10 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut Backend) {
                         last_len = token.len;
                     }
                 },
+                Some(style) => {
+                    backend.set_style(style);
+                    counter = last_len - 1;
+                }
             }
         } else {
             counter = counter.saturating_sub(char_position(text));
@@ -103,6 +103,7 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backen
     let mut lined_up = None;
     let mut idx = 0;
     let cursor_idx = ctx.cursor_char();
+
     if let Some(token) = tokens.next() {
         if token.delta_start == 0 {
             backend.set_style(token.style);
@@ -113,6 +114,7 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backen
         }
         last_len = token.len;
     };
+
     for text in line.chars() {
         if select.start == idx {
             backend.set_bg(Some(select_color));
@@ -124,10 +126,6 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backen
         }
         if counter == 0 {
             match lined_up.take() {
-                Some(style) => {
-                    backend.update_style(style);
-                    counter = last_len - 1;
-                }
                 None => match tokens.next() {
                     None => {
                         backend.set_style(reset_style);
@@ -145,6 +143,10 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backen
                         last_len = token.len;
                     }
                 },
+                Some(style) => {
+                    backend.update_style(style);
+                    counter = last_len - 1;
+                }
             }
         } else {
             counter = counter.saturating_sub(char_position(text));

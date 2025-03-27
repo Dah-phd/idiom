@@ -20,6 +20,7 @@ pub fn complex_line(
     let mut last_len = 0;
     let mut lined_up = None;
     let char_position = ctx.lexer.char_lsp_pos;
+
     if let Some(token) = iter_tokens.next() {
         if token.delta_start == 0 {
             counter = token.len;
@@ -30,6 +31,7 @@ pub fn complex_line(
         }
         last_len = token.len;
     };
+
     for (text, width) in CharLimitedWidths::new(&code.content, 3) {
         if line_width <= width {
             backend.reset_style();
@@ -63,8 +65,8 @@ pub fn complex_line(
                 },
             }
         }
-        counter = counter.saturating_sub(char_position(text));
 
+        counter = counter.saturating_sub(char_position(text));
         backend.print(text);
     }
     backend.reset_style();
@@ -85,6 +87,7 @@ pub fn complex_line_with_select(
     let mut counter = 0;
     let mut last_len = 0;
     let mut lined_up = None;
+
     if let Some(token) = iter_tokens.next() {
         if token.delta_start == 0 {
             counter = token.len;
@@ -95,6 +98,7 @@ pub fn complex_line_with_select(
         }
         last_len = token.len;
     };
+
     for (idx, (text, width)) in CharLimitedWidths::new(&code.content, 3).enumerate() {
         if line_width <= width {
             backend.reset_style();
@@ -113,10 +117,6 @@ pub fn complex_line_with_select(
         }
         if counter == 0 {
             match lined_up.take() {
-                Some(style) => {
-                    backend.update_style(style);
-                    counter = last_len;
-                }
                 None => match iter_tokens.next() {
                     None => {
                         counter = usize::MAX;
@@ -134,12 +134,17 @@ pub fn complex_line_with_select(
                         last_len = token.len;
                     }
                 },
+                Some(style) => {
+                    backend.update_style(style);
+                    counter = last_len;
+                }
             }
         }
-        counter = counter.saturating_sub(char_position(text));
 
+        counter = counter.saturating_sub(char_position(text));
         backend.print(text);
     }
+
     backend.reset_style();
     Some(line_width)
 }
