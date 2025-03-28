@@ -5,7 +5,7 @@ use crate::render::backend::{Backend, StyleExt};
 use crate::render::layout::Line;
 use crate::{runner::EditorTerminal, tree::Tree, workspace::Workspace};
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use crossterm::style::{Color, ContentStyle};
+use crossterm::style::{Color, ContentStyle, Stylize};
 
 const INSERT_SPAN: &str = "  --INSERT--  ";
 const SELECT_SPAN: &str = "  --SELECT--  ";
@@ -140,7 +140,8 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
             if let Some(mut position) = gs.tree_area.relative_position(event.row, event.column) {
                 position.line += 1;
                 if tree.mouse_menu_setup_select(position.line) {
-                    gs.popup(menu_context_tree(position, gs.screen_rect));
+                    let accent_style = gs.theme.accent_style.reverse();
+                    gs.popup(menu_context_tree(position, gs.screen_rect, accent_style));
                 }
             }
         }

@@ -45,7 +45,11 @@ pub fn menu_context_editor(
     Box::new(menu)
 }
 
-pub fn menu_context_tree(position: CursorPosition, screen: Rect) -> Box<ContextMenuTree<7>> {
+pub fn menu_context_tree(
+    position: CursorPosition,
+    screen: Rect,
+    accent_style: ContentStyle,
+) -> Box<ContextMenuTree<7>> {
     let row_offset = position.line as u16;
     let col_offset = position.char as u16;
     let modal_screen = screen.modal_relative(row_offset, col_offset, 30, 7);
@@ -62,9 +66,9 @@ pub fn menu_context_tree(position: CursorPosition, screen: Rect) -> Box<ContextM
         ],
         modal_screen,
         access_cb: None,
-        accent_style: ContentStyle::default(),
+        accent_style,
         rendered: true,
-        state: State::new(),
+        state: State::with_highlight(ContentStyle::default()),
     };
     Box::new(menu)
 }
