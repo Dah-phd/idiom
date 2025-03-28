@@ -27,7 +27,7 @@ Python should work for the most part with jedi, but the interaction is not well 
 - Linux Mint
 
 ## TODO
-- fix tracking from closed tree paths
+- fix tracking edgecase where file is changed in by other app in select
 - write tests
 - lsp server cold start, maybe? "jedi-language server" starts slow
 
