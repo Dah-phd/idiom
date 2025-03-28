@@ -84,10 +84,7 @@ impl Tree {
         let base_style = gs.theme.accent_style;
         let select_base_style = self.state.highlight.with_bg(gs.theme.accent_background);
         for (idx, tree_path) in iter.enumerate().skip(self.state.at_line) {
-            let mut line = match lines.next() {
-                Some(line) => line,
-                None => return,
-            };
+            let Some(mut line) = lines.next() else { return };
             let style = match idx == self.state.selected {
                 true => select_base_style,
                 false => base_style,
@@ -254,11 +251,11 @@ impl Tree {
     }
 
     fn shrink(&mut self, gs: &mut GlobalState) {
-        if let Some(tree_path) = self.tree.get_mut_from_inner(self.state.selected) {
-            if let Err(err) = self.watcher.stop_watch(tree_path.path()) {
+        if let Some(TreePath::Folder { path, tree, .. }) = self.tree.get_mut_from_inner(self.state.selected) {
+            if let Err(err) = self.watcher.stop_watch(path) {
                 gs.error(err.to_string());
             };
-            tree_path.take_tree();
+            *tree = None;
             self.rebuild = true;
         }
     }
@@ -431,6 +428,11 @@ impl Tree {
     pub fn select_by_path(&mut self, path: &PathBuf) -> IdiomResult<()> {
         let rel_result = (self.path_parser)(path);
         let path = rel_result.as_ref().unwrap_or(path);
+
+        if !path.starts_with(self.tree.path()) {
+            return Ok(());
+        }
+
         match self.tree.expand_contained(path, &mut self.watcher) {
             Ok(true) => {
                 self.selected_path.clone_from(path);

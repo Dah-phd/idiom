@@ -136,23 +136,21 @@ impl PopupInterface for Pallet {
 
 impl Pallet {
     pub fn new() -> Box<Self> {
-        let mut commands = vec![
-            (0, Command::pass_event("Open file", IdiomEvent::NewPopup(OpenFileSelector::boxed))),
-            (0, Command::access_edit("UPPERCASE", formatting::uppercase)),
-            (0, Command::access_edit("LOWERCASE", formatting::lowercase)),
-            (0, Command::pass_event("Open editor error log", IdiomEvent::OpenLSPErrors)),
-        ];
-        commands.extend(
-            [
-                Command::cfg_open("open editor configs", EDITOR_CFG_FILE),
-                Command::cfg_open("open keymap config", KEY_MAP),
-                Command::cfg_open("open theme config", THEME_FILE),
-                Command::cfg_open("open UI theme config", THEME_UI),
-            ]
-            .into_iter()
-            .flatten()
-            .map(|cmd| (0, cmd)),
-        );
+        let commands = [
+            Some(Command::pass_event("Open file", IdiomEvent::NewPopup(OpenFileSelector::boxed))),
+            Some(Command::access_edit("UPPERCASE", formatting::uppercase)),
+            Some(Command::access_edit("LOWERCASE", formatting::lowercase)),
+            Command::cfg_open("Open editor configs", EDITOR_CFG_FILE),
+            Command::cfg_open("Open keymap config", KEY_MAP),
+            Command::cfg_open("Open theme config", THEME_FILE),
+            Command::cfg_open("Open UI theme config", THEME_UI),
+            Some(Command::pass_event("Open editor error log", IdiomEvent::OpenLSPErrors)),
+        ]
+        .into_iter()
+        .flatten()
+        .map(|cmd| (0, cmd))
+        .collect();
+
         Box::new(Pallet {
             commands,
             access_cb: None,
