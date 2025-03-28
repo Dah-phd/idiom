@@ -186,6 +186,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
                             }
                         }
                         LSPResponse::Hover(hover) => {
+                            lexer.modal_rect = None;
                             if let Some(modal) = lexer.modal.as_mut() {
                                 modal.hover_map(hover, &lexer.theme);
                             } else {
@@ -193,6 +194,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
                             }
                         }
                         LSPResponse::SignatureHelp(signature) => {
+                            lexer.modal_rect = None;
                             if let Some(modal) = lexer.modal.as_mut() {
                                 modal.signature_map(signature, &lexer.theme);
                             } else {

@@ -37,18 +37,7 @@ pub struct Workspace {
 }
 
 impl Workspace {
-    pub async fn new(key_map: EditorKeyMap, base_tree_paths: Vec<String>, gs: &mut GlobalState) -> Self {
-        let mut base_config = gs.unwrap_or_default(EditorConfigs::new(), ".config: ");
-        let mut lsp_servers = HashMap::new();
-        for (ft, lsp_cmd) in base_config.derive_lsp_preloads(base_tree_paths, gs) {
-            gs.success(format!("Preloading {lsp_cmd}"));
-            match LSP::new(lsp_cmd, ft).await {
-                Ok(lsp) => {
-                    lsp_servers.insert(ft, lsp);
-                }
-                Err(err) => gs.error(format!("Preload filed: {err}")),
-            }
-        }
+    pub async fn new(key_map: EditorKeyMap, base_config: EditorConfigs, lsp_servers: HashMap<FileType, LSP>) -> Self {
         let tab_style = ContentStyle::fg(Color::DarkYellow);
         Self { editors: TrackedList::new(), base_config, key_map, lsp_servers, map_callback: map_editor, tab_style }
     }
@@ -442,8 +431,8 @@ impl Workspace {
         }
     }
 
-    pub fn refresh_cfg(&mut self, new_key_map: EditorKeyMap, gs: &mut GlobalState) {
-        self.key_map = new_key_map;
+    pub fn refresh_cfg(&mut self, new_editor_key_map: EditorKeyMap, gs: &mut GlobalState) {
+        self.key_map = new_editor_key_map;
         gs.unwrap_or_default(self.base_config.refresh(), ".config: ");
         for editor in self.editors.iter_mut() {
             editor.refresh_cfg(&self.base_config);
@@ -545,4 +534,4 @@ pub fn add_editor_from_data(
 }
 
 #[cfg(test)]
-mod tests;
+pub mod tests;

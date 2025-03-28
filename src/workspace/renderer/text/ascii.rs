@@ -10,22 +10,16 @@ use crossterm::style::ContentStyle;
 use std::ops::Range;
 
 pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut impl BackendProtocol) {
-    let line_width = match lines.next() {
-        Some(line) => ctx.setup_line(line, backend),
-        None => return,
-    };
+    let Some(line) = lines.next() else { return };
+    let line_width = ctx.setup_line(line, backend);
     let mut chunks = ByteChunks::new(&text.content, line_width);
-    match chunks.next() {
-        Some(chunk) => backend.print(chunk.text),
-        None => return,
-    }
+
+    let Some(chunk) = chunks.next() else { return };
+    backend.print(chunk.text);
+
     for chunk in chunks {
-        match lines.next() {
-            None => return,
-            Some(line) => {
-                ctx.wrap_line(line, backend);
-            }
-        }
+        let Some(line) = lines.next() else { return };
+        ctx.wrap_line(line, backend);
         backend.print(chunk.text);
     }
 }
@@ -37,28 +31,25 @@ pub fn line_with_select(
     ctx: &mut LineContext,
     backend: &mut impl BackendProtocol,
 ) {
-    let line_width = match lines.next() {
-        Some(line) => ctx.setup_line(line, backend),
-        None => return,
-    };
+    let Some(line) = lines.next() else { return };
+    let line_width = ctx.setup_line(line, backend);
+
     if text.char_len == 0 {
         backend.print_styled(" ", ContentStyle::bg(ctx.lexer.theme.selected));
         return;
     }
+
     let mut line_end = line_width;
     let select_color = ctx.lexer.theme.selected;
+
     for (idx, text) in text.content.chars().enumerate() {
         if idx == line_end {
+            let Some(line) = lines.next() else { return };
+            let reset_style = backend.get_style();
+            backend.reset_style();
+            ctx.wrap_line(line, backend);
+            backend.set_style(reset_style);
             line_end += line_width;
-            match lines.next() {
-                Some(line) => {
-                    let reset_style = backend.get_style();
-                    backend.reset_style();
-                    ctx.wrap_line(line, backend);
-                    backend.set_style(reset_style)
-                }
-                None => return,
-            }
         }
         if select.start == idx {
             backend.set_bg(Some(select_color));
@@ -95,13 +86,9 @@ pub fn basic(text: &mut EditorLine, skip: usize, lines: &mut RectIter, ctx: &mut
     let mut line_end = line_width + idx;
     for text in text.content.chars().skip(idx) {
         if idx == line_end {
+            let Some(line) = lines.next() else { break };
+            ctx.wrap_line(line, backend);
             line_end += line_width;
-            match lines.next() {
-                Some(line) => {
-                    ctx.wrap_line(line, backend);
-                }
-                None => break,
-            }
         }
         if cursor_idx == idx {
             backend.print_styled(text, ContentStyle::reversed())
@@ -125,29 +112,25 @@ pub fn select(
     ctx: &mut LineContext,
     backend: &mut Backend,
 ) {
+    let Some(line) = lines.next() else { return };
+    let line_width = ctx.setup_line(line, backend);
     let cursor_idx = ctx.cursor_char();
-    let line_width = match lines.next() {
-        Some(line) => ctx.setup_line(line, backend),
-        None => return,
-    };
     let select_color = ctx.lexer.theme.selected;
     let mut idx = skip * line_width;
     let mut line_end = line_width + idx;
+
     if select.start < idx && idx < select.end {
         backend.set_bg(Some(select_color));
     }
+
     for text in text.content.chars().skip(idx) {
         if idx == line_end {
+            let Some(line) = lines.next() else { break };
+            let reset_style = backend.get_style();
+            backend.reset_style();
+            ctx.wrap_line(line, backend);
+            backend.set_style(reset_style);
             line_end += line_width;
-            match lines.next() {
-                Some(line) => {
-                    let reset_style = backend.get_style();
-                    backend.reset_style();
-                    ctx.wrap_line(line, backend);
-                    backend.set_style(reset_style)
-                }
-                None => break,
-            }
         }
         if select.start == idx {
             backend.set_bg(Some(select_color));

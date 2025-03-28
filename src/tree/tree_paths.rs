@@ -47,7 +47,7 @@ impl TreePath {
         })
     }
 
-    pub fn render_styled(&self, char_offset: usize, line: Line, mut style: ContentStyle, backend: &mut Backend) {
+    pub fn render(&self, char_offset: usize, line: Line, base_style: ContentStyle, backend: &mut Backend) {
         let (display, diagnostic) = match self {
             TreePath::File { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
             TreePath::Folder { display, diagnostic, tree: Some(..), .. } => {
@@ -56,25 +56,9 @@ impl TreePath {
             TreePath::Folder { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
         };
         match diagnostic {
-            DiagnosticType::Err => style.set_fg(Some(ERR)),
-            DiagnosticType::Warn => style.set_fg(Some(WAR)),
-            _ => (),
-        }
-        line.render_styled(display, style, backend);
-    }
-
-    pub fn render(&self, char_offset: usize, line: Line, backend: &mut Backend) {
-        let (display, diagnostic) = match self {
-            TreePath::File { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
-            TreePath::Folder { display, diagnostic, tree: Some(..), .. } => {
-                (&display[char_offset..display.len() - 2], *diagnostic)
-            }
-            TreePath::Folder { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
-        };
-        match diagnostic {
-            DiagnosticType::Err => line.render_styled(display, ContentStyle::fg(ERR), backend),
-            DiagnosticType::Warn => line.render_styled(display, ContentStyle::fg(WAR), backend),
-            DiagnosticType::None => line.render(display, backend),
+            DiagnosticType::Err => line.render_styled(display, base_style.with_fg(ERR), backend),
+            DiagnosticType::Warn => line.render_styled(display, base_style.with_fg(WAR), backend),
+            DiagnosticType::None => line.render_styled(display, base_style, backend),
         };
     }
 
@@ -138,19 +122,24 @@ impl TreePath {
         if self.path() == rel_path {
             return Ok(true);
         }
-        if rel_path.starts_with(self.path()) {
-            self.expand()?;
-            if let Some(nested_tree) = self.tree_mut() {
-                for tree_path in nested_tree {
-                    let result = tree_path.expand_contained(rel_path, watcher);
-                    if matches!(result, Ok(false)) {
-                        continue;
-                    }
-                    let _ = watcher.watch(self.path());
-                    return result;
-                }
+
+        if !rel_path.starts_with(self.path()) {
+            return Ok(false);
+        }
+
+        self.expand()?;
+        let Some(nested_tree) = self.tree_mut() else {
+            return Ok(false);
+        };
+
+        for tree_path in nested_tree {
+            let result = tree_path.expand_contained(rel_path, watcher);
+            if matches!(result, Ok(true)) {
+                _ = watcher.watch(self.path());
+                return result;
             }
         }
+
         Ok(false)
     }
 

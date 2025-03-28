@@ -1,4 +1,5 @@
 use super::{GlobalState, PopupMessage};
+use crate::configs::{EditorAction, TreeAction};
 use crate::lsp::TreeDiagnostics;
 use crate::popups::{
     popup_replace::ReplacePopup, popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges, PopupInterface,
@@ -14,6 +15,10 @@ use std::path::PathBuf;
 pub enum IdiomEvent {
     PopupAccess,
     PopupAccessOnce,
+    EditorActionCall(EditorAction),
+    EditorActionCallOnce(EditorAction),
+    TreeActionCall(TreeAction),
+    TreeActionCallOnce(TreeAction),
     NewPopup(fn() -> Box<dyn PopupInterface>),
     OpenAtLine(PathBuf, usize),
     OpenAtSelect(PathBuf, (CursorPosition, CursorPosition)),
@@ -57,7 +62,6 @@ pub enum IdiomEvent {
         select: (CursorPosition, CursorPosition),
         clear_popup: bool,
     },
-    Resize,
     Save,
     Rebase,
     Exit,
@@ -73,6 +77,24 @@ impl IdiomEvent {
             IdiomEvent::PopupAccessOnce => {
                 gs.popup.component_access(ws, tree);
                 gs.clear_popup();
+            }
+            IdiomEvent::EditorActionCall(action) => {
+                if let Some(editor) = ws.get_active() {
+                    let _ = editor.map(action, gs);
+                }
+            }
+            IdiomEvent::EditorActionCallOnce(action) => {
+                gs.clear_popup();
+                if let Some(editor) = ws.get_active() {
+                    editor.map(action, gs);
+                }
+            }
+            IdiomEvent::TreeActionCall(action) => {
+                tree.map_action(action, gs);
+            }
+            IdiomEvent::TreeActionCallOnce(action) => {
+                gs.clear_popup();
+                tree.map_action(action, gs);
             }
             IdiomEvent::NewPopup(builder) => {
                 gs.clear_popup();
@@ -228,9 +250,6 @@ impl IdiomEvent {
                 };
             }
             IdiomEvent::WorkspaceEdit(edits) => ws.apply_edits(edits, gs),
-            IdiomEvent::Resize => {
-                ws.resize_all(gs.editor_area.width, gs.editor_area.height as usize);
-            }
             IdiomEvent::Rebase => {
                 if let Some(editor) = ws.get_active() {
                     editor.rebase(gs);

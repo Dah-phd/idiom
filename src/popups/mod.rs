@@ -1,4 +1,5 @@
 mod generics;
+pub mod menu;
 pub mod pallet;
 pub mod popup_file_open;
 pub mod popup_find;
@@ -9,11 +10,13 @@ pub mod popups_tree;
 mod utils;
 
 use crate::{
-    global_state::{Clipboard, GlobalState, PopupMessage},
+    configs::CONFIG_FOLDER,
+    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     tree::Tree,
     workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
+use dirs::config_dir;
 use fuzzy_matcher::skim::SkimMatcherV2;
 pub use generics::{Popup, PopupSelector};
 
@@ -52,6 +55,42 @@ pub trait PopupInterface {
     fn paste_passthrough(&mut self, _clip: String, _matcher: &SkimMatcherV2) -> PopupMessage {
         PopupMessage::None
     }
+}
+
+struct Command {
+    label: &'static str,
+    result: CommandResult,
+}
+
+impl Command {
+    fn execute(self) -> CommandResult {
+        self.result
+    }
+
+    fn clone_executor(&self) -> CommandResult {
+        self.result.clone()
+    }
+
+    fn cfg_open(label: &'static str, file_path: &'static str) -> Option<Self> {
+        let mut path = config_dir()?;
+        path.push(CONFIG_FOLDER);
+        path.push(file_path);
+        Some(Command { label, result: CommandResult::Simple(IdiomEvent::OpenAtLine(path, 0).into()) })
+    }
+
+    fn pass_event(label: &'static str, event: IdiomEvent) -> Self {
+        Command { label, result: CommandResult::Simple(event.into()) }
+    }
+
+    const fn access_edit(label: &'static str, cb: fn(&mut Workspace, &mut Tree)) -> Self {
+        Command { label, result: CommandResult::Complex(cb) }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum CommandResult {
+    Simple(PopupMessage),
+    Complex(fn(&mut Workspace, &mut Tree)),
 }
 
 // syntactic sugar for popups used instead of Option<popup>

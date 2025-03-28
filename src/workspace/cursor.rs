@@ -407,7 +407,7 @@ impl From<&mut Cursor> for Position {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CursorPosition {
     pub line: usize,
     pub char: usize, // this is char position not byte index
@@ -440,5 +440,11 @@ impl From<Position> for CursorPosition {
 impl From<&Position> for CursorPosition {
     fn from(value: &Position) -> Self {
         Self { line: value.line as usize, char: value.character as usize }
+    }
+}
+
+impl PartialEq<CursorPosition> for Cursor {
+    fn eq(&self, position: &CursorPosition) -> bool {
+        self.line == position.line && self.char == position.char
     }
 }

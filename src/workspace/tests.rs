@@ -331,3 +331,31 @@ fn test_jump_select() {
     shift_press(&mut ws, KeyCode::Down, &mut gs);
     select_eq((CursorPosition::default(), CursorPosition { line: 3, char: 11 }), active(&mut ws));
 }
+
+#[test]
+fn cursor_postion_confirm() {
+    let eq = CursorPosition { line: 3, char: 10 };
+    assert_eq!(eq, eq);
+    assert!(eq >= eq);
+    assert!(eq <= eq);
+    assert!(!(eq > eq));
+    assert!(!(eq < eq));
+
+    let smol = CursorPosition { line: 3, char: 10 };
+    let big = CursorPosition { line: 4, char: 1 };
+    assert!(big >= smol);
+    assert!(big > smol);
+    assert!(!(big <= smol));
+    assert!(!(big < smol));
+    assert_eq!(std::cmp::max(smol, big), big);
+    assert_eq!(std::cmp::min(smol, big), smol);
+
+    let smol = CursorPosition { line: 3, char: 10 };
+    let big = CursorPosition { line: 3, char: 11 };
+    assert!(big >= smol);
+    assert!(!(big <= smol));
+    assert!(!(big <= smol));
+    assert!(!(big < smol));
+    assert_eq!(std::cmp::max(smol, big), big);
+    assert_eq!(std::cmp::min(smol, big), smol);
+}

@@ -1,4 +1,11 @@
 ## Includes only major changes (manual updates)
+# Version 0.4.9
+* added context menus (right click) on editor/tree
+* idiom mark linked to file tree
+* editor mode linked to file tree
+* added background color to tree instead of borders
+* fixed line render_centered
+
 # Version 0.4.8
 * fixed Token::decrement_at - remove before postion (inc is postion after, dec is postion at (not before))
 

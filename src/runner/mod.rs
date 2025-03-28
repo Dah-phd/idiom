@@ -2,14 +2,13 @@ mod autocomplete;
 mod commands;
 mod components;
 
-use crate::configs::{EditorConfigs, KeyMap, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE};
+use crate::configs::{EditorConfigs, KeyMap, Theme, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE};
 use crate::error::IdiomResult;
 use crate::global_state::GlobalState;
 use crate::render::layout::BORDERS;
 use crate::render::TextField;
-use crate::runner::commands::load_file;
 use autocomplete::try_autocomplete;
-use commands::{load_cfg, overwrite_cfg, Terminal};
+use commands::{overwrite_cfg, Terminal};
 use components::CmdHistory;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use std::sync::{Arc, Mutex};
@@ -26,11 +25,12 @@ pub struct EditorTerminal {
     terminal: Option<Terminal>,
     prompt: Option<Arc<Mutex<String>>>,
     max_rows: usize,
+    shell: String,
 }
 
 impl EditorTerminal {
-    pub fn new(width: u16) -> Self {
-        Self { width, ..Default::default() }
+    pub fn new(shell: String, width: u16) -> Self {
+        Self { shell, width, ..Default::default() }
     }
 
     pub fn render(&mut self, gs: &mut GlobalState) {
@@ -70,13 +70,13 @@ impl EditorTerminal {
                 if terminal.is_running() {
                     return;
                 }
-                if let Ok((terminal, prompt)) = Terminal::new(self.width) {
+                if let Ok((terminal, prompt)) = Terminal::new(&self.shell, self.width) {
                     self.terminal.replace(terminal).map(|t| t.kill());
                     self.prompt.replace(prompt);
                 }
             }
             None => {
-                if let Ok((terminal, prompt)) = Terminal::new(self.width) {
+                if let Ok((terminal, prompt)) = Terminal::new(&self.shell, self.width) {
                     self.terminal.replace(terminal);
                     self.prompt.replace(prompt);
                 }
@@ -93,7 +93,7 @@ impl EditorTerminal {
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         match key {
             KeyEvent { code: KeyCode::Esc, .. }
-            | KeyEvent { code: KeyCode::Char('`'), modifiers: KeyModifiers::CONTROL, .. } => {
+            | KeyEvent { code: KeyCode::Char('`' | ' '), modifiers: KeyModifiers::CONTROL, .. } => {
                 gs.message("Term: PTY active in background ... (CTRL + d/q) can be used to kill the process!");
                 gs.toggle_terminal(self);
             }
@@ -130,7 +130,7 @@ impl EditorTerminal {
                 self.kill(gs);
                 self.at_log = self.logs.len();
                 self.logs.push("SIGKILL!".to_owned());
-                if let Ok((terminal, prompt)) = Terminal::new(self.width) {
+                if let Ok((terminal, prompt)) = Terminal::new(&self.shell, self.width) {
                     self.terminal.replace(terminal).map(|t| t.kill());
                     self.prompt.replace(prompt);
                 }
@@ -181,13 +181,6 @@ impl EditorTerminal {
 
     pub fn idiom_command_handler(&mut self, arg: &str, gs: &mut GlobalState) -> IdiomResult<()> {
         if arg.trim() == "help" {
-            self.logs.push("load => load config files, available options:".to_owned());
-            self.logs.push("    keymap => open keymap config file.".to_owned());
-            self.logs.push("    config => open editor config file.".to_owned());
-            self.logs.push("    theme => open theme config file.".to_owned());
-            self.logs.push("    ${file_path} => loads path into editor.".to_owned());
-            self.logs.push("Example: &i load keymap".to_owned());
-            self.logs.push("".to_owned());
             self.logs.push("default => returns config file to default".to_owned());
             self.logs.push("    possible files keymap, config".to_owned());
             self.logs.push("Example: &i default keymap".to_owned());
@@ -197,25 +190,14 @@ impl EditorTerminal {
                 terminal.push_command(String::from("git ls-files | xargs wc -l"))?;
             }
         }
-        if let Some(cfg) = arg.trim().strip_prefix("load") {
-            if let Some(msg) = match cfg.trim() {
-                "keymap" => load_cfg(KEY_MAP, gs),
-                "config" => load_cfg(EDITOR_CFG_FILE, gs),
-                "theme" => load_cfg(THEME_FILE, gs),
-                any => load_file(any, gs),
-            } {
-                self.logs.push(msg);
-            } else {
-                gs.toggle_terminal(self);
-            }
-        }
         if let Some(cfg) = arg.trim().strip_prefix("default") {
-            match match cfg.trim() {
+            let default_restore = match cfg.trim() {
                 "keymap" => overwrite_cfg::<KeyMap>(KEY_MAP),
                 "config" => overwrite_cfg::<EditorConfigs>(EDITOR_CFG_FILE),
-                "theme" => overwrite_cfg::<crate::configs::Theme>(THEME_FILE),
+                "theme" => overwrite_cfg::<Theme>(THEME_FILE),
                 _ => return Ok(()),
-            } {
+            };
+            match default_restore {
                 Ok(msg) => gs.success(msg),
                 Err(err) => gs.error(err.to_string()),
             };

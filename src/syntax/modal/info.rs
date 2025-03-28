@@ -131,6 +131,7 @@ impl Info {
     }
 
     pub fn push_hover(&mut self, hover: Hover, theme: &Theme) {
+        self.text.push(StyledLine::default());
         match self.style_builder.as_mut() {
             Some(sty) => parse_hover(hover, sty, &mut self.text),
             None => {
@@ -143,6 +144,7 @@ impl Info {
     }
 
     pub fn push_signature(&mut self, signature: SignatureHelp, theme: &Theme) {
+        self.text.push(StyledLine::default());
         match self.style_builder.as_mut() {
             Some(sty) => {
                 for info in signature.signatures {

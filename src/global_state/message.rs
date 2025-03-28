@@ -1,6 +1,7 @@
 use crate::render::{
     backend::{Backend, BackendProtocol, StyleExt},
     layout::Line,
+    UTF8Safe,
 };
 use crossterm::style::{Color, ContentStyle};
 use std::{
@@ -66,10 +67,11 @@ impl Messages {
     }
 
     pub fn set_line(&mut self, line: Line) {
-        if line.width != self.line.width || line.col != self.line.col {
-            self.active = true;
-            self.line = line;
+        if self.line == line {
+            return;
         }
+        self.active = true;
+        self.line = line;
     }
 
     pub fn message(&mut self, message: String) {
@@ -126,17 +128,25 @@ enum Message {
 impl Message {
     #[inline]
     fn render(&self, line: Line, mut accent_style: ContentStyle, backend: &mut Backend) {
-        match self {
-            Message::Error(text) => {
-                accent_style.set_fg(Some(Color::Red));
-                line.render_styled(text, accent_style, backend)
-            }
-            Message::Success(text) => {
-                accent_style.set_fg(Some(Color::Blue));
-                line.render_styled(text, accent_style, backend)
-            }
-            Message::Text(text) => line.render_styled(text, accent_style, backend),
+        let Line { width, row, col } = line;
+
+        let (color, text) = match self {
+            Message::Error(text) => (Some(Color::Red), text.as_str()),
+            Message::Success(text) => (Some(Color::Blue), text.as_str()),
+            Message::Text(text) => (None, text.as_str()),
         };
+
+        let (pad_width, text) = text.truncate_width(width - 2);
+        let reset_style = backend.get_style();
+        accent_style.set_fg(color);
+        backend.set_style(accent_style);
+        backend.go_to(row, col);
+        backend.pad(2);
+        backend.print(text);
+        if pad_width != 0 {
+            backend.pad(pad_width);
+        }
+        backend.set_style(reset_style);
     }
 
     const fn is_err(&self) -> bool {

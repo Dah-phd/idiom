@@ -1,16 +1,17 @@
 use super::{GlobalState, IdiomEvent, MIN_HEIGHT, MIN_WIDTH};
+use crate::popups::menu::{menu_context_editor, menu_context_tree};
 use crate::popups::pallet::Pallet;
 use crate::render::backend::{Backend, StyleExt};
 use crate::render::layout::Line;
 use crate::{runner::EditorTerminal, tree::Tree, workspace::Workspace};
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use crossterm::style::{Color, ContentStyle};
+use crossterm::style::{Color, ContentStyle, Stylize};
 
-const INSERT_SPAN: &str = "  --INSERT--   ";
-const SELECT_SPAN: &str = "  --SELECT--   ";
+const INSERT_SPAN: &str = "  --INSERT--  ";
+const SELECT_SPAN: &str = "  --SELECT--  ";
 const MODE_LEN: usize = INSERT_SPAN.len();
 
-#[derive(Default, Clone)]
+#[derive(Default, Debug, Clone)]
 pub enum PopupMessage {
     #[default]
     None,
@@ -27,27 +28,27 @@ pub enum Mode {
 
 impl Mode {
     #[inline]
-    pub fn render(&self, line: Line, accent_style: ContentStyle, backend: &mut Backend) {
+    pub fn render(&self, line: Line, backend: &mut Backend) {
         match self {
-            Self::Insert => Self::render_insert_mode(line, accent_style, backend),
-            Self::Select => Self::render_select_mode(line, accent_style, backend),
+            Self::Insert => Self::render_insert_mode(line, backend),
+            Self::Select => Self::render_select_mode(line, backend),
         };
     }
 
     #[inline]
-    pub fn render_select_mode(mut line: Line, mut accent_style: ContentStyle, backend: &mut Backend) {
-        line.width = std::cmp::min(MODE_LEN, line.width);
-        accent_style.add_bold();
-        accent_style.set_fg(Some(Self::select_color()));
-        line.render_styled(SELECT_SPAN, accent_style, backend);
+    pub fn render_select_mode(line: Line, backend: &mut Backend) {
+        let mut style = ContentStyle::reversed();
+        style.add_bold();
+        style.set_fg(Some(Self::select_color()));
+        line.render_centered_styled(SELECT_SPAN, style, backend);
     }
 
     #[inline]
-    pub fn render_insert_mode(mut line: Line, mut accent_style: ContentStyle, backend: &mut Backend) {
-        line.width = std::cmp::min(MODE_LEN, line.width);
-        accent_style.add_bold();
-        accent_style.set_fg(Some(Self::insert_color()));
-        line.render_styled(INSERT_SPAN, accent_style, backend);
+    pub fn render_insert_mode(line: Line, backend: &mut Backend) {
+        let mut style = ContentStyle::reversed();
+        style.add_bold();
+        style.set_fg(Some(Self::insert_color()));
+        line.render_centered_styled(INSERT_SPAN, style, backend);
     }
 
     pub const fn select_color() -> Color {
@@ -98,8 +99,8 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                 }
                 return;
             }
-            if let Some(pos) = gs.tree_area.relative_position(event.row, event.column) {
-                if let Some(path) = tree.mouse_select(pos.line + 1, gs) {
+            if let Some(position) = gs.tree_area.relative_position(event.row, event.column) {
+                if let Some(path) = tree.mouse_select(position.line + 1, gs) {
                     gs.event.push(IdiomEvent::OpenAtLine(path, 0));
                     return;
                 };
@@ -120,10 +121,10 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
             }
         }
         MouseEventKind::Down(MouseButton::Right) => {
-            if let Some(pos) = gs.tab_area.relative_position(event.row, event.column) {
+            if let Some(position) = gs.tab_area.relative_position(event.row, event.column) {
                 if !workspace.is_empty() {
                     gs.insert_mode();
-                    if let Some(idx) = workspace.select_tab_mouse(pos.char) {
+                    if let Some(idx) = workspace.select_tab_mouse(position.char) {
                         workspace.activate_editor(idx, gs);
                         workspace.close_active(gs);
                     }
@@ -131,11 +132,16 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
             }
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = workspace.get_active() {
-                    if let Some(clip) = editor.mouse_copy_paste(position, gs.clipboard.pull()) {
-                        gs.clipboard.push(clip);
-                        gs.success("Copied select!");
-                    };
-                    gs.insert_mode();
+                    editor.mouse_menu_setup(position);
+                    let accent_style = gs.theme.accent_style;
+                    gs.popup(menu_context_editor(position, gs.editor_area, accent_style));
+                }
+            }
+            if let Some(mut position) = gs.tree_area.relative_position(event.row, event.column) {
+                position.line += 1;
+                if tree.mouse_menu_setup_select(position.line) {
+                    let accent_style = gs.theme.accent_style.reverse();
+                    gs.popup(menu_context_tree(position, gs.screen_rect, accent_style));
                 }
             }
         }

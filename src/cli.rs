@@ -9,7 +9,10 @@ use crate::{
     tree::TreePath,
 };
 use clap::Parser;
-use crossterm::event::{Event, KeyCode, KeyEvent};
+use crossterm::{
+    event::{Event, KeyCode, KeyEvent},
+    style::ContentStyle,
+};
 use std::{path::PathBuf, time::Duration};
 
 const MIN_FRAMERATE: Duration = Duration::from_millis(8);
@@ -80,18 +83,11 @@ pub struct TreeSeletor {
 impl TreeSeletor {
     pub fn new(selected_path: PathBuf) -> IdiomResult<Self> {
         std::env::set_current_dir(&selected_path)?;
-        let config = KeyMap::new().unwrap_or_default();
+        let key_map = KeyMap::new().unwrap_or_default().tree_key_map();
         let path_str = selected_path.display().to_string();
         let display_offset = path_str.split(std::path::MAIN_SEPARATOR).count() * 2;
         let tree = TreePath::from_path(selected_path.clone()).unwrap();
-        Ok(Self {
-            state: State::new(),
-            key_map: config.tree_key_map(),
-            display_offset,
-            selected_path,
-            tree,
-            rebuild: true,
-        })
+        Ok(Self { state: State::new(), key_map, display_offset, selected_path, tree, rebuild: true })
     }
 
     pub fn select(backend: &mut Backend, path: PathBuf) -> IdiomResult<Option<PathBuf>> {
@@ -162,9 +158,9 @@ impl TreeSeletor {
                 None => return,
             };
             if idx == self.state.selected {
-                tree_path.render_styled(self.display_offset, line, self.state.highlight, backend);
+                tree_path.render(self.display_offset, line, self.state.highlight, backend);
             } else {
-                tree_path.render(self.display_offset, line, backend);
+                tree_path.render(self.display_offset, line, ContentStyle::default(), backend);
             }
         }
         for line in lines {

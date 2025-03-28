@@ -1,6 +1,8 @@
 use super::snippets::parse_completion_item;
 use crate::global_state::IdiomEvent;
-use lsp_types::{CompletionItem, CompletionTextEdit, InsertReplaceEdit, InsertTextFormat, Range};
+use lsp_types::{
+    CompletionItem, CompletionItemKind, CompletionTextEdit, InsertReplaceEdit, InsertTextFormat, Position, Range,
+};
 
 fn insert_replace_completion_event(replace_text: impl Into<String>) -> IdiomEvent {
     parse_completion_item(CompletionItem {
@@ -128,5 +130,41 @@ fn bad_input_snippets() {
             relative_select: Some(((1, 15), 3)),
         },
         insert_text_completion_event("vary bad ${3:imp\n    }went wrong${1:ana}\n end"),
+    );
+}
+
+#[test]
+fn ref_multi_var_snippet() {
+    let completion_item = CompletionItem {
+        label: "draw(…)".to_owned(),
+        label_details: None,
+        kind: Some(CompletionItemKind::METHOD),
+        detail: None,
+        documentation: None,
+        deprecated: None,
+        preselect: Some(true),
+        sort_text: Some("7fffffff".to_owned()),
+        filter_text: Some("draw".to_owned()),
+        insert_text: None,
+        insert_text_format: Some(InsertTextFormat::SNIPPET),
+        insert_text_mode: None,
+        text_edit: Some(CompletionTextEdit::InsertAndReplace(InsertReplaceEdit {
+            new_text: "draw(${1:&mut workspace}, ${2:&mut tree}, ${3:&mut term});$0".to_owned(),
+            insert: Range { start: Position { line: 133, character: 11 }, end: Position { line: 133, character: 11 } },
+            replace: Range { start: Position { line: 133, character: 11 }, end: Position { line: 133, character: 11 } },
+        })),
+        additional_text_edits: None,
+        command: None,
+        commit_characters: None,
+        data: None,
+        tags: None,
+    };
+    assert_eq!(
+        IdiomEvent::Snippet {
+            snippet: String::from("draw(&mut workspace, &mut tree, &mut term);"),
+            cursor_offset: Some((0, 43)),
+            relative_select: Some(((0, 5), 14)),
+        },
+        parse_completion_item(completion_item),
     );
 }

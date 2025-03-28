@@ -23,7 +23,6 @@ use super::BackendProtocol;
 /// If stdout gets an error Backend will crash the program as rendering is to priority
 /// Add cfg and new implementation of the wrapper to make the backend swichable
 /// Main reason is to clear out the issue with PrintStyled on CrossTerm
-/// TODO: add termios & wezterm
 pub struct Backend {
     writer: Stdout, // could be moved to locked state for performance but current frame generation is about 200 µs
     default_styled: Option<ContentStyle>,

@@ -6,7 +6,7 @@ use crate::render::{
 use crossterm::style::ContentStyle;
 use std::ops::{AddAssign, SubAssign};
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Line {
     pub row: u16,
     pub col: u16,
@@ -30,17 +30,45 @@ impl Line {
         backend.print_styled_at(self.row, self.col, text, style)
     }
 
-    // !TODO fix
     #[inline]
     pub fn render_centered(self, text: &str, backend: &mut Backend) {
-        let text = text.truncate_width(self.width).1;
-        backend.print_at(self.row, self.col, format!("{text:^width$}", width = self.width))
+        let (remaining_width, text) = text.truncate_width(self.width);
+        backend.go_to(self.row, self.col);
+        match remaining_width {
+            0 => backend.print(text),
+            1 => {
+                backend.print(text);
+                backend.pad(1);
+            }
+            pad => {
+                let right_pad = pad / 2;
+                backend.pad(right_pad + (pad % 2));
+                backend.print(text);
+                backend.pad(right_pad);
+            }
+        }
     }
 
     #[inline]
     pub fn render_centered_styled(self, text: &str, style: ContentStyle, backend: &mut Backend) {
-        let text = text.truncate_width(self.width).1;
-        backend.print_styled_at(self.row, self.col, format!("{text:^width$}", width = self.width), style);
+        let (remaining_width, text) = text.truncate_width(self.width);
+        let restore_style = backend.get_style();
+        backend.set_style(style);
+        backend.go_to(self.row, self.col);
+        match remaining_width {
+            0 => backend.print(text),
+            1 => {
+                backend.print(text);
+                backend.pad(1);
+            }
+            pad => {
+                let right_pad = pad / 2;
+                backend.pad(right_pad + (pad % 2));
+                backend.print(text);
+                backend.pad(right_pad);
+            }
+        }
+        backend.set_style(restore_style);
     }
 
     #[inline]
@@ -92,6 +120,18 @@ impl Line {
             backend.pad(pad_width);
         }
         backend.set_style(reset_style);
+    }
+
+    pub const fn split_rel(mut self, idx: usize) -> (Self, Self) {
+        let new = match idx < self.width {
+            true => {
+                let remaining_width = self.width - idx;
+                self.width = idx;
+                Self { row: self.row, col: self.width as u16 + self.col, width: remaining_width }
+            }
+            false => Self { row: self.row, col: self.col + self.width as u16, width: 0 },
+        };
+        (self, new)
     }
 
     /// creates line builder from Line

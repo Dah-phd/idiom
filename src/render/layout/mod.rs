@@ -14,3 +14,6 @@ pub use {
     },
     line::{Line, LineBuilder, LineBuilderRev},
 };
+
+#[cfg(test)]
+mod tests;

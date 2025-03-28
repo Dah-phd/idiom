@@ -284,7 +284,7 @@ impl Writable for Text {
 }
 
 /// Collection of styled texts, useful when rendering multiple times the same string, as it holds meta data for width / charcer len of words
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Default)]
 pub struct StyledLine {
     inner: Vec<Text>,
 }

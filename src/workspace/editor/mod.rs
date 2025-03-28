@@ -460,9 +460,26 @@ impl Editor {
     }
 
     pub fn mouse_cursor(&mut self, mut position: CursorPosition) {
-        self.cursor.select_drop();
         position.line += self.cursor.at_line;
         position.char = position.char.saturating_sub(self.line_number_offset + 1);
+        if self.cursor.select_is_none() && self.cursor == position {
+            self.select_token();
+            return;
+        }
+        self.cursor.select_drop();
+        self.cursor.set_cursor_checked(position, &self.content);
+    }
+
+    pub fn mouse_menu_setup(&mut self, mut position: CursorPosition) {
+        position.line += self.cursor.at_line;
+        position.char = position.char.saturating_sub(self.line_number_offset + 1);
+        match self.cursor.select_get() {
+            Some((from, to)) if from <= position && position <= to => {
+                return;
+            }
+            Some(..) => self.cursor.select_drop(),
+            None => (),
+        }
         self.cursor.set_cursor_checked(position, &self.content);
     }
 
@@ -470,17 +487,6 @@ impl Editor {
         position.line += self.cursor.at_line;
         position.char = position.char.saturating_sub(self.line_number_offset + 1);
         self.cursor.set_cursor_checked_with_select(position, &self.content);
-    }
-
-    pub fn mouse_copy_paste(&mut self, mut position: CursorPosition, clip: Option<String>) -> Option<String> {
-        if let Some((from, to)) = self.cursor.select_get() {
-            return Some(copy_content(from, to, &self.content));
-        };
-        position.line += self.cursor.at_line;
-        position.char = position.char.saturating_sub(self.line_number_offset + 1);
-        self.cursor.set_cursor_checked(position, &self.content);
-        self.actions.paste(clip?, &mut self.cursor, &mut self.content, &mut self.lexer);
-        None
     }
 
     pub fn rebase(&mut self, gs: &mut GlobalState) {

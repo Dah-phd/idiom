@@ -1,18 +1,20 @@
+use std::collections::HashMap;
+
 use super::{
-    defaults::{get_indent_after, get_indent_spaces, get_unident_before},
+    defaults::{get_indent_after, get_indent_spaces, get_shell, get_unident_before},
     load_or_create_config,
     types::FileType,
     EDITOR_CFG_FILE,
 };
-use crate::global_state::GlobalState;
 use crate::utils::{trim_start_inplace, Offset};
 use crate::workspace::line::EditorLine;
+use crate::{global_state::GlobalState, lsp::LSP};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EditorConfigs {
-    #[serde(default)]
+    #[serde(default, skip)]
     pub format_on_save: bool,
     #[serde(default = "get_indent_spaces")]
     pub indent_spaces: usize,
@@ -20,6 +22,9 @@ pub struct EditorConfigs {
     pub indent_after: String,
     #[serde(default = "get_unident_before")]
     pub unindent_before: String,
+    /// SHELL
+    #[serde(default = "get_shell", skip)]
+    pub shell: String,
     /// LSP
     rust_lsp: Option<String>,
     rust_lsp_preload_if_present: Option<Vec<String>>,
@@ -50,8 +55,10 @@ impl Default for EditorConfigs {
         Self {
             format_on_save: true,
             indent_spaces: get_indent_spaces(),
-            indent_after: get_indent_after(),
-            unindent_before: get_unident_before(),
+            indent_after: String::from("({["),
+            unindent_before: String::from("]})"),
+            // shell
+            shell: get_shell(),
             // lsp
             rust_lsp: Some(String::from("rust-analyzer")),
             rust_lsp_preload_if_present: Some(vec!["Cargo.toml".to_owned(), "Cargo.lock".to_owned()]),
@@ -114,7 +121,25 @@ impl EditorConfigs {
         }
     }
 
-    pub fn derive_lsp_preloads(&mut self, base_tree: Vec<String>, gs: &mut GlobalState) -> Vec<(FileType, String)> {
+    pub async fn init_preloaded_lsp_servers(
+        &mut self,
+        base_tree_paths: Vec<String>,
+        gs: &mut GlobalState,
+    ) -> HashMap<FileType, LSP> {
+        let mut lsp_servers = HashMap::new();
+        for (ft, lsp_cmd) in self.derive_lsp_preloads(base_tree_paths, gs) {
+            gs.success(format!("Preloading {lsp_cmd}"));
+            match LSP::new(lsp_cmd, ft).await {
+                Ok(lsp) => {
+                    lsp_servers.insert(ft, lsp);
+                }
+                Err(err) => gs.error(format!("Preload filed: {err}")),
+            }
+        }
+        lsp_servers
+    }
+
+    fn derive_lsp_preloads(&mut self, base_tree: Vec<String>, gs: &mut GlobalState) -> Vec<(FileType, String)> {
         [
             (FileType::Rust, self.rust_lsp_preload_if_present.take(), self.rust_lsp.as_ref()),
             (FileType::Zig, self.zig_lsp_preload_if_present.take(), self.zig_lsp.as_ref()),
@@ -139,6 +164,26 @@ impl EditorConfigs {
     }
 }
 
+fn map_preload(
+    base_tree: &[String],
+    expected: Option<Vec<String>>,
+    cmd: Option<&String>,
+    gs: &mut GlobalState,
+) -> Option<String> {
+    let cmd = cmd?;
+    for try_re in expected?.iter().map(|re| Regex::new(re)) {
+        match try_re {
+            Ok(file_re) => {
+                if base_tree.iter().any(|path| file_re.is_match(path)) {
+                    return Some(cmd.to_owned());
+                }
+            }
+            Err(error) => gs.error(error),
+        }
+    }
+    None
+}
+
 pub struct IndentConfigs {
     pub indent: String,
     pub indent_after: String,
@@ -147,7 +192,7 @@ pub struct IndentConfigs {
 
 impl Default for IndentConfigs {
     fn default() -> Self {
-        Self { indent: "    ".to_owned(), unindent_before: get_unident_before(), indent_after: get_indent_after() }
+        Self { indent: "    ".to_owned(), unindent_before: String::from("]})"), indent_after: String::from("({[") }
     }
 }
 
@@ -205,25 +250,4 @@ impl IndentConfigs {
             Offset::Neg(trim_start_inplace(line))
         }
     }
-}
-
-fn map_preload(
-    base_tree: &[String],
-    expected: Option<Vec<String>>,
-    cmd: Option<&String>,
-    gs: &mut GlobalState,
-) -> Option<String> {
-    if let Some(cmd) = cmd {
-        for try_re in expected?.iter().map(|re| Regex::new(re)) {
-            match try_re {
-                Ok(file_re) => {
-                    if base_tree.iter().any(|path| file_re.is_match(path)) {
-                        return Some(cmd.to_owned());
-                    }
-                }
-                Err(error) => gs.error(error),
-            }
-        }
-    }
-    None
 }

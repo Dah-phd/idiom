@@ -8,7 +8,7 @@ use crate::{
 };
 use crossterm::style::{Color, ContentStyle};
 
-#[derive(Default, Clone, Copy, Debug)]
+#[derive(Default, Clone, Copy, Debug, PartialEq)]
 pub struct Rect {
     pub row: u16,
     pub col: u16,
@@ -44,7 +44,7 @@ impl Rect {
     /// Creates floating modal around position (the row within it);
     /// Modal will float around the row (above or below - below is preffered) within Rect;
     /// Minimum height is 3 otherwise the modal will appear above the location;
-    /// Minumum width is 40 otherwise the modal will appear before the location;
+    /// Minumum width is 30 otherwise the modal will appear before the location;
     /// If there is not enough space the rect will be without space height/width = 0;
     #[inline]
     pub fn modal_relative(&self, row_offset: u16, col_offset: u16, mut width: usize, mut height: u16) -> Self {
@@ -63,11 +63,11 @@ impl Rect {
             };
         };
         if (self.width + self.col as usize) < (width + col as usize) {
-            if self.width > 40 + col as usize {
+            if self.width > 30 + col as usize {
                 width = self.width - col as usize;
-            } else if self.width > 40 {
-                col = (self.col + self.width as u16) - 40;
-                width = 40;
+            } else if self.width > 30 {
+                col = (self.col + self.width as u16) - 30;
+                width = 30;
             } else {
                 width = 0;
                 height = 0;
@@ -76,56 +76,57 @@ impl Rect {
         Rect::new(row, col, width, height)
     }
 
-    /// Splitoff rows into Rect from current Rect - mutating it in place
-    pub fn splitoff_rows(&mut self, rows: u16) -> Self {
-        let old_height = self.height;
-        self.height = self.height.saturating_sub(rows);
-        Self {
-            row: self.row + self.height,
-            col: self.col,
-            height: old_height - self.height,
-            width: self.width,
-            borders: self.borders,
+    /// Creates floating modal around position (the row within it);
+    /// Modal will float around the row (above or below - below is preffered) within Rect;
+    /// Minimum height is 3 otherwise the modal will appear above the location;
+    /// Minumum width is 30 otherwise the modal will appear before the location;
+    /// If there is not enough space the rect will be without space height/width = 0;
+    #[inline]
+    pub fn modal_absolute(&self, row: u16, col: u16, width: usize, height: u16) -> Self {
+        if row < self.row || col < self.col {
+            return Self { row, col, ..Default::default() };
         }
+        self.modal_relative(row - self.row, col - self.col, width, height)
     }
 
-    /// Splitoff cols into Rect from current Rect - mutating it in place
-    pub fn splitoff_cols(&mut self, cols: usize) -> Self {
-        let old_width = self.width;
-        self.width = self.width.saturating_sub(cols);
-        Self {
-            row: self.row,
-            col: self.width as u16 + self.col,
-            height: self.height,
-            width: old_width - self.width,
-            borders: self.borders,
-        }
-    }
-
-    /// Keep rows splitting the remaining into Rect
-    pub fn keep_rows(&mut self, rows: u16) -> Self {
-        let remaining_height = self.height.saturating_sub(rows);
-        self.height -= remaining_height;
-        Self {
-            row: self.row + self.height,
-            col: self.col,
-            height: remaining_height,
-            width: self.width,
-            borders: self.borders,
-        }
-    }
-
-    /// Keep cols splitting the remaining into Rect
-    pub fn keep_col(&mut self, cols: usize) -> Self {
-        let taken_width = self.width.saturating_sub(cols);
+    pub fn split_horizont_rel(mut self, width: usize) -> (Self, Self) {
+        let taken_width = self.width.saturating_sub(width);
         self.width -= taken_width;
-        Self {
-            row: self.row,
-            col: self.col + self.width as u16,
-            height: self.height,
-            width: taken_width,
-            borders: self.borders,
+        (
+            self,
+            Self {
+                row: self.row,
+                col: self.col + self.width as u16,
+                height: self.height,
+                width: taken_width,
+                borders: self.borders,
+            },
+        )
+    }
+
+    pub fn split_vertical_rel(mut self, height: u16) -> (Self, Self) {
+        let remaining_height = self.height.saturating_sub(height);
+        self.height -= remaining_height;
+        (
+            self,
+            Self {
+                row: self.row + self.height,
+                col: self.col,
+                height: remaining_height,
+                width: self.width,
+                borders: self.borders,
+            },
+        )
+    }
+
+    /// Pops last line from rect
+    pub fn pop_line(&mut self) -> Line {
+        if self.height == 0 {
+            return Line { row: self.row + self.height, col: self.col, width: 0 };
         }
+        let row = self.row + self.height;
+        self.height -= 1;
+        Line { row, col: self.col, width: self.width }
     }
 
     pub fn get_line(&self, rel_idx: u16) -> Option<Line> {

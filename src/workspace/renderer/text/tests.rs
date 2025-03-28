@@ -19,7 +19,7 @@ use crate::{
 
 fn generate_lines() -> Vec<EditorLine> {
     [
-        "## TODO",
+        "## TADA",
         "- write tests",
         "- lsp server cold start, maybe? \"jedi-language server\" _starts slow_, but __once__ it starts *it* should **continue** end",
     ].into_iter().map(EditorLine::from).collect()
@@ -27,7 +27,7 @@ fn generate_lines() -> Vec<EditorLine> {
 
 fn generate_complex_lines() -> Vec<EditorLine> {
     [
-        "## 🔥TODO🔥",
+        "## 🔥TADA🔥",
         "- write tests",
         "- lsp server cold start, maybe? \"j🔥di-language server\" _starts slow_, but __once__ it starts *it* should **continue** end",
     ].into_iter().map(EditorLine::from).collect()
@@ -150,7 +150,7 @@ fn simple_line() {
     }
 
     let mut rendered = gs.backend().drain();
-    assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["## TODO".into()]));
+    assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["## TADA".into()]));
     assert_eq!(parse_complex_line(&mut rendered), (Some(2), vec!["- write tests".into()]));
     assert_eq!(parse_complex_line(&mut rendered), (Some(3), vec!["- lsp server cold start, maybe? \"jedi".into()]));
     assert_eq!(parse_complex_line(&mut rendered), (None, vec!["-language server\" _starts slow_, but ".into()]));
@@ -176,7 +176,7 @@ fn simple_line_select() {
 
     let mut rendered = gs.backend().drain();
     let style_select = ctx.lexer.theme.selected;
-    assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["## TODO".into()]));
+    assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["## TADA".into()]));
     expect_select(7, 13, style_select, ctx.accent_style, &rendered);
     assert_eq!(
         parse_complex_line(&mut rendered),
@@ -202,7 +202,7 @@ fn complex_line() {
     }
 
     let mut rendered = gs.backend().drain();
-    assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["## 🔥TODO🔥".into()]));
+    assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["## 🔥TADA🔥".into()]));
     assert_eq!(parse_complex_line(&mut rendered), (Some(2), vec!["- write tests".into()]));
     assert_eq!(parse_complex_line(&mut rendered), (Some(3), vec!["- lsp server cold start, maybe? \"j🔥d".into()]));
     assert_eq!(parse_complex_line(&mut rendered), (None, vec!["i-language server\" _starts slow_, but".into()]));
@@ -228,7 +228,7 @@ fn complex_line_select() {
 
     let mut rendered = gs.backend().drain();
     let style_select = ctx.lexer.theme.selected;
-    assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["## 🔥TODO🔥".into()]));
+    assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["## 🔥TADA🔥".into()]));
     expect_select(7, 13, style_select, ctx.accent_style, &rendered);
     assert_eq!(
         parse_complex_line(&mut rendered),

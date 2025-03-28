@@ -1,6 +1,14 @@
 use super::EditorLine;
 
 #[test]
+fn trim_counted() {
+    let line = EditorLine::from("   // coment");
+    assert_eq!(line.trim_start_counted(), (3, "// coment"));
+    let line = EditorLine::from("  🚀 //coment");
+    assert_eq!(line.trim_start_counted(), (2, "🚀 //coment"));
+}
+
+#[test]
 fn test_insert() {
     let mut line = EditorLine::new("text".to_owned());
     assert!(line.char_len() == 4);

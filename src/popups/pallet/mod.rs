@@ -1,14 +1,13 @@
 mod formatting;
-use super::{popup_file_open::OpenFileSelector, PopupInterface};
+use super::{popup_file_open::OpenFileSelector, Command, CommandResult, PopupInterface};
 use crate::{
-    configs::{CONFIG_FOLDER, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
+    configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
     global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::{layout::Rect, state::State, TextField},
     tree::Tree,
     workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use dirs::config_dir;
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 
 pub struct Pallet {
@@ -18,37 +17,6 @@ pub struct Pallet {
     updated: bool,
     rect: Option<Rect>,
     state: State,
-}
-
-struct Command {
-    label: &'static str,
-    result: CommandResult,
-}
-
-impl Command {
-    fn execute(self) -> CommandResult {
-        self.result
-    }
-
-    fn cfg_open(label: &'static str, file_path: &'static str) -> Option<Self> {
-        let mut path = config_dir()?;
-        path.push(CONFIG_FOLDER);
-        path.push(file_path);
-        Some(Command { label, result: CommandResult::Simple(IdiomEvent::OpenAtLine(path, 0).into()) })
-    }
-
-    fn pass_event(label: &'static str, event: IdiomEvent) -> Self {
-        Command { label, result: CommandResult::Simple(event.into()) }
-    }
-
-    const fn access_edit(label: &'static str, cb: fn(&mut Workspace, &mut Tree)) -> Self {
-        Command { label, result: CommandResult::Complex(cb) }
-    }
-}
-
-enum CommandResult {
-    Simple(PopupMessage),
-    Complex(fn(&mut Workspace, &mut Tree)),
 }
 
 impl PopupInterface for Pallet {
@@ -168,23 +136,21 @@ impl PopupInterface for Pallet {
 
 impl Pallet {
     pub fn new() -> Box<Self> {
-        let mut commands = vec![
-            (0, Command::pass_event("Open file", IdiomEvent::NewPopup(OpenFileSelector::boxed))),
-            (0, Command::access_edit("UPPERCASE", formatting::uppercase)),
-            (0, Command::access_edit("LOWERCASE", formatting::lowercase)),
-            (0, Command::pass_event("Open editor error log", IdiomEvent::OpenLSPErrors)),
-        ];
-        commands.extend(
-            [
-                Command::cfg_open("open editor configs", EDITOR_CFG_FILE),
-                Command::cfg_open("open keymap config", KEY_MAP),
-                Command::cfg_open("open theme config", THEME_FILE),
-                Command::cfg_open("open UI theme config", THEME_UI),
-            ]
-            .into_iter()
-            .flatten()
-            .map(|cmd| (0, cmd)),
-        );
+        let commands = [
+            Some(Command::pass_event("Open file", IdiomEvent::NewPopup(OpenFileSelector::boxed))),
+            Some(Command::access_edit("UPPERCASE", formatting::uppercase)),
+            Some(Command::access_edit("LOWERCASE", formatting::lowercase)),
+            Command::cfg_open("Open editor configs", EDITOR_CFG_FILE),
+            Command::cfg_open("Open keymap config", KEY_MAP),
+            Command::cfg_open("Open theme config", THEME_FILE),
+            Command::cfg_open("Open UI theme config", THEME_UI),
+            Some(Command::pass_event("Open editor error log", IdiomEvent::OpenLSPErrors)),
+        ]
+        .into_iter()
+        .flatten()
+        .map(|cmd| (0, cmd))
+        .collect();
+
         Box::new(Pallet {
             commands,
             access_cb: None,
