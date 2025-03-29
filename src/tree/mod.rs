@@ -252,6 +252,9 @@ impl Tree {
 
     fn shrink(&mut self, gs: &mut GlobalState) {
         if let Some(TreePath::Folder { path, tree, .. }) = self.tree.get_mut_from_inner(self.state.selected) {
+            if tree.is_none() {
+                return;
+            }
             if let Err(err) = self.watcher.stop_watch(path) {
                 gs.error(err.to_string());
             };
