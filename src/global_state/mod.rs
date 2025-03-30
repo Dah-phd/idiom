@@ -261,7 +261,7 @@ impl GlobalState {
             self.components.remove(Components::TERM);
         } else {
             self.components.insert(Components::TERM);
-            runner.activate();
+            runner.activate(self.editor_area);
         }
         self.config_controls();
     }

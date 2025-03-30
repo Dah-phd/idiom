@@ -1,6 +1,8 @@
 pub mod backend;
 mod button;
+mod key_remap;
 pub mod layout;
+pub mod pty;
 pub mod state;
 mod text_field;
 pub mod utils;

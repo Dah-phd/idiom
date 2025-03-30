@@ -29,7 +29,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
 
     // INIT COMPONENTS
     let mut tree = Tree::new(tree_key_map, &mut gs);
-    let mut term = EditorTerminal::new(integrated_shell, gs.editor_area.width as u16);
+    let mut term = EditorTerminal::new(integrated_shell);
     let lsp_servers = editor_base_config.init_preloaded_lsp_servers(tree.get_base_file_names(), &mut gs).await;
     let mut workspace = Workspace::new(editor_key_map, editor_base_config, lsp_servers).await;
 

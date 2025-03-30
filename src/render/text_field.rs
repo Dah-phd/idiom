@@ -31,17 +31,20 @@ impl<T: Default + Clone> TextField<T> {
         self.char = self.text.len();
     }
 
+    #[allow(dead_code)]
     pub fn text_take(&mut self) -> String {
         self.char = 0;
         self.select = None;
         std::mem::take(&mut self.text)
     }
 
+    #[allow(dead_code)]
     pub fn text_get_token_at_cursor(&self) -> Option<&str> {
         let token_range = arg_range_at(&self.text, self.char);
         self.text.get(token_range)
     }
 
+    #[allow(dead_code)]
     pub fn text_replace_token(&mut self, new: &str) {
         let token_range = arg_range_at(&self.text, self.char);
         self.char = new.len() + token_range.start;
