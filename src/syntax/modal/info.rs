@@ -180,8 +180,8 @@ impl Info {
         let lines = area.iter_padded(1);
 
         match self.text.is_empty() {
-            true => self.state.render_list_padded(options, lines, &mut gs.writer),
-            false => self.state.render_list_padded(options.chain(["Information"]), lines, &mut gs.writer),
+            true => self.state.render_list_padded(options, lines, &mut gs.backend),
+            false => self.state.render_list_padded(options.chain(["Information"]), lines, &mut gs.backend),
         };
     }
 
@@ -190,11 +190,11 @@ impl Info {
         let mut text = self.text.iter().skip(self.text_state);
         while lines.len() > 0 {
             match text.next() {
-                Some(text) => text.wrap(&mut lines, &mut gs.writer),
+                Some(text) => text.wrap(&mut lines, &mut gs.backend),
                 None => break,
             }
         }
-        lines.clear_to_end(&mut gs.writer);
+        lines.clear_to_end(&mut gs.backend);
     }
 }
 

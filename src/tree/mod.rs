@@ -92,13 +92,13 @@ impl Tree {
             if let Some(mark) = self.tree_clipboard.get_mark(tree_path.path()) {
                 if mark.len() + 10 < line.width {
                     line.width -= mark.len();
-                    gs.writer.print_styled_at(line.row, line.col + line.width as u16, mark, style);
+                    gs.backend.print_styled_at(line.row, line.col + line.width as u16, mark, style);
                 }
             }
-            tree_path.render(self.display_offset, line, style, &mut gs.writer);
+            tree_path.render(self.display_offset, line, style, &mut gs.backend);
         }
         for line in lines {
-            line.fill_styled(' ', base_style, &mut gs.writer);
+            line.fill_styled(' ', base_style, &mut gs.backend);
         }
     }
 

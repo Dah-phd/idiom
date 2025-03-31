@@ -1,21 +1,24 @@
-use crate::global_state::GlobalState;
-use crate::render::layout::Rect;
-use crate::render::{pty::PopupApplet, TextField};
+use crate::render::layout::{Rect, BORDERS};
+use crate::render::pty::PtyShell;
+use crate::{global_state::GlobalState, render::layout::Line};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use std::sync::{Arc, Mutex};
 
 #[derive(Default)]
 pub struct EditorTerminal {
-    terminal: Option<PopupApplet>,
-    shell: String,
+    terminal: Option<PtyShell>,
+    shell: Option<String>,
+    border: Option<Line>,
 }
 
 impl EditorTerminal {
-    pub fn new(shell: String) -> Self {
+    pub fn new(shell: Option<String>) -> Self {
         Self { shell, ..Default::default() }
     }
 
     pub fn render(&mut self, gs: &mut GlobalState) {
+        if let Some(border) = self.border.clone() {
+            border.fill(BORDERS.horizontal_top, gs.backend());
+        }
         if let Some(term) = self.terminal.as_mut() {
             term.render(gs);
         }
@@ -30,8 +33,11 @@ impl EditorTerminal {
     pub fn activate(&mut self, rect: Rect) {
         if self.terminal.is_none() {
             let max_rows = rect.height / 2;
-            let rect = rect.bot(max_rows);
-            if let Ok(term) = PopupApplet::run(&self.shell, rect) {
+            let mut rect = rect.bot(max_rows);
+            self.border = rect.next_line();
+            if let Ok(term) =
+                self.shell.as_ref().map(|shell| PtyShell::run(shell, rect)).unwrap_or(PtyShell::default_cmd(rect))
+            {
                 self.terminal.replace(term);
             }
         }
@@ -43,6 +49,11 @@ impl EditorTerminal {
 
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         match key {
+            KeyEvent { code: KeyCode::Char('q' | 'd' | 'Q' | 'D'), modifiers: KeyModifiers::CONTROL, .. } => {
+                self.kill(gs);
+                gs.success("Term: Process killed!");
+                gs.toggle_terminal(self);
+            }
             KeyEvent { code: KeyCode::Esc, .. }
             | KeyEvent { code: KeyCode::Char('`' | ' '), modifiers: KeyModifiers::CONTROL, .. } => {
                 gs.message("Term: PTY active in background ... (CTRL + d/q) can be used to kill the process!");
@@ -50,7 +61,7 @@ impl EditorTerminal {
             }
             event_key => {
                 if let Some(term) = self.terminal.as_mut() {
-                    term.key_map(event_key, &mut gs.clipboard, &gs.matcher);
+                    term.key_map(event_key);
                 }
             }
         }
@@ -59,7 +70,9 @@ impl EditorTerminal {
 
     pub fn paste_passthrough(&mut self, clip: String) {}
 
-    pub fn resize(&mut self, width: u16) {
-        todo!()
+    pub fn resize(&mut self, editor_area: Rect) {
+        if let Some(pty) = self.terminal.as_mut() {
+            _ = pty.resize(editor_area);
+        }
     }
 }

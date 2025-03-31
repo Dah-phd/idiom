@@ -59,7 +59,7 @@ impl AutoComplete {
 
     #[inline]
     pub fn render(&mut self, area: &Rect, gs: &mut GlobalState) {
-        self.state.render_list(self.filtered.iter().map(|(c, ..)| c.as_str()), *area, &mut gs.writer);
+        self.state.render_list(self.filtered.iter().map(|(c, ..)| c.as_str()), *area, &mut gs.backend);
     }
 
     #[inline]

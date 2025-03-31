@@ -1,10 +1,17 @@
 use crate::{
-    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
-    render::{backend::BackendProtocol, TextField},
+    global_state::{Clipboard, IdiomEvent, PopupMessage},
+    render::{
+        backend::{Backend, BackendProtocol},
+        layout::Rect,
+        TextField,
+    },
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::{
+    event::{KeyCode, KeyEvent, KeyModifiers},
+    style::ContentStyle,
+};
 use fuzzy_matcher::skim::SkimMatcherV2;
 
 use super::{
@@ -19,11 +26,17 @@ pub struct ReplacePopup {
     pub new_text: TextField<PopupMessage>,
     pub on_text: bool,
     pub state: usize,
+    accent: ContentStyle,
+    rect: Rect,
 }
 
 impl ReplacePopup {
-    pub fn new() -> Box<Self> {
-        Box::default()
+    pub fn new(editor_area: Rect, accent: ContentStyle) -> Option<Box<Self>> {
+        let rect = editor_area.right_top_corner(2, 50);
+        if rect.height < 2 {
+            return None;
+        }
+        Some(Box::new(Self { rect, accent, ..Default::default() }))
     }
 
     pub fn from_search(pattern: String, options: Vec<(CursorPosition, CursorPosition)>) -> Box<Self> {
@@ -84,15 +97,11 @@ impl PopupInterface for ReplacePopup {
         }
     }
 
-    fn fast_render(&mut self, gs: &mut GlobalState) {
-        let area = gs.editor_area.right_top_corner(2, 50);
-        if area.height < 2 {
-            return;
-        };
-        gs.writer.set_style(gs.theme.accent_style);
-        let mut lines = area.into_iter();
+    fn fast_render(&mut self, _screen: Rect, backend: &mut Backend) {
+        backend.set_style(self.accent);
+        let mut lines = self.rect.into_iter();
         if let Some(line) = lines.next() {
-            let mut find_builder = line.unsafe_builder(&mut gs.writer);
+            let mut find_builder = line.unsafe_builder(backend);
             find_builder.push(count_as_string(&self.options).as_str());
             find_builder.push(" > ");
             match self.on_text {
@@ -103,7 +112,7 @@ impl PopupInterface for ReplacePopup {
             }
         };
         if let Some(line) = lines.next() {
-            let mut repl_builder = line.unsafe_builder(&mut gs.writer);
+            let mut repl_builder = line.unsafe_builder(backend);
             repl_builder.push("Rep > ");
             match self.on_text {
                 false => {
@@ -112,11 +121,11 @@ impl PopupInterface for ReplacePopup {
                 true => self.new_text.insert_formatted_text(repl_builder),
             }
         }
-        gs.writer.reset_style();
+        backend.reset_style();
     }
 
-    fn render(&mut self, gs: &mut GlobalState) {
-        self.fast_render(gs);
+    fn render(&mut self, screen: Rect, backend: &mut Backend) {
+        self.fast_render(screen, backend);
     }
 
     fn component_access(&mut self, ws: &mut Workspace, _tree: &mut Tree) {

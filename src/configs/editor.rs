@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::{
-    defaults::{get_indent_after, get_indent_spaces, get_shell, get_unident_before},
+    defaults::{get_indent_after, get_indent_spaces, get_unident_before},
     load_or_create_config,
     types::FileType,
     EDITOR_CFG_FILE,
@@ -23,8 +23,7 @@ pub struct EditorConfigs {
     #[serde(default = "get_unident_before")]
     pub unindent_before: String,
     /// SHELL
-    #[serde(default = "get_shell", skip)]
-    pub shell: String,
+    pub shell: Option<String>,
     /// LSP
     rust_lsp: Option<String>,
     rust_lsp_preload_if_present: Option<Vec<String>>,
@@ -58,7 +57,7 @@ impl Default for EditorConfigs {
             indent_after: String::from("({["),
             unindent_before: String::from("]})"),
             // shell
-            shell: get_shell(),
+            shell: None,
             // lsp
             rust_lsp: Some(String::from("rust-analyzer")),
             rust_lsp_preload_if_present: Some(vec!["Cargo.toml".to_owned(), "Cargo.lock".to_owned()]),

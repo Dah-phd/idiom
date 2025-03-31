@@ -43,7 +43,7 @@ pub struct GlobalState {
     mouse_mapper: MouseMapCallback,
     draw_callback: DrawCallback,
     pub theme: UITheme,
-    pub writer: Backend,
+    pub backend: Backend,
     pub popup: Box<dyn PopupInterface>,
     pub event: Vec<IdiomEvent>,
     pub clipboard: Clipboard,
@@ -70,7 +70,7 @@ impl GlobalState {
             mouse_mapper: controls::mouse_handler,
             draw_callback: draw::full_rebuild,
             theme,
-            writer: backend,
+            backend,
             popup: popups::placeholder(),
             event: Vec::default(),
             clipboard: Clipboard::default(),
@@ -88,7 +88,7 @@ impl GlobalState {
 
     #[inline(always)]
     pub fn backend(&mut self) -> &mut Backend {
-        &mut self.writer
+        &mut self.backend
     }
 
     #[inline]
@@ -103,15 +103,15 @@ impl GlobalState {
         } else {
             line += Mode::len();
         }
-        self.writer.set_style(self.theme.accent_style);
-        let mut rev_builder = line.unsafe_builder_rev(&mut self.writer);
+        self.backend.set_style(self.theme.accent_style);
+        let mut rev_builder = line.unsafe_builder_rev(&mut self.backend);
         if select_len != 0 {
             rev_builder.push(&format!("({select_len} selected) "));
         }
         rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {} ", cursor.line + 1, cursor.char + 1));
         self.messages.set_line(rev_builder.into_line());
-        self.messages.fast_render(self.theme.accent_style, &mut self.writer);
-        self.writer.reset_style();
+        self.messages.fast_render(self.theme.accent_style, &mut self.backend);
+        self.backend.reset_style();
     }
 
     pub fn clear_stats(&mut self) {
@@ -122,11 +122,11 @@ impl GlobalState {
         } else {
             line += Mode::len();
         }
-        self.writer.set_style(accent_style);
-        self.writer.go_to(line.row, line.col);
-        self.writer.clear_to_eol();
-        self.writer.reset_style();
-        self.messages.render(accent_style, &mut self.writer);
+        self.backend.set_style(accent_style);
+        self.backend.go_to(line.row, line.col);
+        self.backend.clear_to_eol();
+        self.backend.reset_style();
+        self.messages.render(accent_style, &mut self.backend);
     }
 
     #[inline]
@@ -181,7 +181,7 @@ impl GlobalState {
         if self.components.contains(Components::TREE) {
             let mut line = self.footer_line.clone();
             line.width = self.tree_size;
-            Mode::render_select_mode(line, &mut self.writer);
+            Mode::render_select_mode(line, &mut self.backend);
         } else {
             self.draw_callback = draw::full_rebuild;
         };
@@ -193,7 +193,7 @@ impl GlobalState {
         if self.components.contains(Components::TREE) {
             let mut line = self.footer_line.clone();
             line.width = self.tree_size;
-            Mode::render_insert_mode(line, &mut self.writer);
+            Mode::render_insert_mode(line, &mut self.backend);
         } else {
             self.draw_callback = draw::full_rebuild;
         };
@@ -216,9 +216,7 @@ impl GlobalState {
 
     #[inline]
     pub fn popup_render(&mut self) {
-        // popups do not mutate during render
-        let gs = unsafe { &mut *(self as *mut GlobalState) };
-        self.popup.fast_render(gs);
+        self.popup.fast_render(self.screen_rect, &mut self.backend);
     }
 
     pub fn popup(&mut self, popup: Box<dyn PopupInterface>) {
@@ -233,8 +231,8 @@ impl GlobalState {
         self.components.remove(Components::POPUP);
         self.config_controls();
         self.draw_callback = draw::full_rebuild;
-        self.editor_area.clear(&mut self.writer);
-        self.tree_area.clear(&mut self.writer);
+        self.editor_area.clear(&mut self.backend);
+        self.tree_area.clear(&mut self.backend);
         self.popup = popups::placeholder();
     }
 

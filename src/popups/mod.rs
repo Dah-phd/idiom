@@ -11,7 +11,8 @@ mod utils;
 
 use crate::{
     configs::CONFIG_FOLDER,
-    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
+    global_state::{Clipboard, IdiomEvent, PopupMessage},
+    render::{backend::Backend, layout::Rect},
     tree::Tree,
     workspace::Workspace,
 };
@@ -27,9 +28,9 @@ pub fn placeholder() -> Box<PlaceHolderPopup> {
 }
 
 pub trait PopupInterface {
-    fn fast_render(&mut self, gs: &mut GlobalState) {
+    fn fast_render(&mut self, screen: Rect, backend: &mut Backend) {
         if self.collect_update_status() {
-            self.render(gs);
+            self.render(screen, backend);
         }
     }
 
@@ -47,7 +48,7 @@ pub trait PopupInterface {
         }
     }
 
-    fn render(&mut self, gs: &mut GlobalState);
+    fn render(&mut self, screen: Rect, backend: &mut Backend);
     fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, matcher: &SkimMatcherV2) -> PopupMessage;
     fn component_access(&mut self, _ws: &mut Workspace, _tree: &mut Tree) {}
     fn mark_as_updated(&mut self);
@@ -105,5 +106,5 @@ impl PopupInterface for PlaceHolderPopup {
     fn collect_update_status(&mut self) -> bool {
         false
     }
-    fn render(&mut self, _gs: &mut GlobalState) {}
+    fn render(&mut self, _rect: Rect, _backend: &mut Backend) {}
 }

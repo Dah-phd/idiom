@@ -11,22 +11,51 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 use portable_pty::{native_pty_system, Child, CommandBuilder, PtyPair, PtySize};
 use std::{
     io::{Read, Write},
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex},
 };
 use tokio::task::JoinHandle;
 use vt100::{Parser, Screen};
 
+struct TrackedParser {
+    inner: Parser,
+    updated: bool,
+}
+
+impl TrackedParser {
+    fn new(rows: u16, cols: u16) -> Self {
+        Self { inner: Parser::new(rows, cols, 2000), updated: false }
+    }
+
+    fn process(&mut self, bytes: &[u8]) {
+        self.updated = true;
+        self.inner.process(bytes);
+    }
+
+    fn new_screen(&mut self) -> Option<Screen> {
+        if !self.updated {
+            return None;
+        }
+        self.updated = false;
+        Some(self.inner.screen().clone())
+    }
+
+    fn screen(&mut self) -> Screen {
+        self.updated = false;
+        self.inner.screen().clone()
+    }
+}
+
 /// Run another tui app within the context of idiom
-pub struct PopupApplet {
+pub struct PtyShell {
     pair: PtyPair,
     child: Box<dyn Child + Send + Sync>,
     writer: Box<dyn Write + Send>,
     output_handler: JoinHandle<std::io::Result<()>>,
-    output: Arc<RwLock<(Parser, bool)>>,
+    output: Arc<Mutex<TrackedParser>>,
     rect: Rect,
 }
 
-impl PopupApplet {
+impl PtyShell {
     pub fn default_cmd(rect: Rect) -> IdiomResult<Self> {
         Self::new(CommandBuilder::new_default_prog(), rect)
     }
@@ -36,17 +65,15 @@ impl PopupApplet {
     }
 
     pub fn new(mut cmd: CommandBuilder, rect: Rect) -> IdiomResult<Self> {
-        let rows = rect.height;
-        let cols = rect.width as u16;
         let system = native_pty_system();
-        let size = PtySize { rows, cols, ..Default::default() };
+        let size = PtySize::from(rect);
         let pair = system.openpty(size).map_err(|err| IdiomError::any(err))?;
 
         cmd.cwd("./");
         let child = pair.slave.spawn_command(cmd).map_err(|error| IdiomError::any(error))?;
         let writer = pair.master.take_writer().map_err(|error| IdiomError::any(error))?;
         let mut reader = pair.master.try_clone_reader().map_err(|error| IdiomError::any(error))?;
-        let output = Arc::new(RwLock::new((Parser::new(rows, cols, 0), false)));
+        let output = Arc::new(Mutex::new(TrackedParser::new(size.rows, size.cols)));
         let output_writer = Arc::clone(&output);
 
         let output_handler = tokio::spawn(async move {
@@ -58,9 +85,8 @@ impl PopupApplet {
                     return Ok(());
                 }
                 processed_buf.extend_from_slice(&buf[..size]);
-                let mut lock = output_writer.write().unwrap();
-                lock.0.process(&processed_buf);
-                lock.1 = true;
+                let mut lock = output_writer.lock().expect("lock on PtyShell read");
+                lock.process(&processed_buf);
                 processed_buf.clear();
             }
         });
@@ -81,51 +107,20 @@ impl PopupApplet {
         }
     }
 
-    pub fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, matcher: &SkimMatcherV2) -> PopupMessage {
+    pub fn key_map(&mut self, key: &KeyEvent) {
+        let mut buf = vec![];
         match key.code {
-            KeyCode::Char('q') => return PopupMessage::Clear,
-            KeyCode::Char(input) => {
-                _ = self.writer.write_all(&[input as u8]).unwrap();
-            }
-            KeyCode::Backspace => {
-                _ = self.writer.write_all(&[8]);
-            }
-            KeyCode::Enter => _ = self.writer.write_all(&[b'\n']),
-            KeyCode::Left => {
-                _ = self.writer.write_all(&[27, 91, 68]);
-            }
-            KeyCode::Right => {
-                _ = self.writer.write_all(&[27, 91, 67]);
-            }
-            KeyCode::Up => {
-                _ = self.writer.write_all(&[27, 91, 65]);
-            }
-            KeyCode::Down => {
-                _ = self.writer.write_all(&[27, 91, 66]);
-            }
-            // KeyCode::Home => todo!(),
-            // KeyCode::End => todo!(),
-            // KeyCode::PageUp => todo!(),
-            // KeyCode::PageDown => todo!(),
-            KeyCode::Tab => _ = self.writer.write_all(&[b'\t']),
-            // KeyCode::BackTab => todo!(),
-            // KeyCode::Delete => todo!(),
-            // KeyCode::Insert => todo!(),
-            // KeyCode::F(_) => todo!(),
-            // KeyCode::Null => todo!(),
-            // KeyCode::Esc => todo!(),
-            // KeyCode::CapsLock => todo!(),
-            // KeyCode::ScrollLock => todo!(),
-            // KeyCode::NumLock => todo!(),
-            // KeyCode::PrintScreen => todo!(),
-            // KeyCode::Pause => todo!(),
-            // KeyCode::Menu => todo!(),
-            // KeyCode::KeypadBegin => todo!(),
-            // KeyCode::Media(_) => todo!(),
-            // KeyCode::Modifier(_) => todo!(),
+            KeyCode::Char(ch) => _ = buf.push(ch as u8),
+            KeyCode::Backspace => _ = buf.push(8),
+            KeyCode::Enter => _ = buf.push(b'\r'),
+            KeyCode::Left => _ = buf.extend([27, 91, 68]),
+            KeyCode::Right => _ = buf.extend([27, 91, 67]),
+            KeyCode::Up => _ = buf.extend([27, 91, 65]),
+            KeyCode::Down => _ = buf.extend([27, 91, 66]),
+            KeyCode::Tab => _ = buf.extend([b'\t']),
             _ => (),
         }
-        PopupMessage::None
+        _ = self.writer.write_all(&buf);
     }
 
     fn mouse_map(&mut self, _event: MouseEvent) -> PopupMessage {
@@ -137,37 +132,43 @@ impl PopupApplet {
     }
 
     pub fn fast_render(&mut self, gs: &mut GlobalState) {
-        let screen = if let Ok(mut lock) = self.output.try_write() {
-            if !lock.1 {
-                return;
-            }
-            lock.1 = false;
-            let size = PtySize { rows: self.rect.height, cols: self.rect.width as u16, ..Default::default() };
-            _ = self.pair.master.resize(size);
-            lock.0.screen().clone()
-        } else {
+        let Ok(Some(screen)) = self.output.try_lock().map(|mut lock| lock.new_screen()) else {
             return;
         };
         self.full_render(screen, gs.backend());
     }
 
     pub fn render(&mut self, gs: &mut GlobalState) {
-        if let Ok(screen) = self.output.read().map(|lock| lock.0.screen().clone()) {
-            let size = PtySize { rows: self.rect.height, cols: self.rect.width as u16, ..Default::default() };
-            _ = self.pair.master.resize(size);
-            self.full_render(screen, gs.backend());
-        }
+        let screen = match self.output.lock() {
+            Ok(mut lock) => lock.screen(),
+            Err(error) => {
+                gs.error(error.to_string());
+                let mut lock = error.into_inner();
+                lock.screen()
+            }
+        };
+        self.full_render(screen, gs.backend());
     }
 
-    fn collect_update_status(&mut self) -> bool {
-        true
+    pub fn resize(&mut self, rect: Rect) -> Result<(), String> {
+        if rect == self.rect {
+            return Ok(());
+        }
+        self.pair.master.resize(rect.into()).map_err(|e| e.to_string())
     }
-    fn mark_as_updated(&mut self) {}
 }
 
-impl Drop for PopupApplet {
+impl Drop for PtyShell {
     fn drop(&mut self) {
         self.output_handler.abort();
         _ = self.child.kill();
+    }
+}
+
+impl From<Rect> for PtySize {
+    fn from(rect: Rect) -> Self {
+        let rows = rect.height;
+        let cols = rect.width as u16;
+        PtySize { rows, cols, ..Default::default() }
     }
 }

@@ -2,8 +2,8 @@ mod formatting;
 use super::{popup_file_open::OpenFileSelector, Command, CommandResult, PopupInterface};
 use crate::{
     configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
-    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
-    render::{layout::Rect, state::State, TextField},
+    global_state::{Clipboard, IdiomEvent, PopupMessage},
+    render::{backend::Backend, layout::Rect, state::State, TextField},
     tree::Tree,
     workspace::Workspace,
 };
@@ -20,17 +20,17 @@ pub struct Pallet {
 }
 
 impl PopupInterface for Pallet {
-    fn render(&mut self, gs: &mut GlobalState) {
-        let mut rect = gs.screen_rect.top(15).vcenter(100);
+    fn render(&mut self, screen: Rect, backend: &mut Backend) {
+        let mut rect = screen.top(15).vcenter(100);
         rect.bordered();
         self.rect.replace(rect);
-        rect.draw_borders(None, None, gs.backend());
+        rect.draw_borders(None, None, backend);
         match rect.next_line() {
-            Some(line) => self.pattern.widget(line, gs.backend()),
+            Some(line) => self.pattern.widget(line, backend),
             None => return,
         }
         let options = self.commands.iter().map(|cmd| cmd.1.label);
-        self.state.render_list(options, rect, gs.backend());
+        self.state.render_list(options, rect, backend);
     }
 
     fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, matcher: &SkimMatcherV2) -> PopupMessage {

@@ -1,7 +1,7 @@
 use super::PopupInterface;
 use crate::{
-    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
-    render::{layout::Rect, state::State, TextField},
+    global_state::{Clipboard, IdiomEvent, PopupMessage},
+    render::{backend::Backend, layout::Rect, state::State, TextField},
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use fuzzy_matcher::skim::SkimMatcherV2;
@@ -63,21 +63,21 @@ impl OpenFileSelector {
 }
 
 impl PopupInterface for OpenFileSelector {
-    fn render(&mut self, gs: &mut GlobalState) {
-        let mut rect = gs.screen_rect.top(15).vcenter(100);
+    fn render(&mut self, screen: Rect, backend: &mut Backend) {
+        let mut rect = screen.top(15).vcenter(100);
         rect.bordered();
         self.rect.replace(rect);
-        rect.draw_borders(None, None, gs.backend());
+        rect.draw_borders(None, None, backend);
         match rect.next_line() {
-            Some(line) => self.pattern.widget(line, gs.backend()),
+            Some(line) => self.pattern.widget(line, backend),
             None => return,
         }
         match self.paths.is_empty() {
             true => {
-                self.state.render_list(["No child paths found!"].into_iter(), rect, gs.backend());
+                self.state.render_list(["No child paths found!"].into_iter(), rect, backend);
             }
             false => {
-                self.state.render_list(self.paths.iter().map(String::as_str), rect, gs.backend());
+                self.state.render_list(self.paths.iter().map(String::as_str), rect, backend);
             }
         };
     }

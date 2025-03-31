@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use super::PopupInterface;
 use crate::{
-    global_state::{Clipboard, GlobalState, PopupMessage},
+    global_state::{Clipboard, PopupMessage},
     render::{
         backend::{Backend, StyleExt},
         layout::{Line, Rect},
@@ -28,21 +28,21 @@ pub struct Popup {
 }
 
 impl PopupInterface for Popup {
-    fn render(&mut self, gs: &mut GlobalState) {
+    fn render(&mut self, screen: Rect, backend: &mut Backend) {
         let (height, width) = self.size;
-        let mut area = gs.screen_rect.center(height, width);
+        let mut area = screen.center(height, width);
         area.bordered();
-        area.draw_borders(None, None, gs.backend());
+        area.draw_borders(None, None, backend);
         match self.title_prefix {
-            Some(prefix) => area.border_title_prefixed(prefix, &self.title, gs.backend()),
-            None => area.border_title(&self.title, gs.backend()),
+            Some(prefix) => area.border_title_prefixed(prefix, &self.title, backend),
+            None => area.border_title(&self.title, backend),
         };
         let mut lines = area.into_iter();
         if let Some(first_line) = lines.next() {
-            self.p_from_message(first_line, gs.backend());
+            self.p_from_message(first_line, backend);
         }
         if let Some(second_line) = lines.next() {
-            self.spans_from_buttons(second_line, &mut gs.writer);
+            self.spans_from_buttons(second_line, backend);
         }
     }
 
@@ -212,15 +212,15 @@ pub struct PopupSelector<T> {
 }
 
 impl<T> PopupInterface for PopupSelector<T> {
-    fn render(&mut self, gs: &mut GlobalState) {
+    fn render(&mut self, screen: Rect, backend: &mut Backend) {
         let (height, width) = self.size;
-        let mut rect = gs.screen_rect.center(height, width);
+        let mut rect = screen.center(height, width);
         rect.bordered();
         self.rect.replace(rect);
-        rect.draw_borders(None, None, &mut gs.writer);
+        rect.draw_borders(None, None, backend);
         match self.options.is_empty() {
-            true => self.state.render_list(["No results found!"].into_iter(), rect, &mut gs.writer),
-            false => self.state.render_list(self.options.iter().map(|opt| (self.display)(opt)), rect, &mut gs.writer),
+            true => self.state.render_list(["No results found!"].into_iter(), rect, backend),
+            false => self.state.render_list(self.options.iter().map(|opt| (self.display)(opt)), rect, backend),
         };
     }
 

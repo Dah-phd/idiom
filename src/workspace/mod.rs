@@ -48,9 +48,9 @@ impl Workspace {
                 Some(line) => line,
                 None => return,
             };
-            gs.writer.set_style(ContentStyle::underlined(None));
+            gs.backend.set_style(ContentStyle::underlined(None));
             {
-                let mut builder = line.unsafe_builder(&mut gs.writer);
+                let mut builder = line.unsafe_builder(&mut gs.backend);
                 builder.push_styled(&editor.display, self.tab_style);
                 for editor in self.editors.iter().skip(1) {
                     if !builder.push(" | ") || !builder.push(&editor.display) {
@@ -58,9 +58,9 @@ impl Workspace {
                     };
                 }
             }
-            gs.writer.reset_style();
+            gs.backend.reset_style();
         } else if let Some(line) = gs.tab_area.into_iter().next() {
-            line.render_empty(&mut gs.writer);
+            line.render_empty(&mut gs.backend);
         }
     }
 
@@ -382,7 +382,7 @@ impl Workspace {
         match self.get_active() {
             None => {
                 gs.clear_stats();
-                gs.editor_area.clear(&mut gs.writer);
+                gs.editor_area.clear(&mut gs.backend);
                 gs.select_mode();
             }
             Some(editor) => {

@@ -1,9 +1,9 @@
 use super::PopupInterface;
 use crate::{
-    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
+    global_state::{Clipboard, IdiomEvent, PopupMessage},
     render::{
-        backend::StyleExt,
-        layout::{IterLines, LineBuilder, BORDERS},
+        backend::{Backend, StyleExt},
+        layout::{IterLines, LineBuilder, Rect, BORDERS},
         state::State,
         TextField,
     },
@@ -60,21 +60,21 @@ impl PopupInterface for ActivePathSearch {
         PopupMessage::None
     }
 
-    fn render(&mut self, gs: &mut GlobalState) {
-        let mut area = gs.screen_rect.center(20, 120);
+    fn render(&mut self, screen: Rect, backend: &mut Backend) {
+        let mut area = screen.center(20, 120);
         area.bordered();
-        area.draw_borders(None, None, &mut gs.writer);
-        area.border_title_styled(PATH_SEARCH_TITLE, ContentStyle::fg(Color::Blue), &mut gs.writer);
+        area.draw_borders(None, None, backend);
+        area.border_title_styled(PATH_SEARCH_TITLE, ContentStyle::fg(Color::Blue), backend);
         let mut lines = area.into_iter();
         if let Some(line) = lines.next() {
-            self.pattern.widget(line, &mut gs.writer);
+            self.pattern.widget(line, backend);
         }
         if let Some(line) = lines.next() {
-            line.fill(BORDERS.horizontal_top, &mut gs.writer);
+            line.fill(BORDERS.horizontal_top, backend);
         }
         if let Some(list_rect) = lines.into_rect() {
             if self.options.is_empty() {
-                self.state.render_list(["No results found!"].into_iter(), list_rect, &mut gs.writer);
+                self.state.render_list(["No results found!"].into_iter(), list_rect, backend);
             } else {
                 self.state.render_list_complex(
                     &self.options,
@@ -82,7 +82,7 @@ impl PopupInterface for ActivePathSearch {
                         builder.push(&format!("{}", path.display()));
                     }],
                     &list_rect,
-                    &mut gs.writer,
+                    backend,
                 );
             };
         };
@@ -167,38 +167,31 @@ impl PopupInterface for ActiveFileSearch {
         PopupMessage::None
     }
 
-    fn render(&mut self, gs: &mut GlobalState) {
-        let mut area = gs.screen_rect.center(20, 120);
+    fn render(&mut self, screen: Rect, backend: &mut Backend) {
+        let mut area = screen.center(20, 120);
         area.bordered();
-        area.draw_borders(None, None, &mut gs.writer);
+        area.draw_borders(None, None, backend);
         match self.mode {
-            Mode::Full => area.border_title_styled(FULL_SEARCH_TITLE, ContentStyle::fg(Color::Red), &mut gs.writer),
-            Mode::Select => {
-                area.border_title_styled(FILE_SEARCH_TITLE, ContentStyle::fg(Color::Yellow), &mut gs.writer)
-            }
+            Mode::Full => area.border_title_styled(FULL_SEARCH_TITLE, ContentStyle::fg(Color::Red), backend),
+            Mode::Select => area.border_title_styled(FILE_SEARCH_TITLE, ContentStyle::fg(Color::Yellow), backend),
         }
         let mut lines = area.into_iter();
         if let Some(line) = lines.next() {
-            self.pattern.widget(line, &mut gs.writer);
+            self.pattern.widget(line, backend);
         }
         if let Some(line) = lines.next() {
-            line.fill(BORDERS.horizontal_top, &mut gs.writer);
+            line.fill(BORDERS.horizontal_top, backend);
         }
         if let Some(list_rect) = lines.into_rect() {
             if self.options.is_empty() {
-                self.state.render_list(["No results found!"].into_iter(), list_rect, &mut gs.writer);
+                self.state.render_list(["No results found!"].into_iter(), list_rect, backend);
             } else {
-                self.state.render_list_complex(
-                    &self.options,
-                    &[build_path_line, build_text_line],
-                    &list_rect,
-                    &mut gs.writer,
-                );
+                self.state.render_list_complex(&self.options, &[build_path_line, build_text_line], &list_rect, backend);
             }
         };
     }
 
-    fn fast_render(&mut self, gs: &mut GlobalState) {
+    fn fast_render(&mut self, screen: Rect, backend: &mut Backend) {
         if let Ok(mut buffer) = self.option_buffer.try_lock() {
             if !buffer.is_empty() {
                 self.options.extend(buffer.drain(..));
@@ -206,7 +199,7 @@ impl PopupInterface for ActiveFileSearch {
             }
         }
         if self.collect_update_status() {
-            self.render(gs);
+            self.render(screen, backend);
         }
     }
 

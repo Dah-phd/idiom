@@ -1,7 +1,7 @@
 use crate::configs::{EditorAction, TreeAction};
-use crate::global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage};
+use crate::global_state::{Clipboard, IdiomEvent, PopupMessage};
 use crate::popups::{Command, CommandResult, PopupInterface};
-use crate::render::backend::BackendProtocol;
+use crate::render::backend::{Backend, BackendProtocol};
 use crate::render::layout::Rect;
 use crate::render::state::State;
 use crate::tree::Tree;
@@ -83,15 +83,11 @@ pub struct ContextMenuTree<const N: usize> {
 }
 
 impl<const N: usize> PopupInterface for ContextMenuTree<N> {
-    fn render(&mut self, gs: &mut GlobalState) {
-        let reset_style = gs.backend().get_style();
-        gs.backend().set_style(self.accent_style);
-        self.state.render_list_padded(
-            self.commands.iter().map(|c| c.label),
-            self.modal_screen.iter_padded(1),
-            gs.backend(),
-        );
-        gs.backend().set_style(reset_style);
+    fn render(&mut self, _screen: Rect, backend: &mut Backend) {
+        let reset_style = backend.get_style();
+        backend.set_style(self.accent_style);
+        self.state.render_list_padded(self.commands.iter().map(|c| c.label), self.modal_screen.iter_padded(1), backend);
+        backend.set_style(reset_style);
     }
 
     fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {

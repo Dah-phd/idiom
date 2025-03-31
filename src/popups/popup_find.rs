@@ -3,10 +3,12 @@ use super::{
     PopupInterface,
 };
 use crate::{
-    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
+    global_state::{Clipboard, IdiomEvent, PopupMessage},
     render::{
-        backend::{BackendProtocol, StyleExt},
-        count_as_string, TextField,
+        backend::{Backend, BackendProtocol, StyleExt},
+        count_as_string,
+        layout::{Line, Rect},
+        TextField,
     },
     tree::Tree,
     workspace::{CursorPosition, Workspace},
@@ -18,17 +20,14 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 pub struct GoToLinePopup {
     line_idx: String,
     updated: bool,
-}
-
-impl Default for GoToLinePopup {
-    fn default() -> Self {
-        Self { line_idx: String::default(), updated: true }
-    }
+    render_line: Line,
+    accent: ContentStyle,
 }
 
 impl GoToLinePopup {
-    pub fn new() -> Box<Self> {
-        Box::default()
+    pub fn new(editor_area: Rect, accent: ContentStyle) -> Option<Box<Self>> {
+        let render_line = editor_area.right_top_corner(1, 50).into_iter().next()?;
+        Some(Box::new(Self { line_idx: String::default(), updated: true, render_line, accent }))
     }
 
     fn parse(&mut self) -> PopupMessage {
@@ -55,17 +54,16 @@ impl PopupInterface for GoToLinePopup {
         }
     }
 
-    fn render(&mut self, gs: &mut GlobalState) {
-        if let Some(line) = gs.editor_area.right_top_corner(1, 50).into_iter().next() {
-            gs.writer.set_style(gs.theme.accent_style);
-            {
-                let mut builder = line.unsafe_builder(&mut gs.writer);
-                builder.push(" Go to >> ");
-                builder.push(&self.line_idx);
-                builder.push_styled("|", ContentStyle::slowblink());
-            }
-            gs.writer.reset_style();
-        };
+    fn render(&mut self, _screen: Rect, backend: &mut Backend) {
+        let reset_style = backend.get_style();
+        backend.set_style(self.accent);
+        {
+            let mut builder = self.render_line.clone().unsafe_builder(backend);
+            builder.push(" Go to >> ");
+            builder.push(&self.line_idx);
+            builder.push_styled("|", ContentStyle::slowblink());
+        }
+        backend.set_style(reset_style);
     }
 
     fn mark_as_updated(&mut self) {
@@ -81,11 +79,20 @@ pub struct FindPopup {
     pub options: Vec<(CursorPosition, CursorPosition)>,
     pub pattern: TextField<PopupMessage>,
     pub state: usize,
+    accent: ContentStyle,
+    render_line: Line,
 }
 
 impl FindPopup {
-    pub fn new() -> Box<Self> {
-        Box::new(Self { options: Vec::new(), pattern: TextField::with_editor_access(String::new()), state: 0 })
+    pub fn new(editor_area: Rect, accent: ContentStyle) -> Option<Box<Self>> {
+        let render_line = editor_area.right_top_corner(1, 50).into_iter().next()?;
+        Some(Box::new(Self {
+            options: Vec::new(),
+            pattern: TextField::with_editor_access(String::new()),
+            state: 0,
+            accent,
+            render_line,
+        }))
     }
 }
 
@@ -106,20 +113,19 @@ impl PopupInterface for FindPopup {
         }
     }
 
-    fn render(&mut self, gs: &mut GlobalState) {
-        self.fast_render(gs);
+    fn render(&mut self, screen: Rect, backend: &mut Backend) {
+        self.fast_render(screen, backend);
     }
 
-    fn fast_render(&mut self, gs: &mut GlobalState) {
-        if let Some(line) = gs.editor_area.right_top_corner(1, 50).into_iter().next() {
-            gs.writer.set_style(gs.theme.accent_style);
-            let mut builder = line.unsafe_builder(&mut gs.writer);
-            builder.push(" Found(");
-            builder.push(&count_as_string(self.options.len()));
-            builder.push(") >> ");
-            self.pattern.insert_formatted_text(builder);
-            gs.writer.reset_style();
-        }
+    fn fast_render(&mut self, _screen: Rect, backend: &mut Backend) {
+        let reset_style = backend.get_style();
+        backend.set_style(self.accent);
+        let mut builder = self.render_line.clone().unsafe_builder(backend);
+        builder.push(" Found(");
+        builder.push(&count_as_string(self.options.len()));
+        builder.push(") >> ");
+        self.pattern.insert_formatted_text(builder);
+        backend.set_style(reset_style);
     }
 
     fn component_access(&mut self, ws: &mut Workspace, _tree: &mut Tree) {

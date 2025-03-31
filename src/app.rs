@@ -50,14 +50,18 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
                             match action {
                                 GeneralAction::Find => {
                                     if gs.is_insert() {
-                                        gs.popup(FindPopup::new());
+                                        if let Some(popup) = FindPopup::new(gs.editor_area, gs.theme.accent_style) {
+                                            gs.popup(popup);
+                                        }
                                     } else {
                                         gs.popup(ActivePathSearch::new());
                                     };
                                 }
                                 GeneralAction::Replace => {
                                     if gs.is_insert() {
-                                        gs.popup(ReplacePopup::new());
+                                        if let Some(popup) = ReplacePopup::new(gs.editor_area, gs.theme.accent_style) {
+                                            gs.popup(popup);
+                                        }
                                     };
                                 }
                                 GeneralAction::SelectOpenEditor => {
@@ -94,7 +98,9 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
                                 }
                                 GeneralAction::GoToLinePopup => {
                                     if gs.is_insert() {
-                                        gs.popup(GoToLinePopup::new());
+                                        if let Some(popup) = GoToLinePopup::new(gs.editor_area, gs.theme.accent_style) {
+                                            gs.popup(popup);
+                                        }
                                     };
                                 }
                                 GeneralAction::ToggleTerminal => {
@@ -117,7 +123,7 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
                     gs.full_resize(height, width);
                     let editor_rect = gs.calc_editor_rect();
                     workspace.resize_all(editor_rect.width, editor_rect.height as usize);
-                    term.resize(gs.editor_area.width as u16);
+                    term.resize(gs.editor_area);
                 }
                 Event::Mouse(event) => gs.map_mouse(event, &mut tree, &mut workspace),
                 Event::Paste(clip) => {

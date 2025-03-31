@@ -32,7 +32,7 @@ impl Default for Components {
 
 // transition
 pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
-    gs.screen_rect.clear(&mut gs.writer);
+    gs.screen_rect.clear(&mut gs.backend);
 
     if gs.screen_rect.width < MIN_WIDTH || gs.screen_rect.height < MIN_HEIGHT {
         gs.draw_callback = draw_too_small_rect;
@@ -48,7 +48,7 @@ pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut 
         gs.draw_callback = draw_with_tree;
 
         let (mode_line, msg_line) = gs.footer_line.clone().split_rel(gs.tree_size);
-        gs.mode.render(mode_line, &mut gs.writer);
+        gs.mode.render(mode_line, &mut gs.backend);
         gs.messages.set_line(msg_line);
         let (mut tree_area, tab_area) = screen.split_horizont_rel(gs.tree_size);
         if let Some(line) = tree_area.next_line() {
@@ -66,14 +66,14 @@ pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut 
         gs.draw_callback = draw;
 
         let (mode_line, msg_line) = gs.footer_line.clone().split_rel(Mode::len());
-        gs.mode.render(mode_line, &mut gs.writer);
+        gs.mode.render(mode_line, &mut gs.backend);
         gs.messages.set_line(msg_line);
         let (tree_area, tab_area) = screen.split_horizont_rel(0);
         gs.tree_area = tree_area;
         tab_area
     };
 
-    gs.messages.render(gs.theme.accent_style, &mut gs.writer);
+    gs.messages.render(gs.theme.accent_style, &mut gs.backend);
     (gs.tab_area, gs.editor_area) = screen.split_vertical_rel(1);
 
     workspace.render(gs);
@@ -110,7 +110,7 @@ pub fn draw(gs: &mut GlobalState, workspace: &mut Workspace, _tree: &mut Tree, _
     workspace.fast_render(gs);
     match workspace.get_active() {
         Some(editor) => editor.fast_render(gs),
-        None => gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer),
+        None => gs.messages.fast_render(gs.theme.accent_style, &mut gs.backend),
     }
 }
 
@@ -119,17 +119,17 @@ pub fn draw_with_tree(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mu
     workspace.fast_render(gs);
     match workspace.get_active() {
         Some(editor) => editor.fast_render(gs),
-        None => gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer),
+        None => gs.messages.fast_render(gs.theme.accent_style, &mut gs.backend),
     }
 }
 
 pub fn draw_popup(gs: &mut GlobalState, _workspace: &mut Workspace, _tree: &mut Tree, _term: &mut EditorTerminal) {
-    gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
+    gs.messages.fast_render(gs.theme.accent_style, &mut gs.backend);
     gs.popup_render();
 }
 
 pub fn draw_term(gs: &mut GlobalState, _workspace: &mut Workspace, _tree: &mut Tree, term: &mut EditorTerminal) {
-    gs.messages.fast_render(gs.theme.accent_style, &mut gs.writer);
+    gs.messages.fast_render(gs.theme.accent_style, &mut gs.backend);
     term.render(gs);
 }
 
