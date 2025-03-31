@@ -130,7 +130,7 @@ pub fn draw_popup(gs: &mut GlobalState, _workspace: &mut Workspace, _tree: &mut 
 
 pub fn draw_term(gs: &mut GlobalState, _workspace: &mut Workspace, _tree: &mut Tree, term: &mut EditorTerminal) {
     gs.messages.fast_render(gs.theme.accent_style, &mut gs.backend);
-    term.render(gs);
+    term.fast_render(gs);
 }
 
 fn render_logo(line: Line, gs: &mut GlobalState) {

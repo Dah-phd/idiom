@@ -117,7 +117,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                 return;
             }
             if gs.tree_area.relative_position(event.row + 2, event.column).is_some() {
-                gs.popup(Pallet::new());
+                gs.popup(Pallet::new(gs.screen_rect));
             }
         }
         MouseEventKind::Down(MouseButton::Right) => {

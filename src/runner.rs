@@ -20,13 +20,13 @@ impl EditorTerminal {
             border.fill(BORDERS.horizontal_top, gs.backend());
         }
         if let Some(term) = self.terminal.as_mut() {
-            term.render(gs);
+            term.render(gs.backend());
         }
     }
 
     pub fn fast_render(&mut self, gs: &mut GlobalState) {
         if let Some(term) = self.terminal.as_mut() {
-            term.fast_render(gs);
+            term.fast_render(gs.backend());
         }
     }
 

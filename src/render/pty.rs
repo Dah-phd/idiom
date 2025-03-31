@@ -1,6 +1,6 @@
 use crate::{
     error::{IdiomError, IdiomResult},
-    global_state::{Clipboard, GlobalState, PopupMessage},
+    global_state::PopupMessage,
     render::{
         backend::{Backend, BackendProtocol},
         layout::Rect,
@@ -94,19 +94,6 @@ impl PtyShell {
         Ok(Self { rect, pair, child, writer, output, output_handler })
     }
 
-    fn full_render(&self, screen: Screen, backend: &mut Backend) {
-        self.rect.clear(backend);
-        let mut screen = screen.rows_formatted(0, self.rect.width as u16);
-        for line in self.rect.into_iter() {
-            if let Some(text) = screen.next() {
-                backend.go_to(line.row, line.col);
-                _ = backend.write_all(&text);
-            } else {
-                line.render_empty(backend);
-            };
-        }
-    }
-
     pub fn key_map(&mut self, key: &KeyEvent) {
         let mut buf = vec![];
         match key.code {
@@ -131,23 +118,42 @@ impl PtyShell {
         todo!();
     }
 
-    pub fn fast_render(&mut self, gs: &mut GlobalState) {
+    pub fn fast_render(&mut self, backend: &mut Backend) {
         let Ok(Some(screen)) = self.output.try_lock().map(|mut lock| lock.new_screen()) else {
             return;
         };
-        self.full_render(screen, gs.backend());
+        self.full_render(screen, backend);
     }
 
-    pub fn render(&mut self, gs: &mut GlobalState) {
+    pub fn render(&mut self, backend: &mut Backend) {
         let screen = match self.output.lock() {
             Ok(mut lock) => lock.screen(),
             Err(error) => {
-                gs.error(error.to_string());
                 let mut lock = error.into_inner();
                 lock.screen()
             }
         };
-        self.full_render(screen, gs.backend());
+        self.full_render(screen, backend);
+    }
+
+    fn full_render(&mut self, screen: Screen, backend: &mut Backend) {
+        let reset_style = backend.get_style();
+        backend.reset_style();
+        self.rect.clear(backend);
+        let mut screen = screen.rows_formatted(0, self.rect.width as u16);
+        for line in self.rect.into_iter() {
+            if let Some(text) = screen.next() {
+                backend.go_to(line.row, line.col);
+                _ = backend.write_all(&text);
+            } else {
+                line.render_empty(backend);
+            };
+        }
+        backend.set_style(reset_style);
+    }
+
+    pub fn is_finished() -> bool {
+        todo!()
     }
 
     pub fn resize(&mut self, rect: Rect) -> Result<(), String> {

@@ -140,7 +140,7 @@ impl PopupInterface for Pallet {
 }
 
 impl Pallet {
-    pub fn new() -> Box<Self> {
+    pub fn new(_screen: Rect) -> Box<Self> {
         let commands = [
             Some(Command::pass_event("Open file", IdiomEvent::NewPopup(OpenFileSelector::boxed))),
             Some(Command::access_edit("UPPERCASE", formatting::uppercase)),
