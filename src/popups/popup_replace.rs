@@ -128,6 +128,16 @@ impl PopupInterface for ReplacePopup {
         self.fast_render(screen, backend);
     }
 
+    fn resize(&mut self, mut new_screen: Rect) -> PopupMessage {
+        if new_screen.width < 100 || new_screen.height < 3 {
+            return PopupMessage::Clear;
+        }
+        new_screen.next_line();
+        self.rect = new_screen.right_top_corner(2, 50);
+        self.mark_as_updated();
+        PopupMessage::None
+    }
+
     fn component_access(&mut self, ws: &mut Workspace, _tree: &mut Tree) {
         if let Some(editor) = ws.get_active() {
             self.options.clear();

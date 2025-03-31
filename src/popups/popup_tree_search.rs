@@ -88,6 +88,11 @@ impl PopupInterface for ActivePathSearch {
         };
     }
 
+    fn resize(&mut self, _new_screen: Rect) -> PopupMessage {
+        self.mark_as_updated();
+        PopupMessage::None
+    }
+
     fn component_access(&mut self, _ws: &mut Workspace, tree: &mut Tree) {
         if self.pattern.text.is_empty() {
             self.options.clear();
@@ -189,6 +194,11 @@ impl PopupInterface for ActiveFileSearch {
                 self.state.render_list_complex(&self.options, &[build_path_line, build_text_line], &list_rect, backend);
             }
         };
+    }
+
+    fn resize(&mut self, _new_screen: Rect) -> PopupMessage {
+        self.mark_as_updated();
+        PopupMessage::None
     }
 
     fn fast_render(&mut self, screen: Rect, backend: &mut Backend) {

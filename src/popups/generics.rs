@@ -46,6 +46,11 @@ impl PopupInterface for Popup {
         }
     }
 
+    fn resize(&mut self, _new_screen: Rect) -> PopupMessage {
+        self.mark_as_updated();
+        PopupMessage::None
+    }
+
     fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         if let Some(button) =
             self.buttons.iter().find(|button| matches!(&button.key, Some(key_code) if key_code.contains(&key.code)))
@@ -222,6 +227,11 @@ impl<T> PopupInterface for PopupSelector<T> {
             true => self.state.render_list(["No results found!"].into_iter(), rect, backend),
             false => self.state.render_list(self.options.iter().map(|opt| (self.display)(opt)), rect, backend),
         };
+    }
+
+    fn resize(&mut self, _new_screen: Rect) -> PopupMessage {
+        self.mark_as_updated();
+        PopupMessage::None
     }
 
     fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {

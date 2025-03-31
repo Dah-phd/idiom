@@ -82,6 +82,11 @@ impl PopupInterface for OpenFileSelector {
         };
     }
 
+    fn resize(&mut self, _new_screen: Rect) -> PopupMessage {
+        self.mark_as_updated();
+        PopupMessage::None
+    }
+
     fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         if self.state.selected != 0 {
             if let KeyEvent { code: KeyCode::Enter | KeyCode::Tab, .. } = key {

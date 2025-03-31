@@ -33,6 +33,11 @@ impl PopupInterface for Pallet {
         self.state.render_list(options, rect, backend);
     }
 
+    fn resize(&mut self, _new_screen: Rect) -> PopupMessage {
+        self.mark_as_updated();
+        PopupMessage::None
+    }
+
     fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, matcher: &SkimMatcherV2) -> PopupMessage {
         if self.commands.is_empty() {
             return PopupMessage::Clear;

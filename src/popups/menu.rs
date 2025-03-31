@@ -90,6 +90,10 @@ impl<const N: usize> PopupInterface for ContextMenuTree<N> {
         backend.set_style(reset_style);
     }
 
+    fn resize(&mut self, _new_screen: Rect) -> PopupMessage {
+        PopupMessage::Clear
+    }
+
     fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         match key {
             KeyEvent { code: KeyCode::Up, .. } => self.state.prev(N),

@@ -302,6 +302,9 @@ impl GlobalState {
     pub fn full_resize(&mut self, height: u16, width: u16) {
         let tree_rate = (self.tree_size * 100) / self.screen_rect.width;
         self.screen_rect = (width, height).into();
+        if self.components.contains(Components::POPUP) {
+            self.popup.resize(self.screen_rect);
+        }
         self.tree_size = std::cmp::max((tree_rate * self.screen_rect.width) / 100, Mode::len());
         self.draw_callback = draw::full_rebuild;
     }

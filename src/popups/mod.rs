@@ -49,6 +49,7 @@ pub trait PopupInterface {
     }
 
     fn render(&mut self, screen: Rect, backend: &mut Backend);
+    fn resize(&mut self, new_screen: Rect) -> PopupMessage;
     fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, matcher: &SkimMatcherV2) -> PopupMessage;
     fn component_access(&mut self, _ws: &mut Workspace, _tree: &mut Tree) {}
     fn mark_as_updated(&mut self);
@@ -107,4 +108,7 @@ impl PopupInterface for PlaceHolderPopup {
         false
     }
     fn render(&mut self, _rect: Rect, _backend: &mut Backend) {}
+    fn resize(&mut self, _new_screen: Rect) -> PopupMessage {
+        PopupMessage::None
+    }
 }
