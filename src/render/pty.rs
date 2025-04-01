@@ -97,25 +97,18 @@ impl PtyShell {
     pub fn key_map(&mut self, key: &KeyEvent) {
         let mut buf = vec![];
         match key.code {
-            KeyCode::Char(ch) => _ = buf.push(ch as u8),
-            KeyCode::Backspace => _ = buf.push(8),
-            KeyCode::Enter => _ = buf.push(b'\r'),
-            KeyCode::Left => _ = buf.extend([27, 91, 68]),
-            KeyCode::Right => _ = buf.extend([27, 91, 67]),
-            KeyCode::Up => _ = buf.extend([27, 91, 65]),
-            KeyCode::Down => _ = buf.extend([27, 91, 66]),
-            KeyCode::Tab => _ = buf.extend([b'\t']),
+            KeyCode::Char(ch) => buf.push(ch as u8),
+            KeyCode::Backspace => buf.push(0x8),
+            KeyCode::Tab => buf.extend([0x9]),
+            KeyCode::Enter => buf.push(0xD),
+            KeyCode::Delete => buf.push(0x7F),
+            KeyCode::Up => buf.extend([0x1B, 0x5B, 0x41]),
+            KeyCode::Down => buf.extend([0x1B, 0x5B, 0x42]),
+            KeyCode::Right => buf.extend([0x1B, 0x5B, 0x43]),
+            KeyCode::Left => buf.extend([0x1B, 0x5B, 0x44]),
             _ => (),
         }
         _ = self.writer.write_all(&buf);
-    }
-
-    fn mouse_map(&mut self, _event: MouseEvent) -> PopupMessage {
-        todo!()
-    }
-
-    fn paste_passthrough(&mut self, _clip: String, _matcher: &SkimMatcherV2) -> PopupMessage {
-        todo!();
     }
 
     pub fn fast_render(&mut self, backend: &mut Backend) {
@@ -152,8 +145,8 @@ impl PtyShell {
         backend.set_style(reset_style);
     }
 
-    pub fn is_finished() -> bool {
-        todo!()
+    pub fn is_finished(&self) -> bool {
+        self.output_handler.is_finished()
     }
 
     pub fn resize(&mut self, rect: Rect) -> Result<(), String> {

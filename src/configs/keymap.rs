@@ -159,7 +159,7 @@ impl Default for EditorUserKeyMap {
             indent: TAB.to_owned(),
             backspace: BACKSPACE.to_owned(),
             delete: DELETE.to_owned(),
-            remove_line: format!("{CTRL} && {DELETE} || {CTRL} && h || {CTRL} && {BACKSPACE}"),
+            remove_line: format!("{SHIFT} && {DELETE} || {CTRL} && {BACKSPACE}"),
             indent_start: format!("{CTRL} && ]"),
             unindent: format!("{SHIFT} && {TAB}"),
             up: UP.to_owned(),

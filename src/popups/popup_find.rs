@@ -125,23 +125,7 @@ impl PopupInterface for FindPopup {
         }
     }
 
-    fn render(&mut self, screen: Rect, backend: &mut Backend) {
-        self.fast_render(screen, backend);
-    }
-
-    fn resize(&mut self, new_screen: Rect) -> PopupMessage {
-        if new_screen.width < 100 {
-            return PopupMessage::Clear;
-        }
-        let Some(render_line) = new_screen.right_top_corner(1, 50).into_iter().next() else {
-            return PopupMessage::Clear;
-        };
-        self.render_line = render_line;
-        self.mark_as_updated();
-        PopupMessage::None
-    }
-
-    fn fast_render(&mut self, _screen: Rect, backend: &mut Backend) {
+    fn render(&mut self, _screen: Rect, backend: &mut Backend) {
         let reset_style = backend.get_style();
         backend.set_style(self.accent);
         let mut builder = self.render_line.clone().unsafe_builder(backend);
@@ -150,6 +134,22 @@ impl PopupInterface for FindPopup {
         builder.push(") >> ");
         self.pattern.insert_formatted_text(builder);
         backend.set_style(reset_style);
+    }
+
+    fn fast_render(&mut self, screen: Rect, backend: &mut Backend) {
+        self.render(screen, backend);
+    }
+
+    fn resize(&mut self, new_screen: Rect) -> PopupMessage {
+        if new_screen.width < 100 {
+            return PopupMessage::Clear;
+        }
+        let Some(render_line) = new_screen.right_top_corner(2, 50).into_iter().nth(1) else {
+            return PopupMessage::Clear;
+        };
+        self.render_line = render_line;
+        self.mark_as_updated();
+        PopupMessage::None
     }
 
     fn component_access(&mut self, ws: &mut Workspace, _tree: &mut Tree) {

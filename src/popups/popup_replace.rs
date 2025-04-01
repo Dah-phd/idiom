@@ -19,7 +19,6 @@ use super::{
     PopupInterface,
 };
 
-#[derive(Default)]
 pub struct ReplacePopup {
     pub options: Vec<(CursorPosition, CursorPosition)>,
     pub pattern: TextField<PopupMessage>,
@@ -36,17 +35,36 @@ impl ReplacePopup {
         if rect.height < 2 {
             return None;
         }
-        Some(Box::new(Self { rect, accent, ..Default::default() }))
+        Some(Box::new(Self {
+            rect,
+            accent,
+            on_text: false,
+            options: Vec::new(),
+            pattern: TextField::with_editor_access(String::new()),
+            new_text: TextField::with_editor_access(String::new()),
+            state: usize::default(),
+        }))
     }
 
-    pub fn from_search(pattern: String, options: Vec<(CursorPosition, CursorPosition)>) -> Box<Self> {
-        Box::new(Self {
+    pub fn from_search(
+        pattern: String,
+        options: Vec<(CursorPosition, CursorPosition)>,
+        editor_area: Rect,
+        accent: ContentStyle,
+    ) -> Option<Box<Self>> {
+        let rect = editor_area.right_top_corner(2, 50);
+        if rect.height < 2 {
+            return None;
+        }
+        Some(Box::new(Self {
             on_text: true,
             pattern: TextField::with_editor_access(pattern),
             new_text: TextField::with_editor_access(String::new()),
             options,
-            ..Default::default()
-        })
+            state: 0,
+            accent,
+            rect,
+        }))
     }
 
     fn drain_next(&mut self) -> (CursorPosition, CursorPosition) {
@@ -97,7 +115,8 @@ impl PopupInterface for ReplacePopup {
         }
     }
 
-    fn fast_render(&mut self, _screen: Rect, backend: &mut Backend) {
+    fn render(&mut self, _screen: Rect, backend: &mut Backend) {
+        let reset = backend.get_style();
         backend.set_style(self.accent);
         let mut lines = self.rect.into_iter();
         if let Some(line) = lines.next() {
@@ -121,18 +140,18 @@ impl PopupInterface for ReplacePopup {
                 true => self.new_text.insert_formatted_text(repl_builder),
             }
         }
-        backend.reset_style();
+        backend.set_style(reset);
     }
 
-    fn render(&mut self, screen: Rect, backend: &mut Backend) {
-        self.fast_render(screen, backend);
+    fn fast_render(&mut self, screen: Rect, backend: &mut Backend) {
+        self.render(screen, backend);
     }
 
     fn resize(&mut self, mut new_screen: Rect) -> PopupMessage {
         if new_screen.width < 100 || new_screen.height < 3 {
             return PopupMessage::Clear;
         }
-        new_screen.next_line();
+        let _skip_tab_bar = new_screen.next_line();
         self.rect = new_screen.right_top_corner(2, 50);
         self.mark_as_updated();
         PopupMessage::None

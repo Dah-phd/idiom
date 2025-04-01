@@ -36,15 +36,9 @@ type MouseMapCallback = fn(&mut GlobalState, MouseEvent, &mut Tree, &mut Workspa
 type DrawCallback = fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal);
 
 pub struct GlobalState {
-    mode: Mode,
-    tree_size: usize,
-    key_mapper: KeyMapCallback,
-    paste_passthrough: PastePassthroughCallback,
-    mouse_mapper: MouseMapCallback,
-    draw_callback: DrawCallback,
-    pub theme: UITheme,
     pub backend: Backend,
-    pub popup: Box<dyn PopupInterface>,
+    pub theme: UITheme,
+    pub matcher: SkimMatcherV2,
     pub event: Vec<IdiomEvent>,
     pub clipboard: Clipboard,
     pub exit: bool,
@@ -53,7 +47,13 @@ pub struct GlobalState {
     pub tab_area: Rect,
     pub editor_area: Rect,
     pub footer_line: Line,
-    pub matcher: SkimMatcherV2,
+    mode: Mode,
+    tree_size: usize,
+    key_mapper: KeyMapCallback,
+    paste_passthrough: PastePassthroughCallback,
+    mouse_mapper: MouseMapCallback,
+    draw_callback: DrawCallback,
+    popup: Box<dyn PopupInterface>,
     messages: Messages,
     components: Components,
 }
@@ -303,7 +303,11 @@ impl GlobalState {
         let tree_rate = (self.tree_size * 100) / self.screen_rect.width;
         self.screen_rect = (width, height).into();
         if self.components.contains(Components::POPUP) {
-            self.popup.resize(self.screen_rect);
+            match self.popup.resize(self.screen_rect) {
+                PopupMessage::Clear => self.clear_popup(),
+                PopupMessage::Event(event) => self.event.push(event),
+                PopupMessage::None => (),
+            };
         }
         self.tree_size = std::cmp::max((tree_rate * self.screen_rect.width) / 100, Mode::len());
         self.draw_callback = draw::full_rebuild;

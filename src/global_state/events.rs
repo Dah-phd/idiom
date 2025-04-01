@@ -294,7 +294,13 @@ impl IdiomEvent {
                 gs.insert_mode();
             }
             IdiomEvent::FindToReplace(pattern, options) => {
-                gs.popup(ReplacePopup::from_search(pattern, options));
+                match ReplacePopup::from_search(pattern, options, gs.editor_area, gs.theme.accent_style) {
+                    Some(replace_popup) => gs.popup(replace_popup),
+                    None => {
+                        gs.error("Failed to build replace popup (size constraints) ...");
+                        gs.clear_popup();
+                    }
+                }
             }
             IdiomEvent::ReplaceAll(clip, ranges) => {
                 if let Some(editor) = ws.get_active() {
@@ -307,6 +313,8 @@ impl IdiomEvent {
                     editor.replace_select(from, to, new_text.as_str());
                     if let Some((from, to)) = next_select {
                         editor.go_to_select(from, to);
+                        editor.render(gs);
+                    } else {
                         editor.render(gs);
                     }
                 }
