@@ -17,6 +17,10 @@ pub trait BackendProtocol: Write + Sized {
     fn exit() -> std::io::Result<()>;
     /// get whole screen as rect
     fn screen() -> Result<Rect>;
+    /// stop updates allowing to build buffer
+    fn freeze(&mut self);
+    /// restore updates allowing to render buffer
+    fn unfreeze(&mut self);
     /// clears from cursor until the End Of Line
     fn clear_to_eol(&mut self);
     /// clears current cursor line

@@ -18,6 +18,14 @@ impl BackendProtocol for Backend {
         Ok(())
     }
 
+    fn freeze(&mut self) {
+        self.data.push((ContentStyle::default(), String::from("<<freeze>>")));
+    }
+
+    fn unfreeze(&mut self) {
+        self.data.push((ContentStyle::default(), String::from("<<unfreeze>>")));
+    }
+
     fn clear_all(&mut self) {
         self.data.push((ContentStyle::default(), String::from("<<clear all>>")));
     }

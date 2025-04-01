@@ -5,7 +5,7 @@ use crossterm::{
     cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show},
     execute, queue,
     style::{ContentStyle, Print, ResetColor, SetStyle},
-    terminal::{size, Clear, ClearType},
+    terminal::{size, BeginSynchronizedUpdate, Clear, ClearType, EndSynchronizedUpdate},
 };
 #[allow(unused_imports)]
 use std::{
@@ -74,6 +74,18 @@ impl BackendProtocol for Backend {
     #[inline]
     fn screen() -> std::io::Result<Rect> {
         size().map(Rect::from)
+    }
+
+    /// freeze screen allowing to build buffer
+    #[inline]
+    fn freeze(&mut self) {
+        execute!(self, BeginSynchronizedUpdate).expect(ERR_MSG);
+    }
+
+    /// unfreeze allowing the buffer to render
+    #[inline]
+    fn unfreeze(&mut self) {
+        execute!(self, EndSynchronizedUpdate).expect(ERR_MSG);
     }
 
     /// clears from cursor until the End Of Line

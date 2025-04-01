@@ -4,6 +4,7 @@ use crate::lsp::TreeDiagnostics;
 use crate::popups::{
     popup_replace::ReplacePopup, popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges, PopupInterface,
 };
+use crate::render::backend::BackendProtocol;
 use crate::tree::Tree;
 use crate::workspace::line::EditorLine;
 use crate::workspace::{add_editor_from_data, Workspace};
@@ -162,8 +163,11 @@ impl IdiomEvent {
                     match clear_popup {
                         true => gs.clear_popup(),
                         false => {
+                            gs.backend.freeze();
                             editor.render(gs);
                             gs.popup.mark_as_updated();
+                            gs.popup_render();
+                            gs.backend.unfreeze();
                         }
                     }
                 }
@@ -175,8 +179,11 @@ impl IdiomEvent {
                     match clear_popup {
                         true => gs.clear_popup(),
                         false => {
+                            gs.backend.freeze();
                             editor.render(gs);
                             gs.popup.mark_as_updated();
+                            gs.popup_render();
+                            gs.backend.unfreeze();
                         }
                     }
                 }
@@ -309,6 +316,7 @@ impl IdiomEvent {
                 gs.clear_popup();
             }
             IdiomEvent::ReplaceNextSelect { new_text, select: (from, to), next_select } => {
+                gs.backend.freeze();
                 if let Some(editor) = ws.get_active() {
                     editor.replace_select(from, to, new_text.as_str());
                     if let Some((from, to)) = next_select {
@@ -317,7 +325,9 @@ impl IdiomEvent {
                     } else {
                         editor.render(gs);
                     }
+                    gs.popup_render();
                 }
+                gs.backend.unfreeze();
             }
         }
     }

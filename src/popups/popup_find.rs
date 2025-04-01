@@ -128,11 +128,13 @@ impl PopupInterface for FindPopup {
     fn render(&mut self, _screen: Rect, backend: &mut Backend) {
         let reset_style = backend.get_style();
         backend.set_style(self.accent);
-        let mut builder = self.render_line.clone().unsafe_builder(backend);
-        builder.push(" Found(");
-        builder.push(&count_as_string(self.options.len()));
-        builder.push(") >> ");
-        self.pattern.insert_formatted_text(builder);
+        {
+            let mut builder = self.render_line.clone().unsafe_builder(backend);
+            builder.push(" Found(");
+            builder.push(&count_as_string(self.options.len()));
+            builder.push(") >> ");
+            self.pattern.insert_formatted_text(builder);
+        }
         backend.set_style(reset_style);
     }
 
