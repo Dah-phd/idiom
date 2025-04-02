@@ -44,9 +44,7 @@ impl BackendProtocol for Backend {
         self.data.push((ContentStyle::default(), format!("<<go to row: {row} col: {col}>>")))
     }
 
-    fn hide_cursor(&mut self) {
-        self.data.push((ContentStyle::default(), String::from("<<hide cursor>>")));
-    }
+    fn hide_cursor() {}
 
     fn print<D: std::fmt::Display>(&mut self, text: D) {
         self.data.push((self.default_style, text.to_string()));

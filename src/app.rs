@@ -12,9 +12,9 @@ use crate::{
     render::backend::Backend,
     runner::EditorTerminal,
     tree::Tree,
-    workspace::{editor, Workspace},
+    workspace::Workspace,
 };
-use crossterm::{cursor, event::Event};
+use crossterm::event::Event;
 use std::{io::Write, path::PathBuf, time::Duration};
 
 const MIN_FRAMERATE: Duration = Duration::from_millis(8);

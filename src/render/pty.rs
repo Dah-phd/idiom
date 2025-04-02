@@ -1,13 +1,11 @@
 use crate::{
     error::{IdiomError, IdiomResult},
-    global_state::PopupMessage,
     render::{
         backend::{Backend, BackendProtocol},
         layout::Rect,
     },
 };
-use crossterm::event::{KeyCode, KeyEvent, MouseEvent};
-use fuzzy_matcher::skim::SkimMatcherV2;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use portable_pty::{native_pty_system, Child, CommandBuilder, PtyPair, PtySize};
 use std::{
     io::{Read, Write},
@@ -94,21 +92,24 @@ impl PtyShell {
         Ok(Self { rect, pair, child, writer, output, output_handler })
     }
 
-    pub fn key_map(&mut self, key: &KeyEvent) {
-        let mut buf = vec![];
+    pub fn key_map(&mut self, key: &KeyEvent) -> std::io::Result<()> {
+        if let KeyEvent { code: KeyCode::Char('c'), modifiers: KeyModifiers::CONTROL, .. } = key {
+            return self.writer.write_all(&[0x3]);
+        };
         match key.code {
-            KeyCode::Char(ch) => buf.push(ch as u8),
-            KeyCode::Backspace => buf.push(0x8),
-            KeyCode::Tab => buf.extend([0x9]),
-            KeyCode::Enter => buf.push(0xD),
-            KeyCode::Delete => buf.push(0x7F),
-            KeyCode::Up => buf.extend([0x1B, 0x5B, 0x41]),
-            KeyCode::Down => buf.extend([0x1B, 0x5B, 0x42]),
-            KeyCode::Right => buf.extend([0x1B, 0x5B, 0x43]),
-            KeyCode::Left => buf.extend([0x1B, 0x5B, 0x44]),
-            _ => (),
+            KeyCode::Char(ch) => self.writer.write_all(&[ch as u8]),
+            KeyCode::Backspace => self.writer.write_all(&[0x8]),
+            KeyCode::Tab => self.writer.write_all(&[0x9]),
+            KeyCode::Enter => self.writer.write_all(&[0xD]),
+            KeyCode::Delete => self.writer.write_all(&[0x7F]),
+            KeyCode::Up => self.writer.write_all(&[0x1B, 0x5B, 0x41]),
+            KeyCode::Down => self.writer.write_all(&[0x1B, 0x5B, 0x42]),
+            KeyCode::Right => self.writer.write_all(&[0x1B, 0x5B, 0x43]),
+            KeyCode::Left => self.writer.write_all(&[0x1B, 0x5B, 0x44]),
+            KeyCode::End => self.writer.write_all(&[0x1B, 0x5B, 0x46]),
+            KeyCode::Home => self.writer.write_all(&[0x1B, 0x5B, 0x48]),
+            _ => Ok(()),
         }
-        _ = self.writer.write_all(&buf);
     }
 
     pub fn fast_render(&mut self, backend: &mut Backend) {
@@ -130,6 +131,7 @@ impl PtyShell {
     }
 
     fn full_render(&mut self, screen: Screen, backend: &mut Backend) {
+        let (row, col) = screen.cursor_position();
         let reset_style = backend.get_style();
         backend.reset_style();
         self.rect.clear(backend);
@@ -143,6 +145,8 @@ impl PtyShell {
             };
         }
         backend.set_style(reset_style);
+        backend.go_to(self.rect.row + row, self.rect.col + col);
+        backend.show_cursor();
     }
 
     pub fn is_finished(&self) -> bool {
@@ -161,6 +165,7 @@ impl Drop for PtyShell {
     fn drop(&mut self) {
         self.output_handler.abort();
         _ = self.child.kill();
+        Backend::hide_cursor();
     }
 }
 

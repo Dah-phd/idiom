@@ -50,7 +50,7 @@ pub trait BackendProtocol: Write + Sized {
     /// direct showing cursor - no buffer queing
     fn show_cursor(&mut self);
     /// direct hiding cursor - no buffer queing
-    fn hide_cursor(&mut self);
+    fn hide_cursor();
     fn print<D: Display>(&mut self, text: D);
     /// goes to location and prints text
     fn print_at<D: Display>(&mut self, row: u16, col: u16, text: D);
