@@ -18,6 +18,7 @@ use crossterm::style::ContentStyle;
 use fuzzy_matcher::skim::SkimMatcherV2;
 
 pub struct GoToLinePopup {
+    current_line: usize,
     line_idx: String,
     updated: bool,
     render_line: Line,
@@ -25,14 +26,14 @@ pub struct GoToLinePopup {
 }
 
 impl GoToLinePopup {
-    pub fn new(editor_area: Rect, accent: ContentStyle) -> Option<Box<Self>> {
+    pub fn new(current_line: usize, editor_area: Rect, accent: ContentStyle) -> Option<Box<Self>> {
         let render_line = editor_area.right_top_corner(1, 50).into_iter().next()?;
-        Some(Box::new(Self { line_idx: String::default(), updated: true, render_line, accent }))
+        Some(Box::new(Self { current_line, line_idx: String::default(), updated: true, render_line, accent }))
     }
 
     fn parse(&mut self) -> PopupMessage {
         if self.line_idx.is_empty() {
-            return PopupMessage::None;
+            return PopupMessage::Event(IdiomEvent::GoToLine { line: self.current_line, clear_popup: false });
         }
         match self.line_idx.parse::<usize>() {
             Ok(idx) => PopupMessage::Event(IdiomEvent::GoToLine { line: idx.saturating_sub(1), clear_popup: false }),

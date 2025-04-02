@@ -12,9 +12,9 @@ use crate::{
     render::backend::Backend,
     runner::EditorTerminal,
     tree::Tree,
-    workspace::Workspace,
+    workspace::{editor, Workspace},
 };
-use crossterm::event::Event;
+use crossterm::{cursor, event::Event};
 use std::{io::Write, path::PathBuf, time::Duration};
 
 const MIN_FRAMERATE: Duration = Duration::from_millis(8);
@@ -98,7 +98,10 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
                                 }
                                 GeneralAction::GoToLinePopup => {
                                     if gs.is_insert() {
-                                        if let Some(popup) = GoToLinePopup::new(gs.editor_area, gs.theme.accent_style) {
+                                        if let Some(popup) = workspace.get_active().and_then(|editor| {
+                                            let current_line = editor.cursor.line;
+                                            GoToLinePopup::new(current_line, gs.editor_area, gs.theme.accent_style)
+                                        }) {
                                             gs.popup(popup);
                                         }
                                     };
