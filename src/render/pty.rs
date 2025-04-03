@@ -149,8 +149,11 @@ impl PtyShell {
         backend.show_cursor();
     }
 
-    pub fn is_finished(&self) -> bool {
-        self.output_handler.is_finished()
+    pub fn is_finished(&mut self) -> bool {
+        match self.child.try_wait() {
+            Ok(None) => false,
+            _ => true,
+        }
     }
 
     pub fn resize(&mut self, rect: Rect) -> Result<(), String> {

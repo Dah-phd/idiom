@@ -2,8 +2,13 @@ use crossterm::event::KeyEvent;
 use fuzzy_matcher::skim::SkimMatcherV2;
 
 use crate::{
+    error::IdiomResult,
     global_state::{Clipboard, PopupMessage},
-    render::{backend::Backend, layout::Rect, pty::PtyShell},
+    render::{
+        backend::{Backend, BackendProtocol},
+        layout::Rect,
+        pty::PtyShell,
+    },
 };
 
 use super::PopupInterface;
@@ -13,8 +18,9 @@ pub struct EmbededTuiApp {
 }
 
 impl EmbededTuiApp {
-    pub fn new(cmd: &str, rect: Rect) -> Self {
-        Self { shell: PtyShell::run(cmd, rect).unwrap() }
+    pub fn new(cmd: &str) -> IdiomResult<Self> {
+        let rect = Backend::screen()?;
+        PtyShell::run(cmd, rect).map(|shell| Self { shell })
     }
 }
 
@@ -23,7 +29,12 @@ impl PopupInterface for EmbededTuiApp {
         true
     }
     fn key_map(&mut self, key: &KeyEvent, _clipboard: &mut Clipboard, _matcher: &SkimMatcherV2) -> PopupMessage {
-        self.shell.key_map(key);
+        let Ok(..) = self.shell.key_map(key) else {
+            return PopupMessage::Clear;
+        };
+        if self.shell.is_finished() {
+            return PopupMessage::Clear;
+        }
         PopupMessage::None
     }
 

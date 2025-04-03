@@ -61,7 +61,11 @@ impl EditorTerminal {
             }
             event_key => {
                 if let Some(term) = self.terminal.as_mut() {
-                    term.key_map(event_key);
+                    if let Err(error) = term.key_map(event_key) {
+                        gs.error(error);
+                        self.terminal.take();
+                        gs.toggle_terminal(self);
+                    };
                 }
             }
         }

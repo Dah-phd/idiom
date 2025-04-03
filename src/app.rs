@@ -8,13 +8,14 @@ use crate::{
         popup_replace::ReplacePopup,
         popup_tree_search::ActivePathSearch,
         popups_editor::{save_all_popup, selector_editors},
+        tui_embed::EmbededTuiApp,
     },
     render::backend::Backend,
     runner::EditorTerminal,
     tree::Tree,
     workspace::Workspace,
 };
-use crossterm::event::Event;
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use std::{io::Write, path::PathBuf, time::Duration};
 
 const MIN_FRAMERATE: Duration = Duration::from_millis(8);
@@ -103,6 +104,10 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
                                             GoToLinePopup::new(current_line, gs.editor_area, gs.theme.accent_style)
                                         }) {
                                             gs.popup(popup);
+                                        }
+                                    } else {
+                                        if let Ok(emb) = EmbededTuiApp::new("gitui") {
+                                            gs.popup(Box::new(emb));
                                         }
                                     };
                                 }
