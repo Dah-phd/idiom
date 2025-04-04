@@ -200,9 +200,7 @@ impl Drop for PtyShell {
     fn drop(&mut self) {
         self.output_handler.abort();
         _ = self.child.kill();
-        if !self.cursor.hidden {
-            Backend::hide_cursor();
-        }
+        Backend::hide_cursor();
     }
 }
 

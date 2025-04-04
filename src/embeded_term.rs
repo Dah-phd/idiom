@@ -1,3 +1,4 @@
+use crate::render::backend::{Backend, BackendProtocol};
 use crate::render::layout::{Rect, BORDERS};
 use crate::render::pty::PtyShell;
 use crate::{global_state::GlobalState, render::layout::Line};
@@ -58,6 +59,7 @@ impl EditorTerminal {
             | KeyEvent { code: KeyCode::Char('`' | ' '), modifiers: KeyModifiers::CONTROL, .. } => {
                 gs.message("Term: PTY active in background ... (CTRL + d/q) can be used to kill the process!");
                 gs.toggle_terminal(self);
+                Backend::hide_cursor();
             }
             event_key => {
                 if let Some(term) = self.terminal.as_mut() {
