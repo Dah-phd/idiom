@@ -17,6 +17,7 @@ pub enum PopupMessage {
     None,
     Event(IdiomEvent),
     Clear,
+    ClearEvent(IdiomEvent),
 }
 
 #[derive(Default)]
@@ -167,6 +168,10 @@ pub fn mouse_popup_handler(gs: &mut GlobalState, event: MouseEvent, _tree: &mut 
         PopupMessage::Event(event) => {
             gs.event.push(event);
         }
+        PopupMessage::ClearEvent(event) => {
+            gs.clear_popup();
+            gs.event.push(event);
+        }
     };
 }
 
@@ -248,6 +253,10 @@ pub fn paste_passthrough_popup(gs: &mut GlobalState, clip: String, _ws: &mut Wor
             gs.clear_popup();
         }
         PopupMessage::Event(event) => {
+            gs.event.push(event);
+        }
+        PopupMessage::ClearEvent(event) => {
+            gs.clear_popup();
             gs.event.push(event);
         }
     };

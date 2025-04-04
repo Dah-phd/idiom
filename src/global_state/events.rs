@@ -101,7 +101,9 @@ impl IdiomEvent {
             }
             IdiomEvent::EmbededApp(cmd) => {
                 gs.draw_callback = super::draw::full_rebuild;
-                run_embeded_tui(&cmd, gs);
+                if let Err(error) = run_embeded_tui(&cmd, gs) {
+                    gs.error(error);
+                };
             }
             IdiomEvent::NewPopup(builder) => {
                 gs.clear_popup();

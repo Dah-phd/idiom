@@ -273,6 +273,10 @@ impl GlobalState {
             PopupMessage::Event(event) => {
                 self.event.push(event);
             }
+            PopupMessage::ClearEvent(event) => {
+                self.clear_popup();
+                self.event.push(event);
+            }
         }
         true
     }
@@ -304,9 +308,13 @@ impl GlobalState {
         self.screen_rect = (width, height).into();
         if self.components.contains(Components::POPUP) {
             match self.popup.resize(self.screen_rect) {
+                PopupMessage::None => (),
                 PopupMessage::Clear => self.clear_popup(),
                 PopupMessage::Event(event) => self.event.push(event),
-                PopupMessage::None => (),
+                PopupMessage::ClearEvent(event) => {
+                    self.clear_popup();
+                    self.event.push(event);
+                }
             };
         }
         self.tree_size = std::cmp::max((tree_rate * self.screen_rect.width) / 100, Mode::len());

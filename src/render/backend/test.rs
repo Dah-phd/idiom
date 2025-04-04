@@ -99,9 +99,8 @@ impl BackendProtocol for Backend {
         self.data.push((self.default_style, format!("<<set style>>")))
     }
 
-    fn show_cursor(&mut self) {
-        self.data.push((self.default_style, String::from("<<show cursor>>")));
-    }
+    fn show_cursor() {}
+    // self.data.push((self.default_style, String::from("<<show cursor>>")));
 
     fn to_set_style(&mut self) {
         self.data.push((self.default_style, String::from("<<set style>>")));

@@ -143,6 +143,7 @@ impl Pallet {
     pub fn new(_screen: Rect) -> Box<Self> {
         let commands = [
             Some(Command::pass_event("Open file", IdiomEvent::NewPopup(OpenFileSelector::boxed))),
+            Some(Command::pass_event("GitUI", IdiomEvent::EmbededApp(String::from("gitui")))),
             Some(Command::access_edit("UPPERCASE", formatting::uppercase)),
             Some(Command::access_edit("LOWERCASE", formatting::lowercase)),
             Command::cfg_open("Open editor configs", EDITOR_CFG_FILE),

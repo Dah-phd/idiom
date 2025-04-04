@@ -81,7 +81,7 @@ impl Command {
     }
 
     fn pass_event(label: &'static str, event: IdiomEvent) -> Self {
-        Command { label, result: CommandResult::Simple(event.into()) }
+        Command { label, result: CommandResult::Simple(PopupMessage::ClearEvent(event)) }
     }
 
     const fn access_edit(label: &'static str, cb: fn(&mut Workspace, &mut Tree)) -> Self {

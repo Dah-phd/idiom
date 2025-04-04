@@ -194,14 +194,14 @@ impl BackendProtocol for Backend {
 
     /// direct showing cursor - no buffer queing
     #[inline]
-    fn show_cursor(&mut self) {
-        queue!(self, Show).expect(ERR_MSG);
+    fn show_cursor() {
+        queue!(std::io::stdout(), Show).expect(ERR_MSG);
     }
 
     /// direct hiding cursor - no buffer queing
     #[inline]
     fn hide_cursor() {
-        execute!(std::io::stdout(), Hide).expect(ERR_MSG);
+        queue!(std::io::stdout(), Hide).expect(ERR_MSG);
     }
 
     #[inline]

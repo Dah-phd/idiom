@@ -51,6 +51,7 @@ pub struct PtyShell {
     output_handler: JoinHandle<std::io::Result<()>>,
     output: Arc<Mutex<TrackedParser>>,
     rect: Rect,
+    cursor: CursorState,
 }
 
 impl PtyShell {
@@ -89,7 +90,7 @@ impl PtyShell {
             }
         });
 
-        Ok(Self { rect, pair, child, writer, output, output_handler })
+        Ok(Self { rect, pair, child, writer, output, output_handler, cursor: CursorState::from(rect) })
     }
 
     pub fn key_map(&mut self, key: &KeyEvent) -> std::io::Result<()> {
@@ -135,20 +136,18 @@ impl PtyShell {
     }
 
     fn full_render(&mut self, screen: Screen, backend: &mut Backend) {
-        let (row, col) = screen.cursor_position();
         let reset_style = backend.get_style();
         backend.reset_style();
         self.rect.clear(backend);
-        let mut screen = screen.rows_formatted(0, self.rect.width as u16);
+        let mut text = screen.rows_formatted(0, self.rect.width as u16);
         for line in self.rect.into_iter() {
-            if let Some(text) = screen.next() {
+            if let Some(text) = text.next() {
                 backend.go_to(line.row, line.col);
                 _ = backend.write_all(&text);
             };
         }
         backend.set_style(reset_style);
-        backend.go_to(self.rect.row + row, self.rect.col + col);
-        backend.show_cursor();
+        self.cursor.apply(&screen, backend);
     }
 
     pub fn is_finished(&mut self) -> bool {
@@ -162,7 +161,38 @@ impl PtyShell {
         if rect == self.rect {
             return Ok(());
         }
+        self.cursor.resize(rect);
         self.pair.master.resize(rect.into()).map_err(|e| e.to_string())
+    }
+}
+
+struct CursorState {
+    hidden: bool,
+    row: u16,
+    col: u16,
+}
+
+impl CursorState {
+    fn apply(&mut self, screen: &Screen, backend: &mut Backend) {
+        if screen.hide_cursor() {
+            if self.hidden {
+                return;
+            }
+            self.hidden = true;
+            Backend::hide_cursor();
+        } else {
+            if !self.hidden {
+                return;
+            }
+            let (row, col) = screen.cursor_position();
+            backend.go_to(self.row + row, self.col + col);
+            Backend::show_cursor();
+        }
+    }
+
+    fn resize(&mut self, rect: Rect) {
+        self.row = rect.row;
+        self.col = rect.col;
     }
 }
 
@@ -170,7 +200,9 @@ impl Drop for PtyShell {
     fn drop(&mut self) {
         self.output_handler.abort();
         _ = self.child.kill();
-        Backend::hide_cursor();
+        if !self.cursor.hidden {
+            Backend::hide_cursor();
+        }
     }
 }
 
@@ -179,5 +211,11 @@ impl From<Rect> for PtySize {
         let rows = rect.height;
         let cols = rect.width as u16;
         PtySize { rows, cols, ..Default::default() }
+    }
+}
+
+impl From<Rect> for CursorState {
+    fn from(rect: Rect) -> Self {
+        Self { row: rect.row, col: rect.col, hidden: true }
     }
 }
