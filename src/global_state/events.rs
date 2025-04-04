@@ -1,5 +1,6 @@
 use super::{GlobalState, PopupMessage};
 use crate::configs::{EditorAction, TreeAction};
+use crate::embeded_tui::run_embeded_tui;
 use crate::lsp::TreeDiagnostics;
 use crate::popups::{
     popup_replace::ReplacePopup, popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges, PopupInterface,
@@ -20,6 +21,7 @@ pub enum IdiomEvent {
     EditorActionCallOnce(EditorAction),
     TreeActionCall(TreeAction),
     TreeActionCallOnce(TreeAction),
+    EmbededApp(String),
     NewPopup(fn() -> Box<dyn PopupInterface>),
     OpenAtLine(PathBuf, usize),
     OpenAtSelect(PathBuf, (CursorPosition, CursorPosition)),
@@ -96,6 +98,10 @@ impl IdiomEvent {
             IdiomEvent::TreeActionCallOnce(action) => {
                 gs.clear_popup();
                 tree.map_action(action, gs);
+            }
+            IdiomEvent::EmbededApp(cmd) => {
+                gs.draw_callback = super::draw::full_rebuild;
+                run_embeded_tui(&cmd, gs);
             }
             IdiomEvent::NewPopup(builder) => {
                 gs.clear_popup();

@@ -3,11 +3,11 @@ use super::{
     GlobalState, Mode, MIN_HEIGHT, MIN_WIDTH,
 };
 use crate::{
+    embeded_term::EditorTerminal,
     render::{
         backend::{BackendProtocol, StyleExt},
         layout::{Line, HAVLED_BALANCED_BORDERS},
     },
-    runner::EditorTerminal,
     tree::Tree,
     workspace::Workspace,
 };

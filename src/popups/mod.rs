@@ -7,7 +7,6 @@ pub mod popup_replace;
 pub mod popup_tree_search;
 pub mod popups_editor;
 pub mod popups_tree;
-pub mod tui_embed;
 mod utils;
 
 use crate::{

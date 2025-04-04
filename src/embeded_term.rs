@@ -72,7 +72,11 @@ impl EditorTerminal {
         true
     }
 
-    pub fn paste_passthrough(&mut self, clip: String) {}
+    pub fn paste_passthrough(&mut self, clip: String) {
+        if let Some(term) = self.terminal.as_mut() {
+            _ = term.paste(clip);
+        }
+    }
 
     pub fn resize(&mut self, editor_area: Rect) {
         if let Some(pty) = self.terminal.as_mut() {

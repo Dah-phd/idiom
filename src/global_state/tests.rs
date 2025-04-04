@@ -1,7 +1,7 @@
 use super::GlobalState;
+use crate::embeded_term::EditorTerminal;
 use crate::render::backend::{Backend, BackendProtocol};
 use crate::render::layout::{Borders, Line, Rect};
-use crate::runner::EditorTerminal;
 use crate::tree::tests::mock_tree;
 use crate::workspace::tests::mock_ws;
 

@@ -7,6 +7,7 @@ mod message;
 
 use crate::{
     configs::{FileType, UITheme},
+    embeded_term::EditorTerminal,
     error::IdiomResult,
     lsp::{LSPError, LSPResult},
     popups::{self, PopupInterface},
@@ -14,7 +15,6 @@ use crate::{
         backend::{Backend, BackendProtocol},
         layout::{Line, Rect},
     },
-    runner::EditorTerminal,
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };

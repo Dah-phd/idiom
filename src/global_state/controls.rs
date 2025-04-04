@@ -3,7 +3,7 @@ use crate::popups::menu::{menu_context_editor, menu_context_tree};
 use crate::popups::pallet::Pallet;
 use crate::render::backend::{Backend, StyleExt};
 use crate::render::layout::Line;
-use crate::{runner::EditorTerminal, tree::Tree, workspace::Workspace};
+use crate::{embeded_term::EditorTerminal, tree::Tree, workspace::Workspace};
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::{Color, ContentStyle, Stylize};
 

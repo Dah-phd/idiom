@@ -112,6 +112,10 @@ impl PtyShell {
         }
     }
 
+    pub fn paste(&mut self, clip: String) -> std::io::Result<()> {
+        self.writer.write_all(clip.as_bytes())
+    }
+
     pub fn fast_render(&mut self, backend: &mut Backend) {
         let Ok(Some(screen)) = self.output.try_lock().map(|mut lock| lock.new_screen()) else {
             return;
@@ -140,8 +144,6 @@ impl PtyShell {
             if let Some(text) = screen.next() {
                 backend.go_to(line.row, line.col);
                 _ = backend.write_all(&text);
-            } else {
-                line.render_empty(backend);
             };
         }
         backend.set_style(reset_style);
