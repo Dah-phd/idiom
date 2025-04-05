@@ -21,12 +21,6 @@ use dirs::config_dir;
 use fuzzy_matcher::skim::SkimMatcherV2;
 pub use generics::{Popup, PopupSelector};
 
-pub const NULL_POPUP: PlaceHolderPopup = PlaceHolderPopup();
-
-pub fn placeholder() -> Box<PlaceHolderPopup> {
-    Box::new(NULL_POPUP)
-}
-
 pub trait PopupInterface {
     fn fast_render(&mut self, screen: Rect, backend: &mut Backend) {
         if self.collect_update_status() {
@@ -93,22 +87,4 @@ impl Command {
 enum CommandResult {
     Simple(PopupMessage),
     Complex(fn(&mut Workspace, &mut Tree)),
-}
-
-// syntactic sugar for popups used instead of Option<popup>
-pub struct PlaceHolderPopup();
-
-impl PopupInterface for PlaceHolderPopup {
-    fn key_map(&mut self, _key: &KeyEvent, _clipboard: &mut Clipboard, _matcher: &SkimMatcherV2) -> PopupMessage {
-        PopupMessage::Clear
-    }
-
-    fn mark_as_updated(&mut self) {}
-    fn collect_update_status(&mut self) -> bool {
-        false
-    }
-    fn render(&mut self, _rect: Rect, _backend: &mut Backend) {}
-    fn resize(&mut self, _new_screen: Rect) -> PopupMessage {
-        PopupMessage::None
-    }
 }
