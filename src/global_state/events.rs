@@ -73,10 +73,19 @@ impl IdiomEvent {
     pub async fn handle(self, gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree) {
         match self {
             IdiomEvent::PopupAccess => {
-                gs.popup.component_access(ws, tree);
+                if let Some(popup) = gs.popup.as_mut() {
+                    popup.component_access(ws, tree);
+                } else {
+                    gs.error("Attempted popup access with no popup");
+                    gs.clear_popup();
+                }
             }
             IdiomEvent::PopupAccessOnce => {
-                gs.popup.component_access(ws, tree);
+                if let Some(popup) = gs.popup.as_mut() {
+                    popup.component_access(ws, tree);
+                } else {
+                    gs.error("Attempted popup access with no popup");
+                }
                 gs.clear_popup();
             }
             IdiomEvent::EditorActionCall(action) => {
@@ -161,8 +170,7 @@ impl IdiomEvent {
                         false => {
                             gs.backend.freeze();
                             editor.render(gs);
-                            gs.popup.mark_as_updated();
-                            gs.popup_render();
+                            gs.popup_force_render();
                             gs.backend.unfreeze();
                         }
                     }
@@ -177,8 +185,7 @@ impl IdiomEvent {
                         false => {
                             gs.backend.freeze();
                             editor.render(gs);
-                            gs.popup.mark_as_updated();
-                            gs.popup_render();
+                            gs.popup_force_render();
                             gs.backend.unfreeze();
                         }
                     }

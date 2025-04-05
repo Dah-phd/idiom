@@ -10,7 +10,7 @@ use crate::{
     embeded_term::EditorTerminal,
     error::IdiomResult,
     lsp::{LSPError, LSPResult},
-    popups::{self, PopupInterface},
+    popups::PopupInterface,
     render::{
         backend::{Backend, BackendProtocol},
         layout::{Line, Rect},
@@ -53,7 +53,7 @@ pub struct GlobalState {
     paste_passthrough: PastePassthroughCallback,
     mouse_mapper: MouseMapCallback,
     draw_callback: DrawCallback,
-    popup: Box<dyn PopupInterface>,
+    popup: Option<Box<dyn PopupInterface>>,
     messages: Messages,
     components: Components,
 }
@@ -71,7 +71,7 @@ impl GlobalState {
             draw_callback: draw::full_rebuild,
             theme,
             backend,
-            popup: popups::placeholder(),
+            popup: None,
             event: Vec::default(),
             clipboard: Clipboard::default(),
             exit: false,
@@ -216,7 +216,15 @@ impl GlobalState {
 
     #[inline]
     pub fn popup_render(&mut self) {
-        self.popup.fast_render(self.screen_rect, &mut self.backend);
+        if let Some(popup) = self.popup.as_mut() {
+            popup.fast_render(self.screen_rect, &mut self.backend);
+        }
+    }
+
+    pub fn popup_force_render(&mut self) {
+        if let Some(popup) = self.popup.as_mut() {
+            popup.render(self.screen_rect, &mut self.backend);
+        }
     }
 
     pub fn popup(&mut self, popup: Box<dyn PopupInterface>) {
@@ -224,7 +232,7 @@ impl GlobalState {
         self.config_controls();
         self.draw_callback = draw::full_rebuild;
         self.mouse_mapper = controls::mouse_popup_handler;
-        self.popup = popup;
+        self.popup = Some(popup);
     }
 
     pub fn clear_popup(&mut self) {
@@ -233,7 +241,7 @@ impl GlobalState {
         self.draw_callback = draw::full_rebuild;
         self.editor_area.clear(&mut self.backend);
         self.tree_area.clear(&mut self.backend);
-        self.popup = popups::placeholder();
+        self.popup.take();
     }
 
     pub fn toggle_tree(&mut self) {
@@ -265,7 +273,8 @@ impl GlobalState {
     }
 
     pub fn map_popup_if_exists(&mut self, key: &KeyEvent) -> bool {
-        match self.popup.map(key, &mut self.clipboard, &self.matcher) {
+        let Some(popup) = self.popup.as_mut() else { return false };
+        match popup.map(key, &mut self.clipboard, &self.matcher) {
             PopupMessage::Clear => {
                 self.clear_popup();
             }
@@ -306,8 +315,8 @@ impl GlobalState {
     pub fn full_resize(&mut self, height: u16, width: u16) {
         let tree_rate = (self.tree_size * 100) / self.screen_rect.width;
         self.screen_rect = (width, height).into();
-        if self.components.contains(Components::POPUP) {
-            match self.popup.resize(self.screen_rect) {
+        if let Some(popup) = self.popup.as_mut() {
+            match popup.resize(self.screen_rect) {
                 PopupMessage::None => (),
                 PopupMessage::Clear => self.clear_popup(),
                 PopupMessage::Event(event) => self.event.push(event),
@@ -315,7 +324,7 @@ impl GlobalState {
                     self.clear_popup();
                     self.event.push(event);
                 }
-            };
+            }
         }
         self.tree_size = std::cmp::max((tree_rate * self.screen_rect.width) / 100, Mode::len());
         self.draw_callback = draw::full_rebuild;

@@ -160,7 +160,11 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
 }
 
 pub fn mouse_popup_handler(gs: &mut GlobalState, event: MouseEvent, _tree: &mut Tree, _workspace: &mut Workspace) {
-    match gs.popup.mouse_map(event) {
+    let Some(popup) = gs.popup.as_mut() else {
+        gs.config_controls();
+        return;
+    };
+    match popup.mouse_map(event) {
         PopupMessage::None => {}
         PopupMessage::Clear => {
             gs.clear_popup();
@@ -247,7 +251,11 @@ pub fn paste_passthrough_editor(
 }
 
 pub fn paste_passthrough_popup(gs: &mut GlobalState, clip: String, _ws: &mut Workspace, _t: &mut EditorTerminal) {
-    match gs.popup.paste_passthrough(clip, &gs.matcher) {
+    let Some(popup) = gs.popup.as_mut() else {
+        gs.config_controls();
+        return;
+    };
+    match popup.paste_passthrough(clip, &gs.matcher) {
         PopupMessage::None => {}
         PopupMessage::Clear => {
             gs.clear_popup();
