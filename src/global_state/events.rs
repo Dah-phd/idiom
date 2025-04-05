@@ -18,9 +18,7 @@ pub enum IdiomEvent {
     PopupAccess,
     PopupAccessOnce,
     EditorActionCall(EditorAction),
-    EditorActionCallOnce(EditorAction),
     TreeActionCall(TreeAction),
-    TreeActionCallOnce(TreeAction),
     EmbededApp(String),
     NewPopup(fn() -> Box<dyn PopupInterface>),
     OpenAtLine(PathBuf, usize),
@@ -86,17 +84,7 @@ impl IdiomEvent {
                     let _ = editor.map(action, gs);
                 }
             }
-            IdiomEvent::EditorActionCallOnce(action) => {
-                gs.clear_popup();
-                if let Some(editor) = ws.get_active() {
-                    editor.map(action, gs);
-                }
-            }
             IdiomEvent::TreeActionCall(action) => {
-                tree.map_action(action, gs);
-            }
-            IdiomEvent::TreeActionCallOnce(action) => {
-                gs.clear_popup();
                 tree.map_action(action, gs);
             }
             IdiomEvent::EmbededApp(cmd) => {
@@ -233,7 +221,6 @@ impl IdiomEvent {
                         Err(error) => gs.error(error),
                     }
                 }
-                gs.clear_popup();
             }
             IdiomEvent::RenameFile(name) => {
                 if name.is_empty() {
@@ -244,7 +231,6 @@ impl IdiomEvent {
                         Err(error) => gs.error(error),
                     }
                 };
-                gs.clear_popup();
             }
             IdiomEvent::RenamedFile { from_path, to_path } => {
                 ws.rename_editors(from_path, to_path, gs);
@@ -269,13 +255,11 @@ impl IdiomEvent {
                 if let Some(editor) = ws.get_active() {
                     editor.rebase(gs);
                 }
-                gs.clear_popup();
             }
             IdiomEvent::Save => {
                 if let Some(editor) = ws.get_active() {
                     editor.save(gs);
                 }
-                gs.clear_popup();
             }
             IdiomEvent::CheckLSP(ft) => {
                 ws.check_lsp(ft, gs).await;
@@ -299,29 +283,22 @@ impl IdiomEvent {
                 if let Some(editor) = ws.get_active() {
                     gs.insert_mode();
                     gs.popup(selector_ranges(editor.find_with_line(&pattern)));
-                } else {
-                    gs.clear_popup();
-                }
+                };
             }
             IdiomEvent::ActivateEditor(idx) => {
                 ws.activate_editor(idx, gs);
-                gs.clear_popup();
                 gs.insert_mode();
             }
             IdiomEvent::FindToReplace(pattern, options) => {
                 match ReplacePopup::from_search(pattern, options, gs.editor_area, gs.theme.accent_style) {
                     Some(replace_popup) => gs.popup(replace_popup),
-                    None => {
-                        gs.error("Failed to build replace popup (size constraints) ...");
-                        gs.clear_popup();
-                    }
+                    None => gs.error("Failed to build replace popup (size constraints) ..."),
                 }
             }
             IdiomEvent::ReplaceAll(clip, ranges) => {
                 if let Some(editor) = ws.get_active() {
                     editor.mass_replace(ranges, clip);
                 }
-                gs.clear_popup();
             }
             IdiomEvent::ReplaceNextSelect { new_text, select: (from, to), next_select } => {
                 gs.backend.freeze();

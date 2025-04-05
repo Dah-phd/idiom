@@ -112,7 +112,10 @@ impl FindPopup {
 impl PopupInterface for FindPopup {
     fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
         if matches!(key.code, KeyCode::Char('h' | 'H') if key.modifiers.contains(KeyModifiers::CONTROL)) {
-            return IdiomEvent::FindToReplace(self.pattern.text.to_owned(), self.options.clone()).into();
+            return PopupMessage::ClearEvent(IdiomEvent::FindToReplace(
+                self.pattern.text.to_owned(),
+                self.options.clone(),
+            ));
         }
         if let Some(event) = self.pattern.map(key, clipboard) {
             return event;
@@ -121,7 +124,7 @@ impl PopupInterface for FindPopup {
             KeyCode::Enter | KeyCode::Down => into_message(next_option(&self.options, &mut self.state)),
             KeyCode::Up => into_message(prev_option(&self.options, &mut self.state)),
             KeyCode::Esc | KeyCode::Left => PopupMessage::Clear,
-            KeyCode::Tab => IdiomEvent::FindSelector(self.pattern.text.to_owned()).into(),
+            KeyCode::Tab => PopupMessage::ClearEvent(IdiomEvent::FindSelector(self.pattern.text.to_owned())),
             _ => PopupMessage::None,
         }
     }

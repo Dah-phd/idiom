@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use super::{Popup, PopupSelector};
-use crate::global_state::IdiomEvent;
+use crate::global_state::{IdiomEvent, PopupMessage};
 use crate::render::Button;
 use crate::workspace::CursorPosition;
 use crossterm::event::KeyCode;
@@ -44,7 +44,7 @@ pub fn selector_editors(options: Vec<String>) -> Box<PopupSelector<String>> {
     Box::new(PopupSelector::new(
         options,
         |editor| editor,
-        |popup| IdiomEvent::ActivateEditor(popup.state.selected).into(),
+        |popup| PopupMessage::ClearEvent(IdiomEvent::ActivateEditor(popup.state.selected)),
         None,
     ))
 }
@@ -57,12 +57,12 @@ pub fn file_updated(path: PathBuf) -> Box<Popup> {
         None,
         vec![
             Button {
-                command: |_| IdiomEvent::Save.into(),
+                command: |_| PopupMessage::ClearEvent(IdiomEvent::Save),
                 name: "Overwrite (S)",
                 key: Some(vec![KeyCode::Char('s'), KeyCode::Char('S')]),
             },
             Button {
-                command: |_| IdiomEvent::Rebase.into(),
+                command: |_| PopupMessage::ClearEvent(IdiomEvent::Rebase),
                 name: "Rebase (L)",
                 key: Some(vec![KeyCode::Char('l'), KeyCode::Char('L')]),
             },

@@ -9,12 +9,22 @@ use std::path::PathBuf;
 pub fn create_file_popup(path: PathBuf) -> Box<Popup> {
     let buttons = vec![
         Button {
-            command: |popup| IdiomEvent::CreateFileOrFolder { name: popup.message.to_owned(), from_base: false }.into(),
+            command: |popup| {
+                PopupMessage::ClearEvent(IdiomEvent::CreateFileOrFolder {
+                    name: popup.message.to_owned(),
+                    from_base: false,
+                })
+            },
             name: "Create",
             key: None,
         },
         Button {
-            command: |popup| IdiomEvent::CreateFileOrFolder { name: popup.message.to_owned(), from_base: true }.into(),
+            command: |popup| {
+                PopupMessage::ClearEvent(IdiomEvent::CreateFileOrFolder {
+                    name: popup.message.to_owned(),
+                    from_base: true,
+                })
+            },
             name: "Create in ./",
             key: None,
         },
@@ -31,7 +41,9 @@ pub fn create_file_popup(path: PathBuf) -> Box<Popup> {
 
 pub fn create_root_file_popup() -> Box<Popup> {
     let buttons = vec![Button {
-        command: |popup| IdiomEvent::CreateFileOrFolder { name: popup.message.to_owned(), from_base: true }.into(),
+        command: |popup| {
+            PopupMessage::ClearEvent(IdiomEvent::CreateFileOrFolder { name: popup.message.to_owned(), from_base: true })
+        },
         name: "Create",
         key: None,
     }];
@@ -46,7 +58,7 @@ pub fn rename_file_popup(path: String) -> Box<Popup> {
         Some(path),
         Some(Some),
         vec![Button {
-            command: |popup| IdiomEvent::RenameFile(popup.message.to_owned()).into(),
+            command: |popup| PopupMessage::ClearEvent(IdiomEvent::RenameFile(popup.message.to_owned())),
             name: "Rename",
             key: None,
         }],

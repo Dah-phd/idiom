@@ -98,7 +98,7 @@ impl PopupInterface for ReplacePopup {
                 if self.options.is_empty() {
                     return PopupMessage::Clear;
                 }
-                IdiomEvent::ReplaceAll(self.new_text.text.to_owned(), self.options.clone()).into()
+                PopupMessage::ClearEvent(IdiomEvent::ReplaceAll(self.new_text.text.to_owned(), self.options.clone()))
             }
             KeyCode::Tab => {
                 self.on_text = !self.on_text;

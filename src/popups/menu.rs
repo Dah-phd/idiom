@@ -28,13 +28,13 @@ pub fn menu_context_editor(
 
     let menu = ContextMenuTree {
         commands: [
-            Command::pass_event("Go to Definition", IdiomEvent::EditorActionCallOnce(EditorAction::GoToDeclaration)),
-            Command::pass_event("Find References", IdiomEvent::EditorActionCallOnce(EditorAction::FindReferences)),
-            Command::pass_event("Details / Info", IdiomEvent::EditorActionCallOnce(EditorAction::Help)),
-            Command::pass_event("Rename", IdiomEvent::EditorActionCallOnce(EditorAction::LSPRename)),
-            Command::pass_event("Cut", IdiomEvent::EditorActionCallOnce(EditorAction::Cut)),
-            Command::pass_event("Copy", IdiomEvent::EditorActionCallOnce(EditorAction::Copy)),
-            Command::pass_event("Paste", IdiomEvent::EditorActionCallOnce(EditorAction::Paste)),
+            Command::pass_event("Go to Definition", IdiomEvent::EditorActionCall(EditorAction::GoToDeclaration)),
+            Command::pass_event("Find References", IdiomEvent::EditorActionCall(EditorAction::FindReferences)),
+            Command::pass_event("Details / Info", IdiomEvent::EditorActionCall(EditorAction::Help)),
+            Command::pass_event("Rename", IdiomEvent::EditorActionCall(EditorAction::LSPRename)),
+            Command::pass_event("Cut", IdiomEvent::EditorActionCall(EditorAction::Cut)),
+            Command::pass_event("Copy", IdiomEvent::EditorActionCall(EditorAction::Copy)),
+            Command::pass_event("Paste", IdiomEvent::EditorActionCall(EditorAction::Paste)),
         ],
         modal_screen,
         access_cb: None,
@@ -56,13 +56,13 @@ pub fn menu_context_tree(
 
     let menu = ContextMenuTree {
         commands: [
-            Command::pass_event("Cut", IdiomEvent::TreeActionCallOnce(TreeAction::CutFile)),
-            Command::pass_event("Copy", IdiomEvent::TreeActionCallOnce(TreeAction::CopyFile)),
-            Command::pass_event("Paste", IdiomEvent::TreeActionCallOnce(TreeAction::Paste)),
-            Command::pass_event("Copy Path", IdiomEvent::TreeActionCallOnce(TreeAction::CopyPath)),
-            Command::pass_event("Copy Relative Path", IdiomEvent::TreeActionCallOnce(TreeAction::CopyPathRelative)),
-            Command::pass_event("Rename", IdiomEvent::TreeActionCallOnce(TreeAction::Rename)),
-            Command::pass_event("Delete", IdiomEvent::TreeActionCallOnce(TreeAction::Delete)),
+            Command::pass_event("Cut", IdiomEvent::TreeActionCall(TreeAction::CutFile)),
+            Command::pass_event("Copy", IdiomEvent::TreeActionCall(TreeAction::CopyFile)),
+            Command::pass_event("Paste", IdiomEvent::TreeActionCall(TreeAction::Paste)),
+            Command::pass_event("Copy Path", IdiomEvent::TreeActionCall(TreeAction::CopyPath)),
+            Command::pass_event("Copy Relative Path", IdiomEvent::TreeActionCall(TreeAction::CopyPathRelative)),
+            Command::pass_event("Rename", IdiomEvent::TreeActionCall(TreeAction::Rename)),
+            Command::pass_event("Delete", IdiomEvent::TreeActionCall(TreeAction::Delete)),
         ],
         modal_screen,
         access_cb: None,
