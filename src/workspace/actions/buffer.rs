@@ -298,6 +298,7 @@ mod tests {
     use crate::configs::FileType;
     use crate::global_state::GlobalState;
     use crate::render::backend::{Backend, BackendProtocol};
+    use crate::render::layout::Rect;
     use crate::syntax::{
         tests::{char_lsp_utf8, encode_pos_utf8},
         Lexer,
@@ -309,7 +310,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn create_lexer() -> Lexer {
-        let mut gs = GlobalState::new(Backend::init()).unwrap();
+        let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
         let path = PathBuf::new();
         Lexer::with_context(FileType::Rust, &path, &mut gs)
     }

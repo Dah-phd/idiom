@@ -27,9 +27,6 @@ use draw::Components;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use message::Messages;
 
-const MIN_HEIGHT: u16 = 6;
-const MIN_WIDTH: usize = 40;
-
 type KeyMapCallback = fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool;
 type PastePassthroughCallback = fn(&mut GlobalState, String, &mut Workspace, &mut EditorTerminal);
 type MouseMapCallback = fn(&mut GlobalState, MouseEvent, &mut Tree, &mut Workspace);
@@ -41,7 +38,6 @@ pub struct GlobalState {
     pub matcher: SkimMatcherV2,
     pub event: Vec<IdiomEvent>,
     pub clipboard: Clipboard,
-    pub exit: bool,
     pub screen_rect: Rect,
     pub tree_area: Rect,
     pub tab_area: Rect,
@@ -59,10 +55,10 @@ pub struct GlobalState {
 }
 
 impl GlobalState {
-    pub fn new(backend: Backend) -> std::io::Result<Self> {
+    pub fn new(screen_rect: Rect, backend: Backend) -> Self {
         let mut messages = Messages::new();
         let theme = messages.unwrap_or_default(UITheme::new(), "Failed to load theme_ui.toml");
-        Backend::screen().map(|screen_rect| Self {
+        Self {
             mode: Mode::default(),
             tree_size: std::cmp::max((15 * screen_rect.width) / 100, Mode::len()),
             key_mapper: controls::map_tree,
@@ -74,7 +70,6 @@ impl GlobalState {
             popup: None,
             event: Vec::default(),
             clipboard: Clipboard::default(),
-            exit: false,
             screen_rect,
             tree_area: Rect::default(),
             tab_area: Rect::default(),
@@ -83,7 +78,7 @@ impl GlobalState {
             matcher: SkimMatcherV2::default(),
             messages,
             components: Components::default(),
-        })
+        }
     }
 
     #[inline(always)]
@@ -150,7 +145,7 @@ impl GlobalState {
     }
 
     fn config_controls(&mut self) {
-        if self.components.contains(Components::POPUP) {
+        if self.popup.is_some() {
             self.key_mapper = controls::map_popup;
             self.mouse_mapper = controls::disable_mouse;
             self.paste_passthrough = controls::paste_passthrough_popup;
@@ -211,7 +206,7 @@ impl GlobalState {
 
     #[inline]
     pub fn has_popup(&self) -> bool {
-        self.components.contains(Components::POPUP)
+        self.popup.is_some()
     }
 
     #[inline]
@@ -228,20 +223,16 @@ impl GlobalState {
     }
 
     pub fn popup(&mut self, popup: Box<dyn PopupInterface>) {
-        self.components.insert(Components::POPUP);
+        self.popup = Some(popup);
         self.config_controls();
         self.draw_callback = draw::full_rebuild;
         self.mouse_mapper = controls::mouse_popup_handler;
-        self.popup = Some(popup);
     }
 
     pub fn clear_popup(&mut self) {
-        self.components.remove(Components::POPUP);
+        self.popup.take();
         self.config_controls();
         self.draw_callback = draw::full_rebuild;
-        self.editor_area.clear(&mut self.backend);
-        self.tree_area.clear(&mut self.backend);
-        self.popup.take();
     }
 
     pub fn toggle_tree(&mut self) {
@@ -330,6 +321,11 @@ impl GlobalState {
         self.draw_callback = draw::full_rebuild;
     }
 
+    #[inline]
+    pub fn force_screen_rebuild(&mut self) {
+        self.draw_callback = draw::full_rebuild;
+    }
+
     pub fn calc_editor_rect(&self) -> Rect {
         let mut base_screen = if self.components.contains(Components::TREE) || self.is_select() {
             self.screen_rect.split_horizont_rel(self.tree_size).1
@@ -375,12 +371,11 @@ impl GlobalState {
         }
     }
 
-    pub async fn exchange_should_exit(&mut self, tree: &mut Tree, ws: &mut Workspace) -> bool {
+    pub async fn handle_events(&mut self, tree: &mut Tree, ws: &mut Workspace) {
         tree.sync(self);
         while let Some(event) = self.event.pop() {
             event.handle(self, ws, tree).await
         }
-        self.exit
     }
 }
 

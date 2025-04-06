@@ -1,5 +1,5 @@
 use crate::{
-    global_state::{Clipboard, IdiomEvent, PopupMessage},
+    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::{
         backend::{Backend, BackendProtocol},
         layout::Rect,
@@ -157,7 +157,7 @@ impl PopupInterface for ReplacePopup {
         PopupMessage::None
     }
 
-    fn component_access(&mut self, ws: &mut Workspace, _tree: &mut Tree) {
+    fn component_access(&mut self, gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tree) {
         if let Some(editor) = ws.get_active() {
             self.options.clear();
             editor.find(&self.pattern.text, &mut self.options);

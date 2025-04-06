@@ -1,6 +1,6 @@
 use super::PopupInterface;
 use crate::{
-    global_state::{Clipboard, IdiomEvent, PopupMessage},
+    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::{
         backend::{Backend, StyleExt},
         layout::{IterLines, LineBuilder, Rect, BORDERS},
@@ -93,7 +93,7 @@ impl PopupInterface for ActivePathSearch {
         PopupMessage::None
     }
 
-    fn component_access(&mut self, _ws: &mut Workspace, tree: &mut Tree) {
+    fn component_access(&mut self, gs: &mut GlobalState, _ws: &mut Workspace, tree: &mut Tree) {
         if self.pattern.text.is_empty() {
             self.options.clear();
         } else {
@@ -213,7 +213,7 @@ impl PopupInterface for ActiveFileSearch {
         }
     }
 
-    fn component_access(&mut self, _ws: &mut Workspace, file_tree: &mut Tree) {
+    fn component_access(&mut self, gs: &mut GlobalState, _ws: &mut Workspace, file_tree: &mut Tree) {
         self.mark_as_updated();
         if self.pattern.text.len() < 2 {
             self.options.clear();

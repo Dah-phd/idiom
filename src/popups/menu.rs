@@ -1,5 +1,5 @@
 use crate::configs::{EditorAction, TreeAction};
-use crate::global_state::{Clipboard, IdiomEvent, PopupMessage};
+use crate::global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage};
 use crate::popups::{Command, CommandResult, PopupInterface};
 use crate::render::backend::{Backend, BackendProtocol};
 use crate::render::layout::Rect;
@@ -142,7 +142,7 @@ impl<const N: usize> PopupInterface for ContextMenuTree<N> {
         }
     }
 
-    fn component_access(&mut self, ws: &mut Workspace, tree: &mut Tree) {
+    fn component_access(&mut self, gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree) {
         if let Some(cb) = self.access_cb {
             (cb)(ws, tree);
         }

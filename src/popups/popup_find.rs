@@ -1,9 +1,9 @@
 use super::{
     utils::{into_message, next_option, prev_option},
-    PopupInterface,
+    InplacePopup, PopupInterface,
 };
 use crate::{
-    global_state::{Clipboard, IdiomEvent, PopupMessage},
+    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::{
         backend::{Backend, BackendProtocol, StyleExt},
         count_as_string,
@@ -158,7 +158,7 @@ impl PopupInterface for FindPopup {
         PopupMessage::None
     }
 
-    fn component_access(&mut self, ws: &mut Workspace, _tree: &mut Tree) {
+    fn component_access(&mut self, gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tree) {
         if let Some(editor) = ws.get_active() {
             self.options.clear();
             editor.find(self.pattern.text.as_str(), &mut self.options);

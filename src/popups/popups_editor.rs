@@ -6,28 +6,6 @@ use crate::render::Button;
 use crate::workspace::CursorPosition;
 use crossterm::event::KeyCode;
 
-pub fn save_all_popup() -> Box<Popup> {
-    Box::new(Popup::new(
-        "Not all opened editors are saved!".into(),
-        None,
-        None,
-        None,
-        vec![
-            Button {
-                command: |_| IdiomEvent::SaveAndExit.into(),
-                name: "Save All (Y)",
-                key: Some(vec![KeyCode::Char('y'), KeyCode::Char('Y')]),
-            },
-            Button {
-                command: |_| IdiomEvent::Exit.into(),
-                name: "Don't save (N)",
-                key: Some(vec![KeyCode::Char('n'), KeyCode::Char('N')]),
-            },
-        ],
-        Some((4, 40)),
-    ))
-}
-
 pub fn selector_ranges(
     options: Vec<((CursorPosition, CursorPosition), String)>,
 ) -> Box<PopupSelector<((CursorPosition, CursorPosition), String)>> {

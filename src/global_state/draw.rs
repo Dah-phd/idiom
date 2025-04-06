@@ -1,7 +1,4 @@
-use super::{
-    controls::{disable_mouse, map_small_rect},
-    GlobalState, Mode, MIN_HEIGHT, MIN_WIDTH,
-};
+use super::{GlobalState, Mode};
 use crate::{
     embeded_term::EditorTerminal,
     render::{
@@ -12,15 +9,13 @@ use crate::{
     workspace::Workspace,
 };
 use bitflags::bitflags;
-use crossterm::style::{Color, ContentStyle};
 
 bitflags! {
     /// Workspace and Footer are always drawn
     #[derive(PartialEq, Eq)]
     pub struct Components: u8 {
         const TREE  = 0b0000_0001;
-        const POPUP = 0b0000_0010;
-        const TERM  = 0b0000_0100;
+        const TERM  = 0b0000_0010;
     }
 }
 
@@ -32,14 +27,9 @@ impl Default for Components {
 
 // transition
 pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
-    gs.screen_rect.clear(&mut gs.backend);
+    gs.backend.freeze();
 
-    if gs.screen_rect.width < MIN_WIDTH || gs.screen_rect.height < MIN_HEIGHT {
-        gs.draw_callback = draw_too_small_rect;
-        gs.key_mapper = map_small_rect;
-        gs.mouse_mapper = disable_mouse;
-        return;
-    }
+    gs.screen_rect.clear(&mut gs.backend);
 
     let mut screen = gs.screen_rect;
     gs.footer_line = screen.pop_line();
@@ -87,23 +77,12 @@ pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut 
         term.render(gs);
     }
     // popup override
-    if gs.components.contains(Components::POPUP) {
+    if gs.popup.is_some() {
         gs.draw_callback = draw_popup;
         gs.popup_render();
-    }
-}
+    };
 
-pub fn draw_too_small_rect(
-    gs: &mut GlobalState,
-    _workspace: &mut Workspace,
-    _tree: &mut Tree,
-    _term: &mut EditorTerminal,
-) {
-    let error_text = ["Terminal size too small!", "Press Q or D to exit ..."];
-    let style = ContentStyle::bold().with_fg(Color::DarkRed);
-    for (line, text) in gs.screen_rect.into_iter().zip(error_text) {
-        line.render_centered_styled(text, style, gs.backend());
-    }
+    gs.backend.unfreeze();
 }
 
 pub fn draw(gs: &mut GlobalState, workspace: &mut Workspace, _tree: &mut Tree, _term: &mut EditorTerminal) {

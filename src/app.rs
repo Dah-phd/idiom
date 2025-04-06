@@ -4,25 +4,32 @@ use crate::{
     error::IdiomResult,
     global_state::{GlobalState, IdiomEvent},
     popups::{
+        get_init_screen, get_new_screen_size,
         pallet::Pallet,
         popup_find::{FindPopup, GoToLinePopup},
         popup_replace::ReplacePopup,
         popup_tree_search::ActivePathSearch,
-        popups_editor::{save_all_popup, selector_editors},
+        popups_editor::selector_editors,
     },
     render::backend::Backend,
+    render::save_all_popupx,
     tree::Tree,
     workspace::Workspace,
 };
 use crossterm::event::Event;
 use std::{io::Write, path::PathBuf, time::Duration};
 
-const MIN_FRAMERATE: Duration = Duration::from_millis(8);
+pub const MIN_FRAMERATE: Duration = Duration::from_millis(8);
+pub const MIN_HEIGHT: u16 = 6;
+pub const MIN_WIDTH: u16 = 40;
 
-pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()> {
+pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResult<()> {
     // builtin cursor is not used - cursor is positioned during render
 
-    let mut gs = GlobalState::new(backend)?;
+    let Some(screen_rect) = get_init_screen(&mut backend) else {
+        return Ok(());
+    };
+    let mut gs = GlobalState::new(screen_rect, backend);
     let (mut general_key_map, editor_key_map, tree_key_map) = gs.unwrap_or_default(KeyMap::new(), KEY_MAP).unpack();
     let mut editor_base_config = gs.unwrap_or_default(EditorConfigs::new(), "editor.toml: ");
     let integrated_shell = editor_base_config.shell.to_owned();
@@ -79,9 +86,11 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
                                 GeneralAction::InvokePallet => gs.popup(Pallet::new(gs.screen_rect)),
                                 GeneralAction::Exit => {
                                     if workspace.are_updates_saved(&mut gs) && !gs.has_popup() {
-                                        gs.exit = true;
-                                    } else {
-                                        gs.popup(save_all_popup());
+                                        workspace.graceful_exit().await;
+                                        return Ok(());
+                                    } else if save_all_popupx(&mut gs, &mut workspace, &mut tree, &mut term).is_some() {
+                                        workspace.graceful_exit().await;
+                                        return Ok(());
                                     };
                                 }
                                 GeneralAction::FileTreeModeOrCancelInput => gs.select_mode(),
@@ -124,7 +133,19 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
                         };
                     }
                 }
-                Event::Resize(width, height) => {
+                Event::Resize(mut width, mut height) => {
+                    if width < MIN_WIDTH || height < MIN_HEIGHT {
+                        match get_new_screen_size(gs.backend()) {
+                            None => {
+                                workspace.graceful_exit().await;
+                                return Ok(());
+                            }
+                            Some((new_width, new_height)) => {
+                                width = new_width;
+                                height = new_height;
+                            }
+                        }
+                    }
                     gs.full_resize(height, width);
                     let editor_rect = gs.calc_editor_rect();
                     workspace.resize_all(editor_rect.width, editor_rect.height as usize);
@@ -143,9 +164,6 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
         gs.backend().flush()?;
 
         // do event exchanges
-        if gs.exchange_should_exit(&mut tree, &mut workspace).await {
-            workspace.graceful_exit().await;
-            return Ok(());
-        };
+        gs.handle_events(&mut tree, &mut workspace).await
     }
 }

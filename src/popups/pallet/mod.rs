@@ -2,7 +2,7 @@ mod formatting;
 use super::{popup_file_open::OpenFileSelector, Command, CommandResult, PopupInterface};
 use crate::{
     configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
-    global_state::{Clipboard, IdiomEvent, PopupMessage},
+    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::{backend::Backend, layout::Rect, state::State, TextField},
     tree::Tree,
     workspace::Workspace,
@@ -132,7 +132,7 @@ impl PopupInterface for Pallet {
         std::mem::take(&mut self.updated)
     }
 
-    fn component_access(&mut self, ws: &mut Workspace, tree: &mut Tree) {
+    fn component_access(&mut self, gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree) {
         if let Some(cb) = self.access_cb.take() {
             cb(ws, tree);
         }

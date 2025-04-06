@@ -65,24 +65,23 @@ pub enum IdiomEvent {
     },
     Save,
     Rebase,
-    Exit,
-    SaveAndExit,
 }
 
 impl IdiomEvent {
     pub async fn handle(self, gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree) {
         match self {
             IdiomEvent::PopupAccess => {
-                if let Some(popup) = gs.popup.as_mut() {
-                    popup.component_access(ws, tree);
+                if let Some(mut popup) = gs.popup.take() {
+                    popup.component_access(gs, ws, tree);
+                    gs.popup = Some(popup);
                 } else {
                     gs.error("Attempted popup access with no popup");
                     gs.clear_popup();
                 }
             }
             IdiomEvent::PopupAccessOnce => {
-                if let Some(popup) = gs.popup.as_mut() {
-                    popup.component_access(ws, tree);
+                if let Some(mut popup) = gs.popup.take() {
+                    popup.component_access(gs, ws, tree);
                 } else {
                     gs.error("Attempted popup access with no popup");
                 }
@@ -109,7 +108,7 @@ impl IdiomEvent {
             IdiomEvent::SearchFiles(pattern) => {
                 if pattern.len() > 1 {
                     let mut new_popup = ActiveFileSearch::new(pattern);
-                    new_popup.component_access(ws, tree);
+                    new_popup.component_access(gs, ws, tree);
                     gs.popup(new_popup);
                 } else {
                     gs.popup(ActiveFileSearch::new(pattern));
@@ -270,13 +269,6 @@ impl IdiomEvent {
             }
             IdiomEvent::CheckLSP(ft) => {
                 ws.check_lsp(ft, gs).await;
-            }
-            IdiomEvent::SaveAndExit => {
-                ws.save_all(gs);
-                gs.exit = true;
-            }
-            IdiomEvent::Exit => {
-                gs.exit = true;
             }
             IdiomEvent::FileUpdated(path) => {
                 ws.notify_update(path, gs);
