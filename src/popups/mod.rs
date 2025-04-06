@@ -9,7 +9,7 @@ pub mod popups_editor;
 pub mod popups_tree;
 mod utils;
 
-use std::time::Duration;
+use std::{io::Write, time::Duration};
 
 use crate::{
     app::{MIN_FRAMERATE, MIN_HEIGHT, MIN_WIDTH},
@@ -17,7 +17,7 @@ use crate::{
     embeded_term::EditorTerminal,
     global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::{
-        backend::{self, Backend, BackendProtocol, StyleExt},
+        backend::{Backend, BackendProtocol, StyleExt},
         layout::Rect,
     },
     tree::Tree,
@@ -110,6 +110,7 @@ pub trait InplacePopup {
                 };
             }
             self.fast_render(gs);
+            gs.backend.flush_buf();
         }
     }
 
@@ -221,6 +222,7 @@ pub fn get_new_screen_size(backend: &mut Backend) -> Option<(u16, u16)> {
                 None => line.render_empty(backend),
             }
         }
+        backend.flush_buf();
     }
 }
 

@@ -12,7 +12,7 @@ use crate::{
         popups_editor::selector_editors,
     },
     render::backend::Backend,
-    render::save_all_popupx,
+    render::save_all_popup,
     tree::Tree,
     workspace::Workspace,
 };
@@ -88,7 +88,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                     if workspace.are_updates_saved(&mut gs) && !gs.has_popup() {
                                         workspace.graceful_exit().await;
                                         return Ok(());
-                                    } else if save_all_popupx(&mut gs, &mut workspace, &mut tree, &mut term).is_some() {
+                                    } else if save_all_popup(&mut gs, &mut workspace, &mut tree, &mut term).is_some() {
                                         workspace.graceful_exit().await;
                                         return Ok(());
                                     };
@@ -161,7 +161,6 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
 
         // render updates
         gs.draw(&mut workspace, &mut tree, &mut term);
-        gs.backend().flush()?;
 
         // do event exchanges
         gs.handle_events(&mut tree, &mut workspace).await

@@ -26,6 +26,9 @@ impl BackendProtocol for Backend {
         self.data.push((ContentStyle::default(), String::from("<<unfreeze>>")));
     }
 
+    /// force flush buffer if writing small amount of data
+    fn flush_buf(&mut self) {}
+
     fn clear_all(&mut self) {
         self.data.push((ContentStyle::default(), String::from("<<clear all>>")));
     }

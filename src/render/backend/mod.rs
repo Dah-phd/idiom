@@ -21,6 +21,7 @@ pub trait BackendProtocol: Write + Sized {
     fn freeze(&mut self);
     /// restore updates allowing to render buffer
     fn unfreeze(&mut self);
+    fn flush_buf(&mut self);
     /// clears from cursor until the End Of Line
     fn clear_to_eol(&mut self);
     /// clears current cursor line

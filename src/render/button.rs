@@ -67,18 +67,19 @@ impl<T> InplacePopup for PopupX<T> {
     fn render(&mut self, gs: &mut GlobalState) {
         let (height, width) = self.size;
         let mut area = gs.screen_rect.center(height, width);
+        let backend = gs.backend();
         area.bordered();
-        area.draw_borders(None, None, gs.backend());
+        area.draw_borders(None, None, backend);
         match self.title_prefix {
-            Some(prefix) => area.border_title_prefixed(prefix, &self.title, gs.backend()),
-            None => area.border_title(&self.title, gs.backend()),
+            Some(prefix) => area.border_title_prefixed(prefix, &self.title, backend),
+            None => area.border_title(&self.title, backend),
         };
         let mut lines = area.into_iter();
         if let Some(first_line) = lines.next() {
-            self.p_from_message(first_line, gs.backend());
+            self.p_from_message(first_line, backend);
         }
         if let Some(second_line) = lines.next() {
-            self.spans_from_buttons(second_line, gs.backend());
+            self.spans_from_buttons(second_line, backend);
         }
     }
 
@@ -237,7 +238,7 @@ impl<T> PopupX<T> {
     }
 }
 
-pub fn save_all_popupx(
+pub fn save_all_popup(
     gs: &mut GlobalState,
     ws: &mut Workspace,
     tree: &mut Tree,

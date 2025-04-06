@@ -88,6 +88,12 @@ impl BackendProtocol for Backend {
         execute!(self, EndSynchronizedUpdate).expect(ERR_MSG);
     }
 
+    /// flushs buffer with panic on error
+    #[inline]
+    fn flush_buf(&mut self) {
+        self.writer.flush().expect(ERR_MSG);
+    }
+
     /// clears from cursor until the End Of Line
     #[inline]
     fn clear_to_eol(&mut self) {

@@ -89,6 +89,7 @@ impl GlobalState {
     #[inline]
     pub fn draw(&mut self, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         (self.draw_callback)(self, workspace, tree, term);
+        self.backend.flush_buf();
     }
 
     pub fn render_stats(&mut self, len: usize, select_len: usize, cursor: CursorPosition) {
