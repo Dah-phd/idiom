@@ -156,7 +156,6 @@ impl<T> InplacePopup for PopupX<T> {
     }
 
     fn collect_update_status(&mut self) -> bool {
-        return true;
         std::mem::take(&mut self.updated)
     }
 }

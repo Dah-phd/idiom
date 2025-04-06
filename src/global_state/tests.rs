@@ -7,7 +7,6 @@ use crate::workspace::tests::mock_ws;
 
 #[test]
 fn full_rebuild_draw() {
-    let backend = Backend::init();
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut ws = mock_ws(
         ["test line uno - in here", "second line", "last line for the test"]
@@ -30,7 +29,6 @@ fn full_rebuild_draw() {
 
 #[test]
 fn full_rebuild_draw_insert() {
-    let backend = Backend::init();
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     gs.toggle_tree();
     gs.insert_mode();
