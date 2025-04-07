@@ -1,5 +1,6 @@
 use super::{GlobalState, PopupMessage};
 use crate::configs::{EditorAction, TreeAction};
+use crate::embeded_term::EditorTerminal;
 use crate::embeded_tui::run_embeded_tui;
 use crate::lsp::TreeDiagnostics;
 use crate::popups::{
@@ -21,6 +22,7 @@ pub enum IdiomEvent {
     TreeActionCall(TreeAction),
     EmbededApp(String),
     NewPopup(fn() -> Box<dyn PopupInterface>),
+    InplacePopup(fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal) -> Option<IdiomEvent>),
     OpenAtLine(PathBuf, usize),
     OpenAtSelect(PathBuf, (CursorPosition, CursorPosition)),
     OpenLSPErrors,
@@ -68,7 +70,7 @@ pub enum IdiomEvent {
 }
 
 impl IdiomEvent {
-    pub async fn handle(self, gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree) {
+    pub async fn handle(self, gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         match self {
             IdiomEvent::PopupAccess => {
                 if let Some(mut popup) = gs.popup.take() {
@@ -104,6 +106,10 @@ impl IdiomEvent {
             IdiomEvent::NewPopup(builder) => {
                 gs.clear_popup();
                 gs.popup(builder());
+            }
+            IdiomEvent::InplacePopup(pop) => {
+                let Some(event) = pop(gs, ws, tree, term) else { return };
+                gs.event.push(event);
             }
             IdiomEvent::SearchFiles(pattern) => {
                 if pattern.len() > 1 {

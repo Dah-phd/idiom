@@ -1,8 +1,9 @@
 use super::{
     utils::{into_message, next_option, prev_option},
-    InplacePopup, PopupInterface,
+    InplacePopup, PopupInterface, Status,
 };
 use crate::{
+    embeded_term::EditorTerminal,
     global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
     render::{
         backend::{Backend, BackendProtocol, StyleExt},
@@ -20,42 +21,68 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 pub struct GoToLinePopup {
     current_line: usize,
     line_idx: String,
-    updated: bool,
     render_line: Line,
     accent: ContentStyle,
 }
 
 impl GoToLinePopup {
-    pub fn new(current_line: usize, editor_area: Rect, accent: ContentStyle) -> Option<Box<Self>> {
-        let render_line = editor_area.right_top_corner(1, 50).into_iter().next()?;
-        Some(Box::new(Self { current_line, line_idx: String::default(), updated: true, render_line, accent }))
+    pub fn run_inplace(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
+        let Some(editor) = workspace.get_active() else { return };
+        let current_line = editor.cursor.line;
+        let Some(mut popup) = GoToLinePopup::new(current_line, gs.editor_area, gs.theme.accent_style) else {
+            return;
+        };
+        InplacePopup::run(&mut popup, gs, workspace, tree, term);
     }
 
-    fn parse(&mut self) -> PopupMessage {
+    pub fn new(current_line: usize, editor_area: Rect, accent: ContentStyle) -> Option<Self> {
+        let render_line = editor_area.right_top_corner(1, 50).into_iter().next()?;
+        Some(Self { current_line, line_idx: String::default(), render_line, accent })
+    }
+
+    fn parse(&mut self) -> Option<usize> {
         if self.line_idx.is_empty() {
-            return PopupMessage::Event(IdiomEvent::GoToLine { line: self.current_line, clear_popup: false });
-        }
-        match self.line_idx.parse::<usize>() {
-            Ok(idx) => PopupMessage::Event(IdiomEvent::GoToLine { line: idx.saturating_sub(1), clear_popup: false }),
-            _ => PopupMessage::None,
-        }
+            return Some(self.current_line);
+        };
+        self.line_idx.parse().ok()
     }
 }
 
-impl PopupInterface for GoToLinePopup {
-    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
-        match key.code {
+impl InplacePopup for GoToLinePopup {
+    type R = ();
+
+    fn map_keyboard(
+        &mut self,
+        key: KeyEvent,
+        gs: &mut GlobalState,
+        ws: &mut Workspace,
+        _: &mut Tree,
+        _: &mut EditorTerminal,
+    ) -> Status<Self::R> {
+        let result_idx = match key.code {
+            KeyCode::Enter => return Status::Dropped,
             KeyCode::Char(ch) if ch.is_numeric() => {
                 self.line_idx.push(ch);
                 self.parse()
             }
             KeyCode::Backspace if self.line_idx.pop().is_some() => self.parse(),
-            KeyCode::Backspace => PopupMessage::None,
-            _ => PopupMessage::Clear,
+            _ => return Status::Pending,
+        };
+        if let Some(line) = result_idx {
+            let Some(editor) = ws.get_active() else {
+                return Status::Dropped;
+            };
+            editor.go_to(line);
+            gs.backend.freeze();
+            editor.render(gs);
+            self.render(gs);
+            gs.backend.unfreeze();
         }
+        Status::Pending
     }
 
-    fn render(&mut self, _screen: Rect, backend: &mut Backend) {
+    fn render(&mut self, gs: &mut GlobalState) {
+        let backend = gs.backend();
         let reset_style = backend.get_style();
         backend.set_style(self.accent);
         {
@@ -67,24 +94,31 @@ impl PopupInterface for GoToLinePopup {
         backend.set_style(reset_style);
     }
 
-    fn resize(&mut self, new_screen: Rect) -> PopupMessage {
-        if new_screen.width < 100 {
-            return PopupMessage::Clear;
+    fn resize_success(&mut self, gs: &mut GlobalState) -> bool {
+        match gs.editor_area.right_top_corner(1, 50).into_iter().next() {
+            Some(render_line) => {
+                self.render_line = render_line;
+                true
+            }
+            None => false,
         }
-        let Some(render_line) = new_screen.right_top_corner(2, 50).into_iter().nth(1) else {
-            return PopupMessage::Clear;
-        };
-        self.render_line = render_line;
-        self.mark_as_updated();
-        PopupMessage::None
     }
 
-    fn mark_as_updated(&mut self) {
-        self.updated = true;
+    fn map_mouse(
+        &mut self,
+        _: crossterm::event::MouseEvent,
+        _: &mut GlobalState,
+        _: &mut Workspace,
+        _: &mut Tree,
+        _: &mut EditorTerminal,
+    ) -> Status<Self::R> {
+        Status::Pending
     }
+
+    fn mark_as_updated(&mut self) {}
 
     fn collect_update_status(&mut self) -> bool {
-        std::mem::take(&mut self.updated)
+        false
     }
 }
 
@@ -158,7 +192,7 @@ impl PopupInterface for FindPopup {
         PopupMessage::None
     }
 
-    fn component_access(&mut self, gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tree) {
+    fn component_access(&mut self, _gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tree) {
         if let Some(editor) = ws.get_active() {
             self.options.clear();
             editor.find(self.pattern.text.as_str(), &mut self.options);

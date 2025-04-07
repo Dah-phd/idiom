@@ -17,7 +17,7 @@ use crate::{
     workspace::Workspace,
 };
 use crossterm::event::Event;
-use std::{io::Write, path::PathBuf, time::Duration};
+use std::{path::PathBuf, time::Duration};
 
 pub const MIN_FRAMERATE: Duration = Duration::from_millis(8);
 pub const MIN_HEIGHT: u16 = 6;
@@ -107,12 +107,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                 }
                                 GeneralAction::GoToLinePopup => {
                                     if gs.is_insert() {
-                                        if let Some(popup) = workspace.get_active().and_then(|editor| {
-                                            let current_line = editor.cursor.line;
-                                            GoToLinePopup::new(current_line, gs.editor_area, gs.theme.accent_style)
-                                        }) {
-                                            gs.popup(popup);
-                                        }
+                                        GoToLinePopup::run_inplace(&mut gs, &mut workspace, &mut tree, &mut term);
                                     } else {
                                         gs.event.push(IdiomEvent::EmbededApp("gitui".to_owned()));
                                     };
@@ -163,6 +158,6 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
         gs.draw(&mut workspace, &mut tree, &mut term);
 
         // do event exchanges
-        gs.handle_events(&mut tree, &mut workspace).await
+        gs.handle_events(&mut tree, &mut workspace, &mut term).await
     }
 }

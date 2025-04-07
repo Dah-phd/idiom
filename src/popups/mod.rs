@@ -97,8 +97,10 @@ pub trait InplacePopup {
                     },
                     Event::Resize(width, height) => {
                         gs.full_resize(height, width);
+                        if !self.resize_success(gs) {
+                            return None;
+                        };
                         gs.draw(ws, tree, term);
-                        self.resize(gs.screen_rect);
                         self.render(gs);
                         // executed when finish
                         gs.force_screen_rebuild();
@@ -121,7 +123,7 @@ pub trait InplacePopup {
     }
 
     fn render(&mut self, gs: &mut GlobalState);
-    fn resize(&mut self, _: Rect) {}
+    fn resize_success(&mut self, gs: &mut GlobalState) -> bool;
     fn mark_as_updated(&mut self);
     fn collect_update_status(&mut self) -> bool;
     fn paste_passthrough(&mut self, _clip: String, _gs: &mut GlobalState) {}

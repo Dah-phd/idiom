@@ -152,6 +152,10 @@ impl<T> InplacePopup for PopupX<T> {
         Status::Pending
     }
 
+    fn resize_success(&mut self, _gs: &mut GlobalState) -> bool {
+        true
+    }
+
     fn mark_as_updated(&mut self) {
         self.updated = true;
     }
