@@ -1,6 +1,7 @@
 use super::{
+    popup_replace::ReplacePopupX,
     utils::{next_option, prev_option},
-    InplacePopup, Status,
+    Components, InplacePopup, Status,
 };
 use crate::{
     embeded_term::EditorTerminal,
@@ -50,14 +51,9 @@ impl GoToLinePopup {
 impl InplacePopup for GoToLinePopup {
     type R = ();
 
-    fn map_keyboard(
-        &mut self,
-        key: KeyEvent,
-        gs: &mut GlobalState,
-        ws: &mut Workspace,
-        _: &mut Tree,
-        _: &mut EditorTerminal,
-    ) -> Status<Self::R> {
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
+        let Components { gs, ws, .. } = components;
+
         let result_idx = match key.code {
             KeyCode::Enter => return Status::Dropped,
             KeyCode::Char(ch) if ch.is_numeric() => {
@@ -103,14 +99,7 @@ impl InplacePopup for GoToLinePopup {
         }
     }
 
-    fn map_mouse(
-        &mut self,
-        _: MouseEvent,
-        _: &mut GlobalState,
-        _: &mut Workspace,
-        _: &mut Tree,
-        _: &mut EditorTerminal,
-    ) -> Status<Self::R> {
+    fn map_mouse(&mut self, _: MouseEvent, _: &mut Components) -> Status<Self::R> {
         Status::Pending
     }
 
@@ -134,13 +123,8 @@ pub struct FindPopup {
 impl FindPopup {
     pub fn new(editor_area: Rect, accent: ContentStyle) -> Option<Self> {
         let render_line = editor_area.right_top_corner(1, 50).into_iter().next()?;
-        Some(Self {
-            options: Vec::new(),
-            pattern: TextField::new(String::new(), Some(true)),
-            state: 0,
-            accent,
-            render_line,
-        })
+        let pattern = TextField::new(String::new(), Some(true));
+        Some(Self { options: Vec::new(), pattern, state: 0, accent, render_line })
     }
 
     pub fn run_inplace(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
@@ -154,16 +138,18 @@ impl FindPopup {
 impl InplacePopup for FindPopup {
     type R = ();
 
-    fn map_keyboard(
-        &mut self,
-        key: KeyEvent,
-        gs: &mut GlobalState,
-        ws: &mut Workspace,
-        _: &mut Tree,
-        _: &mut EditorTerminal,
-    ) -> Status<Self::R> {
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
+        let Components { gs, ws, tree, term } = components;
+
         if matches!(key.code, KeyCode::Char('h' | 'H') if key.modifiers.contains(KeyModifiers::CONTROL)) {
-            gs.event.push(IdiomEvent::FindToReplace(self.pattern.text.to_owned(), self.options.clone()));
+            if let Some(mut popup) = ReplacePopupX::from_search(
+                std::mem::take(&mut self.pattern.text),
+                std::mem::take(&mut self.options),
+                gs.editor_area,
+                self.accent,
+            ) {
+                popup.run(gs, ws, tree, term);
+            }
             return Status::Dropped;
         }
         if Some(true) == self.pattern.map(&key, &mut gs.clipboard) {
@@ -224,18 +210,17 @@ impl InplacePopup for FindPopup {
         }
     }
 
-    fn paste_passthrough(&mut self, clip: String, _gs: &mut GlobalState) {
+    fn paste_passthrough(&mut self, clip: String, components: &mut Components) -> bool {
         self.pattern.paste_passthrough(clip);
+        if let Some(editor) = components.ws.get_active() {
+            self.options.clear();
+            editor.find(self.pattern.text.as_str(), &mut self.options);
+        }
+        self.state = self.options.len().saturating_sub(1);
+        true
     }
 
-    fn map_mouse(
-        &mut self,
-        _: MouseEvent,
-        _: &mut GlobalState,
-        _: &mut Workspace,
-        _: &mut Tree,
-        _: &mut EditorTerminal,
-    ) -> Status<Self::R> {
+    fn map_mouse(&mut self, _: MouseEvent, _: &mut Components) -> Status<Self::R> {
         Status::Pending
     }
 

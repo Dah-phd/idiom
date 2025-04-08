@@ -7,7 +7,7 @@ use crate::{
         get_init_screen, get_new_screen_size,
         pallet::Pallet,
         popup_find::{FindPopup, GoToLinePopup},
-        popup_replace::ReplacePopup,
+        popup_replace::ReplacePopupX,
         popup_tree_search::ActivePathSearch,
         popups_editor::selector_editors,
     },
@@ -64,9 +64,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                 }
                                 GeneralAction::Replace => {
                                     if gs.is_insert() {
-                                        if let Some(popup) = ReplacePopup::new(gs.editor_area, gs.theme.accent_style) {
-                                            gs.popup(popup);
-                                        }
+                                        ReplacePopupX::run_inplace(&mut gs, &mut workspace, &mut tree, &mut term);
                                     };
                                 }
                                 GeneralAction::SelectOpenEditor => {

@@ -3,7 +3,7 @@ use std::ops::Range;
 use crate::{
     embeded_term::EditorTerminal,
     global_state::{GlobalState, PopupMessage},
-    popups::{InplacePopup, Popup, Status},
+    popups::{Components, InplacePopup, Popup, Status},
     tree::Tree,
     workspace::Workspace,
 };
@@ -31,7 +31,7 @@ impl std::fmt::Debug for Button {
 }
 
 pub struct CommandButton<T> {
-    pub command: fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal) -> T,
+    pub command: fn(&mut Components) -> T,
     pub name: &'static str,
     pub key: Option<Vec<KeyCode>>,
 }
@@ -83,18 +83,11 @@ impl<T> InplacePopup for PopupX<T> {
         }
     }
 
-    fn map_keyboard(
-        &mut self,
-        key: KeyEvent,
-        gs: &mut GlobalState,
-        ws: &mut Workspace,
-        tree: &mut Tree,
-        term: &mut EditorTerminal,
-    ) -> Status<Self::R> {
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
         if let Some(button) =
             self.buttons.iter().find(|button| matches!(&button.key, Some(key_code) if key_code.contains(&key.code)))
         {
-            return Status::Result((button.command)(gs, ws, tree, term));
+            return Status::Result((button.command)(components));
         }
         match key.code {
             KeyCode::Char(ch) if self.message_as_buffer_builder.is_some() => {
@@ -107,7 +100,7 @@ impl<T> InplacePopup for PopupX<T> {
             KeyCode::Backspace if self.message_as_buffer_builder.is_some() => {
                 self.message.pop();
             }
-            KeyCode::Enter => return Status::Result((self.buttons[self.state].command)(gs, ws, tree, term)),
+            KeyCode::Enter => return Status::Result((self.buttons[self.state].command)(components)),
             KeyCode::Left => {
                 self.prev();
             }
@@ -119,18 +112,11 @@ impl<T> InplacePopup for PopupX<T> {
         Status::Pending
     }
 
-    fn map_mouse(
-        &mut self,
-        event: MouseEvent,
-        gs: &mut GlobalState,
-        ws: &mut Workspace,
-        tree: &mut Tree,
-        term: &mut EditorTerminal,
-    ) -> Status<Self::R> {
+    fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status<Self::R> {
         match event {
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } if row == self.button_line => {
                 if let Some(position) = self.button_ranges.iter().position(|btn_range| btn_range.contains(&column)) {
-                    return Status::Result((self.buttons[position].command)(gs, ws, tree, term));
+                    return Status::Result((self.buttons[position].command)(components));
                 }
             }
             MouseEvent { kind: MouseEventKind::Moved, column, row, .. } if row == self.button_line => {
@@ -255,12 +241,12 @@ pub fn save_all_popup(
         None,
         vec![
             CommandButton {
-                command: |gs, ws, _, _| ws.save_all(gs),
+                command: |c| c.ws.save_all(c.gs),
                 name: "Save All (Y)",
                 key: Some(vec![KeyCode::Char('y'), KeyCode::Char('Y')]),
             },
             CommandButton {
-                command: |_, _, _, _| (),
+                command: |_| (),
                 name: "Don't save (N)",
                 key: Some(vec![KeyCode::Char('n'), KeyCode::Char('N')]),
             },

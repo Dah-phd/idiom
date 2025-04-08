@@ -68,6 +68,19 @@ pub enum Status<T> {
     Pending,
 }
 
+pub struct Components<'a> {
+    pub gs: &'a mut GlobalState,
+    pub ws: &'a mut Workspace,
+    pub tree: &'a mut Tree,
+    pub term: &'a mut EditorTerminal,
+}
+
+impl<'a> Components<'a> {
+    pub fn re_draw(&mut self) {
+        self.gs.draw(self.ws, self.tree, self.term);
+    }
+}
+
 pub trait InplacePopup {
     type R;
 
@@ -81,37 +94,40 @@ pub trait InplacePopup {
         // executed when finish
         gs.force_screen_rebuild();
         self.render(gs);
+        let mut components = Components { gs, ws, tree, term };
         loop {
             if crossterm::event::poll(MIN_FRAMERATE).ok()? {
                 match crossterm::event::read().ok()? {
-                    Event::Key(key) => match self.map_key(key, gs, ws, tree, term) {
+                    Event::Key(key) => match self.map_key(key, &mut components) {
                         Status::Result(value) => return Some(value),
                         Status::Dropped => return None,
                         Status::Pending => (),
                     },
-                    Event::Mouse(event) => match self.map_mouse(event, gs, ws, tree, term) {
+                    Event::Mouse(event) => match self.map_mouse(event, &mut components) {
                         Status::Result(value) => return Some(value),
                         Status::Dropped => return None,
                         Status::Pending => (),
                     },
                     Event::Resize(width, height) => {
-                        gs.full_resize(height, width);
-                        if !self.resize_success(gs) {
+                        components.gs.full_resize(height, width);
+                        if !self.resize_success(components.gs) {
                             return None;
                         };
-                        gs.draw(ws, tree, term);
-                        self.render(gs);
+                        components.re_draw();
+                        self.render(components.gs);
                         // executed when finish
-                        gs.force_screen_rebuild();
+                        components.gs.force_screen_rebuild();
                     }
                     Event::Paste(clip) => {
-                        self.paste_passthrough(clip, gs);
+                        if self.paste_passthrough(clip, &mut components) {
+                            self.render(components.gs);
+                        };
                     }
                     _ => (),
                 };
             }
-            self.fast_render(gs);
-            gs.backend.flush_buf();
+            self.fast_render(components.gs);
+            components.gs.backend.flush_buf();
         }
     }
 
@@ -125,42 +141,23 @@ pub trait InplacePopup {
     fn resize_success(&mut self, gs: &mut GlobalState) -> bool;
     fn mark_as_updated(&mut self);
     fn collect_update_status(&mut self) -> bool;
-    fn paste_passthrough(&mut self, _clip: String, _gs: &mut GlobalState) {}
+    fn paste_passthrough(&mut self, _clip: String, _components: &mut Components) -> bool {
+        false
+    }
 
-    fn map_key(
-        &mut self,
-        key: KeyEvent,
-        gs: &mut GlobalState,
-        ws: &mut Workspace,
-        tree: &mut Tree,
-        term: &mut EditorTerminal,
-    ) -> Status<Self::R> {
+    fn map_key(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
         self.mark_as_updated();
         match key {
             KeyEvent { code: KeyCode::Char('d' | 'D'), modifiers: KeyModifiers::CONTROL, .. } => Status::Dropped,
             KeyEvent { code: KeyCode::Char('q' | 'Q'), modifiers: KeyModifiers::CONTROL, .. } => Status::Dropped,
             KeyEvent { code: KeyCode::Esc, .. } => Status::Dropped,
-            _ => self.map_keyboard(key, gs, ws, tree, term),
+            _ => self.map_keyboard(key, components),
         }
     }
 
-    fn map_keyboard(
-        &mut self,
-        key: KeyEvent,
-        gs: &mut GlobalState,
-        ws: &mut Workspace,
-        tree: &mut Tree,
-        term: &mut EditorTerminal,
-    ) -> Status<Self::R>;
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R>;
 
-    fn map_mouse(
-        &mut self,
-        event: MouseEvent,
-        gs: &mut GlobalState,
-        ws: &mut Workspace,
-        tree: &mut Tree,
-        term: &mut EditorTerminal,
-    ) -> Status<Self::R>;
+    fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status<Self::R>;
 }
 
 struct Command {
