@@ -1,12 +1,12 @@
 use super::{
-    utils::{into_message, next_option, prev_option},
-    InplacePopup, PopupInterface, Status,
+    utils::{next_option, prev_option},
+    InplacePopup, Status,
 };
 use crate::{
     embeded_term::EditorTerminal,
-    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
+    global_state::{GlobalState, IdiomEvent},
     render::{
-        backend::{Backend, BackendProtocol, StyleExt},
+        backend::{BackendProtocol, StyleExt},
         count_as_string,
         layout::{Line, Rect},
         TextField,
@@ -14,9 +14,8 @@ use crate::{
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
 use crossterm::style::ContentStyle;
-use fuzzy_matcher::skim::SkimMatcherV2;
 
 pub struct GoToLinePopup {
     current_line: usize,
@@ -106,7 +105,7 @@ impl InplacePopup for GoToLinePopup {
 
     fn map_mouse(
         &mut self,
-        _: crossterm::event::MouseEvent,
+        _: MouseEvent,
         _: &mut GlobalState,
         _: &mut Workspace,
         _: &mut Tree,
@@ -114,6 +113,8 @@ impl InplacePopup for GoToLinePopup {
     ) -> Status<Self::R> {
         Status::Pending
     }
+
+    fn fast_render(&mut self, _gs: &mut GlobalState) {}
 
     fn mark_as_updated(&mut self) {}
 
@@ -124,46 +125,81 @@ impl InplacePopup for GoToLinePopup {
 
 pub struct FindPopup {
     pub options: Vec<(CursorPosition, CursorPosition)>,
-    pub pattern: TextField<PopupMessage>,
+    pub pattern: TextField<bool>,
     pub state: usize,
     accent: ContentStyle,
     render_line: Line,
 }
 
 impl FindPopup {
-    pub fn new(editor_area: Rect, accent: ContentStyle) -> Option<Box<Self>> {
+    pub fn new(editor_area: Rect, accent: ContentStyle) -> Option<Self> {
         let render_line = editor_area.right_top_corner(1, 50).into_iter().next()?;
-        Some(Box::new(Self {
+        Some(Self {
             options: Vec::new(),
-            pattern: TextField::with_editor_access(String::new()),
+            pattern: TextField::new(String::new(), Some(true)),
             state: 0,
             accent,
             render_line,
-        }))
+        })
+    }
+
+    pub fn run_inplace(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
+        let Some(mut popup) = FindPopup::new(gs.editor_area, gs.theme.accent_style) else {
+            return;
+        };
+        InplacePopup::run(&mut popup, gs, workspace, tree, term);
     }
 }
 
-impl PopupInterface for FindPopup {
-    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
+impl InplacePopup for FindPopup {
+    type R = ();
+
+    fn map_keyboard(
+        &mut self,
+        key: KeyEvent,
+        gs: &mut GlobalState,
+        ws: &mut Workspace,
+        _: &mut Tree,
+        _: &mut EditorTerminal,
+    ) -> Status<Self::R> {
         if matches!(key.code, KeyCode::Char('h' | 'H') if key.modifiers.contains(KeyModifiers::CONTROL)) {
-            return PopupMessage::ClearEvent(IdiomEvent::FindToReplace(
-                self.pattern.text.to_owned(),
-                self.options.clone(),
-            ));
+            gs.event.push(IdiomEvent::FindToReplace(self.pattern.text.to_owned(), self.options.clone()));
+            return Status::Dropped;
         }
-        if let Some(event) = self.pattern.map(key, clipboard) {
-            return event;
+        if Some(true) == self.pattern.map(&key, &mut gs.clipboard) {
+            if let Some(editor) = ws.get_active() {
+                self.options.clear();
+                editor.find(self.pattern.text.as_str(), &mut self.options);
+            }
+            self.state = self.options.len().saturating_sub(1);
+            self.render(gs);
+            return Status::Pending;
         }
-        match key.code {
-            KeyCode::Enter | KeyCode::Down => into_message(next_option(&self.options, &mut self.state)),
-            KeyCode::Up => into_message(prev_option(&self.options, &mut self.state)),
-            KeyCode::Esc | KeyCode::Left => PopupMessage::Clear,
-            KeyCode::Tab => PopupMessage::ClearEvent(IdiomEvent::FindSelector(self.pattern.text.to_owned())),
-            _ => PopupMessage::None,
+        let select_result = match key.code {
+            KeyCode::Enter | KeyCode::Down => next_option(&self.options, &mut self.state),
+            KeyCode::Up => prev_option(&self.options, &mut self.state),
+            KeyCode::Esc | KeyCode::Left => return Status::Dropped,
+            KeyCode::Tab => {
+                gs.event.push(IdiomEvent::FindSelector(self.pattern.text.to_owned()));
+                return Status::Dropped;
+            }
+            _ => return Status::Pending,
+        };
+        let Some(editor) = ws.get_active() else {
+            return Status::Dropped;
+        };
+        if let Some((from, to)) = select_result {
+            editor.go_to_select(from, to);
+            gs.backend.freeze();
+            editor.render(gs);
+            self.render(gs);
+            gs.backend.unfreeze();
         }
+        Status::Pending
     }
 
-    fn render(&mut self, _screen: Rect, backend: &mut Backend) {
+    fn render(&mut self, gs: &mut GlobalState) {
+        let backend = gs.backend();
         let reset_style = backend.get_style();
         backend.set_style(self.accent);
         {
@@ -176,37 +212,36 @@ impl PopupInterface for FindPopup {
         backend.set_style(reset_style);
     }
 
-    fn fast_render(&mut self, screen: Rect, backend: &mut Backend) {
-        self.render(screen, backend);
+    fn fast_render(&mut self, _gs: &mut GlobalState) {}
+
+    fn resize_success(&mut self, gs: &mut GlobalState) -> bool {
+        match gs.editor_area.right_top_corner(1, 50).into_iter().next() {
+            Some(render_line) => {
+                self.render_line = render_line;
+                true
+            }
+            None => false,
+        }
     }
 
-    fn resize(&mut self, new_screen: Rect) -> PopupMessage {
-        if new_screen.width < 100 {
-            return PopupMessage::Clear;
-        }
-        let Some(render_line) = new_screen.right_top_corner(2, 50).into_iter().nth(1) else {
-            return PopupMessage::Clear;
-        };
-        self.render_line = render_line;
-        self.mark_as_updated();
-        PopupMessage::None
+    fn paste_passthrough(&mut self, clip: String, _gs: &mut GlobalState) {
+        self.pattern.paste_passthrough(clip);
     }
 
-    fn component_access(&mut self, _gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tree) {
-        if let Some(editor) = ws.get_active() {
-            self.options.clear();
-            editor.find(self.pattern.text.as_str(), &mut self.options);
-        }
-        self.state = self.options.len().saturating_sub(1);
+    fn map_mouse(
+        &mut self,
+        _: MouseEvent,
+        _: &mut GlobalState,
+        _: &mut Workspace,
+        _: &mut Tree,
+        _: &mut EditorTerminal,
+    ) -> Status<Self::R> {
+        Status::Pending
     }
 
     fn mark_as_updated(&mut self) {}
 
     fn collect_update_status(&mut self) -> bool {
-        true
-    }
-
-    fn paste_passthrough(&mut self, clip: String, _: &SkimMatcherV2) -> PopupMessage {
-        self.pattern.paste_passthrough(clip)
+        false
     }
 }

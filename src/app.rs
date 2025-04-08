@@ -57,9 +57,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                             match action {
                                 GeneralAction::Find => {
                                     if gs.is_insert() {
-                                        if let Some(popup) = FindPopup::new(gs.editor_area, gs.theme.accent_style) {
-                                            gs.popup(popup);
-                                        }
+                                        FindPopup::run_inplace(&mut gs, &mut workspace, &mut tree, &mut term);
                                     } else {
                                         gs.popup(ActivePathSearch::new());
                                     };

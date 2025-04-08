@@ -8,8 +8,7 @@ pub mod popup_tree_search;
 pub mod popups_editor;
 pub mod popups_tree;
 mod utils;
-
-use std::{io::Write, time::Duration};
+use std::time::Duration;
 
 use crate::{
     app::{MIN_FRAMERATE, MIN_HEIGHT, MIN_WIDTH},
