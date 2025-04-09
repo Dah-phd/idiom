@@ -6,7 +6,7 @@ pub mod state;
 mod text_field;
 pub mod utils;
 pub mod widgets;
-pub use button::save_all_popup;
+pub use button::save_and_exit_popup;
 pub use button::Button;
 pub use text_field::TextField;
 pub use utils::UTF8Safe;

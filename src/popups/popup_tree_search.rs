@@ -93,7 +93,7 @@ impl PopupInterface for ActivePathSearch {
         PopupMessage::None
     }
 
-    fn component_access(&mut self, gs: &mut GlobalState, _ws: &mut Workspace, tree: &mut Tree) {
+    fn component_access(&mut self, _gs: &mut GlobalState, _ws: &mut Workspace, tree: &mut Tree) {
         if self.pattern.text.is_empty() {
             self.options.clear();
         } else {
@@ -213,7 +213,7 @@ impl PopupInterface for ActiveFileSearch {
         }
     }
 
-    fn component_access(&mut self, gs: &mut GlobalState, _ws: &mut Workspace, file_tree: &mut Tree) {
+    fn component_access(&mut self, _gs: &mut GlobalState, _ws: &mut Workspace, file_tree: &mut Tree) {
         self.mark_as_updated();
         if self.pattern.text.len() < 2 {
             self.options.clear();

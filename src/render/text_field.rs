@@ -402,10 +402,6 @@ impl TextField<PopupMessage> {
     pub fn with_tree_access(text: String) -> Self {
         Self::new(text, Some(PopupMessage::Event(IdiomEvent::PopupAccess)))
     }
-
-    pub fn with_editor_access(text: String) -> Self {
-        Self::new(text, Some(PopupMessage::Event(IdiomEvent::PopupAccess)))
-    }
 }
 
 impl TextField<()> {

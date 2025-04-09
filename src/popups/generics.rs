@@ -138,22 +138,6 @@ impl Popup {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn message(message: String) -> Box<Self> {
-        Box::new(Self {
-            message,
-            title_prefix: None,
-            title: "Info".to_owned(),
-            message_as_buffer_builder: None,
-            buttons: vec![Button { command: |_| PopupMessage::Clear, name: "Ok", key: None }],
-            button_line: 0,
-            button_ranges: vec![],
-            size: (6, 40),
-            state: 0,
-            updated: true,
-        })
-    }
-
     fn next(&mut self) {
         if self.state < self.buttons.len() - 1 {
             self.state += 1;

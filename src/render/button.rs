@@ -1,8 +1,8 @@
-use std::ops::Range;
+use std::{ops::Range, path::PathBuf};
 
 use crate::{
     embeded_term::EditorTerminal,
-    global_state::{GlobalState, PopupMessage},
+    global_state::{GlobalState, IdiomEvent, PopupMessage},
     popups::{Components, InplacePopup, Popup, Status},
     tree::Tree,
     workspace::Workspace,
@@ -31,7 +31,7 @@ impl std::fmt::Debug for Button {
 }
 
 pub struct CommandButton<T> {
-    pub command: fn(&mut Components) -> T,
+    pub command: fn(&mut PopupX<T>, &mut Components) -> T,
     pub name: &'static str,
     pub key: Option<Vec<KeyCode>>,
 }
@@ -55,16 +55,26 @@ pub struct PopupX<T> {
     updated: bool,
 }
 
+impl<T> PopupX<T> {
+    fn mark_as_updated(&mut self) {
+        self.updated = true;
+    }
+
+    fn collect_update_status(&mut self) -> bool {
+        std::mem::take(&mut self.updated)
+    }
+}
+
 impl<T> InplacePopup for PopupX<T> {
     type R = T;
 
-    fn fast_render(&mut self, gs: &mut GlobalState) {
+    fn render(&mut self, gs: &mut GlobalState) {
         if self.collect_update_status() {
-            self.render(gs);
+            self.force_render(gs);
         }
     }
 
-    fn render(&mut self, gs: &mut GlobalState) {
+    fn force_render(&mut self, gs: &mut GlobalState) {
         let (height, width) = self.size;
         let mut area = gs.screen_rect.center(height, width);
         let backend = gs.backend();
@@ -84,10 +94,11 @@ impl<T> InplacePopup for PopupX<T> {
     }
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
+        self.mark_as_updated();
         if let Some(button) =
             self.buttons.iter().find(|button| matches!(&button.key, Some(key_code) if key_code.contains(&key.code)))
         {
-            return Status::Result((button.command)(components));
+            return Status::Result((button.command)(self, components));
         }
         match key.code {
             KeyCode::Char(ch) if self.message_as_buffer_builder.is_some() => {
@@ -100,7 +111,7 @@ impl<T> InplacePopup for PopupX<T> {
             KeyCode::Backspace if self.message_as_buffer_builder.is_some() => {
                 self.message.pop();
             }
-            KeyCode::Enter => return Status::Result((self.buttons[self.state].command)(components)),
+            KeyCode::Enter => return Status::Result((self.buttons[self.state].command)(self, components)),
             KeyCode::Left => {
                 self.prev();
             }
@@ -116,7 +127,7 @@ impl<T> InplacePopup for PopupX<T> {
         match event {
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } if row == self.button_line => {
                 if let Some(position) = self.button_ranges.iter().position(|btn_range| btn_range.contains(&column)) {
-                    return Status::Result((self.buttons[position].command)(components));
+                    return Status::Result((self.buttons[position].command)(self, components));
                 }
             }
             MouseEvent { kind: MouseEventKind::Moved, column, row, .. } if row == self.button_line => {
@@ -140,14 +151,6 @@ impl<T> InplacePopup for PopupX<T> {
 
     fn resize_success(&mut self, _gs: &mut GlobalState) -> bool {
         true
-    }
-
-    fn mark_as_updated(&mut self) {
-        self.updated = true;
-    }
-
-    fn collect_update_status(&mut self) -> bool {
-        std::mem::take(&mut self.updated)
     }
 }
 
@@ -228,12 +231,12 @@ impl<T> PopupX<T> {
     }
 }
 
-pub fn save_all_popup(
+pub fn save_and_exit_popup(
     gs: &mut GlobalState,
     ws: &mut Workspace,
     tree: &mut Tree,
     term: &mut EditorTerminal,
-) -> Option<()> {
+) -> bool {
     PopupX::new(
         "Not all opened editors are saved!".into(),
         None,
@@ -241,16 +244,103 @@ pub fn save_all_popup(
         None,
         vec![
             CommandButton {
-                command: |c| c.ws.save_all(c.gs),
+                command: |_, c| c.ws.save_all(c.gs),
                 name: "Save All (Y)",
                 key: Some(vec![KeyCode::Char('y'), KeyCode::Char('Y')]),
             },
             CommandButton {
-                command: |_| (),
+                command: |_, _| (),
                 name: "Don't save (N)",
                 key: Some(vec![KeyCode::Char('n'), KeyCode::Char('N')]),
             },
         ],
+        Some((4, 40)),
+    )
+    .run(gs, ws, tree, term)
+    .is_some()
+}
+
+pub fn file_updated(
+    path: PathBuf,
+    gs: &mut GlobalState,
+    ws: &mut Workspace,
+    tree: &mut Tree,
+    term: &mut EditorTerminal,
+) -> Option<IdiomEvent> {
+    PopupX::new(
+        "File updated! (Use cancel/close to do nothing)".into(),
+        None,
+        Some(path.display().to_string()),
+        None,
+        vec![
+            CommandButton {
+                command: |_, c| IdiomEvent::Save,
+                name: "Overwrite (S)",
+                key: Some(vec![KeyCode::Char('s'), KeyCode::Char('S')]),
+            },
+            CommandButton {
+                command: |_, c| IdiomEvent::Rebase,
+                name: "Rebase (L)",
+                key: Some(vec![KeyCode::Char('l'), KeyCode::Char('L')]),
+            },
+        ],
+        Some((4, 60)),
+    )
+    .run(gs, ws, tree, term)
+}
+
+pub fn create_file_popup(
+    path: PathBuf,
+    gs: &mut GlobalState,
+    ws: &mut Workspace,
+    tree: &mut Tree,
+    term: &mut EditorTerminal,
+) -> Option<IdiomEvent> {
+    let buttons = vec![
+        CommandButton {
+            command: |p, _| IdiomEvent::CreateFileOrFolder { name: p.message.to_owned(), from_base: false },
+            name: "Create",
+            key: None,
+        },
+        CommandButton {
+            command: |p, _| IdiomEvent::CreateFileOrFolder { name: p.message.to_owned(), from_base: true },
+            name: "Create in ./",
+            key: None,
+        },
+    ];
+    PopupX::new(String::new(), Some("New in "), Some(path.display().to_string()), Some(Some), buttons, Some((4, 40)))
+        .run(gs, ws, tree, term)
+}
+
+pub fn create_root_file_popup(
+    gs: &mut GlobalState,
+    ws: &mut Workspace,
+    tree: &mut Tree,
+    term: &mut EditorTerminal,
+) -> Option<IdiomEvent> {
+    let buttons = vec![CommandButton {
+        command: |p, _| IdiomEvent::CreateFileOrFolder { name: std::mem::take(&mut p.message), from_base: true },
+        name: "Create",
+        key: None,
+    }];
+    PopupX::new(String::new(), Some("New in root dir"), None, Some(Some), buttons, Some((4, 40)))
+        .run(gs, ws, tree, term)
+}
+
+pub fn rename_file_popup(
+    path: String,
+    gs: &mut GlobalState,
+    ws: &mut Workspace,
+    tree: &mut Tree,
+    term: &mut EditorTerminal,
+) -> Option<IdiomEvent> {
+    let message = path.split(std::path::MAIN_SEPARATOR).last().map(ToOwned::to_owned).unwrap_or_default();
+    PopupX::new(
+        message,
+        Some("Rename: "),
+        Some(path),
+        Some(Some),
+        vec![CommandButton { command: |p, _| IdiomEvent::RenameFile(p.message.to_owned()), name: "Rename", key: None }],
         Some((4, 40)),
     )
     .run(gs, ws, tree, term)

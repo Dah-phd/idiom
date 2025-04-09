@@ -1,5 +1,5 @@
 use super::{
-    popup_replace::ReplacePopupX,
+    popup_replace::ReplacePopup,
     utils::{next_option, prev_option},
     Components, InplacePopup, Status,
 };
@@ -70,13 +70,13 @@ impl InplacePopup for GoToLinePopup {
             editor.go_to(line);
             gs.backend.freeze();
             editor.render(gs);
-            self.render(gs);
+            self.force_render(gs);
             gs.backend.unfreeze();
         }
         Status::Pending
     }
 
-    fn render(&mut self, gs: &mut GlobalState) {
+    fn force_render(&mut self, gs: &mut GlobalState) {
         let backend = gs.backend();
         let reset_style = backend.get_style();
         backend.set_style(self.accent);
@@ -103,13 +103,7 @@ impl InplacePopup for GoToLinePopup {
         Status::Pending
     }
 
-    fn fast_render(&mut self, _gs: &mut GlobalState) {}
-
-    fn mark_as_updated(&mut self) {}
-
-    fn collect_update_status(&mut self) -> bool {
-        false
-    }
+    fn render(&mut self, _gs: &mut GlobalState) {}
 }
 
 pub struct FindPopup {
@@ -142,7 +136,7 @@ impl InplacePopup for FindPopup {
         let Components { gs, ws, tree, term } = components;
 
         if matches!(key.code, KeyCode::Char('h' | 'H') if key.modifiers.contains(KeyModifiers::CONTROL)) {
-            if let Some(mut popup) = ReplacePopupX::from_search(
+            if let Some(mut popup) = ReplacePopup::from_search(
                 std::mem::take(&mut self.pattern.text),
                 std::mem::take(&mut self.options),
                 gs.editor_area,
@@ -158,7 +152,7 @@ impl InplacePopup for FindPopup {
                 editor.find(self.pattern.text.as_str(), &mut self.options);
             }
             self.state = self.options.len().saturating_sub(1);
-            self.render(gs);
+            self.force_render(gs);
             return Status::Pending;
         }
         let select_result = match key.code {
@@ -178,13 +172,13 @@ impl InplacePopup for FindPopup {
             editor.go_to_select(from, to);
             gs.backend.freeze();
             editor.render(gs);
-            self.render(gs);
+            self.force_render(gs);
             gs.backend.unfreeze();
         }
         Status::Pending
     }
 
-    fn render(&mut self, gs: &mut GlobalState) {
+    fn force_render(&mut self, gs: &mut GlobalState) {
         let backend = gs.backend();
         let reset_style = backend.get_style();
         backend.set_style(self.accent);
@@ -198,7 +192,7 @@ impl InplacePopup for FindPopup {
         backend.set_style(reset_style);
     }
 
-    fn fast_render(&mut self, _gs: &mut GlobalState) {}
+    fn render(&mut self, _gs: &mut GlobalState) {}
 
     fn resize_success(&mut self, gs: &mut GlobalState) -> bool {
         match gs.editor_area.right_top_corner(1, 50).into_iter().next() {
@@ -222,11 +216,5 @@ impl InplacePopup for FindPopup {
 
     fn map_mouse(&mut self, _: MouseEvent, _: &mut Components) -> Status<Self::R> {
         Status::Pending
-    }
-
-    fn mark_as_updated(&mut self) {}
-
-    fn collect_update_status(&mut self) -> bool {
-        false
     }
 }

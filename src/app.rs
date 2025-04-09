@@ -7,12 +7,12 @@ use crate::{
         get_init_screen, get_new_screen_size,
         pallet::Pallet,
         popup_find::{FindPopup, GoToLinePopup},
-        popup_replace::ReplacePopupX,
+        popup_replace::ReplacePopup,
         popup_tree_search::ActivePathSearch,
         popups_editor::selector_editors,
     },
     render::backend::Backend,
-    render::save_all_popup,
+    render::save_and_exit_popup,
     tree::Tree,
     workspace::Workspace,
 };
@@ -64,7 +64,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                 }
                                 GeneralAction::Replace => {
                                     if gs.is_insert() {
-                                        ReplacePopupX::run_inplace(&mut gs, &mut workspace, &mut tree, &mut term);
+                                        ReplacePopup::run_inplace(&mut gs, &mut workspace, &mut tree, &mut term);
                                     };
                                 }
                                 GeneralAction::SelectOpenEditor => {
@@ -84,7 +84,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                     if workspace.are_updates_saved(&mut gs) && !gs.has_popup() {
                                         workspace.graceful_exit().await;
                                         return Ok(());
-                                    } else if save_all_popup(&mut gs, &mut workspace, &mut tree, &mut term).is_some() {
+                                    } else if save_and_exit_popup(&mut gs, &mut workspace, &mut tree, &mut term) {
                                         workspace.graceful_exit().await;
                                         return Ok(());
                                     };

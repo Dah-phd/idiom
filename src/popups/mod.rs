@@ -93,7 +93,7 @@ pub trait InplacePopup {
     ) -> Option<Self::R> {
         // executed when finish
         gs.force_screen_rebuild();
-        self.render(gs);
+        self.force_render(gs);
         let mut components = Components { gs, ws, tree, term };
         loop {
             if crossterm::event::poll(MIN_FRAMERATE).ok()? {
@@ -114,39 +114,28 @@ pub trait InplacePopup {
                             return None;
                         };
                         components.re_draw();
-                        self.render(components.gs);
+                        self.force_render(components.gs);
                         // executed when finish
                         components.gs.force_screen_rebuild();
                     }
                     Event::Paste(clip) => {
                         if self.paste_passthrough(clip, &mut components) {
-                            self.render(components.gs);
+                            self.force_render(components.gs);
                         };
                     }
                     _ => (),
                 };
             }
-            self.fast_render(components.gs);
+            self.render(components.gs);
             components.gs.backend.flush_buf();
         }
     }
 
-    fn fast_render(&mut self, gs: &mut GlobalState) {
-        if self.collect_update_status() {
-            self.render(gs);
-        }
-    }
-
-    fn render(&mut self, gs: &mut GlobalState);
-    fn resize_success(&mut self, gs: &mut GlobalState) -> bool;
-    fn mark_as_updated(&mut self);
-    fn collect_update_status(&mut self) -> bool;
     fn paste_passthrough(&mut self, _clip: String, _components: &mut Components) -> bool {
         false
     }
 
     fn map_key(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
-        self.mark_as_updated();
         match key {
             KeyEvent { code: KeyCode::Char('d' | 'D'), modifiers: KeyModifiers::CONTROL, .. } => Status::Dropped,
             KeyEvent { code: KeyCode::Char('q' | 'Q'), modifiers: KeyModifiers::CONTROL, .. } => Status::Dropped,
@@ -155,8 +144,10 @@ pub trait InplacePopup {
         }
     }
 
+    fn render(&mut self, gs: &mut GlobalState);
+    fn force_render(&mut self, gs: &mut GlobalState);
+    fn resize_success(&mut self, gs: &mut GlobalState) -> bool;
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R>;
-
     fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status<Self::R>;
 }
 

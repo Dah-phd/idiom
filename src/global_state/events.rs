@@ -3,9 +3,7 @@ use crate::configs::{EditorAction, TreeAction};
 use crate::embeded_term::EditorTerminal;
 use crate::embeded_tui::run_embeded_tui;
 use crate::lsp::TreeDiagnostics;
-use crate::popups::{
-    popup_replace::ReplacePopup, popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges, PopupInterface,
-};
+use crate::popups::{popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges, PopupInterface};
 use crate::render::backend::BackendProtocol;
 use crate::tree::Tree;
 use crate::workspace::line::EditorLine;
@@ -14,7 +12,7 @@ use crate::{configs::FileType, workspace::CursorPosition};
 use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, WorkspaceEdit};
 use std::path::PathBuf;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum IdiomEvent {
     PopupAccess,
     PopupAccessOnce,
@@ -51,7 +49,6 @@ pub enum IdiomEvent {
     FindSelector(String),
     ActivateEditor(usize),
     ReplaceAll(String, Vec<(CursorPosition, CursorPosition)>),
-    FindToReplace(String, Vec<(CursorPosition, CursorPosition)>),
     ReplaceNextSelect {
         new_text: String,
         select: (CursorPosition, CursorPosition),
@@ -293,12 +290,6 @@ impl IdiomEvent {
             IdiomEvent::ActivateEditor(idx) => {
                 ws.activate_editor(idx, gs);
                 gs.insert_mode();
-            }
-            IdiomEvent::FindToReplace(pattern, options) => {
-                match ReplacePopup::from_search(pattern, options, gs.editor_area, gs.theme.accent_style) {
-                    Some(replace_popup) => gs.popup(replace_popup),
-                    None => gs.error("Failed to build replace popup (size constraints) ..."),
-                }
             }
             IdiomEvent::ReplaceAll(clip, ranges) => {
                 if let Some(editor) = ws.get_active() {

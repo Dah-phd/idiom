@@ -132,7 +132,7 @@ impl PopupInterface for Pallet {
         std::mem::take(&mut self.updated)
     }
 
-    fn component_access(&mut self, gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree) {
+    fn component_access(&mut self, _gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree) {
         if let Some(cb) = self.access_cb.take() {
             cb(ws, tree);
         }
