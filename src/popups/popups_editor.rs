@@ -13,7 +13,10 @@ pub fn selector_ranges(
         options,
         // display: |((from, _), line)| format!("({}) {line}", from.line + 1),
         |((..), line)| line,
-        |popup| IdiomEvent::GoToSelect { select: popup.options[popup.state.selected].0, clear_popup: true }.into(),
+        |popup| {
+            let (from, to) = popup.options[popup.state.selected].0;
+            PopupMessage::ClearEvent(IdiomEvent::GoToSelect { from, to })
+        },
         None,
     ))
 }

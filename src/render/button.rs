@@ -274,12 +274,12 @@ pub fn file_updated(
         None,
         vec![
             CommandButton {
-                command: |_, c| IdiomEvent::Save,
+                command: |_, _| IdiomEvent::Save,
                 name: "Overwrite (S)",
                 key: Some(vec![KeyCode::Char('s'), KeyCode::Char('S')]),
             },
             CommandButton {
-                command: |_, c| IdiomEvent::Rebase,
+                command: |_, _| IdiomEvent::Rebase,
                 name: "Rebase (L)",
                 key: Some(vec![KeyCode::Char('l'), KeyCode::Char('L')]),
             },

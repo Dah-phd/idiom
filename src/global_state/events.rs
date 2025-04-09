@@ -4,7 +4,6 @@ use crate::embeded_term::EditorTerminal;
 use crate::embeded_tui::run_embeded_tui;
 use crate::lsp::TreeDiagnostics;
 use crate::popups::{popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges, PopupInterface};
-use crate::render::backend::BackendProtocol;
 use crate::tree::Tree;
 use crate::workspace::line::EditorLine;
 use crate::workspace::{add_editor_from_data, Workspace};
@@ -25,43 +24,22 @@ pub enum IdiomEvent {
     OpenAtSelect(PathBuf, (CursorPosition, CursorPosition)),
     OpenLSPErrors,
     SelectPath(PathBuf),
-    CreateFileOrFolder {
-        name: String,
-        from_base: bool,
-    },
+    CreateFileOrFolder { name: String, from_base: bool },
     RenameFile(String),
-    RenamedFile {
-        from_path: PathBuf,
-        to_path: PathBuf,
-    },
+    RenamedFile { from_path: PathBuf, to_path: PathBuf },
     SearchFiles(String),
     FileUpdated(PathBuf),
     CheckLSP(FileType),
     TreeDiagnostics(TreeDiagnostics),
     AutoComplete(String),
-    Snippet {
-        snippet: String,
-        cursor_offset: Option<(usize, usize)>,
-        relative_select: Option<((usize, usize), usize)>,
-    },
+    Snippet { snippet: String, cursor_offset: Option<(usize, usize)>, relative_select: Option<((usize, usize), usize)> },
     InsertText(String),
     WorkspaceEdit(WorkspaceEdit),
     FindSelector(String),
     ActivateEditor(usize),
     ReplaceAll(String, Vec<(CursorPosition, CursorPosition)>),
-    ReplaceNextSelect {
-        new_text: String,
-        select: (CursorPosition, CursorPosition),
-        next_select: Option<(CursorPosition, CursorPosition)>,
-    },
-    GoToLine {
-        line: usize,
-        clear_popup: bool,
-    },
-    GoToSelect {
-        select: (CursorPosition, CursorPosition),
-        clear_popup: bool,
-    },
+    GoToLine(usize),
+    GoToSelect { from: CursorPosition, to: CursorPosition },
     Save,
     Rebase,
 }
@@ -164,36 +142,16 @@ impl IdiomEvent {
                     Err(error) => gs.error(error),
                 }
             }
-            IdiomEvent::GoToLine { line, clear_popup } => match ws.get_active() {
-                Some(editor) => {
+            IdiomEvent::GoToLine(line) => {
+                if let Some(editor) = ws.get_active() {
                     editor.go_to(line);
-                    match clear_popup {
-                        true => gs.clear_popup(),
-                        false => {
-                            gs.backend.freeze();
-                            editor.render(gs);
-                            gs.popup_force_render();
-                            gs.backend.unfreeze();
-                        }
-                    }
                 }
-                None => gs.clear_popup(),
-            },
-            IdiomEvent::GoToSelect { select: (from, to), clear_popup } => match ws.get_active() {
-                Some(editor) => {
+            }
+            IdiomEvent::GoToSelect { from, to } => {
+                if let Some(editor) = ws.get_active() {
                     editor.go_to_select(from, to);
-                    match clear_popup {
-                        true => gs.clear_popup(),
-                        false => {
-                            gs.backend.freeze();
-                            editor.render(gs);
-                            gs.popup_force_render();
-                            gs.backend.unfreeze();
-                        }
-                    }
                 }
-                None => gs.clear_popup(),
-            },
+            }
             IdiomEvent::SelectPath(path) => {
                 let result = tree.select_by_path(&path);
                 gs.log_if_error(result);
@@ -295,20 +253,6 @@ impl IdiomEvent {
                 if let Some(editor) = ws.get_active() {
                     editor.mass_replace(ranges, clip);
                 }
-            }
-            IdiomEvent::ReplaceNextSelect { new_text, select: (from, to), next_select } => {
-                gs.backend.freeze();
-                if let Some(editor) = ws.get_active() {
-                    editor.replace_select(from, to, new_text.as_str());
-                    if let Some((from, to)) = next_select {
-                        editor.go_to_select(from, to);
-                        editor.render(gs);
-                    } else {
-                        editor.render(gs);
-                    }
-                    gs.popup_render();
-                }
-                gs.backend.unfreeze();
             }
         }
     }

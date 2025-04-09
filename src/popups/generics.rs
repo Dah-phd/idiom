@@ -284,7 +284,6 @@ impl<T> PopupSelector<T> {
 }
 
 impl PopupSelector<String> {
-    #[allow(dead_code)]
     pub fn message_list<T: ToString>(list: Vec<T>) -> Box<Self> {
         let options = list.into_iter().map(|el| el.to_string()).collect();
         let size = (20, 120);
