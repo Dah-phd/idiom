@@ -4,12 +4,12 @@ pub mod editor;
 pub mod line;
 pub mod renderer;
 pub mod utils;
+use crate::render::file_updated;
 use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
     error::{IdiomError, IdiomResult},
     global_state::{GlobalState, IdiomEvent},
     lsp::LSP,
-    popups::popups_editor::file_updated,
     render::backend::{BackendProtocol, StyleExt},
     utils::TrackedList,
 };
@@ -134,7 +134,7 @@ impl Workspace {
             editor.clear_screen_cache(gs);
             gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
             if editor.update_status.collect() {
-                gs.popup(file_updated(editor.path.clone()))
+                gs.event.push(file_updated(editor.path.clone()).into());
             }
             self.editors.insert(0, editor);
         }
@@ -300,7 +300,7 @@ impl Workspace {
             let mut editor = self.editors.remove(idx);
             editor.clear_screen_cache(gs);
             if editor.update_status.collect() {
-                gs.popup(file_updated(editor.path.clone()));
+                gs.event.push(file_updated(editor.path.clone()).into());
             }
             self.editors.insert(0, editor);
             return Ok(false);
@@ -366,7 +366,7 @@ impl Workspace {
                 }
                 editor.update_status.mark_updated();
                 if idx == 0 && editor.update_status.collect() {
-                    gs.popup(file_updated(path));
+                    gs.event.push(file_updated(path).into());
                 }
                 return;
             }
@@ -388,7 +388,7 @@ impl Workspace {
             Some(editor) => {
                 editor.clear_screen_cache(gs);
                 if editor.update_status.collect() {
-                    gs.popup(file_updated(editor.path.clone()));
+                    gs.event.push(file_updated(editor.path.clone()).into());
                 }
             }
         }
@@ -418,7 +418,7 @@ impl Workspace {
         gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
         editor.clear_screen_cache(gs);
         if editor.update_status.collect() {
-            gs.popup(file_updated(editor.path.clone()));
+            gs.event.push(file_updated(editor.path.clone()).into());
         }
         self.editors.insert(0, editor);
         self.toggle_editor();
@@ -494,7 +494,7 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
                 let editor = &mut ws.editors.inner_mut_no_update()[0];
                 editor.clear_screen_cache(gs);
                 if editor.update_status.collect() {
-                    gs.popup(file_updated(editor.path.clone()));
+                    gs.event.push(file_updated(editor.path.clone()).into());
                 }
                 gs.event.push(IdiomEvent::SelectPath(ws.editors.inner()[0].path.clone()));
             }
@@ -503,7 +503,7 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
                     gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
                     editor.clear_screen_cache(gs);
                     if editor.update_status.collect() {
-                        gs.popup(file_updated(editor.path.clone()));
+                        gs.event.push(file_updated(editor.path.clone()).into());
                     }
                     ws.editors.insert(0, editor);
                 }

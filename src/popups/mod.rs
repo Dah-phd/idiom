@@ -28,7 +28,7 @@ use crossterm::{
 };
 use dirs::config_dir;
 use fuzzy_matcher::skim::SkimMatcherV2;
-pub use generics::{Popup, PopupSelector};
+pub use generics::PopupSelector;
 
 pub trait PopupInterface {
     fn fast_render(&mut self, screen: Rect, backend: &mut Backend) {

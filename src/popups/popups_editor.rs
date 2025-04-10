@@ -1,10 +1,6 @@
-use std::path::PathBuf;
-
-use super::{Popup, PopupSelector};
+use super::PopupSelector;
 use crate::global_state::{IdiomEvent, PopupMessage};
-use crate::render::Button;
 use crate::workspace::CursorPosition;
-use crossterm::event::KeyCode;
 
 pub fn selector_ranges(
     options: Vec<((CursorPosition, CursorPosition), String)>,
@@ -27,27 +23,5 @@ pub fn selector_editors(options: Vec<String>) -> Box<PopupSelector<String>> {
         |editor| editor,
         |popup| PopupMessage::ClearEvent(IdiomEvent::ActivateEditor(popup.state.selected)),
         None,
-    ))
-}
-
-pub fn file_updated(path: PathBuf) -> Box<Popup> {
-    Box::new(Popup::new(
-        "File updated! (Use cancel/close to do nothing)".into(),
-        None,
-        Some(path.display().to_string()),
-        None,
-        vec![
-            Button {
-                command: |_| PopupMessage::ClearEvent(IdiomEvent::Save),
-                name: "Overwrite (S)",
-                key: Some(vec![KeyCode::Char('s'), KeyCode::Char('S')]),
-            },
-            Button {
-                command: |_| PopupMessage::ClearEvent(IdiomEvent::Rebase),
-                name: "Rebase (L)",
-                key: Some(vec![KeyCode::Char('l'), KeyCode::Char('L')]),
-            },
-        ],
-        Some((4, 60)),
     ))
 }

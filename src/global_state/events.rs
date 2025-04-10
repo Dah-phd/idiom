@@ -3,13 +3,21 @@ use crate::configs::{EditorAction, TreeAction};
 use crate::embeded_term::EditorTerminal;
 use crate::embeded_tui::run_embeded_tui;
 use crate::lsp::TreeDiagnostics;
-use crate::popups::{popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges, PopupInterface};
+use crate::popups::{
+    popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges, InplacePopup, PopupInterface,
+};
+use crate::render::PopupX;
 use crate::tree::Tree;
 use crate::workspace::line::EditorLine;
 use crate::workspace::{add_editor_from_data, Workspace};
 use crate::{configs::FileType, workspace::CursorPosition};
 use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, WorkspaceEdit};
 use std::path::PathBuf;
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum StartInplacePopup {
+    Pop(PopupX<IdiomEvent>),
+}
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum IdiomEvent {
@@ -19,7 +27,7 @@ pub enum IdiomEvent {
     TreeActionCall(TreeAction),
     EmbededApp(String),
     NewPopup(fn() -> Box<dyn PopupInterface>),
-    InplacePopup(fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal) -> Option<IdiomEvent>),
+    InplacePopup(StartInplacePopup),
     OpenAtLine(PathBuf, usize),
     OpenAtSelect(PathBuf, (CursorPosition, CursorPosition)),
     OpenLSPErrors,
@@ -82,10 +90,13 @@ impl IdiomEvent {
                 gs.clear_popup();
                 gs.popup(builder());
             }
-            IdiomEvent::InplacePopup(pop) => {
-                let Some(event) = pop(gs, ws, tree, term) else { return };
-                gs.event.push(event);
-            }
+            IdiomEvent::InplacePopup(pop) => match pop {
+                StartInplacePopup::Pop(mut popup) => {
+                    if let Some(event) = popup.run(gs, ws, tree, term) {
+                        gs.event.push(event)
+                    }
+                }
+            },
             IdiomEvent::SearchFiles(pattern) => {
                 if pattern.len() > 1 {
                     let mut new_popup = ActiveFileSearch::new(pattern);
@@ -261,6 +272,12 @@ impl IdiomEvent {
 impl From<IdiomEvent> for PopupMessage {
     fn from(event: IdiomEvent) -> Self {
         PopupMessage::Event(event)
+    }
+}
+
+impl From<PopupX<IdiomEvent>> for IdiomEvent {
+    fn from(value: PopupX<IdiomEvent>) -> Self {
+        IdiomEvent::InplacePopup(StartInplacePopup::Pop(value))
     }
 }
 

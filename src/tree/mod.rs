@@ -6,9 +6,9 @@ use crate::{
     error::{IdiomError, IdiomResult},
     global_state::{GlobalState, IdiomEvent},
     lsp::{DiagnosticType, TreeDiagnostics},
-    popups::popups_tree::{create_file_popup, create_root_file_popup, rename_file_popup},
     render::{
         backend::{BackendProtocol, StyleExt},
+        create_file_popup, create_root_file_popup, rename_file_popup,
         state::State,
     },
     utils::{build_file_or_folder, to_canon_path, to_relative_path},
@@ -136,28 +136,30 @@ impl Tree {
                 match self.tree.get_mut_from_inner(self.state.selected) {
                     // root cannot be file
                     Some(TreePath::File { path, .. }) => match path.parent() {
-                        Some(parent) if parent != &root => gs.popup(create_file_popup(parent.to_owned())),
-                        _ => gs.popup(create_root_file_popup()),
+                        Some(parent) if parent != &root => gs.event.push(create_file_popup(parent.to_owned()).into()),
+                        _ => gs.event.push(create_root_file_popup().into()),
                     },
                     // in case folder is not expanded create in parant
                     Some(TreePath::Folder { path, tree: None, .. }) => {
                         // should be unreachable
                         if &root == path {
-                            gs.popup(create_root_file_popup());
+                            gs.event.push(create_root_file_popup().into());
                         } else {
                             match path.parent() {
-                                Some(parent) if parent != &root => gs.popup(create_file_popup(parent.to_owned())),
-                                _ => gs.popup(create_root_file_popup()),
+                                Some(parent) if parent != &root => {
+                                    gs.event.push(create_file_popup(parent.to_owned()).into())
+                                }
+                                _ => gs.event.push(create_root_file_popup().into()),
                             }
                         }
                     }
                     // create in selected dir (root check)
                     Some(TreePath::Folder { path, tree: Some(..), .. }) => match path == &root {
-                        true => gs.popup(create_root_file_popup()),
-                        false => gs.popup(create_file_popup(path.to_owned())),
+                        true => gs.event.push(create_root_file_popup().into()),
+                        false => gs.event.push(create_file_popup(path.to_owned()).into()),
                     },
                     // nothing is selected
-                    None => gs.popup(create_root_file_popup()),
+                    None => gs.event.push(create_root_file_popup().into()),
                 };
             }
             TreeAction::CopyPath => match self.selected_path.canonicalize() {
@@ -218,7 +220,7 @@ impl Tree {
                 }
             },
             TreeAction::Rename => {
-                gs.popup(rename_file_popup(self.selected_path.display().to_string()));
+                gs.event.push(rename_file_popup(self.selected_path.display().to_string()).into());
             }
             TreeAction::IncreaseSize => gs.expand_tree_size(),
             TreeAction::DecreaseSize => gs.shrink_tree_size(),

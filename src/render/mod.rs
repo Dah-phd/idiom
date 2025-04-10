@@ -6,8 +6,9 @@ pub mod state;
 mod text_field;
 pub mod utils;
 pub mod widgets;
-pub use button::save_and_exit_popup;
-pub use button::Button;
+pub use button::{
+    create_file_popup, create_root_file_popup, file_updated, rename_file_popup, save_and_exit_popup, PopupX,
+};
 pub use text_field::TextField;
 pub use utils::UTF8Safe;
 

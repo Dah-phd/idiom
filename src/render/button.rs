@@ -2,8 +2,8 @@ use std::{ops::Range, path::PathBuf};
 
 use crate::{
     embeded_term::EditorTerminal,
-    global_state::{GlobalState, IdiomEvent, PopupMessage},
-    popups::{Components, InplacePopup, Popup, Status},
+    global_state::{GlobalState, IdiomEvent},
+    popups::{Components, InplacePopup, Status},
     tree::Tree,
     workspace::Workspace,
 };
@@ -17,19 +17,7 @@ use super::{
     layout::Line,
 };
 
-#[derive(Clone)]
-pub struct Button {
-    pub command: fn(&mut Popup) -> PopupMessage,
-    pub name: &'static str,
-    pub key: Option<Vec<KeyCode>>,
-}
-
-impl std::fmt::Debug for Button {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("").field(&self.name).finish()
-    }
-}
-
+#[derive(Clone, PartialEq)]
 pub struct CommandButton<T> {
     pub command: fn(&mut PopupX<T>, &mut Components) -> T,
     pub name: &'static str,
@@ -42,6 +30,7 @@ impl<T> std::fmt::Debug for CommandButton<T> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct PopupX<T> {
     pub message: String,
     title_prefix: Option<&'static str>,
@@ -260,13 +249,7 @@ pub fn save_and_exit_popup(
     .is_some()
 }
 
-pub fn file_updated(
-    path: PathBuf,
-    gs: &mut GlobalState,
-    ws: &mut Workspace,
-    tree: &mut Tree,
-    term: &mut EditorTerminal,
-) -> Option<IdiomEvent> {
+pub fn file_updated(path: PathBuf) -> PopupX<IdiomEvent> {
     PopupX::new(
         "File updated! (Use cancel/close to do nothing)".into(),
         None,
@@ -286,16 +269,9 @@ pub fn file_updated(
         ],
         Some((4, 60)),
     )
-    .run(gs, ws, tree, term)
 }
 
-pub fn create_file_popup(
-    path: PathBuf,
-    gs: &mut GlobalState,
-    ws: &mut Workspace,
-    tree: &mut Tree,
-    term: &mut EditorTerminal,
-) -> Option<IdiomEvent> {
+pub fn create_file_popup(path: PathBuf) -> PopupX<IdiomEvent> {
     let buttons = vec![
         CommandButton {
             command: |p, _| IdiomEvent::CreateFileOrFolder { name: p.message.to_owned(), from_base: false },
@@ -309,31 +285,18 @@ pub fn create_file_popup(
         },
     ];
     PopupX::new(String::new(), Some("New in "), Some(path.display().to_string()), Some(Some), buttons, Some((4, 40)))
-        .run(gs, ws, tree, term)
 }
 
-pub fn create_root_file_popup(
-    gs: &mut GlobalState,
-    ws: &mut Workspace,
-    tree: &mut Tree,
-    term: &mut EditorTerminal,
-) -> Option<IdiomEvent> {
+pub fn create_root_file_popup() -> PopupX<IdiomEvent> {
     let buttons = vec![CommandButton {
         command: |p, _| IdiomEvent::CreateFileOrFolder { name: std::mem::take(&mut p.message), from_base: true },
         name: "Create",
         key: None,
     }];
     PopupX::new(String::new(), Some("New in root dir"), None, Some(Some), buttons, Some((4, 40)))
-        .run(gs, ws, tree, term)
 }
 
-pub fn rename_file_popup(
-    path: String,
-    gs: &mut GlobalState,
-    ws: &mut Workspace,
-    tree: &mut Tree,
-    term: &mut EditorTerminal,
-) -> Option<IdiomEvent> {
+pub fn rename_file_popup(path: String) -> PopupX<IdiomEvent> {
     let message = path.split(std::path::MAIN_SEPARATOR).last().map(ToOwned::to_owned).unwrap_or_default();
     PopupX::new(
         message,
@@ -343,5 +306,4 @@ pub fn rename_file_popup(
         vec![CommandButton { command: |p, _| IdiomEvent::RenameFile(p.message.to_owned()), name: "Rename", key: None }],
         Some((4, 40)),
     )
-    .run(gs, ws, tree, term)
 }
