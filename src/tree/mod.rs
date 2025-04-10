@@ -6,9 +6,9 @@ use crate::{
     error::{IdiomError, IdiomResult},
     global_state::{GlobalState, IdiomEvent},
     lsp::{DiagnosticType, TreeDiagnostics},
+    popups::popups_tree::{create_file_popup, create_root_file_popup, rename_file_popup},
     render::{
         backend::{BackendProtocol, StyleExt},
-        create_file_popup, create_root_file_popup, rename_file_popup,
         state::State,
     },
     utils::{build_file_or_folder, to_canon_path, to_relative_path},

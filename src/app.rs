@@ -10,9 +10,9 @@ use crate::{
         popup_replace::ReplacePopup,
         popup_tree_search::ActivePathSearch,
         popups_editor::selector_editors,
+        save_and_exit_popup,
     },
     render::backend::Backend,
-    render::save_and_exit_popup,
     tree::Tree,
     workspace::Workspace,
 };

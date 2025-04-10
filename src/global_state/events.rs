@@ -3,10 +3,10 @@ use crate::configs::{EditorAction, TreeAction};
 use crate::embeded_term::EditorTerminal;
 use crate::embeded_tui::run_embeded_tui;
 use crate::lsp::TreeDiagnostics;
+use crate::popups::Popup;
 use crate::popups::{
     popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges, InplacePopup, PopupInterface,
 };
-use crate::render::PopupX;
 use crate::tree::Tree;
 use crate::workspace::line::EditorLine;
 use crate::workspace::{add_editor_from_data, Workspace};
@@ -16,7 +16,7 @@ use std::path::PathBuf;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum StartInplacePopup {
-    Pop(PopupX<IdiomEvent>),
+    Pop(Popup<IdiomEvent>),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -275,8 +275,8 @@ impl From<IdiomEvent> for PopupMessage {
     }
 }
 
-impl From<PopupX<IdiomEvent>> for IdiomEvent {
-    fn from(value: PopupX<IdiomEvent>) -> Self {
+impl From<Popup<IdiomEvent>> for IdiomEvent {
+    fn from(value: Popup<IdiomEvent>) -> Self {
         IdiomEvent::InplacePopup(StartInplacePopup::Pop(value))
     }
 }

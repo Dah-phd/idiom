@@ -4,7 +4,7 @@ pub mod editor;
 pub mod line;
 pub mod renderer;
 pub mod utils;
-use crate::render::file_updated;
+use crate::popups::popups_editor::file_updated;
 use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
     error::{IdiomError, IdiomResult},
