@@ -82,7 +82,7 @@ fn parse_snippet(snippet: String) -> IdiomEvent {
 
                 match next_ch {
                     // positional
-                    '0'..'9' => {
+                    '0'..='9' => {
                         if cursor_offset.is_none() {
                             cursor_offset.replace(buffer.snapshot_position());
                         }
@@ -173,17 +173,12 @@ fn parse_snippet(snippet: String) -> IdiomEvent {
 }
 
 fn skip_numbers(chars: &mut Chars) -> Option<char> {
-    while let Some(ch) = chars.next() {
-        if !ch.is_numeric() {
-            return Some(ch);
-        }
-    }
-    None
+    chars.by_ref().find(|&ch| !ch.is_numeric())
 }
 
 fn collect_numbers(chars: &mut Chars) -> (String, Option<char>) {
     let mut number = String::new();
-    while let Some(ch) = chars.next() {
+    for ch in chars.by_ref() {
         if !ch.is_numeric() {
             return (number, Some(ch));
         }
@@ -194,7 +189,7 @@ fn collect_numbers(chars: &mut Chars) -> (String, Option<char>) {
 
 fn collect_name(chars: &mut Chars) -> (String, Option<char>) {
     let mut name = String::new();
-    while let Some(ch) = chars.next() {
+    for ch in chars.by_ref() {
         if ch.is_alphabetic() || ch.is_numeric() || " _&".contains(ch) {
             name.push(ch);
             continue;

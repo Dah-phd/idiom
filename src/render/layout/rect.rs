@@ -313,12 +313,7 @@ impl Rect {
     #[inline]
     pub fn border_title_bot_styled(&self, text: &str, style: ContentStyle, backend: &mut Backend) {
         if self.borders.contains(Borders::BOTTOM) {
-            return backend.print_styled_at(
-                self.row + self.height + 1,
-                self.col,
-                text.truncate_width(self.width).1,
-                style,
-            );
+            backend.print_styled_at(self.row + self.height + 1, self.col, text.truncate_width(self.width).1, style)
         }
     }
 

@@ -63,7 +63,7 @@ pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Ve
         };
         return;
     };
-    let last_line = content.drain(from.line + 1..=to.line).last().expect("Checked above!");
+    let last_line = content.drain(from.line + 1..=to.line).next_back().expect("Checked above!");
     content[from.line].replace_from(from.char, &last_line[to.char..]);
 }
 

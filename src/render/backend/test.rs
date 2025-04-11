@@ -99,7 +99,7 @@ impl BackendProtocol for Backend {
 
     fn set_style(&mut self, style: ContentStyle) {
         self.default_style = style;
-        self.data.push((self.default_style, format!("<<set style>>")))
+        self.data.push((self.default_style, "<<set style>>".to_string()))
     }
 
     fn show_cursor() {}

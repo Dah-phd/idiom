@@ -138,7 +138,7 @@ impl IdiomEvent {
                         let mut id = 0_usize;
                         while path.exists() {
                             path = base_path.clone();
-                            path.push(&format!("editor_error_{id}.log"));
+                            path.push(format!("editor_error_{id}.log"));
                             id += 1;
                         }
                         let file_type = FileType::Ignored;

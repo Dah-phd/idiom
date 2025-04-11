@@ -205,7 +205,7 @@ impl Edit {
         (new_cursor.unwrap_or(edit.end_position()), edit)
     }
 
-    /// UTILS
+    // UTILS
 
     #[inline]
     pub fn get_new_text(&self) -> &str {
@@ -235,7 +235,7 @@ impl Edit {
     #[inline]
     pub fn end_position(&self) -> CursorPosition {
         let line = self.meta.end_line();
-        let mut char = self.text.split('\n').last().unwrap().char_len();
+        let mut char = self.text.split('\n').next_back().unwrap().char_len();
         if line == self.meta.start_line {
             char += self.cursor.char;
         };
@@ -245,7 +245,7 @@ impl Edit {
     #[inline]
     pub fn end_position_rev(&self) -> CursorPosition {
         let line = self.meta.start_line + self.meta.from - 1;
-        let mut char = self.reverse.split('\n').last().unwrap().char_len();
+        let mut char = self.reverse.split('\n').next_back().unwrap().char_len();
         if line == self.meta.start_line {
             char += self.cursor.char;
         };

@@ -136,7 +136,7 @@ impl Tree {
                 match self.tree.get_mut_from_inner(self.state.selected) {
                     // root cannot be file
                     Some(TreePath::File { path, .. }) => match path.parent() {
-                        Some(parent) if parent != &root => gs.event.push(create_file_popup(parent.to_owned()).into()),
+                        Some(parent) if parent != root => gs.event.push(create_file_popup(parent.to_owned()).into()),
                         _ => gs.event.push(create_root_file_popup().into()),
                     },
                     // in case folder is not expanded create in parant
@@ -146,7 +146,7 @@ impl Tree {
                             gs.event.push(create_root_file_popup().into());
                         } else {
                             match path.parent() {
-                                Some(parent) if parent != &root => {
+                                Some(parent) if parent != root => {
                                     gs.event.push(create_file_popup(parent.to_owned()).into())
                                 }
                                 _ => gs.event.push(create_root_file_popup().into()),
@@ -206,11 +206,11 @@ impl Tree {
             }
             TreeAction::Paste => match self.tree.get_mut_from_inner(self.state.selected) {
                 Some(TreePath::Folder { path, tree: Some(..), .. }) => {
-                    self.tree_clipboard.paste(path.to_owned(), gs);
+                    self.tree_clipboard.paste(path, gs);
                 }
                 Some(TreePath::Folder { path, tree: None, .. }) | Some(TreePath::File { path, .. }) => {
                     match path.parent() {
-                        Some(parent) => self.tree_clipboard.paste(parent.to_owned(), gs),
+                        Some(parent) => self.tree_clipboard.paste(parent, gs),
                         None => gs.error(IdiomError::io_parent_not_found(path)),
                     }
                 }
@@ -225,7 +225,7 @@ impl Tree {
             TreeAction::IncreaseSize => gs.expand_tree_size(),
             TreeAction::DecreaseSize => gs.shrink_tree_size(),
         }
-        return true;
+        true
     }
 
     pub fn expand_dir_or_get_path(&mut self, gs: &mut GlobalState) -> Option<PathBuf> {

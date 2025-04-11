@@ -341,24 +341,24 @@ fn cursor_postion_confirm() {
     assert_eq!(eq, eq);
     assert!(eq >= eq);
     assert!(eq <= eq);
-    assert!(!(eq > eq));
-    assert!(!(eq < eq));
+    assert!((eq <= eq));
+    assert!((eq >= eq));
 
     let smol = CursorPosition { line: 3, char: 10 };
     let big = CursorPosition { line: 4, char: 1 };
     assert!(big >= smol);
     assert!(big > smol);
-    assert!(!(big <= smol));
-    assert!(!(big < smol));
+    assert!((big > smol));
+    assert!((big >= smol));
     assert_eq!(std::cmp::max(smol, big), big);
     assert_eq!(std::cmp::min(smol, big), smol);
 
     let smol = CursorPosition { line: 3, char: 10 };
     let big = CursorPosition { line: 3, char: 11 };
     assert!(big >= smol);
-    assert!(!(big <= smol));
-    assert!(!(big <= smol));
-    assert!(!(big < smol));
+    assert!((big > smol));
+    assert!((big > smol));
+    assert!((big >= smol));
     assert_eq!(std::cmp::max(smol, big), big);
     assert_eq!(std::cmp::min(smol, big), smol);
 }

@@ -77,7 +77,7 @@ pub struct Components<'a> {
     pub term: &'a mut EditorTerminal,
 }
 
-impl<'a> Components<'a> {
+impl Components<'_> {
     pub fn re_draw(&mut self) {
         self.gs.draw(self.ws, self.tree, self.term);
     }

@@ -1,3 +1,7 @@
+use crate::render::{
+    backend::{Backend, StyleExt},
+    layout::Line,
+};
 use crate::{
     embeded_term::EditorTerminal,
     global_state::GlobalState,
@@ -10,11 +14,6 @@ use crossterm::{
     style::ContentStyle,
 };
 use std::ops::Range;
-
-use crate::render::{
-    backend::{Backend, StyleExt},
-    layout::Line,
-};
 
 #[derive(Clone, PartialEq)]
 pub struct CommandButton<T> {

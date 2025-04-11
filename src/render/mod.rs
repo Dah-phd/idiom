@@ -10,7 +10,6 @@ pub use text_field::TextField;
 pub use utils::UTF8Safe;
 
 /// This can easily gorow to be a framework itself
-
 pub fn count_as_string(len: usize) -> String {
     if len < 10 {
         format!("  {len}")

@@ -17,11 +17,8 @@ pub fn run_embeded_tui(cmd: &str, gs: &mut GlobalState) -> IdiomResult<()> {
     tui.render(backend);
     while !tui.is_finished() {
         if crossterm::event::poll(MIN_FRAMERATE)? {
-            match crossterm::event::read()? {
-                crossterm::event::Event::Key(key) => {
-                    _ = tui.key_map(&key);
-                }
-                _ => {}
+            if let crossterm::event::Event::Key(key) = crossterm::event::read()? {
+                _ = tui.key_map(&key);
             }
             backend.freeze();
             tui.render(backend);

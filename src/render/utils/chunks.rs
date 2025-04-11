@@ -16,7 +16,7 @@ impl<'a> CharLimitedWidths<'a> {
     }
 }
 
-impl<'a> Iterator for CharLimitedWidths<'a> {
+impl Iterator for CharLimitedWidths<'_> {
     type Item = (char, usize);
     fn next(&mut self) -> Option<Self::Item> {
         let ch = self.chars.next()?;
@@ -27,7 +27,7 @@ impl<'a> Iterator for CharLimitedWidths<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for CharLimitedWidths<'a> {
+impl DoubleEndedIterator for CharLimitedWidths<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         let ch = self.chars.next_back()?;
         match ch.width() {
@@ -119,7 +119,7 @@ impl<'a> Iterator for WriteChunks<'a> {
             width += current_w;
         }
         self.width = 0;
-        return Some(StrChunks { width, text: unsafe { self.text.get_unchecked(start..) } });
+        Some(StrChunks { width, text: unsafe { self.text.get_unchecked(start..) } })
         // (width, unsafe { self.text.get_unchecked(start..) }));
     }
 }

@@ -66,12 +66,12 @@ impl PtyShell {
     pub fn new(mut cmd: CommandBuilder, rect: Rect) -> IdiomResult<Self> {
         let system = native_pty_system();
         let size = PtySize::from(rect);
-        let pair = system.openpty(size).map_err(|err| IdiomError::any(err))?;
+        let pair = system.openpty(size).map_err(IdiomError::any)?;
 
         cmd.cwd("./");
-        let child = pair.slave.spawn_command(cmd).map_err(|error| IdiomError::any(error))?;
-        let writer = pair.master.take_writer().map_err(|error| IdiomError::any(error))?;
-        let mut reader = pair.master.try_clone_reader().map_err(|error| IdiomError::any(error))?;
+        let child = pair.slave.spawn_command(cmd).map_err(IdiomError::any)?;
+        let writer = pair.master.take_writer().map_err(IdiomError::any)?;
+        let mut reader = pair.master.try_clone_reader().map_err(IdiomError::any)?;
         let output = Arc::new(Mutex::new(TrackedParser::new(size.rows, size.cols)));
         let output_writer = Arc::clone(&output);
 
@@ -151,10 +151,7 @@ impl PtyShell {
     }
 
     pub fn is_finished(&mut self) -> bool {
-        match self.child.try_wait() {
-            Ok(None) => false,
-            _ => true,
-        }
+        !matches!(self.child.try_wait(), Ok(None))
     }
 
     pub fn resize(&mut self, rect: Rect) -> Result<(), String> {

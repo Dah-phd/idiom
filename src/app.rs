@@ -81,10 +81,9 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                 }
                                 GeneralAction::InvokePallet => gs.popup(Pallet::new(gs.screen_rect)),
                                 GeneralAction::Exit => {
-                                    if workspace.are_updates_saved(&mut gs) && !gs.has_popup() {
-                                        workspace.graceful_exit().await;
-                                        return Ok(());
-                                    } else if save_and_exit_popup(&mut gs, &mut workspace, &mut tree, &mut term) {
+                                    if workspace.are_updates_saved(&mut gs) && !gs.has_popup()
+                                        || save_and_exit_popup(&mut gs, &mut workspace, &mut tree, &mut term)
+                                    {
                                         workspace.graceful_exit().await;
                                         return Ok(());
                                     };
