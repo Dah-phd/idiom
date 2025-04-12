@@ -79,6 +79,7 @@ pub struct Components<'a> {
 impl Components<'_> {
     pub fn re_draw(&mut self) {
         self.gs.draw(self.ws, self.tree, self.term);
+        self.gs.force_screen_rebuild();
     }
 }
 
@@ -93,9 +94,9 @@ pub trait InplacePopup {
         term: &mut EditorTerminal,
     ) -> Option<Self::R> {
         // executed when finish
-        gs.force_screen_rebuild();
-        self.force_render(gs);
         let mut components = Components { gs, ws, tree, term };
+        components.re_draw();
+        self.force_render(components.gs);
         loop {
             if crossterm::event::poll(MIN_FRAMERATE).ok()? {
                 match crossterm::event::read().ok()? {
@@ -170,11 +171,11 @@ impl Command {
         let mut path = config_dir()?;
         path.push(CONFIG_FOLDER);
         path.push(file_path);
-        Some(Command { label, result: CommandResult::Simple(IdiomEvent::OpenAtLine(path, 0).into()) })
+        Some(Command { label, result: CommandResult::Simple(IdiomEvent::OpenAtLine(path, 0)) })
     }
 
     fn pass_event(label: &'static str, event: IdiomEvent) -> Self {
-        Command { label, result: CommandResult::Simple(PopupMessage::ClearEvent(event)) }
+        Command { label, result: CommandResult::Simple(event) }
     }
 
     const fn access_edit(label: &'static str, cb: fn(&mut Workspace, &mut Tree)) -> Self {
@@ -184,7 +185,7 @@ impl Command {
 
 #[derive(Debug, Clone)]
 enum CommandResult {
-    Simple(PopupMessage),
+    Simple(IdiomEvent),
     Complex(fn(&mut Workspace, &mut Tree)),
 }
 

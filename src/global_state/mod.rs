@@ -27,9 +27,9 @@ use draw::Components;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use message::Messages;
 
-type KeyMapCallback = fn(&mut GlobalState, &KeyEvent, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool;
+type KeyMapCallback = fn(&KeyEvent, &mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool;
+type MouseMapCallback = fn(MouseEvent, &mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal);
 type PastePassthroughCallback = fn(&mut GlobalState, String, &mut Workspace, &mut EditorTerminal);
-type MouseMapCallback = fn(&mut GlobalState, MouseEvent, &mut Tree, &mut Workspace);
 type DrawCallback = fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal);
 
 pub struct GlobalState {
@@ -133,12 +133,18 @@ impl GlobalState {
         tree: &mut Tree,
         term: &mut EditorTerminal,
     ) -> bool {
-        (self.key_mapper)(self, event, workspace, tree, term)
+        (self.key_mapper)(event, self, workspace, tree, term)
     }
 
     #[inline]
-    pub fn map_mouse(&mut self, event: MouseEvent, tree: &mut Tree, workspace: &mut Workspace) {
-        (self.mouse_mapper)(self, event, tree, workspace)
+    pub fn map_mouse(
+        &mut self,
+        event: MouseEvent,
+        tree: &mut Tree,
+        workspace: &mut Workspace,
+        term: &mut EditorTerminal,
+    ) {
+        (self.mouse_mapper)(event, self, workspace, tree, term)
     }
 
     pub fn passthrough_paste(&mut self, clip: String, workspace: &mut Workspace, term: &mut EditorTerminal) {

@@ -57,7 +57,7 @@ impl PopupInterface for Pallet {
         }
         match key.code {
             KeyCode::Enter => match self.commands.remove(self.state.selected).1.execute() {
-                CommandResult::Simple(msg) => msg,
+                CommandResult::Simple(event) => PopupMessage::ClearEvent(event),
                 CommandResult::Complex(cb) => {
                     self.access_cb.replace(cb);
                     PopupMessage::Event(IdiomEvent::PopupAccessOnce)
@@ -116,7 +116,7 @@ impl PopupInterface for Pallet {
             return PopupMessage::None;
         }
         match self.commands.remove(command_index).1.execute() {
-            CommandResult::Simple(msg) => msg,
+            CommandResult::Simple(event) => PopupMessage::ClearEvent(event),
             CommandResult::Complex(cb) => {
                 self.access_cb.replace(cb);
                 PopupMessage::Event(IdiomEvent::PopupAccessOnce)

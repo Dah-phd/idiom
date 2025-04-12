@@ -1,6 +1,7 @@
 use super::{GlobalState, IdiomEvent};
-use crate::popups::menu::{menu_context_editor, menu_context_tree};
+use crate::popups::menu::{menu_context_editor_inplace, menu_context_tree_inplace};
 use crate::popups::pallet::Pallet;
+use crate::popups::InplacePopup;
 use crate::render::backend::{Backend, StyleExt};
 use crate::render::layout::Line;
 use crate::{embeded_term::EditorTerminal, tree::Tree, workspace::Workspace};
@@ -66,13 +67,26 @@ impl Mode {
     }
 }
 
-pub fn disable_mouse(_gs: &mut GlobalState, _event: MouseEvent, _tree: &mut Tree, _workspace: &mut Workspace) {}
+pub fn disable_mouse(
+    _event: MouseEvent,
+    _gs: &mut GlobalState,
+    _ws: &mut Workspace,
+    _tree: &mut Tree,
+    _term: &mut EditorTerminal,
+) {
+}
 
-pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, workspace: &mut Workspace) {
+pub fn mouse_handler(
+    event: MouseEvent,
+    gs: &mut GlobalState,
+    ws: &mut Workspace,
+    tree: &mut Tree,
+    term: &mut EditorTerminal,
+) {
     match event.kind {
         MouseEventKind::ScrollUp => match gs.mode {
             Mode::Insert => {
-                if let Some(editor) = workspace.get_active() {
+                if let Some(editor) = ws.get_active() {
                     editor.map(crate::configs::EditorAction::ScrollUp, gs);
                     editor.map(crate::configs::EditorAction::ScrollUp, gs);
                 }
@@ -81,7 +95,7 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
         },
         MouseEventKind::ScrollDown => match gs.mode {
             Mode::Insert => {
-                if let Some(editor) = workspace.get_active() {
+                if let Some(editor) = ws.get_active() {
                     editor.map(crate::configs::EditorAction::ScrollDown, gs);
                     editor.map(crate::configs::EditorAction::ScrollDown, gs);
                 }
@@ -90,11 +104,11 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
         },
         MouseEventKind::Down(MouseButton::Left) => {
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
-                if let Some(editor) = workspace.get_active() {
+                if let Some(editor) = ws.get_active() {
                     editor.mouse_cursor(position);
                     gs.insert_mode();
                     match tree.select_by_path(&editor.path) {
-                        Ok(..) => workspace.toggle_editor(),
+                        Ok(..) => ws.toggle_editor(),
                         Err(error) => gs.error(error),
                     };
                 }
@@ -109,10 +123,10 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
                 return;
             };
             if let Some(pos) = gs.tab_area.relative_position(event.row, event.column) {
-                if !workspace.is_empty() {
+                if !ws.is_empty() {
                     gs.insert_mode();
-                    if let Some(idx) = workspace.select_tab_mouse(pos.char) {
-                        workspace.activate_editor(idx, gs);
+                    if let Some(idx) = ws.select_tab_mouse(pos.char) {
+                        ws.activate_editor(idx, gs);
                     };
                 }
                 return;
@@ -123,35 +137,35 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
         }
         MouseEventKind::Down(MouseButton::Right) => {
             if let Some(position) = gs.tab_area.relative_position(event.row, event.column) {
-                if !workspace.is_empty() {
+                if !ws.is_empty() {
                     gs.insert_mode();
-                    if let Some(idx) = workspace.select_tab_mouse(position.char) {
-                        workspace.activate_editor(idx, gs);
-                        workspace.close_active(gs);
+                    if let Some(idx) = ws.select_tab_mouse(position.char) {
+                        ws.activate_editor(idx, gs);
+                        ws.close_active(gs);
                     }
                 }
             }
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
-                if let Some(editor) = workspace.get_active() {
+                if let Some(editor) = ws.get_active() {
                     editor.mouse_menu_setup(position);
                     let accent_style = gs.theme.accent_style;
-                    gs.popup(menu_context_editor(position, gs.editor_area, accent_style));
+                    menu_context_editor_inplace(position, gs.editor_area, accent_style).run(gs, ws, tree, term);
                 }
             }
             if let Some(mut position) = gs.tree_area.relative_position(event.row, event.column) {
                 position.line += 1;
                 if tree.mouse_menu_setup_select(position.line) {
                     let accent_style = gs.theme.accent_style.reverse();
-                    gs.popup(menu_context_tree(position, gs.screen_rect, accent_style));
+                    menu_context_tree_inplace(position, gs.screen_rect, accent_style).run(gs, ws, tree, term);
                 }
             }
         }
         MouseEventKind::Drag(MouseButton::Left) => {
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
-                if let Some(editor) = workspace.get_active() {
+                if let Some(editor) = ws.get_active() {
                     editor.mouse_select(position);
                     gs.insert_mode();
-                    workspace.toggle_editor();
+                    ws.toggle_editor();
                 }
             }
         }
@@ -159,7 +173,13 @@ pub fn mouse_handler(gs: &mut GlobalState, event: MouseEvent, tree: &mut Tree, w
     }
 }
 
-pub fn mouse_popup_handler(gs: &mut GlobalState, event: MouseEvent, _tree: &mut Tree, _workspace: &mut Workspace) {
+pub fn mouse_popup_handler(
+    event: MouseEvent,
+    gs: &mut GlobalState,
+    _workspace: &mut Workspace,
+    _tree: &mut Tree,
+    _term: &mut EditorTerminal,
+) {
     let Some(popup) = gs.popup.as_mut() else {
         gs.config_controls();
         return;
@@ -180,8 +200,8 @@ pub fn mouse_popup_handler(gs: &mut GlobalState, event: MouseEvent, _tree: &mut 
 }
 
 pub fn map_editor(
-    gs: &mut GlobalState,
     key: &KeyEvent,
+    gs: &mut GlobalState,
     workspace: &mut Workspace,
     _t: &mut Tree,
     _r: &mut EditorTerminal,
@@ -190,8 +210,8 @@ pub fn map_editor(
 }
 
 pub fn map_tree(
-    gs: &mut GlobalState,
     key: &KeyEvent,
+    gs: &mut GlobalState,
     _w: &mut Workspace,
     tree: &mut Tree,
     _r: &mut EditorTerminal,
@@ -200,8 +220,8 @@ pub fn map_tree(
 }
 
 pub fn map_popup(
-    gs: &mut GlobalState,
     key: &KeyEvent,
+    gs: &mut GlobalState,
     _w: &mut Workspace,
     _t: &mut Tree,
     _r: &mut EditorTerminal,
@@ -210,8 +230,8 @@ pub fn map_popup(
 }
 
 pub fn map_term(
-    gs: &mut GlobalState,
     key: &KeyEvent,
+    gs: &mut GlobalState,
     _w: &mut Workspace,
     _t: &mut Tree,
     runner: &mut EditorTerminal,
