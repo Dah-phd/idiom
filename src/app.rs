@@ -10,7 +10,7 @@ use crate::{
         popup_replace::ReplacePopup,
         popup_tree_search::ActivePathSearch,
         popups_editor::selector_editors,
-        save_and_exit_popup,
+        save_and_exit_popup, InplacePopup,
     },
     render::backend::Backend,
     tree::Tree,
@@ -70,7 +70,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                 GeneralAction::SelectOpenEditor => {
                                     let tabs = workspace.tabs();
                                     if !tabs.is_empty() {
-                                        gs.popup(selector_editors(tabs));
+                                        selector_editors(tabs).run(&mut gs, &mut workspace, &mut tree, &mut term);
                                     };
                                 }
                                 GeneralAction::GoToTabs => {

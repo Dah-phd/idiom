@@ -4,9 +4,7 @@ use crate::embeded_term::EditorTerminal;
 use crate::embeded_tui::run_embeded_tui;
 use crate::lsp::TreeDiagnostics;
 use crate::popups::Popup;
-use crate::popups::{
-    popup_tree_search::ActiveFileSearch, popups_editor::selector_ranges, InplacePopup, PopupInterface,
-};
+use crate::popups::{popup_tree_search::ActiveFileSearch, InplacePopup, PopupInterface};
 use crate::tree::Tree;
 use crate::workspace::line::EditorLine;
 use crate::workspace::{add_editor_from_data, Workspace};
@@ -43,7 +41,6 @@ pub enum IdiomEvent {
     Snippet { snippet: String, cursor_offset: Option<(usize, usize)>, relative_select: Option<((usize, usize), usize)> },
     InsertText(String),
     WorkspaceEdit(WorkspaceEdit),
-    FindSelector(String),
     ActivateEditor(usize),
     ReplaceAll(String, Vec<(CursorPosition, CursorPosition)>),
     GoToLine(usize),
@@ -248,12 +245,6 @@ impl IdiomEvent {
             IdiomEvent::InsertText(insert) => {
                 if let Some(editor) = ws.get_active() {
                     editor.insert_text_with_relative_offset(insert);
-                };
-            }
-            IdiomEvent::FindSelector(pattern) => {
-                if let Some(editor) = ws.get_active() {
-                    gs.insert_mode();
-                    gs.popup(selector_ranges(editor.find_with_line(&pattern)));
                 };
             }
             IdiomEvent::ActivateEditor(idx) => {

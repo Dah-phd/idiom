@@ -1,34 +1,23 @@
+use super::generic_popup::{CommandButton, Popup};
+use super::generic_selector::PopupSelectorX;
+use super::Components;
+use crate::global_state::IdiomEvent;
+use crossterm::event::KeyCode;
 use std::path::PathBuf;
 
-use crossterm::event::KeyCode;
-
-use super::generic_popup::{CommandButton, Popup};
-use super::PopupSelector;
-use crate::global_state::{IdiomEvent, PopupMessage};
-use crate::workspace::CursorPosition;
-
-pub fn selector_ranges(
-    options: Vec<((CursorPosition, CursorPosition), String)>,
-) -> Box<PopupSelector<((CursorPosition, CursorPosition), String)>> {
-    Box::new(PopupSelector::new(
+pub fn selector_editors(options: Vec<String>) -> PopupSelectorX<String, ()> {
+    PopupSelectorX::new(
         options,
-        // display: |((from, _), line)| format!("({}) {line}", from.line + 1),
-        |((..), line)| line,
-        |popup| {
-            let (from, to) = popup.options[popup.state.selected].0;
-            PopupMessage::ClearEvent(IdiomEvent::GoToSelect { from, to })
+        |editor, line, backend| line.render(editor, backend),
+        |popup, components| {
+            let Components { gs, ws, .. } = components;
+            ws.activate_editor(popup.state.selected, gs);
+            if ws.get_active().is_some() {
+                gs.insert_mode();
+            }
         },
         None,
-    ))
-}
-
-pub fn selector_editors(options: Vec<String>) -> Box<PopupSelector<String>> {
-    Box::new(PopupSelector::new(
-        options,
-        |editor| editor,
-        |popup| PopupMessage::ClearEvent(IdiomEvent::ActivateEditor(popup.state.selected)),
-        None,
-    ))
+    )
 }
 
 pub fn file_updated(path: PathBuf) -> Popup<IdiomEvent> {

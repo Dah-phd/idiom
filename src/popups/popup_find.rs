@@ -1,11 +1,12 @@
 use super::{
+    generic_selector::PopupSelectorX,
     popup_replace::ReplacePopup,
     utils::{next_option, prev_option},
     Components, InplacePopup, Status,
 };
 use crate::{
     embeded_term::EditorTerminal,
-    global_state::{GlobalState, IdiomEvent},
+    global_state::GlobalState,
     render::{
         backend::{BackendProtocol, StyleExt},
         count_as_string,
@@ -160,7 +161,22 @@ impl InplacePopup for FindPopup {
             KeyCode::Up => prev_option(&self.options, &mut self.state),
             KeyCode::Esc | KeyCode::Left => return Status::Dropped,
             KeyCode::Tab => {
-                gs.event.push(IdiomEvent::FindSelector(self.pattern.text.to_owned()));
+                if let Some(editor) = ws.get_active() {
+                    gs.insert_mode();
+                    let options = editor.find_with_select(&self.pattern.text);
+                    PopupSelectorX::new(
+                        options,
+                        |((from, _), text), line, backend| line.render(&format!("({}) {text}", from.line + 1), backend),
+                        |popup, components| {
+                            let (from, to) = popup.options[popup.state.selected].0;
+                            if let Some(editor) = components.ws.get_active() {
+                                editor.go_to_select(from, to);
+                            }
+                        },
+                        None,
+                    )
+                    .run(gs, ws, tree, term);
+                }
                 return Status::Dropped;
             }
             _ => return Status::Pending,

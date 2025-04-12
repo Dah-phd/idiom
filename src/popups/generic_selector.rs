@@ -6,7 +6,6 @@ use crate::{
         layout::{IterLines, Line, Rect},
         state::State,
     },
-    workspace::CursorPosition,
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use fuzzy_matcher::skim::SkimMatcherV2;
@@ -235,33 +234,4 @@ impl<T, R> PopupSelectorX<T, R> {
         let (height, width) = self.size;
         gs.screen_rect.center(height, width).with_borders()
     }
-}
-
-pub fn selector_ranges(
-    options: Vec<((CursorPosition, CursorPosition), String)>,
-) -> PopupSelectorX<((CursorPosition, CursorPosition), String), ()> {
-    PopupSelectorX::new(
-        options,
-        |((from, _), text), line, backend| line.render(&format!("({}) {text}", from.line + 1), backend),
-        |popup, components| {
-            let (from, to) = popup.options[popup.state.selected].0;
-            if let Some(editor) = components.ws.get_active() {
-                editor.go_to_select(from, to);
-            }
-        },
-        None,
-    )
-}
-
-pub fn selector_editors(options: Vec<String>) -> PopupSelectorX<String, ()> {
-    PopupSelectorX::new(
-        options,
-        |editor, line, backend| line.render(editor, backend),
-        |popup, components| {
-            let Components { gs, ws, .. } = components;
-            ws.activate_editor(popup.state.selected, gs);
-            gs.insert_mode();
-        },
-        None,
-    )
 }
