@@ -163,10 +163,6 @@ impl Command {
         self.result
     }
 
-    fn clone_executor(&self) -> CommandResult {
-        self.result.clone()
-    }
-
     fn cfg_open(label: &'static str, file_path: &'static str) -> Option<Self> {
         let mut path = config_dir()?;
         path.push(CONFIG_FOLDER);

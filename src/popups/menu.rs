@@ -1,12 +1,17 @@
-use super::{Command, CommandResult, Components, InplacePopup, Status};
+use super::{Components, InplacePopup, Status};
 use crate::configs::{EditorAction, TreeAction};
-use crate::global_state::{GlobalState, IdiomEvent};
+use crate::global_state::GlobalState;
 use crate::render::backend::BackendProtocol;
 use crate::render::layout::Rect;
 use crate::render::state::State;
 use crate::workspace::CursorPosition;
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
+
+enum Action {
+    Tree(TreeAction),
+    Editor(EditorAction),
+}
 
 pub fn menu_context_editor_inplace(
     position: CursorPosition,
@@ -19,13 +24,13 @@ pub fn menu_context_editor_inplace(
 
     ContextMenu {
         commands: [
-            Command::pass_event("Go to Definition", IdiomEvent::EditorActionCall(EditorAction::GoToDeclaration)),
-            Command::pass_event("Find References", IdiomEvent::EditorActionCall(EditorAction::FindReferences)),
-            Command::pass_event("Details / Info", IdiomEvent::EditorActionCall(EditorAction::Help)),
-            Command::pass_event("Rename", IdiomEvent::EditorActionCall(EditorAction::LSPRename)),
-            Command::pass_event("Cut", IdiomEvent::EditorActionCall(EditorAction::Cut)),
-            Command::pass_event("Copy", IdiomEvent::EditorActionCall(EditorAction::Copy)),
-            Command::pass_event("Paste", IdiomEvent::EditorActionCall(EditorAction::Paste)),
+            ("Go to Definition", EditorAction::GoToDeclaration.into()),
+            ("Find References", EditorAction::FindReferences.into()),
+            ("Details / Info", EditorAction::Help.into()),
+            ("Rename", EditorAction::LSPRename.into()),
+            ("Cut", EditorAction::Cut.into()),
+            ("Copy", EditorAction::Copy.into()),
+            ("Paste", EditorAction::Paste.into()),
         ],
         modal_screen,
         accent_style,
@@ -40,13 +45,13 @@ pub fn menu_context_tree_inplace(position: CursorPosition, screen: Rect, accent_
 
     ContextMenu {
         commands: [
-            Command::pass_event("Cut", IdiomEvent::TreeActionCall(TreeAction::CutFile)),
-            Command::pass_event("Copy", IdiomEvent::TreeActionCall(TreeAction::CopyFile)),
-            Command::pass_event("Paste", IdiomEvent::TreeActionCall(TreeAction::Paste)),
-            Command::pass_event("Copy Path", IdiomEvent::TreeActionCall(TreeAction::CopyPath)),
-            Command::pass_event("Copy Relative Path", IdiomEvent::TreeActionCall(TreeAction::CopyPathRelative)),
-            Command::pass_event("Rename", IdiomEvent::TreeActionCall(TreeAction::Rename)),
-            Command::pass_event("Delete", IdiomEvent::TreeActionCall(TreeAction::Delete)),
+            ("Cut", TreeAction::CutFile.into()),
+            ("Copy", TreeAction::CopyFile.into()),
+            ("Paste", TreeAction::Paste.into()),
+            ("Copy Path", TreeAction::CopyPath.into()),
+            ("Copy Relative Path", TreeAction::CopyPathRelative.into()),
+            ("Rename", TreeAction::Rename.into()),
+            ("Delete", TreeAction::Delete.into()),
         ],
         modal_screen,
         accent_style,
@@ -55,7 +60,7 @@ pub fn menu_context_tree_inplace(position: CursorPosition, screen: Rect, accent_
 }
 
 pub struct ContextMenu<const N: usize> {
-    commands: [Command; N],
+    commands: [(&'static str, Action); N],
     modal_screen: Rect,
     accent_style: ContentStyle,
     state: State,
@@ -68,7 +73,7 @@ impl<const N: usize> InplacePopup for ContextMenu<N> {
         let backend = gs.backend();
         let reset_style = backend.get_style();
         backend.set_style(self.accent_style);
-        self.state.render_list_padded(self.commands.iter().map(|c| c.label), self.modal_screen.iter_padded(1), backend);
+        self.state.render_list_padded(self.commands.iter().map(|c| c.0), self.modal_screen.iter_padded(1), backend);
         backend.set_style(reset_style);
     }
 
@@ -78,11 +83,15 @@ impl<const N: usize> InplacePopup for ContextMenu<N> {
             KeyEvent { code: KeyCode::Up, .. } => self.state.prev(N),
             KeyEvent { code: KeyCode::Down, .. } => self.state.next(N),
             KeyEvent { code: KeyCode::Enter, .. } => {
-                match self.commands[self.state.selected].clone_executor() {
-                    CommandResult::Complex(cb) => {
-                        cb(ws, tree);
+                match self.commands[self.state.selected].1 {
+                    Action::Tree(action) => {
+                        tree.map_action(action, gs);
                     }
-                    CommandResult::Simple(event) => gs.event.push(event),
+                    Action::Editor(action) => {
+                        if let Some(editor) = ws.get_active() {
+                            editor.map(action, gs);
+                        }
+                    }
                 };
                 return Status::Dropped;
             }
@@ -106,9 +115,15 @@ impl<const N: usize> InplacePopup for ContextMenu<N> {
             MouseEventKind::Down(MouseButton::Left | MouseButton::Right) => {
                 if let Some(position) = self.modal_screen.relative_position(event.row, event.column) {
                     self.state.selected = position.line;
-                    match self.commands[self.state.selected].clone_executor() {
-                        CommandResult::Complex(cb) => cb(ws, tree),
-                        CommandResult::Simple(event) => gs.event.push(event),
+                    match self.commands[self.state.selected].1 {
+                        Action::Tree(action) => {
+                            tree.map_action(action, gs);
+                        }
+                        Action::Editor(action) => {
+                            if let Some(editor) = ws.get_active() {
+                                editor.map(action, gs);
+                            }
+                        }
                     }
                 }
                 return Status::Dropped;
@@ -127,4 +142,16 @@ impl<const N: usize> InplacePopup for ContextMenu<N> {
     }
 
     fn render(&mut self, _: &mut GlobalState) {}
+}
+
+impl From<TreeAction> for Action {
+    fn from(action: TreeAction) -> Self {
+        Self::Tree(action)
+    }
+}
+
+impl From<EditorAction> for Action {
+    fn from(action: EditorAction) -> Self {
+        Self::Editor(action)
+    }
 }
