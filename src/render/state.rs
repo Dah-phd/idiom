@@ -36,7 +36,6 @@ impl State {
 
     pub fn select(&mut self, idx: usize, option_len: usize) {
         if option_len > idx {
-            self.at_line = idx;
             self.selected = idx;
         }
     }
