@@ -4,6 +4,7 @@ use crate::{
     error::IdiomResult,
     global_state::{GlobalState, IdiomEvent},
     popups::{
+        generic_selector::PopupSelector,
         get_init_screen, get_new_screen_size,
         pallet::Pallet,
         popup_find::{FindPopup, GoToLinePopup},
@@ -46,6 +47,8 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
         gs.event.push(IdiomEvent::OpenAtLine(path, 0));
         gs.toggle_tree();
     }
+
+    gs.event.push(PopupSelector::message_list(vec!["data", "baseaa", "asdastas", "astafasda"]).into());
 
     loop {
         // handle input events

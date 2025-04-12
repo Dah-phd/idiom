@@ -1,5 +1,5 @@
-mod generic_popup;
-mod generic_selector;
+pub mod generic_popup;
+pub mod generic_selector;
 pub mod menu;
 pub mod pallet;
 pub mod popup_file_open;
@@ -30,7 +30,6 @@ use crossterm::{
 use dirs::config_dir;
 use fuzzy_matcher::skim::SkimMatcherV2;
 pub use generic_popup::{save_and_exit_popup, Popup};
-pub use generic_selector::PopupSelector;
 
 pub trait PopupInterface {
     fn fast_render(&mut self, screen: Rect, backend: &mut Backend) {

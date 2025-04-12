@@ -1,21 +1,20 @@
 use super::generic_popup::{CommandButton, Popup};
-use super::PopupSelector;
-use crate::global_state::{IdiomEvent, PopupMessage};
+use super::generic_selector::PopupSelector;
+use crate::global_state::IdiomEvent;
 use lsp_types::{Location, Range};
 use std::path::PathBuf;
 
-pub fn refrence_selector(locations: Vec<Location>) -> Box<PopupSelector<(String, PathBuf, Range)>> {
-    Box::new(PopupSelector::new(
+pub fn refrence_selector(locations: Vec<Location>) -> PopupSelector<(String, PathBuf, Range), ()> {
+    PopupSelector::new(
         locations.into_iter().map(location_with_display).collect(),
-        |(display, ..)| display,
-        |popup| {
+        |(display, ..), line, backend| line.render(display, backend),
+        |popup, c| {
             if let Some((_, path, range)) = popup.options.get(popup.state.selected) {
-                return IdiomEvent::OpenAtSelect(path.clone(), (range.start.into(), range.end.into())).into();
+                c.gs.event.push(IdiomEvent::OpenAtSelect(path.clone(), (range.start.into(), range.end.into())));
             }
-            PopupMessage::Clear
         },
         None,
-    ))
+    )
 }
 
 fn location_with_display(loc: Location) -> (String, PathBuf, Range) {

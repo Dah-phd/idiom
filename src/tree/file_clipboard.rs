@@ -6,7 +6,7 @@ use std::{
 use crate::{
     error::{IdiomError, IdiomResult},
     global_state::{GlobalState, IdiomEvent},
-    popups::PopupSelector,
+    popups::generic_selector::PopupSelector,
 };
 
 #[derive(Default, Debug)]
@@ -100,7 +100,7 @@ impl FileClipboard {
                     fs_recursive_copy(dest.clone(), path, &mut error_list);
                 }
                 if !error_list.is_empty() {
-                    gs.popup(PopupSelector::message_list(error_list));
+                    gs.event.push(PopupSelector::message_list(error_list).into());
                 }
             }
             ActionType::Cut => {
@@ -114,7 +114,7 @@ impl FileClipboard {
                     };
                 }
                 if !error_list.is_empty() {
-                    gs.popup(PopupSelector::message_list(error_list));
+                    gs.event.push(PopupSelector::message_list(error_list).into());
                 }
             }
         }

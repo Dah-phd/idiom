@@ -1,5 +1,5 @@
 use super::{
-    generic_selector::PopupSelectorX,
+    generic_selector::PopupSelector,
     popup_replace::ReplacePopup,
     utils::{next_option, prev_option},
     Components, InplacePopup, Status,
@@ -164,7 +164,7 @@ impl InplacePopup for FindPopup {
                 if let Some(editor) = ws.get_active() {
                     gs.insert_mode();
                     let options = editor.find_with_select(&self.pattern.text);
-                    PopupSelectorX::new(
+                    PopupSelector::new(
                         options,
                         |((from, _), text), line, backend| line.render(&format!("({}) {text}", from.line + 1), backend),
                         |popup, components| {

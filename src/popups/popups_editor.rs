@@ -1,12 +1,12 @@
 use super::generic_popup::{CommandButton, Popup};
-use super::generic_selector::PopupSelectorX;
+use super::generic_selector::PopupSelector;
 use super::Components;
 use crate::global_state::IdiomEvent;
 use crossterm::event::KeyCode;
 use std::path::PathBuf;
 
-pub fn selector_editors(options: Vec<String>) -> PopupSelectorX<String, ()> {
-    PopupSelectorX::new(
+pub fn selector_editors(options: Vec<String>) -> PopupSelector<String, ()> {
+    PopupSelector::new(
         options,
         |editor, line, backend| line.render(editor, backend),
         |popup, components| {

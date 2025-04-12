@@ -4,6 +4,7 @@ use super::{
 };
 use crossterm::style::ContentStyle;
 
+#[derive(PartialEq, Debug, Clone)]
 pub struct State {
     pub at_line: usize,
     pub selected: usize,

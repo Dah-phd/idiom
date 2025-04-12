@@ -3,18 +3,21 @@ use crate::configs::{EditorAction, TreeAction};
 use crate::embeded_term::EditorTerminal;
 use crate::embeded_tui::run_embeded_tui;
 use crate::lsp::TreeDiagnostics;
+use crate::popups::generic_selector::PopupSelector;
 use crate::popups::Popup;
 use crate::popups::{popup_tree_search::ActiveFileSearch, InplacePopup, PopupInterface};
 use crate::tree::Tree;
 use crate::workspace::line::EditorLine;
 use crate::workspace::{add_editor_from_data, Workspace};
 use crate::{configs::FileType, workspace::CursorPosition};
-use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, WorkspaceEdit};
+use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, Range, WorkspaceEdit};
 use std::path::PathBuf;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum StartInplacePopup {
     Pop(Popup<IdiomEvent>),
+    RefSelector(PopupSelector<(String, PathBuf, Range), ()>),
+    Mesasge(PopupSelector<String, ()>),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -92,6 +95,12 @@ impl IdiomEvent {
                     if let Some(event) = popup.run(gs, ws, tree, term) {
                         gs.event.push(event)
                     }
+                }
+                StartInplacePopup::RefSelector(mut popup) => {
+                    popup.run(gs, ws, tree, term);
+                }
+                StartInplacePopup::Mesasge(mut popup) => {
+                    popup.run(gs, ws, tree, term);
                 }
             },
             IdiomEvent::SearchFiles(pattern) => {
@@ -311,5 +320,17 @@ impl TryFrom<GotoDeclarationResponse> for IdiomEvent {
                 links.remove(0).into()
             }
         })
+    }
+}
+
+impl From<PopupSelector<String, ()>> for IdiomEvent {
+    fn from(value: PopupSelector<String, ()>) -> Self {
+        IdiomEvent::InplacePopup(StartInplacePopup::Mesasge(value))
+    }
+}
+
+impl From<PopupSelector<(String, PathBuf, Range), ()>> for IdiomEvent {
+    fn from(value: PopupSelector<(String, PathBuf, Range), ()>) -> Self {
+        IdiomEvent::InplacePopup(StartInplacePopup::RefSelector(value))
     }
 }
