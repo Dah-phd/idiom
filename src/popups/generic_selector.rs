@@ -1,7 +1,11 @@
 use super::{Components, InplacePopup, PopupInterface, Status};
 use crate::{
     global_state::{Clipboard, GlobalState, PopupMessage},
-    render::{backend::Backend, layout::Rect, state::State},
+    render::{
+        backend::{Backend, BackendProtocol},
+        layout::{IterLines, Line, Rect},
+        state::State,
+    },
     workspace::CursorPosition,
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
@@ -119,26 +123,40 @@ impl PopupSelector<String> {
 pub struct PopupSelectorX<T, R> {
     pub options: Vec<T>,
     pub state: State,
-    display: fn(&T) -> &str,
+    display: fn(&T, Line, &mut Backend),
     command: fn(&mut PopupSelectorX<T, R>, &mut Components) -> R,
     size: (u16, usize),
-    rect: Option<Rect>,
 }
 
 impl<T, R> InplacePopup for PopupSelectorX<T, R> {
     type R = R;
 
     fn force_render(&mut self, gs: &mut GlobalState) {
-        let (height, width) = self.size;
-        let mut rect = gs.screen_rect.center(height, width);
+        let mut rect = self.get_rect(gs);
         let backend = gs.backend();
         rect.bordered();
-        self.rect.replace(rect);
         rect.draw_borders(None, None, backend);
-        match self.options.is_empty() {
-            true => self.state.render_list(["No results found!"].into_iter(), rect, backend),
-            false => self.state.render_list(self.options.iter().map(|opt| (self.display)(opt)), rect, backend),
-        };
+        if self.options.is_empty() {
+            self.state.render_list(["No results found!"].into_iter(), rect, backend);
+            return;
+        }
+        self.state.update_at_line(rect.height as usize);
+        let mut lines = rect.into_iter();
+        for (idx, text) in self.options.iter().enumerate().skip(self.state.at_line) {
+            let Some(line) = lines.next() else { break };
+            match idx == self.state.selected {
+                true => {
+                    let reset_style = backend.get_style();
+                    backend.set_style(self.state.highlight);
+                    (self.display)(text, line, backend);
+                    backend.set_style(reset_style);
+                }
+                false => {
+                    (self.display)(text, line, backend);
+                }
+            }
+        }
+        lines.clear_to_end(backend);
     }
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
@@ -163,7 +181,7 @@ impl<T, R> InplacePopup for PopupSelectorX<T, R> {
     fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status<Self::R> {
         match event {
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), row, column, .. } => {
-                if let Some(pos) = self.rect.and_then(|rect| rect.relative_position(row, column)) {
+                if let Some(pos) = self.get_rect(components.gs).relative_position(row, column) {
                     let option_idx = pos.line + self.state.at_line;
                     if option_idx >= self.options.len() {
                         return Status::Pending;
@@ -173,9 +191,7 @@ impl<T, R> InplacePopup for PopupSelectorX<T, R> {
                 }
             }
             MouseEvent { kind: MouseEventKind::Moved, row, column, .. } => {
-                let (height, width) = self.size;
-                let rect = components.gs.screen_rect.center(height, width);
-                if let Some(pos) = rect.relative_position(row, column) {
+                if let Some(pos) = self.get_rect(components.gs).relative_position(row, column) {
                     let option_idx = pos.line + self.state.at_line;
                     if option_idx >= self.options.len() {
                         return Status::Pending;
@@ -207,12 +223,17 @@ impl<T, R> InplacePopup for PopupSelectorX<T, R> {
 impl<T, R> PopupSelectorX<T, R> {
     pub fn new(
         options: Vec<T>,
-        display: fn(&T) -> &str,
+        display: fn(&T, Line, &mut Backend),
         command: fn(&mut PopupSelectorX<T, R>, &mut Components) -> R,
         size: Option<(u16, usize)>,
     ) -> Self {
         let size = size.unwrap_or((20, 120));
-        Self { options, display, command, state: State::new(), size, rect: None }
+        Self { options, display, command, state: State::new(), size }
+    }
+
+    fn get_rect(&self, gs: &GlobalState) -> Rect {
+        let (height, width) = self.size;
+        gs.screen_rect.center(height, width).with_borders()
     }
 }
 
@@ -221,8 +242,7 @@ pub fn selector_ranges(
 ) -> PopupSelectorX<((CursorPosition, CursorPosition), String), ()> {
     PopupSelectorX::new(
         options,
-        // display: |((from, _), line)| format!("({}) {line}", from.line + 1),
-        |((..), line)| line,
+        |((from, _), text), line, backend| line.render(&format!("({}) {text}", from.line + 1), backend),
         |popup, components| {
             let (from, to) = popup.options[popup.state.selected].0;
             if let Some(editor) = components.ws.get_active() {
@@ -236,7 +256,7 @@ pub fn selector_ranges(
 pub fn selector_editors(options: Vec<String>) -> PopupSelectorX<String, ()> {
     PopupSelectorX::new(
         options,
-        |editor| editor,
+        |editor, line, backend| line.render(editor, backend),
         |popup, components| {
             let Components { gs, ws, .. } = components;
             ws.activate_editor(popup.state.selected, gs);

@@ -10,11 +10,8 @@ use crossterm::style::ContentStyle;
 use std::ops::Range;
 
 pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut Backend) {
-    match StyledParser::new_ascii(lines, ctx, backend) {
-        Some(parser) => {
-            parser.render(&text.content);
-        }
-        None => (),
+    if let Some(parser) = StyledParser::new_ascii(lines, ctx, backend) {
+        parser.render(&text.content);
     }
     backend.reset_style();
 }

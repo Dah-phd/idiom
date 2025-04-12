@@ -231,6 +231,12 @@ impl Rect {
     }
 
     #[inline]
+    pub fn with_borders(mut self) -> Self {
+        self.bordered();
+        self
+    }
+
+    #[inline]
     pub fn top_border(&mut self) -> &mut Self {
         self.row += 1;
         self.height -= 1;
