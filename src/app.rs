@@ -79,7 +79,9 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                         gs.insert_mode();
                                     };
                                 }
-                                GeneralAction::InvokePallet => gs.popup(Pallet::new(gs.screen_rect)),
+                                GeneralAction::InvokePallet => {
+                                    Pallet::new(gs.screen_rect).run(&mut gs, &mut workspace, &mut tree, &mut term);
+                                }
                                 GeneralAction::Exit => {
                                     if workspace.are_updates_saved(&mut gs) && !gs.has_popup()
                                         || save_and_exit_popup(&mut gs, &mut workspace, &mut tree, &mut term)

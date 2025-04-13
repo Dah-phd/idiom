@@ -132,7 +132,7 @@ pub fn mouse_handler(
                 return;
             }
             if gs.tree_area.relative_position(event.row + 2, event.column).is_some() {
-                gs.popup(Pallet::new(gs.screen_rect));
+                Pallet::new(gs.screen_rect).run(gs, ws, tree, term);
             }
         }
         MouseEventKind::Down(MouseButton::Right) => {

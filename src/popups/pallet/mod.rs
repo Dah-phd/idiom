@@ -1,27 +1,26 @@
 mod formatting;
-use super::{popup_file_open::OpenFileSelector, Command, CommandResult, PopupInterface};
+use super::{popup_file_open::OpenFileSelector, Command, CommandResult, Components, InplacePopup, Status};
 use crate::{
     configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
-    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
-    render::{backend::Backend, layout::Rect, state::State, TextField},
-    tree::Tree,
-    workspace::Workspace,
+    global_state::{GlobalState, IdiomEvent},
+    render::{layout::Rect, state::State, TextField},
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
+use fuzzy_matcher::FuzzyMatcher;
 
 pub struct Pallet {
     commands: Vec<(i64, Command)>,
-    access_cb: Option<fn(&mut Workspace, &mut Tree)>,
     pattern: TextField<bool>,
-    updated: bool,
     rect: Option<Rect>,
     state: State,
 }
 
-impl PopupInterface for Pallet {
-    fn render(&mut self, screen: Rect, backend: &mut Backend) {
-        let mut rect = screen.top(15).vcenter(100);
+impl InplacePopup for Pallet {
+    type R = ();
+
+    fn force_render(&mut self, gs: &mut GlobalState) {
+        let mut rect = gs.screen_rect.top(15).vcenter(100);
+        let backend = gs.backend();
         rect.bordered();
         self.rect.replace(rect);
         rect.draw_borders(None, None, backend);
@@ -33,110 +32,101 @@ impl PopupInterface for Pallet {
         self.state.render_list(options, rect, backend);
     }
 
-    fn resize(&mut self, _new_screen: Rect) -> PopupMessage {
-        self.mark_as_updated();
-        PopupMessage::None
-    }
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut super::Components) -> super::Status<Self::R> {
+        let Components { gs, ws, tree, .. } = components;
 
-    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, matcher: &SkimMatcherV2) -> PopupMessage {
         if self.commands.is_empty() {
-            return PopupMessage::Clear;
+            return Status::Dropped;
         }
 
-        if let Some(updated) = self.pattern.map(key, clipboard) {
+        if let Some(updated) = self.pattern.map(&key, &mut gs.clipboard) {
             if updated {
                 for (score, cmd) in self.commands.iter_mut() {
-                    *score = match matcher.fuzzy_match(cmd.label, &self.pattern.text) {
+                    *score = match gs.matcher.fuzzy_match(cmd.label, &self.pattern.text) {
                         Some(new_score) => new_score,
                         None => i64::MAX,
                     };
                 }
                 self.commands.sort_by(|(score, _), (rhscore, _)| score.cmp(rhscore));
             }
-            return PopupMessage::None;
+            return Status::Pending;
         }
         match key.code {
-            KeyCode::Enter => match self.commands.remove(self.state.selected).1.execute() {
-                CommandResult::Simple(event) => PopupMessage::ClearEvent(event),
-                CommandResult::Complex(cb) => {
-                    self.access_cb.replace(cb);
-                    PopupMessage::Event(IdiomEvent::PopupAccessOnce)
+            KeyCode::Enter => {
+                match self.commands.remove(self.state.selected).1.execute() {
+                    CommandResult::Simple(event) => gs.event.push(event),
+                    CommandResult::Complex(cb) => cb(ws, tree),
                 }
-            },
+                return Status::Dropped;
+            }
             KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
                 self.state.prev(self.commands.len());
-                PopupMessage::None
+                self.force_render(gs);
             }
             KeyCode::Down | KeyCode::Char('d') | KeyCode::Char('D') => {
                 self.state.next(self.commands.len());
-                PopupMessage::None
+                self.force_render(gs);
             }
-            _ => PopupMessage::None,
+            _ => (),
         }
+        Status::Pending
     }
 
-    fn paste_passthrough(&mut self, clip: String, matcher: &SkimMatcherV2) -> PopupMessage {
-        if self.pattern.paste_passthrough(clip) {
-            self.mark_as_updated();
-            for (score, cmd) in self.commands.iter_mut() {
-                *score = match matcher.fuzzy_match(cmd.label, &self.pattern.text) {
-                    Some(new_score) => new_score,
-                    None => i64::MAX,
-                };
-            }
-            self.commands.sort_by(|(score, _), (rhscore, _)| score.cmp(rhscore));
-        }
-        PopupMessage::None
-    }
+    fn map_mouse(&mut self, event: MouseEvent, components: &mut super::Components) -> super::Status<Self::R> {
+        let Components { gs, ws, tree, .. } = components;
 
-    fn mouse_map(&mut self, event: crossterm::event::MouseEvent) -> PopupMessage {
         let (row, column) = match event {
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } => (row, column),
             MouseEvent { kind: MouseEventKind::ScrollUp, .. } => {
                 self.state.prev(self.commands.len());
-                self.mark_as_updated();
-                return PopupMessage::None;
+                self.force_render(gs);
+                return Status::Pending;
             }
             MouseEvent { kind: MouseEventKind::ScrollDown, .. } => {
                 self.state.next(self.commands.len());
-                self.mark_as_updated();
-                return PopupMessage::None;
+                self.force_render(gs);
+                return Status::Pending;
             }
-            _ => return PopupMessage::None,
+            _ => return Status::Pending,
         };
         let relative_row = match self.rect.as_ref().and_then(|rect| rect.relative_position(row, column)) {
             Some(pos) => pos.line,
-            None => return PopupMessage::None,
+            None => return Status::Pending,
         };
         if relative_row < 1 {
-            return PopupMessage::None;
+            return Status::Pending;
         }
         let command_index = self.state.at_line + (relative_row - 1);
         if self.commands.len() <= command_index {
-            return PopupMessage::None;
+            return Status::Pending;
         }
         match self.commands.remove(command_index).1.execute() {
-            CommandResult::Simple(event) => PopupMessage::ClearEvent(event),
-            CommandResult::Complex(cb) => {
-                self.access_cb.replace(cb);
-                PopupMessage::Event(IdiomEvent::PopupAccessOnce)
-            }
+            CommandResult::Simple(event) => gs.event.push(event),
+            CommandResult::Complex(cb) => (cb)(ws, tree),
+        };
+        Status::Dropped
+    }
+
+    fn paste_passthrough(&mut self, clip: String, components: &mut super::Components) -> bool {
+        if !self.pattern.paste_passthrough(clip) {
+            return false;
         }
-    }
-
-    fn mark_as_updated(&mut self) {
-        self.updated = true
-    }
-
-    fn collect_update_status(&mut self) -> bool {
-        std::mem::take(&mut self.updated)
-    }
-
-    fn component_access(&mut self, _gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree) {
-        if let Some(cb) = self.access_cb.take() {
-            cb(ws, tree);
+        for (score, cmd) in self.commands.iter_mut() {
+            *score = match components.gs.matcher.fuzzy_match(cmd.label, &self.pattern.text) {
+                Some(new_score) => new_score,
+                None => i64::MAX,
+            };
         }
+        self.commands.sort_by(|(score, _), (rhscore, _)| score.cmp(rhscore));
+        true
     }
+
+    fn resize_success(&mut self, gs: &mut GlobalState) -> bool {
+        self.force_render(gs);
+        true
+    }
+
+    fn render(&mut self, _: &mut GlobalState) {}
 }
 
 impl Pallet {
@@ -159,9 +149,7 @@ impl Pallet {
 
         Box::new(Pallet {
             commands,
-            access_cb: None,
             pattern: TextField::new(String::new(), Some(true)),
-            updated: true,
             rect: None,
             state: State::new(),
         })
