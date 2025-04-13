@@ -177,12 +177,17 @@ impl Command {
     const fn access_edit(label: &'static str, cb: fn(&mut Workspace, &mut Tree)) -> Self {
         Command { label, result: CommandResult::Complex(cb) }
     }
+
+    fn big_cb(label: &'static str, cb: fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal)) -> Self {
+        Command { label, result: CommandResult::BigCB(cb) }
+    }
 }
 
 #[derive(Debug, Clone)]
 enum CommandResult {
     Simple(IdiomEvent),
     Complex(fn(&mut Workspace, &mut Tree)),
+    BigCB(fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal)),
 }
 
 pub fn get_new_screen_size(backend: &mut Backend) -> Option<(u16, u16)> {
