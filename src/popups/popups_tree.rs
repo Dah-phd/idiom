@@ -1,4 +1,4 @@
-use super::generic_popup::{CommandButton, Popup};
+use super::generic_popup::{CommandButton, PopupChoice};
 use super::generic_selector::PopupSelector;
 use crate::global_state::IdiomEvent;
 use lsp_types::{Location, Range};
@@ -23,7 +23,7 @@ fn location_with_display(loc: Location) -> (String, PathBuf, Range) {
     (format!("{} ({})", path.display(), range.start.line + 1), path, range)
 }
 
-pub fn create_file_popup(path: PathBuf) -> Popup<IdiomEvent> {
+pub fn create_file_popup(path: PathBuf) -> PopupChoice<IdiomEvent> {
     let buttons = vec![
         CommandButton {
             command: |p, _| IdiomEvent::CreateFileOrFolder { name: p.message.to_owned(), from_base: false },
@@ -36,21 +36,28 @@ pub fn create_file_popup(path: PathBuf) -> Popup<IdiomEvent> {
             key: None,
         },
     ];
-    Popup::new(String::new(), Some("New in "), Some(path.display().to_string()), Some(Some), buttons, Some((4, 40)))
+    PopupChoice::new(
+        String::new(),
+        Some("New in "),
+        Some(path.display().to_string()),
+        Some(Some),
+        buttons,
+        Some((4, 40)),
+    )
 }
 
-pub fn create_root_file_popup() -> Popup<IdiomEvent> {
+pub fn create_root_file_popup() -> PopupChoice<IdiomEvent> {
     let buttons = vec![CommandButton {
         command: |p, _| IdiomEvent::CreateFileOrFolder { name: std::mem::take(&mut p.message), from_base: true },
         name: "Create",
         key: None,
     }];
-    Popup::new(String::new(), Some("New in root dir"), None, Some(Some), buttons, Some((4, 40)))
+    PopupChoice::new(String::new(), Some("New in root dir"), None, Some(Some), buttons, Some((4, 40)))
 }
 
-pub fn rename_file_popup(path: String) -> Popup<IdiomEvent> {
+pub fn rename_file_popup(path: String) -> PopupChoice<IdiomEvent> {
     let message = path.split(std::path::MAIN_SEPARATOR).next_back().map(ToOwned::to_owned).unwrap_or_default();
-    Popup::new(
+    PopupChoice::new(
         message,
         Some("Rename: "),
         Some(path),

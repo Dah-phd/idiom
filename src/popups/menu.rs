@@ -1,4 +1,4 @@
-use super::{Components, InplacePopup, Status};
+use super::{Components, Popup, Status};
 use crate::configs::{EditorAction, TreeAction};
 use crate::global_state::GlobalState;
 use crate::render::backend::BackendProtocol;
@@ -66,7 +66,7 @@ pub struct ContextMenu<const N: usize> {
     state: State,
 }
 
-impl<const N: usize> InplacePopup for ContextMenu<N> {
+impl<const N: usize> Popup for ContextMenu<N> {
     type R = ();
 
     fn force_render(&mut self, gs: &mut GlobalState) {

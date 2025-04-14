@@ -12,7 +12,7 @@ use crossterm::{
 
 use super::{
     utils::{count_as_string, next_option, prev_option},
-    Components, InplacePopup, Status,
+    Components, Popup, Status,
 };
 
 pub struct ReplacePopup {
@@ -77,7 +77,7 @@ impl ReplacePopup {
     }
 }
 
-impl InplacePopup for ReplacePopup {
+impl Popup for ReplacePopup {
     type R = ();
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {

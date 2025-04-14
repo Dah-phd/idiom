@@ -2,7 +2,7 @@ use super::{
     generic_selector::PopupSelector,
     popup_replace::ReplacePopup,
     utils::{next_option, prev_option},
-    Components, InplacePopup, Status,
+    Components, Popup, Status,
 };
 use crate::{
     embeded_term::EditorTerminal,
@@ -33,7 +33,7 @@ impl GoToLinePopup {
         let Some(mut popup) = GoToLinePopup::new(current_line, gs.editor_area, gs.theme.accent_style) else {
             return;
         };
-        InplacePopup::run(&mut popup, gs, workspace, tree, term);
+        Popup::run(&mut popup, gs, workspace, tree, term);
     }
 
     pub fn new(current_line: usize, editor_area: Rect, accent: ContentStyle) -> Option<Self> {
@@ -49,7 +49,7 @@ impl GoToLinePopup {
     }
 }
 
-impl InplacePopup for GoToLinePopup {
+impl Popup for GoToLinePopup {
     type R = ();
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
@@ -126,11 +126,11 @@ impl FindPopup {
         let Some(mut popup) = FindPopup::new(gs.editor_area, gs.theme.accent_style) else {
             return;
         };
-        InplacePopup::run(&mut popup, gs, workspace, tree, term);
+        Popup::run(&mut popup, gs, workspace, tree, term);
     }
 }
 
-impl InplacePopup for FindPopup {
+impl Popup for FindPopup {
     type R = ();
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {

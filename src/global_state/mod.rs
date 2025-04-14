@@ -10,7 +10,6 @@ use crate::{
     embeded_term::EditorTerminal,
     error::IdiomResult,
     lsp::{LSPError, LSPResult},
-    popups::PopupInterface,
     render::{
         backend::{Backend, BackendProtocol},
         layout::{Line, Rect},
@@ -19,7 +18,7 @@ use crate::{
     workspace::{CursorPosition, Workspace},
 };
 pub use clipboard::Clipboard;
-pub use controls::{Mode, PopupMessage};
+pub use controls::Mode;
 use crossterm::event::{KeyEvent, MouseEvent};
 pub use events::IdiomEvent;
 
@@ -49,7 +48,6 @@ pub struct GlobalState {
     paste_passthrough: PastePassthroughCallback,
     mouse_mapper: MouseMapCallback,
     draw_callback: DrawCallback,
-    popup: Option<Box<dyn PopupInterface>>,
     messages: Messages,
     components: Components,
 }
@@ -67,7 +65,6 @@ impl GlobalState {
             draw_callback: draw::full_rebuild,
             theme,
             backend,
-            popup: None,
             event: Vec::default(),
             clipboard: Clipboard::default(),
             screen_rect,
@@ -152,12 +149,6 @@ impl GlobalState {
     }
 
     fn config_controls(&mut self) {
-        if self.popup.is_some() {
-            self.key_mapper = controls::map_popup;
-            self.mouse_mapper = controls::disable_mouse;
-            self.paste_passthrough = controls::paste_passthrough_popup;
-            return;
-        }
         if self.components.contains(Components::TERM) {
             self.key_mapper = controls::map_term;
             self.mouse_mapper = controls::disable_mouse;
@@ -211,37 +202,6 @@ impl GlobalState {
         matches!(self.mode, Mode::Select)
     }
 
-    #[inline]
-    pub fn has_popup(&self) -> bool {
-        self.popup.is_some()
-    }
-
-    #[inline]
-    pub fn popup_render(&mut self) {
-        if let Some(popup) = self.popup.as_mut() {
-            popup.fast_render(self.screen_rect, &mut self.backend);
-        }
-    }
-
-    pub fn popup_force_render(&mut self) {
-        if let Some(popup) = self.popup.as_mut() {
-            popup.render(self.screen_rect, &mut self.backend);
-        }
-    }
-
-    pub fn popup(&mut self, popup: Box<dyn PopupInterface>) {
-        self.popup = Some(popup);
-        self.config_controls();
-        self.draw_callback = draw::full_rebuild;
-        self.mouse_mapper = controls::mouse_popup_handler;
-    }
-
-    pub fn clear_popup(&mut self) {
-        self.popup.take();
-        self.config_controls();
-        self.draw_callback = draw::full_rebuild;
-    }
-
     pub fn toggle_tree(&mut self) {
         self.components.toggle(Components::TREE);
         self.draw_callback = draw::full_rebuild;
@@ -270,24 +230,6 @@ impl GlobalState {
         self.config_controls();
     }
 
-    pub fn map_popup_if_exists(&mut self, key: &KeyEvent) -> bool {
-        let Some(popup) = self.popup.as_mut() else { return false };
-        match popup.map(key, &mut self.clipboard, &self.matcher) {
-            PopupMessage::Clear => {
-                self.clear_popup();
-            }
-            PopupMessage::None => {}
-            PopupMessage::Event(event) => {
-                self.event.push(event);
-            }
-            PopupMessage::ClearEvent(event) => {
-                self.clear_popup();
-                self.event.push(event);
-            }
-        }
-        true
-    }
-
     pub fn try_tree_event(&mut self, value: impl TryInto<IdiomEvent>) {
         if let Ok(event) = value.try_into() {
             self.event.push(event);
@@ -313,17 +255,6 @@ impl GlobalState {
     pub fn full_resize(&mut self, height: u16, width: u16) {
         let tree_rate = (self.tree_size * 100) / self.screen_rect.width;
         self.screen_rect = (width, height).into();
-        if let Some(popup) = self.popup.as_mut() {
-            match popup.resize(self.screen_rect) {
-                PopupMessage::None => (),
-                PopupMessage::Clear => self.clear_popup(),
-                PopupMessage::Event(event) => self.event.push(event),
-                PopupMessage::ClearEvent(event) => {
-                    self.clear_popup();
-                    self.event.push(event);
-                }
-            }
-        }
         self.tree_size = std::cmp::max((tree_rate * self.screen_rect.width) / 100, Mode::len());
         self.draw_callback = draw::full_rebuild;
     }

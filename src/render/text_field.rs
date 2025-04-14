@@ -1,8 +1,5 @@
 use super::backend::{Backend, StyleExt};
-use crate::{
-    configs::EditorAction,
-    global_state::{Clipboard, IdiomEvent, PopupMessage},
-};
+use crate::{configs::EditorAction, global_state::Clipboard};
 use core::ops::Range;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::{Color, ContentStyle};
@@ -395,12 +392,6 @@ pub fn arg_range_at(line: &str, idx: usize) -> Range<usize> {
         token_start..idx
     } else {
         idx..idx
-    }
-}
-
-impl TextField<PopupMessage> {
-    pub fn with_tree_access(text: String) -> Self {
-        Self::new(text, Some(PopupMessage::Event(IdiomEvent::PopupAccess)))
     }
 }
 

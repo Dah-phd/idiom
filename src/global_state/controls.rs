@@ -1,7 +1,7 @@
 use super::{GlobalState, IdiomEvent};
 use crate::popups::menu::{menu_context_editor_inplace, menu_context_tree_inplace};
 use crate::popups::pallet::Pallet;
-use crate::popups::InplacePopup;
+use crate::popups::Popup;
 use crate::render::backend::{Backend, StyleExt};
 use crate::render::layout::Line;
 use crate::{embeded_term::EditorTerminal, tree::Tree, workspace::Workspace};
@@ -11,15 +11,6 @@ use crossterm::style::{Color, ContentStyle, Stylize};
 const INSERT_SPAN: &str = "  --INSERT--  ";
 const SELECT_SPAN: &str = "  --SELECT--  ";
 const MODE_LEN: usize = INSERT_SPAN.len();
-
-#[derive(Default, Debug, Clone)]
-pub enum PopupMessage {
-    #[default]
-    None,
-    Event(IdiomEvent),
-    Clear,
-    ClearEvent(IdiomEvent),
-}
 
 #[derive(Default)]
 pub enum Mode {
@@ -173,32 +164,6 @@ pub fn mouse_handler(
     }
 }
 
-pub fn mouse_popup_handler(
-    event: MouseEvent,
-    gs: &mut GlobalState,
-    _workspace: &mut Workspace,
-    _tree: &mut Tree,
-    _term: &mut EditorTerminal,
-) {
-    let Some(popup) = gs.popup.as_mut() else {
-        gs.config_controls();
-        return;
-    };
-    match popup.mouse_map(event) {
-        PopupMessage::None => {}
-        PopupMessage::Clear => {
-            gs.clear_popup();
-        }
-        PopupMessage::Event(event) => {
-            gs.event.push(event);
-        }
-        PopupMessage::ClearEvent(event) => {
-            gs.clear_popup();
-            gs.event.push(event);
-        }
-    };
-}
-
 pub fn map_editor(
     key: &KeyEvent,
     gs: &mut GlobalState,
@@ -217,16 +182,6 @@ pub fn map_tree(
     _r: &mut EditorTerminal,
 ) -> bool {
     tree.map(key, gs)
-}
-
-pub fn map_popup(
-    key: &KeyEvent,
-    gs: &mut GlobalState,
-    _w: &mut Workspace,
-    _t: &mut Tree,
-    _r: &mut EditorTerminal,
-) -> bool {
-    gs.map_popup_if_exists(key)
 }
 
 pub fn map_term(
@@ -248,26 +203,6 @@ pub fn paste_passthrough_editor(
     if let Some(editor) = workspace.get_active() {
         editor.paste(clip);
     }
-}
-
-pub fn paste_passthrough_popup(gs: &mut GlobalState, clip: String, _ws: &mut Workspace, _t: &mut EditorTerminal) {
-    let Some(popup) = gs.popup.as_mut() else {
-        gs.config_controls();
-        return;
-    };
-    match popup.paste_passthrough(clip, &gs.matcher) {
-        PopupMessage::None => {}
-        PopupMessage::Clear => {
-            gs.clear_popup();
-        }
-        PopupMessage::Event(event) => {
-            gs.event.push(event);
-        }
-        PopupMessage::ClearEvent(event) => {
-            gs.clear_popup();
-            gs.event.push(event);
-        }
-    };
 }
 
 pub fn paste_passthrough_term(_gs: &mut GlobalState, clip: String, _ws: &mut Workspace, term: &mut EditorTerminal) {

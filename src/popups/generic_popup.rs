@@ -5,7 +5,7 @@ use crate::render::{
 use crate::{
     embeded_term::EditorTerminal,
     global_state::GlobalState,
-    popups::{Components, InplacePopup, Status},
+    popups::{Components, Popup, Status},
     tree::Tree,
     workspace::Workspace,
 };
@@ -17,7 +17,7 @@ use std::ops::Range;
 
 #[derive(Clone, PartialEq)]
 pub struct CommandButton<T> {
-    pub command: fn(&mut Popup<T>, &mut Components) -> T,
+    pub command: fn(&mut PopupChoice<T>, &mut Components) -> T,
     pub name: &'static str,
     pub key: Option<Vec<KeyCode>>,
 }
@@ -29,7 +29,7 @@ impl<T> std::fmt::Debug for CommandButton<T> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Popup<T> {
+pub struct PopupChoice<T> {
     pub message: String,
     title_prefix: Option<&'static str>,
     title: String,
@@ -42,7 +42,7 @@ pub struct Popup<T> {
     updated: bool,
 }
 
-impl<T> Popup<T> {
+impl<T> PopupChoice<T> {
     fn mark_as_updated(&mut self) {
         self.updated = true;
     }
@@ -52,7 +52,7 @@ impl<T> Popup<T> {
     }
 }
 
-impl<T> InplacePopup for Popup<T> {
+impl<T> Popup for PopupChoice<T> {
     type R = T;
 
     fn render(&mut self, gs: &mut GlobalState) {
@@ -141,7 +141,7 @@ impl<T> InplacePopup for Popup<T> {
     }
 }
 
-impl<T> Popup<T> {
+impl<T> PopupChoice<T> {
     pub fn new(
         message: String,
         title_prefix: Option<&'static str>,
@@ -224,7 +224,7 @@ pub fn save_and_exit_popup(
     tree: &mut Tree,
     term: &mut EditorTerminal,
 ) -> bool {
-    Popup::new(
+    PopupChoice::new(
         "Not all opened editors are saved!".into(),
         None,
         None,

@@ -1,18 +1,19 @@
-use super::PopupInterface;
+use super::{Components, Popup, Status};
 use crate::{
-    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
+    embeded_term::EditorTerminal,
+    global_state::{GlobalState, IdiomEvent},
     render::{
-        backend::{Backend, StyleExt},
-        layout::{IterLines, LineBuilder, Rect, BORDERS},
+        backend::StyleExt,
+        layout::{IterLines, LineBuilder, BORDERS},
         state::State,
         TextField,
     },
     tree::Tree,
     workspace::Workspace,
 };
+use crossterm::event::MouseEvent;
 use crossterm::event::{KeyCode, KeyEvent};
 use crossterm::style::{Color, ContentStyle};
-use fuzzy_matcher::skim::SkimMatcherV2;
 use std::{path::PathBuf, sync::Arc};
 use tokio::{sync::Mutex, task::JoinHandle};
 
@@ -25,43 +26,31 @@ const FULL_SEARCH_TITLE: &str = " File search (Full) ";
 pub struct ActivePathSearch {
     options: Vec<PathBuf>,
     state: State,
-    pattern: TextField<PopupMessage>,
-    updated: bool,
+    pattern: TextField<bool>,
 }
 
 impl ActivePathSearch {
-    pub fn new() -> Box<Self> {
-        Box::new(Self {
-            options: Vec::new(),
-            state: State::default(),
-            pattern: TextField::with_tree_access(String::new()),
-            updated: true,
-        })
+    pub fn run(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
+        Self { options: Vec::new(), state: State::default(), pattern: TextField::new(String::new(), Some(true)) }
+            .run(gs, ws, tree, term);
+    }
+
+    fn collect_data(&mut self, tree: &mut Tree) {
+        if self.pattern.text.is_empty() {
+            self.options.clear();
+        } else {
+            self.options = tree.search_paths(&self.pattern.text);
+        };
+        self.state.reset();
     }
 }
 
-impl PopupInterface for ActivePathSearch {
-    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
-        if let Some(msg) = self.pattern.map(key, clipboard) {
-            return msg;
-        }
-        match key.code {
-            KeyCode::Up => self.state.prev(self.options.len()),
-            KeyCode::Down => self.state.next(self.options.len()),
-            KeyCode::Tab => return PopupMessage::Event(IdiomEvent::SearchFiles(self.pattern.text.to_owned())),
-            KeyCode::Enter => {
-                if self.options.len() > self.state.selected {
-                    return IdiomEvent::OpenAtLine(self.options.remove(self.state.selected), 0).into();
-                }
-                return PopupMessage::Clear;
-            }
-            _ => {}
-        }
-        PopupMessage::None
-    }
+impl Popup for ActivePathSearch {
+    type R = ();
 
-    fn render(&mut self, screen: Rect, backend: &mut Backend) {
-        let mut area = screen.center(20, 120);
+    fn force_render(&mut self, gs: &mut GlobalState) {
+        let mut area = gs.screen_rect.center(20, 120);
+        let backend = gs.backend();
         area.bordered();
         area.draw_borders(None, None, backend);
         area.border_title_styled(PATH_SEARCH_TITLE, ContentStyle::fg(Color::Blue), backend);
@@ -88,31 +77,46 @@ impl PopupInterface for ActivePathSearch {
         };
     }
 
-    fn resize(&mut self, _new_screen: Rect) -> PopupMessage {
-        self.mark_as_updated();
-        PopupMessage::None
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
+        let Components { gs, tree, .. } = components;
+        if let Some(update) = self.pattern.map(&key, &mut gs.clipboard) {
+            if update {
+                self.collect_data(tree);
+            }
+            self.force_render(gs);
+            return Status::Pending;
+        }
+        match key.code {
+            KeyCode::Up => self.state.prev(self.options.len()),
+            KeyCode::Down => self.state.next(self.options.len()),
+            KeyCode::Tab => {
+                gs.event.push(IdiomEvent::SearchFiles(self.pattern.text.to_owned()));
+                return Status::Dropped;
+            }
+            KeyCode::Enter => {
+                if self.options.len() > self.state.selected {
+                    gs.event.push(IdiomEvent::OpenAtLine(self.options.remove(self.state.selected), 0));
+                }
+                return Status::Dropped;
+            }
+            _ => return Status::Pending,
+        }
+        self.force_render(gs);
+        Status::Pending
     }
 
-    fn component_access(&mut self, _gs: &mut GlobalState, _ws: &mut Workspace, tree: &mut Tree) {
-        if self.pattern.text.is_empty() {
-            self.options.clear();
-        } else {
-            self.options = tree.search_paths(&self.pattern.text);
-        };
-        self.mark_as_updated();
-        self.state.reset();
+    fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status<Self::R> {
+        todo!()
     }
 
-    fn paste_passthrough(&mut self, clip: String, _: &SkimMatcherV2) -> PopupMessage {
+    fn render(&mut self, _: &mut GlobalState) {}
+
+    fn resize_success(&mut self, _: &mut GlobalState) -> bool {
+        true
+    }
+
+    fn paste_passthrough(&mut self, clip: String, _: &mut Components) -> bool {
         self.pattern.paste_passthrough(clip)
-    }
-
-    fn collect_update_status(&mut self) -> bool {
-        std::mem::take(&mut self.updated)
-    }
-
-    fn mark_as_updated(&mut self) {
-        self.updated = true;
     }
 }
 
@@ -127,94 +131,28 @@ pub struct ActiveFileSearch {
     option_buffer: Arc<Mutex<Vec<SearchResult>>>,
     state: State,
     mode: Mode,
-    pattern: TextField<PopupMessage>,
-    updated: bool,
+    pattern: TextField<bool>,
 }
 
 impl ActiveFileSearch {
-    pub fn new(pattern: String) -> Box<Self> {
-        Box::new(Self {
+    pub fn run(pattern: String, gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
+        let mut new = Self {
             mode: Mode::Select,
             join_handle: None,
             option_buffer: Arc::default(),
             options: Vec::default(),
             state: State::default(),
-            pattern: TextField::with_tree_access(pattern),
-            updated: true,
-        })
-    }
-}
-
-impl PopupInterface for ActiveFileSearch {
-    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
-        if let Some(msg) = self.pattern.map(key, clipboard) {
-            return msg;
-        }
-        match key.code {
-            KeyCode::Up => self.state.prev(self.options.len()),
-            KeyCode::Down => self.state.next(self.options.len()),
-            KeyCode::Tab => {
-                if matches!(self.mode, Mode::Full) {
-                    return PopupMessage::Clear;
-                }
-                self.mode = Mode::Full;
-                return PopupMessage::Event(IdiomEvent::PopupAccess);
-            }
-            KeyCode::Enter => {
-                if self.options.len() > self.state.selected {
-                    let (path, _, line) = self.options.remove(self.state.selected);
-                    return IdiomEvent::OpenAtLine(path, line).into();
-                }
-                return PopupMessage::Clear;
-            }
-            _ => {}
-        }
-        PopupMessage::None
-    }
-
-    fn render(&mut self, screen: Rect, backend: &mut Backend) {
-        let mut area = screen.center(20, 120);
-        area.bordered();
-        area.draw_borders(None, None, backend);
-        match self.mode {
-            Mode::Full => area.border_title_styled(FULL_SEARCH_TITLE, ContentStyle::fg(Color::Red), backend),
-            Mode::Select => area.border_title_styled(FILE_SEARCH_TITLE, ContentStyle::fg(Color::Yellow), backend),
-        }
-        let mut lines = area.into_iter();
-        if let Some(line) = lines.next() {
-            self.pattern.widget(line, backend);
-        }
-        if let Some(line) = lines.next() {
-            line.fill(BORDERS.horizontal_top, backend);
-        }
-        if let Some(list_rect) = lines.into_rect() {
-            if self.options.is_empty() {
-                self.state.render_list(["No results found!"].into_iter(), list_rect, backend);
-            } else {
-                self.state.render_list_complex(&self.options, &[build_path_line, build_text_line], &list_rect, backend);
-            }
+            pattern: TextField::new(pattern, Some(true)),
         };
-    }
 
-    fn resize(&mut self, _new_screen: Rect) -> PopupMessage {
-        self.mark_as_updated();
-        PopupMessage::None
-    }
-
-    fn fast_render(&mut self, screen: Rect, backend: &mut Backend) {
-        if let Ok(mut buffer) = self.option_buffer.try_lock() {
-            if !buffer.is_empty() {
-                self.options.extend(buffer.drain(..));
-                self.updated = true;
-            }
+        if new.pattern.text.len() > 1 {
+            new.collect_data(tree);
         }
-        if self.collect_update_status() {
-            self.render(screen, backend);
-        }
+
+        new.run(gs, ws, tree, term);
     }
 
-    fn component_access(&mut self, _gs: &mut GlobalState, _ws: &mut Workspace, file_tree: &mut Tree) {
-        self.mark_as_updated();
+    fn collect_data(&mut self, file_tree: &mut Tree) {
         if self.pattern.text.len() < 2 {
             self.options.clear();
             return;
@@ -240,18 +178,96 @@ impl PopupInterface for ActiveFileSearch {
                 old_handle.abort();
             }
         }
+        if !self.options.is_empty() {
+            panic!("{:?}", self.options.len())
+        }
+    }
+}
+
+impl Popup for ActiveFileSearch {
+    type R = ();
+
+    fn force_render(&mut self, gs: &mut GlobalState) {
+        let mut area = gs.screen_rect.center(20, 120);
+        let backend = gs.backend();
+        area.bordered();
+        area.draw_borders(None, None, backend);
+        match self.mode {
+            Mode::Full => area.border_title_styled(FULL_SEARCH_TITLE, ContentStyle::fg(Color::Red), backend),
+            Mode::Select => area.border_title_styled(FILE_SEARCH_TITLE, ContentStyle::fg(Color::Yellow), backend),
+        }
+        let mut lines = area.into_iter();
+        if let Some(line) = lines.next() {
+            self.pattern.widget(line, backend);
+        }
+        if let Some(line) = lines.next() {
+            line.fill(BORDERS.horizontal_top, backend);
+        }
+        if let Some(list_rect) = lines.into_rect() {
+            if self.options.is_empty() {
+                self.state.render_list(["No results found!"].into_iter(), list_rect, backend);
+            } else {
+                self.state.render_list_complex(&self.options, &[build_path_line, build_text_line], &list_rect, backend);
+            }
+        };
     }
 
-    fn paste_passthrough(&mut self, clip: String, _: &SkimMatcherV2) -> PopupMessage {
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
+        let Components { gs, tree, .. } = components;
+
+        if let Some(updated) = self.pattern.map(&key, &mut gs.clipboard) {
+            if updated {
+                self.collect_data(tree);
+            }
+            self.force_render(gs);
+            return Status::Pending;
+        }
+        match key.code {
+            KeyCode::Up => self.state.prev(self.options.len()),
+            KeyCode::Down => self.state.next(self.options.len()),
+            KeyCode::Tab => {
+                if matches!(self.mode, Mode::Full) {
+                    return Status::Dropped;
+                }
+                self.mode = Mode::Full;
+                self.collect_data(tree);
+            }
+            KeyCode::Enter => {
+                if self.options.len() > self.state.selected {
+                    let (path, _, line) = self.options.remove(self.state.selected);
+                    gs.event.push(IdiomEvent::OpenAtLine(path, line));
+                }
+                return Status::Dropped;
+            }
+            _ => return Status::Pending,
+        }
+        self.force_render(gs);
+        Status::Pending
+    }
+
+    fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status<Self::R> {
+        todo!()
+    }
+
+    fn render(&mut self, gs: &mut GlobalState) {
+        {
+            let Ok(mut buffer) = self.option_buffer.try_lock() else {
+                return;
+            };
+            if buffer.is_empty() {
+                return;
+            }
+            self.options.extend(buffer.drain(..));
+        }
+        self.force_render(gs);
+    }
+
+    fn resize_success(&mut self, _: &mut GlobalState) -> bool {
+        true
+    }
+
+    fn paste_passthrough(&mut self, clip: String, _: &mut Components) -> bool {
         self.pattern.paste_passthrough(clip)
-    }
-
-    fn collect_update_status(&mut self) -> bool {
-        std::mem::take(&mut self.updated)
-    }
-
-    fn mark_as_updated(&mut self) {
-        self.updated = true;
     }
 }
 

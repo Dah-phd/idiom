@@ -1,4 +1,4 @@
-use super::generic_popup::{CommandButton, Popup};
+use super::generic_popup::{CommandButton, PopupChoice};
 use super::generic_selector::PopupSelector;
 use super::Components;
 use crate::global_state::IdiomEvent;
@@ -20,8 +20,8 @@ pub fn selector_editors(options: Vec<String>) -> PopupSelector<String, ()> {
     )
 }
 
-pub fn file_updated(path: PathBuf) -> Popup<IdiomEvent> {
-    Popup::new(
+pub fn file_updated(path: PathBuf) -> PopupChoice<IdiomEvent> {
+    PopupChoice::new(
         "File updated! (Use cancel/close to do nothing)".into(),
         None,
         Some(path.display().to_string()),

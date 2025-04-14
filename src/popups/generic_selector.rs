@@ -1,4 +1,4 @@
-use super::{Components, InplacePopup, Status};
+use super::{Components, Popup, Status};
 use crate::{
     global_state::GlobalState,
     render::{
@@ -21,7 +21,7 @@ pub struct PopupSelector<T, R> {
     size: (u16, usize),
 }
 
-impl<T, R> InplacePopup for PopupSelector<T, R> {
+impl<T, R> Popup for PopupSelector<T, R> {
     type R = R;
 
     fn force_render(&mut self, gs: &mut GlobalState) {

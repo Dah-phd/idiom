@@ -76,11 +76,6 @@ pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut 
         gs.draw_callback = draw_term;
         term.render(gs);
     }
-    // popup override
-    if gs.popup.is_some() {
-        gs.draw_callback = draw_popup;
-        gs.popup_render();
-    };
 
     gs.backend.unfreeze();
 }
@@ -100,11 +95,6 @@ pub fn draw_with_tree(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mu
         Some(editor) => editor.fast_render(gs),
         None => gs.messages.fast_render(gs.theme.accent_style, &mut gs.backend),
     }
-}
-
-pub fn draw_popup(gs: &mut GlobalState, _workspace: &mut Workspace, _tree: &mut Tree, _term: &mut EditorTerminal) {
-    gs.messages.fast_render(gs.theme.accent_style, &mut gs.backend);
-    gs.popup_render();
 }
 
 pub fn draw_term(gs: &mut GlobalState, _workspace: &mut Workspace, _tree: &mut Tree, term: &mut EditorTerminal) {

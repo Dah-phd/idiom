@@ -1,4 +1,4 @@
-use super::{Components, InplacePopup, Status};
+use super::{Components, Popup, Status};
 use crate::{
     embeded_term::EditorTerminal,
     global_state::{GlobalState, IdiomEvent},
@@ -75,7 +75,7 @@ impl OpenFileSelector {
     }
 }
 
-impl InplacePopup for OpenFileSelector {
+impl Popup for OpenFileSelector {
     type R = ();
 
     fn force_render(&mut self, gs: &mut crate::global_state::GlobalState) {

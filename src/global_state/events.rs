@@ -1,11 +1,11 @@
-use super::{GlobalState, PopupMessage};
+use super::GlobalState;
 use crate::configs::{EditorAction, TreeAction};
 use crate::embeded_term::EditorTerminal;
 use crate::embeded_tui::run_embeded_tui;
 use crate::lsp::TreeDiagnostics;
 use crate::popups::generic_selector::PopupSelector;
-use crate::popups::Popup;
-use crate::popups::{popup_tree_search::ActiveFileSearch, InplacePopup, PopupInterface};
+use crate::popups::PopupChoice;
+use crate::popups::{popup_tree_search::ActiveFileSearch, Popup};
 use crate::tree::Tree;
 use crate::workspace::line::EditorLine;
 use crate::workspace::{add_editor_from_data, Workspace};
@@ -15,19 +15,16 @@ use std::path::PathBuf;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum StartInplacePopup {
-    Pop(Popup<IdiomEvent>),
+    Pop(PopupChoice<IdiomEvent>),
     RefSelector(PopupSelector<(String, PathBuf, Range), ()>),
     Mesasge(PopupSelector<String, ()>),
 }
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum IdiomEvent {
-    PopupAccess,
-    PopupAccessOnce,
     EditorActionCall(EditorAction),
     TreeActionCall(TreeAction),
     EmbededApp(String),
-    NewPopup(fn() -> Box<dyn PopupInterface>),
     InplacePopup(StartInplacePopup),
     OpenAtLine(PathBuf, usize),
     OpenAtSelect(PathBuf, (CursorPosition, CursorPosition)),
@@ -55,23 +52,6 @@ pub enum IdiomEvent {
 impl IdiomEvent {
     pub async fn handle(self, gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         match self {
-            IdiomEvent::PopupAccess => {
-                if let Some(mut popup) = gs.popup.take() {
-                    popup.component_access(gs, ws, tree);
-                    gs.popup = Some(popup);
-                } else {
-                    gs.error("Attempted popup access with no popup");
-                    gs.clear_popup();
-                }
-            }
-            IdiomEvent::PopupAccessOnce => {
-                if let Some(mut popup) = gs.popup.take() {
-                    popup.component_access(gs, ws, tree);
-                } else {
-                    gs.error("Attempted popup access with no popup");
-                }
-                gs.clear_popup();
-            }
             IdiomEvent::EditorActionCall(action) => {
                 if let Some(editor) = ws.get_active() {
                     let _ = editor.map(action, gs);
@@ -85,10 +65,6 @@ impl IdiomEvent {
                 if let Err(error) = run_embeded_tui(&cmd, gs) {
                     gs.error(error);
                 };
-            }
-            IdiomEvent::NewPopup(builder) => {
-                gs.clear_popup();
-                gs.popup(builder());
             }
             IdiomEvent::InplacePopup(pop) => match pop {
                 StartInplacePopup::Pop(mut popup) => {
@@ -104,18 +80,11 @@ impl IdiomEvent {
                 }
             },
             IdiomEvent::SearchFiles(pattern) => {
-                if pattern.len() > 1 {
-                    let mut new_popup = ActiveFileSearch::new(pattern);
-                    new_popup.component_access(gs, ws, tree);
-                    gs.popup(new_popup);
-                } else {
-                    gs.popup(ActiveFileSearch::new(pattern));
-                }
+                ActiveFileSearch::run(pattern, gs, ws, tree, term);
             }
             IdiomEvent::OpenAtLine(path, line) => {
                 let select_result = tree.select_by_path(&path);
                 gs.log_if_error(select_result);
-                gs.clear_popup();
                 match ws.new_at_line(path, line, gs).await {
                     Ok(..) => gs.insert_mode(),
                     Err(error) => gs.error(error),
@@ -123,7 +92,6 @@ impl IdiomEvent {
             }
             IdiomEvent::OpenAtSelect(path, (from, to)) => {
                 let select_result = tree.select_by_path(&path);
-                gs.clear_popup();
                 gs.log_if_error(select_result);
                 match ws.new_from(path, gs).await {
                     Ok(..) => {
@@ -135,30 +103,27 @@ impl IdiomEvent {
                     Err(error) => gs.error(error),
                 };
             }
-            IdiomEvent::OpenLSPErrors => {
-                gs.clear_popup();
-                match PathBuf::from("./").canonicalize() {
-                    Ok(base_path) => {
-                        let mut path = base_path.clone();
-                        path.push("editor_error.log");
-                        let mut id = 0_usize;
-                        while path.exists() {
-                            path = base_path.clone();
-                            path.push(format!("editor_error_{id}.log"));
-                            id += 1;
-                        }
-                        let file_type = FileType::Ignored;
-                        let content: Vec<EditorLine> =
-                            gs.messages.get_logs().map(ToOwned::to_owned).map(EditorLine::from).collect();
-                        if !content.is_empty() {
-                            add_editor_from_data(ws, path, content, file_type, gs);
-                        } else {
-                            gs.success(" >> no error logs found!");
-                        }
+            IdiomEvent::OpenLSPErrors => match PathBuf::from("./").canonicalize() {
+                Ok(base_path) => {
+                    let mut path = base_path.clone();
+                    path.push("editor_error.log");
+                    let mut id = 0_usize;
+                    while path.exists() {
+                        path = base_path.clone();
+                        path.push(format!("editor_error_{id}.log"));
+                        id += 1;
                     }
-                    Err(error) => gs.error(error),
+                    let file_type = FileType::Ignored;
+                    let content: Vec<EditorLine> =
+                        gs.messages.get_logs().map(ToOwned::to_owned).map(EditorLine::from).collect();
+                    if !content.is_empty() {
+                        add_editor_from_data(ws, path, content, file_type, gs);
+                    } else {
+                        gs.success(" >> no error logs found!");
+                    }
                 }
-            }
+                Err(error) => gs.error(error),
+            },
             IdiomEvent::GoToLine(line) => {
                 if let Some(editor) = ws.get_active() {
                     editor.go_to(line);
@@ -269,14 +234,8 @@ impl IdiomEvent {
     }
 }
 
-impl From<IdiomEvent> for PopupMessage {
-    fn from(event: IdiomEvent) -> Self {
-        PopupMessage::Event(event)
-    }
-}
-
-impl From<Popup<IdiomEvent>> for IdiomEvent {
-    fn from(value: Popup<IdiomEvent>) -> Self {
+impl From<PopupChoice<IdiomEvent>> for IdiomEvent {
+    fn from(value: PopupChoice<IdiomEvent>) -> Self {
         IdiomEvent::InplacePopup(StartInplacePopup::Pop(value))
     }
 }

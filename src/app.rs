@@ -10,7 +10,7 @@ use crate::{
         popup_replace::ReplacePopup,
         popup_tree_search::ActivePathSearch,
         popups_editor::selector_editors,
-        save_and_exit_popup, InplacePopup,
+        save_and_exit_popup, Popup,
     },
     render::backend::Backend,
     tree::Tree,
@@ -59,7 +59,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                     if gs.is_insert() {
                                         FindPopup::run_inplace(&mut gs, &mut workspace, &mut tree, &mut term);
                                     } else {
-                                        gs.popup(ActivePathSearch::new());
+                                        ActivePathSearch::run(&mut gs, &mut workspace, &mut tree, &mut term);
                                     };
                                 }
                                 GeneralAction::Replace => {
@@ -83,7 +83,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                     Pallet::run(&mut gs, &mut workspace, &mut tree, &mut term);
                                 }
                                 GeneralAction::Exit => {
-                                    if workspace.are_updates_saved(&mut gs) && !gs.has_popup()
+                                    if workspace.are_updates_saved(&mut gs)
                                         || save_and_exit_popup(&mut gs, &mut workspace, &mut tree, &mut term)
                                     {
                                         workspace.graceful_exit().await;

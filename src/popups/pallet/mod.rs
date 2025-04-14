@@ -1,5 +1,5 @@
 mod formatting;
-use super::{popup_file_open::OpenFileSelector, Command, CommandResult, Components, InplacePopup, Status};
+use super::{popup_file_open::OpenFileSelector, Command, CommandResult, Components, Popup, Status};
 use crate::{
     configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
     embeded_term::EditorTerminal,
@@ -17,7 +17,7 @@ pub struct Pallet {
     state: State,
 }
 
-impl InplacePopup for Pallet {
+impl Popup for Pallet {
     type R = ();
 
     fn force_render(&mut self, gs: &mut GlobalState) {

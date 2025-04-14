@@ -15,7 +15,7 @@ use crate::{
     app::{MIN_FRAMERATE, MIN_HEIGHT, MIN_WIDTH},
     configs::CONFIG_FOLDER,
     embeded_term::EditorTerminal,
-    global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage},
+    global_state::{GlobalState, IdiomEvent},
     render::{
         backend::{Backend, BackendProtocol, StyleExt},
         layout::Rect,
@@ -28,40 +28,7 @@ use crossterm::{
     style::{Color, ContentStyle},
 };
 use dirs::config_dir;
-use fuzzy_matcher::skim::SkimMatcherV2;
-pub use generic_popup::{save_and_exit_popup, Popup};
-
-pub trait PopupInterface {
-    fn fast_render(&mut self, screen: Rect, backend: &mut Backend) {
-        if self.collect_update_status() {
-            self.render(screen, backend);
-        }
-    }
-
-    fn mouse_map(&mut self, _event: MouseEvent) -> PopupMessage {
-        PopupMessage::None
-    }
-
-    fn map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, matcher: &SkimMatcherV2) -> PopupMessage {
-        self.mark_as_updated();
-        match key {
-            KeyEvent { code: KeyCode::Char('d' | 'D'), modifiers: KeyModifiers::CONTROL, .. } => PopupMessage::Clear,
-            KeyEvent { code: KeyCode::Char('q' | 'Q'), modifiers: KeyModifiers::CONTROL, .. } => PopupMessage::Clear,
-            KeyEvent { code: KeyCode::Esc, .. } => PopupMessage::Clear,
-            _ => self.key_map(key, clipboard, matcher),
-        }
-    }
-
-    fn render(&mut self, screen: Rect, backend: &mut Backend);
-    fn resize(&mut self, new_screen: Rect) -> PopupMessage;
-    fn key_map(&mut self, key: &KeyEvent, clipboard: &mut Clipboard, matcher: &SkimMatcherV2) -> PopupMessage;
-    fn component_access(&mut self, _gs: &mut GlobalState, _ws: &mut Workspace, _tree: &mut Tree) {}
-    fn mark_as_updated(&mut self);
-    fn collect_update_status(&mut self) -> bool;
-    fn paste_passthrough(&mut self, _clip: String, _matcher: &SkimMatcherV2) -> PopupMessage {
-        PopupMessage::None
-    }
-}
+pub use generic_popup::{save_and_exit_popup, PopupChoice};
 
 pub enum Status<T> {
     Result(T),
@@ -83,7 +50,7 @@ impl Components<'_> {
     }
 }
 
-pub trait InplacePopup {
+pub trait Popup {
     type R;
 
     fn run(
