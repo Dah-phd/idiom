@@ -33,8 +33,8 @@ impl Rect {
     pub fn relative_position(&self, row: u16, column: u16) -> Option<CursorPosition> {
         match self.col <= column
             && self.row <= row
-            && row <= self.row + self.height
-            && column <= self.col + self.width as u16
+            && row < self.row + self.height
+            && column < self.col + self.width as u16
         {
             true => Some(CursorPosition { line: (row - self.row) as usize, char: (column - self.col) as usize }),
             false => None,

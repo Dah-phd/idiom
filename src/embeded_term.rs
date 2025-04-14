@@ -55,8 +55,7 @@ impl EditorTerminal {
                 gs.success("Term: Process killed!");
                 gs.toggle_terminal(self);
             }
-            KeyEvent { code: KeyCode::Esc, .. }
-            | KeyEvent { code: KeyCode::Char('`' | ' '), modifiers: KeyModifiers::CONTROL, .. } => {
+            KeyEvent { code: KeyCode::Char('`' | ' '), modifiers: KeyModifiers::CONTROL, .. } => {
                 gs.message("Term: PTY active in background ... (CTRL + d/q) can be used to kill the process!");
                 gs.toggle_terminal(self);
                 Backend::hide_cursor();

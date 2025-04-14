@@ -98,6 +98,7 @@ impl PtyShell {
             return self.writer.write_all(&[0x3]);
         };
         match key.code {
+            KeyCode::Esc => self.writer.write_all(&[0x1B]),
             KeyCode::Char(ch) => self.writer.write_all(&[ch as u8]),
             KeyCode::Backspace => self.writer.write_all(&[0x8]),
             KeyCode::Tab => self.writer.write_all(&[0x9]),
