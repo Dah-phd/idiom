@@ -21,7 +21,7 @@ bitflags = "2.9.0"
 clap = {version = "4.5.31", features = ["derive"]}
 coolor = "1.0.0"
 copypasta = "0.10.1"
-crossterm = "0.28.1"
+crossterm = "0.29.0"
 dirs = "6.0.0"
 fuzzy-matcher = "0.3.7"
 ignore = "0.4.23"

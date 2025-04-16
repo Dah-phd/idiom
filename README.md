@@ -27,7 +27,7 @@ Python should work for the most part with jedi, but the interaction is not well 
 - Linux Mint
 
 ## TODO
-- test and make replace more interactive
+- check can you intergrate ripgrep search
 - git integration
 - fix tracking edgecase where file is changed in by other app in select
 - write tests
