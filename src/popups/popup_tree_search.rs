@@ -25,21 +25,39 @@ const FULL_SEARCH_TITLE: &str = " File search (Full) ";
 
 pub struct ActivePathSearch {
     options: Vec<PathBuf>,
+    options_buffer: Arc<Mutex<Vec<PathBuf>>>,
     state: State,
     pattern: TextField<bool>,
+    join_handle: Option<JoinHandle<()>>,
 }
 
 impl ActivePathSearch {
     pub fn run(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
-        Self { options: Vec::new(), state: State::default(), pattern: TextField::new(String::new(), Some(true)) }
-            .run(gs, ws, tree, term);
+        Self {
+            options: Vec::new(),
+            state: State::default(),
+            pattern: TextField::new(String::new(), Some(true)),
+            join_handle: None,
+            options_buffer: Arc::default(),
+        }
+        .run(gs, ws, tree, term);
     }
 
     fn collect_data(&mut self, tree: &mut Tree) {
-        if self.pattern.text.is_empty() {
-            self.options.clear();
-        } else {
-            self.options = tree.search_paths(&self.pattern.text);
+        self.options.clear();
+        if !self.pattern.text.is_empty() {
+            let root_tree = tree.shallow_copy_root_tree_path();
+            let pattern = self.pattern.text.to_owned();
+            let buffer = Arc::clone(&self.options_buffer);
+            if let Some(old_handle) = self.join_handle.replace(tokio::task::spawn(async move {
+                if let Ok(options) = root_tree.search_tree_paths(&pattern) {
+                    *buffer.lock().await = options
+                };
+            })) {
+                if !old_handle.is_finished() {
+                    old_handle.abort();
+                }
+            };
         };
         self.state.reset();
     }
@@ -109,7 +127,18 @@ impl Popup for ActivePathSearch {
         todo!()
     }
 
-    fn render(&mut self, _: &mut GlobalState) {}
+    fn render(&mut self, gs: &mut GlobalState) {
+        {
+            let Ok(mut buffer) = self.options_buffer.try_lock() else {
+                return;
+            };
+            if buffer.is_empty() {
+                return;
+            }
+            self.options.extend(buffer.drain(..));
+        }
+        self.force_render(gs);
+    }
 
     fn resize_success(&mut self, _: &mut GlobalState) -> bool {
         true
