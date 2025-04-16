@@ -4,7 +4,7 @@ use crate::{
     global_state::{GlobalState, IdiomEvent},
     render::{
         backend::StyleExt,
-        layout::{IterLines, LineBuilder, Rect, BORDERS},
+        layout::{LineBuilder, Rect, BORDERS},
         state::State,
         TextField,
     },
@@ -143,8 +143,8 @@ impl Popup for ActivePathSearch {
                 None => return Status::Pending,
             },
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } => {
-                if let Some(idx) = self.get_option_idx(row, column, gs) {
-                    gs.event.push(IdiomEvent::OpenAtLine(self.options.remove(idx), 0));
+                if let Some(index) = self.get_option_idx(row, column, gs) {
+                    gs.event.push(IdiomEvent::OpenAtLine(self.options.remove(index), 0));
                     return Status::Dropped;
                 }
             }
@@ -240,34 +240,46 @@ impl ActiveFileSearch {
             panic!("{:?}", self.options.len())
         }
     }
+
+    fn get_rect(gs: &GlobalState) -> Rect {
+        gs.screen_rect.center(20, 120).with_borders()
+    }
+
+    fn get_option_idx(&self, row: u16, column: u16, gs: &GlobalState) -> Option<usize> {
+        let mut rect = Self::get_rect(gs);
+        rect.height = rect.height.checked_sub(2)?;
+        rect.row += 2;
+        let position = rect.relative_position(row, column)?;
+        let idx = self.state.at_line + position.line;
+        if idx >= self.options.len() {
+            return None;
+        }
+        Some(idx)
+    }
 }
 
 impl Popup for ActiveFileSearch {
     type R = ();
 
     fn force_render(&mut self, gs: &mut GlobalState) {
-        let mut area = gs.screen_rect.center(20, 120);
+        let mut rect = Self::get_rect(gs);
         let backend = gs.backend();
-        area.bordered();
-        area.draw_borders(None, None, backend);
+        rect.draw_borders(None, None, backend);
         match self.mode {
-            Mode::Full => area.border_title_styled(FULL_SEARCH_TITLE, ContentStyle::fg(Color::Red), backend),
-            Mode::Select => area.border_title_styled(FILE_SEARCH_TITLE, ContentStyle::fg(Color::Yellow), backend),
+            Mode::Full => rect.border_title_styled(FULL_SEARCH_TITLE, ContentStyle::fg(Color::Red), backend),
+            Mode::Select => rect.border_title_styled(FILE_SEARCH_TITLE, ContentStyle::fg(Color::Yellow), backend),
         }
-        let mut lines = area.into_iter();
-        if let Some(line) = lines.next() {
-            self.pattern.widget(line, backend);
+
+        let Some(line) = rect.next_line() else { return };
+        self.pattern.widget(line, backend);
+        let Some(line) = rect.next_line() else { return };
+        line.fill(BORDERS.horizontal_top, backend);
+
+        if self.options.is_empty() {
+            self.state.render_list(["No results found!"].into_iter(), rect, backend);
+        } else {
+            self.state.render_list_complex(&self.options, &[build_path_line, build_text_line], rect, backend);
         }
-        if let Some(line) = lines.next() {
-            line.fill(BORDERS.horizontal_top, backend);
-        }
-        if let Some(list_rect) = lines.into_rect() {
-            if self.options.is_empty() {
-                self.state.render_list(["No results found!"].into_iter(), list_rect, backend);
-            } else {
-                self.state.render_list_complex(&self.options, &[build_path_line, build_text_line], list_rect, backend);
-            }
-        };
     }
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
@@ -304,7 +316,25 @@ impl Popup for ActiveFileSearch {
     }
 
     fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status<Self::R> {
-        todo!()
+        let Components { gs, .. } = components;
+        match event {
+            MouseEvent { kind: MouseEventKind::Moved, column, row, .. } => match self.get_option_idx(row, column, gs) {
+                Some(idx) => self.state.select(idx, self.options.len()),
+                None => return Status::Pending,
+            },
+            MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } => {
+                if let Some(index) = self.get_option_idx(row, column, gs) {
+                    let (path, _, line) = self.options.remove(index);
+                    gs.event.push(IdiomEvent::OpenAtLine(path, line));
+                    return Status::Dropped;
+                }
+            }
+            MouseEvent { kind: MouseEventKind::ScrollUp, .. } => self.state.prev(self.options.len()),
+            MouseEvent { kind: MouseEventKind::ScrollDown, .. } => self.state.next(self.options.len()),
+            _ => return Status::Pending,
+        }
+        self.force_render(gs);
+        Status::Pending
     }
 
     fn render(&mut self, gs: &mut GlobalState) {
