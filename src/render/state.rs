@@ -69,7 +69,7 @@ impl State {
         &mut self,
         options: &[T],
         callbacks: &[fn(&T, builder: LineBuilder)],
-        rect: &Rect,
+        rect: Rect,
         backend: &mut Backend,
     ) {
         let limit = rect.height as usize / callbacks.len();
