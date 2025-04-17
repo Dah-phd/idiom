@@ -8,14 +8,17 @@ use crate::{
         state::State,
         TextField,
     },
-    tree::Tree,
+    tree::{Tree, TreePath},
     workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent};
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::{Color, ContentStyle};
-use std::sync::Mutex;
 use std::{path::PathBuf, sync::Arc};
+use std::{
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 use tokio::{sync::Mutex as AsyncMutex, task::JoinHandle};
 
 type SearchResult = (PathBuf, String, usize);
@@ -24,47 +27,38 @@ const PATH_SEARCH_TITLE: &str = " Path search (Tab to switch to in File search) 
 const FILE_SEARCH_TITLE: &str = " File search (Selected - Tab to switch to Full mode) ";
 const FULL_SEARCH_TITLE: &str = " File search (Full) ";
 
+const WAIT_ON_UPDATE: Duration = Duration::from_millis(150);
+
 pub struct ActivePathSearch {
     options: Vec<PathBuf>,
     options_buffer: Arc<Mutex<Vec<PathBuf>>>,
+    clock: Option<Instant>,
     state: State,
     pattern: TextField<bool>,
     join_handle: Option<JoinHandle<()>>,
+    tree: TreePath,
 }
 
 impl ActivePathSearch {
     pub fn run(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         Self {
             options: Vec::new(),
+            options_buffer: Arc::default(),
+            clock: None,
             state: State::default(),
             pattern: TextField::new(String::new(), Some(true)),
             join_handle: None,
-            options_buffer: Arc::default(),
+            tree: tree.shallow_copy_root_tree_path(),
         }
         .run(gs, ws, tree, term);
     }
 
-    fn collect_data(&mut self, tree: &mut Tree) {
+    fn collect_data(&mut self) {
         if let Some(handle) = self.join_handle.take() {
-            if !handle.is_finished() {
-                handle.abort();
-            }
+            handle.abort();
         }
         self.options.clear();
-        if !self.pattern.text.is_empty() {
-            let root_tree = tree.shallow_copy_root_tree_path();
-            let pattern = self.pattern.text.to_owned();
-            let buffer = Arc::clone(&self.options_buffer);
-            self.join_handle.replace(tokio::task::spawn(async move {
-                if let Ok(options) = root_tree.search_tree_paths(&pattern) {
-                    let mut lock = match buffer.lock() {
-                        Ok(lock) => lock,
-                        Err(err) => err.into_inner(),
-                    };
-                    *lock = options;
-                };
-            }));
-        };
+        self.clock = Some(Instant::now());
         self.state.reset();
     }
 
@@ -114,10 +108,10 @@ impl Popup for ActivePathSearch {
     }
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
-        let Components { gs, tree, .. } = components;
+        let Components { gs, .. } = components;
         if let Some(update) = self.pattern.map(&key, &mut gs.clipboard) {
             if update {
-                self.collect_data(tree);
+                self.collect_data();
             }
             self.force_render(gs);
             return Status::Pending;
@@ -163,25 +157,44 @@ impl Popup for ActivePathSearch {
     }
 
     fn render(&mut self, gs: &mut GlobalState) {
-        {
-            let Ok(mut buffer) = self.options_buffer.try_lock() else {
-                return;
+        if matches!(self.clock, Some(inst) if inst.elapsed() >= WAIT_ON_UPDATE) {
+            self.clock = None;
+            if !self.pattern.text.is_empty() {
+                let root_tree = self.tree.clone();
+                let pattern = self.pattern.text.to_owned();
+                let buffer = Arc::clone(&self.options_buffer);
+                self.join_handle.replace(tokio::task::spawn(async move {
+                    if let Ok(options) = root_tree.search_tree_paths(&pattern) {
+                        let mut lock = match buffer.lock() {
+                            Ok(lock) => lock,
+                            Err(err) => err.into_inner(),
+                        };
+                        *lock = options;
+                    };
+                }));
             };
-            if buffer.is_empty() {
+        } else if matches!(&mut self.join_handle, Some(handle) if handle.is_finished()) {
+            let mut lock = match self.options_buffer.lock() {
+                Ok(lock) => lock,
+                Err(err) => err.into_inner(),
+            };
+            if lock.is_empty() {
                 return;
             }
-            self.options = buffer.drain(..).collect();
+            self.options = lock.drain(..).collect();
+            drop(lock);
+            self.join_handle = None;
+            self.force_render(gs);
         }
-        self.force_render(gs);
     }
 
     fn resize_success(&mut self, _: &mut GlobalState) -> bool {
         true
     }
 
-    fn paste_passthrough(&mut self, clip: String, components: &mut Components) -> bool {
+    fn paste_passthrough(&mut self, clip: String, _: &mut Components) -> bool {
         if self.pattern.paste_passthrough(clip) {
-            self.collect_data(components.tree);
+            self.collect_data();
             return true;
         }
         false
@@ -200,10 +213,13 @@ pub struct ActiveFileSearch {
     state: State,
     mode: Mode,
     pattern: TextField<bool>,
+    clock: Option<Instant>,
+    tree: TreePath,
 }
 
 impl ActiveFileSearch {
     pub fn run(pattern: String, gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
+        let clock = if pattern.len() > 2 { Some(Instant::now()) } else { None };
         let mut new = Self {
             mode: Mode::Select,
             join_handle: None,
@@ -211,42 +227,30 @@ impl ActiveFileSearch {
             options: Vec::default(),
             state: State::default(),
             pattern: TextField::new(pattern, Some(true)),
+            clock,
+            tree: tree.shallow_copy_selected_tree_path(),
         };
 
         if new.pattern.text.len() > 1 {
-            new.collect_data(tree);
+            new.collect_data();
         }
 
         new.run(gs, ws, tree, term);
     }
 
-    fn collect_data(&mut self, tree: &mut Tree) {
+    fn collect_data(&mut self) {
+        if let Some(handle) = self.join_handle.take() {
+            handle.abort();
+        }
+
+        self.options.clear();
+        self.state.reset();
+
         if self.pattern.text.len() < 2 {
-            self.options.clear();
             return;
         };
-        self.state.reset();
-        let tree_path = match self.mode {
-            Mode::Full => tree.shallow_copy_root_tree_path(),
-            Mode::Select => tree.shallow_copy_selected_tree_path(),
-        };
-        let buffer = Arc::clone(&self.option_buffer);
-        let pattern = self.pattern.text.to_owned();
-        if let Some(handle) = self.join_handle.take() {
-            if !handle.is_finished() {
-                handle.abort();
-            }
-        }
-        self.options.clear();
-        self.join_handle.replace(tokio::task::spawn(async move {
-            buffer.lock().await.clear();
-            let mut join_set = tree_path.search_files_join_set(pattern);
-            while let Some(task_result) = join_set.join_next().await {
-                if let Ok(result) = task_result {
-                    buffer.lock().await.extend(result);
-                };
-            }
-        }));
+
+        self.clock = Some(Instant::now());
     }
 
     fn get_rect(gs: &GlobalState) -> Rect {
@@ -295,7 +299,7 @@ impl Popup for ActiveFileSearch {
 
         if let Some(updated) = self.pattern.map(&key, &mut gs.clipboard) {
             if updated {
-                self.collect_data(tree);
+                self.collect_data();
             }
             self.force_render(gs);
             return Status::Pending;
@@ -308,7 +312,8 @@ impl Popup for ActiveFileSearch {
                     return Status::Dropped;
                 }
                 self.mode = Mode::Full;
-                self.collect_data(tree);
+                self.tree = tree.shallow_copy_root_tree_path();
+                self.collect_data();
             }
             KeyCode::Enter => {
                 if self.options.len() > self.state.selected {
@@ -346,25 +351,53 @@ impl Popup for ActiveFileSearch {
     }
 
     fn render(&mut self, gs: &mut GlobalState) {
-        {
-            let Ok(mut buffer) = self.option_buffer.try_lock() else {
-                return;
-            };
-            if buffer.is_empty() {
-                return;
+        match self.clock {
+            Some(clock) => {
+                if clock.elapsed() < WAIT_ON_UPDATE {
+                    return;
+                }
+                self.clock = None;
+                self.options.clear();
+                let tree_path = self.tree.clone();
+                let buffer = Arc::clone(&self.option_buffer);
+                let pattern = self.pattern.text.to_owned();
+                self.join_handle.replace(tokio::task::spawn(async move {
+                    buffer.lock().await.clear();
+                    let mut join_set = tree_path.search_files_join_set(pattern);
+                    while let Some(task_result) = join_set.join_next().await {
+                        if let Ok(result) = task_result {
+                            buffer.lock().await.extend(result);
+                        };
+                    }
+                }));
             }
-            self.options.extend(buffer.drain(..));
+            None => {
+                let Some(handle) = self.join_handle.take() else { return };
+                if !handle.is_finished() {
+                    self.join_handle = Some(handle);
+                }
+
+                // if handle is finished there should not be anything preventing lock
+                let Ok(mut buffer) = self.option_buffer.try_lock() else {
+                    return;
+                };
+                if buffer.is_empty() {
+                    return;
+                }
+                self.options.extend(buffer.drain(..));
+                drop(buffer);
+                self.force_render(gs);
+            }
         }
-        self.force_render(gs);
     }
 
     fn resize_success(&mut self, _: &mut GlobalState) -> bool {
         true
     }
 
-    fn paste_passthrough(&mut self, clip: String, components: &mut Components) -> bool {
+    fn paste_passthrough(&mut self, clip: String, _: &mut Components) -> bool {
         if self.pattern.paste_passthrough(clip) {
-            self.collect_data(components.tree);
+            self.collect_data();
             return true;
         }
         false
