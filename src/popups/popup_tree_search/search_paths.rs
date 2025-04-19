@@ -11,14 +11,13 @@ use crate::{
     tree::{Tree, TreePath},
     workspace::Workspace,
 };
-use crossterm::event::{KeyCode, KeyEvent};
-use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
-use crossterm::style::{Color, ContentStyle};
+use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::style::Color;
 use std::{path::PathBuf, sync::Arc};
 use std::{sync::Mutex, time::Instant};
 use tokio::task::JoinHandle;
 
-const PATH_SEARCH_TITLE: &str = " Path search (Tab to switch to in File search) ";
+const PATH_SEARCH_TITLE: &str = "Path search (Tab for File search)";
 
 pub struct ActivePathSearch {
     options: Vec<PathBuf>,
@@ -49,8 +48,13 @@ impl ActivePathSearch {
             handle.abort();
         }
         self.options.clear();
-        self.clock = Some(Instant::now());
         self.state.reset();
+
+        if self.pattern.text.len() < 2 {
+            self.clock = None;
+        } else {
+            self.clock = Some(Instant::now());
+        }
     }
 
     fn get_rect(gs: &GlobalState) -> Rect {
@@ -75,14 +79,20 @@ impl Popup for ActivePathSearch {
 
     fn force_render(&mut self, gs: &mut GlobalState) {
         let mut rect = Self::get_rect(gs);
+        let accent_style = gs.theme.accent_style.with_fg(Color::Blue);
         let backend = gs.backend();
         rect.draw_borders(None, None, backend);
-        rect.border_title_styled(PATH_SEARCH_TITLE, ContentStyle::fg(Color::Blue), backend);
+        rect.border_title_styled(PATH_SEARCH_TITLE, accent_style, backend);
 
         let Some(line) = rect.next_line() else { return };
         self.pattern.widget(line, backend);
         let Some(line) = rect.next_line() else { return };
         line.fill(BORDERS.horizontal_top, backend);
+
+        if self.clock.is_some() || self.join_handle.is_some() {
+            self.state.render_list(["Searching ..."].into_iter(), rect, backend);
+            return;
+        }
 
         if self.options.is_empty() {
             self.state.render_list(["No results found!"].into_iter(), rect, backend);
@@ -169,10 +179,9 @@ impl Popup for ActivePathSearch {
                 Ok(lock) => lock,
                 Err(err) => err.into_inner(),
             };
-            if lock.is_empty() {
-                return;
+            if !lock.is_empty() {
+                self.options = lock.drain(..).collect();
             }
-            self.options = lock.drain(..).collect();
             drop(lock);
             self.join_handle = None;
             self.force_render(gs);

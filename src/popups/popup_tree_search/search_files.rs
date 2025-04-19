@@ -11,9 +11,8 @@ use crate::{
     tree::{Tree, TreePath},
     workspace::Workspace,
 };
-use crossterm::event::{KeyCode, KeyEvent};
-use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
-use crossterm::style::{Color, ContentStyle};
+use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::style::Color;
 use std::time::Instant;
 use std::{path::PathBuf, sync::Arc};
 use tokio::{sync::Mutex as AsyncMutex, task::JoinHandle};
@@ -32,9 +31,9 @@ impl SearchMode {
 }
 
 const FILE_SEARCH_TITLE: SearchMode =
-    SearchMode { title: " File search (Selected - Tab to switch to Full mode) ", fg_color: Color::Yellow };
+    SearchMode { title: "File search (Selected - Tab for root search)", fg_color: Color::Yellow };
 
-const FULL_SEARCH_TITLE: SearchMode = SearchMode { title: " File search (Full) ", fg_color: Color::Red };
+const FULL_SEARCH_TITLE: SearchMode = SearchMode { title: "File search (root)", fg_color: Color::Red };
 
 pub struct ActiveFileSearch {
     join_handle: Option<JoinHandle<()>>,
@@ -92,7 +91,7 @@ impl ActiveFileSearch {
         rect.height = rect.height.checked_sub(2)?;
         rect.row += 2;
         let position = rect.relative_position(row, column)?;
-        let idx = self.state.at_line + position.line;
+        let idx = (self.state.at_line + position.line) / 2;
         if idx >= self.options.len() {
             return None;
         }
@@ -105,13 +104,19 @@ impl Popup for ActiveFileSearch {
 
     fn force_render(&mut self, gs: &mut GlobalState) {
         let mut rect = Self::get_rect(gs);
+        let accent_style = gs.theme.accent_style.with_fg(self.mode.fg_color);
         let backend = gs.backend();
         rect.draw_borders(None, None, backend);
-        rect.border_title_styled(self.mode.title, ContentStyle::fg(self.mode.fg_color), backend);
+        rect.border_title_styled(self.mode.title, accent_style, backend);
         let Some(line) = rect.next_line() else { return };
         self.pattern.widget(line, backend);
         let Some(line) = rect.next_line() else { return };
         line.fill(BORDERS.horizontal_top, backend);
+
+        if self.clock.is_some() || self.join_handle.is_some() {
+            self.state.render_list(["Searching ..."].into_iter(), rect, backend);
+            return;
+        }
 
         if self.options.is_empty() {
             self.state.render_list(["No results found!"].into_iter(), rect, backend);
@@ -207,10 +212,9 @@ impl Popup for ActiveFileSearch {
                 let Ok(mut buffer) = self.option_buffer.try_lock() else {
                     return;
                 };
-                if buffer.is_empty() {
-                    return;
+                if !buffer.is_empty() {
+                    self.options.extend(buffer.drain(..));
                 }
-                self.options.extend(buffer.drain(..));
                 drop(buffer);
                 self.force_render(gs);
             }
