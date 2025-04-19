@@ -20,20 +20,28 @@ use tokio::{sync::Mutex as AsyncMutex, task::JoinHandle};
 
 type SearchResult = (PathBuf, String, usize);
 
-const FILE_SEARCH_TITLE: &str = " File search (Selected - Tab to switch to Full mode) ";
-const FULL_SEARCH_TITLE: &str = " File search (Full) ";
-
-enum Mode {
-    Full,
-    Select,
+struct SearchMode {
+    title: &'static str,
+    fg_color: Color,
 }
+
+impl SearchMode {
+    fn is_full(&self) -> bool {
+        self.fg_color == Color::Red
+    }
+}
+
+const FILE_SEARCH_TITLE: SearchMode =
+    SearchMode { title: " File search (Selected - Tab to switch to Full mode) ", fg_color: Color::Yellow };
+
+const FULL_SEARCH_TITLE: SearchMode = SearchMode { title: " File search (Full) ", fg_color: Color::Red };
 
 pub struct ActiveFileSearch {
     join_handle: Option<JoinHandle<()>>,
     options: Vec<SearchResult>,
     option_buffer: Arc<AsyncMutex<Vec<SearchResult>>>,
     state: State,
-    mode: Mode,
+    mode: SearchMode,
     pattern: TextField<bool>,
     clock: Option<Instant>,
     tree: TreePath,
@@ -43,7 +51,7 @@ impl ActiveFileSearch {
     pub fn run(pattern: String, gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         let clock = if pattern.len() > 2 { Some(Instant::now()) } else { None };
         let mut new = Self {
-            mode: Mode::Select,
+            mode: FILE_SEARCH_TITLE,
             join_handle: None,
             option_buffer: Arc::default(),
             options: Vec::default(),
@@ -99,11 +107,7 @@ impl Popup for ActiveFileSearch {
         let mut rect = Self::get_rect(gs);
         let backend = gs.backend();
         rect.draw_borders(None, None, backend);
-        match self.mode {
-            Mode::Full => rect.border_title_styled(FULL_SEARCH_TITLE, ContentStyle::fg(Color::Red), backend),
-            Mode::Select => rect.border_title_styled(FILE_SEARCH_TITLE, ContentStyle::fg(Color::Yellow), backend),
-        }
-
+        rect.border_title_styled(self.mode.title, ContentStyle::fg(self.mode.fg_color), backend);
         let Some(line) = rect.next_line() else { return };
         self.pattern.widget(line, backend);
         let Some(line) = rect.next_line() else { return };
@@ -130,10 +134,10 @@ impl Popup for ActiveFileSearch {
             KeyCode::Up => self.state.prev(self.options.len()),
             KeyCode::Down => self.state.next(self.options.len()),
             KeyCode::Tab => {
-                if matches!(self.mode, Mode::Full) {
+                if self.mode.is_full() {
                     return Status::Dropped;
                 }
-                self.mode = Mode::Full;
+                self.mode = FULL_SEARCH_TITLE;
                 self.tree = tree.shallow_copy_root_tree_path();
                 self.collect_data();
             }
