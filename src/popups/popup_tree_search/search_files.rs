@@ -1,7 +1,7 @@
 use super::{Components, Popup, Status};
 use crate::{
     embeded_term::EditorTerminal,
-    global_state::GlobalState,
+    global_state::{GlobalState, IdiomEvent},
     render::{
         backend::StyleExt,
         layout::{LineBuilder, Rect, BORDERS},
@@ -15,9 +15,20 @@ use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKin
 use crossterm::style::Color;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use tokio::task::JoinSet;
+use tokio::{
+    sync::mpsc::{Receiver, Sender, UnboundedSender},
+    task::JoinSet,
+};
 
 const MAX_SEARCH_TIME: Duration = Duration::from_millis(50);
+
+const FULL_SEARCH: Color = Color::Red;
+const FULL_TITLE: &str = "File search (root)";
+const FULL_SEARCH_TITLE: SearchMode = SearchMode { title: FULL_TITLE, fg_color: FULL_SEARCH };
+
+const FILE_SEARCH: Color = Color::Yellow;
+const FILE_TITLE: &str = "File search (Selected - Tab for root search)";
+const FILE_SEARCH_TITLE: SearchMode = SearchMode { title: FILE_TITLE, fg_color: FILE_SEARCH };
 
 type SearchResult = (PathBuf, String, usize);
 
@@ -28,50 +39,63 @@ struct SearchMode {
 
 impl SearchMode {
     fn is_full(&self) -> bool {
-        self.fg_color == Color::Red
+        self.fg_color == FULL_SEARCH
     }
 }
 
-const FILE_SEARCH_TITLE: SearchMode =
-    SearchMode { title: "File search (Selected - Tab for root search)", fg_color: Color::Yellow };
-
-const FULL_SEARCH_TITLE: SearchMode = SearchMode { title: "File search (root)", fg_color: Color::Red };
+enum Message {
+    Values(Vec<SearchResult>),
+    Reset(Vec<SearchResult>),
+}
 
 struct CachedBuffer {
     base_search: String,
     filter: String,
-    base_line: Vec<SearchResult>,
+    base_results: Vec<SearchResult>,
     tasks: Option<JoinSet<Vec<SearchResult>>>,
     tree: TreePath,
 }
 
 impl CachedBuffer {
     fn new(tree: TreePath) -> Self {
-        Self { base_search: String::new(), filter: String::new(), base_line: Vec::new(), tasks: None, tree }
+        Self { base_search: String::new(), filter: String::new(), base_results: Vec::new(), tasks: None, tree }
     }
 
-    fn rebase_cache(&mut self) {
+    fn get(&mut self, mut index: usize) -> Option<SearchResult> {
+        for (remove_index, (_, txt, _)) in self.base_results.iter().enumerate() {
+            if txt.contains(self.filter.as_str()) {
+                if index == 0 {
+                    return Some(self.base_results.remove(remove_index));
+                }
+                index -= 1;
+            }
+        }
+        None
+    }
+
+    fn _rebase_cache(&mut self) {
         _ = self.tasks.take().map(|mut t| t.abort_all());
+        self.base_results.clear();
         self.tasks = Some(self.tree.clone().search_files_join_set(self.base_search.to_owned()));
     }
 
     fn len(&self) -> usize {
         if self.filter.is_empty() {
-            return self.base_line.len();
+            return self.base_results.len();
         }
-        self.base_line.iter().filter(|res| res.1.contains(self.filter.as_str())).count()
+        self.base_results.iter().filter(|res| res.1.contains(self.filter.as_str())).count()
     }
 
     fn is_empty(&self) -> bool {
         if self.filter.is_empty() {
-            return self.base_line.is_empty();
+            return self.base_results.is_empty();
         }
-        !self.base_line.iter().any(|res| res.1.contains(self.filter.as_str()))
+        !self.base_results.iter().any(|res| res.1.contains(self.filter.as_str()))
     }
 
     fn vec(&mut self) -> Vec<SearchResult> {
         self.flush_results();
-        self.base_line.iter().filter(|res| res.1.contains(self.filter.as_str())).cloned().collect()
+        self.base_results.iter().filter(|res| res.1.contains(self.filter.as_str())).cloned().collect()
     }
 
     fn is_running(&self) -> bool {
@@ -81,14 +105,15 @@ impl CachedBuffer {
     fn set_search(&mut self, pattern: &str) {
         if pattern.len() < 2 {
             _ = self.tasks.take().map(|mut t| t.abort_all());
-            self.base_line.clear();
             self.base_search.clear();
+            self.base_results.clear();
             self.filter.clear();
             return;
         }
         if self.base_search.is_empty() || !pattern.starts_with(&self.base_search) {
             self.base_search = pattern.to_owned();
-            self.rebase_cache();
+            self.filter.clear();
+            self._rebase_cache();
         } else {
             self.filter = pattern.to_owned();
         }
@@ -115,32 +140,59 @@ impl CachedBuffer {
             }
             let Some(result) = tasks.try_join_next() else { return };
             if let Ok(data) = result {
-                self.base_line.extend(data);
+                self.base_results.extend(data);
             }
         }
     }
 }
 
 pub struct ActiveFileSearch {
+    options: Vec<SearchResult>,
     state: State,
     mode: SearchMode,
     pattern: TextField<bool>,
-    buffer: CachedBuffer,
+    send: UnboundedSender<String>,
+    recv: Receiver<Message>,
+    _join_handle: tokio::task::JoinHandle<()>,
 }
 
 impl ActiveFileSearch {
     pub fn run(pattern: String, gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         let path_tree = tree.shallow_copy_selected_tree_path();
-        let mut buffer = CachedBuffer::new(path_tree);
-        if pattern.len() >= 2 {
-            buffer.set_search(&pattern);
-        }
+        // let mut buffer = CachedBuffer::new(path_tree);
+        // if pattern.len() >= 2 {
+        //     buffer.set_search(&pattern);
+        // }
+
+        let (send_result, recv) = tokio::sync::mpsc::channel::<Message>(20);
+        let (send, mut recv_request) = tokio::sync::mpsc::unbounded_channel::<String>();
 
         let mut new = Self {
+            options: vec![],
             mode: FILE_SEARCH_TITLE,
             state: State::default(),
             pattern: TextField::new(pattern, Some(true)),
-            buffer,
+            send,
+            recv,
+            _join_handle: tokio::task::spawn(async move {
+                while let Some(pattern) = recv_request.recv().await {
+                    let mut results = path_tree.clone().search_files_join_set(pattern);
+                    let Some(Ok(first_msg)) = results.join_next().await else {
+                        continue;
+                    };
+                    if send_result.send(Message::Reset(first_msg)).await.is_err() {
+                        return;
+                    };
+                    while let Some(Ok(msg)) = results.join_next().await {
+                        if !recv_request.is_empty() {
+                            break;
+                        }
+                        if send_result.send(Message::Values(msg)).await.is_err() {
+                            return;
+                        };
+                    }
+                }
+            }),
         };
 
         if new.pattern.text.len() > 1 {
@@ -152,7 +204,7 @@ impl ActiveFileSearch {
 
     fn collect_data(&mut self) {
         self.state.reset();
-        self.buffer.set_search(&self.pattern.text);
+        self.send.send(self.pattern.text.clone());
     }
 
     fn get_rect(gs: &GlobalState) -> Rect {
@@ -165,7 +217,7 @@ impl ActiveFileSearch {
         rect.row += 2;
         let position = rect.relative_position(row, column)?;
         let idx = (self.state.at_line + position.line) / 2;
-        if idx >= self.buffer.len() {
+        if idx >= self.options.len() {
             return None;
         }
         Some(idx)
@@ -186,14 +238,14 @@ impl Popup for ActiveFileSearch {
         let Some(line) = rect.next_line() else { return };
         line.fill(BORDERS.horizontal_top, backend);
 
-        if self.buffer.is_empty() {
-            if self.buffer.is_running() {
-                self.state.render_list(["Searching ..."].into_iter(), rect, backend);
-            } else {
-                self.state.render_list(["No results found!"].into_iter(), rect, backend);
-            }
+        if self.options.is_empty() {
+            // if self.buffer.is_running() {
+            // self.state.render_list(["Searching ..."].into_iter(), rect, backend);
+            // } else {
+            self.state.render_list(["No results found!"].into_iter(), rect, backend);
+            // }
         } else {
-            self.state.render_list_complex(&self.buffer.vec(), &[build_path_line, build_text_line], rect, backend);
+            self.state.render_list_complex(&self.options, &[build_path_line, build_text_line], rect, backend);
         }
     }
 
@@ -208,22 +260,40 @@ impl Popup for ActiveFileSearch {
             return Status::Pending;
         }
         match key.code {
-            KeyCode::Up => self.state.prev(self.buffer.len()),
-            KeyCode::Down => self.state.next(self.buffer.len()),
+            KeyCode::Up => self.state.prev(self.options.len()),
+            KeyCode::Down => self.state.next(self.options.len()),
             KeyCode::Tab => {
                 if self.mode.is_full() {
                     return Status::Dropped;
                 }
                 self.mode = FULL_SEARCH_TITLE;
-                self.buffer.new_tree(tree.shallow_copy_root_tree_path(), &self.pattern.text);
+                let (send_result, recv) = tokio::sync::mpsc::channel::<Message>(20);
+                let (send, mut recv_request) = tokio::sync::mpsc::unbounded_channel::<String>();
+                let path_tree = tree.shallow_copy_root_tree_path();
+                self._join_handle = tokio::task::spawn(async move {
+                    while let Some(pattern) = recv_request.recv().await {
+                        let mut results = path_tree.clone().search_files_join_set(pattern);
+                        let Some(Ok(first_msg)) = results.join_next().await else {
+                            continue;
+                        };
+                        if send_result.send(Message::Reset(first_msg)).await.is_err() {
+                            return;
+                        };
+                        while let Some(Ok(msg)) = results.join_next().await {
+                            if !recv_request.is_empty() {
+                                break;
+                            }
+                            if send_result.send(Message::Values(msg)).await.is_err() {
+                                return;
+                            };
+                        }
+                    }
+                });
                 self.collect_data();
             }
             KeyCode::Enter => {
-                if self.buffer.len() > self.state.selected {
-                    todo!()
-                    // let (path, _, line) = self.options.remove(self.state.selected);
-                    // gs.event.push(IdiomEvent::OpenAtLine(path, line));
-                }
+                let (path, _, line) = self.options.remove(self.state.selected);
+                gs.event.push(IdiomEvent::OpenAtLine(path, line));
                 return Status::Dropped;
             }
             _ => return Status::Pending,
@@ -236,19 +306,18 @@ impl Popup for ActiveFileSearch {
         let Components { gs, .. } = components;
         match event {
             MouseEvent { kind: MouseEventKind::Moved, column, row, .. } => match self.get_option_idx(row, column, gs) {
-                Some(idx) => self.state.select(idx, self.buffer.len()),
+                Some(idx) => self.state.select(idx, self.options.len()),
                 None => return Status::Pending,
             },
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } => {
                 if let Some(index) = self.get_option_idx(row, column, gs) {
-                    todo!()
-                    // let (path, _, line) = self.buffer.remove(index);
-                    // gs.event.push(IdiomEvent::OpenAtLine(path, line));
-                    // return Status::Dropped;
+                    let (path, _, line) = self.options.remove(index);
+                    gs.event.push(IdiomEvent::OpenAtLine(path, line));
+                    return Status::Dropped;
                 }
             }
-            MouseEvent { kind: MouseEventKind::ScrollUp, .. } => self.state.prev(self.buffer.len()),
-            MouseEvent { kind: MouseEventKind::ScrollDown, .. } => self.state.next(self.buffer.len()),
+            MouseEvent { kind: MouseEventKind::ScrollUp, .. } => self.state.prev(self.options.len()),
+            MouseEvent { kind: MouseEventKind::ScrollDown, .. } => self.state.next(self.options.len()),
             _ => return Status::Pending,
         }
         self.force_render(gs);
@@ -256,10 +325,20 @@ impl Popup for ActiveFileSearch {
     }
 
     fn render(&mut self, gs: &mut GlobalState) {
-        if self.buffer.is_running() {
-            self.buffer.flush_results();
-            self.force_render(gs);
+        if self.recv.is_empty() {
+            return;
         }
+        let now = Instant::now();
+        while let Ok(msg) = self.recv.try_recv() {
+            match msg {
+                Message::Reset(new_data) => self.options = new_data,
+                Message::Values(new_data) => self.options.extend(new_data),
+            }
+            if now.elapsed() >= MAX_SEARCH_TIME {
+                break;
+            }
+        }
+        self.force_render(gs);
     }
 
     fn resize_success(&mut self, _: &mut GlobalState) -> bool {

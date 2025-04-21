@@ -1,4 +1,4 @@
-use super::{Components, Popup, Status, WAIT_ON_UPDATE};
+use super::{Components, Popup, Status};
 use crate::{
     embeded_term::EditorTerminal,
     global_state::{GlobalState, IdiomEvent},
@@ -13,9 +13,11 @@ use crate::{
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::Color;
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 use std::{sync::Mutex, time::Instant};
 use tokio::task::JoinHandle;
+
+const WAIT_ON_UPDATE: Duration = Duration::from_millis(100);
 
 const PATH_SEARCH_TITLE: &str = "Path search (Tab for File search)";
 
