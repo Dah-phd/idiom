@@ -9,6 +9,7 @@ use std::{
     io::{Result, Write},
 };
 pub use style::{background_rgb, parse_raw_rgb, pull_color, serialize_rgb, StyleExt};
+pub const ERR_MSG: &str = "Rendering (Stdout) Err:";
 
 /// If stdout is returning errors the program should crash -> use expect
 #[allow(dead_code)] // impl all utilities although not all are used

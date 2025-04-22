@@ -26,9 +26,7 @@ pub const MIN_WIDTH: u16 = 40;
 pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResult<()> {
     // builtin cursor is not used - cursor is positioned during render
 
-    let Some(screen_rect) = get_init_screen(&mut backend) else {
-        return Ok(());
-    };
+    let screen_rect = get_init_screen(&mut backend)?;
     let mut gs = GlobalState::new(screen_rect, backend);
     let (mut general_key_map, editor_key_map, tree_key_map) = gs.unwrap_or_default(KeyMap::new(), KEY_MAP).unpack();
     let mut editor_base_config = gs.unwrap_or_default(EditorConfigs::new(), "editor.toml: ");
@@ -128,16 +126,9 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                 }
                 Event::Resize(mut width, mut height) => {
                     if width < MIN_WIDTH || height < MIN_HEIGHT {
-                        match get_new_screen_size(gs.backend()) {
-                            None => {
-                                workspace.graceful_exit().await;
-                                return Ok(());
-                            }
-                            Some((new_width, new_height)) => {
-                                width = new_width;
-                                height = new_height;
-                            }
-                        }
+                        let (new_width, new_height) = get_new_screen_size(gs.backend())?;
+                        width = new_width;
+                        height = new_height;
                     }
                     gs.full_resize(height, width);
                     let editor_rect = gs.calc_editor_rect();

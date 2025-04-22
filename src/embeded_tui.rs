@@ -1,6 +1,7 @@
 use crate::{
     error::{IdiomError, IdiomResult},
     global_state::GlobalState,
+    popups::checked_new_screen_size,
     render::{
         backend::{Backend, BackendProtocol},
         pty::PtyShell,
@@ -31,6 +32,7 @@ pub fn run_embeded_tui(cmd: Option<&str>, gs: &mut GlobalState) -> IdiomResult<(
                     tui.key_map(&key)?;
                 }
                 Event::Resize(width, height) => {
+                    let (width, height) = checked_new_screen_size(width, height, gs.backend());
                     gs.full_resize(height, width);
                     gs.render_footer();
                     let mut rect = Backend::screen()?;

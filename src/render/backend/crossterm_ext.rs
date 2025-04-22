@@ -1,5 +1,5 @@
 // pub mod color;
-use super::style::StyleExt;
+use super::{style::StyleExt, ERR_MSG};
 use crossterm::style::Color;
 use crossterm::{
     cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show},
@@ -12,8 +12,6 @@ use std::{
     fmt::Display,
     io::{StderrLock, Stdout, Write},
 };
-
-const ERR_MSG: &str = "Rendering (Stdout) Err:";
 
 use crate::render::layout::Rect;
 

@@ -15,6 +15,7 @@ use crate::{
     app::{MIN_FRAMERATE, MIN_HEIGHT, MIN_WIDTH},
     configs::CONFIG_FOLDER,
     embeded_term::EditorTerminal,
+    error::{IdiomError, IdiomResult},
     global_state::{GlobalState, IdiomEvent},
     render::{
         backend::{Backend, BackendProtocol, StyleExt},
@@ -78,6 +79,7 @@ pub trait Popup {
                         Status::Pending => (),
                     },
                     Event::Resize(width, height) => {
+                        let (width, height) = checked_new_screen_size(width, height, components.gs.backend());
                         components.gs.full_resize(height, width);
                         if !self.resize_success(components.gs) {
                             return None;
@@ -157,15 +159,18 @@ enum CommandResult {
     BigCB(fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal)),
 }
 
-pub fn get_new_screen_size(backend: &mut Backend) -> Option<(u16, u16)> {
+type Width = u16;
+type Height = u16;
+
+pub fn get_new_screen_size(backend: &mut Backend) -> IdiomResult<(Width, Height)> {
     loop {
-        if crossterm::event::poll(Duration::from_millis(200)).ok()? {
-            match crossterm::event::read().ok()? {
+        if crossterm::event::poll(Duration::from_millis(200))? {
+            match crossterm::event::read()? {
                 Event::Key(KeyEvent { code: KeyCode::Char('q' | 'Q' | 'd' | 'D'), .. }) => {
-                    return None;
+                    return Err(IdiomError::GeneralError(String::from("Canceled terminal resize!")));
                 }
                 Event::Resize(width, height) if width >= MIN_WIDTH && height >= MIN_HEIGHT => {
-                    return Some((width, height));
+                    return Ok((width, height));
                 }
                 Event::Resize(..) => {}
                 _ => continue,
@@ -173,7 +178,7 @@ pub fn get_new_screen_size(backend: &mut Backend) -> Option<(u16, u16)> {
         }
         let error_text = ["Terminal size too small!", "Press Q or D to exit ..."];
         let style = ContentStyle::bold().with_fg(Color::DarkRed);
-        let screen = Backend::screen().ok()?;
+        let screen = Backend::screen()?;
         let mut text_iter = error_text.iter();
         for line in screen.into_iter() {
             match text_iter.next() {
@@ -185,12 +190,18 @@ pub fn get_new_screen_size(backend: &mut Backend) -> Option<(u16, u16)> {
     }
 }
 
-pub fn get_init_screen(backend: &mut Backend) -> Option<Rect> {
-    let init = Backend::screen().ok()?;
+pub fn get_init_screen(backend: &mut Backend) -> IdiomResult<Rect> {
+    let init = Backend::screen()?;
     if init.width < MIN_WIDTH as usize || init.height < MIN_HEIGHT {
-        get_new_screen_size(backend)?;
+        get_new_screen_size(backend).map(Rect::from)
     } else {
-        return Some(init);
-    };
-    Backend::screen().ok()
+        Ok(init)
+    }
+}
+
+pub fn checked_new_screen_size(width: Width, height: Height, backend: &mut Backend) -> (Width, Height) {
+    if width >= MIN_WIDTH && height >= MIN_HEIGHT {
+        return (width, height);
+    }
+    get_new_screen_size(backend).expect("Manual action")
 }
