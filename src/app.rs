@@ -103,7 +103,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                     tree.key_map = new_tree_key_map;
                                     workspace.refresh_cfg(new_editor_key_map, &mut gs);
                                 }
-                                GeneralAction::GoToLinePopup => {
+                                GeneralAction::GoToLineOrGit => {
                                     if gs.is_insert() {
                                         GoToLinePopup::run_inplace(&mut gs, &mut workspace, &mut tree, &mut term);
                                     } else {

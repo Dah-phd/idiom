@@ -217,7 +217,7 @@ pub enum GeneralAction {
     Exit,
     HideFileTree,
     RefreshSettings,
-    GoToLinePopup,
+    GoToLineOrGit,
     ToggleTerminal,
     GoToTab1,
     GoToTab2,
@@ -244,7 +244,7 @@ pub struct GeneralUserKeyMap {
     exit: String,
     hide_file_tree: String,
     refresh_settings: String,
-    go_to_line: String,
+    go_to_line_or_git: String,
     toggle_terminal: String,
     go_to_tab_1: String,
     go_to_tab_2: String,
@@ -270,7 +270,7 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
         insert_key_event(&mut hash, &val.exit, GeneralAction::Exit);
         insert_key_event(&mut hash, &val.hide_file_tree, GeneralAction::HideFileTree);
         insert_key_event(&mut hash, &val.refresh_settings, GeneralAction::RefreshSettings);
-        insert_key_event(&mut hash, &val.go_to_line, GeneralAction::GoToLinePopup);
+        insert_key_event(&mut hash, &val.go_to_line_or_git, GeneralAction::GoToLineOrGit);
         insert_key_event(&mut hash, &val.toggle_terminal, GeneralAction::ToggleTerminal);
         insert_key_event(&mut hash, &val.go_to_tab_1, GeneralAction::GoToTab1);
         insert_key_event(&mut hash, &val.go_to_tab_2, GeneralAction::GoToTab2);
@@ -299,7 +299,7 @@ impl Default for GeneralUserKeyMap {
             exit: format!("{CTRL} && q || {CTRL} && d"),
             hide_file_tree: format!("{CTRL} && e"),
             refresh_settings: format!("{F}5"),
-            go_to_line: format!("{CTRL} && g"),
+            go_to_line_or_git: format!("{CTRL} && g"),
             toggle_terminal: format!("{CTRL} && `"),
             go_to_tab_1: format!("{ALT} && 1"),
             go_to_tab_2: format!("{ALT} && 2"),
