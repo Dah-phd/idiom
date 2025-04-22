@@ -1,33 +1,58 @@
-use std::time::Duration;
-
 use crate::{
-    error::IdiomResult,
+    error::{IdiomError, IdiomResult},
     global_state::GlobalState,
     render::{
         backend::{Backend, BackendProtocol},
         pty::PtyShell,
     },
 };
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use std::time::Duration;
 const MIN_FRAMERATE: Duration = Duration::from_millis(8);
 
-pub fn run_embeded_tui(cmd: &str, gs: &mut GlobalState) -> IdiomResult<()> {
-    let backend = gs.backend();
-    let rect = Backend::screen()?;
-    let mut tui = PtyShell::run(cmd, rect)?;
-    tui.render(backend);
+pub fn run_embeded_tui(cmd: Option<&str>, gs: &mut GlobalState) -> IdiomResult<()> {
+    let mut rect = Backend::screen()?;
+    rect.height -= 1;
+
+    let mut tui = match cmd {
+        Some(cmd) => PtyShell::run(cmd, rect)?,
+        None => PtyShell::default_cmd(rect)?,
+    };
+
+    tui.render(gs.backend());
+
     while !tui.is_finished() {
         if crossterm::event::poll(MIN_FRAMERATE)? {
-            if let crossterm::event::Event::Key(key) = crossterm::event::read()? {
-                _ = tui.key_map(&key);
+            match crossterm::event::read()? {
+                Event::Key(KeyEvent { code: KeyCode::Char('d' | 'D'), modifiers: KeyModifiers::CONTROL, .. }) => {
+                    return Ok(());
+                }
+                Event::Key(key) => {
+                    tui.key_map(&key)?;
+                }
+                Event::Resize(width, height) => {
+                    gs.full_resize(height, width);
+                    gs.render_footer();
+                    let mut rect = Backend::screen()?;
+                    rect.height -= 1;
+                    tui.resize(rect).map_err(IdiomError::GeneralError)?;
+                }
+                Event::Paste(clip) => {
+                    tui.paste(clip)?;
+                }
+                _ => (),
             }
-            backend.freeze();
-            tui.render(backend);
-            backend.unfreeze();
+            gs.backend.freeze();
+            tui.render(&mut gs.backend);
+            gs.fast_render_message();
+            gs.backend.unfreeze();
         } else {
-            backend.freeze();
-            tui.fast_render(backend);
-            backend.unfreeze();
+            gs.backend.freeze();
+            tui.fast_render(&mut gs.backend);
+            gs.fast_render_message();
+            gs.backend.unfreeze();
         }
     }
+
     Ok(())
 }

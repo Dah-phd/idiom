@@ -33,6 +33,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
     let (mut general_key_map, editor_key_map, tree_key_map) = gs.unwrap_or_default(KeyMap::new(), KEY_MAP).unpack();
     let mut editor_base_config = gs.unwrap_or_default(EditorConfigs::new(), "editor.toml: ");
     let integrated_shell = editor_base_config.shell.to_owned();
+    let git_tui = editor_base_config.git_tui.to_owned();
 
     // INIT COMPONENTS
     let mut tree = Tree::new(tree_key_map, &mut gs);
@@ -106,7 +107,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                     if gs.is_insert() {
                                         GoToLinePopup::run_inplace(&mut gs, &mut workspace, &mut tree, &mut term);
                                     } else {
-                                        gs.event.push(IdiomEvent::EmbededApp("gitui".to_owned()));
+                                        gs.event.push(IdiomEvent::EmbededApp(git_tui.to_owned()));
                                     };
                                 }
                                 GeneralAction::ToggleTerminal => {

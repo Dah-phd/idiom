@@ -24,7 +24,7 @@ pub enum StartInplacePopup {
 pub enum IdiomEvent {
     EditorActionCall(EditorAction),
     TreeActionCall(TreeAction),
-    EmbededApp(String),
+    EmbededApp(Option<String>),
     InplacePopup(StartInplacePopup),
     OpenAtLine(PathBuf, usize),
     OpenAtSelect(PathBuf, (CursorPosition, CursorPosition)),
@@ -61,10 +61,10 @@ impl IdiomEvent {
                 tree.map_action(action, gs);
             }
             IdiomEvent::EmbededApp(cmd) => {
-                gs.draw_callback = super::draw::full_rebuild;
-                if let Err(error) = run_embeded_tui(&cmd, gs) {
+                if let Err(error) = run_embeded_tui(cmd.as_deref(), gs) {
                     gs.error(error);
                 };
+                gs.draw_callback = super::draw::full_rebuild;
             }
             IdiomEvent::InplacePopup(pop) => match pop {
                 StartInplacePopup::Pop(mut popup) => {

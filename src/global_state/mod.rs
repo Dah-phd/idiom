@@ -236,6 +236,23 @@ impl GlobalState {
         }
     }
 
+    pub fn fast_render_message(&mut self) {
+        self.messages.fast_render(self.theme.accent_style, &mut self.backend);
+    }
+
+    pub fn render_footer(&mut self) {
+        // reset expected line positions
+        self.footer_line = self.screen_rect.clone().pop_line();
+        let (mode_line, msg_line) = if self.components.contains(Components::TREE) || self.is_select() {
+            self.footer_line.clone().split_rel(self.tree_size)
+        } else {
+            self.footer_line.clone().split_rel(Mode::len())
+        };
+        self.mode.render(mode_line, &mut self.backend);
+        self.messages.set_line(msg_line);
+        self.messages.render(self.theme.accent_style, &mut self.backend);
+    }
+
     #[inline]
     pub fn message(&mut self, msg: impl Into<String>) {
         self.messages.message(msg.into());

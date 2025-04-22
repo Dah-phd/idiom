@@ -24,6 +24,7 @@ pub struct EditorConfigs {
     pub unindent_before: String,
     /// SHELL
     pub shell: Option<String>,
+    pub git_tui: Option<String>,
     /// LSP
     rust_lsp: Option<String>,
     rust_lsp_preload_if_present: Option<Vec<String>>,
@@ -58,6 +59,7 @@ impl Default for EditorConfigs {
             unindent_before: String::from("]})"),
             // shell
             shell: None,
+            git_tui: None,
             // lsp
             rust_lsp: Some(String::from("rust-analyzer")),
             rust_lsp_preload_if_present: Some(vec!["Cargo.toml".to_owned(), "Cargo.lock".to_owned()]),

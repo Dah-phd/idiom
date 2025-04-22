@@ -232,6 +232,12 @@ impl Popup for ActiveFileSearch {
     }
 }
 
+impl Drop for ActiveFileSearch {
+    fn drop(&mut self) {
+        self.task.abort();
+    }
+}
+
 fn create_async_tree_search_task(tree: TreePath) -> (JoinHandle<()>, UnboundedSender<String>, Receiver<Message>) {
     let (send_results, recv) = tokio::sync::mpsc::channel::<Message>(20);
     let (send, mut recv_requests) = tokio::sync::mpsc::unbounded_channel::<String>();
