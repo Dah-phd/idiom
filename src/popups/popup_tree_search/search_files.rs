@@ -86,10 +86,10 @@ impl ActiveFileSearch {
     fn collect_data(&mut self) -> Result<(), tokio::sync::mpsc::error::SendError<String>> {
         self.options.clear();
         self.state.reset();
-        self.is_searching = true;
         if self.pattern.text.len() <= 2 {
             return Ok(());
         }
+        self.is_searching = true;
         self.send.send(self.pattern.text.clone())
     }
 
