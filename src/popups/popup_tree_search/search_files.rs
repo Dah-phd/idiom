@@ -3,7 +3,7 @@ use crate::{
     embeded_term::EditorTerminal,
     global_state::{GlobalState, IdiomEvent},
     render::{
-        backend::StyleExt,
+        backend::{BackendProtocol, StyleExt},
         layout::{LineBuilder, Rect, BORDERS},
         state::State,
         TextField,
@@ -16,8 +16,8 @@ use crossterm::style::Color;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use tokio::{
-    sync::mpsc::{Receiver, Sender, UnboundedSender},
-    task::JoinSet,
+    sync::mpsc::{Receiver, UnboundedSender},
+    task::JoinHandle,
 };
 
 const MAX_SEARCH_TIME: Duration = Duration::from_millis(50);
@@ -46,104 +46,7 @@ impl SearchMode {
 enum Message {
     Values(Vec<SearchResult>),
     Reset(Vec<SearchResult>),
-}
-
-struct CachedBuffer {
-    base_search: String,
-    filter: String,
-    base_results: Vec<SearchResult>,
-    tasks: Option<JoinSet<Vec<SearchResult>>>,
-    tree: TreePath,
-}
-
-impl CachedBuffer {
-    fn new(tree: TreePath) -> Self {
-        Self { base_search: String::new(), filter: String::new(), base_results: Vec::new(), tasks: None, tree }
-    }
-
-    fn get(&mut self, mut index: usize) -> Option<SearchResult> {
-        for (remove_index, (_, txt, _)) in self.base_results.iter().enumerate() {
-            if txt.contains(self.filter.as_str()) {
-                if index == 0 {
-                    return Some(self.base_results.remove(remove_index));
-                }
-                index -= 1;
-            }
-        }
-        None
-    }
-
-    fn _rebase_cache(&mut self) {
-        _ = self.tasks.take().map(|mut t| t.abort_all());
-        self.base_results.clear();
-        self.tasks = Some(self.tree.clone().search_files_join_set(self.base_search.to_owned()));
-    }
-
-    fn len(&self) -> usize {
-        if self.filter.is_empty() {
-            return self.base_results.len();
-        }
-        self.base_results.iter().filter(|res| res.1.contains(self.filter.as_str())).count()
-    }
-
-    fn is_empty(&self) -> bool {
-        if self.filter.is_empty() {
-            return self.base_results.is_empty();
-        }
-        !self.base_results.iter().any(|res| res.1.contains(self.filter.as_str()))
-    }
-
-    fn vec(&mut self) -> Vec<SearchResult> {
-        self.flush_results();
-        self.base_results.iter().filter(|res| res.1.contains(self.filter.as_str())).cloned().collect()
-    }
-
-    fn is_running(&self) -> bool {
-        self.tasks.as_ref().map(|t| !t.is_empty()).unwrap_or_default()
-    }
-
-    fn set_search(&mut self, pattern: &str) {
-        if pattern.len() < 2 {
-            _ = self.tasks.take().map(|mut t| t.abort_all());
-            self.base_search.clear();
-            self.base_results.clear();
-            self.filter.clear();
-            return;
-        }
-        if self.base_search.is_empty() || !pattern.starts_with(&self.base_search) {
-            self.base_search = pattern.to_owned();
-            self.filter.clear();
-            self._rebase_cache();
-        } else {
-            self.filter = pattern.to_owned();
-        }
-    }
-
-    fn new_tree(&mut self, tree: TreePath, pattern: &str) {
-        // drop existing tasks
-        _ = self.tasks.take().map(|mut t| t.abort_all());
-        // replace self with clean buffer
-        *self = Self::new(tree);
-        self.set_search(pattern);
-    }
-
-    fn flush_results(&mut self) {
-        let Some(tasks) = self.tasks.as_mut() else { return };
-        if tasks.is_empty() {
-            self.tasks = None;
-            return;
-        }
-        let start = Instant::now();
-        loop {
-            if start.elapsed() > MAX_SEARCH_TIME {
-                return;
-            }
-            let Some(result) = tasks.try_join_next() else { return };
-            if let Ok(data) = result {
-                self.base_results.extend(data);
-            }
-        }
-    }
+    Finished,
 }
 
 pub struct ActiveFileSearch {
@@ -151,60 +54,43 @@ pub struct ActiveFileSearch {
     state: State,
     mode: SearchMode,
     pattern: TextField<bool>,
+    is_searching: bool,
     send: UnboundedSender<String>,
     recv: Receiver<Message>,
-    _join_handle: tokio::task::JoinHandle<()>,
+    task: JoinHandle<()>,
 }
 
 impl ActiveFileSearch {
     pub fn run(pattern: String, gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
-        let path_tree = tree.shallow_copy_selected_tree_path();
-        // let mut buffer = CachedBuffer::new(path_tree);
-        // if pattern.len() >= 2 {
-        //     buffer.set_search(&pattern);
-        // }
-
-        let (send_result, recv) = tokio::sync::mpsc::channel::<Message>(20);
-        let (send, mut recv_request) = tokio::sync::mpsc::unbounded_channel::<String>();
+        let (task, send, recv) = create_async_tree_search_task(tree.shallow_copy_selected_tree_path());
 
         let mut new = Self {
             options: vec![],
+            is_searching: false,
             mode: FILE_SEARCH_TITLE,
             state: State::default(),
             pattern: TextField::new(pattern, Some(true)),
             send,
             recv,
-            _join_handle: tokio::task::spawn(async move {
-                while let Some(pattern) = recv_request.recv().await {
-                    let mut results = path_tree.clone().search_files_join_set(pattern);
-                    let Some(Ok(first_msg)) = results.join_next().await else {
-                        continue;
-                    };
-                    if send_result.send(Message::Reset(first_msg)).await.is_err() {
-                        return;
-                    };
-                    while let Some(Ok(msg)) = results.join_next().await {
-                        if !recv_request.is_empty() {
-                            break;
-                        }
-                        if send_result.send(Message::Values(msg)).await.is_err() {
-                            return;
-                        };
-                    }
-                }
-            }),
+            task,
         };
 
-        if new.pattern.text.len() > 1 {
-            new.collect_data();
-        }
+        if let Err(error) = new.collect_data() {
+            gs.error(error);
+            return;
+        };
 
         new.run(gs, ws, tree, term);
     }
 
-    fn collect_data(&mut self) {
+    fn collect_data(&mut self) -> Result<(), tokio::sync::mpsc::error::SendError<String>> {
+        self.options.clear();
         self.state.reset();
-        self.send.send(self.pattern.text.clone());
+        self.is_searching = true;
+        if self.pattern.text.len() <= 2 {
+            return Ok(());
+        }
+        self.send.send(self.pattern.text.clone())
     }
 
     fn get_rect(gs: &GlobalState) -> Rect {
@@ -231,22 +117,24 @@ impl Popup for ActiveFileSearch {
         let mut rect = Self::get_rect(gs);
         let accent_style = gs.theme.accent_style.with_fg(self.mode.fg_color);
         let backend = gs.backend();
+        backend.freeze();
         rect.draw_borders(None, None, backend);
         rect.border_title_styled(self.mode.title, accent_style, backend);
         let Some(line) = rect.next_line() else { return };
-        self.pattern.widget(line, backend);
+        self.pattern.widget_with_count(line, self.options.len(), backend);
         let Some(line) = rect.next_line() else { return };
         line.fill(BORDERS.horizontal_top, backend);
 
         if self.options.is_empty() {
-            // if self.buffer.is_running() {
-            // self.state.render_list(["Searching ..."].into_iter(), rect, backend);
-            // } else {
-            self.state.render_list(["No results found!"].into_iter(), rect, backend);
-            // }
+            if self.is_searching {
+                self.state.render_list(["Searching ..."].into_iter(), rect, backend);
+            } else {
+                self.state.render_list(["No results found!"].into_iter(), rect, backend);
+            }
         } else {
             self.state.render_list_complex(&self.options, &[build_path_line, build_text_line], rect, backend);
         }
+        backend.unfreeze();
     }
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
@@ -254,7 +142,10 @@ impl Popup for ActiveFileSearch {
 
         if let Some(updated) = self.pattern.map(&key, &mut gs.clipboard) {
             if updated {
-                self.collect_data();
+                if let Err(error) = self.collect_data() {
+                    gs.error(error);
+                    return Status::Dropped;
+                }
             }
             self.force_render(gs);
             return Status::Pending;
@@ -267,29 +158,15 @@ impl Popup for ActiveFileSearch {
                     return Status::Dropped;
                 }
                 self.mode = FULL_SEARCH_TITLE;
-                let (send_result, recv) = tokio::sync::mpsc::channel::<Message>(20);
-                let (send, mut recv_request) = tokio::sync::mpsc::unbounded_channel::<String>();
-                let path_tree = tree.shallow_copy_root_tree_path();
-                self._join_handle = tokio::task::spawn(async move {
-                    while let Some(pattern) = recv_request.recv().await {
-                        let mut results = path_tree.clone().search_files_join_set(pattern);
-                        let Some(Ok(first_msg)) = results.join_next().await else {
-                            continue;
-                        };
-                        if send_result.send(Message::Reset(first_msg)).await.is_err() {
-                            return;
-                        };
-                        while let Some(Ok(msg)) = results.join_next().await {
-                            if !recv_request.is_empty() {
-                                break;
-                            }
-                            if send_result.send(Message::Values(msg)).await.is_err() {
-                                return;
-                            };
-                        }
-                    }
-                });
-                self.collect_data();
+                self.task.abort();
+                let (task, send, recv) = create_async_tree_search_task(tree.shallow_copy_root_tree_path());
+                self.task = task;
+                self.send = send;
+                self.recv = recv;
+                if let Err(error) = self.collect_data() {
+                    gs.error(error);
+                    return Status::Dropped;
+                };
             }
             KeyCode::Enter => {
                 let (path, _, line) = self.options.remove(self.state.selected);
@@ -333,6 +210,7 @@ impl Popup for ActiveFileSearch {
             match msg {
                 Message::Reset(new_data) => self.options = new_data,
                 Message::Values(new_data) => self.options.extend(new_data),
+                Message::Finished => self.is_searching = false,
             }
             if now.elapsed() >= MAX_SEARCH_TIME {
                 break;
@@ -347,11 +225,64 @@ impl Popup for ActiveFileSearch {
 
     fn paste_passthrough(&mut self, clip: String, _: &mut Components) -> bool {
         if self.pattern.paste_passthrough(clip) {
-            self.collect_data();
+            _ = self.collect_data();
             return true;
         }
         false
     }
+}
+
+fn create_async_tree_search_task(tree: TreePath) -> (JoinHandle<()>, UnboundedSender<String>, Receiver<Message>) {
+    let (send_results, recv) = tokio::sync::mpsc::channel::<Message>(20);
+    let (send, mut recv_requests) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let task = tokio::task::spawn(async move {
+        let mut cache = (vec![], String::new());
+        while let Some(pattern) = recv_requests.recv().await {
+            if !cache.0.is_empty() && pattern.starts_with(cache.1.as_str()) {
+                if send_results
+                    .send(Message::Reset(
+                        cache.0.iter().filter(|sr: &&SearchResult| sr.1.contains(pattern.as_str())).cloned().collect(),
+                    ))
+                    .await
+                    .is_err()
+                {
+                    return;
+                };
+                if send_results.send(Message::Finished).await.is_err() {
+                    return;
+                }
+                continue;
+            }
+
+            let mut buffer = vec![];
+            let mut results = tree.clone().search_files_join_set(pattern.to_owned());
+
+            let Some(Ok(first_msg)) = results.join_next().await else {
+                continue;
+            };
+            buffer.extend(first_msg.iter().cloned());
+            if send_results.send(Message::Reset(first_msg)).await.is_err() {
+                return;
+            };
+
+            while let Some(Ok(msg)) = results.join_next().await {
+                if !recv_requests.is_empty() {
+                    break;
+                }
+                buffer.extend(msg.iter().cloned());
+                if send_results.send(Message::Values(msg)).await.is_err() {
+                    return;
+                };
+            }
+
+            if send_results.send(Message::Finished).await.is_err() {
+                return;
+            }
+
+            cache = (buffer, pattern);
+        }
+    });
+    (task, send, recv)
 }
 
 fn build_path_line((path, ..): &SearchResult, mut builder: LineBuilder) {

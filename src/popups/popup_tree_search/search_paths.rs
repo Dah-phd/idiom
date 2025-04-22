@@ -87,7 +87,7 @@ impl Popup for ActivePathSearch {
         rect.border_title_styled(PATH_SEARCH_TITLE, accent_style, backend);
 
         let Some(line) = rect.next_line() else { return };
-        self.pattern.widget(line, backend);
+        self.pattern.widget_with_count(line, self.options.len(), backend);
         let Some(line) = rect.next_line() else { return };
         line.fill(BORDERS.horizontal_top, backend);
 
