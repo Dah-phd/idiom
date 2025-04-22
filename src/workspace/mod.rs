@@ -444,12 +444,6 @@ impl Workspace {
             }
         }
     }
-
-    pub async fn graceful_exit(&mut self) {
-        for (_, lsp) in self.lsp_servers.iter_mut() {
-            let _ = lsp.graceful_exit().await;
-        }
-    }
 }
 
 /// handels keybindings for editor

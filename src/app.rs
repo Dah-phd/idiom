@@ -85,7 +85,6 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                     if workspace.are_updates_saved(&mut gs)
                                         || save_and_exit_popup(&mut gs, &mut workspace, &mut tree, &mut term)
                                     {
-                                        workspace.graceful_exit().await;
                                         return Ok(());
                                     };
                                 }
