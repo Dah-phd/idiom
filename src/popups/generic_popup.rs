@@ -16,25 +16,25 @@ use crossterm::{
 use std::ops::Range;
 
 #[derive(Clone, PartialEq)]
-pub struct CommandButton<T> {
-    pub command: fn(&mut PopupChoice<T>, &mut Components) -> T,
+pub struct CommandButton {
+    pub command: fn(&mut PopupChoice, &mut Components),
     pub name: &'static str,
     pub key: Option<Vec<KeyCode>>,
 }
 
-impl<T> std::fmt::Debug for CommandButton<T> {
+impl std::fmt::Debug for CommandButton {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("").field(&self.name).finish()
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct PopupChoice<T> {
+pub struct PopupChoice {
     pub message: String,
     title_prefix: Option<&'static str>,
     title: String,
     message_as_buffer_builder: Option<fn(char) -> Option<char>>,
-    buttons: Vec<CommandButton<T>>,
+    buttons: Vec<CommandButton>,
     button_line: u16,
     button_ranges: Vec<Range<u16>>,
     size: (u16, usize),
@@ -42,7 +42,7 @@ pub struct PopupChoice<T> {
     updated: bool,
 }
 
-impl<T> PopupChoice<T> {
+impl PopupChoice {
     fn mark_as_updated(&mut self) {
         self.updated = true;
     }
@@ -52,8 +52,8 @@ impl<T> PopupChoice<T> {
     }
 }
 
-impl<T> Popup for PopupChoice<T> {
-    type R = T;
+impl Popup for PopupChoice {
+    type R = ();
 
     fn render(&mut self, gs: &mut GlobalState) {
         if self.collect_update_status() {
@@ -85,7 +85,8 @@ impl<T> Popup for PopupChoice<T> {
         if let Some(button) =
             self.buttons.iter().find(|button| matches!(&button.key, Some(key_code) if key_code.contains(&key.code)))
         {
-            return Status::Result((button.command)(self, components));
+            (button.command)(self, components);
+            return Status::Result(());
         }
         match key.code {
             KeyCode::Char(ch) if self.message_as_buffer_builder.is_some() => {
@@ -98,7 +99,10 @@ impl<T> Popup for PopupChoice<T> {
             KeyCode::Backspace if self.message_as_buffer_builder.is_some() => {
                 self.message.pop();
             }
-            KeyCode::Enter => return Status::Result((self.buttons[self.state].command)(self, components)),
+            KeyCode::Enter => {
+                (self.buttons[self.state].command)(self, components);
+                return Status::Result(());
+            }
             KeyCode::Left => {
                 self.prev();
             }
@@ -114,7 +118,8 @@ impl<T> Popup for PopupChoice<T> {
         match event {
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } if row == self.button_line => {
                 if let Some(position) = self.button_ranges.iter().position(|btn_range| btn_range.contains(&column)) {
-                    return Status::Result((self.buttons[position].command)(self, components));
+                    (self.buttons[position].command)(self, components);
+                    return Status::Result(());
                 }
             }
             MouseEvent { kind: MouseEventKind::Moved, column, row, .. } if row == self.button_line => {
@@ -141,13 +146,13 @@ impl<T> Popup for PopupChoice<T> {
     }
 }
 
-impl<T> PopupChoice<T> {
+impl PopupChoice {
     pub fn new(
         message: String,
         title_prefix: Option<&'static str>,
         title: Option<String>,
         message_as_buffer_builder: Option<fn(char) -> Option<char>>,
-        buttons: Vec<CommandButton<T>>,
+        buttons: Vec<CommandButton>,
         size: Option<(u16, usize)>,
     ) -> Self {
         let size = size.unwrap_or((6, 40));

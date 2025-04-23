@@ -23,15 +23,15 @@ fn location_with_display(loc: Location) -> (String, PathBuf, Range) {
     (format!("{} ({})", path.display(), range.start.line + 1), path, range)
 }
 
-pub fn create_file_popup(path: PathBuf) -> PopupChoice<IdiomEvent> {
+pub fn create_file_popup(path: PathBuf) -> PopupChoice {
     let buttons = vec![
         CommandButton {
-            command: |p, _| IdiomEvent::CreateFileOrFolder { name: p.message.to_owned(), from_base: false },
+            command: |p, c| c.event(IdiomEvent::CreateFileOrFolder { name: p.message.to_owned(), from_base: false }),
             name: "Create",
             key: None,
         },
         CommandButton {
-            command: |p, _| IdiomEvent::CreateFileOrFolder { name: p.message.to_owned(), from_base: true },
+            command: |p, c| c.event(IdiomEvent::CreateFileOrFolder { name: p.message.to_owned(), from_base: true }),
             name: "Create in ./",
             key: None,
         },
@@ -46,23 +46,29 @@ pub fn create_file_popup(path: PathBuf) -> PopupChoice<IdiomEvent> {
     )
 }
 
-pub fn create_root_file_popup() -> PopupChoice<IdiomEvent> {
+pub fn create_root_file_popup() -> PopupChoice {
     let buttons = vec![CommandButton {
-        command: |p, _| IdiomEvent::CreateFileOrFolder { name: std::mem::take(&mut p.message), from_base: true },
+        command: |p, c| {
+            c.event(IdiomEvent::CreateFileOrFolder { name: std::mem::take(&mut p.message), from_base: true })
+        },
         name: "Create",
         key: None,
     }];
     PopupChoice::new(String::new(), Some("New in root dir"), None, Some(Some), buttons, Some((4, 40)))
 }
 
-pub fn rename_file_popup(path: String) -> PopupChoice<IdiomEvent> {
+pub fn rename_file_popup(path: String) -> PopupChoice {
     let message = path.split(std::path::MAIN_SEPARATOR).next_back().map(ToOwned::to_owned).unwrap_or_default();
     PopupChoice::new(
         message,
         Some("Rename: "),
         Some(path),
         Some(Some),
-        vec![CommandButton { command: |p, _| IdiomEvent::RenameFile(p.message.to_owned()), name: "Rename", key: None }],
+        vec![CommandButton {
+            command: |p, c| c.event(IdiomEvent::RenameFile(p.message.to_owned())),
+            name: "Rename",
+            key: None,
+        }],
         Some((4, 40)),
     )
 }

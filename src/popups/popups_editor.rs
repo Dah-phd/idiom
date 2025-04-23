@@ -20,7 +20,7 @@ pub fn selector_editors(options: Vec<String>) -> PopupSelector<String> {
     )
 }
 
-pub fn file_updated(path: PathBuf) -> PopupChoice<IdiomEvent> {
+pub fn file_updated(path: PathBuf) -> PopupChoice {
     PopupChoice::new(
         "File updated! (Use cancel/close to do nothing)".into(),
         None,
@@ -28,12 +28,12 @@ pub fn file_updated(path: PathBuf) -> PopupChoice<IdiomEvent> {
         None,
         vec![
             CommandButton {
-                command: |_, _| IdiomEvent::Save,
+                command: |_, c| c.gs.event.push(IdiomEvent::Save),
                 name: "Overwrite (S)",
                 key: Some(vec![KeyCode::Char('s'), KeyCode::Char('S')]),
             },
             CommandButton {
-                command: |_, _| IdiomEvent::Rebase,
+                command: |_, c| c.gs.event.push(IdiomEvent::Rebase),
                 name: "Rebase (L)",
                 key: Some(vec![KeyCode::Char('l'), KeyCode::Char('L')]),
             },

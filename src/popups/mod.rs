@@ -49,6 +49,10 @@ impl Components<'_> {
         self.gs.draw(self.ws, self.tree, self.term);
         self.gs.force_screen_rebuild();
     }
+
+    pub fn event(&mut self, event: IdiomEvent) {
+        self.gs.event.push(event);
+    }
 }
 
 pub trait Popup {

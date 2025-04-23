@@ -15,7 +15,7 @@ use std::path::PathBuf;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum StartInplacePopup {
-    Pop(PopupChoice<IdiomEvent>),
+    Pop(PopupChoice),
     RefSelector(PopupSelector<(String, PathBuf, Range)>),
     Mesasge(PopupSelector<String>),
 }
@@ -68,9 +68,7 @@ impl IdiomEvent {
             }
             IdiomEvent::InplacePopup(pop) => match pop {
                 StartInplacePopup::Pop(mut popup) => {
-                    if let Some(event) = popup.run(gs, ws, tree, term) {
-                        gs.event.push(event)
-                    }
+                    popup.run(gs, ws, tree, term);
                 }
                 StartInplacePopup::RefSelector(mut popup) => {
                     popup.run(gs, ws, tree, term);
@@ -234,8 +232,8 @@ impl IdiomEvent {
     }
 }
 
-impl From<PopupChoice<IdiomEvent>> for IdiomEvent {
-    fn from(value: PopupChoice<IdiomEvent>) -> Self {
+impl From<PopupChoice> for IdiomEvent {
+    fn from(value: PopupChoice) -> Self {
         IdiomEvent::InplacePopup(StartInplacePopup::Pop(value))
     }
 }
