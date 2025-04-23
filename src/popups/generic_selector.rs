@@ -13,16 +13,16 @@ use crossterm::{
 };
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct PopupSelector<T, R> {
+pub struct PopupSelector<T> {
     pub options: Vec<T>,
     pub state: State,
     display: fn(&T, Line, &mut Backend),
-    command: fn(&mut PopupSelector<T, R>, &mut Components) -> R,
+    command: fn(&mut PopupSelector<T>, &mut Components),
     size: (u16, usize),
 }
 
-impl<T, R> Popup for PopupSelector<T, R> {
-    type R = R;
+impl<T> Popup for PopupSelector<T> {
+    type R = ();
 
     fn force_render(&mut self, gs: &mut GlobalState) {
         let mut rect = self.get_rect(gs);
@@ -57,7 +57,12 @@ impl<T, R> Popup for PopupSelector<T, R> {
             return Status::Dropped;
         }
         match key.code {
-            KeyCode::Enter => return Status::Result((self.command)(self, components)),
+            KeyCode::Enter => {
+                return {
+                    (self.command)(self, components);
+                    Status::Result(())
+                }
+            }
             KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
                 self.state.prev(self.options.len());
                 self.force_render(components.gs);
@@ -80,7 +85,10 @@ impl<T, R> Popup for PopupSelector<T, R> {
                         return Status::Pending;
                     }
                     self.state.select(option_idx, self.options.len());
-                    return Status::Result((self.command)(self, components));
+                    return {
+                        (self.command)(self, components);
+                        Status::Result(())
+                    };
                 }
             }
             MouseEvent { kind: MouseEventKind::Moved, row, column, .. } => {
@@ -113,11 +121,11 @@ impl<T, R> Popup for PopupSelector<T, R> {
     fn render(&mut self, _: &mut GlobalState) {}
 }
 
-impl<T, R> PopupSelector<T, R> {
+impl<T> PopupSelector<T> {
     pub fn new(
         options: Vec<T>,
         display: fn(&T, Line, &mut Backend),
-        command: fn(&mut PopupSelector<T, R>, &mut Components) -> R,
+        command: fn(&mut PopupSelector<T>, &mut Components),
         size: Option<(u16, usize)>,
     ) -> Self {
         let size = size.unwrap_or((20, 120));
@@ -130,7 +138,7 @@ impl<T, R> PopupSelector<T, R> {
     }
 }
 
-impl PopupSelector<String, ()> {
+impl PopupSelector<String> {
     pub fn message_list<T: ToString>(list: Vec<T>) -> Self {
         let options = list.into_iter().map(|el| el.to_string()).collect();
         Self {

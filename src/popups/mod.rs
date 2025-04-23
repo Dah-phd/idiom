@@ -86,8 +86,6 @@ pub trait Popup {
                         };
                         components.re_draw();
                         self.force_render(components.gs);
-                        // executed when finish
-                        components.gs.force_screen_rebuild();
                     }
                     Event::Paste(clip) => {
                         if self.paste_passthrough(clip, &mut components) {

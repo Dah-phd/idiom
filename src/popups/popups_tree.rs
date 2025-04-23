@@ -4,7 +4,7 @@ use crate::global_state::IdiomEvent;
 use lsp_types::{Location, Range};
 use std::path::PathBuf;
 
-pub fn refrence_selector(locations: Vec<Location>) -> PopupSelector<(String, PathBuf, Range), ()> {
+pub fn refrence_selector(locations: Vec<Location>) -> PopupSelector<(String, PathBuf, Range)> {
     PopupSelector::new(
         locations.into_iter().map(location_with_display).collect(),
         |(display, ..), line, backend| line.render(display, backend),

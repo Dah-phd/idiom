@@ -5,7 +5,7 @@ use crate::global_state::IdiomEvent;
 use crossterm::event::KeyCode;
 use std::path::PathBuf;
 
-pub fn selector_editors(options: Vec<String>) -> PopupSelector<String, ()> {
+pub fn selector_editors(options: Vec<String>) -> PopupSelector<String> {
     PopupSelector::new(
         options,
         |editor, line, backend| line.render(editor, backend),

@@ -16,8 +16,8 @@ use std::path::PathBuf;
 #[derive(PartialEq, Debug, Clone)]
 pub enum StartInplacePopup {
     Pop(PopupChoice<IdiomEvent>),
-    RefSelector(PopupSelector<(String, PathBuf, Range), ()>),
-    Mesasge(PopupSelector<String, ()>),
+    RefSelector(PopupSelector<(String, PathBuf, Range)>),
+    Mesasge(PopupSelector<String>),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -282,14 +282,14 @@ impl TryFrom<GotoDeclarationResponse> for IdiomEvent {
     }
 }
 
-impl From<PopupSelector<String, ()>> for IdiomEvent {
-    fn from(value: PopupSelector<String, ()>) -> Self {
+impl From<PopupSelector<String>> for IdiomEvent {
+    fn from(value: PopupSelector<String>) -> Self {
         IdiomEvent::InplacePopup(StartInplacePopup::Mesasge(value))
     }
 }
 
-impl From<PopupSelector<(String, PathBuf, Range), ()>> for IdiomEvent {
-    fn from(value: PopupSelector<(String, PathBuf, Range), ()>) -> Self {
+impl From<PopupSelector<(String, PathBuf, Range)>> for IdiomEvent {
+    fn from(value: PopupSelector<(String, PathBuf, Range)>) -> Self {
         IdiomEvent::InplacePopup(StartInplacePopup::RefSelector(value))
     }
 }
