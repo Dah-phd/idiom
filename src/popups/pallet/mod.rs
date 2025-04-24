@@ -18,8 +18,6 @@ pub struct Pallet {
 }
 
 impl Popup for Pallet {
-    type R = ();
-
     fn force_render(&mut self, gs: &mut GlobalState) {
         let mut rect = Self::get_rect(gs);
         let backend = gs.backend();
@@ -32,11 +30,11 @@ impl Popup for Pallet {
         self.state.render_list(options, rect, backend);
     }
 
-    fn map_keyboard(&mut self, key: KeyEvent, components: &mut super::Components) -> super::Status<Self::R> {
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut super::Components) -> Status {
         let Components { gs, ws, tree, term } = components;
 
         if self.commands.is_empty() {
-            return Status::Dropped;
+            return Status::Finished;
         }
 
         if let Some(updated) = self.pattern.map(&key, &mut gs.clipboard) {
@@ -59,7 +57,7 @@ impl Popup for Pallet {
                     CommandResult::Complex(cb) => cb(ws, tree),
                     CommandResult::BigCB(cb) => cb(gs, ws, tree, term),
                 }
-                return Status::Dropped;
+                return Status::Finished;
             }
             KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
                 self.state.prev(self.commands.len());
@@ -73,7 +71,7 @@ impl Popup for Pallet {
         Status::Pending
     }
 
-    fn map_mouse(&mut self, event: MouseEvent, components: &mut super::Components) -> super::Status<Self::R> {
+    fn map_mouse(&mut self, event: MouseEvent, components: &mut super::Components) -> Status {
         let Components { gs, ws, tree, term } = components;
 
         match event {
@@ -90,7 +88,7 @@ impl Popup for Pallet {
                         CommandResult::Complex(cb) => (cb)(ws, tree),
                         CommandResult::BigCB(cb) => cb(gs, ws, tree, term),
                     };
-                    return Status::Dropped;
+                    return Status::Finished;
                 }
             }
             MouseEvent { kind: MouseEventKind::ScrollUp, .. } => {
@@ -149,7 +147,9 @@ impl Pallet {
 
     #[inline]
     pub fn run(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
-        Pallet::new().run(gs, ws, tree, term);
+        if let Err(error) = Pallet::new().run(gs, ws, tree, term) {
+            gs.error(error);
+        };
     }
 
     #[inline]

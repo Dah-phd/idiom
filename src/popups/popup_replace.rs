@@ -31,7 +31,8 @@ impl ReplacePopup {
         if rect.height < 2 {
             return;
         }
-        Self {
+
+        let mut popup: ReplacePopup = Self {
             rect,
             accent: gs.theme.accent_style,
             on_text: false,
@@ -39,8 +40,11 @@ impl ReplacePopup {
             pattern: TextField::new(String::new(), Some(true)),
             new_text: TextField::new(String::new(), Some(true)),
             state: usize::default(),
+        };
+
+        if let Err(error) = popup.run(gs, workspace, tree, term) {
+            gs.error(error);
         }
-        .run(gs, workspace, tree, term);
     }
 
     pub fn from_search(
@@ -78,13 +82,11 @@ impl ReplacePopup {
 }
 
 impl Popup for ReplacePopup {
-    type R = ();
-
-    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         let Components { gs, ws, .. } = components;
 
         let Some(editor) = ws.get_active() else {
-            return Status::Dropped;
+            return Status::Finished;
         };
 
         match key.code {
@@ -110,7 +112,7 @@ impl Popup for ReplacePopup {
                     let ranges = std::mem::take(&mut self.options.clone());
                     editor.mass_replace(ranges, clip);
                 }
-                return Status::Dropped;
+                return Status::Finished;
             }
             KeyCode::Tab => {
                 self.on_text = !self.on_text;
@@ -147,7 +149,7 @@ impl Popup for ReplacePopup {
         Status::Pending
     }
 
-    fn map_mouse(&mut self, _: crossterm::event::MouseEvent, _: &mut Components) -> Status<Self::R> {
+    fn map_mouse(&mut self, _: crossterm::event::MouseEvent, _: &mut Components) -> Status {
         Status::Pending
     }
 

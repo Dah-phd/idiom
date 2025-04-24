@@ -67,8 +67,6 @@ pub struct ContextMenu<const N: usize> {
 }
 
 impl<const N: usize> Popup for ContextMenu<N> {
-    type R = ();
-
     fn force_render(&mut self, gs: &mut GlobalState) {
         let backend = gs.backend();
         let reset_style = backend.get_style();
@@ -77,7 +75,7 @@ impl<const N: usize> Popup for ContextMenu<N> {
         backend.set_style(reset_style);
     }
 
-    fn map_keyboard(&mut self, key: KeyEvent, components: &mut super::Components) -> Status<Self::R> {
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut super::Components) -> Status {
         let Components { gs, ws, tree, .. } = components;
         match key {
             KeyEvent { code: KeyCode::Up, .. } => self.state.prev(N),
@@ -93,7 +91,7 @@ impl<const N: usize> Popup for ContextMenu<N> {
                         }
                     }
                 };
-                return Status::Dropped;
+                return Status::Finished;
             }
             _ => return Status::Pending,
         }
@@ -101,7 +99,7 @@ impl<const N: usize> Popup for ContextMenu<N> {
         Status::Pending
     }
 
-    fn map_mouse(&mut self, event: MouseEvent, components: &mut super::Components) -> Status<Self::R> {
+    fn map_mouse(&mut self, event: MouseEvent, components: &mut super::Components) -> Status {
         let Components { gs, ws, tree, .. } = components;
         match event.kind {
             MouseEventKind::Moved => {
@@ -126,7 +124,7 @@ impl<const N: usize> Popup for ContextMenu<N> {
                         }
                     }
                 }
-                return Status::Dropped;
+                return Status::Finished;
             }
             _ => (),
         }

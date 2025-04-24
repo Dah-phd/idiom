@@ -140,14 +140,20 @@ pub fn mouse_handler(
                 if let Some(editor) = ws.get_active() {
                     editor.mouse_menu_setup(position);
                     let accent_style = gs.theme.accent_style;
-                    menu_context_editor_inplace(position, gs.editor_area, accent_style).run(gs, ws, tree, term);
+                    let mut context_menu = menu_context_editor_inplace(position, gs.editor_area, accent_style);
+                    if let Err(error) = context_menu.run(gs, ws, tree, term) {
+                        gs.error(error);
+                    };
                 }
             }
             if let Some(mut position) = gs.tree_area.relative_position(event.row, event.column) {
                 position.line += 1;
                 if tree.mouse_menu_setup_select(position.line) {
                     let accent_style = gs.theme.accent_style.reverse();
-                    menu_context_tree_inplace(position, gs.screen_rect, accent_style).run(gs, ws, tree, term);
+                    let mut context_menu = menu_context_tree_inplace(position, gs.screen_rect, accent_style);
+                    if let Err(error) = context_menu.run(gs, ws, tree, term) {
+                        gs.error(error);
+                    };
                 }
             }
         }

@@ -29,11 +29,10 @@ use crossterm::{
     style::{Color, ContentStyle},
 };
 use dirs::config_dir;
-pub use generic_popup::{save_and_exit_popup, PopupChoice};
+pub use generic_popup::{should_save_and_exit, PopupChoice};
 
-pub enum Status<T> {
-    Result(T),
-    Dropped,
+pub enum Status {
+    Finished,
     Pending,
 }
 
@@ -56,37 +55,33 @@ impl Components<'_> {
 }
 
 pub trait Popup {
-    type R;
-
     fn run(
         &mut self,
         gs: &mut GlobalState,
         ws: &mut Workspace,
         tree: &mut Tree,
         term: &mut EditorTerminal,
-    ) -> Option<Self::R> {
+    ) -> IdiomResult<()> {
         // executed when finish
         let mut components = Components { gs, ws, tree, term };
         components.re_draw();
         self.force_render(components.gs);
         loop {
-            if crossterm::event::poll(MIN_FRAMERATE).ok()? {
-                match crossterm::event::read().ok()? {
+            if crossterm::event::poll(MIN_FRAMERATE)? {
+                match crossterm::event::read()? {
                     Event::Key(key) => match self.map_key(key, &mut components) {
-                        Status::Result(value) => return Some(value),
-                        Status::Dropped => return None,
+                        Status::Finished => return Ok(()),
                         Status::Pending => (),
                     },
                     Event::Mouse(event) => match self.map_mouse(event, &mut components) {
-                        Status::Result(value) => return Some(value),
-                        Status::Dropped => return None,
+                        Status::Finished => return Ok(()),
                         Status::Pending => (),
                     },
                     Event::Resize(width, height) => {
                         let (width, height) = checked_new_screen_size(width, height, components.gs.backend());
                         components.gs.full_resize(height, width);
                         if !self.resize_success(components.gs) {
-                            return None;
+                            return Ok(());
                         };
                         components.re_draw();
                         self.force_render(components.gs);
@@ -108,11 +103,11 @@ pub trait Popup {
         false
     }
 
-    fn map_key(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
+    fn map_key(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         match key {
-            KeyEvent { code: KeyCode::Char('d' | 'D'), modifiers: KeyModifiers::CONTROL, .. } => Status::Dropped,
-            KeyEvent { code: KeyCode::Char('q' | 'Q'), modifiers: KeyModifiers::CONTROL, .. } => Status::Dropped,
-            KeyEvent { code: KeyCode::Esc, .. } => Status::Dropped,
+            KeyEvent { code: KeyCode::Char('d' | 'D'), modifiers: KeyModifiers::CONTROL, .. } => Status::Finished,
+            KeyEvent { code: KeyCode::Char('q' | 'Q'), modifiers: KeyModifiers::CONTROL, .. } => Status::Finished,
+            KeyEvent { code: KeyCode::Esc, .. } => Status::Finished,
             _ => self.map_keyboard(key, components),
         }
     }
@@ -120,8 +115,8 @@ pub trait Popup {
     fn render(&mut self, gs: &mut GlobalState);
     fn force_render(&mut self, gs: &mut GlobalState);
     fn resize_success(&mut self, gs: &mut GlobalState) -> bool;
-    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R>;
-    fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status<Self::R>;
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status;
+    fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status;
 }
 
 struct Command {

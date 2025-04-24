@@ -33,7 +33,7 @@ pub struct ActivePathSearch {
 
 impl ActivePathSearch {
     pub fn run(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
-        Self {
+        let mut popup = Self {
             options: Vec::new(),
             options_buffer: Arc::default(),
             clock: None,
@@ -41,8 +41,10 @@ impl ActivePathSearch {
             pattern: TextField::new(String::new(), Some(true)),
             join_handle: None,
             tree: tree.shallow_copy_root_tree_path(),
-        }
-        .run(gs, ws, tree, term);
+        };
+        if let Err(error) = popup.run(gs, ws, tree, term) {
+            gs.error(error);
+        };
     }
 
     fn collect_data(&mut self) {
@@ -77,8 +79,6 @@ impl ActivePathSearch {
 }
 
 impl Popup for ActivePathSearch {
-    type R = ();
-
     fn force_render(&mut self, gs: &mut GlobalState) {
         let mut rect = Self::get_rect(gs);
         let accent_style = gs.theme.accent_style.with_fg(Color::Blue);
@@ -110,7 +110,7 @@ impl Popup for ActivePathSearch {
         };
     }
 
-    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         let Components { gs, .. } = components;
         if let Some(update) = self.pattern.map(&key, &mut gs.clipboard) {
             if update {
@@ -124,13 +124,13 @@ impl Popup for ActivePathSearch {
             KeyCode::Down => self.state.next(self.options.len()),
             KeyCode::Tab => {
                 gs.event.push(IdiomEvent::SearchFiles(self.pattern.text.to_owned()));
-                return Status::Dropped;
+                return Status::Finished;
             }
             KeyCode::Enter => {
                 if self.options.len() > self.state.selected {
                     gs.event.push(IdiomEvent::OpenAtLine(self.options.remove(self.state.selected), 0));
                 }
-                return Status::Dropped;
+                return Status::Finished;
             }
             _ => return Status::Pending,
         }
@@ -138,7 +138,7 @@ impl Popup for ActivePathSearch {
         Status::Pending
     }
 
-    fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status<Self::R> {
+    fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status {
         let Components { gs, .. } = components;
         match event {
             MouseEvent { kind: MouseEventKind::Moved, column, row, .. } => match self.get_option_idx(row, column, gs) {
@@ -148,7 +148,7 @@ impl Popup for ActivePathSearch {
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } => {
                 if let Some(index) = self.get_option_idx(row, column, gs) {
                     gs.event.push(IdiomEvent::OpenAtLine(self.options.remove(index), 0));
-                    return Status::Dropped;
+                    return Status::Finished;
                 }
             }
             MouseEvent { kind: MouseEventKind::ScrollUp, .. } => self.state.prev(self.options.len()),

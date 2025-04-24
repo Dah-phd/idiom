@@ -28,7 +28,9 @@ impl OpenFileSelector {
         let pattern = TextField::new(text, Some(true));
         let mut new = Self { pattern, state: State::new(), paths: vec![] };
         new.solve_comletions();
-        new.run(gs, ws, tree, term);
+        if let Err(error) = new.run(gs, ws, tree, term) {
+            gs.error(error);
+        };
     }
 
     fn solve_comletions(&mut self) {
@@ -76,8 +78,6 @@ impl OpenFileSelector {
 }
 
 impl Popup for OpenFileSelector {
-    type R = ();
-
     fn force_render(&mut self, gs: &mut crate::global_state::GlobalState) {
         let mut rect = Self::get_rect(gs);
         let backend = gs.backend();
@@ -96,7 +96,7 @@ impl Popup for OpenFileSelector {
         };
     }
 
-    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         let Components { gs, .. } = components;
 
         if self.state.selected != 0 {
@@ -130,7 +130,7 @@ impl Popup for OpenFileSelector {
                 let path = PathBuf::from(&self.pattern.text);
                 if path.is_file() {
                     gs.event.push(IdiomEvent::OpenAtLine(PathBuf::from(self.pattern.text.as_str()), 0));
-                    return Status::Dropped;
+                    return Status::Finished;
                 }
                 self.resolve_completion();
             }
@@ -140,7 +140,7 @@ impl Popup for OpenFileSelector {
         Status::Pending
     }
 
-    fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status<Self::R> {
+    fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status {
         let Components { gs, .. } = components;
 
         let (row, column) = match event {
@@ -171,7 +171,7 @@ impl Popup for OpenFileSelector {
         let path = PathBuf::from(&text);
         if path.is_file() {
             gs.event.push(IdiomEvent::OpenAtLine(path, 0));
-            return Status::Dropped;
+            return Status::Finished;
         }
         if path.is_dir() && !text.ends_with(MAIN_SEPARATOR) {
             text.push(MAIN_SEPARATOR);

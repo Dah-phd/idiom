@@ -53,8 +53,6 @@ impl PopupChoice {
 }
 
 impl Popup for PopupChoice {
-    type R = ();
-
     fn render(&mut self, gs: &mut GlobalState) {
         if self.collect_update_status() {
             self.force_render(gs);
@@ -80,13 +78,13 @@ impl Popup for PopupChoice {
         }
     }
 
-    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         self.mark_as_updated();
         if let Some(button) =
             self.buttons.iter().find(|button| matches!(&button.key, Some(key_code) if key_code.contains(&key.code)))
         {
             (button.command)(self, components);
-            return Status::Result(());
+            return Status::Finished;
         }
         match key.code {
             KeyCode::Char(ch) if self.message_as_buffer_builder.is_some() => {
@@ -101,7 +99,7 @@ impl Popup for PopupChoice {
             }
             KeyCode::Enter => {
                 (self.buttons[self.state].command)(self, components);
-                return Status::Result(());
+                return Status::Finished;
             }
             KeyCode::Left => {
                 self.prev();
@@ -114,12 +112,12 @@ impl Popup for PopupChoice {
         Status::Pending
     }
 
-    fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status<Self::R> {
+    fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status {
         match event {
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } if row == self.button_line => {
                 if let Some(position) = self.button_ranges.iter().position(|btn_range| btn_range.contains(&column)) {
                     (self.buttons[position].command)(self, components);
-                    return Status::Result(());
+                    return Status::Finished;
                 }
             }
             MouseEvent { kind: MouseEventKind::Moved, column, row, .. } if row == self.button_line => {
@@ -223,20 +221,22 @@ impl PopupChoice {
     }
 }
 
-pub fn save_and_exit_popup(
+pub fn should_save_and_exit(
     gs: &mut GlobalState,
     ws: &mut Workspace,
     tree: &mut Tree,
     term: &mut EditorTerminal,
 ) -> bool {
-    PopupChoice::new(
+    let mut popup = PopupChoice::new(
         "Not all opened editors are saved!".into(),
         None,
         None,
         None,
         vec![
             CommandButton {
-                command: |_, c| c.ws.save_all(c.gs),
+                command: |_, c| {
+                    c.ws.save_all(c.gs);
+                },
                 name: "Save All (Y)",
                 key: Some(vec![KeyCode::Char('y'), KeyCode::Char('Y')]),
             },
@@ -247,7 +247,9 @@ pub fn save_and_exit_popup(
             },
         ],
         Some((4, 40)),
-    )
-    .run(gs, ws, tree, term)
-    .is_some()
+    );
+    if let Err(error) = popup.run(gs, ws, tree, term) {
+        gs.error(error);
+    };
+    false
 }

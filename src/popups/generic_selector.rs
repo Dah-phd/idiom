@@ -22,8 +22,6 @@ pub struct PopupSelector<T> {
 }
 
 impl<T> Popup for PopupSelector<T> {
-    type R = ();
-
     fn force_render(&mut self, gs: &mut GlobalState) {
         let mut rect = self.get_rect(gs);
         let backend = gs.backend();
@@ -52,16 +50,14 @@ impl<T> Popup for PopupSelector<T> {
         lines.clear_to_end(backend);
     }
 
-    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         if self.options.is_empty() {
-            return Status::Dropped;
+            return Status::Finished;
         }
         match key.code {
             KeyCode::Enter => {
-                return {
-                    (self.command)(self, components);
-                    Status::Result(())
-                }
+                (self.command)(self, components);
+                return Status::Finished;
             }
             KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
                 self.state.prev(self.options.len());
@@ -76,7 +72,7 @@ impl<T> Popup for PopupSelector<T> {
         Status::Pending
     }
 
-    fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status<Self::R> {
+    fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status {
         match event {
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), row, column, .. } => {
                 if let Some(pos) = self.get_rect(components.gs).relative_position(row, column) {
@@ -87,7 +83,7 @@ impl<T> Popup for PopupSelector<T> {
                     self.state.select(option_idx, self.options.len());
                     return {
                         (self.command)(self, components);
-                        Status::Result(())
+                        Status::Finished
                     };
                 }
             }

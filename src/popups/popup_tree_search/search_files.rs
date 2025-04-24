@@ -80,7 +80,9 @@ impl ActiveFileSearch {
             return;
         };
 
-        new.run(gs, ws, tree, term);
+        if let Err(error) = new.run(gs, ws, tree, term) {
+            gs.error(error);
+        };
     }
 
     fn collect_data(&mut self) -> Result<(), tokio::sync::mpsc::error::SendError<String>> {
@@ -111,8 +113,6 @@ impl ActiveFileSearch {
 }
 
 impl Popup for ActiveFileSearch {
-    type R = ();
-
     fn force_render(&mut self, gs: &mut GlobalState) {
         let mut rect = Self::get_rect(gs);
         let accent_style = gs.theme.accent_style.with_fg(self.mode.fg_color);
@@ -137,14 +137,14 @@ impl Popup for ActiveFileSearch {
         backend.unfreeze();
     }
 
-    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         let Components { gs, tree, .. } = components;
 
         if let Some(updated) = self.pattern.map(&key, &mut gs.clipboard) {
             if updated {
                 if let Err(error) = self.collect_data() {
                     gs.error(error);
-                    return Status::Dropped;
+                    return Status::Finished;
                 }
             }
             self.force_render(gs);
@@ -155,7 +155,7 @@ impl Popup for ActiveFileSearch {
             KeyCode::Down => self.state.next(self.options.len()),
             KeyCode::Tab => {
                 if self.mode.is_full() {
-                    return Status::Dropped;
+                    return Status::Finished;
                 }
                 self.mode = FULL_SEARCH_TITLE;
                 self.task.abort();
@@ -165,13 +165,13 @@ impl Popup for ActiveFileSearch {
                 self.recv = recv;
                 if let Err(error) = self.collect_data() {
                     gs.error(error);
-                    return Status::Dropped;
+                    return Status::Finished;
                 };
             }
             KeyCode::Enter => {
                 let (path, _, line) = self.options.remove(self.state.selected);
                 gs.event.push(IdiomEvent::OpenAtLine(path, line));
-                return Status::Dropped;
+                return Status::Finished;
             }
             _ => return Status::Pending,
         }
@@ -179,7 +179,7 @@ impl Popup for ActiveFileSearch {
         Status::Pending
     }
 
-    fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status<Self::R> {
+    fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status {
         let Components { gs, .. } = components;
         match event {
             MouseEvent { kind: MouseEventKind::Moved, column, row, .. } => match self.get_option_idx(row, column, gs) {
@@ -190,7 +190,7 @@ impl Popup for ActiveFileSearch {
                 if let Some(index) = self.get_option_idx(row, column, gs) {
                     let (path, _, line) = self.options.remove(index);
                     gs.event.push(IdiomEvent::OpenAtLine(path, line));
-                    return Status::Dropped;
+                    return Status::Finished;
                 }
             }
             MouseEvent { kind: MouseEventKind::ScrollUp, .. } => self.state.prev(self.options.len()),

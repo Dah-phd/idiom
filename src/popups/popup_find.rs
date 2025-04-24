@@ -33,7 +33,9 @@ impl GoToLinePopup {
         let Some(mut popup) = GoToLinePopup::new(current_line, gs.editor_area, gs.theme.accent_style) else {
             return;
         };
-        Popup::run(&mut popup, gs, workspace, tree, term);
+        if let Err(error) = popup.run(gs, workspace, tree, term) {
+            gs.error(error);
+        }
     }
 
     pub fn new(current_line: usize, editor_area: Rect, accent: ContentStyle) -> Option<Self> {
@@ -50,13 +52,11 @@ impl GoToLinePopup {
 }
 
 impl Popup for GoToLinePopup {
-    type R = ();
-
-    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         let Components { gs, ws, .. } = components;
 
         let result_idx = match key.code {
-            KeyCode::Enter => return Status::Dropped,
+            KeyCode::Enter => return Status::Finished,
             KeyCode::Char(ch) if ch.is_numeric() => {
                 self.line_idx.push(ch);
                 self.parse()
@@ -66,7 +66,7 @@ impl Popup for GoToLinePopup {
         };
         if let Some(line) = result_idx {
             let Some(editor) = ws.get_active() else {
-                return Status::Dropped;
+                return Status::Finished;
             };
             editor.go_to(line);
             gs.backend.freeze();
@@ -100,7 +100,7 @@ impl Popup for GoToLinePopup {
         }
     }
 
-    fn map_mouse(&mut self, _: MouseEvent, _: &mut Components) -> Status<Self::R> {
+    fn map_mouse(&mut self, _: MouseEvent, _: &mut Components) -> Status {
         Status::Pending
     }
 
@@ -126,14 +126,13 @@ impl FindPopup {
         let Some(mut popup) = FindPopup::new(gs.editor_area, gs.theme.accent_style) else {
             return;
         };
-        Popup::run(&mut popup, gs, workspace, tree, term);
+        let run_result = Popup::run(&mut popup, gs, workspace, tree, term);
+        gs.log_if_error(run_result);
     }
 }
 
 impl Popup for FindPopup {
-    type R = ();
-
-    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status<Self::R> {
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         let Components { gs, ws, tree, term } = components;
 
         if matches!(key.code, KeyCode::Char('h' | 'H') if key.modifiers.contains(KeyModifiers::CONTROL)) {
@@ -143,9 +142,11 @@ impl Popup for FindPopup {
                 gs.editor_area,
                 self.accent,
             ) {
-                popup.run(gs, ws, tree, term);
+                if let Err(error) = popup.run(gs, ws, tree, term) {
+                    gs.error(error);
+                };
             }
-            return Status::Dropped;
+            return Status::Finished;
         }
         if Some(true) == self.pattern.map(&key, &mut gs.clipboard) {
             if let Some(editor) = ws.get_active() {
@@ -159,30 +160,27 @@ impl Popup for FindPopup {
         let select_result = match key.code {
             KeyCode::Enter | KeyCode::Down => next_option(&self.options, &mut self.state),
             KeyCode::Up => prev_option(&self.options, &mut self.state),
-            KeyCode::Esc | KeyCode::Left => return Status::Dropped,
+            KeyCode::Esc | KeyCode::Left => return Status::Finished,
             KeyCode::Tab => {
                 if let Some(editor) = ws.get_active() {
                     gs.insert_mode();
                     let options = editor.find_with_select(&self.pattern.text);
-                    PopupSelector::new(
+                    let mut popup = PopupSelector::new(
                         options,
                         |((from, _), text), line, backend| line.render(&format!("({}) {text}", from.line + 1), backend),
-                        |popup, components| {
-                            let (from, to) = popup.options[popup.state.selected].0;
-                            if let Some(editor) = components.ws.get_active() {
-                                editor.go_to_select(from, to);
-                            }
-                        },
+                        go_to_select_command,
                         None,
-                    )
-                    .run(gs, ws, tree, term);
+                    );
+                    if let Err(error) = popup.run(gs, ws, tree, term) {
+                        gs.error(error);
+                    };
                 }
-                return Status::Dropped;
+                return Status::Finished;
             }
             _ => return Status::Pending,
         };
         let Some(editor) = ws.get_active() else {
-            return Status::Dropped;
+            return Status::Finished;
         };
         if let Some((from, to)) = select_result {
             editor.go_to_select(from, to);
@@ -230,7 +228,17 @@ impl Popup for FindPopup {
         true
     }
 
-    fn map_mouse(&mut self, _: MouseEvent, _: &mut Components) -> Status<Self::R> {
+    fn map_mouse(&mut self, _: MouseEvent, _: &mut Components) -> Status {
         Status::Pending
+    }
+}
+
+fn go_to_select_command(
+    popup: &mut PopupSelector<((CursorPosition, CursorPosition), String)>,
+    components: &mut Components,
+) {
+    let (from, to) = popup.options[popup.state.selected].0;
+    if let Some(editor) = components.ws.get_active() {
+        editor.go_to_select(from, to);
     }
 }
