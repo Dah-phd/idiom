@@ -221,6 +221,9 @@ impl PopupChoice {
     }
 }
 
+/// uses workaround in order to message if the popup should trigger exit
+/// the solution is no ideal but it otherwise a whole messaging system will be needed
+/// or different exit strategy
 pub fn should_save_and_exit(
     gs: &mut GlobalState,
     ws: &mut Workspace,
@@ -234,22 +237,30 @@ pub fn should_save_and_exit(
         None,
         vec![
             CommandButton {
-                command: |_, c| {
+                command: |p, c| {
+                    // set prefix to true to message outside popup
+                    // if button is called prefix should be some
+                    p.title_prefix = Some("");
                     c.ws.save_all(c.gs);
                 },
                 name: "Save All (Y)",
                 key: Some(vec![KeyCode::Char('y'), KeyCode::Char('Y')]),
             },
             CommandButton {
-                command: |_, _| (),
+                // set prefix to true to message outside
+                // if button is called prefix should be some
+                command: |p, _| p.title_prefix = Some(""),
                 name: "Don't save (N)",
                 key: Some(vec![KeyCode::Char('n'), KeyCode::Char('N')]),
             },
         ],
         Some((4, 40)),
     );
+
     if let Err(error) = popup.run(gs, ws, tree, term) {
         gs.error(error);
     };
-    false
+
+    // ! check if prefix was set during popup execution
+    popup.title_prefix.is_some()
 }

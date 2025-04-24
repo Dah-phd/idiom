@@ -69,14 +69,16 @@ pub trait Popup {
         loop {
             if crossterm::event::poll(MIN_FRAMERATE)? {
                 match crossterm::event::read()? {
-                    Event::Key(key) => match self.map_key(key, &mut components) {
-                        Status::Finished => return Ok(()),
-                        Status::Pending => (),
-                    },
-                    Event::Mouse(event) => match self.map_mouse(event, &mut components) {
-                        Status::Finished => return Ok(()),
-                        Status::Pending => (),
-                    },
+                    Event::Key(key) => {
+                        if let Status::Finished = self.map_key(key, &mut components) {
+                            return Ok(());
+                        }
+                    }
+                    Event::Mouse(event) => {
+                        if let Status::Finished = self.map_mouse(event, &mut components) {
+                            return Ok(());
+                        }
+                    }
                     Event::Resize(width, height) => {
                         let (width, height) = checked_new_screen_size(width, height, components.gs.backend());
                         components.gs.full_resize(height, width);
