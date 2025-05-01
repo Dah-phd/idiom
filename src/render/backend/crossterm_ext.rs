@@ -267,6 +267,9 @@ fn init_terminal() -> std::io::Result<()> {
         crossterm::style::ResetColor,
         crossterm::event::EnableMouseCapture,
         crossterm::event::EnableBracketedPaste,
+        crossterm::event::PushKeyboardEnhancementFlags(
+            crossterm::event::KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES,
+        ),
         crossterm::cursor::Hide,
     )
 }
@@ -279,6 +282,7 @@ fn graceful_exit() -> std::io::Result<()> {
         crossterm::style::ResetColor,
         crossterm::event::DisableMouseCapture,
         crossterm::event::DisableBracketedPaste,
+        crossterm::event::PopKeyboardEnhancementFlags,
         crossterm::cursor::Show,
     )?;
     crossterm::terminal::disable_raw_mode()

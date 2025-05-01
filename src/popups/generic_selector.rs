@@ -23,9 +23,8 @@ pub struct PopupSelector<T> {
 
 impl<T> Popup for PopupSelector<T> {
     fn force_render(&mut self, gs: &mut GlobalState) {
-        let mut rect = self.get_rect(gs);
+        let rect = self.get_rect(gs);
         let backend = gs.backend();
-        rect.bordered();
         rect.draw_borders(None, None, backend);
         if self.options.is_empty() {
             self.state.render_list(["No results found!"].into_iter(), rect, backend);
@@ -59,11 +58,11 @@ impl<T> Popup for PopupSelector<T> {
                 (self.command)(self, components);
                 return Status::Finished;
             }
-            KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
+            KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') | KeyCode::BackTab => {
                 self.state.prev(self.options.len());
                 self.force_render(components.gs);
             }
-            KeyCode::Down | KeyCode::Char('d') | KeyCode::Char('D') => {
+            KeyCode::Down | KeyCode::Char('d') | KeyCode::Char('D') | KeyCode::Tab => {
                 self.state.next(self.options.len());
                 self.force_render(components.gs);
             }

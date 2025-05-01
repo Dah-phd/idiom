@@ -68,13 +68,15 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                 }
                                 GeneralAction::SelectOpenEditor => {
                                     let tabs = workspace.tabs();
-                                    if !tabs.is_empty() {
-                                        let mut selector = selector_editors(tabs);
-                                        if let Err(error) = selector.run(&mut gs, &mut workspace, &mut tree, &mut term)
-                                        {
-                                            gs.error(error);
-                                        };
-                                    };
+                                    match tabs.len() {
+                                        0 => (),
+                                        1 => gs.insert_mode(),
+                                        _ => {
+                                            let mut selector = selector_editors(tabs);
+                                            let result = selector.run(&mut gs, &mut workspace, &mut tree, &mut term);
+                                            gs.log_if_error(result);
+                                        }
+                                    }
                                 }
                                 GeneralAction::GoToTabs => {
                                     if !workspace.is_empty() {
@@ -104,12 +106,13 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                     tree.key_map = new_tree_key_map;
                                     workspace.refresh_cfg(new_editor_key_map, &mut gs);
                                 }
-                                GeneralAction::GoToLineOrGit => {
+                                GeneralAction::GoToLine => {
                                     if gs.is_insert() {
                                         GoToLinePopup::run_inplace(&mut gs, &mut workspace, &mut tree, &mut term);
-                                    } else {
-                                        gs.event.push(IdiomEvent::EmbededApp(git_tui.to_owned()));
                                     };
+                                }
+                                GeneralAction::GitTui => {
+                                    gs.event.push(IdiomEvent::EmbededApp(git_tui.to_owned()));
                                 }
                                 GeneralAction::ToggleTerminal => {
                                     gs.toggle_terminal(&mut term);
