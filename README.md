@@ -23,7 +23,7 @@ Python should work for the most part with jedi, but the interaction is not well 
 ![](/non_dev/screen1.png)
 
 ## Tested platform
-- Linux Fedora derivate (Nobara)
+- Linux Fedora derivate (Nobara / Mint)
 - Linux Mint
 
 ## TODO
