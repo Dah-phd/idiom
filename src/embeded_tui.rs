@@ -34,7 +34,7 @@ pub fn run_embeded_tui(cmd: Option<&str>, gs: &mut GlobalState) -> IdiomResult<(
                 Event::Resize(width, height) => {
                     let (width, height) = checked_new_screen_size(width, height, gs.backend());
                     gs.full_resize(height, width);
-                    gs.render_footer();
+                    gs.render_footer_standalone();
                     let mut rect = Backend::screen()?;
                     rect.height -= 1;
                     tui.resize(rect).map_err(IdiomError::GeneralError)?;
@@ -45,13 +45,13 @@ pub fn run_embeded_tui(cmd: Option<&str>, gs: &mut GlobalState) -> IdiomResult<(
                 _ => (),
             }
             gs.backend.freeze();
+            gs.fast_render_message_with_preserved_cursor();
             tui.render(&mut gs.backend);
-            gs.fast_render_message();
             gs.backend.unfreeze();
         } else {
             gs.backend.freeze();
+            gs.fast_render_message_with_preserved_cursor();
             tui.fast_render(&mut gs.backend);
-            gs.fast_render_message();
             gs.backend.unfreeze();
         }
     }

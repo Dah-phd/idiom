@@ -98,7 +98,7 @@ pub fn draw_with_tree(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mu
 }
 
 pub fn draw_term(gs: &mut GlobalState, _workspace: &mut Workspace, _tree: &mut Tree, term: &mut EditorTerminal) {
-    gs.messages.fast_render(gs.theme.accent_style, &mut gs.backend);
+    gs.fast_render_message_with_preserved_cursor();
     term.fast_render(gs);
 }
 

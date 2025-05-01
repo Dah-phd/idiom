@@ -42,13 +42,13 @@ pub struct GlobalState {
     pub tab_area: Rect,
     pub editor_area: Rect,
     pub footer_line: Line,
+    messages: Messages,
     mode: Mode,
     tree_size: usize,
     key_mapper: KeyMapCallback,
     paste_passthrough: PastePassthroughCallback,
     mouse_mapper: MouseMapCallback,
     draw_callback: DrawCallback,
-    messages: Messages,
     components: Components,
 }
 
@@ -236,11 +236,15 @@ impl GlobalState {
         }
     }
 
-    pub fn fast_render_message(&mut self) {
-        self.messages.fast_render(self.theme.accent_style, &mut self.backend);
+    pub fn fast_render_message_with_preserved_cursor(&mut self) {
+        if self.messages.should_render() {
+            self.backend.save_cursor();
+            self.messages.render(self.theme.accent_style, &mut self.backend);
+            self.backend.restore_cursor();
+        }
     }
 
-    pub fn render_footer(&mut self) {
+    pub fn render_footer_standalone(&mut self) {
         // reset expected line positions
         self.footer_line = self.screen_rect.clone().pop_line();
         let (mode_line, msg_line) = if self.components.contains(Components::TREE) || self.is_select() {

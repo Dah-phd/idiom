@@ -292,7 +292,7 @@ impl Default for GeneralUserKeyMap {
     fn default() -> Self {
         Self {
             go_to_editor_tabs: TAB.to_owned(),
-            invoke_pallet: format!("{CTRL} && p"),
+            invoke_pallet: format!("{CTRL} && p || {CTRL} && {SHIFT} && p"),
             select_open_editor: format!("{CTRL} && {TAB}"),
             save_all: format!("{CTRL} && s"),
             cancel: ESC.to_owned(),
