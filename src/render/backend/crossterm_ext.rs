@@ -259,6 +259,7 @@ fn init_terminal() -> std::io::Result<()> {
         eprintln!("{info}");
     }));
     // Init terminal
+    crossterm::terminal::enable_raw_mode()?;
     crossterm::execute!(
         std::io::stdout(),
         crossterm::terminal::EnterAlternateScreen,
@@ -266,12 +267,12 @@ fn init_terminal() -> std::io::Result<()> {
         crossterm::style::ResetColor,
         crossterm::event::EnableMouseCapture,
         crossterm::event::EnableBracketedPaste,
+        #[cfg(not(windows))]
         crossterm::event::PushKeyboardEnhancementFlags(
             crossterm::event::KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES,
         ),
         crossterm::cursor::Hide,
     )?;
-    crossterm::terminal::enable_raw_mode()?;
     Ok(())
 }
 
@@ -279,6 +280,7 @@ fn graceful_exit() -> std::io::Result<()> {
     crossterm::terminal::disable_raw_mode()?;
     crossterm::execute!(
         std::io::stdout(),
+        #[cfg(not(windows))]
         crossterm::event::PopKeyboardEnhancementFlags,
         crossterm::terminal::LeaveAlternateScreen,
         crossterm::terminal::EnableLineWrap,
