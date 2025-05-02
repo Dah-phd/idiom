@@ -32,6 +32,10 @@ impl EditorTerminal {
     pub fn fast_render(&mut self, gs: &mut GlobalState) {
         if let Some(term) = self.terminal.as_mut() {
             term.fast_render(gs.backend());
+            if term.is_finished() {
+                self.terminal = None;
+                gs.toggle_terminal(self);    
+            }
         }
     }
 
@@ -54,13 +58,13 @@ impl EditorTerminal {
 
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         match key {
-            KeyEvent { code: KeyCode::Char('q' | 'd' | 'Q' | 'D'), modifiers: KeyModifiers::CONTROL, .. } => {
+            KeyEvent { code: KeyCode::Char('q' | 'Q' ), modifiers: KeyModifiers::CONTROL, .. } => {
                 self.kill(gs);
                 gs.success("Term: Process killed!");
                 gs.toggle_terminal(self);
             }
             KeyEvent { code: KeyCode::Char('`' | ' '), modifiers: KeyModifiers::CONTROL, .. } => {
-                gs.message("Term: PTY active in background ... (CTRL + d/q) can be used to kill the process!");
+                gs.message("Term: PTY active in background ... (CTRL + q) can be used to kill the process!");
                 gs.toggle_terminal(self);
                 Backend::hide_cursor();
             }

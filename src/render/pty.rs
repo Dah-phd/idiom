@@ -97,6 +97,9 @@ impl PtyShell {
         if let KeyEvent { code: KeyCode::Char('c'), modifiers: KeyModifiers::CONTROL, .. } = key {
             return self.writer.write_all(&[0x3]);
         };
+        if let KeyEvent { code: KeyCode::Char('d'), modifiers: KeyModifiers::CONTROL, .. } = key {
+            return self.writer.write_all(&[0x4])
+        }
         match key.code {
             KeyCode::Esc => self.writer.write_all(&[0x1B]),
             KeyCode::Char(ch) => self.writer.write_all(&[ch as u8]),

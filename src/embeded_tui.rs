@@ -25,7 +25,7 @@ pub fn run_embeded_tui(cmd: Option<&str>, gs: &mut GlobalState) -> IdiomResult<(
     while !tui.is_finished() {
         if crossterm::event::poll(MIN_FRAMERATE)? {
             match crossterm::event::read()? {
-                Event::Key(KeyEvent { code: KeyCode::Char('d' | 'D'), modifiers: KeyModifiers::CONTROL, .. }) => {
+                Event::Key(KeyEvent { code: KeyCode::Char('q' | 'Q'), modifiers: KeyModifiers::CONTROL, .. }) => {
                     return Ok(());
                 }
                 Event::Key(key) => {
