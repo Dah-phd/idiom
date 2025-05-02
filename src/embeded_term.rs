@@ -16,6 +16,10 @@ impl EditorTerminal {
         Self { shell, ..Default::default() }
     }
 
+    pub fn set_shell(&mut self, shell: Option<String>) {
+        self.shell = shell;
+    }
+
     pub fn render(&mut self, gs: &mut GlobalState) {
         if let Some(border) = self.border.clone() {
             border.fill(BORDERS.horizontal_top, gs.backend());

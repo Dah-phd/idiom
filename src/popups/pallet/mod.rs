@@ -125,10 +125,12 @@ impl Popup for Pallet {
 }
 
 impl Pallet {
-    pub fn new() -> Self {
+    pub fn new(git_ui: Option<String>) -> Self {
         let commands = [
             Some(Command::components("Open file", OpenFileSelector::run)),
             Some(Command::components("Open embeded terminal", change_state::open_embeded_terminal)),
+            git_ui.map(|git_ui| Command::pass_event("Open Git TUI", IdiomEvent::EmbededApp(Some(git_ui)))),
+            Some(Command::pass_event("Open terminal", IdiomEvent::EmbededApp(None))),
             Some(Command::components("UPPERCASE", formatting::uppercase)),
             Some(Command::components("LOWERCASE", formatting::lowercase)),
             Command::cfg_open("Open editor configs", EDITOR_CFG_FILE),
@@ -146,8 +148,14 @@ impl Pallet {
     }
 
     #[inline]
-    pub fn run(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
-        if let Err(error) = Pallet::new().run(gs, ws, tree, term) {
+    pub fn run(
+        gs: &mut GlobalState,
+        ws: &mut Workspace,
+        tree: &mut Tree,
+        term: &mut EditorTerminal,
+        git_tui: Option<String>,
+    ) {
+        if let Err(error) = Pallet::new(git_tui).run(gs, ws, tree, term) {
             gs.error(error);
         };
     }

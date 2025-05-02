@@ -431,7 +431,7 @@ impl Workspace {
         }
     }
 
-    pub fn refresh_cfg(&mut self, new_editor_key_map: EditorKeyMap, gs: &mut GlobalState) {
+    pub fn refresh_cfg(&mut self, new_editor_key_map: EditorKeyMap, gs: &mut GlobalState) -> &mut EditorConfigs {
         self.key_map = new_editor_key_map;
         gs.unwrap_or_default(self.base_config.refresh(), ".config: ");
         for editor in self.editors.iter_mut() {
@@ -443,6 +443,7 @@ impl Workspace {
                 }
             }
         }
+        &mut self.base_config
     }
 }
 
