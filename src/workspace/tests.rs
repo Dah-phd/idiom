@@ -25,7 +25,7 @@ use std::collections::HashMap;
 pub fn mock_ws(content: Vec<String>) -> Workspace {
     let mut ws = Workspace {
         editors: vec![mock_editor(content)].into(),
-        base_config: EditorConfigs::default(),
+        base_configs: EditorConfigs::default(),
         key_map: mock_editor_key_map(),
         lsp_servers: HashMap::default(),
         map_callback: map_editor,

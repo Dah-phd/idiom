@@ -123,7 +123,7 @@ pub fn mouse_handler(
                 return;
             }
             if gs.tree_area.relative_position(event.row + 2, event.column).is_some() {
-                Pallet::run(gs, ws, tree, term, None);
+                Pallet::run(gs, ws, tree, term);
             }
         }
         MouseEventKind::Down(MouseButton::Right) => {

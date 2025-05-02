@@ -29,7 +29,7 @@ const FILE_STATUS_ERR: &str = "File status ERR";
 /// implement Drop to attempt keep state upon close/crash
 pub struct Workspace {
     editors: TrackedList<Editor>,
-    base_config: EditorConfigs,
+    base_configs: EditorConfigs,
     key_map: EditorKeyMap,
     tab_style: ContentStyle,
     lsp_servers: HashMap<FileType, LSP>,
@@ -37,9 +37,9 @@ pub struct Workspace {
 }
 
 impl Workspace {
-    pub async fn new(key_map: EditorKeyMap, base_config: EditorConfigs, lsp_servers: HashMap<FileType, LSP>) -> Self {
+    pub async fn new(key_map: EditorKeyMap, base_configs: EditorConfigs, lsp_servers: HashMap<FileType, LSP>) -> Self {
         let tab_style = ContentStyle::fg(Color::DarkYellow);
-        Self { editors: TrackedList::new(), base_config, key_map, lsp_servers, map_callback: map_editor, tab_style }
+        Self { editors: TrackedList::new(), base_configs, key_map, lsp_servers, map_callback: map_editor, tab_style }
     }
 
     pub fn render(&mut self, gs: &mut GlobalState) {
@@ -248,7 +248,7 @@ impl Workspace {
     }
 
     fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
-        Editor::from_path(file_path, FileType::Ignored, &self.base_config, gs)
+        Editor::from_path(file_path, FileType::Ignored, &self.base_configs, gs)
     }
 
     async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
@@ -256,13 +256,13 @@ impl Workspace {
             Some(file_type) => file_type,
             None => {
                 return match file_path.extension().and_then(|ext| ext.to_str()) {
-                    Some(ext) if ext.to_lowercase() == "md" => Editor::from_path_md(file_path, &self.base_config, gs),
-                    _ => Editor::from_path_text(file_path, &self.base_config, gs),
+                    Some(ext) if ext.to_lowercase() == "md" => Editor::from_path_md(file_path, &self.base_configs, gs),
+                    _ => Editor::from_path_text(file_path, &self.base_configs, gs),
                 }
             }
         };
-        let mut new = Editor::from_path(file_path, file_type, &self.base_config, gs)?;
-        let lsp_cmd = match self.base_config.derive_lsp(&new.file_type) {
+        let mut new = Editor::from_path(file_path, file_type, &self.base_configs, gs)?;
+        let lsp_cmd = match self.base_configs.derive_lsp(&new.file_type) {
             None => {
                 new.lexer.local_lsp(file_type, new.stringify(), gs);
                 return Ok(new);
@@ -433,9 +433,9 @@ impl Workspace {
 
     pub fn refresh_cfg(&mut self, new_editor_key_map: EditorKeyMap, gs: &mut GlobalState) -> &mut EditorConfigs {
         self.key_map = new_editor_key_map;
-        gs.unwrap_or_default(self.base_config.refresh(), ".config: ");
+        gs.unwrap_or_default(self.base_configs.refresh(), ".config: ");
         for editor in self.editors.iter_mut() {
-            editor.refresh_cfg(&self.base_config);
+            editor.refresh_cfg(&self.base_configs);
             editor.lexer.reload_theme(gs);
             if let Some(lsp) = self.lsp_servers.get(&editor.file_type) {
                 if !editor.lexer.lsp {
@@ -443,7 +443,7 @@ impl Workspace {
                 }
             }
         }
-        &mut self.base_config
+        &mut self.base_configs
     }
 }
 
@@ -524,7 +524,7 @@ pub fn add_editor_from_data(
     file_type: FileType,
     gs: &mut GlobalState,
 ) {
-    let editor = editor_from_data(path, content, file_type, &workspace.base_config, gs);
+    let editor = editor_from_data(path, content, file_type, &workspace.base_configs, gs);
     workspace.editors.insert(0, editor);
 }
 

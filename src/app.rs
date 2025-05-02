@@ -1,5 +1,5 @@
 use crate::{
-    configs::{EditorConfigs, GeneralAction, KeyMap, KEY_MAP},
+    configs::GeneralAction,
     embeded_term::EditorTerminal,
     error::IdiomResult,
     global_state::{GlobalState, IdiomEvent},
@@ -28,16 +28,15 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
 
     let screen_rect = get_init_screen(&mut backend)?;
     let mut gs = GlobalState::new(screen_rect, backend);
-    let (mut general_key_map, editor_key_map, tree_key_map) = gs.unwrap_or_default(KeyMap::new(), KEY_MAP).unpack();
-    let mut base_config = gs.unwrap_or_default(EditorConfigs::new(), "editor.toml: ");
-    let mut git_tui = base_config.git_tui.take();
-    let integrated_shell = base_config.shell.take();
+    let (mut general_key_map, editor_key_map, tree_key_map) = gs.get_key_maps();
+    let mut base_configs = gs.get_configs();
+    let integrated_shell = base_configs.shell.take();
 
     // INIT COMPONENTS
     let mut tree = Tree::new(tree_key_map, &mut gs);
     let mut term = EditorTerminal::new(integrated_shell);
-    let lsp_servers = base_config.init_preloaded_lsp_servers(tree.get_base_file_names(), &mut gs).await;
-    let mut workspace = Workspace::new(editor_key_map, base_config, lsp_servers).await;
+    let lsp_servers = base_configs.init_preloaded_lsp_servers(tree.get_base_file_names(), &mut gs).await;
+    let mut workspace = Workspace::new(editor_key_map, base_configs, lsp_servers).await;
 
     // CLI SETUP
     if let Some(path) = open_file {
@@ -85,7 +84,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                     };
                                 }
                                 GeneralAction::InvokePallet => {
-                                    Pallet::run(&mut gs, &mut workspace, &mut tree, &mut term, git_tui.to_owned());
+                                    Pallet::run(&mut gs, &mut workspace, &mut tree, &mut term);
                                 }
                                 GeneralAction::Exit => {
                                     if workspace.are_updates_saved(&mut gs)
@@ -100,13 +99,12 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                     gs.toggle_tree();
                                 }
                                 GeneralAction::RefreshSettings => {
-                                    let (new_general, new_editor_key_map, new_tree_key_map) =
-                                        gs.unwrap_or_default(KeyMap::new(), KEY_MAP).unpack();
+                                    let (new_general, new_editor_key_map, new_tree_key_map) = gs.get_key_maps();
                                     general_key_map = new_general;
                                     tree.key_map = new_tree_key_map;
-                                    let base_config = workspace.refresh_cfg(new_editor_key_map, &mut gs);
-                                    let integrated_shell = base_config.shell.take();
-                                    git_tui = base_config.git_tui.take();
+                                    let base_configs = workspace.refresh_cfg(new_editor_key_map, &mut gs);
+                                    let integrated_shell = base_configs.shell.take();
+                                    gs.git_tui = base_configs.git_tui.take();
                                     term.set_shell(integrated_shell);
                                 }
                                 GeneralAction::GoToLine => {
@@ -115,7 +113,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                                     };
                                 }
                                 GeneralAction::GitTui => {
-                                    gs.event.push(IdiomEvent::EmbededApp(git_tui.to_owned()));
+                                    gs.event.push(IdiomEvent::EmbededApp(gs.git_tui.to_owned()));
                                 }
                                 GeneralAction::ToggleTerminal => {
                                     gs.toggle_terminal(&mut term);

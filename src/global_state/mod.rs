@@ -6,7 +6,9 @@ mod events;
 mod message;
 
 use crate::{
-    configs::{FileType, UITheme},
+    configs::{
+        EditorConfigs, EditorKeyMap, FileType, GeneralKeyMap, KeyMap, TreeKeyMap, UITheme, EDITOR_CFG_FILE, KEY_MAP,
+    },
     embeded_term::EditorTerminal,
     error::IdiomResult,
     lsp::{LSPError, LSPResult},
@@ -42,6 +44,7 @@ pub struct GlobalState {
     pub tab_area: Rect,
     pub editor_area: Rect,
     pub footer_line: Line,
+    pub git_tui: Option<String>,
     messages: Messages,
     mode: Mode,
     tree_size: usize,
@@ -68,6 +71,7 @@ impl GlobalState {
             event: Vec::default(),
             clipboard: Clipboard::default(),
             screen_rect,
+            git_tui: None,
             tree_area: Rect::default(),
             tab_area: Rect::default(),
             editor_area: Rect::default(),
@@ -76,6 +80,16 @@ impl GlobalState {
             messages,
             components: Components::default(),
         }
+    }
+
+    pub fn get_configs(&mut self) -> EditorConfigs {
+        let mut base_configs = self.unwrap_or_default(EditorConfigs::new(), EDITOR_CFG_FILE);
+        self.git_tui = base_configs.git_tui.take();
+        base_configs
+    }
+
+    pub fn get_key_maps(&mut self) -> (GeneralKeyMap, EditorKeyMap, TreeKeyMap) {
+        self.unwrap_or_default(KeyMap::new(), KEY_MAP).unpack()
     }
 
     #[inline(always)]
