@@ -1,3 +1,4 @@
+mod change_state;
 mod formatting;
 use super::{popup_file_open::OpenFileSelector, Command, CommandResult, Components, Popup, Status};
 use crate::{
@@ -54,7 +55,6 @@ impl Popup for Pallet {
             KeyCode::Enter => {
                 match self.commands.remove(self.state.selected).1.execute() {
                     CommandResult::Simple(event) => gs.event.push(event),
-                    CommandResult::Complex(cb) => cb(ws, tree),
                     CommandResult::BigCB(cb) => cb(gs, ws, tree, term),
                 }
                 return Status::Finished;
@@ -85,7 +85,6 @@ impl Popup for Pallet {
                 if let Some(command_idx) = self.get_command_idx(row, column, gs) {
                     match self.commands.remove(command_idx).1.execute() {
                         CommandResult::Simple(event) => gs.event.push(event),
-                        CommandResult::Complex(cb) => (cb)(ws, tree),
                         CommandResult::BigCB(cb) => cb(gs, ws, tree, term),
                     };
                     return Status::Finished;
@@ -128,9 +127,10 @@ impl Popup for Pallet {
 impl Pallet {
     pub fn new() -> Self {
         let commands = [
-            Some(Command::big_cb("Open file", OpenFileSelector::run)),
-            Some(Command::access_edit("UPPERCASE", formatting::uppercase)),
-            Some(Command::access_edit("LOWERCASE", formatting::lowercase)),
+            Some(Command::components("Open file", OpenFileSelector::run)),
+            Some(Command::components("Open embeded terminal", change_state::open_embeded_terminal)),
+            Some(Command::components("UPPERCASE", formatting::uppercase)),
+            Some(Command::components("LOWERCASE", formatting::lowercase)),
             Command::cfg_open("Open editor configs", EDITOR_CFG_FILE),
             Command::cfg_open("Open keymap config", KEY_MAP),
             Command::cfg_open("Open theme config", THEME_FILE),

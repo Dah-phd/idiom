@@ -293,7 +293,7 @@ impl Default for GeneralUserKeyMap {
         Self {
             go_to_editor_tabs: TAB.to_owned(),
             invoke_pallet: format!("{CTRL} && p || {CTRL} && {SHIFT} && p"),
-            select_open_editor: format!("{CTRL} && {TAB}"),
+            select_open_editor: format!("{CTRL} && {TAB} || {CTRL} && {UP} || {CTRL} && {DOWN}"),
             save_all: format!("{CTRL} && s"),
             cancel: ESC.to_owned(),
             find: format!("{CTRL} && f"),

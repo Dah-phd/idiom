@@ -142,11 +142,10 @@ impl Command {
         Command { label, result: CommandResult::Simple(event) }
     }
 
-    const fn access_edit(label: &'static str, cb: fn(&mut Workspace, &mut Tree)) -> Self {
-        Command { label, result: CommandResult::Complex(cb) }
-    }
-
-    fn big_cb(label: &'static str, cb: fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal)) -> Self {
+    fn components(
+        label: &'static str,
+        cb: fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal),
+    ) -> Self {
         Command { label, result: CommandResult::BigCB(cb) }
     }
 }
@@ -154,7 +153,6 @@ impl Command {
 #[derive(Debug, Clone)]
 enum CommandResult {
     Simple(IdiomEvent),
-    Complex(fn(&mut Workspace, &mut Tree)),
     BigCB(fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal)),
 }
 

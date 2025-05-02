@@ -219,13 +219,13 @@ impl GlobalState {
         self.draw_callback = draw::full_rebuild;
     }
 
-    pub fn toggle_terminal(&mut self, runner: &mut EditorTerminal) {
+    pub fn toggle_terminal(&mut self, term: &mut EditorTerminal) {
         self.draw_callback = draw::full_rebuild;
         if self.components.contains(Components::TERM) {
             self.components.remove(Components::TERM);
         } else {
             self.components.insert(Components::TERM);
-            runner.activate(self.editor_area);
+            term.activate(self.editor_area);
         }
         self.config_controls();
     }
