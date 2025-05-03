@@ -34,7 +34,7 @@ impl EditorTerminal {
             term.fast_render(gs.backend());
             if term.is_finished() {
                 self.terminal = None;
-                gs.toggle_terminal(self);    
+                gs.toggle_terminal(self);
             }
         }
     }
@@ -58,7 +58,7 @@ impl EditorTerminal {
 
     pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         match key {
-            KeyEvent { code: KeyCode::Char('q' | 'Q' ), modifiers: KeyModifiers::CONTROL, .. } => {
+            KeyEvent { code: KeyCode::Char('q' | 'Q'), modifiers: KeyModifiers::CONTROL, .. } => {
                 self.kill(gs);
                 gs.success("Term: Process killed!");
                 gs.toggle_terminal(self);
