@@ -2,7 +2,7 @@ use crate::render::backend::{Backend, BackendProtocol};
 use crate::render::layout::{Rect, BORDERS};
 use crate::render::pty::PtyShell;
 use crate::{global_state::GlobalState, render::layout::Line};
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
 
 #[derive(Default)]
 pub struct EditorTerminal {
@@ -79,6 +79,12 @@ impl EditorTerminal {
             }
         }
         true
+    }
+
+    pub fn map_mouse(&mut self, event: MouseEvent) {
+        if let Some(term) = self.terminal.as_mut() {
+            term.map_mouse(event);
+        }
     }
 
     pub fn paste_passthrough(&mut self, clip: String) {

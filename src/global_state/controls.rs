@@ -58,13 +58,14 @@ impl Mode {
     }
 }
 
-pub fn disable_mouse(
-    _event: MouseEvent,
+pub fn mouse_term(
+    event: MouseEvent,
     _gs: &mut GlobalState,
     _ws: &mut Workspace,
     _tree: &mut Tree,
-    _term: &mut EditorTerminal,
+    term: &mut EditorTerminal,
 ) {
+    term.map_mouse(event);
 }
 
 pub fn mouse_handler(

@@ -165,7 +165,7 @@ impl GlobalState {
     fn config_controls(&mut self) {
         if self.components.contains(Components::TERM) {
             self.key_mapper = controls::map_term;
-            self.mouse_mapper = controls::disable_mouse;
+            self.mouse_mapper = controls::mouse_term;
             self.paste_passthrough = controls::paste_passthrough_term;
             return;
         }

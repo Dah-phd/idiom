@@ -41,6 +41,18 @@ impl Rect {
         }
     }
 
+    /// return Option<(Row(u16), Col(u16))>
+    pub fn raw_relative_position(&self, row: u16, column: u16) -> Option<(u16, u16)> {
+        match self.col <= column
+            && self.row <= row
+            && row < self.row + self.height
+            && column < self.col + self.width as u16
+        {
+            true => Some((row - self.row, column - self.col)),
+            false => None,
+        }
+    }
+
     /// Creates floating modal around position (the row within it);
     /// Modal will float around the row (above or below - below is preffered) within Rect;
     /// Minimum height is 3 otherwise the modal will appear above the location;
