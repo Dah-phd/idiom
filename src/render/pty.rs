@@ -5,7 +5,7 @@ use crate::{
         layout::Rect,
     },
 };
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use portable_pty::{native_pty_system, Child, CommandBuilder, PtyPair, PtySize};
 use std::{
     io::{Read, Write},
@@ -93,7 +93,7 @@ impl PtyShell {
         Ok(Self { rect, pair, child, writer, output, output_handler, cursor: CursorState::from(rect) })
     }
 
-    pub fn key_map(&mut self, key: &KeyEvent) -> std::io::Result<()> {
+    pub fn map_key(&mut self, key: &KeyEvent) -> std::io::Result<()> {
         if let Some(ctrl_char) = get_ctrl_char(key) {
             return self.writer.write_all(&[ctrl_char]);
         }
@@ -113,6 +113,19 @@ impl PtyShell {
             KeyCode::Home => self.writer.write_all(&[0x1B, 0x5B, 0x48]),
             _ => Ok(()),
         }
+    }
+
+    pub fn map_mouse(&mut self, event: MouseEvent) -> std::io::Result<()> {
+        let event_buffer = match event.kind {
+            MouseEventKind::Down(MouseButton::Left) => mouse_down(event.row, event.column),
+            MouseEventKind::Drag(MouseButton::Left) => mouse_drag(event.row, event.column),
+            MouseEventKind::Up(MouseButton::Left) => mouse_up(event.row, event.column),
+            _ => return Ok(()),
+        };
+        if let Some(buf) = event_buffer {
+            return self.writer.write_all(&buf);
+        }
+        Ok(())
     }
 
     pub fn paste(&mut self, clip: String) -> std::io::Result<()> {
@@ -138,6 +151,7 @@ impl PtyShell {
     }
 
     fn full_render(&mut self, screen: Screen, backend: &mut Backend) {
+        // screen.contents_between(start_row, start_col, end_row, end_col)
         let reset_style = backend.get_style();
         backend.reset_style();
         self.rect.clear(backend);
@@ -256,5 +270,153 @@ impl From<Rect> for PtySize {
 impl From<Rect> for CursorState {
     fn from(rect: Rect) -> Self {
         Self { row: rect.row, col: rect.col, hidden: true }
+    }
+}
+
+fn mouse_drag(row: u16, col: u16) -> Option<[u8; 6]> {
+    let row = u8::try_from(row.checked_add(33)?).ok()?;
+    let col = u8::try_from(col.checked_add(33)?).ok()?;
+    Some([27, 91, 77, 64, col, row])
+}
+
+fn mouse_down(row: u16, col: u16) -> Option<[u8; 6]> {
+    let row = u8::try_from(row.checked_add(33)?).ok()?;
+    let col = u8::try_from(col.checked_add(33)?).ok()?;
+    Some([27, 91, 77, 32, col, row])
+}
+
+fn mouse_up(row: u16, col: u16) -> Option<[u8; 6]> {
+    let row = u8::try_from(row.checked_add(33)?).ok()?;
+    let col = u8::try_from(col.checked_add(33)?).ok()?;
+    Some([27, 91, 77, 35, col, row])
+}
+
+#[cfg(test)]
+mod test {
+    use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+
+    use super::{mouse_down, mouse_drag, mouse_up};
+
+    fn parse_cb(cb: u8) -> Option<(MouseEventKind, KeyModifiers)> {
+        let button_number = (cb & 0b0000_0011) | ((cb & 0b1100_0000) >> 4);
+        let dragging = cb & 0b0010_0000 == 0b0010_0000;
+
+        let kind = match (button_number, dragging) {
+            (0, false) => MouseEventKind::Down(MouseButton::Left),
+            (1, false) => MouseEventKind::Down(MouseButton::Middle),
+            (2, false) => MouseEventKind::Down(MouseButton::Right),
+            (0, true) => MouseEventKind::Drag(MouseButton::Left),
+            (1, true) => MouseEventKind::Drag(MouseButton::Middle),
+            (2, true) => MouseEventKind::Drag(MouseButton::Right),
+            (3, false) => MouseEventKind::Up(MouseButton::Left),
+            (3, true) | (4, true) | (5, true) => MouseEventKind::Moved,
+            (4, false) => MouseEventKind::ScrollUp,
+            (5, false) => MouseEventKind::ScrollDown,
+            (6, false) => MouseEventKind::ScrollLeft,
+            (7, false) => MouseEventKind::ScrollRight,
+            // We do not support other buttons.
+            _ => return None,
+        };
+
+        let mut modifiers = KeyModifiers::empty();
+
+        if cb & 0b0000_0100 == 0b0000_0100 {
+            modifiers |= KeyModifiers::SHIFT;
+        }
+        if cb & 0b0000_1000 == 0b0000_1000 {
+            modifiers |= KeyModifiers::ALT;
+        }
+        if cb & 0b0001_0000 == 0b0001_0000 {
+            modifiers |= KeyModifiers::CONTROL;
+        }
+
+        Some((kind, modifiers))
+    }
+
+    fn parse_csi_normal_mouse(buffer: &[u8]) -> Option<MouseEvent> {
+        // Normal mouse encoding: ESC [ M CB Cx Cy (6 characters only).
+
+        assert!(buffer.starts_with(b"\x1B[M")); // ESC [ M
+
+        if buffer.len() < 6 {
+            return None;
+        }
+
+        let cb = buffer[3].checked_sub(32)?;
+        let (kind, modifiers) = parse_cb(cb)?;
+
+        // See http://www.xfree86.org/current/ctlseqs.html#Mouse%20Tracking
+        // The upper left character position on the terminal is denoted as 1,1.
+        // Subtract 1 to keep it synced with cursor
+        let cx = u16::from(buffer[4].saturating_sub(32)) - 1;
+        let cy = u16::from(buffer[5].saturating_sub(32)) - 1;
+
+        Some(MouseEvent { kind, column: cx, row: cy, modifiers })
+    }
+
+    #[test]
+    fn mouse_left_down() {
+        assert_eq!(
+            Some(MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: 0,
+                row: 10,
+                modifiers: KeyModifiers::empty()
+            }),
+            mouse_down(10, 0).and_then(|buf| parse_csi_normal_mouse(&buf))
+        );
+        assert_eq!(
+            Some(MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column: 10,
+                row: 20,
+                modifiers: KeyModifiers::empty()
+            }),
+            mouse_down(20, 10).and_then(|buf| parse_csi_normal_mouse(&buf))
+        );
+    }
+
+    #[test]
+    fn mouse_left_drag() {
+        assert_eq!(
+            Some(MouseEvent {
+                kind: MouseEventKind::Drag(MouseButton::Left),
+                column: 0,
+                row: 10,
+                modifiers: KeyModifiers::empty()
+            }),
+            mouse_drag(10, 0).and_then(|buf| parse_csi_normal_mouse(&buf))
+        );
+        assert_eq!(
+            Some(MouseEvent {
+                kind: MouseEventKind::Drag(MouseButton::Left),
+                column: 10,
+                row: 20,
+                modifiers: KeyModifiers::empty()
+            }),
+            mouse_drag(20, 10).and_then(|buf| parse_csi_normal_mouse(&buf))
+        );
+    }
+
+    #[test]
+    fn mouse_left_up() {
+        assert_eq!(
+            Some(MouseEvent {
+                kind: MouseEventKind::Up(MouseButton::Left),
+                column: 0,
+                row: 10,
+                modifiers: KeyModifiers::empty()
+            }),
+            mouse_up(10, 0).and_then(|buf| parse_csi_normal_mouse(&buf))
+        );
+        assert_eq!(
+            Some(MouseEvent {
+                kind: MouseEventKind::Up(MouseButton::Left),
+                column: 10,
+                row: 20,
+                modifiers: KeyModifiers::empty()
+            }),
+            mouse_up(20, 10).and_then(|buf| parse_csi_normal_mouse(&buf))
+        );
     }
 }
