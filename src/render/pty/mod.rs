@@ -3,7 +3,7 @@ mod tracked_parser;
 
 use crate::{
     error::{IdiomError, IdiomResult},
-    global_state::{Clipboard, GlobalState},
+    global_state::GlobalState,
     render::{
         backend::{Backend, BackendProtocol},
         layout::Rect,
@@ -11,7 +11,7 @@ use crate::{
     workspace::CursorPosition,
 };
 use crossterm::{
-    event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind},
+    event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind},
     style::ContentStyle,
 };
 use cursor::{CursorState, Position, Select};
@@ -90,17 +90,7 @@ impl PtyShell {
         })
     }
 
-    pub fn map_key(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> std::io::Result<()> {
-        if let KeyEvent {
-            code: KeyCode::Char('c' | 'C'), modifiers: KeyModifiers::CONTROL | KeyModifiers::SHIFT, ..
-        } = key
-        {
-            if let Some(clip) = self.copy() {
-                clipboard.push(clip);
-            }
-            return Ok(());
-        }
-
+    pub fn map_key(&mut self, key: &KeyEvent) -> std::io::Result<()> {
         self.select.clear();
 
         if let Some(ctrl_char) = get_ctrl_char(key) {
@@ -168,19 +158,6 @@ impl PtyShell {
     pub fn paste(&mut self, clip: String) -> std::io::Result<()> {
         self.select.clear();
         self.writer.write_all(clip.as_bytes())
-    }
-
-    pub fn copy(&self) -> Option<String> {
-        let screen = match self.output.lock() {
-            Ok(mut lock) => lock.screen(),
-            Err(error) => {
-                let mut lock = error.into_inner();
-                lock.screen()
-            }
-        };
-        let (from, to) = self.select.get()?;
-        let clip = screen.contents_between(from.row, from.col, to.row, to.col);
-        Some(clip)
     }
 
     pub fn fast_render(&mut self, backend: &mut Backend) {

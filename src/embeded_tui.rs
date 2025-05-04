@@ -30,7 +30,7 @@ pub fn run_embeded_tui(cmd: Option<&str>, gs: &mut GlobalState) -> IdiomResult<(
                     return Ok(());
                 }
                 Event::Key(key) => {
-                    tui.map_key(&key, &mut gs.clipboard)?;
+                    tui.map_key(&key)?;
                 }
                 Event::Mouse(event) => tui.map_mouse(event, gs),
                 Event::Resize(width, height) => {
