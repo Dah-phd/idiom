@@ -60,12 +60,12 @@ impl Mode {
 
 pub fn mouse_term(
     event: MouseEvent,
-    _gs: &mut GlobalState,
+    gs: &mut GlobalState,
     _ws: &mut Workspace,
     _tree: &mut Tree,
     term: &mut EditorTerminal,
 ) {
-    term.map_mouse(event);
+    term.map_mouse(event, gs);
 }
 
 pub fn mouse_handler(

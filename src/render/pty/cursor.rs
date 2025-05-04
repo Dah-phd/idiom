@@ -95,6 +95,15 @@ impl Select {
         })
     }
 
+    pub fn copy_clip(&self, screen: &Screen) -> Option<String> {
+        let (start, end) = self.get()?;
+        let clip = screen.contents_between(start.row, start.col, end.row, end.col);
+        if clip.is_empty() {
+            return None;
+        }
+        Some(clip)
+    }
+
     pub fn collect_update(&mut self) -> bool {
         std::mem::take(&mut self.updated)
     }

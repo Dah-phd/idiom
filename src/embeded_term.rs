@@ -81,9 +81,9 @@ impl EditorTerminal {
         true
     }
 
-    pub fn map_mouse(&mut self, event: MouseEvent) {
+    pub fn map_mouse(&mut self, event: MouseEvent, gs: &mut GlobalState) {
         if let Some(term) = self.terminal.as_mut() {
-            term.map_mouse(event);
+            term.map_mouse(event, gs);
         }
     }
 

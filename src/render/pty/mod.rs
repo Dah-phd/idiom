@@ -3,7 +3,7 @@ mod tracked_parser;
 
 use crate::{
     error::{IdiomError, IdiomResult},
-    global_state::Clipboard,
+    global_state::{Clipboard, GlobalState},
     render::{
         backend::{Backend, BackendProtocol},
         layout::Rect,
@@ -33,6 +33,7 @@ pub struct PtyShell {
     writer: Box<dyn Write + Send>,
     output_handler: JoinHandle<std::io::Result<()>>,
     output: Arc<Mutex<TrackedParser>>,
+    last_screen: Option<Screen>,
     rect: Rect,
     cursor: CursorState,
     select: Select,
@@ -81,6 +82,7 @@ impl PtyShell {
             writer,
             output,
             output_handler,
+            last_screen: None,
             cursor: CursorState::from(rect),
             select: Select::default(),
         })
@@ -120,7 +122,7 @@ impl PtyShell {
         }
     }
 
-    pub fn map_mouse(&mut self, event: MouseEvent) {
+    pub fn map_mouse(&mut self, event: MouseEvent, gs: &mut GlobalState) {
         match event {
             MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column, row, .. } => {
                 let Some((row, col)) = self.rect.raw_relative_position(row, column) else {
@@ -142,6 +144,19 @@ impl PtyShell {
                     return;
                 };
                 self.select.mouse_up(row, col);
+            }
+            MouseEvent { kind: MouseEventKind::Down(MouseButton::Right), column, row, .. } => {
+                let Some((row, col)) = self.rect.raw_relative_position(row, column) else {
+                    return;
+                };
+                let position = Position { row, col };
+                let Some((start, end)) = self.select.get() else { return };
+                if position < start || position > end {
+                    return;
+                };
+                if let Some(clip) = self.last_screen.as_ref().and_then(|screen| self.select.copy_clip(screen)) {
+                    gs.clipboard.push(clip);
+                }
             }
             _ => (),
         }
@@ -197,61 +212,67 @@ impl PtyShell {
         let reset_style = backend.get_style();
         backend.reset_style();
         self.rect.clear(backend);
-        let mut text = screen.rows_formatted(0, self.rect.width as u16);
-        for line in self.rect.into_iter() {
-            if let Some(text) = text.next() {
-                backend.go_to(line.row, line.col);
-                _ = backend.write_all(&text);
-            };
+        {
+            let mut text = screen.rows_formatted(0, self.rect.width as u16);
+            for line in self.rect.into_iter() {
+                if let Some(text) = text.next() {
+                    backend.go_to(line.row, line.col);
+                    _ = backend.write_all(&text);
+                };
+            }
         }
         backend.set_style(reset_style);
         self.cursor.apply(&screen, backend);
+        self.last_screen = Some(screen);
     }
 
     fn render_with_select(&mut self, screen: Screen, (from, to): (Position, Position), backend: &mut Backend) {
         let reset_style = backend.get_style();
         backend.reset_style();
         self.rect.clear(backend);
-        let mut text = screen.rows_formatted(0, self.rect.width as u16).enumerate();
-        let select_text = screen.contents_between(from.row, from.col, to.row, to.col);
-        let mut select_lines = select_text.lines();
-        let start = CursorPosition::from(from);
-        let end = CursorPosition::from(to);
-        for line in self.rect.into_iter() {
-            if let Some((index, text)) = text.next() {
-                if index < start.line || index > end.line {
-                    backend.go_to(line.row, line.col);
-                    _ = backend.write_all(&text);
-                    continue;
-                }
-                if let Some(raw_text) = select_lines.next() {
-                    backend.reset_style();
-                    backend.go_to(line.row, line.col);
+        {
+            let mut text = screen.rows_formatted(0, self.rect.width as u16).enumerate();
+            let select_text = screen.contents_between(from.row, from.col, to.row, to.col);
+            let mut select_lines = select_text.lines();
+            let start = CursorPosition::from(from);
+            let end = CursorPosition::from(to);
+            for line in self.rect.into_iter() {
+                if let Some((index, text)) = text.next() {
+                    if index < start.line || index > end.line {
+                        backend.go_to(line.row, line.col);
+                        _ = backend.write_all(&text);
+                        continue;
+                    }
+                    if let Some(raw_text) = select_lines.next() {
+                        backend.reset_style();
+                        backend.go_to(line.row, line.col);
 
-                    if start.line == index {
-                        for cell_col in 0..from.col {
-                            if let Some(cell) = screen.cell(from.row, cell_col) {
+                        if start.line == index {
+                            for cell_col in 0..from.col {
+                                if let Some(cell) = screen.cell(from.row, cell_col) {
+                                    let style = parse_cell_style(cell);
+                                    backend.print_styled(cell.contents(), style);
+                                };
+                            }
+                        }
+
+                        backend.print_styled(raw_text, ContentStyle::reversed());
+
+                        if end.line == index {
+                            let mut cell_col = to.col;
+                            while let Some(cell) = screen.cell(to.row, cell_col) {
+                                cell_col += 1;
                                 let style = parse_cell_style(cell);
                                 backend.print_styled(cell.contents(), style);
-                            };
+                            }
                         }
                     }
-
-                    backend.print_styled(raw_text, ContentStyle::reversed());
-
-                    if end.line == index {
-                        let mut cell_col = to.col;
-                        while let Some(cell) = screen.cell(to.row, cell_col) {
-                            cell_col += 1;
-                            let style = parse_cell_style(cell);
-                            backend.print_styled(cell.contents(), style);
-                        }
-                    }
-                }
-            };
+                };
+            }
         }
         backend.set_style(reset_style);
         self.cursor.apply(&screen, backend);
+        self.last_screen = Some(screen);
     }
 
     pub fn is_finished(&mut self) -> bool {
