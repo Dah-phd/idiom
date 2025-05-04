@@ -1,5 +1,10 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use vt100::{Parser, Screen};
+use crossterm::{
+    event::{KeyCode, KeyEvent, KeyModifiers},
+    style::ContentStyle,
+};
+use vt100::{Cell, Color, Parser, Screen};
+
+use crate::render::backend::StyleExt;
 
 pub struct TrackedParser {
     inner: Parser,
@@ -70,4 +75,31 @@ pub fn get_ctrl_char(key: &KeyEvent) -> Option<u8> {
         return Some(ctrl_char);
     };
     None
+}
+
+pub fn parse_cell_style(cell: &Cell) -> ContentStyle {
+    let mut style = ContentStyle::default();
+    style.set_bg(parse_color(cell.bgcolor()));
+    style.set_fg(parse_color(cell.fgcolor()));
+    if cell.bold() {
+        style.add_bold();
+    }
+    if cell.italic() {
+        style.add_ital();
+    }
+    if cell.inverse() {
+        style.add_reverse();
+    }
+    if cell.underline() {
+        style.underline(None);
+    }
+    style
+}
+
+fn parse_color(base: Color) -> Option<crossterm::style::Color> {
+    match base {
+        Color::Default => None,
+        Color::Idx(idx) => Some(crossterm::style::Color::AnsiValue(idx)),
+        Color::Rgb(r, g, b) => Some(crossterm::style::Color::Rgb { r, g, b }),
+    }
 }

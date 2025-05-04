@@ -21,7 +21,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tokio::task::JoinHandle;
-use tracked_parser::{get_ctrl_char, TrackedParser};
+use tracked_parser::{get_ctrl_char, parse_cell_style, TrackedParser};
 use vt100::Screen;
 
 use super::backend::StyleExt;
@@ -225,29 +225,28 @@ impl PtyShell {
                     continue;
                 }
                 if let Some(raw_text) = select_lines.next() {
+                    backend.reset_style();
+                    backend.go_to(line.row, line.col);
+
                     if start.line == index {
-                        backend.go_to(line.row, line.col);
                         for cell_col in 0..from.col {
                             if let Some(cell) = screen.cell(from.row, cell_col) {
-                                backend.print(cell.contents());
-                            } else {
-                                backend.print(' ');
+                                let style = parse_cell_style(cell);
+                                backend.print_styled(cell.contents(), style);
                             };
                         }
-                        backend.print_styled(raw_text, ContentStyle::reversed());
-                        continue;
                     }
+
+                    backend.print_styled(raw_text, ContentStyle::reversed());
+
                     if end.line == index {
-                        backend.go_to(line.row, line.col);
-                        backend.print_styled(raw_text, ContentStyle::reversed());
                         let mut cell_col = to.col;
                         while let Some(cell) = screen.cell(to.row, cell_col) {
                             cell_col += 1;
-                            backend.print(cell.contents());
+                            let style = parse_cell_style(cell);
+                            backend.print_styled(cell.contents(), style);
                         }
-                        continue;
                     }
-                    line.render_styled(raw_text, ContentStyle::reversed(), backend);
                 }
             };
         }
