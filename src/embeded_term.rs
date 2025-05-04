@@ -25,6 +25,7 @@ impl EditorTerminal {
             border.fill(BORDERS.horizontal_top, gs.backend());
         }
         if let Some(term) = self.terminal.as_mut() {
+            PtyShell::controls_help(gs);
             term.render(gs.backend());
         }
     }
@@ -95,7 +96,10 @@ impl EditorTerminal {
 
     pub fn resize(&mut self, editor_area: Rect) {
         if let Some(pty) = self.terminal.as_mut() {
-            _ = pty.resize(editor_area);
+            let max_rows = editor_area.height / 2;
+            let mut rect = editor_area.bot(max_rows);
+            self.border = rect.next_line();
+            _ = pty.resize(rect);
         }
     }
 }

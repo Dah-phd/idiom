@@ -66,6 +66,7 @@ pub trait Popup {
         let mut components = Components { gs, ws, tree, term };
         components.re_draw();
         self.force_render(components.gs);
+        components.gs.backend.flush_buf();
         loop {
             if crossterm::event::poll(MIN_FRAMERATE)? {
                 match crossterm::event::read()? {

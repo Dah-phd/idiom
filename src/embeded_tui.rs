@@ -20,6 +20,7 @@ pub fn run_embeded_tui(cmd: Option<&str>, gs: &mut GlobalState) -> IdiomResult<(
         None => PtyShell::default_cmd(rect)?,
     };
 
+    PtyShell::controls_help(gs);
     tui.render(gs.backend());
 
     while !tui.is_finished() {

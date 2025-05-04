@@ -26,6 +26,8 @@ use vt100::Screen;
 
 use super::backend::StyleExt;
 
+const CONTROLS_HELP: &str = "Term Overlay: MouseLeft drag select / MouseRight copy select";
+
 /// Run another tui app within the context of idiom
 pub struct PtyShell {
     pair: PtyPair,
@@ -155,6 +157,7 @@ impl PtyShell {
                     return;
                 };
                 if let Some(clip) = self.last_screen.as_ref().and_then(|screen| self.select.copy_clip(screen)) {
+                    gs.success("Select from embeded copied!");
                     gs.clipboard.push(clip);
                 }
             }
@@ -286,6 +289,11 @@ impl PtyShell {
         }
         self.cursor.resize(rect);
         self.pair.master.resize(rect.into()).map_err(|e| e.to_string())
+    }
+
+    pub fn controls_help(gs: &mut GlobalState) {
+        gs.message(CONTROLS_HELP);
+        gs.message(CONTROLS_HELP);
     }
 }
 
