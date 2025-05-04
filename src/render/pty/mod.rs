@@ -3,13 +3,18 @@ mod tracked_parser;
 
 use crate::{
     error::{IdiomError, IdiomResult},
+    global_state::Clipboard,
     render::{
         backend::{Backend, BackendProtocol},
         layout::Rect,
     },
+    workspace::CursorPosition,
 };
-use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use cursor::{CursorState, Select};
+use crossterm::{
+    event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind},
+    style::ContentStyle,
+};
+use cursor::{CursorState, Position, Select};
 use portable_pty::{native_pty_system, Child, CommandBuilder, PtyPair, PtySize};
 use std::{
     io::{Read, Write},
@@ -18,6 +23,8 @@ use std::{
 use tokio::task::JoinHandle;
 use tracked_parser::{get_ctrl_char, TrackedParser};
 use vt100::Screen;
+
+use super::backend::StyleExt;
 
 /// Run another tui app within the context of idiom
 pub struct PtyShell {
@@ -79,7 +86,17 @@ impl PtyShell {
         })
     }
 
-    pub fn map_key(&mut self, key: &KeyEvent) -> std::io::Result<()> {
+    pub fn map_key(&mut self, key: &KeyEvent, clipboard: &mut Clipboard) -> std::io::Result<()> {
+        if let KeyEvent {
+            code: KeyCode::Char('c' | 'C'), modifiers: KeyModifiers::CONTROL | KeyModifiers::SHIFT, ..
+        } = key
+        {
+            if let Some(clip) = self.copy() {
+                clipboard.push(clip);
+            }
+            return Ok(());
+        }
+
         self.select.clear();
 
         if let Some(ctrl_char) = get_ctrl_char(key) {
@@ -135,11 +152,31 @@ impl PtyShell {
         self.writer.write_all(clip.as_bytes())
     }
 
+    pub fn copy(&self) -> Option<String> {
+        let screen = match self.output.lock() {
+            Ok(mut lock) => lock.screen(),
+            Err(error) => {
+                let mut lock = error.into_inner();
+                lock.screen()
+            }
+        };
+        let (from, to) = self.select.get()?;
+        let clip = screen.contents_between(from.row, from.col, to.row, to.col);
+        Some(clip)
+    }
+
     pub fn fast_render(&mut self, backend: &mut Backend) {
+        if self.select.collect_update() {
+            return self.render(backend);
+        }
+
         let Ok(Some(screen)) = self.output.try_lock().map(|mut lock| lock.new_screen()) else {
             return;
         };
-        self.full_render(screen, backend);
+        match self.select.get() {
+            Some(select) => self.render_with_select(screen, select, backend),
+            None => self.render_no_select(screen, backend),
+        };
     }
 
     pub fn render(&mut self, backend: &mut Backend) {
@@ -150,10 +187,13 @@ impl PtyShell {
                 lock.screen()
             }
         };
-        self.full_render(screen, backend);
+        match self.select.get() {
+            Some(select) => self.render_with_select(screen, select, backend),
+            None => self.render_no_select(screen, backend),
+        };
     }
 
-    fn full_render(&mut self, screen: Screen, backend: &mut Backend) {
+    fn render_no_select(&mut self, screen: Screen, backend: &mut Backend) {
         let reset_style = backend.get_style();
         backend.reset_style();
         self.rect.clear(backend);
@@ -162,6 +202,53 @@ impl PtyShell {
             if let Some(text) = text.next() {
                 backend.go_to(line.row, line.col);
                 _ = backend.write_all(&text);
+            };
+        }
+        backend.set_style(reset_style);
+        self.cursor.apply(&screen, backend);
+    }
+
+    fn render_with_select(&mut self, screen: Screen, (from, to): (Position, Position), backend: &mut Backend) {
+        let reset_style = backend.get_style();
+        backend.reset_style();
+        self.rect.clear(backend);
+        let mut text = screen.rows_formatted(0, self.rect.width as u16).enumerate();
+        let select_text = screen.contents_between(from.row, from.col, to.row, to.col);
+        let mut select_lines = select_text.lines();
+        let start = CursorPosition::from(from);
+        let end = CursorPosition::from(to);
+        for line in self.rect.into_iter() {
+            if let Some((index, text)) = text.next() {
+                if index < start.line || index > end.line {
+                    backend.go_to(line.row, line.col);
+                    _ = backend.write_all(&text);
+                    continue;
+                }
+                if let Some(raw_text) = select_lines.next() {
+                    if start.line == index {
+                        backend.go_to(line.row, line.col);
+                        for cell_col in 0..from.col {
+                            if let Some(cell) = screen.cell(from.row, cell_col) {
+                                backend.print(cell.contents());
+                            } else {
+                                backend.print(' ');
+                            };
+                        }
+                        backend.print_styled(raw_text, ContentStyle::reversed());
+                        continue;
+                    }
+                    if end.line == index {
+                        backend.go_to(line.row, line.col);
+                        backend.print_styled(raw_text, ContentStyle::reversed());
+                        let mut cell_col = to.col;
+                        while let Some(cell) = screen.cell(to.row, cell_col) {
+                            cell_col += 1;
+                            backend.print(cell.contents());
+                        }
+                        continue;
+                    }
+                    line.render_styled(raw_text, ContentStyle::reversed(), backend);
+                }
             };
         }
         backend.set_style(reset_style);
