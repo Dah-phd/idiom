@@ -33,8 +33,8 @@ pub struct PtyShell {
     pair: PtyPair,
     child: Box<dyn Child + Send + Sync>,
     writer: Box<dyn Write + Send>,
-    output_handler: JoinHandle<std::io::Result<()>>,
-    output: Arc<Mutex<TrackedParser>>,
+    process_handle: JoinHandle<std::io::Result<()>>,
+    parser: Arc<Mutex<TrackedParser>>,
     last_screen: Option<Screen>,
     rect: Rect,
     cursor: CursorState,
@@ -82,8 +82,8 @@ impl PtyShell {
             pair,
             child,
             writer,
-            output,
-            output_handler,
+            parser: output,
+            process_handle: output_handler,
             last_screen: None,
             cursor: CursorState::from(rect),
             select: Select::default(),
@@ -165,7 +165,7 @@ impl PtyShell {
             return self.render(backend);
         }
 
-        let Ok(Some(screen)) = self.output.try_lock().map(|mut lock| lock.new_screen()) else {
+        let Ok(Some(screen)) = self.parser.try_lock().map(|mut lock| lock.new_screen()) else {
             return;
         };
         match self.select.get() {
@@ -175,7 +175,7 @@ impl PtyShell {
     }
 
     pub fn render(&mut self, backend: &mut Backend) {
-        let screen = match self.output.lock() {
+        let screen = match self.parser.lock() {
             Ok(mut lock) => lock.screen(),
             Err(error) => {
                 let mut lock = error.into_inner();
@@ -276,7 +276,7 @@ impl PtyShell {
 
 impl Drop for PtyShell {
     fn drop(&mut self) {
-        self.output_handler.abort();
+        self.process_handle.abort();
         _ = self.child.kill();
         Backend::hide_cursor();
     }
