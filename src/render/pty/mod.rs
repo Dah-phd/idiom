@@ -16,13 +16,9 @@ use crossterm::{
 };
 use cursor::{CursorState, Position, Select};
 use portable_pty::{native_pty_system, Child, CommandBuilder, PtyPair, PtySize};
-use std::{
-    io::{Read, Write},
-    sync::{Arc, Mutex},
-};
+use std::io::{Read, Write};
 use tokio::task::JoinHandle;
 use tracked_parser::{get_ctrl_char, parse_cell_style, TrackedParser};
-use vt100::Screen;
 
 use super::backend::StyleExt;
 
@@ -34,8 +30,7 @@ pub struct PtyShell {
     child: Box<dyn Child + Send + Sync>,
     writer: Box<dyn Write + Send>,
     process_handle: JoinHandle<std::io::Result<()>>,
-    parser: Arc<Mutex<TrackedParser>>,
-    last_screen: Option<Screen>,
+    parser: TrackedParser,
     rect: Rect,
     cursor: CursorState,
     select: Select,
@@ -59,21 +54,18 @@ impl PtyShell {
         let child = pair.slave.spawn_command(cmd).map_err(IdiomError::any)?;
         let writer = pair.master.take_writer().map_err(IdiomError::any)?;
         let mut reader = pair.master.try_clone_reader().map_err(IdiomError::any)?;
-        let output = Arc::new(Mutex::new(TrackedParser::new(size.rows, size.cols)));
-        let output_writer = Arc::clone(&output);
+        let output = TrackedParser::new(size.rows, size.cols);
+        let output_writer = output.buffers_access();
 
         let output_handler = tokio::spawn(async move {
             let mut buf = [0u8; 8192];
-            let mut processed_buf = Vec::new();
             loop {
                 let size = reader.read(&mut buf)?;
                 if size == 0 {
                     return Ok(());
                 }
-                processed_buf.extend_from_slice(&buf[..size]);
                 let mut lock = output_writer.lock().expect("lock on PtyShell read");
-                lock.process(&processed_buf);
-                processed_buf.clear();
+                lock.extend_from_slice(&buf[..size]);
             }
         });
 
@@ -84,7 +76,6 @@ impl PtyShell {
             writer,
             parser: output,
             process_handle: output_handler,
-            last_screen: None,
             cursor: CursorState::from(rect),
             select: Select::default(),
         })
@@ -146,7 +137,7 @@ impl PtyShell {
                 if position < start || position > end {
                     return;
                 };
-                if let Some(clip) = self.last_screen.as_ref().and_then(|screen| self.select.copy_clip(screen)) {
+                if let Some(clip) = self.select.copy_clip(self.parser.screen()) {
                     gs.success("Select from embeded copied!");
                     gs.clipboard.push(clip);
                 }
@@ -165,30 +156,26 @@ impl PtyShell {
             return self.render(backend);
         }
 
-        let Ok(Some(screen)) = self.parser.try_lock().map(|mut lock| lock.new_screen()) else {
+        if !self.parser.try_parse() {
             return;
-        };
+        }
+
         match self.select.get() {
-            Some(select) => self.render_with_select(screen, select, backend),
-            None => self.render_no_select(screen, backend),
+            Some(select) => self.render_with_select(select, backend),
+            None => self.render_no_select(backend),
         };
     }
 
     pub fn render(&mut self, backend: &mut Backend) {
-        let screen = match self.parser.lock() {
-            Ok(mut lock) => lock.screen(),
-            Err(error) => {
-                let mut lock = error.into_inner();
-                lock.screen()
-            }
-        };
+        _ = self.parser.try_parse();
         match self.select.get() {
-            Some(select) => self.render_with_select(screen, select, backend),
-            None => self.render_no_select(screen, backend),
+            Some(select) => self.render_with_select(select, backend),
+            None => self.render_no_select(backend),
         };
     }
 
-    fn render_no_select(&mut self, screen: Screen, backend: &mut Backend) {
+    fn render_no_select(&mut self, backend: &mut Backend) {
+        let screen = self.parser.screen();
         let reset_style = backend.get_style();
         backend.reset_style();
         self.rect.clear(backend);
@@ -202,11 +189,11 @@ impl PtyShell {
             }
         }
         backend.set_style(reset_style);
-        self.cursor.apply(&screen, backend);
-        self.last_screen = Some(screen);
+        self.cursor.apply(screen, backend);
     }
 
-    fn render_with_select(&mut self, screen: Screen, (from, to): (Position, Position), backend: &mut Backend) {
+    fn render_with_select(&mut self, (from, to): (Position, Position), backend: &mut Backend) {
+        let screen = self.parser.screen();
         let reset_style = backend.get_style();
         backend.reset_style();
         self.rect.clear(backend);
@@ -251,8 +238,7 @@ impl PtyShell {
             }
         }
         backend.set_style(reset_style);
-        self.cursor.apply(&screen, backend);
-        self.last_screen = Some(screen);
+        self.cursor.apply(screen, backend);
     }
 
     pub fn is_finished(&mut self) -> bool {

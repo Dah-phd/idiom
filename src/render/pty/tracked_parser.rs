@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use crossterm::{
     event::{KeyCode, KeyEvent, KeyModifiers},
     style::ContentStyle,
@@ -7,31 +9,34 @@ use vt100::{Cell, Color, Parser, Screen};
 use crate::render::backend::StyleExt;
 
 pub struct TrackedParser {
+    buffers: Arc<Mutex<Vec<u8>>>,
     inner: Parser,
-    updated: bool,
 }
 
 impl TrackedParser {
     pub fn new(rows: u16, cols: u16) -> Self {
-        Self { inner: Parser::new(rows, cols, 2000), updated: false }
+        Self { inner: Parser::new(rows, cols, 2000), buffers: Arc::default() }
     }
 
-    pub fn process(&mut self, bytes: &[u8]) {
-        self.updated = true;
-        self.inner.process(bytes);
+    pub fn buffers_access(&self) -> Arc<Mutex<Vec<u8>>> {
+        Arc::clone(&self.buffers)
     }
 
-    pub fn new_screen(&mut self) -> Option<Screen> {
-        if !self.updated {
-            return None;
+    pub fn try_parse(&mut self) -> bool {
+        let Ok(mut lock) = self.buffers.try_lock() else {
+            return false;
+        };
+        if lock.is_empty() {
+            return false;
         }
-        self.updated = false;
-        Some(self.inner.screen().clone())
+        let bytes = lock.drain(..).collect::<Vec<u8>>();
+        drop(lock);
+        self.inner.process(&bytes);
+        true
     }
 
-    pub fn screen(&mut self) -> Screen {
-        self.updated = false;
-        self.inner.screen().clone()
+    pub fn screen(&self) -> &Screen {
+        self.inner.screen()
     }
 }
 
