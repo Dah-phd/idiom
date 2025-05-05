@@ -140,7 +140,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResul
                     gs.full_resize(height, width);
                     let editor_rect = gs.calc_editor_rect();
                     workspace.resize_all(editor_rect.width, editor_rect.height as usize);
-                    term.resize(gs.editor_area);
+                    term.resize(editor_rect);
                 }
                 Event::Mouse(event) => gs.map_mouse(event, &mut tree, &mut workspace, &mut term),
                 Event::Paste(clip) => {

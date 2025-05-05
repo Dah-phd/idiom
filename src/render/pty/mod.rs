@@ -54,17 +54,17 @@ impl PtyShell {
         let child = pair.slave.spawn_command(cmd).map_err(IdiomError::any)?;
         let writer = pair.master.take_writer().map_err(IdiomError::any)?;
         let mut reader = pair.master.try_clone_reader().map_err(IdiomError::any)?;
-        let output = TrackedParser::new(size.rows, size.cols);
-        let output_writer = output.buffers_access();
+        let parser = TrackedParser::new(size.rows, size.cols);
+        let buffer = parser.buffer_access();
 
-        let output_handler = tokio::spawn(async move {
+        let process_handle = tokio::spawn(async move {
             let mut buf = [0u8; 8192];
             loop {
                 let size = reader.read(&mut buf)?;
                 if size == 0 {
                     return Ok(());
                 }
-                let mut lock = output_writer.lock().expect("lock on PtyShell read");
+                let mut lock = buffer.lock().expect("lock on PtyShell read");
                 lock.extend_from_slice(&buf[..size]);
             }
         });
@@ -74,8 +74,8 @@ impl PtyShell {
             pair,
             child,
             writer,
-            parser: output,
-            process_handle: output_handler,
+            parser,
+            process_handle,
             cursor: CursorState::from(rect),
             select: Select::default(),
         })
@@ -250,8 +250,13 @@ impl PtyShell {
         if rect == self.rect {
             return Ok(());
         }
+
+        self.rect = rect;
         self.cursor.resize(rect);
-        self.pair.master.resize(rect.into()).map_err(|e| e.to_string())
+
+        let size = PtySize::from(rect);
+        self.parser.resize(size.rows, size.cols);
+        self.pair.master.resize(size).map_err(|e| e.to_string())
     }
 
     pub fn controls_help(gs: &mut GlobalState) {

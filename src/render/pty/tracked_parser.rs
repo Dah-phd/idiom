@@ -18,7 +18,11 @@ impl TrackedParser {
         Self { inner: Parser::new(rows, cols, 2000), buffers: Arc::default() }
     }
 
-    pub fn buffers_access(&self) -> Arc<Mutex<Vec<u8>>> {
+    pub fn resize(&mut self, rows: u16, cols: u16) {
+        self.inner.set_size(rows, cols);
+    }
+
+    pub fn buffer_access(&self) -> Arc<Mutex<Vec<u8>>> {
         Arc::clone(&self.buffers)
     }
 

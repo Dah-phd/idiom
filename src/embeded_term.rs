@@ -94,10 +94,10 @@ impl EditorTerminal {
         }
     }
 
-    pub fn resize(&mut self, editor_area: Rect) {
+    pub fn resize(&mut self, rect: Rect) {
         if let Some(pty) = self.terminal.as_mut() {
-            let max_rows = editor_area.height / 2;
-            let mut rect = editor_area.bot(max_rows);
+            let max_rows = rect.height / 2;
+            let mut rect = rect.bot(max_rows);
             self.border = rect.next_line();
             _ = pty.resize(rect);
         }
