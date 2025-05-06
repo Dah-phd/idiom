@@ -1,6 +1,8 @@
 ## Includes only major changes (manual updates)
 # Version 0.5.0
 * git integration
+* embeded tui apps
+* imporved terminal integration
 
 # Version 0.4.9
 * added context menus (right click) on editor/tree

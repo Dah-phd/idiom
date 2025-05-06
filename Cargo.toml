@@ -1,7 +1,7 @@
 [package]
 rust-version = "1.76"
 name = "idiom"
-version = "0.4.10"
+version = "0.5.0"
 edition = "2021"
 include = [
     "src/**/*",
@@ -18,9 +18,9 @@ authors = ["Daniel Nikolaev <toolsproed@gmail.com>"]
 
 [dependencies]
 bitflags = "2.9.0"
-clap = {version = "4.5.31", features = ["derive"]}
+clap = {version = "4.5.37", features = ["derive"]}
 coolor = "1.0.0"
-copypasta = "0.10.1"
+copypasta = "0.10.2"
 crossterm = "0.29.0"
 dirs = "6.0.0"
 fuzzy-matcher = "0.3.7"
@@ -35,15 +35,15 @@ serde = { version = "1.0.218", features = ["derive"] }
 serde_json = "1.0.140"
 strip-ansi-escapes = "0.2.1"
 thiserror = "2.0.12"
-toml = "0.8.20"
-tokio = { version="1.43.0", features=["rt", "macros", "rt-multi-thread", "process", "io-util"] }
-tokio-util = { version="0.7.13", features = ["codec", "io"] }
+toml = "0.8.22"
+tokio = { version="1.45.0", features=["rt", "macros", "rt-multi-thread", "process", "io-util"] }
+tokio-util = { version="0.7.15", features = ["codec", "io"] }
 tokio-stream = "0.1.17"
 unicode-width = "0.2.0"
 vt100 = "0.15.2"
 
 [target.'cfg(unix)'.dependencies]
-xterm-query = "0.5.0"
+xterm-query = "0.5.2"
 
 [profile.dev]
 debug = true

@@ -27,6 +27,8 @@ Python should work for the most part with jedi, but the interaction is not well 
 - Linux Mint
 
 ## TODO
+- migrate to markdown 1.0.0
+- persistent state (keeping changes after close witout saving)
 - fix tracking edgecase where file is changed in by other app in select
 - improve cursor handle in embeded tui / terminal
 - write tests
