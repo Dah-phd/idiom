@@ -71,7 +71,7 @@ impl EditorTerminal {
             }
             event_key => {
                 if let Some(term) = self.terminal.as_mut() {
-                    if let Err(error) = term.map_key(event_key) {
+                    if let Err(error) = term.map_key(event_key, gs) {
                         gs.error(error);
                         self.terminal.take();
                         gs.toggle_terminal(self);

@@ -22,6 +22,20 @@ impl TrackedParser {
         self.inner.set_size(rows, cols);
     }
 
+    pub fn scroll_up(&mut self) {
+        let cur_scroll = self.inner.screen().scrollback();
+        self.inner.set_scrollback(cur_scroll + 1);
+    }
+
+    pub fn scroll_down(&mut self) {
+        let cur_scroll = self.inner.screen().scrollback();
+        self.inner.set_scrollback(cur_scroll.checked_sub(1).unwrap_or_default());
+    }
+
+    pub fn scroll_to_end(&mut self) {
+        self.inner.set_scrollback(0);
+    }
+
     pub fn buffer_access(&self) -> Arc<Mutex<Vec<u8>>> {
         Arc::clone(&self.buffers)
     }

@@ -1,5 +1,5 @@
 mod cursor;
-mod tracked_parser;
+mod parser;
 
 use crate::{
     error::{IdiomError, IdiomResult},
@@ -11,14 +11,14 @@ use crate::{
     workspace::CursorPosition,
 };
 use crossterm::{
-    event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind},
+    event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind},
     style::ContentStyle,
 };
 use cursor::{CursorState, Position, Select};
+use parser::{get_ctrl_char, parse_cell_style, TrackedParser};
 use portable_pty::{native_pty_system, Child, CommandBuilder, PtyPair, PtySize};
 use std::io::{Read, Write};
 use tokio::task::JoinHandle;
-use tracked_parser::{get_ctrl_char, parse_cell_style, TrackedParser};
 
 use super::backend::StyleExt;
 
@@ -81,8 +81,26 @@ impl PtyShell {
         })
     }
 
-    pub fn map_key(&mut self, key: &KeyEvent) -> std::io::Result<()> {
+    pub fn map_key(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> std::io::Result<()> {
         self.select.clear();
+
+        if key.modifiers == KeyModifiers::CONTROL | KeyModifiers::SHIFT {
+            match key.code {
+                KeyCode::Down => {
+                    self.parser.scroll_down();
+                    self.inner_render(gs.backend());
+                    return Ok(());
+                }
+                KeyCode::Up => {
+                    self.parser.scroll_up();
+                    self.inner_render(gs.backend());
+                    return Ok(());
+                }
+                _ => {}
+            }
+        }
+
+        self.parser.scroll_to_end();
 
         if let Some(ctrl_char) = get_ctrl_char(key) {
             return self.writer.write_all(&[ctrl_char]);
@@ -140,7 +158,23 @@ impl PtyShell {
                 if let Some(clip) = self.select.copy_clip(self.parser.screen()) {
                     gs.success("Select from embeded copied!");
                     gs.clipboard.push(clip);
-                }
+                };
+            }
+            MouseEvent { kind: MouseEventKind::ScrollUp, column, row, .. } => {
+                if self.rect.raw_relative_position(row, column).is_none() {
+                    return;
+                };
+                self.select.clear();
+                self.parser.scroll_up();
+                self.inner_render(gs.backend());
+            }
+            MouseEvent { kind: MouseEventKind::ScrollDown, column, row, .. } => {
+                if self.rect.raw_relative_position(row, column).is_none() {
+                    return;
+                };
+                self.select.clear();
+                self.parser.scroll_down();
+                self.inner_render(gs.backend());
             }
             _ => (),
         }
@@ -159,15 +193,15 @@ impl PtyShell {
         if !self.parser.try_parse() {
             return;
         }
-
-        match self.select.get() {
-            Some(select) => self.render_with_select(select, backend),
-            None => self.render_no_select(backend),
-        };
+        self.inner_render(backend);
     }
 
     pub fn render(&mut self, backend: &mut Backend) {
         _ = self.parser.try_parse();
+        self.inner_render(backend);
+    }
+
+    fn inner_render(&mut self, backend: &mut Backend) {
         match self.select.get() {
             Some(select) => self.render_with_select(select, backend),
             None => self.render_no_select(backend),
