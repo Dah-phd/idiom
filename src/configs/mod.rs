@@ -57,11 +57,21 @@ impl TreeKeyMap {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize)]
 pub struct KeyMap {
     general_key_map: Option<GeneralUserKeyMap>,
     editor_key_map: Option<EditorUserKeyMap>,
     tree_key_map: Option<TreeUserKeyMap>,
+}
+
+impl Default for KeyMap {
+    fn default() -> Self {
+        Self {
+            general_key_map: Some(GeneralUserKeyMap::default()),
+            editor_key_map: Some(EditorUserKeyMap::default()),
+            tree_key_map: Some(TreeUserKeyMap::default()),
+        }
+    }
 }
 
 impl KeyMap {

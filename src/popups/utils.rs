@@ -1,16 +1,3 @@
-use crate::{
-    global_state::{IdiomEvent, PopupMessage},
-    workspace::CursorPosition,
-};
-
-pub fn into_message(maybe_position: Option<(CursorPosition, CursorPosition)>) -> PopupMessage {
-    if let Some(select) = maybe_position {
-        PopupMessage::Event(IdiomEvent::GoToSelect { select, clear_popup: false })
-    } else {
-        PopupMessage::None
-    }
-}
-
 pub fn next_option<T: Clone>(options: &[T], state: &mut usize) -> Option<T> {
     if options.is_empty() {
         *state = 0;

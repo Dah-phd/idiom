@@ -55,6 +55,11 @@ impl Messages {
         }
     }
 
+    #[inline]
+    pub fn should_render(&self) -> bool {
+        self.active
+    }
+
     pub fn fast_render(&mut self, accent_style: ContentStyle, backend: &mut Backend) {
         if !self.active {
             return;

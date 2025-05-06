@@ -33,10 +33,22 @@ impl Rect {
     pub fn relative_position(&self, row: u16, column: u16) -> Option<CursorPosition> {
         match self.col <= column
             && self.row <= row
-            && row <= self.row + self.height
-            && column <= self.col + self.width as u16
+            && row < self.row + self.height
+            && column < self.col + self.width as u16
         {
             true => Some(CursorPosition { line: (row - self.row) as usize, char: (column - self.col) as usize }),
+            false => None,
+        }
+    }
+
+    /// return Option<(Row(u16), Col(u16))>
+    pub fn raw_relative_position(&self, row: u16, column: u16) -> Option<(u16, u16)> {
+        match self.col <= column
+            && self.row <= row
+            && row < self.row + self.height
+            && column < self.col + self.width as u16
+        {
+            true => Some((row - self.row, column - self.col)),
             false => None,
         }
     }
@@ -231,6 +243,12 @@ impl Rect {
     }
 
     #[inline]
+    pub fn with_borders(mut self) -> Self {
+        self.bordered();
+        self
+    }
+
+    #[inline]
     pub fn top_border(&mut self) -> &mut Self {
         self.row += 1;
         self.height -= 1;
@@ -313,12 +331,7 @@ impl Rect {
     #[inline]
     pub fn border_title_bot_styled(&self, text: &str, style: ContentStyle, backend: &mut Backend) {
         if self.borders.contains(Borders::BOTTOM) {
-            return backend.print_styled_at(
-                self.row + self.height + 1,
-                self.col,
-                text.truncate_width(self.width).1,
-                style,
-            );
+            backend.print_styled_at(self.row + self.height + 1, self.col, text.truncate_width(self.width).1, style)
         }
     }
 

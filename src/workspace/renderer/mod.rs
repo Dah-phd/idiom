@@ -55,7 +55,7 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     let mut lines = gs.editor_area.into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
     ctx.correct_last_line_match(&mut editor.content, lines.len());
-    let backend = &mut gs.writer;
+    let backend = &mut gs.backend;
 
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
         let line = match lines.next() {
@@ -76,7 +76,7 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
 
     if !ctx.lexer.modal_is_rendered() {
         for line in lines {
-            line.render_empty(&mut gs.writer);
+            line.render_empty(&mut gs.backend);
         }
     }
 
@@ -93,7 +93,7 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
     editor.last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area.into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
-    let backend = &mut gs.writer;
+    let backend = &mut gs.backend;
 
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
         let line = match lines.next() {
@@ -109,7 +109,7 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
     }
 
     for line in lines {
-        line.render_empty(&mut gs.writer);
+        line.render_empty(&mut gs.backend);
     }
 
     gs.render_stats(editor.content.len(), cursor.select_len(&editor.content), cursor.into());
@@ -136,7 +136,7 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
     editor.last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area.into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
-    let backend = &mut gs.writer;
+    let backend = &mut gs.backend;
 
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
@@ -161,7 +161,7 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
     }
 
     for line in lines {
-        line.render_empty(&mut gs.writer);
+        line.render_empty(&mut gs.backend);
     }
 
     gs.render_stats(editor.content.len(), cursor.select_len(&editor.content), cursor.into());
@@ -176,7 +176,7 @@ fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     editor.last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area.into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
-    let backend = &mut gs.writer;
+    let backend = &mut gs.backend;
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
             break;
@@ -190,7 +190,7 @@ fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     }
 
     for line in lines {
-        line.render_empty(&mut gs.writer);
+        line.render_empty(&mut gs.backend);
     }
 
     gs.render_stats(editor.content.len(), cursor.select_len(&editor.content), cursor.into());
@@ -211,7 +211,7 @@ fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     editor.last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area.into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
-    let backend = &mut gs.writer;
+    let backend = &mut gs.backend;
 
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
@@ -226,7 +226,7 @@ fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     }
 
     for line in lines {
-        line.render_empty(&mut gs.writer);
+        line.render_empty(&mut gs.backend);
     }
 
     gs.render_stats(editor.content.len(), cursor.select_len(&editor.content), cursor.into());
@@ -245,7 +245,7 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
     editor.last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area.into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
-    let backend = &mut gs.writer;
+    let backend = &mut gs.backend;
 
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
@@ -270,7 +270,7 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
     }
 
     for line in lines {
-        line.render_empty(&mut gs.writer);
+        line.render_empty(&mut gs.backend);
     }
 
     gs.render_stats(editor.content.len(), cursor.select_len(&editor.content), cursor.into());

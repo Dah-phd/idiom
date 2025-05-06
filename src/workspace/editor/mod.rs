@@ -409,7 +409,7 @@ impl Editor {
         }
     }
 
-    pub fn find_with_line(&mut self, pat: &str) -> Vec<((CursorPosition, CursorPosition), String)> {
+    pub fn find_with_select(&mut self, pat: &str) -> Vec<((CursorPosition, CursorPosition), String)> {
         let mut buffer = Vec::new();
         if pat.is_empty() {
             return buffer;

@@ -4,12 +4,12 @@ pub mod editor;
 pub mod line;
 pub mod renderer;
 pub mod utils;
+use crate::popups::popups_editor::file_updated;
 use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
     error::{IdiomError, IdiomResult},
     global_state::{GlobalState, IdiomEvent},
     lsp::LSP,
-    popups::popups_editor::file_updated,
     render::backend::{BackendProtocol, StyleExt},
     utils::TrackedList,
 };
@@ -29,7 +29,7 @@ const FILE_STATUS_ERR: &str = "File status ERR";
 /// implement Drop to attempt keep state upon close/crash
 pub struct Workspace {
     editors: TrackedList<Editor>,
-    base_config: EditorConfigs,
+    base_configs: EditorConfigs,
     key_map: EditorKeyMap,
     tab_style: ContentStyle,
     lsp_servers: HashMap<FileType, LSP>,
@@ -37,9 +37,9 @@ pub struct Workspace {
 }
 
 impl Workspace {
-    pub async fn new(key_map: EditorKeyMap, base_config: EditorConfigs, lsp_servers: HashMap<FileType, LSP>) -> Self {
+    pub async fn new(key_map: EditorKeyMap, base_configs: EditorConfigs, lsp_servers: HashMap<FileType, LSP>) -> Self {
         let tab_style = ContentStyle::fg(Color::DarkYellow);
-        Self { editors: TrackedList::new(), base_config, key_map, lsp_servers, map_callback: map_editor, tab_style }
+        Self { editors: TrackedList::new(), base_configs, key_map, lsp_servers, map_callback: map_editor, tab_style }
     }
 
     pub fn render(&mut self, gs: &mut GlobalState) {
@@ -48,9 +48,9 @@ impl Workspace {
                 Some(line) => line,
                 None => return,
             };
-            gs.writer.set_style(ContentStyle::underlined(None));
+            gs.backend.set_style(ContentStyle::underlined(None));
             {
-                let mut builder = line.unsafe_builder(&mut gs.writer);
+                let mut builder = line.unsafe_builder(&mut gs.backend);
                 builder.push_styled(&editor.display, self.tab_style);
                 for editor in self.editors.iter().skip(1) {
                     if !builder.push(" | ") || !builder.push(&editor.display) {
@@ -58,9 +58,9 @@ impl Workspace {
                     };
                 }
             }
-            gs.writer.reset_style();
+            gs.backend.reset_style();
         } else if let Some(line) = gs.tab_area.into_iter().next() {
-            line.render_empty(&mut gs.writer);
+            line.render_empty(&mut gs.backend);
         }
     }
 
@@ -134,7 +134,7 @@ impl Workspace {
             editor.clear_screen_cache(gs);
             gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
             if editor.update_status.collect() {
-                gs.popup(file_updated(editor.path.clone()))
+                gs.event.push(file_updated(editor.path.clone()).into());
             }
             self.editors.insert(0, editor);
         }
@@ -248,7 +248,7 @@ impl Workspace {
     }
 
     fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
-        Editor::from_path(file_path, FileType::Ignored, &self.base_config, gs)
+        Editor::from_path(file_path, FileType::Ignored, &self.base_configs, gs)
     }
 
     async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
@@ -256,13 +256,13 @@ impl Workspace {
             Some(file_type) => file_type,
             None => {
                 return match file_path.extension().and_then(|ext| ext.to_str()) {
-                    Some(ext) if ext.to_lowercase() == "md" => Editor::from_path_md(file_path, &self.base_config, gs),
-                    _ => Editor::from_path_text(file_path, &self.base_config, gs),
+                    Some(ext) if ext.to_lowercase() == "md" => Editor::from_path_md(file_path, &self.base_configs, gs),
+                    _ => Editor::from_path_text(file_path, &self.base_configs, gs),
                 }
             }
         };
-        let mut new = Editor::from_path(file_path, file_type, &self.base_config, gs)?;
-        let lsp_cmd = match self.base_config.derive_lsp(&new.file_type) {
+        let mut new = Editor::from_path(file_path, file_type, &self.base_configs, gs)?;
+        let lsp_cmd = match self.base_configs.derive_lsp(&new.file_type) {
             None => {
                 new.lexer.local_lsp(file_type, new.stringify(), gs);
                 return Ok(new);
@@ -300,7 +300,7 @@ impl Workspace {
             let mut editor = self.editors.remove(idx);
             editor.clear_screen_cache(gs);
             if editor.update_status.collect() {
-                gs.popup(file_updated(editor.path.clone()));
+                gs.event.push(file_updated(editor.path.clone()).into());
             }
             self.editors.insert(0, editor);
             return Ok(false);
@@ -366,7 +366,7 @@ impl Workspace {
                 }
                 editor.update_status.mark_updated();
                 if idx == 0 && editor.update_status.collect() {
-                    gs.popup(file_updated(path));
+                    gs.event.push(file_updated(path).into());
                 }
                 return;
             }
@@ -382,13 +382,13 @@ impl Workspace {
         match self.get_active() {
             None => {
                 gs.clear_stats();
-                gs.editor_area.clear(&mut gs.writer);
+                gs.editor_area.clear(&mut gs.backend);
                 gs.select_mode();
             }
             Some(editor) => {
                 editor.clear_screen_cache(gs);
                 if editor.update_status.collect() {
-                    gs.popup(file_updated(editor.path.clone()));
+                    gs.event.push(file_updated(editor.path.clone()).into());
                 }
             }
         }
@@ -418,7 +418,7 @@ impl Workspace {
         gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
         editor.clear_screen_cache(gs);
         if editor.update_status.collect() {
-            gs.popup(file_updated(editor.path.clone()));
+            gs.event.push(file_updated(editor.path.clone()).into());
         }
         self.editors.insert(0, editor);
         self.toggle_editor();
@@ -431,11 +431,11 @@ impl Workspace {
         }
     }
 
-    pub fn refresh_cfg(&mut self, new_editor_key_map: EditorKeyMap, gs: &mut GlobalState) {
+    pub fn refresh_cfg(&mut self, new_editor_key_map: EditorKeyMap, gs: &mut GlobalState) -> &mut EditorConfigs {
         self.key_map = new_editor_key_map;
-        gs.unwrap_or_default(self.base_config.refresh(), ".config: ");
+        gs.unwrap_or_default(self.base_configs.refresh(), ".config: ");
         for editor in self.editors.iter_mut() {
-            editor.refresh_cfg(&self.base_config);
+            editor.refresh_cfg(&self.base_configs);
             editor.lexer.reload_theme(gs);
             if let Some(lsp) = self.lsp_servers.get(&editor.file_type) {
                 if !editor.lexer.lsp {
@@ -443,12 +443,7 @@ impl Workspace {
                 }
             }
         }
-    }
-
-    pub async fn graceful_exit(&mut self) {
-        for (_, lsp) in self.lsp_servers.iter_mut() {
-            let _ = lsp.graceful_exit().await;
-        }
+        &mut self.base_configs
     }
 }
 
@@ -494,7 +489,7 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
                 let editor = &mut ws.editors.inner_mut_no_update()[0];
                 editor.clear_screen_cache(gs);
                 if editor.update_status.collect() {
-                    gs.popup(file_updated(editor.path.clone()));
+                    gs.event.push(file_updated(editor.path.clone()).into());
                 }
                 gs.event.push(IdiomEvent::SelectPath(ws.editors.inner()[0].path.clone()));
             }
@@ -503,7 +498,7 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
                     gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
                     editor.clear_screen_cache(gs);
                     if editor.update_status.collect() {
-                        gs.popup(file_updated(editor.path.clone()));
+                        gs.event.push(file_updated(editor.path.clone()).into());
                     }
                     ws.editors.insert(0, editor);
                 }
@@ -529,7 +524,7 @@ pub fn add_editor_from_data(
     file_type: FileType,
     gs: &mut GlobalState,
 ) {
-    let editor = editor_from_data(path, content, file_type, &workspace.base_config, gs);
+    let editor = editor_from_data(path, content, file_type, &workspace.base_configs, gs);
     workspace.editors.insert(0, editor);
 }
 

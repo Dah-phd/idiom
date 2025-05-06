@@ -6,7 +6,7 @@ use std::{
 use crate::{
     error::{IdiomError, IdiomResult},
     global_state::{GlobalState, IdiomEvent},
-    popups::PopupSelector,
+    popups::generic_selector::PopupSelector,
 };
 
 #[derive(Default, Debug)]
@@ -29,7 +29,7 @@ impl FileClipboard {
         self.action_type = ActionType::None;
     }
 
-    pub fn get_mark(&self, path: &PathBuf) -> Option<&str> {
+    pub fn get_mark(&self, path: &Path) -> Option<&str> {
         match self.action_type {
             ActionType::None => None,
             ActionType::Copy => match self.check_if_selected(path) {
@@ -91,7 +91,7 @@ impl FileClipboard {
 
     pub fn paste<P: AsRef<Path>>(&mut self, selected_path: P, gs: &mut GlobalState) {
         match std::mem::take(&mut self.action_type) {
-            ActionType::None => return,
+            ActionType::None => (),
             ActionType::Copy => {
                 let mut error_list = Vec::new();
                 let mut dest = PathBuf::new();
@@ -100,7 +100,7 @@ impl FileClipboard {
                     fs_recursive_copy(dest.clone(), path, &mut error_list);
                 }
                 if !error_list.is_empty() {
-                    gs.popup(PopupSelector::message_list(error_list));
+                    gs.event.push(PopupSelector::message_list(error_list).into());
                 }
             }
             ActionType::Cut => {
@@ -114,7 +114,7 @@ impl FileClipboard {
                     };
                 }
                 if !error_list.is_empty() {
-                    gs.popup(PopupSelector::message_list(error_list));
+                    gs.event.push(PopupSelector::message_list(error_list).into());
                 }
             }
         }
@@ -185,7 +185,6 @@ fn fs_recursive_copy(mut dest: PathBuf, path: PathBuf, error_list: &mut Vec<Idio
             }
             None => {
                 error_list.push(IdiomError::io_other(format!("Unable to determine path stem: {path:?}")));
-                return;
             }
         }
     }
@@ -214,7 +213,7 @@ impl<'a> SuffixedNameIter<'a> {
     }
 }
 
-impl<'a> Iterator for SuffixedNameIter<'a> {
+impl Iterator for SuffixedNameIter<'_> {
     type Item = OsString;
 
     fn next(&mut self) -> Option<Self::Item> {

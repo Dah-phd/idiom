@@ -1,158 +1,155 @@
+use super::{Components, Popup, Status};
 use crate::configs::{EditorAction, TreeAction};
-use crate::global_state::{Clipboard, GlobalState, IdiomEvent, PopupMessage};
-use crate::popups::{Command, CommandResult, PopupInterface};
+use crate::global_state::GlobalState;
 use crate::render::backend::BackendProtocol;
 use crate::render::layout::Rect;
 use crate::render::state::State;
-use crate::tree::Tree;
-use crate::workspace::{CursorPosition, Workspace};
+use crate::workspace::CursorPosition;
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
-use fuzzy_matcher::skim::SkimMatcherV2;
 
-// Go to Definition
-// Find References
-// Details / Info
-// Rename
-// Cut
-// Copy
-// Paste
-pub fn menu_context_editor(
+enum Action {
+    Tree(TreeAction),
+    Editor(EditorAction),
+}
+
+pub fn menu_context_editor_inplace(
     position: CursorPosition,
     screen: Rect,
     accent_style: ContentStyle,
-) -> Box<ContextMenuTree<7>> {
+) -> ContextMenu<7> {
     let row_offset = position.line as u16;
     let col_offset = position.char as u16;
     let modal_screen = screen.modal_relative(row_offset, col_offset, 30, 7);
 
-    let menu = ContextMenuTree {
+    ContextMenu {
         commands: [
-            Command::pass_event("Go to Definition", IdiomEvent::EditorActionCallOnce(EditorAction::GoToDeclaration)),
-            Command::pass_event("Find References", IdiomEvent::EditorActionCallOnce(EditorAction::FindReferences)),
-            Command::pass_event("Details / Info", IdiomEvent::EditorActionCallOnce(EditorAction::Help)),
-            Command::pass_event("Rename", IdiomEvent::EditorActionCallOnce(EditorAction::LSPRename)),
-            Command::pass_event("Cut", IdiomEvent::EditorActionCallOnce(EditorAction::Cut)),
-            Command::pass_event("Copy", IdiomEvent::EditorActionCallOnce(EditorAction::Copy)),
-            Command::pass_event("Paste", IdiomEvent::EditorActionCallOnce(EditorAction::Paste)),
+            ("Go to Definition", EditorAction::GoToDeclaration.into()),
+            ("Find References", EditorAction::FindReferences.into()),
+            ("Details / Info", EditorAction::Help.into()),
+            ("Rename", EditorAction::LSPRename.into()),
+            ("Cut", EditorAction::Cut.into()),
+            ("Copy", EditorAction::Copy.into()),
+            ("Paste", EditorAction::Paste.into()),
         ],
         modal_screen,
-        access_cb: None,
         accent_style,
-        rendered: true,
         state: State::new(),
-    };
-    Box::new(menu)
+    }
 }
 
-pub fn menu_context_tree(
-    position: CursorPosition,
-    screen: Rect,
-    accent_style: ContentStyle,
-) -> Box<ContextMenuTree<7>> {
+pub fn menu_context_tree_inplace(position: CursorPosition, screen: Rect, accent_style: ContentStyle) -> ContextMenu<7> {
     let row_offset = position.line as u16;
     let col_offset = position.char as u16;
     let modal_screen = screen.modal_relative(row_offset, col_offset, 30, 7);
 
-    let menu = ContextMenuTree {
+    ContextMenu {
         commands: [
-            Command::pass_event("Cut", IdiomEvent::TreeActionCallOnce(TreeAction::CutFile)),
-            Command::pass_event("Copy", IdiomEvent::TreeActionCallOnce(TreeAction::CopyFile)),
-            Command::pass_event("Paste", IdiomEvent::TreeActionCallOnce(TreeAction::Paste)),
-            Command::pass_event("Copy Path", IdiomEvent::TreeActionCallOnce(TreeAction::CopyPath)),
-            Command::pass_event("Copy Relative Path", IdiomEvent::TreeActionCallOnce(TreeAction::CopyPathRelative)),
-            Command::pass_event("Rename", IdiomEvent::TreeActionCallOnce(TreeAction::Rename)),
-            Command::pass_event("Delete", IdiomEvent::TreeActionCallOnce(TreeAction::Delete)),
+            ("Cut", TreeAction::CutFile.into()),
+            ("Copy", TreeAction::CopyFile.into()),
+            ("Paste", TreeAction::Paste.into()),
+            ("Copy Path", TreeAction::CopyPath.into()),
+            ("Copy Relative Path", TreeAction::CopyPathRelative.into()),
+            ("Rename", TreeAction::Rename.into()),
+            ("Delete", TreeAction::Delete.into()),
         ],
         modal_screen,
-        access_cb: None,
         accent_style,
-        rendered: true,
         state: State::with_highlight(ContentStyle::default()),
-    };
-    Box::new(menu)
+    }
 }
 
-pub struct ContextMenuTree<const N: usize> {
-    commands: [Command; N],
+pub struct ContextMenu<const N: usize> {
+    commands: [(&'static str, Action); N],
     modal_screen: Rect,
-    access_cb: Option<fn(&mut Workspace, &mut Tree)>,
     accent_style: ContentStyle,
-    rendered: bool,
     state: State,
 }
 
-impl<const N: usize> PopupInterface for ContextMenuTree<N> {
-    fn render(&mut self, gs: &mut GlobalState) {
-        let reset_style = gs.backend().get_style();
-        gs.backend().set_style(self.accent_style);
-        self.state.render_list_padded(
-            self.commands.iter().map(|c| c.label),
-            self.modal_screen.iter_padded(1),
-            gs.backend(),
-        );
-        gs.backend().set_style(reset_style);
+impl<const N: usize> Popup for ContextMenu<N> {
+    fn force_render(&mut self, gs: &mut GlobalState) {
+        let backend = gs.backend();
+        let reset_style = backend.get_style();
+        backend.set_style(self.accent_style);
+        self.state.render_list_padded(self.commands.iter().map(|c| c.0), self.modal_screen.iter_padded(1), backend);
+        backend.set_style(reset_style);
     }
 
-    fn key_map(&mut self, key: &KeyEvent, _: &mut Clipboard, _: &SkimMatcherV2) -> PopupMessage {
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut super::Components) -> Status {
+        let Components { gs, ws, tree, .. } = components;
         match key {
             KeyEvent { code: KeyCode::Up, .. } => self.state.prev(N),
             KeyEvent { code: KeyCode::Down, .. } => self.state.next(N),
             KeyEvent { code: KeyCode::Enter, .. } => {
-                return match self.commands[self.state.selected].clone_executor() {
-                    CommandResult::Complex(cb) => {
-                        self.access_cb.replace(cb);
-                        PopupMessage::Event(IdiomEvent::PopupAccessOnce)
+                match self.commands[self.state.selected].1 {
+                    Action::Tree(action) => {
+                        tree.map_action(action, gs);
                     }
-                    CommandResult::Simple(event) => event,
+                    Action::Editor(action) => {
+                        if let Some(editor) = ws.get_active() {
+                            editor.map(action, gs);
+                        }
+                    }
                 };
+                return Status::Finished;
             }
-            _ => {}
+            _ => return Status::Pending,
         }
-        PopupMessage::None
+        self.force_render(gs);
+        Status::Pending
     }
 
-    // TODO refactor
-    fn mouse_map(&mut self, event: MouseEvent) -> PopupMessage {
+    fn map_mouse(&mut self, event: MouseEvent, components: &mut super::Components) -> Status {
+        let Components { gs, ws, tree, .. } = components;
         match event.kind {
             MouseEventKind::Moved => {
-                let Some(position) = self.modal_screen.relative_position(event.row, event.column) else {
-                    return PopupMessage::None;
+                if let Some(position) = self.modal_screen.relative_position(event.row, event.column) {
+                    if N > position.line {
+                        self.state.selected = position.line;
+                        self.force_render(gs);
+                    };
                 };
-                if N > position.line {
-                    self.mark_as_updated();
-                    self.state.selected = position.line;
-                };
-                PopupMessage::None
             }
             MouseEventKind::Down(MouseButton::Left | MouseButton::Right) => {
-                match self.modal_screen.relative_position(event.row, event.column) {
-                    None => return PopupMessage::Clear,
-                    Some(position) => self.state.selected = position.line,
-                }
-                match self.commands[self.state.selected].clone_executor() {
-                    CommandResult::Complex(cb) => {
-                        self.access_cb.replace(cb);
-                        PopupMessage::Event(IdiomEvent::PopupAccessOnce)
+                if let Some(position) = self.modal_screen.relative_position(event.row, event.column) {
+                    self.state.selected = position.line;
+                    match self.commands[self.state.selected].1 {
+                        Action::Tree(action) => {
+                            tree.map_action(action, gs);
+                        }
+                        Action::Editor(action) => {
+                            if let Some(editor) = ws.get_active() {
+                                editor.map(action, gs);
+                            }
+                        }
                     }
-                    CommandResult::Simple(event) => event,
                 }
+                return Status::Finished;
             }
-            _ => PopupMessage::None,
+            _ => (),
         }
+        Status::Pending
     }
 
-    fn component_access(&mut self, ws: &mut Workspace, tree: &mut Tree) {
-        if let Some(cb) = self.access_cb {
-            (cb)(ws, tree);
-        }
+    fn resize_success(&mut self, _: &mut GlobalState) -> bool {
+        false
     }
 
-    fn collect_update_status(&mut self) -> bool {
-        std::mem::take(&mut self.rendered)
+    fn paste_passthrough(&mut self, _clip: String, _components: &mut super::Components) -> bool {
+        false
     }
 
-    fn mark_as_updated(&mut self) {
-        self.rendered = true
+    fn render(&mut self, _: &mut GlobalState) {}
+}
+
+impl From<TreeAction> for Action {
+    fn from(action: TreeAction) -> Self {
+        Self::Tree(action)
+    }
+}
+
+impl From<EditorAction> for Action {
+    fn from(action: EditorAction) -> Self {
+        Self::Editor(action)
     }
 }

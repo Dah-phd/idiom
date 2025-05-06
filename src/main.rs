@@ -1,12 +1,13 @@
 mod app;
 mod cli;
 mod configs;
+mod embeded_term;
+mod embeded_tui;
 mod error;
 mod global_state;
 mod lsp;
 mod popups;
 mod render;
-mod runner;
 mod syntax;
 mod tree;
 mod utils;

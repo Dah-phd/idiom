@@ -1,14 +1,13 @@
 use super::GlobalState;
+use crate::embeded_term::EditorTerminal;
 use crate::render::backend::{Backend, BackendProtocol};
 use crate::render::layout::{Borders, Line, Rect};
-use crate::runner::EditorTerminal;
 use crate::tree::tests::mock_tree;
 use crate::workspace::tests::mock_ws;
 
 #[test]
 fn full_rebuild_draw() {
-    let backend = Backend::init();
-    let mut gs = GlobalState::new(backend).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut ws = mock_ws(
         ["test line uno - in here", "second line", "last line for the test"]
             .into_iter()
@@ -16,7 +15,7 @@ fn full_rebuild_draw() {
             .collect(),
     );
     let mut tree = mock_tree();
-    let mut term = EditorTerminal::new(String::new(), 80);
+    let mut term = EditorTerminal::new(Some(String::new()));
     gs.full_resize(80, 80);
     let editor_rect = gs.calc_editor_rect();
     gs.draw(&mut ws, &mut tree, &mut term);
@@ -30,8 +29,7 @@ fn full_rebuild_draw() {
 
 #[test]
 fn full_rebuild_draw_insert() {
-    let backend = Backend::init();
-    let mut gs = GlobalState::new(backend).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     gs.toggle_tree();
     gs.insert_mode();
     let mut ws = mock_ws(
@@ -41,7 +39,7 @@ fn full_rebuild_draw_insert() {
             .collect(),
     );
     let mut tree = mock_tree();
-    let mut term = EditorTerminal::new(String::new(), 80);
+    let mut term = EditorTerminal::new(Some(String::new()));
     gs.full_resize(80, 80);
     let editor_rect = gs.calc_editor_rect();
     gs.draw(&mut ws, &mut tree, &mut term);

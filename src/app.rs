@@ -1,37 +1,42 @@
 use crate::{
-    configs::{EditorConfigs, GeneralAction, KeyMap, KEY_MAP},
+    configs::GeneralAction,
+    embeded_term::EditorTerminal,
     error::IdiomResult,
     global_state::{GlobalState, IdiomEvent},
     popups::{
+        get_init_screen, get_new_screen_size,
         pallet::Pallet,
         popup_find::{FindPopup, GoToLinePopup},
         popup_replace::ReplacePopup,
         popup_tree_search::ActivePathSearch,
-        popups_editor::{save_all_popup, selector_editors},
+        popups_editor::selector_editors,
+        should_save_and_exit, Popup,
     },
     render::backend::Backend,
-    runner::EditorTerminal,
     tree::Tree,
     workspace::Workspace,
 };
 use crossterm::event::Event;
-use std::{io::Write, path::PathBuf, time::Duration};
+use std::{path::PathBuf, time::Duration};
 
-const MIN_FRAMERATE: Duration = Duration::from_millis(8);
+pub const MIN_FRAMERATE: Duration = Duration::from_millis(8);
+pub const MIN_HEIGHT: u16 = 6;
+pub const MIN_WIDTH: u16 = 40;
 
-pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()> {
+pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResult<()> {
     // builtin cursor is not used - cursor is positioned during render
 
-    let mut gs = GlobalState::new(backend)?;
-    let (mut general_key_map, editor_key_map, tree_key_map) = gs.unwrap_or_default(KeyMap::new(), KEY_MAP).unpack();
-    let mut editor_base_config = gs.unwrap_or_default(EditorConfigs::new(), "editor.toml: ");
-    let integrated_shell = editor_base_config.shell.to_owned();
+    let screen_rect = get_init_screen(&mut backend)?;
+    let mut gs = GlobalState::new(screen_rect, backend);
+    let (mut general_key_map, editor_key_map, tree_key_map) = gs.get_key_maps();
+    let mut base_configs = gs.get_configs();
+    let integrated_shell = base_configs.shell.take();
 
     // INIT COMPONENTS
     let mut tree = Tree::new(tree_key_map, &mut gs);
-    let mut term = EditorTerminal::new(integrated_shell, gs.editor_area.width as u16);
-    let lsp_servers = editor_base_config.init_preloaded_lsp_servers(tree.get_base_file_names(), &mut gs).await;
-    let mut workspace = Workspace::new(editor_key_map, editor_base_config, lsp_servers).await;
+    let mut term = EditorTerminal::new(integrated_shell);
+    let lsp_servers = base_configs.init_preloaded_lsp_servers(tree.get_base_file_names(), &mut gs).await;
+    let mut workspace = Workspace::new(editor_key_map, base_configs, lsp_servers).await;
 
     // CLI SETUP
     if let Some(path) = open_file {
@@ -50,21 +55,27 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
                             match action {
                                 GeneralAction::Find => {
                                     if gs.is_insert() {
-                                        gs.popup(FindPopup::new());
+                                        FindPopup::run_inplace(&mut gs, &mut workspace, &mut tree, &mut term);
                                     } else {
-                                        gs.popup(ActivePathSearch::new());
+                                        ActivePathSearch::run(&mut gs, &mut workspace, &mut tree, &mut term);
                                     };
                                 }
                                 GeneralAction::Replace => {
                                     if gs.is_insert() {
-                                        gs.popup(ReplacePopup::new());
+                                        ReplacePopup::run_inplace(&mut gs, &mut workspace, &mut tree, &mut term);
                                     };
                                 }
                                 GeneralAction::SelectOpenEditor => {
                                     let tabs = workspace.tabs();
-                                    if !tabs.is_empty() {
-                                        gs.popup(selector_editors(tabs));
-                                    };
+                                    match tabs.len() {
+                                        0 => (),
+                                        1 => gs.insert_mode(),
+                                        _ => {
+                                            let mut selector = selector_editors(tabs);
+                                            let result = selector.run(&mut gs, &mut workspace, &mut tree, &mut term);
+                                            gs.log_if_error(result);
+                                        }
+                                    }
                                 }
                                 GeneralAction::GoToTabs => {
                                     if !workspace.is_empty() {
@@ -72,12 +83,14 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
                                         gs.insert_mode();
                                     };
                                 }
-                                GeneralAction::InvokePallet => gs.popup(Pallet::new()),
+                                GeneralAction::InvokePallet => {
+                                    Pallet::run(&mut gs, &mut workspace, &mut tree, &mut term);
+                                }
                                 GeneralAction::Exit => {
-                                    if workspace.are_updates_saved(&mut gs) && !gs.has_popup() {
-                                        gs.exit = true;
-                                    } else {
-                                        gs.popup(save_all_popup());
+                                    if workspace.are_updates_saved(&mut gs)
+                                        || should_save_and_exit(&mut gs, &mut workspace, &mut tree, &mut term)
+                                    {
+                                        return Ok(());
                                     };
                                 }
                                 GeneralAction::FileTreeModeOrCancelInput => gs.select_mode(),
@@ -86,16 +99,21 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
                                     gs.toggle_tree();
                                 }
                                 GeneralAction::RefreshSettings => {
-                                    let (new_general, new_editor_key_map, new_tree_key_map) =
-                                        gs.unwrap_or_default(KeyMap::new(), KEY_MAP).unpack();
+                                    let (new_general, new_editor_key_map, new_tree_key_map) = gs.get_key_maps();
                                     general_key_map = new_general;
                                     tree.key_map = new_tree_key_map;
-                                    workspace.refresh_cfg(new_editor_key_map, &mut gs);
+                                    let base_configs = workspace.refresh_cfg(new_editor_key_map, &mut gs);
+                                    let integrated_shell = base_configs.shell.take();
+                                    gs.git_tui = base_configs.git_tui.take();
+                                    term.set_shell(integrated_shell);
                                 }
-                                GeneralAction::GoToLinePopup => {
+                                GeneralAction::GoToLine => {
                                     if gs.is_insert() {
-                                        gs.popup(GoToLinePopup::new());
+                                        GoToLinePopup::run_inplace(&mut gs, &mut workspace, &mut tree, &mut term);
                                     };
+                                }
+                                GeneralAction::GitTui => {
+                                    gs.event.push(IdiomEvent::EmbededApp(gs.git_tui.to_owned()));
                                 }
                                 GeneralAction::ToggleTerminal => {
                                     gs.toggle_terminal(&mut term);
@@ -113,13 +131,18 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
                         };
                     }
                 }
-                Event::Resize(width, height) => {
+                Event::Resize(mut width, mut height) => {
+                    if width < MIN_WIDTH || height < MIN_HEIGHT {
+                        let (new_width, new_height) = get_new_screen_size(gs.backend())?;
+                        width = new_width;
+                        height = new_height;
+                    }
                     gs.full_resize(height, width);
                     let editor_rect = gs.calc_editor_rect();
                     workspace.resize_all(editor_rect.width, editor_rect.height as usize);
-                    term.resize(gs.editor_area.width as u16);
+                    term.resize(editor_rect);
                 }
-                Event::Mouse(event) => gs.map_mouse(event, &mut tree, &mut workspace),
+                Event::Mouse(event) => gs.map_mouse(event, &mut tree, &mut workspace, &mut term),
                 Event::Paste(clip) => {
                     gs.passthrough_paste(clip, &mut workspace, &mut term);
                 }
@@ -129,12 +152,8 @@ pub async fn app(open_file: Option<PathBuf>, backend: Backend) -> IdiomResult<()
 
         // render updates
         gs.draw(&mut workspace, &mut tree, &mut term);
-        gs.backend().flush()?;
 
         // do event exchanges
-        if gs.exchange_should_exit(&mut tree, &mut workspace).await {
-            workspace.graceful_exit().await;
-            return Ok(());
-        };
+        gs.handle_events(&mut tree, &mut workspace, &mut term).await
     }
 }

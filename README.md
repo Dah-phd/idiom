@@ -23,11 +23,14 @@ Python should work for the most part with jedi, but the interaction is not well 
 ![](/non_dev/screen1.png)
 
 ## Tested platform
-- Linux Fedora derivate (Nobara)
+- Linux Fedora derivate (Nobara / Mint)
 - Linux Mint
 
 ## TODO
+- migrate to markdown 1.0.0
+- persistent state (keeping changes after close witout saving)
 - fix tracking edgecase where file is changed in by other app in select
+- improve cursor handle in embeded tui / terminal
 - write tests
 - lsp server cold start, maybe? "jedi-language server" starts slow
 

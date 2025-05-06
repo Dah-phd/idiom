@@ -195,7 +195,7 @@ pub struct LineBuilder<'a> {
     backend: &'a mut Backend,
 }
 
-impl<'a> LineBuilder<'a> {
+impl LineBuilder<'_> {
     /// returns Ok(bool) -> if true line is not full, false the line is finished
     pub fn push(&mut self, text: &str) -> bool {
         match text.truncate_if_wider(self.remaining) {
@@ -254,7 +254,7 @@ pub struct LineBuilderRev<'a> {
     backend: &'a mut Backend,
 }
 
-impl<'a> LineBuilderRev<'a> {
+impl LineBuilderRev<'_> {
     /// returns Ok(bool) -> if true line is not full, false the line is finished
     pub fn push(&mut self, text: &str) -> bool {
         match text.truncate_if_wider_start(self.remaining) {

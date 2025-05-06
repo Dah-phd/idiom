@@ -122,12 +122,6 @@ impl LSP {
         &self.client
     }
 
-    pub async fn graceful_exit(&mut self) -> LSPResult<()> {
-        self.client.stop();
-        self.dash_nine().await?;
-        Ok(())
-    }
-
     async fn dash_nine(&mut self) -> LSPResult<()> {
         self.lsp_json_handler.abort();
         self.lsp_send_handler.abort();

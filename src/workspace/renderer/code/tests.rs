@@ -23,7 +23,7 @@ use crossterm::style::{Color, ContentStyle};
 
 #[test]
 fn test_cursor() {
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::default(), Backend::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.set_position((0, 12).into());
@@ -43,7 +43,7 @@ fn test_cursor() {
 
 #[test]
 fn test_cursor_complex() {
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.set_position((0, 12).into());
@@ -63,7 +63,7 @@ fn test_cursor_complex() {
 
 #[test]
 fn test_cursor_select() {
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set((0, 4).into(), (0, 15).into());
@@ -86,7 +86,7 @@ fn test_cursor_select() {
 
 #[test]
 fn test_cursor_select_complex() {
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set((0, 4).into(), (0, 15).into());
@@ -109,7 +109,7 @@ fn test_cursor_select_complex() {
 
 #[test]
 fn wrap_cursor() {
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set((0, 20).into(), (0, 35).into());
@@ -132,7 +132,7 @@ fn wrap_cursor() {
 
 #[test]
 fn wrap_cursor_complex() {
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set((0, 20).into(), (0, 35).into());
@@ -157,7 +157,7 @@ fn wrap_cursor_complex() {
 
 #[test]
 fn test_line_render_utf8() {
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
 
     let cursor = Cursor::default();
@@ -170,15 +170,15 @@ fn test_line_render_utf8() {
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
         let select = ctx.get_select(line.width);
-        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
-    test_content(gs.writer.drain());
+    test_content(gs.backend.drain());
 }
 
 #[test]
 fn test_line_render_utf16() {
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut lexer = mock_utf16_lexer(&mut gs, FileType::Rust);
 
     let cursor = Cursor::default();
@@ -191,15 +191,15 @@ fn test_line_render_utf16() {
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
         let select = ctx.get_select(line.width);
-        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
-    test_content(gs.writer.drain());
+    test_content(gs.backend.drain());
 }
 
 #[test]
 fn test_line_render_utf32() {
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut lexer = mock_utf32_lexer(&mut gs, FileType::Rust);
 
     let cursor = Cursor::default();
@@ -212,17 +212,17 @@ fn test_line_render_utf32() {
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
         let select = ctx.get_select(line.width);
-        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
-    test_content(gs.writer.drain());
+    test_content(gs.backend.drain());
 }
 
 #[test]
 fn test_line_render_shrunk_utf8() {
     let limit = 42;
 
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
 
     let cursor = Cursor::default();
@@ -235,17 +235,17 @@ fn test_line_render_shrunk_utf8() {
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: limit };
         let select = ctx.get_select(line.width);
-        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
-    test_content_shrunk(gs.writer.drain());
+    test_content_shrunk(gs.backend.drain());
 }
 
 #[test]
 fn test_line_render_shrunk_utf16() {
     let limit = 42;
 
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut lexer = mock_utf16_lexer(&mut gs, FileType::Rust);
 
     let cursor = Cursor::default();
@@ -258,17 +258,17 @@ fn test_line_render_shrunk_utf16() {
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: limit };
         let select = ctx.get_select(line.width);
-        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
-    test_content_shrunk(gs.writer.drain());
+    test_content_shrunk(gs.backend.drain());
 }
 
 #[test]
 fn test_line_render_shrunk_utf32() {
     let limit = 42;
 
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut lexer = mock_utf32_lexer(&mut gs, FileType::Rust);
 
     let cursor = Cursor::default();
@@ -281,15 +281,15 @@ fn test_line_render_shrunk_utf32() {
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: limit };
         let select = ctx.get_select(line.width);
-        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
-    test_content_shrunk(gs.writer.drain());
+    test_content_shrunk(gs.backend.drain());
 }
 
 #[test]
 fn test_line_render_select_utf8() {
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
 
     let mut cursor = Cursor::default();
@@ -303,15 +303,15 @@ fn test_line_render_select_utf8() {
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
         let select = ctx.get_select(line.width);
-        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
-    test_content_select(gs.writer.drain());
+    test_content_select(gs.backend.drain());
 }
 
 #[test]
 fn test_line_render_select_utf16() {
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut lexer = mock_utf16_lexer(&mut gs, FileType::Rust);
 
     let mut cursor = Cursor::default();
@@ -325,15 +325,15 @@ fn test_line_render_select_utf16() {
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
         let select = ctx.get_select(line.width);
-        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
-    test_content_select(gs.writer.drain());
+    test_content_select(gs.backend.drain());
 }
 
 #[test]
 fn test_line_render_select_utf32() {
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut lexer = mock_utf32_lexer(&mut gs, FileType::Rust);
 
     let mut cursor = Cursor::default();
@@ -347,10 +347,10 @@ fn test_line_render_select_utf32() {
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
         let select = ctx.get_select(line.width);
-        inner_render(code_line, &mut ctx, line, select, &mut gs.writer);
+        inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
-    test_content_select(gs.writer.drain());
+    test_content_select(gs.backend.drain());
 }
 
 #[test]
@@ -358,7 +358,7 @@ fn test_line_wrapping_utf8() {
     let rect = Rect::new(0, 0, 50, 5);
     let mut lines = rect.into_iter();
 
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
 
     let mut cursor = Cursor::default();
@@ -370,12 +370,12 @@ fn test_line_wrapping_utf8() {
     let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 1, ContentStyle::default());
     let line = lines.next().unwrap();
     let select = ctx.get_select(line.width);
-    inner_render(&mut content[0], &mut ctx, line, select, &mut gs.writer);
+    inner_render(&mut content[0], &mut ctx, line, select, &mut gs.backend);
     let line = lines.next().unwrap();
     let text = &mut content[1];
-    rend_cursor(text, &mut ctx, line, &mut gs.writer);
+    rend_cursor(text, &mut ctx, line, &mut gs.backend);
 
-    test_line_wrap(gs.writer.drain());
+    test_line_wrap(gs.backend.drain());
 }
 
 #[test]
@@ -383,7 +383,7 @@ fn test_line_wrapping_utf16() {
     let rect = Rect::new(0, 0, 50, 5);
     let mut lines = rect.into_iter();
 
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut lexer = mock_utf16_lexer(&mut gs, FileType::Rust);
 
     let mut cursor = Cursor::default();
@@ -395,12 +395,12 @@ fn test_line_wrapping_utf16() {
     let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 1, ContentStyle::default());
     let line = lines.next().unwrap();
     let select = ctx.get_select(line.width);
-    inner_render(&mut content[0], &mut ctx, line, select, &mut gs.writer);
+    inner_render(&mut content[0], &mut ctx, line, select, &mut gs.backend);
     let line = lines.next().unwrap();
     let text = &mut content[1];
-    rend_cursor(text, &mut ctx, line, &mut gs.writer);
+    rend_cursor(text, &mut ctx, line, &mut gs.backend);
 
-    test_line_wrap(gs.writer.drain());
+    test_line_wrap(gs.backend.drain());
 }
 
 #[test]
@@ -408,7 +408,7 @@ fn test_line_wrapping_utf32() {
     let rect = Rect::new(0, 0, 50, 5);
     let mut lines = rect.into_iter();
 
-    let mut gs = GlobalState::new(Backend::init()).unwrap();
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
     let mut lexer = mock_utf32_lexer(&mut gs, FileType::Rust);
 
     let mut cursor = Cursor::default();
@@ -420,12 +420,12 @@ fn test_line_wrapping_utf32() {
     let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 1, ContentStyle::default());
     let line = lines.next().unwrap();
     let select = ctx.get_select(line.width);
-    inner_render(&mut content[0], &mut ctx, line, select, &mut gs.writer);
+    inner_render(&mut content[0], &mut ctx, line, select, &mut gs.backend);
     let line = lines.next().unwrap();
     let text = &mut content[1];
-    rend_cursor(text, &mut ctx, line, &mut gs.writer);
+    rend_cursor(text, &mut ctx, line, &mut gs.backend);
 
-    test_line_wrap(gs.writer.drain());
+    test_line_wrap(gs.backend.drain());
 }
 
 fn test_content(mut render_data: Vec<(ContentStyle, String)>) {

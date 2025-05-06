@@ -92,13 +92,13 @@ impl Tree {
             if let Some(mark) = self.tree_clipboard.get_mark(tree_path.path()) {
                 if mark.len() + 10 < line.width {
                     line.width -= mark.len();
-                    gs.writer.print_styled_at(line.row, line.col + line.width as u16, mark, style);
+                    gs.backend.print_styled_at(line.row, line.col + line.width as u16, mark, style);
                 }
             }
-            tree_path.render(self.display_offset, line, style, &mut gs.writer);
+            tree_path.render(self.display_offset, line, style, &mut gs.backend);
         }
         for line in lines {
-            line.fill_styled(' ', base_style, &mut gs.writer);
+            line.fill_styled(' ', base_style, &mut gs.backend);
         }
     }
 
@@ -136,28 +136,30 @@ impl Tree {
                 match self.tree.get_mut_from_inner(self.state.selected) {
                     // root cannot be file
                     Some(TreePath::File { path, .. }) => match path.parent() {
-                        Some(parent) if parent != &root => gs.popup(create_file_popup(parent.to_owned())),
-                        _ => gs.popup(create_root_file_popup()),
+                        Some(parent) if parent != root => gs.event.push(create_file_popup(parent.to_owned()).into()),
+                        _ => gs.event.push(create_root_file_popup().into()),
                     },
                     // in case folder is not expanded create in parant
                     Some(TreePath::Folder { path, tree: None, .. }) => {
                         // should be unreachable
                         if &root == path {
-                            gs.popup(create_root_file_popup());
+                            gs.event.push(create_root_file_popup().into());
                         } else {
                             match path.parent() {
-                                Some(parent) if parent != &root => gs.popup(create_file_popup(parent.to_owned())),
-                                _ => gs.popup(create_root_file_popup()),
+                                Some(parent) if parent != root => {
+                                    gs.event.push(create_file_popup(parent.to_owned()).into())
+                                }
+                                _ => gs.event.push(create_root_file_popup().into()),
                             }
                         }
                     }
                     // create in selected dir (root check)
                     Some(TreePath::Folder { path, tree: Some(..), .. }) => match path == &root {
-                        true => gs.popup(create_root_file_popup()),
-                        false => gs.popup(create_file_popup(path.to_owned())),
+                        true => gs.event.push(create_root_file_popup().into()),
+                        false => gs.event.push(create_file_popup(path.to_owned()).into()),
                     },
                     // nothing is selected
-                    None => gs.popup(create_root_file_popup()),
+                    None => gs.event.push(create_root_file_popup().into()),
                 };
             }
             TreeAction::CopyPath => match self.selected_path.canonicalize() {
@@ -204,11 +206,11 @@ impl Tree {
             }
             TreeAction::Paste => match self.tree.get_mut_from_inner(self.state.selected) {
                 Some(TreePath::Folder { path, tree: Some(..), .. }) => {
-                    self.tree_clipboard.paste(path.to_owned(), gs);
+                    self.tree_clipboard.paste(path, gs);
                 }
                 Some(TreePath::Folder { path, tree: None, .. }) | Some(TreePath::File { path, .. }) => {
                     match path.parent() {
-                        Some(parent) => self.tree_clipboard.paste(parent.to_owned(), gs),
+                        Some(parent) => self.tree_clipboard.paste(parent, gs),
                         None => gs.error(IdiomError::io_parent_not_found(path)),
                     }
                 }
@@ -218,12 +220,12 @@ impl Tree {
                 }
             },
             TreeAction::Rename => {
-                gs.popup(rename_file_popup(self.selected_path.display().to_string()));
+                gs.event.push(rename_file_popup(self.selected_path.display().to_string()).into());
             }
             TreeAction::IncreaseSize => gs.expand_tree_size(),
             TreeAction::DecreaseSize => gs.shrink_tree_size(),
         }
-        return true;
+        true
     }
 
     pub fn expand_dir_or_get_path(&mut self, gs: &mut GlobalState) -> Option<PathBuf> {
@@ -252,6 +254,9 @@ impl Tree {
 
     fn shrink(&mut self, gs: &mut GlobalState) {
         if let Some(TreePath::Folder { path, tree, .. }) = self.tree.get_mut_from_inner(self.state.selected) {
+            if tree.is_none() {
+                return;
+            }
             if let Err(err) = self.watcher.stop_watch(path) {
                 gs.error(err.to_string());
             };

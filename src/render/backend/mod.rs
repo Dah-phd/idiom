@@ -9,6 +9,7 @@ use std::{
     io::{Result, Write},
 };
 pub use style::{background_rgb, parse_raw_rgb, pull_color, serialize_rgb, StyleExt};
+pub const ERR_MSG: &str = "Rendering (Stdout) Err:";
 
 /// If stdout is returning errors the program should crash -> use expect
 #[allow(dead_code)] // impl all utilities although not all are used
@@ -17,6 +18,11 @@ pub trait BackendProtocol: Write + Sized {
     fn exit() -> std::io::Result<()>;
     /// get whole screen as rect
     fn screen() -> Result<Rect>;
+    /// stop updates allowing to build buffer
+    fn freeze(&mut self);
+    /// restore updates allowing to render buffer
+    fn unfreeze(&mut self);
+    fn flush_buf(&mut self);
     /// clears from cursor until the End Of Line
     fn clear_to_eol(&mut self);
     /// clears current cursor line
@@ -44,9 +50,9 @@ pub trait BackendProtocol: Write + Sized {
     /// direct adding cursor at location - no buffer queing
     fn render_cursor_at(&mut self, row: u16, col: u16);
     /// direct showing cursor - no buffer queing
-    fn show_cursor(&mut self);
+    fn show_cursor();
     /// direct hiding cursor - no buffer queing
-    fn hide_cursor(&mut self);
+    fn hide_cursor();
     fn print<D: Display>(&mut self, text: D);
     /// goes to location and prints text
     fn print_at<D: Display>(&mut self, row: u16, col: u16, text: D);

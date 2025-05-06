@@ -183,7 +183,7 @@ impl TreePath {
         Ok(())
     }
 
-    /// Search utils
+    // Search utils
 
     pub fn get_from_inner(&self, idx: usize) -> Option<&TreePath> {
         self.iter().nth(idx + 1)
@@ -345,7 +345,7 @@ impl TreePath {
         buffer
     }
 
-    /// Diagnostics
+    // Diagnostics
 
     pub fn map_diagnostics_base(&mut self, d_path: &PathBuf, new_diagnostic: DiagnosticType) {
         if let Self::Folder { tree: Some(tree), .. } = self {

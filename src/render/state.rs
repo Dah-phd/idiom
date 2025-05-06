@@ -4,6 +4,7 @@ use super::{
 };
 use crossterm::style::ContentStyle;
 
+#[derive(PartialEq, Debug, Clone)]
 pub struct State {
     pub at_line: usize,
     pub selected: usize,
@@ -35,7 +36,6 @@ impl State {
 
     pub fn select(&mut self, idx: usize, option_len: usize) {
         if option_len > idx {
-            self.at_line = idx;
             self.selected = idx;
         }
     }
@@ -69,7 +69,7 @@ impl State {
         &mut self,
         options: &[T],
         callbacks: &[fn(&T, builder: LineBuilder)],
-        rect: &Rect,
+        rect: Rect,
         backend: &mut Backend,
     ) {
         let limit = rect.height as usize / callbacks.len();

@@ -227,7 +227,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
                                 if locations.len() == 1 {
                                     gs.event.push(locations.remove(0).into());
                                 } else {
-                                    gs.popup(refrence_selector(locations));
+                                    gs.event.push(refrence_selector(locations).into())
                                 }
                             }
                         }

@@ -18,6 +18,17 @@ impl BackendProtocol for Backend {
         Ok(())
     }
 
+    fn freeze(&mut self) {
+        self.data.push((ContentStyle::default(), String::from("<<freeze>>")));
+    }
+
+    fn unfreeze(&mut self) {
+        self.data.push((ContentStyle::default(), String::from("<<unfreeze>>")));
+    }
+
+    /// force flush buffer if writing small amount of data
+    fn flush_buf(&mut self) {}
+
     fn clear_all(&mut self) {
         self.data.push((ContentStyle::default(), String::from("<<clear all>>")));
     }
@@ -36,9 +47,7 @@ impl BackendProtocol for Backend {
         self.data.push((ContentStyle::default(), format!("<<go to row: {row} col: {col}>>")))
     }
 
-    fn hide_cursor(&mut self) {
-        self.data.push((ContentStyle::default(), String::from("<<hide cursor>>")));
-    }
+    fn hide_cursor() {}
 
     fn print<D: std::fmt::Display>(&mut self, text: D) {
         self.data.push((self.default_style, text.to_string()));
@@ -90,12 +99,11 @@ impl BackendProtocol for Backend {
 
     fn set_style(&mut self, style: ContentStyle) {
         self.default_style = style;
-        self.data.push((self.default_style, format!("<<set style>>")))
+        self.data.push((self.default_style, "<<set style>>".to_string()))
     }
 
-    fn show_cursor(&mut self) {
-        self.data.push((self.default_style, String::from("<<show cursor>>")));
-    }
+    fn show_cursor() {}
+    // self.data.push((self.default_style, String::from("<<show cursor>>")));
 
     fn to_set_style(&mut self) {
         self.data.push((self.default_style, String::from("<<set style>>")));

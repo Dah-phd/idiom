@@ -159,7 +159,7 @@ impl Default for EditorUserKeyMap {
             indent: TAB.to_owned(),
             backspace: BACKSPACE.to_owned(),
             delete: DELETE.to_owned(),
-            remove_line: format!("{CTRL} && {DELETE} || {CTRL} && h || {CTRL} && {BACKSPACE}"),
+            remove_line: format!("{SHIFT} && {DELETE}"),
             indent_start: format!("{CTRL} && ]"),
             unindent: format!("{SHIFT} && {TAB}"),
             up: UP.to_owned(),
@@ -217,7 +217,8 @@ pub enum GeneralAction {
     Exit,
     HideFileTree,
     RefreshSettings,
-    GoToLinePopup,
+    GoToLine,
+    GitTui,
     ToggleTerminal,
     GoToTab1,
     GoToTab2,
@@ -245,6 +246,7 @@ pub struct GeneralUserKeyMap {
     hide_file_tree: String,
     refresh_settings: String,
     go_to_line: String,
+    git_tui: String,
     toggle_terminal: String,
     go_to_tab_1: String,
     go_to_tab_2: String,
@@ -270,7 +272,8 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
         insert_key_event(&mut hash, &val.exit, GeneralAction::Exit);
         insert_key_event(&mut hash, &val.hide_file_tree, GeneralAction::HideFileTree);
         insert_key_event(&mut hash, &val.refresh_settings, GeneralAction::RefreshSettings);
-        insert_key_event(&mut hash, &val.go_to_line, GeneralAction::GoToLinePopup);
+        insert_key_event(&mut hash, &val.go_to_line, GeneralAction::GoToLine);
+        insert_key_event(&mut hash, &val.git_tui, GeneralAction::GitTui);
         insert_key_event(&mut hash, &val.toggle_terminal, GeneralAction::ToggleTerminal);
         insert_key_event(&mut hash, &val.go_to_tab_1, GeneralAction::GoToTab1);
         insert_key_event(&mut hash, &val.go_to_tab_2, GeneralAction::GoToTab2);
@@ -289,8 +292,8 @@ impl Default for GeneralUserKeyMap {
     fn default() -> Self {
         Self {
             go_to_editor_tabs: TAB.to_owned(),
-            invoke_pallet: format!("{CTRL} && p"),
-            select_open_editor: format!("{CTRL} && {UP} || {CTRL} && {DOWN}"),
+            invoke_pallet: format!("{CTRL} && p || {CTRL} && {SHIFT} && p"),
+            select_open_editor: format!("{CTRL} && {TAB} || {CTRL} && {UP} || {CTRL} && {DOWN}"),
             save_all: format!("{CTRL} && s"),
             cancel: ESC.to_owned(),
             find: format!("{CTRL} && f"),
@@ -300,6 +303,7 @@ impl Default for GeneralUserKeyMap {
             hide_file_tree: format!("{CTRL} && e"),
             refresh_settings: format!("{F}5"),
             go_to_line: format!("{CTRL} && g"),
+            git_tui: format!("{CTRL} && {SHIFT} && g"),
             toggle_terminal: format!("{CTRL} && `"),
             go_to_tab_1: format!("{ALT} && 1"),
             go_to_tab_2: format!("{ALT} && 2"),
