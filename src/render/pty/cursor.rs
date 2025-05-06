@@ -17,7 +17,7 @@ pub struct CursorState {
 
 impl CursorState {
     pub fn apply(&mut self, screen: &Screen, backend: &mut Backend) {
-        if screen.hide_cursor() {
+        if screen.hide_cursor() || screen.scrollback() != 0 {
             if self.hidden {
                 return;
             }
