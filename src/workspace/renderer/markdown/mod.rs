@@ -1,10 +1,11 @@
 mod ascii;
 mod complex;
+mod parser;
 
 use std::ops::Range;
 
 use crossterm::style::{Attribute, Attributes, Color, ContentStyle, Stylize};
-use markdown::{tokenize, Block, ListItem, Span};
+use parser::{parse, Block, ListItem, Span};
 
 use crate::{
     render::{
@@ -70,7 +71,7 @@ impl<'a, 'b> StyledParser<'a, 'b> {
 
     fn render(mut self, content: &str) {
         let mut limit = self.line_width;
-        for block in tokenize(content) {
+        for block in parse(content) {
             match self.print_block(block, limit) {
                 Some(remining) => limit = remining,
                 None => return,
@@ -102,9 +103,6 @@ impl<'a, 'b> StyledParser<'a, 'b> {
             }
             Block::CodeBlock(x, y) => {
                 limit = (self.wrap_printer)(self, &format!(" X X X {x:?} {y}"), limit)?;
-            }
-            Block::Raw(text) => {
-                limit = (self.wrap_printer)(self, &text, limit)?;
             }
             Block::OrderedList(items, list_type) => {
                 limit = (self.wrap_printer)(self, &format!(" {}.", list_type.0), limit)?;
