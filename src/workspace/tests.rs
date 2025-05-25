@@ -2,7 +2,7 @@ use super::{
     editor::Editor,
     line::EditorLine,
     map_editor,
-    utils::{clip_content, copy_content, insert_clip, remove_content},
+    utils::{clip_content, copy_content, get_closing_char_from_context, insert_clip, remove_content},
     Workspace,
 };
 use crate::{
@@ -140,6 +140,36 @@ fn test_copy_content() {
     assert_eq!(&clip3, "here comes the text\n");
 }
 
+#[test]
+fn get_closing_context() {
+    for (brack, rev) in "{([\"'".chars().zip("})]\"'".chars()) {
+        for next_c in ";:.=, {}[]()".chars() {
+            let text = EditorLine::from(format!(" {next_c} "));
+            assert_eq!(Some(rev), get_closing_char_from_context(brack, &text, 1));
+        }
+        for next_c in ";:.=, {}[]()".chars() {
+            let text = EditorLine::from(format!("{next_c}{next_c} "));
+            assert_eq!(Some(rev), get_closing_char_from_context(brack, &text, 1));
+        }
+    }
+    for next_c in "asdb1234".chars() {
+        let text = EditorLine::from(format!(" {next_c} "));
+        assert_eq!(None, get_closing_char_from_context('[', &text, 1));
+    }
+    for next_c in "asdb1234".chars() {
+        let text = EditorLine::from(format!("{next_c}  "));
+        assert_eq!(Some(')'), get_closing_char_from_context('(', &text, 1));
+    }
+    for next_c in "asdb1234".chars() {
+        let text = EditorLine::from(format!("{next_c}  "));
+        assert_eq!(None, get_closing_char_from_context('"', &text, 1));
+    }
+    for sandwich_c in "bamwqer_235".chars() {
+        let text = EditorLine::from(format!("{sandwich_c}{sandwich_c} "));
+        assert_eq!(None, get_closing_char_from_context('"', &text, 1));
+    }
+}
+
 /// ACTIONS
 
 #[test]
@@ -147,12 +177,73 @@ fn test_open_scope() {
     let mut ws = base_ws();
     let mut gs = GlobalState::new(Rect::default(), Backend::init());
     gs.insert_mode();
+    press(&mut ws, KeyCode::Char(' '), &mut gs);
+    press(&mut ws, KeyCode::Left, &mut gs);
     press(&mut ws, KeyCode::Char('{'), &mut gs);
+    press(&mut ws, KeyCode::Char('('), &mut gs);
+    press(&mut ws, KeyCode::Char('['), &mut gs);
     press(&mut ws, KeyCode::Enter, &mut gs);
     assert_position(&mut ws, CursorPosition { char: 4, line: 1 });
-    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "{");
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "{([");
     assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "    ");
-    assert_eq!(pull_line(active(&mut ws), 2).unwrap(), "}hello world!");
+    assert_eq!(pull_line(active(&mut ws), 2).unwrap(), "])} hello world!");
+}
+
+#[test]
+fn test_block_closing() {
+    let mut ws = base_ws();
+    let mut gs = GlobalState::new(Rect::default(), Backend::init());
+    gs.insert_mode();
+    press(&mut ws, KeyCode::Char('{'), &mut gs);
+    press(&mut ws, KeyCode::Char('('), &mut gs);
+    press(&mut ws, KeyCode::Char('['), &mut gs);
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "{([hello world!");
+    assert_position(&mut ws, CursorPosition { char: 3, line: 0 });
+}
+
+#[test]
+fn test_allow_closing() {
+    let mut ws = base_ws();
+    let mut gs = GlobalState::new(Rect::default(), Backend::init());
+    gs.insert_mode();
+    press(&mut ws, KeyCode::Char('{'), &mut gs);
+    press(&mut ws, KeyCode::Left, &mut gs);
+    press(&mut ws, KeyCode::Char('{'), &mut gs);
+    press(&mut ws, KeyCode::Char('('), &mut gs);
+    press(&mut ws, KeyCode::Char('['), &mut gs);
+    press(&mut ws, KeyCode::Char('='), &mut gs);
+    press(&mut ws, KeyCode::Left, &mut gs);
+    press(&mut ws, KeyCode::Char('('), &mut gs);
+    press(&mut ws, KeyCode::Char(';'), &mut gs);
+    press(&mut ws, KeyCode::Char('['), &mut gs);
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "{([(;[])=])}{hello world!");
+    assert_position(&mut ws, CursorPosition { char: 6, line: 0 });
+}
+
+#[test]
+fn test_block_quotes() {
+    let mut ws = base_ws();
+    let mut gs = GlobalState::new(Rect::default(), Backend::init());
+    press(&mut ws, KeyCode::Char('"'), &mut gs);
+    press(&mut ws, KeyCode::Char('\''), &mut gs);
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "\"'hello world!");
+    assert_position(&mut ws, CursorPosition { char: 2, line: 0 });
+}
+
+#[test]
+fn test_allow_quotes() {
+    let mut ws = base_ws();
+    let mut gs = GlobalState::new(Rect::default(), Backend::init());
+    press(&mut ws, KeyCode::Char(':'), &mut gs);
+    press(&mut ws, KeyCode::Char(';'), &mut gs);
+    press(&mut ws, KeyCode::Left, &mut gs);
+    press(&mut ws, KeyCode::Char('"'), &mut gs);
+    press(&mut ws, KeyCode::Char('.'), &mut gs);
+    press(&mut ws, KeyCode::Char(','), &mut gs);
+    press(&mut ws, KeyCode::Left, &mut gs);
+    press(&mut ws, KeyCode::Char('\''), &mut gs);
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), ":\".'',\";hello world!");
+    assert_position(&mut ws, CursorPosition { char: 4, line: 0 });
 }
 
 #[test]
@@ -217,17 +308,15 @@ fn test_chars() {
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nhello world!");
     press(&mut ws, KeyCode::Right, &mut gs);
     press(&mut ws, KeyCode::Char('('), &mut gs);
-    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh()ello world!");
-    press(&mut ws, KeyCode::Right, &mut gs);
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh(ello world!");
     press(&mut ws, KeyCode::Char('{'), &mut gs);
-    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh(){}ello world!");
-    press(&mut ws, KeyCode::Right, &mut gs);
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh({ello world!");
     press(&mut ws, KeyCode::Char('['), &mut gs);
-    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh(){}[]ello world!");
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh({[ello world!");
     press(&mut ws, KeyCode::Char('"'), &mut gs);
-    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh(){}[\"\"]ello world!");
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh({[\"ello world!");
     press(&mut ws, KeyCode::Char('\''), &mut gs);
-    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh(){}[\"''\"]ello world!");
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh({[\"'ello world!");
 }
 
 #[test]

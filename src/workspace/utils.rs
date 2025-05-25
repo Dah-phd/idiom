@@ -33,6 +33,48 @@ pub fn insert_clip(clip: &str, content: &mut Vec<EditorLine>, mut cursor: Cursor
     cursor
 }
 
+/// inserts clip using cursor position to clone prefix on all lines
+/// first line is trimmed
+#[inline(always)]
+pub fn insert_clip_on_prefix(
+    clip: &str,
+    content: &mut Vec<EditorLine>,
+    mut cursor: CursorPosition,
+) -> (String, CursorPosition) {
+    let mut lines = clip.split('\n').collect::<Vec<_>>();
+    if lines.len() == 1 {
+        let text = lines[0];
+        content[cursor.line].insert_str(cursor.char, lines[0]);
+        cursor.char += text.char_len();
+        return (clip.to_owned(), cursor);
+    };
+
+    let first_line = &mut content[cursor.line];
+    let mut last_line = first_line.split_off(cursor.char);
+    let prefix = first_line.to_string();
+    let mut clip = lines.remove(0).trim_start().to_owned();
+    first_line.push_str(&clip);
+
+    let last_line_prefix = lines.remove(lines.len() - 1); // len is already checked
+    cursor.line += 1;
+    cursor.char = last_line_prefix.char_len() + prefix.char_len();
+
+    for new_line in lines {
+        let prefixed = format!("{prefix}{new_line}");
+        clip = push_on_newline(clip, &prefixed);
+        content.insert(cursor.line, prefixed.into());
+        cursor.line += 1;
+    }
+
+    clip = push_on_newline(clip, &prefix);
+    clip.push_str(last_line_prefix);
+    last_line.insert_str(0, &prefix);
+    last_line.insert_str(0, last_line_prefix);
+    content.insert(cursor.line, last_line);
+
+    (clip, cursor)
+}
+
 /// panics if out of bounds
 #[inline(always)]
 pub fn clip_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<EditorLine>) -> String {
@@ -86,6 +128,30 @@ pub fn get_closing_char(ch: char) -> Option<char> {
         '"' => Some('"'),
         '\'' => Some('\''),
         _ => None,
+    }
+}
+
+#[inline(always)]
+pub fn get_closing_char_from_context(ch: char, text: &EditorLine, idx: usize) -> Option<char> {
+    match ch {
+        '{' if should_close(text.get(idx, idx + 1)) => Some('}'),
+        '(' if should_close(text.get(idx, idx + 1)) => Some(')'),
+        '[' if should_close(text.get(idx, idx + 1)) => Some(']'),
+        '"' | '\''
+            if should_close(idx.checked_sub(1).and_then(|p_idx| text.get(p_idx, idx)))
+                && should_close(text.get(idx, idx + 1)) =>
+        {
+            Some(ch)
+        }
+        _ => None,
+    }
+}
+
+#[inline(always)]
+fn should_close(text: Option<&str>) -> bool {
+    match text.and_then(|text| text.chars().next()) {
+        None => true,
+        Some(text) => !text.is_numeric() && !text.is_alphabetic() && text != '_',
     }
 }
 

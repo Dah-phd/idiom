@@ -1,7 +1,7 @@
 use super::super::{
     cursor::Cursor,
     line::EditorLine,
-    utils::{clip_content, insert_clip, is_scope, remove_content, token_range_at},
+    utils::{clip_content, insert_clip, insert_clip_on_prefix, is_scope, remove_content, token_range_at},
     CursorPosition,
 };
 use super::EditMetaData;
@@ -103,6 +103,13 @@ impl Edit {
         let end = insert_clip(&clip, content, cursor);
         let to = (end.line - cursor.line) + 1;
         Self::without_select(cursor, 1, to, clip, String::new())
+    }
+
+    #[inline]
+    pub fn insert_clip_indent_on_prefix(cursor: CursorPosition, clip: String, content: &mut Vec<EditorLine>) -> Self {
+        let (new_clip, end) = insert_clip_on_prefix(&clip, content, cursor);
+        let to = (end.line - cursor.line) + 1;
+        Self::without_select(cursor, 1, to, new_clip, String::new())
     }
 
     #[inline]
