@@ -52,14 +52,21 @@ pub fn insert_clip_on_prefix(
     let first_line = &mut content[cursor.line];
     let mut last_line = first_line.split_off(cursor.char);
     let prefix = first_line.to_string();
-    let mut clip = lines.remove(0).trim_start().to_owned();
+    let first_clip_line = lines.remove(0);
+    let mut clip = first_clip_line.trim_start().to_owned();
+    let trim = format!("{:width$}", " ", width = first_clip_line.len() - clip.len());
     first_line.push_str(&clip);
 
-    let last_line_prefix = lines.remove(lines.len() - 1); // len is already checked
-    cursor.line += 1;
-    cursor.char = last_line_prefix.char_len() + prefix.char_len();
+    let last_line_raw = lines.remove(lines.len() - 1); // len is already checked
+    let last_line_stipped = match last_line_raw.strip_prefix(&trim) {
+        Some(stripped) => stripped,
+        None => last_line_raw,
+    };
 
-    for new_line in lines {
+    cursor.line += 1;
+    cursor.char = last_line_stipped.char_len() + prefix.char_len();
+
+    for new_line in lines.into_iter().map(|l| l.strip_prefix(&trim).unwrap_or(l)) {
         let prefixed = format!("{prefix}{new_line}");
         clip = push_on_newline(clip, &prefixed);
         content.insert(cursor.line, prefixed.into());
@@ -67,9 +74,10 @@ pub fn insert_clip_on_prefix(
     }
 
     clip = push_on_newline(clip, &prefix);
-    clip.push_str(last_line_prefix);
+
+    clip.push_str(last_line_stipped);
     last_line.insert_str(0, &prefix);
-    last_line.insert_str(0, last_line_prefix);
+    last_line.insert_str(0, last_line_stipped);
     content.insert(cursor.line, last_line);
 
     (clip, cursor)
