@@ -217,6 +217,22 @@ fn paste_with_indent() {
 }
 
 #[test]
+fn paste_with_deep_indent() {
+    let mut content = create_content();
+    let big_clippy = "    text\n    \n    text\n".to_owned();
+    let edits = vec![Edit::insert_clip_indent_on_prefix(
+        CursorPosition { line: 7, char: 4 },
+        big_clippy,
+        &mut content,
+    )];
+    match_line(&content[7], &"    text");
+    match_line(&content[8], &"    ");
+    match_line(&content[9], &"    text");
+    match_line(&content[10], &"    this is the first scope");
+    assert_edits_applicable(content, edits);
+}
+
+#[test]
 fn remove_line() {
     let mut content = create_content();
     let edits = vec![Edit::remove_line(4, &mut content), Edit::remove_line(4, &mut content)];
