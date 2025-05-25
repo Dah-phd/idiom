@@ -117,6 +117,10 @@ impl BackendProtocol for Backend {
     fn pad(&mut self, width: usize) {
         self.data.push((self.default_style, format!("<<padding: {:?}>>", width)))
     }
+
+    fn pad_styled(&mut self, width: usize, style: ContentStyle) {
+        self.data.push((self.default_style, format!("<<padding: {:?}, styled: {:?}>>", width, style)))
+    }
 }
 
 impl Write for Backend {

@@ -244,6 +244,16 @@ impl BackendProtocol for Backend {
     fn pad(&mut self, width: usize) {
         queue!(self, Print(format!("{:width$}", ""))).expect(ERR_MSG);
     }
+
+    #[inline]
+    fn pad_styled(&mut self, width: usize, style: ContentStyle) {
+        let text = format!("{:width$}", "");
+        match self.default_styled {
+            Some(restore_style) => queue!(self, SetStyle(style), Print(text), ResetColor, SetStyle(restore_style)),
+            None => queue!(self, SetStyle(style), Print(text), ResetColor),
+        }
+        .expect(ERR_MSG);
+    }
 }
 
 impl Drop for Backend {

@@ -228,6 +228,22 @@ impl LineBuilder<'_> {
         }
     }
 
+    pub fn pad(&mut self) {
+        if self.remaining == 0 {
+            return;
+        }
+        self.backend.pad(self.remaining);
+        self.remaining = 0;
+    }
+
+    pub fn pad_styled(&mut self, style: ContentStyle) {
+        if self.remaining == 0 {
+            return;
+        }
+        self.backend.pad_styled(self.remaining, style);
+        self.remaining = 0;
+    }
+
     #[inline]
     pub fn width(&self) -> usize {
         self.remaining

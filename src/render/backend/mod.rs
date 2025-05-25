@@ -62,6 +62,8 @@ pub trait BackendProtocol: Write + Sized {
     fn print_styled_at<D: Display>(&mut self, row: u16, col: u16, text: D, style: ContentStyle);
     /// padding with empty space
     fn pad(&mut self, width: usize);
+    /// padding with empty space styled
+    fn pad_styled(&mut self, width: usize, style: ContentStyle);
 }
 
 #[cfg(test)]

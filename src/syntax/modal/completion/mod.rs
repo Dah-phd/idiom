@@ -71,16 +71,24 @@ impl AutoComplete {
             match item.detail.as_ref() {
                 Some(detail) => {
                     let mut components = [" ", &item.label, "  ", detail].into_iter();
-                    _ = match idx == self.state.selected {
-                        true => components.all(|text| builder.push_styled(text, self.state.highlight)),
-                        false => components.all(|text| builder.push(text)),
+                    match idx == self.state.selected {
+                        true => {
+                            if components.all(|text| builder.push_styled(text, self.state.highlight)) {
+                                builder.pad_styled(self.state.highlight);
+                            }
+                        }
+                        false => _ = components.all(|text| builder.push(text)),
                     };
                 }
                 None => {
                     let mut components = [" ", &item.label].into_iter();
-                    _ = match idx == self.state.selected {
-                        true => components.all(|text| builder.push_styled(text, self.state.highlight)),
-                        false => components.all(|text| builder.push(text)),
+                    match idx == self.state.selected {
+                        true => {
+                            if components.all(|text| builder.push_styled(text, self.state.highlight)) {
+                                builder.pad_styled(self.state.highlight);
+                            }
+                        }
+                        false => _ = components.all(|text| builder.push(text)),
                     }
                 }
             }
