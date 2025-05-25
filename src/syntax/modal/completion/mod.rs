@@ -3,7 +3,10 @@ use super::ModalMessage;
 use crate::{
     configs::EditorAction,
     global_state::GlobalState,
-    render::{layout::Rect, state::State},
+    render::{
+        layout::{IterLines, Rect},
+        state::State,
+    },
     syntax::Lang,
     workspace::CursorPosition,
 };
@@ -14,7 +17,7 @@ use snippets::parse_completion_item;
 pub struct AutoComplete {
     state: State,
     filter: String,
-    filtered: Vec<(String, i64, usize)>,
+    filtered: Vec<(i64, usize)>,
     completions: Vec<CompletionItem>,
 }
 
@@ -36,7 +39,7 @@ impl AutoComplete {
     pub fn map(&mut self, action: EditorAction, lang: &Lang, gs: &mut GlobalState) -> ModalMessage {
         match action {
             EditorAction::NewLine | EditorAction::Indent => {
-                let mut completion_item = self.completions.remove(self.filtered.remove(self.state.selected).2);
+                let mut completion_item = self.completions.remove(self.filtered.remove(self.state.selected).1);
                 if let Some(data) = completion_item.data.take() {
                     lang.handle_completion_data(data, gs);
                 };
@@ -59,7 +62,30 @@ impl AutoComplete {
 
     #[inline]
     pub fn render(&mut self, area: &Rect, gs: &mut GlobalState) {
-        self.state.render_list(self.filtered.iter().map(|(c, ..)| c.as_str()), *area, &mut gs.backend);
+        let backend = gs.backend();
+        self.state.update_at_line(area.height as usize);
+        let mut lines = area.into_iter();
+        for (idx, item) in self.iter_filtered().enumerate().skip(self.state.at_line) {
+            let Some(line) = lines.next() else { break };
+            let mut builder = line.unsafe_builder(backend);
+            match item.detail.as_ref() {
+                Some(detail) => {
+                    let mut components = [" ", &item.label, "  ", detail].into_iter();
+                    _ = match idx == self.state.selected {
+                        true => components.all(|text| builder.push_styled(text, self.state.highlight)),
+                        false => components.all(|text| builder.push(text)),
+                    };
+                }
+                None => {
+                    let mut components = [" ", &item.label].into_iter();
+                    _ = match idx == self.state.selected {
+                        true => components.all(|text| builder.push_styled(text, self.state.highlight)),
+                        false => components.all(|text| builder.push(text)),
+                    }
+                }
+            }
+        }
+        lines.clear_to_end(backend);
     }
 
     #[inline]
@@ -95,16 +121,16 @@ impl AutoComplete {
                 matcher.fuzzy_match(item.filter_text.as_ref().unwrap_or(&item.label), &self.filter).map(|score| {
                     let divisor = item.label.len().abs_diff(self.filter.len()) as i64;
                     let new_score = if divisor != 0 { score / divisor } else { score };
-                    let line = match item.detail.as_ref() {
-                        Some(info) => format!(" {}  {info}", item.label),
-                        None => format!(" {}", item.label),
-                    };
-                    (line, new_score, item_idx)
+                    (new_score, item_idx)
                 })
             })
             .collect();
-        self.filtered.sort_by(|(_, idx, _), (_, rhidx, _)| rhidx.cmp(idx));
+        self.filtered.sort_by(|(idx, _), (rhidx, _)| rhidx.cmp(idx));
         self.state.reset();
+    }
+
+    fn iter_filtered(&self) -> impl Iterator<Item = &CompletionItem> {
+        self.filtered.iter().map(|(.., idx)| &self.completions[*idx])
     }
 }
 

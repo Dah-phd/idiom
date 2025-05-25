@@ -114,10 +114,7 @@ impl State {
         self.update_at_line(rect.height as usize);
         let mut lines = rect.into_iter();
         for (idx, (text, mut style)) in options.enumerate().skip(self.at_line) {
-            let line = match lines.next() {
-                Some(line) => line,
-                None => break,
-            };
+            let Some(line) = lines.next() else { break };
             if idx == self.selected {
                 style.update(self.highlight);
             }
@@ -130,10 +127,7 @@ impl State {
         self.update_at_line(rect.height as usize);
         let mut lines = rect.into_iter();
         for (idx, text) in options.enumerate().skip(self.at_line) {
-            let line = match lines.next() {
-                Some(line) => line,
-                None => break,
-            };
+            let Some(line) = lines.next() else { break };
             match idx == self.selected {
                 true => line.render_styled(text, self.highlight, backend),
                 false => line.render(text, backend),
@@ -150,10 +144,7 @@ impl State {
     ) {
         self.update_at_line(lines.len());
         for (idx, text) in options.enumerate().skip(self.at_line) {
-            let line = match lines.next_padded(backend) {
-                Some(line) => line,
-                None => break,
-            };
+            let Some(line) = lines.next_padded(backend) else { break };
             match idx == self.selected {
                 true => line.render_styled(text, self.highlight, backend),
                 false => line.render(text, backend),
