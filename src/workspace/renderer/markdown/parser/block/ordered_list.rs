@@ -7,10 +7,10 @@ use regex::Regex;
 
 pub fn parse_ordered_list(lines: &[&str]) -> Option<(Block, usize)> {
     lazy_static! {
-        static ref LIST_BEGIN: Regex =
-            Regex::new(r"^(?P<indent> *)(?P<numbering>[0-9.]+|[aAiI]+\.) (?P<content>.*)").unwrap();
-        static ref NEW_PARAGRAPH: Regex = Regex::new(r"^ +").unwrap();
-        static ref INDENTED: Regex = Regex::new(r"^ {0,4}(?P<content>.*)").unwrap();
+        static ref LIST_BEGIN: Regex = Regex::new(r"^(?P<indent> *)(?P<numbering>[0-9.]+|[aAiI]+\.) (?P<content>.*)")
+            .expect("Pattern already testsed!");
+        static ref NEW_PARAGRAPH: Regex = Regex::new(r"^ +").expect("Pattern already testsed!");
+        static ref INDENTED: Regex = Regex::new(r"^ {0,4}(?P<content>.*)").expect("Pattern already testsed!");
     }
 
     // if the beginning doesn't match a list don't even bother
@@ -125,17 +125,17 @@ mod test {
 
     #[test]
     fn finds_list() {
-        match parse_ordered_list(&vec!["1. A list", "2. is good"]) {
+        match parse_ordered_list(&["1. A list", "2. is good"]) {
             Some((OrderedList(_, ref lt), 2)) if lt == &n_type() => (),
             x => panic!("Found {:?}", x),
         }
 
-        match parse_ordered_list(&vec!["a. A list", "b. is good", "laksjdnflakdsjnf"]) {
+        match parse_ordered_list(&["a. A list", "b. is good", "laksjdnflakdsjnf"]) {
             Some((OrderedList(_, ref lt), 3)) if lt == &a_type() => (),
             x => panic!("Found {:?}", x),
         }
 
-        match parse_ordered_list(&vec!["A. A list", "B. is good", "laksjdnflakdsjnf"]) {
+        match parse_ordered_list(&["A. A list", "B. is good", "laksjdnflakdsjnf"]) {
             Some((OrderedList(_, ref lt), 3)) if lt == &A_type() => (),
             x => panic!("Found {:?}", x),
         }
@@ -143,12 +143,12 @@ mod test {
 
     #[test]
     fn knows_when_to_stop() {
-        match parse_ordered_list(&vec!["i. A list", "ii. is good", "", "laksjdnflakdsjnf"]) {
+        match parse_ordered_list(&["i. A list", "ii. is good", "", "laksjdnflakdsjnf"]) {
             Some((OrderedList(_, ref lt), 3)) if lt == &i_type() => (),
             x => panic!("Found {:?}", x),
         }
 
-        match parse_ordered_list(&vec!["I. A list", "", "laksjdnflakdsjnf"]) {
+        match parse_ordered_list(&["I. A list", "", "laksjdnflakdsjnf"]) {
             Some((OrderedList(_, ref lt), 2)) if lt == &I_type() => (),
             x => panic!("Found {:?}", x),
         }
@@ -156,10 +156,10 @@ mod test {
 
     #[test]
     fn multi_level_list() {
-        match parse_ordered_list(&vec!["1. A list", "     1.1. One point one", "     1.2. One point two"]) {
+        match parse_ordered_list(&["1. A list", "     1.1. One point one", "     1.2. One point two"]) {
             Some((OrderedList(ref items, ref lt), 3)) if lt == &n_type() => match &items[0] {
-                &Paragraph(ref items) => match &items[1] {
-                    &OrderedList(_, ref lt1) if lt1 == &n_type() => (),
+                Paragraph(ref items) => match &items[1] {
+                    OrderedList(_, ref lt1) if lt1 == &n_type() => (),
                     x => panic!("Found {:?}", x),
                 },
                 x => panic!("Found {:?}", x),
@@ -170,11 +170,11 @@ mod test {
 
     #[test]
     fn no_false_positives() {
-        assert_eq!(parse_ordered_list(&vec!["test 1. test"]), None);
+        assert_eq!(parse_ordered_list(&["test 1. test"]), None);
     }
 
     #[test]
     fn no_early_matching() {
-        assert_eq!(parse_ordered_list(&vec!["test", "1. not", "2. a list"]), None);
+        assert_eq!(parse_ordered_list(&["test", "1. not", "2. a list"]), None);
     }
 }

@@ -5,7 +5,7 @@ use regex::Regex;
 
 pub fn parse_hr(lines: &[&str]) -> Option<(Block, usize)> {
     lazy_static! {
-        static ref HORIZONTAL_RULE: Regex = Regex::new(r"^(===+)$|^(---+)$").unwrap();
+        static ref HORIZONTAL_RULE: Regex = Regex::new(r"^(===+)$|^(---+)$").expect("Pattern already testsed!");
     }
 
     if HORIZONTAL_RULE.is_match(lines[0]) {
@@ -21,27 +21,27 @@ mod test {
 
     #[test]
     fn finds_hr() {
-        assert_eq!(parse_hr(&vec!["-------"]).unwrap(), (Hr, 1));
-        assert_eq!(parse_hr(&vec!["---"]).unwrap(), (Hr, 1));
-        assert_eq!(parse_hr(&vec!["----------------------------"]).unwrap(), (Hr, 1));
-        assert_eq!(parse_hr(&vec!["-------", "abc"]).unwrap(), (Hr, 1));
+        assert_eq!(parse_hr(&["-------"]).unwrap(), (Hr, 1));
+        assert_eq!(parse_hr(&["---"]).unwrap(), (Hr, 1));
+        assert_eq!(parse_hr(&["----------------------------"]).unwrap(), (Hr, 1));
+        assert_eq!(parse_hr(&["-------", "abc"]).unwrap(), (Hr, 1));
 
-        assert_eq!(parse_hr(&vec!["======="]).unwrap(), (Hr, 1));
-        assert_eq!(parse_hr(&vec!["==="]).unwrap(), (Hr, 1));
-        assert_eq!(parse_hr(&vec!["============================"]).unwrap(), (Hr, 1));
-        assert_eq!(parse_hr(&vec!["=======", "abc"]).unwrap(), (Hr, 1));
+        assert_eq!(parse_hr(&["======="]).unwrap(), (Hr, 1));
+        assert_eq!(parse_hr(&["==="]).unwrap(), (Hr, 1));
+        assert_eq!(parse_hr(&["============================"]).unwrap(), (Hr, 1));
+        assert_eq!(parse_hr(&["=======", "abc"]).unwrap(), (Hr, 1));
     }
 
     #[test]
     fn no_false_positives() {
-        assert_eq!(parse_hr(&vec!["a-------"]), None);
-        assert_eq!(parse_hr(&vec!["--- a"]), None);
-        assert_eq!(parse_hr(&vec!["--a-"]), None);
-        assert_eq!(parse_hr(&vec!["-------====--------------"]), None);
+        assert_eq!(parse_hr(&["a-------"]), None);
+        assert_eq!(parse_hr(&["--- a"]), None);
+        assert_eq!(parse_hr(&["--a-"]), None);
+        assert_eq!(parse_hr(&["-------====--------------"]), None);
 
-        assert_eq!(parse_hr(&vec!["a======"]), None);
-        assert_eq!(parse_hr(&vec!["=== a"]), None);
-        assert_eq!(parse_hr(&vec!["==a="]), None);
-        assert_eq!(parse_hr(&vec!["=======---================="]), None);
+        assert_eq!(parse_hr(&["a======"]), None);
+        assert_eq!(parse_hr(&["=== a"]), None);
+        assert_eq!(parse_hr(&["==a="]), None);
+        assert_eq!(parse_hr(&["=======---================="]), None);
     }
 }

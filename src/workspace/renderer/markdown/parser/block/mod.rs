@@ -69,14 +69,14 @@ pub fn parse_blocks(md: &str) -> Vec<Block> {
 
 fn parse_block(lines: &[&str]) -> Option<(Block, usize)> {
     pipe_opt!(
-    lines
-    => parse_hr
-    => parse_atx_header
-    => parse_setext_header
-    => parse_code_block
-    => parse_blockquote
-    => parse_unordered_list
-    => parse_ordered_list
+        lines
+        => parse_hr
+        => parse_atx_header
+        => parse_setext_header
+        => parse_code_block
+        => parse_blockquote
+        => parse_unordered_list
+        => parse_ordered_list
     )
 }
 

@@ -62,15 +62,11 @@ pub fn parse_unordered_list(lines: &[&str]) -> Option<(Block, usize)> {
             }
 
             // newline means we start a new paragraph
-            if line.unwrap().is_empty() {
-                prev_newline = true;
-            } else {
-                prev_newline = false;
-            }
+            prev_newline = line.unwrap().is_empty();
 
             content.push('\n');
             let caps = INDENTED.captures(line.unwrap()).unwrap();
-            content.push_str(&caps.name("content").unwrap().as_str());
+            content.push_str(caps.name("content").unwrap().as_str());
 
             i += 1;
         }
@@ -101,12 +97,12 @@ mod test {
 
     #[test]
     fn finds_list() {
-        match parse_unordered_list(&vec!["* A list", "* is good"]) {
+        match parse_unordered_list(&["* A list", "* is good"]) {
             Some((UnorderedList(_), 2)) => (),
             x => panic!("Found {:?}", x),
         }
 
-        match parse_unordered_list(&vec!["* A list", "* is good", "laksjdnflakdsjnf"]) {
+        match parse_unordered_list(&["* A list", "* is good", "laksjdnflakdsjnf"]) {
             Some((UnorderedList(_), 3)) => (),
             x => panic!("Found {:?}", x),
         }
@@ -114,12 +110,12 @@ mod test {
 
     #[test]
     fn knows_when_to_stop() {
-        match parse_unordered_list(&vec!["* A list", "* is good", "", "laksjdnflakdsjnf"]) {
+        match parse_unordered_list(&["* A list", "* is good", "", "laksjdnflakdsjnf"]) {
             Some((UnorderedList(_), 3)) => (),
             x => panic!("Found {:?}", x),
         }
 
-        match parse_unordered_list(&vec!["* A list", "", "laksjdnflakdsjnf"]) {
+        match parse_unordered_list(&["* A list", "", "laksjdnflakdsjnf"]) {
             Some((UnorderedList(_), 2)) => (),
             x => panic!("Found {:?}", x),
         }
@@ -127,11 +123,11 @@ mod test {
 
     #[test]
     fn no_false_positives() {
-        assert_eq!(parse_unordered_list(&vec!["test * test"]), None);
+        assert_eq!(parse_unordered_list(&["test * test"]), None);
     }
 
     #[test]
     fn no_early_matching() {
-        assert_eq!(parse_unordered_list(&vec!["test", "* whot", "* a list"]), None);
+        assert_eq!(parse_unordered_list(&["test", "* whot", "* a list"]), None);
     }
 }

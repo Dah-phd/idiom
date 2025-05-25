@@ -5,9 +5,9 @@ use regex::Regex;
 
 pub fn parse_code_block(lines: &[&str]) -> Option<(Block, usize)> {
     lazy_static! {
-        static ref CODE_BLOCK_SPACES: Regex = Regex::new(r"^ {4}").unwrap();
-        static ref CODE_BLOCK_TABS: Regex = Regex::new(r"^\t").unwrap();
-        static ref CODE_BLOCK_BACKTICKS: Regex = Regex::new(r"```").unwrap();
+        static ref CODE_BLOCK_SPACES: Regex = Regex::new(r"^ {4}").expect("Pattern already tested!");
+        static ref CODE_BLOCK_TABS: Regex = Regex::new(r"^\t").expect("Pattern already tested!");
+        static ref CODE_BLOCK_BACKTICKS: Regex = Regex::new(r"```").expect("Pattern already tested!");
     }
 
     let mut content = String::new();
@@ -68,34 +68,31 @@ mod test {
 
     #[test]
     fn finds_code_block() {
-        assert_eq!(parse_code_block(&vec!["    Test"]).unwrap(), ((CodeBlock(None, "Test".to_owned()), 1)));
+        assert_eq!(parse_code_block(&["    Test"]), Some((CodeBlock(None, "Test".to_owned()), 1)));
+
+        assert_eq!(parse_code_block(&["    Test", "    this"]), Some((CodeBlock(None, "Test\nthis".to_owned()), 2)));
 
         assert_eq!(
-            parse_code_block(&vec!["    Test", "    this"]).unwrap(),
-            ((CodeBlock(None, "Test\nthis".to_owned()), 2))
-        );
-
-        assert_eq!(
-            parse_code_block(&vec!["```testlang", "Test", "this", "```"]).unwrap(),
-            ((CodeBlock(Some(String::from("testlang")), "Test\nthis".to_owned()), 4))
+            parse_code_block(&["```testlang", "Test", "this", "```"]),
+            Some((CodeBlock(Some(String::from("testlang")), "Test\nthis".to_owned()), 4))
         );
     }
 
     #[test]
     fn knows_when_to_stop() {
         assert_eq!(
-            parse_code_block(&vec!["    Test", "    this", "stuff", "    now"]).unwrap(),
-            ((CodeBlock(None, "Test\nthis".to_owned()), 2))
+            parse_code_block(&["    Test", "    this", "stuff", "    now"]),
+            Some((CodeBlock(None, "Test\nthis".to_owned()), 2))
         );
     }
 
     #[test]
     fn no_false_positives() {
-        assert_eq!(parse_code_block(&vec!["   Test"]), None);
+        assert_eq!(parse_code_block(&["   Test"]), None);
     }
 
     #[test]
     fn no_early_matching() {
-        assert_eq!(parse_code_block(&vec!["Test", "    this", "stuff", "    now"]), None);
+        assert_eq!(parse_code_block(&["Test", "    this", "stuff", "    now"]), None);
     }
 }

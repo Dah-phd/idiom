@@ -23,14 +23,10 @@ pub fn parse_blockquote(lines: &[&str]) -> Option<(Block, usize)> {
         // stop parsing on two newlines or if the paragraph after
         // a newline isn't started with a >
         // we continue to parse if it's just another empty line
-        if prev_newline && line.len() > 0 && !line.starts_with(">") {
+        if prev_newline && !line.is_empty() && !line.starts_with(">") {
             break;
         }
-        if line.is_empty() {
-            prev_newline = true;
-        } else {
-            prev_newline = false;
-        }
+        prev_newline = line.is_empty();
         let mut chars = line.chars();
         let begin = match chars.next() {
             Some('>') => match chars.next() {
@@ -60,12 +56,12 @@ mod test {
 
     #[test]
     fn finds_blockquote() {
-        match parse_blockquote(&vec!["> A citation", "> is good"]) {
+        match parse_blockquote(&["> A citation", "> is good"]) {
             Some((Blockquote(_), 2)) => (),
             _ => panic!(),
         }
 
-        match parse_blockquote(&vec!["> A citation", "> is good,", "very good"]) {
+        match parse_blockquote(&["> A citation", "> is good,", "very good"]) {
             Some((Blockquote(_), 3)) => (),
             _ => panic!(),
         }
@@ -73,7 +69,7 @@ mod test {
 
     #[test]
     fn knows_when_to_stop() {
-        match parse_blockquote(&vec!["> A citation", "> is good", "", "whatever"]) {
+        match parse_blockquote(&["> A citation", "> is good", "", "whatever"]) {
             Some((Blockquote(_), 3)) => (),
             _ => panic!(),
         }
@@ -81,11 +77,11 @@ mod test {
 
     #[test]
     fn no_false_positives() {
-        assert_eq!(parse_blockquote(&vec!["wat > this"]), None);
+        assert_eq!(parse_blockquote(&["wat > this"]), None);
     }
 
     #[test]
     fn no_early_matching() {
-        assert_eq!(parse_blockquote(&vec!["Hello", "> A citation", "> is good", "", "whatever"]), None);
+        assert_eq!(parse_blockquote(&["Hello", "> A citation", "> is good", "", "whatever"]), None);
     }
 }

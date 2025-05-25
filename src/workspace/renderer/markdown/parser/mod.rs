@@ -1,10 +1,9 @@
-mod block;
-mod span;
-
 /// markdown v0.3.0 (pre-release)
 /// the functionallity provided is enough for the purpose
 /// keeping the code as is, ref [MIT]:
 /// https://crates.io/crates/markdown
+mod block;
+mod span;
 
 #[allow(missing_docs)]
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -16,6 +15,7 @@ pub enum Block {
     Header(Vec<Span>, usize),
     Paragraph(Vec<Span>),
     Blockquote(Vec<Block>),
+    #[allow(clippy::enum_variant_names)]
     CodeBlock(Option<String>, String),
     OrderedList(Vec<ListItem>, OrderedListType),
     UnorderedList(Vec<ListItem>),

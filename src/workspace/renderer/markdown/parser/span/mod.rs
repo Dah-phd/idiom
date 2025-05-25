@@ -194,6 +194,6 @@ mod test {
     #[test]
     fn properly_consumes_multibyte_utf8() {
         let test_phrase = str::from_utf8(b"This shouldn\xE2\x80\x99t panic").unwrap();
-        let _ = parse_spans(&test_phrase);
+        let _ = parse_spans(test_phrase);
     }
 }
