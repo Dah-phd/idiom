@@ -37,12 +37,14 @@ pub fn parse_code_block(lines: &[&str]) -> Option<(Block, usize)> {
         } else if CODE_BLOCK_BACKTICKS.is_match(line) {
             line_number += 1;
 
-            if !backtick_opened && !(line_number == 0 && line.get(3..).is_some()) {
-                lang = Some(String::from(line.get(3..).unwrap()));
-                backtick_opened = true;
-            } else if backtick_opened {
+            if backtick_opened {
                 backtick_closed = true;
                 break;
+            }
+
+            if let Some(lang_name) = line.get(3..) {
+                backtick_opened = true;
+                lang = Some(String::from(lang_name));
             }
         } else if backtick_opened {
             content.push_str(line);
@@ -54,7 +56,7 @@ pub fn parse_code_block(lines: &[&str]) -> Option<(Block, usize)> {
         }
     }
 
-    if line_number > 0 && ((backtick_opened && backtick_closed) || !backtick_opened) {
+    if line_number > 0 && (backtick_closed || !backtick_opened) {
         return Some((CodeBlock(lang, content.trim_matches('\n').to_owned()), line_number));
     }
 

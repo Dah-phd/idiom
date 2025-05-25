@@ -21,15 +21,15 @@ mod test {
 
     #[test]
     fn finds_hr() {
-        assert_eq!(parse_hr(&["-------"]).unwrap(), (Hr, 1));
-        assert_eq!(parse_hr(&["---"]).unwrap(), (Hr, 1));
-        assert_eq!(parse_hr(&["----------------------------"]).unwrap(), (Hr, 1));
-        assert_eq!(parse_hr(&["-------", "abc"]).unwrap(), (Hr, 1));
+        assert_eq!(parse_hr(&["-------"]), Some((Hr, 1)));
+        assert_eq!(parse_hr(&["---"]), Some((Hr, 1)));
+        assert_eq!(parse_hr(&["----------------------------"]), Some((Hr, 1)));
+        assert_eq!(parse_hr(&["-------", "abc"]), Some((Hr, 1)));
 
-        assert_eq!(parse_hr(&["======="]).unwrap(), (Hr, 1));
-        assert_eq!(parse_hr(&["==="]).unwrap(), (Hr, 1));
-        assert_eq!(parse_hr(&["============================"]).unwrap(), (Hr, 1));
-        assert_eq!(parse_hr(&["=======", "abc"]).unwrap(), (Hr, 1));
+        assert_eq!(parse_hr(&["======="]), Some((Hr, 1)));
+        assert_eq!(parse_hr(&["==="]), Some((Hr, 1)));
+        assert_eq!(parse_hr(&["============================"]), Some((Hr, 1)));
+        assert_eq!(parse_hr(&["=======", "abc"]), Some((Hr, 1)));
     }
 
     #[test]

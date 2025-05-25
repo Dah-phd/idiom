@@ -6,20 +6,14 @@ use regex::Regex;
 
 pub fn parse_strong(text: &str) -> Option<(Span, usize)> {
     lazy_static! {
-        static ref STRONG_UNDERSCORE: Regex = Regex::new(r"^__(?P<text>.+?)__").unwrap();
-        static ref STRONG_STAR: Regex = Regex::new(r"^\*\*(?P<text>.+?)\*\*").unwrap();
+        static ref STRONG_UNDERSCORE: Regex = Regex::new(r"^__(?P<text>.+?)__").expect("Pattern tested!");
+        static ref STRONG_STAR: Regex = Regex::new(r"^\*\*(?P<text>.+?)\*\*").expect("Pattern tested!");
     }
 
-    if STRONG_UNDERSCORE.is_match(text) {
-        let caps = STRONG_UNDERSCORE.captures(text).unwrap();
-        let t = caps.name("text").unwrap().as_str();
-        return Some((Strong(parse_spans(t)), t.len() + 4));
-    } else if STRONG_STAR.is_match(text) {
-        let caps = STRONG_STAR.captures(text).unwrap();
-        let t = caps.name("text").unwrap().as_str();
-        return Some((Strong(parse_spans(t)), t.len() + 4));
-    }
-    None
+    let caps = STRONG_UNDERSCORE.captures(text).or(STRONG_STAR.captures(text))?;
+
+    let text = caps.name("text")?.as_str();
+    Some((Strong(parse_spans(text)), text.len() + 4))
 }
 
 #[cfg(test)]

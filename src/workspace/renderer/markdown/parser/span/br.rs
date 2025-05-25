@@ -5,7 +5,7 @@ use regex::Regex;
 
 pub fn parse_break(text: &str) -> Option<(Span, usize)> {
     lazy_static! {
-        static ref BR: Regex = Regex::new(r"^ {2}$").unwrap();
+        static ref BR: Regex = Regex::new(r"^ {2}$").expect("Pattern tested!");
     }
 
     if BR.is_match(text) {

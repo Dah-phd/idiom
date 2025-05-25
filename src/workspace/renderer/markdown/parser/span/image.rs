@@ -6,19 +6,16 @@ use regex::Regex;
 pub fn parse_image(text: &str) -> Option<(Span, usize)> {
     lazy_static! {
         static ref IMAGE: Regex =
-            Regex::new("^!\\[(?P<text>.*?)\\]\\((?P<url>.*?)(?:\\s\"(?P<title>.*?)\")?\\)").unwrap();
+            Regex::new("^!\\[(?P<text>.*?)\\]\\((?P<url>.*?)(?:\\s\"(?P<title>.*?)\")?\\)").expect("Pattern tested");
     }
 
-    if IMAGE.is_match(text) {
-        let caps = IMAGE.captures(text).unwrap();
-        let text = if let Some(mat) = caps.name("text") { mat.as_str().to_owned() } else { "".to_owned() };
-        let url = if let Some(mat) = caps.name("url") { mat.as_str().to_owned() } else { "".to_owned() };
-        let title = caps.name("title").map(|mat| mat.as_str().to_owned());
-        // TODO correctly get whitespace length between url and title
-        let len = text.len() + url.len() + 5 + title.clone().map_or(0, |t| t.len() + 3);
-        return Some((Image(text, url, title), len));
-    }
-    None
+    let caps = IMAGE.captures(text)?;
+    let text = if let Some(mat) = caps.name("text") { mat.as_str().to_owned() } else { "".to_owned() };
+    let url = if let Some(mat) = caps.name("url") { mat.as_str().to_owned() } else { "".to_owned() };
+    let title = caps.name("title").map(|mat| mat.as_str().to_owned());
+    // TODO correctly get whitespace length between url and title
+    let len = text.len() + url.len() + 5 + title.clone().map_or(0, |t| t.len() + 3);
+    Some((Image(text, url, title), len))
 }
 
 #[test]

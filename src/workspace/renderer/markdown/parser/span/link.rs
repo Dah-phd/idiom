@@ -6,20 +6,17 @@ use regex::Regex;
 pub fn parse_link(text: &str) -> Option<(Span, usize)> {
     lazy_static! {
         static ref LINK: Regex =
-            Regex::new("^\\[(?P<text>.*?)\\]\\((?P<url>.*?)(?:\\s\"(?P<title>.*?)\")?\\)").unwrap();
+            Regex::new("^\\[(?P<text>.*?)\\]\\((?P<url>.*?)(?:\\s\"(?P<title>.*?)\")?\\)").expect("Pattern tested");
     }
 
-    if LINK.is_match(text) {
-        let caps = LINK.captures(text).unwrap();
-        let text = if let Some(mat) = caps.name("text") { mat.as_str().to_owned() } else { "".to_owned() };
-        let url = if let Some(mat) = caps.name("url") { mat.as_str().to_owned() } else { "".to_owned() };
-        let title = caps.name("title").map(|mat| mat.as_str().to_owned());
-        // let title = caps.name("title").map(|t| t.to_owned());
-        // TODO correctly get whitespace length between url and title
-        let len = text.len() + url.len() + 4 + title.clone().map_or(0, |t| t.len() + 3);
-        return Some((Link(text, url, title), len));
-    }
-    None
+    let caps = LINK.captures(text)?;
+    let text = if let Some(mat) = caps.name("text") { mat.as_str().to_owned() } else { "".to_owned() };
+    let url = if let Some(mat) = caps.name("url") { mat.as_str().to_owned() } else { "".to_owned() };
+    let title = caps.name("title").map(|mat| mat.as_str().to_owned());
+    // let title = caps.name("title").map(|t| t.to_owned());
+    // TODO correctly get whitespace length between url and title
+    let len = text.len() + url.len() + 4 + title.clone().map_or(0, |t| t.len() + 3);
+    Some((Link(text, url, title), len))
 }
 
 #[test]

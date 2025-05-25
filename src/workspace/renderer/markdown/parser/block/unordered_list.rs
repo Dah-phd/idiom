@@ -7,9 +7,10 @@ use regex::Regex;
 
 pub fn parse_unordered_list(lines: &[&str]) -> Option<(Block, usize)> {
     lazy_static! {
-        static ref LIST_BEGIN: Regex = Regex::new(r"^(?P<indent> *)(-|\+|\*) (?P<content>.*)").unwrap();
-        static ref NEW_PARAGRAPH: Regex = Regex::new(r"^ +").unwrap();
-        static ref INDENTED: Regex = Regex::new(r"^ {0,4}(?P<content>.*)").unwrap();
+        static ref LIST_BEGIN: Regex =
+            Regex::new(r"^(?P<indent> *)(-|\+|\*) (?P<content>.*)").expect("Pattern already testsed!");
+        static ref NEW_PARAGRAPH: Regex = Regex::new(r"^ +").expect("Pattern already testsed!");
+        static ref INDENTED: Regex = Regex::new(r"^ {0,4}(?P<content>.*)").expect("Pattern already testsed!");
     }
 
     // if the beginning doesn't match a list don't even bother
@@ -31,42 +32,42 @@ pub fn parse_unordered_list(lines: &[&str]) -> Option<(Block, usize)> {
 
     // loop for list items
     loop {
-        if line.is_none() || !LIST_BEGIN.is_match(line.unwrap()) {
-            break;
-        }
+        let Some(text) = line else { break };
+        let Some(caps) = LIST_BEGIN.captures(text) else { break };
+
         if prev_newline {
             is_paragraph = true;
             prev_newline = false;
         }
 
-        let caps = LIST_BEGIN.captures(line.unwrap()).unwrap();
-
-        let mut content = caps.name("content").unwrap().as_str().to_owned();
-        let last_indent = caps.name("indent").unwrap().as_str().len();
+        let mut content = caps.name("content").map(|m| m.as_str().to_owned()).unwrap_or_default();
+        let last_indent = caps.name("indent").map(|m| m.as_str().len()).unwrap_or_default();
         i += 1;
 
         // parse additional lines of the listitem
         loop {
             line = line_iter.next();
+            let Some(text) = line else { break };
 
-            if line.is_none() || (prev_newline && !NEW_PARAGRAPH.is_match(line.unwrap())) {
+            if prev_newline && !NEW_PARAGRAPH.is_match(text) {
                 break;
             }
 
-            if LIST_BEGIN.is_match(line.unwrap()) {
-                let caps = LIST_BEGIN.captures(line.unwrap()).unwrap();
-                let indent = caps.name("indent").unwrap().as_str().len();
+            if let Some(caps) = LIST_BEGIN.captures(text) {
+                let indent = caps.name("indent").map(|m| m.as_str().len()).unwrap_or_default();
                 if indent < 2 || indent <= last_indent {
                     break;
                 }
             }
 
             // newline means we start a new paragraph
-            prev_newline = line.unwrap().is_empty();
+            prev_newline = text.is_empty();
 
             content.push('\n');
-            let caps = INDENTED.captures(line.unwrap()).unwrap();
-            content.push_str(caps.name("content").unwrap().as_str());
+
+            if let Some(cont_match) = INDENTED.captures(text).and_then(|c| c.name("content")) {
+                content.push_str(cont_match.as_str());
+            }
 
             i += 1;
         }

@@ -6,20 +6,13 @@ use regex::Regex;
 
 pub fn parse_emphasis(text: &str) -> Option<(Span, usize)> {
     lazy_static! {
-        static ref EMPHASIS_UNDERSCORE: Regex = Regex::new(r"^_(?P<text>.+?)_").unwrap();
-        static ref EMPHASIS_STAR: Regex = Regex::new(r"^\*(?P<text>.+?)\*").unwrap();
+        static ref EMPHASIS_UNDERSCORE: Regex = Regex::new(r"^_(?P<text>.+?)_").expect("Pattern tested!");
+        static ref EMPHASIS_STAR: Regex = Regex::new(r"^\*(?P<text>.+?)\*").expect("Pattern tested!");
     }
+    let caps = EMPHASIS_UNDERSCORE.captures(text).or(EMPHASIS_STAR.captures(text))?;
 
-    if EMPHASIS_UNDERSCORE.is_match(text) {
-        let caps = EMPHASIS_UNDERSCORE.captures(text).unwrap();
-        let t = caps.name("text").unwrap().as_str();
-        return Some((Emphasis(parse_spans(t)), t.len() + 2));
-    } else if EMPHASIS_STAR.is_match(text) {
-        let caps = EMPHASIS_STAR.captures(text).unwrap();
-        let t = caps.name("text").unwrap().as_str();
-        return Some((Emphasis(parse_spans(t)), t.len() + 2));
-    }
-    None
+    let t = caps.name("text")?.as_str();
+    Some((Emphasis(parse_spans(t)), t.len() + 2))
 }
 
 #[cfg(test)]

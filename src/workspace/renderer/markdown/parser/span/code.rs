@@ -5,17 +5,16 @@ use regex::Regex;
 
 pub fn parse_code(text: &str) -> Option<(Span, usize)> {
     lazy_static! {
-        static ref CODE_SINGLE: Regex = Regex::new(r"^`(?P<text>.+?)`").unwrap();
-        static ref CODE_DOUBLE: Regex = Regex::new(r"^``(?P<text>.+?)``").unwrap();
+        static ref CODE_SINGLE: Regex = Regex::new(r"^`(?P<text>.+?)`").expect("Pattern tested!");
+        static ref CODE_DOUBLE: Regex = Regex::new(r"^``(?P<text>.+?)``").expect("Pattern tested!");
     }
 
-    if CODE_DOUBLE.is_match(text) {
-        let caps = CODE_DOUBLE.captures(text).unwrap();
-        let t = caps.name("text").unwrap().as_str();
+    if let Some(caps) = CODE_DOUBLE.captures(text) {
+        let t = caps.name("text")?.as_str();
         return Some((Code(t.to_owned()), t.len() + 4));
-    } else if CODE_SINGLE.is_match(text) {
-        let caps = CODE_SINGLE.captures(text).unwrap();
-        let t = caps.name("text").unwrap().as_str();
+    }
+    if let Some(caps) = CODE_SINGLE.captures(text) {
+        let t = caps.name("text")?.as_str();
         return Some((Code(t.to_owned()), t.len() + 2));
     }
     None

@@ -33,49 +33,43 @@ pub fn parse_ordered_list(lines: &[&str]) -> Option<(Block, usize)> {
 
     // loop for list items
     loop {
-        if line.is_none() || !LIST_BEGIN.is_match(line.unwrap()) {
-            break;
-        }
+        let Some(text) = line else { break };
+        let Some(caps) = LIST_BEGIN.captures(text) else { break };
+
         if prev_newline {
             is_paragraph = true;
             prev_newline = false;
         }
 
-        let caps = LIST_BEGIN.captures(line.unwrap()).unwrap();
+        let mut content = caps.name("content").map(|t| t.as_str().to_owned()).unwrap_or_default();
+        let last_indent = caps.name("indent").map(|t| t.as_str().len()).unwrap_or_default();
 
-        let mut content = caps.name("content").unwrap().as_str().to_owned();
-        let last_indent = caps.name("indent").unwrap().as_str().len();
-        //We use the first list type found
-        let list_num = caps.name("numbering").unwrap().as_str()[0..1].to_owned();
+        let list_num = caps.name("numbering").and_then(|t| t.as_str().get(0..1)).unwrap_or_default();
         list_num_opt = list_num_opt.or(Some(list_num));
         i += 1;
 
-        // parse additional lines of the listitem
         loop {
             line = line_iter.next();
+            let Some(text) = line else { break };
 
-            if line.is_none() || (prev_newline && !NEW_PARAGRAPH.is_match(line.unwrap())) {
+            if prev_newline && !NEW_PARAGRAPH.is_match(text) {
                 break;
             }
 
-            if LIST_BEGIN.is_match(line.unwrap()) {
-                let caps = LIST_BEGIN.captures(line.unwrap()).unwrap();
-                let indent = caps.name("indent").unwrap().as_str().len();
+            if let Some(caps) = LIST_BEGIN.captures(text) {
+                let indent = caps.name("indent").map(|t| t.as_str().len()).unwrap_or_default();
                 if indent < 2 || indent <= last_indent {
                     break;
                 }
             }
 
             // newline means we start a new paragraph
-            if line.unwrap().is_empty() {
-                prev_newline = true;
-            } else {
-                prev_newline = false;
-            }
+            prev_newline = text.is_empty();
 
             content.push('\n');
-            let caps = INDENTED.captures(line.unwrap()).unwrap();
-            content.push_str(&caps.name("content").unwrap().as_str());
+            if let Some(text_match) = INDENTED.captures(text).and_then(|c| c.name("content")) {
+                content.push_str(text_match.as_str());
+            };
 
             i += 1;
         }
@@ -93,8 +87,8 @@ pub fn parse_ordered_list(lines: &[&str]) -> Option<(Block, usize)> {
     }
 
     if i > 0 {
-        let list_num = list_num_opt.unwrap_or("1".to_string());
-        return Some((OrderedList(list_contents, OrderedListType(list_num)), i));
+        let list_num = list_num_opt.unwrap_or("1");
+        return Some((OrderedList(list_contents, OrderedListType(list_num.to_string())), i));
     }
 
     None
