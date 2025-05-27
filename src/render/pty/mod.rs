@@ -219,6 +219,7 @@ impl PtyShell {
                 if let Some(text) = text.next() {
                     backend.go_to(line.row, line.col);
                     _ = backend.write_all(&text);
+                    backend.reset_style();
                 };
             }
         }
@@ -242,6 +243,7 @@ impl PtyShell {
                     if index < start.line || index > end.line {
                         backend.go_to(line.row, line.col);
                         _ = backend.write_all(&text);
+                        backend.reset_style();
                         continue;
                     }
                     if let Some(raw_text) = select_lines.next() {
@@ -267,6 +269,8 @@ impl PtyShell {
                                 backend.print_styled(cell.contents(), style);
                             }
                         }
+
+                        backend.reset_style();
                     }
                 };
             }

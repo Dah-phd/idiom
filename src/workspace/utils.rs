@@ -36,7 +36,7 @@ pub fn insert_clip(clip: &str, content: &mut Vec<EditorLine>, mut cursor: Cursor
 /// inserts clip using cursor position to clone prefix on all lines
 /// first line is trimmed
 #[inline(always)]
-pub fn insert_clip_on_prefix(
+pub fn insert_lines_prefixed_with_start(
     clip: &str,
     content: &mut Vec<EditorLine>,
     mut cursor: CursorPosition,
@@ -74,7 +74,6 @@ pub fn insert_clip_on_prefix(
     }
 
     clip = push_on_newline(clip, &prefix);
-
     clip.push_str(last_line_stipped);
     last_line.insert_str(0, &prefix);
     last_line.insert_str(0, last_line_stipped);
@@ -159,7 +158,7 @@ pub fn get_closing_char_from_context(ch: char, text: &EditorLine, idx: usize) ->
 fn should_close(text: Option<&str>) -> bool {
     match text.and_then(|text| text.chars().next()) {
         None => true,
-        Some(text) => !text.is_numeric() && !text.is_alphabetic() && text != '_',
+        Some(text) => text.is_ascii() && !text.is_numeric() && !text.is_alphabetic() && text != '_',
     }
 }
 
