@@ -330,6 +330,10 @@ impl EditorLine {
         Self { char_len: content.char_len(), content, ..Default::default() }
     }
 
+    pub fn empty() -> Self {
+        Self { ..Default::default() }
+    }
+
     #[inline]
     pub fn push_token(&mut self, token: Token) {
         self.cached.reset();

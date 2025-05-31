@@ -442,14 +442,7 @@ impl Actions {
     pub fn paste(&mut self, clip: String, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
         let edit = match cursor.select_take() {
             Some((from, to)) => Edit::replace_select(from, to, clip, content),
-            None => {
-                let line = &content[cursor.line];
-                if let Some("") = line.get_to(cursor.char).map(|s| s.trim_start_matches(&self.cfg.indent)) {
-                    Edit::insert_clip_indent_on_prefix(cursor.into(), clip, content)
-                } else {
-                    Edit::insert_clip(cursor.into(), clip, content)
-                }
-            }
+            None => Edit::insert_clip_with_indent(cursor.into(), clip, &self.cfg, content),
         };
         cursor.set_position(edit.end_position());
         self.push_done(edit, lexer, content);

@@ -1,4 +1,5 @@
 use crate::{
+    configs::IndentConfigs,
     render::UTF8Safe,
     workspace::{cursor::CursorPosition, line::EditorLine},
 };
@@ -6,78 +7,80 @@ use std::ops::Range;
 
 #[inline(always)]
 pub fn insert_clip(clip: &str, content: &mut Vec<EditorLine>, mut cursor: CursorPosition) -> CursorPosition {
-    let mut lines = clip.split('\n').collect::<Vec<_>>();
-    if lines.len() == 1 {
-        let text = lines[0];
-        content[cursor.line].insert_str(cursor.char, lines[0]);
-        cursor.char += text.char_len();
+    let mut lines = clip.split('\n');
+    let first_line = lines.next().expect("first line should exist!");
+    let Some(last_line_prefix) = lines.next_back() else {
+        content[cursor.line].insert_str(cursor.char, first_line);
+        cursor.char += first_line.char_len();
         return cursor;
     };
 
-    let first_line = &mut content[cursor.line];
-    let mut last_line = first_line.split_off(cursor.char);
-    first_line.push_str(lines.remove(0));
-
-    let prefix = lines.remove(lines.len() - 1); // len is already checked
-    cursor.line += 1;
-    cursor.char = prefix.char_len();
-
-    last_line.insert_str(0, prefix);
-    content.insert(cursor.line, last_line);
+    let start_line = &mut content[cursor.line];
+    let mut end_line = start_line.split_off(cursor.char);
+    start_line.push_str(first_line);
 
     for new_line in lines {
-        content.insert(cursor.line, new_line.to_owned().into());
         cursor.line += 1;
+        content.insert(cursor.line, new_line.to_owned().into());
     }
+
+    cursor.line += 1;
+    cursor.char = last_line_prefix.char_len();
+
+    end_line.insert_str(0, last_line_prefix);
+    content.insert(cursor.line, end_line);
 
     cursor
 }
 
-/// inserts clip using cursor position to clone prefix on all lines
-/// first line is trimmed
+/// inserts clip with indent if possible
 #[inline(always)]
-pub fn insert_lines_prefixed_with_start(
+pub fn insert_lines_indented(
     clip: &str,
+    cfg: &IndentConfigs,
     content: &mut Vec<EditorLine>,
     mut cursor: CursorPosition,
 ) -> (String, CursorPosition) {
-    let mut lines = clip.split('\n').collect::<Vec<_>>();
-    if lines.len() == 1 {
-        let text = lines[0];
-        content[cursor.line].insert_str(cursor.char, lines[0]);
-        cursor.char += text.char_len();
+    let use_indent = &content[cursor.line].get_to(cursor.char).expect("checked within cursor!");
+    if !use_indent.trim_start_matches(&cfg.indent).is_empty() {
+        return (clip.to_owned(), insert_clip(clip, content, cursor));
+    };
+    let mut lines = clip.split('\n');
+    let first_line = lines.next().expect("first line should exist!");
+
+    let Some(last_line) = lines.next_back().map(|l| l.trim_start()) else {
+        content[cursor.line].insert_str(cursor.char, first_line);
+        cursor.char += first_line.char_len();
         return (clip.to_owned(), cursor);
     };
 
-    let first_line = &mut content[cursor.line];
-    let mut last_line = first_line.split_off(cursor.char);
-    let prefix = first_line.to_string();
-    let first_clip_line = lines.remove(0);
-    let mut clip = first_clip_line.trim_start().to_owned();
-    let trim = format!("{:width$}", " ", width = first_clip_line.len() - clip.len());
-    first_line.push_str(&clip);
+    let first_line = first_line.trim_start();
+    let indent = use_indent.to_string();
+    let start_line = &mut content[cursor.line];
+    let mut end_line = start_line.split_off(cursor.char);
+    let mut clip = String::from(first_line);
+    start_line.push_str(first_line);
 
-    let last_line_raw = lines.remove(lines.len() - 1); // len is already checked
-    let last_line_stipped = match last_line_raw.strip_prefix(&trim) {
-        Some(stripped) => stripped,
-        None => last_line_raw,
-    };
-
-    cursor.line += 1;
-    cursor.char = last_line_stipped.char_len() + prefix.char_len();
-
-    for new_line in lines.into_iter().map(|l| l.strip_prefix(&trim).unwrap_or(l)) {
-        let prefixed = format!("{prefix}{new_line}");
+    for new_line in lines.map(|l| l.trim_start()) {
+        cursor.line += 1;
+        if new_line.chars().all(|c| c == ' ') {
+            clip = push_on_newline(clip, "");
+            content.insert(cursor.line, EditorLine::empty());
+            continue;
+        }
+        let prefixed = format!("{indent}{new_line}");
         clip = push_on_newline(clip, &prefixed);
         content.insert(cursor.line, prefixed.into());
-        cursor.line += 1;
     }
 
-    clip = push_on_newline(clip, &prefix);
-    clip.push_str(last_line_stipped);
-    last_line.insert_str(0, &prefix);
-    last_line.insert_str(0, last_line_stipped);
-    content.insert(cursor.line, last_line);
+    cursor.line += 1;
+    cursor.char = last_line.char_len() + indent.char_len();
+
+    clip = push_on_newline(clip, &indent);
+    clip.push_str(last_line);
+    end_line.insert_str(0, last_line);
+    end_line.insert_str(0, &indent);
+    content.insert(cursor.line, end_line);
 
     (clip, cursor)
 }
