@@ -219,6 +219,24 @@ fn paste_with_indent() {
 }
 
 #[test]
+fn paste_indent_derived() {
+    let mut content = create_content();
+    let clip = "println!(\"hello there\");\n".to_owned();
+    let cfg = IndentConfigs::default();
+    let edits = vec![Edit::insert_clip_with_indent(
+        CursorPosition { line: 7, char: 0 },
+        clip,
+        &cfg,
+        &mut content,
+    )];
+    match_line(&content[6], &"i will have to have some scopes {");
+    match_line(&content[7], &"    println!(\"hello there\");");
+    match_line(&content[8], &"    this is the first scope");
+    match_line(&content[9], &"}");
+    assert_edits_applicable(content, edits);
+}
+
+#[test]
 fn paste_with_deep_indent() {
     let mut content = create_content();
     let big_clippy = "    text\n    \n    text\n".to_owned();

@@ -41,8 +41,8 @@ pub fn insert_lines_indented(
     content: &mut Vec<EditorLine>,
     mut cursor: CursorPosition,
 ) -> (String, CursorPosition) {
-    let use_indent = &content[cursor.line].get_to(cursor.char).expect("checked within cursor!");
-    if !use_indent.trim_start_matches(&cfg.indent).is_empty() {
+    let start_indent = &content[cursor.line].get_to(cursor.char).expect("checked within cursor!");
+    if !start_indent.trim_start_matches(&cfg.indent).is_empty() {
         return (clip.to_owned(), insert_clip(clip, content, cursor));
     };
     let mut lines = clip.split('\n');
@@ -54,35 +54,47 @@ pub fn insert_lines_indented(
         return (clip.to_owned(), cursor);
     };
 
-    let first_line = first_line.trim_start();
-    let indent = use_indent.to_string();
+    // infering indent if not derived from first line
+    let (mut new_clip, indent) = if start_indent.is_empty() {
+        let indent = cfg.derive_indent_from_lines(&content[..cursor.line]);
+        (format!("{indent}{}", first_line.trim_start()), indent)
+    } else {
+        (first_line.trim_start().to_owned(), start_indent.to_string())
+    };
+
     let start_line = &mut content[cursor.line];
     let mut end_line = start_line.split_off(cursor.char);
-    let mut clip = String::from(first_line);
-    start_line.push_str(first_line);
+    start_line.push_str(&new_clip);
 
-    for new_line in lines.map(|l| l.trim_start()) {
+    for clip_line in lines.map(|l| l.trim_start()) {
         cursor.line += 1;
-        if new_line.chars().all(|c| c == ' ') {
-            clip = push_on_newline(clip, "");
+        if clip_line.chars().all(|c| c == ' ') {
+            new_clip = push_on_newline(new_clip, "");
             content.insert(cursor.line, EditorLine::empty());
             continue;
         }
-        let prefixed = format!("{indent}{new_line}");
-        clip = push_on_newline(clip, &prefixed);
+        let prefixed = format!("{indent}{clip_line}");
+        new_clip = push_on_newline(new_clip, &prefixed);
         content.insert(cursor.line, prefixed.into());
     }
 
     cursor.line += 1;
     cursor.char = last_line.char_len() + indent.char_len();
 
-    clip = push_on_newline(clip, &indent);
-    clip.push_str(last_line);
     end_line.insert_str(0, last_line);
-    end_line.insert_str(0, &indent);
+
+    // skipping double indent last line
+    if !end_line.starts_with(&indent) {
+        end_line.insert_str(0, &indent);
+        new_clip = push_on_newline(new_clip, &indent);
+    } else {
+        new_clip.push('\n');
+    }
+
+    new_clip.push_str(last_line);
     content.insert(cursor.line, end_line);
 
-    (clip, cursor)
+    (new_clip, cursor)
 }
 
 /// panics if out of bounds
