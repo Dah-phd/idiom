@@ -16,7 +16,7 @@ use crate::{
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
 
 pub struct GoToLinePopup {
@@ -100,7 +100,12 @@ impl Popup for GoToLinePopup {
         }
     }
 
-    fn map_mouse(&mut self, _: MouseEvent, _: &mut Components) -> Status {
+    fn map_mouse(&mut self, event: MouseEvent, _: &mut Components) -> Status {
+        if let MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column, row, .. } = event {
+            if !self.render_line.contains_position(row, column) {
+                return Status::Finished;
+            }
+        };
         Status::Pending
     }
 
@@ -228,7 +233,12 @@ impl Popup for FindPopup {
         true
     }
 
-    fn map_mouse(&mut self, _: MouseEvent, _: &mut Components) -> Status {
+    fn map_mouse(&mut self, event: MouseEvent, _: &mut Components) -> Status {
+        if let MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column, row, .. } = event {
+            if !self.render_line.contains_position(row, column) {
+                return Status::Finished;
+            }
+        };
         Status::Pending
     }
 }

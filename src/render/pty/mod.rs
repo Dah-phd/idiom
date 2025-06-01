@@ -81,19 +81,19 @@ impl PtyShell {
         })
     }
 
-    pub fn map_key(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> std::io::Result<()> {
+    pub fn map_key(&mut self, key: &KeyEvent, backend: &mut Backend) -> std::io::Result<()> {
         self.select.clear();
 
         if key.modifiers == KeyModifiers::CONTROL | KeyModifiers::SHIFT {
             match key.code {
                 KeyCode::Down => {
                     self.parser.scroll_down();
-                    self.inner_render(gs.backend());
+                    self.inner_render(backend);
                     return Ok(());
                 }
                 KeyCode::Up => {
                     self.parser.scroll_up();
-                    self.inner_render(gs.backend());
+                    self.inner_render(backend);
                     return Ok(());
                 }
                 _ => {}
@@ -199,6 +199,10 @@ impl PtyShell {
     pub fn render(&mut self, backend: &mut Backend) {
         _ = self.parser.try_parse();
         self.inner_render(backend);
+    }
+
+    pub fn rect(&self) -> Rect {
+        self.rect
     }
 
     fn inner_render(&mut self, backend: &mut Backend) {

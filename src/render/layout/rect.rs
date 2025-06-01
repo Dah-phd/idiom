@@ -30,12 +30,12 @@ impl Rect {
         Self { row, col, width, height, borders: Borders::all() }
     }
 
+    pub fn contains_position(&self, row: u16, column: u16) -> bool {
+        self.col <= column && self.row <= row && row < self.row + self.height && column < self.col + self.width as u16
+    }
+
     pub fn relative_position(&self, row: u16, column: u16) -> Option<CursorPosition> {
-        match self.col <= column
-            && self.row <= row
-            && row < self.row + self.height
-            && column < self.col + self.width as u16
-        {
+        match self.contains_position(row, column) {
             true => Some(CursorPosition { line: (row - self.row) as usize, char: (column - self.col) as usize }),
             false => None,
         }
@@ -43,11 +43,7 @@ impl Rect {
 
     /// return Option<(Row(u16), Col(u16))>
     pub fn raw_relative_position(&self, row: u16, column: u16) -> Option<(u16, u16)> {
-        match self.col <= column
-            && self.row <= row
-            && row < self.row + self.height
-            && column < self.col + self.width as u16
-        {
+        match self.contains_position(row, column) {
             true => Some((row - self.row, column - self.col)),
             false => None,
         }

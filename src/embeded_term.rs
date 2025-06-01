@@ -2,7 +2,7 @@ use crate::render::backend::{Backend, BackendProtocol};
 use crate::render::layout::{Rect, BORDERS};
 use crate::render::pty::PtyShell;
 use crate::{global_state::GlobalState, render::layout::Line};
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 
 #[derive(Default)]
 pub struct EditorTerminal {
@@ -71,7 +71,7 @@ impl EditorTerminal {
             }
             event_key => {
                 if let Some(term) = self.terminal.as_mut() {
-                    if let Err(error) = term.map_key(event_key, gs) {
+                    if let Err(error) = term.map_key(event_key, gs.backend()) {
                         gs.error(error);
                         self.terminal.take();
                         gs.toggle_terminal(self);
@@ -83,8 +83,15 @@ impl EditorTerminal {
     }
 
     pub fn map_mouse(&mut self, event: MouseEvent, gs: &mut GlobalState) {
-        if let Some(term) = self.terminal.as_mut() {
-            term.map_mouse(event, gs);
+        if let MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column, row, .. } = event {
+            if let Some(term) = self.terminal.as_mut() {
+                if !term.rect().contains_position(row, column) {
+                    gs.toggle_terminal(self);
+                    Backend::hide_cursor();
+                    return;
+                };
+                term.map_mouse(event, gs);
+            };
         }
     }
 

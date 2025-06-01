@@ -134,6 +134,10 @@ impl Line {
         (self, new)
     }
 
+    pub fn contains_position(&self, row: u16, column: u16) -> bool {
+        self.row == row && self.col <= column && column < self.col + self.width as u16
+    }
+
     /// creates line builder from Line
     /// push/push_styled can be used to add to line
     /// on drop pads the line to end
