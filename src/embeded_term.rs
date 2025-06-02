@@ -1,6 +1,6 @@
 use crate::render::backend::{Backend, BackendProtocol};
 use crate::render::layout::{Rect, BORDERS};
-use crate::render::pty::PtyShell;
+use crate::render::pty::{Message, PtyShell, OVERLAY_INFO};
 use crate::{global_state::GlobalState, render::layout::Line};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 
@@ -25,7 +25,8 @@ impl EditorTerminal {
             border.fill(BORDERS.horizontal_top, gs.backend());
         }
         if let Some(term) = self.terminal.as_mut() {
-            PtyShell::controls_help(gs);
+            gs.message(OVERLAY_INFO);
+            gs.message(OVERLAY_INFO);
             term.render(gs.backend());
         }
     }
@@ -83,16 +84,19 @@ impl EditorTerminal {
     }
 
     pub fn map_mouse(&mut self, event: MouseEvent, gs: &mut GlobalState) {
-        if let MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column, row, .. } = event {
-            if let Some(term) = self.terminal.as_mut() {
-                if !term.rect().contains_position(row, column) {
+        if let Some(term) = self.terminal.as_mut() {
+            match term.map_mouse(event, gs.backend()) {
+                Message::Copied(clip) => {
+                    gs.clipboard.push(clip);
+                    gs.success("Select from embeded copied!");
+                }
+                Message::Skipped(MouseEventKind::Down(MouseButton::Left) | MouseEventKind::Up(MouseButton::Left)) => {
                     gs.toggle_terminal(self);
                     Backend::hide_cursor();
-                    return;
-                };
-                term.map_mouse(event, gs);
+                }
+                _ => {}
             };
-        }
+        };
     }
 
     pub fn paste_passthrough(&mut self, clip: String) {

@@ -248,7 +248,8 @@ fn go_to_select_command(
     components: &mut Components,
 ) {
     let (from, to) = popup.options[popup.state.selected].0;
-    if let Some(editor) = components.ws.get_active() {
-        editor.go_to_select(from, to);
-    }
+    let Some(editor) = components.ws.get_active() else {
+        return;
+    };
+    editor.go_to_select(from, to);
 }

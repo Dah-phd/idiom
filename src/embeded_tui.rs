@@ -4,7 +4,7 @@ use crate::{
     popups::checked_new_screen_size,
     render::{
         backend::{Backend, BackendProtocol},
-        pty::PtyShell,
+        pty::{Message, PtyShell, OVERLAY_INFO},
     },
 };
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
@@ -20,7 +20,8 @@ pub fn run_embeded_tui(cmd: Option<&str>, gs: &mut GlobalState) -> IdiomResult<(
         None => PtyShell::default_cmd(rect)?,
     };
 
-    PtyShell::controls_help(gs);
+    gs.message(OVERLAY_INFO);
+    gs.message(OVERLAY_INFO);
     tui.render(gs.backend());
 
     while !tui.is_finished() {
@@ -32,7 +33,12 @@ pub fn run_embeded_tui(cmd: Option<&str>, gs: &mut GlobalState) -> IdiomResult<(
                 Event::Key(key) => {
                     tui.map_key(&key, gs.backend())?;
                 }
-                Event::Mouse(event) => tui.map_mouse(event, gs),
+                Event::Mouse(event) => {
+                    if let Message::Copied(clip) = tui.map_mouse(event, gs.backend()) {
+                        gs.clipboard.push(clip);
+                        gs.success("Select from embeded copied!");
+                    }
+                }
                 Event::Resize(width, height) => {
                     let (width, height) = checked_new_screen_size(width, height, gs.backend());
                     gs.full_resize(height, width);

@@ -3,7 +3,6 @@ mod parser;
 
 use crate::{
     error::{IdiomError, IdiomResult},
-    global_state::GlobalState,
     render::{
         backend::{Backend, BackendProtocol},
         layout::Rect,
@@ -22,7 +21,14 @@ use tokio::task::JoinHandle;
 
 use super::backend::StyleExt;
 
-const CONTROLS_HELP: &str = "Term Overlay: MouseLeft drag select / MouseRight copy select";
+pub const OVERLAY_INFO: &str = "Term Overlay: MouseLeft drag select / MouseRight copy select";
+
+pub enum Message {
+    Mapped,
+    Skipped(MouseEventKind),
+    Unmapped,
+    Copied(String),
+}
 
 /// Run another tui app within the context of idiom
 pub struct PtyShell {
@@ -123,61 +129,63 @@ impl PtyShell {
         }
     }
 
-    pub fn map_mouse(&mut self, event: MouseEvent, gs: &mut GlobalState) {
+    pub fn map_mouse(&mut self, event: MouseEvent, backend: &mut Backend) -> Message {
         match event {
             MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column, row, .. } => {
                 let Some((row, col)) = self.rect.raw_relative_position(row, column) else {
                     self.select.clear();
-                    return;
+                    return Message::Skipped(event.kind);
                 };
                 self.select.mouse_down(row, col);
             }
             MouseEvent { kind: MouseEventKind::Drag(MouseButton::Left), column, row, .. } => {
                 let Some((row, col)) = self.rect.raw_relative_position(row, column) else {
                     self.select.clear();
-                    return;
+                    return Message::Skipped(event.kind);
                 };
                 self.select.mouse_drag(row, col);
             }
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } => {
                 let Some((row, col)) = self.rect.raw_relative_position(row, column) else {
                     self.select.clear();
-                    return;
+                    return Message::Skipped(event.kind);
                 };
                 self.select.mouse_up(row, col);
             }
             MouseEvent { kind: MouseEventKind::Down(MouseButton::Right), column, row, .. } => {
                 let Some((row, col)) = self.rect.raw_relative_position(row, column) else {
-                    return;
+                    return Message::Skipped(event.kind);
                 };
                 let position = Position { row, col };
-                let Some((start, end)) = self.select.get() else { return };
+                let Some((start, end)) = self.select.get() else {
+                    return Message::Mapped;
+                };
                 if position < start || position > end {
-                    return;
+                    return Message::Mapped;
                 };
                 if let Some(clip) = self.select.copy_clip(self.parser.screen()) {
-                    gs.success("Select from embeded copied!");
-                    gs.clipboard.push(clip);
+                    return Message::Copied(clip);
                 };
             }
             MouseEvent { kind: MouseEventKind::ScrollUp, column, row, .. } => {
                 if self.rect.raw_relative_position(row, column).is_none() {
-                    return;
+                    return Message::Skipped(event.kind);
                 };
                 self.select.clear();
                 self.parser.scroll_up();
-                self.inner_render(gs.backend());
+                self.inner_render(backend);
             }
             MouseEvent { kind: MouseEventKind::ScrollDown, column, row, .. } => {
                 if self.rect.raw_relative_position(row, column).is_none() {
-                    return;
+                    return Message::Skipped(event.kind);
                 };
                 self.select.clear();
                 self.parser.scroll_down();
-                self.inner_render(gs.backend());
+                self.inner_render(backend);
             }
-            _ => (),
+            _ => return Message::Unmapped,
         }
+        Message::Mapped
     }
 
     pub fn paste(&mut self, clip: String) -> std::io::Result<()> {
@@ -199,10 +207,6 @@ impl PtyShell {
     pub fn render(&mut self, backend: &mut Backend) {
         _ = self.parser.try_parse();
         self.inner_render(backend);
-    }
-
-    pub fn rect(&self) -> Rect {
-        self.rect
     }
 
     fn inner_render(&mut self, backend: &mut Backend) {
@@ -299,11 +303,6 @@ impl PtyShell {
         let size = PtySize::from(rect);
         self.parser.resize(size.rows, size.cols);
         self.pair.master.resize(size).map_err(|e| e.to_string())
-    }
-
-    pub fn controls_help(gs: &mut GlobalState) {
-        gs.message(CONTROLS_HELP);
-        gs.message(CONTROLS_HELP);
     }
 }
 

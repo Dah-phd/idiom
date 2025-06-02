@@ -1,4 +1,3 @@
-// pub mod color;
 use super::{style::StyleExt, ERR_MSG};
 use crossterm::style::Color;
 use crossterm::{

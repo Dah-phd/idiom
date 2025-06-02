@@ -27,7 +27,7 @@ Python should work for the most part with jedi, but the interaction is not well 
 - Linux Mint
 
 ## TODO
-- add embeded term hide on clicking outside of its rect
+- move rendering backend to internal create
 - persistent state (keeping changes after close witout saving)
 - fix tracking edgecase where file is changed in by other app in select
 - improve cursor handle in embeded tui / terminal
