@@ -3,7 +3,7 @@ use super::parser::{parse, Block, ListItem, Span};
 use super::{ascii, complex, line};
 use crate::{
     configs::FileType,
-    global_state::GlobalState,
+    global_state::mocked_global,
     syntax::tests::mock_utf8_lexer,
     workspace::{
         cursor::Cursor,
@@ -13,7 +13,7 @@ use crate::{
 };
 use crossterm::style::{Color, ContentStyle};
 use idiom_ui::{
-    backend::{Backend, StyleExt},
+    backend::StyleExt,
     layout::{Borders, Rect},
 };
 
@@ -35,7 +35,7 @@ fn generate_complex_lines() -> Vec<EditorLine> {
 
 #[test]
 fn cursor_render() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = mocked_global();
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.set_position(CursorPosition { line: 0, char: 39 });
@@ -58,7 +58,7 @@ fn cursor_render() {
 
 #[test]
 fn cursor_complex_render() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = mocked_global();
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.set_position(CursorPosition { line: 0, char: 39 });
@@ -81,7 +81,7 @@ fn cursor_complex_render() {
 
 #[test]
 fn cursor_select() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = mocked_global();
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set(CursorPosition::default(), (0, 39).into());
@@ -109,7 +109,7 @@ fn cursor_select() {
 
 #[test]
 fn cursor_complex_select() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = mocked_global();
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set(CursorPosition::default(), (0, 39).into());
@@ -137,7 +137,7 @@ fn cursor_complex_select() {
 
 #[test]
 fn simple_line() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = mocked_global();
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let cursor = Cursor::default();
 
@@ -166,7 +166,7 @@ fn simple_line() {
 
 #[test]
 fn simple_line_select() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = mocked_global();
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set((1, 7).into(), (2, 60).into());
@@ -195,7 +195,7 @@ fn simple_line_select() {
 
 #[test]
 fn complex_line() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = mocked_global();
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let cursor = Cursor::default();
 
@@ -224,7 +224,7 @@ fn complex_line() {
 
 #[test]
 fn complex_line_select() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = mocked_global();
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set((1, 7).into(), (2, 60).into());

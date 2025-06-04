@@ -4,17 +4,16 @@ use super::super::{
     Editor,
 };
 use super::calc_line_number_offset;
-use crate::global_state::GlobalState;
+use crate::global_state::mocked_global;
 use crate::syntax::Lexer;
 use crate::workspace::{actions::Actions, line::EditorLine};
 use crate::{configs::FileType, workspace::renderer::Renderer};
-use idiom_ui::{backend::Backend, layout::Rect};
 use std::path::PathBuf;
 
 pub fn mock_editor(content: Vec<String>) -> Editor {
     let ft = FileType::Rust;
     let path = PathBuf::from("");
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = mocked_global();
     let content: Vec<EditorLine> = content.into_iter().map(EditorLine::from).collect();
     Editor {
         line_number_offset: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },

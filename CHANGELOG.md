@@ -1,4 +1,9 @@
 ## Includes only major changes (manual updates)
+# Version 0.5.1
+* splitoff render mod into separate create (idium_ui), holding crossterm widgets and components
+* improved indent on paste
+* improved mouse handling on popups
+
 # Version 0.5.0
 * git integration
 * embeded tui apps

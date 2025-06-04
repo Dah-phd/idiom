@@ -1,8 +1,8 @@
 [package]
-rust-version = "1.76"
+rust-version.workspace = true
 name = "idiom_ui"
 version = "0.0.1"
-edition = "2021"
+edition.workspace = true
 include = [
     "src/**/*",
     "Cargo.toml",
@@ -12,7 +12,7 @@ include = [
 license = "MIT"
 description = "Simple low config editor supporting LSP and syntax highlighting."
 repository = "https://github.com/Dah-phd/idiom"
-keywords = ["terminal", "tui", "widgets"]
+keywords = ["terminal", "tui", "widgets", "crossterm"]
 categories = []
 authors = ["Daniel Nikolaev <toolsproed@gmail.com>"]
 
@@ -42,7 +42,3 @@ xterm-query = "0.5.2"
 
 [profile.dev]
 debug = true
-
-[profile.release]
-strip = true
-lto = true

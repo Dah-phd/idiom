@@ -356,6 +356,6 @@ impl GlobalState {
 }
 
 #[cfg(test)]
-mod tests;
+pub mod tests;
 #[cfg(test)]
-pub use tests::MockedBackend as CrossTerm;
+pub use tests::{mocked_global, MockedBackend as CrossTerm};

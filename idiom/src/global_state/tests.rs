@@ -162,9 +162,14 @@ impl MockedBackend {
     }
 }
 
+pub fn mocked_global() -> GlobalState {
+    let backend = MockedBackend { data: vec![], default_style: ContentStyle::default() };
+    GlobalState::new(Rect::new(0, 0, 120, 60), backend)
+}
+
 #[test]
 fn full_rebuild_draw() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), MockedBackend::init());
+    let mut gs = mocked_global();
     let mut ws = mock_ws(
         ["test line uno - in here", "second line", "last line for the test"]
             .into_iter()
@@ -186,7 +191,7 @@ fn full_rebuild_draw() {
 
 #[test]
 fn full_rebuild_draw_insert() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), MockedBackend::init());
+    let mut gs = mocked_global();
     gs.toggle_tree();
     gs.insert_mode();
     let mut ws = mock_ws(
