@@ -7,7 +7,6 @@ use super::{
 };
 use crate::{
     configs::{test::mock_editor_key_map, EditorConfigs},
-    global_state::tests::MockedBackend,
     global_state::{mocked_global, GlobalState},
     workspace::{
         actions::tests::create_content,
@@ -17,7 +16,6 @@ use crate::{
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::ContentStyle;
-use idiom_ui::{backend::Backend, layout::Rect};
 use std::collections::HashMap;
 
 pub fn mock_ws(content: Vec<String>) -> Workspace {
@@ -408,7 +406,7 @@ fn test_cut_paste() {
 
 #[test]
 fn test_jump_select() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 0), MockedBackend::init());
+    let mut gs = mocked_global();
     let mut ws = base_ws();
     gs.insert_mode();
     ctrl_shift_press(&mut ws, KeyCode::Right, &mut gs);

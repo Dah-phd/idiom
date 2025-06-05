@@ -111,7 +111,6 @@ impl Backend for MockedBackend {
     }
 
     fn show_cursor(&mut self) {}
-    // self.data.push((self.default_style, String::from("<<show cursor>>")));
 
     fn to_set_style(&mut self) {
         self.data.push((self.default_style, String::from("<<set style>>")));
