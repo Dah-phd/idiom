@@ -1,36 +1,27 @@
 use copypasta::{ClipboardContext, ClipboardProvider};
+use std::error::Error;
 
-pub enum Clipboard {
-    System(ClipboardContext),
-    Internal(Vec<String>),
+pub struct Clipboard {
+    sys: Result<ClipboardContext, Box<dyn Error + Send + Sync + 'static>>,
+    tmp: Option<String>,
 }
 
 impl Default for Clipboard {
     fn default() -> Self {
-        if let Ok(clipboard) = ClipboardContext::new() {
-            Self::System(clipboard)
-        } else {
-            Self::Internal(Vec::new())
-        }
+        Self { sys: ClipboardContext::new(), tmp: None }
     }
 }
 
 impl Clipboard {
     pub fn pull(&mut self) -> Option<String> {
-        match self {
-            Self::System(cliboard) => cliboard.get_contents().ok(),
-            Self::Internal(inner) => inner.pop(),
-        }
+        self.sys.as_mut().ok().and_then(|cc| cc.get_contents().ok()).or(self.tmp.clone())
     }
 
     pub fn push(&mut self, clip: String) {
-        match self {
-            Self::System(clipboard) => {
-                let _ = clipboard.set_contents(clip);
-            }
-            Self::Internal(inner) => {
-                inner.push(clip);
-            }
-        }
+        if let Ok(ctx) = self.sys.as_mut() {
+            _ = ctx.set_contents(clip);
+        } else {
+            self.tmp.replace(clip);
+        };
     }
 }

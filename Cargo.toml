@@ -18,7 +18,7 @@ authors = ["Daniel Nikolaev <toolsproed@gmail.com>"]
 
 [dependencies]
 bitflags = "2.9.1"
-clap = {version = "4.5.38", features = ["derive"]}
+clap = {version = "4.5.39", features = ["derive"]}
 coolor = "1.0.0"
 copypasta = "0.10.2"
 crossterm = "0.29.0"
