@@ -3,7 +3,7 @@ pub use super::{
     tokens::{set_tokens, TokenLine},
     Legend, Lexer, Token,
 };
-use crate::{configs::FileType, global_state::GlobalState, render::backend::StyleExt, workspace::line::EditorLine};
+use crate::{configs::FileType, ext_tui::StyleExt, global_state::GlobalState, workspace::line::EditorLine};
 use crossterm::style::ContentStyle;
 use lsp_types::SemanticToken;
 use std::path::PathBuf;

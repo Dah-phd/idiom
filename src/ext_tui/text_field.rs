@@ -1,10 +1,9 @@
-use super::backend::{Backend, StyleExt};
+use crate::ext_tui::{CrossTerm, StyleExt};
 use crate::{configs::EditorAction, global_state::Clipboard};
 use core::ops::Range;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::{Color, ContentStyle};
-
-use super::{
+use idiom_tui::{
     count_as_string,
     layout::{Line, LineBuilder},
 };
@@ -50,7 +49,7 @@ impl<T: Default + Clone> TextField<T> {
     }
 
     /// returns blockless paragraph widget " >> inner text"
-    pub fn widget(&self, line: Line, backend: &mut Backend) {
+    pub fn widget(&self, line: Line, backend: &mut CrossTerm) {
         let mut builder = line.unsafe_builder(backend);
         builder.push(" >> ");
         self.insert_formatted_text(builder);
@@ -58,21 +57,21 @@ impl<T: Default + Clone> TextField<T> {
 
     /// returns blockless paragraph widget "99+ >> inner text"
     #[allow(dead_code)]
-    pub fn widget_with_count(&self, line: Line, count: usize, backend: &mut Backend) {
+    pub fn widget_with_count(&self, line: Line, count: usize, backend: &mut CrossTerm) {
         let mut builder = line.unsafe_builder(backend);
         builder.push(count_as_string(count).as_str());
         builder.push(" >> ");
         self.insert_formatted_text(builder);
     }
 
-    pub fn insert_formatted_text(&self, line_builder: LineBuilder) {
+    pub fn insert_formatted_text(&self, line_builder: LineBuilder<CrossTerm>) {
         match self.select.as_ref().map(|(f, t)| if f > t { (*t, *f) } else { (*f, *t) }) {
             Some((from, to)) => self.text_cursor_select(from, to, line_builder),
             None => self.text_cursor(line_builder),
         };
     }
 
-    fn text_cursor(&self, mut builder: LineBuilder) {
+    fn text_cursor(&self, mut builder: LineBuilder<CrossTerm>) {
         if self.char == self.text.len() {
             builder.push(&self.text);
             builder.push_styled(" ", ContentStyle::reversed());
@@ -83,7 +82,7 @@ impl<T: Default + Clone> TextField<T> {
         };
     }
 
-    fn text_cursor_select(&self, from: usize, to: usize, mut builder: LineBuilder) {
+    fn text_cursor_select(&self, from: usize, to: usize, mut builder: LineBuilder<CrossTerm>) {
         builder.push(self.text[..from].as_ref());
         if from == self.char {
             builder.push_styled(self.text[self.char..=self.char].as_ref(), ContentStyle::reversed());

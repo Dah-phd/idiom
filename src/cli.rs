@@ -1,11 +1,7 @@
 use crate::{
     configs::{KeyMap, TreeAction, TreeKeyMap},
     error::{IdiomError, IdiomResult},
-    render::{
-        backend::{Backend, BackendProtocol},
-        layout::Rect,
-        state::State,
-    },
+    ext_tui::{CrossTerm, State},
     tree::TreePath,
 };
 use clap::Parser;
@@ -13,6 +9,7 @@ use crossterm::{
     event::{Event, KeyCode, KeyEvent},
     style::ContentStyle,
 };
+use idiom_tui::{layout::Rect, Backend};
 use std::{path::PathBuf, time::Duration};
 
 const MIN_FRAMERATE: Duration = Duration::from_millis(8);
@@ -28,7 +25,7 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn collect(self, backend: &mut Backend) -> IdiomResult<Option<PathBuf>> {
+    pub fn collect(self, backend: &mut CrossTerm) -> IdiomResult<Option<PathBuf>> {
         match self.path {
             Some(rel_path) => {
                 let path = rel_path.canonicalize()?;
@@ -90,18 +87,18 @@ impl TreeSeletor {
         Ok(Self { state: State::new(), key_map, display_offset, selected_path, tree, rebuild: true })
     }
 
-    pub fn select(backend: &mut Backend, path: PathBuf) -> IdiomResult<Option<PathBuf>> {
+    pub fn select(backend: &mut CrossTerm, path: PathBuf) -> IdiomResult<Option<PathBuf>> {
         let tree_selector = Self::new(path)?;
         tree_selector.run(backend)
     }
 
-    pub fn select_home(backend: &mut Backend) -> IdiomResult<Option<PathBuf>> {
+    pub fn select_home(backend: &mut CrossTerm) -> IdiomResult<Option<PathBuf>> {
         let home_path = dirs::home_dir().ok_or(IdiomError::io_not_found("Filed to find home dir!"))?.canonicalize()?;
         Self::select(backend, home_path)
     }
 
-    fn run(mut self, backend: &mut Backend) -> IdiomResult<Option<PathBuf>> {
-        let rect = Backend::screen()?;
+    fn run(mut self, backend: &mut CrossTerm) -> IdiomResult<Option<PathBuf>> {
+        let rect = CrossTerm::screen()?;
         self.render_stateless(rect, backend);
         let limit = rect.height as usize;
         loop {
@@ -148,7 +145,7 @@ impl TreeSeletor {
         }
     }
 
-    pub fn render_stateless(&mut self, rect: Rect, backend: &mut Backend) {
+    pub fn render_stateless(&mut self, rect: Rect, backend: &mut CrossTerm) {
         let mut iter = self.tree.iter();
         iter.next();
         let mut lines = rect.into_iter();
@@ -168,7 +165,7 @@ impl TreeSeletor {
         }
     }
 
-    pub fn fast_render_stateless(&mut self, rect: Rect, backend: &mut Backend) {
+    pub fn fast_render_stateless(&mut self, rect: Rect, backend: &mut CrossTerm) {
         if self.rebuild {
             self.rebuild = false;
             self.render_stateless(rect, backend);

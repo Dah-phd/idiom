@@ -1,9 +1,10 @@
 use super::{WRAP_CLOSE, WRAP_OPEN};
 use crate::{
-    render::backend::{Backend, BackendProtocol, StyleExt},
+    ext_tui::{CrossTerm, StyleExt},
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::{ContentStyle, Stylize};
+use idiom_tui::Backend;
 use std::ops::Range;
 
 pub fn render(
@@ -11,7 +12,7 @@ pub fn render(
     ctx: &mut LineContext,
     line_width: usize,
     select: Option<Range<usize>>,
-    backend: &mut Backend,
+    backend: &mut CrossTerm,
 ) {
     if line_width > line.char_len {
         match select {
@@ -29,7 +30,7 @@ pub fn render(
     }
 }
 
-pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut Backend) {
+pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut CrossTerm) {
     let mut iter_tokens = line.iter_tokens();
     let mut counter = 0;
     let mut last_len = 0;
@@ -88,7 +89,7 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut Backend) {
 }
 
 #[inline]
-pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backend: &mut Backend) {
+pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backend: &mut CrossTerm) {
     let select_color = ctx.lexer.theme.selected;
     let mut reset_style = ContentStyle::default();
     let mut iter_tokens = line.iter_tokens();
@@ -157,7 +158,7 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backen
 }
 
 #[inline(always)]
-pub fn partial(line: &mut EditorLine, ctx: &LineContext, line_width: usize, backend: &mut Backend) {
+pub fn partial(line: &mut EditorLine, ctx: &LineContext, line_width: usize, backend: &mut CrossTerm) {
     let cursor_idx = ctx.cursor_char();
     let (mut idx, reduction) = line.cached.generate_skipped_chars_simple(cursor_idx, line_width);
     if idx != 0 {
@@ -234,7 +235,7 @@ pub fn partial_select(
     ctx: &LineContext,
     line_width: usize,
     select: Range<usize>,
-    backend: &mut Backend,
+    backend: &mut CrossTerm,
 ) {
     let cursor_idx = ctx.cursor_char();
     let (mut idx, reduction) = line.cached.generate_skipped_chars_simple(cursor_idx, line_width);

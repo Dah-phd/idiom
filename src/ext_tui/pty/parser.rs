@@ -6,7 +6,7 @@ use crossterm::{
 };
 use vt100::{Cell, Color, Parser, Screen};
 
-use crate::render::backend::StyleExt;
+use crate::ext_tui::StyleExt;
 
 pub struct TrackedParser {
     buffers: Arc<Mutex<Vec<u8>>>,

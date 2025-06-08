@@ -1,17 +1,16 @@
 use super::ModalMessage;
 use crate::{
     configs::{EditorAction, Theme},
+    ext_tui::{State, StyleExt, StyledLine},
     global_state::GlobalState,
     lsp::Highlighter,
-    render::{
-        backend::StyleExt,
-        layout::{IterLines, Rect},
-        state::State,
-        widgets::{StyledLine, Writable},
-    },
     syntax::{Action, DiagnosticInfo},
 };
 use crossterm::style::ContentStyle;
+use idiom_tui::{
+    layout::{IterLines, Rect},
+    widgets::Writable,
+};
 use lsp_types::{Documentation, Hover, HoverContents, MarkedString, SignatureHelp, SignatureInformation};
 use std::cmp::Ordering;
 

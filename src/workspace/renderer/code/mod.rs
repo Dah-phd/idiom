@@ -3,17 +3,13 @@ pub mod ascii_line;
 pub mod complex_cursor;
 pub mod complex_line;
 
-use crate::render::backend::StyleExt;
-use crate::render::utils::CharLimitedWidths;
-use crate::render::{
-    backend::{Backend, BackendProtocol},
-    layout::Line,
-};
+use crate::ext_tui::{CrossTerm, StyleExt};
 use crate::workspace::{
     cursor::Cursor,
     line::{EditorLine, LineContext},
 };
 use crossterm::style::{ContentStyle, Stylize};
+use idiom_tui::{layout::Line, utils::CharLimitedWidths, Backend};
 use std::ops::Range;
 
 const WRAP_OPEN: char = '<';
@@ -32,7 +28,7 @@ pub fn width_remainder(line: &EditorLine, line_width: usize) -> Option<usize> {
 }
 
 #[inline(always)]
-pub fn cursor(code: &mut EditorLine, ctx: &mut LineContext, line: Line, backend: &mut Backend) {
+pub fn cursor(code: &mut EditorLine, ctx: &mut LineContext, line: Line, backend: &mut CrossTerm) {
     let line_row = line.row;
     let select = ctx.get_select(line.width);
     let line_width = ctx.setup_cursor(line, backend);
@@ -51,7 +47,7 @@ pub fn inner_render(
     ctx: &mut LineContext<'_>,
     line: Line,
     select: Option<Range<usize>>,
-    backend: &mut Backend,
+    backend: &mut CrossTerm,
 ) {
     let cache_line = line.row;
     let line_width = ctx.setup_line(line, backend);
@@ -68,7 +64,7 @@ fn render_with_select(
     line_width: usize,
     select: Range<usize>,
     ctx: &mut LineContext,
-    backend: &mut impl BackendProtocol,
+    backend: &mut CrossTerm,
 ) {
     if code.char_len == 0 && select.end != 0 {
         backend.print_styled(" ", ContentStyle::bg(ctx.lexer.theme.selected));
@@ -99,12 +95,7 @@ fn render_with_select(
 }
 
 #[inline(always)]
-fn render_no_select(
-    code: &mut EditorLine,
-    line_width: usize,
-    ctx: &mut LineContext,
-    backend: &mut impl BackendProtocol,
-) {
+fn render_no_select(code: &mut EditorLine, line_width: usize, ctx: &mut LineContext, backend: &mut CrossTerm) {
     if code.is_simple() {
         // ascii (byte idx based) render
         match line_width > code.content.len() {
@@ -132,7 +123,7 @@ fn render_no_select(
 }
 
 #[inline(always)]
-pub fn cursor_fast(code: &mut EditorLine, ctx: &mut LineContext, line: Line, backend: &mut Backend) {
+pub fn cursor_fast(code: &mut EditorLine, ctx: &mut LineContext, line: Line, backend: &mut CrossTerm) {
     let select = ctx.get_select(line.width);
     if !code.cached.should_render_cursor_or_update(line.row, ctx.cursor_char(), select.clone()) {
         ctx.skip_line();

@@ -1,7 +1,7 @@
 use crate::{
     embeded_term::EditorTerminal,
+    ext_tui::text_field::TextField,
     global_state::GlobalState,
-    render::{backend::BackendProtocol, layout::Rect, TextField},
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
@@ -9,6 +9,7 @@ use crossterm::{
     event::{KeyCode, KeyEvent, KeyModifiers},
     style::ContentStyle,
 };
+use idiom_tui::{layout::Rect, Backend};
 
 use super::{
     utils::{count_as_string, next_option, prev_option},
@@ -101,13 +102,13 @@ impl Popup for ReplacePopup {
                     editor.go_to_select(from, to);
                     editor.render(gs);
                 } else {
-                    editor.render(gs);
+                    return Status::Finished;
                 }
                 self.force_render(gs);
                 gs.backend.unfreeze();
             }
             KeyCode::Char('a' | 'A') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                if self.options.is_empty() {
+                if !self.options.is_empty() {
                     let clip = std::mem::take(&mut self.new_text.text);
                     let ranges = std::mem::take(&mut self.options.clone());
                     editor.mass_replace(ranges, clip);

@@ -5,12 +5,12 @@ mod rename;
 use crate::{
     configs::{EditorAction, Theme},
     global_state::GlobalState,
-    render::{backend::BackendProtocol, layout::Rect},
     syntax::{DiagnosticInfo, Lang},
     workspace::CursorPosition,
 };
 use completion::AutoComplete;
 use fuzzy_matcher::skim::SkimMatcherV2;
+use idiom_tui::{layout::Rect, Backend};
 use info::Info;
 use lsp_types::{CompletionItem, Hover, SignatureHelp};
 use rename::RenameVariable;

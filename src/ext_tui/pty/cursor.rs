@@ -1,12 +1,6 @@
+use crate::{ext_tui::CrossTerm, workspace::CursorPosition};
+use idiom_tui::{layout::Rect, Backend};
 use std::cmp::Ordering;
-
-use crate::{
-    render::{
-        backend::{Backend, BackendProtocol},
-        layout::Rect,
-    },
-    workspace::CursorPosition,
-};
 use vt100::Screen;
 
 pub struct CursorState {
@@ -16,20 +10,20 @@ pub struct CursorState {
 }
 
 impl CursorState {
-    pub fn apply(&mut self, screen: &Screen, backend: &mut Backend) {
+    pub fn apply(&mut self, screen: &Screen, backend: &mut CrossTerm) {
         if screen.hide_cursor() || screen.scrollback() != 0 {
             if self.hidden {
                 return;
             }
             self.hidden = true;
-            Backend::hide_cursor();
+            backend.hide_cursor();
         } else {
             if !self.hidden {
                 return;
             }
             let (row, col) = screen.cursor_position();
             backend.go_to(self.row + row, self.col + col);
-            Backend::show_cursor();
+            backend.show_cursor();
         }
     }
 

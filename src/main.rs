@@ -4,10 +4,10 @@ mod configs;
 mod embeded_term;
 mod embeded_tui;
 mod error;
+mod ext_tui;
 mod global_state;
 mod lsp;
 mod popups;
-mod render;
 mod syntax;
 mod tree;
 mod utils;
@@ -17,12 +17,13 @@ use app::app;
 use clap::Parser;
 use cli::Args;
 use error::IdiomResult;
-use render::backend::{Backend, BackendProtocol};
+use ext_tui::CrossTerm;
+use idiom_tui::Backend;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> IdiomResult<()> {
     let args = Args::parse();
-    let mut backend = Backend::init();
+    let mut backend = CrossTerm::init();
     let open_file = args.collect(&mut backend)?;
     app(open_file, backend).await
 }

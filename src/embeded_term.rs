@@ -1,8 +1,10 @@
-use crate::render::backend::{Backend, BackendProtocol};
-use crate::render::layout::{Rect, BORDERS};
-use crate::render::pty::{Message, PtyShell, OVERLAY_INFO};
-use crate::{global_state::GlobalState, render::layout::Line};
+use crate::ext_tui::{
+    pty::{Message, PtyShell, OVERLAY_INFO},
+    CrossTerm,
+};
+use crate::global_state::GlobalState;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use idiom_tui::layout::{Line, Rect, BORDERS};
 
 #[derive(Default)]
 pub struct EditorTerminal {
@@ -68,7 +70,7 @@ impl EditorTerminal {
             KeyEvent { code: KeyCode::Char('`' | ' '), modifiers: KeyModifiers::CONTROL, .. } => {
                 gs.message("Term: PTY active in background ... (CTRL + q) can be used to kill the process!");
                 gs.toggle_terminal(self);
-                Backend::hide_cursor();
+                CrossTerm::detached_hide_cursor();
             }
             event_key => {
                 if let Some(term) = self.terminal.as_mut() {
@@ -92,7 +94,7 @@ impl EditorTerminal {
                 }
                 Message::Skipped(MouseEventKind::Down(MouseButton::Left) | MouseEventKind::Up(MouseButton::Left)) => {
                     gs.toggle_terminal(self);
-                    Backend::hide_cursor();
+                    CrossTerm::detached_hide_cursor();
                 }
                 _ => {}
             };

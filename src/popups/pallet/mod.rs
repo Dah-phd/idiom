@@ -4,13 +4,14 @@ use super::{popup_file_open::OpenFileSelector, Command, CommandResult, Component
 use crate::{
     configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
     embeded_term::EditorTerminal,
+    ext_tui::{text_field::TextField, State},
     global_state::{GlobalState, IdiomEvent},
-    render::{layout::Rect, state::State, TextField},
     tree::Tree,
-    workspace::{CursorPosition, Workspace},
+    workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use fuzzy_matcher::FuzzyMatcher;
+use idiom_tui::{layout::Rect, Position};
 
 pub struct Pallet {
     commands: Vec<(i64, Command)>,
@@ -157,7 +158,8 @@ impl Pallet {
 
     #[inline]
     fn get_command_idx(&self, row: u16, column: u16, gs: &GlobalState) -> Option<usize> {
-        let CursorPosition { line, .. } = Self::get_rect(gs).relative_position(row, column)?;
+        let Position { row, .. } = Self::get_rect(gs).relative_position(row, column)?;
+        let line = row as usize;
         let command_idx = self.state.at_line + line.checked_sub(1)?;
         if self.commands.len() <= command_idx {
             return None;

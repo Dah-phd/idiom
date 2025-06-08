@@ -1,15 +1,16 @@
 use crate::{
-    render::{
-        backend::{Backend, BackendProtocol, StyleExt},
-        layout::RectIter,
-        utils::{CharLimitedWidths, WriteChunks},
-    },
+    ext_tui::{CrossTerm, StyleExt},
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::ContentStyle;
+use idiom_tui::{
+    layout::RectIter,
+    utils::{CharLimitedWidths, WriteChunks},
+    Backend,
+};
 use std::ops::Range;
 
-pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut impl BackendProtocol) {
+pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
     let mut chunks = WriteChunks::new(&text.content, line_width);
@@ -29,7 +30,7 @@ pub fn line_with_select(
     select: Range<usize>,
     lines: &mut RectIter,
     ctx: &mut LineContext,
-    backend: &mut impl BackendProtocol,
+    backend: &mut CrossTerm,
 ) {
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
@@ -65,7 +66,7 @@ pub fn cursor(
     skip: usize,
     lines: &mut RectIter,
     ctx: &mut LineContext,
-    backend: &mut Backend,
+    backend: &mut CrossTerm,
 ) {
     match select {
         Some(select) => self::select(text, select, skip, lines, ctx, backend),
@@ -78,7 +79,7 @@ pub fn basic(
     mut skip: usize,
     lines: &mut RectIter,
     ctx: &mut LineContext,
-    backend: &mut Backend,
+    backend: &mut CrossTerm,
 ) {
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
@@ -130,7 +131,7 @@ pub fn select(
     mut skip: usize,
     lines: &mut RectIter,
     ctx: &mut LineContext,
-    backend: &mut Backend,
+    backend: &mut CrossTerm,
 ) {
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);

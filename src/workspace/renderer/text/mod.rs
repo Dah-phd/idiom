@@ -4,16 +4,14 @@ mod complex;
 use std::ops::Range;
 
 use crate::{
-    render::{
-        backend::Backend,
-        layout::{IterLines, RectIter},
-    },
+    ext_tui::CrossTerm,
     syntax::tokens::{calc_wrap_line, calc_wrap_line_capped},
     workspace::{
         cursor::Cursor,
         line::{EditorLine, LineContext},
     },
 };
+use idiom_tui::layout::{IterLines, RectIter};
 
 #[inline]
 pub fn repositioning(cursor: &mut Cursor, content: &mut [EditorLine]) -> Option<usize> {
@@ -56,7 +54,7 @@ pub fn cursor(
     skip: usize,
     ctx: &mut LineContext,
     lines: &mut RectIter,
-    backend: &mut Backend,
+    backend: &mut CrossTerm,
 ) {
     text.cached.cursor(lines.next_line_idx(), ctx.cursor_char(), skip, select.clone());
     match text.is_simple() {
@@ -71,7 +69,7 @@ pub fn line(
     select: Option<Range<usize>>,
     ctx: &mut LineContext,
     lines: &mut RectIter,
-    backend: &mut Backend,
+    backend: &mut CrossTerm,
 ) {
     text.cached.line(lines.next_line_idx(), select.clone());
     match text.is_simple() {

@@ -11,11 +11,8 @@ use crate::{
     },
     embeded_term::EditorTerminal,
     error::IdiomResult,
+    ext_tui::CrossTerm,
     lsp::{LSPError, LSPResult},
-    render::{
-        backend::{Backend, BackendProtocol},
-        layout::{Line, Rect},
-    },
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
@@ -23,6 +20,10 @@ pub use clipboard::Clipboard;
 pub use controls::Mode;
 use crossterm::event::{KeyEvent, MouseEvent};
 pub use events::IdiomEvent;
+use idiom_tui::{
+    layout::{Line, Rect},
+    Backend,
+};
 
 use draw::Components;
 use fuzzy_matcher::skim::SkimMatcherV2;
@@ -34,7 +35,7 @@ type PastePassthroughCallback = fn(&mut GlobalState, String, &mut Workspace, &mu
 type DrawCallback = fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal);
 
 pub struct GlobalState {
-    pub backend: Backend,
+    pub backend: CrossTerm,
     pub theme: UITheme,
     pub matcher: SkimMatcherV2,
     pub event: Vec<IdiomEvent>,
@@ -56,7 +57,7 @@ pub struct GlobalState {
 }
 
 impl GlobalState {
-    pub fn new(screen_rect: Rect, backend: Backend) -> Self {
+    pub fn new(screen_rect: Rect, backend: CrossTerm) -> Self {
         let mut messages = Messages::new();
         let theme = messages.unwrap_or_default(UITheme::new(), "Failed to load theme_ui.toml");
         Self {
@@ -93,7 +94,7 @@ impl GlobalState {
     }
 
     #[inline(always)]
-    pub fn backend(&mut self) -> &mut Backend {
+    pub fn backend(&mut self) -> &mut CrossTerm {
         &mut self.backend
     }
 

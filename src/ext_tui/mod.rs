@@ -1,6 +1,30 @@
+#[cfg(test)]
+mod mock;
+#[cfg(test)]
+pub use mock::MockedBackend as CrossTerm;
+
+#[cfg(not(test))]
+mod crossterm_backend;
+#[cfg(not(test))]
+pub use crossterm_backend::CrossTerm;
+
+pub mod pty;
+pub mod text_field;
+
+use crate::workspace::CursorPosition;
 use crossterm::style::{Attribute, Attributes, Color, ContentStyle};
+use idiom_tui::{
+    layout::LineBuilder as BaseLineBuilder,
+    widgets::{State as BaseState, StyledLine as BaseStyledLine, Text as BaseText},
+    Position,
+};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
+
+pub type State = BaseState<CrossTerm>;
+pub type Text = BaseText<CrossTerm>;
+pub type StyledLine = BaseStyledLine<CrossTerm>;
+pub type LineBuilder<'a> = BaseLineBuilder<'a, CrossTerm>;
 
 #[allow(dead_code)]
 pub trait StyleExt: Sized {
@@ -198,6 +222,12 @@ impl StyleExt for ContentStyle {
     }
 }
 
+impl From<Position> for CursorPosition {
+    fn from(value: Position) -> Self {
+        CursorPosition { line: value.row as usize, char: value.col as usize }
+    }
+}
+
 #[cfg(not(test))]
 #[inline]
 pub fn background_rgb() -> Option<(u8, u8, u8)> {
@@ -356,6 +386,3 @@ impl std::fmt::Display for ParseColorError {
 }
 
 impl std::error::Error for ParseColorError {}
-
-#[cfg(test)]
-mod tests {}

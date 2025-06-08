@@ -27,6 +27,12 @@ Python should work for the most part with jedi, but the interaction is not well 
 - Linux Mint
 
 ## TODO
+- change to select mode on file open with mouse
+- check copy on replace/find popup
+- check replace all on replace popup
+- after replace if no replace points are left close popup
+- maybe more autocomplete (even on long words)
+
 - move rendering backend to internal create
 - persistent state (keeping changes after close witout saving)
 - fix tracking edgecase where file is changed in by other app in select

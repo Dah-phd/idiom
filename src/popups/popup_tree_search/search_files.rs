@@ -1,18 +1,17 @@
 use super::{Components, Popup, Status};
 use crate::{
     embeded_term::EditorTerminal,
+    ext_tui::{text_field::TextField, LineBuilder, State, StyleExt},
     global_state::{GlobalState, IdiomEvent},
-    render::{
-        backend::{BackendProtocol, StyleExt},
-        layout::{LineBuilder, Rect, BORDERS},
-        state::State,
-        TextField,
-    },
     tree::{Tree, TreePath},
     workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::Color;
+use idiom_tui::{
+    layout::{Rect, BORDERS},
+    Backend,
+};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use tokio::{
@@ -104,7 +103,7 @@ impl ActiveFileSearch {
         rect.height = rect.height.checked_sub(2)?;
         rect.row += 2;
         let position = rect.relative_position(row, column)?;
-        let idx = (self.state.at_line + position.line) / 2;
+        let idx = (self.state.at_line + position.row as usize) / 2;
         if idx >= self.options.len() {
             return None;
         }

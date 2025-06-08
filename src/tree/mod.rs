@@ -4,17 +4,15 @@ mod watcher;
 use crate::{
     configs::{TreeAction, TreeKeyMap},
     error::{IdiomError, IdiomResult},
+    ext_tui::{State, StyleExt},
     global_state::{GlobalState, IdiomEvent},
     lsp::{DiagnosticType, TreeDiagnostics},
     popups::popups_tree::{create_file_popup, create_root_file_popup, rename_file_popup},
-    render::{
-        backend::{BackendProtocol, StyleExt},
-        state::State,
-    },
     utils::{build_file_or_folder, to_canon_path, to_relative_path},
 };
 use crossterm::event::KeyEvent;
 use file_clipboard::FileClipboard;
+use idiom_tui::Backend;
 use std::{
     collections::{hash_map::Entry, HashMap},
     path::{Path, PathBuf},

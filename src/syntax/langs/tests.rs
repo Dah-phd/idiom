@@ -1,8 +1,8 @@
 use crate::{
     configs::{FileType, Theme},
-    render::{widgets::Writable, UTF8Safe},
     workspace::line::EditorLine,
 };
+use idiom_tui::{widgets::Writable, UTF8Safe};
 
 use super::Lang;
 

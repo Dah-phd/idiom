@@ -1,12 +1,13 @@
 use super::status::RenderStatus;
 use super::EditorLine;
 use crate::{
+    ext_tui::CrossTerm,
     global_state::GlobalState,
-    render::{backend::BackendProtocol, layout::Line},
     syntax::Lexer,
     workspace::{cursor::Cursor, CursorPosition},
 };
 use crossterm::style::ContentStyle;
+use idiom_tui::{layout::Line, Backend};
 use std::{cmp::Ordering, ops::Range};
 
 pub struct LineContext<'a> {
@@ -64,7 +65,7 @@ impl<'a> LineContext<'a> {
     }
 
     #[inline]
-    pub fn setup_cursor(&mut self, line: Line, backend: &mut impl BackendProtocol) -> usize {
+    pub fn setup_cursor(&mut self, line: Line, backend: &mut CrossTerm) -> usize {
         self.line_number += 1;
         let text = format!("{: >1$} ", self.line_number, self.line_number_offset);
         let remaining_width = line.width - text.len();
@@ -74,7 +75,7 @@ impl<'a> LineContext<'a> {
     }
 
     #[inline]
-    pub fn setup_line(&mut self, line: Line, backend: &mut impl BackendProtocol) -> usize {
+    pub fn setup_line(&mut self, line: Line, backend: &mut CrossTerm) -> usize {
         self.line_number += 1;
         let text = format!("{: >1$} ", self.line_number, self.line_number_offset);
         let remaining_width = line.width - text.len();
@@ -84,7 +85,7 @@ impl<'a> LineContext<'a> {
     }
 
     #[inline]
-    pub fn wrap_line(&mut self, line: Line, backend: &mut impl BackendProtocol) {
+    pub fn wrap_line(&mut self, line: Line, backend: &mut CrossTerm) {
         let text = format!("{: >1$} ", "", self.line_number_offset);
         backend.print_styled_at(line.row, line.col, text, self.accent_style);
         backend.clear_to_eol();

@@ -1,19 +1,17 @@
 use super::WRAP_CLOSE;
 use crate::{
-    render::{
-        backend::{BackendProtocol, StyleExt},
-        utils::CharLimitedWidths,
-    },
+    ext_tui::{CrossTerm, StyleExt},
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::{ContentStyle, Stylize};
+use idiom_tui::{utils::CharLimitedWidths, Backend};
 use std::ops::Range;
 
 pub fn complex_line(
     code: &EditorLine,
     mut line_width: usize,
     ctx: &mut LineContext,
-    backend: &mut impl BackendProtocol,
+    backend: &mut CrossTerm,
 ) -> Option<usize> {
     let mut iter_tokens = code.iter_tokens();
     let mut counter = 0;
@@ -78,7 +76,7 @@ pub fn complex_line_with_select(
     mut line_width: usize,
     select: Range<usize>,
     ctx: &mut LineContext,
-    backend: &mut impl BackendProtocol,
+    backend: &mut CrossTerm,
 ) -> Option<usize> {
     let char_position = ctx.lexer.char_lsp_pos;
     let select_color = ctx.lexer.theme.selected;

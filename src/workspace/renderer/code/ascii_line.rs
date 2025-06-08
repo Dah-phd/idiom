@@ -1,13 +1,13 @@
 use std::ops::Range;
 
 use crate::{
-    render::backend::StyleExt,
+    ext_tui::{CrossTerm, StyleExt},
     syntax::{tokens::TokenLine, Lexer},
-    BackendProtocol,
 };
 use crossterm::style::ContentStyle;
+use idiom_tui::Backend;
 
-pub fn ascii_line(content: &str, tokens: &TokenLine, backend: &mut impl BackendProtocol) {
+pub fn ascii_line(content: &str, tokens: &TokenLine, backend: &mut CrossTerm) {
     let mut cursor = 0;
     let mut last_len = 0;
     for token in tokens.iter() {
@@ -51,7 +51,7 @@ pub fn ascii_line_with_select(
     tokens: &TokenLine,
     select: Range<usize>,
     lexer: &Lexer,
-    backend: &mut impl BackendProtocol,
+    backend: &mut CrossTerm,
 ) {
     let select_color = lexer.theme.selected;
     let mut reset_style = ContentStyle::default();

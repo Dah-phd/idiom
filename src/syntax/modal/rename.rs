@@ -1,10 +1,8 @@
 use super::ModalMessage;
 use crate::{
-    configs::EditorAction,
-    global_state::GlobalState,
-    render::{layout::Rect, TextField},
-    workspace::CursorPosition,
+    configs::EditorAction, ext_tui::text_field::TextField, global_state::GlobalState, workspace::CursorPosition,
 };
+use idiom_tui::layout::Rect;
 
 pub struct RenameVariable {
     new_name: TextField<()>,

@@ -2,11 +2,9 @@ mod context;
 mod status;
 use status::RenderStatus;
 
-use crate::{
-    render::{utils::UTF8SafeStringExt, UTF8Safe},
-    syntax::{tokens::TokenLine, DiagnosticLine, Lang, Token},
-};
+use crate::syntax::{tokens::TokenLine, DiagnosticLine, Lang, Token};
 pub use context::LineContext;
+use idiom_tui::{utils::UTF8SafeStringExt, UTF8Safe};
 use std::{
     fmt::Display,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},

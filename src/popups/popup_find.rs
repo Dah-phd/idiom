@@ -6,18 +6,18 @@ use super::{
 };
 use crate::{
     embeded_term::EditorTerminal,
+    ext_tui::{text_field::TextField, StyleExt},
     global_state::GlobalState,
-    render::{
-        backend::{BackendProtocol, StyleExt},
-        count_as_string,
-        layout::{Line, Rect},
-        TextField,
-    },
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
+use idiom_tui::{
+    count_as_string,
+    layout::{Line, Rect},
+    Backend,
+};
 
 pub struct GoToLinePopup {
     current_line: usize,

@@ -2,6 +2,7 @@ use crate::{
     configs::GeneralAction,
     embeded_term::EditorTerminal,
     error::IdiomResult,
+    ext_tui::CrossTerm,
     global_state::{GlobalState, IdiomEvent},
     popups::{
         get_init_screen, get_new_screen_size,
@@ -12,7 +13,6 @@ use crate::{
         popups_editor::selector_editors,
         should_save_and_exit, Popup,
     },
-    render::backend::Backend,
     tree::Tree,
     workspace::Workspace,
 };
@@ -23,7 +23,7 @@ pub const MIN_FRAMERATE: Duration = Duration::from_millis(8);
 pub const MIN_HEIGHT: u16 = 6;
 pub const MIN_WIDTH: u16 = 40;
 
-pub async fn app(open_file: Option<PathBuf>, mut backend: Backend) -> IdiomResult<()> {
+pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomResult<()> {
     // builtin cursor is not used - cursor is positioned during render
 
     let screen_rect = get_init_screen(&mut backend)?;

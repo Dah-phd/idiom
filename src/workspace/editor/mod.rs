@@ -11,9 +11,9 @@ use crate::{
     error::{IdiomError, IdiomResult},
     global_state::GlobalState,
     lsp::LSPError,
-    render::layout::Rect,
     syntax::{tokens::calc_wraps, Lexer},
 };
+use idiom_tui::layout::Rect;
 use lsp_types::TextEdit;
 use std::{cmp::Ordering, path::PathBuf};
 use utils::{big_file_protection, build_display, calc_line_number_offset, FileUpdate};

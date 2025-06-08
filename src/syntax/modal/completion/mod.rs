@@ -1,16 +1,10 @@
 mod snippets;
 use super::ModalMessage;
 use crate::{
-    configs::EditorAction,
-    global_state::GlobalState,
-    render::{
-        layout::{IterLines, Rect},
-        state::State,
-    },
-    syntax::Lang,
-    workspace::CursorPosition,
+    configs::EditorAction, ext_tui::State, global_state::GlobalState, syntax::Lang, workspace::CursorPosition,
 };
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
+use idiom_tui::layout::{IterLines, Rect};
 use lsp_types::CompletionItem;
 use snippets::parse_completion_item;
 

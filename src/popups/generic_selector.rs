@@ -1,22 +1,22 @@
 use super::{Components, Popup, Status};
 use crate::{
+    ext_tui::{CrossTerm, State},
     global_state::GlobalState,
-    render::{
-        backend::{Backend, BackendProtocol},
-        layout::{IterLines, Line, Rect},
-        state::State,
-    },
 };
 use crossterm::{
     event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind},
     style::ContentStyle,
+};
+use idiom_tui::{
+    layout::{IterLines, Line, Rect},
+    Backend,
 };
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct PopupSelector<T> {
     pub options: Vec<T>,
     pub state: State,
-    display: fn(&T, Line, &mut Backend),
+    display: fn(&T, Line, &mut CrossTerm),
     command: fn(&mut PopupSelector<T>, &mut Components),
     size: (u16, usize),
 }
@@ -75,7 +75,7 @@ impl<T> Popup for PopupSelector<T> {
         match event {
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), row, column, .. } => {
                 if let Some(pos) = self.get_rect(components.gs).relative_position(row, column) {
-                    let option_idx = pos.line + self.state.at_line;
+                    let option_idx = pos.row as usize + self.state.at_line;
                     if option_idx >= self.options.len() {
                         return Status::Pending;
                     }
@@ -88,7 +88,7 @@ impl<T> Popup for PopupSelector<T> {
             }
             MouseEvent { kind: MouseEventKind::Moved, row, column, .. } => {
                 if let Some(pos) = self.get_rect(components.gs).relative_position(row, column) {
-                    let option_idx = pos.line + self.state.at_line;
+                    let option_idx = pos.row as usize + self.state.at_line;
                     if option_idx >= self.options.len() {
                         return Status::Pending;
                     }
@@ -119,7 +119,7 @@ impl<T> Popup for PopupSelector<T> {
 impl<T> PopupSelector<T> {
     pub fn new(
         options: Vec<T>,
-        display: fn(&T, Line, &mut Backend),
+        display: fn(&T, Line, &mut CrossTerm),
         command: fn(&mut PopupSelector<T>, &mut Components),
         size: Option<(u16, usize)>,
     ) -> Self {

@@ -1,6 +1,6 @@
 use super::{LangStream, PositionedToken};
-use crate::render::utils::{UTF8Safe, UTF8SafeStringExt};
 use crate::workspace::CursorPosition;
+use idiom_tui::utils::{UTF8Safe, UTF8SafeStringExt};
 use lsp_types::{
     SemanticToken, SemanticTokenType, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
 };

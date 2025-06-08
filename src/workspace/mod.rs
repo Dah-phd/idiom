@@ -8,15 +8,16 @@ use crate::popups::popups_editor::file_updated;
 use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
     error::{IdiomError, IdiomResult},
+    ext_tui::StyleExt,
     global_state::{GlobalState, IdiomEvent},
     lsp::LSP,
-    render::backend::{BackendProtocol, StyleExt},
     utils::TrackedList,
 };
 use crossterm::event::KeyEvent;
 use crossterm::style::{Color, ContentStyle};
 pub use cursor::CursorPosition;
 pub use editor::{editor_from_data, Editor};
+use idiom_tui::Backend;
 use line::EditorLine;
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
 use std::{

@@ -2,11 +2,8 @@ mod rust;
 use super::{Action, GlobalState};
 use crate::{
     configs::{FileType, Theme},
+    ext_tui::{StyleExt, StyledLine, Text},
     global_state::IdiomEvent,
-    render::{
-        backend::StyleExt,
-        widgets::{StyledLine, Text},
-    },
     workspace::line::EditorLine,
 };
 use crossterm::style::{Color, ContentStyle};

@@ -1,15 +1,29 @@
+use super::StyleExt;
+use crossterm::style::{Color, ContentStyle};
+use idiom_tui::{backend::Backend, layout::Rect};
 use std::io::Write;
 
-use crossterm::style::ContentStyle;
-
-use super::{style::StyleExt, BackendProtocol};
-
-pub struct Backend {
+#[derive(Debug, Default)]
+pub struct MockedBackend {
     pub data: Vec<(ContentStyle, String)>,
     pub default_style: ContentStyle,
 }
 
-impl BackendProtocol for Backend {
+impl PartialEq for MockedBackend {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl MockedBackend {
+    pub fn detached_hide_cursor() {}
+    pub fn detached_show_cursor() {}
+}
+
+impl Backend for MockedBackend {
+    type Style = ContentStyle;
+    type Color = Color;
+
     fn init() -> Self {
         Self { data: Vec::new(), default_style: ContentStyle::default() }
     }
@@ -47,7 +61,7 @@ impl BackendProtocol for Backend {
         self.data.push((ContentStyle::default(), format!("<<go to row: {row} col: {col}>>")))
     }
 
-    fn hide_cursor() {}
+    fn hide_cursor(&mut self) {}
 
     fn print<D: std::fmt::Display>(&mut self, text: D) {
         self.data.push((self.default_style, text.to_string()));
@@ -83,16 +97,16 @@ impl BackendProtocol for Backend {
         self.data.push((self.default_style, String::from("<<saved cursor>>")));
     }
 
-    fn screen() -> std::io::Result<crate::render::layout::Rect> {
-        Ok(crate::render::layout::Rect::new(0, 0, 120, 60))
+    fn screen() -> std::io::Result<Rect> {
+        Ok(Rect::new(0, 0, 120, 60))
     }
 
-    fn set_bg(&mut self, color: Option<super::Color>) {
+    fn set_bg(&mut self, color: Option<Color>) {
         self.default_style.set_bg(color);
         self.data.push((self.default_style, format!("<<set bg {:?}>>", color)));
     }
 
-    fn set_fg(&mut self, color: Option<super::Color>) {
+    fn set_fg(&mut self, color: Option<Color>) {
         self.default_style.set_fg(color);
         self.data.push((self.default_style, format!("<<set fg {:?}>>", color)));
     }
@@ -102,8 +116,7 @@ impl BackendProtocol for Backend {
         self.data.push((self.default_style, "<<set style>>".to_string()))
     }
 
-    fn show_cursor() {}
-    // self.data.push((self.default_style, String::from("<<show cursor>>")));
+    fn show_cursor(&mut self) {}
 
     fn to_set_style(&mut self) {
         self.data.push((self.default_style, String::from("<<set style>>")));
@@ -121,9 +134,46 @@ impl BackendProtocol for Backend {
     fn pad_styled(&mut self, width: usize, style: ContentStyle) {
         self.data.push((self.default_style, format!("<<padding: {:?}, styled: {:?}>>", width, style)))
     }
+
+    fn merge_style(mut left: Self::Style, right: Self::Style) -> Self::Style {
+        left.update(right);
+        left
+    }
+
+    fn reversed_style() -> Self::Style {
+        ContentStyle::reversed()
+    }
+
+    fn bold_style() -> Self::Style {
+        ContentStyle::bold()
+    }
+
+    fn ital_style() -> Self::Style {
+        ContentStyle::ital()
+    }
+
+    fn fg_style(color: Self::Color) -> Self::Style {
+        ContentStyle::fg(color)
+    }
+
+    fn bg_style(color: Self::Color) -> Self::Style {
+        ContentStyle::bg(color)
+    }
+
+    fn slow_blink_style() -> Self::Style {
+        ContentStyle::slowblink()
+    }
+
+    fn underline_style(color: Option<Self::Color>) -> Self::Style {
+        ContentStyle::underlined(color)
+    }
+
+    fn undercurle_style(color: Option<Self::Color>) -> Self::Style {
+        ContentStyle::undercurled(color)
+    }
 }
 
-impl Write for Backend {
+impl Write for MockedBackend {
     fn by_ref(&mut self) -> &mut Self
     where
         Self: Sized,
@@ -144,7 +194,7 @@ impl Write for Backend {
     }
 }
 
-impl Backend {
+impl MockedBackend {
     pub fn unwrap(self) -> Vec<(ContentStyle, String)> {
         self.data
     }

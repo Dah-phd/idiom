@@ -1,9 +1,6 @@
-use crate::render::{
-    backend::{Backend, BackendProtocol, StyleExt},
-    layout::Line,
-    UTF8Safe,
-};
+use crate::ext_tui::{CrossTerm, StyleExt};
 use crossterm::style::{Color, ContentStyle};
+use idiom_tui::{layout::Line, Backend, UTF8Safe};
 use std::{
     collections::VecDeque,
     error::Error,
@@ -35,7 +32,7 @@ impl Messages {
         }
     }
 
-    pub fn render(&mut self, accent_style: ContentStyle, backend: &mut Backend) {
+    pub fn render(&mut self, accent_style: ContentStyle, backend: &mut CrossTerm) {
         if self.is_expaired() {
             match self.messages.pop() {
                 Some(message) => {
@@ -60,7 +57,7 @@ impl Messages {
         self.active
     }
 
-    pub fn fast_render(&mut self, accent_style: ContentStyle, backend: &mut Backend) {
+    pub fn fast_render(&mut self, accent_style: ContentStyle, backend: &mut CrossTerm) {
         if !self.active {
             return;
         }
@@ -132,7 +129,7 @@ enum Message {
 
 impl Message {
     #[inline]
-    fn render(&self, line: Line, mut accent_style: ContentStyle, backend: &mut Backend) {
+    fn render(&self, line: Line, mut accent_style: ContentStyle, backend: &mut CrossTerm) {
         let Line { width, row, col } = line;
 
         let (color, text) = match self {

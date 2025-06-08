@@ -1,8 +1,8 @@
 use crate::{
     configs::IndentConfigs,
-    render::UTF8Safe,
     workspace::{cursor::CursorPosition, line::EditorLine},
 };
+use idiom_tui::UTF8Safe;
 use std::ops::Range;
 
 #[inline(always)]

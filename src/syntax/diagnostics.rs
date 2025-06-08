@@ -1,9 +1,9 @@
+use crate::ext_tui::{CrossTerm, StyleExt};
 use crate::global_state::IdiomEvent;
-use crate::render::backend::{BackendProtocol, StyleExt};
-use crate::render::UTF8Safe;
 use crate::syntax::Lang;
 use crate::workspace::line::EditorLine;
 use crossterm::style::{Color, ContentStyle};
+use idiom_tui::{Backend, UTF8Safe};
 use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
 
 const ELS_COLOR: Color = Color::DarkGrey;
@@ -102,7 +102,7 @@ impl DiagnosticLine {
 
     /// Prints truncated text based on info from diagnostics
     #[inline(always)]
-    pub fn inline_render(&self, max_width: usize, backend: &mut impl BackendProtocol) {
+    pub fn inline_render(&self, max_width: usize, backend: &mut CrossTerm) {
         if max_width < 5 {
             return;
         }

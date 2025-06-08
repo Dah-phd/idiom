@@ -1,15 +1,12 @@
 use crate::{
-    render::{
-        backend::{Backend, BackendProtocol, StyleExt},
-        layout::RectIter,
-        utils::ByteChunks,
-    },
+    ext_tui::{CrossTerm, StyleExt},
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::ContentStyle;
+use idiom_tui::{layout::RectIter, utils::ByteChunks, Backend};
 use std::ops::Range;
 
-pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut impl BackendProtocol) {
+pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
     let mut chunks = ByteChunks::new(&text.content, line_width);
@@ -29,7 +26,7 @@ pub fn line_with_select(
     select: Range<usize>,
     lines: &mut RectIter,
     ctx: &mut LineContext,
-    backend: &mut impl BackendProtocol,
+    backend: &mut CrossTerm,
 ) {
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
@@ -68,7 +65,7 @@ pub fn cursor(
     skip: usize,
     lines: &mut RectIter,
     ctx: &mut LineContext,
-    backend: &mut Backend,
+    backend: &mut CrossTerm,
 ) {
     match select {
         Some(select) => self::select(text, skip, select, lines, ctx, backend),
@@ -76,7 +73,7 @@ pub fn cursor(
     }
 }
 
-pub fn basic(text: &mut EditorLine, skip: usize, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut Backend) {
+pub fn basic(text: &mut EditorLine, skip: usize, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
     let cursor_idx = ctx.cursor_char();
     let line_width = match lines.next() {
         Some(line) => ctx.setup_line(line, backend),
@@ -110,7 +107,7 @@ pub fn select(
     select: Range<usize>,
     lines: &mut RectIter,
     ctx: &mut LineContext,
-    backend: &mut Backend,
+    backend: &mut CrossTerm,
 ) {
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);

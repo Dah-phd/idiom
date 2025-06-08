@@ -5,10 +5,11 @@ use super::super::{
     CursorPosition,
 };
 use super::EditMetaData;
+use idiom_tui::UTF8Safe;
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 use std::fmt::Debug;
 
-use crate::{configs::IndentConfigs, render::UTF8Safe, utils::Offset};
+use crate::{configs::IndentConfigs, utils::Offset};
 
 #[derive(Debug)]
 pub struct Edit {
