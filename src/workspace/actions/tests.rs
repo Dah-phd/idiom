@@ -1,9 +1,20 @@
-use super::meta::EditMetaData;
-use crate::configs::IndentConfigs;
+use super::{meta::EditMetaData, Actions};
+use crate::configs::{FileType, IndentConfigs};
+use crate::ext_tui::CrossTerm;
+use crate::lsp::LSPResult;
+use crate::syntax::{
+    tests::{char_lsp_pos, encode_pos_utf32, intercept_sync, intercept_sync_rev},
+    Lexer,
+};
 use crate::workspace::actions::Edit;
+use crate::workspace::actions::EditType;
 use crate::workspace::cursor::Cursor;
 use crate::workspace::line::EditorLine;
 use crate::workspace::CursorPosition;
+use crate::workspace::GlobalState;
+use idiom_tui::Backend;
+use lsp_types::{Position, Range};
+use std::path::PathBuf;
 
 pub fn create_content() -> Vec<EditorLine> {
     vec![
@@ -447,4 +458,50 @@ fn meta_eq_inc_stat() {
     assert_eq!(m1 + m2, expect);
     m1 += m2;
     assert_eq!(m1, expect);
+}
+
+#[test]
+fn push_char_with_closing_and_select() {
+    let start = " asd ";
+    let end = " [asd] ";
+    let cfg = IndentConfigs::default();
+    let mut gs = GlobalState::new(CrossTerm::screen().unwrap(), CrossTerm::init());
+    let mut lexer = Lexer::with_context(FileType::Rust, PathBuf::new().as_path(), &mut gs);
+    intercept_sync(&mut lexer, probe_char_closing_with_select);
+    intercept_sync_rev(&mut lexer, probe_char_closing_with_select_rev);
+    let mut actions = Actions::new(cfg);
+    let mut content = vec![EditorLine::from(String::from(start))];
+    let mut cursor = Cursor::default();
+    cursor.select_set(CursorPosition { line: 0, char: 1 }, CursorPosition { line: 0, char: 4 });
+    actions.push_char('[', &mut cursor, &mut content, &mut lexer);
+    // confirm open close has been added
+    assert_eq!(&content[0].content, end);
+    actions.undo(&mut cursor, &mut content, &mut lexer);
+    assert_eq!(&content[0].content, start);
+    actions.redo(&mut cursor, &mut content, &mut lexer);
+    assert_eq!(&content[0].content, end);
+}
+
+fn probe_char_closing_with_select(_: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
+    let (meta, edit) = action.change_event(encode_pos_utf32, char_lsp_pos, content);
+    assert_eq!(meta.start_line, 0);
+    assert_eq!(meta.from, 1);
+    assert_eq!(meta.from, meta.to);
+    assert_eq!(edit[0].range, Some(Range::new(Position::new(0, 4), Position::new(0, 4))),);
+    assert_eq!(&edit[0].text, "]");
+    assert_eq!(edit[1].range, Some(Range::new(Position::new(0, 1), Position::new(0, 1))),);
+    assert_eq!(&edit[1].text, "[");
+    Ok(())
+}
+
+fn probe_char_closing_with_select_rev(_: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
+    let (meta, edit) = action.change_event_rev(encode_pos_utf32, char_lsp_pos, content);
+    assert_eq!(meta.start_line, 0);
+    assert_eq!(meta.from, 1);
+    assert_eq!(meta.from, meta.to);
+    assert_eq!(edit[0].range, Some(Range::new(Position::new(0, 1), Position::new(0, 2))),);
+    assert_eq!(&edit[0].text, "");
+    assert_eq!(edit[1].range, Some(Range::new(Position::new(0, 4), Position::new(0, 5))),);
+    assert_eq!(&edit[1].text, "");
+    Ok(())
 }

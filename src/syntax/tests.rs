@@ -1,12 +1,26 @@
 pub use super::{
-    lsp_calls::{char_lsp_utf16, char_lsp_utf8, encode_pos_utf16, encode_pos_utf8},
+    lsp_calls::{char_lsp_pos, char_lsp_utf16, char_lsp_utf8, encode_pos_utf16, encode_pos_utf32, encode_pos_utf8},
     tokens::{set_tokens, TokenLine},
     Legend, Lexer, Token,
 };
-use crate::{configs::FileType, ext_tui::StyleExt, global_state::GlobalState, workspace::line::EditorLine};
+use crate::{
+    configs::FileType,
+    ext_tui::StyleExt,
+    global_state::GlobalState,
+    lsp::LSPResult,
+    workspace::{actions::EditType, line::EditorLine},
+};
 use crossterm::style::ContentStyle;
 use lsp_types::SemanticToken;
 use std::path::PathBuf;
+
+pub fn intercept_sync(lexer: &mut Lexer, sync: fn(&mut Lexer, &EditType, &mut [EditorLine]) -> LSPResult<()>) {
+    lexer.sync = sync;
+}
+
+pub fn intercept_sync_rev(lexer: &mut Lexer, sync: fn(&mut Lexer, &EditType, &mut [EditorLine]) -> LSPResult<()>) {
+    lexer.sync_rev = sync;
+}
 
 fn get_text() -> Vec<String> {
     vec![

@@ -20,14 +20,14 @@ impl EditType {
     pub fn apply_rev(&self, content: &mut Vec<EditorLine>) -> (CursorPosition, Option<Select>) {
         match self {
             Self::Single(action) => action.apply_rev(content),
-            Self::Multi(actions) => actions.iter().rev().map(|a| a.apply_rev(content)).next_back().unwrap_or_default(),
+            Self::Multi(actions) => actions.iter().rev().map(|a| a.apply_rev(content)).last().unwrap_or_default(),
         }
     }
 
     pub fn apply(&self, content: &mut Vec<EditorLine>) -> (CursorPosition, Option<Select>) {
         match self {
             Self::Single(action) => action.apply(content),
-            Self::Multi(actions) => actions.iter().map(|a| a.apply(content)).next_back().unwrap_or_default(),
+            Self::Multi(actions) => actions.iter().map(|a| a.apply(content)).last().unwrap_or_default(),
         }
     }
 
