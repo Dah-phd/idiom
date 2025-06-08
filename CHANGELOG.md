@@ -2,6 +2,7 @@
 # Version 0.5.1
 - split off tui componenets into idiom_tui crate
 - fixed EditType::Multi apply and apply_rev
+- fixed snippet parsing of the Type { data: ${1:()} }
 - fix mass replace on find and replace popup
 - added on mouse clip drop for multiple popups (find, repalce, go to line, etc...)
 

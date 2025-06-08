@@ -169,6 +169,11 @@ fn parse_snippet(snippet: String) -> IdiomEvent {
             _ => buffer.push(ch),
         }
     }
+    // if there is no select pin position to empty select start
+    if let Some((pos, 0)) = relative_select {
+        relative_select = None;
+        cursor_offset.replace(pos);
+    };
     IdiomEvent::Snippet { snippet: buffer.inner, cursor_offset, relative_select }
 }
 
@@ -190,6 +195,9 @@ fn collect_numbers(chars: &mut Chars) -> (String, Option<char>) {
 fn collect_name(chars: &mut Chars) -> (String, Option<char>) {
     let mut name = String::new();
     for ch in chars.by_ref() {
+        if "()".contains(ch) {
+            continue;
+        }
         if ch.is_alphabetic() || ch.is_numeric() || " _&".contains(ch) {
             name.push(ch);
             continue;

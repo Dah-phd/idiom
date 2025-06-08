@@ -114,6 +114,18 @@ fn test_hard_snippet() {
 }
 
 #[test]
+fn test_brach_snippet() {
+    assert_eq!(
+        IdiomEvent::Snippet {
+            snippet: String::from("CursorPosition { line: , char:  }"),
+            cursor_offset: Some((0, 23)),
+            relative_select: None
+        },
+        insert_text_completion_event("CursorPosition { line: ${1:()}, char: ${2:()} }$0"),
+    )
+}
+
+#[test]
 fn bad_input_snippets() {
     assert_eq!(
         IdiomEvent::Snippet {

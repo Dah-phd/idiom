@@ -20,6 +20,7 @@ impl EditType {
     pub fn apply_rev(&self, content: &mut Vec<EditorLine>) -> (CursorPosition, Option<Select>) {
         match self {
             Self::Single(action) => action.apply_rev(content),
+            #[allow(clippy::double_ended_iterator_last)]
             Self::Multi(actions) => actions.iter().rev().map(|a| a.apply_rev(content)).last().unwrap_or_default(),
         }
     }
@@ -27,6 +28,7 @@ impl EditType {
     pub fn apply(&self, content: &mut Vec<EditorLine>) -> (CursorPosition, Option<Select>) {
         match self {
             Self::Single(action) => action.apply(content),
+            #[allow(clippy::double_ended_iterator_last)]
             Self::Multi(actions) => actions.iter().map(|a| a.apply(content)).last().unwrap_or_default(),
         }
     }
