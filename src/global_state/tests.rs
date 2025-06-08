@@ -1,13 +1,16 @@
 use super::GlobalState;
 use crate::embeded_term::EditorTerminal;
-use crate::render::backend::{Backend, BackendProtocol};
-use crate::render::layout::{Borders, Line, Rect};
+use crate::ext_tui::CrossTerm;
 use crate::tree::tests::mock_tree;
 use crate::workspace::tests::mock_ws;
+use idiom_tui::{
+    layout::{Borders, Line, Rect},
+    Backend,
+};
 
 #[test]
 fn full_rebuild_draw() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut ws = mock_ws(
         ["test line uno - in here", "second line", "last line for the test"]
             .into_iter()
@@ -29,7 +32,7 @@ fn full_rebuild_draw() {
 
 #[test]
 fn full_rebuild_draw_insert() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     gs.toggle_tree();
     gs.insert_mode();
     let mut ws = mock_ws(

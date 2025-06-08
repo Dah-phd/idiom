@@ -1,8 +1,10 @@
-use crate::render::backend::{Backend, BackendProtocol};
-use crate::render::layout::{Rect, BORDERS};
-use crate::render::pty::PtyShell;
-use crate::{global_state::GlobalState, render::layout::Line};
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
+use crate::ext_tui::{
+    pty::{Message, PtyShell, OVERLAY_INFO},
+    CrossTerm,
+};
+use crate::global_state::GlobalState;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use idiom_tui::layout::{Line, Rect, BORDERS};
 
 #[derive(Default)]
 pub struct EditorTerminal {
@@ -25,7 +27,8 @@ impl EditorTerminal {
             border.fill(BORDERS.horizontal_top, gs.backend());
         }
         if let Some(term) = self.terminal.as_mut() {
-            PtyShell::controls_help(gs);
+            gs.message(OVERLAY_INFO);
+            gs.message(OVERLAY_INFO);
             term.render(gs.backend());
         }
     }
@@ -67,11 +70,11 @@ impl EditorTerminal {
             KeyEvent { code: KeyCode::Char('`' | ' '), modifiers: KeyModifiers::CONTROL, .. } => {
                 gs.message("Term: PTY active in background ... (CTRL + q) can be used to kill the process!");
                 gs.toggle_terminal(self);
-                Backend::hide_cursor();
+                CrossTerm::detached_hide_cursor();
             }
             event_key => {
                 if let Some(term) = self.terminal.as_mut() {
-                    if let Err(error) = term.map_key(event_key, gs) {
+                    if let Err(error) = term.map_key(event_key, gs.backend()) {
                         gs.error(error);
                         self.terminal.take();
                         gs.toggle_terminal(self);
@@ -84,8 +87,18 @@ impl EditorTerminal {
 
     pub fn map_mouse(&mut self, event: MouseEvent, gs: &mut GlobalState) {
         if let Some(term) = self.terminal.as_mut() {
-            term.map_mouse(event, gs);
-        }
+            match term.map_mouse(event, gs.backend()) {
+                Message::Copied(clip) => {
+                    gs.clipboard.push(clip);
+                    gs.success("Select from embeded copied!");
+                }
+                Message::Skipped(MouseEventKind::Down(MouseButton::Left) | MouseEventKind::Up(MouseButton::Left)) => {
+                    gs.toggle_terminal(self);
+                    CrossTerm::detached_hide_cursor();
+                }
+                _ => {}
+            };
+        };
     }
 
     pub fn paste_passthrough(&mut self, clip: String) {

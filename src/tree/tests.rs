@@ -4,7 +4,7 @@ use std::{
     time::Instant,
 };
 
-use crate::{configs::KeyMap, error::IdiomResult, lsp::DiagnosticType, render::state::State};
+use crate::{configs::KeyMap, error::IdiomResult, ext_tui::State, lsp::DiagnosticType};
 
 use super::{file_clipboard::FileClipboard, watcher::TreeWatcher, Tree, TreePath};
 

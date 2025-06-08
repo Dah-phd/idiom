@@ -1,12 +1,13 @@
 use super::{Components, Popup, Status};
 use crate::{
     embeded_term::EditorTerminal,
+    ext_tui::{text_field::TextField, State},
     global_state::{GlobalState, IdiomEvent},
-    render::{layout::Rect, state::State, TextField},
     tree::Tree,
-    workspace::{CursorPosition, Workspace},
+    workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use idiom_tui::{layout::Rect, Position};
 use std::{
     fs::DirEntry,
     path::{PathBuf, MAIN_SEPARATOR},
@@ -68,7 +69,8 @@ impl OpenFileSelector {
     }
 
     fn get_path_idx(&self, row: u16, column: u16, gs: &GlobalState) -> Option<usize> {
-        let CursorPosition { line, .. } = Self::get_rect(gs).relative_position(row, column)?;
+        let Position { row, .. } = Self::get_rect(gs).relative_position(row, column)?;
+        let line = row as usize;
         let path_index = self.state.at_line + line.checked_sub(1)?;
         if self.paths.len() <= path_index {
             return None;

@@ -1,12 +1,10 @@
 use super::super::tests::{expect_cursor, expect_select, parse_complex_line};
+use super::parser::{parse, Block, ListItem, Span};
 use super::{ascii, complex, line};
 use crate::{
     configs::FileType,
+    ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
-    render::{
-        backend::{Backend, BackendProtocol, StyleExt},
-        layout::{Borders, Rect},
-    },
     syntax::tests::mock_utf8_lexer,
     workspace::{
         cursor::Cursor,
@@ -15,7 +13,10 @@ use crate::{
     },
 };
 use crossterm::style::{Color, ContentStyle};
-use markdown::{tokenize, Block, ListItem, Span};
+use idiom_tui::{
+    layout::{Borders, Rect},
+    Backend,
+};
 
 fn generate_lines() -> Vec<EditorLine> {
     [
@@ -35,7 +36,7 @@ fn generate_complex_lines() -> Vec<EditorLine> {
 
 #[test]
 fn cursor_render() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.set_position(CursorPosition { line: 0, char: 39 });
@@ -58,7 +59,7 @@ fn cursor_render() {
 
 #[test]
 fn cursor_complex_render() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.set_position(CursorPosition { line: 0, char: 39 });
@@ -81,7 +82,7 @@ fn cursor_complex_render() {
 
 #[test]
 fn cursor_select() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set(CursorPosition::default(), (0, 39).into());
@@ -109,7 +110,7 @@ fn cursor_select() {
 
 #[test]
 fn cursor_complex_select() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set(CursorPosition::default(), (0, 39).into());
@@ -137,7 +138,7 @@ fn cursor_complex_select() {
 
 #[test]
 fn simple_line() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let cursor = Cursor::default();
 
@@ -166,7 +167,7 @@ fn simple_line() {
 
 #[test]
 fn simple_line_select() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set((1, 7).into(), (2, 60).into());
@@ -195,7 +196,7 @@ fn simple_line_select() {
 
 #[test]
 fn complex_line() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let cursor = Cursor::default();
 
@@ -224,7 +225,7 @@ fn complex_line() {
 
 #[test]
 fn complex_line_select() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set((1, 7).into(), (2, 60).into());
@@ -257,25 +258,22 @@ fn complex_line_select() {
 #[test]
 fn parser_code_snippet() {
     let txt = "```";
-    assert_eq!(tokenize(txt), vec![Block::Paragraph(vec![Span::Code(String::from('`'))])]);
+    assert_eq!(parse(txt), vec![Block::Paragraph(vec![Span::Code(String::from('`'))])]);
 }
 
 #[test]
 fn example_parsed_code() {
     assert_eq!(
-        tokenize("![](/non_dev/screen1.png)"),
+        parse("![](/non_dev/screen1.png)"),
         vec![Block::Paragraph(vec![Span::Image(
             String::new(),
             String::from("/non_dev/screen1.png"),
             None
         )])]
     );
+    assert_eq!(parse("## Tested platform"), vec![Block::Header(vec![Span::Text(String::from("Tested platform"))], 2)]);
     assert_eq!(
-        tokenize("## Tested platform"),
-        vec![Block::Header(vec![Span::Text(String::from("Tested platform"))], 2)]
-    );
-    assert_eq!(
-        tokenize("- Linux Fedora derivate (Nobara)"),
+        parse("- Linux Fedora derivate (Nobara)"),
         vec![Block::UnorderedList(vec![ListItem::Simple(vec![Span::Text(
             String::from("Linux Fedora derivate (Nobara)")
         )])])],

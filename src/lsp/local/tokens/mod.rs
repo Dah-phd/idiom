@@ -6,15 +6,14 @@ pub mod placeholder;
 pub mod python;
 pub mod rust;
 pub mod ts;
-use logos::{Logos, Span};
-use lsp_types::{CompletionItem, InsertTextFormat, SemanticToken};
-
 use crate::{
     configs::{FileType, Theme},
-    render::UTF8Safe,
     syntax::{tokens::set_tokens, Legend},
     workspace::line::EditorLine,
 };
+use idiom_tui::UTF8Safe;
+use logos::{Logos, Span};
+use lsp_types::{CompletionItem, InsertTextFormat, SemanticToken};
 
 use super::{
     create_semantic_capabilities,

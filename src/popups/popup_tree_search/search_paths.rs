@@ -1,18 +1,14 @@
 use super::{Components, Popup, Status};
 use crate::{
     embeded_term::EditorTerminal,
+    ext_tui::{text_field::TextField, State, StyleExt},
     global_state::{GlobalState, IdiomEvent},
-    render::{
-        backend::StyleExt,
-        layout::{Rect, BORDERS},
-        state::State,
-        TextField,
-    },
     tree::{Tree, TreePath},
     workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::Color;
+use idiom_tui::layout::{Rect, BORDERS};
 use std::{path::PathBuf, sync::Arc, time::Duration};
 use std::{sync::Mutex, time::Instant};
 use tokio::task::JoinHandle;
@@ -70,7 +66,7 @@ impl ActivePathSearch {
         rect.height = rect.height.checked_sub(2)?;
         rect.row += 2;
         let position = rect.relative_position(row, column)?;
-        let idx = self.state.at_line + position.line;
+        let idx = self.state.at_line + position.row as usize;
         if idx >= self.options.len() {
             return None;
         }

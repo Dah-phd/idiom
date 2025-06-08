@@ -1,18 +1,19 @@
 use crate::{
     error::{IdiomError, IdiomResult},
+    ext_tui::{
+        pty::{Message, PtyShell, OVERLAY_INFO},
+        CrossTerm,
+    },
     global_state::GlobalState,
     popups::checked_new_screen_size,
-    render::{
-        backend::{Backend, BackendProtocol},
-        pty::PtyShell,
-    },
 };
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use idiom_tui::Backend;
 use std::time::Duration;
 const MIN_FRAMERATE: Duration = Duration::from_millis(8);
 
 pub fn run_embeded_tui(cmd: Option<&str>, gs: &mut GlobalState) -> IdiomResult<()> {
-    let mut rect = Backend::screen()?;
+    let mut rect = CrossTerm::screen()?;
     rect.height -= 1;
 
     let mut tui = match cmd {
@@ -20,7 +21,8 @@ pub fn run_embeded_tui(cmd: Option<&str>, gs: &mut GlobalState) -> IdiomResult<(
         None => PtyShell::default_cmd(rect)?,
     };
 
-    PtyShell::controls_help(gs);
+    gs.message(OVERLAY_INFO);
+    gs.message(OVERLAY_INFO);
     tui.render(gs.backend());
 
     while !tui.is_finished() {
@@ -30,14 +32,19 @@ pub fn run_embeded_tui(cmd: Option<&str>, gs: &mut GlobalState) -> IdiomResult<(
                     return Ok(());
                 }
                 Event::Key(key) => {
-                    tui.map_key(&key, gs)?;
+                    tui.map_key(&key, gs.backend())?;
                 }
-                Event::Mouse(event) => tui.map_mouse(event, gs),
+                Event::Mouse(event) => {
+                    if let Message::Copied(clip) = tui.map_mouse(event, gs.backend()) {
+                        gs.clipboard.push(clip);
+                        gs.success("Select from embeded copied!");
+                    }
+                }
                 Event::Resize(width, height) => {
                     let (width, height) = checked_new_screen_size(width, height, gs.backend());
                     gs.full_resize(height, width);
                     gs.render_footer_standalone();
-                    let mut rect = Backend::screen()?;
+                    let mut rect = CrossTerm::screen()?;
                     rect.height -= 1;
                     tui.resize(rect).map_err(IdiomError::GeneralError)?;
                 }

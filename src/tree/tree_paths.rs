@@ -3,14 +3,12 @@ use tokio::task::JoinSet;
 
 use crate::{
     error::IdiomResult,
+    ext_tui::{CrossTerm, StyleExt},
     lsp::DiagnosticType,
-    render::{
-        backend::{Backend, StyleExt},
-        layout::Line,
-    },
     utils::get_nested_paths,
 };
 use crossterm::style::{Color, ContentStyle};
+use idiom_tui::layout::Line;
 use std::{
     cmp::Ordering,
     collections::HashSet,
@@ -47,7 +45,7 @@ impl TreePath {
         })
     }
 
-    pub fn render(&self, char_offset: usize, line: Line, base_style: ContentStyle, backend: &mut Backend) {
+    pub fn render(&self, char_offset: usize, line: Line, base_style: ContentStyle, backend: &mut CrossTerm) {
         let (display, diagnostic) = match self {
             TreePath::File { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
             TreePath::Folder { display, diagnostic, tree: Some(..), .. } => {

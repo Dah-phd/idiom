@@ -1,4 +1,4 @@
-use crate::render::utils::CharLimitedWidths;
+use idiom_tui::utils::CharLimitedWidths;
 use std::ops::Range;
 
 type Reduction = usize;

@@ -1,9 +1,6 @@
-use crate::render::{
-    backend::{Backend, StyleExt},
-    layout::Line,
-};
 use crate::{
     embeded_term::EditorTerminal,
+    ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
     popups::{Components, Popup, Status},
     tree::Tree,
@@ -13,6 +10,7 @@ use crossterm::{
     event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind},
     style::ContentStyle,
 };
+use idiom_tui::layout::Line;
 use std::ops::Range;
 
 #[derive(Clone, PartialEq)]
@@ -185,7 +183,7 @@ impl PopupChoice {
         }
     }
 
-    fn p_from_message(&self, line: Line, backend: &mut Backend) {
+    fn p_from_message(&self, line: Line, backend: &mut CrossTerm) {
         if self.message_as_buffer_builder.is_none() {
             return line.render_centered(&self.message, backend);
         }
@@ -195,7 +193,7 @@ impl PopupChoice {
         builder.push_styled("|", ContentStyle::slowblink());
     }
 
-    fn spans_from_buttons(&mut self, line: Line, backend: &mut Backend) {
+    fn spans_from_buttons(&mut self, line: Line, backend: &mut CrossTerm) {
         let mut last_btn_end = line.col;
         self.button_line = line.row;
         self.button_ranges.clear();

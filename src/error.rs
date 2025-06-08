@@ -23,7 +23,7 @@ impl IdiomError {
     }
 
     pub fn io_other(message: impl Into<String>) -> Self {
-        Self::IOError(std::io::Error::new(ErrorKind::Other, message.into()))
+        Self::IOError(std::io::Error::other(message.into()))
     }
 
     pub fn io_not_found(message: impl Into<String>) -> Self {

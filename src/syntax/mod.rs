@@ -9,7 +9,6 @@ use crate::{
     configs::{EditorAction, FileType, Theme},
     global_state::{GlobalState, IdiomEvent},
     lsp::{LSPClient, LSPError, LSPResponseType, LSPResult},
-    render::layout::Rect,
     workspace::{
         actions::{EditMetaData, EditType},
         line::EditorLine,
@@ -17,6 +16,7 @@ use crate::{
     },
 };
 pub use diagnostics::{set_diganostics, Action, DiagnosticInfo, DiagnosticLine};
+use idiom_tui::layout::Rect;
 pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{

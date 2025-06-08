@@ -1,12 +1,11 @@
 use super::{Components, Popup, Status};
 use crate::configs::{EditorAction, TreeAction};
+use crate::ext_tui::State;
 use crate::global_state::GlobalState;
-use crate::render::backend::BackendProtocol;
-use crate::render::layout::Rect;
-use crate::render::state::State;
 use crate::workspace::CursorPosition;
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
+use idiom_tui::{layout::Rect, Backend};
 
 enum Action {
     Tree(TreeAction),
@@ -104,15 +103,16 @@ impl<const N: usize> Popup for ContextMenu<N> {
         match event.kind {
             MouseEventKind::Moved => {
                 if let Some(position) = self.modal_screen.relative_position(event.row, event.column) {
-                    if N > position.line {
-                        self.state.selected = position.line;
+                    let pos_line = position.row as usize;
+                    if N > pos_line {
+                        self.state.selected = pos_line;
                         self.force_render(gs);
                     };
                 };
             }
             MouseEventKind::Down(MouseButton::Left | MouseButton::Right) => {
                 if let Some(position) = self.modal_screen.relative_position(event.row, event.column) {
-                    self.state.selected = position.line;
+                    self.state.selected = position.row as usize;
                     match self.commands[self.state.selected].1 {
                         Action::Tree(action) => {
                             tree.map_action(action, gs);

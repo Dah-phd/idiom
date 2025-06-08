@@ -1,5 +1,5 @@
 use super::{diagnostics::DiagnosticData, Legend};
-use crate::{render::backend::StyleExt, workspace::cursor::Cursor, workspace::line::EditorLine};
+use crate::{ext_tui::StyleExt, workspace::cursor::Cursor, workspace::line::EditorLine};
 use crossterm::style::ContentStyle;
 use lsp_types::SemanticToken;
 use unicode_width::UnicodeWidthChar;

@@ -5,12 +5,12 @@ mod rename;
 use crate::{
     configs::{EditorAction, Theme},
     global_state::GlobalState,
-    render::{backend::BackendProtocol, layout::Rect},
     syntax::{DiagnosticInfo, Lang},
     workspace::CursorPosition,
 };
 use completion::AutoComplete;
 use fuzzy_matcher::skim::SkimMatcherV2;
+use idiom_tui::{layout::Rect, Backend};
 use info::Info;
 use lsp_types::{CompletionItem, Hover, SignatureHelp};
 use rename::RenameVariable;
@@ -57,7 +57,7 @@ impl LSPModal {
         match self {
             Self::AutoComplete(modal) => {
                 let height = std::cmp::min(modal.len() as u16, 7);
-                let area = gs.screen_rect.modal_relative(row, col, 50, height);
+                let area = gs.screen_rect.modal_relative(row, col, 70, height);
                 if area.height != 0 {
                     gs.backend.set_style(gs.theme.accent_style);
                     modal.render(&area, gs);
@@ -76,7 +76,7 @@ impl LSPModal {
             }
             Self::Info(modal) => {
                 let height = std::cmp::min(modal.len() as u16, 7);
-                let area = gs.screen_rect.modal_relative(row, col, 80, height);
+                let area = gs.screen_rect.modal_relative(row, col, 90, height);
                 if area.height != 0 {
                     gs.backend.set_style(gs.theme.accent_style);
                     modal.render(area, gs);

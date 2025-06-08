@@ -1,9 +1,7 @@
 use crate::configs::Theme;
-use crate::render::backend::StyleExt;
-use crate::render::widgets::StyledLine;
-use crate::render::widgets::Text;
-use crate::render::UTF8Safe;
+use crate::ext_tui::{StyleExt, StyledLine, Text};
 use crate::syntax::Legend;
+use idiom_tui::UTF8Safe;
 
 use super::create_semantic_capabilities;
 use super::GenericToken;

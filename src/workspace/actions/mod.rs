@@ -5,7 +5,7 @@ mod meta;
 use super::{
     cursor::{Cursor, CursorPosition, Select},
     line::EditorLine,
-    utils::{get_closing_char, is_closing_repeat},
+    utils::{get_closing_char, get_closing_char_from_context, is_closing_repeat},
 };
 use crate::{configs::IndentConfigs, syntax::Lexer, utils::Offset};
 use buffer::ActionBuffer;
@@ -340,22 +340,25 @@ impl Actions {
     }
 
     fn push_char_simple(&mut self, ch: char, cursor: &mut Cursor, content: &mut [EditorLine], lexer: &mut Lexer) {
-        if let Some(text) = content.get_mut(cursor.line) {
-            if is_closing_repeat(text, ch, cursor.char) {
-                cursor.add_to_char(1);
-            } else if let Some(closing) = get_closing_char(ch) {
-                let new_text = format!("{ch}{closing}");
-                text.insert_str(cursor.char, &new_text);
-                self.push_done(Edit::record_in_line_insertion(cursor.into(), new_text), lexer, content);
-                cursor.add_to_char(1);
-            } else {
-                let (maybe_edit, event) = self.buffer.push(ch, cursor, text, lexer);
-                lexer.sync_changes(vec![event]);
-                if let Some(edit) = maybe_edit {
-                    lexer.sync_tokens(edit.meta);
-                    self.done.push(edit.into());
-                }
-            }
+        let Some(text) = content.get_mut(cursor.line) else {
+            return;
+        };
+        if is_closing_repeat(text, ch, cursor.char) {
+            cursor.add_to_char(1);
+            return;
+        };
+        if let Some(closing) = get_closing_char_from_context(ch, text, cursor.char) {
+            let new_text = format!("{ch}{closing}");
+            text.insert_str(cursor.char, &new_text);
+            self.push_done(Edit::record_in_line_insertion(cursor.into(), new_text), lexer, content);
+            cursor.add_to_char(1);
+            return;
+        }
+        let (maybe_edit, event) = self.buffer.push(ch, cursor, text, lexer);
+        lexer.sync_changes(vec![event]);
+        if let Some(edit) = maybe_edit {
+            lexer.sync_tokens(edit.meta);
+            self.done.push(edit.into());
         }
     }
 
@@ -439,7 +442,7 @@ impl Actions {
     pub fn paste(&mut self, clip: String, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
         let edit = match cursor.select_take() {
             Some((from, to)) => Edit::replace_select(from, to, clip, content),
-            None => Edit::insert_clip(cursor.into(), clip, content),
+            None => Edit::insert_clip_with_indent(cursor.into(), clip, &self.cfg, content),
         };
         cursor.set_position(edit.end_position());
         self.push_done(edit, lexer, content);

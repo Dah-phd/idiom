@@ -6,18 +6,18 @@ use super::{
 };
 use crate::{
     embeded_term::EditorTerminal,
+    ext_tui::{text_field::TextField, StyleExt},
     global_state::GlobalState,
-    render::{
-        backend::{BackendProtocol, StyleExt},
-        count_as_string,
-        layout::{Line, Rect},
-        TextField,
-    },
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
+use idiom_tui::{
+    count_as_string,
+    layout::{Line, Rect},
+    Backend,
+};
 
 pub struct GoToLinePopup {
     current_line: usize,
@@ -100,7 +100,12 @@ impl Popup for GoToLinePopup {
         }
     }
 
-    fn map_mouse(&mut self, _: MouseEvent, _: &mut Components) -> Status {
+    fn map_mouse(&mut self, event: MouseEvent, _: &mut Components) -> Status {
+        if let MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column, row, .. } = event {
+            if !self.render_line.contains_position(row, column) {
+                return Status::Finished;
+            }
+        };
         Status::Pending
     }
 
@@ -228,7 +233,12 @@ impl Popup for FindPopup {
         true
     }
 
-    fn map_mouse(&mut self, _: MouseEvent, _: &mut Components) -> Status {
+    fn map_mouse(&mut self, event: MouseEvent, _: &mut Components) -> Status {
+        if let MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column, row, .. } = event {
+            if !self.render_line.contains_position(row, column) {
+                return Status::Finished;
+            }
+        };
         Status::Pending
     }
 }
@@ -238,7 +248,8 @@ fn go_to_select_command(
     components: &mut Components,
 ) {
     let (from, to) = popup.options[popup.state.selected].0;
-    if let Some(editor) = components.ws.get_active() {
-        editor.go_to_select(from, to);
-    }
+    let Some(editor) = components.ws.get_active() else {
+        return;
+    };
+    editor.go_to_select(from, to);
 }

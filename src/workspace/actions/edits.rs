@@ -1,14 +1,15 @@
 use super::super::{
     cursor::Cursor,
     line::EditorLine,
-    utils::{clip_content, insert_clip, is_scope, remove_content, token_range_at},
+    utils::{clip_content, insert_clip, insert_lines_indented, is_scope, remove_content, token_range_at},
     CursorPosition,
 };
 use super::EditMetaData;
+use idiom_tui::UTF8Safe;
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 use std::fmt::Debug;
 
-use crate::{configs::IndentConfigs, render::UTF8Safe, utils::Offset};
+use crate::{configs::IndentConfigs, utils::Offset};
 
 #[derive(Debug)]
 pub struct Edit {
@@ -103,6 +104,18 @@ impl Edit {
         let end = insert_clip(&clip, content, cursor);
         let to = (end.line - cursor.line) + 1;
         Self::without_select(cursor, 1, to, clip, String::new())
+    }
+
+    #[inline]
+    pub fn insert_clip_with_indent(
+        cursor: CursorPosition,
+        clip: String,
+        cfg: &IndentConfigs,
+        content: &mut Vec<EditorLine>,
+    ) -> Self {
+        let (new_clip, end) = insert_lines_indented(&clip, cfg, content, cursor);
+        let to = (end.line - cursor.line) + 1;
+        Self::without_select(cursor, 1, to, new_clip, String::new())
     }
 
     #[inline]

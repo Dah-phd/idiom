@@ -179,19 +179,12 @@ where
                     text_document: Some(lsp::TextDocumentClientCapabilities {
                         completion: Some(lsp::CompletionClientCapabilities {
                             completion_item: Some(lsp::CompletionItemCapability {
-                                resolve_support: Some(lsp::CompletionItemCapabilityResolveSupport {
-                                    properties: vec![
-                                        String::from("documentation"),
-                                        String::from("detail"),
-                                        String::from("additionalTextEdits"),
-                                    ],
-                                }),
                                 insert_replace_support: Some(true),
                                 snippet_support: Some(true),
                                 ..Default::default()
                             }),
                             completion_item_kind: Some(lsp::CompletionItemKindCapability { ..Default::default() }),
-                            context_support: None, // additional context information Some(true)
+                            context_support: Some(true),
                             ..Default::default()
                         }),
                         synchronization: Some(lsp::TextDocumentSyncClientCapabilities {

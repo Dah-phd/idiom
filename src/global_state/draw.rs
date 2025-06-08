@@ -1,14 +1,10 @@
 use super::{GlobalState, Mode};
-use crate::{
-    embeded_term::EditorTerminal,
-    render::{
-        backend::{BackendProtocol, StyleExt},
-        layout::{Line, HAVLED_BALANCED_BORDERS},
-    },
-    tree::Tree,
-    workspace::Workspace,
-};
+use crate::{embeded_term::EditorTerminal, ext_tui::StyleExt, tree::Tree, workspace::Workspace};
 use bitflags::bitflags;
+use idiom_tui::{
+    layout::{Line, HAVLED_BALANCED_BORDERS},
+    Backend,
+};
 
 bitflags! {
     /// Workspace and Footer are always drawn

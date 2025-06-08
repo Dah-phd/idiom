@@ -3,11 +3,7 @@ mod parser;
 
 use crate::{
     error::{IdiomError, IdiomResult},
-    global_state::GlobalState,
-    render::{
-        backend::{Backend, BackendProtocol},
-        layout::Rect,
-    },
+    ext_tui::{CrossTerm, StyleExt},
     workspace::CursorPosition,
 };
 use crossterm::{
@@ -15,14 +11,20 @@ use crossterm::{
     style::ContentStyle,
 };
 use cursor::{CursorState, Position, Select};
+use idiom_tui::{layout::Rect, Backend};
 use parser::{get_ctrl_char, parse_cell_style, TrackedParser};
 use portable_pty::{native_pty_system, Child, CommandBuilder, PtyPair, PtySize};
 use std::io::{Read, Write};
 use tokio::task::JoinHandle;
 
-use super::backend::StyleExt;
+pub const OVERLAY_INFO: &str = "Term Overlay: MouseLeft drag select / MouseRight copy select";
 
-const CONTROLS_HELP: &str = "Term Overlay: MouseLeft drag select / MouseRight copy select";
+pub enum Message {
+    Mapped,
+    Skipped(MouseEventKind),
+    Unmapped,
+    Copied(String),
+}
 
 /// Run another tui app within the context of idiom
 pub struct PtyShell {
@@ -47,7 +49,7 @@ impl PtyShell {
 
     pub fn new(mut cmd: CommandBuilder, rect: Rect) -> IdiomResult<Self> {
         let system = native_pty_system();
-        let size = PtySize::from(rect);
+        let size = rect_to_ptysize(rect);
         let pair = system.openpty(size).map_err(IdiomError::any)?;
 
         cmd.cwd("./");
@@ -81,19 +83,19 @@ impl PtyShell {
         })
     }
 
-    pub fn map_key(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> std::io::Result<()> {
+    pub fn map_key(&mut self, key: &KeyEvent, backend: &mut CrossTerm) -> std::io::Result<()> {
         self.select.clear();
 
         if key.modifiers == KeyModifiers::CONTROL | KeyModifiers::SHIFT {
             match key.code {
                 KeyCode::Down => {
                     self.parser.scroll_down();
-                    self.inner_render(gs.backend());
+                    self.inner_render(backend);
                     return Ok(());
                 }
                 KeyCode::Up => {
                     self.parser.scroll_up();
-                    self.inner_render(gs.backend());
+                    self.inner_render(backend);
                     return Ok(());
                 }
                 _ => {}
@@ -123,61 +125,63 @@ impl PtyShell {
         }
     }
 
-    pub fn map_mouse(&mut self, event: MouseEvent, gs: &mut GlobalState) {
+    pub fn map_mouse(&mut self, event: MouseEvent, backend: &mut CrossTerm) -> Message {
         match event {
             MouseEvent { kind: MouseEventKind::Down(MouseButton::Left), column, row, .. } => {
-                let Some((row, col)) = self.rect.raw_relative_position(row, column) else {
+                let Some(pos) = self.rect.relative_position(row, column) else {
                     self.select.clear();
-                    return;
+                    return Message::Skipped(event.kind);
                 };
-                self.select.mouse_down(row, col);
+                self.select.mouse_down(pos.row, pos.col);
             }
             MouseEvent { kind: MouseEventKind::Drag(MouseButton::Left), column, row, .. } => {
-                let Some((row, col)) = self.rect.raw_relative_position(row, column) else {
+                let Some(pos) = self.rect.relative_position(row, column) else {
                     self.select.clear();
-                    return;
+                    return Message::Skipped(event.kind);
                 };
-                self.select.mouse_drag(row, col);
+                self.select.mouse_drag(pos.row, pos.col);
             }
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } => {
-                let Some((row, col)) = self.rect.raw_relative_position(row, column) else {
+                let Some(pos) = self.rect.relative_position(row, column) else {
                     self.select.clear();
-                    return;
+                    return Message::Skipped(event.kind);
                 };
-                self.select.mouse_up(row, col);
+                self.select.mouse_up(pos.row, pos.col);
             }
             MouseEvent { kind: MouseEventKind::Down(MouseButton::Right), column, row, .. } => {
-                let Some((row, col)) = self.rect.raw_relative_position(row, column) else {
-                    return;
+                let Some(pos) = self.rect.relative_position(row, column) else {
+                    return Message::Skipped(event.kind);
                 };
-                let position = Position { row, col };
-                let Some((start, end)) = self.select.get() else { return };
+                let position = Position { row: pos.row, col: pos.col };
+                let Some((start, end)) = self.select.get() else {
+                    return Message::Mapped;
+                };
                 if position < start || position > end {
-                    return;
+                    return Message::Mapped;
                 };
                 if let Some(clip) = self.select.copy_clip(self.parser.screen()) {
-                    gs.success("Select from embeded copied!");
-                    gs.clipboard.push(clip);
+                    return Message::Copied(clip);
                 };
             }
             MouseEvent { kind: MouseEventKind::ScrollUp, column, row, .. } => {
-                if self.rect.raw_relative_position(row, column).is_none() {
-                    return;
+                if self.rect.relative_position(row, column).is_none() {
+                    return Message::Skipped(event.kind);
                 };
                 self.select.clear();
                 self.parser.scroll_up();
-                self.inner_render(gs.backend());
+                self.inner_render(backend);
             }
             MouseEvent { kind: MouseEventKind::ScrollDown, column, row, .. } => {
-                if self.rect.raw_relative_position(row, column).is_none() {
-                    return;
+                if self.rect.relative_position(row, column).is_none() {
+                    return Message::Skipped(event.kind);
                 };
                 self.select.clear();
                 self.parser.scroll_down();
-                self.inner_render(gs.backend());
+                self.inner_render(backend);
             }
-            _ => (),
+            _ => return Message::Unmapped,
         }
+        Message::Mapped
     }
 
     pub fn paste(&mut self, clip: String) -> std::io::Result<()> {
@@ -185,7 +189,7 @@ impl PtyShell {
         self.writer.write_all(clip.as_bytes())
     }
 
-    pub fn fast_render(&mut self, backend: &mut Backend) {
+    pub fn fast_render(&mut self, backend: &mut CrossTerm) {
         if self.select.collect_update() {
             return self.render(backend);
         }
@@ -196,19 +200,19 @@ impl PtyShell {
         self.inner_render(backend);
     }
 
-    pub fn render(&mut self, backend: &mut Backend) {
+    pub fn render(&mut self, backend: &mut CrossTerm) {
         _ = self.parser.try_parse();
         self.inner_render(backend);
     }
 
-    fn inner_render(&mut self, backend: &mut Backend) {
+    fn inner_render(&mut self, backend: &mut CrossTerm) {
         match self.select.get() {
             Some(select) => self.render_with_select(select, backend),
             None => self.render_no_select(backend),
         };
     }
 
-    fn render_no_select(&mut self, backend: &mut Backend) {
+    fn render_no_select(&mut self, backend: &mut CrossTerm) {
         let screen = self.parser.screen();
         let reset_style = backend.get_style();
         backend.reset_style();
@@ -219,6 +223,7 @@ impl PtyShell {
                 if let Some(text) = text.next() {
                     backend.go_to(line.row, line.col);
                     _ = backend.write_all(&text);
+                    backend.reset_style();
                 };
             }
         }
@@ -226,7 +231,7 @@ impl PtyShell {
         self.cursor.apply(screen, backend);
     }
 
-    fn render_with_select(&mut self, (from, to): (Position, Position), backend: &mut Backend) {
+    fn render_with_select(&mut self, (from, to): (Position, Position), backend: &mut CrossTerm) {
         let screen = self.parser.screen();
         let reset_style = backend.get_style();
         backend.reset_style();
@@ -242,6 +247,7 @@ impl PtyShell {
                     if index < start.line || index > end.line {
                         backend.go_to(line.row, line.col);
                         _ = backend.write_all(&text);
+                        backend.reset_style();
                         continue;
                     }
                     if let Some(raw_text) = select_lines.next() {
@@ -267,6 +273,8 @@ impl PtyShell {
                                 backend.print_styled(cell.contents(), style);
                             }
                         }
+
+                        backend.reset_style();
                     }
                 };
             }
@@ -288,14 +296,9 @@ impl PtyShell {
         self.rect = rect;
         self.cursor.resize(rect);
 
-        let size = PtySize::from(rect);
+        let size = rect_to_ptysize(rect);
         self.parser.resize(size.rows, size.cols);
         self.pair.master.resize(size).map_err(|e| e.to_string())
-    }
-
-    pub fn controls_help(gs: &mut GlobalState) {
-        gs.message(CONTROLS_HELP);
-        gs.message(CONTROLS_HELP);
     }
 }
 
@@ -303,14 +306,12 @@ impl Drop for PtyShell {
     fn drop(&mut self) {
         self.process_handle.abort();
         _ = self.child.kill();
-        Backend::hide_cursor();
+        CrossTerm::detached_hide_cursor();
     }
 }
 
-impl From<Rect> for PtySize {
-    fn from(rect: Rect) -> Self {
-        let rows = rect.height;
-        let cols = rect.width as u16;
-        PtySize { rows, cols, ..Default::default() }
-    }
+fn rect_to_ptysize(rect: Rect) -> PtySize {
+    let rows = rect.height;
+    let cols = rect.width as u16;
+    PtySize { rows, cols, ..Default::default() }
 }

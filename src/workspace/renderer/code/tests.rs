@@ -2,7 +2,6 @@ use super::{
     super::tests::{expect_cursor, expect_select, parse_complex_line, parse_simple_line},
     cursor as rend_cursor, inner_render,
 };
-use crate::render::layout::{Line, Rect};
 use crate::syntax::tests::{
     create_token_pairs_utf16, create_token_pairs_utf32, create_token_pairs_utf8, longline_token_pair_utf16,
     longline_token_pair_utf32, longline_token_pair_utf8, mock_utf16_lexer, mock_utf32_lexer, mock_utf8_lexer,
@@ -10,20 +9,24 @@ use crate::syntax::tests::{
 };
 use crate::workspace::cursor::Cursor;
 use crate::workspace::line::LineContext;
+use crate::workspace::renderer::tests::count_to_cursor;
 use crate::workspace::CursorPosition;
 use crate::{configs::FileType, workspace::line::EditorLine};
-use crate::{global_state::GlobalState, render::backend::StyleExt};
 use crate::{
-    render::backend::{Backend, BackendProtocol},
-    workspace::renderer::tests::count_to_cursor,
+    ext_tui::{CrossTerm, StyleExt},
+    global_state::GlobalState,
 };
 use crossterm::style::{Color, ContentStyle};
+use idiom_tui::{
+    layout::{Line, Rect},
+    Backend,
+};
 
 /// BASIC CURSOR TEST
 
 #[test]
 fn test_cursor() {
-    let mut gs = GlobalState::new(Rect::default(), Backend::init());
+    let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.set_position((0, 12).into());
@@ -43,7 +46,7 @@ fn test_cursor() {
 
 #[test]
 fn test_cursor_complex() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.set_position((0, 12).into());
@@ -63,7 +66,7 @@ fn test_cursor_complex() {
 
 #[test]
 fn test_cursor_select() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set((0, 4).into(), (0, 15).into());
@@ -86,7 +89,7 @@ fn test_cursor_select() {
 
 #[test]
 fn test_cursor_select_complex() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set((0, 4).into(), (0, 15).into());
@@ -109,7 +112,7 @@ fn test_cursor_select_complex() {
 
 #[test]
 fn wrap_cursor() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set((0, 20).into(), (0, 35).into());
@@ -132,7 +135,7 @@ fn wrap_cursor() {
 
 #[test]
 fn wrap_cursor_complex() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set((0, 20).into(), (0, 35).into());
@@ -157,7 +160,7 @@ fn wrap_cursor_complex() {
 
 #[test]
 fn test_line_render_utf8() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
 
     let cursor = Cursor::default();
@@ -178,7 +181,7 @@ fn test_line_render_utf8() {
 
 #[test]
 fn test_line_render_utf16() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf16_lexer(&mut gs, FileType::Rust);
 
     let cursor = Cursor::default();
@@ -199,7 +202,7 @@ fn test_line_render_utf16() {
 
 #[test]
 fn test_line_render_utf32() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf32_lexer(&mut gs, FileType::Rust);
 
     let cursor = Cursor::default();
@@ -222,7 +225,7 @@ fn test_line_render_utf32() {
 fn test_line_render_shrunk_utf8() {
     let limit = 42;
 
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
 
     let cursor = Cursor::default();
@@ -245,7 +248,7 @@ fn test_line_render_shrunk_utf8() {
 fn test_line_render_shrunk_utf16() {
     let limit = 42;
 
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf16_lexer(&mut gs, FileType::Rust);
 
     let cursor = Cursor::default();
@@ -268,7 +271,7 @@ fn test_line_render_shrunk_utf16() {
 fn test_line_render_shrunk_utf32() {
     let limit = 42;
 
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf32_lexer(&mut gs, FileType::Rust);
 
     let cursor = Cursor::default();
@@ -289,7 +292,7 @@ fn test_line_render_shrunk_utf32() {
 
 #[test]
 fn test_line_render_select_utf8() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
 
     let mut cursor = Cursor::default();
@@ -311,7 +314,7 @@ fn test_line_render_select_utf8() {
 
 #[test]
 fn test_line_render_select_utf16() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf16_lexer(&mut gs, FileType::Rust);
 
     let mut cursor = Cursor::default();
@@ -333,7 +336,7 @@ fn test_line_render_select_utf16() {
 
 #[test]
 fn test_line_render_select_utf32() {
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf32_lexer(&mut gs, FileType::Rust);
 
     let mut cursor = Cursor::default();
@@ -358,7 +361,7 @@ fn test_line_wrapping_utf8() {
     let rect = Rect::new(0, 0, 50, 5);
     let mut lines = rect.into_iter();
 
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
 
     let mut cursor = Cursor::default();
@@ -383,7 +386,7 @@ fn test_line_wrapping_utf16() {
     let rect = Rect::new(0, 0, 50, 5);
     let mut lines = rect.into_iter();
 
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf16_lexer(&mut gs, FileType::Rust);
 
     let mut cursor = Cursor::default();
@@ -408,7 +411,7 @@ fn test_line_wrapping_utf32() {
     let rect = Rect::new(0, 0, 50, 5);
     let mut lines = rect.into_iter();
 
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), Backend::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let mut lexer = mock_utf32_lexer(&mut gs, FileType::Rust);
 
     let mut cursor = Cursor::default();

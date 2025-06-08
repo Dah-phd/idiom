@@ -1,5 +1,4 @@
-// pub mod color;
-use super::{style::StyleExt, ERR_MSG};
+use super::StyleExt;
 use crossterm::style::Color;
 use crossterm::{
     cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show},
@@ -7,26 +6,50 @@ use crossterm::{
     style::{ContentStyle, Print, ResetColor, SetStyle},
     terminal::{size, BeginSynchronizedUpdate, Clear, ClearType, EndSynchronizedUpdate},
 };
-#[allow(unused_imports)]
+use std::fmt::Debug;
 use std::{
     fmt::Display,
-    io::{StderrLock, Stdout, Write},
+    io::{Stdout, Write},
 };
 
-use crate::render::layout::Rect;
-
-use super::BackendProtocol;
+use idiom_tui::{
+    backend::{Backend, ERR_MSG},
+    layout::Rect,
+};
 
 /// Thin wrapper around rendering framework, allowing easy switching of backend
 /// If stdout gets an error Backend will crash the program as rendering is to priority
 /// Add cfg and new implementation of the wrapper to make the backend swichable
 /// Main reason is to clear out the issue with PrintStyled on CrossTerm
-pub struct Backend {
+#[derive(Debug)]
+pub struct CrossTerm {
     writer: Stdout, // could be moved to locked state for performance but current frame generation is about 200 µs
     default_styled: Option<ContentStyle>,
 }
 
-impl Write for Backend {
+impl Default for CrossTerm {
+    fn default() -> Self {
+        Self::init()
+    }
+}
+
+impl PartialEq for CrossTerm {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl CrossTerm {
+    pub fn detached_hide_cursor() {
+        queue!(std::io::stdout(), Show).expect(ERR_MSG);
+    }
+
+    pub fn detached_show_cursor() {
+        queue!(std::io::stdout(), Hide).expect(ERR_MSG);
+    }
+}
+
+impl Write for CrossTerm {
     #[inline(always)]
     fn by_ref(&mut self) -> &mut Self
     where
@@ -56,7 +79,10 @@ impl Write for Backend {
     }
 }
 
-impl BackendProtocol for Backend {
+impl Backend for CrossTerm {
+    type Style = ContentStyle;
+    type Color = Color;
+
     #[inline]
     fn init() -> Self {
         init_terminal().expect(ERR_MSG);
@@ -198,14 +224,14 @@ impl BackendProtocol for Backend {
 
     /// direct showing cursor - no buffer queing
     #[inline]
-    fn show_cursor() {
-        queue!(std::io::stdout(), Show).expect(ERR_MSG);
+    fn show_cursor(&mut self) {
+        queue!(self, Show).expect(ERR_MSG);
     }
 
     /// direct hiding cursor - no buffer queing
     #[inline]
-    fn hide_cursor() {
-        queue!(std::io::stdout(), Hide).expect(ERR_MSG);
+    fn hide_cursor(&mut self) {
+        queue!(self, Hide).expect(ERR_MSG);
     }
 
     #[inline]
@@ -244,11 +270,65 @@ impl BackendProtocol for Backend {
     fn pad(&mut self, width: usize) {
         queue!(self, Print(format!("{:width$}", ""))).expect(ERR_MSG);
     }
+
+    #[inline]
+    fn pad_styled(&mut self, width: usize, style: ContentStyle) {
+        let text = format!("{:width$}", "");
+        match self.default_styled {
+            Some(restore_style) => queue!(self, SetStyle(style), Print(text), ResetColor, SetStyle(restore_style)),
+            None => queue!(self, SetStyle(style), Print(text), ResetColor),
+        }
+        .expect(ERR_MSG);
+    }
+
+    #[inline]
+    fn merge_style(mut left: ContentStyle, right: ContentStyle) -> ContentStyle {
+        left.update(right);
+        left
+    }
+
+    #[inline]
+    fn reversed_style() -> Self::Style {
+        Self::Style::reversed()
+    }
+
+    #[inline]
+    fn bold_style() -> Self::Style {
+        Self::Style::bold()
+    }
+
+    #[inline]
+    fn slow_blink_style() -> Self::Style {
+        Self::Style::slowblink()
+    }
+
+    #[inline]
+    fn ital_style() -> Self::Style {
+        Self::Style::ital()
+    }
+
+    #[inline]
+    fn undercurle_style(color: Option<Self::Color>) -> Self::Style {
+        Self::Style::undercurled(color)
+    }
+
+    #[inline]
+    fn underline_style(color: Option<Self::Color>) -> Self::Style {
+        Self::Style::underlined(color)
+    }
+
+    fn fg_style(color: Self::Color) -> Self::Style {
+        Self::Style::fg(color)
+    }
+
+    fn bg_style(color: Self::Color) -> Self::Style {
+        Self::Style::bg(color)
+    }
 }
 
-impl Drop for Backend {
+impl Drop for CrossTerm {
     fn drop(&mut self) {
-        let _ = Backend::exit();
+        let _ = CrossTerm::exit();
     }
 }
 

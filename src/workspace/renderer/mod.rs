@@ -2,14 +2,10 @@ mod code;
 mod markdown;
 mod text;
 
-use crossterm::style::ContentStyle;
-
 use super::{line::LineContext, Editor};
-use crate::{
-    global_state::GlobalState,
-    render::{backend::StyleExt, layout::IterLines},
-    syntax::Lexer,
-};
+use crate::{ext_tui::StyleExt, global_state::GlobalState, syntax::Lexer};
+use crossterm::style::ContentStyle;
+use idiom_tui::layout::IterLines;
 
 /// Component containing logic regarding rendering
 /// In order to escape complicated state machines and any form on polymorphism,

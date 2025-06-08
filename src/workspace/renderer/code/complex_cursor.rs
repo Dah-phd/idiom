@@ -1,11 +1,9 @@
 use crate::{
-    render::{
-        backend::{Backend, BackendProtocol, StyleExt},
-        utils::CharLimitedWidths,
-    },
+    ext_tui::{CrossTerm, StyleExt},
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::{ContentStyle, Stylize};
+use idiom_tui::{utils::CharLimitedWidths, Backend};
 use std::ops::Range;
 
 use super::{width_remainder, WRAP_CLOSE, WRAP_OPEN};
@@ -15,7 +13,7 @@ pub fn render(
     ctx: &mut LineContext,
     line_width: usize,
     select: Option<Range<usize>>,
-    backend: &mut Backend,
+    backend: &mut CrossTerm,
 ) {
     if let Some(remainder) = width_remainder(line, line_width) {
         match select {
@@ -33,7 +31,7 @@ pub fn render(
     }
 }
 
-pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut Backend) {
+pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut CrossTerm) {
     let mut tokens = line.iter_tokens();
     let mut counter = 0;
     let mut last_len = 0;
@@ -93,7 +91,7 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut Backend) {
     backend.reset_style();
 }
 
-pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backend: &mut Backend) {
+pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backend: &mut CrossTerm) {
     let char_position = ctx.lexer.char_lsp_pos;
     let select_color = ctx.lexer.theme.selected;
     let mut reset_style = ContentStyle::default();
@@ -166,7 +164,7 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backen
     backend.reset_style();
 }
 
-pub fn partial(code: &mut EditorLine, ctx: &mut LineContext, mut line_width: usize, backend: &mut Backend) {
+pub fn partial(code: &mut EditorLine, ctx: &mut LineContext, mut line_width: usize, backend: &mut CrossTerm) {
     let cursor_idx = ctx.cursor_char();
     let char_position = ctx.lexer.char_lsp_pos;
     let mut idx = code.cached.generate_skipped_chars_complex(&code.content, code.char_len(), cursor_idx, line_width);
@@ -259,7 +257,7 @@ pub fn partial_select(
     ctx: &mut LineContext,
     select: Range<usize>,
     mut line_width: usize,
-    backend: &mut Backend,
+    backend: &mut CrossTerm,
 ) {
     let cursor_idx = ctx.cursor_char();
     let char_position = ctx.lexer.char_lsp_pos;

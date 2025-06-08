@@ -1,12 +1,12 @@
 use super::{GlobalState, IdiomEvent};
+use crate::ext_tui::{CrossTerm, StyleExt};
 use crate::popups::menu::{menu_context_editor_inplace, menu_context_tree_inplace};
 use crate::popups::pallet::Pallet;
 use crate::popups::Popup;
-use crate::render::backend::{Backend, StyleExt};
-use crate::render::layout::Line;
 use crate::{embeded_term::EditorTerminal, tree::Tree, workspace::Workspace};
 use crossterm::event::{KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::{Color, ContentStyle, Stylize};
+use idiom_tui::layout::Line;
 
 const INSERT_SPAN: &str = "  --INSERT--  ";
 const SELECT_SPAN: &str = "  --SELECT--  ";
@@ -21,7 +21,7 @@ pub enum Mode {
 
 impl Mode {
     #[inline]
-    pub fn render(&self, line: Line, backend: &mut Backend) {
+    pub fn render(&self, line: Line, backend: &mut CrossTerm) {
         match self {
             Self::Insert => Self::render_insert_mode(line, backend),
             Self::Select => Self::render_select_mode(line, backend),
@@ -29,7 +29,7 @@ impl Mode {
     }
 
     #[inline]
-    pub fn render_select_mode(line: Line, backend: &mut Backend) {
+    pub fn render_select_mode(line: Line, backend: &mut CrossTerm) {
         let mut style = ContentStyle::reversed();
         style.add_bold();
         style.set_fg(Some(Self::select_color()));
@@ -37,7 +37,7 @@ impl Mode {
     }
 
     #[inline]
-    pub fn render_insert_mode(line: Line, backend: &mut Backend) {
+    pub fn render_insert_mode(line: Line, backend: &mut CrossTerm) {
         let mut style = ContentStyle::reversed();
         style.add_bold();
         style.set_fg(Some(Self::insert_color()));
@@ -97,7 +97,7 @@ pub fn mouse_handler(
         MouseEventKind::Down(MouseButton::Left) => {
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = ws.get_active() {
-                    editor.mouse_cursor(position);
+                    editor.mouse_cursor(position.into());
                     gs.insert_mode();
                     match tree.select_by_path(&editor.path) {
                         Ok(..) => ws.toggle_editor(),
@@ -107,7 +107,8 @@ pub fn mouse_handler(
                 return;
             }
             if let Some(position) = gs.tree_area.relative_position(event.row, event.column) {
-                if let Some(path) = tree.mouse_select(position.line + 1, gs) {
+                let pos_line = position.row as usize + 1;
+                if let Some(path) = tree.mouse_select(pos_line, gs) {
                     gs.event.push(IdiomEvent::OpenAtLine(path, 0));
                     return;
                 };
@@ -117,7 +118,8 @@ pub fn mouse_handler(
             if let Some(pos) = gs.tab_area.relative_position(event.row, event.column) {
                 if !ws.is_empty() {
                     gs.insert_mode();
-                    if let Some(idx) = ws.select_tab_mouse(pos.char) {
+                    let pos_char = pos.col as usize;
+                    if let Some(idx) = ws.select_tab_mouse(pos_char) {
                         ws.activate_editor(idx, gs);
                     };
                 }
@@ -131,7 +133,8 @@ pub fn mouse_handler(
             if let Some(position) = gs.tab_area.relative_position(event.row, event.column) {
                 if !ws.is_empty() {
                     gs.insert_mode();
-                    if let Some(idx) = ws.select_tab_mouse(position.char) {
+                    let pos_char = position.col as usize;
+                    if let Some(idx) = ws.select_tab_mouse(pos_char) {
                         ws.activate_editor(idx, gs);
                         ws.close_active(gs);
                     }
@@ -139,6 +142,7 @@ pub fn mouse_handler(
             }
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = ws.get_active() {
+                    let position = crate::workspace::CursorPosition::from(position);
                     editor.mouse_menu_setup(position);
                     let accent_style = gs.theme.accent_style;
                     let mut context_menu = menu_context_editor_inplace(position, gs.editor_area, accent_style);
@@ -147,7 +151,8 @@ pub fn mouse_handler(
                     };
                 }
             }
-            if let Some(mut position) = gs.tree_area.relative_position(event.row, event.column) {
+            if let Some(position) = gs.tree_area.relative_position(event.row, event.column) {
+                let mut position = crate::workspace::CursorPosition::from(position);
                 position.line += 1;
                 if tree.mouse_menu_setup_select(position.line) {
                     let accent_style = gs.theme.accent_style.reverse();
@@ -161,7 +166,7 @@ pub fn mouse_handler(
         MouseEventKind::Drag(MouseButton::Left) => {
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = ws.get_active() {
-                    editor.mouse_select(position);
+                    editor.mouse_select(position.into());
                     gs.insert_mode();
                     ws.toggle_editor();
                 }

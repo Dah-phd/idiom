@@ -1,6 +1,18 @@
 use super::EditorLine;
 
 #[test]
+fn test_get() {
+    let line = EditorLine::from("bytb 🚀 asd 🚀");
+    assert_eq!(line.get(1, 2), Some("y"));
+    assert_eq!(line.get(2, 3), Some("t"));
+    assert_eq!(line.get(5, 6), Some("🚀"));
+    assert_eq!(line.get(10, 11), Some(" "));
+    assert_eq!(line.get(11, 12), Some("🚀"));
+    assert_eq!(line.get(11, 11), Some(""));
+    assert_eq!(line.get(100, 200), None);
+}
+
+#[test]
 fn trim_counted() {
     let line = EditorLine::from("   // coment");
     assert_eq!(line.trim_start_counted(), (3, "// coment"));
