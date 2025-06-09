@@ -45,6 +45,7 @@ pub fn insert_lines_indented(
     if !start_indent.trim_start_matches(&cfg.indent).is_empty() {
         return (clip.to_owned(), insert_clip(clip, content, cursor));
     };
+
     let mut lines = clip.split('\n');
     let first_line = lines.next().expect("first line should exist!");
 
@@ -55,7 +56,7 @@ pub fn insert_lines_indented(
     };
 
     // infering indent if not derived from first line
-    let (mut new_clip, indent) = if start_indent.is_empty() {
+    let (mut new_clip, mut indent) = if start_indent.is_empty() {
         let indent = cfg.derive_indent_from_lines(&content[..cursor.line]);
         (format!("{indent}{}", first_line.trim_start()), indent)
     } else {
@@ -68,14 +69,17 @@ pub fn insert_lines_indented(
 
     for clip_line in lines.map(|l| l.trim_start()) {
         cursor.line += 1;
-        if clip_line.chars().all(|c| c == ' ') {
+        if clip_line.chars().all(|c| c.is_whitespace()) {
             new_clip = push_on_newline(new_clip, "");
             content.insert(cursor.line, EditorLine::empty());
             continue;
         }
         let prefixed = format!("{indent}{clip_line}");
-        new_clip = push_on_newline(new_clip, &prefixed);
-        content.insert(cursor.line, prefixed.into());
+        let mut new_editor_line = EditorLine::from(prefixed);
+        cfg.unindent_if_before_base_pattern(&mut new_editor_line);
+        new_clip = push_on_newline(new_clip, &new_editor_line.content);
+        indent = cfg.derive_indent_from(&new_editor_line);
+        content.insert(cursor.line, new_editor_line);
     }
 
     cursor.line += 1;
