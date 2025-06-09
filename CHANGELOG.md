@@ -1,4 +1,7 @@
 ## Includes only major changes (manual updates)
+# Version 0.5.2
+- fix paste of multiline clip
+
 # Version 0.5.1
 - split off tui componenets into idiom_tui crate
 - fixed EditType::Multi apply and apply_rev
