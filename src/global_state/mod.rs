@@ -238,6 +238,7 @@ impl GlobalState {
         self.draw_callback = draw::full_rebuild;
         if self.components.contains(Components::TERM) {
             self.components.remove(Components::TERM);
+            self.backend.hide_cursor();
         } else {
             self.components.insert(Components::TERM);
             term.activate(self.editor_area);

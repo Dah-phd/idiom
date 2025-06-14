@@ -23,14 +23,12 @@ Python should work for the most part with jedi, but the interaction is not well 
 ![](/non_dev/screen1.png)
 
 ## Tested platform
-- Linux Fedora derivate (Nobara / Mint)
+- Linux Fedora derivate (Nobara)
 - Linux Mint
 
 ## TODO
+- check on sort text in autocomplete (probably not that useful as request is sent once)
 - change to select mode on file open with mouse
-- check copy on replace/find popup
-- check replace all on replace popup
-- after replace if no replace points are left close popup
 - maybe more autocomplete (even on long words)
 
 - move rendering backend to internal create
