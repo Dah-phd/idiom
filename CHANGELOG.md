@@ -1,4 +1,7 @@
 ## Includes only major changes (manual updates)
+# Version 0.5.4
+- dep version bump
+
 # Version 0.5.3
 - fixed cursor showing after embeds
 
