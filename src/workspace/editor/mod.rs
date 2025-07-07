@@ -318,6 +318,7 @@ impl Editor {
     }
 
     pub fn is_saved(&self) -> IdiomResult<bool> {
+        // for most source code files direct read should be faster
         let file_content = std::fs::read_to_string(&self.path)?;
 
         let mut counter = 0_usize;
