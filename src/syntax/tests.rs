@@ -1,16 +1,18 @@
 pub use super::{
+    diagnostics::DiagnosticLine,
     lsp_calls::{char_lsp_pos, char_lsp_utf16, char_lsp_utf8, encode_pos_utf16, encode_pos_utf32, encode_pos_utf8},
     tokens::{set_tokens, TokenLine},
     Legend, Lexer, Token,
 };
 use crate::{
     configs::FileType,
-    ext_tui::StyleExt,
+    ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
     lsp::LSPResult,
     workspace::{actions::EditType, line::EditorLine},
 };
-use crossterm::style::ContentStyle;
+use crossterm::style::{Color, ContentStyle};
+use idiom_tui::Backend;
 use lsp_types::SemanticToken;
 use std::path::PathBuf;
 
@@ -483,6 +485,27 @@ fn create_tokens() -> TokenLine {
     token_line
 }
 
+fn create_dline() -> DiagnosticLine {
+    use lsp_types::{Diagnostic, DiagnosticSeverity};
+    let mut dline = DiagnosticLine::from(Diagnostic {
+        message: String::from("big err"),
+        severity: Some(DiagnosticSeverity::ERROR),
+        ..Default::default()
+    });
+    dline.append(Diagnostic {
+        message: String::from("warn"),
+        severity: Some(DiagnosticSeverity::WARNING),
+        ..Default::default()
+    });
+    dline.append(Diagnostic {
+        message: String::from("first err"),
+        severity: Some(DiagnosticSeverity::ERROR),
+        ..Default::default()
+    });
+    dline.append(Diagnostic { message: String::from("hint"), ..Default::default() });
+    dline
+}
+
 #[test]
 fn token_inc() {
     let mut token_line = create_tokens();
@@ -590,4 +613,34 @@ fn token_replace_till() {
     expected.push(Token { len: 4, delta_start: 1, style: ContentStyle::default() });
     token_line.remove_tokens_till(4);
     assert_eq!(token_line, expected);
+}
+
+#[test]
+fn diagnostic_inline() {
+    let mut backend = CrossTerm::init();
+    let dline = create_dline();
+    dline.inline_render(200, &mut backend);
+    assert_eq!(
+        backend.drain(),
+        [(ContentStyle::ital().with_fg(crossterm::style::Color::Red), String::from("    first err"))]
+    );
+}
+
+#[test]
+fn dianostic_info() {
+    use crate::syntax::{FileType, Lang};
+
+    let lang = Lang::from(FileType::Rust);
+    let dline = create_dline();
+    let info = dline.collect_info(&lang);
+    assert!(info.actions.is_none());
+    assert_eq!(
+        info.messages,
+        [
+            ("first err".to_owned(), Color::Red),
+            ("big err".to_owned(), Color::Red),
+            ("warn".to_owned(), Color::Yellow),
+            ("hint".to_owned(), Color::DarkGrey)
+        ]
+    );
 }
