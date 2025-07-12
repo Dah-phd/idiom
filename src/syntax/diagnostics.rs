@@ -1,14 +1,35 @@
-use crate::ext_tui::{CrossTerm, StyleExt};
+use crate::ext_tui::CrossTerm;
 use crate::global_state::IdiomEvent;
 use crate::syntax::Lang;
 use crate::workspace::line::EditorLine;
-use crossterm::style::{Color, ContentStyle};
+use crossterm::style::{Attribute, Attributes, Color, ContentStyle};
 use idiom_tui::{Backend, UTF8Safe};
-use lsp_types::{Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity};
+use lsp_types::{DiagnosticRelatedInformation, DiagnosticSeverity};
 
 const ELS_COLOR: Color = Color::DarkGrey;
 const ERR_COLOR: Color = Color::Red;
 const WAR_COLOR: Color = Color::Yellow;
+
+const ELS_STL: ContentStyle = ContentStyle {
+    foreground_color: Some(ELS_COLOR),
+    background_color: None,
+    attributes: Attributes::none().with(Attribute::Italic),
+    underline_color: None,
+};
+
+const ERR_STL: ContentStyle = ContentStyle {
+    foreground_color: Some(ERR_COLOR),
+    background_color: None,
+    attributes: Attributes::none().with(Attribute::Italic),
+    underline_color: None,
+};
+
+const WAR_STL: ContentStyle = ContentStyle {
+    foreground_color: Some(WAR_COLOR),
+    background_color: None,
+    attributes: Attributes::none().with(Attribute::Italic),
+    underline_color: None,
+};
 
 #[derive(Default)]
 pub struct DiagnosticInfo {
@@ -43,43 +64,46 @@ impl std::fmt::Display for Action {
 pub struct DiagnosticData {
     pub start: usize,
     pub end: Option<usize>,
-    pub color: Color,
     pub inline_text: String,
     pub message: String,
+    pub style: ContentStyle,
+    pub severity: DiagnosticSeverity,
     pub info: Option<Vec<DiagnosticRelatedInformation>>,
 }
 
 impl DiagnosticData {
+    #[inline]
+    pub fn text_style(&self) -> ContentStyle {
+        self.style
+    }
+
+    #[inline]
+    pub fn text_color(&self) -> Color {
+        self.style.foreground_color.unwrap_or(ELS_COLOR)
+    }
+
     fn new(
         range: lsp_types::Range,
         message: String,
-        color: Color,
         info: Option<Vec<DiagnosticRelatedInformation>>,
+        severity: DiagnosticSeverity,
+        style: ContentStyle,
     ) -> Self {
         let inline_text = message.lines().next().map(|s| format!("    {s}")).unwrap_or_default();
         Self {
             start: range.start.character as usize,
             end: if range.start.line == range.end.line { Some(range.end.character as usize) } else { None },
-            color,
+            severity,
+            style,
             inline_text,
             message,
             info,
         }
     }
-
-    #[inline]
-    pub fn truncated_inline(&self, len: usize) -> &str {
-        unsafe { self.inline_text.as_str().get_unchecked(..std::cmp::min(self.inline_text.len(), len)) }
-    }
-
-    #[inline]
-    pub fn text_style(&self) -> ContentStyle {
-        ContentStyle::fg(self.color)
-    }
 }
 
 pub struct DiagnosticLine {
-    pub data: Vec<DiagnosticData>,
+    data: Vec<DiagnosticData>,
 }
 
 impl DiagnosticLine {
@@ -87,7 +111,7 @@ impl DiagnosticLine {
         let mut info = DiagnosticInfo::default();
         let mut buffer = Vec::new();
         for diagnostic in self.data.iter() {
-            info.messages.push((diagnostic.message.clone(), diagnostic.color));
+            info.messages.push((diagnostic.message.clone(), diagnostic.text_color()));
             if let Some(actions) = lang.derive_diagnostic_actions(diagnostic.info.as_ref()) {
                 for action in actions {
                     buffer.push(action.clone());
@@ -98,6 +122,10 @@ impl DiagnosticLine {
             info.actions.replace(buffer);
         }
         info
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, DiagnosticData> {
+        self.data.iter()
     }
 
     /// Prints truncated text based on info from diagnostics
@@ -114,42 +142,45 @@ impl DiagnosticLine {
     }
 
     pub fn drop_non_errs(&mut self) {
-        self.data.retain(|d| d.color == ERR_COLOR);
+        self.data.retain(|d| d.severity == DiagnosticSeverity::ERROR);
     }
 
-    pub fn append(&mut self, d: Diagnostic) {
-        match d.severity {
-            Some(DiagnosticSeverity::ERROR) => {
-                self.data.insert(0, DiagnosticData::new(d.range, d.message, ERR_COLOR, d.related_information));
+    pub fn append(&mut self, d: lsp_types::Diagnostic) {
+        let severity = d.severity.unwrap_or(DiagnosticSeverity::INFORMATION);
+        match severity {
+            DiagnosticSeverity::ERROR => {
+                let dd = DiagnosticData::new(d.range, d.message, d.related_information, severity, ERR_STL);
+                self.data.insert(0, dd);
             }
-            Some(DiagnosticSeverity::WARNING) => match self.data[0].color {
-                ELS_COLOR => {
-                    self.data.insert(0, DiagnosticData::new(d.range, d.message, WAR_COLOR, d.related_information));
-                }
-                _ => {
-                    self.data.insert(0, DiagnosticData::new(d.range, d.message, WAR_COLOR, d.related_information));
-                }
-            },
+            DiagnosticSeverity::WARNING => {
+                let dd = DiagnosticData::new(d.range, d.message, d.related_information, severity, WAR_STL);
+                match self.data.iter().position(|x| x.severity != DiagnosticSeverity::ERROR) {
+                    None => self.data.push(dd),
+                    Some(index) => self.data.insert(index, dd),
+                };
+            }
             _ => {
-                self.data.push(DiagnosticData::new(d.range, d.message, ELS_COLOR, d.related_information));
+                self.data.push(DiagnosticData::new(d.range, d.message, d.related_information, severity, ELS_STL));
             }
         }
     }
 }
 
-impl From<Diagnostic> for DiagnosticLine {
-    fn from(diagnostic: Diagnostic) -> Self {
-        let color = match diagnostic.severity {
-            Some(DiagnosticSeverity::ERROR) => ERR_COLOR,
-            Some(DiagnosticSeverity::WARNING) => WAR_COLOR,
-            _ => ELS_COLOR,
+impl From<lsp_types::Diagnostic> for DiagnosticLine {
+    fn from(diagnostic: lsp_types::Diagnostic) -> Self {
+        let severity = diagnostic.severity.unwrap_or(DiagnosticSeverity::INFORMATION);
+        let style = match diagnostic.severity {
+            Some(DiagnosticSeverity::ERROR) => ERR_STL,
+            Some(DiagnosticSeverity::WARNING) => WAR_STL,
+            _ => ELS_STL,
         };
         Self {
             data: vec![DiagnosticData::new(
                 diagnostic.range,
                 diagnostic.message,
-                color,
                 diagnostic.related_information,
+                severity,
+                style,
             )],
         }
     }

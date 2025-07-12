@@ -265,3 +265,34 @@ impl Display for LSPResponseType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use lsp_types::{Diagnostic, DiagnosticSeverity};
+
+    #[test]
+    fn diagnostic_parse() {
+        let diags = vec![
+            Diagnostic { severity: Some(DiagnosticSeverity::HINT), ..Default::default() },
+            Diagnostic { severity: Some(DiagnosticSeverity::ERROR), ..Default::default() },
+            Diagnostic { severity: Some(DiagnosticSeverity::WARNING), ..Default::default() },
+            Diagnostic { ..Default::default() },
+            Diagnostic { severity: Some(DiagnosticSeverity::ERROR), ..Default::default() },
+        ];
+
+        let dd = super::Diagnostic::new(diags);
+        assert_eq!(dd.errors, 2);
+        assert_eq!(dd.warnings, 1);
+        let diag_types = dd.lines.unwrap().first().unwrap().1.iter().map(|d| d.severity).collect::<Vec<_>>();
+        assert_eq!(
+            diag_types,
+            [
+                DiagnosticSeverity::ERROR,
+                DiagnosticSeverity::ERROR,
+                DiagnosticSeverity::WARNING,
+                DiagnosticSeverity::HINT,
+                DiagnosticSeverity::INFORMATION,
+            ]
+        )
+    }
+}

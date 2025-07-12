@@ -591,6 +591,3 @@ fn token_replace_till() {
     token_line.remove_tokens_till(4);
     assert_eq!(token_line, expected);
 }
-
-#[test]
-fn token_replace_range() {}

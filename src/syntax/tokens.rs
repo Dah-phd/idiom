@@ -163,10 +163,10 @@ impl TokenLine {
             cursor += token.delta_start;
             match diagnostic.end {
                 Some(end) if diagnostic.start <= cursor && token.len + cursor <= end => {
-                    token.style.undercurle(Some(diagnostic.color));
+                    token.style.undercurle(diagnostic.style.foreground_color);
                 }
                 None if diagnostic.start <= cursor => {
-                    token.style.undercurle(Some(diagnostic.color));
+                    token.style.undercurle(diagnostic.style.foreground_color);
                 }
                 _ => {}
             }
