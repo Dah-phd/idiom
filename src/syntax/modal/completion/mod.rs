@@ -41,11 +41,11 @@ impl AutoComplete {
                 ModalMessage::TakenDone
             }
             EditorAction::Char(ch) => self.push_filter(ch, &gs.matcher),
-            EditorAction::Down => {
+            EditorAction::Down | EditorAction::ScrollDown => {
                 self.state.next(self.filtered.len());
                 ModalMessage::Taken
             }
-            EditorAction::Up => {
+            EditorAction::Up | EditorAction::ScrollUp => {
                 self.state.prev(self.filtered.len());
                 ModalMessage::Taken
             }

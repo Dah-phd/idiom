@@ -57,7 +57,7 @@ impl LSPModal {
         match self {
             Self::AutoComplete(modal) => {
                 let height = std::cmp::min(modal.len() as u16, 7);
-                let area = gs.screen_rect.modal_relative(row, col, 70, height);
+                let area = gs.editor_area.modal_relative(row, col, 70, height);
                 if area.height != 0 {
                     gs.backend.set_style(gs.theme.accent_style);
                     modal.render(&area, gs);
@@ -66,7 +66,7 @@ impl LSPModal {
                 };
             }
             Self::RenameVar(modal) => {
-                let area = gs.screen_rect.modal_relative(row, col, 60, modal.len() as u16);
+                let area = gs.editor_area.modal_relative(row, col, 60, modal.len() as u16);
                 if area.height == 2 {
                     gs.backend.set_style(gs.theme.accent_style);
                     modal.render(&area, gs);
@@ -76,7 +76,7 @@ impl LSPModal {
             }
             Self::Info(modal) => {
                 let height = std::cmp::min(modal.len() as u16, 7);
-                let area = gs.screen_rect.modal_relative(row, col, 90, height);
+                let area = gs.editor_area.modal_relative(row, col, 90, height);
                 if area.height != 0 {
                     gs.backend.set_style(gs.theme.accent_style);
                     modal.render(area, gs);

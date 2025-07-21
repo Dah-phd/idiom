@@ -231,28 +231,26 @@ impl Lexer {
 
     #[inline]
     pub fn map_modal_if_exists(&mut self, action: EditorAction, gs: &mut GlobalState) -> (bool, Option<Rect>) {
-        if let Some(modal) = &mut self.modal {
-            match modal.map_and_finish(action, &self.lang, gs) {
-                ModalMessage::Taken => return (true, self.modal_rect.take()),
-                ModalMessage::TakenDone => {
-                    self.modal.take();
-                    return (true, self.modal_rect.take());
-                }
-                ModalMessage::Done => {
-                    self.modal.take();
-                    return (false, self.modal_rect.take());
-                }
-                ModalMessage::RenameVar(new_name, c) => {
-                    self.get_rename(c, new_name, gs);
-                    self.modal.take();
-                    return (true, self.modal_rect.take());
-                }
-                ModalMessage::None => {
-                    return (false, self.modal_rect.take());
-                }
+        let Some(modal) = &mut self.modal else {
+            return (false, None);
+        };
+        match modal.map_and_finish(action, &self.lang, gs) {
+            ModalMessage::Taken => (true, self.modal_rect.take()),
+            ModalMessage::TakenDone => {
+                self.modal.take();
+                (true, self.modal_rect.take())
             }
+            ModalMessage::Done => {
+                self.modal.take();
+                (false, self.modal_rect.take())
+            }
+            ModalMessage::RenameVar(new_name, c) => {
+                self.get_rename(c, new_name, gs);
+                self.modal.take();
+                (true, self.modal_rect.take())
+            }
+            ModalMessage::None => (false, self.modal_rect.take()),
         }
-        (false, None)
     }
 
     pub fn set_lsp_client(&mut self, mut client: LSPClient, content: String, gs: &mut GlobalState) {
