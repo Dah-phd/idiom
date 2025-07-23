@@ -92,7 +92,7 @@ impl Info {
                 }
                 ModalMessage::Done
             }
-            EditorAction::Up | EditorAction::SelectUp => self.prev(),
+            EditorAction::Up | EditorAction::ScrollUp => self.prev(),
             EditorAction::Down | EditorAction::ScrollDown => self.next(),
             EditorAction::Left if !matches!(self.mode, Mode::Select) && self.actions.is_some() => {
                 self.mode = Mode::Select;

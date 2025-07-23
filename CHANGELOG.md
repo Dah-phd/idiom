@@ -1,6 +1,7 @@
 ## Includes only major changes (manual updates)
 # Version 0.5.5
 - diagnostics moved to italic style
+- scroll on modals (autocomplete/info)
 
 # Version 0.5.4
 - dep version bump

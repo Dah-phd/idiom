@@ -461,7 +461,7 @@ impl Editor {
     }
 
     pub fn mouse_scroll_up(&mut self, gs: &mut GlobalState) {
-        let (taken, render_update) = self.lexer.map_modal_if_exists(EditorAction::SelectUp, gs);
+        let (taken, render_update) = self.lexer.map_modal_if_exists(EditorAction::ScrollUp, gs);
         if let Some(modal_rect) = render_update {
             self.updated_rect(modal_rect, gs);
         }
@@ -473,7 +473,7 @@ impl Editor {
     }
 
     pub fn mouse_scroll_down(&mut self, gs: &mut GlobalState) {
-        let (taken, render_update) = self.lexer.map_modal_if_exists(EditorAction::SelectDown, gs);
+        let (taken, render_update) = self.lexer.map_modal_if_exists(EditorAction::ScrollDown, gs);
         if let Some(modal_rect) = render_update {
             self.updated_rect(modal_rect, gs);
         }
