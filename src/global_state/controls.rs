@@ -79,8 +79,7 @@ pub fn mouse_handler(
         MouseEventKind::ScrollUp => match gs.mode {
             Mode::Insert => {
                 if let Some(editor) = ws.get_active() {
-                    editor.map(crate::configs::EditorAction::ScrollUp, gs);
-                    editor.map(crate::configs::EditorAction::ScrollUp, gs);
+                    editor.mouse_scroll_up(gs);
                 }
             }
             Mode::Select => tree.select_up(gs),
@@ -88,8 +87,7 @@ pub fn mouse_handler(
         MouseEventKind::ScrollDown => match gs.mode {
             Mode::Insert => {
                 if let Some(editor) = ws.get_active() {
-                    editor.map(crate::configs::EditorAction::ScrollDown, gs);
-                    editor.map(crate::configs::EditorAction::ScrollDown, gs);
+                    editor.mouse_scroll_down(gs);
                 }
             }
             Mode::Select => tree.select_down(gs),

@@ -460,6 +460,30 @@ impl Editor {
         );
     }
 
+    pub fn mouse_scroll_up(&mut self, gs: &mut GlobalState) {
+        let (taken, render_update) = self.lexer.map_modal_if_exists(EditorAction::SelectUp, gs);
+        if let Some(modal_rect) = render_update {
+            self.updated_rect(modal_rect, gs);
+        }
+        if taken {
+            return;
+        };
+        self.cursor.scroll_up(&self.content);
+        self.cursor.scroll_up(&self.content);
+    }
+
+    pub fn mouse_scroll_down(&mut self, gs: &mut GlobalState) {
+        let (taken, render_update) = self.lexer.map_modal_if_exists(EditorAction::SelectDown, gs);
+        if let Some(modal_rect) = render_update {
+            self.updated_rect(modal_rect, gs);
+        }
+        if taken {
+            return;
+        };
+        self.cursor.scroll_down(&self.content);
+        self.cursor.scroll_down(&self.content);
+    }
+
     pub fn mouse_cursor(&mut self, mut position: CursorPosition) {
         position.line += self.cursor.at_line;
         position.char = position.char.saturating_sub(self.line_number_offset + 1);
