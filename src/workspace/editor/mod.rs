@@ -128,6 +128,12 @@ impl Editor {
         (self.renderer.fast_render)(self, gs)
     }
 
+    pub fn clear_ui(&mut self, gs: &GlobalState) {
+        if let Some(rect) = self.lexer.clear_modal() {
+            self.updated_rect(rect, gs);
+        }
+    }
+
     #[inline(always)]
     pub fn clear_screen_cache(&mut self, gs: &mut GlobalState) {
         self.lexer.refresh_lsp(gs);

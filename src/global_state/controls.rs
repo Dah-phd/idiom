@@ -96,6 +96,7 @@ pub fn mouse_handler(
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = ws.get_active() {
                     editor.mouse_cursor(position.into());
+                    editor.clear_ui(gs);
                     gs.insert_mode();
                     match tree.select_by_path(&editor.path) {
                         Ok(..) => ws.toggle_editor(),
@@ -141,6 +142,7 @@ pub fn mouse_handler(
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = ws.get_active() {
                     let position = crate::workspace::CursorPosition::from(position);
+                    editor.clear_ui(gs);
                     editor.mouse_menu_setup(position);
                     let accent_style = gs.theme.accent_style;
                     let mut context_menu = menu_context_editor_inplace(position, gs.editor_area, accent_style);

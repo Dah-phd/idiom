@@ -478,6 +478,9 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         match action {
             EditorAction::NewLine => {
                 ws.toggle_editor();
+                if let Some(editor) = ws.get_active() {
+                    editor.clear_ui(gs);
+                }
             }
             EditorAction::Up | EditorAction::Down => {
                 ws.toggle_editor();
@@ -506,6 +509,9 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
             }
             EditorAction::Cancel => {
                 ws.toggle_editor();
+                if let Some(editor) = ws.get_active() {
+                    editor.clear_ui(gs);
+                }
                 return false;
             }
             EditorAction::Close => {

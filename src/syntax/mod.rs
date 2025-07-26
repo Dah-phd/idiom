@@ -212,6 +212,8 @@ impl Lexer {
         self.question_lsp = (self.sync_rev)(self, action, content).is_err();
     }
 
+    /// MODAL
+
     #[inline]
     pub fn modal_is_rendered(&self) -> bool {
         self.modal_rect.is_some()
@@ -252,6 +254,28 @@ impl Lexer {
             ModalMessage::None => (false, self.modal_rect.take()),
         }
     }
+
+    #[inline]
+    pub fn clear_modal(&mut self) -> Option<Rect> {
+        _ = self.modal.take();
+        self.modal_rect.take()
+    }
+
+    pub fn mouse_click_map_modal_if_exists(&mut self, gs: &mut GlobalState) -> (bool, Option<Rect>) {
+        let Some(modal) = &mut self.modal else {
+            return (false, None);
+        };
+        todo!()
+    }
+
+    pub fn mouse_move_map_modal_if_exists(&mut self, gs: &mut GlobalState) -> (bool, Option<Rect>) {
+        let Some(modal) = &mut self.modal else {
+            return (false, None);
+        };
+        todo!()
+    }
+
+    /// LSP HANDLES
 
     pub fn set_lsp_client(&mut self, mut client: LSPClient, content: String, gs: &mut GlobalState) {
         if let Err(error) = client.file_did_open(self.uri.clone(), self.lang.file_type, content) {
