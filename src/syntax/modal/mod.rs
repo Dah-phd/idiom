@@ -10,7 +10,7 @@ use crate::{
 };
 use completion::AutoComplete;
 use fuzzy_matcher::skim::SkimMatcherV2;
-use idiom_tui::{layout::Rect, Backend};
+use idiom_tui::{layout::Rect, Backend, Position};
 use info::Info;
 use lsp_types::{CompletionItem, Hover, SignatureHelp};
 use rename::RenameVariable;
@@ -50,6 +50,29 @@ impl LSPModal {
                 Self::Info(modal) => modal.map(action, gs),
                 Self::RenameVar(modal) => modal.map(action, gs),
             },
+        }
+    }
+
+    pub fn mouse_moved(&mut self, position: Position) -> bool {
+        match self {
+            Self::AutoComplete(modal) => modal.mouse_moved(position.row as usize),
+            Self::Info(modal) => modal.mouse_moved(position.row as usize),
+            Self::RenameVar(..) => false,
+        }
+    }
+
+    pub fn mouse_click_and_finished(&mut self, position: Position, lang: &Lang, gs: &mut GlobalState) -> bool {
+        match self {
+            Self::AutoComplete(modal) => modal.mouse_click_and_finished(position.row as usize, lang, gs),
+            Self::Info(modal) => modal.mouse_click_and_finish(position.row as usize, gs),
+            Self::RenameVar(modal) => {
+                if position.row == 1 {
+                    modal.mouse_click(position.col as usize);
+                    false
+                } else {
+                    true
+                }
+            }
         }
     }
 

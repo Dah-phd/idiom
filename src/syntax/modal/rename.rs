@@ -12,7 +12,9 @@ pub struct RenameVariable {
 
 impl RenameVariable {
     pub fn new(cursor: CursorPosition, title: &str) -> Self {
-        Self { new_name: TextField::basic(title.to_owned()), cursor, title: format!(" Rename: {} ", title) }
+        let mut new_name = TextField::basic(title.to_owned());
+        new_name.select_all();
+        Self { new_name, cursor, title: format!(" Rename: {} ", title) }
     }
 
     #[inline]
@@ -31,6 +33,12 @@ impl RenameVariable {
         match action {
             EditorAction::NewLine => ModalMessage::RenameVar(self.new_name.text.to_owned(), self.cursor),
             _ => ModalMessage::Taken,
+        }
+    }
+
+    pub fn mouse_click(&mut self, rel_char: usize) {
+        if let Some(checked_rel_char) = rel_char.checked_sub(4) {
+            self.new_name.click_char(checked_rel_char);
         }
     }
 }

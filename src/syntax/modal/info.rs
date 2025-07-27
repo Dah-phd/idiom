@@ -74,31 +74,40 @@ impl Info {
             return ModalMessage::Done;
         }
         match action {
-            EditorAction::NewLine | EditorAction::Right => {
-                if !matches!(self.mode, Mode::Select) {
-                    return ModalMessage::Done;
-                }
-                if let Some(mut i) = self.actions.take() {
-                    return match i.len().cmp(&self.state.selected) {
-                        Ordering::Greater => {
-                            gs.event.push(i.remove(self.state.selected).into());
-                            ModalMessage::TakenDone
-                        }
-                        _ => {
-                            self.mode = Mode::Text;
-                            ModalMessage::Taken
-                        }
-                    };
-                }
-                ModalMessage::Done
-            }
+            EditorAction::NewLine | EditorAction::Right => self.finish(gs),
             EditorAction::Up | EditorAction::ScrollUp => self.prev(),
             EditorAction::Down | EditorAction::ScrollDown => self.next(),
             EditorAction::Left if !matches!(self.mode, Mode::Select) && self.actions.is_some() => {
                 self.mode = Mode::Select;
+                self.state.select(0, self.len());
                 ModalMessage::Taken
             }
             _ => ModalMessage::Done,
+        }
+    }
+
+    pub fn mouse_moved(&mut self, rel_index: usize) -> bool {
+        match self.mode {
+            Mode::Text => false,
+            Mode::Select => {
+                let expected_select = self.state.at_line + rel_index;
+                if expected_select == self.state.selected {
+                    return false;
+                }
+                self.state.select(expected_select, self.len());
+                true
+            }
+        }
+    }
+
+    pub fn mouse_click_and_finish(&mut self, rel_index: usize, gs: &mut GlobalState) -> bool {
+        match self.mode {
+            Mode::Text => true,
+            Mode::Select => {
+                let selected = self.state.at_line + rel_index;
+                self.state.select(selected, self.len());
+                !matches!(self.finish(gs), ModalMessage::Taken | ModalMessage::None)
+            }
         }
     }
 
@@ -194,6 +203,26 @@ impl Info {
             }
         }
         lines.clear_to_end(&mut gs.backend);
+    }
+
+    fn finish(&mut self, gs: &mut GlobalState) -> ModalMessage {
+        if !matches!(self.mode, Mode::Select) {
+            return ModalMessage::Done;
+        }
+        if let Some(mut i) = self.actions.take() {
+            return match i.len().cmp(&self.state.selected) {
+                Ordering::Greater => {
+                    gs.event.push(i.remove(self.state.selected).into());
+                    ModalMessage::TakenDone
+                }
+                _ => {
+                    self.mode = Mode::Text;
+                    self.state.select(0, self.len());
+                    ModalMessage::Taken
+                }
+            };
+        }
+        ModalMessage::Done
     }
 }
 

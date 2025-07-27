@@ -13,7 +13,7 @@ use crate::{
     lsp::LSPError,
     syntax::{tokens::calc_wraps, Lexer},
 };
-use idiom_tui::layout::Rect;
+use idiom_tui::{layout::Rect, Position};
 use lsp_types::TextEdit;
 use std::{cmp::Ordering, path::PathBuf};
 use utils::{big_file_protection, build_display, calc_line_number_offset, FileUpdate};
@@ -490,7 +490,12 @@ impl Editor {
         self.cursor.scroll_down(&self.content);
     }
 
-    pub fn mouse_cursor(&mut self, mut position: CursorPosition) {
+    pub fn mouse_click(&mut self, position: Position, gs: &mut GlobalState) {
+        if let Some(rect) = self.lexer.mouse_click_modal_if_exists(position, gs) {
+            self.updated_rect(rect, gs);
+            return;
+        }
+        let mut position = CursorPosition::from(position);
         position.line += self.cursor.at_line;
         position.char = position.char.saturating_sub(self.line_number_offset + 1);
         if self.cursor.select_is_none() && self.cursor == position {
@@ -518,6 +523,12 @@ impl Editor {
         position.line += self.cursor.at_line;
         position.char = position.char.saturating_sub(self.line_number_offset + 1);
         self.cursor.set_cursor_checked_with_select(position, &self.content);
+    }
+
+    pub fn mouse_moved(&mut self, row: u16, column: u16, gs: &GlobalState) {
+        if let Some(rect) = self.lexer.mouse_moved_modal_if_exists(row, column) {
+            self.updated_rect(rect, gs);
+        };
     }
 
     pub fn rebase(&mut self, gs: &mut GlobalState) {

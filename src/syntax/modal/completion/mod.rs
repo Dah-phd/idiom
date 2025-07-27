@@ -54,6 +54,25 @@ impl AutoComplete {
         }
     }
 
+    pub fn mouse_click_and_finished(&mut self, relative_idx: usize, lang: &Lang, gs: &mut GlobalState) -> bool {
+        let selected = self.state.at_line + relative_idx;
+        let mut completion_item = self.completions.remove(self.filtered.remove(selected).1);
+        if let Some(data) = completion_item.data.take() {
+            lang.handle_completion_data(data, gs);
+        };
+        gs.event.push(parse_completion_item(completion_item));
+        true
+    }
+
+    pub fn mouse_moved(&mut self, relative_idx: usize) -> bool {
+        let expected_select = self.state.at_line + relative_idx;
+        if self.state.selected == expected_select {
+            return false;
+        };
+        self.state.selected = expected_select;
+        true
+    }
+
     #[inline]
     pub fn render(&mut self, area: &Rect, gs: &mut GlobalState) {
         let backend = gs.backend();

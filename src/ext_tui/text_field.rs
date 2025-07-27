@@ -138,6 +138,10 @@ impl<T: Default + Clone> TextField<T> {
                 };
                 Some(T::default())
             }
+            KeyCode::Char('a' | 'A') if key.modifiers == KeyModifiers::CONTROL => {
+                self.select_all();
+                Some(T::default())
+            }
             KeyCode::Char(ch) => {
                 self.take_selected();
                 self.text.insert(self.char, ch);
@@ -160,60 +164,13 @@ impl<T: Default + Clone> TextField<T> {
                 Some(self.on_text_update.clone().unwrap_or_default())
             }
             KeyCode::End => {
-                self.char = self.text.len().saturating_sub(1);
+                self.char = self.text.len();
                 Some(T::default())
             }
             KeyCode::Left => self.move_left(key.modifiers),
             KeyCode::Right => self.move_right(key.modifiers),
             _ => None,
         }
-    }
-
-    fn move_left(&mut self, mods: KeyModifiers) -> Option<T> {
-        let should_select = mods.contains(KeyModifiers::SHIFT);
-        if should_select {
-            self.init_select();
-        } else {
-            self.select = None;
-        };
-        self.char = self.char.saturating_sub(1);
-        if mods.contains(KeyModifiers::CONTROL) {
-            // jump
-            while self.char > 0 {
-                let next_idx = self.char - 1;
-                if matches!(self.text.chars().nth(next_idx), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
-                    break;
-                };
-                self.char = next_idx;
-            }
-        };
-        if should_select {
-            self.push_select();
-        };
-        Some(T::default())
-    }
-
-    fn move_right(&mut self, mods: KeyModifiers) -> Option<T> {
-        let should_select = mods.contains(KeyModifiers::SHIFT);
-        if should_select {
-            self.init_select();
-        } else {
-            self.select = None;
-        };
-        self.char = std::cmp::min(self.text.len(), self.char + 1);
-        if mods.contains(KeyModifiers::CONTROL) {
-            // jump
-            while self.text.len() > self.char {
-                self.char += 1;
-                if matches!(self.text.chars().nth(self.char), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
-                    break;
-                }
-            }
-        };
-        if should_select {
-            self.push_select();
-        };
-        Some(T::default())
     }
 
     pub fn map_actions(&mut self, action: EditorAction, clipboard: &mut Clipboard) -> Option<T> {
@@ -264,7 +221,7 @@ impl<T: Default + Clone> TextField<T> {
                 Some(self.on_text_update.clone().unwrap_or_default())
             }
             EditorAction::EndOfLine | EditorAction::EndOfFile => {
-                self.char = self.text.len().saturating_sub(1);
+                self.char = self.text.len();
                 Some(T::default())
             }
             EditorAction::Left => {
@@ -311,28 +268,26 @@ impl<T: Default + Clone> TextField<T> {
                 self.push_select();
                 Some(T::default())
             }
+            EditorAction::SelectAll => {
+                self.select_all();
+                Some(T::default())
+            }
             _ => None,
         }
     }
 
-    fn jump_left(&mut self) {
-        while self.char > 0 {
-            let next_idx = self.char - 1;
-            if matches!(self.text.chars().nth(next_idx), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
-                break;
-            };
-            self.char = next_idx;
-        }
+    pub fn select_all(&mut self) {
+        self.select = Some((0, self.text.len()));
+        self.char = self.text.len();
     }
 
-    fn jump_right(&mut self) {
-        // jump
-        while self.text.len() > self.char {
-            self.char += 1;
-            if matches!(self.text.chars().nth(self.char), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
-                break;
-            }
+    pub fn click_char(&mut self, rel_char: usize) {
+        if self.char == rel_char {
+            self.select_all();
+            return;
         }
+        self.select.take();
+        self.char = std::cmp::min(rel_char, self.text.len());
     }
 
     fn init_select(&mut self) {
@@ -364,6 +319,73 @@ impl<T: Default + Clone> TextField<T> {
         self.text.replace_range(from..to, "");
         self.char = from;
         Some(clip)
+    }
+
+    fn move_left(&mut self, mods: KeyModifiers) -> Option<T> {
+        let should_select = mods.contains(KeyModifiers::SHIFT);
+        if should_select {
+            self.init_select();
+        } else {
+            self.select = None;
+        };
+        self.char = self.char.saturating_sub(1);
+        if mods.contains(KeyModifiers::CONTROL) {
+            // jump
+            while self.char > 0 {
+                let next_idx = self.char - 1;
+                if matches!(self.text.chars().nth(next_idx), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
+                    break;
+                };
+                self.char = next_idx;
+            }
+        };
+        if should_select {
+            self.push_select();
+        };
+        Some(T::default())
+    }
+
+    fn move_right(&mut self, mods: KeyModifiers) -> Option<T> {
+        let should_select = mods.contains(KeyModifiers::SHIFT);
+        if should_select {
+            self.init_select();
+        } else {
+            self.select = None;
+        };
+        self.char = std::cmp::min(self.text.len(), self.char + 1);
+        if mods.contains(KeyModifiers::CONTROL) {
+            // jump
+            while self.text.len() > self.char {
+                self.char += 1;
+                if matches!(self.text.chars().nth(self.char), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
+                    break;
+                }
+            }
+        };
+        if should_select {
+            self.push_select();
+        };
+        Some(T::default())
+    }
+
+    fn jump_left(&mut self) {
+        while self.char > 0 {
+            let next_idx = self.char - 1;
+            if matches!(self.text.chars().nth(next_idx), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
+                break;
+            };
+            self.char = next_idx;
+        }
+    }
+
+    fn jump_right(&mut self) {
+        // jump
+        while self.text.len() > self.char {
+            self.char += 1;
+            if matches!(self.text.chars().nth(self.char), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
+                break;
+            }
+        }
     }
 }
 
@@ -457,5 +479,13 @@ mod test {
         assert_eq!(field.select, Some((5, 0)));
         field.map(&KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()), &mut clip);
         assert_eq!(&field.text, "");
+    }
+
+    #[test]
+    fn select_all() {
+        let mut tf = TextField::basic("1234".to_string());
+        tf.select_all();
+        assert_eq!(tf.select, Some((0, 4)));
+        assert_eq!("1234", tf.take_selected().unwrap());
     }
 }

@@ -16,7 +16,7 @@ use crate::{
     },
 };
 pub use diagnostics::{set_diganostics, Action, DiagnosticInfo, DiagnosticLine};
-use idiom_tui::layout::Rect;
+use idiom_tui::{layout::Rect, Position};
 pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
@@ -212,7 +212,7 @@ impl Lexer {
         self.question_lsp = (self.sync_rev)(self, action, content).is_err();
     }
 
-    /// MODAL
+    // MODAL
 
     #[inline]
     pub fn modal_is_rendered(&self) -> bool {
@@ -261,21 +261,30 @@ impl Lexer {
         self.modal_rect.take()
     }
 
-    pub fn mouse_click_map_modal_if_exists(&mut self, gs: &mut GlobalState) -> (bool, Option<Rect>) {
-        let Some(modal) = &mut self.modal else {
-            return (false, None);
+    pub fn mouse_click_modal_if_exists(
+        &mut self,
+        relative_editor_position: Position,
+        gs: &mut GlobalState,
+    ) -> Option<Rect> {
+        let modal = self.modal.as_mut()?;
+        let position = self.modal_rect.and_then(|rect| {
+            let row = gs.editor_area.row + relative_editor_position.row;
+            let column = gs.editor_area.col + relative_editor_position.col;
+            rect.relative_position(row, column)
+        })?;
+        if modal.mouse_click_and_finished(position, &self.lang, gs) {
+            self.modal.take();
         };
-        todo!()
+        self.modal_rect.take()
     }
 
-    pub fn mouse_move_map_modal_if_exists(&mut self, gs: &mut GlobalState) -> (bool, Option<Rect>) {
-        let Some(modal) = &mut self.modal else {
-            return (false, None);
-        };
-        todo!()
+    pub fn mouse_moved_modal_if_exists(&mut self, row: u16, column: u16) -> Option<Rect> {
+        let modal = self.modal.as_mut()?;
+        let position = self.modal_rect.and_then(|rect| rect.relative_position(row, column))?;
+        modal.mouse_moved(position).then_some(self.modal_rect.take()?)
     }
 
-    /// LSP HANDLES
+    // LSP HANDLES
 
     pub fn set_lsp_client(&mut self, mut client: LSPClient, content: String, gs: &mut GlobalState) {
         if let Err(error) = client.file_did_open(self.uri.clone(), self.lang.file_type, content) {

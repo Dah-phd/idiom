@@ -2,6 +2,7 @@
 # Version 0.5.5
 - diagnostics moved to italic style
 - scroll on modals (autocomplete/info)
+- modal cleanup on context switching
 
 # Version 0.5.4
 - dep version bump
