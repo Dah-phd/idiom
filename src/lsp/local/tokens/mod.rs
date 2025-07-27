@@ -152,7 +152,7 @@ impl Definitions {
         for func in fn_set.into_iter() {
             items.push(CompletionItem {
                 insert_text_format: Some(InsertTextFormat::SNIPPET),
-                insert_text: Some(format!("{}($0)", func)),
+                insert_text: Some(format!("{func}($0)")),
                 label: func,
                 detail: Some("Function".to_owned()),
                 ..Default::default()

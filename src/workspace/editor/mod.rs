@@ -533,7 +533,7 @@ impl Editor {
 
     pub fn rebase(&mut self, gs: &mut GlobalState) {
         if let Err(error) = big_file_protection(&self.path) {
-            gs.error(format!("Failed to load file {}", error));
+            gs.error(format!("Failed to load file {error}"));
             return;
         };
         self.actions.clear();
@@ -549,7 +549,7 @@ impl Editor {
         self.content = content.split('\n').map(|line| EditorLine::new(line.to_owned())).collect();
         match self.lexer.reopen(content, self.file_type) {
             Ok(()) => gs.success("File rebased!"),
-            Err(err) => gs.error(format!("Filed to reactivate LSP after rebase! ERR: {}", err)),
+            Err(err) => gs.error(format!("Filed to reactivate LSP after rebase! ERR: {err}")),
         }
     }
 

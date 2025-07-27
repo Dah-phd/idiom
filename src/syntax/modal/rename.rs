@@ -14,7 +14,7 @@ impl RenameVariable {
     pub fn new(cursor: CursorPosition, title: &str) -> Self {
         let mut new_name = TextField::basic(title.to_owned());
         new_name.select_all();
-        Self { new_name, cursor, title: format!(" Rename: {} ", title) }
+        Self { new_name, cursor, title: format!(" Rename: {title} ") }
     }
 
     #[inline]

@@ -267,12 +267,13 @@ impl Lexer {
         gs: &mut GlobalState,
     ) -> Option<Rect> {
         let modal = self.modal.as_mut()?;
-        let position = self.modal_rect.and_then(|rect| {
+        let maybe_pos = self.modal_rect.and_then(|rect| {
             let row = gs.editor_area.row + relative_editor_position.row;
             let column = gs.editor_area.col + relative_editor_position.col;
             rect.relative_position(row, column)
-        })?;
-        if modal.mouse_click_and_finished(position, &self.lang, gs) {
+        });
+        // click out of modal or click finished modal
+        if !matches!(maybe_pos, Some(position) if !modal.mouse_click_and_finished(position, &self.lang, gs)) {
             self.modal.take();
         };
         self.modal_rect.take()

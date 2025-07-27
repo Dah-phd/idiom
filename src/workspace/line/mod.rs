@@ -314,7 +314,7 @@ impl EditorLine {
             }
             sum += ch.len_utf16();
         }
-        panic!("Index out of bounds! Index {} where max is {}", utf16_idx, sum)
+        panic!("Index out of bounds! Index {utf16_idx} where max is {sum}")
     }
 
     #[inline]

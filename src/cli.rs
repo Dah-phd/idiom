@@ -36,8 +36,7 @@ impl Args {
                             let parent_path = match path.parent() {
                                 None => {
                                     return Err(IdiomError::io_not_found(format!(
-                                        "Unable to derive parent directory of {:?}!",
-                                        path
+                                        "Unable to derive parent directory of {path:?}!",
                                     )))
                                 }
                                 Some(path) => path.to_owned(),
