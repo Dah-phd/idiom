@@ -281,9 +281,20 @@ impl<T: Default + Clone> TextField<T> {
         self.char = self.text.len();
     }
 
+    pub fn select_token(&mut self) {
+        let range = arg_range_at(&self.text, self.char);
+        if range.len() > 0 {
+            self.select = Some((range.start, range.end));
+            self.char = range.end;
+        }
+    }
+
+    /// in most cases there is offset that needs to be handled outside
+    /// for widget the value is 4
+    /// for counted widget the value is 7
     pub fn click_char(&mut self, rel_char: usize) {
         if self.char == rel_char {
-            self.select_all();
+            self.select_token();
             return;
         }
         self.select.take();
@@ -429,7 +440,7 @@ mod test {
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
     #[test]
-    fn test_setting() {
+    fn setting() {
         let mut field: TextField<()> = TextField::default();
         field.text_set("12345".to_owned());
         assert_eq!(&field.text, "12345");
@@ -445,7 +456,7 @@ mod test {
     }
 
     #[test]
-    fn test_move() {
+    fn move_presses() {
         let mut field: TextField<()> = TextField::default();
         let mut clip = Clipboard::default();
         field.map(&KeyEvent::new(KeyCode::Right, KeyModifiers::empty()), &mut clip);
@@ -462,7 +473,7 @@ mod test {
     }
 
     #[test]
-    fn test_select() {
+    fn select() {
         let mut field: TextField<()> = TextField::default();
         let mut clip = Clipboard::default();
         field.text_set("a3cde".to_owned());
@@ -487,5 +498,25 @@ mod test {
         tf.select_all();
         assert_eq!(tf.select, Some((0, 4)));
         assert_eq!("1234", tf.take_selected().unwrap());
+    }
+
+    #[test]
+    fn select_token_and_char_set() {
+        let mut tf = TextField::basic("asd baba".to_string());
+        assert_eq!(tf.char, 8);
+        tf.click_char(8);
+        assert_eq!(tf.select, Some((4, 8)));
+        assert_eq!(tf.char, 8);
+        tf.click_char(2);
+        assert_eq!(tf.select, None);
+        assert_eq!(tf.char, 2);
+        tf.click_char(2);
+        assert_eq!(tf.select, Some((0, 3)));
+        assert_eq!(tf.char, 3);
+        tf.click_char(6);
+        assert_eq!(tf.char, 6);
+        tf.select_token();
+        assert_eq!(tf.select, Some((4, 8)));
+        assert_eq!(tf.char, 8);
     }
 }
