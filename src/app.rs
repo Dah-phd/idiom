@@ -36,7 +36,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
     let mut tree = Tree::new(tree_key_map, &mut gs);
     let mut term = EditorTerminal::new(integrated_shell);
     let lsp_servers = base_configs.init_preloaded_lsp_servers(tree.get_base_file_names(), &mut gs).await;
-    let mut workspace = Workspace::new(editor_key_map, base_configs, lsp_servers).await;
+    let mut workspace = Workspace::new(editor_key_map, base_configs, lsp_servers);
 
     // CLI SETUP
     if let Some(path) = open_file {

@@ -283,7 +283,7 @@ impl<T: Default + Clone> TextField<T> {
 
     pub fn select_token(&mut self) {
         let range = arg_range_at(&self.text, self.char);
-        if range.len() > 0 {
+        if !range.is_empty() {
             self.select = Some((range.start, range.end));
             self.char = range.end;
         }

@@ -38,7 +38,7 @@ pub struct Workspace {
 }
 
 impl Workspace {
-    pub async fn new(key_map: EditorKeyMap, base_configs: EditorConfigs, lsp_servers: HashMap<FileType, LSP>) -> Self {
+    pub fn new(key_map: EditorKeyMap, base_configs: EditorConfigs, lsp_servers: HashMap<FileType, LSP>) -> Self {
         let tab_style = ContentStyle::fg(Color::DarkYellow);
         Self { editors: TrackedList::new(), base_configs, key_map, lsp_servers, map_callback: map_editor, tab_style }
     }
@@ -321,6 +321,44 @@ impl Workspace {
         Ok(())
     }
 
+    pub async fn force_lsp_type_on_active(&mut self, file_type: FileType, gs: &mut GlobalState) -> IdiomResult<()> {
+        let new_indent_cfg = self.base_configs.get_indent_cfg(&file_type);
+        match self.get_active() {
+            Some(editor) => editor.file_type_set(file_type, new_indent_cfg, gs),
+            None => return Err(IdiomError::LSP(crate::lsp::LSPError::Null)),
+        };
+
+        let lsp_cmd = match self.base_configs.derive_lsp(&file_type) {
+            Some(lsp_cmd) => lsp_cmd,
+            None => {
+                _ = self.get_active().map(|e| e.lexer.local_lsp(file_type, e.stringify(), gs));
+                return Ok(());
+            }
+        };
+
+        match self.lsp_servers.entry(file_type) {
+            Entry::Vacant(entry) => {
+                let lsp = match LSP::new(lsp_cmd, file_type).await {
+                    Ok(lsp) => lsp,
+                    Err(err) => {
+                        _ = self.get_active().map(|e| e.lexer.local_lsp(file_type, e.stringify(), gs));
+                        return Err(IdiomError::LSP(err));
+                    }
+                };
+                for editor in self.editors.iter_mut().filter(|e| e.file_type == file_type) {
+                    editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);
+                }
+                entry.insert(lsp);
+                Ok(())
+            }
+            Entry::Occupied(entry) => {
+                let client = entry.get().aquire_client();
+                _ = self.get_active().map(|e| e.lexer.set_lsp_client(client, e.stringify(), gs));
+                Ok(())
+            }
+        }
+    }
+
     pub fn select_tab_mouse(&mut self, col_idx: usize) -> Option<usize> {
         self.toggle_tabs();
         let mut cols_len = 0;
@@ -334,13 +372,13 @@ impl Workspace {
     }
 
     #[inline]
-    pub async fn check_lsp(&mut self, ft: FileType, gs: &mut GlobalState) {
-        if let Some(lsp) = self.lsp_servers.get_mut(&ft) {
-            match lsp.check_status(ft).await {
+    pub async fn check_lsp(&mut self, file_type: FileType, gs: &mut GlobalState) {
+        if let Some(lsp) = self.lsp_servers.get_mut(&file_type) {
+            match lsp.check_status(file_type).await {
                 Ok(data) => match data {
                     None => gs.success("LSP function is normal".to_owned()),
                     Some(err) => {
-                        self.full_sync(&ft, gs);
+                        self.full_sync(&file_type, gs);
                         gs.success(format!("LSP recoved after: {err}"));
                     }
                 },
@@ -350,9 +388,9 @@ impl Workspace {
     }
 
     #[inline]
-    pub fn full_sync(&mut self, ft: &FileType, gs: &mut GlobalState) {
-        if let Some(lsp) = self.lsp_servers.get(ft) {
-            for editor in self.editors.iter_mut().filter(|e| &e.file_type == ft) {
+    pub fn full_sync(&mut self, file_type: &FileType, gs: &mut GlobalState) {
+        if let Some(lsp) = self.lsp_servers.get(file_type) {
+            for editor in self.editors.iter_mut().filter(|e| &e.file_type == file_type) {
                 editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);
             }
         }

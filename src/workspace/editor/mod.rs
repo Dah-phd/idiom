@@ -7,7 +7,7 @@ use super::{
     utils::{copy_content, find_line_start, token_range_at},
 };
 use crate::{
-    configs::{EditorAction, EditorConfigs, FileType},
+    configs::{EditorAction, EditorConfigs, FileType, IndentConfigs},
     error::{IdiomError, IdiomResult},
     global_state::GlobalState,
     lsp::LSPError,
@@ -105,6 +105,16 @@ impl Editor {
             path,
             last_render_at_line: None,
         })
+    }
+
+    pub fn file_type_set(&mut self, file_type: FileType, cfg: IndentConfigs, gs: &mut GlobalState) {
+        self.actions.cfg = cfg;
+        self.lexer = Lexer::with_context(file_type, &self.path, gs);
+        self.file_type = file_type;
+        match self.file_type {
+            FileType::Ignored => self.renderer = Renderer::text(),
+            _ => self.renderer = Renderer::code(),
+        }
     }
 
     #[inline]

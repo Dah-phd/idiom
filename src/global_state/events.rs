@@ -36,6 +36,7 @@ pub enum IdiomEvent {
     SearchFiles(String),
     FileUpdated(PathBuf),
     CheckLSP(FileType),
+    SetLSP(FileType),
     TreeDiagnostics(TreeDiagnostics),
     AutoComplete(String),
     Snippet { snippet: String, cursor_offset: Option<(usize, usize)>, relative_select: Option<((usize, usize), usize)> },
@@ -214,8 +215,15 @@ impl IdiomEvent {
                     editor.save(gs);
                 }
             }
-            IdiomEvent::CheckLSP(ft) => {
-                ws.check_lsp(ft, gs).await;
+            IdiomEvent::CheckLSP(file_type) => {
+                ws.check_lsp(file_type, gs).await;
+            }
+            IdiomEvent::SetLSP(file_type) => {
+                if let Err(error) = ws.force_lsp_type_on_active(file_type, gs).await {
+                    if !matches!(error, crate::error::IdiomError::LSP(crate::lsp::LSPError::Null)) {
+                        gs.error(error);
+                    }
+                };
             }
             IdiomEvent::FileUpdated(path) => {
                 ws.notify_update(path, gs);

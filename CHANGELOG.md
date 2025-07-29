@@ -4,6 +4,7 @@
 - scroll on modals (autocomplete/info)
 - modal cleanup on context switching
 - modal mouse support
+- added set lsp to pallet
 
 # Version 0.5.4
 - dep version bump
