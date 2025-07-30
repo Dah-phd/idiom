@@ -132,7 +132,7 @@ impl Pallet {
             Some(Command::components("Open embeded terminal", change_state::open_embeded_terminal)),
             git_tui.map(|git_tui| Command::pass_event("Open Git TUI", IdiomEvent::EmbededApp(Some(git_tui)))),
             Some(Command::pass_event("Open terminal", IdiomEvent::EmbededApp(None))),
-            Some(Command::components("LSP to bash", change_state::set_lsp)),
+            Some(Command::components("Select LSP", change_state::select_lsp)),
             Some(Command::components("UPPERCASE", formatting::uppercase)),
             Some(Command::components("LOWERCASE", formatting::lowercase)),
             Command::cfg_open("Open editor configs", EDITOR_CFG_FILE),

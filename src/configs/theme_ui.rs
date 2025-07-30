@@ -5,7 +5,7 @@ use crossterm::style::{Color, ContentStyle};
 use serde::ser::{Serialize, SerializeStruct};
 use serde_json::Value;
 
-const ACCENT_OFFSET: u8 = 24;
+const ACCENT_OFFSET: u8 = 40;
 const ACCENT_KEY: &str = "accent_offset";
 
 fn offset_color_part(base: u8, offset: u8) -> u8 {

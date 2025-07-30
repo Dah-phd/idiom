@@ -100,7 +100,8 @@ pub fn mouse_handler(
             }
             Mode::Select => (), // no action
         },
-        MouseEventKind::Up(MouseButton::Left) => {
+        MouseEventKind::Down(MouseButton::Left) => {
+            // on up currsor can drop select
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = ws.get_active() {
                     editor.mouse_click(position, gs);

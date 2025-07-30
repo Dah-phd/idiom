@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone, Copy, Default)]
 pub enum FileType {
@@ -21,8 +21,7 @@ pub enum FileType {
 }
 
 impl FileType {
-    #[allow(clippy::ptr_arg)]
-    pub fn derive_type(path: &PathBuf) -> Option<Self> {
+    pub fn derive_type(path: &Path) -> Option<Self> {
         let extension = path.extension().and_then(|e| e.to_str())?;
         match extension.to_lowercase().as_str() {
             "rs" => Some(Self::Rust),
@@ -49,33 +48,55 @@ impl FileType {
             _ => "//",
         }
     }
+
+    pub const fn iter_langs() -> [Self; 14] {
+        [
+            FileType::Zig,
+            FileType::Rust,
+            FileType::Python,
+            FileType::TypeScript,
+            FileType::JavaScript,
+            FileType::Html,
+            FileType::Nim,
+            FileType::C,
+            FileType::Cpp,
+            FileType::Yml,
+            FileType::Toml,
+            FileType::Lobster,
+            FileType::Json,
+            FileType::Shell,
+        ]
+    }
 }
 
 impl From<FileType> for &'static str {
     fn from(value: FileType) -> Self {
-        match value {
-            FileType::Ignored => "unknown file type - error",
-            FileType::Zig => "zig",
-            FileType::Rust => "rust",
-            FileType::Python => "python",
-            FileType::TypeScript => "typescript",
-            FileType::JavaScript => "javascript",
-            FileType::Html => "html",
-            FileType::Nim => "nim",
-            FileType::C => "c",
-            FileType::Cpp => "c++",
-            FileType::Yml => "yaml",
-            FileType::Toml => "toml",
-            FileType::Lobster => "lobster",
-            FileType::Json => "json",
-            FileType::Shell => "shellscript",
-        }
+        ft_to_str(value)
     }
 }
 
 impl From<FileType> for String {
     fn from(value: FileType) -> String {
-        let string: &'static str = value.into();
-        string.to_owned()
+        ft_to_str(value).to_owned()
+    }
+}
+
+const fn ft_to_str(value: FileType) -> &'static str {
+    match value {
+        FileType::Ignored => "unknown file type - error",
+        FileType::Zig => "zig",
+        FileType::Rust => "rust",
+        FileType::Python => "python",
+        FileType::TypeScript => "typescript",
+        FileType::JavaScript => "javascript",
+        FileType::Html => "html",
+        FileType::Nim => "nim",
+        FileType::C => "c",
+        FileType::Cpp => "c++",
+        FileType::Yml => "yaml",
+        FileType::Toml => "toml",
+        FileType::Lobster => "lobster",
+        FileType::Json => "json",
+        FileType::Shell => "shellscript",
     }
 }
