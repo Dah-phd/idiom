@@ -14,7 +14,7 @@ pub fn render_tree(tree: &mut Tree, gs: &mut GlobalState) {
     let mut iter = tree.inner.iter();
     iter.next();
 
-    let mut tree_area = gs.tree_area.clone();
+    let mut tree_area = gs.tree_area;
     let mut last_line = tree_area.pop_line();
     let mut lines = tree_area.into_iter();
 

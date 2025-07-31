@@ -1,4 +1,4 @@
-mod file_clipboard;
+mod clipboard;
 mod render;
 mod tree_paths;
 mod watcher;
@@ -12,8 +12,8 @@ use crate::{
     popups::popups_tree::{create_file_popup, create_root_file_popup, rename_file_popup},
     utils::{build_file_or_folder, to_canon_path, to_relative_path},
 };
+use clipboard::FileClipboard;
 use crossterm::event::KeyEvent;
-use file_clipboard::FileClipboard;
 use idiom_tui::Backend;
 use std::{
     collections::{hash_map::Entry, HashMap},

@@ -8,7 +8,7 @@ use idiom_tui::{
     layout::{Line, LineBuilder},
 };
 
-#[derive(Default)]
+#[derive(Default, PartialEq, Debug, Clone)]
 pub struct TextField<T: Default + Clone> {
     pub text: String,
     char: usize,
