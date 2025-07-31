@@ -17,7 +17,7 @@ pub fn mock_tree() -> Tree {
         state: State::default(),
         diagnostics_state: HashMap::new(),
         selected_path: PathBuf::new(),
-        tree: TreePath::Folder {
+        inner: TreePath::Folder {
             path: PathBuf::new(),
             tree: None,
             display: String::new(),
