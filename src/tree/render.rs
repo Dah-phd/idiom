@@ -56,10 +56,9 @@ pub fn render_tree(tree: &mut Tree, gs: &mut GlobalState) {
 
         print_styled_path(tree_path, line, style, tree.display_offset, &tree.tree_clipboard, &mut gs.backend);
     }
-    for line in lines {
+    for line in lines.chain([last_line]) {
         line.fill_styled(' ', base_style, &mut gs.backend);
     }
-    last_line.fill_styled(' ', base_style, &mut gs.backend);
 }
 
 fn print_styled_path(

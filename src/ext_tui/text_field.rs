@@ -434,10 +434,18 @@ impl TextField<()> {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use super::TextField;
     use crate::global_state::Clipboard;
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    pub fn pull_select<T: Clone + Default>(text_field: &TextField<T>) -> Option<(usize, usize)> {
+        text_field.select.clone()
+    }
+
+    pub fn pull_char<T: Clone + Default>(text_field: &TextField<T>) -> usize {
+        text_field.char
+    }
 
     #[test]
     fn setting() {
