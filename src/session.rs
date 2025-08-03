@@ -31,30 +31,34 @@ struct MetaData {
     path: PathBuf,
 }
 
-pub fn store_session(ws: &mut Workspace, max_sessions: usize) -> bool {
-    if ws.is_empty() {
-        return true;
-    }
+pub enum SessionStatus {
+    Stored,
+    Failed,
+    FailedNoUnsaved,
+}
 
+pub fn store_session(ws: &Workspace, max_sessions: usize) -> SessionStatus {
     // get app folder
     let Some(mut store) = data_local_dir() else {
-        return false;
+        return SessionStatus::Failed;
     };
     store.push(APP_FOLDER);
 
     // create app folded if not exists
     if !store.exists() && std::fs::create_dir(&store).is_err() {
-        return false;
+        return SessionStatus::Failed;
     }
 
-    let Ok(cwd) = std::env::current_dir() else { return false };
+    let Ok(cwd) = std::env::current_dir() else {
+        return SessionStatus::Failed;
+    };
     let cwd_hash = hash_path(&cwd);
 
     // cleanup
     clean_up(&store, cwd_hash, max_sessions);
 
     let Ok(epoch) = SystemTime::now().duration_since(UNIX_EPOCH) else {
-        return false;
+        return SessionStatus::Failed;
     };
     let timestamp = epoch.as_secs();
 
@@ -62,17 +66,17 @@ pub fn store_session(ws: &mut Workspace, max_sessions: usize) -> bool {
     let folder_name = format!("{timestamp}_{cwd_hash}");
     store.push(folder_name);
     if std::fs::create_dir(&store).is_err() {
-        return false;
+        return SessionStatus::Failed;
     }
 
     let md = MetaData { path: cwd };
     let Ok(md_contents) = serde_json::to_string(&md) else {
-        return false;
+        return SessionStatus::Failed;
     };
     let mut md_path = store.clone();
     md_path.push(META_FILE);
     let Ok(..) = std::fs::write(md_path, md_contents) else {
-        return false;
+        return SessionStatus::Failed;
     };
 
     let mut session_files = vec![];
@@ -86,11 +90,23 @@ pub fn store_session(ws: &mut Workspace, max_sessions: usize) -> bool {
     }
 
     let Ok(session_contents) = serde_json::to_string(&session_files) else {
-        return false;
+        if session_files.iter().any(|fd| fd.content.is_some()) {
+            return SessionStatus::Failed;
+        };
+        return SessionStatus::FailedNoUnsaved;
     };
 
     store.push(DATA_FILE);
-    std::fs::write(store, session_contents).is_ok()
+    match std::fs::write(store, session_contents) {
+        Ok(..) => SessionStatus::Stored,
+        Err(..) => {
+            if session_files.iter().any(|fd| fd.content.is_some()) {
+                SessionStatus::Failed
+            } else {
+                SessionStatus::FailedNoUnsaved
+            }
+        }
+    }
 }
 
 pub fn restore_last_sesson() -> IdiomResult<PathBuf> {

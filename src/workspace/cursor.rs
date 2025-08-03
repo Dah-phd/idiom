@@ -1,4 +1,5 @@
-use crate::{global_state::GlobalState, workspace::line::EditorLine};
+use crate::workspace::line::EditorLine;
+use idiom_tui::layout::Rect;
 use lsp_types::Position;
 pub type Select = (CursorPosition, CursorPosition);
 
@@ -14,10 +15,9 @@ pub struct Cursor {
 }
 
 impl Cursor {
-    pub fn sized(gs: &GlobalState, offset: usize) -> Self {
-        let editor_rect = gs.calc_editor_rect();
-        let text_width = editor_rect.width.saturating_sub(offset + 1);
-        let max_rows = editor_rect.height as usize;
+    pub fn sized(editor_screen: Rect, offset: usize) -> Self {
+        let text_width = editor_screen.width.saturating_sub(offset + 1);
+        let max_rows = editor_screen.height as usize;
         Self { text_width, max_rows, ..Default::default() }
     }
 

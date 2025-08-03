@@ -11,9 +11,9 @@ use crate::{
         popup_replace::ReplacePopup,
         popup_tree_search::ActivePathSearch,
         popups_editor::selector_editors,
-        should_save_and_exit, Popup,
+        save_and_exit, Popup,
     },
-    session::{load_session, store_session},
+    session::{load_session, store_session, SessionStatus},
     tree::Tree,
     workspace::Workspace,
 };
@@ -40,16 +40,18 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
     let lsp_servers = base_configs.init_preloaded_lsp_servers(tree.get_base_file_names(), &mut gs).await;
     let mut workspace = Workspace::new(editor_key_map, base_configs, lsp_servers);
 
-    if max_sessions != 0 {
-        load_session(&mut workspace, &mut gs).await;
-    };
-
     // CLI SETUP
     if let Some(path) = open_file {
         tree.select_by_path(&path)?;
         gs.event.push(IdiomEvent::OpenAtLine(path, 0));
         gs.toggle_tree();
     }
+
+    // LOAD SESSION
+    if max_sessions != 0 {
+        gs.force_area_calc();
+        load_session(&mut workspace, &mut gs).await;
+    };
 
     loop {
         // handle input events
@@ -93,11 +95,16 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
                                     Pallet::run(&mut gs, &mut workspace, &mut tree, &mut term);
                                 }
                                 GeneralAction::Exit => {
-                                    if max_sessions != 0 && store_session(&mut workspace, max_sessions)
-                                        || workspace.are_updates_saved(&mut gs)
-                                        || should_save_and_exit(&mut gs, &mut workspace, &mut tree, &mut term)
-                                    {
-                                        return Ok(());
+                                    if max_sessions == 0 {
+                                        if save_and_exit(&mut gs, &mut workspace, &mut tree, &mut term) {
+                                            return Ok(());
+                                        };
+                                    } else {
+                                        match store_session(&workspace, max_sessions) {
+                                            SessionStatus::Failed
+                                                if !save_and_exit(&mut gs, &mut workspace, &mut tree, &mut term) => {}
+                                            _ => return Ok(()),
+                                        }
                                     };
                                 }
                                 GeneralAction::FileTreeModeOrCancelInput => gs.select_mode(),
@@ -145,9 +152,9 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
                         height = new_height;
                     }
                     gs.full_resize(height, width);
-                    let editor_rect = gs.calc_editor_rect();
-                    workspace.resize_all(editor_rect.width, editor_rect.height as usize);
-                    term.resize(editor_rect);
+                    gs.force_area_calc();
+                    workspace.resize_all(gs.editor_area.width, gs.editor_area.height as usize);
+                    term.resize(gs.editor_area);
                 }
                 Event::Mouse(event) => gs.map_mouse(event, &mut tree, &mut workspace, &mut term),
                 Event::Paste(clip) => {

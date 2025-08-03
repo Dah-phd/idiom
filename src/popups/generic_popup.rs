@@ -241,12 +241,10 @@ impl PopupChoice {
 /// uses workaround in order to message if the popup should trigger exit
 /// the solution is no ideal but it otherwise a whole messaging system will be needed
 /// or different exit strategy
-pub fn should_save_and_exit(
-    gs: &mut GlobalState,
-    ws: &mut Workspace,
-    tree: &mut Tree,
-    term: &mut EditorTerminal,
-) -> bool {
+pub fn save_and_exit(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) -> bool {
+    if ws.iter().all(|e| gs.unwrap_or_default(e.is_saved(), "prefix")) {
+        return true;
+    };
     let mut popup = PopupChoice::new_static(
         "Not all opened editors are saved!".into(),
         None,

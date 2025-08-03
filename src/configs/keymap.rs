@@ -197,7 +197,7 @@ impl Default for EditorUserKeyMap {
             redo: format!("{CTRL} && y"),
             save: format!("{CTRL} && s"),
             cancel: ESC.to_owned(),
-            close: format!("{CTRL} && q || {CTRL} && d"),
+            close: format!("{CTRL} && d"),
             comment_out: format!("{CTRL} && /"),
         }
     }

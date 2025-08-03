@@ -79,7 +79,7 @@ pub fn text_editor_from_data(
 ) -> Editor {
     let display = build_display(&path);
     let line_number_offset = calc_line_number_offset(content.len());
-    let cursor = Cursor::sized(gs, line_number_offset);
+    let cursor = Cursor::sized(gs.editor_area, line_number_offset);
     calc_wraps(&mut content, cursor.text_width);
     Editor {
         actions: Actions::new(cfg.default_indent_cfg()),
@@ -108,7 +108,7 @@ pub fn editor_from_data(
     };
     let display = build_display(&path);
     let line_number_offset = calc_line_number_offset(content.len());
-    let cursor = Cursor::sized(gs, line_number_offset);
+    let cursor = Cursor::sized(gs.editor_area, line_number_offset);
     Editor {
         actions: Actions::new(cfg.get_indent_cfg(&file_type)),
         update_status: FileUpdate::None,

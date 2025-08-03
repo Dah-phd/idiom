@@ -27,7 +27,7 @@ use crossterm::{
     style::{Color, ContentStyle},
 };
 use dirs::config_dir;
-pub use generic_popup::{should_save_and_exit, PopupChoice};
+pub use generic_popup::{save_and_exit, PopupChoice};
 use idiom_tui::{layout::Rect, Backend};
 
 pub enum Status {
