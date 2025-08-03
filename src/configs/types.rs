@@ -1,6 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-#[derive(Debug, PartialEq, Hash, Eq, Clone, Copy, Default)]
+#[derive(Debug, PartialEq, Hash, Eq, Clone, Copy, Default, Serialize, Deserialize)]
 pub enum FileType {
     #[default]
     Ignored,

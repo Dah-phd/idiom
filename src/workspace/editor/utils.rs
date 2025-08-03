@@ -1,3 +1,4 @@
+use super::{calc_wraps, Actions, Cursor, Editor, EditorConfigs, EditorLine, FileType, GlobalState, Lexer, Renderer};
 use crate::error::{IdiomError, IdiomResult};
 use std::{
     os::unix::fs::MetadataExt,
@@ -64,5 +65,61 @@ pub const fn calc_line_number_offset(len: usize) -> usize {
         1
     } else {
         (len.ilog10() + 1) as usize
+    }
+}
+
+/// This is not a normal constructor for Editor
+/// it should be used in cases where the content is present
+/// or real file does not exists
+pub fn text_editor_from_data(
+    path: PathBuf,
+    mut content: Vec<EditorLine>,
+    cfg: &EditorConfigs,
+    gs: &mut GlobalState,
+) -> Editor {
+    let display = build_display(&path);
+    let line_number_offset = calc_line_number_offset(content.len());
+    let cursor = Cursor::sized(gs, line_number_offset);
+    calc_wraps(&mut content, cursor.text_width);
+    Editor {
+        actions: Actions::new(cfg.default_indent_cfg()),
+        update_status: FileUpdate::None,
+        renderer: Renderer::text(),
+        last_render_at_line: None,
+        cursor,
+        line_number_offset,
+        lexer: Lexer::text_lexer(&path, gs),
+        content,
+        file_type: FileType::Ignored,
+        display,
+        path,
+    }
+}
+
+pub fn editor_from_data(
+    path: PathBuf,
+    file_type: FileType,
+    content: Vec<EditorLine>,
+    cfg: &EditorConfigs,
+    gs: &mut GlobalState,
+) -> Editor {
+    if matches!(file_type, FileType::Ignored) {
+        return text_editor_from_data(path, content, cfg, gs);
+    };
+    let display = build_display(&path);
+    let line_number_offset = calc_line_number_offset(content.len());
+    let cursor = Cursor::sized(gs, line_number_offset);
+    Editor {
+        actions: Actions::new(cfg.get_indent_cfg(&file_type)),
+        update_status: FileUpdate::None,
+        renderer: Renderer::code(),
+        last_render_at_line: None,
+        cursor,
+        line_number_offset,
+        lexer: Lexer::with_context(file_type, &path, gs),
+        content,
+        file_type,
+        display,
+        path,
     }
 }

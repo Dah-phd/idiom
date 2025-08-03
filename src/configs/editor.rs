@@ -25,6 +25,8 @@ pub struct EditorConfigs {
     /// SHELL
     pub shell: Option<String>,
     pub git_tui: Option<String>,
+    /// GENERAL
+    pub max_sessions: Option<usize>,
     /// LSP
     rust_lsp: Option<String>,
     rust_lsp_preload_if_present: Option<Vec<String>>,
@@ -60,6 +62,8 @@ impl Default for EditorConfigs {
             // shell
             shell: None,
             git_tui: None,
+            // general
+            max_sessions: Some(10),
             // lsp
             rust_lsp: Some(String::from("rust-analyzer")),
             rust_lsp_preload_if_present: Some(vec!["Cargo.toml".to_owned(), "Cargo.lock".to_owned()]),

@@ -17,6 +17,7 @@ use idiom_tui::{layout::Rect, Position};
 use lsp_types::TextEdit;
 use std::{cmp::Ordering, path::PathBuf};
 use utils::{big_file_protection, build_display, calc_line_number_offset, FileUpdate};
+pub use utils::{editor_from_data, text_editor_from_data};
 
 #[allow(dead_code)]
 pub struct Editor {
@@ -600,39 +601,6 @@ impl Editor {
 impl Drop for Editor {
     fn drop(&mut self) {
         self.lexer.close();
-    }
-}
-
-/// This is not a normal constructor for Editor
-/// it should be used in cases where the content is present
-/// or real file does not exists
-pub fn editor_from_data(
-    path: PathBuf,
-    mut content: Vec<EditorLine>,
-    file_type: FileType,
-    cfg: &EditorConfigs,
-    gs: &mut GlobalState,
-) -> Editor {
-    let lexer = match file_type {
-        FileType::Ignored => Lexer::text_lexer(&path, gs),
-        code_file_type => Lexer::with_context(code_file_type, &path, gs),
-    };
-    let display = build_display(&path);
-    let line_number_offset = calc_line_number_offset(content.len());
-    let cursor = Cursor::sized(gs, line_number_offset);
-    calc_wraps(&mut content, cursor.text_width);
-    Editor {
-        actions: Actions::new(cfg.default_indent_cfg()),
-        update_status: FileUpdate::None,
-        renderer: Renderer::text(),
-        last_render_at_line: None,
-        cursor,
-        line_number_offset,
-        lexer,
-        content,
-        file_type,
-        display,
-        path,
     }
 }
 

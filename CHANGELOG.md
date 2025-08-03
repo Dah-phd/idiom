@@ -7,6 +7,7 @@
 - added set lsp to pallet
 - added fisual effect (arrow) on tree scroll
 - moved popupchoice buffer from string to text_field
+- added session support
 
 # Version 0.5.4
 - dep version bump

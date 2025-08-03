@@ -13,6 +13,7 @@ use crate::{
         popups_editor::selector_editors,
         should_save_and_exit, Popup,
     },
+    session::{load_session, store_session},
     tree::Tree,
     workspace::Workspace,
 };
@@ -31,6 +32,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
     let (mut general_key_map, editor_key_map, tree_key_map) = gs.get_key_maps();
     let mut base_configs = gs.get_configs();
     let integrated_shell = base_configs.shell.take();
+    let max_sessions = base_configs.max_sessions.unwrap_or_default();
 
     // INIT COMPONENTS
     let mut tree = Tree::new(tree_key_map, &mut gs);
@@ -38,9 +40,13 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
     let lsp_servers = base_configs.init_preloaded_lsp_servers(tree.get_base_file_names(), &mut gs).await;
     let mut workspace = Workspace::new(editor_key_map, base_configs, lsp_servers);
 
+    if max_sessions != 0 {
+        load_session(&mut workspace, &mut gs).await;
+    };
+
     // CLI SETUP
     if let Some(path) = open_file {
-        tree.select_by_path(&path).unwrap();
+        tree.select_by_path(&path)?;
         gs.event.push(IdiomEvent::OpenAtLine(path, 0));
         gs.toggle_tree();
     }
@@ -87,7 +93,8 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
                                     Pallet::run(&mut gs, &mut workspace, &mut tree, &mut term);
                                 }
                                 GeneralAction::Exit => {
-                                    if workspace.are_updates_saved(&mut gs)
+                                    if max_sessions != 0 && store_session(&mut workspace, max_sessions)
+                                        || workspace.are_updates_saved(&mut gs)
                                         || should_save_and_exit(&mut gs, &mut workspace, &mut tree, &mut term)
                                     {
                                         return Ok(());

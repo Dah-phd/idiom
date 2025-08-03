@@ -15,8 +15,9 @@ pub struct Cursor {
 
 impl Cursor {
     pub fn sized(gs: &GlobalState, offset: usize) -> Self {
-        let text_width = gs.editor_area.width.saturating_sub(offset + 1);
-        let max_rows = gs.editor_area.height as usize;
+        let editor_rect = gs.calc_editor_rect();
+        let text_width = editor_rect.width.saturating_sub(offset + 1);
+        let max_rows = editor_rect.height as usize;
         Self { text_width, max_rows, ..Default::default() }
     }
 

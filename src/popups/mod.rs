@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use crate::{
     app::{MIN_FRAMERATE, MIN_HEIGHT, MIN_WIDTH},
-    configs::CONFIG_FOLDER,
+    configs::APP_FOLDER,
     embeded_term::EditorTerminal,
     error::{IdiomError, IdiomResult},
     ext_tui::{CrossTerm, StyleExt},
@@ -133,7 +133,7 @@ impl Command {
 
     fn cfg_open(label: &'static str, file_path: &'static str) -> Option<Self> {
         let mut path = config_dir()?;
-        path.push(CONFIG_FOLDER);
+        path.push(APP_FOLDER);
         path.push(file_path);
         Some(Command { label, result: CommandResult::Simple(IdiomEvent::OpenAtLine(path, 0)) })
     }
