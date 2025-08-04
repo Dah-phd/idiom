@@ -25,7 +25,7 @@ use std::{
     path::PathBuf,
 };
 
-const FILE_STATUS_ERR: &str = "File status ERR";
+pub const FILE_STATUS_ERR: &str = "File status ERR";
 
 /// implement Drop to attempt keep state upon close/crash
 pub struct Workspace {
@@ -256,6 +256,7 @@ impl Workspace {
         Editor::from_path(file_path, FileType::Ignored, &self.base_configs, gs)
     }
 
+    /// it could be the case that the file no longer exits
     pub async fn new_from_session(
         &mut self,
         path: PathBuf,
@@ -263,7 +264,6 @@ impl Workspace {
         content: Option<Vec<String>>,
         gs: &mut GlobalState,
     ) -> IdiomResult<()> {
-        let path = path.canonicalize()?;
         let content = match content {
             None => EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?,
             Some(lines) => lines.into_iter().map(EditorLine::from).collect(),

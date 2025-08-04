@@ -13,7 +13,7 @@ use std::path::PathBuf;
 
 pub fn mock_editor(content: Vec<String>) -> Editor {
     let ft = FileType::Rust;
-    let path = PathBuf::from("");
+    let path = PathBuf::from("test-path");
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), crate::ext_tui::CrossTerm::init());
     let content: Vec<EditorLine> = content.into_iter().map(EditorLine::from).collect();
     Editor {

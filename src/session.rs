@@ -11,7 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 const DATA_FILE: &str = "data.json";
 const META_FILE: &str = "meta.json";
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 struct StoreFileData<'a> {
     path: PathBuf,
     file_type: FileType,
@@ -22,11 +22,8 @@ impl<'a> StoreFileData<'a> {
     fn from_workspace(ws: &'a Workspace) -> Vec<Self> {
         ws.iter()
             .map(|editor| {
-                let content = if editor.is_saved().unwrap_or(true) {
-                    None
-                } else {
-                    Some(editor.content.iter().map(|l| l.content.as_str()).collect())
-                };
+                let store_content = !editor.is_saved().unwrap_or_default();
+                let content = store_content.then_some(editor.content.iter().map(|l| l.content.as_str()).collect());
                 StoreFileData { content, file_type: editor.file_type, path: editor.path.clone() }
             })
             .collect()
@@ -54,18 +51,21 @@ pub enum SessionStatus {
     Stored,
 }
 
+#[inline]
 pub fn store_session(ws: &Workspace, max_sessions: usize) -> SessionStatus {
     // get app folder
-    let Some(mut store) = data_local_dir() else {
+    let Some(store) = get_store_path() else {
         return SessionStatus::Failed;
     };
-    store.push(APP_FOLDER);
-
     // create app folded if not exists
     if !store.exists() && std::fs::create_dir(&store).is_err() {
         return SessionStatus::Failed;
     }
+    create_and_store_session(store, ws, max_sessions)
+}
 
+// temp dir testible
+fn create_and_store_session(mut store: PathBuf, ws: &Workspace, max_sessions: usize) -> SessionStatus {
     let Ok(cwd) = std::env::current_dir() else {
         return SessionStatus::Failed;
     };
@@ -118,10 +118,14 @@ pub fn store_session(ws: &Workspace, max_sessions: usize) -> SessionStatus {
     }
 }
 
+#[inline]
 pub fn restore_last_sesson() -> IdiomResult<PathBuf> {
-    let mut store = data_local_dir().ok_or(IdiomError::io_not_found("Unable to determine session storage"))?;
-    store.push(APP_FOLDER);
+    let store = get_store_path().ok_or(IdiomError::io_not_found("Unable to determine session storage"))?;
+    read_last_session_working_dir(store)
+}
 
+// temp dir testible
+fn read_last_session_working_dir(store: PathBuf) -> IdiomResult<PathBuf> {
     let mut last_session_path = std::fs::read_dir(&store)?
         .flatten()
         .map(|dir_entry| {
@@ -138,10 +142,15 @@ pub fn restore_last_sesson() -> IdiomResult<PathBuf> {
     Ok(md.path)
 }
 
+#[inline]
 pub async fn load_session(ws: &mut Workspace, gs: &mut GlobalState) {
-    let Some(mut store) = data_local_dir() else { return };
-    store.push(APP_FOLDER);
+    if let Some(store) = get_store_path() {
+        load_session_if_exists(store, ws, gs).await
+    }
+}
 
+// temp dir testible
+async fn load_session_if_exists(store: PathBuf, ws: &mut Workspace, gs: &mut GlobalState) {
     if !store.exists() {
         return;
     };
@@ -215,6 +224,12 @@ fn clean_up(store: &Path, cwd_hash: u64, max_sessions: usize) {
     }
 }
 
+fn get_store_path() -> Option<PathBuf> {
+    let mut store = data_local_dir()?;
+    store.push(APP_FOLDER);
+    Some(store)
+}
+
 // (timestamp, hash)
 fn split_path(path: &Path) -> Option<(u64, u64)> {
     let full = path.file_stem()?.to_string_lossy();
@@ -247,12 +262,40 @@ fn hash_path(path: &Path) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{LoadedFileData, StoreFileData};
+    use super::{
+        create_and_store_session, load_session_if_exists, read_last_session_working_dir, LoadedFileData, SessionStatus,
+        StoreFileData,
+    };
     use crate::configs::FileType;
+    use crate::ext_tui::CrossTerm;
+    use crate::global_state::GlobalState;
+    use crate::utils::test::TempDir;
+    use crate::workspace::tests::{mock_ws, mock_ws_empty};
+    use idiom_tui::{layout::Rect, Backend};
     use std::path::PathBuf;
 
-    #[test]
-    fn store_and_load() {}
+    #[tokio::test]
+    async fn store_and_load() {
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+        let mut ws = mock_ws(vec![String::from("test data"), String::from("second line")]);
+        assert_eq!(ws.get_active().unwrap().path, PathBuf::from("test-path"));
+        assert!(!StoreFileData::from_workspace(&ws).is_empty());
+        let mut receiver_ws = mock_ws_empty();
+        assert!(receiver_ws.is_empty());
+        let temp_dir = TempDir::new("session-store").unwrap();
+        // store session
+        let status = create_and_store_session(temp_dir.path().to_owned(), &ws, 10);
+        assert!(matches!(status, SessionStatus::Stored));
+        // check if can be mapped to last session
+        assert!(read_last_session_working_dir(temp_dir.path().to_owned()).is_ok());
+        // loading session
+        load_session_if_exists(temp_dir.path().to_owned(), &mut receiver_ws, &mut gs).await;
+        assert!(!receiver_ws.is_empty());
+        // confirm stored is same as loaded
+        let expected_content = ws.get_active().unwrap().content.iter().map(|l| l.content.as_str()).collect::<Vec<_>>();
+        let content = receiver_ws.get_active().unwrap().content.iter().map(|l| l.content.as_str()).collect::<Vec<_>>();
+        assert_eq!(content, expected_content);
+    }
 
     #[test]
     fn separate_serde() {

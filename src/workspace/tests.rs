@@ -33,6 +33,17 @@ pub fn mock_ws(content: Vec<String>) -> Workspace {
     ws
 }
 
+pub fn mock_ws_empty() -> Workspace {
+    Workspace {
+        editors: vec![].into(),
+        base_configs: EditorConfigs::default(),
+        key_map: mock_editor_key_map(),
+        lsp_servers: HashMap::default(),
+        map_callback: map_editor,
+        tab_style: ContentStyle::default(),
+    }
+}
+
 fn base_ws() -> Workspace {
     mock_ws(vec![
         "hello world!".to_owned(),

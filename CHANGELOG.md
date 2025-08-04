@@ -8,6 +8,7 @@
 - added fisual effect (arrow) on tree scroll
 - moved popupchoice buffer from string to text_field
 - added session support
+- session loading can load already deleted files (also should store them)
 
 # Version 0.5.4
 - dep version bump

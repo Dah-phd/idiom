@@ -4,7 +4,7 @@ use crate::{
     global_state::GlobalState,
     popups::{Components, Popup, Status},
     tree::Tree,
-    workspace::Workspace,
+    workspace::{Workspace, FILE_STATUS_ERR},
 };
 use crossterm::{
     event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind},
@@ -242,7 +242,7 @@ impl PopupChoice {
 /// the solution is no ideal but it otherwise a whole messaging system will be needed
 /// or different exit strategy
 pub fn save_and_exit(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) -> bool {
-    if ws.iter().all(|e| gs.unwrap_or_default(e.is_saved(), "prefix")) {
+    if ws.iter().all(|e| gs.unwrap_or_default(e.is_saved(), FILE_STATUS_ERR)) {
         return true;
     };
     let mut popup = PopupChoice::new_static(
