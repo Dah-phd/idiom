@@ -95,7 +95,9 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
                                     Pallet::run(&mut gs, &mut workspace, &mut tree, &mut term);
                                 }
                                 GeneralAction::Exit => {
-                                    if max_sessions == 0 {
+                                    if workspace.is_empty() {
+                                        return Ok(());
+                                    } else if max_sessions == 0 {
                                         if save_and_exit(&mut gs, &mut workspace, &mut tree, &mut term) {
                                             return Ok(());
                                         };

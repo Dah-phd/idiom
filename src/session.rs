@@ -18,6 +18,21 @@ struct StoreFileData<'a> {
     content: Option<Vec<&'a str>>,
 }
 
+impl<'a> StoreFileData<'a> {
+    fn from_workspace(ws: &'a Workspace) -> Vec<Self> {
+        ws.iter()
+            .map(|editor| {
+                let content = if editor.is_saved().unwrap_or(true) {
+                    None
+                } else {
+                    Some(editor.content.iter().map(|l| l.content.as_str()).collect())
+                };
+                StoreFileData { content, file_type: editor.file_type, path: editor.path.clone() }
+            })
+            .collect()
+    }
+}
+
 #[derive(Deserialize)]
 struct LoadedFileData {
     path: PathBuf,
@@ -31,10 +46,12 @@ struct MetaData {
     path: PathBuf,
 }
 
+#[derive(Default)]
 pub enum SessionStatus {
-    Stored,
+    #[default]
     Failed,
     FailedNoUnsaved,
+    Stored,
 }
 
 pub fn store_session(ws: &Workspace, max_sessions: usize) -> SessionStatus {
@@ -79,15 +96,7 @@ pub fn store_session(ws: &Workspace, max_sessions: usize) -> SessionStatus {
         return SessionStatus::Failed;
     };
 
-    let mut session_files = vec![];
-    for editor in ws.iter() {
-        let content = if editor.is_saved().unwrap_or(true) {
-            None
-        } else {
-            Some(editor.content.iter().map(|l| l.content.as_str()).collect())
-        };
-        session_files.push(StoreFileData { content, file_type: editor.file_type, path: editor.path.clone() })
-    }
+    let session_files = StoreFileData::from_workspace(ws);
 
     let Ok(session_contents) = serde_json::to_string(&session_files) else {
         if session_files.iter().any(|fd| fd.content.is_some()) {
@@ -170,7 +179,9 @@ pub async fn load_session(ws: &mut Workspace, gs: &mut GlobalState) {
             }
         }
         _ = std::fs::remove_dir_all(path);
-        gs.insert_mode();
+        if !ws.is_empty() && gs.is_select() {
+            gs.insert_mode();
+        };
         return;
     }
 }
@@ -239,6 +250,9 @@ mod tests {
     use super::{LoadedFileData, StoreFileData};
     use crate::configs::FileType;
     use std::path::PathBuf;
+
+    #[test]
+    fn store_and_load() {}
 
     #[test]
     fn separate_serde() {
