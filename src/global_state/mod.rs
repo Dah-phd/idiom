@@ -318,16 +318,6 @@ impl GlobalState {
         (self.tab_area, self.editor_area) = screen.split_vertical_rel(1);
     }
 
-    pub fn calc_editor_rect(&self) -> Rect {
-        let mut base_screen = if self.components.contains(Components::TREE) || self.is_select() {
-            self.screen_rect.split_horizont_rel(self.tree_size).1
-        } else {
-            self.screen_rect
-        };
-        base_screen.pop_line();
-        base_screen.split_vertical_rel(1).1
-    }
-
     /// unwrap or default with logged error
     #[inline]
     pub fn unwrap_or_default<T: Default, E: Error>(&mut self, result: Result<T, E>, prefix: &str) -> T {

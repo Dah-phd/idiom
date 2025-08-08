@@ -15,7 +15,7 @@ use crate::{
 };
 use crossterm::event::KeyEvent;
 use crossterm::style::{Color, ContentStyle};
-pub use cursor::CursorPosition;
+pub use cursor::{Cursor, CursorPosition};
 pub use editor::{editor_from_data, text_editor_from_data, Editor};
 use idiom_tui::Backend;
 use line::EditorLine;
@@ -252,8 +252,17 @@ impl Workspace {
         self.editors.iter_mut().find(|editor| editor.path == path)
     }
 
-    fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
-        Editor::from_path(file_path, FileType::Ignored, &self.base_configs, gs)
+    // EDITOR BUILDERS
+
+    pub fn new_text_from_data(
+        &mut self,
+        path: PathBuf,
+        content: Vec<EditorLine>,
+        cursor: Option<Cursor>,
+        gs: &mut GlobalState,
+    ) {
+        let editor = text_editor_from_data(path, content, cursor.unwrap_or_default(), &self.base_configs, gs);
+        self.editors.insert(0, editor);
     }
 
     /// it could be the case that the file no longer exits
@@ -261,6 +270,7 @@ impl Workspace {
         &mut self,
         path: PathBuf,
         file_type: FileType,
+        cursor: Cursor,
         content: Option<Vec<String>>,
         gs: &mut GlobalState,
     ) -> IdiomResult<()> {
@@ -269,10 +279,10 @@ impl Workspace {
             Some(lines) => lines.into_iter().map(EditorLine::from).collect(),
         };
         if matches!(file_type, FileType::Ignored) {
-            add_text_editor_from_data(self, path, content, gs);
+            self.new_text_from_data(path, content, Some(cursor), gs);
             return Ok(());
         };
-        let mut editor = editor_from_data(path, file_type, content, &self.base_configs, gs);
+        let mut editor = editor_from_data(path, file_type, content, cursor, &self.base_configs, gs);
         self.lsp_enroll(&mut editor, gs).await;
         self.editors.insert(0, editor);
         Ok(())
@@ -302,6 +312,10 @@ impl Workspace {
         self.editors.insert(0, editor);
         self.toggle_editor();
         Ok(true)
+    }
+
+    fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
+        Editor::from_path(file_path, FileType::Ignored, &self.base_configs, gs)
     }
 
     async fn determine_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
@@ -592,16 +606,6 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         return true;
     }
     false
-}
-
-pub fn add_text_editor_from_data(
-    workspace: &mut Workspace,
-    path: PathBuf,
-    content: Vec<EditorLine>,
-    gs: &mut GlobalState,
-) {
-    let editor = text_editor_from_data(path, content, &workspace.base_configs, gs);
-    workspace.editors.insert(0, editor);
 }
 
 #[cfg(test)]

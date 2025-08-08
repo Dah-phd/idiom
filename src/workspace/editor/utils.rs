@@ -73,15 +73,19 @@ pub const fn calc_line_number_offset(len: usize) -> usize {
 /// or real file does not exists
 pub fn text_editor_from_data(
     path: PathBuf,
-    mut content: Vec<EditorLine>,
+    content: Vec<EditorLine>,
+    mut cursor: Cursor,
     cfg: &EditorConfigs,
     gs: &mut GlobalState,
 ) -> Editor {
     let display = build_display(&path);
     let line_number_offset = calc_line_number_offset(content.len());
-    let cursor = Cursor::sized(gs.editor_area, line_number_offset);
-    calc_wraps(&mut content, cursor.text_width);
-    Editor {
+
+    if !cursor.matches_content(&content) {
+        cursor = Cursor::default();
+    }
+
+    let mut editor = Editor {
         actions: Actions::new(cfg.default_indent_cfg()),
         update_status: FileUpdate::None,
         renderer: Renderer::text(),
@@ -93,23 +97,31 @@ pub fn text_editor_from_data(
         file_type: FileType::Ignored,
         display,
         path,
-    }
+    };
+    editor.resize(gs.editor_area.width, gs.editor_area.height as usize);
+    calc_wraps(&mut editor.content, editor.cursor.text_width);
+    editor
 }
 
 pub fn editor_from_data(
     path: PathBuf,
     file_type: FileType,
     content: Vec<EditorLine>,
+    mut cursor: Cursor,
     cfg: &EditorConfigs,
     gs: &mut GlobalState,
 ) -> Editor {
     if matches!(file_type, FileType::Ignored) {
-        return text_editor_from_data(path, content, cfg, gs);
+        return text_editor_from_data(path, content, cursor, cfg, gs);
     };
     let display = build_display(&path);
     let line_number_offset = calc_line_number_offset(content.len());
-    let cursor = Cursor::sized(gs.editor_area, line_number_offset);
-    Editor {
+
+    if !cursor.matches_content(&content) {
+        cursor = Cursor::default();
+    }
+
+    let mut editor = Editor {
         actions: Actions::new(cfg.get_indent_cfg(&file_type)),
         update_status: FileUpdate::None,
         renderer: Renderer::code(),
@@ -121,5 +133,7 @@ pub fn editor_from_data(
         file_type,
         display,
         path,
-    }
+    };
+    editor.resize(gs.editor_area.width, gs.editor_area.height as usize);
+    editor
 }

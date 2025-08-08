@@ -404,7 +404,7 @@ impl Editor {
 
     pub fn go_to(&mut self, line: usize) {
         self.cursor.select_drop();
-        if self.content.len() >= line {
+        if self.content.len() > line {
             self.cursor.line = line;
             self.cursor.char = find_line_start(&self.content[line]);
             self.cursor.at_line = line.saturating_sub(self.cursor.max_rows / 2);

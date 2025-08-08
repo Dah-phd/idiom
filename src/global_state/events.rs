@@ -8,7 +8,7 @@ use crate::popups::PopupChoice;
 use crate::popups::{popup_tree_search::ActiveFileSearch, Popup};
 use crate::tree::Tree;
 use crate::workspace::line::EditorLine;
-use crate::workspace::{add_text_editor_from_data, Workspace};
+use crate::workspace::Workspace;
 use crate::{configs::FileType, workspace::CursorPosition};
 use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, Range, WorkspaceEdit};
 use std::path::PathBuf;
@@ -121,7 +121,7 @@ impl IdiomEvent {
                     let content: Vec<EditorLine> =
                         gs.messages.get_logs().map(ToOwned::to_owned).map(EditorLine::from).collect();
                     if !content.is_empty() {
-                        add_text_editor_from_data(ws, path, content, gs);
+                        ws.new_text_from_data(path, content, None, gs);
                     } else {
                         gs.success(" >> no error logs found!");
                     }

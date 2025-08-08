@@ -1,7 +1,7 @@
 use crate::configs::{FileType, APP_FOLDER};
 use crate::error::{IdiomError, IdiomResult};
 use crate::global_state::GlobalState;
-use crate::workspace::Workspace;
+use crate::workspace::{cursor::Cursor, Workspace};
 use dirs::data_local_dir;
 use serde::{Deserialize, Serialize};
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -16,6 +16,7 @@ struct StoreFileData<'a> {
     path: PathBuf,
     file_type: FileType,
     content: Option<Vec<&'a str>>,
+    cursor: Cursor,
 }
 
 impl<'a> StoreFileData<'a> {
@@ -24,7 +25,12 @@ impl<'a> StoreFileData<'a> {
             .map(|editor| {
                 let store_content = !editor.is_saved().unwrap_or_default();
                 let content = store_content.then_some(editor.content.iter().map(|l| l.content.as_str()).collect());
-                StoreFileData { content, file_type: editor.file_type, path: editor.path.clone() }
+                StoreFileData {
+                    content,
+                    file_type: editor.file_type,
+                    path: editor.path.clone(),
+                    cursor: editor.cursor.clone(),
+                }
             })
             .collect()
     }
@@ -35,6 +41,7 @@ struct LoadedFileData {
     path: PathBuf,
     file_type: FileType,
     content: Option<Vec<String>>,
+    cursor: Cursor,
 }
 
 // enough to restore last session
@@ -183,7 +190,7 @@ async fn load_session_if_exists(store: PathBuf, ws: &mut Workspace, gs: &mut Glo
         };
 
         for fd in session.into_iter().rev() {
-            if let Err(error) = ws.new_from_session(fd.path, fd.file_type, fd.content, gs).await {
+            if let Err(error) = ws.new_from_session(fd.path, fd.file_type, fd.cursor, fd.content, gs).await {
                 gs.error(error);
             }
         }
@@ -270,7 +277,10 @@ mod tests {
     use crate::ext_tui::CrossTerm;
     use crate::global_state::GlobalState;
     use crate::utils::test::TempDir;
-    use crate::workspace::tests::{mock_ws, mock_ws_empty};
+    use crate::workspace::{
+        cursor::Cursor,
+        tests::{mock_ws, mock_ws_empty},
+    };
     use idiom_tui::{layout::Rect, Backend};
     use std::path::PathBuf;
 
@@ -303,6 +313,7 @@ mod tests {
             path: PathBuf::from("/home/test"),
             file_type: FileType::Rust,
             content: Some(vec!["text", "more text"]),
+            cursor: Cursor::default(),
         }];
 
         let as_txt = serde_json::to_string(&serialized).unwrap();

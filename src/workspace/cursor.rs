@@ -1,9 +1,11 @@
 use crate::workspace::line::EditorLine;
 use idiom_tui::layout::Rect;
 use lsp_types::Position;
+use serde::{Deserialize, Serialize};
+
 pub type Select = (CursorPosition, CursorPosition);
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
 pub struct Cursor {
     pub line: usize,
     pub char: usize,    // this is a char position not byte index
@@ -19,6 +21,24 @@ impl Cursor {
         let text_width = editor_screen.width.saturating_sub(offset + 1);
         let max_rows = editor_screen.height as usize;
         Self { text_width, max_rows, ..Default::default() }
+    }
+
+    pub fn matches_content(&self, content: &[EditorLine]) -> bool {
+        if content.len() <= self.line {
+            return false;
+        }
+        if content[self.line].char_len() < self.char {
+            return false;
+        }
+        if let Some((from, to)) = self.select {
+            if content.len() <= from.line || content.len() <= to.line {
+                return false;
+            }
+            if content[from.line].char_len() < from.char || content[to.line].char_len() < to.char {
+                return false;
+            }
+        }
+        true
     }
 
     pub fn set_cursor_checked_with_select(&mut self, position: CursorPosition, content: &[EditorLine]) {
@@ -408,7 +428,7 @@ impl From<&mut Cursor> for Position {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct CursorPosition {
     pub line: usize,
     pub char: usize, // this is char position not byte index
