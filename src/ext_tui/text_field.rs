@@ -440,7 +440,7 @@ pub mod test {
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
     pub fn pull_select<T: Clone + Default>(text_field: &TextField<T>) -> Option<(usize, usize)> {
-        text_field.select.clone()
+        text_field.select
     }
 
     pub fn pull_char<T: Clone + Default>(text_field: &TextField<T>) -> usize {
