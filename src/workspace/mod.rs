@@ -115,18 +115,16 @@ impl Workspace {
     #[inline]
     pub fn rename_editors(&mut self, from_path: PathBuf, to_path: PathBuf, gs: &mut GlobalState) {
         if to_path.is_dir() {
-            for editor in self.editors.iter_mut() {
-                if editor.path.starts_with(&from_path) {
-                    let mut updated_path = PathBuf::new();
-                    let mut old = editor.path.iter();
-                    for (new_part, ..) in to_path.iter().zip(&mut old) {
-                        updated_path.push(new_part);
-                    }
-                    for remaining_part in old {
-                        updated_path.push(remaining_part)
-                    }
-                    gs.log_if_lsp_error(editor.update_path(updated_path), editor.file_type);
+            for editor in self.editors.iter_mut().filter(|e| e.path.starts_with(&from_path)) {
+                let mut updated_path = PathBuf::new();
+                let mut old = editor.path.iter();
+                for (new_part, ..) in to_path.iter().zip(&mut old) {
+                    updated_path.push(new_part);
                 }
+                for remaining_part in old {
+                    updated_path.push(remaining_part)
+                }
+                gs.log_if_lsp_error(editor.update_path(updated_path), editor.file_type);
             }
         } else if let Some(editor) = self.editors.find(|e| e.path == from_path) {
             gs.log_if_lsp_error(editor.update_path(to_path), editor.file_type);
@@ -134,15 +132,16 @@ impl Workspace {
     }
 
     pub fn activate_editor(&mut self, idx: usize, gs: &mut GlobalState) {
-        if idx < self.editors.len() {
-            let mut editor = self.editors.remove(idx);
-            editor.clear_screen_cache(gs);
-            gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
-            if editor.update_status.collect() {
-                gs.event.push(file_updated(editor.path.clone()).into());
-            }
-            self.editors.insert(0, editor);
+        if idx >= self.editors.len() {
+            return;
         }
+        let mut editor = self.editors.remove(idx);
+        editor.clear_screen_cache(gs);
+        gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
+        if editor.update_status.collect() {
+            gs.event.push(file_updated(editor.path.clone()).into());
+        }
+        self.editors.insert(0, editor);
     }
 
     pub fn apply_edits(&mut self, edits: WorkspaceEdit, gs: &mut GlobalState) {
@@ -261,7 +260,7 @@ impl Workspace {
         cursor: Option<Cursor>,
         gs: &mut GlobalState,
     ) {
-        let editor = text_editor_from_data(path, content, cursor.unwrap_or_default(), &self.base_configs, gs);
+        let editor = text_editor_from_data(path, content, cursor, &self.base_configs, gs);
         self.editors.insert(0, editor);
     }
 
@@ -282,7 +281,7 @@ impl Workspace {
             self.new_text_from_data(path, content, Some(cursor), gs);
             return Ok(());
         };
-        let mut editor = editor_from_data(path, file_type, content, cursor, &self.base_configs, gs);
+        let mut editor = editor_from_data(path, file_type, content, Some(cursor), &self.base_configs, gs);
         self.lsp_enroll(&mut editor, gs).await;
         self.editors.insert(0, editor);
         Ok(())

@@ -27,7 +27,6 @@ Python should work for the most part with jedi, but the interaction is not well 
 - Linux Mint
 
 ## TODO
-- test cursor / select in sessions
 - add mouse tests to mouse effects on modals
 - check on sort text in autocomplete (probably not that useful as request is sent once)
 - change to select mode on file open with mouse

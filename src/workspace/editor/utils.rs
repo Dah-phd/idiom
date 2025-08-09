@@ -74,16 +74,17 @@ pub const fn calc_line_number_offset(len: usize) -> usize {
 pub fn text_editor_from_data(
     path: PathBuf,
     content: Vec<EditorLine>,
-    mut cursor: Cursor,
+    cursor: Option<Cursor>,
     cfg: &EditorConfigs,
     gs: &mut GlobalState,
 ) -> Editor {
     let display = build_display(&path);
     let line_number_offset = calc_line_number_offset(content.len());
 
-    if !cursor.matches_content(&content) {
-        cursor = Cursor::default();
-    }
+    let cursor = match cursor {
+        Some(cursor) if cursor.matches_content(&content) => cursor,
+        Some(..) | None => Cursor::default(),
+    };
 
     let mut editor = Editor {
         actions: Actions::new(cfg.default_indent_cfg()),
@@ -107,7 +108,7 @@ pub fn editor_from_data(
     path: PathBuf,
     file_type: FileType,
     content: Vec<EditorLine>,
-    mut cursor: Cursor,
+    cursor: Option<Cursor>,
     cfg: &EditorConfigs,
     gs: &mut GlobalState,
 ) -> Editor {
@@ -117,9 +118,10 @@ pub fn editor_from_data(
     let display = build_display(&path);
     let line_number_offset = calc_line_number_offset(content.len());
 
-    if !cursor.matches_content(&content) {
-        cursor = Cursor::default();
-    }
+    let cursor = match cursor {
+        Some(cursor) if cursor.matches_content(&content) => cursor,
+        Some(..) | None => Cursor::default(),
+    };
 
     let mut editor = Editor {
         actions: Actions::new(cfg.get_indent_cfg(&file_type)),
