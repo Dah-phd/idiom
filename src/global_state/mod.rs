@@ -301,14 +301,21 @@ impl GlobalState {
         self.draw_callback = draw::full_rebuild;
     }
 
-    pub fn calc_editor_rect(&self) -> Rect {
-        let mut base_screen = if self.components.contains(Components::TREE) || self.is_select() {
-            self.screen_rect.split_horizont_rel(self.tree_size).1
+    pub fn force_area_calc(&mut self) {
+        let mut screen = self.screen_rect;
+        self.footer_line = screen.pop_line();
+        let screen = if self.components.contains(Components::TREE) || self.is_select() {
+            let (mut tree_area, tab_area) = screen.split_horizont_rel(self.tree_size);
+            let _logo_line = tree_area.next_line();
+            tree_area.right_border().left_border();
+            self.tree_area = tree_area;
+            tab_area
         } else {
-            self.screen_rect
+            let (tree_area, tab_area) = screen.split_horizont_rel(0);
+            self.tree_area = tree_area;
+            tab_area
         };
-        base_screen.pop_line();
-        base_screen.split_vertical_rel(1).1
+        (self.tab_area, self.editor_area) = screen.split_vertical_rel(1);
     }
 
     /// unwrap or default with logged error

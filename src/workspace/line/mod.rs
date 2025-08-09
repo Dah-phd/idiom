@@ -314,7 +314,7 @@ impl EditorLine {
             }
             sum += ch.len_utf16();
         }
-        panic!("Index out of bounds! Index {} where max is {}", utf16_idx, sum)
+        panic!("Index out of bounds! Index {utf16_idx} where max is {sum}")
     }
 
     #[inline]
@@ -343,7 +343,7 @@ impl EditorLine {
         self.cached.reset();
         self.tokens = tokens;
         if let Some(diagnostics) = self.diagnostics.as_ref() {
-            for diagnostic in diagnostics.data.iter() {
+            for diagnostic in diagnostics.iter() {
                 self.tokens.mark_diagnostics(diagnostic);
             }
         };
@@ -352,7 +352,7 @@ impl EditorLine {
     #[inline]
     pub fn set_diagnostics(&mut self, diagnostics: DiagnosticLine) {
         self.cached.reset();
-        for diagnostic in diagnostics.data.iter() {
+        for diagnostic in diagnostics.iter() {
             self.tokens.mark_diagnostics(diagnostic);
         }
         self.diagnostics.replace(diagnostics);

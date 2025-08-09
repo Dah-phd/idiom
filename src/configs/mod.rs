@@ -15,7 +15,7 @@ pub use theme::Theme;
 pub use theme_ui::UITheme;
 pub use types::FileType;
 
-pub const CONFIG_FOLDER: &str = "idiom";
+pub const APP_FOLDER: &str = "idiom";
 pub const EDITOR_CFG_FILE: &str = "editor.toml";
 pub const KEY_MAP: &str = "keys.toml";
 pub const THEME_FILE: &str = "theme.toml";
@@ -107,20 +107,20 @@ pub fn load_or_create_config<T: Default + DeserializeOwned + Serialize>(path: &s
 /// should not fail as config files/dirs are created on start
 pub fn get_config_dir() -> Option<PathBuf> {
     let mut config_path = config_dir()?;
-    config_path.push(CONFIG_FOLDER);
+    config_path.push(APP_FOLDER);
     Some(config_path)
 }
 
 fn read_config_file(path: &str) -> Option<String> {
     let mut config_file = config_dir()?;
-    config_file.push(CONFIG_FOLDER);
+    config_file.push(APP_FOLDER);
     config_file.push(path);
     std::fs::read_to_string(config_file).ok()
 }
 
 fn write_config_file<T: Serialize>(path: &str, configs: &T) -> Option<()> {
     let mut config_file = config_dir()?;
-    config_file.push(CONFIG_FOLDER);
+    config_file.push(APP_FOLDER);
     if !config_file.exists() {
         std::fs::create_dir(&config_file).ok()?;
     }

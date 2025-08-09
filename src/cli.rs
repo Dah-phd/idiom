@@ -2,6 +2,7 @@ use crate::{
     configs::{KeyMap, TreeAction, TreeKeyMap},
     error::{IdiomError, IdiomResult},
     ext_tui::{CrossTerm, State},
+    session::restore_last_sesson,
     tree::TreePath,
 };
 use clap::Parser;
@@ -22,10 +23,18 @@ pub struct Args {
     /// Run in select mode opening basic file tree from HOME dir (ignores provided PATH args)
     #[arg(short, long)]
     pub select: bool,
+    /// Attempts to restore last saved session
+    #[arg(short, long)]
+    pub restore: bool,
 }
 
 impl Args {
     pub fn collect(self, backend: &mut CrossTerm) -> IdiomResult<Option<PathBuf>> {
+        if self.restore {
+            let path = restore_last_sesson()?;
+            std::env::set_current_dir(path)?;
+            return Ok(None);
+        }
         match self.path {
             Some(rel_path) => {
                 let path = rel_path.canonicalize()?;
@@ -36,8 +45,7 @@ impl Args {
                             let parent_path = match path.parent() {
                                 None => {
                                     return Err(IdiomError::io_not_found(format!(
-                                        "Unable to derive parent directory of {:?}!",
-                                        path
+                                        "Unable to derive parent directory of {path:?}!",
                                     )))
                                 }
                                 Some(path) => path.to_owned(),

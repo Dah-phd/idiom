@@ -6,7 +6,7 @@ use std::{
 
 use crate::{configs::KeyMap, error::IdiomResult, ext_tui::State, lsp::DiagnosticType};
 
-use super::{file_clipboard::FileClipboard, watcher::TreeWatcher, Tree, TreePath};
+use super::{clipboard::FileClipboard, watcher::TreeWatcher, Tree, TreePath};
 
 pub fn mock_tree() -> Tree {
     let key_map = KeyMap::default().tree_key_map();
@@ -17,7 +17,7 @@ pub fn mock_tree() -> Tree {
         state: State::default(),
         diagnostics_state: HashMap::new(),
         selected_path: PathBuf::new(),
-        tree: TreePath::Folder {
+        inner: TreePath::Folder {
             path: PathBuf::new(),
             tree: None,
             display: String::new(),

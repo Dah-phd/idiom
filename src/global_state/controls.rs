@@ -79,8 +79,7 @@ pub fn mouse_handler(
         MouseEventKind::ScrollUp => match gs.mode {
             Mode::Insert => {
                 if let Some(editor) = ws.get_active() {
-                    editor.map(crate::configs::EditorAction::ScrollUp, gs);
-                    editor.map(crate::configs::EditorAction::ScrollUp, gs);
+                    editor.mouse_scroll_up(gs);
                 }
             }
             Mode::Select => tree.select_up(gs),
@@ -88,34 +87,38 @@ pub fn mouse_handler(
         MouseEventKind::ScrollDown => match gs.mode {
             Mode::Insert => {
                 if let Some(editor) = ws.get_active() {
-                    editor.map(crate::configs::EditorAction::ScrollDown, gs);
-                    editor.map(crate::configs::EditorAction::ScrollDown, gs);
+                    editor.mouse_scroll_down(gs);
                 }
             }
             Mode::Select => tree.select_down(gs),
         },
+        MouseEventKind::Moved => match gs.mode {
+            Mode::Insert => {
+                if let Some(editor) = ws.get_active() {
+                    editor.mouse_moved(event.row, event.column, gs);
+                }
+            }
+            Mode::Select => (), // no action
+        },
         MouseEventKind::Down(MouseButton::Left) => {
+            // on up currsor can drop select
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = ws.get_active() {
-                    editor.mouse_cursor(position.into());
+                    editor.mouse_click(position, gs);
                     gs.insert_mode();
                     match tree.select_by_path(&editor.path) {
                         Ok(..) => ws.toggle_editor(),
                         Err(error) => gs.error(error),
                     };
                 }
-                return;
-            }
-            if let Some(position) = gs.tree_area.relative_position(event.row, event.column) {
+            } else if let Some(position) = gs.tree_area.relative_position(event.row, event.column) {
                 let pos_line = position.row as usize + 1;
                 if let Some(path) = tree.mouse_select(pos_line, gs) {
                     gs.event.push(IdiomEvent::OpenAtLine(path, 0));
                     return;
                 };
                 gs.select_mode();
-                return;
-            };
-            if let Some(pos) = gs.tab_area.relative_position(event.row, event.column) {
+            } else if let Some(pos) = gs.tab_area.relative_position(event.row, event.column) {
                 if !ws.is_empty() {
                     gs.insert_mode();
                     let pos_char = pos.col as usize;
@@ -123,14 +126,23 @@ pub fn mouse_handler(
                         ws.activate_editor(idx, gs);
                     };
                 }
-                return;
-            }
-            if gs.tree_area.relative_position(event.row + 2, event.column).is_some() {
+            } else if gs.tree_area.relative_position(event.row + 2, event.column).is_some() {
                 Pallet::run(gs, ws, tree, term);
             }
         }
-        MouseEventKind::Down(MouseButton::Right) => {
-            if let Some(position) = gs.tab_area.relative_position(event.row, event.column) {
+        MouseEventKind::Up(MouseButton::Right) => {
+            if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
+                if let Some(editor) = ws.get_active() {
+                    let position = crate::workspace::CursorPosition::from(position);
+                    editor.clear_ui(gs);
+                    editor.mouse_menu_setup(position);
+                    let accent_style = gs.theme.accent_style;
+                    let mut context_menu = menu_context_editor_inplace(position, gs.editor_area, accent_style);
+                    if let Err(error) = context_menu.run(gs, ws, tree, term) {
+                        gs.error(error);
+                    };
+                };
+            } else if let Some(position) = gs.tab_area.relative_position(event.row, event.column) {
                 if !ws.is_empty() {
                     gs.insert_mode();
                     let pos_char = position.col as usize;
@@ -139,19 +151,7 @@ pub fn mouse_handler(
                         ws.close_active(gs);
                     }
                 }
-            }
-            if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
-                if let Some(editor) = ws.get_active() {
-                    let position = crate::workspace::CursorPosition::from(position);
-                    editor.mouse_menu_setup(position);
-                    let accent_style = gs.theme.accent_style;
-                    let mut context_menu = menu_context_editor_inplace(position, gs.editor_area, accent_style);
-                    if let Err(error) = context_menu.run(gs, ws, tree, term) {
-                        gs.error(error);
-                    };
-                }
-            }
-            if let Some(position) = gs.tree_area.relative_position(event.row, event.column) {
+            } else if let Some(position) = gs.tree_area.relative_position(event.row, event.column) {
                 let mut position = crate::workspace::CursorPosition::from(position);
                 position.line += 1;
                 if tree.mouse_menu_setup_select(position.line) {

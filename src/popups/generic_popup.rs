@@ -1,10 +1,10 @@
 use crate::{
     embeded_term::EditorTerminal,
-    ext_tui::{CrossTerm, StyleExt},
+    ext_tui::{text_field::TextField, CrossTerm, StyleExt},
     global_state::GlobalState,
     popups::{Components, Popup, Status},
     tree::Tree,
-    workspace::Workspace,
+    workspace::{Workspace, FILE_STATUS_ERR},
 };
 use crossterm::{
     event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind},
@@ -28,10 +28,10 @@ impl std::fmt::Debug for CommandButton {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PopupChoice {
-    pub message: String,
+    pub message: TextField<()>,
+    buffer_message: bool,
     title_prefix: Option<&'static str>,
     title: String,
-    message_as_buffer_builder: Option<fn(char) -> Option<char>>,
     buttons: Vec<CommandButton>,
     button_line: u16,
     button_ranges: Vec<Range<u16>>,
@@ -47,6 +47,10 @@ impl PopupChoice {
 
     fn collect_update_status(&mut self) -> bool {
         std::mem::take(&mut self.updated)
+    }
+
+    pub fn get_message(&self) -> &str {
+        &self.message.text
     }
 }
 
@@ -84,25 +88,18 @@ impl Popup for PopupChoice {
             (button.command)(self, components);
             return Status::Finished;
         }
+        if self.buffer_message && self.message.map(&key, &mut components.gs.clipboard).is_some() {
+            return Status::Pending;
+        }
         match key.code {
-            KeyCode::Char(ch) if self.message_as_buffer_builder.is_some() => {
-                if let Some(buffer_builder) = self.message_as_buffer_builder {
-                    if let Some(ch) = buffer_builder(ch) {
-                        self.message.push(ch);
-                    }
-                }
-            }
-            KeyCode::Backspace if self.message_as_buffer_builder.is_some() => {
-                self.message.pop();
-            }
             KeyCode::Enter => {
                 (self.buttons[self.state].command)(self, components);
                 return Status::Finished;
             }
-            KeyCode::Left => {
+            KeyCode::Left | KeyCode::BackTab => {
                 self.prev();
             }
-            KeyCode::Right => {
+            KeyCode::Right | KeyCode::Tab => {
                 self.next();
             }
             _ => (),
@@ -143,21 +140,45 @@ impl Popup for PopupChoice {
 }
 
 impl PopupChoice {
-    pub fn new(
+    pub fn new_static(
         message: String,
         title_prefix: Option<&'static str>,
         title: Option<String>,
-        message_as_buffer_builder: Option<fn(char) -> Option<char>>,
         buttons: Vec<CommandButton>,
         size: Option<(u16, usize)>,
     ) -> Self {
         let size = size.unwrap_or((6, 40));
         let title = title.unwrap_or("Prompt".to_owned());
+        let message = TextField::basic(message);
         Self {
             message,
             title_prefix,
             title,
-            message_as_buffer_builder,
+            buffer_message: false,
+            buttons,
+            button_line: 0,
+            button_ranges: vec![],
+            size,
+            state: 0,
+            updated: true,
+        }
+    }
+
+    pub fn new_with_text_field(
+        message: String,
+        title_prefix: Option<&'static str>,
+        title: Option<String>,
+        buttons: Vec<CommandButton>,
+        size: Option<(u16, usize)>,
+    ) -> Self {
+        let size = size.unwrap_or((6, 40));
+        let title = title.unwrap_or("Prompt".to_owned());
+        let message = TextField::basic(message);
+        Self {
+            message,
+            title_prefix,
+            title,
+            buffer_message: true,
             buttons,
             button_line: 0,
             button_ranges: vec![],
@@ -184,13 +205,11 @@ impl PopupChoice {
     }
 
     fn p_from_message(&self, line: Line, backend: &mut CrossTerm) {
-        if self.message_as_buffer_builder.is_none() {
-            return line.render_centered(&self.message, backend);
+        if self.buffer_message {
+            self.message.widget(line, backend);
+            return;
         }
-        let mut builder = line.unsafe_builder(backend);
-        builder.push(" >> ");
-        builder.push(&self.message);
-        builder.push_styled("|", ContentStyle::slowblink());
+        line.render_centered(self.get_message(), backend);
     }
 
     fn spans_from_buttons(&mut self, line: Line, backend: &mut CrossTerm) {
@@ -222,15 +241,12 @@ impl PopupChoice {
 /// uses workaround in order to message if the popup should trigger exit
 /// the solution is no ideal but it otherwise a whole messaging system will be needed
 /// or different exit strategy
-pub fn should_save_and_exit(
-    gs: &mut GlobalState,
-    ws: &mut Workspace,
-    tree: &mut Tree,
-    term: &mut EditorTerminal,
-) -> bool {
-    let mut popup = PopupChoice::new(
+pub fn save_and_exit(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) -> bool {
+    if ws.iter().all(|e| gs.unwrap_or_default(e.is_saved(), FILE_STATUS_ERR)) {
+        return true;
+    };
+    let mut popup = PopupChoice::new_static(
         "Not all opened editors are saved!".into(),
-        None,
         None,
         None,
         vec![

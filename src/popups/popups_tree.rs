@@ -26,21 +26,24 @@ fn location_with_display(loc: Location) -> (String, PathBuf, Range) {
 pub fn create_file_popup(path: PathBuf) -> PopupChoice {
     let buttons = vec![
         CommandButton {
-            command: |p, c| c.event(IdiomEvent::CreateFileOrFolder { name: p.message.to_owned(), from_base: false }),
+            command: |p, c| {
+                c.event(IdiomEvent::CreateFileOrFolder { name: p.get_message().to_owned(), from_base: false })
+            },
             name: "Create",
             key: None,
         },
         CommandButton {
-            command: |p, c| c.event(IdiomEvent::CreateFileOrFolder { name: p.message.to_owned(), from_base: true }),
+            command: |p, c| {
+                c.event(IdiomEvent::CreateFileOrFolder { name: p.get_message().to_owned(), from_base: true })
+            },
             name: "Create in ./",
             key: None,
         },
     ];
-    PopupChoice::new(
+    PopupChoice::new_with_text_field(
         String::new(),
         Some("New in "),
         Some(path.display().to_string()),
-        Some(Some),
         buttons,
         Some((4, 40)),
     )
@@ -48,29 +51,28 @@ pub fn create_file_popup(path: PathBuf) -> PopupChoice {
 
 pub fn create_root_file_popup() -> PopupChoice {
     let buttons = vec![CommandButton {
-        command: |p, c| {
-            c.event(IdiomEvent::CreateFileOrFolder { name: std::mem::take(&mut p.message), from_base: true })
-        },
+        command: |p, c| c.event(IdiomEvent::CreateFileOrFolder { name: p.get_message().to_owned(), from_base: true }),
         name: "Create",
         key: None,
     }];
-    PopupChoice::new(String::new(), Some("New in root dir"), None, Some(Some), buttons, Some((4, 40)))
+    PopupChoice::new_with_text_field(String::new(), Some("New in root dir"), None, buttons, Some((4, 40)))
 }
 
 pub fn rename_file_popup(path: String) -> PopupChoice {
     let message = path.split(std::path::MAIN_SEPARATOR).next_back().map(ToOwned::to_owned).unwrap_or_default();
-    PopupChoice::new(
+    let mut popup = PopupChoice::new_with_text_field(
         message,
         Some("Rename: "),
         Some(path),
-        Some(Some),
         vec![CommandButton {
-            command: |p, c| c.event(IdiomEvent::RenameFile(p.message.to_owned())),
+            command: |p, c| c.event(IdiomEvent::RenameFile(p.get_message().to_owned())),
             name: "Rename",
             key: None,
         }],
         Some((4, 40)),
-    )
+    );
+    popup.message.select_all();
+    popup
 }
 
 #[cfg(test)]

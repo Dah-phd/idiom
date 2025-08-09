@@ -296,3 +296,39 @@ impl From<usize> for Offset {
         Self::Pos(value)
     }
 }
+
+#[cfg(test)]
+pub mod test {
+    use std::path::{Path, PathBuf};
+
+    pub struct TempDir {
+        inner: PathBuf,
+    }
+
+    impl TempDir {
+        pub fn new(title: &str) -> std::io::Result<Self> {
+            let mut inner = PathBuf::from(".").canonicalize()?;
+            inner.push(format!("tmp-{title}"));
+            std::fs::create_dir(&inner).map(|_| Self { inner })
+        }
+
+        pub fn path(&self) -> &Path {
+            &self.inner
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            _ = std::fs::remove_dir_all(self.path());
+        }
+    }
+
+    #[test]
+    fn temp_dir() {
+        let temp_dir = TempDir::new("shoulwork").unwrap();
+        let tp = temp_dir.path().to_owned();
+        assert!(tp.exists());
+        drop(temp_dir);
+        assert!(!tp.exists());
+    }
+}

@@ -15,8 +15,8 @@ use crate::{
 };
 use crossterm::event::KeyEvent;
 use crossterm::style::{Color, ContentStyle};
-pub use cursor::CursorPosition;
-pub use editor::{editor_from_data, Editor};
+pub use cursor::{Cursor, CursorPosition};
+pub use editor::{editor_from_data, text_editor_from_data, Editor};
 use idiom_tui::Backend;
 use line::EditorLine;
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
@@ -25,7 +25,7 @@ use std::{
     path::PathBuf,
 };
 
-const FILE_STATUS_ERR: &str = "File status ERR";
+pub const FILE_STATUS_ERR: &str = "File status ERR";
 
 /// implement Drop to attempt keep state upon close/crash
 pub struct Workspace {
@@ -38,7 +38,7 @@ pub struct Workspace {
 }
 
 impl Workspace {
-    pub async fn new(key_map: EditorKeyMap, base_configs: EditorConfigs, lsp_servers: HashMap<FileType, LSP>) -> Self {
+    pub fn new(key_map: EditorKeyMap, base_configs: EditorConfigs, lsp_servers: HashMap<FileType, LSP>) -> Self {
         let tab_style = ContentStyle::fg(Color::DarkYellow);
         Self { editors: TrackedList::new(), base_configs, key_map, lsp_servers, map_callback: map_editor, tab_style }
     }
@@ -99,6 +99,10 @@ impl Workspace {
         self.editors.is_empty()
     }
 
+    pub fn iter(&self) -> std::slice::Iter<'_, Editor> {
+        self.editors.iter()
+    }
+
     pub fn tabs(&self) -> Vec<String> {
         self.editors.iter().map(|editor| editor.display.to_owned()).collect()
     }
@@ -111,18 +115,16 @@ impl Workspace {
     #[inline]
     pub fn rename_editors(&mut self, from_path: PathBuf, to_path: PathBuf, gs: &mut GlobalState) {
         if to_path.is_dir() {
-            for editor in self.editors.iter_mut() {
-                if editor.path.starts_with(&from_path) {
-                    let mut updated_path = PathBuf::new();
-                    let mut old = editor.path.iter();
-                    for (new_part, ..) in to_path.iter().zip(&mut old) {
-                        updated_path.push(new_part);
-                    }
-                    for remaining_part in old {
-                        updated_path.push(remaining_part)
-                    }
-                    gs.log_if_lsp_error(editor.update_path(updated_path), editor.file_type);
+            for editor in self.editors.iter_mut().filter(|e| e.path.starts_with(&from_path)) {
+                let mut updated_path = PathBuf::new();
+                let mut old = editor.path.iter();
+                for (new_part, ..) in to_path.iter().zip(&mut old) {
+                    updated_path.push(new_part);
                 }
+                for remaining_part in old {
+                    updated_path.push(remaining_part)
+                }
+                gs.log_if_lsp_error(editor.update_path(updated_path), editor.file_type);
             }
         } else if let Some(editor) = self.editors.find(|e| e.path == from_path) {
             gs.log_if_lsp_error(editor.update_path(to_path), editor.file_type);
@@ -130,15 +132,16 @@ impl Workspace {
     }
 
     pub fn activate_editor(&mut self, idx: usize, gs: &mut GlobalState) {
-        if idx < self.editors.len() {
-            let mut editor = self.editors.remove(idx);
-            editor.clear_screen_cache(gs);
-            gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
-            if editor.update_status.collect() {
-                gs.event.push(file_updated(editor.path.clone()).into());
-            }
-            self.editors.insert(0, editor);
+        if idx >= self.editors.len() {
+            return;
         }
+        let mut editor = self.editors.remove(idx);
+        editor.clear_screen_cache(gs);
+        gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
+        if editor.update_status.collect() {
+            gs.event.push(file_updated(editor.path.clone()).into());
+        }
+        self.editors.insert(0, editor);
     }
 
     pub fn apply_edits(&mut self, edits: WorkspaceEdit, gs: &mut GlobalState) {
@@ -248,51 +251,49 @@ impl Workspace {
         self.editors.iter_mut().find(|editor| editor.path == path)
     }
 
-    fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
-        Editor::from_path(file_path, FileType::Ignored, &self.base_configs, gs)
+    // EDITOR BUILDERS
+
+    pub fn new_text_from_data(
+        &mut self,
+        path: PathBuf,
+        content: Vec<EditorLine>,
+        cursor: Option<Cursor>,
+        gs: &mut GlobalState,
+    ) {
+        let editor = text_editor_from_data(path, content, cursor, &self.base_configs, gs);
+        self.editors.insert(0, editor);
     }
 
-    async fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
-        let file_type = match FileType::derive_type(&file_path) {
-            Some(file_type) => file_type,
-            None => {
-                return match file_path.extension().and_then(|ext| ext.to_str()) {
-                    Some(ext) if ext.to_lowercase() == "md" => Editor::from_path_md(file_path, &self.base_configs, gs),
-                    _ => Editor::from_path_text(file_path, &self.base_configs, gs),
-                }
-            }
+    /// it could be the case that the file no longer exits
+    pub async fn new_from_session(
+        &mut self,
+        path: PathBuf,
+        file_type: FileType,
+        cursor: Cursor,
+        content: Option<Vec<String>>,
+        gs: &mut GlobalState,
+    ) -> IdiomResult<()> {
+        let content = match content {
+            None => EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?,
+            Some(lines) => lines.into_iter().map(EditorLine::from).collect(),
         };
-        let mut new = Editor::from_path(file_path, file_type, &self.base_configs, gs)?;
-        let lsp_cmd = match self.base_configs.derive_lsp(&new.file_type) {
-            None => {
-                new.lexer.local_lsp(file_type, new.stringify(), gs);
-                return Ok(new);
-            }
-            Some(cmd) => cmd,
+        if matches!(file_type, FileType::Ignored) {
+            self.new_text_from_data(path, content, Some(cursor), gs);
+            return Ok(());
         };
+        let mut editor = editor_from_data(path, file_type, content, Some(cursor), &self.base_configs, gs);
+        self.lsp_enroll(&mut editor, gs).await;
+        self.editors.insert(0, editor);
+        Ok(())
+    }
 
-        // set initial tokens while LSP is indexing
-        crate::lsp::init_local_tokens(file_type, &mut new.content, &new.lexer.theme);
-        match self.lsp_servers.entry(new.file_type) {
-            Entry::Vacant(entry) => match LSP::new(lsp_cmd, new.file_type).await {
-                Ok(lsp) => {
-                    let client = lsp.aquire_client();
-                    new.lexer.set_lsp_client(client, new.stringify(), gs);
-                    for editor in self.editors.iter_mut().filter(|e| e.file_type == new.file_type) {
-                        editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);
-                    }
-                    entry.insert(lsp);
-                }
-                Err(err) => {
-                    gs.error(err.to_string());
-                    new.lexer.local_lsp(file_type, new.stringify(), gs);
-                }
-            },
-            Entry::Occupied(entry) => {
-                new.lexer.set_lsp_client(entry.get().aquire_client(), new.stringify(), gs);
+    pub async fn new_at_line(&mut self, file_path: PathBuf, line: usize, gs: &mut GlobalState) -> IdiomResult<()> {
+        if self.new_from(file_path, gs).await? {
+            if let Some(editor) = self.get_active() {
+                editor.go_to(line);
             }
-        }
-        Ok(new)
+        };
+        Ok(())
     }
 
     pub async fn new_from(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<bool> {
@@ -306,41 +307,111 @@ impl Workspace {
             self.editors.insert(0, editor);
             return Ok(false);
         }
-        let editor = self.build_editor(file_path, gs).await?;
+        let editor = self.determine_editor(file_path, gs).await?;
         self.editors.insert(0, editor);
         self.toggle_editor();
         Ok(true)
     }
 
-    pub async fn new_at_line(&mut self, file_path: PathBuf, line: usize, gs: &mut GlobalState) -> IdiomResult<()> {
-        if self.new_from(file_path, gs).await? {
-            if let Some(editor) = self.get_active() {
-                editor.go_to(line);
-            }
-        };
-        Ok(())
+    fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
+        Editor::from_path(file_path, FileType::Ignored, &self.base_configs, gs)
     }
 
-    pub fn select_tab_mouse(&mut self, col_idx: usize) -> Option<usize> {
-        self.toggle_tabs();
-        let mut cols_len = 0;
-        for (editor_idx, editor) in self.editors.iter().enumerate() {
-            cols_len += editor.display.len() + 3;
-            if col_idx < cols_len {
-                return Some(editor_idx);
-            };
+    async fn determine_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
+        let file_type = match FileType::derive_type(&file_path) {
+            Some(file_type) => file_type,
+            None => {
+                return match file_path.extension().and_then(|ext| ext.to_str()) {
+                    Some(ext) if ext.to_lowercase() == "md" => Editor::from_path_md(file_path, &self.base_configs, gs),
+                    _ => Editor::from_path_text(file_path, &self.base_configs, gs),
+                }
+            }
+        };
+        let mut editor = Editor::from_path(file_path, file_type, &self.base_configs, gs)?;
+        self.lsp_enroll(&mut editor, gs).await;
+        Ok(editor)
+    }
+
+    // LSP HANDLES
+
+    async fn lsp_enroll(&mut self, editor: &mut Editor, gs: &mut GlobalState) {
+        let lsp_cmd = match self.base_configs.derive_lsp(&editor.file_type) {
+            None => {
+                editor.lexer.local_lsp(editor.file_type, editor.stringify(), gs);
+                return;
+            }
+            Some(cmd) => cmd,
+        };
+
+        // set initial tokens while LSP is indexing
+        crate::lsp::init_local_tokens(editor.file_type, &mut editor.content, &editor.lexer.theme);
+        match self.lsp_servers.entry(editor.file_type) {
+            Entry::Vacant(entry) => match LSP::new(lsp_cmd, editor.file_type).await {
+                Ok(lsp) => {
+                    let client = lsp.aquire_client();
+                    editor.lexer.set_lsp_client(client, editor.stringify(), gs);
+                    for editor in self.editors.iter_mut().filter(|e| e.file_type == editor.file_type) {
+                        editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);
+                    }
+                    entry.insert(lsp);
+                }
+                Err(err) => {
+                    gs.error(err.to_string());
+                    editor.lexer.local_lsp(editor.file_type, editor.stringify(), gs);
+                }
+            },
+            Entry::Occupied(entry) => {
+                editor.lexer.set_lsp_client(entry.get().aquire_client(), editor.stringify(), gs);
+            }
         }
-        None
+    }
+
+    pub async fn force_lsp_type_on_active(&mut self, file_type: FileType, gs: &mut GlobalState) -> IdiomResult<()> {
+        let new_indent_cfg = self.base_configs.get_indent_cfg(&file_type);
+        match self.get_active() {
+            Some(editor) => editor.file_type_set(file_type, new_indent_cfg, gs),
+            None => return Err(IdiomError::LSP(crate::lsp::LSPError::Null)),
+        };
+
+        let lsp_cmd = match self.base_configs.derive_lsp(&file_type) {
+            Some(lsp_cmd) => lsp_cmd,
+            None => {
+                _ = self.get_active().map(|e| e.lexer.local_lsp(file_type, e.stringify(), gs));
+                return Ok(());
+            }
+        };
+
+        match self.lsp_servers.entry(file_type) {
+            Entry::Vacant(entry) => {
+                let lsp = match LSP::new(lsp_cmd, file_type).await {
+                    Ok(lsp) => lsp,
+                    Err(err) => {
+                        _ = self.get_active().map(|e| e.lexer.local_lsp(file_type, e.stringify(), gs));
+                        return Err(IdiomError::LSP(err));
+                    }
+                };
+                for editor in self.editors.iter_mut().filter(|e| e.file_type == file_type) {
+                    editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);
+                }
+                entry.insert(lsp);
+                Ok(())
+            }
+            Entry::Occupied(entry) => {
+                let client = entry.get().aquire_client();
+                _ = self.get_active().map(|e| e.lexer.set_lsp_client(client, e.stringify(), gs));
+                Ok(())
+            }
+        }
     }
 
     #[inline]
-    pub async fn check_lsp(&mut self, ft: FileType, gs: &mut GlobalState) {
-        if let Some(lsp) = self.lsp_servers.get_mut(&ft) {
-            match lsp.check_status(ft).await {
+    pub async fn check_lsp(&mut self, file_type: FileType, gs: &mut GlobalState) {
+        if let Some(lsp) = self.lsp_servers.get_mut(&file_type) {
+            match lsp.check_status(file_type).await {
                 Ok(data) => match data {
                     None => gs.success("LSP function is normal".to_owned()),
                     Some(err) => {
-                        self.full_sync(&ft, gs);
+                        self.full_sync(&file_type, gs);
                         gs.success(format!("LSP recoved after: {err}"));
                     }
                 },
@@ -350,9 +421,9 @@ impl Workspace {
     }
 
     #[inline]
-    pub fn full_sync(&mut self, ft: &FileType, gs: &mut GlobalState) {
-        if let Some(lsp) = self.lsp_servers.get(ft) {
-            for editor in self.editors.iter_mut().filter(|e| &e.file_type == ft) {
+    pub fn full_sync(&mut self, file_type: &FileType, gs: &mut GlobalState) {
+        if let Some(lsp) = self.lsp_servers.get(file_type) {
+            for editor in self.editors.iter_mut().filter(|e| &e.file_type == file_type) {
                 editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);
             }
         }
@@ -372,6 +443,18 @@ impl Workspace {
                 return;
             }
         }
+    }
+
+    pub fn select_tab_mouse(&mut self, col_idx: usize) -> Option<usize> {
+        self.toggle_tabs();
+        let mut cols_len = 0;
+        for (editor_idx, editor) in self.editors.iter().enumerate() {
+            cols_len += editor.display.len() + 3;
+            if col_idx < cols_len {
+                return Some(editor_idx);
+            };
+        }
+        None
     }
 
     pub fn close_active(&mut self, gs: &mut GlobalState) {
@@ -478,6 +561,9 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         match action {
             EditorAction::NewLine => {
                 ws.toggle_editor();
+                if let Some(editor) = ws.get_active() {
+                    editor.clear_ui(gs);
+                }
             }
             EditorAction::Up | EditorAction::Down => {
                 ws.toggle_editor();
@@ -506,6 +592,9 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
             }
             EditorAction::Cancel => {
                 ws.toggle_editor();
+                if let Some(editor) = ws.get_active() {
+                    editor.clear_ui(gs);
+                }
                 return false;
             }
             EditorAction::Close => {
@@ -516,17 +605,6 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         return true;
     }
     false
-}
-
-pub fn add_editor_from_data(
-    workspace: &mut Workspace,
-    path: PathBuf,
-    content: Vec<EditorLine>,
-    file_type: FileType,
-    gs: &mut GlobalState,
-) {
-    let editor = editor_from_data(path, content, file_type, &workspace.base_configs, gs);
-    workspace.editors.insert(0, editor);
 }
 
 #[cfg(test)]

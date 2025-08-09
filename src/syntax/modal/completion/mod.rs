@@ -41,17 +41,36 @@ impl AutoComplete {
                 ModalMessage::TakenDone
             }
             EditorAction::Char(ch) => self.push_filter(ch, &gs.matcher),
-            EditorAction::Down => {
+            EditorAction::Down | EditorAction::ScrollDown => {
                 self.state.next(self.filtered.len());
                 ModalMessage::Taken
             }
-            EditorAction::Up => {
+            EditorAction::Up | EditorAction::ScrollUp => {
                 self.state.prev(self.filtered.len());
                 ModalMessage::Taken
             }
             EditorAction::Backspace => self.filter_pop(&gs.matcher),
             _ => ModalMessage::Done,
         }
+    }
+
+    pub fn mouse_click_and_finished(&mut self, relative_idx: usize, lang: &Lang, gs: &mut GlobalState) -> bool {
+        let selected = self.state.at_line + relative_idx;
+        let mut completion_item = self.completions.remove(self.filtered.remove(selected).1);
+        if let Some(data) = completion_item.data.take() {
+            lang.handle_completion_data(data, gs);
+        };
+        gs.event.push(parse_completion_item(completion_item));
+        true
+    }
+
+    pub fn mouse_moved(&mut self, relative_idx: usize) -> bool {
+        let expected_select = self.state.at_line + relative_idx;
+        if self.state.selected == expected_select {
+            return false;
+        };
+        self.state.selected = expected_select;
+        true
     }
 
     #[inline]

@@ -8,7 +8,7 @@ use idiom_tui::{
     layout::{Line, LineBuilder},
 };
 
-#[derive(Default)]
+#[derive(Default, PartialEq, Debug, Clone)]
 pub struct TextField<T: Default + Clone> {
     pub text: String,
     char: usize,
@@ -138,6 +138,10 @@ impl<T: Default + Clone> TextField<T> {
                 };
                 Some(T::default())
             }
+            KeyCode::Char('a' | 'A') if key.modifiers == KeyModifiers::CONTROL => {
+                self.select_all();
+                Some(T::default())
+            }
             KeyCode::Char(ch) => {
                 self.take_selected();
                 self.text.insert(self.char, ch);
@@ -160,60 +164,13 @@ impl<T: Default + Clone> TextField<T> {
                 Some(self.on_text_update.clone().unwrap_or_default())
             }
             KeyCode::End => {
-                self.char = self.text.len().saturating_sub(1);
+                self.char = self.text.len();
                 Some(T::default())
             }
             KeyCode::Left => self.move_left(key.modifiers),
             KeyCode::Right => self.move_right(key.modifiers),
             _ => None,
         }
-    }
-
-    fn move_left(&mut self, mods: KeyModifiers) -> Option<T> {
-        let should_select = mods.contains(KeyModifiers::SHIFT);
-        if should_select {
-            self.init_select();
-        } else {
-            self.select = None;
-        };
-        self.char = self.char.saturating_sub(1);
-        if mods.contains(KeyModifiers::CONTROL) {
-            // jump
-            while self.char > 0 {
-                let next_idx = self.char - 1;
-                if matches!(self.text.chars().nth(next_idx), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
-                    break;
-                };
-                self.char = next_idx;
-            }
-        };
-        if should_select {
-            self.push_select();
-        };
-        Some(T::default())
-    }
-
-    fn move_right(&mut self, mods: KeyModifiers) -> Option<T> {
-        let should_select = mods.contains(KeyModifiers::SHIFT);
-        if should_select {
-            self.init_select();
-        } else {
-            self.select = None;
-        };
-        self.char = std::cmp::min(self.text.len(), self.char + 1);
-        if mods.contains(KeyModifiers::CONTROL) {
-            // jump
-            while self.text.len() > self.char {
-                self.char += 1;
-                if matches!(self.text.chars().nth(self.char), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
-                    break;
-                }
-            }
-        };
-        if should_select {
-            self.push_select();
-        };
-        Some(T::default())
     }
 
     pub fn map_actions(&mut self, action: EditorAction, clipboard: &mut Clipboard) -> Option<T> {
@@ -264,7 +221,7 @@ impl<T: Default + Clone> TextField<T> {
                 Some(self.on_text_update.clone().unwrap_or_default())
             }
             EditorAction::EndOfLine | EditorAction::EndOfFile => {
-                self.char = self.text.len().saturating_sub(1);
+                self.char = self.text.len();
                 Some(T::default())
             }
             EditorAction::Left => {
@@ -311,28 +268,37 @@ impl<T: Default + Clone> TextField<T> {
                 self.push_select();
                 Some(T::default())
             }
+            EditorAction::SelectAll => {
+                self.select_all();
+                Some(T::default())
+            }
             _ => None,
         }
     }
 
-    fn jump_left(&mut self) {
-        while self.char > 0 {
-            let next_idx = self.char - 1;
-            if matches!(self.text.chars().nth(next_idx), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
-                break;
-            };
-            self.char = next_idx;
+    pub fn select_all(&mut self) {
+        self.select = Some((0, self.text.len()));
+        self.char = self.text.len();
+    }
+
+    pub fn select_token(&mut self) {
+        let range = arg_range_at(&self.text, self.char);
+        if !range.is_empty() {
+            self.select = Some((range.start, range.end));
+            self.char = range.end;
         }
     }
 
-    fn jump_right(&mut self) {
-        // jump
-        while self.text.len() > self.char {
-            self.char += 1;
-            if matches!(self.text.chars().nth(self.char), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
-                break;
-            }
+    /// in most cases there is offset that needs to be handled outside
+    /// for widget the value is 4
+    /// for counted widget the value is 7
+    pub fn click_char(&mut self, rel_char: usize) {
+        if self.char == rel_char {
+            self.select_token();
+            return;
         }
+        self.select.take();
+        self.char = std::cmp::min(rel_char, self.text.len());
     }
 
     fn init_select(&mut self) {
@@ -364,6 +330,73 @@ impl<T: Default + Clone> TextField<T> {
         self.text.replace_range(from..to, "");
         self.char = from;
         Some(clip)
+    }
+
+    fn move_left(&mut self, mods: KeyModifiers) -> Option<T> {
+        let should_select = mods.contains(KeyModifiers::SHIFT);
+        if should_select {
+            self.init_select();
+        } else {
+            self.select = None;
+        };
+        self.char = self.char.saturating_sub(1);
+        if mods.contains(KeyModifiers::CONTROL) {
+            // jump
+            while self.char > 0 {
+                let next_idx = self.char - 1;
+                if matches!(self.text.chars().nth(next_idx), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
+                    break;
+                };
+                self.char = next_idx;
+            }
+        };
+        if should_select {
+            self.push_select();
+        };
+        Some(T::default())
+    }
+
+    fn move_right(&mut self, mods: KeyModifiers) -> Option<T> {
+        let should_select = mods.contains(KeyModifiers::SHIFT);
+        if should_select {
+            self.init_select();
+        } else {
+            self.select = None;
+        };
+        self.char = std::cmp::min(self.text.len(), self.char + 1);
+        if mods.contains(KeyModifiers::CONTROL) {
+            // jump
+            while self.text.len() > self.char {
+                self.char += 1;
+                if matches!(self.text.chars().nth(self.char), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
+                    break;
+                }
+            }
+        };
+        if should_select {
+            self.push_select();
+        };
+        Some(T::default())
+    }
+
+    fn jump_left(&mut self) {
+        while self.char > 0 {
+            let next_idx = self.char - 1;
+            if matches!(self.text.chars().nth(next_idx), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
+                break;
+            };
+            self.char = next_idx;
+        }
+    }
+
+    fn jump_right(&mut self) {
+        // jump
+        while self.text.len() > self.char {
+            self.char += 1;
+            if matches!(self.text.chars().nth(self.char), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
+                break;
+            }
+        }
     }
 }
 
@@ -401,13 +434,21 @@ impl TextField<()> {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use super::TextField;
     use crate::global_state::Clipboard;
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
+    pub fn pull_select<T: Clone + Default>(text_field: &TextField<T>) -> Option<(usize, usize)> {
+        text_field.select
+    }
+
+    pub fn pull_char<T: Clone + Default>(text_field: &TextField<T>) -> usize {
+        text_field.char
+    }
+
     #[test]
-    fn test_setting() {
+    fn setting() {
         let mut field: TextField<()> = TextField::default();
         field.text_set("12345".to_owned());
         assert_eq!(&field.text, "12345");
@@ -423,7 +464,7 @@ mod test {
     }
 
     #[test]
-    fn test_move() {
+    fn move_presses() {
         let mut field: TextField<()> = TextField::default();
         let mut clip = Clipboard::default();
         field.map(&KeyEvent::new(KeyCode::Right, KeyModifiers::empty()), &mut clip);
@@ -440,7 +481,7 @@ mod test {
     }
 
     #[test]
-    fn test_select() {
+    fn select() {
         let mut field: TextField<()> = TextField::default();
         let mut clip = Clipboard::default();
         field.text_set("a3cde".to_owned());
@@ -457,5 +498,33 @@ mod test {
         assert_eq!(field.select, Some((5, 0)));
         field.map(&KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()), &mut clip);
         assert_eq!(&field.text, "");
+    }
+
+    #[test]
+    fn select_all() {
+        let mut tf = TextField::basic("1234".to_string());
+        tf.select_all();
+        assert_eq!(tf.select, Some((0, 4)));
+        assert_eq!("1234", tf.take_selected().unwrap());
+    }
+
+    #[test]
+    fn select_token_and_char_set() {
+        let mut tf = TextField::basic("asd baba".to_string());
+        assert_eq!(tf.char, 8);
+        tf.click_char(8);
+        assert_eq!(tf.select, Some((4, 8)));
+        assert_eq!(tf.char, 8);
+        tf.click_char(2);
+        assert_eq!(tf.select, None);
+        assert_eq!(tf.char, 2);
+        tf.click_char(2);
+        assert_eq!(tf.select, Some((0, 3)));
+        assert_eq!(tf.char, 3);
+        tf.click_char(6);
+        assert_eq!(tf.char, 6);
+        tf.select_token();
+        assert_eq!(tf.select, Some((4, 8)));
+        assert_eq!(tf.char, 8);
     }
 }

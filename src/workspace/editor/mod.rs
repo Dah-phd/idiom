@@ -7,16 +7,17 @@ use super::{
     utils::{copy_content, find_line_start, token_range_at},
 };
 use crate::{
-    configs::{EditorAction, EditorConfigs, FileType},
+    configs::{EditorAction, EditorConfigs, FileType, IndentConfigs},
     error::{IdiomError, IdiomResult},
     global_state::GlobalState,
     lsp::LSPError,
     syntax::{tokens::calc_wraps, Lexer},
 };
-use idiom_tui::layout::Rect;
+use idiom_tui::{layout::Rect, Position};
 use lsp_types::TextEdit;
 use std::{cmp::Ordering, path::PathBuf};
 use utils::{big_file_protection, build_display, calc_line_number_offset, FileUpdate};
+pub use utils::{editor_from_data, text_editor_from_data};
 
 #[allow(dead_code)]
 pub struct Editor {
@@ -45,7 +46,7 @@ impl Editor {
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
         Ok(Self {
-            cursor: Cursor::sized(gs, line_number_offset),
+            cursor: Cursor::sized(gs.editor_area, line_number_offset),
             line_number_offset,
             lexer: Lexer::with_context(file_type, &path, gs),
             content,
@@ -67,7 +68,7 @@ impl Editor {
         let mut content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
-        let cursor = Cursor::sized(gs, line_number_offset);
+        let cursor = Cursor::sized(gs.editor_area, line_number_offset);
         calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
             cursor,
@@ -90,7 +91,7 @@ impl Editor {
         let mut content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
-        let cursor = Cursor::sized(gs, line_number_offset);
+        let cursor = Cursor::sized(gs.editor_area, line_number_offset);
         calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
             cursor,
@@ -105,6 +106,16 @@ impl Editor {
             path,
             last_render_at_line: None,
         })
+    }
+
+    pub fn file_type_set(&mut self, file_type: FileType, cfg: IndentConfigs, gs: &mut GlobalState) {
+        self.actions.cfg = cfg;
+        self.lexer = Lexer::with_context(file_type, &self.path, gs);
+        self.file_type = file_type;
+        match self.file_type {
+            FileType::Ignored => self.renderer = Renderer::text(),
+            _ => self.renderer = Renderer::code(),
+        }
     }
 
     #[inline]
@@ -126,6 +137,12 @@ impl Editor {
             self.last_render_at_line.take();
         };
         (self.renderer.fast_render)(self, gs)
+    }
+
+    pub fn clear_ui(&mut self, gs: &GlobalState) {
+        if let Some(rect) = self.lexer.clear_modal() {
+            self.updated_rect(rect, gs);
+        }
     }
 
     #[inline(always)]
@@ -318,6 +335,7 @@ impl Editor {
     }
 
     pub fn is_saved(&self) -> IdiomResult<bool> {
+        // for most source code files direct read should be faster
         let file_content = std::fs::read_to_string(&self.path)?;
 
         let mut counter = 0_usize;
@@ -386,7 +404,7 @@ impl Editor {
 
     pub fn go_to(&mut self, line: usize) {
         self.cursor.select_drop();
-        if self.content.len() >= line {
+        if self.content.len() > line {
             self.cursor.line = line;
             self.cursor.char = find_line_start(&self.content[line]);
             self.cursor.at_line = line.saturating_sub(self.cursor.max_rows / 2);
@@ -459,7 +477,36 @@ impl Editor {
         );
     }
 
-    pub fn mouse_cursor(&mut self, mut position: CursorPosition) {
+    pub fn mouse_scroll_up(&mut self, gs: &mut GlobalState) {
+        let (taken, render_update) = self.lexer.map_modal_if_exists(EditorAction::ScrollUp, gs);
+        if let Some(modal_rect) = render_update {
+            self.updated_rect(modal_rect, gs);
+        }
+        if taken {
+            return;
+        };
+        self.cursor.scroll_up(&self.content);
+        self.cursor.scroll_up(&self.content);
+    }
+
+    pub fn mouse_scroll_down(&mut self, gs: &mut GlobalState) {
+        let (taken, render_update) = self.lexer.map_modal_if_exists(EditorAction::ScrollDown, gs);
+        if let Some(modal_rect) = render_update {
+            self.updated_rect(modal_rect, gs);
+        }
+        if taken {
+            return;
+        };
+        self.cursor.scroll_down(&self.content);
+        self.cursor.scroll_down(&self.content);
+    }
+
+    pub fn mouse_click(&mut self, position: Position, gs: &mut GlobalState) {
+        if let Some(rect) = self.lexer.mouse_click_modal_if_exists(position, gs) {
+            self.updated_rect(rect, gs);
+            return;
+        }
+        let mut position = CursorPosition::from(position);
         position.line += self.cursor.at_line;
         position.char = position.char.saturating_sub(self.line_number_offset + 1);
         if self.cursor.select_is_none() && self.cursor == position {
@@ -489,9 +536,15 @@ impl Editor {
         self.cursor.set_cursor_checked_with_select(position, &self.content);
     }
 
+    pub fn mouse_moved(&mut self, row: u16, column: u16, gs: &GlobalState) {
+        if let Some(rect) = self.lexer.mouse_moved_modal_if_exists(row, column) {
+            self.updated_rect(rect, gs);
+        };
+    }
+
     pub fn rebase(&mut self, gs: &mut GlobalState) {
         if let Err(error) = big_file_protection(&self.path) {
-            gs.error(format!("Failed to load file {}", error));
+            gs.error(format!("Failed to load file {error}"));
             return;
         };
         self.actions.clear();
@@ -507,7 +560,7 @@ impl Editor {
         self.content = content.split('\n').map(|line| EditorLine::new(line.to_owned())).collect();
         match self.lexer.reopen(content, self.file_type) {
             Ok(()) => gs.success("File rebased!"),
-            Err(err) => gs.error(format!("Filed to reactivate LSP after rebase! ERR: {}", err)),
+            Err(err) => gs.error(format!("Filed to reactivate LSP after rebase! ERR: {err}")),
         }
     }
 
@@ -548,39 +601,6 @@ impl Editor {
 impl Drop for Editor {
     fn drop(&mut self) {
         self.lexer.close();
-    }
-}
-
-/// This is not a normal constructor for Editor
-/// it should be used in cases where the content is present
-/// or real file does not exists
-pub fn editor_from_data(
-    path: PathBuf,
-    mut content: Vec<EditorLine>,
-    file_type: FileType,
-    cfg: &EditorConfigs,
-    gs: &mut GlobalState,
-) -> Editor {
-    let lexer = match file_type {
-        FileType::Ignored => Lexer::text_lexer(&path, gs),
-        code_file_type => Lexer::with_context(code_file_type, &path, gs),
-    };
-    let display = build_display(&path);
-    let line_number_offset = calc_line_number_offset(content.len());
-    let cursor = Cursor::sized(gs, line_number_offset);
-    calc_wraps(&mut content, cursor.text_width);
-    Editor {
-        actions: Actions::new(cfg.default_indent_cfg()),
-        update_status: FileUpdate::None,
-        renderer: Renderer::text(),
-        last_render_at_line: None,
-        cursor,
-        line_number_offset,
-        lexer,
-        content,
-        file_type,
-        display,
-        path,
     }
 }
 

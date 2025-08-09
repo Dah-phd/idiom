@@ -4,6 +4,7 @@ pub mod menu;
 pub mod pallet;
 pub mod popup_file_open;
 pub mod popup_find;
+pub mod popup_lsp_select;
 pub mod popup_replace;
 pub mod popup_tree_search;
 pub mod popups_editor;
@@ -13,7 +14,7 @@ use std::time::Duration;
 
 use crate::{
     app::{MIN_FRAMERATE, MIN_HEIGHT, MIN_WIDTH},
-    configs::CONFIG_FOLDER,
+    configs::APP_FOLDER,
     embeded_term::EditorTerminal,
     error::{IdiomError, IdiomResult},
     ext_tui::{CrossTerm, StyleExt},
@@ -26,7 +27,7 @@ use crossterm::{
     style::{Color, ContentStyle},
 };
 use dirs::config_dir;
-pub use generic_popup::{should_save_and_exit, PopupChoice};
+pub use generic_popup::{save_and_exit, PopupChoice};
 use idiom_tui::{layout::Rect, Backend};
 
 pub enum Status {
@@ -132,7 +133,7 @@ impl Command {
 
     fn cfg_open(label: &'static str, file_path: &'static str) -> Option<Self> {
         let mut path = config_dir()?;
-        path.push(CONFIG_FOLDER);
+        path.push(APP_FOLDER);
         path.push(file_path);
         Some(Command { label, result: CommandResult::Simple(IdiomEvent::OpenAtLine(path, 0)) })
     }

@@ -103,12 +103,12 @@ impl Backend for MockedBackend {
 
     fn set_bg(&mut self, color: Option<Color>) {
         self.default_style.set_bg(color);
-        self.data.push((self.default_style, format!("<<set bg {:?}>>", color)));
+        self.data.push((self.default_style, format!("<<set bg {color:?}>>")));
     }
 
     fn set_fg(&mut self, color: Option<Color>) {
         self.default_style.set_fg(color);
-        self.data.push((self.default_style, format!("<<set fg {:?}>>", color)));
+        self.data.push((self.default_style, format!("<<set fg {color:?}>>")));
     }
 
     fn set_style(&mut self, style: ContentStyle) {
@@ -128,11 +128,11 @@ impl Backend for MockedBackend {
     }
 
     fn pad(&mut self, width: usize) {
-        self.data.push((self.default_style, format!("<<padding: {:?}>>", width)))
+        self.data.push((self.default_style, format!("<<padding: {width:?}>>")))
     }
 
     fn pad_styled(&mut self, width: usize, style: ContentStyle) {
-        self.data.push((self.default_style, format!("<<padding: {:?}, styled: {:?}>>", width, style)))
+        self.data.push((self.default_style, format!("<<padding: {width:?}, styled: {style:?}>>")))
     }
 
     fn merge_style(mut left: Self::Style, right: Self::Style) -> Self::Style {

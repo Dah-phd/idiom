@@ -4,6 +4,8 @@ use crate::{
 };
 use idiom_tui::layout::Rect;
 
+const TEXT_FIELD_RENDER_OFFSET: usize = 4;
+
 pub struct RenameVariable {
     new_name: TextField<()>,
     cursor: CursorPosition,
@@ -12,7 +14,9 @@ pub struct RenameVariable {
 
 impl RenameVariable {
     pub fn new(cursor: CursorPosition, title: &str) -> Self {
-        Self { new_name: TextField::basic(title.to_owned()), cursor, title: format!(" Rename: {} ", title) }
+        let mut new_name = TextField::basic(title.to_owned());
+        new_name.select_all();
+        Self { new_name, cursor, title: format!(" Rename: {title} ") }
     }
 
     #[inline]
@@ -32,5 +36,27 @@ impl RenameVariable {
             EditorAction::NewLine => ModalMessage::RenameVar(self.new_name.text.to_owned(), self.cursor),
             _ => ModalMessage::Taken,
         }
+    }
+
+    pub fn mouse_click(&mut self, rel_char: usize) {
+        if let Some(checked_rel_char) = rel_char.checked_sub(TEXT_FIELD_RENDER_OFFSET) {
+            self.new_name.click_char(checked_rel_char);
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{RenameVariable, TEXT_FIELD_RENDER_OFFSET};
+    use crate::ext_tui::text_field::test::{pull_char, pull_select};
+    use crate::workspace::CursorPosition;
+
+    #[test]
+    fn mause() {
+        let mut modal = RenameVariable::new(CursorPosition::default(), "test_var");
+        assert_eq!(pull_select(&modal.new_name), Some((0, 8)));
+        modal.mouse_click(4 + TEXT_FIELD_RENDER_OFFSET);
+        assert_eq!(4, pull_char(&modal.new_name));
+        assert_eq!(None, pull_select(&modal.new_name));
     }
 }

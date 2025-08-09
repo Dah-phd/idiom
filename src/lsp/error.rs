@@ -48,7 +48,7 @@ impl Display for LSPError {
                 Display::fmt(err, f)
             }
             Self::ServerCapability(message) => {
-                f.write_fmt(format_args!("LSP Error: Server is unable to process {}.", message))
+                f.write_fmt(format_args!("LSP Error: Server is unable to process {message}."))
             }
             Self::IOError(err) => {
                 f.write_str("IO Error: ")?;

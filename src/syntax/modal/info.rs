@@ -74,31 +74,40 @@ impl Info {
             return ModalMessage::Done;
         }
         match action {
-            EditorAction::NewLine | EditorAction::Right => {
-                if !matches!(self.mode, Mode::Select) {
-                    return ModalMessage::Done;
-                }
-                if let Some(mut i) = self.actions.take() {
-                    return match i.len().cmp(&self.state.selected) {
-                        Ordering::Greater => {
-                            gs.event.push(i.remove(self.state.selected).into());
-                            ModalMessage::TakenDone
-                        }
-                        _ => {
-                            self.mode = Mode::Text;
-                            ModalMessage::Taken
-                        }
-                    };
-                }
-                ModalMessage::Done
-            }
-            EditorAction::Up => self.prev(),
-            EditorAction::Down => self.next(),
-            EditorAction::Left if !matches!(self.mode, Mode::Select) && self.actions.is_some() => {
+            EditorAction::NewLine | EditorAction::Right => self.finish(gs),
+            EditorAction::Up | EditorAction::ScrollUp => self.prev(),
+            EditorAction::Down | EditorAction::ScrollDown => self.next(),
+            EditorAction::Left if matches!(self.mode, Mode::Text) && self.actions.is_some() => {
                 self.mode = Mode::Select;
+                self.state.select(0, self.len());
                 ModalMessage::Taken
             }
             _ => ModalMessage::Done,
+        }
+    }
+
+    pub fn mouse_moved(&mut self, rel_index: usize) -> bool {
+        match self.mode {
+            Mode::Text => false,
+            Mode::Select => {
+                let expected_select = self.state.at_line + rel_index;
+                if expected_select == self.state.selected {
+                    return false;
+                }
+                self.state.select(expected_select, self.len());
+                true
+            }
+        }
+    }
+
+    pub fn mouse_click_and_finish(&mut self, rel_index: usize, gs: &mut GlobalState) -> bool {
+        match self.mode {
+            Mode::Text => true,
+            Mode::Select => {
+                let selected = self.state.at_line + rel_index;
+                self.state.select(selected, self.len());
+                !matches!(self.finish(gs), ModalMessage::Taken | ModalMessage::None)
+            }
         }
     }
 
@@ -195,6 +204,26 @@ impl Info {
         }
         lines.clear_to_end(&mut gs.backend);
     }
+
+    fn finish(&mut self, gs: &mut GlobalState) -> ModalMessage {
+        if !matches!(self.mode, Mode::Select) {
+            return ModalMessage::Done;
+        }
+        if let Some(actions) = self.actions.as_mut() {
+            return match actions.len().cmp(&self.state.selected) {
+                Ordering::Greater => {
+                    gs.event.push(actions.remove(self.state.selected).into());
+                    ModalMessage::TakenDone
+                }
+                _ => {
+                    self.mode = Mode::Text;
+                    self.state.select(0, self.len());
+                    ModalMessage::Taken
+                }
+            };
+        }
+        ModalMessage::Done
+    }
 }
 
 impl From<DiagnosticInfo> for Info {
@@ -288,5 +317,51 @@ fn parse_markedstr(value: MarkedString, sty: &mut Highlighter, lines: &mut Vec<S
                 lines.push(StyledLine::from(text_line.to_owned()))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{Info, ModalMessage, Mode};
+    use crate::configs::{EditorAction, Theme};
+    use crate::ext_tui::CrossTerm;
+    use crate::global_state::GlobalState;
+    use crate::syntax::{Action, DiagnosticInfo};
+    use idiom_tui::{layout::Rect, Backend};
+    use lsp_types::Hover;
+
+    #[test]
+    fn mouse() {
+        let second = Action::Import("second".to_owned());
+        let di = DiagnosticInfo {
+            actions: Some(vec![Action::Import("first".to_owned()), second.clone()]),
+            messages: vec![],
+        };
+        let theme = Theme::default();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+
+        let mut modal = Info::from(di);
+        modal.push_hover(
+            Hover {
+                contents: lsp_types::HoverContents::Scalar(lsp_types::MarkedString::String("test text".to_owned())),
+                range: None,
+            },
+            &theme,
+        );
+
+        assert_eq!(0, modal.state.selected);
+        assert!(modal.mouse_moved(1));
+        assert_eq!(1, modal.state.selected);
+        assert!(modal.actions.is_some());
+        assert!(!modal.mouse_click_and_finish(2, &mut gs));
+        assert!(modal.actions.is_some());
+        assert!(matches!(modal.mode, Mode::Text));
+        assert_eq!(modal.state.selected, 0);
+        assert!(matches!(modal.map(EditorAction::Left, &mut gs), ModalMessage::Taken));
+        assert!(matches!(modal.mode, Mode::Select));
+        assert!(modal.mouse_moved(2));
+        assert_eq!(modal.state.selected, 2);
+        assert!(modal.mouse_click_and_finish(1, &mut gs));
+        assert_eq!(gs.event, vec![second.into()]);
     }
 }

@@ -16,7 +16,7 @@ use crate::{
     },
 };
 pub use diagnostics::{set_diganostics, Action, DiagnosticInfo, DiagnosticLine};
-use idiom_tui::layout::Rect;
+use idiom_tui::{layout::Rect, Position};
 pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
@@ -212,6 +212,8 @@ impl Lexer {
         self.question_lsp = (self.sync_rev)(self, action, content).is_err();
     }
 
+    // MODAL
+
     #[inline]
     pub fn modal_is_rendered(&self) -> bool {
         self.modal_rect.is_some()
@@ -231,29 +233,69 @@ impl Lexer {
 
     #[inline]
     pub fn map_modal_if_exists(&mut self, action: EditorAction, gs: &mut GlobalState) -> (bool, Option<Rect>) {
-        if let Some(modal) = &mut self.modal {
-            match modal.map_and_finish(action, &self.lang, gs) {
-                ModalMessage::Taken => return (true, self.modal_rect.take()),
-                ModalMessage::TakenDone => {
-                    self.modal.take();
-                    return (true, self.modal_rect.take());
-                }
-                ModalMessage::Done => {
-                    self.modal.take();
-                    return (false, self.modal_rect.take());
-                }
-                ModalMessage::RenameVar(new_name, c) => {
-                    self.get_rename(c, new_name, gs);
-                    self.modal.take();
-                    return (true, self.modal_rect.take());
-                }
-                ModalMessage::None => {
-                    return (false, self.modal_rect.take());
-                }
+        let Some(modal) = &mut self.modal else {
+            return (false, None);
+        };
+        match modal.map_and_finish(action, &self.lang, gs) {
+            ModalMessage::Taken => (true, self.modal_rect.take()),
+            ModalMessage::TakenDone => {
+                self.modal.take();
+                (true, self.modal_rect.take())
             }
+            ModalMessage::Done => {
+                self.modal.take();
+                (false, self.modal_rect.take())
+            }
+            ModalMessage::RenameVar(new_name, c) => {
+                self.get_rename(c, new_name, gs);
+                self.modal.take();
+                (true, self.modal_rect.take())
+            }
+            ModalMessage::None => (false, self.modal_rect.take()),
         }
-        (false, None)
     }
+
+    #[inline]
+    pub fn clear_modal(&mut self) -> Option<Rect> {
+        _ = self.modal.take();
+        self.modal_rect.take()
+    }
+
+    pub fn mouse_click_modal_if_exists(
+        &mut self,
+        relative_editor_position: Position,
+        gs: &mut GlobalState,
+    ) -> Option<Rect> {
+        let modal = self.modal.as_mut()?;
+        let found_positon = self.modal_rect.and_then(|rect| {
+            let row = gs.editor_area.row + relative_editor_position.row;
+            let column = gs.editor_area.col + relative_editor_position.col;
+            rect.relative_position(row, column)
+        });
+        match found_positon {
+            // click outside modal
+            None => {
+                self.modal.take();
+                self.modal_rect.take()
+            }
+            Some(position) => match modal.mouse_click_and_finished(position, &self.lang, gs) {
+                // modal finished
+                true => {
+                    self.modal.take();
+                    self.modal_rect.take()
+                }
+                false => self.modal_rect.take(),
+            },
+        }
+    }
+
+    pub fn mouse_moved_modal_if_exists(&mut self, row: u16, column: u16) -> Option<Rect> {
+        let modal = self.modal.as_mut()?;
+        let position = self.modal_rect.and_then(|rect| rect.relative_position(row, column))?;
+        modal.mouse_moved(position).then_some(self.modal_rect.take()?)
+    }
+
+    // LSP HANDLES
 
     pub fn set_lsp_client(&mut self, mut client: LSPClient, content: String, gs: &mut GlobalState) {
         if let Err(error) = client.file_did_open(self.uri.clone(), self.lang.file_type, content) {

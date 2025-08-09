@@ -10,7 +10,7 @@ use crate::{
 };
 use completion::AutoComplete;
 use fuzzy_matcher::skim::SkimMatcherV2;
-use idiom_tui::{layout::Rect, Backend};
+use idiom_tui::{layout::Rect, Backend, Position};
 use info::Info;
 use lsp_types::{CompletionItem, Hover, SignatureHelp};
 use rename::RenameVariable;
@@ -53,11 +53,34 @@ impl LSPModal {
         }
     }
 
+    pub fn mouse_moved(&mut self, position: Position) -> bool {
+        match self {
+            Self::AutoComplete(modal) => modal.mouse_moved(position.row as usize),
+            Self::Info(modal) => modal.mouse_moved(position.row as usize),
+            Self::RenameVar(..) => false,
+        }
+    }
+
+    pub fn mouse_click_and_finished(&mut self, position: Position, lang: &Lang, gs: &mut GlobalState) -> bool {
+        match self {
+            Self::AutoComplete(modal) => modal.mouse_click_and_finished(position.row as usize, lang, gs),
+            Self::Info(modal) => modal.mouse_click_and_finish(position.row as usize, gs),
+            Self::RenameVar(modal) => {
+                if position.row == 1 {
+                    modal.mouse_click(position.col as usize);
+                    false
+                } else {
+                    true
+                }
+            }
+        }
+    }
+
     pub fn render_at(&mut self, col: u16, row: u16, gs: &mut GlobalState) -> Option<Rect> {
         match self {
             Self::AutoComplete(modal) => {
                 let height = std::cmp::min(modal.len() as u16, 7);
-                let area = gs.screen_rect.modal_relative(row, col, 70, height);
+                let area = gs.editor_area.modal_relative(row, col, 70, height);
                 if area.height != 0 {
                     gs.backend.set_style(gs.theme.accent_style);
                     modal.render(&area, gs);
@@ -66,7 +89,7 @@ impl LSPModal {
                 };
             }
             Self::RenameVar(modal) => {
-                let area = gs.screen_rect.modal_relative(row, col, 60, modal.len() as u16);
+                let area = gs.editor_area.modal_relative(row, col, 60, modal.len() as u16);
                 if area.height == 2 {
                     gs.backend.set_style(gs.theme.accent_style);
                     modal.render(&area, gs);
@@ -76,7 +99,7 @@ impl LSPModal {
             }
             Self::Info(modal) => {
                 let height = std::cmp::min(modal.len() as u16, 7);
-                let area = gs.screen_rect.modal_relative(row, col, 90, height);
+                let area = gs.editor_area.modal_relative(row, col, 90, height);
                 if area.height != 0 {
                     gs.backend.set_style(gs.theme.accent_style);
                     modal.render(area, gs);

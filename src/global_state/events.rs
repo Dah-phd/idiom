@@ -8,7 +8,7 @@ use crate::popups::PopupChoice;
 use crate::popups::{popup_tree_search::ActiveFileSearch, Popup};
 use crate::tree::Tree;
 use crate::workspace::line::EditorLine;
-use crate::workspace::{add_editor_from_data, Workspace};
+use crate::workspace::Workspace;
 use crate::{configs::FileType, workspace::CursorPosition};
 use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, Range, WorkspaceEdit};
 use std::path::PathBuf;
@@ -36,6 +36,7 @@ pub enum IdiomEvent {
     SearchFiles(String),
     FileUpdated(PathBuf),
     CheckLSP(FileType),
+    SetLSP(FileType),
     TreeDiagnostics(TreeDiagnostics),
     AutoComplete(String),
     Snippet { snippet: String, cursor_offset: Option<(usize, usize)>, relative_select: Option<((usize, usize), usize)> },
@@ -117,11 +118,10 @@ impl IdiomEvent {
                         path.push(format!("editor_error_{id}.log"));
                         id += 1;
                     }
-                    let file_type = FileType::Ignored;
                     let content: Vec<EditorLine> =
                         gs.messages.get_logs().map(ToOwned::to_owned).map(EditorLine::from).collect();
                     if !content.is_empty() {
-                        add_editor_from_data(ws, path, content, file_type, gs);
+                        ws.new_text_from_data(path, content, None, gs);
                     } else {
                         gs.success(" >> no error logs found!");
                     }
@@ -214,8 +214,15 @@ impl IdiomEvent {
                     editor.save(gs);
                 }
             }
-            IdiomEvent::CheckLSP(ft) => {
-                ws.check_lsp(ft, gs).await;
+            IdiomEvent::CheckLSP(file_type) => {
+                ws.check_lsp(file_type, gs).await;
+            }
+            IdiomEvent::SetLSP(file_type) => {
+                if let Err(error) = ws.force_lsp_type_on_active(file_type, gs).await {
+                    if !matches!(error, crate::error::IdiomError::LSP(crate::lsp::LSPError::Null)) {
+                        gs.error(error);
+                    }
+                };
             }
             IdiomEvent::FileUpdated(path) => {
                 ws.notify_update(path, gs);

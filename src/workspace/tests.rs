@@ -12,7 +12,7 @@ use crate::{
     workspace::{
         actions::tests::create_content,
         editor::code_tests::{mock_editor, pull_line, select_eq},
-        CursorPosition,
+        Cursor, CursorPosition,
     },
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -31,6 +31,17 @@ pub fn mock_ws(content: Vec<String>) -> Workspace {
     };
     ws.resize_all(60, 90);
     ws
+}
+
+pub fn mock_ws_empty() -> Workspace {
+    Workspace {
+        editors: vec![].into(),
+        base_configs: EditorConfigs::default(),
+        key_map: mock_editor_key_map(),
+        lsp_servers: HashMap::default(),
+        map_callback: map_editor,
+        tab_style: ContentStyle::default(),
+    }
 }
 
 fn base_ws() -> Workspace {
@@ -274,6 +285,51 @@ fn test_move() {
 }
 
 #[test]
+fn move_checks() {
+    let mut ws = base_ws();
+    let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+    gs.insert_mode();
+    let base_line = active(&mut ws).content[0].content.to_string();
+    assert_eq!(pull_line(active(&mut ws), 0).unwrap(), base_line);
+    press(&mut ws, KeyCode::End, &mut gs);
+    assert_position(&mut ws, CursorPosition { char: base_line.len(), line: 0 });
+    press(&mut ws, KeyCode::Right, &mut gs);
+    assert_position(&mut ws, CursorPosition { char: 0, line: 1 });
+    press(&mut ws, KeyCode::Left, &mut gs);
+    assert_position(&mut ws, CursorPosition { char: base_line.len(), line: 0 });
+    shift_press(&mut ws, KeyCode::Left, &mut gs);
+    assert!(select_eq(
+        (CursorPosition { char: base_line.len() - 1, line: 0 }, CursorPosition { char: base_line.len(), line: 0 }),
+        active(&mut ws)
+    ));
+    let mut test_cursor = Cursor::default();
+    test_cursor.select_set(
+        CursorPosition { line: 0, char: base_line.len() - 1 },
+        CursorPosition { line: 0, char: base_line.len() },
+    );
+    assert_eq!(test_cursor.char, base_line.len());
+    assert!(test_cursor.matches_content(&active(&mut ws).content));
+    test_cursor.select_set(
+        CursorPosition { line: 0, char: base_line.len() },
+        CursorPosition { line: 0, char: base_line.len() - 1 },
+    );
+    assert_eq!(test_cursor.char, base_line.len() - 1);
+    assert!(test_cursor.matches_content(&active(&mut ws).content));
+    test_cursor.select_set(
+        CursorPosition { line: 0, char: base_line.len() },
+        CursorPosition { line: 0, char: base_line.len() + 1 },
+    );
+    assert_eq!(test_cursor.char, base_line.len() + 1);
+    assert!(!test_cursor.matches_content(&active(&mut ws).content));
+    test_cursor.select_set(
+        CursorPosition { line: 0, char: base_line.len() + 1 },
+        CursorPosition { line: 0, char: base_line.len() },
+    );
+    assert_eq!(test_cursor.char, base_line.len());
+    assert!(!test_cursor.matches_content(&active(&mut ws).content));
+}
+
+#[test]
 fn test_select() {
     let mut ws = base_ws();
     let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
@@ -295,6 +351,38 @@ fn test_select() {
     assert!(select_eq((CursorPosition { char: 7, line: 1 }, CursorPosition { char: 8, line: 1 }), active(&mut ws)));
     shift_press(&mut ws, KeyCode::Up, &mut gs);
     assert!(select_eq((CursorPosition { char: 7, line: 0 }, CursorPosition { char: 8, line: 1 }), active(&mut ws)));
+}
+
+#[test]
+fn select_checks() {
+    let mut ws = base_ws();
+    let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+
+    gs.insert_mode();
+    let last_line = active(&mut ws).content.len() - 1;
+    let base_line = active(&mut ws).content[last_line].to_string();
+    let mut test_cursor = Cursor::default();
+    let all = (CursorPosition::default(), CursorPosition { char: base_line.len(), line: last_line });
+
+    ctrl_press(&mut ws, KeyCode::Char('a'), &mut gs);
+    assert_position(&mut ws, CursorPosition { char: base_line.len(), line: last_line });
+    assert!(select_eq(all, active(&mut ws)));
+    active(&mut ws).cursor.select_set(all.1, all.0); // swap select 'from' and 'to'
+    shift_press(&mut ws, KeyCode::Down, &mut gs);
+    assert!(select_eq((CursorPosition { line: 1, char: 0 }, all.1), active(&mut ws)));
+    shift_press(&mut ws, KeyCode::Left, &mut gs);
+    assert!(select_eq(
+        (CursorPosition { line: 0, char: active(&mut ws).content[0].char_len() }, all.1),
+        active(&mut ws)
+    ));
+    test_cursor.select_set(CursorPosition { line: 0, char: active(&mut ws).content[0].char_len() }, all.1);
+    assert!(test_cursor.matches_content(&active(&mut ws).content));
+    test_cursor.select_set(CursorPosition { line: 0, char: active(&mut ws).content[0].char_len() + 1 }, all.1);
+    assert!(!test_cursor.matches_content(&active(&mut ws).content));
+    test_cursor.select_set(all.0, all.1);
+    assert!(test_cursor.matches_content(&active(&mut ws).content));
+    test_cursor.select_set(all.0, CursorPosition { line: all.1.line + 1, char: 0 });
+    assert!(!test_cursor.matches_content(&active(&mut ws).content));
 }
 
 #[test]

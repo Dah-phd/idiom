@@ -21,11 +21,10 @@ pub fn selector_editors(options: Vec<String>) -> PopupSelector<String> {
 }
 
 pub fn file_updated(path: PathBuf) -> PopupChoice {
-    PopupChoice::new(
+    PopupChoice::new_static(
         "File updated! (Use cancel/close to do nothing)".into(),
         None,
         Some(path.display().to_string()),
-        None,
         vec![
             CommandButton {
                 command: |_, c| c.gs.event.push(IdiomEvent::Save),
