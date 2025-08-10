@@ -1,6 +1,5 @@
-use super::{Editor, CursorPosition, token_range_at};
+use super::{token_range_at, CursorPosition, Editor};
 use crate::{configs::EditorAction, global_state::GlobalState};
-
 
 pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut GlobalState) -> bool {
     let (taken, render_update) = editor.lexer.map_modal_if_exists(action, gs);

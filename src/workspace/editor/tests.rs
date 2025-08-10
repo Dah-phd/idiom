@@ -4,6 +4,7 @@ use super::super::{
     Editor,
 };
 use super::calc_line_number_offset;
+use super::controls;
 use crate::global_state::GlobalState;
 use crate::syntax::Lexer;
 use crate::workspace::{actions::Actions, line::EditorLine};
@@ -26,6 +27,7 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
         cursor: Cursor::default(),
         positions: vec![],
         actions: Actions::default(),
+        action_map: controls::single_cursor_map,
         content,
         renderer: Renderer::code(),
         last_render_at_line: None,
