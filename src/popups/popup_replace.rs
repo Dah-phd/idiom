@@ -35,7 +35,7 @@ impl ReplacePopup {
 
         let mut popup: ReplacePopup = Self {
             rect,
-            accent: gs.theme.accent_style,
+            accent: gs.theme.accent_style(),
             on_text: false,
             options: Vec::new(),
             pattern: TextField::new(String::new(), Some(true)),

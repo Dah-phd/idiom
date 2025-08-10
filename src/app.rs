@@ -94,6 +94,9 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
                                 GeneralAction::InvokePallet => {
                                     Pallet::run(&mut gs, &mut workspace, &mut tree, &mut term);
                                 }
+                                GeneralAction::ContextMenu => {
+                                    gs.context_menu(&mut workspace, &mut tree, &mut term);
+                                }
                                 GeneralAction::Exit => {
                                     if workspace.is_empty() {
                                         return Ok(());

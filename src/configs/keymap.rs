@@ -220,6 +220,7 @@ pub enum GeneralAction {
     GoToLine,
     GitTui,
     ToggleTerminal,
+    ContextMenu,
     GoToTab1,
     GoToTab2,
     GoToTab3,
@@ -248,6 +249,7 @@ pub struct GeneralUserKeyMap {
     go_to_line: String,
     git_tui: String,
     toggle_terminal: String,
+    context_menu: String,
     go_to_tab_1: String,
     go_to_tab_2: String,
     go_to_tab_3: String,
@@ -275,6 +277,7 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
         insert_key_event(&mut hash, &val.go_to_line, GeneralAction::GoToLine);
         insert_key_event(&mut hash, &val.git_tui, GeneralAction::GitTui);
         insert_key_event(&mut hash, &val.toggle_terminal, GeneralAction::ToggleTerminal);
+        insert_key_event(&mut hash, &val.context_menu, GeneralAction::ContextMenu);
         insert_key_event(&mut hash, &val.go_to_tab_1, GeneralAction::GoToTab1);
         insert_key_event(&mut hash, &val.go_to_tab_2, GeneralAction::GoToTab2);
         insert_key_event(&mut hash, &val.go_to_tab_3, GeneralAction::GoToTab3);
@@ -305,6 +308,7 @@ impl Default for GeneralUserKeyMap {
             go_to_line: format!("{CTRL} && g"),
             git_tui: format!("{CTRL} && {SHIFT} && g"),
             toggle_terminal: format!("{CTRL} && `"),
+            context_menu: MENU.to_owned(),
             go_to_tab_1: format!("{ALT} && 1"),
             go_to_tab_2: format!("{ALT} && 2"),
             go_to_tab_3: format!("{ALT} && 3"),
@@ -434,6 +438,8 @@ fn parse_key(keys: &str) -> KeyEvent {
             INSERT => replace_option(&mut code, KeyCode::Insert),
             ESC => replace_option(&mut code, KeyCode::Esc),
             BACKTAB => replace_option(&mut code, KeyCode::BackTab),
+            MENU => replace_option(&mut code, KeyCode::Menu),
+
             SHIFT => modifier.toggle(KeyModifiers::SHIFT),
             CTRL => modifier.toggle(KeyModifiers::CONTROL),
             ALT => modifier.toggle(KeyModifiers::ALT),

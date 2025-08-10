@@ -5,7 +5,7 @@ use crate::popups::pallet::Pallet;
 use crate::popups::Popup;
 use crate::{embeded_term::EditorTerminal, tree::Tree, workspace::Workspace};
 use crossterm::event::{KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use crossterm::style::{Color, ContentStyle, Stylize};
+use crossterm::style::{Color, ContentStyle};
 use idiom_tui::layout::Line;
 
 const INSERT_SPAN: &str = "  --INSERT--  ";
@@ -136,7 +136,7 @@ pub fn mouse_handler(
                     let position = crate::workspace::CursorPosition::from(position);
                     editor.clear_ui(gs);
                     editor.mouse_menu_setup(position);
-                    let accent_style = gs.theme.accent_style;
+                    let accent_style = gs.theme.accent_style();
                     let mut context_menu = menu_context_editor_inplace(position, gs.editor_area, accent_style);
                     if let Err(error) = context_menu.run(gs, ws, tree, term) {
                         gs.error(error);
@@ -155,7 +155,7 @@ pub fn mouse_handler(
                 let mut position = crate::workspace::CursorPosition::from(position);
                 position.line += 1;
                 if tree.mouse_menu_setup_select(position.line) {
-                    let accent_style = gs.theme.accent_style.reverse();
+                    let accent_style = gs.theme.accent_style_reversed();
                     let mut context_menu = menu_context_tree_inplace(position, gs.screen_rect, accent_style);
                     if let Err(error) = context_menu.run(gs, ws, tree, term) {
                         gs.error(error);

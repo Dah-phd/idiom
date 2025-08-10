@@ -3,8 +3,7 @@ mod markdown;
 mod text;
 
 use super::{line::LineContext, Editor};
-use crate::{ext_tui::StyleExt, global_state::GlobalState, syntax::Lexer};
-use crossterm::style::ContentStyle;
+use crate::{global_state::GlobalState, syntax::Lexer};
 use idiom_tui::layout::IterLines;
 
 /// Component containing logic regarding rendering
@@ -45,7 +44,7 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     }
 
     let cursor = &editor.cursor;
-    let accent_style = ContentStyle::fg(gs.theme.accent_background);
+    let accent_style = gs.theme.accent_fg();
     let line_number_offset = editor.line_number_offset;
 
     let mut lines = gs.editor_area.into_iter();
@@ -83,7 +82,7 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
 #[inline(always)]
 fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
     let cursor = &editor.cursor;
-    let accent_style = ContentStyle::fg(gs.theme.accent_background);
+    let accent_style = gs.theme.accent_fg();
     let line_number_offset = editor.line_number_offset;
 
     editor.last_render_at_line.replace(cursor.at_line);
@@ -126,7 +125,7 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
     }
 
     let cursor = &editor.cursor;
-    let accent_style = ContentStyle::fg(gs.theme.accent_background);
+    let accent_style = gs.theme.accent_fg();
     let line_number_offset = editor.line_number_offset;
 
     editor.last_render_at_line.replace(cursor.at_line);
@@ -166,7 +165,7 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
 #[inline(always)]
 fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     let cursor = &editor.cursor;
-    let accent_style = ContentStyle::fg(gs.theme.accent_background);
+    let accent_style = gs.theme.accent_fg();
     let line_number_offset = editor.line_number_offset;
 
     editor.last_render_at_line.replace(cursor.at_line);
@@ -201,7 +200,7 @@ fn md_render(editor: &mut Editor, gs: &mut GlobalState) {
 
 fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     let cursor = &editor.cursor;
-    let accent_style = ContentStyle::fg(gs.theme.accent_background);
+    let accent_style = gs.theme.accent_fg();
     let line_number_offset = editor.line_number_offset;
 
     editor.last_render_at_line.replace(cursor.at_line);
@@ -235,7 +234,7 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
     }
 
     let cursor = &editor.cursor;
-    let accent_style = ContentStyle::fg(gs.theme.accent_background);
+    let accent_style = gs.theme.accent_fg();
     let line_number_offset = editor.line_number_offset;
 
     editor.last_render_at_line.replace(cursor.at_line);

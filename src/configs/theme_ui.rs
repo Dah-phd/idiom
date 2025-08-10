@@ -1,7 +1,7 @@
 use super::{load_or_create_config, THEME_UI};
 use crate::error::IdiomError;
 use crate::ext_tui::{background_rgb, parse_raw_rgb, serialize_rgb, StyleExt};
-use crossterm::style::{Color, ContentStyle};
+use crossterm::style::{Color, ContentStyle, Stylize};
 use serde::ser::{Serialize, SerializeStruct};
 use serde_json::Value;
 
@@ -17,8 +17,8 @@ fn offset_color_part(base: u8, offset: u8) -> u8 {
 
 #[derive(Debug)]
 pub struct UITheme {
-    pub accent_background: Color,
-    pub accent_style: ContentStyle,
+    accent_background: Color,
+    accent_style: ContentStyle,
 }
 
 impl<'de> serde::Deserialize<'de> for UITheme {
@@ -79,5 +79,25 @@ impl Default for UITheme {
 impl UITheme {
     pub fn new() -> Result<Self, toml::de::Error> {
         load_or_create_config(THEME_UI)
+    }
+
+    pub fn accent(&self) -> Color {
+        self.accent_background
+    }
+
+    pub fn accent_fg(&self) -> ContentStyle {
+        ContentStyle::fg(self.accent_background)
+    }
+
+    pub fn accent_fg_reversed(&self) -> ContentStyle {
+        ContentStyle::fg(self.accent_background).reverse()
+    }
+
+    pub fn accent_style(&self) -> ContentStyle {
+        self.accent_style
+    }
+
+    pub fn accent_style_reversed(&self) -> ContentStyle {
+        self.accent_style.reverse()
     }
 }

@@ -42,7 +42,7 @@ pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut 
         }
         tree_area.right_border().left_border().draw_borders(
             Some(HAVLED_BALANCED_BORDERS),
-            Some(gs.theme.accent_background),
+            Some(gs.theme.accent()),
             gs.backend(),
         );
         gs.tree_area = tree_area;
@@ -59,7 +59,7 @@ pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut 
         tab_area
     };
 
-    gs.messages.render(gs.theme.accent_style, &mut gs.backend);
+    gs.messages.render(gs.theme.accent_style(), &mut gs.backend);
     (gs.tab_area, gs.editor_area) = screen.split_vertical_rel(1);
 
     workspace.render(gs);
@@ -80,7 +80,7 @@ pub fn draw(gs: &mut GlobalState, workspace: &mut Workspace, _tree: &mut Tree, _
     workspace.fast_render(gs);
     match workspace.get_active() {
         Some(editor) => editor.fast_render(gs),
-        None => gs.messages.fast_render(gs.theme.accent_style, &mut gs.backend),
+        None => gs.messages.fast_render(gs.theme.accent_style(), &mut gs.backend),
     }
 }
 
@@ -89,7 +89,7 @@ pub fn draw_with_tree(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mu
     workspace.fast_render(gs);
     match workspace.get_active() {
         Some(editor) => editor.fast_render(gs),
-        None => gs.messages.fast_render(gs.theme.accent_style, &mut gs.backend),
+        None => gs.messages.fast_render(gs.theme.accent_style(), &mut gs.backend),
     }
 }
 
@@ -104,7 +104,7 @@ fn render_logo(line: Line, gs: &mut GlobalState) {
         gs.error(format!("Unexpected tree width: {}", line.width));
         return;
     }
-    let style = gs.theme.accent_style;
+    let style = gs.theme.accent_style();
     let backend = gs.backend();
     let reset_style = backend.get_style();
     backend.set_style(style);
