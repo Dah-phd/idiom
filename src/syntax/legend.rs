@@ -5,7 +5,7 @@ use lsp_types::SemanticTokensServerCapabilities;
 #[derive(Clone, Copy, Debug)]
 pub enum ColorResult {
     Direct(Color),
-    Modifiable { normal: Color, moded: Color, mod_bit: usize },
+    Modifiable { normal: Color, moded: Color },
 }
 
 impl Default for ColorResult {
@@ -18,20 +18,19 @@ impl Default for ColorResult {
 pub struct Legend {
     legend: Vec<ColorResult>,
     default: Color,
-    async_mod: Option<usize>,
 }
 
 impl Default for Legend {
     fn default() -> Self {
-        Self { legend: vec![], default: Color::Reset, async_mod: None }
+        Self { legend: vec![], default: Color::Reset }
     }
 }
 
 impl Legend {
     pub fn parse_to_color(&self, token_type: usize, modifier: u32) -> Color {
         match self.legend.get(token_type) {
-            Some(ColorResult::Modifiable { normal, moded, mod_bit }) => {
-                if modifier >> mod_bit & 1 == 1 {
+            Some(ColorResult::Modifiable { normal, moded }) => {
+                if modifier != 0 {
                     return *moded;
                 }
                 *normal
@@ -49,12 +48,6 @@ impl Legend {
                 &opt.semantic_tokens_options.legend
             }
         };
-
-        for (mod_bit, token_mod) in legend.token_modifiers.iter().enumerate() {
-            if token_mod.as_str() == lsp_types::SemanticTokenModifier::ASYNC.as_str() {
-                self.async_mod = Some(mod_bit);
-            };
-        }
 
         match file_type {
             FileType::Rust => {
@@ -143,15 +136,7 @@ impl Legend {
             "method" => self.legend.push(ColorResult::Direct(theme.functions)),
             "macro" => self.legend.push(ColorResult::Direct(theme.key_words)),
             "keyword" => {
-                if let Some(mod_bit) = self.async_mod {
-                    self.legend.push(ColorResult::Modifiable {
-                        normal: theme.key_words,
-                        moded: theme.flow_control,
-                        mod_bit,
-                    })
-                } else {
-                    self.legend.push(ColorResult::Direct(theme.key_words))
-                }
+                self.legend.push(ColorResult::Modifiable { normal: theme.key_words, moded: theme.flow_control })
             }
             "modifier" => self.legend.push(ColorResult::Direct(theme.key_words)),
             "comment" => self.legend.push(ColorResult::Direct(theme.comment)),

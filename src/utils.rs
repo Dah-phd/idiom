@@ -1,90 +1,12 @@
+use crate::{
+    error::{IdiomError, IdiomResult},
+    workspace::line::EditorLine,
+};
 use std::{
     ops::{Add, Sub},
     path::{Path, PathBuf},
     sync::Arc,
 };
-
-use crate::{
-    error::{IdiomError, IdiomResult},
-    workspace::line::EditorLine,
-};
-
-pub fn trim_start_inplace(line: &mut EditorLine) -> usize {
-    if let Some(idx) = line.to_string().find(|c: char| !c.is_whitespace() && c != '\t') {
-        line.replace_till(idx, "");
-        return idx;
-    };
-    0
-}
-
-pub fn split_arc<T: Default>() -> (Arc<T>, Arc<T>) {
-    let arc = Arc::default();
-    let clone = Arc::clone(&arc);
-    (arc, clone)
-}
-
-pub fn get_nested_paths(path: &PathBuf) -> IdiomResult<impl Iterator<Item = PathBuf>> {
-    Ok(std::fs::read_dir(path)?.flatten().map(|p| p.path()))
-}
-
-pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> IdiomResult<PathBuf> {
-    let mut path = if base_path.is_dir() {
-        base_path
-    } else if let Some(parent) = base_path.parent() {
-        parent.into()
-    } else {
-        PathBuf::from("./")
-    };
-
-    if add.ends_with('/') || add.ends_with(std::path::MAIN_SEPARATOR) {
-        path.push(add);
-        std::fs::create_dir_all(&path)?;
-    } else {
-        let mut split: Vec<&str> = add.split('/').collect();
-        let file_name = split.pop();
-        let stem = split.join("/");
-        path.push(stem);
-        std::fs::create_dir_all(&path)?;
-        if let Some(file_name) = file_name {
-            path.push(file_name);
-            if path.exists() {
-                return Err(IdiomError::io_exists("File already exists!"));
-            }
-        }
-        std::fs::write(&path, "")?;
-    }
-
-    Ok(path)
-}
-
-pub fn to_relative_path(target_dir: &Path) -> IdiomResult<PathBuf> {
-    let cd = std::env::current_dir()?;
-    if target_dir.is_relative() {
-        return Ok(target_dir.into());
-    }
-    let mut result = PathBuf::from("./");
-    let mut path_before_current_dir = PathBuf::new();
-    let mut after_current_dir = false;
-    for component in target_dir.components() {
-        if after_current_dir {
-            result.push(component.as_os_str());
-        } else {
-            path_before_current_dir.push(component.as_os_str());
-        }
-        if path_before_current_dir == cd {
-            after_current_dir = true;
-        }
-    }
-    if result.to_string_lossy().is_empty() {
-        Err(IdiomError::io_other("Empty buffer!"))
-    } else {
-        Ok(result)
-    }
-}
-
-pub fn to_canon_path(target_dir: &Path) -> IdiomResult<PathBuf> {
-    Ok(target_dir.canonicalize()?)
-}
 
 pub struct TrackedList<T> {
     inner: Vec<T>,
@@ -295,6 +217,83 @@ impl From<usize> for Offset {
     fn from(value: usize) -> Self {
         Self::Pos(value)
     }
+}
+
+pub fn trim_start_inplace(line: &mut EditorLine) -> usize {
+    if let Some(idx) = line.to_string().find(|c: char| !c.is_whitespace() && c != '\t') {
+        line.replace_till(idx, "");
+        return idx;
+    };
+    0
+}
+
+pub fn split_arc<T: Default>() -> (Arc<T>, Arc<T>) {
+    let arc = Arc::default();
+    let clone = Arc::clone(&arc);
+    (arc, clone)
+}
+
+pub fn get_nested_paths(path: &PathBuf) -> IdiomResult<impl Iterator<Item = PathBuf>> {
+    Ok(std::fs::read_dir(path)?.flatten().map(|p| p.path()))
+}
+
+pub fn build_file_or_folder(base_path: PathBuf, add: &str) -> IdiomResult<PathBuf> {
+    let mut path = if base_path.is_dir() {
+        base_path
+    } else if let Some(parent) = base_path.parent() {
+        parent.into()
+    } else {
+        PathBuf::from("./")
+    };
+
+    if add.ends_with('/') || add.ends_with(std::path::MAIN_SEPARATOR) {
+        path.push(add);
+        std::fs::create_dir_all(&path)?;
+    } else {
+        let mut split: Vec<&str> = add.split('/').collect();
+        let file_name = split.pop();
+        let stem = split.join("/");
+        path.push(stem);
+        std::fs::create_dir_all(&path)?;
+        if let Some(file_name) = file_name {
+            path.push(file_name);
+            if path.exists() {
+                return Err(IdiomError::io_exists("File already exists!"));
+            }
+        }
+        std::fs::write(&path, "")?;
+    }
+
+    Ok(path)
+}
+
+pub fn to_relative_path(target_dir: &Path) -> IdiomResult<PathBuf> {
+    let cd = std::env::current_dir()?;
+    if target_dir.is_relative() {
+        return Ok(target_dir.into());
+    }
+    let mut result = PathBuf::from("./");
+    let mut path_before_current_dir = PathBuf::new();
+    let mut after_current_dir = false;
+    for component in target_dir.components() {
+        if after_current_dir {
+            result.push(component.as_os_str());
+        } else {
+            path_before_current_dir.push(component.as_os_str());
+        }
+        if path_before_current_dir == cd {
+            after_current_dir = true;
+        }
+    }
+    if result.to_string_lossy().is_empty() {
+        Err(IdiomError::io_other("Empty buffer!"))
+    } else {
+        Ok(result)
+    }
+}
+
+pub fn to_canon_path(target_dir: &Path) -> IdiomResult<PathBuf> {
+    Ok(target_dir.canonicalize()?)
 }
 
 #[cfg(test)]
