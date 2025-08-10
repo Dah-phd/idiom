@@ -145,15 +145,30 @@ impl Cursor {
         self.adjust_char(&content[self.line]);
     }
 
+    pub fn screen_up(&mut self, content: &[EditorLine]) {
+        self.line = self.line.saturating_sub(self.max_rows);
+        self.at_line = self.line.saturating_sub(self.max_rows / 2);
+        self.adjust_char(&content[self.line]);
+    }
+
     pub fn scroll_up(&mut self, content: &[EditorLine]) {
         if self.at_line != 0 {
             self.at_line -= 1;
-            self.up(content)
-        }
+        };
+        self.up(content);
     }
 
     pub fn select_up(&mut self, content: &[EditorLine]) {
         self.init_select();
+        self.move_up(content);
+        self.push_to_select();
+    }
+
+    pub fn select_scroll_up(&mut self, content: &[EditorLine]) {
+        self.init_select();
+        if self.at_line != 0 {
+            self.at_line -= 1;
+        };
         self.move_up(content);
         self.push_to_select();
     }
@@ -180,17 +195,35 @@ impl Cursor {
         self.adjust_char(&content[self.line]);
     }
 
+    pub fn screen_down(&mut self, content: &[EditorLine]) {
+        if content.is_empty() {
+            return;
+        };
+        self.line = std::cmp::min(content.len() - 1, self.line + self.max_rows);
+        self.at_line = self.line.saturating_sub(self.max_rows / 2);
+        self.adjust_char(&content[self.line]);
+    }
+
+    pub fn scroll_down(&mut self, content: &[EditorLine]) {
+        if self.at_line + 2 < content.len() {
+            self.at_line += 1;
+        };
+        self.down(content);
+    }
+
     pub fn select_down(&mut self, content: &[EditorLine]) {
         self.init_select();
         self.move_down(content);
         self.push_to_select();
     }
 
-    pub fn scroll_down(&mut self, content: &[EditorLine]) {
+    pub fn select_scroll_down(&mut self, content: &[EditorLine]) {
+        self.init_select();
         if self.at_line + 2 < content.len() {
             self.at_line += 1;
-            self.down(content)
-        }
+        };
+        self.move_down(content);
+        self.push_to_select();
     }
 
     pub fn left(&mut self, content: &[EditorLine]) {

@@ -24,6 +24,7 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
         path,
         update_status: FileUpdate::None,
         cursor: Cursor::default(),
+        positions: vec![],
         actions: Actions::default(),
         content,
         renderer: Renderer::code(),

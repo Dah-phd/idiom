@@ -100,12 +100,12 @@ mod test {
     fn finds_list() {
         match parse_unordered_list(&["* A list", "* is good"]) {
             Some((UnorderedList(_), 2)) => (),
-            x => panic!("Found {:?}", x),
+            x => panic!("Found {x:?}"),
         }
 
         match parse_unordered_list(&["* A list", "* is good", "laksjdnflakdsjnf"]) {
             Some((UnorderedList(_), 3)) => (),
-            x => panic!("Found {:?}", x),
+            x => panic!("Found {x:?}"),
         }
     }
 
@@ -113,12 +113,12 @@ mod test {
     fn knows_when_to_stop() {
         match parse_unordered_list(&["* A list", "* is good", "", "laksjdnflakdsjnf"]) {
             Some((UnorderedList(_), 3)) => (),
-            x => panic!("Found {:?}", x),
+            x => panic!("Found {x:?}"),
         }
 
         match parse_unordered_list(&["* A list", "", "laksjdnflakdsjnf"]) {
             Some((UnorderedList(_), 2)) => (),
-            x => panic!("Found {:?}", x),
+            x => panic!("Found {x:?}"),
         }
     }
 

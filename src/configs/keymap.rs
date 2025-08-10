@@ -27,6 +27,10 @@ pub enum EditorAction {
     SelectAll,
     ScrollUp,
     ScrollDown,
+    SelectScrollUp,
+    SelectScrollDown,
+    ScreenUp,
+    ScreenDown,
     SwapUp,
     SwapDown,
     JumpLeft,
@@ -75,7 +79,11 @@ pub struct EditorUserKeyMap {
     select_line: String,
     select_all: String,
     scroll_up: String,
+    select_scroll_up: String,
     scroll_down: String,
+    select_scroll_down: String,
+    screen_up: String,
+    screen_down: String,
     swap_up: String,
     swap_down: String,
     jump_left: String,
@@ -124,9 +132,13 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
         insert_key_event(&mut hash, &val.select_line, EditorAction::SelectLine);
         insert_key_event(&mut hash, &val.select_all, EditorAction::SelectAll);
         insert_key_event(&mut hash, &val.scroll_up, EditorAction::ScrollUp);
+        insert_key_event(&mut hash, &val.select_scroll_up, EditorAction::SelectScrollUp);
         insert_key_event(&mut hash, &val.scroll_down, EditorAction::ScrollDown);
+        insert_key_event(&mut hash, &val.select_scroll_down, EditorAction::SelectScrollDown);
         insert_key_event(&mut hash, &val.swap_up, EditorAction::SwapUp);
         insert_key_event(&mut hash, &val.swap_down, EditorAction::SwapDown);
+        insert_key_event(&mut hash, &val.screen_up, EditorAction::ScreenUp);
+        insert_key_event(&mut hash, &val.screen_down, EditorAction::ScreenDown);
         insert_key_event(&mut hash, &val.jump_left, EditorAction::JumpLeft);
         insert_key_event(&mut hash, &val.jump_left_select, EditorAction::JumpLeftSelect);
         insert_key_event(&mut hash, &val.jump_right, EditorAction::JumpRight);
@@ -173,8 +185,12 @@ impl Default for EditorUserKeyMap {
             select_token: format!("{CTRL} && w"),
             select_line: format!("{CTRL} && l"),
             select_all: format!("{CTRL} && a"),
-            scroll_up: format!("{CTRL} && {UP} || {PAGEUP}"),
-            scroll_down: format!("{CTRL} && {DOWN} || {PAGEDOWN}"),
+            scroll_up: format!("{CTRL} && {UP}"),
+            scroll_down: format!("{CTRL} && {DOWN}"),
+            select_scroll_up: format!("{CTRL} && {SHIFT} && {UP}"),
+            select_scroll_down: format!("{CTRL} && {SHIFT} && {DOWN}"),
+            screen_up: PAGEUP.to_owned(),
+            screen_down: PAGEDOWN.to_owned(),
             swap_up: format!("{ALT} && {UP}"),
             swap_down: format!("{ALT} && {DOWN}"),
             jump_left: format!("{CTRL} && {LEFT} || {ALT} && {LEFT}"),

@@ -121,17 +121,17 @@ mod test {
     fn finds_list() {
         match parse_ordered_list(&["1. A list", "2. is good"]) {
             Some((OrderedList(_, ref lt), 2)) if lt == &n_type() => (),
-            x => panic!("Found {:?}", x),
+            x => panic!("Found {x:?}"),
         }
 
         match parse_ordered_list(&["a. A list", "b. is good", "laksjdnflakdsjnf"]) {
             Some((OrderedList(_, ref lt), 3)) if lt == &a_type() => (),
-            x => panic!("Found {:?}", x),
+            x => panic!("Found {x:?}"),
         }
 
         match parse_ordered_list(&["A. A list", "B. is good", "laksjdnflakdsjnf"]) {
             Some((OrderedList(_, ref lt), 3)) if lt == &A_type() => (),
-            x => panic!("Found {:?}", x),
+            x => panic!("Found {x:?}"),
         }
     }
 
@@ -139,12 +139,12 @@ mod test {
     fn knows_when_to_stop() {
         match parse_ordered_list(&["i. A list", "ii. is good", "", "laksjdnflakdsjnf"]) {
             Some((OrderedList(_, ref lt), 3)) if lt == &i_type() => (),
-            x => panic!("Found {:?}", x),
+            x => panic!("Found {x:?}"),
         }
 
         match parse_ordered_list(&["I. A list", "", "laksjdnflakdsjnf"]) {
             Some((OrderedList(_, ref lt), 2)) if lt == &I_type() => (),
-            x => panic!("Found {:?}", x),
+            x => panic!("Found {x:?}"),
         }
     }
 
@@ -154,11 +154,11 @@ mod test {
             Some((OrderedList(ref items, ref lt), 3)) if lt == &n_type() => match &items[0] {
                 Paragraph(ref items) => match &items[1] {
                     OrderedList(_, ref lt1) if lt1 == &n_type() => (),
-                    x => panic!("Found {:?}", x),
+                    x => panic!("Found {x:?}"),
                 },
-                x => panic!("Found {:?}", x),
+                x => panic!("Found {x:?}"),
             },
-            x => panic!("Found {:?}", x),
+            x => panic!("Found {x:?}"),
         }
     }
 

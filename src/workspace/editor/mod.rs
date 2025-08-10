@@ -1,4 +1,5 @@
 mod utils;
+// mod controls;
 use super::{
     actions::Actions,
     cursor::{Cursor, CursorPosition},
@@ -26,6 +27,7 @@ pub struct Editor {
     pub path: PathBuf,
     pub lexer: Lexer,
     pub cursor: Cursor,
+    positions: Vec<Cursor>,
     actions: Actions,
     pub content: Vec<EditorLine>,
     renderer: Renderer,
@@ -47,6 +49,7 @@ impl Editor {
         let line_number_offset = calc_line_number_offset(content.len());
         Ok(Self {
             cursor: Cursor::sized(gs.editor_area, line_number_offset),
+            positions: Vec::new(),
             line_number_offset,
             lexer: Lexer::with_context(file_type, &path, gs),
             content,
@@ -72,6 +75,7 @@ impl Editor {
         calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
             cursor,
+            positions: Vec::new(),
             line_number_offset,
             lexer: Lexer::text_lexer(&path, gs),
             content,
@@ -95,6 +99,7 @@ impl Editor {
         calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
             cursor,
+            positions: Vec::new(),
             line_number_offset,
             lexer: Lexer::text_lexer(&path, gs),
             content,
@@ -280,6 +285,10 @@ impl Editor {
             EditorAction::SelectAll => self.select_all(),
             EditorAction::ScrollUp => self.cursor.scroll_up(&self.content),
             EditorAction::ScrollDown => self.cursor.scroll_down(&self.content),
+            EditorAction::SelectScrollUp => self.cursor.select_scroll_up(&self.content),
+            EditorAction::SelectScrollDown => self.cursor.select_scroll_down(&self.content),
+            EditorAction::ScreenUp => self.cursor.screen_up(&self.content),
+            EditorAction::ScreenDown => self.cursor.screen_down(&self.content),
             EditorAction::JumpLeft => self.cursor.jump_left(&self.content),
             EditorAction::JumpLeftSelect => self.cursor.jump_left_select(&self.content),
             EditorAction::JumpRight => self.cursor.jump_right(&self.content),
@@ -404,11 +413,12 @@ impl Editor {
 
     pub fn go_to(&mut self, line: usize) {
         self.cursor.select_drop();
-        if self.content.len() > line {
-            self.cursor.line = line;
-            self.cursor.char = find_line_start(&self.content[line]);
-            self.cursor.at_line = line.saturating_sub(self.cursor.max_rows / 2);
-        }
+        if self.content.len() <= line {
+            return;
+        };
+        self.cursor.line = line;
+        self.cursor.char = find_line_start(&self.content[line]);
+        self.cursor.at_line = line.saturating_sub(self.cursor.max_rows / 2);
     }
 
     pub fn go_to_select(&mut self, from: CursorPosition, to: CursorPosition) {
@@ -477,7 +487,7 @@ impl Editor {
         );
     }
 
-    pub fn mouse_scroll_up(&mut self, gs: &mut GlobalState) {
+    pub fn mouse_scroll_up(&mut self, select: bool, gs: &mut GlobalState) {
         let (taken, render_update) = self.lexer.map_modal_if_exists(EditorAction::ScrollUp, gs);
         if let Some(modal_rect) = render_update {
             self.updated_rect(modal_rect, gs);
@@ -485,11 +495,19 @@ impl Editor {
         if taken {
             return;
         };
-        self.cursor.scroll_up(&self.content);
-        self.cursor.scroll_up(&self.content);
+        match select {
+            true => {
+                self.cursor.select_scroll_up(&self.content);
+                self.cursor.select_scroll_up(&self.content);
+            }
+            false => {
+                self.cursor.scroll_up(&self.content);
+                self.cursor.scroll_up(&self.content);
+            }
+        }
     }
 
-    pub fn mouse_scroll_down(&mut self, gs: &mut GlobalState) {
+    pub fn mouse_scroll_down(&mut self, select: bool, gs: &mut GlobalState) {
         let (taken, render_update) = self.lexer.map_modal_if_exists(EditorAction::ScrollDown, gs);
         if let Some(modal_rect) = render_update {
             self.updated_rect(modal_rect, gs);
@@ -497,8 +515,16 @@ impl Editor {
         if taken {
             return;
         };
-        self.cursor.scroll_down(&self.content);
-        self.cursor.scroll_down(&self.content);
+        match select {
+            true => {
+                self.cursor.select_scroll_down(&self.content);
+                self.cursor.select_scroll_down(&self.content);
+            }
+            false => {
+                self.cursor.scroll_down(&self.content);
+                self.cursor.scroll_down(&self.content);
+            }
+        }
     }
 
     pub fn mouse_click(&mut self, position: Position, gs: &mut GlobalState) {

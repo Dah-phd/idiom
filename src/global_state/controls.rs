@@ -4,7 +4,7 @@ use crate::popups::menu::{menu_context_editor_inplace, menu_context_tree_inplace
 use crate::popups::pallet::Pallet;
 use crate::popups::Popup;
 use crate::{embeded_term::EditorTerminal, tree::Tree, workspace::Workspace};
-use crossterm::event::{KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::layout::Line;
 
@@ -79,7 +79,7 @@ pub fn mouse_handler(
         MouseEventKind::ScrollUp => match gs.mode {
             Mode::Insert => {
                 if let Some(editor) = ws.get_active() {
-                    editor.mouse_scroll_up(gs);
+                    editor.mouse_scroll_up(event.modifiers.contains(KeyModifiers::SHIFT), gs);
                 }
             }
             Mode::Select => tree.select_up(gs),
@@ -87,7 +87,7 @@ pub fn mouse_handler(
         MouseEventKind::ScrollDown => match gs.mode {
             Mode::Insert => {
                 if let Some(editor) = ws.get_active() {
-                    editor.mouse_scroll_down(gs);
+                    editor.mouse_scroll_down(event.modifiers.contains(KeyModifiers::SHIFT), gs);
                 }
             }
             Mode::Select => tree.select_down(gs),
