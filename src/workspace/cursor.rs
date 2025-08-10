@@ -146,6 +146,7 @@ impl Cursor {
     }
 
     pub fn screen_up(&mut self, content: &[EditorLine]) {
+        self.select = None;
         self.line = self.line.saturating_sub(self.max_rows);
         self.at_line = self.line.saturating_sub(self.max_rows / 2);
         self.adjust_char(&content[self.line]);
@@ -196,6 +197,7 @@ impl Cursor {
     }
 
     pub fn screen_down(&mut self, content: &[EditorLine]) {
+        self.select = None;
         if content.is_empty() {
             return;
         };
