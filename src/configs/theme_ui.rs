@@ -17,8 +17,11 @@ fn offset_color_part(base: u8, offset: u8) -> u8 {
 
 #[derive(Debug)]
 pub struct UITheme {
-    accent_background: Color,
+    accent: Color,
+    accent_style_rev: ContentStyle,
     accent_style: ContentStyle,
+    accent_fg_rev: ContentStyle,
+    accent_fg: ContentStyle,
 }
 
 impl<'de> serde::Deserialize<'de> for UITheme {
@@ -34,7 +37,7 @@ impl<'de> serde::Deserialize<'de> for UITheme {
                         Some(Err(msg)) => return Err(serde::de::Error::custom(msg)),
                         None => (ACCENT_OFFSET, ACCENT_OFFSET, ACCENT_OFFSET),
                     };
-                let accent_background = match background_rgb() {
+                let accent = match background_rgb() {
                     Some((r, g, b)) => Color::Rgb {
                         r: offset_color_part(r, r_offset),
                         g: offset_color_part(g, g_offset),
@@ -43,7 +46,13 @@ impl<'de> serde::Deserialize<'de> for UITheme {
                     // assume pitch black
                     None => Color::Rgb { r: ACCENT_OFFSET, g: ACCENT_OFFSET, b: ACCENT_OFFSET },
                 };
-                Ok(Self { accent_style: ContentStyle::bg(accent_background), accent_background })
+                Ok(Self {
+                    accent_style: ContentStyle::bg(accent),
+                    accent_style_rev: ContentStyle::bg(accent).reverse(),
+                    accent_fg: ContentStyle::fg(accent),
+                    accent_fg_rev: ContentStyle::fg(accent).reverse(),
+                    accent,
+                })
             }
             _ => Err(serde::de::Error::custom(IdiomError::any("theme_ui.toml in not an Object!"))),
         }
@@ -63,7 +72,7 @@ impl Serialize for UITheme {
 
 impl Default for UITheme {
     fn default() -> Self {
-        let accent_background = match background_rgb() {
+        let accent = match background_rgb() {
             Some((r, g, b)) => Color::Rgb {
                 r: offset_color_part(r, ACCENT_OFFSET),
                 g: offset_color_part(g, ACCENT_OFFSET),
@@ -72,7 +81,13 @@ impl Default for UITheme {
             // assume pitch black
             None => Color::Rgb { r: ACCENT_OFFSET, g: ACCENT_OFFSET, b: ACCENT_OFFSET },
         };
-        Self { accent_style: ContentStyle::bg(accent_background), accent_background }
+        Self {
+            accent_style: ContentStyle::bg(accent),
+            accent_style_rev: ContentStyle::bg(accent).reverse(),
+            accent_fg: ContentStyle::fg(accent),
+            accent_fg_rev: ContentStyle::fg(accent).reverse(),
+            accent,
+        }
     }
 }
 
@@ -82,15 +97,15 @@ impl UITheme {
     }
 
     pub fn accent(&self) -> Color {
-        self.accent_background
+        self.accent
     }
 
     pub fn accent_fg(&self) -> ContentStyle {
-        ContentStyle::fg(self.accent_background)
+        self.accent_fg
     }
 
     pub fn accent_fg_reversed(&self) -> ContentStyle {
-        ContentStyle::fg(self.accent_background).reverse()
+        self.accent_fg_rev
     }
 
     pub fn accent_style(&self) -> ContentStyle {
@@ -98,6 +113,6 @@ impl UITheme {
     }
 
     pub fn accent_style_reversed(&self) -> ContentStyle {
-        self.accent_style.reverse()
+        self.accent_style_rev
     }
 }
