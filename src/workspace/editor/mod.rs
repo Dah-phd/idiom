@@ -631,4 +631,4 @@ impl Drop for Editor {
 }
 
 #[cfg(test)]
-pub mod code_tests;
+pub mod tests;

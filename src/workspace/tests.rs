@@ -11,7 +11,7 @@ use crate::{
     global_state::GlobalState,
     workspace::{
         actions::tests::create_content,
-        editor::code_tests::{mock_editor, pull_line, select_eq},
+        editor::tests::{mock_editor, pull_line, select_eq},
         Cursor, CursorPosition,
     },
 };
