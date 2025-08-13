@@ -31,6 +31,8 @@ pub enum EditorAction {
     SelectScrollDown,
     ScreenUp,
     ScreenDown,
+    NewCursorUp,
+    NewCursorDown,
     SwapUp,
     SwapDown,
     JumpLeft,
@@ -84,6 +86,8 @@ pub struct EditorUserKeyMap {
     select_scroll_down: String,
     screen_up: String,
     screen_down: String,
+    new_cursor_up: String,
+    new_cursor_down: String,
     swap_up: String,
     swap_down: String,
     jump_left: String,
@@ -135,6 +139,8 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
         insert_key_event(&mut hash, &val.select_scroll_up, EditorAction::SelectScrollUp);
         insert_key_event(&mut hash, &val.scroll_down, EditorAction::ScrollDown);
         insert_key_event(&mut hash, &val.select_scroll_down, EditorAction::SelectScrollDown);
+        insert_key_event(&mut hash, &val.new_cursor_up, EditorAction::NewCursorUp);
+        insert_key_event(&mut hash, &val.new_cursor_down, EditorAction::NewCursorDown);
         insert_key_event(&mut hash, &val.swap_up, EditorAction::SwapUp);
         insert_key_event(&mut hash, &val.swap_down, EditorAction::SwapDown);
         insert_key_event(&mut hash, &val.screen_up, EditorAction::ScreenUp);
@@ -191,6 +197,8 @@ impl Default for EditorUserKeyMap {
             select_scroll_down: format!("{CTRL} && {SHIFT} && {DOWN}"),
             screen_up: PAGEUP.to_owned(),
             screen_down: PAGEDOWN.to_owned(),
+            new_cursor_up: format!("{ALT} && {CTRL} && {UP}"),
+            new_cursor_down: format!("{ALT} && {CTRL} && {DOWN}"),
             swap_up: format!("{ALT} && {UP}"),
             swap_down: format!("{ALT} && {DOWN}"),
             jump_left: format!("{CTRL} && {LEFT} || {ALT} && {LEFT}"),

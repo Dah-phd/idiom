@@ -437,6 +437,67 @@ impl Cursor {
         self.at_line = 0;
         self.select = None;
     }
+
+    pub fn merge_if_intersect(&mut self, other: &Cursor) -> bool {
+        match self.select {
+            Some((from, to)) if from > to => match other.select {
+                Some((mut oth_from, mut oth_to)) => {
+                    // likely not needed match self direction
+                    if oth_from < oth_to {
+                        std::mem::swap(&mut oth_from, &mut oth_to);
+                    };
+                    if from >= oth_from && oth_from >= to {
+                        self.select_set(from, std::cmp::min(oth_to, to));
+                    };
+                    if oth_from >= from && from >= oth_to {
+                        self.select_set(oth_from, std::cmp::min(oth_to, to));
+                    };
+                }
+                None => {
+                    let oth_pos = CursorPosition { line: other.line, char: other.char };
+                    return from >= oth_pos && oth_pos >= to;
+                }
+            },
+            Some((from, to)) if from < to => match other.select {
+                Some((mut oth_from, mut oth_to)) => {
+                    // likely not needed match self direction
+                    if oth_from > oth_to {
+                        std::mem::swap(&mut oth_from, &mut oth_to);
+                    };
+                    if from <= oth_from && oth_from <= to {
+                        self.select_set(from, std::cmp::max(oth_to, to));
+                    };
+                    if oth_from <= from && from <= oth_to {
+                        self.select_set(oth_from, std::cmp::max(oth_to, to));
+                    };
+                }
+                None => {
+                    let oth_pos = CursorPosition { line: other.line, char: other.char };
+                    return from <= oth_pos && oth_pos <= to;
+                }
+            },
+            Some((.., to)) => match other.select {
+                Some((oth_from, oth_to)) => {
+                    if (oth_from >= to && to >= oth_to) || (oth_from <= to && to <= oth_to) {
+                        self.select_set(oth_from, oth_to);
+                        return true;
+                    }
+                }
+                None => return to.line == other.line && to.char == other.char,
+            },
+            None => match other.select {
+                Some((oth_from, oth_to)) => {
+                    let pos = CursorPosition { line: self.line, char: self.char };
+                    if (oth_from >= pos && pos >= oth_to) || (oth_to >= pos && pos >= oth_from) {
+                        self.select_set(oth_from, oth_to);
+                        return true;
+                    };
+                }
+                None => return self.line == other.line && self.char == other.char,
+            },
+        }
+        false
+    }
 }
 
 impl From<&mut Cursor> for CursorPosition {
