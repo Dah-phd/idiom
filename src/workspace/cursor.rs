@@ -13,7 +13,7 @@ pub struct Cursor {
     pub at_line: usize,
     pub max_rows: usize,
     pub text_width: usize,
-    select: Option<Select>,
+    select: Option<CursorPosition>,
 }
 
 impl Cursor {
@@ -30,11 +30,11 @@ impl Cursor {
         if content[self.line].char_len() < self.char {
             return false;
         }
-        if let Some((from, to)) = self.select {
-            if content.len() <= from.line || content.len() <= to.line {
+        if let Some(from) = self.select {
+            if content.len() <= from.line || content.len() <= self.line {
                 return false;
             }
-            if content[from.line].char_len() < from.char || content[to.line].char_len() < to.char {
+            if content[from.line].char_len() < from.char || content[self.line].char_len() < self.char {
                 return false;
             }
         }
@@ -44,7 +44,6 @@ impl Cursor {
     pub fn set_cursor_checked_with_select(&mut self, position: CursorPosition, content: &[EditorLine]) {
         self.set_cursor_checked(position, content);
         self.init_select();
-        self.push_to_select();
     }
 
     pub fn set_cursor_checked(&mut self, mut position: CursorPosition, content: &[EditorLine]) {
@@ -162,7 +161,6 @@ impl Cursor {
     pub fn select_up(&mut self, content: &[EditorLine]) {
         self.init_select();
         self.move_up(content);
-        self.push_to_select();
     }
 
     pub fn select_scroll_up(&mut self, content: &[EditorLine]) {
@@ -171,7 +169,6 @@ impl Cursor {
             self.at_line -= 1;
         };
         self.move_up(content);
-        self.push_to_select();
     }
 
     pub fn down(&mut self, content: &[EditorLine]) {
@@ -216,7 +213,6 @@ impl Cursor {
     pub fn select_down(&mut self, content: &[EditorLine]) {
         self.init_select();
         self.move_down(content);
-        self.push_to_select();
     }
 
     pub fn select_scroll_down(&mut self, content: &[EditorLine]) {
@@ -225,7 +221,6 @@ impl Cursor {
             self.at_line += 1;
         };
         self.move_down(content);
-        self.push_to_select();
     }
 
     pub fn left(&mut self, content: &[EditorLine]) {
@@ -256,7 +251,6 @@ impl Cursor {
     pub fn jump_left_select(&mut self, content: &[EditorLine]) {
         self.init_select();
         self._jump_left(content);
-        self.push_to_select();
     }
 
     fn _jump_left(&mut self, content: &[EditorLine]) {
@@ -279,7 +273,6 @@ impl Cursor {
     pub fn select_left(&mut self, content: &[EditorLine]) {
         self.init_select();
         self.move_left(content);
-        self.push_to_select();
     }
 
     pub fn right(&mut self, content: &[EditorLine]) {
@@ -307,7 +300,6 @@ impl Cursor {
     pub fn jump_right_select(&mut self, content: &[EditorLine]) {
         self.init_select();
         self._jump_right(content);
-        self.push_to_select();
     }
 
     pub fn _jump_right(&mut self, content: &[EditorLine]) {
@@ -330,7 +322,6 @@ impl Cursor {
     pub fn select_right(&mut self, content: &[EditorLine]) {
         self.init_select();
         self.move_right(content);
-        self.push_to_select();
     }
 
     pub fn adjust_max_line(&mut self, content: &[EditorLine]) {
@@ -350,14 +341,7 @@ impl Cursor {
 
     pub fn init_select(&mut self) {
         if self.select.is_none() {
-            let position = self.into();
-            self.select.replace((position, position));
-        }
-    }
-
-    pub fn push_to_select(&mut self) {
-        if let Some((_, to)) = self.select.as_mut() {
-            *to = CursorPosition { line: self.line, char: self.char };
+            self.select.replace(CursorPosition { line: self.line, char: self.char });
         }
     }
 
@@ -365,21 +349,23 @@ impl Cursor {
         self.select.is_none()
     }
 
-    pub fn select_line_offset(&mut self, offset: usize) {
-        if let Some((from, to)) = self.select.as_mut() {
+    pub fn add_line_offset(&mut self, offset: usize) {
+        self.line += offset;
+        self.at_line += offset;
+        if let Some(from) = self.select.as_mut() {
             from.line += offset;
-            to.line += offset;
         }
     }
 
     pub fn select_get(&self) -> Option<Select> {
         match self.select.as_ref() {
             None => None,
-            Some((from, to)) => {
-                if from.line > to.line || from.line == to.line && from.char > to.char {
-                    Some((*to, *from))
+            Some(from) => {
+                let cursor = CursorPosition::from(self);
+                if from.line > self.line || from.line == self.line && from.char > self.char {
+                    Some((cursor, *from))
                 } else {
-                    Some((*from, *to))
+                    Some((*from, cursor))
                 }
             }
         }
@@ -391,24 +377,28 @@ impl Cursor {
 
     pub fn select_set(&mut self, from: CursorPosition, to: CursorPosition) {
         self.set_position(to);
-        self.select.replace((from, to));
+        self.select.replace(from);
     }
 
     pub fn select_replace(&mut self, select: Option<Select>) {
-        self.select = select;
-        if let Some((_, to)) = self.select {
-            self.set_position(to);
+        match select {
+            Some((from, to)) => {
+                self.select = Some(from);
+                self.set_position(to);
+            }
+            None => self.select = None,
         };
     }
 
     pub fn select_take(&mut self) -> Option<Select> {
         match self.select.take() {
             None => None,
-            Some((from, to)) => {
-                if from.line > to.line || from.line == to.line && from.char > to.char {
-                    Some((to, from))
+            Some(from) => {
+                let cursor = CursorPosition { line: self.line, char: self.char };
+                if from.line > self.line || from.line == self.line && from.char > self.char {
+                    Some((cursor, from))
                 } else {
-                    Some((from, to))
+                    Some((from, cursor))
                 }
             }
         }
@@ -439,57 +429,59 @@ impl Cursor {
     }
 
     pub fn merge_if_intersect(&mut self, other: &Cursor) -> bool {
+        let cursor = CursorPosition { line: self.line, char: self.char };
+        let mut oth_cursor = CursorPosition { line: self.line, char: self.char };
         match self.select {
-            Some((from, to)) if from > to => match other.select {
-                Some((mut oth_from, mut oth_to)) => {
+            Some(from) if from > cursor => match other.select {
+                Some(mut oth_from) => {
                     // likely not needed match self direction
-                    if oth_from < oth_to {
-                        std::mem::swap(&mut oth_from, &mut oth_to);
+                    if oth_from < oth_cursor {
+                        std::mem::swap(&mut oth_from, &mut oth_cursor);
                     };
-                    if from >= oth_from && oth_from >= to {
-                        self.select_set(from, std::cmp::min(oth_to, to));
+                    if from >= oth_from && oth_from >= cursor {
+                        self.select_set(from, std::cmp::min(oth_cursor, cursor));
                     };
-                    if oth_from >= from && from >= oth_to {
-                        self.select_set(oth_from, std::cmp::min(oth_to, to));
+                    if oth_from >= from && from >= oth_cursor {
+                        self.select_set(oth_from, std::cmp::min(oth_cursor, cursor));
                     };
                 }
                 None => {
                     let oth_pos = CursorPosition { line: other.line, char: other.char };
-                    return from >= oth_pos && oth_pos >= to;
+                    return from >= oth_pos && oth_pos >= cursor;
                 }
             },
-            Some((from, to)) if from < to => match other.select {
-                Some((mut oth_from, mut oth_to)) => {
+            Some(from) if from < cursor => match other.select {
+                Some(mut oth_from) => {
                     // likely not needed match self direction
-                    if oth_from > oth_to {
-                        std::mem::swap(&mut oth_from, &mut oth_to);
+                    if oth_from > oth_cursor {
+                        std::mem::swap(&mut oth_from, &mut oth_cursor);
                     };
-                    if from <= oth_from && oth_from <= to {
-                        self.select_set(from, std::cmp::max(oth_to, to));
+                    if from <= oth_from && oth_from <= cursor {
+                        self.select_set(from, std::cmp::max(oth_cursor, cursor));
                     };
-                    if oth_from <= from && from <= oth_to {
-                        self.select_set(oth_from, std::cmp::max(oth_to, to));
+                    if oth_from <= from && from <= oth_cursor {
+                        self.select_set(oth_from, std::cmp::max(oth_cursor, cursor));
                     };
                 }
                 None => {
                     let oth_pos = CursorPosition { line: other.line, char: other.char };
-                    return from <= oth_pos && oth_pos <= to;
+                    return from <= oth_pos && oth_pos <= cursor;
                 }
             },
-            Some((.., to)) => match other.select {
-                Some((oth_from, oth_to)) => {
-                    if (oth_from >= to && to >= oth_to) || (oth_from <= to && to <= oth_to) {
-                        self.select_set(oth_from, oth_to);
+            Some(..) => match other.select {
+                Some(oth_from) => {
+                    if (oth_from >= cursor && cursor >= oth_cursor) || (oth_from <= cursor && cursor <= oth_cursor) {
+                        self.select_set(oth_from, oth_cursor);
                         return true;
                     }
                 }
-                None => return to.line == other.line && to.char == other.char,
+                None => return oth_cursor == cursor,
             },
             None => match other.select {
-                Some((oth_from, oth_to)) => {
+                Some(oth_from) => {
                     let pos = CursorPosition { line: self.line, char: self.char };
-                    if (oth_from >= pos && pos >= oth_to) || (oth_to >= pos && pos >= oth_from) {
-                        self.select_set(oth_from, oth_to);
+                    if (oth_from >= pos && pos >= oth_cursor) || (oth_cursor >= pos && pos >= oth_from) {
+                        self.select_set(oth_from, oth_cursor);
                         return true;
                     };
                 }
@@ -497,6 +489,13 @@ impl Cursor {
             },
         }
         false
+    }
+
+    pub fn conjoin_cursor(&mut self, positions: &mut Vec<Cursor>) {
+        if let Some(last) = positions.pop() {
+            *self = last;
+        };
+        positions.clear();
     }
 }
 

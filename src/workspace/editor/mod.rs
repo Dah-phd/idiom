@@ -165,6 +165,17 @@ impl Editor {
         (self.action_map)(self, action, gs)
     }
 
+    pub fn enable_multi_cursors(&mut self) {
+        self.positions.clear();
+        self.positions.push(self.cursor.clone());
+        self.action_map = controls::multi_cursor_map;
+    }
+
+    pub fn disable_multi_cursor(&mut self) {
+        self.cursor.conjoin_cursor(&mut self.positions);
+        self.action_map = controls::single_cursor_map;
+    }
+
     pub fn update_path(&mut self, new_path: PathBuf) -> Result<(), LSPError> {
         self.display = build_display(&new_path);
         self.path = new_path;

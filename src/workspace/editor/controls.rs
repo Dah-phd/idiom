@@ -121,8 +121,10 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::SelectScrollDown => editor.cursor.select_scroll_down(&editor.content),
         EditorAction::ScreenUp => editor.cursor.screen_up(&editor.content),
         EditorAction::ScreenDown => editor.cursor.screen_down(&editor.content),
-        EditorAction::NewCursorUp => gs.message("NEW UP"),
-        EditorAction::NewCursorDown => gs.message("NEW DOWN"),
+        EditorAction::NewCursorUp | EditorAction::NewCursorDown => {
+            editor.enable_multi_cursors();
+            return editor.map(action, gs);
+        }
         EditorAction::JumpLeft => editor.cursor.jump_left(&editor.content),
         EditorAction::JumpLeftSelect => editor.cursor.jump_left_select(&editor.content),
         EditorAction::JumpRight => editor.cursor.jump_right(&editor.content),
@@ -164,12 +166,8 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
     match action {
         // EDITS:
         EditorAction::Char(ch) => {
-            editor.actions.push_char(ch, &mut editor.cursor, &mut editor.content, &mut editor.lexer);
-            let line = &editor.content[editor.cursor.line];
-            if editor.lexer.should_autocomplete(editor.cursor.char, line) {
-                let line = line.to_string();
-                editor.actions.push_buffer(&mut editor.lexer);
-                editor.lexer.get_autocomplete((&editor.cursor).into(), line, gs);
+            for cursor in iter_cursors(&mut editor.cursor, &mut editor.positions) {
+                editor.actions.push_char(ch, cursor, &mut editor.content, &mut editor.lexer);
             }
             return true;
         }
@@ -283,8 +281,20 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         EditorAction::SelectScrollDown => editor.cursor.select_scroll_down(&editor.content),
         EditorAction::ScreenUp => editor.cursor.screen_up(&editor.content),
         EditorAction::ScreenDown => editor.cursor.screen_down(&editor.content),
-        EditorAction::NewCursorUp => gs.message("NEW UP"),
-        EditorAction::NewCursorDown => gs.message("NEW DOWN"),
+        EditorAction::NewCursorUp => {
+            let new_cursor = editor.cursor.clone();
+            editor.cursor.up(&editor.content);
+            if new_cursor.line != editor.cursor.line {
+                editor.positions.push(new_cursor);
+            }
+        }
+        EditorAction::NewCursorDown => {
+            let new_cursor = editor.cursor.clone();
+            editor.cursor.down(&editor.content);
+            if new_cursor.line != editor.cursor.line {
+                editor.positions.push(new_cursor);
+            }
+        }
         EditorAction::JumpLeft => editor.cursor.jump_left(&editor.content),
         EditorAction::JumpLeftSelect => editor.cursor.jump_left_select(&editor.content),
         EditorAction::JumpRight => editor.cursor.jump_right(&editor.content),
@@ -320,50 +330,20 @@ fn iter_cursors<'a>(cursor: &'a mut Cursor, positions: &'a mut Vec<Cursor>) -> i
 }
 
 fn consolidate_cursors(editor: &mut Editor) {
-    if editor.positions.is_empty() {
+    if editor.positions.len() < 2 {
         return;
     };
 
-    while intersect(&editor.cursor, &editor.positions[0]) {
-        merge(&mut editor.cursor, editor.positions.remove(0));
-    }
+    let mut idx = 1;
 
-    let mut idx = 0;
-
-    while let Some(next) = editor.positions.get(idx + 1) {
-        if intersect(&editor.positions[idx], next) {
-            let other = editor.positions.remove(idx + 1);
-            merge(&mut editor.positions[idx], other);
-            continue;
-        }
-        idx += 1;
+    while idx < editor.positions.len() {
+        unsafe {
+            let [cursor, other] = editor.positions.get_disjoint_unchecked_mut([idx - 1, idx]);
+            if cursor.merge_if_intersect(other) {
+                editor.positions.remove(idx);
+            } else {
+                idx += 1;
+            };
+        };
     }
-}
-
-fn intersect(cursor: &Cursor, other: &Cursor) -> bool {
-    let cursor_pos = CursorPosition::from(cursor);
-    let other_pos = CursorPosition::from(other);
-    if cursor_pos == other_pos {
-        return true;
-    }
-    if let Some((from, to)) = cursor.select_get() {
-        if other_pos >= from && to >= other_pos {
-            return true;
-        }
-    }
-    if let Some((from, to)) = other.select_get() {
-        if cursor_pos >= from && to >= cursor_pos {
-            return true;
-        }
-    }
-    false
-}
-
-fn merge(cursor: &mut Cursor, other: Cursor) {
-    match (cursor.select_get(), other.select_get()) {
-        (Some((from, to)), Some((other_from, other_to))) => {}
-        (None, Some(other)) => {}
-        (Some(..), None) => {}
-        (None, None) => return,
-    };
 }

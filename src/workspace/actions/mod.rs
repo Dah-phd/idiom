@@ -60,9 +60,7 @@ impl Actions {
     ) {
         let edit = Edit::replace_select(CursorPosition::default(), CursorPosition::default(), line, content);
         let offset = edit.meta.to - edit.meta.from;
-        cursor.line += offset;
-        cursor.at_line += offset;
-        cursor.select_line_offset(offset);
+        cursor.add_line_offset(offset);
         self.push_done(edit, lexer, content);
     }
 
