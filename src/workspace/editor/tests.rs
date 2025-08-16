@@ -3,12 +3,13 @@ use super::super::{
     editor::{utils::build_display, FileUpdate},
     Editor,
 };
-use super::calc_line_number_offset;
-use super::controls;
-use crate::global_state::GlobalState;
-use crate::syntax::Lexer;
-use crate::workspace::{actions::Actions, line::EditorLine};
-use crate::{configs::FileType, workspace::renderer::Renderer};
+use super::{calc_line_number_offset, controls};
+use crate::{
+    configs::FileType,
+    global_state::GlobalState,
+    syntax::Lexer,
+    workspace::{actions::Actions, line::EditorLine, renderer::Renderer, tests::make_cursor},
+};
 use idiom_tui::{layout::Rect, Backend};
 use std::path::PathBuf;
 
@@ -25,7 +26,7 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
         path,
         update_status: FileUpdate::None,
         cursor: Cursor::default(),
-        positions: vec![],
+        multi_positions: vec![],
         actions: Actions::default(),
         action_map: controls::single_cursor_map,
         content,
@@ -72,4 +73,29 @@ fn test_line_number_calcs() {
     let result = calc_line_number_offset(bigger_content.len());
     assert_eq!(result, 2);
     assert_eq!(result, expect);
+}
+
+#[test]
+fn merge_multi_cursors() {
+    let mut editor = mock_editor(vec![]);
+    editor.multi_positions.extend([
+        Cursor::default(),
+        Cursor::default(),
+        make_cursor(2, 2),
+        make_cursor(2, 2),
+        make_cursor(3, 2),
+        make_cursor(3, 3),
+        make_cursor(4, 2),
+    ]);
+    controls::consolidate_cursors(&mut editor);
+    assert_eq!(
+        editor.multi_positions,
+        vec![
+            make_cursor(4, 2),
+            make_cursor(3, 3),
+            make_cursor(3, 2),
+            make_cursor(2, 2),
+            Cursor::default(),
+        ]
+    );
 }

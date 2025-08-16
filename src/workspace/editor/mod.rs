@@ -33,7 +33,7 @@ pub struct Editor {
     actions: Actions,
     renderer: Renderer,
     action_map: fn(&mut Self, EditorAction, gs: &mut GlobalState) -> bool,
-    positions: Vec<Cursor>,
+    multi_positions: Vec<Cursor>,
 }
 
 impl Editor {
@@ -49,7 +49,7 @@ impl Editor {
         let line_number_offset = calc_line_number_offset(content.len());
         Ok(Self {
             cursor: Cursor::sized(*gs.editor_area(), line_number_offset),
-            positions: Vec::new(),
+            multi_positions: Vec::new(),
             line_number_offset,
             lexer: Lexer::with_context(file_type, &path, gs),
             content,
@@ -76,7 +76,7 @@ impl Editor {
         calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
             cursor,
-            positions: Vec::new(),
+            multi_positions: Vec::new(),
             line_number_offset,
             lexer: Lexer::text_lexer(&path, gs),
             content,
@@ -101,7 +101,7 @@ impl Editor {
         calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
             cursor,
-            positions: Vec::new(),
+            multi_positions: Vec::new(),
             line_number_offset,
             lexer: Lexer::text_lexer(&path, gs),
             content,
@@ -166,13 +166,13 @@ impl Editor {
     }
 
     pub fn enable_multi_cursors(&mut self) {
-        self.positions.clear();
-        self.positions.push(self.cursor.clone());
+        self.multi_positions.clear();
+        self.multi_positions.push(self.cursor.clone());
         self.action_map = controls::multi_cursor_map;
     }
 
     pub fn disable_multi_cursor(&mut self) {
-        self.cursor.conjoin_cursor(&mut self.positions);
+        self.cursor.conjoin_cursor(&mut self.multi_positions);
         self.action_map = controls::single_cursor_map;
     }
 

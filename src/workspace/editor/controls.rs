@@ -1,4 +1,4 @@
-use super::{token_range_at, Cursor, CursorPosition, Editor};
+use super::{token_range_at, CursorPosition, Editor};
 use crate::{configs::EditorAction, global_state::GlobalState};
 
 pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut GlobalState) -> bool {
@@ -8,7 +8,7 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
     }
     if taken {
         return true;
-    };
+    }
     match action {
         // EDITS:
         EditorAction::Char(ch) => {
@@ -42,7 +42,7 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
             if !editor.cursor.select_is_none() {
                 editor.actions.del(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
                 return true;
-            };
+            }
         }
         EditorAction::IndentStart => {
             editor.actions.indent_start(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
@@ -162,11 +162,11 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
     }
     if taken {
         return true;
-    };
+    }
     match action {
         // EDITS:
         EditorAction::Char(ch) => {
-            for cursor in iter_cursors(&mut editor.cursor, &mut editor.positions) {
+            for cursor in editor.multi_positions.iter_mut() {
                 editor.actions.push_char(ch, cursor, &mut editor.content, &mut editor.lexer);
             }
             return true;
@@ -192,7 +192,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             if !editor.cursor.select_is_none() {
                 editor.actions.del(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
                 return true;
-            };
+            }
         }
         EditorAction::IndentStart => {
             editor.actions.indent_start(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
@@ -247,13 +247,13 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         }
         // CURSOR:
         EditorAction::Up => {
-            for cursor in iter_cursors(&mut editor.cursor, &mut editor.positions) {
+            for cursor in editor.multi_positions.iter_mut() {
                 cursor.up(&editor.content);
             }
             consolidate_cursors(editor);
         }
         EditorAction::Down => {
-            for cursor in iter_cursors(&mut editor.cursor, &mut editor.positions) {
+            for cursor in editor.multi_positions.iter_mut() {
                 cursor.down(&editor.content);
             }
             consolidate_cursors(editor);
@@ -285,14 +285,14 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             let new_cursor = editor.cursor.clone();
             editor.cursor.up(&editor.content);
             if new_cursor.line != editor.cursor.line {
-                editor.positions.push(new_cursor);
+                editor.multi_positions.push(new_cursor);
             }
         }
         EditorAction::NewCursorDown => {
             let new_cursor = editor.cursor.clone();
             editor.cursor.down(&editor.content);
             if new_cursor.line != editor.cursor.line {
-                editor.positions.push(new_cursor);
+                editor.multi_positions.push(new_cursor);
             }
         }
         EditorAction::JumpLeft => editor.cursor.jump_left(&editor.content),
@@ -325,25 +325,23 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
     true
 }
 
-fn iter_cursors<'a>(cursor: &'a mut Cursor, positions: &'a mut Vec<Cursor>) -> impl Iterator<Item = &'a mut Cursor> {
-    [cursor].into_iter().chain(positions.iter_mut().rev())
-}
-
-fn consolidate_cursors(editor: &mut Editor) {
-    if editor.positions.len() < 2 {
+pub fn consolidate_cursors(editor: &mut Editor) {
+    if editor.multi_positions.len() < 2 {
         return;
-    };
+    }
 
     let mut idx = 1;
 
-    while idx < editor.positions.len() {
+    editor.multi_positions.sort_by(|x, y| y.line.cmp(&x.line).then(y.char.cmp(&x.char)));
+
+    while idx < editor.multi_positions.len() {
         unsafe {
-            let [cursor, other] = editor.positions.get_disjoint_unchecked_mut([idx - 1, idx]);
+            let [cursor, other] = editor.multi_positions.get_disjoint_unchecked_mut([idx - 1, idx]);
             if cursor.merge_if_intersect(other) {
-                editor.positions.remove(idx);
+                editor.multi_positions.remove(idx);
             } else {
                 idx += 1;
-            };
-        };
+            }
+        }
     }
 }

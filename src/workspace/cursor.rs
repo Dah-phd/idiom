@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 pub type Select = (CursorPosition, CursorPosition);
 
-#[derive(Debug, Default, Deserialize, Serialize, Clone)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone, PartialEq)]
 pub struct Cursor {
     pub line: usize,
     pub char: usize,    // this is a char position not byte index
