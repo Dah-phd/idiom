@@ -26,6 +26,7 @@ use std::{
 };
 
 pub const FILE_STATUS_ERR: &str = "File status ERR";
+pub const TAB_SELECT: Color = Color::DarkYellow;
 
 /// implement Drop to attempt keep state upon close/crash
 pub struct Workspace {
@@ -39,19 +40,20 @@ pub struct Workspace {
 
 impl Workspace {
     pub fn new(key_map: EditorKeyMap, base_configs: EditorConfigs, lsp_servers: HashMap<FileType, LSP>) -> Self {
-        let tab_style = ContentStyle::fg(Color::DarkYellow);
+        let tab_style = ContentStyle::fg(TAB_SELECT);
         Self { editors: TrackedList::new(), base_configs, key_map, lsp_servers, map_callback: map_editor, tab_style }
     }
 
     pub fn render(&mut self, gs: &mut GlobalState) {
         if let Some(editor) = self.editors.get_mut(0) {
-            let line = match gs.tab_area.into_iter().next() {
+            let line = match gs.tab_area().into_iter().next() {
                 Some(line) => line,
                 None => return,
             };
             gs.backend.set_style(ContentStyle::underlined(None));
             {
                 let mut builder = line.unsafe_builder(&mut gs.backend);
+                builder.push_styled(" ", self.tab_style);
                 builder.push_styled(&editor.display, self.tab_style);
                 for editor in self.editors.iter().skip(1) {
                     if !builder.push(" | ") || !builder.push(&editor.display) {
@@ -60,7 +62,7 @@ impl Workspace {
                 }
             }
             gs.backend.reset_style();
-        } else if let Some(line) = gs.tab_area.into_iter().next() {
+        } else if let Some(line) = gs.tab_area().into_iter().next() {
             line.render_empty(&mut gs.backend);
         }
     }
@@ -463,10 +465,11 @@ impl Workspace {
         }
         let editor = self.editors.remove(0);
         drop(editor);
+        let editor_area = *gs.editor_area();
         match self.get_active() {
             None => {
                 gs.clear_stats();
-                gs.editor_area.clear(&mut gs.backend);
+                editor_area.clear(&mut gs.backend);
                 gs.select_mode();
             }
             Some(editor) => {

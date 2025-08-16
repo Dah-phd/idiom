@@ -158,8 +158,8 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
                     }
                     gs.full_resize(height, width);
                     gs.force_area_calc();
-                    workspace.resize_all(gs.editor_area.width, gs.editor_area.height as usize);
-                    term.resize(gs.editor_area);
+                    workspace.resize_all(gs.editor_area().width, gs.editor_area().height as usize);
+                    term.resize(*gs.editor_area());
                 }
                 Event::Mouse(event) => gs.map_mouse(event, &mut tree, &mut workspace, &mut term),
                 Event::Paste(clip) => {

@@ -103,7 +103,7 @@ pub fn text_editor_from_data(
         display,
         path,
     };
-    editor.resize(gs.editor_area.width, gs.editor_area.height as usize);
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
     calc_wraps(&mut editor.content, editor.cursor.text_width);
     editor
 }
@@ -142,6 +142,6 @@ pub fn editor_from_data(
         display,
         path,
     };
-    editor.resize(gs.editor_area.width, gs.editor_area.height as usize);
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
     editor
 }

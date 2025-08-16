@@ -48,7 +48,7 @@ impl Editor {
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
         Ok(Self {
-            cursor: Cursor::sized(gs.editor_area, line_number_offset),
+            cursor: Cursor::sized(*gs.editor_area(), line_number_offset),
             positions: Vec::new(),
             line_number_offset,
             lexer: Lexer::with_context(file_type, &path, gs),
@@ -72,7 +72,7 @@ impl Editor {
         let mut content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
-        let cursor = Cursor::sized(gs.editor_area, line_number_offset);
+        let cursor = Cursor::sized(*gs.editor_area(), line_number_offset);
         calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
             cursor,
@@ -97,7 +97,7 @@ impl Editor {
         let mut content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
-        let cursor = Cursor::sized(gs.editor_area, line_number_offset);
+        let cursor = Cursor::sized(*gs.editor_area(), line_number_offset);
         calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
             cursor,
@@ -152,7 +152,7 @@ impl Editor {
     }
 
     pub fn updated_rect(&mut self, rect: Rect, gs: &GlobalState) {
-        let skip_offset = rect.row.saturating_sub(gs.editor_area.row) as usize;
+        let skip_offset = rect.row.saturating_sub(gs.editor_area().row) as usize;
         for line in self.content.iter_mut().skip(self.cursor.at_line + skip_offset).take(rect.width) {
             line.cached.reset();
         }

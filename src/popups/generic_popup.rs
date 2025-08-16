@@ -63,7 +63,7 @@ impl Popup for PopupChoice {
 
     fn force_render(&mut self, gs: &mut GlobalState) {
         let (height, width) = self.size;
-        let mut area = gs.screen_rect.center(height, width);
+        let mut area = gs.screen().center(height, width);
         let backend = gs.backend();
         area.bordered();
         area.draw_borders(None, None, backend);

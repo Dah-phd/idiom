@@ -129,7 +129,7 @@ impl<T> PopupSelector<T> {
 
     fn get_rect(&self, gs: &GlobalState) -> Rect {
         let (height, width) = self.size;
-        gs.screen_rect.center(height, width).with_borders()
+        gs.screen().center(height, width).with_borders()
     }
 }
 

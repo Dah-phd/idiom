@@ -55,7 +55,7 @@ impl SelectorLSP {
     }
 
     fn get_rect(gs: &GlobalState) -> Rect {
-        gs.screen_rect.top(15).vcenter(100).with_borders()
+        gs.screen().top(15).vcenter(100).with_borders()
     }
 }
 

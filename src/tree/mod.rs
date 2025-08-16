@@ -292,7 +292,7 @@ impl Tree {
             return;
         }
         self.state.prev(tree_len);
-        self.state.update_at_line(gs.tree_area.height as usize);
+        self.state.update_at_line(gs.tree_area().height as usize);
         self.unsafe_set_path();
     }
 
@@ -302,7 +302,7 @@ impl Tree {
             return;
         }
         self.state.next(tree_len);
-        self.state.update_at_line(gs.tree_area.height as usize);
+        self.state.update_at_line(gs.tree_area().height as usize);
         self.unsafe_set_path();
     }
 

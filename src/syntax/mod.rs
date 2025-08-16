@@ -268,8 +268,8 @@ impl Lexer {
     ) -> Option<Rect> {
         let modal = self.modal.as_mut()?;
         let found_positon = self.modal_rect.and_then(|rect| {
-            let row = gs.editor_area.row + relative_editor_position.row;
-            let column = gs.editor_area.col + relative_editor_position.col;
+            let row = gs.editor_area().row + relative_editor_position.row;
+            let column = gs.editor_area().col + relative_editor_position.col;
             rect.relative_position(row, column)
         });
         match found_positon {

@@ -436,7 +436,7 @@ impl<'a> From<SerachResult<'a>> for Option<&'a TreePath> {
 
 fn get_path_display(path: &Path) -> String {
     let path_str = &path.display().to_string();
-    let mut buffer = String::new();
+    let mut buffer = String::from(" ");
     let mut path_split = path_str.split(std::path::MAIN_SEPARATOR).peekable();
     while let Some(path_element) = path_split.next() {
         if path_split.peek().is_none() {

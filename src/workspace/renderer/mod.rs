@@ -47,7 +47,7 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     let accent_style = gs.theme.accent_fg();
     let line_number_offset = editor.line_number_offset;
 
-    let mut lines = gs.editor_area.into_iter();
+    let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
     ctx.correct_last_line_match(&mut editor.content, lines.len());
     let backend = &mut gs.backend;
@@ -86,7 +86,7 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
     let line_number_offset = editor.line_number_offset;
 
     editor.last_render_at_line.replace(cursor.at_line);
-    let mut lines = gs.editor_area.into_iter();
+    let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
     let backend = &mut gs.backend;
 
@@ -129,7 +129,7 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
     let line_number_offset = editor.line_number_offset;
 
     editor.last_render_at_line.replace(cursor.at_line);
-    let mut lines = gs.editor_area.into_iter();
+    let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
     let backend = &mut gs.backend;
 
@@ -169,7 +169,7 @@ fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     let line_number_offset = editor.line_number_offset;
 
     editor.last_render_at_line.replace(cursor.at_line);
-    let mut lines = gs.editor_area.into_iter();
+    let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
     let backend = &mut gs.backend;
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
@@ -204,7 +204,7 @@ fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     let line_number_offset = editor.line_number_offset;
 
     editor.last_render_at_line.replace(cursor.at_line);
-    let mut lines = gs.editor_area.into_iter();
+    let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
     let backend = &mut gs.backend;
 
@@ -238,7 +238,7 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
     let line_number_offset = editor.line_number_offset;
 
     editor.last_render_at_line.replace(cursor.at_line);
-    let mut lines = gs.editor_area.into_iter();
+    let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
     let backend = &mut gs.backend;
 

@@ -44,11 +44,11 @@ pub struct GlobalState {
     pub matcher: SkimMatcherV2,
     pub event: Vec<IdiomEvent>,
     pub clipboard: Clipboard,
-    pub screen_rect: Rect,
-    pub tree_area: Rect,
-    pub tab_area: Rect,
-    pub editor_area: Rect,
-    pub footer_line: Line,
+    screen_rect: Rect,
+    tree_area: Rect,
+    tab_area: Rect,
+    editor_area: Rect,
+    footer_line: Line,
     pub git_tui: Option<String>,
     messages: Messages,
     mode: Mode,
@@ -307,7 +307,6 @@ impl GlobalState {
         let screen = if self.components.contains(Components::TREE) || self.is_select() {
             let (mut tree_area, tab_area) = screen.split_horizont_rel(self.tree_size);
             let _logo_line = tree_area.next_line();
-            tree_area.right_border().left_border();
             self.tree_area = tree_area;
             tab_area
         } else {
@@ -316,6 +315,7 @@ impl GlobalState {
             tab_area
         };
         (self.tab_area, self.editor_area) = screen.split_vertical_rel(1);
+        self.editor_area.left_border();
     }
 
     pub fn clear_stats(&mut self) {
@@ -331,6 +331,28 @@ impl GlobalState {
         self.backend.clear_to_eol();
         self.backend.reset_style();
         self.messages.render(accent_style, &mut self.backend);
+    }
+
+    // SCREEN ACCESS
+
+    pub fn screen(&self) -> &Rect {
+        &self.screen_rect
+    }
+
+    pub fn tree_area(&self) -> &Rect {
+        &self.tree_area
+    }
+
+    pub fn tab_area(&self) -> &Rect {
+        &self.tab_area
+    }
+
+    pub fn editor_area(&self) -> &Rect {
+        &self.editor_area
+    }
+
+    pub fn footer(&self) -> Line {
+        self.footer_line.clone()
     }
 
     // LOGGING

@@ -7,14 +7,14 @@ use idiom_tui::{layout::Line, Backend};
 const UP: char = '⭡';
 const DOWN: char = '⭣';
 const ARROW_WIDTH: usize = 1;
-const MIN_OFFSET: usize = 10;
+const MIN_OFFSET: usize = 11;
 const MIN_ARROW_LINE_WIDTH: usize = ARROW_WIDTH + MIN_OFFSET;
 
 pub fn render_tree(tree: &mut Tree, gs: &mut GlobalState) {
     let mut iter = tree.inner.iter();
     iter.next();
 
-    let mut tree_area = gs.tree_area;
+    let mut tree_area = *gs.tree_area();
     let mut last_line = tree_area.pop_line();
     let mut lines = tree_area.into_iter();
 
@@ -74,7 +74,7 @@ fn print_styled_path(
             line.width -= mark.len();
             backend.print_styled_at(line.row, line.col + line.width as u16, mark, style);
         }
-    }
+    };
     tree_path.render(offset, line, style, backend);
 }
 

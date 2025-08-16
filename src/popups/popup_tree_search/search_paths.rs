@@ -58,7 +58,7 @@ impl ActivePathSearch {
     }
 
     fn get_rect(gs: &GlobalState) -> Rect {
-        gs.screen_rect.center(20, 120).with_borders()
+        gs.screen().center(20, 120).with_borders()
     }
 
     fn get_option_idx(&self, row: u16, column: u16, gs: &GlobalState) -> Option<usize> {
