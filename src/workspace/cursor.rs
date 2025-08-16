@@ -490,13 +490,6 @@ impl Cursor {
         }
         false
     }
-
-    pub fn conjoin_cursor(&mut self, positions: &mut Vec<Cursor>) {
-        if let Some(last) = positions.pop() {
-            *self = last;
-        };
-        positions.clear();
-    }
 }
 
 impl From<&mut Cursor> for CursorPosition {

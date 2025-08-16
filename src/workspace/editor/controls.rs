@@ -1,4 +1,4 @@
-use super::{token_range_at, CursorPosition, Editor};
+use super::{token_range_at, Cursor, CursorPosition, Editor};
 use crate::{configs::EditorAction, global_state::GlobalState};
 
 pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut GlobalState) -> bool {
@@ -169,77 +169,92 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             for cursor in editor.multi_positions.iter_mut() {
                 editor.actions.push_char(ch, cursor, &mut editor.content, &mut editor.lexer);
             }
-            return true;
         }
         EditorAction::Backspace => {
-            editor.actions.backspace(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
-            return true;
-        }
-        EditorAction::Delete => {
-            editor.actions.del(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
-            return true;
-        }
-        EditorAction::NewLine => {
-            editor.actions.new_line(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
-            return true;
-        }
-        EditorAction::Indent => {
-            editor.actions.indent(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
-            return true;
-        }
-        EditorAction::RemoveLine => {
-            editor.select_line();
-            if !editor.cursor.select_is_none() {
-                editor.actions.del(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
-                return true;
+            for cursor in editor.multi_positions.iter_mut() {
+                editor.actions.backspace(cursor, &mut editor.content, &mut editor.lexer);
             }
         }
+        EditorAction::Delete => {
+            for cursor in editor.multi_positions.iter_mut() {
+                editor.actions.del(cursor, &mut editor.content, &mut editor.lexer);
+            }
+        }
+        EditorAction::NewLine => {
+            for cursor in editor.multi_positions.iter_mut() {
+                editor.actions.new_line(cursor, &mut editor.content, &mut editor.lexer);
+            }
+        }
+        EditorAction::Indent => {
+            for cursor in editor.multi_positions.iter_mut() {
+                editor.actions.indent(cursor, &mut editor.content, &mut editor.lexer);
+            }
+        }
+        EditorAction::RemoveLine => {
+            todo!()
+            // editor.select_line();
+            // if !editor.cursor.select_is_none() {
+            // editor.actions.del(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
+            // return true;
+            // }
+        }
         EditorAction::IndentStart => {
-            editor.actions.indent_start(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
-            return true;
+            for cursor in editor.multi_positions.iter_mut() {
+                editor.actions.indent_start(cursor, &mut editor.content, &mut editor.lexer);
+            }
         }
         EditorAction::Unintent => {
-            editor.actions.unindent(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
-            return true;
+            for cursor in editor.multi_positions.iter_mut() {
+                editor.actions.unindent(cursor, &mut editor.content, &mut editor.lexer);
+            }
         }
         EditorAction::SwapUp => {
-            editor.actions.swap_up(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
-            return true;
+            todo!()
+            // editor.actions.swap_up(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
+            // return true;
         }
         EditorAction::SwapDown => {
-            editor.actions.swap_down(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
-            return true;
+            todo!()
+            // editor.actions.swap_down(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
+            // return true;
         }
         EditorAction::Undo => {
+            todo!();
             editor.actions.undo(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
             return true;
         }
         EditorAction::Redo => {
+            todo!();
             editor.actions.redo(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
             return true;
         }
         EditorAction::CommentOut => {
-            editor.actions.comment_out(
-                editor.file_type.comment_start(),
-                &mut editor.cursor,
-                &mut editor.content,
-                &mut editor.lexer,
-            );
-            return true;
+            todo!("run only cursors on different lines");
+            for cursor in editor.multi_positions.iter_mut() {
+                editor.actions.comment_out(
+                    editor.file_type.comment_start(),
+                    cursor,
+                    &mut editor.content,
+                    &mut editor.lexer,
+                );
+            }
         }
         EditorAction::Paste => {
             if let Some(clip) = gs.clipboard.pull() {
-                editor.actions.paste(clip, &mut editor.cursor, &mut editor.content, &mut editor.lexer);
-                return true;
+                for cursor in editor.multi_positions.iter_mut() {
+                    editor.actions.paste(clip.to_owned(), cursor, &mut editor.content, &mut editor.lexer);
+                }
             }
         }
         EditorAction::Cut => {
+            todo!();
             if let Some(clip) = editor.cut() {
                 gs.clipboard.push(clip);
                 return true;
             }
         }
         EditorAction::Copy => {
+            todo!();
             if let Some(clip) = editor.copy() {
                 gs.clipboard.push(clip);
                 return true;
@@ -250,31 +265,58 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             for cursor in editor.multi_positions.iter_mut() {
                 cursor.up(&editor.content);
             }
-            consolidate_cursors(editor);
         }
         EditorAction::Down => {
             for cursor in editor.multi_positions.iter_mut() {
                 cursor.down(&editor.content);
             }
-            consolidate_cursors(editor);
         }
-        EditorAction::Left => editor.cursor.left(&editor.content),
-        EditorAction::Right => editor.cursor.right(&editor.content),
-        EditorAction::SelectUp => editor.cursor.select_up(&editor.content),
-        EditorAction::SelectDown => editor.cursor.select_down(&editor.content),
-        EditorAction::SelectLeft => editor.cursor.select_left(&editor.content),
-        EditorAction::SelectRight => editor.cursor.select_right(&editor.content),
+        EditorAction::Left => {
+            for cursor in editor.multi_positions.iter_mut() {
+                cursor.left(&editor.content);
+            }
+        }
+        EditorAction::Right => {
+            for cursor in editor.multi_positions.iter_mut() {
+                cursor.right(&editor.content);
+            }
+        }
+        EditorAction::SelectUp => {
+            for cursor in editor.multi_positions.iter_mut() {
+                cursor.select_up(&editor.content)
+            }
+        }
+        EditorAction::SelectDown => {
+            for cursor in editor.multi_positions.iter_mut() {
+                cursor.select_down(&editor.content)
+            }
+        }
+        EditorAction::SelectLeft => {
+            for cursor in editor.multi_positions.iter_mut() {
+                cursor.select_left(&editor.content)
+            }
+        }
+        EditorAction::SelectRight => {
+            for cursor in editor.multi_positions.iter_mut() {
+                cursor.select_right(&editor.content)
+            }
+        }
         EditorAction::SelectToken => {
-            let range = token_range_at(&editor.content[editor.cursor.line], editor.cursor.char);
-            if !range.is_empty() {
-                editor.cursor.select_set(
-                    CursorPosition { line: editor.cursor.line, char: range.start },
-                    CursorPosition { line: editor.cursor.line, char: range.end },
-                )
+            for cursor in editor.multi_positions.iter_mut() {
+                let range = token_range_at(&editor.content[cursor.line], cursor.char);
+                if !range.is_empty() {
+                    cursor.select_set(
+                        CursorPosition { line: cursor.line, char: range.start },
+                        CursorPosition { line: cursor.line, char: range.end },
+                    )
+                }
             }
         }
         EditorAction::SelectLine => editor.select_line(),
-        EditorAction::SelectAll => editor.select_all(),
+        EditorAction::SelectAll => {
+            resore_single_cursor_mode(editor);
+            return editor.map(action, gs);
+        }
         EditorAction::ScrollUp => editor.cursor.scroll_up(&editor.content),
         EditorAction::ScrollDown => editor.cursor.scroll_down(&editor.content),
         EditorAction::SelectScrollUp => editor.cursor.select_scroll_up(&editor.content),
@@ -282,16 +324,26 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         EditorAction::ScreenUp => editor.cursor.screen_up(&editor.content),
         EditorAction::ScreenDown => editor.cursor.screen_down(&editor.content),
         EditorAction::NewCursorUp => {
-            let new_cursor = editor.cursor.clone();
-            editor.cursor.up(&editor.content);
-            if new_cursor.line != editor.cursor.line {
+            let Some(main_cursor) = editor.multi_positions.iter_mut().find(|c| c.max_rows != 0) else {
+                resore_single_cursor_mode(editor);
+                return true;
+            };
+            let mut new_cursor = main_cursor.clone();
+            main_cursor.up(&editor.content);
+            if new_cursor.line != main_cursor.line {
+                new_cursor.max_rows = 0;
                 editor.multi_positions.push(new_cursor);
             }
         }
         EditorAction::NewCursorDown => {
-            let new_cursor = editor.cursor.clone();
-            editor.cursor.down(&editor.content);
-            if new_cursor.line != editor.cursor.line {
+            let Some(main_cursor) = editor.multi_positions.iter_mut().find(|c| c.max_rows != 0) else {
+                resore_single_cursor_mode(editor);
+                return true;
+            };
+            let mut new_cursor = main_cursor.clone();
+            main_cursor.down(&editor.content);
+            if new_cursor.line != main_cursor.line {
+                new_cursor.max_rows = 0;
                 editor.multi_positions.push(new_cursor);
             }
         }
@@ -321,6 +373,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         }
         EditorAction::Close => return false,
     }
+    consolidate_cursors(editor);
     editor.actions.push_buffer(&mut editor.lexer);
     true
 }
@@ -332,16 +385,29 @@ pub fn consolidate_cursors(editor: &mut Editor) {
 
     let mut idx = 1;
 
-    editor.multi_positions.sort_by(|x, y| y.line.cmp(&x.line).then(y.char.cmp(&x.char)));
+    editor.multi_positions.sort_by(sort_cursors);
 
     while idx < editor.multi_positions.len() {
         unsafe {
             let [cursor, other] = editor.multi_positions.get_disjoint_unchecked_mut([idx - 1, idx]);
             if cursor.merge_if_intersect(other) {
+                cursor.max_rows = std::cmp::max(cursor.max_rows, other.max_rows);
                 editor.multi_positions.remove(idx);
             } else {
                 idx += 1;
             }
         }
     }
+}
+
+pub fn resore_single_cursor_mode(editor: &mut Editor) {
+    if let Some(main_cursor) = editor.multi_positions.iter().find(|c| c.max_rows != 0) {
+        editor.cursor.set_position(main_cursor.into());
+    };
+    editor.action_map = single_cursor_map;
+    editor.multi_positions.clear();
+}
+
+fn sort_cursors(x: &Cursor, y: &Cursor) -> std::cmp::Ordering {
+    y.line.cmp(&x.line).then(y.char.cmp(&x.char))
 }
