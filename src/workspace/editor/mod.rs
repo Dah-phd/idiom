@@ -26,6 +26,7 @@ pub struct Editor {
     pub path: PathBuf,
     pub lexer: Lexer,
     pub cursor: Cursor,
+    pub multi_positions: Vec<Cursor>,
     pub content: Vec<EditorLine>,
     pub update_status: FileUpdate,
     pub line_number_offset: usize,
@@ -33,7 +34,6 @@ pub struct Editor {
     actions: Actions,
     renderer: Renderer,
     action_map: fn(&mut Self, EditorAction, gs: &mut GlobalState) -> bool,
-    multi_positions: Vec<Cursor>,
 }
 
 impl Editor {
@@ -163,12 +163,6 @@ impl Editor {
     #[inline]
     pub fn map(&mut self, action: EditorAction, gs: &mut GlobalState) -> bool {
         (self.action_map)(self, action, gs)
-    }
-
-    pub fn enable_multi_cursors(&mut self) {
-        self.multi_positions.clear();
-        self.multi_positions.push(self.cursor.clone());
-        self.action_map = controls::multi_cursor_map;
     }
 
     pub fn update_path(&mut self, new_path: PathBuf) -> Result<(), LSPError> {

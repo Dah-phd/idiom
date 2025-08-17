@@ -26,6 +26,16 @@ impl Renderer {
     pub fn markdown() -> Self {
         Self { render: md_render, fast_render: fast_md_render }
     }
+
+    pub fn multi_cursor(&mut self) {
+        self.render = multi_code_render;
+        self.fast_render = multi_fast_code_render;
+    }
+
+    pub fn single_cursor(&mut self) {
+        self.render = code_render;
+        self.fast_render = fast_code_render;
+    }
 }
 
 // CODE
@@ -57,10 +67,10 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
             None => break,
             Some(line) => line,
         };
-        if cursor.line == line_idx {
+        if ctx.has_cursor(line_idx) {
             code::cursor_fast(text, &mut ctx, line, backend);
         } else {
-            let select = ctx.get_select(line.width);
+            let select = ctx.select_get(line.width);
             if text.cached.should_render_line(line.row, &select) {
                 code::inner_render(text, &mut ctx, line, select, backend);
             } else {
@@ -95,10 +105,10 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
             None => break,
             Some(line) => line,
         };
-        if cursor.line == line_idx {
+        if ctx.has_cursor(line_idx) {
             code::cursor(text, &mut ctx, line, backend);
         } else {
-            let select = ctx.get_select(line.width);
+            let select = ctx.select_get(line.width);
             code::inner_render(text, &mut ctx, line, select, backend);
         }
     }
@@ -109,6 +119,93 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
 
     gs.render_stats(editor.content.len(), cursor.select_len(&editor.content), cursor.into());
     ctx.forced_modal_render(gs);
+}
+
+// CODE RENDER MULTICURSOR
+
+fn multi_code_render(editor: &mut Editor, gs: &mut GlobalState) {
+    editor.lexer.clear_modal();
+    Lexer::context(editor, gs);
+    code::repositioning(&mut editor.cursor);
+    multi_code_render_full(editor, gs);
+}
+
+fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
+    editor.lexer.clear_modal();
+    Lexer::context(editor, gs);
+    code::repositioning(&mut editor.cursor);
+    if !matches!(editor.last_render_at_line, Some(idx) if idx == editor.cursor.at_line) {
+        return multi_code_render_full(editor, gs);
+    }
+
+    let cursor = &editor.cursor;
+    let accent_style = gs.theme.accent_fg();
+    let line_number_offset = editor.line_number_offset;
+
+    let mut lines = gs.editor_area().into_iter();
+    let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
+    ctx.correct_last_line_match(&mut editor.content, lines.len());
+    let backend = &mut gs.backend;
+
+    ctx.init_multi_cursor(&editor.multi_positions);
+    for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
+        ctx.multi_cursor_line_setup(&editor.multi_positions);
+        let line = match lines.next() {
+            None => break,
+            Some(line) => line,
+        };
+        if ctx.has_cursor(line_idx) {
+            code::cursor_fast(text, &mut ctx, line, backend);
+        } else {
+            let select = ctx.select_get(line.width);
+            if text.cached.should_render_line(line.row, &select) {
+                code::inner_render(text, &mut ctx, line, select, backend);
+            } else {
+                ctx.skip_line();
+            }
+        }
+    }
+
+    if !ctx.lexer.modal_is_rendered() {
+        for line in lines {
+            line.render_empty(&mut gs.backend);
+        }
+    }
+
+    gs.render_stats(editor.content.len(), editor.multi_positions.len(), cursor.into());
+}
+
+#[inline(always)]
+fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
+    let cursor = &editor.cursor;
+    let accent_style = gs.theme.accent_fg();
+    let line_number_offset = editor.line_number_offset;
+
+    editor.last_render_at_line.replace(cursor.at_line);
+    let mut lines = gs.editor_area().into_iter();
+    let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
+    let backend = &mut gs.backend;
+
+    ctx.init_multi_cursor(&editor.multi_positions);
+    for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
+        ctx.multi_cursor_line_setup(&editor.multi_positions);
+        let line = match lines.next() {
+            None => break,
+            Some(line) => line,
+        };
+        if ctx.has_cursor(line_idx) {
+            code::cursor(text, &mut ctx, line, backend);
+        } else {
+            let select = ctx.select_get(line.width);
+            code::inner_render(text, &mut ctx, line, select, backend);
+        }
+    }
+
+    for line in lines {
+        line.render_empty(&mut gs.backend);
+    }
+
+    gs.render_stats(editor.content.len(), editor.multi_positions.len(), cursor.into());
 }
 
 // TEXT
@@ -137,8 +234,8 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
         if lines.is_finished() {
             break;
         }
-        let select = ctx.get_select_full_line(text.char_len());
-        if cursor.line == line_idx {
+        let select = ctx.select_get_full_line(text.char_len());
+        if ctx.has_cursor(line_idx) {
             if text.cached.should_render_cursor(lines.next_line_idx(), ctx.cursor_char(), &select)
                 || text.cached.skipped_chars() != skip
             {
@@ -176,8 +273,8 @@ fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
         if lines.is_finished() {
             break;
         }
-        let select = ctx.get_select_full_line(text.char_len());
-        if cursor.line == line_idx {
+        let select = ctx.select_get_full_line(text.char_len());
+        if ctx.has_cursor(line_idx) {
             text::cursor(text, select, skip, &mut ctx, &mut lines, backend);
         } else {
             text::line(text, select, &mut ctx, &mut lines, backend)
@@ -212,8 +309,8 @@ fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
         if lines.is_finished() {
             break;
         }
-        let select = ctx.get_select_full_line(text.char_len());
-        if cursor.line == line_idx {
+        let select = ctx.select_get_full_line(text.char_len());
+        if ctx.has_cursor(line_idx) {
             markdown::cursor(text, select, skip, &mut ctx, &mut lines, backend);
         } else {
             markdown::line(text, select, &mut ctx, &mut lines, backend)
@@ -246,8 +343,8 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
         if lines.is_finished() {
             break;
         }
-        let select = ctx.get_select_full_line(text.char_len());
-        if cursor.line == line_idx {
+        let select = ctx.select_get_full_line(text.char_len());
+        if ctx.has_cursor(line_idx) {
             if text.cached.should_render_cursor(lines.next_line_idx(), ctx.cursor_char(), &select)
                 || text.cached.skipped_chars() != skip
             {

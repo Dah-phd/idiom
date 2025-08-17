@@ -172,7 +172,7 @@ fn test_line_render_utf8() {
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
-        let select = ctx.get_select(line.width);
+        let select = ctx.select_get(line.width);
         inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
@@ -193,7 +193,7 @@ fn test_line_render_utf16() {
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
-        let select = ctx.get_select(line.width);
+        let select = ctx.select_get(line.width);
         inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
@@ -214,7 +214,7 @@ fn test_line_render_utf32() {
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
-        let select = ctx.get_select(line.width);
+        let select = ctx.select_get(line.width);
         inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
@@ -237,7 +237,7 @@ fn test_line_render_shrunk_utf8() {
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: limit };
-        let select = ctx.get_select(line.width);
+        let select = ctx.select_get(line.width);
         inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
@@ -260,7 +260,7 @@ fn test_line_render_shrunk_utf16() {
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: limit };
-        let select = ctx.get_select(line.width);
+        let select = ctx.select_get(line.width);
         inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
@@ -283,7 +283,7 @@ fn test_line_render_shrunk_utf32() {
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: limit };
-        let select = ctx.get_select(line.width);
+        let select = ctx.select_get(line.width);
         inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
@@ -305,7 +305,7 @@ fn test_line_render_select_utf8() {
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
-        let select = ctx.get_select(line.width);
+        let select = ctx.select_get(line.width);
         inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
@@ -327,7 +327,7 @@ fn test_line_render_select_utf16() {
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
-        let select = ctx.get_select(line.width);
+        let select = ctx.select_get(line.width);
         inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
@@ -349,7 +349,7 @@ fn test_line_render_select_utf32() {
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
-        let select = ctx.get_select(line.width);
+        let select = ctx.select_get(line.width);
         inner_render(code_line, &mut ctx, line, select, &mut gs.backend);
     }
 
@@ -372,7 +372,7 @@ fn test_line_wrapping_utf8() {
 
     let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 1, ContentStyle::default());
     let line = lines.next().unwrap();
-    let select = ctx.get_select(line.width);
+    let select = ctx.select_get(line.width);
     inner_render(&mut content[0], &mut ctx, line, select, &mut gs.backend);
     let line = lines.next().unwrap();
     let text = &mut content[1];
@@ -397,7 +397,7 @@ fn test_line_wrapping_utf16() {
 
     let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 1, ContentStyle::default());
     let line = lines.next().unwrap();
-    let select = ctx.get_select(line.width);
+    let select = ctx.select_get(line.width);
     inner_render(&mut content[0], &mut ctx, line, select, &mut gs.backend);
     let line = lines.next().unwrap();
     let text = &mut content[1];
@@ -422,7 +422,7 @@ fn test_line_wrapping_utf32() {
 
     let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 1, ContentStyle::default());
     let line = lines.next().unwrap();
-    let select = ctx.get_select(line.width);
+    let select = ctx.select_get(line.width);
     inner_render(&mut content[0], &mut ctx, line, select, &mut gs.backend);
     let line = lines.next().unwrap();
     let text = &mut content[1];

@@ -75,6 +75,11 @@ impl Cursor {
         }
     }
 
+    /// get current cursor position
+    pub fn get_position(&self) -> CursorPosition {
+        self.into()
+    }
+
     pub fn set_position(&mut self, position: CursorPosition) {
         self.line = position.line;
         self.char = position.char;
@@ -418,6 +423,12 @@ impl Cursor {
                 len + to.char
             })
             .unwrap_or_default()
+    }
+
+    /// retrn the starting point of select
+    /// the value can be smaller or bigger than current poistion
+    pub fn select_from_raw(&self) -> Option<CursorPosition> {
+        self.select
     }
 
     pub fn reset(&mut self) {

@@ -16,7 +16,8 @@ pub struct LineContext<'a> {
     line_number: usize,
     line_number_offset: usize,
     line: usize,
-    char: usize,
+    cursor_line: usize,
+    cursor_char: usize,
     select: Option<(CursorPosition, CursorPosition)>,
 }
 
@@ -31,7 +32,8 @@ impl<'a> LineContext<'a> {
         let select = cursor.select_get();
         Self {
             line: cursor.line - line_number,
-            char: cursor.char,
+            cursor_line: cursor.line,
+            cursor_char: cursor.char,
             select,
             lexer,
             line_number,
@@ -60,8 +62,13 @@ impl<'a> LineContext<'a> {
     }
 
     #[inline(always)]
+    pub fn has_cursor(&self, line_idx: usize) -> bool {
+        self.cursor_line == line_idx
+    }
+
+    #[inline(always)]
     pub fn cursor_char(&self) -> usize {
-        self.char
+        self.cursor_char
     }
 
     #[inline]
@@ -92,16 +99,16 @@ impl<'a> LineContext<'a> {
     }
 
     #[inline]
-    pub fn get_select(&self, width: usize) -> Option<Range<usize>> {
+    pub fn select_get(&self, width: usize) -> Option<Range<usize>> {
         build_select_buffer(self.select, self.line_number, width - (self.line_number_offset + 1))
     }
 
-    #[inline]
-    pub fn get_select_full_line(&self, char_len: usize) -> Option<Range<usize>> {
+    #[inline(always)]
+    pub fn select_get_full_line(&self, char_len: usize) -> Option<Range<usize>> {
         build_select_buffer(self.select, self.line_number, char_len)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn skip_line(&mut self) {
         self.line_number += 1;
     }
@@ -109,15 +116,33 @@ impl<'a> LineContext<'a> {
     #[inline]
     pub fn forced_modal_render(self, gs: &mut GlobalState) {
         let row = self.line as u16;
-        let col = (self.char + self.line_number_offset + 1) as u16;
+        let col = (self.cursor_char + self.line_number_offset + 1) as u16;
         self.lexer.forece_modal_render_if_exists(row, col, gs);
     }
 
     #[inline]
     pub fn render_modal(self, gs: &mut GlobalState) {
         let row = self.line as u16;
-        let col = (self.char + self.line_number_offset + 1) as u16;
+        let col = (self.cursor_char + self.line_number_offset + 1) as u16;
         self.lexer.render_modal_if_exist(row, col, gs);
+    }
+
+    #[inline]
+    pub fn multi_cursor_line_setup(&mut self, cursors: &[Cursor]) {
+        let Some(cursor) = cursors.iter().find(|c| c.line == self.line_number) else {
+            return;
+        };
+        self.cursor_line = cursor.line;
+        self.cursor_char = cursor.char;
+        self.select = cursor.select_get();
+    }
+
+    #[inline]
+    pub fn init_multi_cursor(&mut self, cursors: &[Cursor]) {
+        let Some(cursor) = cursors.last() else { return };
+        self.cursor_line = cursor.line;
+        self.cursor_char = cursor.char;
+        self.select = cursor.select_get();
     }
 }
 

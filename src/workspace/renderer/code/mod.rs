@@ -30,7 +30,7 @@ pub fn width_remainder(line: &EditorLine, line_width: usize) -> Option<usize> {
 #[inline(always)]
 pub fn cursor(code: &mut EditorLine, ctx: &mut LineContext, line: Line, backend: &mut CrossTerm) {
     let line_row = line.row;
-    let select = ctx.get_select(line.width);
+    let select = ctx.select_get(line.width);
     let line_width = ctx.setup_cursor(line, backend);
     code.cached.cursor(line_row, ctx.cursor_char(), 0, select.clone());
     if code.is_simple() {
@@ -124,7 +124,7 @@ fn render_no_select(code: &mut EditorLine, line_width: usize, ctx: &mut LineCont
 
 #[inline(always)]
 pub fn cursor_fast(code: &mut EditorLine, ctx: &mut LineContext, line: Line, backend: &mut CrossTerm) {
-    let select = ctx.get_select(line.width);
+    let select = ctx.select_get(line.width);
     if !code.cached.should_render_cursor_or_update(line.row, ctx.cursor_char(), select.clone()) {
         ctx.skip_line();
         return;

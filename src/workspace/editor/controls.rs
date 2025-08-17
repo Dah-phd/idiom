@@ -122,7 +122,7 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::ScreenUp => editor.cursor.screen_up(&editor.content),
         EditorAction::ScreenDown => editor.cursor.screen_down(&editor.content),
         EditorAction::NewCursorUp | EditorAction::NewCursorDown => {
-            editor.enable_multi_cursors();
+            enable_multi_cursor_mode(editor);
             return editor.map(action, gs);
         }
         EditorAction::JumpLeft => editor.cursor.jump_left(&editor.content),
@@ -209,7 +209,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             }
         }
         EditorAction::SwapUp => {
-            todo!()
+            todo!("{:?}", &editor.multi_positions);
             // editor.actions.swap_up(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
             // return true;
         }
@@ -366,10 +366,8 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         EditorAction::RefreshUI => editor.lexer.refresh_lsp(gs),
         EditorAction::Save => editor.save(gs),
         EditorAction::Cancel => {
-            if editor.cursor.select_take().is_none() {
-                editor.actions.push_buffer(&mut editor.lexer);
-                return false;
-            }
+            resore_single_cursor_mode(editor);
+            return true;
         }
         EditorAction::Close => return false,
     }
@@ -401,11 +399,20 @@ pub fn consolidate_cursors(editor: &mut Editor) {
 }
 
 pub fn resore_single_cursor_mode(editor: &mut Editor) {
-    if let Some(main_cursor) = editor.multi_positions.iter().find(|c| c.max_rows != 0) {
-        editor.cursor.set_position(main_cursor.into());
+    match editor.multi_positions.iter().find(|c| c.max_rows != 0) {
+        Some(cursor) => editor.cursor.set_position(cursor.get_position()),
+        None => editor.cursor.set_position(CursorPosition::default()),
     };
     editor.action_map = single_cursor_map;
     editor.multi_positions.clear();
+    editor.renderer.single_cursor();
+}
+
+pub fn enable_multi_cursor_mode(editor: &mut Editor) {
+    editor.multi_positions.clear();
+    editor.multi_positions.push(editor.cursor.clone());
+    editor.action_map = multi_cursor_map;
+    editor.renderer.multi_cursor();
 }
 
 fn sort_cursors(x: &Cursor, y: &Cursor) -> std::cmp::Ordering {
