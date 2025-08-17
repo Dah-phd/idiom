@@ -324,7 +324,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         EditorAction::ScreenUp => editor.cursor.screen_up(&editor.content),
         EditorAction::ScreenDown => editor.cursor.screen_down(&editor.content),
         EditorAction::NewCursorUp => {
-            let Some(main_cursor) = editor.multi_positions.iter_mut().find(|c| c.max_rows != 0) else {
+            let Some(main_cursor) = editor.multi_positions.last_mut() else {
                 resore_single_cursor_mode(editor);
                 return true;
             };
@@ -336,7 +336,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             }
         }
         EditorAction::NewCursorDown => {
-            let Some(main_cursor) = editor.multi_positions.iter_mut().find(|c| c.max_rows != 0) else {
+            let Some(main_cursor) = editor.multi_positions.first_mut() else {
                 resore_single_cursor_mode(editor);
                 return true;
             };
