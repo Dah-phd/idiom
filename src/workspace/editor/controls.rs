@@ -166,8 +166,8 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
     match action {
         // EDITS:
         EditorAction::Char(ch) => {
-            for cursor in editor.multi_positions.iter_mut() {
-                editor.actions.push_char(ch, cursor, &mut editor.content, &mut editor.lexer);
+            for cc in editor.multi_positions.iter_mut() {
+                editor.actions.push_char(ch, cc, &mut editor.content, &mut editor.lexer);
             }
         }
         EditorAction::Backspace => {
@@ -328,10 +328,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 resore_single_cursor_mode(editor);
                 return true;
             };
-            let mut new_cursor = main_cursor.clone();
-            main_cursor.up(&editor.content);
-            if new_cursor.line != main_cursor.line {
-                new_cursor.max_rows = 0;
+            if let Some(new_cursor) = main_cursor.clone_above(&editor.content) {
                 editor.multi_positions.push(new_cursor);
             }
         }
@@ -340,10 +337,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 resore_single_cursor_mode(editor);
                 return true;
             };
-            let mut new_cursor = main_cursor.clone();
-            main_cursor.down(&editor.content);
-            if new_cursor.line != main_cursor.line {
-                new_cursor.max_rows = 0;
+            if let Some(new_cursor) = main_cursor.clone_below(&editor.content) {
                 editor.multi_positions.push(new_cursor);
             }
         }
@@ -377,10 +371,6 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
 }
 
 pub fn consolidate_cursors(editor: &mut Editor) {
-    if editor.multi_positions.len() < 2 {
-        return;
-    }
-
     let mut idx = 1;
 
     editor.multi_positions.sort_by(sort_cursors);
@@ -395,6 +385,9 @@ pub fn consolidate_cursors(editor: &mut Editor) {
                 idx += 1;
             }
         }
+    }
+    if editor.multi_positions.len() < 2 {
+        resore_single_cursor_mode(editor);
     }
 }
 

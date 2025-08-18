@@ -439,9 +439,42 @@ impl Cursor {
         self.select = None;
     }
 
+    // MULTI CURSOR UTILS
+
+    pub fn clone_above(&mut self, content: &[EditorLine]) -> Option<Self> {
+        let line = self.line.checked_sub(1)?;
+        let char = std::cmp::min(self.char, content[line].char_len());
+        let mut select = self.select.clone();
+        if let Some(position) = select.as_mut() {
+            if position.line == 0 {
+                position.char = 0;
+            } else {
+                position.line -= 1;
+                position.char = std::cmp::min(position.char, content[position.line].char_len());
+            }
+        };
+        Some(Self { line, char, text_width: self.text_width, select, ..Default::default() })
+    }
+
+    pub fn clone_below(&mut self, content: &[EditorLine]) -> Option<Self> {
+        let line = self.line + 1;
+        let char = std::cmp::min(self.char, content.get(line)?.char_len());
+        let mut select = self.select.clone();
+        if let Some(position) = select.as_mut() {
+            let next_line = position.line + 1;
+            if next_line < content.len() {
+                position.line = next_line;
+                position.char = std::cmp::min(position.char, content[position.line].char_len());
+            } else {
+                position.char = content[position.line].char_len();
+            }
+        };
+        Some(Self { line, char, text_width: self.text_width, select, ..Default::default() })
+    }
+
     pub fn merge_if_intersect(&mut self, other: &Cursor) -> bool {
         let cursor = CursorPosition { line: self.line, char: self.char };
-        let mut oth_cursor = CursorPosition { line: self.line, char: self.char };
+        let mut oth_cursor = CursorPosition { line: other.line, char: other.char };
         match self.select {
             Some(from) if from > cursor => match other.select {
                 Some(mut oth_from) => {
