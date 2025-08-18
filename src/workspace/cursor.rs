@@ -444,7 +444,7 @@ impl Cursor {
     pub fn clone_above(&mut self, content: &[EditorLine]) -> Option<Self> {
         let line = self.line.checked_sub(1)?;
         let char = std::cmp::min(self.char, content[line].char_len());
-        let mut select = self.select.clone();
+        let mut select = self.select;
         if let Some(position) = select.as_mut() {
             if position.line == 0 {
                 position.char = 0;
@@ -459,7 +459,7 @@ impl Cursor {
     pub fn clone_below(&mut self, content: &[EditorLine]) -> Option<Self> {
         let line = self.line + 1;
         let char = std::cmp::min(self.char, content.get(line)?.char_len());
-        let mut select = self.select.clone();
+        let mut select = self.select;
         if let Some(position) = select.as_mut() {
             let next_line = position.line + 1;
             if next_line < content.len() {
