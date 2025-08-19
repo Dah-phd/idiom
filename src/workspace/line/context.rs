@@ -127,22 +127,53 @@ impl<'a> LineContext<'a> {
         self.lexer.render_modal_if_exist(row, col, gs);
     }
 
-    #[inline]
-    pub fn multi_cursor_line_setup(&mut self, cursors: &[Cursor]) {
-        let Some(cursor) = cursors.iter().find(|c| c.line == self.line_number) else {
-            return;
-        };
-        self.cursor_line = cursor.line;
-        self.cursor_char = cursor.char;
-        self.select = cursor.select_get();
-    }
-
-    #[inline]
     pub fn init_multi_cursor(&mut self, cursors: &[Cursor]) {
         let Some(cursor) = cursors.last() else { return };
         self.cursor_line = cursor.line;
         self.cursor_char = cursor.char;
         self.select = cursor.select_get();
+    }
+
+    pub fn multi_cursor_line_setup(
+        &mut self,
+        cursors: &[Cursor],
+        width: usize,
+    ) -> Option<(Vec<CursorPosition>, Vec<Range<usize>>)> {
+        let mut positions = vec![];
+        let mut selects = vec![];
+        for cursor in cursors.iter().rev() {
+            if self.line_number == cursor.line {
+                positions.push(cursor.get_position());
+                if let Some(pos) = cursor.select_get() {
+                    selects.push(pos);
+                }
+            } else if let Some((from, to)) = cursor.select_get() {
+                if from.line <= self.line_number && self.line_number <= to.line {
+                    selects.push((from, to));
+                }
+            }
+            if cursor.line > self.line_number {
+                break;
+            }
+        }
+        if positions.len() > 1 || selects.len() > 1 {
+            let max_len = width - (self.line_number_offset + 1);
+            let select_ranges = selects
+                .into_iter()
+                .flat_map(|select| build_select_buffer(Some(select), self.line_number, max_len))
+                .collect();
+            if let Some(last) = positions.last() {
+                self.cursor_line = last.line;
+                self.cursor_char = last.char;
+            }
+            return Some((positions, select_ranges));
+        }
+        if !positions.is_empty() {
+            self.cursor_line = positions[0].line;
+            self.cursor_char = positions[0].char;
+        }
+        self.select = selects.pop();
+        None
     }
 }
 

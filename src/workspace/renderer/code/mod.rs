@@ -1,11 +1,13 @@
 pub mod ascii_cursor;
 pub mod ascii_line;
+pub mod ascii_multi_cursor;
 pub mod complex_cursor;
 pub mod complex_line;
+pub mod complex_multi_cursor;
 
 use crate::ext_tui::{CrossTerm, StyleExt};
 use crate::workspace::{
-    cursor::Cursor,
+    cursor::{Cursor, CursorPosition},
     line::{EditorLine, LineContext},
 };
 use crossterm::style::{ContentStyle, Stylize};
@@ -137,6 +139,23 @@ pub fn cursor_fast(code: &mut EditorLine, ctx: &mut LineContext, line: Line, bac
         false => complex_cursor::render(code, ctx, line_width, select, backend),
     }
     backend.reset_style();
+}
+
+#[inline(always)]
+pub fn multi_cursor(
+    code: &mut EditorLine,
+    ctx: &mut LineContext,
+    line: Line,
+    backend: &mut CrossTerm,
+    cursors: Vec<CursorPosition>,
+    selects: Vec<Range<usize>>,
+) {
+    code.cached.reset();
+    let line_width = ctx.setup_cursor(line, backend);
+    match code.is_simple() {
+        true => ascii_multi_cursor::render(code, ctx, line_width, cursors, selects, backend),
+        false => complex_multi_cursor::render(code, ctx, line_width, cursors, selects, backend),
+    }
 }
 
 // ensures cursor is rendered

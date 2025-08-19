@@ -149,12 +149,13 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
 
     ctx.init_multi_cursor(&editor.multi_positions);
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
-        ctx.multi_cursor_line_setup(&editor.multi_positions);
         let line = match lines.next() {
             None => break,
             Some(line) => line,
         };
-        if ctx.has_cursor(line_idx) {
+        if let Some((cursors, selects)) = ctx.multi_cursor_line_setup(&editor.multi_positions, line.width) {
+            code::multi_cursor(text, &mut ctx, line, backend, cursors, selects);
+        } else if ctx.has_cursor(line_idx) {
             code::cursor_fast(text, &mut ctx, line, backend);
         } else {
             let select = ctx.select_get(line.width);
@@ -188,11 +189,11 @@ fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
 
     ctx.init_multi_cursor(&editor.multi_positions);
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
-        ctx.multi_cursor_line_setup(&editor.multi_positions);
         let line = match lines.next() {
             None => break,
             Some(line) => line,
         };
+        ctx.multi_cursor_line_setup(&editor.multi_positions, line.width);
         if ctx.has_cursor(line_idx) {
             code::cursor(text, &mut ctx, line, backend);
         } else {
