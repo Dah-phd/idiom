@@ -135,7 +135,14 @@ pub fn partial(
     let last_idx = cursors.last().map(|c| c.char).unwrap_or_default();
 
     let char_position = ctx.lexer.char_lsp_pos;
+
+    // index needs to be generated based on 0 skipped chars on multicursor
+    // skipped chars are use to store info on multi cursor
+    let skipped = code.cached.skipped_chars();
+    code.cached.set_skipped_chars(0);
     let mut idx = code.cached.generate_skipped_chars_complex(&code.content, code.char_len(), last_idx, line_width);
+    code.cached.set_skipped_chars(skipped);
+
     let mut content = CharLimitedWidths::new(&code.content, 3);
 
     let mut cursor_iter = cursors.into_iter().map(|x| x.char);

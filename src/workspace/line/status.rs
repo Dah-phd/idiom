@@ -1,9 +1,10 @@
+use crate::workspace::CursorPosition;
 use idiom_tui::utils::CharLimitedWidths;
 use std::ops::Range;
 
 type Reduction = usize;
 
-#[derive(Default)]
+#[derive(Default, PartialEq)]
 pub enum RenderStatus {
     Cursor {
         line: u16,
@@ -74,6 +75,30 @@ impl RenderStatus {
             self.cursor(new_line, new_char, 0, new_select);
             true
         }
+    }
+
+    /// handles caching on multicursor
+    pub fn should_render_multi_cursor(
+        &mut self,
+        new_line: u16,
+        cursors: &[CursorPosition],
+        selects: &[Range<usize>],
+    ) -> bool {
+        let multi_cursor = Self::Cursor {
+            // line stores number of cursors
+            line: new_line * cursors.len() as u16,
+            // cursor sum
+            char: cursors.iter().fold(0, |s, c| s + c.char),
+            // last char
+            skipped_chars: cursors.last().map(|c| c.char).unwrap_or_default(),
+            // select sum
+            select: selects.iter().cloned().reduce(|r, s| (r.start + s.start)..(r.end + s.end)),
+        };
+        if self == &multi_cursor {
+            return false;
+        };
+        *self = multi_cursor;
+        true
     }
 
     pub fn generate_skipped_chars_simple(&mut self, cursor_idx: usize, line_width: usize) -> (usize, Reduction) {

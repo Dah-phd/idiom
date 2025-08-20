@@ -129,7 +129,12 @@ pub fn partial(
 ) {
     let last_idx = cursors.last().map(|c| c.char).unwrap_or_default();
 
+    // index needs to be generated based on 0 skipped chars on multicursor
+    // skipped chars are use to store info on multi cursor
+    let skipped = line.cached.skipped_chars();
+    line.cached.set_skipped_chars(0);
     let (mut idx, reduction) = line.cached.generate_skipped_chars_simple(last_idx, line_width);
+    line.cached.set_skipped_chars(skipped);
 
     let mut cursor_iter = cursors.into_iter().map(|x| x.char);
     let mut cursor_idx = cursor_iter.next().unwrap_or(usize::MAX);

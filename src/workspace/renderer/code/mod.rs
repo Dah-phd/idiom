@@ -150,7 +150,11 @@ pub fn multi_cursor(
     cursors: Vec<CursorPosition>,
     selects: Vec<Range<usize>>,
 ) {
-    code.cached.reset();
+    if !code.cached.should_render_multi_cursor(line.row, &cursors, &selects) {
+        ctx.skip_line();
+        return;
+    };
+
     let line_width = ctx.setup_cursor(line, backend);
     match code.is_simple() {
         true => ascii_multi_cursor::render(code, ctx, line_width, cursors, selects, backend),
