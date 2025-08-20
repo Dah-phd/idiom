@@ -314,7 +314,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         }
         EditorAction::SelectLine => editor.select_line(),
         EditorAction::SelectAll => {
-            resore_single_cursor_mode(editor);
+            restore_single_cursor_mode(editor);
             return editor.map(action, gs);
         }
         EditorAction::ScrollUp => editor.cursor.scroll_up(&editor.content),
@@ -325,7 +325,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         EditorAction::ScreenDown => editor.cursor.screen_down(&editor.content),
         EditorAction::NewCursorUp => {
             let Some(main_cursor) = editor.multi_positions.last_mut() else {
-                resore_single_cursor_mode(editor);
+                restore_single_cursor_mode(editor);
                 return true;
             };
             if let Some(new_cursor) = main_cursor.clone_above(&editor.content) {
@@ -334,7 +334,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         }
         EditorAction::NewCursorDown => {
             let Some(main_cursor) = editor.multi_positions.first_mut() else {
-                resore_single_cursor_mode(editor);
+                restore_single_cursor_mode(editor);
                 return true;
             };
             if let Some(new_cursor) = main_cursor.clone_below(&editor.content) {
@@ -360,7 +360,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         EditorAction::RefreshUI => editor.lexer.refresh_lsp(gs),
         EditorAction::Save => editor.save(gs),
         EditorAction::Cancel => {
-            resore_single_cursor_mode(editor);
+            restore_single_cursor_mode(editor);
             return true;
         }
         EditorAction::Close => return false,
@@ -387,15 +387,16 @@ pub fn consolidate_cursors(editor: &mut Editor) {
         }
     }
     if editor.multi_positions.len() < 2 {
-        resore_single_cursor_mode(editor);
+        restore_single_cursor_mode(editor);
     }
 }
 
-pub fn resore_single_cursor_mode(editor: &mut Editor) {
+pub fn restore_single_cursor_mode(editor: &mut Editor) {
     match editor.multi_positions.iter().find(|c| c.max_rows != 0) {
         Some(cursor) => editor.cursor.set_position(cursor.get_position()),
         None => editor.cursor.set_position(CursorPosition::default()),
     };
+    editor.last_render_at_line = None;
     editor.action_map = single_cursor_map;
     editor.multi_positions.clear();
     editor.renderer.single_cursor();

@@ -223,6 +223,11 @@ impl Actions {
                     };
                 }
                 cursor.select_set(from, to);
+
+                if edits.is_empty() {
+                    return;
+                }
+
                 add_select(&mut edits, Some(initial_select), Some((from, to)));
                 self.push_done(edits, lexer, content);
             }

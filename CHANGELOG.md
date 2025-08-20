@@ -1,6 +1,7 @@
 ## Includes only major changes (manual updates)
 # Version 0.6.0
 - multicursor support
+- fix crashbug when unindent produces 0 edits
 
 # Version 0.5.5
 - diagnostics moved to italic style
