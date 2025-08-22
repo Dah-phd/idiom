@@ -393,7 +393,7 @@ pub fn consolidate_cursors(editor: &mut Editor) {
 
 pub fn restore_single_cursor_mode(editor: &mut Editor) {
     match editor.multi_positions.iter().find(|c| c.max_rows != 0) {
-        Some(cursor) => editor.cursor.set_position(cursor.get_position()),
+        Some(cursor) => editor.cursor.set_cursor(cursor),
         None => editor.cursor.set_position(CursorPosition::default()),
     };
     editor.last_render_at_line = None;

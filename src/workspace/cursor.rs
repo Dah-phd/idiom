@@ -441,6 +441,11 @@ impl Cursor {
 
     // MULTI CURSOR UTILS
 
+    pub fn set_cursor(&mut self, other: &Cursor) {
+        self.select = other.select;
+        self.set_position(other.get_position());
+    }
+
     pub fn clone_above(&mut self, content: &[EditorLine]) -> Option<Self> {
         let line = self.line.checked_sub(1)?;
         let char = std::cmp::min(self.char, content[line].char_len());
@@ -484,9 +489,11 @@ impl Cursor {
                     };
                     if from >= oth_from && oth_from >= cursor {
                         self.select_set(from, std::cmp::min(oth_cursor, cursor));
+                        return true;
                     };
                     if oth_from >= from && from >= oth_cursor {
                         self.select_set(oth_from, std::cmp::min(oth_cursor, cursor));
+                        return true;
                     };
                 }
                 None => {
@@ -502,9 +509,11 @@ impl Cursor {
                     };
                     if from <= oth_from && oth_from <= cursor {
                         self.select_set(from, std::cmp::max(oth_cursor, cursor));
+                        return true;
                     };
                     if oth_from <= from && from <= oth_cursor {
                         self.select_set(oth_from, std::cmp::max(oth_cursor, cursor));
+                        return true;
                     };
                 }
                 None => {
