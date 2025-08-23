@@ -1,6 +1,7 @@
 mod buffer;
 mod edits;
 mod meta;
+mod transaction;
 
 use super::{
     cursor::{Cursor, CursorPosition, Select},
@@ -12,6 +13,7 @@ use buffer::ActionBuffer;
 pub use edits::Edit;
 use lsp_types::TextEdit;
 pub use meta::{EditMetaData, EditType};
+use transaction::Transaction;
 
 #[derive(Default)]
 pub struct Actions {
@@ -25,6 +27,8 @@ impl Actions {
     pub fn new(cfg: IndentConfigs) -> Self {
         Self { cfg, ..Default::default() }
     }
+
+    // EDITS
 
     pub fn swap_up(&mut self, cursor: &mut Cursor, content: &mut [EditorLine], lexer: &mut Lexer) {
         if cursor.line == 0 {
@@ -471,7 +475,9 @@ impl Actions {
         clip
     }
 
-    fn push_done(&mut self, edit: impl Into<EditType>, lexer: &mut Lexer, content: &mut [EditorLine]) {
+    // HANDLERS
+
+    fn push_done(&mut self, edit: impl Into<EditType>, lexer: &mut Lexer, content: &[EditorLine]) {
         self.push_buffer(lexer);
         let action: EditType = edit.into();
         lexer.sync(&action, content);
@@ -490,6 +496,16 @@ impl Actions {
         self.done.clear();
         self.undone.clear();
         let _ = self.buffer.collect();
+    }
+
+    // TRANSACTIONS (main use in multicursor)
+
+    pub fn init_transaction(&mut self, lexer: &mut Lexer) -> Transaction {
+        Transaction::new(std::mem::take(&mut self.done), lexer)
+    }
+
+    pub fn finish_transaction(&mut self, transaction: Transaction, lexer: &mut Lexer, content: &mut [EditorLine]) {
+        transaction.finish(self, lexer, content);
     }
 }
 

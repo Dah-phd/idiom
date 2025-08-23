@@ -57,8 +57,8 @@ pub struct Lexer {
     renames: fn(&mut Self, CursorPosition, String, &mut GlobalState),
     sync_tokens: fn(&mut Self, EditMetaData),
     sync_changes: fn(&mut Self, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
-    sync: fn(&mut Self, &EditType, &mut [EditorLine]) -> LSPResult<()>,
-    sync_rev: fn(&mut Self, &EditType, &mut [EditorLine]) -> LSPResult<()>,
+    sync: fn(&mut Self, &EditType, &[EditorLine]) -> LSPResult<()>,
+    sync_rev: fn(&mut Self, &EditType, &[EditorLine]) -> LSPResult<()>,
     meta: Option<EditMetaData>,
     pub encode_position: fn(usize, &str) -> usize,
     pub char_lsp_pos: fn(char) -> usize,
@@ -202,7 +202,7 @@ impl Lexer {
 
     /// sync event
     #[inline(always)]
-    pub fn sync(&mut self, action: &EditType, content: &mut [EditorLine]) {
+    pub fn sync(&mut self, action: &EditType, content: &[EditorLine]) {
         self.question_lsp = (self.sync)(self, action, content).is_err();
     }
 
@@ -433,6 +433,31 @@ impl Lexer {
             return;
         }
         let _ = self.client.file_did_close(self.uri.clone());
+    }
+}
+
+pub struct SyncCallbacks {
+    sync: fn(&mut Lexer, &EditType, &[EditorLine]) -> LSPResult<()>,
+    sync_rev: fn(&mut Lexer, &EditType, &[EditorLine]) -> LSPResult<()>,
+    sync_changes: fn(&mut Lexer, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
+    sync_tokens: fn(&mut Lexer, EditMetaData),
+}
+
+impl SyncCallbacks {
+    pub fn take(lexer: &mut Lexer) -> Self {
+        Self {
+            sync: std::mem::replace(&mut lexer.sync, lsp_calls::sync_edits_dead),
+            sync_rev: std::mem::replace(&mut lexer.sync_rev, lsp_calls::sync_edits_dead_rev),
+            sync_changes: std::mem::replace(&mut lexer.sync_changes, lsp_calls::sync_changes_dead),
+            sync_tokens: std::mem::replace(&mut lexer.sync_tokens, lsp_calls::sync_tokens_dead),
+        }
+    }
+
+    pub fn set(self, lexer: &mut Lexer) {
+        lexer.sync = self.sync;
+        lexer.sync_rev = self.sync_rev;
+        lexer.sync_changes = self.sync_changes;
+        lexer.sync_tokens = self.sync_tokens;
     }
 }
 

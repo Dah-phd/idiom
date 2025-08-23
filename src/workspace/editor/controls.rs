@@ -166,29 +166,39 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
     match action {
         // EDITS:
         EditorAction::Char(ch) => {
+            let transaction = editor.actions.init_transaction(&mut editor.lexer);
             for cc in editor.multi_positions.iter_mut() {
                 editor.actions.push_char(ch, cc, &mut editor.content, &mut editor.lexer);
             }
+            editor.actions.finish_transaction(transaction, &mut editor.lexer, &mut editor.content);
         }
         EditorAction::Backspace => {
+            let transaction = editor.actions.init_transaction(&mut editor.lexer);
             for cursor in editor.multi_positions.iter_mut() {
                 editor.actions.backspace(cursor, &mut editor.content, &mut editor.lexer);
             }
+            editor.actions.finish_transaction(transaction, &mut editor.lexer, &mut editor.content);
         }
         EditorAction::Delete => {
+            let transaction = editor.actions.init_transaction(&mut editor.lexer);
             for cursor in editor.multi_positions.iter_mut() {
                 editor.actions.del(cursor, &mut editor.content, &mut editor.lexer);
             }
+            editor.actions.finish_transaction(transaction, &mut editor.lexer, &mut editor.content);
         }
         EditorAction::NewLine => {
+            let transaction = editor.actions.init_transaction(&mut editor.lexer);
             for cursor in editor.multi_positions.iter_mut() {
                 editor.actions.new_line(cursor, &mut editor.content, &mut editor.lexer);
             }
+            editor.actions.finish_transaction(transaction, &mut editor.lexer, &mut editor.content);
         }
         EditorAction::Indent => {
+            let transaction = editor.actions.init_transaction(&mut editor.lexer);
             for cursor in editor.multi_positions.iter_mut() {
                 editor.actions.indent(cursor, &mut editor.content, &mut editor.lexer);
             }
+            editor.actions.finish_transaction(transaction, &mut editor.lexer, &mut editor.content);
         }
         EditorAction::RemoveLine => {
             todo!()
@@ -389,6 +399,11 @@ pub fn consolidate_cursors(editor: &mut Editor) {
     if editor.multi_positions.len() < 2 {
         restore_single_cursor_mode(editor);
     }
+}
+
+pub fn solve_offset(from_to: Option<(CursorPosition, CursorPosition)>) -> Option<CursorPosition> {
+    let (from, to) = from_to?;
+    None
 }
 
 pub fn restore_single_cursor_mode(editor: &mut Editor) {

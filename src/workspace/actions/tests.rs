@@ -482,7 +482,7 @@ fn push_char_with_closing_and_select() {
     assert_eq!(&content[0].content, end);
 }
 
-fn probe_char_closing_with_select(_: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
+fn probe_char_closing_with_select(_: &mut Lexer, action: &EditType, content: &[EditorLine]) -> LSPResult<()> {
     let (meta, edit) = action.change_event(encode_pos_utf32, char_lsp_pos, content);
     assert_eq!(meta.start_line, 0);
     assert_eq!(meta.from, 1);
@@ -494,7 +494,7 @@ fn probe_char_closing_with_select(_: &mut Lexer, action: &EditType, content: &mu
     Ok(())
 }
 
-fn probe_char_closing_with_select_rev(_: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
+fn probe_char_closing_with_select_rev(_: &mut Lexer, action: &EditType, content: &[EditorLine]) -> LSPResult<()> {
     let (meta, edit) = action.change_event_rev(encode_pos_utf32, char_lsp_pos, content);
     assert_eq!(meta.start_line, 0);
     assert_eq!(meta.from, 1);

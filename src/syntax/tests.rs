@@ -16,11 +16,11 @@ use idiom_tui::Backend;
 use lsp_types::SemanticToken;
 use std::path::PathBuf;
 
-pub fn intercept_sync(lexer: &mut Lexer, sync: fn(&mut Lexer, &EditType, &mut [EditorLine]) -> LSPResult<()>) {
+pub fn intercept_sync(lexer: &mut Lexer, sync: fn(&mut Lexer, &EditType, &[EditorLine]) -> LSPResult<()>) {
     lexer.sync = sync;
 }
 
-pub fn intercept_sync_rev(lexer: &mut Lexer, sync: fn(&mut Lexer, &EditType, &mut [EditorLine]) -> LSPResult<()>) {
+pub fn intercept_sync_rev(lexer: &mut Lexer, sync: fn(&mut Lexer, &EditType, &[EditorLine]) -> LSPResult<()>) {
     lexer.sync_rev = sync;
 }
 
