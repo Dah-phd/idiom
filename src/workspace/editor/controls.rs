@@ -175,18 +175,16 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 }
             },
         ),
-        EditorAction::Backspace => {
-            perform_tranasaction(
-                &mut editor.actions,
-                &mut editor.lexer,
-                &mut editor.content,
-                |actions, lexer, content| {
-                    for cursor in editor.multi_positions.iter_mut() {
-                        actions.backspace(cursor, content, lexer);
-                    }
-                },
-            );
-        }
+        EditorAction::Backspace => perform_tranasaction(
+            &mut editor.actions,
+            &mut editor.lexer,
+            &mut editor.content,
+            |actions, lexer, content| {
+                for cursor in editor.multi_positions.iter_mut() {
+                    actions.backspace(cursor, content, lexer);
+                }
+            },
+        ),
         EditorAction::Delete => {
             perform_tranasaction(
                 &mut editor.actions,
@@ -366,13 +364,34 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 }
             }
         }
-        EditorAction::SelectLine => editor.select_line(),
-        EditorAction::ScrollUp => editor.cursor.scroll_up(&editor.content),
-        EditorAction::ScrollDown => editor.cursor.scroll_down(&editor.content),
-        EditorAction::SelectScrollUp => editor.cursor.select_scroll_up(&editor.content),
-        EditorAction::SelectScrollDown => editor.cursor.select_scroll_down(&editor.content),
-        EditorAction::ScreenUp => editor.cursor.screen_up(&editor.content),
-        EditorAction::ScreenDown => editor.cursor.screen_down(&editor.content),
+        EditorAction::SelectLine => {
+            todo!();
+            for cursor in editor.multi_positions.iter_mut() {}
+        }
+        EditorAction::ScrollUp => {
+            todo!();
+            editor.cursor.scroll_up(&editor.content)
+        }
+        EditorAction::ScrollDown => {
+            todo!();
+            editor.cursor.scroll_down(&editor.content)
+        }
+        EditorAction::SelectScrollUp => {
+            todo!();
+            editor.cursor.select_scroll_up(&editor.content)
+        }
+        EditorAction::SelectScrollDown => {
+            todo!();
+            editor.cursor.select_scroll_down(&editor.content)
+        }
+        EditorAction::ScreenUp => {
+            todo!();
+            editor.cursor.screen_up(&editor.content)
+        }
+        EditorAction::ScreenDown => {
+            todo!();
+            editor.cursor.screen_down(&editor.content)
+        }
         EditorAction::NewCursorUp => {
             let Some(main_cursor) = editor.multi_positions.last_mut() else {
                 restore_single_cursor_mode(editor);
@@ -407,17 +426,50 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 editor.multi_positions.push(new_cursor);
             }
         }
-        EditorAction::JumpLeft => editor.cursor.jump_left(&editor.content),
-        EditorAction::JumpLeftSelect => editor.cursor.jump_left_select(&editor.content),
-        EditorAction::JumpRight => editor.cursor.jump_right(&editor.content),
-        EditorAction::JumpRightSelect => editor.cursor.jump_right_select(&editor.content),
-        EditorAction::EndOfLine => editor.cursor.end_of_line(&editor.content),
-
-        EditorAction::StartOfLine => editor.cursor.start_of_line(&editor.content),
-        EditorAction::FindReferences => editor.lexer.go_to_reference((&editor.cursor).into(), gs),
-        EditorAction::GoToDeclaration => editor.lexer.go_to_declaration((&editor.cursor).into(), gs),
-        EditorAction::Help => editor.lexer.help((&editor.cursor).into(), &editor.content, gs),
+        EditorAction::JumpLeft => {
+            for cursor in editor.multi_positions.iter_mut() {
+                cursor.jump_left(&editor.content);
+            }
+        }
+        EditorAction::JumpLeftSelect => {
+            for cursor in editor.multi_positions.iter_mut() {
+                cursor.jump_left_select(&editor.content)
+            }
+        }
+        EditorAction::JumpRight => {
+            for cursor in editor.multi_positions.iter_mut() {
+                cursor.jump_right(&editor.content)
+            }
+        }
+        EditorAction::JumpRightSelect => {
+            for cursor in editor.multi_positions.iter_mut() {
+                cursor.jump_right_select(&editor.content)
+            }
+        }
+        EditorAction::EndOfLine => {
+            for cursor in editor.multi_positions.iter_mut() {
+                cursor.end_of_line(&editor.content)
+            }
+        }
+        EditorAction::StartOfLine => {
+            for cursor in editor.multi_positions.iter_mut() {
+                cursor.start_of_line(&editor.content)
+            }
+        }
+        EditorAction::FindReferences => {
+            todo!();
+            editor.lexer.go_to_reference((&editor.cursor).into(), gs)
+        }
+        EditorAction::GoToDeclaration => {
+            todo!();
+            editor.lexer.go_to_declaration((&editor.cursor).into(), gs)
+        }
+        EditorAction::Help => {
+            todo!();
+            editor.lexer.help((&editor.cursor).into(), &editor.content, gs)
+        }
         EditorAction::LSPRename => {
+            todo!();
             let line = &editor.content[editor.cursor.line];
             let token_range = token_range_at(line, editor.cursor.char);
             editor.lexer.start_rename((&editor.cursor).into(), &line[token_range]);
