@@ -121,7 +121,7 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::SelectScrollDown => editor.cursor.select_scroll_down(&editor.content),
         EditorAction::ScreenUp => editor.cursor.screen_up(&editor.content),
         EditorAction::ScreenDown => editor.cursor.screen_down(&editor.content),
-        EditorAction::NewCursorUp | EditorAction::NewCursorDown => {
+        EditorAction::NewCursorUp | EditorAction::NewCursorDown | EditorAction::NewCursorWithLine => {
             enable_multi_cursor_mode(editor);
             return editor.map(action, gs);
         }
@@ -232,14 +232,28 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             // }
         }
         EditorAction::IndentStart => {
-            for cursor in editor.multi_positions.iter_mut() {
-                editor.actions.indent_start(cursor, &mut editor.content, &mut editor.lexer);
-            }
+            perform_tranasaction(
+                &mut editor.actions,
+                &mut editor.lexer,
+                &mut editor.content,
+                |actions, lexer, content| {
+                    for cursor in editor.multi_positions.iter_mut() {
+                        actions.indent_start(cursor, content, lexer);
+                    }
+                },
+            );
         }
         EditorAction::Unintent => {
-            for cursor in editor.multi_positions.iter_mut() {
-                editor.actions.unindent(cursor, &mut editor.content, &mut editor.lexer);
-            }
+            perform_tranasaction(
+                &mut editor.actions,
+                &mut editor.lexer,
+                &mut editor.content,
+                |actions, lexer, content| {
+                    for cursor in editor.multi_positions.iter_mut() {
+                        actions.unindent(cursor, content, lexer);
+                    }
+                },
+            );
         }
         EditorAction::SwapUp => {
             todo!("{:?}", &editor.multi_positions);
@@ -274,9 +288,16 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         }
         EditorAction::Paste => {
             if let Some(clip) = gs.clipboard.pull() {
-                for cursor in editor.multi_positions.iter_mut() {
-                    editor.actions.paste(clip.to_owned(), cursor, &mut editor.content, &mut editor.lexer);
-                }
+                perform_tranasaction(
+                    &mut editor.actions,
+                    &mut editor.lexer,
+                    &mut editor.content,
+                    |actions, lexer, content| {
+                        for cursor in editor.multi_positions.iter_mut() {
+                            actions.paste(clip.to_owned(), cursor, content, lexer);
+                        }
+                    },
+                );
             }
         }
         EditorAction::Cut => {
@@ -346,10 +367,6 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             }
         }
         EditorAction::SelectLine => editor.select_line(),
-        EditorAction::SelectAll => {
-            restore_single_cursor_mode(editor);
-            return editor.map(action, gs);
-        }
         EditorAction::ScrollUp => editor.cursor.scroll_up(&editor.content),
         EditorAction::ScrollDown => editor.cursor.scroll_down(&editor.content),
         EditorAction::SelectScrollUp => editor.cursor.select_scroll_up(&editor.content),
@@ -374,14 +391,27 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 editor.multi_positions.push(new_cursor);
             }
         }
+        EditorAction::NewCursorWithLine => {
+            let Some(main_cursor) = editor.multi_positions.first_mut() else {
+                restore_single_cursor_mode(editor);
+                return true;
+            };
+            let mut new_cursor = main_cursor.clone();
+            editor.actions.new_line_raw(&mut new_cursor, &mut editor.content, &mut editor.lexer);
+            if main_cursor.line != new_cursor.line {
+                if let Some((from_position, ..)) = main_cursor.select_take() {
+                    main_cursor.set_position(from_position);
+                }
+                editor.multi_positions.push(new_cursor);
+            }
+        }
         EditorAction::JumpLeft => editor.cursor.jump_left(&editor.content),
         EditorAction::JumpLeftSelect => editor.cursor.jump_left_select(&editor.content),
         EditorAction::JumpRight => editor.cursor.jump_right(&editor.content),
         EditorAction::JumpRightSelect => editor.cursor.jump_right_select(&editor.content),
         EditorAction::EndOfLine => editor.cursor.end_of_line(&editor.content),
-        EditorAction::EndOfFile => editor.cursor.end_of_file(&editor.content),
+
         EditorAction::StartOfLine => editor.cursor.start_of_line(&editor.content),
-        EditorAction::StartOfFile => editor.cursor.start_of_file(),
         EditorAction::FindReferences => editor.lexer.go_to_reference((&editor.cursor).into(), gs),
         EditorAction::GoToDeclaration => editor.lexer.go_to_declaration((&editor.cursor).into(), gs),
         EditorAction::Help => editor.lexer.help((&editor.cursor).into(), &editor.content, gs),
@@ -392,6 +422,10 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         }
         EditorAction::RefreshUI => editor.lexer.refresh_lsp(gs),
         EditorAction::Save => editor.save(gs),
+        EditorAction::EndOfFile | EditorAction::StartOfFile | EditorAction::SelectAll => {
+            restore_single_cursor_mode(editor);
+            return editor.map(action, gs);
+        }
         EditorAction::Cancel => {
             restore_single_cursor_mode(editor);
             return true;

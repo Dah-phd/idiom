@@ -197,6 +197,26 @@ impl Edit {
     }
 
     #[inline]
+    pub fn new_line_raw(
+        mut cursor: CursorPosition,
+        cfg: &IndentConfigs,
+        content: &mut Vec<EditorLine>,
+    ) -> (CursorPosition, Self) {
+        let from_cursor = cursor;
+        let reverse = String::new();
+        let mut text = String::from('\n');
+        let prev_line = &mut content[cursor.line];
+        let mut line = prev_line.split_off(cursor.char);
+        let indent = cfg.derive_indent_from(prev_line);
+        line.insert_str(0, &indent);
+        cursor.line += 1;
+        cursor.char = indent.len();
+        text.push_str(&indent);
+        content.insert(cursor.line, line);
+        (cursor, Self::without_select(from_cursor, 1, 2, text, reverse))
+    }
+
+    #[inline]
     pub fn insert_snippet(
         c: &Cursor,
         snippet: String,

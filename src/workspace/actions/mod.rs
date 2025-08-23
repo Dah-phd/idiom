@@ -269,6 +269,27 @@ impl Actions {
         }
     }
 
+    pub fn new_line_raw(&mut self, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
+        if content.is_empty() {
+            cursor.set_position(CursorPosition { line: 0, char: 0 });
+            content.push(Default::default());
+            return;
+        }
+        match cursor.select_take() {
+            Some((from, to)) => {
+                let cut_edit = Edit::remove_select(from, to, content);
+                let (new_position, new_line_edit) = Edit::new_line_raw(from, &self.cfg, content);
+                cursor.set_position(new_position);
+                self.push_done(vec![cut_edit, new_line_edit], lexer, content)
+            }
+            None => {
+                let (new_position, edit) = Edit::new_line_raw(cursor.into(), &self.cfg, content);
+                cursor.set_position(new_position);
+                self.push_done(edit, lexer, content);
+            }
+        }
+    }
+
     pub fn comment_out(&mut self, pat: &str, cursor: &mut Cursor, content: &mut [EditorLine], lexer: &mut Lexer) {
         // TODO refactor
         match cursor.select_take() {
