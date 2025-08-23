@@ -185,42 +185,36 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 }
             },
         ),
-        EditorAction::Delete => {
-            perform_tranasaction(
-                &mut editor.actions,
-                &mut editor.lexer,
-                &mut editor.content,
-                |actions, lexer, content| {
-                    for cursor in editor.multi_positions.iter_mut() {
-                        actions.del(cursor, content, lexer);
-                    }
-                },
-            );
-        }
-        EditorAction::NewLine => {
-            perform_tranasaction(
-                &mut editor.actions,
-                &mut editor.lexer,
-                &mut editor.content,
-                |actions, lexer, content| {
-                    for cursor in editor.multi_positions.iter_mut() {
-                        actions.new_line(cursor, content, lexer);
-                    }
-                },
-            );
-        }
-        EditorAction::Indent => {
-            perform_tranasaction(
-                &mut editor.actions,
-                &mut editor.lexer,
-                &mut editor.content,
-                |actions, lexer, content| {
-                    for cursor in editor.multi_positions.iter_mut() {
-                        actions.indent(cursor, content, lexer);
-                    }
-                },
-            );
-        }
+        EditorAction::Delete => perform_tranasaction(
+            &mut editor.actions,
+            &mut editor.lexer,
+            &mut editor.content,
+            |actions, lexer, content| {
+                for cursor in editor.multi_positions.iter_mut() {
+                    actions.del(cursor, content, lexer);
+                }
+            },
+        ),
+        EditorAction::NewLine => perform_tranasaction(
+            &mut editor.actions,
+            &mut editor.lexer,
+            &mut editor.content,
+            |actions, lexer, content| {
+                for cursor in editor.multi_positions.iter_mut() {
+                    actions.new_line(cursor, content, lexer);
+                }
+            },
+        ),
+        EditorAction::Indent => perform_tranasaction(
+            &mut editor.actions,
+            &mut editor.lexer,
+            &mut editor.content,
+            |actions, lexer, content| {
+                for cursor in editor.multi_positions.iter_mut() {
+                    actions.indent(cursor, content, lexer);
+                }
+            },
+        ),
         EditorAction::RemoveLine => {
             todo!()
             // editor.select_line();
@@ -229,30 +223,26 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             // return true;
             // }
         }
-        EditorAction::IndentStart => {
-            perform_tranasaction(
-                &mut editor.actions,
-                &mut editor.lexer,
-                &mut editor.content,
-                |actions, lexer, content| {
-                    for cursor in editor.multi_positions.iter_mut() {
-                        actions.indent_start(cursor, content, lexer);
-                    }
-                },
-            );
-        }
-        EditorAction::Unintent => {
-            perform_tranasaction(
-                &mut editor.actions,
-                &mut editor.lexer,
-                &mut editor.content,
-                |actions, lexer, content| {
-                    for cursor in editor.multi_positions.iter_mut() {
-                        actions.unindent(cursor, content, lexer);
-                    }
-                },
-            );
-        }
+        EditorAction::IndentStart => perform_tranasaction(
+            &mut editor.actions,
+            &mut editor.lexer,
+            &mut editor.content,
+            |actions, lexer, content| {
+                for cursor in editor.multi_positions.iter_mut() {
+                    actions.indent_start(cursor, content, lexer);
+                }
+            },
+        ),
+        EditorAction::Unintent => perform_tranasaction(
+            &mut editor.actions,
+            &mut editor.lexer,
+            &mut editor.content,
+            |actions, lexer, content| {
+                for cursor in editor.multi_positions.iter_mut() {
+                    actions.unindent(cursor, content, lexer);
+                }
+            },
+        ),
         EditorAction::SwapUp => {
             todo!("{:?}", &editor.multi_positions);
             // editor.actions.swap_up(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
