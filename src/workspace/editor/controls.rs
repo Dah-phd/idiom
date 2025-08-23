@@ -1,5 +1,5 @@
 use super::{token_range_at, Cursor, CursorPosition, Editor};
-use crate::{configs::EditorAction, global_state::GlobalState};
+use crate::{configs::EditorAction, global_state::GlobalState, workspace::actions::perform_tranasaction};
 
 pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut GlobalState) -> bool {
     let (taken, render_update) = editor.lexer.map_modal_if_exists(action, gs);
@@ -165,40 +165,63 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
     }
     match action {
         // EDITS:
-        EditorAction::Char(ch) => {
-            let transaction = editor.actions.init_transaction(&mut editor.lexer);
-            for cc in editor.multi_positions.iter_mut() {
-                editor.actions.push_char(ch, cc, &mut editor.content, &mut editor.lexer);
-            }
-            editor.actions.finish_transaction(transaction, &mut editor.lexer, &mut editor.content);
-        }
+        EditorAction::Char(ch) => perform_tranasaction(
+            &mut editor.actions,
+            &mut editor.lexer,
+            &mut editor.content,
+            |actions, lexer, content| {
+                for cc in editor.multi_positions.iter_mut() {
+                    actions.push_char(ch, cc, content, lexer);
+                }
+            },
+        ),
         EditorAction::Backspace => {
-            let transaction = editor.actions.init_transaction(&mut editor.lexer);
-            for cursor in editor.multi_positions.iter_mut() {
-                editor.actions.backspace(cursor, &mut editor.content, &mut editor.lexer);
-            }
-            editor.actions.finish_transaction(transaction, &mut editor.lexer, &mut editor.content);
+            perform_tranasaction(
+                &mut editor.actions,
+                &mut editor.lexer,
+                &mut editor.content,
+                |actions, lexer, content| {
+                    for cursor in editor.multi_positions.iter_mut() {
+                        actions.backspace(cursor, content, lexer);
+                    }
+                },
+            );
         }
         EditorAction::Delete => {
-            let transaction = editor.actions.init_transaction(&mut editor.lexer);
-            for cursor in editor.multi_positions.iter_mut() {
-                editor.actions.del(cursor, &mut editor.content, &mut editor.lexer);
-            }
-            editor.actions.finish_transaction(transaction, &mut editor.lexer, &mut editor.content);
+            perform_tranasaction(
+                &mut editor.actions,
+                &mut editor.lexer,
+                &mut editor.content,
+                |actions, lexer, content| {
+                    for cursor in editor.multi_positions.iter_mut() {
+                        actions.del(cursor, content, lexer);
+                    }
+                },
+            );
         }
         EditorAction::NewLine => {
-            let transaction = editor.actions.init_transaction(&mut editor.lexer);
-            for cursor in editor.multi_positions.iter_mut() {
-                editor.actions.new_line(cursor, &mut editor.content, &mut editor.lexer);
-            }
-            editor.actions.finish_transaction(transaction, &mut editor.lexer, &mut editor.content);
+            perform_tranasaction(
+                &mut editor.actions,
+                &mut editor.lexer,
+                &mut editor.content,
+                |actions, lexer, content| {
+                    for cursor in editor.multi_positions.iter_mut() {
+                        actions.new_line(cursor, content, lexer);
+                    }
+                },
+            );
         }
         EditorAction::Indent => {
-            let transaction = editor.actions.init_transaction(&mut editor.lexer);
-            for cursor in editor.multi_positions.iter_mut() {
-                editor.actions.indent(cursor, &mut editor.content, &mut editor.lexer);
-            }
-            editor.actions.finish_transaction(transaction, &mut editor.lexer, &mut editor.content);
+            perform_tranasaction(
+                &mut editor.actions,
+                &mut editor.lexer,
+                &mut editor.content,
+                |actions, lexer, content| {
+                    for cursor in editor.multi_positions.iter_mut() {
+                        actions.indent(cursor, content, lexer);
+                    }
+                },
+            );
         }
         EditorAction::RemoveLine => {
             todo!()

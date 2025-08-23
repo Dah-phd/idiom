@@ -453,7 +453,7 @@ impl SyncCallbacks {
         }
     }
 
-    pub fn set(self, lexer: &mut Lexer) {
+    pub fn set_in(self, lexer: &mut Lexer) {
         lexer.sync = self.sync;
         lexer.sync_rev = self.sync_rev;
         lexer.sync_changes = self.sync_changes;

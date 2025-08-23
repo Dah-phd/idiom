@@ -31,7 +31,7 @@ pub struct Editor {
     pub update_status: FileUpdate,
     pub line_number_offset: usize,
     pub last_render_at_line: Option<usize>,
-    actions: Actions,
+    pub actions: Actions,
     renderer: Renderer,
     action_map: fn(&mut Self, EditorAction, gs: &mut GlobalState) -> bool,
 }

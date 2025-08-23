@@ -13,7 +13,7 @@ use buffer::ActionBuffer;
 pub use edits::Edit;
 use lsp_types::TextEdit;
 pub use meta::{EditMetaData, EditType};
-use transaction::Transaction;
+pub use transaction::perform_tranasaction;
 
 #[derive(Default)]
 pub struct Actions {
@@ -496,16 +496,6 @@ impl Actions {
         self.done.clear();
         self.undone.clear();
         let _ = self.buffer.collect();
-    }
-
-    // TRANSACTIONS (main use in multicursor)
-
-    pub fn init_transaction(&mut self, lexer: &mut Lexer) -> Transaction {
-        Transaction::new(std::mem::take(&mut self.done), lexer)
-    }
-
-    pub fn finish_transaction(&mut self, transaction: Transaction, lexer: &mut Lexer, content: &mut [EditorLine]) {
-        transaction.finish(self, lexer, content);
     }
 }
 
