@@ -392,32 +392,20 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             }
         }
         EditorAction::NewCursorWithLine => {
-            if editor.multi_positions.is_empty() {
+            let Some(main_cursor) = editor.multi_positions.first_mut() else {
                 restore_single_cursor_mode(editor);
                 return true;
             };
-            perform_tranasaction(
-                &mut editor.actions,
-                &mut editor.lexer,
-                &mut editor.content,
-                |actions, lexer, content| {
-                    let (main_cursor, remaining) =
-                        editor.multi_positions.split_first_mut().expect("Checked before callback");
-                    let mut new_cursor = main_cursor.clone();
-                    actions.new_line_raw(&mut new_cursor, content, lexer);
 
-                    for cursor in remaining {
-                        actions.remove_select(cursor, content, lexer);
-                    }
+            let mut new_cursor = main_cursor.clone();
+            editor.actions.new_line_raw(&mut new_cursor, &mut editor.content, &mut editor.lexer);
 
-                    if main_cursor.line != new_cursor.line {
-                        if let Some((from_position, ..)) = main_cursor.select_take() {
-                            main_cursor.set_position(from_position);
-                        }
-                        editor.multi_positions.push(new_cursor);
-                    }
-                },
-            );
+            if main_cursor.line != new_cursor.line {
+                if let Some((from_position, ..)) = main_cursor.select_take() {
+                    main_cursor.set_position(from_position);
+                }
+                editor.multi_positions.push(new_cursor);
+            }
         }
         EditorAction::JumpLeft => editor.cursor.jump_left(&editor.content),
         EditorAction::JumpLeftSelect => editor.cursor.jump_left_select(&editor.content),
