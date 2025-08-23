@@ -136,14 +136,6 @@ impl Actions {
         self.push_done(actions, lexer, content);
     }
 
-    pub fn apply_edits(&mut self, edits: Vec<TextEdit>, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
-        let actions = edits
-            .into_iter()
-            .map(|e| Edit::replace_select(e.range.start.into(), e.range.end.into(), e.new_text, content))
-            .collect::<Vec<Edit>>();
-        self.push_done(actions, lexer, content);
-    }
-
     pub fn indent(&mut self, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
         match cursor.select_take() {
             Some((from, to)) => {
@@ -445,28 +437,6 @@ impl Actions {
         }
     }
 
-    pub fn undo(&mut self, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
-        self.push_buffer(lexer);
-        if let Some(action) = self.done.pop() {
-            let (position, select) = action.apply_rev(content);
-            lexer.sync_rev(&action, content);
-            cursor.set_position(position);
-            cursor.select_replace(select);
-            self.undone.push(action);
-        }
-    }
-
-    pub fn redo(&mut self, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
-        self.push_buffer(lexer);
-        if let Some(action) = self.undone.pop() {
-            let (position, select) = action.apply(content);
-            lexer.sync(&action, content);
-            cursor.set_position(position);
-            cursor.select_replace(select);
-            self.done.push(action);
-        }
-    }
-
     pub fn paste(&mut self, clip: String, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
         let edit = match cursor.select_take() {
             Some((from, to)) => Edit::replace_select(from, to, clip, content),
@@ -494,6 +464,43 @@ impl Actions {
         let clip = edit.get_removed_text().to_owned();
         self.push_done(edit, lexer, content);
         clip
+    }
+
+    pub fn remove_select(&mut self, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
+        if let Some((from, to)) = cursor.select_take() {
+            cursor.set_position(from);
+            self.push_done(Edit::remove_select(from, to, content), lexer, content);
+        }
+    }
+
+    pub fn undo(&mut self, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
+        self.push_buffer(lexer);
+        if let Some(action) = self.done.pop() {
+            let (position, select) = action.apply_rev(content);
+            lexer.sync_rev(&action, content);
+            cursor.set_position(position);
+            cursor.select_replace(select);
+            self.undone.push(action);
+        }
+    }
+
+    pub fn redo(&mut self, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
+        self.push_buffer(lexer);
+        if let Some(action) = self.undone.pop() {
+            let (position, select) = action.apply(content);
+            lexer.sync(&action, content);
+            cursor.set_position(position);
+            cursor.select_replace(select);
+            self.done.push(action);
+        }
+    }
+
+    pub fn apply_edits(&mut self, edits: Vec<TextEdit>, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
+        let actions = edits
+            .into_iter()
+            .map(|e| Edit::replace_select(e.range.start.into(), e.range.end.into(), e.new_text, content))
+            .collect::<Vec<Edit>>();
+        self.push_done(actions, lexer, content);
     }
 
     // HANDLERS
