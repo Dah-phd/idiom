@@ -342,14 +342,16 @@ impl Actions {
                     let first_edit = Edit::record_in_line_insertion(to, closing.into());
                     let second_edit = Edit::record_in_line_insertion(from, ch.into());
                     let new_from = CursorPosition { line: from.line, char: from.char + 1 };
-                    let mut new_to = CursorPosition { line: to.line, char: to.line };
-                    if from.line == to.line {
-                        new_to.char += 1;
-                    }
-                    let edits = dir.apply_ordered((new_from, from), (new_to, to), |(new_from, from), (new_to, to)| {
-                        cursor.select_set(new_from, new_to);
-                        vec![first_edit.select(from, to), second_edit.new_select(new_from, new_to)]
+                    let new_to = match from.line == to.line {
+                        true => CursorPosition { line: to.line, char: to.char + 1 },
+                        false => to,
+                    };
+
+                    let edits = dir.apply_ordered((new_from, from), (new_to, to), |(new_from, from), (new_c, c)| {
+                        cursor.select_set(new_from, new_c);
+                        vec![first_edit.select(from, c), second_edit.new_select(new_from, new_c)]
                     });
+
                     self.push_done(edits, lexer, content);
                 }
                 None => {

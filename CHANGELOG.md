@@ -2,6 +2,7 @@
 # Version 0.6.0
 - multicursor support
 - fix crashbug when unindent produces 0 edits
+- bracked wrapping no longer moves cursor at the end of select
 
 # Version 0.5.5
 - diagnostics moved to italic style
