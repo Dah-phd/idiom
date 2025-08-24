@@ -219,8 +219,12 @@ impl From<usize> for Offset {
     }
 }
 
-/// provides information about direction of sequence
-/// espectially useful for 2 values (for example select)
+/// provides information about direction of sequence, against value ordering
+/// espectially useful for 2 values
+///
+/// Example with selecting of value, in order to be able to parse text effectively
+/// it makes sense to start from smaller value, in certain cases also the information
+/// regarding the original state is need - that is the used case for the Direction.
 pub enum Direction {
     Normal,
     Reversed,

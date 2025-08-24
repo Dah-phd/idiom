@@ -335,28 +335,21 @@ impl Actions {
 
     pub fn push_char(&mut self, ch: char, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
         match cursor.select_take_direction() {
-            Some((mut from, mut to, direction)) => match get_closing_char(ch) {
+            Some((from, to, dir)) => match get_closing_char(ch) {
                 Some(closing) => {
                     content[to.line].insert(to.char, closing);
                     content[from.line].insert(from.char, ch);
                     let first_edit = Edit::record_in_line_insertion(to, closing.into());
                     let second_edit = Edit::record_in_line_insertion(from, ch.into());
-                    let (init_from, init_to) = (from, to);
-                    from.char += 1;
+                    let new_from = CursorPosition { line: from.line, char: from.char + 1 };
+                    let mut new_to = CursorPosition { line: to.line, char: to.line };
                     if from.line == to.line {
-                        to.char += 1;
+                        new_to.char += 1;
                     }
-                    let edits = direction.apply_ordered(
-                        (from, init_from),
-                        (to, init_to),
-                        |(new_init, old_init), (new_cursor, old_cursor)| {
-                            cursor.select_set(new_init, new_cursor);
-                            vec![
-                                first_edit.select(old_init, old_cursor),
-                                second_edit.new_select(new_init, new_cursor),
-                            ]
-                        },
-                    );
+                    let edits = dir.apply_ordered((new_from, from), (new_to, to), |(new_from, from), (new_to, to)| {
+                        cursor.select_set(new_from, new_to);
+                        vec![first_edit.select(from, to), second_edit.new_select(new_from, new_to)]
+                    });
                     self.push_done(edits, lexer, content);
                 }
                 None => {
