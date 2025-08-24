@@ -334,20 +334,30 @@ impl Actions {
     }
 
     pub fn push_char(&mut self, ch: char, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
-        match cursor.select_take() {
-            Some((mut from, mut to)) => match get_closing_char(ch) {
+        match cursor.select_take_direction() {
+            Some((mut from, mut to, direction)) => match get_closing_char(ch) {
                 Some(closing) => {
                     content[to.line].insert(to.char, closing);
                     content[from.line].insert(from.char, ch);
-                    let first_edit = Edit::record_in_line_insertion(to, closing.into()).select(from, to);
+                    let first_edit = Edit::record_in_line_insertion(to, closing.into());
                     let second_edit = Edit::record_in_line_insertion(from, ch.into());
+                    let (init_from, init_to) = (from, to);
                     from.char += 1;
                     if from.line == to.line {
                         to.char += 1;
                     }
-                    self.push_done(vec![first_edit, second_edit.new_select(from, to)], lexer, content);
-                    cursor.set_position(to);
-                    cursor.select_set(from, to);
+                    let edits = direction.apply_ordered(
+                        (from, init_from),
+                        (to, init_to),
+                        |(new_init, old_init), (new_cursor, old_cursor)| {
+                            cursor.select_set(new_init, new_cursor);
+                            vec![
+                                first_edit.select(old_init, old_cursor),
+                                second_edit.new_select(new_init, new_cursor),
+                            ]
+                        },
+                    );
+                    self.push_done(edits, lexer, content);
                 }
                 None => {
                     cursor.set_position(from);
@@ -478,8 +488,10 @@ impl Actions {
         if let Some(action) = self.done.pop() {
             let (position, select) = action.apply_rev(content);
             lexer.sync_rev(&action, content);
-            cursor.set_position(position);
-            cursor.select_replace(select);
+            match select {
+                Some((from, to)) => cursor.select_set(from, to),
+                None => cursor.set_position(position),
+            }
             self.undone.push(action);
         }
     }
@@ -490,7 +502,10 @@ impl Actions {
             let (position, select) = action.apply(content);
             lexer.sync(&action, content);
             cursor.set_position(position);
-            cursor.select_replace(select);
+            match select {
+                Some((from, to)) => cursor.select_set(from, to),
+                None => cursor.set_position(position),
+            }
             self.done.push(action);
         }
     }

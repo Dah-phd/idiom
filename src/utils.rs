@@ -219,6 +219,36 @@ impl From<usize> for Offset {
     }
 }
 
+/// provides information about direction of sequence
+/// espectially useful for 2 values (for example select)
+pub enum Direction {
+    Normal,
+    Reversed,
+}
+
+impl Direction {
+    pub fn is_reversed(&self) -> bool {
+        matches!(self, Self::Reversed)
+    }
+
+    pub fn is_normal(&self) -> bool {
+        matches!(self, Self::Reversed)
+    }
+
+    /// will apply the callback based on the order struct
+    /// if normal callback(x, y)
+    /// if reversed callback(y, x)
+    pub fn apply_ordered<T, R, F>(&self, x: T, y: T, callback: F) -> R
+    where
+        F: FnOnce(T, T) -> R,
+    {
+        match self {
+            Self::Normal => (callback)(x, y),
+            Self::Reversed => (callback)(y, x),
+        }
+    }
+}
+
 pub fn trim_start_inplace(line: &mut EditorLine) -> usize {
     if let Some(idx) = line.to_string().find(|c: char| !c.is_whitespace() && c != '\t') {
         line.replace_till(idx, "");
@@ -298,6 +328,7 @@ pub fn to_canon_path(target_dir: &Path) -> IdiomResult<PathBuf> {
 
 #[cfg(test)]
 pub mod test {
+    use super::Direction;
     use std::path::{Path, PathBuf};
 
     pub struct TempDir {
@@ -329,5 +360,19 @@ pub mod test {
         assert!(tp.exists());
         drop(temp_dir);
         assert!(!tp.exists());
+    }
+
+    #[test]
+    fn diction_apply() {
+        let norm = Direction::Normal;
+        let revr = Direction::Reversed;
+        assert!(norm.apply_ordered(1, 2, |x, y| { x < y }));
+        assert!(revr.apply_ordered(1, 2, |x, y| { x > y }));
+
+        let outer_val = 30;
+        let expected = 23;
+
+        assert_eq!(norm.apply_ordered(3, 10, |x, y| (outer_val + x) - y), expected);
+        assert_eq!(revr.apply_ordered(10, 3, |x, y| (outer_val + x) - y), expected);
     }
 }

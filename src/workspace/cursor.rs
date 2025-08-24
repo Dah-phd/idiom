@@ -1,4 +1,4 @@
-use crate::workspace::line::EditorLine;
+use crate::{utils::Direction, workspace::line::EditorLine};
 use idiom_tui::layout::Rect;
 use lsp_types::Position;
 use serde::{Deserialize, Serialize};
@@ -14,6 +14,19 @@ pub struct Cursor {
     pub max_rows: usize,
     pub text_width: usize,
     select: Option<CursorPosition>,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct CursorPosition {
+    pub line: usize,
+    pub char: usize, // this is char position not byte index
+}
+
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+pub struct SelectPosition {
+    pub from: CursorPosition,
+    pub to: CursorPosition,
+    swaped: bool,
 }
 
 impl Cursor {
@@ -362,6 +375,17 @@ impl Cursor {
         }
     }
 
+    // SELECT
+
+    pub fn select_drop(&mut self) {
+        self.select = None;
+    }
+
+    pub fn select_set(&mut self, from: CursorPosition, to: CursorPosition) {
+        self.set_position(to);
+        self.select.replace(from);
+    }
+
     pub fn select_get(&self) -> Option<Select> {
         match self.select.as_ref() {
             None => None,
@@ -376,23 +400,18 @@ impl Cursor {
         }
     }
 
-    pub fn select_drop(&mut self) {
-        self.select = None;
-    }
-
-    pub fn select_set(&mut self, from: CursorPosition, to: CursorPosition) {
-        self.set_position(to);
-        self.select.replace(from);
-    }
-
-    pub fn select_replace(&mut self, select: Option<Select>) {
-        match select {
-            Some((from, to)) => {
-                self.select = Some(from);
-                self.set_position(to);
+    pub fn select_get_direction(&self) -> Option<(CursorPosition, CursorPosition, Direction)> {
+        match self.select.as_ref() {
+            None => None,
+            Some(from) => {
+                let cursor = CursorPosition::from(self);
+                if from.line > self.line || from.line == self.line && from.char > self.char {
+                    Some((cursor, *from, Direction::Reversed))
+                } else {
+                    Some((*from, cursor, Direction::Normal))
+                }
             }
-            None => self.select = None,
-        };
+        }
     }
 
     pub fn select_take(&mut self) -> Option<Select> {
@@ -404,6 +423,20 @@ impl Cursor {
                     Some((cursor, from))
                 } else {
                     Some((from, cursor))
+                }
+            }
+        }
+    }
+
+    pub fn select_take_direction(&mut self) -> Option<(CursorPosition, CursorPosition, Direction)> {
+        match self.select.take() {
+            None => None,
+            Some(from) => {
+                let to = CursorPosition { line: self.line, char: self.char };
+                if from > to {
+                    Some((to, from, Direction::Reversed))
+                } else {
+                    Some((from, to, Direction::Normal))
                 }
             }
         }
@@ -545,6 +578,41 @@ impl Cursor {
     }
 }
 
+impl SelectPosition {
+    pub fn cursor_pos(&self) -> CursorPosition {
+        match self.swaped {
+            true => self.from,
+            false => self.to,
+        }
+    }
+
+    pub fn init_pos(&self) -> CursorPosition {
+        match self.swaped {
+            true => self.to,
+            false => self.from,
+        }
+    }
+
+    pub fn init_to_cursor(&self) -> (CursorPosition, CursorPosition) {
+        match self.swaped {
+            true => (self.to, self.from),
+            false => (self.from, self.to),
+        }
+    }
+}
+
+impl From<SelectPosition> for (CursorPosition, CursorPosition) {
+    fn from(value: SelectPosition) -> Self {
+        (value.from, value.to)
+    }
+}
+
+impl From<&SelectPosition> for (CursorPosition, CursorPosition) {
+    fn from(value: &SelectPosition) -> Self {
+        (value.from, value.to)
+    }
+}
+
 impl From<&mut Cursor> for CursorPosition {
     fn from(value: &mut Cursor) -> Self {
         Self { line: value.line, char: value.char }
@@ -567,12 +635,6 @@ impl From<&mut Cursor> for Position {
     fn from(value: &mut Cursor) -> Self {
         Self { line: value.line as u32, character: value.char as u32 }
     }
-}
-
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct CursorPosition {
-    pub line: usize,
-    pub char: usize, // this is char position not byte index
 }
 
 impl From<&CursorPosition> for Position {
@@ -608,5 +670,11 @@ impl From<&Position> for CursorPosition {
 impl PartialEq<CursorPosition> for Cursor {
     fn eq(&self, position: &CursorPosition) -> bool {
         self.line == position.line && self.char == position.char
+    }
+}
+
+impl From<&mut SelectPosition> for (CursorPosition, CursorPosition) {
+    fn from(value: &mut SelectPosition) -> Self {
+        (value.from, value.to)
     }
 }

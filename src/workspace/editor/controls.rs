@@ -502,11 +502,6 @@ pub fn consolidate_cursors(editor: &mut Editor) {
     }
 }
 
-pub fn solve_offset(from_to: Option<(CursorPosition, CursorPosition)>) -> Option<CursorPosition> {
-    let (from, to) = from_to?;
-    None
-}
-
 pub fn restore_single_cursor_mode(editor: &mut Editor) {
     match editor.multi_positions.iter().find(|c| c.max_rows != 0) {
         Some(cursor) => editor.cursor.set_cursor(cursor),
