@@ -88,7 +88,19 @@ impl Cursor {
         }
     }
 
-    /// get current cursor position
+    pub fn match_content(&mut self, content: &[EditorLine]) {
+        let Some(line) = content.get(self.line) else {
+            self.select = None;
+            self.end_of_file(content);
+            return;
+        };
+        self.adjust_char(line);
+        let Some(from) = self.select else { return };
+        if (self.line < from.line) || (self.line == from.line && self.char <= from.char) {
+            self.select = None;
+        }
+    }
+
     pub fn get_position(&self) -> CursorPosition {
         self.into()
     }
@@ -143,6 +155,8 @@ impl Cursor {
             self.char += 1;
         }
     }
+
+    // MOVEMENT
 
     pub fn up(&mut self, content: &[EditorLine]) {
         self.select = None;
@@ -320,7 +334,7 @@ impl Cursor {
         self._jump_right(content);
     }
 
-    pub fn _jump_right(&mut self, content: &[EditorLine]) {
+    fn _jump_right(&mut self, content: &[EditorLine]) {
         let mut line = &content[self.line][self.char..];
         let mut last_was_char = false;
         if line.is_empty() && content.len() - 1 > self.line {

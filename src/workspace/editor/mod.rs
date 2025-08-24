@@ -363,13 +363,9 @@ impl Editor {
 
     pub fn apply_file_edits(&mut self, mut edits: Vec<TextEdit>) {
         edits.sort_by(|a, b| {
-            let line_ord = b.range.start.line.cmp(&a.range.start.line);
-            if let Ordering::Equal = line_ord {
-                return b.range.start.character.cmp(&a.range.start.character);
-            }
-            line_ord
+            b.range.start.line.cmp(&a.range.start.line).then(b.range.start.character.cmp(&a.range.start.character))
         });
-        self.actions.apply_edits(edits, &mut self.content, &mut self.lexer);
+        self.actions.apply_edits(&mut self.cursor, edits, &mut self.content, &mut self.lexer);
     }
 
     #[inline(always)]

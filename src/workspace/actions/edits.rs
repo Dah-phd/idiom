@@ -146,8 +146,8 @@ impl Edit {
     ) -> Self {
         let reverse_text_edit = clip_content(from, to, content);
         let end = if !clip.is_empty() { insert_clip(&clip, content, from) } else { from };
-        let meta =
-            EditMetaData { start_line: from.line, from: (to.line - from.line) + 1, to: (end.line - from.line) + 1 };
+        let start_line = from.line;
+        let meta = EditMetaData { start_line, from: (to.line - from.line) + 1, to: (end.line - from.line) + 1 };
         Self { cursor: from, meta, reverse: reverse_text_edit, text: clip, select: Some((from, to)), new_select: None }
     }
 

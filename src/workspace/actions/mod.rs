@@ -505,12 +505,28 @@ impl Actions {
         }
     }
 
-    pub fn apply_edits(&mut self, edits: Vec<TextEdit>, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
-        let actions = edits
+    pub fn apply_edits(
+        &mut self,
+        cursor: &mut Cursor,
+        edits: Vec<TextEdit>,
+        content: &mut Vec<EditorLine>,
+        lexer: &mut Lexer,
+    ) {
+        cursor.select_take();
+        let actions: Vec<Edit> = edits
             .into_iter()
-            .map(|e| Edit::replace_select(e.range.start.into(), e.range.end.into(), e.new_text, content))
-            .collect::<Vec<Edit>>();
+            .map(|e| {
+                let from = CursorPosition::from(e.range.start);
+                let to = CursorPosition::from(e.range.end);
+                let edit = Edit::replace_select(from, to, e.new_text, content);
+                if from.line <= cursor.line && cursor.line <= to.line {
+                    cursor.set_position(edit.end_position());
+                }
+                edit
+            })
+            .collect();
         self.push_done(actions, lexer, content);
+        cursor.match_content(content);
     }
 
     // HANDLERS

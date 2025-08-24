@@ -575,3 +575,22 @@ fn cursor_directions_take() {
     assert_eq!((from, to), (CursorPosition::default(), position_l3));
     dir.apply_ordered(from, to, |first, second| assert_eq!((first, second), (CursorPosition::default(), position_l3)));
 }
+
+#[test]
+fn match_content() {
+    let content: Vec<EditorLine> =
+        ["test", "test2", "test3", "end line"].into_iter().map(|s| EditorLine::from(String::from(s))).collect();
+
+    let mut cursor = Cursor::default();
+    cursor.select_set(CursorPosition { line: 3, char: 5 }, CursorPosition { line: 3, char: 9 });
+    cursor.match_content(&content);
+    assert_eq!(cursor.select_get(), Some((CursorPosition { line: 3, char: 5 }, CursorPosition { line: 3, char: 8 })));
+    cursor.select_set(CursorPosition { line: 3, char: 9 }, CursorPosition { line: 3, char: 9 });
+    cursor.match_content(&content);
+    assert_eq!(cursor.get_position(), CursorPosition { line: 3, char: 8 });
+    assert_eq!(None, cursor.select_get());
+    cursor.select_set(CursorPosition { line: 2, char: 3 }, CursorPosition { line: 4, char: 9 });
+    cursor.match_content(&content);
+    assert_eq!(cursor.get_position(), CursorPosition { line: 3, char: 8 });
+    assert_eq!(None, cursor.select_get());
+}
