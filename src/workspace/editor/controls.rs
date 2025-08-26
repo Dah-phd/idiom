@@ -170,9 +170,9 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             &mut editor.lexer,
             &mut editor.content,
             |actions, lexer, content| {
-                for cc in editor.multi_positions.iter_mut() {
-                    actions.push_char(ch, cc, content, lexer);
-                }
+                apply_and_correct(&mut editor.multi_positions, |cursor| {
+                    actions.push_char(ch, cursor, content, lexer);
+                })
             },
         ),
         EditorAction::Backspace => perform_tranasaction(
@@ -180,9 +180,9 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             &mut editor.lexer,
             &mut editor.content,
             |actions, lexer, content| {
-                for cursor in editor.multi_positions.iter_mut() {
+                apply_and_correct(&mut editor.multi_positions, |cursor| {
                     actions.backspace(cursor, content, lexer);
-                }
+                })
             },
         ),
         EditorAction::Delete => perform_tranasaction(
@@ -190,9 +190,9 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             &mut editor.lexer,
             &mut editor.content,
             |actions, lexer, content| {
-                for cursor in editor.multi_positions.iter_mut() {
+                apply_and_correct(&mut editor.multi_positions, |cursor| {
                     actions.del(cursor, content, lexer);
-                }
+                })
             },
         ),
         EditorAction::NewLine => perform_tranasaction(
@@ -200,9 +200,9 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             &mut editor.lexer,
             &mut editor.content,
             |actions, lexer, content| {
-                for cursor in editor.multi_positions.iter_mut() {
+                apply_and_correct(&mut editor.multi_positions, |cursor| {
                     actions.new_line(cursor, content, lexer);
-                }
+                })
             },
         ),
         EditorAction::Indent => perform_tranasaction(
@@ -210,9 +210,9 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             &mut editor.lexer,
             &mut editor.content,
             |actions, lexer, content| {
-                for cursor in editor.multi_positions.iter_mut() {
+                apply_and_correct(&mut editor.multi_positions, |cursor| {
                     actions.indent(cursor, content, lexer);
-                }
+                })
             },
         ),
         EditorAction::RemoveLine => {
@@ -228,9 +228,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             &mut editor.lexer,
             &mut editor.content,
             |actions, lexer, content| {
-                for cursor in editor.multi_positions.iter_mut() {
-                    actions.indent_start(cursor, content, lexer);
-                }
+                apply_and_correct(&mut editor.multi_positions, |cursor| actions.indent_start(cursor, content, lexer));
             },
         ),
         EditorAction::Unintent => perform_tranasaction(
@@ -238,9 +236,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             &mut editor.lexer,
             &mut editor.content,
             |actions, lexer, content| {
-                for cursor in editor.multi_positions.iter_mut() {
-                    actions.unindent(cursor, content, lexer);
-                }
+                apply_and_correct(&mut editor.multi_positions, |cursor| actions.unindent(cursor, content, lexer));
             },
         ),
         EditorAction::SwapUp => {
@@ -281,9 +277,9 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                     &mut editor.lexer,
                     &mut editor.content,
                     |actions, lexer, content| {
-                        for cursor in editor.multi_positions.iter_mut() {
+                        apply_and_correct(&mut editor.multi_positions, |cursor| {
                             actions.paste(clip.to_owned(), cursor, content, lexer);
-                        }
+                        });
                     },
                 );
             }
@@ -522,4 +518,10 @@ pub fn enable_multi_cursor_mode(editor: &mut Editor) {
 
 fn sort_cursors(x: &Cursor, y: &Cursor) -> std::cmp::Ordering {
     y.line.cmp(&x.line).then(y.char.cmp(&x.char))
+}
+
+fn apply_and_correct(cursors: &mut Vec<Cursor>, mut callback: impl FnMut(&mut Cursor)) {
+    for cursor in cursors.iter_mut() {
+        (callback)(cursor);
+    }
 }
