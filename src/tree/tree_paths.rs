@@ -191,7 +191,7 @@ impl TreePath {
         self.serch_by_idx(idx + 1).into()
     }
 
-    fn serch_by_idx(&mut self, mut idx: usize) -> SerachResult {
+    fn serch_by_idx<'a>(&'a mut self, mut idx: usize) -> SerachResult<'a> {
         if idx == 0 {
             return SerachResult::Found(self);
         }
@@ -380,7 +380,7 @@ impl TreePath {
 
     fn reset_diagnostic(&mut self) {}
 
-    pub fn iter(&self) -> TreeIter {
+    pub fn iter<'a>(&'a self) -> TreeIter<'a> {
         TreeIter { holder: vec![self] }
     }
 }

@@ -1,7 +1,7 @@
 mod buffer;
 mod edits;
 mod meta;
-mod transaction;
+pub mod transaction;
 
 use super::{
     cursor::{Cursor, CursorPosition, Select},
@@ -13,7 +13,6 @@ use buffer::ActionBuffer;
 pub use edits::Edit;
 use lsp_types::TextEdit;
 pub use meta::{EditMetaData, EditType};
-pub use transaction::perform_tranasaction;
 
 #[derive(Default)]
 pub struct Actions {

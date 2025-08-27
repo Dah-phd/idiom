@@ -12,6 +12,7 @@ use idiom_tui::{
     Backend,
 };
 
+#[allow(unpredictable_function_pointer_comparisons)]
 #[derive(PartialEq, Debug, Clone)]
 pub struct PopupSelector<T> {
     pub options: Vec<T>,

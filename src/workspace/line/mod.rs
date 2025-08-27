@@ -218,7 +218,7 @@ impl EditorLine {
     }
 
     #[inline]
-    pub fn match_indices<'a>(&self, pat: &'a str) -> std::str::MatchIndices<&'a str> {
+    pub fn match_indices<'a>(&self, pat: &'a str) -> std::str::MatchIndices<'_, &'a str> {
         self.content.match_indices(pat)
     }
 

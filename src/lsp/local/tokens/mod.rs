@@ -39,7 +39,7 @@ pub trait LangStream: Sized + Debug + PartialEq + Logos<'static> {
         Definitions::default()
     }
 
-    fn objectify(&self) -> ObjType {
+    fn objectify(&self) -> ObjType<'_> {
         ObjType::None
     }
 

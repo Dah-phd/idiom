@@ -220,7 +220,7 @@ impl LangStream for Pincer {
         }
     }
 
-    fn objectify(&self) -> super::ObjType {
+    fn objectify(&self) -> super::ObjType<'_> {
         match self {
             Self::Name(name) => ObjType::Var(name),
             Self::Type(name) | Self::TypeHint(name) => ObjType::Struct(name),

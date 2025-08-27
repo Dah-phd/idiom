@@ -13,6 +13,7 @@ use crossterm::{
 use idiom_tui::layout::Line;
 use std::ops::Range;
 
+#[allow(unpredictable_function_pointer_comparisons)]
 #[derive(Clone, PartialEq)]
 pub struct CommandButton {
     pub command: fn(&mut PopupChoice, &mut Components),

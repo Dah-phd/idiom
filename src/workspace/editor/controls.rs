@@ -1,5 +1,13 @@
 use super::{token_range_at, Cursor, CursorPosition, Editor};
-use crate::{configs::EditorAction, global_state::GlobalState, workspace::actions::perform_tranasaction};
+use crate::{
+    configs::EditorAction,
+    global_state::GlobalState,
+    syntax::Lexer,
+    workspace::{
+        actions::{transaction, Actions},
+        EditorLine,
+    },
+};
 
 pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut GlobalState) -> bool {
     let (taken, render_update) = editor.lexer.map_modal_if_exists(action, gs);
@@ -165,56 +173,21 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
     }
     match action {
         // EDITS:
-        EditorAction::Char(ch) => perform_tranasaction(
-            &mut editor.actions,
-            &mut editor.lexer,
-            &mut editor.content,
-            |actions, lexer, content| {
-                apply_and_correct(&mut editor.multi_positions, |cursor| {
-                    actions.push_char(ch, cursor, content, lexer);
-                })
-            },
-        ),
-        EditorAction::Backspace => perform_tranasaction(
-            &mut editor.actions,
-            &mut editor.lexer,
-            &mut editor.content,
-            |actions, lexer, content| {
-                apply_and_correct(&mut editor.multi_positions, |cursor| {
-                    actions.backspace(cursor, content, lexer);
-                })
-            },
-        ),
-        EditorAction::Delete => perform_tranasaction(
-            &mut editor.actions,
-            &mut editor.lexer,
-            &mut editor.content,
-            |actions, lexer, content| {
-                apply_and_correct(&mut editor.multi_positions, |cursor| {
-                    actions.del(cursor, content, lexer);
-                })
-            },
-        ),
-        EditorAction::NewLine => perform_tranasaction(
-            &mut editor.actions,
-            &mut editor.lexer,
-            &mut editor.content,
-            |actions, lexer, content| {
-                apply_and_correct(&mut editor.multi_positions, |cursor| {
-                    actions.new_line(cursor, content, lexer);
-                })
-            },
-        ),
-        EditorAction::Indent => perform_tranasaction(
-            &mut editor.actions,
-            &mut editor.lexer,
-            &mut editor.content,
-            |actions, lexer, content| {
-                apply_and_correct(&mut editor.multi_positions, |cursor| {
-                    actions.indent(cursor, content, lexer);
-                })
-            },
-        ),
+        EditorAction::Char(ch) => apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
+            actions.push_char(ch, cursor, content, lexer);
+        }),
+        EditorAction::Backspace => apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
+            actions.backspace(cursor, content, lexer);
+        }),
+        EditorAction::Delete => apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
+            actions.del(cursor, content, lexer);
+        }),
+        EditorAction::NewLine => apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
+            actions.new_line(cursor, content, lexer);
+        }),
+        EditorAction::Indent => apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
+            actions.indent(cursor, content, lexer);
+        }),
         EditorAction::RemoveLine => {
             todo!()
             // editor.select_line();
@@ -223,22 +196,12 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             // return true;
             // }
         }
-        EditorAction::IndentStart => perform_tranasaction(
-            &mut editor.actions,
-            &mut editor.lexer,
-            &mut editor.content,
-            |actions, lexer, content| {
-                apply_and_correct(&mut editor.multi_positions, |cursor| actions.indent_start(cursor, content, lexer));
-            },
-        ),
-        EditorAction::Unintent => perform_tranasaction(
-            &mut editor.actions,
-            &mut editor.lexer,
-            &mut editor.content,
-            |actions, lexer, content| {
-                apply_and_correct(&mut editor.multi_positions, |cursor| actions.unindent(cursor, content, lexer));
-            },
-        ),
+        EditorAction::IndentStart => apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
+            actions.indent_start(cursor, content, lexer);
+        }),
+        EditorAction::Unintent => apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
+            actions.unindent(cursor, content, lexer);
+        }),
         EditorAction::SwapUp => {
             todo!("{:?}", &editor.multi_positions);
             // editor.actions.swap_up(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
@@ -272,16 +235,9 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         }
         EditorAction::Paste => {
             if let Some(clip) = gs.clipboard.pull() {
-                perform_tranasaction(
-                    &mut editor.actions,
-                    &mut editor.lexer,
-                    &mut editor.content,
-                    |actions, lexer, content| {
-                        apply_and_correct(&mut editor.multi_positions, |cursor| {
-                            actions.paste(clip.to_owned(), cursor, content, lexer);
-                        });
-                    },
-                );
+                apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
+                    actions.paste(clip.to_owned(), cursor, content, lexer);
+                });
             }
         }
         EditorAction::Cut => {
@@ -520,8 +476,34 @@ fn sort_cursors(x: &Cursor, y: &Cursor) -> std::cmp::Ordering {
     y.line.cmp(&x.line).then(y.char.cmp(&x.char))
 }
 
-fn apply_and_correct(cursors: &mut Vec<Cursor>, mut callback: impl FnMut(&mut Cursor)) {
-    for cursor in cursors.iter_mut() {
-        (callback)(cursor);
+fn apply_multi_cursor_transaction<F>(editor: &mut Editor, mut callback: F)
+where
+    F: FnMut(&mut Actions, &mut Lexer, &mut Vec<EditorLine>, &mut Cursor),
+{
+    let result: Result<(), ()> = transaction::perform_tranasaction(
+        &mut editor.actions,
+        &mut editor.lexer,
+        &mut editor.content,
+        |actions, lexer, content| {
+            let mut index = 0;
+            let mut last_edit_idx = 0;
+            while let Some(cursor) = editor.multi_positions.get_mut(index) {
+                (callback)(actions, lexer, content, cursor);
+
+                let current_edit_idx = transaction::check_edit_true_count(actions, lexer);
+                if current_edit_idx > last_edit_idx && index > 0 {
+                    let edit_offset = transaction::EditOffsetType::get_from_edit(actions, current_edit_idx - 1);
+                    edit_offset.apply_cursor(editor.multi_positions.iter_mut().take(index))?;
+                };
+                last_edit_idx = current_edit_idx;
+                index += 1;
+            }
+            Ok(())
+        },
+    );
+
+    if result.is_err() {
+        // force restore during consolidation of cursors
+        editor.multi_positions.retain(|c| c.max_rows != 0);
     }
 }
