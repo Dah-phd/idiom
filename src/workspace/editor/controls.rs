@@ -189,12 +189,10 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             actions.indent(cursor, content, lexer);
         }),
         EditorAction::RemoveLine => {
-            todo!()
-            // editor.select_line();
-            // if !editor.cursor.select_is_none() {
-            // editor.actions.del(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
-            // return true;
-            // }
+            join_cursor_per_line(editor);
+            apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
+                actions.del(cursor, content, lexer);
+            });
         }
         EditorAction::IndentStart => apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
             actions.indent_start(cursor, content, lexer);
@@ -203,14 +201,26 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             actions.unindent(cursor, content, lexer);
         }),
         EditorAction::SwapUp => {
-            todo!("{:?}", &editor.multi_positions);
-            // editor.actions.swap_up(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
-            // return true;
+            let mut last_line = None;
+            for cursor in editor.multi_positions.iter_mut().rev() {
+                if last_line == Some(cursor.line) {
+                    cursor.line += 1;
+                    continue;
+                }
+                last_line = Some(cursor.line);
+                editor.actions.swap_up(cursor, &mut editor.content, &mut editor.lexer);
+            }
         }
         EditorAction::SwapDown => {
-            todo!()
-            // editor.actions.swap_down(&mut editor.cursor, &mut editor.content, &mut editor.lexer);
-            // return true;
+            let mut last_line = None;
+            for cursor in editor.multi_positions.iter_mut() {
+                if last_line == Some(cursor.line) {
+                    cursor.line += 1;
+                    continue;
+                }
+                last_line = Some(cursor.line);
+                editor.actions.swap_down(cursor, &mut editor.content, &mut editor.lexer);
+            }
         }
         EditorAction::Undo => {
             todo!();
@@ -431,6 +441,26 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
     consolidate_cursors(editor);
     editor.actions.push_buffer(&mut editor.lexer);
     true
+}
+
+pub fn join_cursor_per_line(editor: &mut Editor) {
+    let mut idx = 1;
+    editor.multi_positions.sort_by(sort_cursors);
+
+    while idx < editor.multi_positions.len() {
+        unsafe {
+            let [cursor, other] = editor.multi_positions.get_disjoint_unchecked_mut([idx - 1, idx]);
+            if cursor.line == other.line {
+                cursor.max_rows = std::cmp::max(cursor.max_rows, other.max_rows);
+                editor.multi_positions.remove(idx);
+            } else {
+                idx += 1;
+            }
+        }
+    }
+    if editor.multi_positions.len() < 2 {
+        restore_single_cursor_mode(editor);
+    }
 }
 
 pub fn consolidate_cursors(editor: &mut Editor) {

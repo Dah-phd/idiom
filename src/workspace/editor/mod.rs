@@ -205,6 +205,17 @@ impl Editor {
         };
     }
 
+    #[inline(always)]
+    pub fn select_all(&mut self) {
+        self.cursor.select_set(
+            CursorPosition::default(),
+            CursorPosition {
+                line: self.content.len() - 1,
+                char: self.content.last().map(|line| line.char_len()).unwrap_or_default(),
+            },
+        );
+    }
+
     pub fn go_to(&mut self, line: usize) {
         self.cursor.select_drop();
         if self.content.len() <= line {
@@ -316,6 +327,9 @@ impl Editor {
         self.cursor.max_rows = height;
         self.line_number_offset = calc_line_number_offset(self.content.len());
         self.cursor.text_width = width.saturating_sub(self.line_number_offset + 1);
+        for pos in self.multi_positions.iter_mut() {
+            pos.text_width = self.cursor.text_width;
+        }
     }
 
     // EDITS
@@ -389,17 +403,6 @@ impl Editor {
 
     pub fn paste(&mut self, clip: String) {
         self.actions.paste(clip, &mut self.cursor, &mut self.content, &mut self.lexer);
-    }
-
-    #[inline(always)]
-    pub fn select_all(&mut self) {
-        self.cursor.select_set(
-            CursorPosition::default(),
-            CursorPosition {
-                line: self.content.len() - 1,
-                char: self.content.last().map(|line| line.char_len()).unwrap_or_default(),
-            },
-        );
     }
 
     // MOUSE

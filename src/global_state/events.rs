@@ -43,7 +43,6 @@ pub enum IdiomEvent {
     InsertText(String),
     WorkspaceEdit(WorkspaceEdit),
     ActivateEditor(usize),
-    ReplaceAll(String, Vec<(CursorPosition, CursorPosition)>),
     GoToLine(usize),
     GoToSelect { from: CursorPosition, to: CursorPosition },
     Save,
@@ -235,11 +234,6 @@ impl IdiomEvent {
             IdiomEvent::ActivateEditor(idx) => {
                 ws.activate_editor(idx, gs);
                 gs.insert_mode();
-            }
-            IdiomEvent::ReplaceAll(clip, ranges) => {
-                if let Some(editor) = ws.get_active() {
-                    editor.mass_replace(ranges, clip);
-                }
             }
         }
     }
