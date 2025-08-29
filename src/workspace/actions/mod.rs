@@ -495,7 +495,6 @@ impl Actions {
         if let Some(action) = self.undone.pop() {
             let (position, select) = action.apply(content);
             lexer.sync(&action, content);
-            cursor.set_position(position);
             match select {
                 Some((from, to)) => cursor.select_set(from, to),
                 None => cursor.set_position(position),

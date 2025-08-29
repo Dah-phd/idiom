@@ -53,6 +53,89 @@ pub fn get_edit(actions: &Actions, index: usize) -> &EditType {
     &actions.done[index]
 }
 
+pub fn undo_multi_cursor(
+    actions: &mut Actions,
+    content: &mut Vec<EditorLine>,
+    lexer: &mut Lexer,
+    text_width: usize,
+) -> Option<Vec<Cursor>> {
+    actions.push_buffer(lexer);
+    let action = actions.done.pop()?;
+    let cursors = match &action {
+        EditType::Single(edit) => {
+            let (position, select) = edit.apply_rev(content);
+            let mut cursor = Cursor::default();
+            cursor.text_width = text_width;
+            match select {
+                Some((from, to)) => cursor.select_set(from, to),
+                None => cursor.set_position(position),
+            }
+            vec![cursor]
+        }
+        EditType::Multi(edits) => {
+            let cursors = edits
+                .iter()
+                .rev()
+                .map(|edit| {
+                    let (position, select) = edit.apply_rev(content);
+                    let mut cursor = Cursor::default();
+                    cursor.text_width = text_width;
+                    match select {
+                        Some((from, to)) => cursor.select_set(from, to),
+                        None => cursor.set_position(position),
+                    }
+                    cursor
+                })
+                .collect();
+            cursors
+        }
+    };
+    lexer.sync_rev(&action, content);
+    actions.undone.push(action);
+    Some(cursors)
+}
+
+pub fn redo_multi_cursor(
+    actions: &mut Actions,
+    content: &mut Vec<EditorLine>,
+    lexer: &mut Lexer,
+    text_width: usize,
+) -> Option<Vec<Cursor>> {
+    actions.push_buffer(lexer);
+    let action = actions.done.pop()?;
+    let cursors = match &action {
+        EditType::Single(edit) => {
+            let (position, select) = edit.apply(content);
+            let mut cursor = Cursor::default();
+            cursor.text_width = text_width;
+            match select {
+                Some((from, to)) => cursor.select_set(from, to),
+                None => cursor.set_position(position),
+            }
+            vec![cursor]
+        }
+        EditType::Multi(edits) => {
+            let cursors = edits
+                .iter()
+                .map(|edit| {
+                    let (position, select) = edit.apply(content);
+                    let mut cursor = Cursor::default();
+                    cursor.text_width = text_width;
+                    match select {
+                        Some((from, to)) => cursor.select_set(from, to),
+                        None => cursor.set_position(position),
+                    }
+                    cursor
+                })
+                .collect();
+            cursors
+        }
+    };
+    lexer.sync(&action, content);
+    actions.undone.push(action);
+    Some(cursors)
+}
+
 #[derive(Debug)]
 pub struct EditOffset {
     start: CursorPosition,
