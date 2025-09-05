@@ -258,16 +258,28 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         }
         EditorAction::Paste => {
             if let Some(clip) = gs.clipboard.pull() {
-                apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
-                    actions.paste(clip.to_owned(), cursor, content, lexer);
-                });
+                if editor.multi_positions.len() == clip.lines().count() {
+                    let mut clip_lines = clip.lines().rev();
+                    apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
+                        if let Some(next_clip) = clip_lines.next() {
+                            actions.paste(next_clip.to_owned(), cursor, content, lexer);
+                        };
+                    });
+                } else {
+                    apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
+                        actions.paste(clip.to_owned(), cursor, content, lexer);
+                    });
+                }
             }
         }
         EditorAction::Cut => {
-            todo!();
-            if let Some(clip) = editor.cut() {
-                gs.clipboard.push(clip);
-                return true;
+            if !editor.content.is_empty() {
+                let mut clips = vec![];
+                apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
+                    let clip = actions.cut(cursor, content, lexer);
+                    clips.push(clip);
+                });
+                gs.clipboard.push(clips.into_iter().rev().map(with_new_line_if_not).collect());
             }
         }
         EditorAction::Copy => {
@@ -522,10 +534,6 @@ pub fn enable_multi_cursor_mode(editor: &mut Editor) {
     editor.renderer.multi_cursor();
 }
 
-fn sort_cursors(x: &Cursor, y: &Cursor) -> std::cmp::Ordering {
-    y.line.cmp(&x.line).then(y.char.cmp(&x.char))
-}
-
 fn apply_multi_cursor_transaction<F>(editor: &mut Editor, mut callback: F)
 where
     F: FnMut(&mut Actions, &mut Lexer, &mut Vec<EditorLine>, &mut Cursor),
@@ -556,4 +564,17 @@ where
         // force restore during consolidation of cursors
         editor.multi_positions.retain(|c| c.max_rows != 0);
     }
+}
+
+// UTILS
+
+fn sort_cursors(x: &Cursor, y: &Cursor) -> std::cmp::Ordering {
+    y.line.cmp(&x.line).then(y.char.cmp(&x.char))
+}
+
+fn with_new_line_if_not(mut text: String) -> String {
+    if !text.ends_with('\n') {
+        text.push('\n');
+    }
+    text
 }
