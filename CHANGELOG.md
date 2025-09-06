@@ -1,6 +1,7 @@
 ## Includes only major changes (manual updates)
 # Version 0.6.0
 - multicursor support
+- improved mouse support on editor (multicursor / select)
 - fix crashbug when unindent produces 0 edits
 - bracked wrapping no longer moves cursor at the end of select
 - on apply edits ensure cursor matches content
