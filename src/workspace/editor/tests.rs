@@ -8,7 +8,7 @@ use crate::{
     configs::FileType,
     global_state::GlobalState,
     syntax::Lexer,
-    workspace::{actions::Actions, line::EditorLine, renderer::Renderer, tests::make_cursor},
+    workspace::{actions::Actions, line::EditorLine, renderer::Renderer},
 };
 use idiom_tui::{layout::Rect, Backend};
 use std::path::PathBuf;
@@ -77,6 +77,14 @@ fn test_line_number_calcs() {
 
 #[test]
 fn merge_multi_cursors() {
+    fn make_cursor(line: usize, char: usize) -> Cursor {
+        let mut cursor = Cursor::default();
+        cursor.at_line = line;
+        cursor.line = line;
+        cursor.char = char;
+        cursor
+    }
+
     let mut editor = mock_editor(vec![]);
     editor.multi_positions.extend([
         Cursor::default(),
@@ -95,6 +103,57 @@ fn merge_multi_cursors() {
             make_cursor(3, 3),
             make_cursor(3, 2),
             make_cursor(2, 2),
+            Cursor::default(),
+        ]
+    );
+}
+
+#[test]
+fn filter_per_line_if_no_select() {
+    fn with_select(from: CursorPosition, to: CursorPosition) -> Cursor {
+        let mut cursor = Cursor::default();
+        cursor.select_set(from, to);
+        cursor
+    }
+
+    let mut main_cursor = Cursor::default();
+    main_cursor.set_position(CursorPosition { line: 10, char: 9 });
+    main_cursor.max_rows = 100;
+    let expect_main = main_cursor.clone();
+
+    let mut second_no_select = Cursor::default();
+    second_no_select.set_position(CursorPosition { line: 2, char: 12 });
+    let mut exepct_second = second_no_select.clone();
+
+    let mut second_cursor = Cursor::default();
+    second_cursor.select_set(CursorPosition { line: 1, char: 3 }, CursorPosition { line: 2, char: 10 });
+    second_cursor.max_rows = 99;
+    exepct_second.max_rows = second_cursor.max_rows;
+
+    let mut editor = mock_editor(vec![]);
+    editor.multi_positions = vec![
+        with_select(CursorPosition { line: 11, char: 9 }, CursorPosition { line: 11, char: 10 }),
+        with_select(CursorPosition { line: 11, char: 3 }, CursorPosition { line: 11, char: 8 }),
+        with_select(CursorPosition { line: 10, char: 12 }, CursorPosition { line: 10, char: 15 }),
+        main_cursor,
+        with_select(CursorPosition { line: 12, char: 2 }, CursorPosition { line: 10, char: 8 }),
+        with_select(CursorPosition { line: 6, char: 2 }, CursorPosition { line: 6, char: 8 }),
+        with_select(CursorPosition { line: 3, char: 2 }, CursorPosition { line: 3, char: 8 }),
+        second_no_select,
+        second_cursor,
+        Cursor::default(),
+    ];
+
+    let cursors = controls::filter_multi_cursors_per_line_if_no_select(&editor);
+    assert_eq!(
+        cursors,
+        vec![
+            with_select(CursorPosition { line: 11, char: 9 }, CursorPosition { line: 11, char: 10 }),
+            with_select(CursorPosition { line: 11, char: 3 }, CursorPosition { line: 11, char: 8 }),
+            expect_main,
+            with_select(CursorPosition { line: 6, char: 2 }, CursorPosition { line: 6, char: 8 }),
+            with_select(CursorPosition { line: 3, char: 2 }, CursorPosition { line: 3, char: 8 }),
+            exepct_second,
             Cursor::default(),
         ]
     );

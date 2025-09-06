@@ -33,14 +33,6 @@ pub fn mock_ws(content: Vec<String>) -> Workspace {
     ws
 }
 
-pub fn make_cursor(line: usize, char: usize) -> Cursor {
-    let mut cursor = Cursor::default();
-    cursor.at_line = line;
-    cursor.line = line;
-    cursor.char = char;
-    cursor
-}
-
 pub fn mock_ws_empty() -> Workspace {
     Workspace {
         editors: vec![].into(),

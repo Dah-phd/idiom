@@ -5,6 +5,7 @@ use crate::{
     syntax::Lexer,
     workspace::{
         actions::{transaction, Actions},
+        utils::copy_content,
         EditorLine,
     },
 };
@@ -189,7 +190,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             actions.indent(cursor, content, lexer);
         }),
         EditorAction::RemoveLine => {
-            join_cursor_per_line(editor);
+            consolidate_cursors_per_line(editor);
             apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
                 actions.del(cursor, content, lexer);
             });
@@ -274,6 +275,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         }
         EditorAction::Cut => {
             if !editor.content.is_empty() {
+                editor.multi_positions = filter_multi_cursors_per_line_if_no_select(editor);
                 let mut clips = vec![];
                 apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
                     let clip = actions.cut(cursor, content, lexer);
@@ -283,11 +285,16 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             }
         }
         EditorAction::Copy => {
-            todo!();
-            if let Some(clip) = editor.copy() {
-                gs.clipboard.push(clip);
-                return true;
-            }
+            if !editor.content.is_empty() {
+                let mut clips = vec![];
+                for cursor in editor.multi_positions.iter() {
+                    match cursor.select_get() {
+                        Some((from, to)) => clips.push(copy_content(from, to, &editor.content)),
+                        None => clips.push(format!("{}\n", &editor.content[cursor.line])),
+                    }
+                }
+                gs.clipboard.push(clips.into_iter().rev().map(with_new_line_if_not).collect());
+            };
         }
         // CURSOR:
         EditorAction::Up => {
@@ -475,7 +482,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
     true
 }
 
-pub fn join_cursor_per_line(editor: &mut Editor) {
+pub fn consolidate_cursors_per_line(editor: &mut Editor) {
     let mut idx = 1;
     editor.multi_positions.sort_by(sort_cursors);
 
@@ -492,6 +499,38 @@ pub fn join_cursor_per_line(editor: &mut Editor) {
     }
     if editor.multi_positions.len() < 2 {
         restore_single_cursor_mode(editor);
+    }
+}
+
+pub fn filter_multi_cursors_per_line_if_no_select(editor: &Editor) -> Vec<Cursor> {
+    let mut filtered = vec![];
+    let mut index = 0;
+    loop {
+        let Some(mut cursor) = editor.multi_positions.get(index).cloned() else {
+            return filtered;
+        };
+        if cursor.select_is_none() {
+            // remove any cursors already added on the same line
+            while let Some(last_filtered) = filtered.last() {
+                if last_filtered.line != cursor.line {
+                    break;
+                }
+                cursor.max_rows = std::cmp::max(cursor.max_rows, last_filtered.max_rows);
+                filtered.pop();
+            }
+            // skip all cursors following on the same line
+            index += 1;
+            while let Some(next_cursor) = editor.multi_positions.get(index) {
+                if next_cursor.line != cursor.line {
+                    break;
+                }
+                cursor.max_rows = std::cmp::max(cursor.max_rows, next_cursor.max_rows);
+                index += 1;
+            }
+        } else {
+            index += 1;
+        };
+        filtered.push(cursor);
     }
 }
 
