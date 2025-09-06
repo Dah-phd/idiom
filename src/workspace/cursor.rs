@@ -371,16 +371,6 @@ impl Cursor {
         }
     }
 
-    pub fn init_select(&mut self) {
-        if self.select.is_none() {
-            self.select.replace(CursorPosition { line: self.line, char: self.char });
-        }
-    }
-
-    pub fn select_is_none(&self) -> bool {
-        self.select.is_none()
-    }
-
     pub fn add_line_offset(&mut self, offset: usize) {
         self.line += offset;
         self.at_line += offset;
@@ -391,8 +381,26 @@ impl Cursor {
 
     // SELECT
 
+    pub fn init_select(&mut self) {
+        if self.select.is_none() {
+            self.select.replace(CursorPosition { line: self.line, char: self.char });
+        }
+    }
+
+    pub fn select_is_none(&self) -> bool {
+        self.select.is_none()
+    }
+
     pub fn select_drop(&mut self) {
         self.select = None;
+    }
+
+    pub fn select_to(&mut self, position: CursorPosition) {
+        if position.line == self.line && position.char == self.char {
+            return;
+        }
+        self.init_select();
+        self.set_position(position);
     }
 
     pub fn select_set(&mut self, from: CursorPosition, to: CursorPosition) {

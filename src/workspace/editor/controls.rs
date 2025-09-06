@@ -561,6 +561,13 @@ pub fn consolidate_cursors(editor: &mut Editor) {
     }
 }
 
+pub fn ensure_single_cursor(editor: &mut Editor) {
+    if editor.multi_positions.is_empty() {
+        return;
+    }
+    restore_single_cursor_mode(editor);
+}
+
 pub fn restore_single_cursor_mode(editor: &mut Editor) {
     match editor.multi_positions.iter().find(|c| c.max_rows != 0) {
         Some(cursor) => editor.cursor.set_cursor(cursor),
@@ -577,6 +584,22 @@ pub fn enable_multi_cursor_mode(editor: &mut Editor) {
     editor.multi_positions.push(editor.cursor.clone());
     editor.action_map = multi_cursor_map;
     editor.renderer.multi_cursor();
+}
+
+pub fn push_multicursor_position(editor: &mut Editor, mut position: CursorPosition) {
+    let Some(line) = editor.content.get(position.line) else {
+        return;
+    };
+    position.char = std::cmp::min(position.char, line.char_len());
+    if editor.multi_positions.is_empty() {
+        enable_multi_cursor_mode(editor);
+    }
+    let mut new_cursor = Cursor::default();
+    new_cursor.set_position(position);
+    match editor.multi_positions.iter().position(|c| c.get_position() < position) {
+        Some(index) => editor.multi_positions.insert(index, new_cursor),
+        None => editor.multi_positions.push(new_cursor),
+    }
 }
 
 fn apply_multi_cursor_transaction<F>(editor: &mut Editor, mut callback: F)

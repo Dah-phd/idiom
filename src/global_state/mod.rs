@@ -26,7 +26,7 @@ use crossterm::event::{KeyEvent, MouseEvent};
 pub use events::IdiomEvent;
 use idiom_tui::{
     layout::{Line, Rect},
-    Backend,
+    Backend, Position,
 };
 
 use draw::Components;
@@ -226,11 +226,10 @@ impl GlobalState {
             }
             Mode::Insert => {
                 let Some(editor) = ws.get_active() else { return };
-                let line = editor.cursor.line - editor.cursor.at_line;
-                let char = editor.cursor.char + editor.line_number_offset + 1;
-                let position = CursorPosition { line, char };
+                let row = (editor.cursor.line - editor.cursor.at_line) as u16;
+                let col = (editor.cursor.char + editor.line_number_offset + 1) as u16;
                 let accent_style = self.theme.accent_style();
-                menu_context_editor_inplace(position, self.editor_area, accent_style)
+                menu_context_editor_inplace(Position { row, col }, self.editor_area, accent_style)
             }
         };
         if let Err(error) = menu.run(self, ws, tree, term) {

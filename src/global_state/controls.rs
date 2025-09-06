@@ -104,7 +104,11 @@ pub fn mouse_handler(
             // on up currsor can drop select
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = ws.get_active() {
-                    editor.mouse_click(position, gs);
+                    match event.modifiers {
+                        KeyModifiers::ALT => editor.mouse_multi_cursor(position),
+                        KeyModifiers::CONTROL => editor.mouse_select_to(position, gs),
+                        _ => editor.mouse_click(position, gs),
+                    };
                     gs.insert_mode();
                     match tree.select_by_path(&editor.path) {
                         Ok(..) => ws.toggle_editor(),
@@ -133,7 +137,6 @@ pub fn mouse_handler(
         MouseEventKind::Up(MouseButton::Right) => {
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = ws.get_active() {
-                    let position = crate::workspace::CursorPosition::from(position);
                     editor.clear_ui(gs);
                     editor.mouse_menu_setup(position);
                     let accent_style = gs.theme.accent_style();

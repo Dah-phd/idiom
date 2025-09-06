@@ -448,13 +448,12 @@ impl Editor {
     }
 
     pub fn mouse_click(&mut self, position: Position, gs: &mut GlobalState) {
+        controls::ensure_single_cursor(self);
         if let Some(rect) = self.lexer.mouse_click_modal_if_exists(position, gs) {
             self.updated_rect(rect, gs);
             return;
         }
-        let mut position = CursorPosition::from(position);
-        position.line += self.cursor.at_line;
-        position.char = position.char.saturating_sub(self.line_number_offset + 1);
+        let position = self.mouse_parse(position);
         if self.cursor.select_is_none() && self.cursor == position {
             self.select_token();
             return;
@@ -463,9 +462,28 @@ impl Editor {
         self.cursor.set_cursor_checked(position, &self.content);
     }
 
-    pub fn mouse_menu_setup(&mut self, mut position: CursorPosition) {
-        position.line += self.cursor.at_line;
-        position.char = position.char.saturating_sub(self.line_number_offset + 1);
+    pub fn mouse_multi_cursor(&mut self, position: Position) {
+        self.lexer.clear_modal();
+        self.last_render_at_line = None;
+        let position = self.mouse_parse(position);
+        if self.cursor == position {
+            return;
+        }
+        controls::push_multicursor_position(self, position);
+    }
+
+    pub fn mouse_select_to(&mut self, position: Position, gs: &mut GlobalState) {
+        controls::ensure_single_cursor(self);
+        if let Some(rect) = self.lexer.mouse_click_modal_if_exists(position, gs) {
+            self.updated_rect(rect, gs);
+            return;
+        }
+        let position = self.mouse_parse(position);
+        self.cursor.select_to(position);
+    }
+
+    pub fn mouse_menu_setup(&mut self, position: Position) {
+        let position = self.mouse_parse(position);
         match self.cursor.select_get() {
             Some((from, to)) if from <= position && position <= to => {
                 return;
@@ -486,6 +504,13 @@ impl Editor {
         if let Some(rect) = self.lexer.mouse_moved_modal_if_exists(row, column) {
             self.updated_rect(rect, gs);
         };
+    }
+
+    fn mouse_parse(&self, position: Position) -> CursorPosition {
+        let mut position = CursorPosition::from(position);
+        position.line += self.cursor.at_line;
+        position.char = position.char.saturating_sub(self.line_number_offset + 1);
+        position
     }
 }
 
