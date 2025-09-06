@@ -381,8 +381,14 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 cursor.select_scroll_down(&editor.content)
             }
         }
-        EditorAction::ScreenUp => editor.cursor.screen_up(&editor.content),
-        EditorAction::ScreenDown => editor.cursor.screen_down(&editor.content),
+        EditorAction::ScreenUp => {
+            editor.cursor.screen_up(&editor.content);
+            return true;
+        }
+        EditorAction::ScreenDown => {
+            editor.cursor.screen_down(&editor.content);
+            return true;
+        }
         EditorAction::NewCursorUp => {
             let Some(main_cursor) = editor.multi_positions.last_mut() else {
                 restore_single_cursor_mode(editor);
