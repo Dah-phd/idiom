@@ -453,27 +453,15 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 cursor.start_of_line(&editor.content)
             }
         }
-        EditorAction::FindReferences => {
-            todo!();
-            editor.lexer.go_to_reference((&editor.cursor).into(), gs)
-        }
-        EditorAction::GoToDeclaration => {
-            todo!();
-            editor.lexer.go_to_declaration((&editor.cursor).into(), gs)
-        }
-        EditorAction::Help => {
-            todo!();
-            editor.lexer.help((&editor.cursor).into(), &editor.content, gs)
-        }
-        EditorAction::LSPRename => {
-            todo!();
-            let line = &editor.content[editor.cursor.line];
-            let token_range = token_range_at(line, editor.cursor.char);
-            editor.lexer.start_rename((&editor.cursor).into(), &line[token_range]);
-        }
         EditorAction::RefreshUI => editor.lexer.refresh_lsp(gs),
         EditorAction::Save => editor.save(gs),
-        EditorAction::EndOfFile | EditorAction::StartOfFile | EditorAction::SelectAll => {
+        EditorAction::EndOfFile
+        | EditorAction::StartOfFile
+        | EditorAction::SelectAll
+        | EditorAction::FindReferences
+        | EditorAction::GoToDeclaration
+        | EditorAction::LSPRename
+        | EditorAction::Help => {
             restore_single_cursor_mode(editor);
             return editor.map(action, gs);
         }
