@@ -50,6 +50,26 @@ impl FileType {
         }
     }
 
+    pub fn is_code(&self) -> bool {
+        match self {
+            Self::Ignored => false,
+            Self::Rust
+            | Self::Lobster
+            | Self::Zig
+            | Self::Python
+            | Self::TypeScript
+            | Self::JavaScript
+            | Self::Html
+            | Self::Nim
+            | Self::C
+            | Self::Cpp
+            | Self::Toml
+            | Self::Json
+            | Self::Shell
+            | Self::Yml => true,
+        }
+    }
+
     pub const fn iter_langs() -> [Self; 14] {
         [
             FileType::Zig,

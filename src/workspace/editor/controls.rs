@@ -568,6 +568,9 @@ pub fn restore_single_cursor_mode(editor: &mut Editor) {
 }
 
 pub fn enable_multi_cursor_mode(editor: &mut Editor) {
+    if !editor.file_type.is_code() {
+        return;
+    }
     editor.multi_positions.clear();
     editor.multi_positions.push(editor.cursor.clone());
     editor.action_map = multi_cursor_map;
