@@ -129,7 +129,6 @@ impl<'a> LineContext<'a> {
 
     pub fn init_multic_mod(&mut self, cursors: &[Cursor]) {
         let Some(cursor) = cursors.last() else { return };
-        self.line = cursor.line - self.line_number;
         self.cursor_line = cursor.line;
         self.cursor_char = cursor.char;
         self.select = cursor.select_get();

@@ -404,6 +404,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 if let Some((from_position, ..)) = main_cursor.select_take() {
                     main_cursor.set_position(from_position);
                 }
+                new_cursor.max_rows = 0;
                 editor.controls.cursors.push(new_cursor);
             }
         }
