@@ -28,7 +28,7 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
         cursor: Cursor::default(),
         multi_positions: vec![],
         actions: Actions::default(),
-        action_map: controls::single_cursor_map,
+        controls: controls::ControlMap::default(),
         content,
         renderer: Renderer::code(),
         last_render_at_line: None,

@@ -1,5 +1,6 @@
 use super::{
-    calc_wraps, controls, Actions, Cursor, Editor, EditorConfigs, EditorLine, FileType, GlobalState, Lexer, Renderer,
+    calc_wraps, controls::ControlMap, Actions, Cursor, Editor, EditorConfigs, EditorLine, FileType, GlobalState, Lexer,
+    Renderer,
 };
 use crate::error::{IdiomError, IdiomResult};
 use std::{
@@ -90,7 +91,7 @@ pub fn text_editor_from_data(
 
     let mut editor = Editor {
         actions: Actions::new(cfg.default_indent_cfg()),
-        action_map: controls::single_cursor_map,
+        controls: ControlMap::default(),
         update_status: FileUpdate::None,
         renderer: Renderer::text(),
         last_render_at_line: None,
@@ -129,7 +130,7 @@ pub fn editor_from_data(
 
     let mut editor = Editor {
         actions: Actions::new(cfg.get_indent_cfg(&file_type)),
-        action_map: controls::single_cursor_map,
+        controls: ControlMap::default(),
         update_status: FileUpdate::None,
         renderer: Renderer::code(),
         last_render_at_line: None,

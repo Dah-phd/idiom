@@ -1,4 +1,5 @@
 mod controls;
+
 mod utils;
 use super::{
     actions::Actions,
@@ -14,6 +15,7 @@ use crate::{
     lsp::LSPError,
     syntax::{tokens::calc_wraps, Lexer},
 };
+use controls::ControlMap;
 use idiom_tui::{layout::Rect, Position};
 use lsp_types::TextEdit;
 use std::{cmp::Ordering, path::PathBuf};
@@ -33,7 +35,7 @@ pub struct Editor {
     pub last_render_at_line: Option<usize>,
     pub actions: Actions,
     renderer: Renderer,
-    action_map: fn(&mut Self, EditorAction, gs: &mut GlobalState) -> bool,
+    controls: ControlMap,
 }
 
 impl Editor {
@@ -55,7 +57,7 @@ impl Editor {
             content,
             renderer: Renderer::code(),
             actions: Actions::new(cfg.get_indent_cfg(&file_type)),
-            action_map: controls::single_cursor_map,
+            controls: ControlMap::default(),
             file_type,
             display,
             update_status: FileUpdate::None,
@@ -82,7 +84,7 @@ impl Editor {
             content,
             renderer: Renderer::text(),
             actions: Actions::new(cfg.default_indent_cfg()),
-            action_map: controls::single_cursor_map,
+            controls: ControlMap::default(),
             file_type: FileType::Ignored,
             display,
             update_status: FileUpdate::None,
@@ -107,7 +109,7 @@ impl Editor {
             content,
             renderer: Renderer::markdown(),
             actions: Actions::new(cfg.default_indent_cfg()),
-            action_map: controls::single_cursor_map,
+            controls: ControlMap::default(),
             file_type: FileType::Ignored,
             display,
             update_status: FileUpdate::None,
@@ -141,7 +143,7 @@ impl Editor {
 
     pub fn clear_ui(&mut self, gs: &GlobalState) {
         if let Some(rect) = self.lexer.clear_modal() {
-            self.updated_rect(rect, gs);
+            self.clear_lines_cache(rect, gs);
         }
     }
 
@@ -151,7 +153,7 @@ impl Editor {
         self.last_render_at_line = None;
     }
 
-    pub fn updated_rect(&mut self, rect: Rect, gs: &GlobalState) {
+    pub fn clear_lines_cache(&mut self, rect: Rect, gs: &GlobalState) {
         let skip_offset = rect.row.saturating_sub(gs.editor_area().row) as usize;
         for line in self.content.iter_mut().skip(self.cursor.at_line + skip_offset).take(rect.width) {
             line.cached.reset();
@@ -162,7 +164,7 @@ impl Editor {
 
     #[inline]
     pub fn map(&mut self, action: EditorAction, gs: &mut GlobalState) -> bool {
-        (self.action_map)(self, action, gs)
+        (self.controls.action_map)(self, action, gs)
     }
 
     pub fn update_path(&mut self, new_path: PathBuf) -> Result<(), LSPError> {
@@ -191,7 +193,7 @@ impl Editor {
         }
     }
 
-    pub fn select_line(&mut self) {
+    fn select_line(&mut self) {
         let start = CursorPosition { line: self.cursor.line, char: 0 };
         let next_line = self.cursor.line + 1;
         if self.content.len() > next_line {
@@ -206,7 +208,7 @@ impl Editor {
     }
 
     #[inline(always)]
-    pub fn select_all(&mut self) {
+    fn select_all(&mut self) {
         self.cursor.select_set(
             CursorPosition::default(),
             CursorPosition {
@@ -217,6 +219,7 @@ impl Editor {
     }
 
     pub fn go_to(&mut self, line: usize) {
+        controls::ensure_single_cursor(self);
         self.cursor.select_drop();
         if self.content.len() <= line {
             return;
@@ -227,6 +230,7 @@ impl Editor {
     }
 
     pub fn go_to_select(&mut self, from: CursorPosition, to: CursorPosition) {
+        controls::ensure_single_cursor(self);
         self.cursor.at_line = to.line.saturating_sub(self.cursor.max_rows / 2);
         self.cursor.select_set(from, to);
     }
@@ -242,7 +246,7 @@ impl Editor {
         }
     }
 
-    pub fn find_with_select(&mut self, pat: &str) -> Vec<((CursorPosition, CursorPosition), String)> {
+    pub fn find_with_select(&self, pat: &str) -> Vec<((CursorPosition, CursorPosition), String)> {
         let mut buffer = Vec::new();
         if pat.is_empty() {
             return buffer;
@@ -282,6 +286,10 @@ impl Editor {
         self.actions.clear();
         self.cursor.reset();
         self.lexer.close();
+        if !self.multi_positions.is_empty() {
+            self.multi_positions.clear();
+            self.renderer.single_cursor();
+        }
         let content = match std::fs::read_to_string(&self.path) {
             Ok(content) => content,
             Err(err) => {
@@ -410,7 +418,7 @@ impl Editor {
     pub fn mouse_scroll_up(&mut self, select: bool, gs: &mut GlobalState) {
         let (taken, render_update) = self.lexer.map_modal_if_exists(EditorAction::ScrollUp, gs);
         if let Some(modal_rect) = render_update {
-            self.updated_rect(modal_rect, gs);
+            self.clear_lines_cache(modal_rect, gs);
         }
         if taken {
             return;
@@ -430,7 +438,7 @@ impl Editor {
     pub fn mouse_scroll_down(&mut self, select: bool, gs: &mut GlobalState) {
         let (taken, render_update) = self.lexer.map_modal_if_exists(EditorAction::ScrollDown, gs);
         if let Some(modal_rect) = render_update {
-            self.updated_rect(modal_rect, gs);
+            self.clear_lines_cache(modal_rect, gs);
         }
         if taken {
             return;
@@ -450,7 +458,7 @@ impl Editor {
     pub fn mouse_click(&mut self, position: Position, gs: &mut GlobalState) {
         controls::ensure_single_cursor(self);
         if let Some(rect) = self.lexer.mouse_click_modal_if_exists(position, gs) {
-            self.updated_rect(rect, gs);
+            self.clear_lines_cache(rect, gs);
             return;
         }
         let position = self.mouse_parse(position);
@@ -475,7 +483,7 @@ impl Editor {
     pub fn mouse_select_to(&mut self, position: Position, gs: &mut GlobalState) {
         controls::ensure_single_cursor(self);
         if let Some(rect) = self.lexer.mouse_click_modal_if_exists(position, gs) {
-            self.updated_rect(rect, gs);
+            self.clear_lines_cache(rect, gs);
             return;
         }
         let position = self.mouse_parse(position);
@@ -502,7 +510,7 @@ impl Editor {
 
     pub fn mouse_moved(&mut self, row: u16, column: u16, gs: &GlobalState) {
         if let Some(rect) = self.lexer.mouse_moved_modal_if_exists(row, column) {
-            self.updated_rect(rect, gs);
+            self.clear_lines_cache(rect, gs);
         };
     }
 
