@@ -26,7 +26,7 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
         path,
         update_status: FileUpdate::None,
         cursor: Cursor::default(),
-        multi_positions: vec![],
+        // multi_positions: vec![],
         actions: Actions::default(),
         controls: controls::ControlMap::default(),
         content,
@@ -86,7 +86,7 @@ fn merge_multi_cursors() {
     }
 
     let mut editor = mock_editor(vec![]);
-    editor.multi_positions.extend([
+    editor.controls.cursors.extend([
         Cursor::default(),
         Cursor::default(),
         make_cursor(2, 2),
@@ -97,7 +97,7 @@ fn merge_multi_cursors() {
     ]);
     controls::consolidate_cursors(&mut editor);
     assert_eq!(
-        editor.multi_positions,
+        editor.controls.cursors,
         vec![
             make_cursor(4, 2),
             make_cursor(3, 3),
@@ -131,7 +131,7 @@ fn filter_per_line_if_no_select() {
     exepct_second.max_rows = second_cursor.max_rows;
 
     let mut editor = mock_editor(vec![]);
-    editor.multi_positions = vec![
+    editor.controls.cursors = vec![
         with_select(CursorPosition { line: 11, char: 9 }, CursorPosition { line: 11, char: 10 }),
         with_select(CursorPosition { line: 11, char: 3 }, CursorPosition { line: 11, char: 8 }),
         with_select(CursorPosition { line: 10, char: 12 }, CursorPosition { line: 10, char: 15 }),

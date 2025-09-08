@@ -1,15 +1,8 @@
-use super::{
-    apply_multi_cursor_transaction, consolidate_cursors, consolidate_cursors_per_line, enable_multi_cursor_mode,
-    filter_multi_cursors_per_line_if_no_select, restore_single_cursor_mode, with_new_line_if_not,
-};
+use super::{apply_multi_cursor_transaction, consolidate_cursors, consolidate_cursors_per_line, ControlMap};
 use crate::{
     configs::EditorAction,
     global_state::GlobalState,
-    workspace::{
-        actions::transaction,
-        utils::{copy_content, token_range_at},
-        CursorPosition, Editor,
-    },
+    workspace::{actions::transaction, utils::token_range_at, CursorPosition, Editor},
 };
 
 pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut GlobalState) -> bool {
@@ -90,18 +83,18 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         }
         EditorAction::Paste => {
             if let Some(clip) = gs.clipboard.pull() {
-                editor.actions.paste(clip, &mut editor.cursor, &mut editor.content, &mut editor.lexer);
+                (editor.controls.paste)(editor, clip);
                 return true;
             }
         }
         EditorAction::Cut => {
-            if let Some(clip) = editor.cut() {
+            if let Some(clip) = (editor.controls.cut)(editor) {
                 gs.clipboard.push(clip);
                 return true;
             }
         }
         EditorAction::Copy => {
-            if let Some(clip) = editor.copy() {
+            if let Some(clip) = (editor.controls.copy)(editor) {
                 gs.clipboard.push(clip);
                 return true;
             }
@@ -133,7 +126,7 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::ScreenUp => editor.cursor.screen_up(&editor.content),
         EditorAction::ScreenDown => editor.cursor.screen_down(&editor.content),
         EditorAction::NewCursorUp | EditorAction::NewCursorDown | EditorAction::NewCursorWithLine => {
-            enable_multi_cursor_mode(editor);
+            ControlMap::multi_cursor(editor);
             return editor.map(action, gs);
         }
         EditorAction::JumpLeft => editor.cursor.jump_left(&editor.content),
@@ -205,7 +198,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         }),
         EditorAction::SwapUp => {
             let mut last_line = None;
-            for cursor in editor.multi_positions.iter_mut().rev() {
+            for cursor in editor.controls.cursors.iter_mut().rev() {
                 if last_line == Some(cursor.line) {
                     cursor.line += 1;
                     continue;
@@ -216,7 +209,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         }
         EditorAction::SwapDown => {
             let mut last_line = None;
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 if last_line == Some(cursor.line) {
                     cursor.line += 1;
                     continue;
@@ -230,13 +223,13 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             if let Some(mut cursors) =
                 transaction::undo_multi_cursor(&mut editor.actions, &mut editor.content, &mut editor.lexer, text_width)
             {
-                let main_index = editor.multi_positions.iter().position(|c| c.max_rows != 0).unwrap_or(usize::MAX);
+                let main_index = editor.controls.cursors.iter().position(|c| c.max_rows != 0).unwrap_or(usize::MAX);
                 if let Some(cursor) = cursors.get_mut(main_index) {
                     cursor.max_rows = editor.cursor.max_rows;
                 } else if let Some(cursor) = cursors.last_mut() {
                     cursor.max_rows = editor.cursor.max_rows;
                 };
-                editor.multi_positions = cursors;
+                editor.controls.cursors = cursors;
             };
         }
         EditorAction::Redo => {
@@ -244,13 +237,13 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             if let Some(mut cursors) =
                 transaction::redo_multi_cursor(&mut editor.actions, &mut editor.content, &mut editor.lexer, text_width)
             {
-                let main_index = editor.multi_positions.iter().position(|c| c.max_rows != 0).unwrap_or(usize::MAX);
+                let main_index = editor.controls.cursors.iter().position(|c| c.max_rows != 0).unwrap_or(usize::MAX);
                 if let Some(cursor) = cursors.get_mut(main_index) {
                     cursor.max_rows = editor.cursor.max_rows;
                 } else if let Some(cursor) = cursors.last_mut() {
                     cursor.max_rows = editor.cursor.max_rows;
                 };
-                editor.multi_positions = cursors;
+                editor.controls.cursors = cursors;
             }
         }
         EditorAction::CommentOut => {
@@ -261,86 +254,63 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         }
         EditorAction::Paste => {
             if let Some(clip) = gs.clipboard.pull() {
-                if editor.multi_positions.len() == clip.lines().count() {
-                    let mut clip_lines = clip.lines().rev();
-                    apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
-                        if let Some(next_clip) = clip_lines.next() {
-                            actions.paste(next_clip.to_owned(), cursor, content, lexer);
-                        };
-                    });
-                } else {
-                    apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
-                        actions.paste(clip.to_owned(), cursor, content, lexer);
-                    });
-                }
+                (editor.controls.paste)(editor, clip);
             }
         }
         EditorAction::Cut => {
-            if !editor.content.is_empty() {
-                editor.multi_positions = filter_multi_cursors_per_line_if_no_select(editor);
-                let mut clips = vec![];
-                apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
-                    let clip = actions.cut(cursor, content, lexer);
-                    clips.push(clip);
-                });
-                gs.clipboard.push(clips.into_iter().rev().map(with_new_line_if_not).collect());
+            if let Some(clip) = (editor.controls.cut)(editor) {
+                gs.clipboard.push(clip);
             }
         }
         EditorAction::Copy => {
-            if !editor.content.is_empty() {
-                let mut clips = vec![];
-                for cursor in editor.multi_positions.iter() {
-                    match cursor.select_get() {
-                        Some((from, to)) => clips.push(copy_content(from, to, &editor.content)),
-                        None => clips.push(format!("{}\n", &editor.content[cursor.line])),
-                    }
-                }
-                gs.clipboard.push(clips.into_iter().rev().map(with_new_line_if_not).collect());
-            };
+            if let Some(clip) = (editor.controls.copy)(editor) {
+                gs.clipboard.push(clip);
+                return true;
+            }
         }
         // CURSOR:
         EditorAction::Up => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 cursor.up(&editor.content);
             }
         }
         EditorAction::Down => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 cursor.down(&editor.content);
             }
         }
         EditorAction::Left => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 cursor.left(&editor.content);
             }
         }
         EditorAction::Right => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 cursor.right(&editor.content);
             }
         }
         EditorAction::SelectUp => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 cursor.select_up(&editor.content)
             }
         }
         EditorAction::SelectDown => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 cursor.select_down(&editor.content)
             }
         }
         EditorAction::SelectLeft => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 cursor.select_left(&editor.content)
             }
         }
         EditorAction::SelectRight => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 cursor.select_right(&editor.content)
             }
         }
         EditorAction::SelectToken => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 let range = token_range_at(&editor.content[cursor.line], cursor.char);
                 if !range.is_empty() {
                     cursor.select_set(
@@ -351,7 +321,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             }
         }
         EditorAction::SelectLine => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 let start = CursorPosition { line: cursor.line, char: 0 };
                 let next_line = cursor.line + 1;
                 if editor.content.len() > next_line {
@@ -374,12 +344,12 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             return true;
         }
         EditorAction::SelectScrollUp => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 cursor.select_scroll_up(&editor.content)
             }
         }
         EditorAction::SelectScrollDown => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 cursor.select_scroll_down(&editor.content)
             }
         }
@@ -392,26 +362,26 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             return true;
         }
         EditorAction::NewCursorUp => {
-            let Some(main_cursor) = editor.multi_positions.last_mut() else {
-                restore_single_cursor_mode(editor);
+            let Some(main_cursor) = editor.controls.cursors.last_mut() else {
+                ControlMap::single_cursor(editor);
                 return true;
             };
             if let Some(new_cursor) = main_cursor.clone_above(&editor.content) {
-                editor.multi_positions.push(new_cursor);
+                editor.controls.cursors.push(new_cursor);
             }
         }
         EditorAction::NewCursorDown => {
-            let Some(main_cursor) = editor.multi_positions.first_mut() else {
-                restore_single_cursor_mode(editor);
+            let Some(main_cursor) = editor.controls.cursors.first_mut() else {
+                ControlMap::single_cursor(editor);
                 return true;
             };
             if let Some(new_cursor) = main_cursor.clone_below(&editor.content) {
-                editor.multi_positions.push(new_cursor);
+                editor.controls.cursors.push(new_cursor);
             }
         }
         EditorAction::NewCursorWithLine => {
-            let Some(main_cursor) = editor.multi_positions.first_mut() else {
-                restore_single_cursor_mode(editor);
+            let Some(main_cursor) = editor.controls.cursors.first_mut() else {
+                ControlMap::single_cursor(editor);
                 return true;
             };
 
@@ -422,36 +392,36 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 if let Some((from_position, ..)) = main_cursor.select_take() {
                     main_cursor.set_position(from_position);
                 }
-                editor.multi_positions.push(new_cursor);
+                editor.controls.cursors.push(new_cursor);
             }
         }
         EditorAction::JumpLeft => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 cursor.jump_left(&editor.content);
             }
         }
         EditorAction::JumpLeftSelect => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 cursor.jump_left_select(&editor.content)
             }
         }
         EditorAction::JumpRight => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 cursor.jump_right(&editor.content)
             }
         }
         EditorAction::JumpRightSelect => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 cursor.jump_right_select(&editor.content)
             }
         }
         EditorAction::EndOfLine => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 cursor.end_of_line(&editor.content)
             }
         }
         EditorAction::StartOfLine => {
-            for cursor in editor.multi_positions.iter_mut() {
+            for cursor in editor.controls.cursors.iter_mut() {
                 cursor.start_of_line(&editor.content)
             }
         }
@@ -464,11 +434,11 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         | EditorAction::GoToDeclaration
         | EditorAction::LSPRename
         | EditorAction::Help => {
-            restore_single_cursor_mode(editor);
+            ControlMap::single_cursor(editor);
             return editor.map(action, gs);
         }
         EditorAction::Cancel => {
-            restore_single_cursor_mode(editor);
+            ControlMap::single_cursor(editor);
             return true;
         }
         EditorAction::Close => return false,

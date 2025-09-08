@@ -1,5 +1,5 @@
 mod event;
-pub use event::{multi_cursor_map, single_cursor_map};
+mod methods;
 
 use crate::{
     configs::EditorAction,
@@ -10,45 +10,125 @@ use crate::{
         Cursor, CursorPosition, Editor, EditorLine,
     },
 };
+use lsp_types::TextEdit;
 
 /// holds controls and manages cursor type
 /// if switched to multicursor will swap callbacks to multi cursor
 pub struct ControlMap {
     pub action_map: fn(&mut Editor, EditorAction, gs: &mut GlobalState) -> bool,
+    pub insert_import: fn(&mut Editor, String),
+    pub insert_snippet: fn(&mut Editor, String, Option<(usize, usize)>),
+    pub insert_snippet_with_select: fn(&mut Editor, String, (usize, usize), usize),
+    pub replace_token: fn(&mut Editor, String),
+    pub replace_select: fn(&mut Editor, CursorPosition, CursorPosition, &str),
+    pub mass_replace: fn(&mut Editor, Vec<(CursorPosition, CursorPosition)>, String),
+    pub apply_file_edits: fn(&mut Editor, Vec<TextEdit>),
+    pub copy: fn(&mut Editor) -> Option<String>,
+    pub cut: fn(&mut Editor) -> Option<String>,
+    pub paste: fn(&mut Editor, String),
     pub cursors: Vec<Cursor>,
+}
+
+impl ControlMap {
+    pub fn multi_cursor(editor: &mut Editor) {
+        if !editor.file_type.is_code() {
+            return;
+        }
+        editor.controls.cursors.clear();
+        editor.controls.cursors.push(editor.cursor.clone());
+        editor.controls.multi_cursor_map();
+        editor.renderer.multi_cursor();
+    }
+
+    pub fn single_cursor(editor: &mut Editor) {
+        match editor.controls.cursors.iter().find(|c| c.max_rows != 0) {
+            Some(cursor) => editor.cursor.set_cursor(cursor),
+            None => editor.cursor.set_position(CursorPosition::default()),
+        };
+        editor.last_render_at_line = None;
+        editor.controls.single_cursor_map();
+        editor.renderer.single_cursor();
+    }
+
+    pub fn ensure_single_cursor(editor: &mut Editor) {
+        if editor.controls.cursors.is_empty() {
+            return;
+        }
+        Self::single_cursor(editor);
+    }
+
+    fn multi_cursor_map(&mut self) {
+        self.action_map = event::multi_cursor_map;
+
+        self.insert_import = methods::multic_insert_import;
+        self.insert_snippet = methods::multic_insert_snippet;
+        self.insert_snippet_with_select = methods::multic_insert_snippet_with_select;
+
+        self.cut = methods::multic_cut;
+        self.copy = methods::multic_copy;
+        self.paste = methods::multic_paste;
+    }
+
+    fn single_cursor_map(&mut self) {
+        self.cursors.clear();
+        self.action_map = event::single_cursor_map;
+
+        self.insert_import = methods::insert_import;
+        self.insert_snippet = methods::insert_snippet;
+        self.insert_snippet_with_select = methods::insert_snippet_with_select;
+
+        self.cut = methods::cut;
+        self.copy = methods::copy;
+        self.paste = methods::paste;
+    }
 }
 
 impl Default for ControlMap {
     fn default() -> Self {
-        Self { action_map: single_cursor_map, cursors: Vec::default() }
+        Self {
+            action_map: event::single_cursor_map,
+            cursors: Vec::default(),
+            insert_snippet_with_select: methods::insert_snippet_with_select,
+            insert_snippet: methods::insert_snippet,
+            insert_import: methods::insert_import,
+            replace_token: methods::replace_token,
+            replace_select: methods::replace_select,
+            mass_replace: methods::mass_replace,
+            apply_file_edits: methods::apply_file_edits,
+            cut: methods::cut,
+            copy: methods::copy,
+            paste: methods::paste,
+        }
     }
 }
 
 pub fn consolidate_cursors_per_line(editor: &mut Editor) {
     let mut idx = 1;
-    editor.multi_positions.sort_by(sort_cursors);
+    let cursors = &mut editor.controls.cursors;
+    cursors.sort_by(sort_cursors);
 
-    while idx < editor.multi_positions.len() {
+    while idx < cursors.len() {
         unsafe {
-            let [cursor, other] = editor.multi_positions.get_disjoint_unchecked_mut([idx - 1, idx]);
+            let [cursor, other] = cursors.get_disjoint_unchecked_mut([idx - 1, idx]);
             if cursor.line == other.line {
                 cursor.max_rows = std::cmp::max(cursor.max_rows, other.max_rows);
-                editor.multi_positions.remove(idx);
+                cursors.remove(idx);
             } else {
                 idx += 1;
             }
         }
     }
-    if editor.multi_positions.len() < 2 {
-        restore_single_cursor_mode(editor);
+    if cursors.len() < 2 {
+        ControlMap::single_cursor(editor);
     }
 }
 
 pub fn filter_multi_cursors_per_line_if_no_select(editor: &Editor) -> Vec<Cursor> {
     let mut filtered = vec![];
     let mut index = 0;
+    let cursors = &editor.controls.cursors;
     loop {
-        let Some(mut cursor) = editor.multi_positions.get(index).cloned() else {
+        let Some(mut cursor) = cursors.get(index).cloned() else {
             return filtered;
         };
         if cursor.select_is_none() {
@@ -62,7 +142,7 @@ pub fn filter_multi_cursors_per_line_if_no_select(editor: &Editor) -> Vec<Cursor
             }
             // skip all cursors following on the same line
             index += 1;
-            while let Some(next_cursor) = editor.multi_positions.get(index) {
+            while let Some(next_cursor) = cursors.get(index) {
                 if next_cursor.line != cursor.line {
                     break;
                 }
@@ -79,65 +159,40 @@ pub fn filter_multi_cursors_per_line_if_no_select(editor: &Editor) -> Vec<Cursor
 pub fn consolidate_cursors(editor: &mut Editor) {
     let mut idx = 1;
 
-    editor.multi_positions.sort_by(sort_cursors);
+    let cursors = &mut editor.controls.cursors;
+    cursors.sort_by(sort_cursors);
 
-    while idx < editor.multi_positions.len() {
+    while idx < cursors.len() {
         unsafe {
-            let [cursor, other] = editor.multi_positions.get_disjoint_unchecked_mut([idx - 1, idx]);
+            let [cursor, other] = cursors.get_disjoint_unchecked_mut([idx - 1, idx]);
             if cursor.merge_if_intersect(other) {
                 cursor.max_rows = std::cmp::max(cursor.max_rows, other.max_rows);
-                editor.multi_positions.remove(idx);
+                cursors.remove(idx);
             } else {
                 idx += 1;
             }
         }
     }
-    if editor.multi_positions.len() < 2 {
-        restore_single_cursor_mode(editor);
+    if cursors.len() < 2 {
+        ControlMap::single_cursor(editor);
     }
-}
-
-pub fn ensure_single_cursor(editor: &mut Editor) {
-    if editor.multi_positions.is_empty() {
-        return;
-    }
-    restore_single_cursor_mode(editor);
-}
-
-pub fn restore_single_cursor_mode(editor: &mut Editor) {
-    match editor.multi_positions.iter().find(|c| c.max_rows != 0) {
-        Some(cursor) => editor.cursor.set_cursor(cursor),
-        None => editor.cursor.set_position(CursorPosition::default()),
-    };
-    editor.last_render_at_line = None;
-    editor.controls.action_map = single_cursor_map;
-    editor.multi_positions.clear();
-    editor.renderer.single_cursor();
-}
-
-pub fn enable_multi_cursor_mode(editor: &mut Editor) {
-    if !editor.file_type.is_code() {
-        return;
-    }
-    editor.multi_positions.clear();
-    editor.multi_positions.push(editor.cursor.clone());
-    editor.controls.action_map = multi_cursor_map;
-    editor.renderer.multi_cursor();
 }
 
 pub fn push_multicursor_position(editor: &mut Editor, mut position: CursorPosition) {
     let Some(line) = editor.content.get(position.line) else {
         return;
     };
+
     position.char = std::cmp::min(position.char, line.char_len());
-    if editor.multi_positions.is_empty() {
-        enable_multi_cursor_mode(editor);
+    if editor.controls.cursors.is_empty() {
+        ControlMap::multi_cursor(editor);
     }
+    let cursors = &mut editor.controls.cursors;
     let mut new_cursor = Cursor::default();
     new_cursor.set_position(position);
-    match editor.multi_positions.iter().position(|c| c.get_position() < position) {
-        Some(index) => editor.multi_positions.insert(index, new_cursor),
-        None => editor.multi_positions.push(new_cursor),
+    match cursors.iter().position(|c| c.get_position() < position) {
+        Some(index) => cursors.insert(index, new_cursor),
+        None => cursors.push(new_cursor),
     }
 }
 
@@ -152,13 +207,13 @@ where
         |actions, lexer, content| {
             let mut index = 0;
             let mut last_edit_idx = 0;
-            while let Some(cursor) = editor.multi_positions.get_mut(index) {
+            while let Some(cursor) = editor.controls.cursors.get_mut(index) {
                 (callback)(actions, lexer, content, cursor);
 
                 let current_edit_idx = transaction::check_edit_true_count(actions, lexer);
                 if current_edit_idx > last_edit_idx && index > 0 {
                     let edit_offset = transaction::EditOffsetType::get_from_edit(actions, current_edit_idx - 1);
-                    edit_offset.apply_cursor(editor.multi_positions.iter_mut().take(index))?;
+                    edit_offset.apply_cursor(editor.controls.cursors.iter_mut().take(index))?;
                 };
                 last_edit_idx = current_edit_idx;
                 index += 1;
@@ -169,7 +224,7 @@ where
 
     if result.is_err() {
         // force restore during consolidation of cursors
-        editor.multi_positions.retain(|c| c.max_rows != 0);
+        editor.controls.cursors.retain(|c| c.max_rows != 0);
     }
 }
 

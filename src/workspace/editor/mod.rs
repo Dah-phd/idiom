@@ -6,7 +6,7 @@ use super::{
     cursor::{Cursor, CursorPosition},
     line::EditorLine,
     renderer::Renderer,
-    utils::{copy_content, find_line_start, token_range_at},
+    utils::{find_line_start, token_range_at},
 };
 use crate::{
     configs::{EditorAction, EditorConfigs, FileType, IndentConfigs},
@@ -18,7 +18,7 @@ use crate::{
 use controls::ControlMap;
 use idiom_tui::{layout::Rect, Position};
 use lsp_types::TextEdit;
-use std::{cmp::Ordering, path::PathBuf};
+use std::path::PathBuf;
 use utils::{big_file_protection, build_display, calc_line_number_offset, FileUpdate};
 pub use utils::{editor_from_data, text_editor_from_data};
 
@@ -28,14 +28,13 @@ pub struct Editor {
     pub path: PathBuf,
     pub lexer: Lexer,
     pub cursor: Cursor,
-    pub multi_positions: Vec<Cursor>,
     pub content: Vec<EditorLine>,
     pub update_status: FileUpdate,
     pub line_number_offset: usize,
     pub last_render_at_line: Option<usize>,
     pub actions: Actions,
     renderer: Renderer,
-    controls: ControlMap,
+    pub controls: ControlMap,
 }
 
 impl Editor {
@@ -51,7 +50,6 @@ impl Editor {
         let line_number_offset = calc_line_number_offset(content.len());
         Ok(Self {
             cursor: Cursor::sized(*gs.editor_area(), line_number_offset),
-            multi_positions: Vec::new(),
             line_number_offset,
             lexer: Lexer::with_context(file_type, &path, gs),
             content,
@@ -78,7 +76,6 @@ impl Editor {
         calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
             cursor,
-            multi_positions: Vec::new(),
             line_number_offset,
             lexer: Lexer::text_lexer(&path, gs),
             content,
@@ -103,7 +100,6 @@ impl Editor {
         calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
             cursor,
-            multi_positions: Vec::new(),
             line_number_offset,
             lexer: Lexer::text_lexer(&path, gs),
             content,
@@ -158,6 +154,10 @@ impl Editor {
         for line in self.content.iter_mut().skip(self.cursor.at_line + skip_offset).take(rect.width) {
             line.cached.reset();
         }
+    }
+
+    pub fn cursors(&self) -> &[Cursor] {
+        &self.controls.cursors
     }
 
     // MAPPING
@@ -219,7 +219,7 @@ impl Editor {
     }
 
     pub fn go_to(&mut self, line: usize) {
-        controls::ensure_single_cursor(self);
+        ControlMap::ensure_single_cursor(self);
         self.cursor.select_drop();
         if self.content.len() <= line {
             return;
@@ -230,7 +230,7 @@ impl Editor {
     }
 
     pub fn go_to_select(&mut self, from: CursorPosition, to: CursorPosition) {
-        controls::ensure_single_cursor(self);
+        ControlMap::ensure_single_cursor(self);
         self.cursor.at_line = to.line.saturating_sub(self.cursor.max_rows / 2);
         self.cursor.select_set(from, to);
     }
@@ -286,8 +286,8 @@ impl Editor {
         self.actions.clear();
         self.cursor.reset();
         self.lexer.close();
-        if !self.multi_positions.is_empty() {
-            self.multi_positions.clear();
+        if !self.controls.cursors.is_empty() {
+            self.controls.cursors.clear();
             self.renderer.single_cursor();
         }
         let content = match std::fs::read_to_string(&self.path) {
@@ -335,82 +335,56 @@ impl Editor {
         self.cursor.max_rows = height;
         self.line_number_offset = calc_line_number_offset(self.content.len());
         self.cursor.text_width = width.saturating_sub(self.line_number_offset + 1);
-        for pos in self.multi_positions.iter_mut() {
+        for pos in self.controls.cursors.iter_mut() {
             pos.text_width = self.cursor.text_width;
         }
     }
 
-    // EDITS
+    // EDITS (control map pass through)
 
+    #[inline(always)]
     pub fn insert_text_with_relative_offset(&mut self, insert: String) {
-        self.actions.insert_top_cursor_relative_offset(insert, &mut self.cursor, &mut self.content, &mut self.lexer);
+        (self.controls.insert_import)(self, insert);
     }
 
+    #[inline(always)]
     pub fn replace_select(&mut self, from: CursorPosition, to: CursorPosition, new_clip: &str) {
-        self.actions.replace_select(from, to, new_clip, &mut self.cursor, &mut self.content, &mut self.lexer);
+        (self.controls.replace_select)(self, from, to, new_clip);
     }
 
     #[inline(always)]
     pub fn replace_token(&mut self, new: String) {
-        self.actions.replace_token(new, &mut self.cursor, &mut self.content, &mut self.lexer);
+        (self.controls.replace_token)(self, new);
     }
 
     #[inline(always)]
     pub fn insert_snippet(&mut self, snippet: String, cursor_offset: Option<(usize, usize)>) {
-        self.actions.insert_snippet(&mut self.cursor, snippet, cursor_offset, &mut self.content, &mut self.lexer);
+        (self.controls.insert_snippet)(self, snippet, cursor_offset);
     }
 
     #[inline(always)]
     pub fn insert_snippet_with_select(&mut self, snippet: String, cursor_offset: (usize, usize), len: usize) {
-        self.actions.insert_snippet_with_select(
-            &mut self.cursor,
-            snippet,
-            cursor_offset,
-            len,
-            &mut self.content,
-            &mut self.lexer,
-        );
-    }
-
-    pub fn mass_replace(&mut self, mut ranges: Vec<(CursorPosition, CursorPosition)>, clip: String) {
-        ranges.sort_by(|a, b| {
-            let line_ord = b.0.line.cmp(&a.0.line);
-            if let Ordering::Equal = line_ord {
-                return b.0.char.cmp(&a.0.char);
-            }
-            line_ord
-        });
-        self.actions.mass_replace(&mut self.cursor, ranges, clip, &mut self.content, &mut self.lexer);
-    }
-
-    pub fn apply_file_edits(&mut self, mut edits: Vec<TextEdit>) {
-        edits.sort_by(|a, b| {
-            b.range.start.line.cmp(&a.range.start.line).then(b.range.start.character.cmp(&a.range.start.character))
-        });
-        self.actions.apply_edits(&mut self.cursor, edits, &mut self.content, &mut self.lexer);
+        (self.controls.insert_snippet_with_select)(self, snippet, cursor_offset, len);
     }
 
     #[inline(always)]
-    pub fn cut(&mut self) -> Option<String> {
-        if self.content.is_empty() {
-            return None;
-        }
-        Some(self.actions.cut(&mut self.cursor, &mut self.content, &mut self.lexer))
+    pub fn mass_replace(&mut self, ranges: Vec<(CursorPosition, CursorPosition)>, clip: String) {
+        (self.controls.mass_replace)(self, ranges, clip);
+    }
+
+    #[inline(always)]
+    pub fn apply_file_edits(&mut self, edits: Vec<TextEdit>) {
+        (self.controls.apply_file_edits)(self, edits)
     }
 
     #[inline(always)]
     pub fn copy(&mut self) -> Option<String> {
-        if self.content.is_empty() {
-            None
-        } else if let Some((from, to)) = self.cursor.select_get() {
-            Some(copy_content(from, to, &self.content))
-        } else {
-            Some(format!("{}\n", &self.content[self.cursor.line]))
-        }
+        (self.controls.copy)(self)
     }
 
+    #[inline(always)]
     pub fn paste(&mut self, clip: String) {
-        self.actions.paste(clip, &mut self.cursor, &mut self.content, &mut self.lexer);
+        (self.controls.paste)(self, clip)
     }
 
     // MOUSE
@@ -456,7 +430,7 @@ impl Editor {
     }
 
     pub fn mouse_click(&mut self, position: Position, gs: &mut GlobalState) {
-        controls::ensure_single_cursor(self);
+        ControlMap::ensure_single_cursor(self);
         if let Some(rect) = self.lexer.mouse_click_modal_if_exists(position, gs) {
             self.clear_lines_cache(rect, gs);
             return;
@@ -481,7 +455,7 @@ impl Editor {
     }
 
     pub fn mouse_select_to(&mut self, position: Position, gs: &mut GlobalState) {
-        controls::ensure_single_cursor(self);
+        ControlMap::ensure_single_cursor(self);
         if let Some(rect) = self.lexer.mouse_click_modal_if_exists(position, gs) {
             self.clear_lines_cache(rect, gs);
             return;

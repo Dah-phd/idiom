@@ -147,13 +147,13 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     ctx.correct_last_line_match(&mut editor.content, lines.len());
     let backend = &mut gs.backend;
 
-    ctx.init_multi_cursor(&editor.multi_positions);
+    ctx.init_multi_cursor(&editor.controls.cursors);
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
         let line = match lines.next() {
             None => break,
             Some(line) => line,
         };
-        if let Some((cursors, selects)) = ctx.multi_cursor_line_setup(&editor.multi_positions, line.width) {
+        if let Some((cursors, selects)) = ctx.multi_cursor_line_setup(&editor.controls.cursors, line.width) {
             code::multi_cursor(text, &mut ctx, line, backend, cursors, selects);
         } else if ctx.has_cursor(line_idx) {
             code::cursor_fast(text, &mut ctx, line, backend);
@@ -173,7 +173,7 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
         }
     }
 
-    gs.render_stats(editor.content.len(), editor.multi_positions.len(), cursor.into());
+    gs.render_stats(editor.content.len(), editor.controls.cursors.len(), cursor.into());
 }
 
 #[inline(always)]
@@ -187,13 +187,13 @@ fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
     let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
     let backend = &mut gs.backend;
 
-    ctx.init_multi_cursor(&editor.multi_positions);
+    ctx.init_multi_cursor(&editor.controls.cursors);
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
         let line = match lines.next() {
             None => break,
             Some(line) => line,
         };
-        ctx.multi_cursor_line_setup(&editor.multi_positions, line.width);
+        ctx.multi_cursor_line_setup(&editor.controls.cursors, line.width);
         if ctx.has_cursor(line_idx) {
             code::cursor(text, &mut ctx, line, backend);
         } else {
@@ -206,7 +206,7 @@ fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
         line.render_empty(&mut gs.backend);
     }
 
-    gs.render_stats(editor.content.len(), editor.multi_positions.len(), cursor.into());
+    gs.render_stats(editor.content.len(), editor.controls.cursors.len(), cursor.into());
 }
 
 // TEXT
