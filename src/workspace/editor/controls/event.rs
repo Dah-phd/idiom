@@ -181,6 +181,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 }
             });
             if let Some((position, line)) = auto_complete {
+                editor.cursor.set_position(position);
                 editor.lexer.get_autocomplete(position, line, gs);
             }
         }

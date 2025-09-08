@@ -165,14 +165,11 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
         }
     }
 
-    if !ctx.lexer.modal_is_rendered() {
-        for line in lines {
-            line.render_empty(&mut gs.backend);
-        }
+    for line in lines {
+        line.render_empty(&mut gs.backend);
     }
-
     gs.render_stats(editor.content.len(), editor.controls.cursors.len(), cursor.into());
-    ctx.render_modal(gs);
+    ctx.forced_modal_render(gs);
 }
 
 #[inline(always)]
