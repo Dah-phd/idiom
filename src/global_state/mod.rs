@@ -227,7 +227,7 @@ impl GlobalState {
             Mode::Insert => {
                 let Some(editor) = ws.get_active() else { return };
                 let row = (editor.cursor.line - editor.cursor.at_line) as u16;
-                let col = (editor.cursor.char + editor.line_number_offset + 1) as u16;
+                let col = (editor.cursor.char + editor.line_number_padding + 1) as u16;
                 let accent_style = self.theme.accent_style();
                 menu_context_editor_inplace(Position { row, col }, self.editor_area, accent_style)
             }

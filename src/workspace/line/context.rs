@@ -14,7 +14,7 @@ pub struct LineContext<'a> {
     pub lexer: &'a mut Lexer,
     pub accent_style: ContentStyle,
     line_number: usize,
-    line_number_offset: usize,
+    line_number_padding: usize,
     line: usize,
     cursor_line: usize,
     cursor_char: usize,
@@ -25,7 +25,7 @@ impl<'a> LineContext<'a> {
     pub fn collect_context(
         lexer: &'a mut Lexer,
         cursor: &Cursor,
-        line_number_offset: usize,
+        line_number_padding: usize,
         accent_style: ContentStyle,
     ) -> Self {
         let line_number = cursor.at_line;
@@ -37,7 +37,7 @@ impl<'a> LineContext<'a> {
             select,
             lexer,
             line_number,
-            line_number_offset,
+            line_number_padding,
             accent_style,
         }
     }
@@ -74,7 +74,7 @@ impl<'a> LineContext<'a> {
     #[inline]
     pub fn setup_cursor(&mut self, line: Line, backend: &mut CrossTerm) -> usize {
         self.line_number += 1;
-        let text = format!("{: >1$} ", self.line_number, self.line_number_offset);
+        let text = format!("{: >1$} ", self.line_number, self.line_number_padding);
         let remaining_width = line.width - text.len();
         backend.print_at(line.row, line.col, text);
         backend.clear_to_eol();
@@ -84,7 +84,7 @@ impl<'a> LineContext<'a> {
     #[inline]
     pub fn setup_line(&mut self, line: Line, backend: &mut CrossTerm) -> usize {
         self.line_number += 1;
-        let text = format!("{: >1$} ", self.line_number, self.line_number_offset);
+        let text = format!("{: >1$} ", self.line_number, self.line_number_padding);
         let remaining_width = line.width - text.len();
         backend.print_styled_at(line.row, line.col, text, self.accent_style);
         backend.clear_to_eol();
@@ -93,14 +93,14 @@ impl<'a> LineContext<'a> {
 
     #[inline]
     pub fn wrap_line(&mut self, line: Line, backend: &mut CrossTerm) {
-        let text = format!("{: >1$} ", "", self.line_number_offset);
+        let text = format!("{: >1$} ", "", self.line_number_padding);
         backend.print_styled_at(line.row, line.col, text, self.accent_style);
         backend.clear_to_eol();
     }
 
     #[inline]
     pub fn select_get(&self, width: usize) -> Option<Range<usize>> {
-        build_select_buffer(self.select, self.line_number, width - (self.line_number_offset + 1))
+        build_select_buffer(self.select, self.line_number, width - (self.line_number_padding + 1))
     }
 
     #[inline(always)]
@@ -116,25 +116,26 @@ impl<'a> LineContext<'a> {
     #[inline]
     pub fn forced_modal_render(self, gs: &mut GlobalState) {
         let row = self.line as u16;
-        let col = (self.cursor_char + self.line_number_offset + 1) as u16;
+        let col = (self.cursor_char + self.line_number_padding + 1) as u16;
         self.lexer.forece_modal_render_if_exists(row, col, gs);
     }
 
     #[inline]
     pub fn render_modal(self, gs: &mut GlobalState) {
         let row = self.line as u16;
-        let col = (self.cursor_char + self.line_number_offset + 1) as u16;
+        let col = (self.cursor_char + self.line_number_padding + 1) as u16;
         self.lexer.render_modal_if_exist(row, col, gs);
     }
 
-    pub fn init_multi_cursor(&mut self, cursors: &[Cursor]) {
+    pub fn init_multic_mod(&mut self, cursors: &[Cursor]) {
         let Some(cursor) = cursors.last() else { return };
+        self.line = cursor.line - self.line_number;
         self.cursor_line = cursor.line;
         self.cursor_char = cursor.char;
         self.select = cursor.select_get();
     }
 
-    pub fn multi_cursor_line_setup(
+    pub fn multic_line_setup(
         &mut self,
         cursors: &[Cursor],
         width: usize,
@@ -157,7 +158,7 @@ impl<'a> LineContext<'a> {
             }
         }
         if positions.len() > 1 || selects.len() > 1 {
-            let max_len = width - (self.line_number_offset + 1);
+            let max_len = width - (self.line_number_padding + 1);
             let select_ranges = selects
                 .into_iter()
                 .flat_map(|select| build_select_buffer(Some(select), self.line_number, max_len))

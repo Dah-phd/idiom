@@ -30,7 +30,7 @@ pub struct Editor {
     pub cursor: Cursor,
     pub content: Vec<EditorLine>,
     pub update_status: FileUpdate,
-    pub line_number_offset: usize,
+    pub line_number_padding: usize,
     pub last_render_at_line: Option<usize>,
     pub actions: Actions,
     renderer: Renderer,
@@ -50,7 +50,7 @@ impl Editor {
         let line_number_offset = calc_line_number_offset(content.len());
         Ok(Self {
             cursor: Cursor::sized(*gs.editor_area(), line_number_offset),
-            line_number_offset,
+            line_number_padding: line_number_offset,
             lexer: Lexer::with_context(file_type, &path, gs),
             content,
             renderer: Renderer::code(),
@@ -76,7 +76,7 @@ impl Editor {
         calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
             cursor,
-            line_number_offset,
+            line_number_padding: line_number_offset,
             lexer: Lexer::text_lexer(&path, gs),
             content,
             renderer: Renderer::text(),
@@ -100,7 +100,7 @@ impl Editor {
         calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
             cursor,
-            line_number_offset,
+            line_number_padding: line_number_offset,
             lexer: Lexer::text_lexer(&path, gs),
             content,
             renderer: Renderer::markdown(),
@@ -119,8 +119,8 @@ impl Editor {
     #[inline]
     pub fn render(&mut self, gs: &mut GlobalState) {
         let new_offset = calc_line_number_offset(self.content.len());
-        if new_offset != self.line_number_offset {
-            self.line_number_offset = new_offset;
+        if new_offset != self.line_number_padding {
+            self.line_number_padding = new_offset;
             self.last_render_at_line.take();
         };
         (self.renderer.render)(self, gs);
@@ -130,8 +130,8 @@ impl Editor {
     #[inline]
     pub fn fast_render(&mut self, gs: &mut GlobalState) {
         let new_offset = calc_line_number_offset(self.content.len());
-        if new_offset != self.line_number_offset {
-            self.line_number_offset = new_offset;
+        if new_offset != self.line_number_padding {
+            self.line_number_padding = new_offset;
             self.last_render_at_line.take();
         };
         (self.renderer.fast_render)(self, gs)
@@ -333,8 +333,8 @@ impl Editor {
 
     pub fn resize(&mut self, width: usize, height: usize) {
         self.cursor.max_rows = height;
-        self.line_number_offset = calc_line_number_offset(self.content.len());
-        self.cursor.text_width = width.saturating_sub(self.line_number_offset + 1);
+        self.line_number_padding = calc_line_number_offset(self.content.len());
+        self.cursor.text_width = width.saturating_sub(self.line_number_padding + 1);
         for pos in self.controls.cursors.iter_mut() {
             pos.text_width = self.cursor.text_width;
         }
@@ -478,7 +478,7 @@ impl Editor {
 
     pub fn mouse_select(&mut self, mut position: CursorPosition) {
         position.line += self.cursor.at_line;
-        position.char = position.char.saturating_sub(self.line_number_offset + 1);
+        position.char = position.char.saturating_sub(self.line_number_padding + 1);
         self.cursor.set_cursor_checked_with_select(position, &self.content);
     }
 
@@ -491,7 +491,7 @@ impl Editor {
     fn mouse_parse(&self, position: Position) -> CursorPosition {
         let mut position = CursorPosition::from(position);
         position.line += self.cursor.at_line;
-        position.char = position.char.saturating_sub(self.line_number_offset + 1);
+        position.char = position.char.saturating_sub(self.line_number_padding + 1);
         position
     }
 }

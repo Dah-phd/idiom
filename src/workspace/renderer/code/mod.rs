@@ -142,7 +142,7 @@ pub fn cursor_fast(code: &mut EditorLine, ctx: &mut LineContext, line: Line, bac
 }
 
 #[inline(always)]
-pub fn multi_cursor(
+pub fn multi_cursor_fast(
     code: &mut EditorLine,
     ctx: &mut LineContext,
     line: Line,
@@ -154,7 +154,18 @@ pub fn multi_cursor(
         ctx.skip_line();
         return;
     };
+    multi_cursor(code, ctx, line, backend, cursors, selects);
+}
 
+#[inline(always)]
+pub fn multi_cursor(
+    code: &mut EditorLine,
+    ctx: &mut LineContext,
+    line: Line,
+    backend: &mut CrossTerm,
+    cursors: Vec<CursorPosition>,
+    selects: Vec<Range<usize>>,
+) {
     let line_width = ctx.setup_cursor(line, backend);
     match code.is_simple() {
         true => ascii_multi_cursor::render(code, ctx, line_width, cursors, selects, backend),

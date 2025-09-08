@@ -19,7 +19,7 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), crate::ext_tui::CrossTerm::init());
     let content: Vec<EditorLine> = content.into_iter().map(EditorLine::from).collect();
     Editor {
-        line_number_offset: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
+        line_number_padding: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
         lexer: Lexer::with_context(ft, &path, &mut gs),
         file_type: ft,
         display: "".to_string(),
