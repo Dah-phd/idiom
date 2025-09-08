@@ -21,7 +21,7 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
             if editor.lexer.should_autocomplete(editor.cursor.char, line) {
                 let line = line.to_string();
                 editor.actions.push_buffer(&mut editor.lexer);
-                editor.lexer.get_autocomplete((&editor.cursor).into(), line, gs);
+                editor.lexer.get_autocomplete(editor.cursor.get_position(), line, gs);
             }
             return true;
         }
@@ -169,9 +169,21 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
     }
     match action {
         // EDITS:
-        EditorAction::Char(ch) => apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
-            actions.push_char(ch, cursor, content, lexer);
-        }),
+        EditorAction::Char(ch) => {
+            let mut auto_complete = None;
+            apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
+                actions.push_char(ch, cursor, content, lexer);
+                if cursor.max_rows != 0 {
+                    let line = &content[cursor.line];
+                    if lexer.should_autocomplete(cursor.char, line) {
+                        auto_complete = Some((cursor.get_position(), line.to_string()));
+                    }
+                }
+            });
+            if let Some((position, line)) = auto_complete {
+                editor.lexer.get_autocomplete(position, line, gs);
+            }
+        }
         EditorAction::Backspace => apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
             actions.backspace(cursor, content, lexer);
         }),

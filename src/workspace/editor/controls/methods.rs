@@ -50,33 +50,14 @@ pub fn multic_insert_snippet_with_select(
     })
 }
 
-pub fn replace_select(editor: &mut Editor, from: CursorPosition, to: CursorPosition, new_clip: &str) {
-    ControlMap::ensure_single_cursor(editor);
-    editor.actions.replace_select(from, to, new_clip, &mut editor.cursor, &mut editor.content, &mut editor.lexer);
-}
-
 pub fn replace_token(editor: &mut Editor, new: String) {
     editor.actions.replace_token(new, &mut editor.cursor, &mut editor.content, &mut editor.lexer);
 }
 
-pub fn mass_replace(editor: &mut Editor, mut ranges: Vec<(CursorPosition, CursorPosition)>, clip: String) {
-    ControlMap::ensure_single_cursor(editor);
-    ranges.sort_by(|a, b| {
-        let line_ord = b.0.line.cmp(&a.0.line);
-        if let Ordering::Equal = line_ord {
-            return b.0.char.cmp(&a.0.char);
-        }
-        line_ord
-    });
-    editor.actions.mass_replace(&mut editor.cursor, ranges, clip, &mut editor.content, &mut editor.lexer);
-}
-
-pub fn apply_file_edits(editor: &mut Editor, mut edits: Vec<TextEdit>) {
-    ControlMap::ensure_single_cursor(editor);
-    edits.sort_by(|a, b| {
-        b.range.start.line.cmp(&a.range.start.line).then(b.range.start.character.cmp(&a.range.start.character))
-    });
-    editor.actions.apply_edits(&mut editor.cursor, edits, &mut editor.content, &mut editor.lexer);
+pub fn multic_replace_token(editor: &mut Editor, new: String) {
+    apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
+        actions.replace_token(new.clone(), cursor, content, lexer);
+    })
 }
 
 pub fn cut(editor: &mut Editor) -> Option<String> {
@@ -140,4 +121,31 @@ pub fn multic_paste(editor: &mut Editor, clip: String) {
             actions.paste(clip.to_owned(), cursor, content, lexer);
         });
     }
+}
+
+// SINGLE CURSOR ONLY
+
+pub fn replace_select(editor: &mut Editor, from: CursorPosition, to: CursorPosition, new_clip: &str) {
+    ControlMap::ensure_single_cursor(editor);
+    editor.actions.replace_select(from, to, new_clip, &mut editor.cursor, &mut editor.content, &mut editor.lexer);
+}
+
+pub fn mass_replace(editor: &mut Editor, mut ranges: Vec<(CursorPosition, CursorPosition)>, clip: String) {
+    ControlMap::ensure_single_cursor(editor);
+    ranges.sort_by(|a, b| {
+        let line_ord = b.0.line.cmp(&a.0.line);
+        if let Ordering::Equal = line_ord {
+            return b.0.char.cmp(&a.0.char);
+        }
+        line_ord
+    });
+    editor.actions.mass_replace(&mut editor.cursor, ranges, clip, &mut editor.content, &mut editor.lexer);
+}
+
+pub fn apply_file_edits(editor: &mut Editor, mut edits: Vec<TextEdit>) {
+    ControlMap::ensure_single_cursor(editor);
+    edits.sort_by(|a, b| {
+        b.range.start.line.cmp(&a.range.start.line).then(b.range.start.character.cmp(&a.range.start.character))
+    });
+    editor.actions.apply_edits(&mut editor.cursor, edits, &mut editor.content, &mut editor.lexer);
 }

@@ -61,6 +61,7 @@ impl ControlMap {
         self.action_map = event::multi_cursor_map;
 
         self.insert_import = methods::multic_insert_import;
+        self.replace_token = methods::multic_replace_token;
         self.insert_snippet = methods::multic_insert_snippet;
         self.insert_snippet_with_select = methods::multic_insert_snippet_with_select;
 
@@ -74,6 +75,7 @@ impl ControlMap {
         self.action_map = event::single_cursor_map;
 
         self.insert_import = methods::insert_import;
+        self.replace_token = methods::replace_token;
         self.insert_snippet = methods::insert_snippet;
         self.insert_snippet_with_select = methods::insert_snippet_with_select;
 
