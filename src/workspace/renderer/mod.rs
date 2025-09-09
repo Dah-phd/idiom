@@ -145,31 +145,33 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     ctx.correct_last_line_match(&mut editor.content, lines.len());
     let backend = &mut gs.backend;
 
+    let mut is_rendered_cursor = false;
+
     ctx.init_multic_mod(&editor.controls.cursors);
     for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
         let line = match lines.next() {
             None => break,
             Some(line) => line,
         };
-        if let Some((cursors, selects)) = ctx.multic_line_setup(&editor.controls.cursors, line.width) {
-            code::multi_cursor_fast(text, &mut ctx, line, backend, cursors, selects);
-        } else if ctx.has_cursor(line_idx) {
-            code::cursor_fast(text, &mut ctx, line, backend);
-        } else {
-            let select = ctx.select_get(line.width);
-            if text.cached.should_render_line(line.row, &select) {
-                code::inner_render(text, &mut ctx, line, select, backend);
-            } else {
-                ctx.skip_line();
-            }
-        }
+        is_rendered_cursor |=
+            code::fast_render_is_cursor(text, &editor.controls.cursors, line, line_idx, &mut ctx, backend);
     }
 
-    for line in lines {
-        line.render_empty(&mut gs.backend);
+    if is_rendered_cursor {
+        for line in lines {
+            line.render_empty(&mut gs.backend);
+        }
+        ctx.forced_modal_render(gs);
+    } else {
+        if !ctx.lexer.modal_is_rendered() {
+            for line in lines {
+                line.render_empty(&mut gs.backend);
+            }
+        }
+
+        ctx.render_modal(gs);
     }
     gs.render_stats(editor.content.len(), editor.controls.cursors.len(), cursor.into());
-    ctx.forced_modal_render(gs);
 }
 
 #[inline(always)]

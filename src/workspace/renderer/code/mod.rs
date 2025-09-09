@@ -141,20 +141,45 @@ pub fn cursor_fast(code: &mut EditorLine, ctx: &mut LineContext, line: Line, bac
     backend.reset_style();
 }
 
-#[inline(always)]
-pub fn multi_cursor_fast(
-    code: &mut EditorLine,
-    ctx: &mut LineContext,
+/// returns true if renders cursor
+pub fn fast_render_is_cursor(
+    text: &mut EditorLine,
+    cursors: &[Cursor],
     line: Line,
+    line_idx: usize,
+    ctx: &mut LineContext,
     backend: &mut CrossTerm,
-    cursors: Vec<CursorPosition>,
-    selects: Vec<Range<usize>>,
-) {
-    if !code.cached.should_render_multi_cursor(line.row, &cursors, &selects) {
-        ctx.skip_line();
-        return;
-    };
-    multi_cursor(code, ctx, line, backend, cursors, selects);
+) -> bool {
+    if let Some((cursors, selects)) = ctx.multic_line_setup(cursors, line.width) {
+        if !text.cached.should_render_multi_cursor(line.row, &cursors, &selects) {
+            ctx.skip_line();
+            return false;
+        };
+        multi_cursor(text, ctx, line, backend, cursors, selects);
+    } else if ctx.has_cursor(line_idx) {
+        let select = ctx.select_get(line.width);
+        if !text.cached.should_render_cursor_or_update(line.row, ctx.cursor_char(), select.clone()) {
+            ctx.skip_line();
+            return false;
+        }
+
+        let line_width = ctx.setup_cursor(line, backend);
+
+        match text.is_simple() {
+            true => ascii_cursor::render(text, ctx, line_width, select, backend),
+            false => complex_cursor::render(text, ctx, line_width, select, backend),
+        }
+        backend.reset_style();
+    } else {
+        let select = ctx.select_get(line.width);
+        if text.cached.should_render_line(line.row, &select) {
+            inner_render(text, ctx, line, select, backend);
+        } else {
+            ctx.skip_line();
+        }
+        return false;
+    }
+    true
 }
 
 #[inline(always)]
