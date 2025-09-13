@@ -111,7 +111,7 @@ impl EditorConfigs {
 
     pub fn derive_lsp(&self, file_type: &FileType) -> Option<String> {
         match file_type {
-            FileType::Ignored | FileType::Lobster | FileType::Json | FileType::Shell => None,
+            FileType::Text | FileType::MarkDown | FileType::Lobster | FileType::Json | FileType::Shell => None,
             FileType::Rust => self.rust_lsp.to_owned(),
             FileType::Zig => self.zig_lsp.to_owned(),
             FileType::Python => self.python_lsp.to_owned(),

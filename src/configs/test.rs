@@ -10,7 +10,8 @@ fn ensure_file_types_iter() {
     assert_eq!(FileType::iter_langs().len(), 14);
     let ft = FileType::default();
     match ft {
-        FileType::Ignored => {}
+        FileType::MarkDown => (),
+        FileType::Text => (),
         FileType::Zig => (),
         FileType::Rust => (),
         FileType::Python => (),

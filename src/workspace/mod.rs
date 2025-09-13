@@ -16,7 +16,7 @@ use crate::{
 use crossterm::event::KeyEvent;
 use crossterm::style::{Color, ContentStyle};
 pub use cursor::{Cursor, CursorPosition};
-pub use editor::{editor_from_data, text_editor_from_data, Editor};
+pub use editor::{editor_from_data, Editor};
 use idiom_tui::Backend;
 use line::EditorLine;
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
@@ -262,7 +262,7 @@ impl Workspace {
         cursor: Option<Cursor>,
         gs: &mut GlobalState,
     ) {
-        let editor = text_editor_from_data(path, content, cursor, &self.base_configs, gs);
+        let editor = editor_from_data(path, FileType::Text, content, cursor, &self.base_configs, gs);
         self.editors.insert(0, editor);
     }
 
@@ -278,10 +278,6 @@ impl Workspace {
         let content = match content {
             None => EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?,
             Some(lines) => lines.into_iter().map(EditorLine::from).collect(),
-        };
-        if matches!(file_type, FileType::Ignored) {
-            self.new_text_from_data(path, content, Some(cursor), gs);
-            return Ok(());
         };
         let mut editor = editor_from_data(path, file_type, content, Some(cursor), &self.base_configs, gs);
         self.lsp_enroll(&mut editor, gs).await;
@@ -316,27 +312,27 @@ impl Workspace {
     }
 
     fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
-        Editor::from_path(file_path, FileType::Ignored, &self.base_configs, gs)
+        Editor::from_path(file_path, FileType::Text, &self.base_configs, gs)
     }
 
     async fn determine_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
-        let file_type = match FileType::derive_type(&file_path) {
-            Some(file_type) => file_type,
-            None => {
-                return match file_path.extension().and_then(|ext| ext.to_str()) {
-                    Some(ext) if ext.to_lowercase() == "md" => Editor::from_path_md(file_path, &self.base_configs, gs),
-                    _ => Editor::from_path_text(file_path, &self.base_configs, gs),
-                }
+        match FileType::derive_type(&file_path) {
+            FileType::Text => Editor::from_path_text(file_path, &self.base_configs, gs),
+            FileType::MarkDown => Editor::from_path_md(file_path, &self.base_configs, gs),
+            file_type => {
+                let mut editor = Editor::from_path(file_path, file_type, &self.base_configs, gs)?;
+                self.lsp_enroll(&mut editor, gs).await;
+                Ok(editor)
             }
-        };
-        let mut editor = Editor::from_path(file_path, file_type, &self.base_configs, gs)?;
-        self.lsp_enroll(&mut editor, gs).await;
-        Ok(editor)
+        }
     }
 
     // LSP HANDLES
 
     async fn lsp_enroll(&mut self, editor: &mut Editor, gs: &mut GlobalState) {
+        if !editor.file_type.is_code() {
+            return; // no lsp for text / markdown files
+        }
         let lsp_cmd = match self.base_configs.derive_lsp(&editor.file_type) {
             None => {
                 editor.lexer.local_lsp(editor.file_type, editor.stringify(), gs);
@@ -374,6 +370,10 @@ impl Workspace {
             Some(editor) => editor.file_type_set(file_type, new_indent_cfg, gs),
             None => return Err(IdiomError::LSP(crate::lsp::LSPError::Null)),
         };
+
+        if !file_type.is_code() {
+            return Ok(());
+        }
 
         let lsp_cmd = match self.base_configs.derive_lsp(&file_type) {
             Some(lsp_cmd) => lsp_cmd,

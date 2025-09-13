@@ -69,7 +69,7 @@ impl Lexer {
         Self {
             lang: Lang::from(file_type),
             legend: Legend::default(),
-            theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
+            theme: gs.unwrap_or_default(Theme::new(), "theme.toml: "),
             modal: None,
             modal_rect: None,
             uri: as_url(path),
@@ -106,7 +106,7 @@ impl Lexer {
         Self {
             lang: Lang::default(),
             legend: Legend::default(),
-            theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
+            theme: gs.unwrap_or_default(Theme::new(), "theme.toml: "),
             modal: None,
             modal_rect: None,
             uri: as_url(path),
@@ -143,7 +143,7 @@ impl Lexer {
         Self {
             lang: Lang::default(),
             legend: Legend::default(),
-            theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
+            theme: gs.unwrap_or_default(Theme::new(), "theme.toml: "),
             modal: None,
             modal_rect: None,
             uri: as_url(path),

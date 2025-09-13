@@ -23,7 +23,11 @@ pub struct SelectorLSP {
 
 impl SelectorLSP {
     pub fn run(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
-        let file_types = FileType::iter_langs().into_iter().map(|x| (0, x.into(), x)).collect();
+        let file_types = FileType::iter_langs()
+            .into_iter()
+            .map(|x| (0, x.into(), x))
+            .chain([(0, "markdown", FileType::MarkDown), (0, "no LSP", FileType::Text)])
+            .collect();
         let pattern = TextField::new(String::new(), Some(true));
         let mut new = Self { pattern, state: State::default(), file_types };
 

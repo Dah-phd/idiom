@@ -19,8 +19,12 @@ use controls::ControlMap;
 use idiom_tui::{layout::Rect, Position};
 use lsp_types::TextEdit;
 use std::path::PathBuf;
+pub use utils::editor_from_data;
 use utils::{big_file_protection, build_display, calc_line_number_offset, FileUpdate};
-pub use utils::{editor_from_data, text_editor_from_data};
+
+const WARN_TXT: &str =
+    "The file is opened in text mode, beware idiom is not designed with plain text performance in mind!";
+const WARN_MD: &str = "The file is opened in MD mode, beware idiom is not designed with MD performance in mind!";
 
 pub struct Editor {
     pub file_type: FileType,
@@ -66,9 +70,7 @@ impl Editor {
 
     pub fn from_path_text(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
         big_file_protection(&path)?;
-        gs.message(
-            "The file is opened in text mode, beware idiom is not designed with plain text performance in mind!",
-        );
+        gs.message(WARN_TXT);
         let mut content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
@@ -82,7 +84,7 @@ impl Editor {
             renderer: Renderer::text(),
             actions: Actions::new(cfg.default_indent_cfg()),
             controls: ControlMap::default(),
-            file_type: FileType::Ignored,
+            file_type: FileType::Text,
             display,
             update_status: FileUpdate::None,
             path,
@@ -92,7 +94,7 @@ impl Editor {
 
     pub fn from_path_md(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
         big_file_protection(&path)?;
-        gs.message("The file is opened in MD mode, beware idiom is not designed with MD performance in mind!");
+        gs.message(WARN_MD);
         let mut content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
@@ -106,7 +108,7 @@ impl Editor {
             renderer: Renderer::markdown(),
             actions: Actions::new(cfg.default_indent_cfg()),
             controls: ControlMap::default(),
-            file_type: FileType::Ignored,
+            file_type: FileType::MarkDown,
             display,
             update_status: FileUpdate::None,
             path,
@@ -175,12 +177,37 @@ impl Editor {
 
     pub fn file_type_set(&mut self, file_type: FileType, cfg: IndentConfigs, gs: &mut GlobalState) {
         self.actions.cfg = cfg;
-        self.lexer = Lexer::with_context(file_type, &self.path, gs);
         self.file_type = file_type;
         match self.file_type {
-            FileType::Ignored => self.renderer = Renderer::text(),
-            _ => self.renderer = Renderer::code(),
-        }
+            FileType::Text => {
+                self.renderer = Renderer::text();
+                self.lexer = Lexer::text_lexer(&self.path, gs);
+                calc_wraps(&mut self.content, self.cursor.text_width);
+            }
+            FileType::MarkDown => {
+                self.renderer = Renderer::markdown();
+                self.lexer = Lexer::md_lexer(&self.path, gs);
+                calc_wraps(&mut self.content, self.cursor.text_width);
+            }
+            FileType::Rust
+            | FileType::Zig
+            | FileType::C
+            | FileType::Cpp
+            | FileType::Nim
+            | FileType::Python
+            | FileType::JavaScript
+            | FileType::TypeScript
+            | FileType::Yml
+            | FileType::Toml
+            | FileType::Html
+            | FileType::Lobster
+            | FileType::Json
+            | FileType::Shell => {
+                self.renderer = Renderer::code();
+                self.lexer = Lexer::with_context(file_type, &self.path, gs);
+            }
+        };
+        gs.force_screen_rebuild();
     }
 
     pub fn select_token(&mut self) {
