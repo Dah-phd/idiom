@@ -6,9 +6,10 @@ use super::super::{
 use super::{calc_line_number_offset, controls};
 use crate::{
     configs::FileType,
+    ext_tui::CrossTerm,
     global_state::GlobalState,
     syntax::Lexer,
-    workspace::{actions::Actions, line::EditorLine, renderer::Renderer},
+    workspace::{actions::Actions, line::EditorLine, renderer::Renderer, utils::token_range_at},
 };
 use idiom_tui::{layout::Rect, Backend};
 use std::path::PathBuf;
@@ -16,7 +17,7 @@ use std::path::PathBuf;
 pub fn mock_editor(content: Vec<String>) -> Editor {
     let ft = FileType::Rust;
     let path = PathBuf::from("test-path");
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), crate::ext_tui::CrossTerm::init());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let content: Vec<EditorLine> = content.into_iter().map(EditorLine::from).collect();
     Editor {
         line_number_padding: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
@@ -157,4 +158,25 @@ fn filter_per_line_if_no_select() {
             Cursor::default(),
         ]
     );
+}
+
+#[test]
+fn token_if_already_selected() {
+    let mut editor = mock_editor(vec![String::new(), String::from("let data = 3;")]);
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
+    let pos = CursorPosition { line: 1, char: 4 };
+    editor.cursor.set_position(pos);
+    _ = editor.map(crate::configs::EditorAction::SelectToken, &mut gs);
+    let base_range = token_range_at(&editor.content[pos.line], pos.char);
+    let base_select = Some(((pos.line, base_range.start).into(), (pos.line, base_range.end).into()));
+    assert_eq!(base_select, editor.cursor.select_get());
+    let post_pos = editor.cursor.get_position();
+    assert_ne!(post_pos, pos);
+    let post_range = token_range_at(&editor.content[post_pos.line], post_pos.char);
+    assert_eq!(post_range, base_range);
+
+    // second invoke
+    _ = editor.map(crate::configs::EditorAction::SelectToken, &mut gs);
+    let post_select = editor.cursor.select_get();
+    assert_eq!(post_select, base_select);
 }
