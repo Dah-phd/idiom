@@ -1,17 +1,14 @@
-use super::{Action, Lang};
+use super::{Fix, Lang};
 use crate::configs::Theme;
 use crossterm::style::Color;
 use lsp_types::DiagnosticRelatedInformation;
 
-pub fn rust_process_related_info(
-    _lang: &Lang,
-    related_info: &Vec<DiagnosticRelatedInformation>,
-) -> Option<Vec<Action>> {
+pub fn rust_process_related_info(_lang: &Lang, related_info: &Vec<DiagnosticRelatedInformation>) -> Option<Vec<Fix>> {
     let mut buffer = Vec::new();
     for info in related_info {
         if info.message.starts_with("consider importing") {
             if let Some(imports) = rust_derive_import(&info.message) {
-                buffer.extend(imports.into_iter().map(Action::Import))
+                buffer.extend(imports.into_iter().map(Fix::Import))
             }
         }
     }

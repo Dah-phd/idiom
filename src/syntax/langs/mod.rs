@@ -1,5 +1,5 @@
 mod rust;
-use super::{Action, GlobalState};
+use super::{Fix, GlobalState};
 use crate::{
     configs::{FileType, Theme},
     ext_tui::{StyleExt, StyledLine, Text},
@@ -12,7 +12,7 @@ use rust::{rust_process_related_info, rust_specific_handler};
 use serde_json::Value;
 
 type LangSpecificHandler = Option<fn(char_idx: usize, word: &str, full_line: &str, theme: &Theme) -> Option<Color>>;
-type DiagnosticHandler = Option<fn(&Lang, &Vec<DiagnosticRelatedInformation>) -> Option<Vec<Action>>>;
+type DiagnosticHandler = Option<fn(&Lang, &Vec<DiagnosticRelatedInformation>) -> Option<Vec<Fix>>>;
 
 #[derive(Debug, Clone, Default)]
 pub struct Lang {
@@ -71,7 +71,7 @@ impl Lang {
         self.completion_data_handler.as_ref().inspect(|cb| (cb)(self, data, gs));
     }
 
-    pub fn derive_diagnostic_actions(&self, info: Option<&Vec<DiagnosticRelatedInformation>>) -> Option<Vec<Action>> {
+    pub fn derive_diagnostic_actions(&self, info: Option<&Vec<DiagnosticRelatedInformation>>) -> Option<Vec<Fix>> {
         self.diagnostic_handler.as_ref().and_then(|cb| (cb)(self, info?))
     }
 

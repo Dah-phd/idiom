@@ -12,13 +12,13 @@ use crate::{configs::IndentConfigs, syntax::Lexer, utils::Offset};
 use buffer::ActionBuffer;
 pub use edits::Edit;
 use lsp_types::TextEdit;
-pub use meta::{EditMetaData, EditType};
+pub use meta::{Action, EditMetaData};
 
 #[derive(Default)]
 pub struct Actions {
     pub cfg: IndentConfigs,
-    done: Vec<EditType>,
-    undone: Vec<EditType>,
+    done: Vec<Action>,
+    undone: Vec<Action>,
     buffer: ActionBuffer,
 }
 
@@ -528,9 +528,9 @@ impl Actions {
 
     // HANDLERS
 
-    fn push_done(&mut self, edit: impl Into<EditType>, lexer: &mut Lexer, content: &[EditorLine]) {
+    fn push_done(&mut self, edit: impl Into<Action>, lexer: &mut Lexer, content: &[EditorLine]) {
         self.push_buffer(lexer);
-        let action: EditType = edit.into();
+        let action: Action = edit.into();
         lexer.sync(&action, content);
         self.done.push(action);
     }

@@ -9,18 +9,18 @@ use crate::{
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
     lsp::LSPResult,
-    workspace::{actions::EditType, line::EditorLine},
+    workspace::{actions::Action, line::EditorLine},
 };
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::Backend;
 use lsp_types::SemanticToken;
 use std::path::PathBuf;
 
-pub fn intercept_sync(lexer: &mut Lexer, sync: fn(&mut Lexer, &EditType, &[EditorLine]) -> LSPResult<()>) {
+pub fn intercept_sync(lexer: &mut Lexer, sync: fn(&mut Lexer, &Action, &[EditorLine]) -> LSPResult<()>) {
     lexer.sync = sync;
 }
 
-pub fn intercept_sync_rev(lexer: &mut Lexer, sync: fn(&mut Lexer, &EditType, &[EditorLine]) -> LSPResult<()>) {
+pub fn intercept_sync_rev(lexer: &mut Lexer, sync: fn(&mut Lexer, &Action, &[EditorLine]) -> LSPResult<()>) {
     lexer.sync_rev = sync;
 }
 

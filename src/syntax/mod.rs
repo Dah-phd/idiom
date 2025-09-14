@@ -10,12 +10,12 @@ use crate::{
     global_state::{GlobalState, IdiomEvent},
     lsp::{LSPClient, LSPError, LSPResponseType, LSPResult},
     workspace::{
-        actions::{EditMetaData, EditType},
+        actions::{Action, EditMetaData},
         line::EditorLine,
         CursorPosition, Editor,
     },
 };
-pub use diagnostics::{set_diganostics, Action, DiagnosticInfo, DiagnosticLine};
+pub use diagnostics::{set_diganostics, DiagnosticInfo, DiagnosticLine, Fix};
 use idiom_tui::{layout::Rect, Position};
 pub use langs::Lang;
 pub use legend::Legend;
@@ -57,8 +57,8 @@ pub struct Lexer {
     renames: fn(&mut Self, CursorPosition, String, &mut GlobalState),
     sync_tokens: fn(&mut Self, EditMetaData),
     sync_changes: fn(&mut Self, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
-    sync: fn(&mut Self, &EditType, &[EditorLine]) -> LSPResult<()>,
-    sync_rev: fn(&mut Self, &EditType, &[EditorLine]) -> LSPResult<()>,
+    sync: fn(&mut Self, &Action, &[EditorLine]) -> LSPResult<()>,
+    sync_rev: fn(&mut Self, &Action, &[EditorLine]) -> LSPResult<()>,
     meta: Option<EditMetaData>,
     pub encode_position: fn(usize, &str) -> usize,
     pub char_lsp_pos: fn(char) -> usize,
@@ -202,13 +202,13 @@ impl Lexer {
 
     /// sync event
     #[inline(always)]
-    pub fn sync(&mut self, action: &EditType, content: &[EditorLine]) {
+    pub fn sync(&mut self, action: &Action, content: &[EditorLine]) {
         self.question_lsp = (self.sync)(self, action, content).is_err();
     }
 
     /// sync reverse event
     #[inline(always)]
-    pub fn sync_rev(&mut self, action: &EditType, content: &mut [EditorLine]) {
+    pub fn sync_rev(&mut self, action: &Action, content: &mut [EditorLine]) {
         self.question_lsp = (self.sync_rev)(self, action, content).is_err();
     }
 
@@ -437,8 +437,8 @@ impl Lexer {
 }
 
 pub struct SyncCallbacks {
-    sync: fn(&mut Lexer, &EditType, &[EditorLine]) -> LSPResult<()>,
-    sync_rev: fn(&mut Lexer, &EditType, &[EditorLine]) -> LSPResult<()>,
+    sync: fn(&mut Lexer, &Action, &[EditorLine]) -> LSPResult<()>,
+    sync_rev: fn(&mut Lexer, &Action, &[EditorLine]) -> LSPResult<()>,
     sync_changes: fn(&mut Lexer, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
     sync_tokens: fn(&mut Lexer, EditMetaData),
 }

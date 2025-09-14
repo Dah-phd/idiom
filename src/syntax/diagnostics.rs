@@ -34,23 +34,23 @@ const WAR_STL: ContentStyle = ContentStyle {
 #[derive(Default)]
 pub struct DiagnosticInfo {
     pub messages: Vec<(String, Color)>,
-    pub actions: Option<Vec<Action>>,
+    pub actions: Option<Vec<Fix>>,
 }
 
 #[derive(Clone)]
-pub enum Action {
+pub enum Fix {
     Import(String),
 }
 
-impl From<Action> for IdiomEvent {
-    fn from(value: Action) -> Self {
+impl From<Fix> for IdiomEvent {
+    fn from(value: Fix) -> Self {
         match value {
-            Action::Import(text) => IdiomEvent::InsertText(text),
+            Fix::Import(text) => IdiomEvent::InsertText(text),
         }
     }
 }
 
-impl std::fmt::Display for Action {
+impl std::fmt::Display for Fix {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Import(text) => match text.strip_suffix('\n') {

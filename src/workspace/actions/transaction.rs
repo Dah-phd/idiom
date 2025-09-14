@@ -3,7 +3,7 @@ use crate::{
     syntax::{Lexer, SyncCallbacks},
     utils::Offset,
     workspace::{
-        actions::{Edit, EditType, EditorLine},
+        actions::{Action, Edit, EditorLine},
         Cursor, CursorPosition,
     },
 };
@@ -32,8 +32,8 @@ where
     let mut edits = vec![];
     for edit in transaction {
         match edit {
-            EditType::Single(edit) => edits.push(edit),
-            EditType::Multi(mutli) => edits.extend(mutli),
+            Action::Single(edit) => edits.push(edit),
+            Action::Multi(mutli) => edits.extend(mutli),
         }
     }
     if !edits.is_empty() {
@@ -49,7 +49,7 @@ pub fn check_edit_true_count(actions: &mut Actions, lexer: &mut Lexer) -> usize 
     actions.done.len()
 }
 
-pub fn get_edit(actions: &Actions, index: usize) -> &EditType {
+pub fn get_edit(actions: &Actions, index: usize) -> &Action {
     &actions.done[index]
 }
 
@@ -62,7 +62,7 @@ pub fn undo_multi_cursor(
     actions.push_buffer(lexer);
     let action = actions.done.pop()?;
     let cursors = match &action {
-        EditType::Single(edit) => {
+        Action::Single(edit) => {
             let (position, select) = edit.apply_rev(content);
             let mut cursor = Cursor::default();
             cursor.text_width = text_width;
@@ -72,7 +72,7 @@ pub fn undo_multi_cursor(
             }
             vec![cursor]
         }
-        EditType::Multi(edits) => {
+        Action::Multi(edits) => {
             let cursors = edits
                 .iter()
                 .rev()
@@ -104,7 +104,7 @@ pub fn redo_multi_cursor(
     actions.push_buffer(lexer);
     let action = actions.done.pop()?;
     let cursors = match &action {
-        EditType::Single(edit) => {
+        Action::Single(edit) => {
             let (position, select) = edit.apply(content);
             let mut cursor = Cursor::default();
             cursor.text_width = text_width;
@@ -114,7 +114,7 @@ pub fn redo_multi_cursor(
             }
             vec![cursor]
         }
-        EditType::Multi(edits) => {
+        Action::Multi(edits) => {
             let cursors = edits
                 .iter()
                 .map(|edit| {
@@ -181,10 +181,10 @@ pub enum EditOffsetType {
 }
 
 impl EditOffsetType {
-    pub fn new(edit_type: &EditType) -> Self {
+    pub fn new(edit_type: &Action) -> Self {
         match edit_type {
-            EditType::Single(edit) => Self::Single(EditOffset::new(edit)),
-            EditType::Multi(edits) => Self::Multi(edits.iter().map(EditOffset::new).collect()),
+            Action::Single(edit) => Self::Single(EditOffset::new(edit)),
+            Action::Multi(edits) => Self::Multi(edits.iter().map(EditOffset::new).collect()),
         }
     }
 

@@ -4,7 +4,7 @@ use crate::{
     popups::popups_tree::refrence_selector,
     syntax::Lexer,
     workspace::{
-        actions::{EditMetaData, EditType},
+        actions::{Action, EditMetaData},
         line::EditorLine,
         CursorPosition, Editor,
     },
@@ -277,7 +277,7 @@ pub fn sync_changes(lexer: &mut Lexer, change_events: Vec<TextDocumentContentCha
     lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)
 }
 
-pub fn sync_edits(lexer: &mut Lexer, action: &EditType, content: &[EditorLine]) -> LSPResult<()> {
+pub fn sync_edits(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
     lexer.version += 1;
     let (meta, change_events) = action.change_event(lexer.encode_position, lexer.char_lsp_pos, content);
     lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
@@ -288,7 +288,7 @@ pub fn sync_edits(lexer: &mut Lexer, action: &EditType, content: &[EditorLine]) 
     Ok(())
 }
 
-pub fn sync_edits_rev(lexer: &mut Lexer, action: &EditType, content: &[EditorLine]) -> LSPResult<()> {
+pub fn sync_edits_rev(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
     lexer.version += 1;
     let (meta, change_events) = action.change_event_rev(lexer.encode_position, lexer.char_lsp_pos, content);
     lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
@@ -308,12 +308,12 @@ pub fn sync_changes_dead(_lexer: &mut Lexer, _change_events: Vec<TextDocumentCon
 }
 
 #[inline(always)]
-pub fn sync_edits_dead(_lexer: &mut Lexer, _action: &EditType, _content: &[EditorLine]) -> LSPResult<()> {
+pub fn sync_edits_dead(_lexer: &mut Lexer, _action: &Action, _content: &[EditorLine]) -> LSPResult<()> {
     Ok(())
 }
 
 #[inline(always)]
-pub fn sync_edits_dead_rev(_lexer: &mut Lexer, _action: &EditType, _content: &[EditorLine]) -> LSPResult<()> {
+pub fn sync_edits_dead_rev(_lexer: &mut Lexer, _action: &Action, _content: &[EditorLine]) -> LSPResult<()> {
     Ok(())
 }
 

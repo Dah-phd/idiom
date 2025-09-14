@@ -11,12 +11,12 @@ use crate::workspace::{cursor::Select, line::EditorLine, CursorPosition};
 use super::Edit;
 
 #[derive(Debug)]
-pub enum EditType {
+pub enum Action {
     Single(Edit),
     Multi(Vec<Edit>),
 }
 
-impl EditType {
+impl Action {
     pub fn apply_rev(&self, content: &mut Vec<EditorLine>) -> (CursorPosition, Option<Select>) {
         match self {
             Self::Single(action) => action.apply_rev(content),
@@ -114,13 +114,13 @@ impl EditType {
     }
 }
 
-impl From<Edit> for EditType {
+impl From<Edit> for Action {
     fn from(value: Edit) -> Self {
         Self::Single(value)
     }
 }
 
-impl From<Vec<Edit>> for EditType {
+impl From<Vec<Edit>> for Action {
     fn from(value: Vec<Edit>) -> Self {
         Self::Multi(value)
     }
