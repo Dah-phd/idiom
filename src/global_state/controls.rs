@@ -12,7 +12,7 @@ const INSERT_SPAN: &str = "  --INSERT--  ";
 const SELECT_SPAN: &str = "  --SELECT--  ";
 const MODE_LEN: usize = INSERT_SPAN.len();
 
-#[derive(Default)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub enum Mode {
     #[default]
     Select,
@@ -117,15 +117,13 @@ pub fn mouse_handler(
                 }
             } else if let Some(position) = gs.tree_area.relative_position(event.row, event.column) {
                 let pos_line = position.row as usize + 1;
-
+                gs.event.push(IdiomEvent::SetMode(Mode::Select));
                 if let Some(path) = tree.mouse_select(pos_line, gs) {
                     gs.event.push(IdiomEvent::OpenAtLine(path, 0));
-                    return;
-                };
-                gs.select_mode();
+                }
             } else if let Some(pos) = gs.tab_area.relative_position(event.row, event.column) {
                 if !ws.is_empty() {
-                    gs.insert_mode();
+                    gs.select_mode();
                     let pos_char = pos.col as usize;
                     if let Some(idx) = ws.select_tab_mouse(pos_char) {
                         ws.activate_editor(idx, gs);

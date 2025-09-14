@@ -1,4 +1,4 @@
-use super::GlobalState;
+use super::{GlobalState, Mode};
 use crate::configs::{EditorAction, TreeAction};
 use crate::embeded_term::EditorTerminal;
 use crate::embeded_tui::run_embeded_tui;
@@ -45,6 +45,7 @@ pub enum IdiomEvent {
     ActivateEditor(usize),
     GoToLine(usize),
     GoToSelect { from: CursorPosition, to: CursorPosition },
+    SetMode(Mode),
     Save,
     Rebase,
 }
@@ -203,6 +204,10 @@ impl IdiomEvent {
                 };
             }
             IdiomEvent::WorkspaceEdit(edits) => ws.apply_edits(edits, gs),
+            IdiomEvent::SetMode(mode) => match mode {
+                Mode::Select => gs.select_mode(),
+                Mode::Insert => gs.insert_mode(),
+            },
             IdiomEvent::Rebase => {
                 if let Some(editor) = ws.get_active() {
                     editor.rebase(gs);
