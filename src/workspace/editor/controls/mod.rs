@@ -30,13 +30,14 @@ pub struct ControlMap {
 }
 
 impl ControlMap {
-    pub fn multi_cursor(editor: &mut Editor) {
+    pub fn try_multi_cursor(editor: &mut Editor) -> bool {
         if !editor.renderer.try_multi_cursor(editor.file_type) {
-            return;
+            return false;
         };
         editor.controls.cursors.clear();
         editor.controls.cursors.push(editor.cursor.clone());
         editor.controls.multi_cursor_map();
+        true
     }
 
     pub fn single_cursor(editor: &mut Editor) {
@@ -185,8 +186,8 @@ pub fn push_multicursor_position(editor: &mut Editor, mut position: CursorPositi
     };
 
     position.char = std::cmp::min(position.char, line.char_len());
-    if editor.controls.cursors.is_empty() {
-        ControlMap::multi_cursor(editor);
+    if editor.controls.cursors.is_empty() && !ControlMap::try_multi_cursor(editor) {
+        return;
     }
     let cursors = &mut editor.controls.cursors;
     let mut new_cursor = Cursor::default();

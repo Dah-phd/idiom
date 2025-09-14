@@ -126,8 +126,9 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::ScreenUp => editor.cursor.screen_up(&editor.content),
         EditorAction::ScreenDown => editor.cursor.screen_down(&editor.content),
         EditorAction::NewCursorUp | EditorAction::NewCursorDown | EditorAction::NewCursorWithLine => {
-            ControlMap::multi_cursor(editor);
-            return editor.map(action, gs);
+            if ControlMap::try_multi_cursor(editor) {
+                return editor.map(action, gs);
+            };
         }
         EditorAction::JumpLeft => editor.cursor.jump_left(&editor.content),
         EditorAction::JumpLeftSelect => editor.cursor.jump_left_select(&editor.content),
