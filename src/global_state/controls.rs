@@ -117,6 +117,7 @@ pub fn mouse_handler(
                 }
             } else if let Some(position) = gs.tree_area.relative_position(event.row, event.column) {
                 let pos_line = position.row as usize + 1;
+
                 if let Some(path) = tree.mouse_select(pos_line, gs) {
                     gs.event.push(IdiomEvent::OpenAtLine(path, 0));
                     return;

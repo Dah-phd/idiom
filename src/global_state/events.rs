@@ -22,6 +22,7 @@ pub enum StartInplacePopup {
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum IdiomEvent {
+    TreeDiagnostics(TreeDiagnostics),
     EditorActionCall(EditorAction),
     TreeActionCall(TreeAction),
     EmbededApp(Option<String>),
@@ -37,7 +38,6 @@ pub enum IdiomEvent {
     FileUpdated(PathBuf),
     CheckLSP(FileType),
     SetLSP(FileType),
-    TreeDiagnostics(TreeDiagnostics),
     AutoComplete(String),
     Snippet { snippet: String, cursor_offset: Option<(usize, usize)>, relative_select: Option<((usize, usize), usize)> },
     InsertText(String),
