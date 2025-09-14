@@ -9,7 +9,7 @@ use super::{
     utils::{find_line_start, token_range_at},
 };
 use crate::{
-    configs::{EditorAction, EditorConfigs, FileType, IndentConfigs},
+    configs::{EditorAction, EditorConfigs, FileFamily, FileType, IndentConfigs},
     error::{IdiomError, IdiomResult},
     global_state::GlobalState,
     lsp::LSPError,
@@ -59,7 +59,7 @@ impl Editor {
             lexer: Lexer::with_context(file_type, &path, gs),
             content,
             renderer: Renderer::code(),
-            actions: Actions::new(cfg.get_indent_cfg(&file_type)),
+            actions: Actions::new(cfg.get_indent_cfg(file_type)),
             controls: ControlMap::default(),
             file_type,
             display,
@@ -179,31 +179,18 @@ impl Editor {
     pub fn file_type_set(&mut self, file_type: FileType, cfg: IndentConfigs, gs: &mut GlobalState) {
         self.actions.cfg = cfg;
         self.file_type = file_type;
-        match self.file_type {
-            FileType::Text => {
+        match self.file_type.family() {
+            FileFamily::Text => {
                 self.renderer = Renderer::text();
                 self.lexer = Lexer::text_lexer(&self.path, gs);
                 calc_wraps(&mut self.content, self.cursor.text_width);
             }
-            FileType::MarkDown => {
+            FileFamily::MarkDown => {
                 self.renderer = Renderer::markdown();
                 self.lexer = Lexer::md_lexer(&self.path, gs);
                 calc_wraps(&mut self.content, self.cursor.text_width);
             }
-            FileType::Rust
-            | FileType::Zig
-            | FileType::C
-            | FileType::Cpp
-            | FileType::Nim
-            | FileType::Python
-            | FileType::JavaScript
-            | FileType::TypeScript
-            | FileType::Yml
-            | FileType::Toml
-            | FileType::Html
-            | FileType::Lobster
-            | FileType::Json
-            | FileType::Shell => {
+            FileFamily::Code(..) => {
                 self.renderer = Renderer::code();
                 self.lexer = Lexer::with_context(file_type, &self.path, gs);
             }
@@ -316,7 +303,7 @@ impl Editor {
         self.lexer.close();
         if !self.controls.cursors.is_empty() {
             self.controls.cursors.clear();
-            self.renderer.single_cursor();
+            self.renderer.single_cursor(self.file_type);
         }
         let content = match std::fs::read_to_string(&self.path) {
             Ok(content) => content,
@@ -350,7 +337,7 @@ impl Editor {
     }
 
     pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {
-        self.actions.cfg = new_cfg.get_indent_cfg(&self.file_type);
+        self.actions.cfg = new_cfg.get_indent_cfg(self.file_type);
     }
 
     pub fn stringify(&self) -> String {

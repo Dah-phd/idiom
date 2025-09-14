@@ -365,7 +365,7 @@ impl Workspace {
     }
 
     pub async fn force_lsp_type_on_active(&mut self, file_type: FileType, gs: &mut GlobalState) -> IdiomResult<()> {
-        let new_indent_cfg = self.base_configs.get_indent_cfg(&file_type);
+        let new_indent_cfg = self.base_configs.get_indent_cfg(file_type);
         match self.get_active() {
             Some(editor) => editor.file_type_set(file_type, new_indent_cfg, gs),
             None => return Err(IdiomError::LSP(crate::lsp::LSPError::Null)),

@@ -2,6 +2,14 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 #[derive(Debug, PartialEq, Hash, Eq, Clone, Copy, Default, Serialize, Deserialize)]
+pub enum FileFamily {
+    #[default]
+    Text,
+    MarkDown,
+    Code(FileType),
+}
+
+#[derive(Debug, PartialEq, Hash, Eq, Clone, Copy, Default, Serialize, Deserialize)]
 pub enum FileType {
     #[default]
     Text,
@@ -54,6 +62,10 @@ impl FileType {
         }
     }
 
+    pub fn family(self) -> FileFamily {
+        FileFamily::from(self)
+    }
+
     pub fn is_code(&self) -> bool {
         match self {
             Self::Text | Self::MarkDown => false,
@@ -76,21 +88,31 @@ impl FileType {
 
     pub const fn iter_langs() -> [Self; 14] {
         [
-            FileType::Rust,
-            FileType::Zig,
-            FileType::C,
-            FileType::Cpp,
-            FileType::Nim,
-            FileType::Python,
-            FileType::JavaScript,
-            FileType::TypeScript,
-            FileType::Yml,
-            FileType::Toml,
-            FileType::Html,
-            FileType::Lobster,
-            FileType::Json,
-            FileType::Shell,
+            Self::Rust,
+            Self::Zig,
+            Self::C,
+            Self::Cpp,
+            Self::Nim,
+            Self::Python,
+            Self::JavaScript,
+            Self::TypeScript,
+            Self::Yml,
+            Self::Toml,
+            Self::Html,
+            Self::Lobster,
+            Self::Json,
+            Self::Shell,
         ]
+    }
+}
+
+impl From<FileFamily> for FileType {
+    fn from(value: FileFamily) -> Self {
+        match value {
+            FileFamily::Text => FileType::Text,
+            FileFamily::MarkDown => FileType::MarkDown,
+            FileFamily::Code(file_type) => file_type,
+        }
     }
 }
 
@@ -103,6 +125,29 @@ impl From<FileType> for &'static str {
 impl From<FileType> for String {
     fn from(value: FileType) -> String {
         ft_to_str(value).to_owned()
+    }
+}
+
+impl From<FileType> for FileFamily {
+    fn from(value: FileType) -> Self {
+        match value {
+            FileType::Text => FileFamily::Text,
+            FileType::MarkDown => FileFamily::MarkDown,
+            FileType::Rust
+            | FileType::Zig
+            | FileType::C
+            | FileType::Cpp
+            | FileType::Nim
+            | FileType::Python
+            | FileType::JavaScript
+            | FileType::TypeScript
+            | FileType::Yml
+            | FileType::Toml
+            | FileType::Html
+            | FileType::Lobster
+            | FileType::Json
+            | FileType::Shell => FileFamily::Code(value),
+        }
     }
 }
 

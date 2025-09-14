@@ -31,13 +31,12 @@ pub struct ControlMap {
 
 impl ControlMap {
     pub fn multi_cursor(editor: &mut Editor) {
-        if !editor.file_type.is_code() {
+        if !editor.renderer.try_multi_cursor(editor.file_type) {
             return;
-        }
+        };
         editor.controls.cursors.clear();
         editor.controls.cursors.push(editor.cursor.clone());
         editor.controls.multi_cursor_map();
-        editor.renderer.multi_cursor();
     }
 
     pub fn single_cursor(editor: &mut Editor) {
@@ -47,7 +46,7 @@ impl ControlMap {
         };
         editor.last_render_at_line = None;
         editor.controls.single_cursor_map();
-        editor.renderer.single_cursor();
+        editor.renderer.single_cursor(editor.file_type);
     }
 
     pub fn ensure_single_cursor(editor: &mut Editor) {

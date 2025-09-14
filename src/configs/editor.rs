@@ -96,7 +96,7 @@ impl EditorConfigs {
         load_or_create_config(EDITOR_CFG_FILE)
     }
 
-    pub fn get_indent_cfg(&self, file_type: &FileType) -> IndentConfigs {
+    pub fn get_indent_cfg(&self, file_type: FileType) -> IndentConfigs {
         let indent_cfg = self.default_indent_cfg();
         indent_cfg.update_by_file_type(file_type)
     }
@@ -202,7 +202,7 @@ impl Default for IndentConfigs {
 }
 
 impl IndentConfigs {
-    pub fn update_by_file_type(mut self, file_type: &FileType) -> Self {
+    pub fn update_by_file_type(mut self, file_type: FileType) -> Self {
         #[allow(clippy::single_match)]
         match file_type {
             FileType::Python | FileType::Nim | FileType::Lobster => self.indent_after.push(':'),

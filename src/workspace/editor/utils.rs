@@ -1,6 +1,6 @@
 use super::{
-    calc_wraps, controls::ControlMap, Actions, Cursor, Editor, EditorConfigs, EditorLine, FileType, GlobalState, Lexer,
-    Renderer,
+    calc_wraps, controls::ControlMap, Actions, Cursor, Editor, EditorConfigs, EditorLine, FileFamily, FileType,
+    GlobalState, Lexer, Renderer,
 };
 use crate::error::{IdiomError, IdiomResult};
 use std::{
@@ -80,23 +80,10 @@ pub fn editor_from_data(
     cfg: &EditorConfigs,
     gs: &mut GlobalState,
 ) -> Editor {
-    let (renderer, lexer) = match file_type {
-        FileType::Text => (Renderer::text(), Lexer::text_lexer(&path, gs)),
-        FileType::MarkDown => (Renderer::markdown(), Lexer::md_lexer(&path, gs)),
-        FileType::Rust
-        | FileType::Zig
-        | FileType::C
-        | FileType::Cpp
-        | FileType::Nim
-        | FileType::Python
-        | FileType::JavaScript
-        | FileType::TypeScript
-        | FileType::Yml
-        | FileType::Toml
-        | FileType::Html
-        | FileType::Lobster
-        | FileType::Json
-        | FileType::Shell => (Renderer::code(), Lexer::with_context(file_type, &path, gs)),
+    let (renderer, lexer) = match file_type.family() {
+        FileFamily::Text => (Renderer::text(), Lexer::text_lexer(&path, gs)),
+        FileFamily::MarkDown => (Renderer::markdown(), Lexer::md_lexer(&path, gs)),
+        FileFamily::Code(file_type) => (Renderer::code(), Lexer::with_context(file_type, &path, gs)),
     };
 
     let display = build_display(&path);
@@ -108,7 +95,7 @@ pub fn editor_from_data(
     };
 
     let mut editor = Editor {
-        actions: Actions::new(cfg.get_indent_cfg(&file_type)),
+        actions: Actions::new(cfg.get_indent_cfg(file_type)),
         controls: ControlMap::default(),
         update_status: FileUpdate::None,
         renderer,

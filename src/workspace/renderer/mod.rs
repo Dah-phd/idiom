@@ -3,7 +3,11 @@ mod markdown;
 mod text;
 
 use super::{line::LineContext, Editor};
-use crate::{global_state::GlobalState, syntax::Lexer};
+use crate::{
+    configs::{FileFamily, FileType},
+    global_state::GlobalState,
+    syntax::Lexer,
+};
 use idiom_tui::layout::IterLines;
 
 /// Component containing logic regarding rendering
@@ -27,14 +31,30 @@ impl Renderer {
         Self { render: md_render, fast_render: fast_md_render }
     }
 
-    pub fn multi_cursor(&mut self) {
+    pub fn try_multi_cursor(&mut self, file_type: FileType) -> bool {
+        if !file_type.is_code() {
+            return false;
+        }
         self.render = multi_code_render;
         self.fast_render = multi_fast_code_render;
+        true
     }
 
-    pub fn single_cursor(&mut self) {
-        self.render = code_render;
-        self.fast_render = fast_code_render;
+    pub fn single_cursor(&mut self, file_type: FileType) {
+        match file_type.family() {
+            FileFamily::Text => {
+                self.render = text_render;
+                self.fast_render = fast_text_render;
+            }
+            FileFamily::MarkDown => {
+                self.render = md_render;
+                self.fast_render = fast_md_render;
+            }
+            FileFamily::Code(..) => {
+                self.render = code_render;
+                self.fast_render = fast_code_render;
+            }
+        }
     }
 }
 
