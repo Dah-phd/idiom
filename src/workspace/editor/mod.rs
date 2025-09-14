@@ -22,9 +22,10 @@ use std::path::PathBuf;
 pub use utils::editor_from_data;
 use utils::{big_file_protection, build_display, calc_line_number_offset, FileUpdate};
 
-const WARN_TXT: &str =
-    "The file is opened in text mode, beware idiom is not designed with plain text performance in mind!";
-const WARN_MD: &str = "The file is opened in MD mode, beware idiom is not designed with MD performance in mind!";
+const WARN_TXT: &str = "The file is opened in text mode, \
+    beware idiom is not designed with plain text performance in mind!";
+const WARN_MD: &str = "The file is opened in markdown mode, \
+    beware idiom is not designed with MD performance in mind!";
 
 pub struct Editor {
     pub file_type: FileType,
