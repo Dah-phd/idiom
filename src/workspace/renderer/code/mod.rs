@@ -20,7 +20,7 @@ const WRAP_CLOSE: char = '>';
 #[inline(always)]
 pub fn width_remainder(line: &EditorLine, line_width: usize) -> Option<usize> {
     let mut current_with = 0;
-    for (.., char_width) in CharLimitedWidths::new(&line.content, 3) {
+    for (.., char_width) in CharLimitedWidths::new(line.as_str(), 3) {
         current_with += char_width;
         if current_with >= line_width {
             return None;
@@ -68,19 +68,19 @@ fn render_with_select(
     ctx: &mut LineContext,
     backend: &mut CrossTerm,
 ) {
-    if code.char_len == 0 && select.end != 0 {
+    if code.char_len() == 0 && select.end != 0 {
         backend.print_styled(" ", ContentStyle::bg(ctx.lexer.theme.selected));
         return;
     }
     if code.is_simple() {
         if line_width > code.char_len() {
-            let content = code.content.chars();
+            let content = code.chars();
             ascii_line::ascii_line_with_select(content, &code.tokens, select, ctx.lexer, backend);
             if let Some(diagnostic) = code.diagnostics.as_ref() {
-                diagnostic.inline_render(line_width - code.char_len, backend)
+                diagnostic.inline_render(line_width - code.char_len(), backend)
             }
         } else {
-            let content = code.content.chars().take(line_width.saturating_sub(1));
+            let content = code.chars().take(line_width.saturating_sub(1));
             ascii_line::ascii_line_with_select(content, &code.tokens, select, ctx.lexer, backend);
             backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
         }
@@ -100,15 +100,15 @@ fn render_with_select(
 fn render_no_select(code: &mut EditorLine, line_width: usize, ctx: &mut LineContext, backend: &mut CrossTerm) {
     if code.is_simple() {
         // ascii (byte idx based) render
-        match line_width > code.content.len() {
+        match line_width > code.len() {
             true => {
-                ascii_line::ascii_line(&code.content, &code.tokens, backend);
+                ascii_line::ascii_line(code.as_str(), &code.tokens, backend);
                 if let Some(diagnostic) = code.diagnostics.as_ref() {
-                    diagnostic.inline_render(line_width - code.char_len, backend)
+                    diagnostic.inline_render(line_width - code.char_len(), backend)
                 }
             }
             false => {
-                ascii_line::ascii_line(&code.content[..line_width.saturating_sub(1)], &code.tokens, backend);
+                ascii_line::ascii_line(&code.as_str()[..line_width.saturating_sub(1)], &code.tokens, backend);
                 backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
             }
         }

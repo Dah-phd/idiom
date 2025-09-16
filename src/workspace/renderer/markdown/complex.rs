@@ -9,7 +9,7 @@ use std::ops::Range;
 
 pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
     if let Some(parser) = StyledParser::new_complex(lines, ctx, backend) {
-        parser.render(&text.content);
+        parser.render(text.as_str());
     }
     backend.reset_style();
 }
@@ -26,7 +26,7 @@ pub fn line_with_select(
     let mut remaining_width = line_width;
     let select_color = ctx.lexer.theme.selected;
 
-    for (idx, (text, current_width)) in CharLimitedWidths::new(&text.content, 3).enumerate() {
+    for (idx, (text, current_width)) in CharLimitedWidths::new(text.as_str(), 3).enumerate() {
         if remaining_width < current_width {
             let Some(line) = lines.next() else { return };
             let reset_style = backend.get_style();
@@ -71,7 +71,7 @@ pub fn basic(
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
     let cursor_idx = ctx.cursor_char();
-    let mut content = CharLimitedWidths::new(&text.content, 3);
+    let mut content = CharLimitedWidths::new(text.as_str(), 3);
     let mut idx = 0;
     let mut remaining_width = line_width;
 
@@ -124,7 +124,7 @@ pub fn select(
     let line_width = ctx.setup_line(line, backend);
     let cursor_idx = ctx.cursor_char();
     let select_color = ctx.lexer.theme.selected;
-    let mut content = CharLimitedWidths::new(&text.content, 3);
+    let mut content = CharLimitedWidths::new(text.as_str(), 3);
     let mut idx = 0;
     let mut remaining_width = line_width;
 

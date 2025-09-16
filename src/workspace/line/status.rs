@@ -2,7 +2,7 @@ use crate::workspace::CursorPosition;
 use idiom_tui::utils::CharLimitedWidths;
 use std::ops::Range;
 
-type Reduction = usize;
+pub type Reduction = usize;
 
 #[derive(Default, PartialEq)]
 pub enum RenderStatus {

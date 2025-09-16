@@ -289,7 +289,7 @@ fn move_checks() {
     let mut ws = base_ws();
     let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
     gs.insert_mode();
-    let base_line = active(&mut ws).content[0].content.to_string();
+    let base_line = active(&mut ws).content[0].to_string();
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), base_line);
     press(&mut ws, KeyCode::End, &mut gs);
     assert_position(&mut ws, CursorPosition { char: base_line.len(), line: 0 });

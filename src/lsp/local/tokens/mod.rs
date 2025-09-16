@@ -44,7 +44,7 @@ pub trait LangStream: Sized + Debug + PartialEq + Logos<'static> {
     }
 
     fn init_tokens(content: &mut Vec<EditorLine>, theme: &Theme, file_type: FileType) {
-        let text = content.iter().map(|l| l.content.to_string()).collect::<Vec<_>>();
+        let text = content.iter().map(|l| l.to_string()).collect::<Vec<_>>();
         let mut tokens = Vec::new();
         Self::parse(text.iter().map(|t| t.as_str()), &mut tokens, PositionedToken::<Self>::utf32);
         let mut legend = Legend::default();

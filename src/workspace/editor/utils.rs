@@ -71,7 +71,7 @@ pub const fn calc_line_number_offset(len: usize) -> usize {
     }
 }
 
-// builds editor from provided data
+/// builds editor from provided data
 pub fn editor_from_data(
     path: PathBuf,
     file_type: FileType,

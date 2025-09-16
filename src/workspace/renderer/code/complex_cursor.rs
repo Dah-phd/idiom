@@ -167,8 +167,8 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backen
 pub fn partial(code: &mut EditorLine, ctx: &mut LineContext, mut line_width: usize, backend: &mut CrossTerm) {
     let cursor_idx = ctx.cursor_char();
     let char_position = ctx.lexer.char_lsp_pos;
-    let mut idx = code.cached.generate_skipped_chars_complex(&code.content, code.char_len(), cursor_idx, line_width);
-    let mut content = CharLimitedWidths::new(&code.content, 3);
+    let mut idx = code.generate_skipped_chars_complex(cursor_idx, line_width);
+    let mut content = CharLimitedWidths::new(code.as_str(), 3);
     let mut cursor = 0;
 
     for _ in 0..idx {
@@ -261,8 +261,8 @@ pub fn partial_select(
 ) {
     let cursor_idx = ctx.cursor_char();
     let char_position = ctx.lexer.char_lsp_pos;
-    let mut idx = code.cached.generate_skipped_chars_complex(&code.content, code.char_len(), cursor_idx, line_width);
-    let mut content = CharLimitedWidths::new(&code.content, 3);
+    let mut idx = code.generate_skipped_chars_complex(cursor_idx, line_width);
+    let mut content = CharLimitedWidths::new(code.as_str(), 3);
 
     let mut cursor = 0;
     for _ in 0..idx {

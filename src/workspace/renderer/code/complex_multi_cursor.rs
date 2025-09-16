@@ -19,10 +19,10 @@ pub fn render(
     selects: Vec<Range<usize>>,
     backend: &mut CrossTerm,
 ) {
-    if line_width > line.char_len {
+    if line_width > line.char_len() {
         basic(line, ctx, cursors, selects, backend);
         if let Some(diagnostics) = line.diagnostics.as_ref() {
-            diagnostics.inline_render(line_width - line.char_len, backend);
+            diagnostics.inline_render(line_width - line.char_len(), backend);
         }
     } else {
         self::partial(line, ctx, line_width, cursors, selects, backend);
@@ -140,10 +140,10 @@ pub fn partial(
     // skipped chars are use to store info on multi cursor
     let skipped = code.cached.skipped_chars();
     code.cached.set_skipped_chars(0);
-    let mut idx = code.cached.generate_skipped_chars_complex(&code.content, code.char_len(), last_idx, line_width);
+    let mut idx = code.generate_skipped_chars_complex(last_idx, line_width);
     code.cached.set_skipped_chars(skipped);
 
-    let mut content = CharLimitedWidths::new(&code.content, 3);
+    let mut content = CharLimitedWidths::new(code.as_str(), 3);
 
     let mut cursor_iter = cursors.into_iter().map(|x| x.char);
     let mut cursor_idx = cursor_iter.next().unwrap_or(usize::MAX);

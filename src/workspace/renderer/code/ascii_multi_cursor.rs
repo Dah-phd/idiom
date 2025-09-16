@@ -18,10 +18,10 @@ pub fn render(
     selects: Vec<Range<usize>>,
     backend: &mut CrossTerm,
 ) {
-    if line_width > line.char_len {
+    if line_width > line.char_len() {
         basic(line, ctx, cursors, selects, backend);
         if let Some(diagnostics) = line.diagnostics.as_ref() {
-            diagnostics.inline_render(line_width - line.char_len, backend);
+            diagnostics.inline_render(line_width - line.char_len(), backend);
         }
     } else {
         self::partial(line, ctx, line_width, cursors, selects, backend);
@@ -182,7 +182,7 @@ pub fn partial(
         cursor -= token.delta_start;
     }
 
-    let content = unsafe { line.content.get_unchecked(idx..) };
+    let content = unsafe { line.as_str().get_unchecked(idx..) };
     for text in content.chars().take(line_width.saturating_sub(reduction)) {
         if select.start == idx {
             reset_style.set_bg(Some(select_color));

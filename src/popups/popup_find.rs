@@ -169,7 +169,7 @@ impl Popup for FindPopup {
             KeyCode::Tab => {
                 if let Some(editor) = ws.get_active() {
                     gs.insert_mode();
-                    let options = editor.find_with_select(&self.pattern.text);
+                    let options = editor.find_with_text(&self.pattern.text);
                     let mut popup = PopupSelector::new(
                         options,
                         |((from, _), text), line, backend| line.render(&format!("({}) {text}", from.line + 1), backend),

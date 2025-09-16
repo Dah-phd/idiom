@@ -77,7 +77,7 @@ pub fn insert_lines_indented(
         let prefixed = format!("{indent}{clip_line}");
         let mut new_editor_line = EditorLine::from(prefixed);
         cfg.unindent_if_before_base_pattern(&mut new_editor_line);
-        new_clip = push_on_newline(new_clip, &new_editor_line.content);
+        new_clip = push_on_newline(new_clip, new_editor_line.as_str());
         indent = cfg.derive_indent_from(&new_editor_line);
         content.insert(cursor.line, new_editor_line);
     }
@@ -225,12 +225,11 @@ pub fn find_line_start(line: &EditorLine) -> usize {
     0
 }
 
-#[inline(always)]
 pub fn token_range_at(line: &EditorLine, idx: usize) -> Range<usize> {
     let mut token_start = 0;
     let mut last_not_in_token = false;
     for (char_idx, ch) in line.chars().enumerate() {
-        if ch.is_alphabetic() || ch == '_' {
+        if is_token_char(ch) {
             if last_not_in_token {
                 token_start = char_idx;
             }
@@ -251,6 +250,26 @@ pub fn token_range_at(line: &EditorLine, idx: usize) -> Range<usize> {
     } else {
         idx..idx
     }
+}
+
+// finds char indexies
+pub fn find_token(text: &str, token: &str) -> Option<(usize, usize)> {
+    todo!("function that matches token in string");
+    if token.is_empty() {
+        return None;
+    }
+    let mut chars = text.chars();
+    while let Some(ch) = chars.next() {
+        if !is_token_char(ch) {
+            continue;
+        }
+    }
+    None
+}
+
+#[inline]
+fn is_token_char(ch: char) -> bool {
+    matches!(ch, 'a'..='z' | 'A'..='Z' | '0'..='9' | '_')
 }
 
 #[inline(always)]

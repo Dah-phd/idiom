@@ -111,10 +111,12 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::SelectToken => {
             let range = token_range_at(&editor.content[editor.cursor.line], editor.cursor.char);
             if !range.is_empty() {
-                editor.cursor.select_set(
-                    CursorPosition { line: editor.cursor.line, char: range.start },
-                    CursorPosition { line: editor.cursor.line, char: range.end },
-                )
+                let from = CursorPosition { line: editor.cursor.line, char: range.start };
+                let to = CursorPosition { line: editor.cursor.line, char: range.end };
+                if editor.cursor.select_get() == Some((from, to)) {
+                    todo!("implement multi cursor token selection");
+                };
+                editor.cursor.select_set(from, to);
             }
         }
         EditorAction::SelectLine => editor.select_line(),
@@ -324,13 +326,39 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             }
         }
         EditorAction::SelectToken => {
-            for cursor in editor.controls.cursors.iter_mut() {
-                let range = token_range_at(&editor.content[cursor.line], cursor.char);
-                if !range.is_empty() {
-                    cursor.select_set(
-                        CursorPosition { line: cursor.line, char: range.start },
-                        CursorPosition { line: cursor.line, char: range.end },
-                    )
+            let should_wrap = editor
+                .controls
+                .cursors
+                .first()
+                .and_then(|c| c.select_get())
+                .and_then(|(from, to)| {
+                    if from.line != to.line || from.char == to.char {
+                        return None;
+                    };
+                    editor.content[from.line].get(from.char, to.char).map(ToOwned::to_owned)
+                })
+                .map(|token| {
+                    editor.controls.cursors.iter().skip(1).all(|c| {
+                        let Some((from, to)) = c.select_get() else { return false };
+                        if from.line != to.line || from.char == to.char {
+                            return false;
+                        };
+                        editor.content[from.line].get(from.char, to.char) == Some(&token)
+                    })
+                })
+                .unwrap_or_default();
+
+            if should_wrap {
+                todo!("handle multiple cursor token select");
+            } else {
+                for cursor in editor.controls.cursors.iter_mut() {
+                    let range = token_range_at(&editor.content[cursor.line], cursor.char);
+                    if !range.is_empty() {
+                        cursor.select_set(
+                            CursorPosition { line: cursor.line, char: range.start },
+                            CursorPosition { line: cursor.line, char: range.end },
+                        )
+                    }
                 }
             }
         }

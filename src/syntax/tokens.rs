@@ -222,11 +222,7 @@ pub fn calc_wraps(content: &mut [EditorLine], text_width: usize) {
 pub fn calc_wrap_line(text: &mut EditorLine, text_width: usize) -> usize {
     if text.is_simple() {
         text.tokens.clear();
-        text.tokens.push(Token {
-            len: 0,
-            delta_start: text.content.len() / text_width,
-            style: ContentStyle::default(),
-        });
+        text.tokens.push(Token { len: 0, delta_start: text.len() / text_width, style: ContentStyle::default() });
     } else {
         complex_wrap_calc(text, text_width);
     }
@@ -237,7 +233,7 @@ pub fn complex_wrap_calc(text: &mut EditorLine, text_width: usize) {
     text.tokens.clear();
     let mut counter = text_width;
     let mut wraps = Token { delta_start: 0, len: 0, style: ContentStyle::default() };
-    for ch in text.content.chars() {
+    for ch in text.chars() {
         let w = UnicodeWidthChar::width(ch).unwrap_or_default();
         if w > counter {
             counter = text_width;
@@ -254,11 +250,7 @@ pub fn calc_wrap_line_capped(text: &mut EditorLine, cursor: &Cursor) -> Option<u
     let max_rows = cursor.max_rows;
     text.tokens.clear();
     if text.is_simple() {
-        text.tokens.push(Token {
-            len: 0,
-            delta_start: text.content.len() / text_width,
-            style: ContentStyle::default(),
-        });
+        text.tokens.push(Token { len: 0, delta_start: text.len() / text_width, style: ContentStyle::default() });
         let cursor_at_row = 2 + cursor_char / text_width;
         if cursor_at_row > max_rows {
             return Some(cursor_at_row - max_rows);
@@ -268,7 +260,7 @@ pub fn calc_wrap_line_capped(text: &mut EditorLine, cursor: &Cursor) -> Option<u
         let mut cursor_at_row = 1;
         let mut prev_idx_break = 0;
         let mut wraps = Token { delta_start: 0, len: 0, style: ContentStyle::default() };
-        for (idx, ch) in text.content.chars().enumerate() {
+        for (idx, ch) in text.chars().enumerate() {
             let w = UnicodeWidthChar::width(ch).unwrap_or_default();
             if w > counter {
                 counter = text_width;

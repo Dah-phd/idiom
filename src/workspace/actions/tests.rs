@@ -475,11 +475,11 @@ fn push_char_with_closing_and_select() {
     cursor.select_set(CursorPosition { line: 0, char: 1 }, CursorPosition { line: 0, char: 4 });
     actions.push_char('[', &mut cursor, &mut content, &mut lexer);
     // confirm open close has been added
-    assert_eq!(&content[0].content, end);
+    assert_eq!(content[0].as_str(), end);
     actions.undo(&mut cursor, &mut content, &mut lexer);
-    assert_eq!(&content[0].content, start);
+    assert_eq!(content[0].as_str(), start);
     actions.redo(&mut cursor, &mut content, &mut lexer);
-    assert_eq!(&content[0].content, end);
+    assert_eq!(content[0].as_str(), end);
 }
 
 fn probe_char_closing_with_select(_: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {

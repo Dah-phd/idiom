@@ -180,3 +180,11 @@ fn token_if_already_selected() {
     let post_select = editor.cursor.select_get();
     assert_eq!(post_select, base_select);
 }
+
+#[test]
+fn test_token_next() {
+    let text_line = EditorLine::from("a=split here");
+    assert_eq!(text_line.get(2, 7), Some("split"));
+    assert_eq!(text_line.get_from(7), Some(" here"));
+    assert_eq!(text_line.get_to(2), Some("a="));
+}
