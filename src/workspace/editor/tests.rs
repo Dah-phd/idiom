@@ -9,7 +9,7 @@ use crate::{
     ext_tui::CrossTerm,
     global_state::GlobalState,
     syntax::Lexer,
-    workspace::{actions::Actions, line::EditorLine, renderer::Renderer, utils::token_range_at},
+    workspace::{actions::Actions, line::EditorLine, renderer::Renderer, utils::word_range_at},
 };
 use idiom_tui::{layout::Rect, Backend};
 use std::path::PathBuf;
@@ -167,12 +167,12 @@ fn token_if_already_selected() {
     let pos = CursorPosition { line: 1, char: 4 };
     editor.cursor.set_position(pos);
     _ = editor.map(crate::configs::EditorAction::SelectToken, &mut gs);
-    let base_range = token_range_at(&editor.content[pos.line], pos.char);
+    let base_range = word_range_at(&editor.content[pos.line], pos.char);
     let base_select = Some(((pos.line, base_range.start).into(), (pos.line, base_range.end).into()));
     assert_eq!(base_select, editor.cursor.select_get());
     let post_pos = editor.cursor.get_position();
     assert_ne!(post_pos, pos);
-    let post_range = token_range_at(&editor.content[post_pos.line], post_pos.char);
+    let post_range = word_range_at(&editor.content[post_pos.line], post_pos.char);
     assert_eq!(post_range, base_range);
 
     // second invoke

@@ -5,7 +5,7 @@ use super::{
     cursor::{Cursor, CursorPosition},
     line::EditorLine,
     renderer::Renderer,
-    utils::{find_line_start, find_token, token_range_at},
+    utils::{find_line_start, word_range_at},
 };
 use crate::{
     configs::{EditorAction, EditorConfigs, FileFamily, FileType, IndentConfigs},
@@ -198,7 +198,7 @@ impl Editor {
     }
 
     pub fn select_token(&mut self) {
-        let range = token_range_at(&self.content[self.cursor.line], self.cursor.char);
+        let range = word_range_at(&self.content[self.cursor.line], self.cursor.char);
         if !range.is_empty() {
             self.cursor.select_set(
                 CursorPosition { line: self.cursor.line, char: range.start },
@@ -274,29 +274,6 @@ impl Editor {
             }
         }
         buffer
-    }
-
-    pub fn find_next_token(
-        &self,
-        line: usize,
-        token_range: std::ops::Range<usize>,
-    ) -> Option<(CursorPosition, CursorPosition)> {
-        let from_line = self.content.get(line)?;
-        let token = from_line.get(token_range.start, token_range.end)?;
-        if let Some(next_range) = from_line.get_from(token_range.end).and_then(|text| find_token(text, token)) {
-            return Some(((line, next_range.0).into(), (line, next_range.1).into()));
-        }
-        for (idx, text) in
-            self.content.iter().enumerate().skip(line + 1).chain(self.content.iter().enumerate().take(line))
-        {
-            if let Some(next_range) = find_token(text.as_str(), token) {
-                return Some(((idx, next_range.0).into(), (idx, next_range.1).into()));
-            }
-        }
-        if let Some(next_range) = from_line.get_to(token_range.start).and_then(|text| find_token(text, token)) {
-            return Some(((line, next_range.0).into(), (line, next_range.1).into()));
-        }
-        None
     }
 
     pub fn is_saved(&self) -> IdiomResult<bool> {

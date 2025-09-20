@@ -1,8 +1,12 @@
 use crate::{
     configs::IndentConfigs,
+    ext_tui::CrossTerm,
     workspace::{cursor::CursorPosition, line::EditorLine},
 };
-use idiom_tui::UTF8Safe;
+use idiom_tui::{
+    widgets::{Text, Writable},
+    UTF8Safe,
+};
 use std::ops::Range;
 
 #[inline(always)]
@@ -225,11 +229,14 @@ pub fn find_line_start(line: &EditorLine) -> usize {
     0
 }
 
-pub fn token_range_at(line: &EditorLine, idx: usize) -> Range<usize> {
+/// returns range of char positions, not indexies
+///  - that means text.chars().nth(range.start) will return the start position,
+///    instead of text[range.start]
+pub fn word_range_at(line: &EditorLine, idx: usize) -> Range<usize> {
     let mut token_start = 0;
     let mut last_not_in_token = false;
     for (char_idx, ch) in line.chars().enumerate() {
-        if is_token_char(ch) {
+        if is_word_char(ch) {
             if last_not_in_token {
                 token_start = char_idx;
             }
@@ -252,23 +259,101 @@ pub fn token_range_at(line: &EditorLine, idx: usize) -> Range<usize> {
     }
 }
 
-// finds char indexies
-pub fn find_token(text: &str, token: &str) -> Option<(usize, usize)> {
-    todo!("function that matches token in string");
-    if token.is_empty() {
-        return None;
-    }
-    let mut chars = text.chars();
-    while let Some(ch) = chars.next() {
-        if !is_token_char(ch) {
-            continue;
+pub fn find_words_inline_from<'a>(
+    from: CursorPosition,
+    content: &'a [EditorLine],
+    token: &'a Text<CrossTerm>,
+) -> Option<impl Iterator<Item = (CursorPosition, CursorPosition)> + use<'a>> {
+    let text = content.get(from.line)?;
+    let wide_heystack = text.get_from(from.char.saturating_sub(1))?;
+    let (first_char, heystack) = match wide_heystack.char_indices().next() {
+        Some((char_idx, ch)) => (Some(ch), &wide_heystack[char_idx..]),
+        None => (None, wide_heystack),
+    };
+    Some(heystack.match_indices(token.as_str()).flat_map(move |(position, _)| {
+        let prefix = &heystack[..position];
+        if prefix.chars().next_back().or(first_char).map(is_word_char).unwrap_or_default() {
+            return None;
+        };
+        let end_char_idx = position + token.len();
+        if heystack[end_char_idx..].chars().next().map(is_word_char).unwrap_or_default() {
+            return None;
+        };
+        if text.is_simple() {
+            return Some((
+                CursorPosition { line: from.line, char: from.char + position },
+                CursorPosition { line: from.line, char: from.char + end_char_idx },
+            ));
         }
-    }
-    None
+        let char = from.char + prefix.char_len();
+        Some((
+            CursorPosition { line: from.line, char },
+            CursorPosition { line: from.line, char: char + token.char_len() },
+        ))
+    }))
+}
+
+pub fn find_words_inline_to<'a>(
+    to: CursorPosition,
+    content: &'a [EditorLine],
+    token: &'a Text<CrossTerm>,
+) -> Option<impl Iterator<Item = (CursorPosition, CursorPosition)> + use<'a>> {
+    let text = content.get(to.line)?;
+    let heystack = text.get_to(to.char)?;
+    Some(heystack.match_indices(token.as_str()).flat_map(move |(position, _)| {
+        let prefix = &heystack[..position];
+        if prefix.chars().next_back().map(is_word_char).unwrap_or_default() {
+            return None;
+        };
+        let end_char_idx = position + token.len();
+        if text.as_str()[end_char_idx..].chars().next().map(is_word_char).unwrap_or_default() {
+            return None;
+        };
+        if text.is_simple() {
+            return Some((
+                CursorPosition { line: to.line, char: position },
+                CursorPosition { line: to.line, char: end_char_idx },
+            ));
+        }
+        let char = prefix.char_len();
+        Some((CursorPosition { line: to.line, char }, CursorPosition { line: to.line, char: char + token.char_len() }))
+    }))
+}
+
+/// maps token selects for iter <(line_idx, EditorLine)>
+pub fn iter_word_selects<'a, B>(
+    content_iter: B,
+    word: &'a Text<CrossTerm>,
+) -> impl Iterator<Item = (CursorPosition, CursorPosition)> + use<'a, B>
+where
+    B: Iterator<Item = (usize, &'a EditorLine)>,
+{
+    content_iter
+        .map(move |(line, text)| {
+            text.as_str().match_indices(word.as_str()).flat_map(move |(position, _)| {
+                let prefix = &text.as_str()[..position];
+                if prefix.chars().next_back().map(is_word_char).unwrap_or_default() {
+                    return None;
+                }
+                let end_char_idx = position + word.len();
+                if text.as_str()[end_char_idx..].chars().next().map(is_word_char).unwrap_or_default() {
+                    return None;
+                };
+                if text.is_simple() {
+                    return Some((
+                        CursorPosition { line, char: position },
+                        CursorPosition { line, char: end_char_idx },
+                    ));
+                }
+                let char = prefix.char_len();
+                Some((CursorPosition { line, char }, CursorPosition { line, char: char + word.char_len() }))
+            })
+        })
+        .flatten()
 }
 
 #[inline]
-fn is_token_char(ch: char) -> bool {
+fn is_word_char(ch: char) -> bool {
     matches!(ch, 'a'..='z' | 'A'..='Z' | '0'..='9' | '_')
 }
 

@@ -1,7 +1,7 @@
 use super::super::{
     cursor::Cursor,
     line::EditorLine,
-    utils::{clip_content, insert_clip, insert_lines_indented, is_scope, remove_content, token_range_at},
+    utils::{clip_content, insert_clip, insert_lines_indented, is_scope, remove_content, word_range_at},
     CursorPosition,
 };
 use super::EditMetaData;
@@ -154,7 +154,7 @@ impl Edit {
     #[inline]
     pub fn replace_token(line: usize, char: usize, new_text: String, content: &mut [EditorLine]) -> Self {
         let code_line = &mut content[line];
-        let range = token_range_at(code_line, char);
+        let range = word_range_at(code_line, char);
         let char = range.start;
         let reverse = code_line[range.clone()].to_owned();
         code_line.replace_range(range, &new_text);
@@ -225,7 +225,7 @@ impl Edit {
         content: &mut Vec<EditorLine>,
     ) -> (CursorPosition, Self) {
         let code_line = &mut content[c.line];
-        let range = token_range_at(code_line, c.char);
+        let range = word_range_at(code_line, c.char);
         let from = CursorPosition { line: c.line, char: range.start };
         let to = CursorPosition { line: c.line, char: range.end };
         let indent = cfg.derive_indent_from(code_line);

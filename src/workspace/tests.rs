@@ -2,7 +2,10 @@ use super::{
     editor::Editor,
     line::EditorLine,
     map_editor,
-    utils::{clip_content, copy_content, get_closing_char_from_context, insert_clip, remove_content},
+    utils::{
+        clip_content, copy_content, find_words_inline_from, find_words_inline_to, get_closing_char_from_context,
+        insert_clip, iter_word_selects, remove_content, word_range_at,
+    },
     Workspace,
 };
 use crate::{
@@ -17,7 +20,7 @@ use crate::{
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::ContentStyle;
-use idiom_tui::{layout::Rect, Backend};
+use idiom_tui::{layout::Rect, widgets::Text, Backend};
 use std::collections::HashMap;
 
 pub fn mock_ws(content: Vec<String>) -> Workspace {
@@ -585,4 +588,78 @@ fn match_content() {
     cursor.match_content(&content);
     assert_eq!(cursor.get_position(), CursorPosition { line: 3, char: 8 });
     assert_eq!(None, cursor.select_get());
+}
+
+#[test]
+fn test_word_range_at() {
+    let line = EditorLine::from("let word = \"word\";");
+    let cr = word_range_at(&line, 4);
+    assert_eq!(cr, 4..8);
+    assert_eq!(line.get(cr.start, cr.end), Some("word"));
+    let line = EditorLine::from("let __word__ = \"word\";");
+    let cr = word_range_at(&line, 4);
+    assert_eq!(cr, 4..12);
+    assert_eq!(line.get(cr.start, cr.end), Some("__word__"));
+    let line = EditorLine::from("let (__word__,) = \"word\";");
+    let cr = word_range_at(&line, 4);
+    assert!(cr.is_empty());
+    assert_eq!(cr, 4..4);
+}
+
+#[test]
+fn test_iter_word_selects() {
+    let content = vec![
+        EditorLine::from("let word = \"bird\";"),
+        EditorLine::from("println!(\"{:?}\", &word);"),
+        EditorLine::from("let is_there = word.contins(\"word\");"),
+        EditorLine::from("if word.starts_with(\"bird\") {"),
+        EditorLine::from("    println!(\"🦀 end: {}\", &word);"),
+        EditorLine::from("} // not a __word__"),
+    ];
+
+    let word = Text::<CrossTerm>::raw("word".to_owned());
+
+    let content_iter = content.iter().enumerate().skip(3).chain(content.iter().enumerate().take(3));
+    let selects = iter_word_selects(content_iter, &word).collect::<Vec<_>>();
+    assert!(!selects.is_sorted());
+    let line_order = [3, 4, 0, 1, 2, 2];
+    assert_eq!(selects.len(), line_order.len());
+    for (idx, (from, to)) in selects.into_iter().enumerate() {
+        assert_eq!(from.line, line_order[idx]);
+        assert_eq!(to.line, line_order[idx]);
+        assert_eq!(content[from.line].get(from.char, to.char), Some(word.as_str()));
+    }
+}
+
+#[test]
+fn test_find_word_inline_from() {
+    let content = vec![
+        EditorLine::from("let word = String::from(\"word\"); // word and __word__"),
+        EditorLine::from("let word = String::from(\"word\"); // 🦀 word and __word__"),
+        EditorLine::from("println!(\"end 🦀 {}\", word) // word"),
+    ];
+
+    let word = Text::<CrossTerm>::raw("word".to_owned());
+
+    let range = word_range_at(&content[0], 26);
+    assert_eq!(range, 25..29);
+    let (base_from, base_to) =
+        (CursorPosition { line: 0, char: range.start }, CursorPosition { line: 0, char: range.end });
+    assert_eq!(content[0].get(base_from.char, base_to.char), Some(word.as_str()));
+    for (from, to) in find_words_inline_from(base_to, &content, &word).unwrap() {}
+}
+
+#[test]
+fn test_find_word_inline_to() {
+    let line = EditorLine::from("let word = String::from(\"word\"); // 🦀 word and __word__");
+
+    let word = Text::<CrossTerm>::raw("word".to_owned());
+
+    let range = word_range_at(&line, 26);
+    assert_eq!(range, 25..29);
+    let (from, to) = (CursorPosition { line: 0, char: range.start }, CursorPosition { line: 0, char: range.end });
+    assert_eq!(line.get(from.char, to.char), Some(word.as_str()));
+
+    let content = vec![line];
+    let selects = find_words_inline_from(to, &content, &word).unwrap();
 }

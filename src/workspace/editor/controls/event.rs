@@ -2,7 +2,7 @@ use super::{apply_multi_cursor_transaction, consolidate_cursors, consolidate_cur
 use crate::{
     configs::EditorAction,
     global_state::GlobalState,
-    workspace::{actions::transaction, utils::token_range_at, CursorPosition, Editor},
+    workspace::{actions::transaction, utils::word_range_at, CursorPosition, Editor},
 };
 
 pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut GlobalState) -> bool {
@@ -109,7 +109,7 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::SelectLeft => editor.cursor.select_left(&editor.content),
         EditorAction::SelectRight => editor.cursor.select_right(&editor.content),
         EditorAction::SelectToken => {
-            let range = token_range_at(&editor.content[editor.cursor.line], editor.cursor.char);
+            let range = word_range_at(&editor.content[editor.cursor.line], editor.cursor.char);
             if !range.is_empty() {
                 let from = CursorPosition { line: editor.cursor.line, char: range.start };
                 let to = CursorPosition { line: editor.cursor.line, char: range.end };
@@ -145,7 +145,7 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::Help => editor.lexer.help((&editor.cursor).into(), &editor.content, gs),
         EditorAction::LSPRename => {
             let line = &editor.content[editor.cursor.line];
-            let token_range = token_range_at(line, editor.cursor.char);
+            let token_range = word_range_at(line, editor.cursor.char);
             editor.lexer.start_rename((&editor.cursor).into(), &line[token_range]);
         }
         EditorAction::RefreshUI => editor.lexer.refresh_lsp(gs),
@@ -352,7 +352,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 todo!("handle multiple cursor token select");
             } else {
                 for cursor in editor.controls.cursors.iter_mut() {
-                    let range = token_range_at(&editor.content[cursor.line], cursor.char);
+                    let range = word_range_at(&editor.content[cursor.line], cursor.char);
                     if !range.is_empty() {
                         cursor.select_set(
                             CursorPosition { line: cursor.line, char: range.start },
