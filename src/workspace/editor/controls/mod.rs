@@ -3,13 +3,16 @@ mod methods;
 
 use crate::{
     configs::EditorAction,
+    ext_tui::CrossTerm,
     global_state::GlobalState,
     syntax::Lexer,
     workspace::{
         actions::{transaction, Actions},
+        utils::{find_words_inline_from, find_words_inline_to, iter_word_selects},
         Cursor, CursorPosition, Editor, EditorLine,
     },
 };
+use idiom_tui::widgets::Text;
 use lsp_types::TextEdit;
 
 /// holds controls and manages cursor type
@@ -227,6 +230,60 @@ where
     if result.is_err() {
         // force restore during consolidation of cursors
         editor.controls.cursors.retain(|c| c.max_rows != 0);
+    }
+}
+
+/// assumption is that from, to represent word location
+/// that means all cursors are confirmed to hold the same word
+/// and are sorted (consolidated)
+fn multi_cursor_word_select(editor: &mut Editor, from: CursorPosition, to: CursorPosition, word: Text<CrossTerm>) {
+    if let Some((new_from, new_to)) =
+        find_words_inline_from(to, &editor.content, &word).and_then(|mut iter| iter.next())
+    {
+        let mut new_cursor = Cursor::default();
+        editor.cursor.set_position(new_to);
+        new_cursor.text_width = editor.cursor.text_width;
+        new_cursor.select_set(new_from, new_to);
+        editor.controls.cursors.insert(0, new_cursor);
+        return;
+    }
+    let top_content = editor.content.iter().enumerate().take(from.line);
+    let content_iter = editor.content.iter().enumerate().skip(to.line + 1).chain(top_content);
+    for (new_from, new_to) in iter_word_selects(content_iter, &word) {
+        if new_from > from {
+            let mut new_cursor = Cursor::default();
+            editor.cursor.set_position(new_to);
+            new_cursor.text_width = editor.cursor.text_width;
+            new_cursor.select_set(new_from, new_to);
+            editor.controls.cursors.insert(0, new_cursor);
+            return;
+        }
+        if editor.controls.cursors.iter().skip(1).any(|c| c.select_get() == Some((new_from, new_to))) {
+            continue;
+        };
+
+        let mut new_cursor = Cursor::default();
+        editor.cursor.set_position(new_to);
+        new_cursor.text_width = editor.cursor.text_width;
+        new_cursor.select_set(new_from, new_to);
+        // sorting will figure out the correct postion
+        editor.controls.cursors.push(new_cursor);
+        return;
+    }
+
+    if let Some(inline_start) = find_words_inline_to(from, &editor.content, &word) {
+        for (new_from, new_to) in inline_start {
+            if editor.controls.cursors.iter().skip(1).any(|c| c.select_get() == Some((new_from, new_to))) {
+                continue;
+            };
+            let mut new_cursor = Cursor::default();
+            editor.cursor.set_position(new_to);
+            new_cursor.text_width = editor.cursor.text_width;
+            new_cursor.select_set(new_from, new_to);
+            // sorting will figure out the correct postion
+            editor.controls.cursors.push(new_cursor);
+            return;
+        }
     }
 }
 

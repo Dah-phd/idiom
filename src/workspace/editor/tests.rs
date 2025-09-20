@@ -178,7 +178,8 @@ fn token_if_already_selected() {
     // second invoke
     _ = editor.map(crate::configs::EditorAction::SelectToken, &mut gs);
     let post_select = editor.cursor.select_get();
-    assert_eq!(post_select, base_select);
+    assert_eq!(editor.controls.cursors.len(), 2);
+    todo!("finish test")
 }
 
 #[test]

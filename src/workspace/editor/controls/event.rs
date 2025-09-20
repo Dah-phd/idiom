@@ -1,9 +1,14 @@
-use super::{apply_multi_cursor_transaction, consolidate_cursors, consolidate_cursors_per_line, ControlMap};
+use super::{
+    apply_multi_cursor_transaction, consolidate_cursors, consolidate_cursors_per_line, multi_cursor_word_select,
+    ControlMap,
+};
 use crate::{
     configs::EditorAction,
+    ext_tui::CrossTerm,
     global_state::GlobalState,
     workspace::{actions::transaction, utils::word_range_at, CursorPosition, Editor},
 };
+use idiom_tui::widgets::Text;
 
 pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut GlobalState) -> bool {
     let (taken, render_update) = editor.lexer.map_modal_if_exists(action, gs);
@@ -113,10 +118,11 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
             if !range.is_empty() {
                 let from = CursorPosition { line: editor.cursor.line, char: range.start };
                 let to = CursorPosition { line: editor.cursor.line, char: range.end };
-                if editor.cursor.select_get() == Some((from, to)) {
-                    todo!("implement multi cursor token selection");
-                };
-                editor.cursor.select_set(from, to);
+                if editor.cursor.select_get() == Some((from, to)) && ControlMap::try_multi_cursor(editor) {
+                    return editor.map(action, gs);
+                } else {
+                    editor.cursor.select_set(from, to);
+                }
             }
         }
         EditorAction::SelectLine => editor.select_line(),
@@ -326,38 +332,38 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             }
         }
         EditorAction::SelectToken => {
-            let should_wrap = editor
-                .controls
-                .cursors
-                .first()
-                .and_then(|c| c.select_get())
-                .and_then(|(from, to)| {
-                    if from.line != to.line || from.char == to.char {
-                        return None;
-                    };
-                    editor.content[from.line].get(from.char, to.char).map(ToOwned::to_owned)
-                })
-                .map(|token| {
-                    editor.controls.cursors.iter().skip(1).all(|c| {
+            let maybe_word = editor.controls.cursors.first().and_then(|cursor| {
+                let (from, to) = cursor.select_get()?;
+                if from.line != to.line || from.char == to.char {
+                    return None;
+                };
+                let word = Text::<CrossTerm>::raw(editor.content[from.line].get(from.char, to.char)?.to_owned());
+                editor
+                    .controls
+                    .cursors
+                    .iter()
+                    .skip(1)
+                    .all(|c| {
                         let Some((from, to)) = c.select_get() else { return false };
                         if from.line != to.line || from.char == to.char {
                             return false;
                         };
-                        editor.content[from.line].get(from.char, to.char) == Some(&token)
+                        editor.content[from.line].get(from.char, to.char) == Some(word.as_str())
                     })
-                })
-                .unwrap_or_default();
+                    .then_some((word, (from, to)))
+            });
 
-            if should_wrap {
-                todo!("handle multiple cursor token select");
-            } else {
-                for cursor in editor.controls.cursors.iter_mut() {
-                    let range = word_range_at(&editor.content[cursor.line], cursor.char);
-                    if !range.is_empty() {
-                        cursor.select_set(
-                            CursorPosition { line: cursor.line, char: range.start },
-                            CursorPosition { line: cursor.line, char: range.end },
-                        )
+            match maybe_word {
+                Some((word, (from, to))) => multi_cursor_word_select(editor, from, to, word),
+                None => {
+                    for cursor in editor.controls.cursors.iter_mut() {
+                        let range = word_range_at(&editor.content[cursor.line], cursor.char);
+                        if !range.is_empty() {
+                            cursor.select_set(
+                                CursorPosition { line: cursor.line, char: range.start },
+                                CursorPosition { line: cursor.line, char: range.end },
+                            )
+                        }
                     }
                 }
             }
@@ -418,7 +424,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 return true;
             };
             if let Some(new_cursor) = main_cursor.clone_below(&editor.content) {
-                editor.controls.cursors.push(new_cursor);
+                editor.controls.cursors.insert(0, new_cursor);
             }
         }
         EditorAction::NewCursorWithLine => {

@@ -262,19 +262,19 @@ pub fn word_range_at(line: &EditorLine, idx: usize) -> Range<usize> {
 pub fn find_words_inline_from<'a>(
     from: CursorPosition,
     content: &'a [EditorLine],
-    token: &'a Text<CrossTerm>,
+    word: &'a Text<CrossTerm>,
 ) -> Option<impl Iterator<Item = (CursorPosition, CursorPosition)> + use<'a>> {
     let text = content.get(from.line)?;
     let skipped = text.get_to(from.char)?;
     let char_before_heystack = skipped.chars().next_back();
     let heystack = &text.as_str()[skipped.len()..];
-    Some(heystack.match_indices(token.as_str()).flat_map(move |(position, _)| {
+    Some(heystack.match_indices(word.as_str()).flat_map(move |(position, _)| {
         let prefix = &heystack[..position];
         let prev_char = if position == 0 { char_before_heystack } else { prefix.chars().next_back() };
         if prev_char.map(is_word_char).unwrap_or_default() {
             return None;
         };
-        let end_char_idx = position + token.len();
+        let end_char_idx = position + word.len();
         if heystack[end_char_idx..].chars().next().map(is_word_char).unwrap_or_default() {
             return None;
         };
@@ -287,7 +287,7 @@ pub fn find_words_inline_from<'a>(
         let char = from.char + prefix.char_len();
         Some((
             CursorPosition { line: from.line, char },
-            CursorPosition { line: from.line, char: char + token.char_len() },
+            CursorPosition { line: from.line, char: char + word.char_len() },
         ))
     }))
 }
@@ -295,16 +295,16 @@ pub fn find_words_inline_from<'a>(
 pub fn find_words_inline_to<'a>(
     to: CursorPosition,
     content: &'a [EditorLine],
-    token: &'a Text<CrossTerm>,
+    word: &'a Text<CrossTerm>,
 ) -> Option<impl Iterator<Item = (CursorPosition, CursorPosition)> + use<'a>> {
     let text = content.get(to.line)?;
     let heystack = text.get_to(to.char)?;
-    Some(heystack.match_indices(token.as_str()).flat_map(move |(position, _)| {
+    Some(heystack.match_indices(word.as_str()).flat_map(move |(position, _)| {
         let prefix = &heystack[..position];
         if prefix.chars().next_back().map(is_word_char).unwrap_or_default() {
             return None;
         };
-        let end_char_idx = position + token.len();
+        let end_char_idx = position + word.len();
         if text.as_str()[end_char_idx..].chars().next().map(is_word_char).unwrap_or_default() {
             return None;
         };
@@ -315,7 +315,7 @@ pub fn find_words_inline_to<'a>(
             ));
         }
         let char = prefix.char_len();
-        Some((CursorPosition { line: to.line, char }, CursorPosition { line: to.line, char: char + token.char_len() }))
+        Some((CursorPosition { line: to.line, char }, CursorPosition { line: to.line, char: char + word.char_len() }))
     }))
 }
 
@@ -327,28 +327,23 @@ pub fn iter_word_selects<'a, B>(
 where
     B: Iterator<Item = (usize, &'a EditorLine)>,
 {
-    content_iter
-        .map(move |(line, text)| {
-            text.as_str().match_indices(word.as_str()).flat_map(move |(position, _)| {
-                let prefix = &text.as_str()[..position];
-                if prefix.chars().next_back().map(is_word_char).unwrap_or_default() {
-                    return None;
-                }
-                let end_char_idx = position + word.len();
-                if text.as_str()[end_char_idx..].chars().next().map(is_word_char).unwrap_or_default() {
-                    return None;
-                };
-                if text.is_simple() {
-                    return Some((
-                        CursorPosition { line, char: position },
-                        CursorPosition { line, char: end_char_idx },
-                    ));
-                }
-                let char = prefix.char_len();
-                Some((CursorPosition { line, char }, CursorPosition { line, char: char + word.char_len() }))
-            })
+    content_iter.flat_map(move |(line, text)| {
+        text.as_str().match_indices(word.as_str()).flat_map(move |(position, _)| {
+            let prefix = &text.as_str()[..position];
+            if prefix.chars().next_back().map(is_word_char).unwrap_or_default() {
+                return None;
+            }
+            let end_char_idx = position + word.len();
+            if text.as_str()[end_char_idx..].chars().next().map(is_word_char).unwrap_or_default() {
+                return None;
+            };
+            if text.is_simple() {
+                return Some((CursorPosition { line, char: position }, CursorPosition { line, char: end_char_idx }));
+            }
+            let char = prefix.char_len();
+            Some((CursorPosition { line, char }, CursorPosition { line, char: char + word.char_len() }))
         })
-        .flatten()
+    })
 }
 
 #[inline]
