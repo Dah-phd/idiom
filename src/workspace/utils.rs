@@ -265,14 +265,13 @@ pub fn find_words_inline_from<'a>(
     token: &'a Text<CrossTerm>,
 ) -> Option<impl Iterator<Item = (CursorPosition, CursorPosition)> + use<'a>> {
     let text = content.get(from.line)?;
-    let wide_heystack = text.get_from(from.char.saturating_sub(1))?;
-    let (first_char, heystack) = match wide_heystack.char_indices().next() {
-        Some((char_idx, ch)) => (Some(ch), &wide_heystack[char_idx..]),
-        None => (None, wide_heystack),
-    };
+    let skipped = text.get_to(from.char)?;
+    let char_before_heystack = skipped.chars().next_back();
+    let heystack = &text.as_str()[skipped.len()..];
     Some(heystack.match_indices(token.as_str()).flat_map(move |(position, _)| {
         let prefix = &heystack[..position];
-        if prefix.chars().next_back().or(first_char).map(is_word_char).unwrap_or_default() {
+        let prev_char = if position == 0 { char_before_heystack } else { prefix.chars().next_back() };
+        if prev_char.map(is_word_char).unwrap_or_default() {
             return None;
         };
         let end_char_idx = position + token.len();

@@ -637,29 +637,98 @@ fn test_find_word_inline_from() {
         EditorLine::from("let word = String::from(\"word\"); // word and __word__"),
         EditorLine::from("let word = String::from(\"word\"); // 🦀 word and __word__"),
         EditorLine::from("println!(\"end 🦀 {}\", word) // word"),
+        EditorLine::from("println!(\"end 🦀 {}\", word) // __word__"),
+    ];
+
+    let word = Text::<CrossTerm>::raw("word".to_owned());
+    let range = word_range_at(&content[0], 26);
+    assert!(!range.is_empty());
+    let base_from = CursorPosition { line: 0, char: range.end };
+    let selects = find_words_inline_from(base_from, &content, &word).unwrap().collect::<Vec<_>>();
+    assert_eq!(selects.len(), 1);
+    for (from, to) in selects {
+        assert_eq!((from, to), (CursorPosition { line: 0, char: 36 }, CursorPosition { line: 0, char: 40 }));
+        assert_eq!(content[from.line].get(from.char, to.char), Some(word.as_str()));
+    }
+
+    let range = word_range_at(&content[1], 4);
+    assert!(!range.is_empty());
+    let base_from = CursorPosition { line: 1, char: range.end };
+    let selects = find_words_inline_from(base_from, &content, &word).unwrap().collect::<Vec<_>>();
+    assert_eq!(selects.len(), 2);
+    let expected = [
+        (CursorPosition { line: 1, char: 25 }, CursorPosition { line: 1, char: 29 }),
+        (CursorPosition { line: 1, char: 38 }, CursorPosition { line: 1, char: 42 }),
+    ];
+    for (idx, (from, to)) in selects.into_iter().enumerate() {
+        // only 2 offset for the emoji + /s
+        assert_eq!((from, to), expected[idx]);
+        assert_eq!(content[from.line].get(from.char, to.char), Some(word.as_str()));
+    }
+
+    let range = word_range_at(&content[2], 23);
+    assert!(!range.is_empty());
+    let base_from = CursorPosition { line: 2, char: range.end };
+    let selects = find_words_inline_from(base_from, &content, &word).unwrap().collect::<Vec<_>>();
+    assert_eq!(selects.len(), 1);
+    for (from, to) in selects {
+        // only 2 offset for the emoji + /s
+        assert_eq!((from, to), (CursorPosition { line: 2, char: 30 }, CursorPosition { line: 2, char: 34 }));
+        assert_eq!(content[from.line].get(from.char, to.char), Some(word.as_str()));
+    }
+
+    let range = word_range_at(&content[3], 23);
+    assert!(!range.is_empty());
+    let base_from = CursorPosition { line: 3, char: range.end };
+    let selects = find_words_inline_from(base_from, &content, &word);
+    assert!(selects.is_none() || selects.unwrap().collect::<Vec<_>>().is_empty());
+}
+
+#[test]
+fn test_find_word_inline_to() {
+    let content = vec![
+        EditorLine::from("let word = String::from(\"word\"); // word and __word__"),
+        EditorLine::from("let word = String::from(\"word\"); // 🦀 word and __word__"),
+        EditorLine::from("println!(\"word 🦀 {}\", word) // word"),
     ];
 
     let word = Text::<CrossTerm>::raw("word".to_owned());
 
     let range = word_range_at(&content[0], 26);
-    assert_eq!(range, 25..29);
-    let (base_from, base_to) =
-        (CursorPosition { line: 0, char: range.start }, CursorPosition { line: 0, char: range.end });
-    assert_eq!(content[0].get(base_from.char, base_to.char), Some(word.as_str()));
-    for (from, to) in find_words_inline_from(base_to, &content, &word).unwrap() {}
-}
+    assert!(!range.is_empty());
+    let base_to = CursorPosition { line: 0, char: range.start };
+    let selects = find_words_inline_to(base_to, &content, &word).unwrap().collect::<Vec<_>>();
+    assert_eq!(selects.len(), 1);
+    for (from, to) in selects {
+        assert_eq!((from, to), (CursorPosition { line: 0, char: 4 }, CursorPosition { line: 0, char: 8 }));
+        assert_eq!(content[from.line].get(from.char, to.char), Some(word.as_str()));
+    }
 
-#[test]
-fn test_find_word_inline_to() {
-    let line = EditorLine::from("let word = String::from(\"word\"); // 🦀 word and __word__");
+    let range = word_range_at(&content[1], 40);
+    assert!(!range.is_empty());
+    let base_to = CursorPosition { line: 1, char: range.start };
+    let selects = find_words_inline_to(base_to, &content, &word).unwrap().collect::<Vec<_>>();
+    assert_eq!(selects.len(), 2);
+    let expected = [
+        (CursorPosition { line: 1, char: 4 }, CursorPosition { line: 1, char: 8 }),
+        (CursorPosition { line: 1, char: 25 }, CursorPosition { line: 1, char: 29 }),
+    ];
+    for (idx, (from, to)) in selects.into_iter().enumerate() {
+        assert_eq!((from, to), expected[idx]);
+        assert_eq!(content[from.line].get(from.char, to.char), Some(word.as_str()));
+    }
 
-    let word = Text::<CrossTerm>::raw("word".to_owned());
-
-    let range = word_range_at(&line, 26);
-    assert_eq!(range, 25..29);
-    let (from, to) = (CursorPosition { line: 0, char: range.start }, CursorPosition { line: 0, char: range.end });
-    assert_eq!(line.get(from.char, to.char), Some(word.as_str()));
-
-    let content = vec![line];
-    let selects = find_words_inline_from(to, &content, &word).unwrap();
+    let range = word_range_at(&content[2], 33);
+    assert!(!range.is_empty());
+    let base_to = CursorPosition { line: 2, char: range.start };
+    let selects = find_words_inline_to(base_to, &content, &word).unwrap().collect::<Vec<_>>();
+    assert_eq!(selects.len(), 2);
+    let expected = [
+        (CursorPosition { line: 2, char: 10 }, CursorPosition { line: 2, char: 14 }),
+        (CursorPosition { line: 2, char: 22 }, CursorPosition { line: 2, char: 26 }),
+    ];
+    for (idx, (from, to)) in selects.into_iter().enumerate() {
+        assert_eq!((from, to), expected[idx]);
+        assert_eq!(content[from.line].get(from.char, to.char), Some(word.as_str()));
+    }
 }
