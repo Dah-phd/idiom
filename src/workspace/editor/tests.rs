@@ -1,5 +1,5 @@
 use super::super::{
-    cursor::{Cursor, CursorPosition},
+    cursor::{word::WordRange, Cursor, CursorPosition},
     editor::{utils::build_display, FileUpdate},
     Editor,
 };
@@ -9,7 +9,7 @@ use crate::{
     ext_tui::CrossTerm,
     global_state::GlobalState,
     syntax::Lexer,
-    workspace::{actions::Actions, line::EditorLine, renderer::Renderer, utils::word_range_at},
+    workspace::{actions::Actions, line::EditorLine, renderer::Renderer},
 };
 use idiom_tui::{layout::Rect, Backend};
 use std::path::PathBuf;
@@ -162,24 +162,49 @@ fn filter_per_line_if_no_select() {
 
 #[test]
 fn token_if_already_selected() {
-    let mut editor = mock_editor(vec![String::new(), String::from("let data = 3;")]);
+    let mut editor = mock_editor(vec![
+        String::from("let word = \"bird\";"),
+        String::from("println!(\"{:?}\", &word);"),
+        String::from("let is_there = word.contins(\"word\");"),
+        String::from("if word.starts_with(\"bird\") {"),
+        String::from("    println!(\"🦀 end: {}\", &word);"),
+        String::from("} // not a __word__"),
+    ]);
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
-    let pos = CursorPosition { line: 1, char: 4 };
+    let pos = CursorPosition { line: 3, char: 4 };
     editor.cursor.set_position(pos);
     _ = editor.map(crate::configs::EditorAction::SelectToken, &mut gs);
-    let base_range = word_range_at(&editor.content[pos.line], pos.char);
-    let base_select = Some(((pos.line, base_range.start).into(), (pos.line, base_range.end).into()));
-    assert_eq!(base_select, editor.cursor.select_get());
-    let post_pos = editor.cursor.get_position();
-    assert_ne!(post_pos, pos);
-    let post_range = word_range_at(&editor.content[post_pos.line], post_pos.char);
-    assert_eq!(post_range, base_range);
+    let range = WordRange::find_at(&editor.content, editor.cursor.get_position()).unwrap();
+    assert_eq!(Some(range.as_select()), editor.cursor.select_get());
+
+    let mut expected = vec![
+        (CursorPosition { line: 4, char: 27 }, CursorPosition { line: 4, char: 31 }),
+        (CursorPosition { line: 3, char: 3 }, CursorPosition { line: 3, char: 7 }),
+    ];
 
     // second invoke
     _ = editor.map(crate::configs::EditorAction::SelectToken, &mut gs);
-    let post_select = editor.cursor.select_get();
     assert_eq!(editor.controls.cursors.len(), 2);
-    todo!("finish test")
+    assert_eq!(editor.controls.cursors.iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
+
+    _ = editor.map(crate::configs::EditorAction::SelectToken, &mut gs);
+    expected.push((CursorPosition { line: 0, char: 4 }, CursorPosition { line: 0, char: 8 }));
+    assert_eq!(editor.controls.cursors.iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
+
+    _ = editor.map(crate::configs::EditorAction::SelectToken, &mut gs);
+    expected.insert(expected.len() - 1, (CursorPosition { line: 1, char: 18 }, CursorPosition { line: 1, char: 22 }));
+    assert_eq!(editor.controls.cursors.iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
+
+    _ = editor.map(crate::configs::EditorAction::SelectToken, &mut gs);
+    expected.insert(expected.len() - 2, (CursorPosition { line: 2, char: 15 }, CursorPosition { line: 2, char: 19 }));
+    assert_eq!(editor.controls.cursors.iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
+
+    _ = editor.map(crate::configs::EditorAction::SelectToken, &mut gs);
+    expected.insert(expected.len() - 3, (CursorPosition { line: 2, char: 29 }, CursorPosition { line: 2, char: 33 }));
+    assert_eq!(editor.controls.cursors.iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
+
+    _ = editor.map(crate::configs::EditorAction::SelectToken, &mut gs);
+    assert_eq!(editor.controls.cursors.iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
 }
 
 #[test]

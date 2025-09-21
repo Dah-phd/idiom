@@ -1,3 +1,5 @@
+pub mod word;
+
 use crate::{utils::Direction, workspace::line::EditorLine};
 use idiom_tui::layout::Rect;
 use lsp_types::Position;
@@ -700,3 +702,6 @@ impl From<&mut SelectPosition> for (CursorPosition, CursorPosition) {
         (value.from, value.to)
     }
 }
+
+#[cfg(test)]
+mod test;

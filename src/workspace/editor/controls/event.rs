@@ -4,11 +4,13 @@ use super::{
 };
 use crate::{
     configs::EditorAction,
-    ext_tui::CrossTerm,
     global_state::GlobalState,
-    workspace::{actions::transaction, utils::word_range_at, CursorPosition, Editor},
+    workspace::{
+        actions::transaction,
+        cursor::{word::WordRange, CursorPosition},
+        Editor,
+    },
 };
-use idiom_tui::widgets::Text;
 
 pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut GlobalState) -> bool {
     let (taken, render_update) = editor.lexer.map_modal_if_exists(action, gs);
@@ -114,10 +116,8 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::SelectLeft => editor.cursor.select_left(&editor.content),
         EditorAction::SelectRight => editor.cursor.select_right(&editor.content),
         EditorAction::SelectToken => {
-            let range = word_range_at(&editor.content[editor.cursor.line], editor.cursor.char);
-            if !range.is_empty() {
-                let from = CursorPosition { line: editor.cursor.line, char: range.start };
-                let to = CursorPosition { line: editor.cursor.line, char: range.end };
+            if let Some(range) = WordRange::find_at(&editor.content, editor.cursor.get_position()) {
+                let (from, to) = range.as_select();
                 if editor.cursor.select_get() == Some((from, to)) && ControlMap::try_multi_cursor(editor) {
                     return editor.map(action, gs);
                 } else {
@@ -150,9 +150,12 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::GoToDeclaration => editor.lexer.go_to_declaration((&editor.cursor).into(), gs),
         EditorAction::Help => editor.lexer.help((&editor.cursor).into(), &editor.content, gs),
         EditorAction::LSPRename => {
-            let line = &editor.content[editor.cursor.line];
-            let token_range = word_range_at(line, editor.cursor.char);
-            editor.lexer.start_rename((&editor.cursor).into(), &line[token_range]);
+            let position = editor.cursor.get_position();
+            if let Some(title) =
+                WordRange::find_at(&editor.content, position).and_then(|range| range.get_text(&editor.content))
+            {
+                editor.lexer.start_rename(position, title);
+            }
         }
         EditorAction::RefreshUI => editor.lexer.refresh_lsp(gs),
         EditorAction::Save => editor.save(gs),
@@ -333,11 +336,12 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         }
         EditorAction::SelectToken => {
             let maybe_word = editor.controls.cursors.first().and_then(|cursor| {
-                let (from, to) = cursor.select_get()?;
-                if from.line != to.line || from.char == to.char {
+                let range = WordRange::find_at(&editor.content, cursor.get_position())?;
+                let current_select = cursor.select_get()?;
+                if range.as_select() != current_select {
                     return None;
-                };
-                let word = Text::<CrossTerm>::raw(editor.content[from.line].get(from.char, to.char)?.to_owned());
+                }
+                let word = range.into_word(&editor.content)?;
                 editor
                     .controls
                     .cursors
@@ -350,19 +354,17 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                         };
                         editor.content[from.line].get(from.char, to.char) == Some(word.as_str())
                     })
-                    .then_some((word, (from, to)))
+                    .then_some(word)
             });
 
             match maybe_word {
-                Some((word, (from, to))) => multi_cursor_word_select(editor, from, to, word),
+                Some(word) => multi_cursor_word_select(editor, word),
                 None => {
                     for cursor in editor.controls.cursors.iter_mut() {
-                        let range = word_range_at(&editor.content[cursor.line], cursor.char);
-                        if !range.is_empty() {
-                            cursor.select_set(
-                                CursorPosition { line: cursor.line, char: range.start },
-                                CursorPosition { line: cursor.line, char: range.end },
-                            )
+                        if let Some((from, to)) =
+                            WordRange::find_at(&editor.content, cursor.get_position()).map(|r| r.as_select())
+                        {
+                            cursor.select_set(from, to)
                         }
                     }
                 }
