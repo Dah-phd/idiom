@@ -1,11 +1,13 @@
-pub mod word;
+mod positions;
+mod word;
 
 use crate::{utils::Direction, workspace::line::EditorLine};
 use idiom_tui::layout::Rect;
 use lsp_types::Position;
 use serde::{Deserialize, Serialize};
 
-pub type Select = (CursorPosition, CursorPosition);
+pub use positions::{CharRange, CursorPosition, Select, SelectPosition};
+pub use word::{PositionedWord, WordRange};
 
 #[derive(Debug, Default, Deserialize, Serialize, Clone, PartialEq)]
 pub struct Cursor {
@@ -16,19 +18,6 @@ pub struct Cursor {
     pub max_rows: usize,
     pub text_width: usize,
     select: Option<CursorPosition>,
-}
-
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct CursorPosition {
-    pub line: usize,
-    pub char: usize, // this is char position not byte index
-}
-
-#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
-pub struct SelectPosition {
-    pub from: CursorPosition,
-    pub to: CursorPosition,
-    swaped: bool,
 }
 
 impl Cursor {
@@ -599,29 +588,6 @@ impl Cursor {
             },
         }
         false
-    }
-}
-
-impl SelectPosition {
-    pub fn cursor_pos(&self) -> CursorPosition {
-        match self.swaped {
-            true => self.from,
-            false => self.to,
-        }
-    }
-
-    pub fn init_pos(&self) -> CursorPosition {
-        match self.swaped {
-            true => self.to,
-            false => self.from,
-        }
-    }
-
-    pub fn init_to_cursor(&self) -> (CursorPosition, CursorPosition) {
-        match self.swaped {
-            true => (self.to, self.from),
-            false => (self.from, self.to),
-        }
     }
 }
 

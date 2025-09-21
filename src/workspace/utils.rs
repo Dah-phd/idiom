@@ -3,7 +3,6 @@ use crate::{
     workspace::{cursor::CursorPosition, line::EditorLine},
 };
 use idiom_tui::UTF8Safe;
-use std::ops::Range;
 
 #[inline(always)]
 pub fn insert_clip(clip: &str, content: &mut Vec<EditorLine>, mut cursor: CursorPosition) -> CursorPosition {
@@ -223,41 +222,6 @@ pub fn find_line_start(line: &EditorLine) -> usize {
         }
     }
     0
-}
-
-/// returns range of char positions, not indexies
-///  - that means text.chars().nth(range.start) will return the start position,
-///    instead of text[range.start]
-pub fn word_range_at(line: &EditorLine, idx: usize) -> Range<usize> {
-    let mut token_start = 0;
-    let mut last_not_in_token = false;
-    for (char_idx, ch) in line.chars().enumerate() {
-        if is_word_char(ch) {
-            if last_not_in_token {
-                token_start = char_idx;
-            }
-            last_not_in_token = false;
-        } else if char_idx >= idx {
-            if last_not_in_token {
-                return idx..idx;
-            }
-            return token_start..char_idx;
-        } else {
-            last_not_in_token = true;
-        }
-    }
-    if idx < line.char_len() {
-        token_start..line.char_len()
-    } else if !last_not_in_token && token_start <= idx {
-        token_start..idx
-    } else {
-        idx..idx
-    }
-}
-
-#[inline]
-fn is_word_char(ch: char) -> bool {
-    matches!(ch, 'a'..='z' | 'A'..='Z' | '0'..='9' | '_')
 }
 
 #[inline(always)]

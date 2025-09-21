@@ -95,7 +95,7 @@ impl Actions {
         content: &mut Vec<EditorLine>,
         lexer: &mut Lexer,
     ) {
-        let (position, action) = Edit::insert_snippet(c, snippet, cursor_offset, &self.cfg, content);
+        let (position, action) = Edit::insert_snippet(c.get_position(), snippet, cursor_offset, &self.cfg, content);
         c.set_position(position);
         self.push_done(action, lexer, content);
     }
@@ -109,7 +109,8 @@ impl Actions {
         content: &mut Vec<EditorLine>,
         lexer: &mut Lexer,
     ) {
-        let (position, action) = Edit::insert_snippet(c, snippet, Some(cursor_offset), &self.cfg, content);
+        let (position, action) =
+            Edit::insert_snippet(c.get_position(), snippet, Some(cursor_offset), &self.cfg, content);
         let to = CursorPosition { line: position.line, char: position.char + select_len };
         c.select_set(position, to);
         self.push_done(action, lexer, content);

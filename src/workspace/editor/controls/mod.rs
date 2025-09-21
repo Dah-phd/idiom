@@ -7,7 +7,7 @@ use crate::{
     syntax::Lexer,
     workspace::{
         actions::{transaction, Actions},
-        cursor::{word::PositionedWord, Cursor, CursorPosition},
+        cursor::{Cursor, CursorPosition, PositionedWord},
         Editor, EditorLine,
     },
 };
@@ -270,7 +270,7 @@ fn multi_cursor_word_select(editor: &mut Editor, word: PositionedWord) {
         return;
     }
 
-    if let Some(inline_start) = word.find_words_inline_before(&editor.content) {
+    if let Some(inline_start) = word.find_word_inline_before(&editor.content) {
         for new_range in inline_start {
             let (new_from, new_to) = new_range.as_select();
             if editor.controls.cursors.iter().skip(1).any(|c| c.select_get() == Some((new_from, new_to))) {

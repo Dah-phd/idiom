@@ -1,4 +1,4 @@
-use super::{CursorPosition, Select};
+use super::{CharRange, CursorPosition, Select};
 use crate::workspace::EditorLine;
 use idiom_tui::UTF8Safe;
 
@@ -9,6 +9,12 @@ pub struct PositionedWord {
 }
 
 impl PositionedWord {
+    pub fn find_at(content: &[EditorLine], position: CursorPosition) -> Option<Self> {
+        let range = WordRange::find_at(content, position)?;
+        let text = content[range.line][range.from..range.to].to_owned();
+        Some(Self { range, text })
+    }
+
     #[inline]
     pub fn as_str(&self) -> &str {
         self.text.as_str()
@@ -82,7 +88,7 @@ impl PositionedWord {
         }))
     }
 
-    pub fn find_words_inline_before<'a>(
+    pub fn find_word_inline_before<'a>(
         &'a self,
         content: &'a [EditorLine],
     ) -> Option<impl Iterator<Item = WordRange> + use<'a>> {
@@ -144,17 +150,52 @@ impl WordRange {
         }
     }
 
+    pub fn find_text_at<'a>(content: &'a [EditorLine], position: CursorPosition) -> Option<&'a str> {
+        let range = Self::find_at(content, position)?;
+        Some(&content[range.line][range.from..range.to])
+    }
+
+    pub fn find_char_range(line: &EditorLine, idx: usize) -> Option<CharRange> {
+        let mut token_start = 0;
+        let mut last_not_in_token = false;
+        for (char_idx, ch) in line.chars().enumerate() {
+            if is_word_char(ch) {
+                if last_not_in_token {
+                    token_start = char_idx;
+                }
+                last_not_in_token = false;
+            } else if char_idx >= idx {
+                if last_not_in_token {
+                    return None;
+                }
+                return Some(CharRange { from: token_start, to: char_idx });
+            } else {
+                last_not_in_token = true;
+            }
+        }
+        if idx < line.char_len() {
+            Some(CharRange { from: token_start, to: line.char_len() })
+        } else if !last_not_in_token && token_start <= idx {
+            Some(CharRange { from: token_start, to: idx })
+        } else {
+            None
+        }
+    }
+
+    #[allow(dead_code)]
+    #[inline]
+    pub fn get_text<'a>(&self, content: &'a [EditorLine]) -> Option<&'a str> {
+        content[self.line].get(self.from, self.to)
+    }
+
+    #[allow(dead_code)]
+    #[inline]
+    pub fn get_text_uncheded<'a>(&self, content: &'a [EditorLine]) -> &'a str {
+        &content[self.line][self.from..self.to]
+    }
+
     pub fn as_select(&self) -> Select {
         (CursorPosition { line: self.line, char: self.from }, CursorPosition { line: self.line, char: self.to })
-    }
-
-    pub fn into_word(self, content: &[EditorLine]) -> Option<PositionedWord> {
-        let text = self.get_text(content)?.to_owned();
-        Some(PositionedWord { text, range: self })
-    }
-
-    pub fn get_text<'a>(&self, content: &'a [EditorLine]) -> Option<&'a str> {
-        content.get(self.line).and_then(|text| text.get(self.from, self.to))
     }
 }
 

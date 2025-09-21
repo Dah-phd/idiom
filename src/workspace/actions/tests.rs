@@ -327,14 +327,16 @@ fn insert_snippet() {
     let cfg = IndentConfigs::default();
     let mut cursor = Cursor::default();
     cursor.set_position((7, 5).into());
-    let (pos, edit) = Edit::insert_snippet(&cursor, "text() {\n    \n}".to_owned(), Some((1, 0)), &cfg, &mut content);
+    let (pos, edit) =
+        Edit::insert_snippet(cursor.get_position(), "text() {\n    \n}".to_owned(), Some((1, 0)), &cfg, &mut content);
     let mut edits = vec![edit];
     match_line(&content[7], &"    text() {");
     match_line(&content[8], &"        ");
     match_line(&content[9], &"    } is the first scope");
     assert_eq!(pos, CursorPosition { line: 8, char: 4 });
     cursor.set_position((0, 6).into());
-    let (pos, edit) = Edit::insert_snippet(&cursor, "text() {\n    \n}".to_owned(), None, &cfg, &mut content);
+    let (pos, edit) =
+        Edit::insert_snippet(cursor.get_position(), "text() {\n    \n}".to_owned(), None, &cfg, &mut content);
     edits.push(edit);
     match_line(&content[0], &"here text() {");
     match_line(&content[1], &"    ");

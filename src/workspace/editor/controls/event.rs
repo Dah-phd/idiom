@@ -7,7 +7,7 @@ use crate::{
     global_state::GlobalState,
     workspace::{
         actions::transaction,
-        cursor::{word::WordRange, CursorPosition},
+        cursor::{CursorPosition, PositionedWord, WordRange},
         Editor,
     },
 };
@@ -151,9 +151,7 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::Help => editor.lexer.help((&editor.cursor).into(), &editor.content, gs),
         EditorAction::LSPRename => {
             let position = editor.cursor.get_position();
-            if let Some(title) =
-                WordRange::find_at(&editor.content, position).and_then(|range| range.get_text(&editor.content))
-            {
+            if let Some(title) = WordRange::find_text_at(&editor.content, position) {
                 editor.lexer.start_rename(position, title);
             }
         }
@@ -336,12 +334,11 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         }
         EditorAction::SelectToken => {
             let maybe_word = editor.controls.cursors.first().and_then(|cursor| {
-                let range = WordRange::find_at(&editor.content, cursor.get_position())?;
                 let current_select = cursor.select_get()?;
-                if range.as_select() != current_select {
+                let word = PositionedWord::find_at(&editor.content, cursor.get_position())?;
+                if word.range().as_select() != current_select {
                     return None;
                 }
-                let word = range.into_word(&editor.content)?;
                 editor
                     .controls
                     .cursors
@@ -361,11 +358,11 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 Some(word) => multi_cursor_word_select(editor, word),
                 None => {
                     for cursor in editor.controls.cursors.iter_mut() {
-                        if let Some((from, to)) =
-                            WordRange::find_at(&editor.content, cursor.get_position()).map(|r| r.as_select())
-                        {
-                            cursor.select_set(from, to)
-                        }
+                        let Some(range) = WordRange::find_at(&editor.content, cursor.get_position()) else {
+                            continue;
+                        };
+                        let (from, to) = range.as_select();
+                        cursor.select_set(from, to)
                     }
                 }
             }

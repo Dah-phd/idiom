@@ -2,10 +2,10 @@ mod controls;
 mod utils;
 use super::{
     actions::Actions,
-    cursor::{Cursor, CursorPosition},
+    cursor::{Cursor, CursorPosition, WordRange},
     line::EditorLine,
     renderer::Renderer,
-    utils::{find_line_start, word_range_at},
+    utils::find_line_start,
 };
 use crate::{
     configs::{EditorAction, EditorConfigs, FileFamily, FileType, IndentConfigs},
@@ -198,13 +198,11 @@ impl Editor {
     }
 
     pub fn select_token(&mut self) {
-        let range = word_range_at(&self.content[self.cursor.line], self.cursor.char);
-        if !range.is_empty() {
-            self.cursor.select_set(
-                CursorPosition { line: self.cursor.line, char: range.start },
-                CursorPosition { line: self.cursor.line, char: range.end },
-            )
-        }
+        let Some(range) = WordRange::find_at(&self.content, self.cursor.get_position()) else {
+            return;
+        };
+        let (from, to) = range.as_select();
+        self.cursor.select_set(from, to);
     }
 
     fn select_line(&mut self) {

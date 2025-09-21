@@ -1,5 +1,5 @@
 use super::super::{
-    cursor::{word::WordRange, Cursor, CursorPosition},
+    cursor::{Cursor, CursorPosition, WordRange},
     editor::{utils::build_display, FileUpdate},
     Editor,
 };

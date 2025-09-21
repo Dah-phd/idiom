@@ -1,8 +1,7 @@
 use super::super::{
-    cursor::Cursor,
+    cursor::{CursorPosition, WordRange},
     line::EditorLine,
-    utils::{clip_content, insert_clip, insert_lines_indented, is_scope, remove_content, word_range_at},
-    CursorPosition,
+    utils::{clip_content, insert_clip, insert_lines_indented, is_scope, remove_content},
 };
 use super::EditMetaData;
 use idiom_tui::UTF8Safe;
@@ -152,12 +151,17 @@ impl Edit {
     }
 
     #[inline]
-    pub fn replace_token(line: usize, char: usize, new_text: String, content: &mut [EditorLine]) -> Self {
+    pub fn replace_token(line: usize, mut char: usize, new_text: String, content: &mut [EditorLine]) -> Self {
         let code_line = &mut content[line];
-        let range = word_range_at(code_line, char);
-        let char = range.start;
-        let reverse = code_line[range.clone()].to_owned();
-        code_line.replace_range(range, &new_text);
+        let mut reverse = String::new();
+        match WordRange::find_char_range(code_line, char) {
+            Some(range) => {
+                char = range.from;
+                reverse.push_str(&code_line[range.from..range.to]);
+                code_line.replace_range(range.from..range.to, &new_text);
+            }
+            None => code_line.insert_str(char, &new_text),
+        };
         Self::single_line(CursorPosition { line, char }, new_text, reverse)
     }
 
@@ -218,23 +222,24 @@ impl Edit {
 
     #[inline]
     pub fn insert_snippet(
-        c: &Cursor,
+        position: CursorPosition,
         snippet: String,
         cursor_offset: Option<(usize, usize)>,
         cfg: &IndentConfigs,
         content: &mut Vec<EditorLine>,
     ) -> (CursorPosition, Self) {
-        let code_line = &mut content[c.line];
-        let range = word_range_at(code_line, c.char);
-        let from = CursorPosition { line: c.line, char: range.start };
-        let to = CursorPosition { line: c.line, char: range.end };
+        let code_line = &mut content[position.line];
         let indent = cfg.derive_indent_from(code_line);
         let snippet = snippet.replace('\n', &format!("\n{}", &indent));
+        let (from, edit) =
+            match WordRange::find_char_range(code_line, position.char).map(|r| r.into_select(position.line)) {
+                Some((from, to)) => (from, Self::replace_select(from, to, snippet, content)),
+                None => (position, Self::insert_clip(position, snippet, content)),
+            };
         let new_cursor = cursor_offset.map(|(line, char)| CursorPosition {
-            line: line + c.line,
+            line: line + position.line,
             char: if line == 0 { from.char + char } else { indent.len() + char },
         });
-        let edit = Edit::replace_select(from, to, snippet, content);
         (new_cursor.unwrap_or(edit.end_position()), edit)
     }
 
