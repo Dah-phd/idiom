@@ -192,11 +192,11 @@ impl EditOffsetType {
         Self::new(get_edit(actions, index))
     }
 
-    pub fn apply_cursor<'a>(&self, cursors: impl Iterator<Item = &'a mut Cursor>) -> Result<(), ()> {
+    pub fn apply_cursor<'a>(&self, mut cursors: impl Iterator<Item = &'a mut Cursor>) -> Result<(), ()> {
         match self {
-            Self::Single(offset) => cursors.map(|cursor| offset.apply_cursor(cursor)).collect(),
+            Self::Single(offset) => cursors.try_for_each(|cursor| offset.apply_cursor(cursor)),
             Self::Multi(offsets) => {
-                cursors.map(|cursor| offsets.iter().map(|offset| offset.apply_cursor(cursor)).collect()).collect()
+                cursors.try_for_each(|cursor| offsets.iter().try_for_each(|offset| offset.apply_cursor(cursor)))
             }
         }
     }

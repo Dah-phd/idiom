@@ -150,7 +150,7 @@ impl WordRange {
         }
     }
 
-    pub fn find_text_at<'a>(content: &'a [EditorLine], position: CursorPosition) -> Option<&'a str> {
+    pub fn find_text_at(content: &[EditorLine], position: CursorPosition) -> Option<&str> {
         let range = Self::find_at(content, position)?;
         Some(&content[range.line][range.from..range.to])
     }
