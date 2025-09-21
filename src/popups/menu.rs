@@ -31,13 +31,14 @@ pub fn menu_context_editor_inplace(position: Position, screen: Rect, accent_styl
     }
 }
 
-pub fn menu_context_tree_inplace(position: CursorPosition, screen: Rect, accent_style: ContentStyle) -> ContextMenu<7> {
+pub fn menu_context_tree_inplace(position: CursorPosition, screen: Rect, accent_style: ContentStyle) -> ContextMenu<8> {
     let row_offset = position.line as u16;
     let col_offset = position.char as u16;
-    let modal_screen = screen.modal_relative(row_offset, col_offset, 30, 7);
+    let modal_screen = screen.modal_relative(row_offset, col_offset, 30, 8);
 
     ContextMenu {
         commands: [
+            ("New", TreeAction::NewFile.into()),
             ("Cut", TreeAction::CutFile.into()),
             ("Copy", TreeAction::CopyFile.into()),
             ("Paste", TreeAction::Paste.into()),

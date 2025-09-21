@@ -215,24 +215,26 @@ impl GlobalState {
     // RENDER CONTROLS
 
     pub fn context_menu(&mut self, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
-        let mut menu = match self.mode {
+        let result = match self.mode {
             Mode::Select => {
                 let state = tree.get_state();
                 let line = (state.selected - state.at_line) + 1;
                 let char = self.tree_area.width / 2;
                 let position = CursorPosition { line, char };
                 let accent_style = self.theme.accent_style_reversed();
-                menu_context_tree_inplace(position, self.screen_rect, accent_style)
+                let mut menu = menu_context_tree_inplace(position, self.screen_rect, accent_style);
+                menu.run(self, ws, tree, term)
             }
             Mode::Insert => {
                 let Some(editor) = ws.get_active() else { return };
                 let row = (editor.cursor.line - editor.cursor.at_line) as u16;
                 let col = (editor.cursor.char + editor.line_number_padding + 1) as u16;
                 let accent_style = self.theme.accent_style();
-                menu_context_editor_inplace(Position { row, col }, self.editor_area, accent_style)
+                let mut menu = menu_context_editor_inplace(Position { row, col }, self.editor_area, accent_style);
+                menu.run(self, ws, tree, term)
             }
         };
-        if let Err(error) = menu.run(self, ws, tree, term) {
+        if let Err(error) = result {
             self.error(error);
         };
     }

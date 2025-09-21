@@ -27,7 +27,7 @@ Python should work for the most part with jedi, but the interaction is not well 
 - Linux Mint
 
 ## TODO
-- add word select with multicursor
+- try optimize multicursor word selector
 - add mouse tests to mouse effects on modals
 - check on sort text in autocomplete (probably not that useful as request is sent once)
 - maybe more autocomplete (even on long words)
