@@ -49,10 +49,6 @@ pub fn check_edit_true_count(actions: &mut Actions, lexer: &mut Lexer) -> usize 
     actions.done.len()
 }
 
-pub fn get_edit(actions: &Actions, index: usize) -> &Action {
-    &actions.done[index]
-}
-
 pub fn undo_multi_cursor(
     actions: &mut Actions,
     content: &mut Vec<EditorLine>,
@@ -188,8 +184,8 @@ impl EditOffsetType {
         }
     }
 
-    pub fn get_from_edit(actions: &Actions, index: usize) -> Self {
-        Self::new(get_edit(actions, index))
+    pub fn parse_edit(actions: &Actions, index: usize) -> Self {
+        Self::new(&actions.done[index])
     }
 
     pub fn apply_cursor<'a>(&self, mut cursors: impl Iterator<Item = &'a mut Cursor>) -> Result<(), ()> {

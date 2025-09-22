@@ -208,18 +208,24 @@ where
         &mut editor.lexer,
         &mut editor.content,
         |actions, lexer, content| {
-            let mut index = 0;
-            let mut last_edit_idx = 0;
-            while let Some(cursor) = editor.controls.cursors.get_mut(index) {
-                (callback)(actions, lexer, content, cursor);
+            let ControlMap { cursors, .. } = &mut editor.controls;
 
-                let current_edit_idx = transaction::check_edit_true_count(actions, lexer);
-                if current_edit_idx > last_edit_idx && index > 0 {
-                    let edit_offset = transaction::EditOffsetType::get_from_edit(actions, current_edit_idx - 1);
-                    edit_offset.apply_cursor(editor.controls.cursors.iter_mut().take(index))?;
-                };
-                last_edit_idx = current_edit_idx;
-                index += 1;
+            // apply first cursor - there is no cursor for offset below
+            let Some(first_cursor) = cursors.first_mut() else {
+                return Ok(());
+            };
+            (callback)(actions, lexer, content, first_cursor);
+
+            let mut last_offset_edit = transaction::check_edit_true_count(actions, lexer);
+            for cursor_idx in 1..cursors.len() {
+                (callback)(actions, lexer, content, &mut cursors[cursor_idx]);
+
+                let current_edit = transaction::check_edit_true_count(actions, lexer);
+                while current_edit > last_offset_edit {
+                    let edit_offset = transaction::EditOffsetType::parse_edit(actions, last_offset_edit);
+                    edit_offset.apply_cursor(cursors.iter_mut().take(cursor_idx))?;
+                    last_offset_edit += 1;
+                }
             }
             Ok(())
         },
