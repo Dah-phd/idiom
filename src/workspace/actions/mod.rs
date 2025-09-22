@@ -484,7 +484,10 @@ impl Actions {
             lexer.sync_rev(&action, content);
             match select {
                 Some((from, to)) => cursor.select_set(from, to),
-                None => cursor.set_position(position),
+                None => {
+                    cursor.select_drop();
+                    cursor.set_position(position)
+                }
             }
             self.undone.push(action);
         }
@@ -497,7 +500,10 @@ impl Actions {
             lexer.sync(&action, content);
             match select {
                 Some((from, to)) => cursor.select_set(from, to),
-                None => cursor.set_position(position),
+                None => {
+                    cursor.select_drop();
+                    cursor.set_position(position)
+                }
             }
             self.done.push(action);
         }

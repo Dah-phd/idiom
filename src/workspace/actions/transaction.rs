@@ -78,7 +78,10 @@ pub fn undo_multi_cursor(
                     cursor.text_width = text_width;
                     match select {
                         Some((from, to)) => cursor.select_set(from, to),
-                        None => cursor.set_position(position),
+                        None => {
+                            cursor.select_drop();
+                            cursor.set_position(position)
+                        }
                     }
                     cursor
                 })
@@ -119,7 +122,10 @@ pub fn redo_multi_cursor(
                     cursor.text_width = text_width;
                     match select {
                         Some((from, to)) => cursor.select_set(from, to),
-                        None => cursor.set_position(position),
+                        None => {
+                            cursor.select_drop();
+                            cursor.set_position(position)
+                        }
                     }
                     cursor
                 })
