@@ -68,21 +68,22 @@ fn code_render(editor: &mut Editor, gs: &mut GlobalState) {
 
 fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     Lexer::context(editor, gs);
-    code::repositioning(&mut editor.cursor);
-    if !matches!(editor.last_render_at_line, Some(idx) if idx == editor.cursor.at_line) {
+
+    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
+
+    code::repositioning(cursor);
+    if !matches!(last_render_at_line, Some(idx) if *idx == cursor.at_line) {
         return code_render_full(editor, gs);
     }
 
-    let cursor = &editor.cursor;
     let accent_style = gs.theme.accent_fg();
-    let line_number_offset = editor.line_number_padding;
 
     let mut lines = gs.editor_area().into_iter();
-    let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
-    ctx.correct_last_line_match(&mut editor.content, lines.len());
+    let mut ctx = LineContext::collect_context(lexer, cursor, *line_number_padding, accent_style);
+    ctx.correct_last_line_match(content, lines.len());
     let backend = &mut gs.backend;
 
-    for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
+    for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         let line = match lines.next() {
             None => break,
             Some(line) => line,
@@ -105,22 +106,22 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
         }
     }
 
-    gs.render_stats(editor.content.len(), cursor.select_len(&editor.content), cursor.into());
+    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
     ctx.render_modal(gs);
 }
 
 #[inline(always)]
 fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
-    let cursor = &editor.cursor;
-    let accent_style = gs.theme.accent_fg();
-    let line_number_offset = editor.line_number_padding;
+    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
 
-    editor.last_render_at_line.replace(cursor.at_line);
+    let accent_style = gs.theme.accent_fg();
+
+    last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
-    let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
+    let mut ctx = LineContext::collect_context(lexer, cursor, *line_number_padding, accent_style);
     let backend = &mut gs.backend;
 
-    for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
+    for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         let line = match lines.next() {
             None => break,
             Some(line) => line,
@@ -137,7 +138,7 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
         line.render_empty(&mut gs.backend);
     }
 
-    gs.render_stats(editor.content.len(), cursor.select_len(&editor.content), cursor.into());
+    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
     ctx.forced_modal_render(gs);
 }
 
@@ -151,30 +152,31 @@ fn multi_code_render(editor: &mut Editor, gs: &mut GlobalState) {
 
 fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     Lexer::context(editor, gs);
-    code::repositioning(&mut editor.cursor);
-    if !matches!(editor.last_render_at_line, Some(idx) if idx == editor.cursor.at_line) {
+
+    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, controls, .. } = editor;
+
+    code::repositioning(cursor);
+
+    if !matches!(last_render_at_line, Some(idx) if *idx == cursor.at_line) {
         return multi_code_render_full(editor, gs);
     }
 
-    let cursor = &editor.cursor;
     let accent_style = gs.theme.accent_fg();
-    let line_number_offset = editor.line_number_padding;
 
     let mut lines = gs.editor_area().into_iter();
-    let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
-    ctx.correct_last_line_match(&mut editor.content, lines.len());
+    let mut ctx = LineContext::collect_context(lexer, cursor, *line_number_padding, accent_style);
+    ctx.correct_last_line_match(content, lines.len());
     let backend = &mut gs.backend;
 
     let mut is_rendered_cursor = false;
 
-    ctx.init_multic_mod(&editor.controls.cursors);
-    for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
+    ctx.init_multic_mod(&controls.cursors);
+    for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         let line = match lines.next() {
             None => break,
             Some(line) => line,
         };
-        is_rendered_cursor |=
-            code::fast_render_is_cursor(text, &editor.controls.cursors, line, line_idx, &mut ctx, backend);
+        is_rendered_cursor |= code::fast_render_is_cursor(text, &controls.cursors, line, line_idx, &mut ctx, backend);
     }
 
     if is_rendered_cursor {
@@ -191,27 +193,27 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
 
         ctx.render_modal(gs);
     }
-    gs.render_stats(editor.content.len(), editor.controls.cursors.len(), cursor.into());
+    gs.render_stats(content.len(), controls.cursors.len(), cursor.into());
 }
 
 #[inline(always)]
 fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
-    let cursor = &editor.cursor;
-    let accent_style = gs.theme.accent_fg();
-    let line_number_offset = editor.line_number_padding;
+    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, controls, .. } = editor;
 
-    editor.last_render_at_line.replace(cursor.at_line);
+    let accent_style = gs.theme.accent_fg();
+
+    last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
-    let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
+    let mut ctx = LineContext::collect_context(lexer, cursor, *line_number_padding, accent_style);
     let backend = &mut gs.backend;
 
-    ctx.init_multic_mod(&editor.controls.cursors);
-    for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
+    ctx.init_multic_mod(&controls.cursors);
+    for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         let line = match lines.next() {
             None => break,
             Some(line) => line,
         };
-        if let Some((cursors, selects)) = ctx.multic_line_setup(&editor.controls.cursors, line.width) {
+        if let Some((cursors, selects)) = ctx.multic_line_setup(&controls.cursors, line.width) {
             code::multi_cursor(text, &mut ctx, line, backend, cursors, selects);
         } else if ctx.has_cursor(line_idx) {
             code::cursor(text, &mut ctx, line, backend);
@@ -225,7 +227,7 @@ fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
         line.render_empty(&mut gs.backend);
     }
 
-    gs.render_stats(editor.content.len(), editor.controls.cursors.len(), cursor.into());
+    gs.render_stats(content.len(), controls.cursors.len(), cursor.into());
     ctx.forced_modal_render(gs);
 }
 
@@ -237,21 +239,21 @@ fn text_render(editor: &mut Editor, gs: &mut GlobalState) {
 }
 
 fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
-    let skip = text::repositioning(&mut editor.cursor, &mut editor.content).unwrap_or_default();
-    if !matches!(editor.last_render_at_line, Some(idx) if idx == editor.cursor.at_line) {
+    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
+
+    let skip = text::repositioning(cursor, content).unwrap_or_default();
+    if !matches!(last_render_at_line, Some(idx) if *idx == cursor.at_line) {
         return text_full_render(editor, gs, skip);
     }
 
-    let cursor = &editor.cursor;
     let accent_style = gs.theme.accent_fg();
-    let line_number_offset = editor.line_number_padding;
 
-    editor.last_render_at_line.replace(cursor.at_line);
+    last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
-    let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
+    let mut ctx = LineContext::collect_context(lexer, cursor, *line_number_padding, accent_style);
     let backend = &mut gs.backend;
 
-    for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
+    for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
             break;
         }
@@ -277,20 +279,20 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
         line.render_empty(&mut gs.backend);
     }
 
-    gs.render_stats(editor.content.len(), cursor.select_len(&editor.content), cursor.into());
+    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
 }
 
 #[inline(always)]
 fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
-    let cursor = &editor.cursor;
-    let accent_style = gs.theme.accent_fg();
-    let line_number_offset = editor.line_number_padding;
+    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
 
-    editor.last_render_at_line.replace(cursor.at_line);
+    let accent_style = gs.theme.accent_fg();
+
+    last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
-    let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
+    let mut ctx = LineContext::collect_context(lexer, cursor, *line_number_padding, accent_style);
     let backend = &mut gs.backend;
-    for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
+    for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
             break;
         }
@@ -306,7 +308,7 @@ fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
         line.render_empty(&mut gs.backend);
     }
 
-    gs.render_stats(editor.content.len(), cursor.select_len(&editor.content), cursor.into());
+    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
 }
 
 // MARKDOWN
@@ -317,16 +319,16 @@ fn md_render(editor: &mut Editor, gs: &mut GlobalState) {
 }
 
 fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
-    let cursor = &editor.cursor;
-    let accent_style = gs.theme.accent_fg();
-    let line_number_offset = editor.line_number_padding;
+    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
 
-    editor.last_render_at_line.replace(cursor.at_line);
+    let accent_style = gs.theme.accent_fg();
+
+    last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
-    let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
+    let mut ctx = LineContext::collect_context(lexer, cursor, *line_number_padding, accent_style);
     let backend = &mut gs.backend;
 
-    for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
+    for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
             break;
         }
@@ -342,25 +344,25 @@ fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
         line.render_empty(&mut gs.backend);
     }
 
-    gs.render_stats(editor.content.len(), cursor.select_len(&editor.content), cursor.into());
+    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
 }
 
 fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
-    let skip = markdown::repositioning(&mut editor.cursor, &mut editor.content).unwrap_or_default();
-    if !matches!(editor.last_render_at_line, Some(idx) if idx == editor.cursor.at_line) {
+    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
+
+    let skip = markdown::repositioning(cursor, content).unwrap_or_default();
+    if !matches!(last_render_at_line, Some(idx) if *idx == cursor.at_line) {
         return md_full_render(editor, gs, skip);
     }
 
-    let cursor = &editor.cursor;
     let accent_style = gs.theme.accent_fg();
-    let line_number_offset = editor.line_number_padding;
 
-    editor.last_render_at_line.replace(cursor.at_line);
+    last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
-    let mut ctx = LineContext::collect_context(&mut editor.lexer, cursor, line_number_offset, accent_style);
+    let mut ctx = LineContext::collect_context(lexer, cursor, *line_number_padding, accent_style);
     let backend = &mut gs.backend;
 
-    for (line_idx, text) in editor.content.iter_mut().enumerate().skip(cursor.at_line) {
+    for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
             break;
         }
@@ -386,7 +388,7 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
         line.render_empty(&mut gs.backend);
     }
 
-    gs.render_stats(editor.content.len(), cursor.select_len(&editor.content), cursor.into());
+    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
 }
 
 #[cfg(test)]
