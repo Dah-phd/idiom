@@ -1,4 +1,4 @@
-use super::GlobalState;
+use super::{GlobalState, Mode};
 use crate::configs::{EditorAction, TreeAction};
 use crate::embeded_term::EditorTerminal;
 use crate::embeded_tui::run_embeded_tui;
@@ -22,6 +22,7 @@ pub enum StartInplacePopup {
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum IdiomEvent {
+    TreeDiagnostics(TreeDiagnostics),
     EditorActionCall(EditorAction),
     TreeActionCall(TreeAction),
     EmbededApp(Option<String>),
@@ -37,15 +38,14 @@ pub enum IdiomEvent {
     FileUpdated(PathBuf),
     CheckLSP(FileType),
     SetLSP(FileType),
-    TreeDiagnostics(TreeDiagnostics),
     AutoComplete(String),
     Snippet { snippet: String, cursor_offset: Option<(usize, usize)>, relative_select: Option<((usize, usize), usize)> },
     InsertText(String),
     WorkspaceEdit(WorkspaceEdit),
     ActivateEditor(usize),
-    ReplaceAll(String, Vec<(CursorPosition, CursorPosition)>),
     GoToLine(usize),
     GoToSelect { from: CursorPosition, to: CursorPosition },
+    SetMode(Mode),
     Save,
     Rebase,
 }
@@ -204,6 +204,10 @@ impl IdiomEvent {
                 };
             }
             IdiomEvent::WorkspaceEdit(edits) => ws.apply_edits(edits, gs),
+            IdiomEvent::SetMode(mode) => match mode {
+                Mode::Select => gs.select_mode(),
+                Mode::Insert => gs.insert_mode(),
+            },
             IdiomEvent::Rebase => {
                 if let Some(editor) = ws.get_active() {
                     editor.rebase(gs);
@@ -235,11 +239,6 @@ impl IdiomEvent {
             IdiomEvent::ActivateEditor(idx) => {
                 ws.activate_editor(idx, gs);
                 gs.insert_mode();
-            }
-            IdiomEvent::ReplaceAll(clip, ranges) => {
-                if let Some(editor) = ws.get_active() {
-                    editor.mass_replace(ranges, clip);
-                }
             }
         }
     }

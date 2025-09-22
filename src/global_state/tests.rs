@@ -68,9 +68,9 @@ fn force_calc_insert(h: u16, w: u16) -> GlobalState {
 fn full_rebuild_draw() {
     let gs = full_draw_select(80, 80);
     assert_eq!(gs.screen_rect, Rect::from((80, 80)));
-    assert_eq!(gs.editor_area, Rect { row: 1, col: 14, width: 66, height: 78, borders: Borders::empty() });
+    assert_eq!(gs.editor_area, Rect { row: 1, col: 15, width: 65, height: 78, borders: Borders::LEFT });
     assert_eq!(gs.tab_area, Rect { row: 0, col: 14, width: 66, height: 1, borders: Borders::empty() });
-    assert_eq!(gs.tree_area, Rect { row: 1, col: 1, width: 12, height: 78, borders: Borders::LEFT | Borders::RIGHT });
+    assert_eq!(gs.tree_area, Rect { row: 1, col: 0, width: 14, height: 78, borders: Borders::empty() });
     assert_eq!(gs.footer_line, Line { row: 79, col: 0, width: 80 });
 }
 
@@ -78,7 +78,7 @@ fn full_rebuild_draw() {
 fn full_rebuild_draw_insert() {
     let gs = full_draw_insert(80, 80);
     assert_eq!(gs.screen_rect, Rect::from((80, 80)));
-    assert_eq!(gs.editor_area, Rect { row: 1, col: 0, width: 80, height: 78, borders: Borders::empty() });
+    assert_eq!(gs.editor_area, Rect { row: 1, col: 1, width: 79, height: 78, borders: Borders::LEFT });
     assert_eq!(gs.tab_area, Rect { row: 0, col: 0, width: 80, height: 1, borders: Borders::empty() });
     assert_eq!(gs.tree_area, Rect { row: 0, col: 0, width: 0, height: 79, borders: Borders::empty() });
     assert_eq!(gs.footer_line, Line { row: 79, col: 0, width: 80 });
@@ -88,9 +88,9 @@ fn full_rebuild_draw_insert() {
 fn force_area_calc() {
     let gs = force_calc_select(80, 80);
     assert_eq!(gs.screen_rect, Rect::from((80, 80)));
-    assert_eq!(gs.editor_area, Rect { row: 1, col: 14, width: 66, height: 78, borders: Borders::empty() });
+    assert_eq!(gs.editor_area, Rect { row: 1, col: 15, width: 65, height: 78, borders: Borders::LEFT });
     assert_eq!(gs.tab_area, Rect { row: 0, col: 14, width: 66, height: 1, borders: Borders::empty() });
-    assert_eq!(gs.tree_area, Rect { row: 1, col: 1, width: 12, height: 78, borders: Borders::LEFT | Borders::RIGHT });
+    assert_eq!(gs.tree_area, Rect { row: 1, col: 0, width: 14, height: 78, borders: Borders::empty() });
     assert_eq!(gs.footer_line, Line { row: 79, col: 0, width: 80 });
 }
 
@@ -98,7 +98,7 @@ fn force_area_calc() {
 fn force_area_calc_insert() {
     let gs = force_calc_insert(80, 80);
     assert_eq!(gs.screen_rect, Rect::from((80, 80)));
-    assert_eq!(gs.editor_area, Rect { row: 1, col: 0, width: 80, height: 78, borders: Borders::empty() });
+    assert_eq!(gs.editor_area, Rect { row: 1, col: 1, width: 79, height: 78, borders: Borders::LEFT });
     assert_eq!(gs.tab_area, Rect { row: 0, col: 0, width: 80, height: 1, borders: Borders::empty() });
     assert_eq!(gs.tree_area, Rect { row: 0, col: 0, width: 0, height: 79, borders: Borders::empty() });
     assert_eq!(gs.footer_line, Line { row: 79, col: 0, width: 80 });

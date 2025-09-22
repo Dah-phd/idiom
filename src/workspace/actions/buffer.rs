@@ -199,7 +199,7 @@ impl BackspaceBuffer {
             self.text.push(ch);
             let character = match text.is_simple() {
                 true => self.last,
-                false => (lexer.encode_position)(self.last, text.content.as_str()),
+                false => (lexer.encode_position)(self.last, text.as_str()),
             };
             let start = Position::new(line, character as u32);
             let end = Position::new(line, (character + (lexer.char_lsp_pos)(ch)) as u32);
@@ -363,7 +363,7 @@ mod tests {
         let edit = buf.collect().unwrap();
         let mut content = vec![code_text];
         edit.apply_rev(&mut content);
-        assert_eq!(content[0].content, "0123456789");
+        assert_eq!(content[0].as_str(), "0123456789");
         assert_eq!(edit.text, "");
         assert_eq!(edit.reverse, "789");
         assert_eq!(edit.cursor, CursorPosition { line: 0, char: 7 });
@@ -452,7 +452,7 @@ mod tests {
                 range_length: None
             }
         );
-        assert_eq!(code_text.content.as_str(), "        🙀");
+        assert_eq!(code_text.as_str(), "        🙀");
         assert_eq!(cursor.char, 8);
         assert!(edit.is_none());
         let (edit, event) = buf.backspace(indent, &mut cursor, &mut code_text, &lexer);
@@ -464,7 +464,7 @@ mod tests {
                 range_length: None
             }
         );
-        assert_eq!(code_text.content.as_str(), "    🙀");
+        assert_eq!(code_text.as_str(), "    🙀");
         assert_eq!(cursor.char, 4);
         assert!(edit.is_none());
         assert!(matches!(buf, ActionBuffer::Backspace(..)));
@@ -479,7 +479,7 @@ mod tests {
         let mut cursor = Cursor::default();
         cursor.set_position((0, 12).into());
         let (edit, event) = buf.backspace(indent, &mut cursor, &mut code_text, &lexer);
-        assert_eq!("        🙀🙀12", code_text.content);
+        assert_eq!("        🙀🙀12", code_text.as_str());
         assert_eq!(
             event,
             TextDocumentContentChangeEvent {
@@ -491,7 +491,7 @@ mod tests {
         assert!(edit.is_none());
         cursor.set_position((0, 9).into());
         let (edit, event) = buf.backspace(indent, &mut cursor, &mut code_text, &lexer);
-        assert_eq!("        🙀12", code_text.content);
+        assert_eq!("        🙀12", code_text.as_str());
         assert_eq!(
             event,
             TextDocumentContentChangeEvent {
@@ -502,7 +502,7 @@ mod tests {
         );
         assert!(edit.is_some());
         let (edit, event) = buf.backspace(indent, &mut cursor, &mut code_text, &lexer);
-        assert_eq!("    🙀12", code_text.content);
+        assert_eq!("    🙀12", code_text.as_str());
         assert_eq!(
             event,
             TextDocumentContentChangeEvent {
@@ -581,7 +581,7 @@ mod tests {
         let range = Some(Range::new(Position::new(0, 10), Position::new(0, 10)));
         assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('b'), range, range_length: None });
         assert!(no_edit.is_none());
-        assert_eq!(code_text.content, "tesxt🙀bbasd32ra 🙀dw");
+        assert_eq!(code_text.as_str(), "tesxt🙀bbasd32ra 🙀dw");
 
         let (edit, event) = buf.push('🙀', &mut cursor, &mut code_text, &lexer);
         let range = Some(Range::new(Position::new(0, 11), Position::new(0, 11)));
@@ -589,12 +589,12 @@ mod tests {
         assert!(
             matches!(edit, Some(edit) if edit.reverse.is_empty() && edit.text == "bb" && edit.cursor == CursorPosition {line: 0, char: 6})
         );
-        assert_eq!(code_text.content, "tesxt🙀bb🙀asd32ra 🙀dw");
+        assert_eq!(code_text.as_str(), "tesxt🙀bb🙀asd32ra 🙀dw");
 
         cursor.set_char(8);
         let (edit, event) = buf.push('x', &mut cursor, &mut code_text, &lexer);
         assert!(edit.is_some());
-        assert_eq!(code_text.content, "tesxt🙀bbx🙀asd32ra 🙀dw");
+        assert_eq!(code_text.as_str(), "tesxt🙀bbx🙀asd32ra 🙀dw");
         let range = Some(Range::new(Position::new(0, 11), Position::new(0, 11)));
         assert_eq!(event, TextDocumentContentChangeEvent { text: String::from('x'), range, range_length: None });
         assert!(

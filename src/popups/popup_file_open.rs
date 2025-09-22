@@ -65,7 +65,7 @@ impl OpenFileSelector {
     }
 
     fn get_rect(gs: &GlobalState) -> Rect {
-        gs.screen_rect.top(15).vcenter(100).with_borders()
+        gs.screen().top(15).vcenter(100).with_borders()
     }
 
     fn get_path_idx(&self, row: u16, column: u16, gs: &GlobalState) -> Option<usize> {

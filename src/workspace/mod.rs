@@ -16,7 +16,7 @@ use crate::{
 use crossterm::event::KeyEvent;
 use crossterm::style::{Color, ContentStyle};
 pub use cursor::{Cursor, CursorPosition};
-pub use editor::{editor_from_data, text_editor_from_data, Editor};
+pub use editor::{editor_from_data, Editor};
 use idiom_tui::Backend;
 use line::EditorLine;
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
@@ -26,6 +26,7 @@ use std::{
 };
 
 pub const FILE_STATUS_ERR: &str = "File status ERR";
+pub const TAB_SELECT: Color = Color::DarkYellow;
 
 /// implement Drop to attempt keep state upon close/crash
 pub struct Workspace {
@@ -39,19 +40,20 @@ pub struct Workspace {
 
 impl Workspace {
     pub fn new(key_map: EditorKeyMap, base_configs: EditorConfigs, lsp_servers: HashMap<FileType, LSP>) -> Self {
-        let tab_style = ContentStyle::fg(Color::DarkYellow);
+        let tab_style = ContentStyle::fg(TAB_SELECT);
         Self { editors: TrackedList::new(), base_configs, key_map, lsp_servers, map_callback: map_editor, tab_style }
     }
 
     pub fn render(&mut self, gs: &mut GlobalState) {
         if let Some(editor) = self.editors.get_mut(0) {
-            let line = match gs.tab_area.into_iter().next() {
+            let line = match gs.tab_area().into_iter().next() {
                 Some(line) => line,
                 None => return,
             };
             gs.backend.set_style(ContentStyle::underlined(None));
             {
                 let mut builder = line.unsafe_builder(&mut gs.backend);
+                builder.push_styled(" ", self.tab_style);
                 builder.push_styled(&editor.display, self.tab_style);
                 for editor in self.editors.iter().skip(1) {
                     if !builder.push(" | ") || !builder.push(&editor.display) {
@@ -60,7 +62,7 @@ impl Workspace {
                 }
             }
             gs.backend.reset_style();
-        } else if let Some(line) = gs.tab_area.into_iter().next() {
+        } else if let Some(line) = gs.tab_area().into_iter().next() {
             line.render_empty(&mut gs.backend);
         }
     }
@@ -260,7 +262,7 @@ impl Workspace {
         cursor: Option<Cursor>,
         gs: &mut GlobalState,
     ) {
-        let editor = text_editor_from_data(path, content, cursor, &self.base_configs, gs);
+        let editor = editor_from_data(path, FileType::Text, content, cursor, &self.base_configs, gs);
         self.editors.insert(0, editor);
     }
 
@@ -276,10 +278,6 @@ impl Workspace {
         let content = match content {
             None => EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?,
             Some(lines) => lines.into_iter().map(EditorLine::from).collect(),
-        };
-        if matches!(file_type, FileType::Ignored) {
-            self.new_text_from_data(path, content, Some(cursor), gs);
-            return Ok(());
         };
         let mut editor = editor_from_data(path, file_type, content, Some(cursor), &self.base_configs, gs);
         self.lsp_enroll(&mut editor, gs).await;
@@ -314,27 +312,27 @@ impl Workspace {
     }
 
     fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
-        Editor::from_path(file_path, FileType::Ignored, &self.base_configs, gs)
+        Editor::from_path(file_path, FileType::Text, &self.base_configs, gs)
     }
 
     async fn determine_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
-        let file_type = match FileType::derive_type(&file_path) {
-            Some(file_type) => file_type,
-            None => {
-                return match file_path.extension().and_then(|ext| ext.to_str()) {
-                    Some(ext) if ext.to_lowercase() == "md" => Editor::from_path_md(file_path, &self.base_configs, gs),
-                    _ => Editor::from_path_text(file_path, &self.base_configs, gs),
-                }
+        match FileType::derive_type(&file_path) {
+            FileType::Text => Editor::from_path_text(file_path, &self.base_configs, gs),
+            FileType::MarkDown => Editor::from_path_md(file_path, &self.base_configs, gs),
+            file_type => {
+                let mut editor = Editor::from_path(file_path, file_type, &self.base_configs, gs)?;
+                self.lsp_enroll(&mut editor, gs).await;
+                Ok(editor)
             }
-        };
-        let mut editor = Editor::from_path(file_path, file_type, &self.base_configs, gs)?;
-        self.lsp_enroll(&mut editor, gs).await;
-        Ok(editor)
+        }
     }
 
     // LSP HANDLES
 
     async fn lsp_enroll(&mut self, editor: &mut Editor, gs: &mut GlobalState) {
+        if !editor.file_type.is_code() {
+            return; // no lsp for text / markdown files
+        }
         let lsp_cmd = match self.base_configs.derive_lsp(&editor.file_type) {
             None => {
                 editor.lexer.local_lsp(editor.file_type, editor.stringify(), gs);
@@ -367,11 +365,15 @@ impl Workspace {
     }
 
     pub async fn force_lsp_type_on_active(&mut self, file_type: FileType, gs: &mut GlobalState) -> IdiomResult<()> {
-        let new_indent_cfg = self.base_configs.get_indent_cfg(&file_type);
+        let new_indent_cfg = self.base_configs.get_indent_cfg(file_type);
         match self.get_active() {
             Some(editor) => editor.file_type_set(file_type, new_indent_cfg, gs),
             None => return Err(IdiomError::LSP(crate::lsp::LSPError::Null)),
         };
+
+        if !file_type.is_code() {
+            return Ok(());
+        }
 
         let lsp_cmd = match self.base_configs.derive_lsp(&file_type) {
             Some(lsp_cmd) => lsp_cmd,
@@ -463,10 +465,11 @@ impl Workspace {
         }
         let editor = self.editors.remove(0);
         drop(editor);
+        let editor_area = *gs.editor_area();
         match self.get_active() {
             None => {
                 gs.clear_stats();
-                gs.editor_area.clear(&mut gs.backend);
+                editor_area.clear(&mut gs.backend);
                 gs.select_mode();
             }
             Some(editor) => {

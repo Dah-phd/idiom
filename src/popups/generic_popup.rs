@@ -13,6 +13,7 @@ use crossterm::{
 use idiom_tui::layout::Line;
 use std::ops::Range;
 
+#[allow(unpredictable_function_pointer_comparisons)]
 #[derive(Clone, PartialEq)]
 pub struct CommandButton {
     pub command: fn(&mut PopupChoice, &mut Components),
@@ -63,7 +64,7 @@ impl Popup for PopupChoice {
 
     fn force_render(&mut self, gs: &mut GlobalState) {
         let (height, width) = self.size;
-        let mut area = gs.screen_rect.center(height, width);
+        let mut area = gs.screen().center(height, width);
         let backend = gs.backend();
         area.bordered();
         area.draw_borders(None, None, backend);

@@ -14,13 +14,13 @@ pub fn render(
     select: Option<Range<usize>>,
     backend: &mut CrossTerm,
 ) {
-    if line_width > line.char_len {
+    if line_width > line.char_len() {
         match select {
             Some(select) => self::select(line, ctx, select, backend),
             None => self::basic(line, ctx, backend),
         }
         if let Some(diagnostics) = line.diagnostics.as_ref() {
-            diagnostics.inline_render(line_width - line.char_len, backend);
+            diagnostics.inline_render(line_width - line.char_len(), backend);
         }
     } else {
         match select {
@@ -160,7 +160,7 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backen
 #[inline(always)]
 pub fn partial(line: &mut EditorLine, ctx: &LineContext, line_width: usize, backend: &mut CrossTerm) {
     let cursor_idx = ctx.cursor_char();
-    let (mut idx, reduction) = line.cached.generate_skipped_chars_simple(cursor_idx, line_width);
+    let (mut idx, reduction) = line.generate_skipped_chars_simple(cursor_idx, line_width);
     if idx != 0 {
         backend.print_styled(WRAP_OPEN, ctx.accent_style.reverse());
     }
@@ -184,7 +184,7 @@ pub fn partial(line: &mut EditorLine, ctx: &LineContext, line_width: usize, back
         cursor -= token.delta_start;
     }
 
-    let content = unsafe { line.content.get_unchecked(idx..) };
+    let content = unsafe { line.as_str().get_unchecked(idx..) };
     for text in content.chars().take(line_width.saturating_sub(reduction)) {
         if counter == 0 {
             match lined_up.take() {
@@ -238,7 +238,7 @@ pub fn partial_select(
     backend: &mut CrossTerm,
 ) {
     let cursor_idx = ctx.cursor_char();
-    let (mut idx, reduction) = line.cached.generate_skipped_chars_simple(cursor_idx, line_width);
+    let (mut idx, reduction) = line.generate_skipped_chars_simple(cursor_idx, line_width);
     if idx != 0 {
         backend.print_styled(WRAP_OPEN, ctx.accent_style.reverse());
     }
@@ -269,7 +269,7 @@ pub fn partial_select(
         cursor -= token.delta_start;
     }
 
-    let content = unsafe { line.content.get_unchecked(idx..) };
+    let content = unsafe { line.as_str().get_unchecked(idx..) };
     for text in content.chars().take(line_width.saturating_sub(reduction)) {
         if select.start == idx {
             reset_style.set_bg(Some(select_color));

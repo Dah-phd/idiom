@@ -18,7 +18,7 @@ pub struct Highlighter {
 impl Highlighter {
     pub fn new(theme: &Theme) -> Self {
         let mut legend = Legend::default();
-        legend.map_styles(crate::configs::FileType::Ignored, theme, &create_semantic_capabilities());
+        legend.map_styles(crate::configs::FileType::Text, theme, &create_semantic_capabilities());
         Self { legend, tokens: vec![] }
     }
 

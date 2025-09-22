@@ -7,6 +7,7 @@ pub const HYPER: &str = "hyper";
 pub const META: &str = "meta";
 
 // KEYS
+pub const MENU: &str = "menu";
 pub const BACKSPACE: &str = "backspace";
 pub const ENTER: &str = "enter";
 pub const LEFT: &str = "left";

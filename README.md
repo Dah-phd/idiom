@@ -27,13 +27,11 @@ Python should work for the most part with jedi, but the interaction is not well 
 - Linux Mint
 
 ## TODO
+- try optimize multicursor word selector
 - add mouse tests to mouse effects on modals
 - check on sort text in autocomplete (probably not that useful as request is sent once)
-- change to select mode on file open with mouse
 - maybe more autocomplete (even on long words)
 
-- move rendering backend to internal create
-- persistent state (keeping changes after close witout saving)
 - fix tracking edgecase where file is changed in by other app in select
 - improve cursor handle in embeded tui / terminal
 - write tests

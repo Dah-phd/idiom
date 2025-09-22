@@ -6,8 +6,8 @@ use crate::syntax::{
     tests::{char_lsp_pos, encode_pos_utf32, intercept_sync, intercept_sync_rev},
     Lexer,
 };
+use crate::workspace::actions::Action;
 use crate::workspace::actions::Edit;
-use crate::workspace::actions::EditType;
 use crate::workspace::cursor::Cursor;
 use crate::workspace::line::EditorLine;
 use crate::workspace::CursorPosition;
@@ -327,14 +327,16 @@ fn insert_snippet() {
     let cfg = IndentConfigs::default();
     let mut cursor = Cursor::default();
     cursor.set_position((7, 5).into());
-    let (pos, edit) = Edit::insert_snippet(&cursor, "text() {\n    \n}".to_owned(), Some((1, 0)), &cfg, &mut content);
+    let (pos, edit) =
+        Edit::insert_snippet(cursor.get_position(), "text() {\n    \n}".to_owned(), Some((1, 0)), &cfg, &mut content);
     let mut edits = vec![edit];
     match_line(&content[7], &"    text() {");
     match_line(&content[8], &"        ");
     match_line(&content[9], &"    } is the first scope");
     assert_eq!(pos, CursorPosition { line: 8, char: 4 });
     cursor.set_position((0, 6).into());
-    let (pos, edit) = Edit::insert_snippet(&cursor, "text() {\n    \n}".to_owned(), None, &cfg, &mut content);
+    let (pos, edit) =
+        Edit::insert_snippet(cursor.get_position(), "text() {\n    \n}".to_owned(), None, &cfg, &mut content);
     edits.push(edit);
     match_line(&content[0], &"here text() {");
     match_line(&content[1], &"    ");
@@ -475,14 +477,14 @@ fn push_char_with_closing_and_select() {
     cursor.select_set(CursorPosition { line: 0, char: 1 }, CursorPosition { line: 0, char: 4 });
     actions.push_char('[', &mut cursor, &mut content, &mut lexer);
     // confirm open close has been added
-    assert_eq!(&content[0].content, end);
+    assert_eq!(content[0].as_str(), end);
     actions.undo(&mut cursor, &mut content, &mut lexer);
-    assert_eq!(&content[0].content, start);
+    assert_eq!(content[0].as_str(), start);
     actions.redo(&mut cursor, &mut content, &mut lexer);
-    assert_eq!(&content[0].content, end);
+    assert_eq!(content[0].as_str(), end);
 }
 
-fn probe_char_closing_with_select(_: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
+fn probe_char_closing_with_select(_: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
     let (meta, edit) = action.change_event(encode_pos_utf32, char_lsp_pos, content);
     assert_eq!(meta.start_line, 0);
     assert_eq!(meta.from, 1);
@@ -494,7 +496,7 @@ fn probe_char_closing_with_select(_: &mut Lexer, action: &EditType, content: &mu
     Ok(())
 }
 
-fn probe_char_closing_with_select_rev(_: &mut Lexer, action: &EditType, content: &mut [EditorLine]) -> LSPResult<()> {
+fn probe_char_closing_with_select_rev(_: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
     let (meta, edit) = action.change_event_rev(encode_pos_utf32, char_lsp_pos, content);
     assert_eq!(meta.start_line, 0);
     assert_eq!(meta.from, 1);

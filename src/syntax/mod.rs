@@ -10,12 +10,12 @@ use crate::{
     global_state::{GlobalState, IdiomEvent},
     lsp::{LSPClient, LSPError, LSPResponseType, LSPResult},
     workspace::{
-        actions::{EditMetaData, EditType},
+        actions::{Action, EditMetaData},
         line::EditorLine,
         CursorPosition, Editor,
     },
 };
-pub use diagnostics::{set_diganostics, Action, DiagnosticInfo, DiagnosticLine};
+pub use diagnostics::{set_diganostics, DiagnosticInfo, DiagnosticLine, Fix};
 use idiom_tui::{layout::Rect, Position};
 pub use langs::Lang;
 pub use legend::Legend;
@@ -57,8 +57,8 @@ pub struct Lexer {
     renames: fn(&mut Self, CursorPosition, String, &mut GlobalState),
     sync_tokens: fn(&mut Self, EditMetaData),
     sync_changes: fn(&mut Self, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
-    sync: fn(&mut Self, &EditType, &mut [EditorLine]) -> LSPResult<()>,
-    sync_rev: fn(&mut Self, &EditType, &mut [EditorLine]) -> LSPResult<()>,
+    sync: fn(&mut Self, &Action, &[EditorLine]) -> LSPResult<()>,
+    sync_rev: fn(&mut Self, &Action, &[EditorLine]) -> LSPResult<()>,
     meta: Option<EditMetaData>,
     pub encode_position: fn(usize, &str) -> usize,
     pub char_lsp_pos: fn(char) -> usize,
@@ -69,7 +69,7 @@ impl Lexer {
         Self {
             lang: Lang::from(file_type),
             legend: Legend::default(),
-            theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
+            theme: gs.unwrap_or_default(Theme::new(), "theme.toml: "),
             modal: None,
             modal_rect: None,
             uri: as_url(path),
@@ -106,7 +106,7 @@ impl Lexer {
         Self {
             lang: Lang::default(),
             legend: Legend::default(),
-            theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
+            theme: gs.unwrap_or_default(Theme::new(), "theme.toml: "),
             modal: None,
             modal_rect: None,
             uri: as_url(path),
@@ -143,7 +143,7 @@ impl Lexer {
         Self {
             lang: Lang::default(),
             legend: Legend::default(),
-            theme: gs.unwrap_or_default(Theme::new(), "theme.json: "),
+            theme: gs.unwrap_or_default(Theme::new(), "theme.toml: "),
             modal: None,
             modal_rect: None,
             uri: as_url(path),
@@ -202,13 +202,13 @@ impl Lexer {
 
     /// sync event
     #[inline(always)]
-    pub fn sync(&mut self, action: &EditType, content: &mut [EditorLine]) {
+    pub fn sync(&mut self, action: &Action, content: &[EditorLine]) {
         self.question_lsp = (self.sync)(self, action, content).is_err();
     }
 
     /// sync reverse event
     #[inline(always)]
-    pub fn sync_rev(&mut self, action: &EditType, content: &mut [EditorLine]) {
+    pub fn sync_rev(&mut self, action: &Action, content: &mut [EditorLine]) {
         self.question_lsp = (self.sync_rev)(self, action, content).is_err();
     }
 
@@ -268,8 +268,8 @@ impl Lexer {
     ) -> Option<Rect> {
         let modal = self.modal.as_mut()?;
         let found_positon = self.modal_rect.and_then(|rect| {
-            let row = gs.editor_area.row + relative_editor_position.row;
-            let column = gs.editor_area.col + relative_editor_position.col;
+            let row = gs.editor_area().row + relative_editor_position.row;
+            let column = gs.editor_area().col + relative_editor_position.col;
             rect.relative_position(row, column)
         });
         match found_positon {
@@ -433,6 +433,31 @@ impl Lexer {
             return;
         }
         let _ = self.client.file_did_close(self.uri.clone());
+    }
+}
+
+pub struct SyncCallbacks {
+    sync: fn(&mut Lexer, &Action, &[EditorLine]) -> LSPResult<()>,
+    sync_rev: fn(&mut Lexer, &Action, &[EditorLine]) -> LSPResult<()>,
+    sync_changes: fn(&mut Lexer, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
+    sync_tokens: fn(&mut Lexer, EditMetaData),
+}
+
+impl SyncCallbacks {
+    pub fn take(lexer: &mut Lexer) -> Self {
+        Self {
+            sync: std::mem::replace(&mut lexer.sync, lsp_calls::sync_edits_dead),
+            sync_rev: std::mem::replace(&mut lexer.sync_rev, lsp_calls::sync_edits_dead_rev),
+            sync_changes: std::mem::replace(&mut lexer.sync_changes, lsp_calls::sync_changes_dead),
+            sync_tokens: std::mem::replace(&mut lexer.sync_tokens, lsp_calls::sync_tokens_dead),
+        }
+    }
+
+    pub fn set_in(self, lexer: &mut Lexer) {
+        lexer.sync = self.sync;
+        lexer.sync_rev = self.sync_rev;
+        lexer.sync_changes = self.sync_changes;
+        lexer.sync_tokens = self.sync_tokens;
     }
 }
 

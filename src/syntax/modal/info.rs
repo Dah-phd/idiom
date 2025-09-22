@@ -4,7 +4,7 @@ use crate::{
     ext_tui::{State, StyleExt, StyledLine},
     global_state::GlobalState,
     lsp::Highlighter,
-    syntax::{Action, DiagnosticInfo},
+    syntax::{DiagnosticInfo, Fix},
 };
 use crossterm::style::ContentStyle;
 use idiom_tui::{
@@ -24,7 +24,7 @@ enum Mode {
 #[derive(Default)]
 pub struct Info {
     style_builder: Option<Highlighter>,
-    actions: Option<Vec<Action>>,
+    actions: Option<Vec<Fix>>,
     text: Vec<StyledLine>,
     state: State,
     text_state: usize,
@@ -326,17 +326,15 @@ mod test {
     use crate::configs::{EditorAction, Theme};
     use crate::ext_tui::CrossTerm;
     use crate::global_state::GlobalState;
-    use crate::syntax::{Action, DiagnosticInfo};
+    use crate::syntax::{DiagnosticInfo, Fix};
     use idiom_tui::{layout::Rect, Backend};
     use lsp_types::Hover;
 
     #[test]
     fn mouse() {
-        let second = Action::Import("second".to_owned());
-        let di = DiagnosticInfo {
-            actions: Some(vec![Action::Import("first".to_owned()), second.clone()]),
-            messages: vec![],
-        };
+        let second = Fix::Import("second".to_owned());
+        let di =
+            DiagnosticInfo { actions: Some(vec![Fix::Import("first".to_owned()), second.clone()]), messages: vec![] };
         let theme = Theme::default();
         let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
 

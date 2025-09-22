@@ -5,21 +5,15 @@ use crate::global_state::GlobalState;
 use crate::workspace::CursorPosition;
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
-use idiom_tui::{layout::Rect, Backend};
+use idiom_tui::{layout::Rect, Backend, Position};
 
 enum Action {
     Tree(TreeAction),
     Editor(EditorAction),
 }
 
-pub fn menu_context_editor_inplace(
-    position: CursorPosition,
-    screen: Rect,
-    accent_style: ContentStyle,
-) -> ContextMenu<7> {
-    let row_offset = position.line as u16;
-    let col_offset = position.char as u16;
-    let modal_screen = screen.modal_relative(row_offset, col_offset, 30, 7);
+pub fn menu_context_editor_inplace(position: Position, screen: Rect, accent_style: ContentStyle) -> ContextMenu<7> {
+    let modal_screen = screen.modal_relative(position.row, position.col, 30, 7);
 
     ContextMenu {
         commands: [
@@ -37,13 +31,14 @@ pub fn menu_context_editor_inplace(
     }
 }
 
-pub fn menu_context_tree_inplace(position: CursorPosition, screen: Rect, accent_style: ContentStyle) -> ContextMenu<7> {
+pub fn menu_context_tree_inplace(position: CursorPosition, screen: Rect, accent_style: ContentStyle) -> ContextMenu<8> {
     let row_offset = position.line as u16;
     let col_offset = position.char as u16;
-    let modal_screen = screen.modal_relative(row_offset, col_offset, 30, 7);
+    let modal_screen = screen.modal_relative(row_offset, col_offset, 30, 8);
 
     ContextMenu {
         commands: [
+            ("New", TreeAction::NewFile.into()),
             ("Cut", TreeAction::CutFile.into()),
             ("Copy", TreeAction::CopyFile.into()),
             ("Paste", TreeAction::Paste.into()),

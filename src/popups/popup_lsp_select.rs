@@ -23,7 +23,11 @@ pub struct SelectorLSP {
 
 impl SelectorLSP {
     pub fn run(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
-        let file_types = FileType::iter_langs().into_iter().map(|x| (0, x.into(), x)).collect();
+        let file_types = FileType::iter_langs()
+            .into_iter()
+            .map(|x| (0, x.into(), x))
+            .chain([(0, "markdown", FileType::MarkDown), (0, "no LSP", FileType::Text)])
+            .collect();
         let pattern = TextField::new(String::new(), Some(true));
         let mut new = Self { pattern, state: State::default(), file_types };
 
@@ -55,14 +59,14 @@ impl SelectorLSP {
     }
 
     fn get_rect(gs: &GlobalState) -> Rect {
-        gs.screen_rect.top(15).vcenter(100).with_borders()
+        gs.screen().top(15).vcenter(100).with_borders()
     }
 }
 
 impl Popup for SelectorLSP {
     fn force_render(&mut self, gs: &mut crate::global_state::GlobalState) {
         let mut rect = Self::get_rect(gs);
-        let accent = ContentStyle::fg(gs.theme.accent_background);
+        let accent = ContentStyle::fg(gs.theme.accent());
         let backend = gs.backend();
         rect.draw_borders(None, None, backend);
         match rect.next_line() {

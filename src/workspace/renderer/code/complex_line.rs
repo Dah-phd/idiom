@@ -30,7 +30,7 @@ pub fn complex_line(
         last_len = token.len;
     };
 
-    for (text, width) in CharLimitedWidths::new(&code.content, 3) {
+    for (text, width) in CharLimitedWidths::new(code.as_str(), 3) {
         if line_width <= width {
             backend.reset_style();
             backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
@@ -97,7 +97,7 @@ pub fn complex_line_with_select(
         last_len = token.len;
     };
 
-    for (idx, (text, width)) in CharLimitedWidths::new(&code.content, 3).enumerate() {
+    for (idx, (text, width)) in CharLimitedWidths::new(code.as_str(), 3).enumerate() {
         if line_width <= width {
             backend.reset_style();
             backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());

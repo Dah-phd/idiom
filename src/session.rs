@@ -1,6 +1,6 @@
 use crate::configs::{FileType, APP_FOLDER};
 use crate::error::{IdiomError, IdiomResult};
-use crate::global_state::GlobalState;
+use crate::global_state::{GlobalState, IdiomEvent};
 use crate::workspace::{cursor::Cursor, Workspace};
 use dirs::data_local_dir;
 use serde::{Deserialize, Serialize};
@@ -24,7 +24,7 @@ impl<'a> StoreFileData<'a> {
         ws.iter()
             .map(|editor| {
                 let store_content = !editor.is_saved().unwrap_or_default();
-                let content = store_content.then_some(editor.content.iter().map(|l| l.content.as_str()).collect());
+                let content = store_content.then_some(editor.content.iter().map(|l| l.as_str()).collect());
                 StoreFileData {
                     content,
                     file_type: editor.file_type,
@@ -195,10 +195,13 @@ async fn load_session_if_exists(store: PathBuf, ws: &mut Workspace, gs: &mut Glo
             }
         }
         _ = std::fs::remove_dir_all(path);
-        if !ws.is_empty() && gs.is_select() {
+
+        let Some(editor) = ws.get_active() else { return };
+        gs.event.push(IdiomEvent::SelectPath(editor.path.to_owned()));
+
+        if gs.is_select() {
             gs.insert_mode();
         };
-        return;
     }
 }
 
@@ -302,8 +305,8 @@ mod tests {
         load_session_if_exists(temp_dir.path().to_owned(), &mut receiver_ws, &mut gs).await;
         assert!(!receiver_ws.is_empty());
         // confirm stored is same as loaded
-        let expected_content = ws.get_active().unwrap().content.iter().map(|l| l.content.as_str()).collect::<Vec<_>>();
-        let content = receiver_ws.get_active().unwrap().content.iter().map(|l| l.content.as_str()).collect::<Vec<_>>();
+        let expected_content = ws.get_active().unwrap().content.iter().map(|l| l.as_str()).collect::<Vec<_>>();
+        let content = receiver_ws.get_active().unwrap().content.iter().map(|l| l.as_str()).collect::<Vec<_>>();
         assert_eq!(content, expected_content);
     }
 

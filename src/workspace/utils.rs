@@ -3,7 +3,6 @@ use crate::{
     workspace::{cursor::CursorPosition, line::EditorLine},
 };
 use idiom_tui::UTF8Safe;
-use std::ops::Range;
 
 #[inline(always)]
 pub fn insert_clip(clip: &str, content: &mut Vec<EditorLine>, mut cursor: CursorPosition) -> CursorPosition {
@@ -77,7 +76,7 @@ pub fn insert_lines_indented(
         let prefixed = format!("{indent}{clip_line}");
         let mut new_editor_line = EditorLine::from(prefixed);
         cfg.unindent_if_before_base_pattern(&mut new_editor_line);
-        new_clip = push_on_newline(new_clip, &new_editor_line.content);
+        new_clip = push_on_newline(new_clip, new_editor_line.as_str());
         indent = cfg.derive_indent_from(&new_editor_line);
         content.insert(cursor.line, new_editor_line);
     }
@@ -223,34 +222,6 @@ pub fn find_line_start(line: &EditorLine) -> usize {
         }
     }
     0
-}
-
-#[inline(always)]
-pub fn token_range_at(line: &EditorLine, idx: usize) -> Range<usize> {
-    let mut token_start = 0;
-    let mut last_not_in_token = false;
-    for (char_idx, ch) in line.chars().enumerate() {
-        if ch.is_alphabetic() || ch == '_' {
-            if last_not_in_token {
-                token_start = char_idx;
-            }
-            last_not_in_token = false;
-        } else if char_idx >= idx {
-            if last_not_in_token {
-                return idx..idx;
-            }
-            return token_start..char_idx;
-        } else {
-            last_not_in_token = true;
-        }
-    }
-    if idx < line.char_len() {
-        token_start..line.char_len()
-    } else if !last_not_in_token && token_start <= idx {
-        token_start..idx
-    } else {
-        idx..idx
-    }
 }
 
 #[inline(always)]

@@ -13,6 +13,10 @@ use crate::{
     error::IdiomResult,
     ext_tui::CrossTerm,
     lsp::{LSPError, LSPResult},
+    popups::{
+        menu::{menu_context_editor_inplace, menu_context_tree_inplace},
+        Popup,
+    },
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
@@ -22,7 +26,7 @@ use crossterm::event::{KeyEvent, MouseEvent};
 pub use events::IdiomEvent;
 use idiom_tui::{
     layout::{Line, Rect},
-    Backend,
+    Backend, Position,
 };
 
 use draw::Components;
@@ -40,11 +44,11 @@ pub struct GlobalState {
     pub matcher: SkimMatcherV2,
     pub event: Vec<IdiomEvent>,
     pub clipboard: Clipboard,
-    pub screen_rect: Rect,
-    pub tree_area: Rect,
-    pub tab_area: Rect,
-    pub editor_area: Rect,
-    pub footer_line: Line,
+    screen_rect: Rect,
+    tree_area: Rect,
+    tab_area: Rect,
+    editor_area: Rect,
+    footer_line: Line,
     pub git_tui: Option<String>,
     messages: Messages,
     mode: Mode,
@@ -93,50 +97,6 @@ impl GlobalState {
         self.unwrap_or_default(KeyMap::new(), KEY_MAP).unpack()
     }
 
-    #[inline(always)]
-    pub fn backend(&mut self) -> &mut CrossTerm {
-        &mut self.backend
-    }
-
-    #[inline]
-    pub fn draw(&mut self, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
-        (self.draw_callback)(self, workspace, tree, term);
-        self.backend.flush_buf();
-    }
-
-    pub fn render_stats(&mut self, len: usize, select_len: usize, cursor: CursorPosition) {
-        let mut line = self.footer_line.clone();
-        if self.components.contains(Components::TREE) || self.is_select() {
-            line += self.tree_size;
-        } else {
-            line += Mode::len();
-        }
-        self.backend.set_style(self.theme.accent_style);
-        let mut rev_builder = line.unsafe_builder_rev(&mut self.backend);
-        if select_len != 0 {
-            rev_builder.push(&format!("({select_len} selected) "));
-        }
-        rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {} ", cursor.line + 1, cursor.char + 1));
-        self.messages.set_line(rev_builder.into_line());
-        self.messages.fast_render(self.theme.accent_style, &mut self.backend);
-        self.backend.reset_style();
-    }
-
-    pub fn clear_stats(&mut self) {
-        let mut line = self.footer_line.clone();
-        let accent_style = self.theme.accent_style;
-        if self.components.contains(Components::TREE) || self.is_select() {
-            line += self.tree_size;
-        } else {
-            line += Mode::len();
-        }
-        self.backend.set_style(accent_style);
-        self.backend.go_to(line.row, line.col);
-        self.backend.clear_to_eol();
-        self.backend.reset_style();
-        self.messages.render(accent_style, &mut self.backend);
-    }
-
     #[inline]
     pub fn map_key(
         &mut self,
@@ -163,26 +123,6 @@ impl GlobalState {
         (self.paste_passthrough)(self, clip, workspace, term);
     }
 
-    fn config_controls(&mut self) {
-        if self.components.contains(Components::TERM) {
-            self.key_mapper = controls::map_term;
-            self.mouse_mapper = controls::mouse_term;
-            self.paste_passthrough = controls::paste_passthrough_term;
-            return;
-        }
-        match self.mode {
-            Mode::Insert => {
-                self.key_mapper = controls::map_editor;
-                self.paste_passthrough = controls::paste_passthrough_editor;
-            }
-            Mode::Select => {
-                self.key_mapper = controls::map_tree;
-                self.paste_passthrough = controls::paste_passthrough_ignore;
-            }
-        }
-        self.mouse_mapper = controls::mouse_handler;
-    }
-
     pub fn select_mode(&mut self) {
         self.mode = Mode::Select;
         self.config_controls();
@@ -205,6 +145,26 @@ impl GlobalState {
         } else {
             self.draw_callback = draw::full_rebuild;
         };
+    }
+
+    fn config_controls(&mut self) {
+        if self.components.contains(Components::TERM) {
+            self.key_mapper = controls::map_term;
+            self.mouse_mapper = controls::mouse_term;
+            self.paste_passthrough = controls::paste_passthrough_term;
+            return;
+        }
+        match self.mode {
+            Mode::Insert => {
+                self.key_mapper = controls::map_editor;
+                self.paste_passthrough = controls::paste_passthrough_editor;
+            }
+            Mode::Select => {
+                self.key_mapper = controls::map_tree;
+                self.paste_passthrough = controls::paste_passthrough_ignore;
+            }
+        }
+        self.mouse_mapper = controls::mouse_handler;
     }
 
     #[inline]
@@ -252,10 +212,66 @@ impl GlobalState {
         }
     }
 
+    // RENDER CONTROLS
+
+    pub fn context_menu(&mut self, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
+        let result = match self.mode {
+            Mode::Select => {
+                let state = tree.get_state();
+                let line = (state.selected - state.at_line) + 1;
+                let char = self.tree_area.width / 2;
+                let position = CursorPosition { line, char };
+                let accent_style = self.theme.accent_style_reversed();
+                let mut menu = menu_context_tree_inplace(position, self.screen_rect, accent_style);
+                menu.run(self, ws, tree, term)
+            }
+            Mode::Insert => {
+                let Some(editor) = ws.get_active() else { return };
+                let row = (editor.cursor.line - editor.cursor.at_line) as u16;
+                let col = (editor.cursor.char + editor.line_number_padding + 1) as u16;
+                let accent_style = self.theme.accent_style();
+                let mut menu = menu_context_editor_inplace(Position { row, col }, self.editor_area, accent_style);
+                menu.run(self, ws, tree, term)
+            }
+        };
+        if let Err(error) = result {
+            self.error(error);
+        };
+    }
+
+    #[inline(always)]
+    pub fn backend(&mut self) -> &mut CrossTerm {
+        &mut self.backend
+    }
+
+    #[inline]
+    pub fn draw(&mut self, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
+        (self.draw_callback)(self, workspace, tree, term);
+        self.backend.flush_buf();
+    }
+
+    pub fn render_stats(&mut self, len: usize, select_len: usize, cursor: CursorPosition) {
+        let mut line = self.footer_line.clone();
+        if self.components.contains(Components::TREE) || self.is_select() {
+            line += self.tree_size;
+        } else {
+            line += Mode::len();
+        }
+        self.backend.set_style(self.theme.accent_style());
+        let mut rev_builder = line.unsafe_builder_rev(&mut self.backend);
+        if select_len != 0 {
+            rev_builder.push(&format!("({select_len} selected) "));
+        }
+        rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {} ", cursor.line + 1, cursor.char + 1));
+        self.messages.set_line(rev_builder.into_line());
+        self.messages.fast_render(self.theme.accent_style(), &mut self.backend);
+        self.backend.reset_style();
+    }
+
     pub fn fast_render_message_with_preserved_cursor(&mut self) {
         if self.messages.should_render() {
             self.backend.save_cursor();
-            self.messages.render(self.theme.accent_style, &mut self.backend);
+            self.messages.render(self.theme.accent_style(), &mut self.backend);
             self.backend.restore_cursor();
         }
     }
@@ -270,22 +286,7 @@ impl GlobalState {
         };
         self.mode.render(mode_line, &mut self.backend);
         self.messages.set_line(msg_line);
-        self.messages.render(self.theme.accent_style, &mut self.backend);
-    }
-
-    #[inline]
-    pub fn message(&mut self, msg: impl Into<String>) {
-        self.messages.message(msg.into());
-    }
-
-    #[inline]
-    pub fn error(&mut self, error: impl ToString) {
-        self.messages.error(error.to_string());
-    }
-
-    #[inline]
-    pub fn success(&mut self, msg: impl Into<String>) {
-        self.messages.success(msg.into());
+        self.messages.render(self.theme.accent_style(), &mut self.backend);
     }
 
     #[inline]
@@ -307,7 +308,6 @@ impl GlobalState {
         let screen = if self.components.contains(Components::TREE) || self.is_select() {
             let (mut tree_area, tab_area) = screen.split_horizont_rel(self.tree_size);
             let _logo_line = tree_area.next_line();
-            tree_area.right_border().left_border();
             self.tree_area = tree_area;
             tab_area
         } else {
@@ -316,6 +316,61 @@ impl GlobalState {
             tab_area
         };
         (self.tab_area, self.editor_area) = screen.split_vertical_rel(1);
+        self.editor_area.left_border();
+    }
+
+    pub fn clear_stats(&mut self) {
+        let mut line = self.footer_line.clone();
+        let accent_style = self.theme.accent_style();
+        if self.components.contains(Components::TREE) || self.is_select() {
+            line += self.tree_size;
+        } else {
+            line += Mode::len();
+        }
+        self.backend.set_style(accent_style);
+        self.backend.go_to(line.row, line.col);
+        self.backend.clear_to_eol();
+        self.backend.reset_style();
+        self.messages.render(accent_style, &mut self.backend);
+    }
+
+    // SCREEN ACCESS
+
+    pub fn screen(&self) -> &Rect {
+        &self.screen_rect
+    }
+
+    pub fn tree_area(&self) -> &Rect {
+        &self.tree_area
+    }
+
+    pub fn tab_area(&self) -> &Rect {
+        &self.tab_area
+    }
+
+    pub fn editor_area(&self) -> &Rect {
+        &self.editor_area
+    }
+
+    pub fn footer(&self) -> Line {
+        self.footer_line.clone()
+    }
+
+    // LOGGING
+
+    #[inline]
+    pub fn message(&mut self, msg: impl Into<String>) {
+        self.messages.message(msg.into());
+    }
+
+    #[inline]
+    pub fn error(&mut self, error: impl ToString) {
+        self.messages.error(error.to_string());
+    }
+
+    #[inline]
+    pub fn success(&mut self, msg: impl Into<String>) {
+        self.messages.success(msg.into());
     }
 
     /// unwrap or default with logged error

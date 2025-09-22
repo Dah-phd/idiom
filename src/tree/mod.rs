@@ -86,7 +86,7 @@ impl Tree {
     pub fn fast_render(&mut self, gs: &mut GlobalState) {
         if self.rebuild {
             self.rebuild = false;
-            let accent = Some(gs.theme.accent_background);
+            let accent = Some(gs.theme.accent());
             gs.backend().set_bg(accent);
             render::render_tree(self, gs);
             gs.backend().reset_style();
@@ -292,7 +292,7 @@ impl Tree {
             return;
         }
         self.state.prev(tree_len);
-        self.state.update_at_line(gs.tree_area.height as usize);
+        self.state.update_at_line(gs.tree_area().height as usize);
         self.unsafe_set_path();
     }
 
@@ -302,7 +302,7 @@ impl Tree {
             return;
         }
         self.state.next(tree_len);
-        self.state.update_at_line(gs.tree_area.height as usize);
+        self.state.update_at_line(gs.tree_area().height as usize);
         self.unsafe_set_path();
     }
 
@@ -439,6 +439,10 @@ impl Tree {
 
     pub fn get_base_file_names(&self) -> Vec<String> {
         self.inner.tree_file_names()
+    }
+
+    pub fn get_state(&self) -> &State {
+        &self.state
     }
 
     pub fn sync(&mut self, gs: &mut GlobalState) {

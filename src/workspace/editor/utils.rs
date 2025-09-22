@@ -1,4 +1,7 @@
-use super::{calc_wraps, Actions, Cursor, Editor, EditorConfigs, EditorLine, FileType, GlobalState, Lexer, Renderer};
+use super::{
+    calc_wraps, controls::ControlMap, Actions, Cursor, Editor, EditorConfigs, EditorLine, FileFamily, FileType,
+    GlobalState, Lexer, Renderer,
+};
 use crate::error::{IdiomError, IdiomResult};
 use std::{
     os::unix::fs::MetadataExt,
@@ -68,42 +71,7 @@ pub const fn calc_line_number_offset(len: usize) -> usize {
     }
 }
 
-/// This is not a normal constructor for Editor
-/// it should be used in cases where the content is present
-/// or real file does not exists
-pub fn text_editor_from_data(
-    path: PathBuf,
-    content: Vec<EditorLine>,
-    cursor: Option<Cursor>,
-    cfg: &EditorConfigs,
-    gs: &mut GlobalState,
-) -> Editor {
-    let display = build_display(&path);
-    let line_number_offset = calc_line_number_offset(content.len());
-
-    let cursor = match cursor {
-        Some(cursor) if cursor.matches_content(&content) => cursor,
-        Some(..) | None => Cursor::default(),
-    };
-
-    let mut editor = Editor {
-        actions: Actions::new(cfg.default_indent_cfg()),
-        update_status: FileUpdate::None,
-        renderer: Renderer::text(),
-        last_render_at_line: None,
-        cursor,
-        line_number_offset,
-        lexer: Lexer::text_lexer(&path, gs),
-        content,
-        file_type: FileType::Ignored,
-        display,
-        path,
-    };
-    editor.resize(gs.editor_area.width, gs.editor_area.height as usize);
-    calc_wraps(&mut editor.content, editor.cursor.text_width);
-    editor
-}
-
+/// builds editor from provided data
 pub fn editor_from_data(
     path: PathBuf,
     file_type: FileType,
@@ -112,9 +80,12 @@ pub fn editor_from_data(
     cfg: &EditorConfigs,
     gs: &mut GlobalState,
 ) -> Editor {
-    if matches!(file_type, FileType::Ignored) {
-        return text_editor_from_data(path, content, cursor, cfg, gs);
+    let (renderer, lexer) = match file_type.family() {
+        FileFamily::Text => (Renderer::text(), Lexer::text_lexer(&path, gs)),
+        FileFamily::MarkDown => (Renderer::markdown(), Lexer::md_lexer(&path, gs)),
+        FileFamily::Code(file_type) => (Renderer::code(), Lexer::with_context(file_type, &path, gs)),
     };
+
     let display = build_display(&path);
     let line_number_offset = calc_line_number_offset(content.len());
 
@@ -124,18 +95,25 @@ pub fn editor_from_data(
     };
 
     let mut editor = Editor {
-        actions: Actions::new(cfg.get_indent_cfg(&file_type)),
+        actions: Actions::new(cfg.get_indent_cfg(file_type)),
+        controls: ControlMap::default(),
         update_status: FileUpdate::None,
-        renderer: Renderer::code(),
+        renderer,
         last_render_at_line: None,
         cursor,
-        line_number_offset,
-        lexer: Lexer::with_context(file_type, &path, gs),
+        line_number_padding: line_number_offset,
+        lexer,
         content,
         file_type,
         display,
         path,
     };
-    editor.resize(gs.editor_area.width, gs.editor_area.height as usize);
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+
+    // precal wraps for redndering of non code
+    if !editor.file_type.is_code() {
+        calc_wraps(&mut editor.content, editor.cursor.text_width);
+    }
+
     editor
 }

@@ -1,11 +1,15 @@
-use crate::workspace::line::EditorLine;
+mod positions;
+mod word;
+
+use crate::{utils::Direction, workspace::line::EditorLine};
 use idiom_tui::layout::Rect;
 use lsp_types::Position;
 use serde::{Deserialize, Serialize};
 
-pub type Select = (CursorPosition, CursorPosition);
+pub use positions::{CharRange, CursorPosition, Select, SelectPosition};
+pub use word::{PositionedWord, WordRange};
 
-#[derive(Debug, Default, Deserialize, Serialize, Clone)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone, PartialEq)]
 pub struct Cursor {
     pub line: usize,
     pub char: usize,    // this is a char position not byte index
@@ -13,7 +17,7 @@ pub struct Cursor {
     pub at_line: usize,
     pub max_rows: usize,
     pub text_width: usize,
-    select: Option<Select>,
+    select: Option<CursorPosition>,
 }
 
 impl Cursor {
@@ -30,11 +34,11 @@ impl Cursor {
         if content[self.line].char_len() < self.char {
             return false;
         }
-        if let Some((from, to)) = self.select {
-            if content.len() <= from.line || content.len() <= to.line {
+        if let Some(from) = self.select {
+            if content.len() <= from.line || content.len() <= self.line {
                 return false;
             }
-            if content[from.line].char_len() < from.char || content[to.line].char_len() < to.char {
+            if content[from.line].char_len() < from.char || content[self.line].char_len() < self.char {
                 return false;
             }
         }
@@ -44,7 +48,6 @@ impl Cursor {
     pub fn set_cursor_checked_with_select(&mut self, position: CursorPosition, content: &[EditorLine]) {
         self.set_cursor_checked(position, content);
         self.init_select();
-        self.push_to_select();
     }
 
     pub fn set_cursor_checked(&mut self, mut position: CursorPosition, content: &[EditorLine]) {
@@ -74,6 +77,23 @@ impl Cursor {
                 self.set_char(content[self.line].char_len())
             }
         }
+    }
+
+    pub fn match_content(&mut self, content: &[EditorLine]) {
+        let Some(line) = content.get(self.line) else {
+            self.select = None;
+            self.end_of_file(content);
+            return;
+        };
+        self.adjust_char(line);
+        let Some(from) = self.select else { return };
+        if (self.line < from.line) || (self.line == from.line && self.char <= from.char) {
+            self.select = None;
+        }
+    }
+
+    pub fn get_position(&self) -> CursorPosition {
+        self.into()
     }
 
     pub fn set_position(&mut self, position: CursorPosition) {
@@ -127,6 +147,8 @@ impl Cursor {
         }
     }
 
+    // MOVEMENT
+
     pub fn up(&mut self, content: &[EditorLine]) {
         self.select = None;
         self.move_up(content)
@@ -145,17 +167,31 @@ impl Cursor {
         self.adjust_char(&content[self.line]);
     }
 
+    pub fn screen_up(&mut self, content: &[EditorLine]) {
+        self.select = None;
+        self.line = self.line.saturating_sub(self.max_rows);
+        self.at_line = self.line.saturating_sub(self.max_rows / 2);
+        self.adjust_char(&content[self.line]);
+    }
+
     pub fn scroll_up(&mut self, content: &[EditorLine]) {
         if self.at_line != 0 {
             self.at_line -= 1;
-            self.up(content)
-        }
+        };
+        self.up(content);
     }
 
     pub fn select_up(&mut self, content: &[EditorLine]) {
         self.init_select();
         self.move_up(content);
-        self.push_to_select();
+    }
+
+    pub fn select_scroll_up(&mut self, content: &[EditorLine]) {
+        self.init_select();
+        if self.at_line != 0 {
+            self.at_line -= 1;
+        };
+        self.move_up(content);
     }
 
     pub fn down(&mut self, content: &[EditorLine]) {
@@ -180,17 +216,34 @@ impl Cursor {
         self.adjust_char(&content[self.line]);
     }
 
-    pub fn select_down(&mut self, content: &[EditorLine]) {
-        self.init_select();
-        self.move_down(content);
-        self.push_to_select();
+    pub fn screen_down(&mut self, content: &[EditorLine]) {
+        self.select = None;
+        if content.is_empty() {
+            return;
+        };
+        self.line = std::cmp::min(content.len() - 1, self.line + self.max_rows);
+        self.at_line = self.line.saturating_sub(self.max_rows / 2);
+        self.adjust_char(&content[self.line]);
     }
 
     pub fn scroll_down(&mut self, content: &[EditorLine]) {
         if self.at_line + 2 < content.len() {
             self.at_line += 1;
-            self.down(content)
-        }
+        };
+        self.down(content);
+    }
+
+    pub fn select_down(&mut self, content: &[EditorLine]) {
+        self.init_select();
+        self.move_down(content);
+    }
+
+    pub fn select_scroll_down(&mut self, content: &[EditorLine]) {
+        self.init_select();
+        if self.at_line + 2 < content.len() {
+            self.at_line += 1;
+        };
+        self.move_down(content);
     }
 
     pub fn left(&mut self, content: &[EditorLine]) {
@@ -221,7 +274,6 @@ impl Cursor {
     pub fn jump_left_select(&mut self, content: &[EditorLine]) {
         self.init_select();
         self._jump_left(content);
-        self.push_to_select();
     }
 
     fn _jump_left(&mut self, content: &[EditorLine]) {
@@ -244,7 +296,6 @@ impl Cursor {
     pub fn select_left(&mut self, content: &[EditorLine]) {
         self.init_select();
         self.move_left(content);
-        self.push_to_select();
     }
 
     pub fn right(&mut self, content: &[EditorLine]) {
@@ -272,10 +323,9 @@ impl Cursor {
     pub fn jump_right_select(&mut self, content: &[EditorLine]) {
         self.init_select();
         self._jump_right(content);
-        self.push_to_select();
     }
 
-    pub fn _jump_right(&mut self, content: &[EditorLine]) {
+    fn _jump_right(&mut self, content: &[EditorLine]) {
         let mut line = &content[self.line][self.char..];
         let mut last_was_char = false;
         if line.is_empty() && content.len() - 1 > self.line {
@@ -295,7 +345,6 @@ impl Cursor {
     pub fn select_right(&mut self, content: &[EditorLine]) {
         self.init_select();
         self.move_right(content);
-        self.push_to_select();
     }
 
     pub fn adjust_max_line(&mut self, content: &[EditorLine]) {
@@ -313,16 +362,19 @@ impl Cursor {
         }
     }
 
-    pub fn init_select(&mut self) {
-        if self.select.is_none() {
-            let position = self.into();
-            self.select.replace((position, position));
+    pub fn add_line_offset(&mut self, offset: usize) {
+        self.line += offset;
+        self.at_line += offset;
+        if let Some(from) = self.select.as_mut() {
+            from.line += offset;
         }
     }
 
-    pub fn push_to_select(&mut self) {
-        if let Some((_, to)) = self.select.as_mut() {
-            *to = CursorPosition { line: self.line, char: self.char };
+    // SELECT
+
+    pub fn init_select(&mut self) {
+        if self.select.is_none() {
+            self.select.replace(CursorPosition { line: self.line, char: self.char });
         }
     }
 
@@ -330,50 +382,74 @@ impl Cursor {
         self.select.is_none()
     }
 
-    pub fn select_line_offset(&mut self, offset: usize) {
-        if let Some((from, to)) = self.select.as_mut() {
-            from.line += offset;
-            to.line += offset;
+    pub fn select_drop(&mut self) {
+        self.select = None;
+    }
+
+    pub fn select_to(&mut self, position: CursorPosition) {
+        if position.line == self.line && position.char == self.char {
+            return;
         }
+        self.init_select();
+        self.set_position(position);
+    }
+
+    pub fn select_set(&mut self, from: CursorPosition, to: CursorPosition) {
+        self.set_position(to);
+        self.select.replace(from);
     }
 
     pub fn select_get(&self) -> Option<Select> {
         match self.select.as_ref() {
             None => None,
-            Some((from, to)) => {
-                if from.line > to.line || from.line == to.line && from.char > to.char {
-                    Some((*to, *from))
+            Some(from) => {
+                let cursor = CursorPosition::from(self);
+                if from.line > self.line || from.line == self.line && from.char > self.char {
+                    Some((cursor, *from))
                 } else {
-                    Some((*from, *to))
+                    Some((*from, cursor))
                 }
             }
         }
     }
 
-    pub fn select_drop(&mut self) {
-        self.select = None;
-    }
-
-    pub fn select_set(&mut self, from: CursorPosition, to: CursorPosition) {
-        self.set_position(to);
-        self.select.replace((from, to));
-    }
-
-    pub fn select_replace(&mut self, select: Option<Select>) {
-        self.select = select;
-        if let Some((_, to)) = self.select {
-            self.set_position(to);
-        };
+    pub fn select_get_direction(&self) -> Option<(CursorPosition, CursorPosition, Direction)> {
+        match self.select.as_ref() {
+            None => None,
+            Some(from) => {
+                let cursor = CursorPosition::from(self);
+                if from.line > self.line || from.line == self.line && from.char > self.char {
+                    Some((cursor, *from, Direction::Reversed))
+                } else {
+                    Some((*from, cursor, Direction::Normal))
+                }
+            }
+        }
     }
 
     pub fn select_take(&mut self) -> Option<Select> {
         match self.select.take() {
             None => None,
-            Some((from, to)) => {
-                if from.line > to.line || from.line == to.line && from.char > to.char {
-                    Some((to, from))
+            Some(from) => {
+                let cursor = CursorPosition { line: self.line, char: self.char };
+                if from.line > self.line || from.line == self.line && from.char > self.char {
+                    Some((cursor, from))
                 } else {
-                    Some((from, to))
+                    Some((from, cursor))
+                }
+            }
+        }
+    }
+
+    pub fn select_take_direction(&mut self) -> Option<(CursorPosition, CursorPosition, Direction)> {
+        match self.select.take() {
+            None => None,
+            Some(from) => {
+                let to = CursorPosition { line: self.line, char: self.char };
+                if from > to {
+                    Some((to, from, Direction::Reversed))
+                } else {
+                    Some((from, to, Direction::Normal))
                 }
             }
         }
@@ -395,12 +471,135 @@ impl Cursor {
             .unwrap_or_default()
     }
 
+    /// retrn the starting point of select
+    /// the value can be smaller or bigger than current poistion
+    pub fn select_from_raw(&self) -> Option<CursorPosition> {
+        self.select
+    }
+
     pub fn reset(&mut self) {
         self.line = 0;
         self.char = 0;
         self.phantm_char = 0;
         self.at_line = 0;
         self.select = None;
+    }
+
+    // MULTI CURSOR UTILS
+
+    pub fn set_cursor(&mut self, other: &Cursor) {
+        self.select = other.select;
+        self.set_position(other.get_position());
+    }
+
+    pub fn clone_above(&mut self, content: &[EditorLine]) -> Option<Self> {
+        let line = self.line.checked_sub(1)?;
+        let char = std::cmp::min(self.char, content[line].char_len());
+        let mut select = self.select;
+        if let Some(position) = select.as_mut() {
+            if position.line == 0 {
+                position.char = 0;
+            } else {
+                position.line -= 1;
+                position.char = std::cmp::min(position.char, content[position.line].char_len());
+            }
+        };
+        Some(Self { line, char, text_width: self.text_width, select, ..Default::default() })
+    }
+
+    pub fn clone_below(&mut self, content: &[EditorLine]) -> Option<Self> {
+        let line = self.line + 1;
+        let char = std::cmp::min(self.char, content.get(line)?.char_len());
+        let mut select = self.select;
+        if let Some(position) = select.as_mut() {
+            let next_line = position.line + 1;
+            if next_line < content.len() {
+                position.line = next_line;
+                position.char = std::cmp::min(position.char, content[position.line].char_len());
+            } else {
+                position.char = content[position.line].char_len();
+            }
+        };
+        Some(Self { line, char, text_width: self.text_width, select, ..Default::default() })
+    }
+
+    pub fn merge_if_intersect(&mut self, other: &Cursor) -> bool {
+        let cursor = CursorPosition { line: self.line, char: self.char };
+        let mut oth_cursor = CursorPosition { line: other.line, char: other.char };
+        match self.select {
+            Some(from) if from > cursor => match other.select {
+                Some(mut oth_from) => {
+                    // likely not needed match self direction
+                    if oth_from < oth_cursor {
+                        std::mem::swap(&mut oth_from, &mut oth_cursor);
+                    };
+                    if from >= oth_from && oth_from >= cursor {
+                        self.select_set(from, std::cmp::min(oth_cursor, cursor));
+                        return true;
+                    };
+                    if oth_from >= from && from >= oth_cursor {
+                        self.select_set(oth_from, std::cmp::min(oth_cursor, cursor));
+                        return true;
+                    };
+                }
+                None => {
+                    let oth_pos = CursorPosition { line: other.line, char: other.char };
+                    return from >= oth_pos && oth_pos >= cursor;
+                }
+            },
+            Some(from) if from < cursor => match other.select {
+                Some(mut oth_from) => {
+                    // likely not needed match self direction
+                    if oth_from > oth_cursor {
+                        std::mem::swap(&mut oth_from, &mut oth_cursor);
+                    };
+                    if from <= oth_from && oth_from <= cursor {
+                        self.select_set(from, std::cmp::max(oth_cursor, cursor));
+                        return true;
+                    };
+                    if oth_from <= from && from <= oth_cursor {
+                        self.select_set(oth_from, std::cmp::max(oth_cursor, cursor));
+                        return true;
+                    };
+                }
+                None => {
+                    let oth_pos = CursorPosition { line: other.line, char: other.char };
+                    return from <= oth_pos && oth_pos <= cursor;
+                }
+            },
+            Some(..) => match other.select {
+                Some(oth_from) => {
+                    if (oth_from >= cursor && cursor >= oth_cursor) || (oth_from <= cursor && cursor <= oth_cursor) {
+                        self.select_set(oth_from, oth_cursor);
+                        return true;
+                    }
+                }
+                None => return oth_cursor == cursor,
+            },
+            None => match other.select {
+                Some(oth_from) => {
+                    let pos = CursorPosition { line: self.line, char: self.char };
+                    if (oth_from >= pos && pos >= oth_cursor) || (oth_cursor >= pos && pos >= oth_from) {
+                        self.select_set(oth_from, oth_cursor);
+                        return true;
+                    };
+                }
+                None => return self.line == other.line && self.char == other.char,
+            },
+        }
+        false
+    }
+}
+
+impl From<SelectPosition> for (CursorPosition, CursorPosition) {
+    fn from(value: SelectPosition) -> Self {
+        (value.from, value.to)
+    }
+}
+
+impl From<&SelectPosition> for (CursorPosition, CursorPosition) {
+    fn from(value: &SelectPosition) -> Self {
+        (value.from, value.to)
     }
 }
 
@@ -426,12 +625,6 @@ impl From<&mut Cursor> for Position {
     fn from(value: &mut Cursor) -> Self {
         Self { line: value.line as u32, character: value.char as u32 }
     }
-}
-
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct CursorPosition {
-    pub line: usize,
-    pub char: usize, // this is char position not byte index
 }
 
 impl From<&CursorPosition> for Position {
@@ -469,3 +662,12 @@ impl PartialEq<CursorPosition> for Cursor {
         self.line == position.line && self.char == position.char
     }
 }
+
+impl From<&mut SelectPosition> for (CursorPosition, CursorPosition) {
+    fn from(value: &mut SelectPosition) -> Self {
+        (value.from, value.to)
+    }
+}
+
+#[cfg(test)]
+mod test;

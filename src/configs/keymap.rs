@@ -27,6 +27,13 @@ pub enum EditorAction {
     SelectAll,
     ScrollUp,
     ScrollDown,
+    SelectScrollUp,
+    SelectScrollDown,
+    ScreenUp,
+    ScreenDown,
+    NewCursorUp,
+    NewCursorDown,
+    NewCursorWithLine,
     SwapUp,
     SwapDown,
     JumpLeft,
@@ -75,7 +82,14 @@ pub struct EditorUserKeyMap {
     select_line: String,
     select_all: String,
     scroll_up: String,
+    select_scroll_up: String,
     scroll_down: String,
+    select_scroll_down: String,
+    screen_up: String,
+    screen_down: String,
+    new_cursor_up: String,
+    new_cursor_down: String,
+    new_cursor_with_line: String,
     swap_up: String,
     swap_down: String,
     jump_left: String,
@@ -124,9 +138,16 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
         insert_key_event(&mut hash, &val.select_line, EditorAction::SelectLine);
         insert_key_event(&mut hash, &val.select_all, EditorAction::SelectAll);
         insert_key_event(&mut hash, &val.scroll_up, EditorAction::ScrollUp);
+        insert_key_event(&mut hash, &val.select_scroll_up, EditorAction::SelectScrollUp);
         insert_key_event(&mut hash, &val.scroll_down, EditorAction::ScrollDown);
+        insert_key_event(&mut hash, &val.select_scroll_down, EditorAction::SelectScrollDown);
+        insert_key_event(&mut hash, &val.new_cursor_up, EditorAction::NewCursorUp);
+        insert_key_event(&mut hash, &val.new_cursor_down, EditorAction::NewCursorDown);
+        insert_key_event(&mut hash, &val.new_cursor_with_line, EditorAction::NewCursorWithLine);
         insert_key_event(&mut hash, &val.swap_up, EditorAction::SwapUp);
         insert_key_event(&mut hash, &val.swap_down, EditorAction::SwapDown);
+        insert_key_event(&mut hash, &val.screen_up, EditorAction::ScreenUp);
+        insert_key_event(&mut hash, &val.screen_down, EditorAction::ScreenDown);
         insert_key_event(&mut hash, &val.jump_left, EditorAction::JumpLeft);
         insert_key_event(&mut hash, &val.jump_left_select, EditorAction::JumpLeftSelect);
         insert_key_event(&mut hash, &val.jump_right, EditorAction::JumpRight);
@@ -173,8 +194,15 @@ impl Default for EditorUserKeyMap {
             select_token: format!("{CTRL} && w"),
             select_line: format!("{CTRL} && l"),
             select_all: format!("{CTRL} && a"),
-            scroll_up: format!("{CTRL} && {UP} || {PAGEUP}"),
-            scroll_down: format!("{CTRL} && {DOWN} || {PAGEDOWN}"),
+            scroll_up: format!("{CTRL} && {UP}"),
+            scroll_down: format!("{CTRL} && {DOWN}"),
+            select_scroll_up: format!("{CTRL} && {SHIFT} && {UP}"),
+            select_scroll_down: format!("{CTRL} && {SHIFT} && {DOWN}"),
+            screen_up: PAGEUP.to_owned(),
+            screen_down: PAGEDOWN.to_owned(),
+            new_cursor_up: format!("{ALT} && {CTRL} && {UP}"),
+            new_cursor_down: format!("{ALT} && {CTRL} && {DOWN}"),
+            new_cursor_with_line: format!("{ALT} && {ENTER}"),
             swap_up: format!("{ALT} && {UP}"),
             swap_down: format!("{ALT} && {DOWN}"),
             jump_left: format!("{CTRL} && {LEFT} || {ALT} && {LEFT}"),
@@ -220,6 +248,7 @@ pub enum GeneralAction {
     GoToLine,
     GitTui,
     ToggleTerminal,
+    ContextMenu,
     GoToTab1,
     GoToTab2,
     GoToTab3,
@@ -248,6 +277,7 @@ pub struct GeneralUserKeyMap {
     go_to_line: String,
     git_tui: String,
     toggle_terminal: String,
+    context_menu: String,
     go_to_tab_1: String,
     go_to_tab_2: String,
     go_to_tab_3: String,
@@ -275,6 +305,7 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
         insert_key_event(&mut hash, &val.go_to_line, GeneralAction::GoToLine);
         insert_key_event(&mut hash, &val.git_tui, GeneralAction::GitTui);
         insert_key_event(&mut hash, &val.toggle_terminal, GeneralAction::ToggleTerminal);
+        insert_key_event(&mut hash, &val.context_menu, GeneralAction::ContextMenu);
         insert_key_event(&mut hash, &val.go_to_tab_1, GeneralAction::GoToTab1);
         insert_key_event(&mut hash, &val.go_to_tab_2, GeneralAction::GoToTab2);
         insert_key_event(&mut hash, &val.go_to_tab_3, GeneralAction::GoToTab3);
@@ -305,6 +336,7 @@ impl Default for GeneralUserKeyMap {
             go_to_line: format!("{CTRL} && g"),
             git_tui: format!("{CTRL} && {SHIFT} && g"),
             toggle_terminal: format!("{CTRL} && `"),
+            context_menu: MENU.to_owned(),
             go_to_tab_1: format!("{ALT} && 1"),
             go_to_tab_2: format!("{ALT} && 2"),
             go_to_tab_3: format!("{ALT} && 3"),
@@ -434,6 +466,8 @@ fn parse_key(keys: &str) -> KeyEvent {
             INSERT => replace_option(&mut code, KeyCode::Insert),
             ESC => replace_option(&mut code, KeyCode::Esc),
             BACKTAB => replace_option(&mut code, KeyCode::BackTab),
+            MENU => replace_option(&mut code, KeyCode::Menu),
+
             SHIFT => modifier.toggle(KeyModifiers::SHIFT),
             CTRL => modifier.toggle(KeyModifiers::CONTROL),
             ALT => modifier.toggle(KeyModifiers::ALT),

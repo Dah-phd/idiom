@@ -11,7 +11,7 @@ use crate::{
     global_state::GlobalState,
     workspace::{
         actions::tests::create_content,
-        editor::code_tests::{mock_editor, pull_line, select_eq},
+        editor::tests::{mock_editor, pull_line, select_eq},
         Cursor, CursorPosition,
     },
 };
@@ -289,7 +289,7 @@ fn move_checks() {
     let mut ws = base_ws();
     let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
     gs.insert_mode();
-    let base_line = active(&mut ws).content[0].content.to_string();
+    let base_line = active(&mut ws).content[0].to_string();
     assert_eq!(pull_line(active(&mut ws), 0).unwrap(), base_line);
     press(&mut ws, KeyCode::End, &mut gs);
     assert_position(&mut ws, CursorPosition { char: base_line.len(), line: 0 });
@@ -536,4 +536,53 @@ fn cursor_postion_confirm() {
     assert!((big >= smol));
     assert_eq!(std::cmp::max(smol, big), big);
     assert_eq!(std::cmp::min(smol, big), smol);
+}
+
+#[test]
+fn cursor_directions_get() {
+    let mut test_cursor = Cursor::default();
+    let position_l3 = CursorPosition { line: 3, char: 2 };
+    test_cursor.select_set(position_l3, CursorPosition::default());
+    let (from, to, dir) = test_cursor.select_get_direction().unwrap();
+    assert_eq!((from, to), (CursorPosition::default(), position_l3));
+    dir.apply_ordered(from, to, |first, second| assert_eq!((first, second), (position_l3, CursorPosition::default())));
+
+    test_cursor.select_set(CursorPosition::default(), position_l3);
+    let (from, to, dir) = test_cursor.select_get_direction().unwrap();
+    assert_eq!((from, to), (CursorPosition::default(), position_l3));
+    dir.apply_ordered(from, to, |first, second| assert_eq!((first, second), (CursorPosition::default(), position_l3)));
+}
+
+#[test]
+fn cursor_directions_take() {
+    let mut test_cursor = Cursor::default();
+    let position_l3 = CursorPosition { line: 3, char: 2 };
+    test_cursor.select_set(position_l3, CursorPosition::default());
+    let (from, to, dir) = test_cursor.select_take_direction().unwrap();
+    assert_eq!((from, to), (CursorPosition::default(), position_l3));
+    dir.apply_ordered(from, to, |first, second| assert_eq!((first, second), (position_l3, CursorPosition::default())));
+
+    test_cursor.select_set(CursorPosition::default(), position_l3);
+    let (from, to, dir) = test_cursor.select_take_direction().unwrap();
+    assert_eq!((from, to), (CursorPosition::default(), position_l3));
+    dir.apply_ordered(from, to, |first, second| assert_eq!((first, second), (CursorPosition::default(), position_l3)));
+}
+
+#[test]
+fn match_content() {
+    let content: Vec<EditorLine> =
+        ["test", "test2", "test3", "end line"].into_iter().map(|s| EditorLine::from(String::from(s))).collect();
+
+    let mut cursor = Cursor::default();
+    cursor.select_set(CursorPosition { line: 3, char: 5 }, CursorPosition { line: 3, char: 9 });
+    cursor.match_content(&content);
+    assert_eq!(cursor.select_get(), Some((CursorPosition { line: 3, char: 5 }, CursorPosition { line: 3, char: 8 })));
+    cursor.select_set(CursorPosition { line: 3, char: 9 }, CursorPosition { line: 3, char: 9 });
+    cursor.match_content(&content);
+    assert_eq!(cursor.get_position(), CursorPosition { line: 3, char: 8 });
+    assert_eq!(None, cursor.select_get());
+    cursor.select_set(CursorPosition { line: 2, char: 3 }, CursorPosition { line: 4, char: 9 });
+    cursor.match_content(&content);
+    assert_eq!(cursor.get_position(), CursorPosition { line: 3, char: 8 });
+    assert_eq!(None, cursor.select_get());
 }

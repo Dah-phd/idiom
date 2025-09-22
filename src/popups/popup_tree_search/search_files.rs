@@ -95,7 +95,7 @@ impl ActiveFileSearch {
     }
 
     fn get_rect(gs: &GlobalState) -> Rect {
-        gs.screen_rect.center(20, 120).with_borders()
+        gs.screen().center(20, 120).with_borders()
     }
 
     fn get_option_idx(&self, row: u16, column: u16, gs: &GlobalState) -> Option<usize> {
@@ -114,7 +114,7 @@ impl ActiveFileSearch {
 impl Popup for ActiveFileSearch {
     fn force_render(&mut self, gs: &mut GlobalState) {
         let mut rect = Self::get_rect(gs);
-        let accent_style = gs.theme.accent_style.with_fg(self.mode.fg_color);
+        let accent_style = gs.theme.accent_style().with_fg(self.mode.fg_color);
         let backend = gs.backend();
         backend.freeze();
         rect.draw_borders(None, None, backend);

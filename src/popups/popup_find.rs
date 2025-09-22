@@ -30,7 +30,7 @@ impl GoToLinePopup {
     pub fn run_inplace(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         let Some(editor) = workspace.get_active() else { return };
         let current_line = editor.cursor.line;
-        let Some(mut popup) = GoToLinePopup::new(current_line, gs.editor_area, gs.theme.accent_style) else {
+        let Some(mut popup) = GoToLinePopup::new(current_line, *gs.editor_area(), gs.theme.accent_style()) else {
             return;
         };
         if let Err(error) = popup.run(gs, workspace, tree, term) {
@@ -91,7 +91,7 @@ impl Popup for GoToLinePopup {
     }
 
     fn resize_success(&mut self, gs: &mut GlobalState) -> bool {
-        match gs.editor_area.right_top_corner(1, 50).into_iter().next() {
+        match gs.editor_area().right_top_corner(1, 50).into_iter().next() {
             Some(render_line) => {
                 self.render_line = render_line;
                 true
@@ -128,7 +128,7 @@ impl FindPopup {
     }
 
     pub fn run_inplace(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
-        let Some(mut popup) = FindPopup::new(gs.editor_area, gs.theme.accent_style) else {
+        let Some(mut popup) = FindPopup::new(*gs.editor_area(), gs.theme.accent_style()) else {
             return;
         };
         let run_result = Popup::run(&mut popup, gs, workspace, tree, term);
@@ -144,7 +144,7 @@ impl Popup for FindPopup {
             if let Some(mut popup) = ReplacePopup::from_search(
                 std::mem::take(&mut self.pattern.text),
                 std::mem::take(&mut self.options),
-                gs.editor_area,
+                *gs.editor_area(),
                 self.accent,
             ) {
                 if let Err(error) = popup.run(gs, ws, tree, term) {
@@ -169,7 +169,7 @@ impl Popup for FindPopup {
             KeyCode::Tab => {
                 if let Some(editor) = ws.get_active() {
                     gs.insert_mode();
-                    let options = editor.find_with_select(&self.pattern.text);
+                    let options = editor.find_with_text(&self.pattern.text);
                     let mut popup = PopupSelector::new(
                         options,
                         |((from, _), text), line, backend| line.render(&format!("({}) {text}", from.line + 1), backend),
@@ -214,7 +214,7 @@ impl Popup for FindPopup {
     fn render(&mut self, _gs: &mut GlobalState) {}
 
     fn resize_success(&mut self, gs: &mut GlobalState) -> bool {
-        match gs.editor_area.right_top_corner(1, 50).into_iter().next() {
+        match gs.editor_area().right_top_corner(1, 50).into_iter().next() {
             Some(render_line) => {
                 self.render_line = render_line;
                 true

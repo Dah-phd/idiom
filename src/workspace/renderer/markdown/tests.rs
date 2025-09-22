@@ -92,7 +92,7 @@ fn cursor_select() {
     let mut text =
         EditorLine::from("**The project is currently in development - so if you want to try it do it with caution.**");
     assert!(text.is_simple());
-    let select = ctx.get_select_full_line(text.char_len());
+    let select = ctx.select_get_full_line(text.char_len());
     ascii::cursor(&mut text, select, 0, &mut lines, &mut ctx, gs.backend());
 
     let mut rendered = gs.backend().drain();
@@ -120,7 +120,7 @@ fn cursor_complex_select() {
     let mut text =
         EditorLine::from("**The project is currently in devel🔥pment - so if you want to try it do it with caution.**");
     assert!(!text.is_simple());
-    let select = ctx.get_select_full_line(text.char_len());
+    let select = ctx.select_get_full_line(text.char_len());
     complex::cursor(&mut text, select, 0, &mut lines, &mut ctx, gs.backend());
     let mut rendered = gs.backend().drain();
 
@@ -177,7 +177,7 @@ fn simple_line_select() {
     let mut texts = generate_lines();
 
     for text in texts.iter_mut() {
-        let select = ctx.get_select_full_line(text.char_len());
+        let select = ctx.select_get_full_line(text.char_len());
         line(text, select, &mut ctx, &mut lines, gs.backend());
     }
 
@@ -235,7 +235,7 @@ fn complex_line_select() {
     let mut texts = generate_complex_lines();
 
     for text in texts.iter_mut() {
-        let select = ctx.get_select_full_line(text.char_len());
+        let select = ctx.select_get_full_line(text.char_len());
         line(text, select, &mut ctx, &mut lines, gs.backend());
     }
 

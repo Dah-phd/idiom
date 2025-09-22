@@ -143,7 +143,7 @@ fn to_lines(mut a: String, b: String) -> String {
     a
 }
 
-fn into_guard<T>(mutex: &Mutex<T>) -> MutexGuard<T> {
+fn into_guard<'a, T>(mutex: &'a Mutex<T>) -> MutexGuard<'a, T> {
     match mutex.lock() {
         Ok(guard) => guard,
         Err(poisoned) => poisoned.into_inner(),

@@ -191,7 +191,7 @@ impl TreePath {
         self.serch_by_idx(idx + 1).into()
     }
 
-    fn serch_by_idx(&mut self, mut idx: usize) -> SerachResult {
+    fn serch_by_idx<'a>(&'a mut self, mut idx: usize) -> SerachResult<'a> {
         if idx == 0 {
             return SerachResult::Found(self);
         }
@@ -380,7 +380,7 @@ impl TreePath {
 
     fn reset_diagnostic(&mut self) {}
 
-    pub fn iter(&self) -> TreeIter {
+    pub fn iter<'a>(&'a self) -> TreeIter<'a> {
         TreeIter { holder: vec![self] }
     }
 }
@@ -436,7 +436,7 @@ impl<'a> From<SerachResult<'a>> for Option<&'a TreePath> {
 
 fn get_path_display(path: &Path) -> String {
     let path_str = &path.display().to_string();
-    let mut buffer = String::new();
+    let mut buffer = String::from(" ");
     let mut path_split = path_str.split(std::path::MAIN_SEPARATOR).peekable();
     while let Some(path_element) = path_split.next() {
         if path_split.peek().is_none() {

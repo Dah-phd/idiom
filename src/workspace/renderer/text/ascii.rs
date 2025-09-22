@@ -9,7 +9,7 @@ use std::ops::Range;
 pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
-    let mut chunks = ByteChunks::new(&text.content, line_width);
+    let mut chunks = ByteChunks::new(text.as_str(), line_width);
 
     let Some(chunk) = chunks.next() else { return };
     backend.print(chunk.text);
@@ -31,7 +31,7 @@ pub fn line_with_select(
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
 
-    if text.char_len == 0 {
+    if text.char_len() == 0 {
         backend.print_styled(" ", ContentStyle::bg(ctx.lexer.theme.selected));
         return;
     }
@@ -39,7 +39,7 @@ pub fn line_with_select(
     let mut line_end = line_width;
     let select_color = ctx.lexer.theme.selected;
 
-    for (idx, text) in text.content.chars().enumerate() {
+    for (idx, text) in text.chars().enumerate() {
         if idx == line_end {
             let Some(line) = lines.next() else { return };
             let reset_style = backend.get_style();
@@ -81,7 +81,7 @@ pub fn basic(text: &mut EditorLine, skip: usize, lines: &mut RectIter, ctx: &mut
     };
     let mut idx = skip * line_width;
     let mut line_end = line_width + idx;
-    for text in text.content.chars().skip(idx) {
+    for text in text.chars().skip(idx) {
         if idx == line_end {
             let Some(line) = lines.next() else { break };
             ctx.wrap_line(line, backend);
@@ -120,7 +120,7 @@ pub fn select(
         backend.set_bg(Some(select_color));
     }
 
-    for text in text.content.chars().skip(idx) {
+    for text in text.chars().skip(idx) {
         if idx == line_end {
             let Some(line) = lines.next() else { break };
             let reset_style = backend.get_style();

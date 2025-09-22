@@ -4,15 +4,15 @@ use crate::popups::menu::{menu_context_editor_inplace, menu_context_tree_inplace
 use crate::popups::pallet::Pallet;
 use crate::popups::Popup;
 use crate::{embeded_term::EditorTerminal, tree::Tree, workspace::Workspace};
-use crossterm::event::{KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use crossterm::style::{Color, ContentStyle, Stylize};
+use crossterm::event::{KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::style::{Color, ContentStyle};
 use idiom_tui::layout::Line;
 
 const INSERT_SPAN: &str = "  --INSERT--  ";
 const SELECT_SPAN: &str = "  --SELECT--  ";
 const MODE_LEN: usize = INSERT_SPAN.len();
 
-#[derive(Default)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub enum Mode {
     #[default]
     Select,
@@ -79,7 +79,7 @@ pub fn mouse_handler(
         MouseEventKind::ScrollUp => match gs.mode {
             Mode::Insert => {
                 if let Some(editor) = ws.get_active() {
-                    editor.mouse_scroll_up(gs);
+                    editor.mouse_scroll_up(event.modifiers.contains(KeyModifiers::SHIFT), gs);
                 }
             }
             Mode::Select => tree.select_up(gs),
@@ -87,7 +87,7 @@ pub fn mouse_handler(
         MouseEventKind::ScrollDown => match gs.mode {
             Mode::Insert => {
                 if let Some(editor) = ws.get_active() {
-                    editor.mouse_scroll_down(gs);
+                    editor.mouse_scroll_down(event.modifiers.contains(KeyModifiers::SHIFT), gs);
                 }
             }
             Mode::Select => tree.select_down(gs),
@@ -104,7 +104,11 @@ pub fn mouse_handler(
             // on up currsor can drop select
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = ws.get_active() {
-                    editor.mouse_click(position, gs);
+                    match event.modifiers {
+                        KeyModifiers::ALT => editor.mouse_multi_cursor(position),
+                        KeyModifiers::CONTROL => editor.mouse_select_to(position, gs),
+                        _ => editor.mouse_click(position, gs),
+                    };
                     gs.insert_mode();
                     match tree.select_by_path(&editor.path) {
                         Ok(..) => ws.toggle_editor(),
@@ -113,14 +117,13 @@ pub fn mouse_handler(
                 }
             } else if let Some(position) = gs.tree_area.relative_position(event.row, event.column) {
                 let pos_line = position.row as usize + 1;
+                gs.event.push(IdiomEvent::SetMode(Mode::Select));
                 if let Some(path) = tree.mouse_select(pos_line, gs) {
                     gs.event.push(IdiomEvent::OpenAtLine(path, 0));
-                    return;
-                };
-                gs.select_mode();
+                }
             } else if let Some(pos) = gs.tab_area.relative_position(event.row, event.column) {
                 if !ws.is_empty() {
-                    gs.insert_mode();
+                    gs.select_mode();
                     let pos_char = pos.col as usize;
                     if let Some(idx) = ws.select_tab_mouse(pos_char) {
                         ws.activate_editor(idx, gs);
@@ -133,10 +136,9 @@ pub fn mouse_handler(
         MouseEventKind::Up(MouseButton::Right) => {
             if let Some(position) = gs.editor_area.relative_position(event.row, event.column) {
                 if let Some(editor) = ws.get_active() {
-                    let position = crate::workspace::CursorPosition::from(position);
                     editor.clear_ui(gs);
                     editor.mouse_menu_setup(position);
-                    let accent_style = gs.theme.accent_style;
+                    let accent_style = gs.theme.accent_style();
                     let mut context_menu = menu_context_editor_inplace(position, gs.editor_area, accent_style);
                     if let Err(error) = context_menu.run(gs, ws, tree, term) {
                         gs.error(error);
@@ -155,7 +157,7 @@ pub fn mouse_handler(
                 let mut position = crate::workspace::CursorPosition::from(position);
                 position.line += 1;
                 if tree.mouse_menu_setup_select(position.line) {
-                    let accent_style = gs.theme.accent_style.reverse();
+                    let accent_style = gs.theme.accent_style_reversed();
                     let mut context_menu = menu_context_tree_inplace(position, gs.screen_rect, accent_style);
                     if let Err(error) = context_menu.run(gs, ws, tree, term) {
                         gs.error(error);

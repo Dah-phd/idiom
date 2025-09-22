@@ -48,6 +48,7 @@ impl Legend {
                 &opt.semantic_tokens_options.legend
             }
         };
+
         match file_type {
             FileType::Rust => {
                 for token_type in legend.token_types.iter() {

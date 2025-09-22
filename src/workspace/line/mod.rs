@@ -1,6 +1,6 @@
 mod context;
 mod status;
-use status::RenderStatus;
+use status::{Reduction, RenderStatus};
 
 use crate::syntax::{tokens::TokenLine, DiagnosticLine, Lang, Token};
 pub use context::LineContext;
@@ -14,9 +14,9 @@ use std::{
 /// Used to represent code, has simpler wrapping as cpde lines shoud be shorter than 120 chars in most cases
 #[derive(Default)]
 pub struct EditorLine {
-    pub content: String,
+    content: String,
     // keeps trach of utf8 char len
-    pub char_len: usize,
+    char_len: usize,
     // syntax
     pub tokens: TokenLine,
     pub diagnostics: Option<DiagnosticLine>,
@@ -25,6 +25,16 @@ pub struct EditorLine {
 }
 
 impl EditorLine {
+    #[inline(always)]
+    pub fn as_str(&self) -> &str {
+        self.content.as_str()
+    }
+
+    #[inline(always)]
+    pub fn content(&self) -> &String {
+        &self.content
+    }
+
     #[inline]
     pub fn parse_lines<P: AsRef<Path>>(path: P) -> Result<Vec<Self>, String> {
         Ok(std::fs::read_to_string(path)
@@ -218,7 +228,7 @@ impl EditorLine {
     }
 
     #[inline]
-    pub fn match_indices<'a>(&self, pat: &'a str) -> std::str::MatchIndices<&'a str> {
+    pub fn match_indices<'a>(&self, pat: &'a str) -> std::str::MatchIndices<'_, &'a str> {
         self.content.match_indices(pat)
     }
 
@@ -263,7 +273,7 @@ impl EditorLine {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn len(&self) -> usize {
         self.content.len()
     }
@@ -321,9 +331,7 @@ impl EditorLine {
     pub fn utf16_len(&self) -> usize {
         self.content.chars().fold(0, |sum, ch| sum + ch.len_utf16())
     }
-}
 
-impl EditorLine {
     pub fn new(content: String) -> Self {
         Self { char_len: content.char_len(), content, ..Default::default() }
     }
@@ -380,6 +388,14 @@ impl EditorLine {
             self.tokens.drop_diagnostics();
             self.cached.reset();
         };
+    }
+
+    pub fn generate_skipped_chars_simple(&mut self, cursor_idx: usize, line_width: usize) -> (usize, Reduction) {
+        self.cached.generate_skipped_chars_simple(cursor_idx, line_width)
+    }
+
+    pub fn generate_skipped_chars_complex(&mut self, cursor_idx: usize, line_width: usize) -> usize {
+        self.cached.generate_skipped_chars_complex(self.content.as_str(), self.char_len(), cursor_idx, line_width)
     }
 }
 

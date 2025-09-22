@@ -328,7 +328,7 @@ impl LangStream for Rustacean {
         }
     }
 
-    fn objectify(&self) -> super::ObjType {
+    fn objectify(&self) -> super::ObjType<'_> {
         match self {
             Self::Name(name) => ObjType::Var(name),
             Self::Type(name) | Self::Trait(name) | Self::Union(name) | Self::Enum(name) | Self::Struct(name) => {

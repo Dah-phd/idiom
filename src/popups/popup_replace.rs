@@ -28,14 +28,14 @@ pub struct ReplacePopup {
 
 impl ReplacePopup {
     pub fn run_inplace(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
-        let rect = gs.editor_area.right_top_corner(2, 50);
+        let rect = gs.editor_area().right_top_corner(2, 50);
         if rect.height < 2 {
             return;
         }
 
         let mut popup: ReplacePopup = Self {
             rect,
-            accent: gs.theme.accent_style,
+            accent: gs.theme.accent_style(),
             on_text: false,
             options: Vec::new(),
             pattern: TextField::new(String::new(), Some(true)),
@@ -186,7 +186,7 @@ impl Popup for ReplacePopup {
     fn render(&mut self, _gs: &mut GlobalState) {}
 
     fn resize_success(&mut self, gs: &mut GlobalState) -> bool {
-        let rect = gs.editor_area.right_top_corner(2, 50);
+        let rect = gs.editor_area().right_top_corner(2, 50);
         if rect.height < 2 {
             return false;
         }
