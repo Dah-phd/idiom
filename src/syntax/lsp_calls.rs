@@ -5,6 +5,7 @@ use crate::{
     syntax::Lexer,
     workspace::{
         actions::{Action, EditMetaData},
+        cursor::WordRange,
         line::EditorLine,
         CursorPosition, Editor,
     },
@@ -82,7 +83,7 @@ pub fn map_lsp(lexer: &mut Lexer, client: LSPClient) {
         lexer.start_renames = start_renames;
         lexer.renames = renames;
     } else {
-        lexer.start_renames = start_renames_dead;
+        lexer.start_renames = start_renames_local;
     }
 
     // hover
@@ -141,7 +142,7 @@ pub fn remove_lsp(lexer: &mut Lexer) {
     lexer.declarations = info_position_dead;
     lexer.hover = info_position_dead;
     lexer.signatures = info_position_dead;
-    lexer.start_renames = start_renames_dead;
+    lexer.start_renames = start_renames_local;
     lexer.renames = renames_dead;
     lexer.sync = sync_edits_dead;
     lexer.sync_rev = sync_edits_dead_rev;
@@ -396,10 +397,14 @@ pub fn signatures(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalState) {
     }
 }
 
-pub fn start_renames_dead(_: &mut Lexer, _: CursorPosition, _: &str) {}
+pub fn start_renames_local(lexer: &mut Lexer, position: CursorPosition, content: &[EditorLine]) {
+    todo!("base on word range")
+}
 
-pub fn start_renames(lexer: &mut Lexer, c: CursorPosition, title: &str) {
-    lexer.modal.replace(LSPModal::renames_at(c, title));
+pub fn start_renames(lexer: &mut Lexer, position: CursorPosition, content: &[EditorLine]) {
+    if let Some(title) = WordRange::find_text_at(content, position) {
+        lexer.modal.replace(LSPModal::renames_at(position, title));
+    }
 }
 
 pub fn renames_dead(_: &mut Lexer, _: CursorPosition, _: String, _: &mut GlobalState) {}

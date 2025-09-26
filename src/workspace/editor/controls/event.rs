@@ -146,14 +146,13 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::EndOfFile => editor.cursor.end_of_file(&editor.content),
         EditorAction::StartOfLine => editor.cursor.start_of_line(&editor.content),
         EditorAction::StartOfFile => editor.cursor.start_of_file(),
+        EditorAction::IdiomCommand => todo!(),
         EditorAction::FindReferences => editor.lexer.go_to_reference((&editor.cursor).into(), gs),
         EditorAction::GoToDeclaration => editor.lexer.go_to_declaration((&editor.cursor).into(), gs),
         EditorAction::Help => editor.lexer.help((&editor.cursor).into(), &editor.content, gs),
         EditorAction::LSPRename => {
             let position = editor.cursor.get_position();
-            if let Some(title) = WordRange::find_text_at(&editor.content, position) {
-                editor.lexer.start_rename(position, title);
-            }
+            editor.lexer.start_rename(position, &editor.content);
         }
         EditorAction::RefreshUI => editor.lexer.refresh_lsp(gs),
         EditorAction::Save => editor.save(gs),
@@ -473,6 +472,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 cursor.start_of_line(&editor.content)
             }
         }
+        EditorAction::IdiomCommand => todo!(),
         EditorAction::RefreshUI => editor.lexer.refresh_lsp(gs),
         EditorAction::Save => editor.save(gs),
         EditorAction::EndOfFile

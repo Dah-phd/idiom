@@ -21,7 +21,7 @@ pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
     as_url, char_lsp_pos, completable_dead, context_local, encode_pos_utf32, get_autocomplete_dead, info_position_dead,
-    map_lsp, remove_lsp, renames_dead, start_renames_dead, sync_changes_dead, sync_edits_dead, sync_edits_dead_rev,
+    map_lsp, remove_lsp, renames_dead, start_renames_local, sync_changes_dead, sync_edits_dead, sync_edits_dead_rev,
     sync_tokens_dead, tokens_dead, tokens_partial_dead,
 };
 use lsp_types::{PublishDiagnosticsParams, Range, TextDocumentContentChangeEvent, Uri};
@@ -53,7 +53,7 @@ pub struct Lexer {
     declarations: fn(&mut Self, CursorPosition, &mut GlobalState),
     hover: fn(&mut Self, CursorPosition, &mut GlobalState),
     signatures: fn(&mut Self, CursorPosition, &mut GlobalState),
-    start_renames: fn(&mut Self, CursorPosition, &str),
+    start_renames: fn(&mut Self, CursorPosition, &[EditorLine]),
     renames: fn(&mut Self, CursorPosition, String, &mut GlobalState),
     sync_tokens: fn(&mut Self, EditMetaData),
     sync_changes: fn(&mut Self, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
@@ -90,7 +90,7 @@ impl Lexer {
             declarations: info_position_dead,
             hover: info_position_dead,
             signatures: info_position_dead,
-            start_renames: start_renames_dead,
+            start_renames: start_renames_local,
             renames: renames_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
@@ -127,7 +127,7 @@ impl Lexer {
             declarations: info_position_dead,
             hover: info_position_dead,
             signatures: info_position_dead,
-            start_renames: start_renames_dead,
+            start_renames: start_renames_local,
             renames: renames_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
@@ -164,7 +164,7 @@ impl Lexer {
             declarations: info_position_dead,
             hover: info_position_dead,
             signatures: info_position_dead,
-            start_renames: start_renames_dead,
+            start_renames: start_renames_local,
             renames: renames_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
@@ -363,8 +363,8 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn start_rename(&mut self, c: CursorPosition, title: &str) {
-        (self.start_renames)(self, c, title);
+    pub fn start_rename(&mut self, position: CursorPosition, content: &[EditorLine]) {
+        (self.start_renames)(self, position, content);
     }
 
     #[inline]
