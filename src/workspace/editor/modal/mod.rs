@@ -1,4 +1,5 @@
 use crate::workspace::editor::WordRange;
+use crate::workspace::Editor;
 use crate::workspace::EditorLine;
 mod completion;
 mod info;
@@ -7,7 +8,7 @@ mod rename;
 use crate::{
     configs::{EditorAction, Theme},
     global_state::GlobalState,
-    syntax::{DiagnosticInfo, Lang, Lexer},
+    syntax::DiagnosticInfo,
     workspace::CursorPosition,
 };
 use completion::AutoComplete;
@@ -24,7 +25,14 @@ pub enum ModalMessage {
     Done,
     Taken,
     TakenDone,
-    RenameVar(String, CursorPosition),
+    Action(ModalAction),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ModalAction {
+    Rename(String, CursorPosition),
+    AutoComplete(String),
+    Snippet { snippet: String, cursor_offset: Option<(usize, usize)>, relative_select: Option<((usize, usize), usize)> },
 }
 
 impl<T> From<&[T]> for ModalMessage {
@@ -51,18 +59,18 @@ pub struct EditorModal {
 
 impl EditorModal {
     #[inline]
-    pub fn modal_is_rendered(&self) -> bool {
+    pub fn is_rendered(&self) -> bool {
         self.last_render.is_some()
     }
 
     #[inline]
-    pub fn forece_modal_render_if_exists(&mut self, row: u16, col: u16, gs: &mut GlobalState) {
+    pub fn forece_render_if_exists(&mut self, row: u16, col: u16, gs: &mut GlobalState) {
         let Some(modal) = self.inner.as_mut() else { return };
         self.last_render = modal.render_at(col, row, gs);
     }
 
     #[inline]
-    pub fn render_modal_if_exist(&mut self, row: u16, col: u16, gs: &mut GlobalState) {
+    pub fn render_if_exist(&mut self, row: u16, col: u16, gs: &mut GlobalState) {
         let Some(modal) = self.inner.as_mut() else { return };
         if self.last_render.is_none() {
             self.last_render = modal.render_at(col, row, gs);
@@ -70,32 +78,52 @@ impl EditorModal {
     }
 
     #[inline]
-    pub fn map_modal_if_exists(
-        &mut self,
-        action: EditorAction,
-        lexer: &mut Lexer,
-        gs: &mut GlobalState,
-    ) -> (bool, Option<Rect>) {
-        let Some(modal) = self.inner.as_mut() else {
+    pub fn map_if_exists(editor: &mut Editor, action: EditorAction, gs: &mut GlobalState) -> (bool, Option<Rect>) {
+        let Some(modal) = editor.modal.inner.as_mut() else {
             return (false, None);
         };
-        match modal.map_and_finish(action, &lexer.lang, gs) {
-            ModalMessage::None => (false, self.last_render.take()),
-            ModalMessage::Taken => (true, self.last_render.take()),
+        let message = match action {
+            EditorAction::Cancel | EditorAction::Close => ModalMessage::TakenDone,
+            _ => match modal {
+                LSPModal::AutoComplete(modal) => modal.map(action, &editor.lexer.lang, gs),
+                LSPModal::Info(modal) => modal.map(action, gs),
+                LSPModal::RenameVar(modal) => modal.map(action, gs),
+            },
+        };
+        match message {
+            ModalMessage::None => (false, editor.modal.last_render.take()),
+            ModalMessage::Taken => (true, editor.modal.last_render.take()),
             ModalMessage::TakenDone => {
-                self.inner.take();
-                (true, self.last_render.take())
+                editor.modal.inner.take();
+                (true, editor.modal.last_render.take())
             }
             ModalMessage::Done => {
-                self.inner.take();
-                (false, self.last_render.take())
+                editor.modal.inner.take();
+                (false, editor.modal.last_render.take())
             }
-            ModalMessage::RenameVar(new_name, c) => {
-                lexer.get_rename(c, new_name, gs);
-                self.inner.take();
-                (true, self.last_render.take())
+            ModalMessage::Action(action) => {
+                match action {
+                    ModalAction::Rename(new_name, c) => {
+                        editor.lexer.get_rename(c, new_name, gs);
+                        editor.modal.inner.take();
+                    }
+                    ModalAction::AutoComplete(new) => editor.replace_token(new),
+                    ModalAction::Snippet { snippet, cursor_offset, relative_select } => match relative_select {
+                        Some((cursor_offset, len)) => {
+                            editor.insert_snippet_with_select(snippet, cursor_offset, len);
+                        }
+                        None => editor.insert_snippet(snippet, cursor_offset),
+                    },
+                }
+                editor.modal.inner.take();
+                (true, editor.modal.last_render.take())
             }
         }
+    }
+
+    #[inline]
+    pub fn take_render_cache(&mut self) -> Option<Rect> {
+        self.last_render.take()
     }
 
     #[inline]
@@ -104,19 +132,18 @@ impl EditorModal {
     }
 
     #[inline]
-    pub fn clear_modal(&mut self) -> Option<Rect> {
+    pub fn drop(&mut self) -> Option<Rect> {
         _ = self.inner.take();
         self.last_render.take()
     }
 
-    pub fn mouse_click_modal_if_exists(
-        &mut self,
+    pub fn mouse_click_if_exists(
+        editor: &mut Editor,
         relative_editor_position: Position,
-        lexer: &Lexer,
         gs: &mut GlobalState,
     ) -> Option<Rect> {
-        let modal = self.inner.as_mut()?;
-        let found_positon = self.last_render.and_then(|rect| {
+        let modal = editor.modal.inner.as_mut()?;
+        let found_positon = editor.modal.last_render.and_then(|rect| {
             let row = gs.editor_area().row + relative_editor_position.row;
             let column = gs.editor_area().col + relative_editor_position.col;
             rect.relative_position(row, column)
@@ -124,21 +151,47 @@ impl EditorModal {
         match found_positon {
             // click outside modal
             None => {
-                self.inner.take();
-                self.last_render.take()
+                editor.modal.inner.take();
+                editor.modal.last_render.take()
             }
-            Some(position) => match modal.mouse_click_and_finished(position, &lexer.lang, gs) {
-                // modal finished
-                true => {
-                    self.inner.take();
-                    self.last_render.take()
+            Some(position) => {
+                let finish = match modal {
+                    LSPModal::AutoComplete(modal) => {
+                        match modal.mouse_click_and_finished(position.row as usize, &editor.lexer.lang, gs) {
+                            ModalAction::Rename(..) => {}
+                            ModalAction::AutoComplete(new) => editor.replace_token(new),
+                            ModalAction::Snippet { snippet, cursor_offset, relative_select } => match relative_select {
+                                Some((cursor_offset, len)) => {
+                                    editor.insert_snippet_with_select(snippet, cursor_offset, len);
+                                }
+                                None => editor.insert_snippet(snippet, cursor_offset),
+                            },
+                        }
+                        true
+                    }
+                    LSPModal::Info(modal) => modal.mouse_click_and_finish(position.row as usize, gs),
+                    LSPModal::RenameVar(modal) => {
+                        if position.row == 1 {
+                            modal.mouse_click(position.col as usize);
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                };
+                match finish {
+                    // modal finished
+                    true => {
+                        editor.modal.inner.take();
+                        editor.modal.last_render.take()
+                    }
+                    false => editor.modal.last_render.take(),
                 }
-                false => self.last_render.take(),
-            },
+            }
         }
     }
 
-    pub fn mouse_moved_modal_if_exists(&mut self, row: u16, column: u16) -> Option<Rect> {
+    pub fn mouse_moved_if_exists(&mut self, row: u16, column: u16) -> Option<Rect> {
         let modal = self.inner.as_mut()?;
         let position = self.last_render.and_then(|rect| rect.relative_position(row, column))?;
         modal.mouse_moved(position).then_some(self.last_render.take()?)
@@ -187,37 +240,11 @@ impl EditorModal {
 }
 
 impl LSPModal {
-    pub fn map_and_finish(&mut self, action: EditorAction, lang: &Lang, gs: &mut GlobalState) -> ModalMessage {
-        match action {
-            EditorAction::Cancel | EditorAction::Close => ModalMessage::TakenDone,
-            _ => match self {
-                Self::AutoComplete(modal) => modal.map(action, lang, gs),
-                Self::Info(modal) => modal.map(action, gs),
-                Self::RenameVar(modal) => modal.map(action, gs),
-            },
-        }
-    }
-
     pub fn mouse_moved(&mut self, position: Position) -> bool {
         match self {
             Self::AutoComplete(modal) => modal.mouse_moved(position.row as usize),
             Self::Info(modal) => modal.mouse_moved(position.row as usize),
             Self::RenameVar(..) => false,
-        }
-    }
-
-    pub fn mouse_click_and_finished(&mut self, position: Position, lang: &Lang, gs: &mut GlobalState) -> bool {
-        match self {
-            Self::AutoComplete(modal) => modal.mouse_click_and_finished(position.row as usize, lang, gs),
-            Self::Info(modal) => modal.mouse_click_and_finish(position.row as usize, gs),
-            Self::RenameVar(modal) => {
-                if position.row == 1 {
-                    modal.mouse_click(position.col as usize);
-                    false
-                } else {
-                    true
-                }
-            }
         }
     }
 

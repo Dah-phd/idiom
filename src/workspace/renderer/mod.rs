@@ -100,7 +100,7 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
         }
     }
 
-    if !modal.modal_is_rendered() {
+    if !modal.is_rendered() {
         for line in lines {
             line.render_empty(&mut gs.backend);
         }
@@ -185,7 +185,7 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
         }
         ctx.forced_modal_render(modal, gs);
     } else {
-        if !modal.modal_is_rendered() {
+        if !modal.is_rendered() {
             for line in lines {
                 line.render_empty(&mut gs.backend);
             }

@@ -37,8 +37,7 @@ impl AutoComplete {
                 if let Some(data) = completion_item.data.take() {
                     lang.handle_completion_data(data, gs);
                 };
-                gs.event.push(parse_completion_item(completion_item));
-                ModalMessage::TakenDone
+                ModalMessage::Action(parse_completion_item(completion_item))
             }
             EditorAction::Char(ch) => self.push_filter(ch, &gs.matcher),
             EditorAction::Down | EditorAction::ScrollDown => {
@@ -54,14 +53,18 @@ impl AutoComplete {
         }
     }
 
-    pub fn mouse_click_and_finished(&mut self, relative_idx: usize, lang: &Lang, gs: &mut GlobalState) -> bool {
+    pub fn mouse_click_and_finished(
+        &mut self,
+        relative_idx: usize,
+        lang: &Lang,
+        gs: &mut GlobalState,
+    ) -> super::ModalAction {
         let selected = self.state.at_line + relative_idx;
         let mut completion_item = self.completions.remove(self.filtered.remove(selected).1);
         if let Some(data) = completion_item.data.take() {
             lang.handle_completion_data(data, gs);
         };
-        gs.event.push(parse_completion_item(completion_item));
-        true
+        parse_completion_item(completion_item)
     }
 
     pub fn mouse_moved(&mut self, relative_idx: usize) -> bool {

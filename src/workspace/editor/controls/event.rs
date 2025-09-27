@@ -8,12 +8,12 @@ use crate::{
     workspace::{
         actions::transaction,
         cursor::{CursorPosition, PositionedWord, WordRange},
-        Editor,
+        editor::{Editor, EditorModal},
     },
 };
 
 pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut GlobalState) -> bool {
-    let (taken, render_update) = editor.modal.map_modal_if_exists(action, &mut editor.lexer, gs);
+    let (taken, render_update) = EditorModal::map_if_exists(editor, action, gs);
     if let Some(modal_rect) = render_update {
         editor.clear_lines_cache(modal_rect, gs);
     }
@@ -175,7 +175,7 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
 }
 
 pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut GlobalState) -> bool {
-    let (taken, render_update) = editor.modal.map_modal_if_exists(action, &mut editor.lexer, gs);
+    let (taken, render_update) = EditorModal::map_if_exists(editor, action, gs);
     if let Some(modal_rect) = render_update {
         editor.clear_lines_cache(modal_rect, gs);
     }

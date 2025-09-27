@@ -117,14 +117,14 @@ impl<'a> LineContext<'a> {
     pub fn forced_modal_render(self, modal: &mut EditorModal, gs: &mut GlobalState) {
         let row = self.line as u16;
         let col = (self.cursor_char + self.line_number_padding + 1) as u16;
-        modal.forece_modal_render_if_exists(row, col, gs);
+        modal.forece_render_if_exists(row, col, gs);
     }
 
     #[inline]
     pub fn render_modal(self, modal: &mut EditorModal, gs: &mut GlobalState) {
         let row = self.line as u16;
         let col = (self.cursor_char + self.line_number_padding + 1) as u16;
-        modal.render_modal_if_exist(row, col, gs);
+        modal.render_if_exist(row, col, gs);
     }
 
     pub fn init_multic_mod(&mut self, cursors: &[Cursor]) {
