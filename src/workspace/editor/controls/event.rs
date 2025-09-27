@@ -13,7 +13,7 @@ use crate::{
 };
 
 pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut GlobalState) -> bool {
-    let (taken, render_update) = editor.lexer.map_modal_if_exists(action, gs);
+    let (taken, render_update) = editor.modal.map_modal_if_exists(action, &mut editor.lexer, gs);
     if let Some(modal_rect) = render_update {
         editor.clear_lines_cache(modal_rect, gs);
     }
@@ -25,7 +25,7 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::Char(ch) => {
             editor.actions.push_char(ch, &mut editor.cursor, &mut editor.content, &mut editor.lexer);
             let line = &editor.content[editor.cursor.line];
-            if editor.lexer.should_autocomplete(editor.cursor.char, line) {
+            if !editor.modal.is_autocomplete() && editor.lexer.should_autocomplete(editor.cursor.char, line) {
                 let line = line.to_string();
                 editor.actions.push_buffer(&mut editor.lexer);
                 editor.lexer.get_autocomplete(editor.cursor.get_position(), line, gs);
@@ -149,10 +149,16 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::IdiomCommand => todo!(),
         EditorAction::FindReferences => editor.lexer.go_to_reference((&editor.cursor).into(), gs),
         EditorAction::GoToDeclaration => editor.lexer.go_to_declaration((&editor.cursor).into(), gs),
-        EditorAction::Help => editor.lexer.help((&editor.cursor).into(), &editor.content, gs),
+        EditorAction::Help => {
+            let position = editor.cursor.get_position();
+            if let Some(actions) = editor.content[position.line].diagnostic_info(&editor.lexer.lang) {
+                editor.modal.replace_with_action(actions);
+            }
+            editor.lexer.help(position, gs)
+        }
         EditorAction::LSPRename => {
             let position = editor.cursor.get_position();
-            editor.lexer.start_rename(position, &editor.content);
+            editor.modal.start_renames(&editor.content, position);
         }
         EditorAction::RefreshUI => editor.lexer.refresh_lsp(gs),
         EditorAction::Save => editor.save(gs),
@@ -169,7 +175,7 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
 }
 
 pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut GlobalState) -> bool {
-    let (taken, render_update) = editor.lexer.map_modal_if_exists(action, gs);
+    let (taken, render_update) = editor.modal.map_modal_if_exists(action, &mut editor.lexer, gs);
     if let Some(modal_rect) = render_update {
         editor.clear_lines_cache(modal_rect, gs);
     }
@@ -179,12 +185,13 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
     match action {
         // EDITS:
         EditorAction::Char(ch) => {
+            let modal_is_autocomplete = editor.modal.is_autocomplete();
             let mut auto_complete = None;
             apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
                 actions.push_char(ch, cursor, content, lexer);
                 if cursor.max_rows != 0 {
                     let line = &content[cursor.line];
-                    if lexer.should_autocomplete(cursor.char, line) {
+                    if !modal_is_autocomplete && lexer.should_autocomplete(cursor.char, line) {
                         auto_complete = Some((cursor.get_position(), line.to_string()));
                     }
                 }

@@ -1,3 +1,5 @@
+use crate::workspace::editor::WordRange;
+use crate::workspace::EditorLine;
 mod completion;
 mod info;
 mod rename;
@@ -5,7 +7,7 @@ mod rename;
 use crate::{
     configs::{EditorAction, Theme},
     global_state::GlobalState,
-    syntax::{DiagnosticInfo, Lang},
+    syntax::{DiagnosticInfo, Lang, Lexer},
     workspace::CursorPosition,
 };
 use completion::AutoComplete;
@@ -15,18 +17,12 @@ use info::Info;
 use lsp_types::{CompletionItem, Hover, SignatureHelp};
 use rename::RenameVariable;
 
-pub enum LSPModal {
-    AutoComplete(AutoComplete),
-    RenameVar(RenameVariable),
-    Info(Info),
-}
-
 #[derive(Default, Debug)]
 pub enum ModalMessage {
-    Taken,
     #[default]
     None,
     Done,
+    Taken,
     TakenDone,
     RenameVar(String, CursorPosition),
 }
@@ -37,6 +33,155 @@ impl<T> From<&[T]> for ModalMessage {
             ModalMessage::Done
         } else {
             ModalMessage::default()
+        }
+    }
+}
+
+pub enum LSPModal {
+    AutoComplete(AutoComplete),
+    RenameVar(RenameVariable),
+    Info(Info),
+}
+
+#[derive(Default)]
+pub struct EditorModal {
+    last_render: Option<Rect>,
+    inner: Option<LSPModal>,
+}
+
+impl EditorModal {
+    #[inline]
+    pub fn modal_is_rendered(&self) -> bool {
+        self.last_render.is_some()
+    }
+
+    #[inline]
+    pub fn forece_modal_render_if_exists(&mut self, row: u16, col: u16, gs: &mut GlobalState) {
+        let Some(modal) = self.inner.as_mut() else { return };
+        self.last_render = modal.render_at(col, row, gs);
+    }
+
+    #[inline]
+    pub fn render_modal_if_exist(&mut self, row: u16, col: u16, gs: &mut GlobalState) {
+        let Some(modal) = self.inner.as_mut() else { return };
+        if self.last_render.is_none() {
+            self.last_render = modal.render_at(col, row, gs);
+        };
+    }
+
+    #[inline]
+    pub fn map_modal_if_exists(
+        &mut self,
+        action: EditorAction,
+        lexer: &mut Lexer,
+        gs: &mut GlobalState,
+    ) -> (bool, Option<Rect>) {
+        let Some(modal) = self.inner.as_mut() else {
+            return (false, None);
+        };
+        match modal.map_and_finish(action, &lexer.lang, gs) {
+            ModalMessage::None => (false, self.last_render.take()),
+            ModalMessage::Taken => (true, self.last_render.take()),
+            ModalMessage::TakenDone => {
+                self.inner.take();
+                (true, self.last_render.take())
+            }
+            ModalMessage::Done => {
+                self.inner.take();
+                (false, self.last_render.take())
+            }
+            ModalMessage::RenameVar(new_name, c) => {
+                lexer.get_rename(c, new_name, gs);
+                self.inner.take();
+                (true, self.last_render.take())
+            }
+        }
+    }
+
+    #[inline]
+    pub fn cleanr_render_cache(&mut self) {
+        self.last_render = None;
+    }
+
+    #[inline]
+    pub fn clear_modal(&mut self) -> Option<Rect> {
+        _ = self.inner.take();
+        self.last_render.take()
+    }
+
+    pub fn mouse_click_modal_if_exists(
+        &mut self,
+        relative_editor_position: Position,
+        lexer: &Lexer,
+        gs: &mut GlobalState,
+    ) -> Option<Rect> {
+        let modal = self.inner.as_mut()?;
+        let found_positon = self.last_render.and_then(|rect| {
+            let row = gs.editor_area().row + relative_editor_position.row;
+            let column = gs.editor_area().col + relative_editor_position.col;
+            rect.relative_position(row, column)
+        });
+        match found_positon {
+            // click outside modal
+            None => {
+                self.inner.take();
+                self.last_render.take()
+            }
+            Some(position) => match modal.mouse_click_and_finished(position, &lexer.lang, gs) {
+                // modal finished
+                true => {
+                    self.inner.take();
+                    self.last_render.take()
+                }
+                false => self.last_render.take(),
+            },
+        }
+    }
+
+    pub fn mouse_moved_modal_if_exists(&mut self, row: u16, column: u16) -> Option<Rect> {
+        let modal = self.inner.as_mut()?;
+        let position = self.last_render.and_then(|rect| rect.relative_position(row, column))?;
+        modal.mouse_moved(position).then_some(self.last_render.take()?)
+    }
+
+    pub fn is_autocomplete(&self) -> bool {
+        matches!(self.inner, Some(LSPModal::AutoComplete(..)))
+    }
+
+    pub fn replace_with_action(&mut self, actions: DiagnosticInfo) {
+        self.inner.replace(LSPModal::actions(actions));
+    }
+
+    pub fn map_signatures(&mut self, signature: SignatureHelp, theme: &Theme) {
+        if let Some(modal) = self.inner.as_mut() {
+            modal.signature_map(signature, theme);
+            self.cleanr_render_cache();
+        } else {
+            self.inner = Some(LSPModal::from_signature(signature, theme));
+        }
+    }
+    pub fn map_hover(&mut self, hover: Hover, theme: &Theme) {
+        if let Some(modal) = self.inner.as_mut() {
+            modal.hover_map(hover, theme);
+            self.cleanr_render_cache();
+        } else {
+            self.inner = Some(LSPModal::from_hover(hover, theme));
+        }
+    }
+
+    pub fn auto_complete(
+        &mut self,
+        completions: Vec<CompletionItem>,
+        line: String,
+        c: CursorPosition,
+        matcher: &SkimMatcherV2,
+    ) {
+        self.inner = LSPModal::auto_complete(completions, line, c, matcher);
+    }
+
+    pub fn start_renames(&mut self, content: &[EditorLine], position: CursorPosition) {
+        if let Some(title) = WordRange::find_text_at(content, position) {
+            self.inner.replace(LSPModal::renames_at(position, title));
         }
     }
 }

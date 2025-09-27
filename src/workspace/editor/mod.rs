@@ -1,4 +1,5 @@
 mod controls;
+mod modal;
 mod utils;
 use super::{
     actions::Actions,
@@ -17,6 +18,7 @@ use crate::{
 use controls::ControlMap;
 use idiom_tui::{layout::Rect, Position};
 use lsp_types::TextEdit;
+pub use modal::EditorModal;
 use std::path::PathBuf;
 pub use utils::editor_from_data;
 use utils::{big_file_protection, build_display, calc_line_number_offset, FileUpdate};
@@ -36,9 +38,10 @@ pub struct Editor {
     pub update_status: FileUpdate,
     pub line_number_padding: usize,
     pub last_render_at_line: Option<usize>,
-    pub actions: Actions,
-    renderer: Renderer,
     pub controls: ControlMap,
+    pub modal: EditorModal,
+    actions: Actions,
+    renderer: Renderer,
 }
 
 impl Editor {
@@ -65,6 +68,7 @@ impl Editor {
             update_status: FileUpdate::None,
             path,
             last_render_at_line: None,
+            modal: EditorModal::default(),
         })
     }
 
@@ -89,6 +93,7 @@ impl Editor {
             update_status: FileUpdate::None,
             path,
             last_render_at_line: None,
+            modal: EditorModal::default(),
         })
     }
 
@@ -113,6 +118,7 @@ impl Editor {
             update_status: FileUpdate::None,
             path,
             last_render_at_line: None,
+            modal: EditorModal::default(),
         })
     }
 
@@ -140,7 +146,7 @@ impl Editor {
     }
 
     pub fn clear_ui(&mut self, gs: &GlobalState) {
-        if let Some(rect) = self.lexer.clear_modal() {
+        if let Some(rect) = self.modal.clear_modal() {
             self.clear_lines_cache(rect, gs);
         }
     }
@@ -402,7 +408,7 @@ impl Editor {
     // MOUSE
 
     pub fn mouse_scroll_up(&mut self, select: bool, gs: &mut GlobalState) {
-        let (taken, render_update) = self.lexer.map_modal_if_exists(EditorAction::ScrollUp, gs);
+        let (taken, render_update) = self.modal.map_modal_if_exists(EditorAction::ScrollUp, &mut self.lexer, gs);
         if let Some(modal_rect) = render_update {
             self.clear_lines_cache(modal_rect, gs);
         }
@@ -422,7 +428,7 @@ impl Editor {
     }
 
     pub fn mouse_scroll_down(&mut self, select: bool, gs: &mut GlobalState) {
-        let (taken, render_update) = self.lexer.map_modal_if_exists(EditorAction::ScrollDown, gs);
+        let (taken, render_update) = self.modal.map_modal_if_exists(EditorAction::ScrollDown, &mut self.lexer, gs);
         if let Some(modal_rect) = render_update {
             self.clear_lines_cache(modal_rect, gs);
         }
@@ -443,7 +449,7 @@ impl Editor {
 
     pub fn mouse_click(&mut self, position: Position, gs: &mut GlobalState) {
         ControlMap::ensure_single_cursor(self);
-        if let Some(rect) = self.lexer.mouse_click_modal_if_exists(position, gs) {
+        if let Some(rect) = self.modal.mouse_click_modal_if_exists(position, &mut self.lexer, gs) {
             self.clear_lines_cache(rect, gs);
             return;
         }
@@ -457,7 +463,7 @@ impl Editor {
     }
 
     pub fn mouse_multi_cursor(&mut self, position: Position) {
-        self.lexer.clear_modal();
+        self.modal.clear_modal();
         self.last_render_at_line = None;
         let position = self.mouse_parse(position);
         if self.cursor == position {
@@ -468,7 +474,7 @@ impl Editor {
 
     pub fn mouse_select_to(&mut self, position: Position, gs: &mut GlobalState) {
         ControlMap::ensure_single_cursor(self);
-        if let Some(rect) = self.lexer.mouse_click_modal_if_exists(position, gs) {
+        if let Some(rect) = self.modal.mouse_click_modal_if_exists(position, &mut self.lexer, gs) {
             self.clear_lines_cache(rect, gs);
             return;
         }
@@ -495,7 +501,7 @@ impl Editor {
     }
 
     pub fn mouse_moved(&mut self, row: u16, column: u16, gs: &GlobalState) {
-        if let Some(rect) = self.lexer.mouse_moved_modal_if_exists(row, column) {
+        if let Some(rect) = self.modal.mouse_moved_modal_if_exists(row, column) {
             self.clear_lines_cache(rect, gs);
         };
     }
