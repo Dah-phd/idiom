@@ -64,16 +64,16 @@ impl EditorModal {
     }
 
     #[inline]
-    pub fn forece_render_if_exists(&mut self, row: u16, col: u16, gs: &mut GlobalState) {
+    pub fn forece_render_if_exists(&mut self, relative_pos: Position, gs: &mut GlobalState) {
         let Some(modal) = self.inner.as_mut() else { return };
-        self.last_render = modal.render_at(col, row, gs);
+        self.last_render = modal.render_at(relative_pos, gs);
     }
 
     #[inline]
-    pub fn render_if_exist(&mut self, row: u16, col: u16, gs: &mut GlobalState) {
+    pub fn render_if_exist(&mut self, relative_pos: Position, gs: &mut GlobalState) {
         let Some(modal) = self.inner.as_mut() else { return };
         if self.last_render.is_none() {
-            self.last_render = modal.render_at(col, row, gs);
+            self.last_render = modal.render_at(relative_pos, gs);
         };
     }
 
@@ -248,11 +248,12 @@ impl LSPModal {
         }
     }
 
-    pub fn render_at(&mut self, col: u16, row: u16, gs: &mut GlobalState) -> Option<Rect> {
+    pub fn render_at(&mut self, relative_pos: Position, gs: &mut GlobalState) -> Option<Rect> {
+        let Position { row: row_offset, col: col_offset } = relative_pos;
         match self {
             Self::AutoComplete(modal) => {
                 let height = std::cmp::min(modal.len() as u16, 7);
-                let area = gs.editor_area().modal_relative(row, col, 70, height);
+                let area = gs.editor_area().modal_relative(row_offset, col_offset, 70, height);
                 if area.height != 0 {
                     gs.backend.set_style(gs.theme.accent_style());
                     modal.render(&area, gs);
@@ -261,7 +262,7 @@ impl LSPModal {
                 };
             }
             Self::RenameVar(modal) => {
-                let area = gs.editor_area().modal_relative(row, col, 60, modal.len() as u16);
+                let area = gs.editor_area().modal_relative(row_offset, col_offset, 60, modal.len() as u16);
                 if area.height == 2 {
                     gs.backend.set_style(gs.theme.accent_style());
                     modal.render(&area, gs);
@@ -271,7 +272,7 @@ impl LSPModal {
             }
             Self::Info(modal) => {
                 let height = std::cmp::min(modal.len() as u16, 7);
-                let area = gs.editor_area().modal_relative(row, col, 90, height);
+                let area = gs.editor_area().modal_relative(row_offset, col_offset, 90, height);
                 if area.height != 0 {
                     gs.backend.set_style(gs.theme.accent_style());
                     modal.render(area, gs);

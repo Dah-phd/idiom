@@ -1,4 +1,7 @@
 ## Includes only major changes (manual updates)
+# Version 0.6.1
+- moved modals from syntax to editor > direct calls instead events
+
 # Version 0.6.0
 - multicursor support
 - added "New" to tree context menu

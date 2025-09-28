@@ -107,8 +107,8 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     }
 
     gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
-    let pos = ctx.get_modal_position();
-    modal.render_if_exist(pos.row, pos.col, gs);
+    let relative_pos = ctx.get_modal_relative_position();
+    modal.render_if_exist(relative_pos, gs);
 }
 
 #[inline(always)]
@@ -140,8 +140,8 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
     }
 
     gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
-    let pos = ctx.get_modal_position();
-    modal.forece_render_if_exists(pos.row, pos.col, gs);
+    let relative_pos = ctx.get_modal_relative_position();
+    modal.forece_render_if_exists(relative_pos, gs);
 }
 
 // CODE RENDER MULTICURSOR
@@ -185,16 +185,16 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
         for line in lines {
             line.render_empty(&mut gs.backend);
         }
-        let pos = ctx.get_modal_position();
-        modal.forece_render_if_exists(pos.row, pos.col, gs);
+        let relative_pos = ctx.get_modal_relative_position();
+        modal.forece_render_if_exists(relative_pos, gs);
     } else {
         if !modal.is_rendered() {
             for line in lines {
                 line.render_empty(&mut gs.backend);
             }
         }
-        let pos = ctx.get_modal_position();
-        modal.render_if_exist(pos.row, pos.col, gs);
+        let relative_pos = ctx.get_modal_relative_position();
+        modal.render_if_exist(relative_pos, gs);
     }
     gs.render_stats(content.len(), controls.cursors.len(), cursor.into());
 }
@@ -231,8 +231,8 @@ fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
     }
 
     gs.render_stats(content.len(), controls.cursors.len(), cursor.into());
-    let pos = ctx.get_modal_position();
-    modal.forece_render_if_exists(pos.row, pos.col, gs);
+    let relative_pos = ctx.get_modal_relative_position();
+    modal.forece_render_if_exists(relative_pos, gs);
 }
 
 // TEXT

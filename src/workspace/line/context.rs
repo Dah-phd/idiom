@@ -113,7 +113,7 @@ impl<'a> LineContext<'a> {
         self.line_number += 1;
     }
 
-    pub fn get_modal_position(&self) -> Position {
+    pub fn get_modal_relative_position(&self) -> Position {
         let row = self.line as u16;
         let col = (self.cursor_char + self.line_number_padding + 1) as u16;
         Position { row, col }
