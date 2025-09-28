@@ -61,7 +61,7 @@ fn test_iter_word_selects() {
     let word = PositionedWord::find_at(&content, (0, 4).into()).unwrap();
 
     let content_iter = content.iter().enumerate().skip(3).chain(content.iter().enumerate().take(3));
-    let selects = word.iter_word_selects(content_iter).collect::<Vec<_>>();
+    let selects = word.iter_word_ranges(content_iter).collect::<Vec<_>>();
     let line_order = [3, 4, 0, 1, 2, 2];
     assert_eq!(selects.len(), line_order.len());
     for (idx, range) in selects.into_iter().enumerate() {

@@ -1,6 +1,7 @@
 ## Includes only major changes (manual updates)
 # Version 0.6.1
 - moved modals from syntax to editor > direct calls instead events
+- added local version on LSPRename modal
 
 # Version 0.6.0
 - multicursor support

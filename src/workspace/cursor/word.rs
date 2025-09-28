@@ -35,7 +35,7 @@ impl PositionedWord {
         &self.range
     }
 
-    pub fn iter_word_selects<'a, B>(&'a self, content_iter: B) -> impl Iterator<Item = WordRange> + use<'a, B>
+    pub fn iter_word_ranges<'a, B>(&'a self, content_iter: B) -> impl Iterator<Item = WordRange> + use<'a, B>
     where
         B: Iterator<Item = (usize, &'a EditorLine)>,
     {

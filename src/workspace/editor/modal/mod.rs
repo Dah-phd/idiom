@@ -1,6 +1,7 @@
-use crate::workspace::editor::WordRange;
-use crate::workspace::Editor;
-use crate::workspace::EditorLine;
+use crate::workspace::{
+    cursor::{PositionedWord, WordRange},
+    Editor, EditorLine,
+};
 mod completion;
 mod info;
 mod rename;
@@ -104,11 +105,15 @@ impl EditorModal {
             ModalMessage::Action(action) => {
                 match action {
                     ModalAction::Rename(new_name, c) => {
-                        if let Err(error) = editor.lexer.try_lsp_rename(c, new_name) {
+                        if let Err(error) = editor.lexer.try_lsp_rename(c, new_name.to_owned()) {
                             if !error.is_missing_capability() {
                                 gs.error(error);
                             }
-                            todo!("loacal handle")
+                            if let Some(old_name) = PositionedWord::find_at(&editor.content, c) {
+                                let content_iter = editor.content.iter().enumerate().rev();
+                                let ranges = old_name.iter_word_ranges(content_iter).map(|r| r.as_select()).collect();
+                                editor.mass_replace(ranges, new_name);
+                            }
                         };
                         editor.modal.inner.take();
                     }
