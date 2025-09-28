@@ -2,11 +2,11 @@ use super::status::RenderStatus;
 use super::EditorLine;
 use crate::{
     ext_tui::CrossTerm,
-    global_state::GlobalState,
     syntax::Lexer,
-    workspace::{cursor::Cursor, editor::EditorModal, CursorPosition},
+    workspace::{cursor::Cursor, CursorPosition},
 };
 use crossterm::style::ContentStyle;
+use idiom_tui::Position;
 use idiom_tui::{layout::Line, Backend};
 use std::{cmp::Ordering, ops::Range};
 
@@ -113,18 +113,10 @@ impl<'a> LineContext<'a> {
         self.line_number += 1;
     }
 
-    #[inline]
-    pub fn forced_modal_render(self, modal: &mut EditorModal, gs: &mut GlobalState) {
+    pub fn get_modal_position(&self) -> Position {
         let row = self.line as u16;
         let col = (self.cursor_char + self.line_number_padding + 1) as u16;
-        modal.forece_render_if_exists(row, col, gs);
-    }
-
-    #[inline]
-    pub fn render_modal(self, modal: &mut EditorModal, gs: &mut GlobalState) {
-        let row = self.line as u16;
-        let col = (self.cursor_char + self.line_number_padding + 1) as u16;
-        modal.render_if_exist(row, col, gs);
+        Position { row, col }
     }
 
     pub fn init_multic_mod(&mut self, cursors: &[Cursor]) {
