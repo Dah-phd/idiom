@@ -104,7 +104,12 @@ impl EditorModal {
             ModalMessage::Action(action) => {
                 match action {
                     ModalAction::Rename(new_name, c) => {
-                        editor.lexer.get_rename(c, new_name, gs);
+                        if let Err(error) = editor.lexer.try_lsp_rename(c, new_name) {
+                            if !error.is_missing_capability() {
+                                gs.error(error);
+                            }
+                            todo!("loacal handle")
+                        };
                         editor.modal.inner.take();
                     }
                     ModalAction::AutoComplete(new) => editor.replace_token(new),

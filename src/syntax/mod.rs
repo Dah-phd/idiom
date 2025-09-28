@@ -18,8 +18,8 @@ pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
     as_url, char_lsp_pos, completable_dead, context_local, encode_pos_utf32, get_autocomplete_dead, info_position_dead,
-    map_lsp, remove_lsp, renames_dead, sync_changes_dead, sync_edits_dead, sync_edits_dead_rev, sync_tokens_dead,
-    tokens_dead, tokens_partial_dead,
+    map_lsp, remove_lsp, sync_changes_dead, sync_edits_dead, sync_edits_dead_rev, sync_tokens_dead, tokens_dead,
+    tokens_partial_dead,
 };
 use lsp_types::{PublishDiagnosticsParams, Range, TextDocumentContentChangeEvent, Uri};
 use std::path::{Path, PathBuf};
@@ -47,7 +47,6 @@ pub struct Lexer {
     declarations: fn(&mut Self, CursorPosition, &mut GlobalState),
     hover: fn(&mut Self, CursorPosition, &mut GlobalState),
     signatures: fn(&mut Self, CursorPosition, &mut GlobalState),
-    renames: fn(&mut Self, CursorPosition, String, &mut GlobalState),
     sync_tokens: fn(&mut Self, EditMetaData),
     sync_changes: fn(&mut Self, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
     sync: fn(&mut Self, &Action, &[EditorLine]) -> LSPResult<()>,
@@ -81,7 +80,6 @@ impl Lexer {
             declarations: info_position_dead,
             hover: info_position_dead,
             signatures: info_position_dead,
-            renames: renames_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
@@ -115,7 +113,6 @@ impl Lexer {
             declarations: info_position_dead,
             hover: info_position_dead,
             signatures: info_position_dead,
-            renames: renames_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
@@ -149,7 +146,6 @@ impl Lexer {
             declarations: info_position_dead,
             hover: info_position_dead,
             signatures: info_position_dead,
-            renames: renames_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
@@ -261,8 +257,13 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn get_rename(&mut self, c: CursorPosition, new_name: String, gs: &mut GlobalState) {
-        (self.renames)(self, c, new_name, gs);
+    pub fn try_lsp_rename(&mut self, c: CursorPosition, new_name: String) -> LSPResult<()> {
+        if self.client.capabilities.rename_provider.is_none() {
+            return Err(LSPError::missing_capability("renames"));
+        }
+        let request = self.client.request_rename(self.uri.clone(), c, new_name).map(LSPResponseType::Renames)?;
+        self.requests.push(request);
+        Ok(())
     }
 
     #[inline]

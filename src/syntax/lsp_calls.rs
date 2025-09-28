@@ -76,11 +76,6 @@ pub fn map_lsp(lexer: &mut Lexer, client: LSPClient) {
         lexer.declarations = info_position_dead;
     }
 
-    // renames
-    if client.capabilities.rename_provider.is_some() {
-        lexer.renames = renames;
-    }
-
     // hover
     if client.capabilities.hover_provider.is_some() {
         lexer.hover = hover;
@@ -137,7 +132,6 @@ pub fn remove_lsp(lexer: &mut Lexer) {
     lexer.declarations = info_position_dead;
     lexer.hover = info_position_dead;
     lexer.signatures = info_position_dead;
-    lexer.renames = renames_dead;
     lexer.sync = sync_edits_dead;
     lexer.sync_rev = sync_edits_dead_rev;
     lexer.encode_position = encode_pos_utf32;
@@ -376,15 +370,6 @@ pub fn hover(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalState) {
 
 pub fn signatures(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalState) {
     match lexer.client.request_signitures(lexer.uri.clone(), c).map(LSPResponseType::SignatureHelp) {
-        Ok(request) => lexer.requests.push(request),
-        Err(err) => gs.send_error(err, lexer.lang.file_type),
-    }
-}
-
-pub fn renames_dead(_: &mut Lexer, _: CursorPosition, _: String, _: &mut GlobalState) {}
-
-pub fn renames(lexer: &mut Lexer, c: CursorPosition, new_name: String, gs: &mut GlobalState) {
-    match lexer.client.request_rename(lexer.uri.clone(), c, new_name).map(LSPResponseType::Renames) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }

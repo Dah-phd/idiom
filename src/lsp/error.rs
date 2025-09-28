@@ -27,6 +27,10 @@ impl LSPError {
     pub fn missing_capability(message: impl Into<String>) -> Self {
         Self::ServerCapability(message.into())
     }
+
+    pub fn is_missing_capability(&self) -> bool {
+        matches!(self, Self::ServerCapability(..))
+    }
 }
 
 impl Display for LSPError {
