@@ -1,11 +1,11 @@
-use crate::global_state::IdiomEvent;
+use super::super::ModalAction;
 use lsp_types::{CompletionItem, CompletionTextEdit, InsertTextFormat};
 use std::str::Chars;
 
-pub fn parse_completion_item(item: CompletionItem) -> IdiomEvent {
+pub fn parse_completion_item(item: CompletionItem) -> ModalAction {
     let parser = match item.insert_text_format {
         Some(InsertTextFormat::SNIPPET) => parse_snippet,
-        _ => IdiomEvent::AutoComplete,
+        _ => ModalAction::AutoComplete,
     };
     if let Some(text) = item.insert_text {
         return (parser)(text);
@@ -20,7 +20,7 @@ pub fn parse_completion_item(item: CompletionItem) -> IdiomEvent {
             }
         };
     }
-    IdiomEvent::AutoComplete(item.label)
+    ModalAction::AutoComplete(item.label)
 }
 
 #[derive(Default)]
@@ -59,7 +59,7 @@ impl WrappedBuffer {
 /// Example:
 /// "push(${1:value})$0"
 /// TODO refactor
-fn parse_snippet(snippet: String) -> IdiomEvent {
+fn parse_snippet(snippet: String) -> ModalAction {
     let mut cursor_offset = None;
     let mut relative_select = None;
     let mut buffer = WrappedBuffer::default();
@@ -76,7 +76,7 @@ fn parse_snippet(snippet: String) -> IdiomEvent {
                     Some(next_ch) => next_ch,
                     None => {
                         buffer.push(ch);
-                        return IdiomEvent::Snippet { snippet: buffer.inner, cursor_offset, relative_select };
+                        return ModalAction::Snippet { snippet: buffer.inner, cursor_offset, relative_select };
                     }
                 };
 
@@ -174,7 +174,7 @@ fn parse_snippet(snippet: String) -> IdiomEvent {
         relative_select = None;
         cursor_offset.replace(pos);
     };
-    IdiomEvent::Snippet { snippet: buffer.inner, cursor_offset, relative_select }
+    ModalAction::Snippet { snippet: buffer.inner, cursor_offset, relative_select }
 }
 
 fn skip_numbers(chars: &mut Chars) -> Option<char> {

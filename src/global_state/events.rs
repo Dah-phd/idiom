@@ -22,6 +22,10 @@ pub enum StartInplacePopup {
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum IdiomEvent {
+    CreateFileOrFolder { name: String, from_base: bool },
+    RenamedFile { from_path: PathBuf, to_path: PathBuf },
+    GoToSelect { from: CursorPosition, to: CursorPosition },
+    GoToLine(usize),
     TreeDiagnostics(TreeDiagnostics),
     EditorActionCall(EditorAction),
     TreeActionCall(TreeAction),
@@ -31,20 +35,14 @@ pub enum IdiomEvent {
     OpenAtSelect(PathBuf, (CursorPosition, CursorPosition)),
     OpenLSPErrors,
     SelectPath(PathBuf),
-    CreateFileOrFolder { name: String, from_base: bool },
     RenameFile(String),
-    RenamedFile { from_path: PathBuf, to_path: PathBuf },
     SearchFiles(String),
     FileUpdated(PathBuf),
     CheckLSP(FileType),
     SetLSP(FileType),
-    AutoComplete(String),
-    Snippet { snippet: String, cursor_offset: Option<(usize, usize)>, relative_select: Option<((usize, usize), usize)> },
     InsertText(String),
     WorkspaceEdit(WorkspaceEdit),
     ActivateEditor(usize),
-    GoToLine(usize),
-    GoToSelect { from: CursorPosition, to: CursorPosition },
     SetMode(Mode),
     Save,
     Rebase,
@@ -187,21 +185,6 @@ impl IdiomEvent {
             }
             IdiomEvent::RenamedFile { from_path, to_path } => {
                 ws.rename_editors(from_path, to_path, gs);
-            }
-            IdiomEvent::AutoComplete(completion) => {
-                if let Some(editor) = ws.get_active() {
-                    editor.replace_token(completion);
-                }
-            }
-            IdiomEvent::Snippet { snippet, cursor_offset, relative_select } => {
-                if let Some(editor) = ws.get_active() {
-                    match relative_select {
-                        Some((cursor_offset, len)) => {
-                            editor.insert_snippet_with_select(snippet, cursor_offset, len);
-                        }
-                        None => editor.insert_snippet(snippet, cursor_offset),
-                    }
-                };
             }
             IdiomEvent::WorkspaceEdit(edits) => ws.apply_edits(edits, gs),
             IdiomEvent::SetMode(mode) => match mode {

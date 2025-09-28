@@ -2,11 +2,9 @@ pub mod diagnostics;
 pub mod langs;
 pub mod legend;
 mod lsp_calls;
-pub mod modal;
-// pub mod theme;
 pub mod tokens;
 use crate::{
-    configs::{EditorAction, FileType, Theme},
+    configs::{FileType, Theme},
     global_state::{GlobalState, IdiomEvent},
     lsp::{LSPClient, LSPError, LSPResponseType, LSPResult},
     workspace::{
@@ -16,16 +14,14 @@ use crate::{
     },
 };
 pub use diagnostics::{set_diganostics, DiagnosticInfo, DiagnosticLine, Fix};
-use idiom_tui::{layout::Rect, Position};
 pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
     as_url, char_lsp_pos, completable_dead, context_local, encode_pos_utf32, get_autocomplete_dead, info_position_dead,
-    map_lsp, remove_lsp, renames_dead, start_renames_dead, sync_changes_dead, sync_edits_dead, sync_edits_dead_rev,
-    sync_tokens_dead, tokens_dead, tokens_partial_dead,
+    map_lsp, remove_lsp, sync_changes_dead, sync_edits_dead, sync_edits_dead_rev, sync_tokens_dead, tokens_dead,
+    tokens_partial_dead,
 };
 use lsp_types::{PublishDiagnosticsParams, Range, TextDocumentContentChangeEvent, Uri};
-use modal::{LSPModal, ModalMessage};
 use std::path::{Path, PathBuf};
 pub use tokens::Token;
 
@@ -39,12 +35,10 @@ pub struct Lexer {
     pub path: PathBuf,
     question_lsp: bool,
     version: i32,
-    modal: Option<LSPModal>,
-    modal_rect: Option<Rect>,
     requests: Vec<LSPResponseType>,
     client: LSPClient,
     context: fn(&mut Editor, &mut GlobalState),
-    completable: fn(&Self, char_idx: usize, line: &EditorLine) -> bool,
+    completable_: fn(&Self, char_idx: usize, line: &EditorLine) -> bool,
     autocomplete: fn(&mut Self, CursorPosition, String, &mut GlobalState),
     tokens: fn(&mut Self) -> LSPResult<LSPResponseType>,
     tokens_partial: fn(&mut Self, Range, usize) -> LSPResult<LSPResponseType>,
@@ -53,8 +47,6 @@ pub struct Lexer {
     declarations: fn(&mut Self, CursorPosition, &mut GlobalState),
     hover: fn(&mut Self, CursorPosition, &mut GlobalState),
     signatures: fn(&mut Self, CursorPosition, &mut GlobalState),
-    start_renames: fn(&mut Self, CursorPosition, &str),
-    renames: fn(&mut Self, CursorPosition, String, &mut GlobalState),
     sync_tokens: fn(&mut Self, EditMetaData),
     sync_changes: fn(&mut Self, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
     sync: fn(&mut Self, &Action, &[EditorLine]) -> LSPResult<()>,
@@ -70,8 +62,6 @@ impl Lexer {
             lang: Lang::from(file_type),
             legend: Legend::default(),
             theme: gs.unwrap_or_default(Theme::new(), "theme.toml: "),
-            modal: None,
-            modal_rect: None,
             uri: as_url(path),
             path: path.into(),
             version: 0,
@@ -81,7 +71,7 @@ impl Lexer {
             lsp: false,
             client: LSPClient::placeholder(),
             context: context_local,
-            completable: completable_dead,
+            completable_: completable_dead,
             autocomplete: get_autocomplete_dead,
             tokens: tokens_dead,
             tokens_partial: tokens_partial_dead,
@@ -90,8 +80,6 @@ impl Lexer {
             declarations: info_position_dead,
             hover: info_position_dead,
             signatures: info_position_dead,
-            start_renames: start_renames_dead,
-            renames: renames_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
@@ -107,8 +95,6 @@ impl Lexer {
             lang: Lang::default(),
             legend: Legend::default(),
             theme: gs.unwrap_or_default(Theme::new(), "theme.toml: "),
-            modal: None,
-            modal_rect: None,
             uri: as_url(path),
             path: path.into(),
             version: 0,
@@ -118,7 +104,7 @@ impl Lexer {
             lsp: false,
             client: LSPClient::placeholder(),
             context: context_local,
-            completable: completable_dead,
+            completable_: completable_dead,
             autocomplete: get_autocomplete_dead,
             tokens: tokens_dead,
             tokens_partial: tokens_partial_dead,
@@ -127,8 +113,6 @@ impl Lexer {
             declarations: info_position_dead,
             hover: info_position_dead,
             signatures: info_position_dead,
-            start_renames: start_renames_dead,
-            renames: renames_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
@@ -144,8 +128,6 @@ impl Lexer {
             lang: Lang::default(),
             legend: Legend::default(),
             theme: gs.unwrap_or_default(Theme::new(), "theme.toml: "),
-            modal: None,
-            modal_rect: None,
             uri: as_url(path),
             path: path.into(),
             version: 0,
@@ -155,7 +137,7 @@ impl Lexer {
             lsp: false,
             client: LSPClient::placeholder(),
             context: context_local,
-            completable: completable_dead,
+            completable_: completable_dead,
             autocomplete: get_autocomplete_dead,
             tokens: tokens_dead,
             tokens_partial: tokens_partial_dead,
@@ -164,8 +146,6 @@ impl Lexer {
             declarations: info_position_dead,
             hover: info_position_dead,
             signatures: info_position_dead,
-            start_renames: start_renames_dead,
-            renames: renames_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
@@ -210,89 +190,6 @@ impl Lexer {
     #[inline(always)]
     pub fn sync_rev(&mut self, action: &Action, content: &mut [EditorLine]) {
         self.question_lsp = (self.sync_rev)(self, action, content).is_err();
-    }
-
-    // MODAL
-
-    #[inline]
-    pub fn modal_is_rendered(&self) -> bool {
-        self.modal_rect.is_some()
-    }
-
-    #[inline]
-    pub fn forece_modal_render_if_exists(&mut self, row: u16, col: u16, gs: &mut GlobalState) {
-        self.modal_rect = self.modal.as_mut().and_then(|modal| modal.render_at(col, row, gs));
-    }
-
-    #[inline]
-    pub fn render_modal_if_exist(&mut self, row: u16, col: u16, gs: &mut GlobalState) {
-        if self.modal_rect.is_none() {
-            self.modal_rect = self.modal.as_mut().and_then(|modal| modal.render_at(col, row, gs));
-        };
-    }
-
-    #[inline]
-    pub fn map_modal_if_exists(&mut self, action: EditorAction, gs: &mut GlobalState) -> (bool, Option<Rect>) {
-        let Some(modal) = &mut self.modal else {
-            return (false, None);
-        };
-        match modal.map_and_finish(action, &self.lang, gs) {
-            ModalMessage::Taken => (true, self.modal_rect.take()),
-            ModalMessage::TakenDone => {
-                self.modal.take();
-                (true, self.modal_rect.take())
-            }
-            ModalMessage::Done => {
-                self.modal.take();
-                (false, self.modal_rect.take())
-            }
-            ModalMessage::RenameVar(new_name, c) => {
-                self.get_rename(c, new_name, gs);
-                self.modal.take();
-                (true, self.modal_rect.take())
-            }
-            ModalMessage::None => (false, self.modal_rect.take()),
-        }
-    }
-
-    #[inline]
-    pub fn clear_modal(&mut self) -> Option<Rect> {
-        _ = self.modal.take();
-        self.modal_rect.take()
-    }
-
-    pub fn mouse_click_modal_if_exists(
-        &mut self,
-        relative_editor_position: Position,
-        gs: &mut GlobalState,
-    ) -> Option<Rect> {
-        let modal = self.modal.as_mut()?;
-        let found_positon = self.modal_rect.and_then(|rect| {
-            let row = gs.editor_area().row + relative_editor_position.row;
-            let column = gs.editor_area().col + relative_editor_position.col;
-            rect.relative_position(row, column)
-        });
-        match found_positon {
-            // click outside modal
-            None => {
-                self.modal.take();
-                self.modal_rect.take()
-            }
-            Some(position) => match modal.mouse_click_and_finished(position, &self.lang, gs) {
-                // modal finished
-                true => {
-                    self.modal.take();
-                    self.modal_rect.take()
-                }
-                false => self.modal_rect.take(),
-            },
-        }
-    }
-
-    pub fn mouse_moved_modal_if_exists(&mut self, row: u16, column: u16) -> Option<Rect> {
-        let modal = self.modal.as_mut()?;
-        let position = self.modal_rect.and_then(|rect| rect.relative_position(row, column))?;
-        modal.mouse_moved(position).then_some(self.modal_rect.take()?)
     }
 
     // LSP HANDLES
@@ -345,7 +242,7 @@ impl Lexer {
 
     #[inline]
     pub fn should_autocomplete(&self, char_idx: usize, line: &EditorLine) -> bool {
-        (self.completable)(self, char_idx, line)
+        (self.completable_)(self, char_idx, line)
     }
 
     #[inline]
@@ -354,22 +251,19 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn help(&mut self, c: CursorPosition, content: &[EditorLine], gs: &mut GlobalState) {
-        if let Some(actions) = content[c.line].diagnostic_info(&self.lang) {
-            self.modal.replace(LSPModal::actions(actions));
-        }
+    pub fn help(&mut self, c: CursorPosition, gs: &mut GlobalState) {
         (self.signatures)(self, c, gs);
         (self.hover)(self, c, gs);
     }
 
     #[inline]
-    pub fn start_rename(&mut self, c: CursorPosition, title: &str) {
-        (self.start_renames)(self, c, title);
-    }
-
-    #[inline]
-    pub fn get_rename(&mut self, c: CursorPosition, new_name: String, gs: &mut GlobalState) {
-        (self.renames)(self, c, new_name, gs);
+    pub fn try_lsp_rename(&mut self, c: CursorPosition, new_name: String) -> LSPResult<()> {
+        if self.client.capabilities.rename_provider.is_none() {
+            return Err(LSPError::missing_capability("renames"));
+        }
+        let request = self.client.request_rename(self.uri.clone(), c, new_name).map(LSPResponseType::Renames)?;
+        self.requests.push(request);
+        Ok(())
     }
 
     #[inline]

@@ -9,7 +9,7 @@ use crate::{
     ext_tui::CrossTerm,
     global_state::GlobalState,
     syntax::Lexer,
-    workspace::{actions::Actions, line::EditorLine, renderer::Renderer},
+    workspace::{actions::Actions, editor::EditorModal, line::EditorLine, renderer::Renderer},
 };
 use idiom_tui::{layout::Rect, Backend};
 use std::path::PathBuf;
@@ -27,7 +27,7 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
         path,
         update_status: FileUpdate::None,
         cursor: Cursor::default(),
-        // multi_positions: vec![],
+        modal: EditorModal::default(),
         actions: Actions::default(),
         controls: controls::ControlMap::default(),
         content,

@@ -17,7 +17,6 @@ use lsp_types::{
 use std::path::Path;
 
 use super::{
-    modal::LSPModal,
     set_diganostics,
     tokens::{set_tokens, set_tokens_partial},
 };
@@ -31,7 +30,7 @@ pub fn map_lsp(lexer: &mut Lexer, client: LSPClient) {
 
     if let Some(provider) = client.capabilities.completion_provider.as_ref() {
         lexer.autocomplete = get_autocomplete;
-        lexer.completable = completable;
+        lexer.completable_ = completable;
         if let Some(chars) = provider.trigger_characters.as_ref() {
             if !chars.is_empty() {
                 lexer.lang.compl_trigger_chars.clear();
@@ -75,14 +74,6 @@ pub fn map_lsp(lexer: &mut Lexer, client: LSPClient) {
         lexer.declarations = declarations;
     } else {
         lexer.declarations = info_position_dead;
-    }
-
-    // renames
-    if client.capabilities.rename_provider.is_some() {
-        lexer.start_renames = start_renames;
-        lexer.renames = renames;
-    } else {
-        lexer.start_renames = start_renames_dead;
     }
 
     // hover
@@ -132,7 +123,7 @@ pub fn remove_lsp(lexer: &mut Lexer) {
     lexer.lsp = false;
     lexer.client = LSPClient::placeholder();
     lexer.context = context_local;
-    lexer.completable = completable_dead;
+    lexer.completable_ = completable_dead;
     lexer.autocomplete = get_autocomplete_dead;
     lexer.tokens = tokens_dead;
     lexer.tokens_partial = tokens_partial_dead;
@@ -141,8 +132,6 @@ pub fn remove_lsp(lexer: &mut Lexer) {
     lexer.declarations = info_position_dead;
     lexer.hover = info_position_dead;
     lexer.signatures = info_position_dead;
-    lexer.start_renames = start_renames_dead;
-    lexer.renames = renames_dead;
     lexer.sync = sync_edits_dead;
     lexer.sync_rev = sync_edits_dead_rev;
     lexer.encode_position = encode_pos_utf32;
@@ -155,6 +144,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     let lexer = &mut editor.lexer;
     let client = &mut lexer.client;
     let content = &mut editor.content;
+    let modal = &mut editor.modal;
 
     if lexer.question_lsp && client.is_closed() {
         gs.error("LSP failure ...");
@@ -166,7 +156,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     let (editor_diagnostics, tree_diagnostics) = client.get_diagnostics(&lexer.uri);
     if let Some(diagnostics) = editor_diagnostics {
         set_diganostics(content, diagnostics);
-        lexer.modal_rect.take(); // force rebuild
+        modal.cleanr_render_cache(); // force rebuild
     }
 
     if let Some(tree_diagnostics) = tree_diagnostics {
@@ -182,24 +172,14 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
                     Some(result) => match result {
                         LSPResponse::Completion(completions, line, c) => {
                             if editor.cursor.line == c.line {
-                                lexer.modal = LSPModal::auto_complete(completions, line, c, &gs.matcher);
+                                modal.auto_complete(completions, line, c, &gs.matcher);
                             }
                         }
                         LSPResponse::Hover(hover) => {
-                            lexer.modal_rect = None;
-                            if let Some(modal) = lexer.modal.as_mut() {
-                                modal.hover_map(hover, &lexer.theme);
-                            } else {
-                                lexer.modal.replace(LSPModal::from_hover(hover, &lexer.theme));
-                            }
+                            modal.map_hover(hover, &lexer.theme);
                         }
                         LSPResponse::SignatureHelp(signature) => {
-                            lexer.modal_rect = None;
-                            if let Some(modal) = lexer.modal.as_mut() {
-                                modal.signature_map(signature, &lexer.theme);
-                            } else {
-                                lexer.modal.replace(LSPModal::from_signature(signature, &lexer.theme));
-                            }
+                            modal.map_signatures(signature, &lexer.theme);
                         }
                         LSPResponse::Renames(workspace_edit) => {
                             gs.event.push(workspace_edit.into());
@@ -318,8 +298,7 @@ pub fn sync_edits_dead_rev(_lexer: &mut Lexer, _action: &Action, _content: &[Edi
 }
 
 pub fn completable(lexer: &Lexer, char_idx: usize, line: &EditorLine) -> bool {
-    !matches!(lexer.modal, Some(LSPModal::AutoComplete(..)))
-        && !lexer.requests.iter().any(|req| matches!(req, LSPResponseType::Completion(..)))
+    !lexer.requests.iter().any(|req| matches!(req, LSPResponseType::Completion(..)))
         && lexer.lang.completable(line, char_idx)
 }
 
@@ -391,21 +370,6 @@ pub fn hover(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalState) {
 
 pub fn signatures(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalState) {
     match lexer.client.request_signitures(lexer.uri.clone(), c).map(LSPResponseType::SignatureHelp) {
-        Ok(request) => lexer.requests.push(request),
-        Err(err) => gs.send_error(err, lexer.lang.file_type),
-    }
-}
-
-pub fn start_renames_dead(_: &mut Lexer, _: CursorPosition, _: &str) {}
-
-pub fn start_renames(lexer: &mut Lexer, c: CursorPosition, title: &str) {
-    lexer.modal.replace(LSPModal::renames_at(c, title));
-}
-
-pub fn renames_dead(_: &mut Lexer, _: CursorPosition, _: String, _: &mut GlobalState) {}
-
-pub fn renames(lexer: &mut Lexer, c: CursorPosition, new_name: String, gs: &mut GlobalState) {
-    match lexer.client.request_rename(lexer.uri.clone(), c, new_name).map(LSPResponseType::Renames) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }

@@ -470,13 +470,6 @@ impl Actions {
         clip
     }
 
-    pub fn remove_select(&mut self, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
-        if let Some((from, to)) = cursor.select_take() {
-            cursor.set_position(from);
-            self.push_done(Edit::remove_select(from, to, content), lexer, content);
-        }
-    }
-
     pub fn undo(&mut self, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
         self.push_buffer(lexer);
         if let Some(action) = self.done.pop() {

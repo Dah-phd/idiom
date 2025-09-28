@@ -1,4 +1,4 @@
-use super::ModalMessage;
+use super::{ModalAction, ModalMessage};
 use crate::{
     configs::EditorAction, ext_tui::text_field::TextField, global_state::GlobalState, workspace::CursorPosition,
 };
@@ -33,7 +33,9 @@ impl RenameVariable {
     pub fn map(&mut self, action: EditorAction, gs: &mut GlobalState) -> ModalMessage {
         self.new_name.map_actions(action, &mut gs.clipboard);
         match action {
-            EditorAction::NewLine => ModalMessage::RenameVar(self.new_name.text.to_owned(), self.cursor),
+            EditorAction::NewLine => {
+                ModalMessage::Action(ModalAction::Rename(self.new_name.text.to_owned(), self.cursor))
+            }
             _ => ModalMessage::Taken,
         }
     }

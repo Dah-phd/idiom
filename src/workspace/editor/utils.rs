@@ -1,6 +1,6 @@
 use super::{
-    calc_wraps, controls::ControlMap, Actions, Cursor, Editor, EditorConfigs, EditorLine, FileFamily, FileType,
-    GlobalState, Lexer, Renderer,
+    calc_wraps, controls::ControlMap, Actions, Cursor, Editor, EditorConfigs, EditorLine, EditorModal, FileFamily,
+    FileType, GlobalState, Lexer, Renderer,
 };
 use crate::error::{IdiomError, IdiomResult};
 use std::{
@@ -106,6 +106,7 @@ pub fn editor_from_data(
         content,
         file_type,
         display,
+        modal: EditorModal::default(),
         path,
     };
     editor.resize(gs.editor_area().width, gs.editor_area().height as usize);

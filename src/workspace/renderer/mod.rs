@@ -69,7 +69,7 @@ fn code_render(editor: &mut Editor, gs: &mut GlobalState) {
 fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     Lexer::context(editor, gs);
 
-    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
+    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, modal, .. } = editor;
 
     code::repositioning(cursor);
     if !matches!(last_render_at_line, Some(idx) if *idx == cursor.at_line) {
@@ -100,19 +100,20 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
         }
     }
 
-    if !ctx.lexer.modal_is_rendered() {
+    if !modal.is_rendered() {
         for line in lines {
             line.render_empty(&mut gs.backend);
         }
     }
 
     gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
-    ctx.render_modal(gs);
+    let relative_pos = ctx.get_modal_relative_position();
+    modal.render_if_exist(relative_pos, gs);
 }
 
 #[inline(always)]
 fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
-    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
+    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, modal, .. } = editor;
 
     let accent_style = gs.theme.accent_fg();
 
@@ -139,7 +140,8 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
     }
 
     gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
-    ctx.forced_modal_render(gs);
+    let relative_pos = ctx.get_modal_relative_position();
+    modal.forece_render_if_exists(relative_pos, gs);
 }
 
 // CODE RENDER MULTICURSOR
@@ -153,7 +155,7 @@ fn multi_code_render(editor: &mut Editor, gs: &mut GlobalState) {
 fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     Lexer::context(editor, gs);
 
-    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, controls, .. } = editor;
+    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, controls, modal, .. } = editor;
 
     code::repositioning(cursor);
 
@@ -183,22 +185,23 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
         for line in lines {
             line.render_empty(&mut gs.backend);
         }
-        ctx.forced_modal_render(gs);
+        let relative_pos = ctx.get_modal_relative_position();
+        modal.forece_render_if_exists(relative_pos, gs);
     } else {
-        if !ctx.lexer.modal_is_rendered() {
+        if !modal.is_rendered() {
             for line in lines {
                 line.render_empty(&mut gs.backend);
             }
         }
-
-        ctx.render_modal(gs);
+        let relative_pos = ctx.get_modal_relative_position();
+        modal.render_if_exist(relative_pos, gs);
     }
     gs.render_stats(content.len(), controls.cursors.len(), cursor.into());
 }
 
 #[inline(always)]
 fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
-    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, controls, .. } = editor;
+    let Editor { modal, lexer, cursor, content, line_number_padding, last_render_at_line, controls, .. } = editor;
 
     let accent_style = gs.theme.accent_fg();
 
@@ -228,7 +231,8 @@ fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
     }
 
     gs.render_stats(content.len(), controls.cursors.len(), cursor.into());
-    ctx.forced_modal_render(gs);
+    let relative_pos = ctx.get_modal_relative_position();
+    modal.forece_render_if_exists(relative_pos, gs);
 }
 
 // TEXT
