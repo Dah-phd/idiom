@@ -1,5 +1,8 @@
-use crate::ext_tui::{CrossTerm, StyleExt};
-use crate::{configs::EditorAction, global_state::Clipboard};
+use crate::{
+    configs::EditorAction,
+    ext_tui::{CrossTerm, StyleExt},
+    global_state::Clipboard,
+};
 use core::ops::Range;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::{Color, ContentStyle};
@@ -10,7 +13,7 @@ use idiom_tui::{
 
 #[derive(Default, PartialEq, Debug, Clone)]
 pub struct TextField<T: Default + Clone> {
-    pub text: String,
+    text: String,
     char: usize,
     select: Option<(usize, usize)>,
     on_text_update: Option<T>,
@@ -19,6 +22,16 @@ pub struct TextField<T: Default + Clone> {
 impl<T: Default + Clone> TextField<T> {
     pub fn new(text: String, on_text_update: Option<T>) -> Self {
         Self { char: text.len(), text, select: None, on_text_update }
+    }
+
+    #[inline]
+    pub fn as_str(&self) -> &str {
+        self.text.as_str()
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.text.len()
     }
 
     pub fn text_set(&mut self, text: String) {
@@ -202,7 +215,7 @@ impl<T: Default + Clone> TextField<T> {
             EditorAction::Char(ch) => {
                 self.take_selected();
                 self.text.insert(self.char, ch);
-                self.char += 1;
+                self.char += ch.len_utf8();
                 Some(self.on_text_update.clone().unwrap_or_default())
             }
             EditorAction::Delete => {
@@ -424,6 +437,12 @@ pub fn arg_range_at(line: &str, idx: usize) -> Range<usize> {
         token_start..idx
     } else {
         idx..idx
+    }
+}
+
+impl<T: Clone + Default> ToString for TextField<T> {
+    fn to_string(&self) -> String {
+        self.text.to_string()
     }
 }
 

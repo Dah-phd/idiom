@@ -97,7 +97,7 @@ impl Popup for ReplacePopup {
                 }
                 let (from, to) = self.drain_next();
                 gs.backend.freeze();
-                editor.replace_select(from, to, &self.new_text.text);
+                editor.replace_select(from, to, self.new_text.as_str());
                 if let Some((from, to)) = self.get_state() {
                     editor.go_to_select(from, to);
                     editor.render(gs);
@@ -109,7 +109,7 @@ impl Popup for ReplacePopup {
             }
             KeyCode::Char('a' | 'A') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 if !self.options.is_empty() {
-                    let clip = std::mem::take(&mut self.new_text.text);
+                    let clip = self.new_text.text_take();
                     let ranges = std::mem::take(&mut self.options.clone());
                     editor.mass_replace(ranges, clip);
                 }
@@ -141,7 +141,7 @@ impl Popup for ReplacePopup {
                     }
                 {
                     self.options.clear();
-                    editor.find(&self.pattern.text, &mut self.options);
+                    editor.find(self.pattern.as_str(), &mut self.options);
                     self.state = self.options.len().saturating_sub(1);
                 }
                 self.force_render(gs);
@@ -166,7 +166,7 @@ impl Popup for ReplacePopup {
             match self.on_text {
                 false => self.pattern.insert_formatted_text(find_builder),
                 true => {
-                    find_builder.push(&self.pattern.text);
+                    find_builder.push(self.pattern.as_str());
                 }
             }
         };
@@ -175,7 +175,7 @@ impl Popup for ReplacePopup {
             repl_builder.push("Rep > ");
             match self.on_text {
                 false => {
-                    repl_builder.push(&self.new_text.text);
+                    repl_builder.push(self.new_text.as_str());
                 }
                 true => self.new_text.insert_formatted_text(repl_builder),
             }

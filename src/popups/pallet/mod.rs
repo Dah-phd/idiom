@@ -37,7 +37,7 @@ impl Popup for Pallet {
         if let Some(updated) = self.pattern.map(&key, &mut gs.clipboard) {
             if updated {
                 for (score, cmd) in self.commands.iter_mut() {
-                    *score = match gs.matcher.fuzzy_match(cmd.label, &self.pattern.text) {
+                    *score = match gs.matcher.fuzzy_match(cmd.label, self.pattern.as_str()) {
                         Some(new_score) => new_score,
                         None => i64::MAX,
                     };
@@ -104,7 +104,7 @@ impl Popup for Pallet {
             return false;
         }
         for (score, cmd) in self.commands.iter_mut() {
-            *score = match components.gs.matcher.fuzzy_match(cmd.label, &self.pattern.text) {
+            *score = match components.gs.matcher.fuzzy_match(cmd.label, self.pattern.as_str()) {
                 Some(new_score) => new_score,
                 None => i64::MAX,
             };
@@ -174,7 +174,7 @@ impl Pallet {
     }
 
     fn is_in_cmd_mode(&self) -> bool {
-        self.pattern.text.starts_with(':')
+        self.pattern.as_str().starts_with(':')
     }
 
     fn force_render_as_pallet(&mut self, gs: &mut GlobalState) {

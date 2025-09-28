@@ -33,9 +33,7 @@ impl RenameVariable {
     pub fn map(&mut self, action: EditorAction, gs: &mut GlobalState) -> ModalMessage {
         self.new_name.map_actions(action, &mut gs.clipboard);
         match action {
-            EditorAction::NewLine => {
-                ModalMessage::Action(ModalAction::Rename(self.new_name.text.to_owned(), self.cursor))
-            }
+            EditorAction::NewLine => ModalMessage::Action(ModalAction::Rename(self.new_name.to_string(), self.cursor)),
             _ => ModalMessage::Taken,
         }
     }

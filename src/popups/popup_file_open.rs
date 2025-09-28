@@ -37,7 +37,7 @@ impl OpenFileSelector {
     fn solve_comletions(&mut self) {
         self.paths.clear();
         self.state.reset();
-        let path = PathBuf::from(&self.pattern.text);
+        let path = PathBuf::from(self.pattern.as_str());
         match path.is_dir() {
             true => {
                 if let Ok(entries) = path.read_dir() {
@@ -46,14 +46,14 @@ impl OpenFileSelector {
             }
             false => {
                 if let Some(entries) = path.parent().and_then(|parent| parent.read_dir().ok()) {
-                    self.paths.extend(entries.flatten().filter_map(|de| checked_string(de, &self.pattern.text)));
+                    self.paths.extend(entries.flatten().filter_map(|de| checked_string(de, self.pattern.as_str())));
                 }
             }
         }
     }
 
     fn resolve_completion(&mut self) {
-        let match_idx = self.paths.iter().position(|txt| txt.starts_with(&self.pattern.text));
+        let match_idx = self.paths.iter().position(|txt| txt.starts_with(self.pattern.as_str()));
         if let Some(idx) = match_idx {
             let mut text = self.paths.remove(idx);
             if PathBuf::from(&text).is_dir() {
@@ -129,9 +129,9 @@ impl Popup for OpenFileSelector {
                 self.resolve_completion();
             }
             KeyEvent { code: KeyCode::Enter, .. } => {
-                let path = PathBuf::from(&self.pattern.text);
+                let path = PathBuf::from(self.pattern.as_str());
                 if path.is_file() {
-                    gs.event.push(IdiomEvent::OpenAtLine(PathBuf::from(self.pattern.text.as_str()), 0));
+                    gs.event.push(IdiomEvent::OpenAtLine(PathBuf::from(self.pattern.as_str()), 0));
                     return Status::Finished;
                 }
                 self.resolve_completion();

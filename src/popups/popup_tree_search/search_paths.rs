@@ -50,7 +50,7 @@ impl ActivePathSearch {
         self.options.clear();
         self.state.reset();
 
-        if self.pattern.text.len() < 2 {
+        if self.pattern.len() < 2 {
             self.clock = None;
         } else {
             self.clock = Some(Instant::now());
@@ -119,7 +119,7 @@ impl Popup for ActivePathSearch {
             KeyCode::Up => self.state.prev(self.options.len()),
             KeyCode::Down => self.state.next(self.options.len()),
             KeyCode::Tab => {
-                gs.event.push(IdiomEvent::SearchFiles(self.pattern.text.to_owned()));
+                gs.event.push(IdiomEvent::SearchFiles(self.pattern.to_string()));
                 return Status::Finished;
             }
             KeyCode::Enter => {
@@ -158,9 +158,9 @@ impl Popup for ActivePathSearch {
     fn render(&mut self, gs: &mut GlobalState) {
         if matches!(self.clock, Some(inst) if inst.elapsed() >= WAIT_ON_UPDATE) {
             self.clock = None;
-            if !self.pattern.text.is_empty() {
+            if !self.pattern.as_str().is_empty() {
                 let root_tree = self.tree.clone();
-                let pattern = self.pattern.text.to_owned();
+                let pattern = self.pattern.to_string();
                 let buffer = Arc::clone(&self.options_buffer);
                 self.join_handle.replace(tokio::task::spawn(async move {
                     if let Ok(options) = root_tree.search_tree_paths(&pattern) {

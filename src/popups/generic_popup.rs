@@ -51,7 +51,7 @@ impl PopupChoice {
     }
 
     pub fn get_message(&self) -> &str {
-        &self.message.text
+        &self.message.as_str()
     }
 }
 

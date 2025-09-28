@@ -142,7 +142,7 @@ impl Popup for FindPopup {
 
         if matches!(key.code, KeyCode::Char('h' | 'H') if key.modifiers.contains(KeyModifiers::CONTROL)) {
             if let Some(mut popup) = ReplacePopup::from_search(
-                std::mem::take(&mut self.pattern.text),
+                self.pattern.text_take(),
                 std::mem::take(&mut self.options),
                 *gs.editor_area(),
                 self.accent,
@@ -156,7 +156,7 @@ impl Popup for FindPopup {
         if Some(true) == self.pattern.map(&key, &mut gs.clipboard) {
             if let Some(editor) = ws.get_active() {
                 self.options.clear();
-                editor.find(self.pattern.text.as_str(), &mut self.options);
+                editor.find(self.pattern.as_str(), &mut self.options);
             }
             self.state = self.options.len().saturating_sub(1);
             self.force_render(gs);
@@ -169,7 +169,7 @@ impl Popup for FindPopup {
             KeyCode::Tab => {
                 if let Some(editor) = ws.get_active() {
                     gs.insert_mode();
-                    let options = editor.find_with_text(&self.pattern.text);
+                    let options = editor.find_with_text(self.pattern.as_str());
                     let mut popup = PopupSelector::new(
                         options,
                         |((from, _), text), line, backend| line.render(&format!("({}) {text}", from.line + 1), backend),
@@ -227,7 +227,7 @@ impl Popup for FindPopup {
         self.pattern.paste_passthrough(clip);
         if let Some(editor) = components.ws.get_active() {
             self.options.clear();
-            editor.find(self.pattern.text.as_str(), &mut self.options);
+            editor.find(self.pattern.as_str(), &mut self.options);
         }
         self.state = self.options.len().saturating_sub(1);
         true

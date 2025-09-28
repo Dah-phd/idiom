@@ -43,7 +43,7 @@ impl SelectorLSP {
     fn filter(&mut self, matcher: &SkimMatcherV2) {
         self.state.select(0, self.file_types.len());
         for (score, label, ..) in self.file_types.iter_mut() {
-            *score = matcher.fuzzy_match(label, &self.pattern.text).unwrap_or_default();
+            *score = matcher.fuzzy_match(label, self.pattern.as_str()).unwrap_or_default();
         }
         self.file_types.sort_by(|(idx, ..), (rhidx, ..)| rhidx.cmp(idx));
     }
