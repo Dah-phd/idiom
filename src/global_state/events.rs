@@ -4,6 +4,7 @@ use crate::embeded_term::EditorTerminal;
 use crate::embeded_tui::run_embeded_tui;
 use crate::lsp::TreeDiagnostics;
 use crate::popups::generic_selector::PopupSelector;
+use crate::popups::pallet::Pallet;
 use crate::popups::PopupChoice;
 use crate::popups::{popup_tree_search::ActiveFileSearch, Popup};
 use crate::tree::Tree;
@@ -44,6 +45,7 @@ pub enum IdiomEvent {
     WorkspaceEdit(WorkspaceEdit),
     ActivateEditor(usize),
     SetMode(Mode),
+    IdiomCommand,
     Save,
     Rebase,
 }
@@ -191,16 +193,6 @@ impl IdiomEvent {
                 Mode::Select => gs.select_mode(),
                 Mode::Insert => gs.insert_mode(),
             },
-            IdiomEvent::Rebase => {
-                if let Some(editor) = ws.get_active() {
-                    editor.rebase(gs);
-                }
-            }
-            IdiomEvent::Save => {
-                if let Some(editor) = ws.get_active() {
-                    editor.save(gs);
-                }
-            }
             IdiomEvent::CheckLSP(file_type) => {
                 ws.check_lsp(file_type, gs).await;
             }
@@ -222,6 +214,22 @@ impl IdiomEvent {
             IdiomEvent::ActivateEditor(idx) => {
                 ws.activate_editor(idx, gs);
                 gs.insert_mode();
+            }
+            IdiomEvent::IdiomCommand => {
+                if ws.is_empty() && matches!(gs.mode, Mode::Insert) {
+                    return;
+                }
+                Pallet::run_as_command(gs, ws, tree, term);
+            }
+            IdiomEvent::Rebase => {
+                if let Some(editor) = ws.get_active() {
+                    editor.rebase(gs);
+                }
+            }
+            IdiomEvent::Save => {
+                if let Some(editor) = ws.get_active() {
+                    editor.save(gs);
+                }
             }
         }
     }

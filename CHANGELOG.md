@@ -1,6 +1,6 @@
 ## Includes only major changes (manual updates)
 # Version 0.7.0
-- idiom_command
+- idiom_command added
 
 # Version 0.6.2
 - fixed todo left in last release

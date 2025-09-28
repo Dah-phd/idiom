@@ -21,15 +21,10 @@ pub struct Pallet {
 
 impl Popup for Pallet {
     fn force_render(&mut self, gs: &mut GlobalState) {
-        let mut rect = Self::get_rect(gs);
-        let backend = gs.backend();
-        rect.draw_borders(None, None, backend);
-        match rect.next_line() {
-            Some(line) => self.pattern.widget(line, backend),
-            None => return,
+        match self.is_in_cmd_mode() {
+            true => self.force_render_as_cmd(gs),
+            false => self.force_render_as_pallet(gs),
         }
-        let options = self.commands.iter().map(|cmd| cmd.1.label);
-        self.state.render_list(options, rect, backend);
     }
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut super::Components) -> Status {
@@ -149,17 +144,27 @@ impl Pallet {
         Pallet { commands, pattern: TextField::new(String::new(), Some(true)), state: State::new() }
     }
 
-    #[inline]
     pub fn run(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         let git_tui = gs.git_tui.to_owned();
         if let Err(error) = Pallet::new(git_tui).run(gs, ws, tree, term) {
             gs.error(error);
-        };
+        }
     }
 
-    #[inline]
+    pub fn run_as_command(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
+        let git_tui = gs.git_tui.to_owned();
+        let mut pallet = Pallet::new(git_tui);
+        pallet.pattern.text_set(":".to_owned());
+        if let Err(error) = pallet.run(gs, ws, tree, term) {
+            gs.error(error);
+        }
+    }
+
     fn get_command_idx(&self, row: u16, column: u16, gs: &GlobalState) -> Option<usize> {
-        let Position { row, .. } = Self::get_rect(gs).relative_position(row, column)?;
+        if self.is_in_cmd_mode() {
+            return None;
+        }
+        let Position { row, .. } = Self::get_pallet_rect(gs).relative_position(row, column)?;
         let line = row as usize;
         let command_idx = self.state.at_line + line.checked_sub(1)?;
         if self.commands.len() <= command_idx {
@@ -168,8 +173,41 @@ impl Pallet {
         Some(command_idx)
     }
 
-    pub fn get_rect(gs: &GlobalState) -> Rect {
+    fn is_in_cmd_mode(&self) -> bool {
+        self.pattern.text.starts_with(':')
+    }
+
+    fn force_render_as_pallet(&mut self, gs: &mut GlobalState) {
+        let mut rect = Self::get_pallet_rect(gs);
+        let backend = gs.backend();
+        rect.draw_borders(None, None, backend);
+
+        let Some(line) = rect.next_line() else { return };
+        self.pattern.widget(line, backend);
+
+        let options = self.commands.iter().map(|cmd| cmd.1.label);
+        self.state.render_list(options, rect, backend);
+    }
+
+    fn force_render_as_cmd(&mut self, gs: &mut GlobalState) {
+        let rect = Self::get_cmd_rect(gs);
+        let backend = gs.backend();
+        rect.draw_borders(None, None, backend);
+        let mut lines = rect.into_iter();
+
+        let Some(line) = lines.next() else { return };
+        self.pattern.widget(line, backend);
+
+        let Some(line) = lines.next() else { return };
+        line.render("resolution", backend);
+    }
+
+    pub fn get_pallet_rect(gs: &GlobalState) -> Rect {
         gs.screen().top(15).vcenter(100).with_borders()
+    }
+
+    pub fn get_cmd_rect(gs: &GlobalState) -> Rect {
+        gs.screen().top(4).vcenter(100).with_borders()
     }
 }
 
