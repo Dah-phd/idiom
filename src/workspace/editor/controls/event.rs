@@ -146,7 +146,7 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::EndOfFile => editor.cursor.end_of_file(&editor.content),
         EditorAction::StartOfLine => editor.cursor.start_of_line(&editor.content),
         EditorAction::StartOfFile => editor.cursor.start_of_file(),
-        EditorAction::IdiomCommand => todo!(),
+        EditorAction::IdiomCommand => return false,
         EditorAction::FindReferences => editor.lexer.go_to_reference((&editor.cursor).into(), gs),
         EditorAction::GoToDeclaration => editor.lexer.go_to_declaration((&editor.cursor).into(), gs),
         EditorAction::Help => {
@@ -479,7 +479,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 cursor.start_of_line(&editor.content)
             }
         }
-        EditorAction::IdiomCommand => todo!(),
+        EditorAction::IdiomCommand => return false,
         EditorAction::RefreshUI => editor.lexer.refresh_lsp(gs),
         EditorAction::Save => editor.save(gs),
         EditorAction::EndOfFile

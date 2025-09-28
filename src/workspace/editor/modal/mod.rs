@@ -1,7 +1,3 @@
-use crate::workspace::{
-    cursor::{PositionedWord, WordRange},
-    Editor, EditorLine,
-};
 mod completion;
 mod info;
 mod rename;
@@ -10,7 +6,10 @@ use crate::{
     configs::{EditorAction, Theme},
     global_state::GlobalState,
     syntax::DiagnosticInfo,
-    workspace::CursorPosition,
+    workspace::{
+        cursor::{CursorPosition, PositionedWord, WordRange},
+        Editor, EditorLine,
+    },
 };
 use completion::AutoComplete;
 use fuzzy_matcher::skim::SkimMatcherV2;

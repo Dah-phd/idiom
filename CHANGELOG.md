@@ -1,5 +1,9 @@
 ## Includes only major changes (manual updates)
 # Version 0.7.0
+- idiom_command
+
+# Version 0.6.2
+- fixed todo left in last release
 
 # Version 0.6.1
 - moved modals from syntax to editor > direct calls instead events
