@@ -85,30 +85,44 @@ impl<T: Default + Clone> TextField<T> {
     }
 
     fn text_cursor(&self, mut builder: LineBuilder<CrossTerm>) {
-        if self.char == self.text.len() {
-            builder.push(&self.text);
-            builder.push_styled(" ", ContentStyle::reversed());
-        } else {
-            builder.push(self.text[..self.char].as_ref());
-            builder.push_styled(self.text[self.char..=self.char].as_ref(), ContentStyle::reversed());
-            builder.push(self.text[self.char + 1..].as_ref());
+        match self.get_cursor_range() {
+            Some(cursor) => {
+                builder.push(self.text[..cursor.start].as_ref());
+                builder.push_styled(&self.text[cursor.clone()], ContentStyle::reversed());
+                builder.push(self.text[cursor.end..].as_ref());
+            }
+            None => {
+                builder.push(&self.text);
+                builder.push_styled(" ", ContentStyle::reversed());
+            }
         };
     }
 
     fn text_cursor_select(&self, from: usize, to: usize, mut builder: LineBuilder<CrossTerm>) {
         builder.push(self.text[..from].as_ref());
-        if from == self.char {
-            builder.push_styled(self.text[self.char..=self.char].as_ref(), ContentStyle::reversed());
-            builder.push_styled(self.text[from + 1..to].as_ref(), ContentStyle::bg(Color::Rgb { r: 72, g: 72, b: 72 }));
-            builder.push(self.text[to..].as_ref());
-        } else if self.char == self.text.len() {
-            builder.push_styled(self.text[from..to].as_ref(), ContentStyle::bg(Color::Rgb { r: 72, g: 72, b: 72 }));
-            builder.push(self.text[to..].as_ref());
-            builder.push_styled(" ", ContentStyle::reversed());
-        } else {
-            builder.push_styled(self.text[from..to].as_ref(), ContentStyle::bg(Color::Rgb { r: 72, g: 72, b: 72 }));
-            builder.push_styled(self.text[to..=to].as_ref(), ContentStyle::reversed());
-            builder.push(self.text[to + 1..].as_ref());
+        match self.get_cursor_range() {
+            Some(cursor) => {
+                if from == cursor.start {
+                    builder.push_styled(self.text[cursor.clone()].as_ref(), ContentStyle::reversed());
+                    builder.push_styled(
+                        self.text[cursor.end..to].as_ref(),
+                        ContentStyle::bg(Color::Rgb { r: 72, g: 72, b: 72 }),
+                    );
+                    builder.push(self.text[to..].as_ref());
+                } else {
+                    builder.push_styled(
+                        self.text[from..cursor.start].as_ref(),
+                        ContentStyle::bg(Color::Rgb { r: 72, g: 72, b: 72 }),
+                    );
+                    builder.push_styled(self.text[cursor.clone()].as_ref(), ContentStyle::reversed());
+                    builder.push(self.text[cursor.end..].as_ref());
+                }
+            }
+            None => {
+                builder.push_styled(self.text[from..to].as_ref(), ContentStyle::bg(Color::Rgb { r: 72, g: 72, b: 72 }));
+                builder.push(self.text[to..].as_ref());
+                builder.push_styled(" ", ContentStyle::reversed());
+            }
         }
     }
 
@@ -158,7 +172,7 @@ impl<T: Default + Clone> TextField<T> {
             KeyCode::Char(ch) => {
                 self.take_selected();
                 self.text.insert(self.char, ch);
-                self.char += 1;
+                self.char += ch.len_utf8();
                 Some(self.on_text_update.clone().unwrap_or_default())
             }
             KeyCode::Delete => {
@@ -171,7 +185,7 @@ impl<T: Default + Clone> TextField<T> {
             KeyCode::Backspace => {
                 if self.take_selected().is_some() {
                 } else if self.char > 0 && !self.text.is_empty() {
-                    self.char -= 1;
+                    self.prev_char();
                     self.text.remove(self.char);
                 };
                 Some(self.on_text_update.clone().unwrap_or_default())
@@ -228,7 +242,7 @@ impl<T: Default + Clone> TextField<T> {
             EditorAction::Backspace => {
                 if self.take_selected().is_some() {
                 } else if self.char > 0 && !self.text.is_empty() {
-                    self.char -= 1;
+                    self.prev_char();
                     self.text.remove(self.char);
                 };
                 Some(self.on_text_update.clone().unwrap_or_default())
@@ -238,13 +252,13 @@ impl<T: Default + Clone> TextField<T> {
                 Some(T::default())
             }
             EditorAction::Left => {
-                self.char = self.char.saturating_sub(1);
+                self.prev_char();
                 self.select = None;
                 Some(T::default())
             }
             EditorAction::SelectLeft => {
                 self.init_select();
-                self.char = self.char.saturating_sub(1);
+                self.prev_char();
                 self.push_select();
                 Some(T::default())
             }
@@ -260,13 +274,13 @@ impl<T: Default + Clone> TextField<T> {
                 Some(T::default())
             }
             EditorAction::Right => {
-                self.char = std::cmp::min(self.text.len(), self.char + 1);
+                self.next_char();
                 self.select = None;
                 Some(T::default())
             }
             EditorAction::SelectRight => {
                 self.init_select();
-                self.char = std::cmp::min(self.text.len(), self.char + 1);
+                self.next_char();
                 self.push_select();
                 Some(T::default())
             }
@@ -314,6 +328,19 @@ impl<T: Default + Clone> TextField<T> {
         self.char = std::cmp::min(rel_char, self.text.len());
     }
 
+    fn get_cursor_range(&self) -> Option<Range<usize>> {
+        let cursor_char = self.text[self.char..].chars().next()?;
+        Some(self.char..self.char + cursor_char.len_utf8())
+    }
+
+    fn next_char(&mut self) {
+        self.char += self.text[self.char..].chars().next().map(|ch| ch.len_utf8()).unwrap_or_default();
+    }
+
+    fn prev_char(&mut self) {
+        self.char -= self.text[..self.char].chars().rev().next().map(|ch| ch.len_utf8()).unwrap_or_default();
+    }
+
     fn init_select(&mut self) {
         if self.select.is_none() {
             self.select = Some((self.char, self.char))
@@ -352,16 +379,9 @@ impl<T: Default + Clone> TextField<T> {
         } else {
             self.select = None;
         };
-        self.char = self.char.saturating_sub(1);
+        self.prev_char();
         if mods.contains(KeyModifiers::CONTROL) {
-            // jump
-            while self.char > 0 {
-                let next_idx = self.char - 1;
-                if matches!(self.text.chars().nth(next_idx), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
-                    break;
-                };
-                self.char = next_idx;
-            }
+            self.jump_left();
         };
         if should_select {
             self.push_select();
@@ -376,15 +396,9 @@ impl<T: Default + Clone> TextField<T> {
         } else {
             self.select = None;
         };
-        self.char = std::cmp::min(self.text.len(), self.char + 1);
+        self.next_char();
         if mods.contains(KeyModifiers::CONTROL) {
-            // jump
-            while self.text.len() > self.char {
-                self.char += 1;
-                if matches!(self.text.chars().nth(self.char), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
-                    break;
-                }
-            }
+            self.jump_right();
         };
         if should_select {
             self.push_select();
@@ -393,23 +407,23 @@ impl<T: Default + Clone> TextField<T> {
     }
 
     fn jump_left(&mut self) {
-        while self.char > 0 {
-            let next_idx = self.char - 1;
-            if matches!(self.text.chars().nth(next_idx), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
-                break;
-            };
-            self.char = next_idx;
+        for (idx, ch) in self.text[..self.char].char_indices().rev() {
+            if !ch.is_alphabetic() && !ch.is_numeric() {
+                return;
+            }
+            self.char = idx;
         }
     }
 
     fn jump_right(&mut self) {
         // jump
-        while self.text.len() > self.char {
-            self.char += 1;
-            if matches!(self.text.chars().nth(self.char), Some(ch) if !ch.is_alphabetic() && !ch.is_numeric()) {
-                break;
+        for (idx, ch) in self.text[self.char..].char_indices() {
+            if !ch.is_alphabetic() && !ch.is_numeric() {
+                self.char += idx;
+                return;
             }
         }
+        self.char = self.text.len();
     }
 }
 
