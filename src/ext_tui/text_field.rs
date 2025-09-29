@@ -94,9 +94,10 @@ impl<T: Default + Clone> TextField<T> {
     fn text_cursor(&self, mut builder: LineBuilder<CrossTerm>) {
         match self.get_cursor_range() {
             Some(cursor) => {
-                builder.push(self.text[..cursor.start].as_ref());
-                builder.push_styled(&self.text[cursor.clone()], ContentStyle::reversed());
-                builder.push(self.text[cursor.end..].as_ref());
+                let Range { start, end } = cursor;
+                builder.push(&self.text[..start]);
+                builder.push_styled(&self.text[cursor], ContentStyle::reversed());
+                builder.push(&self.text[end..]);
             }
             None => {
                 builder.push(&self.text);
@@ -109,14 +110,15 @@ impl<T: Default + Clone> TextField<T> {
         builder.push(self.text[..from].as_ref());
         match self.get_cursor_range() {
             Some(cursor) => {
+                let Range { start, end } = cursor;
                 if from == cursor.start {
-                    builder.push_styled(self.text[cursor.clone()].as_ref(), ContentStyle::reversed());
-                    builder.push_styled(self.text[cursor.end..to].as_ref(), self.select_style);
-                    builder.push(self.text[to..].as_ref());
+                    builder.push_styled(&self.text[cursor], ContentStyle::reversed());
+                    builder.push_styled(&self.text[end..to], self.select_style);
+                    builder.push(&self.text[to..]);
                 } else {
-                    builder.push_styled(self.text[from..cursor.start].as_ref(), self.select_style);
-                    builder.push_styled(self.text[cursor.clone()].as_ref(), ContentStyle::reversed());
-                    builder.push(self.text[cursor.end..].as_ref());
+                    builder.push_styled(&self.text[from..start], self.select_style);
+                    builder.push_styled(&self.text[cursor], ContentStyle::reversed());
+                    builder.push(&self.text[end..]);
                 }
             }
             None => {
