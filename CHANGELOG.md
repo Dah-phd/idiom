@@ -2,6 +2,9 @@
 # Version 0.7.0
 - idiom_command added
 
+# Version 0.6.3
+- added support for non ascii in text_field
+
 # Version 0.6.2
 - fixed todo left in last release
 

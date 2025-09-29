@@ -16,12 +16,19 @@ pub struct TextField<T: Default + Clone> {
     text: String,
     char: usize,
     select: Option<(usize, usize)>,
+    select_style: ContentStyle,
     on_text_update: Option<T>,
 }
 
 impl<T: Default + Clone> TextField<T> {
     pub fn new(text: String, on_text_update: Option<T>) -> Self {
-        Self { char: text.len(), text, select: None, on_text_update }
+        Self {
+            char: text.len(),
+            text,
+            select: None,
+            on_text_update,
+            select_style: ContentStyle::bg(Color::Rgb { r: 72, g: 72, b: 72 }),
+        }
     }
 
     #[inline]
@@ -79,8 +86,8 @@ impl<T: Default + Clone> TextField<T> {
 
     pub fn insert_formatted_text(&self, line_builder: LineBuilder<CrossTerm>) {
         match self.select.as_ref().map(|(f, t)| if f > t { (*t, *f) } else { (*f, *t) }) {
-            Some((from, to)) => self.text_cursor_select(from, to, line_builder),
-            None => self.text_cursor(line_builder),
+            Some((from, to)) if from != to => self.text_cursor_select(from, to, line_builder),
+            _ => self.text_cursor(line_builder),
         };
     }
 
@@ -104,22 +111,16 @@ impl<T: Default + Clone> TextField<T> {
             Some(cursor) => {
                 if from == cursor.start {
                     builder.push_styled(self.text[cursor.clone()].as_ref(), ContentStyle::reversed());
-                    builder.push_styled(
-                        self.text[cursor.end..to].as_ref(),
-                        ContentStyle::bg(Color::Rgb { r: 72, g: 72, b: 72 }),
-                    );
+                    builder.push_styled(self.text[cursor.end..to].as_ref(), self.select_style);
                     builder.push(self.text[to..].as_ref());
                 } else {
-                    builder.push_styled(
-                        self.text[from..cursor.start].as_ref(),
-                        ContentStyle::bg(Color::Rgb { r: 72, g: 72, b: 72 }),
-                    );
+                    builder.push_styled(self.text[from..cursor.start].as_ref(), self.select_style);
                     builder.push_styled(self.text[cursor.clone()].as_ref(), ContentStyle::reversed());
                     builder.push(self.text[cursor.end..].as_ref());
                 }
             }
             None => {
-                builder.push_styled(self.text[from..to].as_ref(), ContentStyle::bg(Color::Rgb { r: 72, g: 72, b: 72 }));
+                builder.push_styled(self.text[from..to].as_ref(), self.select_style);
                 builder.push(self.text[to..].as_ref());
                 builder.push_styled(" ", ContentStyle::reversed());
             }
@@ -191,6 +192,7 @@ impl<T: Default + Clone> TextField<T> {
                 Some(self.on_text_update.clone().unwrap_or_default())
             }
             KeyCode::End => {
+                self.select = None;
                 self.char = self.text.len();
                 Some(T::default())
             }
@@ -248,6 +250,7 @@ impl<T: Default + Clone> TextField<T> {
                 Some(self.on_text_update.clone().unwrap_or_default())
             }
             EditorAction::EndOfLine | EditorAction::EndOfFile => {
+                self.select = None;
                 self.char = self.text.len();
                 Some(T::default())
             }
