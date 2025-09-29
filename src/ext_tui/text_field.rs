@@ -111,7 +111,7 @@ impl<T: Default + Clone> TextField<T> {
         match self.get_cursor_range() {
             Some(cursor) => {
                 let Range { start, end } = cursor;
-                if from == cursor.start {
+                if from == start {
                     builder.push_styled(&self.text[cursor], ContentStyle::reversed());
                     builder.push_styled(&self.text[end..to], self.select_style);
                     builder.push(&self.text[to..]);
@@ -502,6 +502,26 @@ pub mod test {
     }
 
     #[test]
+    fn setting_non_ascii() {
+        let mut field: TextField<()> = TextField::default();
+        field.text_set("12🦀45".to_owned());
+        assert_eq!(&field.text, "12🦀45");
+        assert_eq!(field.char, 8);
+        let mut clip = Clipboard::default();
+        field.map(&KeyEvent::new(KeyCode::Left, KeyModifiers::SHIFT), &mut clip);
+        assert_eq!(field.char, 7);
+        field.map(&KeyEvent::new(KeyCode::Left, KeyModifiers::SHIFT), &mut clip);
+        assert_eq!(field.char, 6);
+        field.map(&KeyEvent::new(KeyCode::Left, KeyModifiers::SHIFT), &mut clip);
+        assert!(field.select.is_some());
+        assert_eq!(field.char, 2);
+        assert_eq!(&field.text_take(), "12🦀45");
+        assert_eq!(field.char, 0);
+        assert_eq!(&field.text, "");
+        assert!(field.select.is_none());
+    }
+
+    #[test]
     fn move_presses() {
         let mut field: TextField<()> = TextField::default();
         let mut clip = Clipboard::default();
@@ -514,6 +534,25 @@ pub mod test {
         assert_eq!(field.char, 0);
         field.map(&KeyEvent::new(KeyCode::Right, KeyModifiers::empty()), &mut clip);
         assert_eq!(field.char, 1);
+        field.map(&KeyEvent::new(KeyCode::Left, KeyModifiers::empty()), &mut clip);
+        assert_eq!(field.char, 0);
+    }
+
+    #[test]
+    fn move_presses_non_ascii() {
+        let mut field: TextField<()> = TextField::default();
+        let mut clip = Clipboard::default();
+        field.map(&KeyEvent::new(KeyCode::Right, KeyModifiers::empty()), &mut clip);
+        assert!(field.char == 0);
+        field.text_set("🦀1".to_owned());
+        field.map(&KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL), &mut clip);
+        assert_eq!(field.char, 5);
+        field.map(&KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL), &mut clip);
+        assert_eq!(field.char, 4);
+        field.map(&KeyEvent::new(KeyCode::Left, KeyModifiers::empty()), &mut clip);
+        assert_eq!(field.char, 0);
+        field.map(&KeyEvent::new(KeyCode::Right, KeyModifiers::empty()), &mut clip);
+        assert_eq!(field.char, 4);
         field.map(&KeyEvent::new(KeyCode::Left, KeyModifiers::empty()), &mut clip);
         assert_eq!(field.char, 0);
     }
