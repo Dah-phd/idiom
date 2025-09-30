@@ -474,8 +474,13 @@ impl TextField<()> {
 #[cfg(test)]
 pub mod test {
     use super::TextField;
+    use crate::ext_tui::{CrossTerm, StyleExt};
     use crate::global_state::Clipboard;
-    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use crossterm::{
+        event::{KeyCode, KeyEvent, KeyModifiers},
+        style::{Color, ContentStyle},
+    };
+    use idiom_tui::{layout::Line, Backend};
 
     pub fn pull_select<T: Clone + Default>(text_field: &TextField<T>) -> Option<(usize, usize)> {
         text_field.select
@@ -483,6 +488,86 @@ pub mod test {
 
     pub fn pull_char<T: Clone + Default>(text_field: &TextField<T>) -> usize {
         text_field.char
+    }
+
+    #[test]
+    fn render_non_ascii() {
+        let mut field = TextField::new("a a🦀🦀ssd asd 🦀s".to_owned(), Some(true));
+        let mut backend = CrossTerm::init();
+        let line = Line { row: 0, col: 1, width: 50 };
+        field.widget(line, &mut backend);
+        let mut cliptboard = Clipboard::default();
+
+        assert_eq!(
+            backend.drain(),
+            &[
+                (ContentStyle::default(), "<<go to row: 0 col: 1>>".to_owned()),
+                (ContentStyle::default(), " >> ".to_owned()),
+                (ContentStyle::default(), "a a🦀🦀ssd asd 🦀s".to_owned()),
+                (ContentStyle::reversed(), " ".to_owned()),
+                (ContentStyle::default(), "<<padding: 27>>".to_owned()),
+            ]
+        );
+
+        field.char = 0;
+        assert!(!field.map(&KeyEvent::new(KeyCode::Right, KeyModifiers::empty()), &mut cliptboard).unwrap());
+        assert!(!field.map(&KeyEvent::new(KeyCode::Right, KeyModifiers::empty()), &mut cliptboard).unwrap());
+        assert!(!field.map(&KeyEvent::new(KeyCode::Right, KeyModifiers::empty()), &mut cliptboard).unwrap());
+
+        let line = Line { row: 0, col: 1, width: 50 };
+        field.widget(line, &mut backend);
+        assert_eq!(
+            backend.drain(),
+            &[
+                (ContentStyle::default(), "<<go to row: 0 col: 1>>".to_owned()),
+                (ContentStyle::default(), " >> ".to_owned()),
+                (ContentStyle::default(), "a a".to_owned()),
+                (ContentStyle::reversed(), "🦀".to_owned()),
+                (ContentStyle::default(), "🦀ssd asd 🦀s".to_owned()),
+                (ContentStyle::default(), "<<padding: 28>>".to_owned()),
+            ]
+        );
+
+        assert!(!field.map(&KeyEvent::new(KeyCode::Right, KeyModifiers::empty()), &mut cliptboard).unwrap());
+        assert!(!field
+            .map(&KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL | KeyModifiers::SHIFT), &mut cliptboard)
+            .unwrap());
+
+        let line = Line { row: 0, col: 1, width: 50 };
+        field.widget(line, &mut backend);
+        assert_eq!(
+            backend.drain(),
+            &[
+                (ContentStyle::default(), "<<go to row: 0 col: 1>>".to_owned()),
+                (ContentStyle::default(), " >> ".to_owned()),
+                (ContentStyle::default(), "a a🦀".to_owned()),
+                (ContentStyle::bg(Color::Rgb { r: 72, g: 72, b: 72 }), "🦀ssd".to_owned()),
+                (ContentStyle::reversed(), " ".to_owned()),
+                (ContentStyle::default(), "asd 🦀s".to_owned()),
+                (ContentStyle::default(), "<<padding: 28>>".to_owned()),
+            ]
+        );
+    }
+
+    #[test]
+    fn render_with_number() {
+        let field = TextField::new("some text".to_owned(), Some(true));
+        let mut backend = CrossTerm::init();
+        let line = Line { row: 0, col: 1, width: 50 };
+
+        field.widget_with_count(line, 3, &mut backend);
+
+        assert_eq!(
+            backend.drain(),
+            &[
+                (ContentStyle::default(), "<<go to row: 0 col: 1>>".to_owned()),
+                (ContentStyle::default(), "  3".to_owned()),
+                (ContentStyle::default(), " >> ".to_owned()),
+                (ContentStyle::default(), "some text".to_owned()),
+                (ContentStyle::reversed(), " ".to_owned()),
+                (ContentStyle::default(), "<<padding: 33>>".to_owned()),
+            ]
+        );
     }
 
     #[test]
