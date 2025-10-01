@@ -162,11 +162,6 @@ impl EditorConfigs {
         .flat_map(|(ft, expected, cmd)| Some((ft, map_preload(&base_tree, expected, cmd, gs)?)))
         .collect()
     }
-
-    pub fn refresh(&mut self) -> Result<(), toml::de::Error> {
-        (*self) = Self::new()?;
-        Ok(())
-    }
 }
 
 fn map_preload(

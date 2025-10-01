@@ -76,12 +76,11 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
         return code_render_full(editor, gs);
     }
 
-    let accent_style = gs.theme.accent_fg();
+    let accent_style = gs.ui_theme.accent_fg();
 
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(lexer, cursor, *line_number_padding, accent_style);
     ctx.correct_last_line_match(content, lines.len());
-    let backend = &mut gs.backend;
 
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         let line = match lines.next() {
@@ -89,11 +88,11 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
             Some(line) => line,
         };
         if ctx.has_cursor(line_idx) {
-            code::cursor_fast(text, &mut ctx, line, backend);
+            code::cursor_fast(text, &mut ctx, line, gs);
         } else {
             let select = ctx.select_get(line.width);
             if text.cached.should_render_line(line.row, &select) {
-                code::inner_render(text, &mut ctx, line, select, backend);
+                code::inner_render(text, &mut ctx, line, select, gs);
             } else {
                 ctx.skip_line();
             }
@@ -115,12 +114,11 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
 fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, modal, .. } = editor;
 
-    let accent_style = gs.theme.accent_fg();
+    let accent_style = gs.ui_theme.accent_fg();
 
     last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(lexer, cursor, *line_number_padding, accent_style);
-    let backend = &mut gs.backend;
 
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         let line = match lines.next() {
@@ -128,10 +126,10 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
             Some(line) => line,
         };
         if ctx.has_cursor(line_idx) {
-            code::cursor(text, &mut ctx, line, backend);
+            code::cursor(text, &mut ctx, line, gs);
         } else {
             let select = ctx.select_get(line.width);
-            code::inner_render(text, &mut ctx, line, select, backend);
+            code::inner_render(text, &mut ctx, line, select, gs);
         }
     }
 
@@ -163,12 +161,11 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
         return multi_code_render_full(editor, gs);
     }
 
-    let accent_style = gs.theme.accent_fg();
+    let accent_style = gs.ui_theme.accent_fg();
 
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(lexer, cursor, *line_number_padding, accent_style);
     ctx.correct_last_line_match(content, lines.len());
-    let backend = &mut gs.backend;
 
     let mut is_rendered_cursor = false;
 
@@ -178,7 +175,7 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
             None => break,
             Some(line) => line,
         };
-        is_rendered_cursor |= code::fast_render_is_cursor(text, &controls.cursors, line, line_idx, &mut ctx, backend);
+        is_rendered_cursor |= code::fast_render_is_cursor(text, &controls.cursors, line, line_idx, &mut ctx, gs);
     }
 
     if is_rendered_cursor {
@@ -203,12 +200,11 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
 fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
     let Editor { modal, lexer, cursor, content, line_number_padding, last_render_at_line, controls, .. } = editor;
 
-    let accent_style = gs.theme.accent_fg();
+    let accent_style = gs.ui_theme.accent_fg();
 
     last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(lexer, cursor, *line_number_padding, accent_style);
-    let backend = &mut gs.backend;
 
     ctx.init_multic_mod(&controls.cursors);
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
@@ -217,12 +213,12 @@ fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
             Some(line) => line,
         };
         if let Some((cursors, selects)) = ctx.multic_line_setup(&controls.cursors, line.width) {
-            code::multi_cursor(text, &mut ctx, line, backend, cursors, selects);
+            code::multi_cursor(text, &mut ctx, line, gs, cursors, selects);
         } else if ctx.has_cursor(line_idx) {
-            code::cursor(text, &mut ctx, line, backend);
+            code::cursor(text, &mut ctx, line, gs);
         } else {
             let select = ctx.select_get(line.width);
-            code::inner_render(text, &mut ctx, line, select, backend);
+            code::inner_render(text, &mut ctx, line, select, gs);
         }
     }
 
@@ -250,12 +246,11 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
         return text_full_render(editor, gs, skip);
     }
 
-    let accent_style = gs.theme.accent_fg();
+    let accent_style = gs.ui_theme.accent_fg();
 
     last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(lexer, cursor, *line_number_padding, accent_style);
-    let backend = &mut gs.backend;
 
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
@@ -266,13 +261,13 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
             if text.cached.should_render_cursor(lines.next_line_idx(), ctx.cursor_char(), &select)
                 || text.cached.skipped_chars() != skip
             {
-                text::cursor(text, select, skip, &mut ctx, &mut lines, backend);
+                text::cursor(text, select, skip, &mut ctx, &mut lines, gs);
             } else {
                 ctx.skip_line();
                 lines.forward(1 + text.tokens.char_len());
             }
         } else if text.cached.should_render_line(lines.next_line_idx(), &select) {
-            text::line(text, select, &mut ctx, &mut lines, backend)
+            text::line(text, select, &mut ctx, &mut lines, gs)
         } else {
             ctx.skip_line();
             lines.forward(1 + text.tokens.char_len());
@@ -290,21 +285,21 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
 fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
 
-    let accent_style = gs.theme.accent_fg();
+    let accent_style = gs.ui_theme.accent_fg();
 
     last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(lexer, cursor, *line_number_padding, accent_style);
-    let backend = &mut gs.backend;
+
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
             break;
         }
         let select = ctx.select_get_full_line(text.char_len());
         if ctx.has_cursor(line_idx) {
-            text::cursor(text, select, skip, &mut ctx, &mut lines, backend);
+            text::cursor(text, select, skip, &mut ctx, &mut lines, gs);
         } else {
-            text::line(text, select, &mut ctx, &mut lines, backend)
+            text::line(text, select, &mut ctx, &mut lines, gs)
         }
     }
 
@@ -325,12 +320,11 @@ fn md_render(editor: &mut Editor, gs: &mut GlobalState) {
 fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
 
-    let accent_style = gs.theme.accent_fg();
+    let accent_style = gs.ui_theme.accent_fg();
 
     last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(lexer, cursor, *line_number_padding, accent_style);
-    let backend = &mut gs.backend;
 
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
@@ -338,9 +332,9 @@ fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
         }
         let select = ctx.select_get_full_line(text.char_len());
         if ctx.has_cursor(line_idx) {
-            markdown::cursor(text, select, skip, &mut ctx, &mut lines, backend);
+            markdown::cursor(text, select, skip, &mut ctx, &mut lines, gs);
         } else {
-            markdown::line(text, select, &mut ctx, &mut lines, backend)
+            markdown::line(text, select, &mut ctx, &mut lines, gs)
         }
     }
 
@@ -359,12 +353,11 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
         return md_full_render(editor, gs, skip);
     }
 
-    let accent_style = gs.theme.accent_fg();
+    let accent_style = gs.ui_theme.accent_fg();
 
     last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(lexer, cursor, *line_number_padding, accent_style);
-    let backend = &mut gs.backend;
 
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
@@ -375,13 +368,13 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
             if text.cached.should_render_cursor(lines.next_line_idx(), ctx.cursor_char(), &select)
                 || text.cached.skipped_chars() != skip
             {
-                markdown::cursor(text, select, skip, &mut ctx, &mut lines, backend);
+                markdown::cursor(text, select, skip, &mut ctx, &mut lines, gs);
             } else {
                 ctx.skip_line();
                 lines.forward(1 + text.tokens.char_len());
             }
         } else if text.cached.should_render_line(lines.next_line_idx(), &select) {
-            markdown::line(text, select, &mut ctx, &mut lines, backend)
+            markdown::line(text, select, &mut ctx, &mut lines, gs)
         } else {
             ctx.skip_line();
             lines.forward(1 + text.tokens.char_len());

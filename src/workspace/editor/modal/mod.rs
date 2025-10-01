@@ -264,7 +264,7 @@ impl LSPModal {
                 let height = std::cmp::min(modal.len() as u16, 7);
                 let area = gs.editor_area().modal_relative(row_offset, col_offset, 70, height);
                 if area.height != 0 {
-                    gs.backend.set_style(gs.theme.accent_style());
+                    gs.backend.set_style(gs.ui_theme.accent_style());
                     modal.render(&area, gs);
                     gs.backend.reset_style();
                     return Some(area);
@@ -273,7 +273,7 @@ impl LSPModal {
             Self::RenameVar(modal) => {
                 let area = gs.editor_area().modal_relative(row_offset, col_offset, 60, modal.len() as u16);
                 if area.height == 2 {
-                    gs.backend.set_style(gs.theme.accent_style());
+                    gs.backend.set_style(gs.ui_theme.accent_style());
                     modal.render(&area, gs);
                     gs.backend.reset_style();
                     return Some(area);
@@ -283,7 +283,7 @@ impl LSPModal {
                 let height = std::cmp::min(modal.len() as u16, 7);
                 let area = gs.editor_area().modal_relative(row_offset, col_offset, 90, height);
                 if area.height != 0 {
-                    gs.backend.set_style(gs.theme.accent_style());
+                    gs.backend.set_style(gs.ui_theme.accent_style());
                     modal.render(area, gs);
                     gs.backend.reset_style();
                     return Some(area);

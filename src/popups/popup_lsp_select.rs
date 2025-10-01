@@ -66,7 +66,7 @@ impl SelectorLSP {
 impl Popup for SelectorLSP {
     fn force_render(&mut self, gs: &mut crate::global_state::GlobalState) {
         let mut rect = Self::get_rect(gs);
-        let accent = ContentStyle::fg(gs.theme.accent());
+        let accent = ContentStyle::fg(gs.ui_theme.accent());
         let backend = gs.backend();
         rect.draw_borders(None, None, backend);
         match rect.next_line() {

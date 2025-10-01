@@ -1,6 +1,5 @@
 use super::{meta::EditMetaData, Actions};
 use crate::configs::{FileType, IndentConfigs};
-use crate::ext_tui::CrossTerm;
 use crate::lsp::LSPResult;
 use crate::syntax::{
     tests::{char_lsp_pos, encode_pos_utf32, intercept_sync, intercept_sync_rev},
@@ -11,8 +10,6 @@ use crate::workspace::actions::Edit;
 use crate::workspace::cursor::Cursor;
 use crate::workspace::line::EditorLine;
 use crate::workspace::CursorPosition;
-use crate::workspace::GlobalState;
-use idiom_tui::Backend;
 use lsp_types::{Position, Range};
 use std::path::PathBuf;
 
@@ -467,8 +464,7 @@ fn push_char_with_closing_and_select() {
     let start = " asd ";
     let end = " [asd] ";
     let cfg = IndentConfigs::default();
-    let mut gs = GlobalState::new(CrossTerm::screen().unwrap(), CrossTerm::init());
-    let mut lexer = Lexer::with_context(FileType::Rust, PathBuf::new().as_path(), &mut gs);
+    let mut lexer = Lexer::with_context(FileType::Rust, PathBuf::new().as_path());
     intercept_sync(&mut lexer, probe_char_closing_with_select);
     intercept_sync_rev(&mut lexer, probe_char_closing_with_select_rev);
     let mut actions = Actions::new(cfg);

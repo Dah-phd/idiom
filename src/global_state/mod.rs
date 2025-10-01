@@ -7,11 +7,12 @@ mod message;
 
 use crate::{
     configs::{
-        EditorConfigs, EditorKeyMap, FileType, GeneralKeyMap, KeyMap, TreeKeyMap, UITheme, EDITOR_CFG_FILE, KEY_MAP,
+        EditorConfigs, EditorKeyMap, FileType, GeneralKeyMap, KeyMap, Theme, TreeKeyMap, UITheme, EDITOR_CFG_FILE,
+        KEY_MAP, THEME_FILE, THEME_UI,
     },
     embeded_term::EditorTerminal,
     error::IdiomResult,
-    ext_tui::CrossTerm,
+    ext_tui::{CrossTerm, StyleExt},
     lsp::{LSPError, LSPResult},
     popups::{
         menu::{menu_context_editor_inplace, menu_context_tree_inplace},
@@ -22,7 +23,10 @@ use crate::{
 };
 pub use clipboard::Clipboard;
 pub use controls::Mode;
-use crossterm::event::{KeyEvent, MouseEvent};
+use crossterm::{
+    event::{KeyEvent, MouseEvent},
+    style::ContentStyle,
+};
 pub use events::IdiomEvent;
 use idiom_tui::{
     layout::{Line, Rect},
@@ -40,7 +44,8 @@ type DrawCallback = fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorT
 
 pub struct GlobalState {
     pub backend: CrossTerm,
-    pub theme: UITheme,
+    pub theme: Theme,
+    pub ui_theme: UITheme,
     pub matcher: SkimMatcherV2,
     pub event: Vec<IdiomEvent>,
     pub clipboard: Clipboard,
@@ -63,7 +68,8 @@ pub struct GlobalState {
 impl GlobalState {
     pub fn new(screen_rect: Rect, backend: CrossTerm) -> Self {
         let mut messages = Messages::new();
-        let theme = messages.unwrap_or_default(UITheme::new(), "Failed to load theme_ui.toml");
+        let ui_theme = messages.unwrap_or_default(UITheme::new(), THEME_UI);
+        let theme = messages.unwrap_or_default(Theme::new(), THEME_FILE);
         Self {
             mode: Mode::default(),
             tree_size: std::cmp::max((15 * screen_rect.width) / 100, Mode::len()),
@@ -72,6 +78,7 @@ impl GlobalState {
             mouse_mapper: controls::mouse_handler,
             draw_callback: draw::full_rebuild,
             theme,
+            ui_theme,
             backend,
             event: Vec::default(),
             clipboard: Clipboard::default(),
@@ -91,6 +98,22 @@ impl GlobalState {
         let mut base_configs = self.unwrap_or_default(EditorConfigs::new(), EDITOR_CFG_FILE);
         self.git_tui = base_configs.git_tui.take();
         base_configs
+    }
+
+    pub fn reload_confgs(&mut self) -> EditorConfigs {
+        self.ui_theme = self.unwrap_or_default(UITheme::new(), THEME_UI);
+        self.theme = self.unwrap_or_default(Theme::new(), THEME_FILE);
+        self.get_configs()
+    }
+
+    #[inline]
+    pub fn get_theme(&self) -> &Theme {
+        &self.theme
+    }
+
+    #[inline]
+    pub fn get_select_style(&self) -> ContentStyle {
+        ContentStyle::bg(self.theme.selected)
     }
 
     pub fn get_key_maps(&mut self) -> (GeneralKeyMap, EditorKeyMap, TreeKeyMap) {
@@ -119,6 +142,7 @@ impl GlobalState {
         (self.mouse_mapper)(event, self, workspace, tree, term)
     }
 
+    #[inline]
     pub fn passthrough_paste(&mut self, clip: String, workspace: &mut Workspace, term: &mut EditorTerminal) {
         (self.paste_passthrough)(self, clip, workspace, term);
     }
@@ -221,7 +245,7 @@ impl GlobalState {
                 let line = (state.selected - state.at_line) + 1;
                 let char = self.tree_area.width / 2;
                 let position = CursorPosition { line, char };
-                let accent_style = self.theme.accent_style_reversed();
+                let accent_style = self.ui_theme.accent_style_reversed();
                 let mut menu = menu_context_tree_inplace(position, self.screen_rect, accent_style);
                 menu.run(self, ws, tree, term)
             }
@@ -229,7 +253,7 @@ impl GlobalState {
                 let Some(editor) = ws.get_active() else { return };
                 let row = (editor.cursor.line - editor.cursor.at_line) as u16;
                 let col = (editor.cursor.char + editor.line_number_padding + 1) as u16;
-                let accent_style = self.theme.accent_style();
+                let accent_style = self.ui_theme.accent_style();
                 let mut menu = menu_context_editor_inplace(Position { row, col }, self.editor_area, accent_style);
                 menu.run(self, ws, tree, term)
             }
@@ -257,21 +281,21 @@ impl GlobalState {
         } else {
             line += Mode::len();
         }
-        self.backend.set_style(self.theme.accent_style());
+        self.backend.set_style(self.ui_theme.accent_style());
         let mut rev_builder = line.unsafe_builder_rev(&mut self.backend);
         if select_len != 0 {
             rev_builder.push(&format!("({select_len} selected) "));
         }
         rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {} ", cursor.line + 1, cursor.char + 1));
         self.messages.set_line(rev_builder.into_line());
-        self.messages.fast_render(self.theme.accent_style(), &mut self.backend);
+        self.messages.fast_render(self.ui_theme.accent_style(), &mut self.backend);
         self.backend.reset_style();
     }
 
     pub fn fast_render_message_with_preserved_cursor(&mut self) {
         if self.messages.should_render() {
             self.backend.save_cursor();
-            self.messages.render(self.theme.accent_style(), &mut self.backend);
+            self.messages.render(self.ui_theme.accent_style(), &mut self.backend);
             self.backend.restore_cursor();
         }
     }
@@ -286,7 +310,7 @@ impl GlobalState {
         };
         self.mode.render(mode_line, &mut self.backend);
         self.messages.set_line(msg_line);
-        self.messages.render(self.theme.accent_style(), &mut self.backend);
+        self.messages.render(self.ui_theme.accent_style(), &mut self.backend);
     }
 
     #[inline]
@@ -321,7 +345,7 @@ impl GlobalState {
 
     pub fn clear_stats(&mut self) {
         let mut line = self.footer_line.clone();
-        let accent_style = self.theme.accent_style();
+        let accent_style = self.ui_theme.accent_style();
         if self.components.contains(Components::TREE) || self.is_select() {
             line += self.tree_size;
         } else {

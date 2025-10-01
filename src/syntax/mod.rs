@@ -28,7 +28,6 @@ pub use tokens::Token;
 pub struct Lexer {
     pub lang: Lang,
     pub legend: Legend,
-    pub theme: Theme,
     pub diagnostics: Option<PublishDiagnosticsParams>,
     pub lsp: bool,
     pub uri: Uri,
@@ -57,11 +56,10 @@ pub struct Lexer {
 }
 
 impl Lexer {
-    pub fn with_context(file_type: FileType, path: &Path, gs: &mut GlobalState) -> Self {
+    pub fn with_context(file_type: FileType, path: &Path) -> Self {
         Self {
             lang: Lang::from(file_type),
             legend: Legend::default(),
-            theme: gs.unwrap_or_default(Theme::new(), "theme.toml: "),
             uri: as_url(path),
             path: path.into(),
             version: 0,
@@ -90,11 +88,10 @@ impl Lexer {
         }
     }
 
-    pub fn text_lexer(path: &Path, gs: &mut GlobalState) -> Self {
+    pub fn text_lexer(path: &Path) -> Self {
         Self {
             lang: Lang::default(),
             legend: Legend::default(),
-            theme: gs.unwrap_or_default(Theme::new(), "theme.toml: "),
             uri: as_url(path),
             path: path.into(),
             version: 0,
@@ -123,11 +120,10 @@ impl Lexer {
         }
     }
 
-    pub fn md_lexer(path: &Path, gs: &mut GlobalState) -> Self {
+    pub fn md_lexer(path: &Path) -> Self {
         Self {
             lang: Lang::default(),
             legend: Legend::default(),
-            theme: gs.unwrap_or_default(Theme::new(), "theme.toml: "),
             uri: as_url(path),
             path: path.into(),
             version: 0,
@@ -199,7 +195,7 @@ impl Lexer {
             gs.error(error);
             return;
         }
-        map_lsp(self, client);
+        map_lsp(self, client, &gs.theme);
         gs.success("LSP mapped!");
         match (self.tokens)(self) {
             Ok(request) => self.requests.push(request),
@@ -209,7 +205,7 @@ impl Lexer {
 
     pub fn local_lsp(&mut self, file_type: FileType, content: String, gs: &mut GlobalState) {
         let client = LSPClient::local_lsp(file_type);
-        map_lsp(self, client);
+        map_lsp(self, client, &gs.theme);
         match self.client.file_did_open(self.uri.clone(), file_type, content) {
             Ok(_) => {
                 gs.success("Starting local LSP - internal system to provide basic language feature");
@@ -277,18 +273,9 @@ impl Lexer {
     }
 
     pub fn reload_theme(&mut self, gs: &mut GlobalState) {
-        self.theme = match Theme::new() {
-            Ok(theme) => theme,
-            Err(err) => {
-                let mut msg = "theme.json: ".to_owned();
-                msg.push_str(&err.to_string());
-                gs.error(msg);
-                return;
-            }
-        };
         if self.lsp {
             if let Some(capabilities) = &self.client.capabilities.semantic_tokens_provider {
-                self.legend.map_styles(self.lang.file_type, &self.theme, capabilities);
+                self.legend.map_styles(self.lang.file_type, &gs.theme, capabilities);
             }
             match (self.tokens)(self) {
                 Ok(request) => self.requests.push(request),

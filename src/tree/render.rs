@@ -18,8 +18,8 @@ pub fn render_tree(tree: &mut Tree, gs: &mut GlobalState) {
     let mut last_line = tree_area.pop_line();
     let mut lines = tree_area.into_iter();
 
-    let base_style = gs.theme.accent_style();
-    let select_base_style = tree.state.highlight.with_bg(gs.theme.accent());
+    let base_style = gs.ui_theme.accent_style();
+    let select_base_style = tree.state.highlight.with_bg(gs.ui_theme.accent());
 
     let mut tree_iter = iter.enumerate().skip(tree.state.at_line);
 

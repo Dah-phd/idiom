@@ -7,7 +7,6 @@ pub use super::{
 use crate::{
     configs::FileType,
     ext_tui::{CrossTerm, StyleExt},
-    global_state::GlobalState,
     lsp::LSPResult,
     workspace::{actions::Action, line::EditorLine},
 };
@@ -459,22 +458,22 @@ pub fn zip_text_tokens(text: Vec<String>, tokens: Vec<SemanticToken>) -> Vec<Edi
     content
 }
 
-pub fn mock_utf8_lexer(gs: &mut GlobalState, file_type: FileType) -> Lexer {
-    let mut lexer = Lexer::with_context(file_type, PathBuf::new().as_path(), gs);
+pub fn mock_utf8_lexer(file_type: FileType) -> Lexer {
+    let mut lexer = Lexer::with_context(file_type, PathBuf::new().as_path());
     lexer.encode_position = encode_pos_utf8;
     lexer.char_lsp_pos = char_lsp_utf8;
     lexer
 }
 
-pub fn mock_utf16_lexer(gs: &mut GlobalState, file_type: FileType) -> Lexer {
-    let mut lexer = Lexer::with_context(file_type, PathBuf::new().as_path(), gs);
+pub fn mock_utf16_lexer(file_type: FileType) -> Lexer {
+    let mut lexer = Lexer::with_context(file_type, PathBuf::new().as_path());
     lexer.encode_position = encode_pos_utf16;
     lexer.char_lsp_pos = char_lsp_utf16;
     lexer
 }
 
-pub fn mock_utf32_lexer(gs: &mut GlobalState, file_type: FileType) -> Lexer {
-    Lexer::with_context(file_type, PathBuf::new().as_path(), gs)
+pub fn mock_utf32_lexer(file_type: FileType) -> Lexer {
+    Lexer::with_context(file_type, PathBuf::new().as_path())
 }
 
 // test tokens

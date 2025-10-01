@@ -114,7 +114,7 @@ impl ActiveFileSearch {
 impl Popup for ActiveFileSearch {
     fn force_render(&mut self, gs: &mut GlobalState) {
         let mut rect = Self::get_rect(gs);
-        let accent_style = gs.theme.accent_style().with_fg(self.mode.fg_color);
+        let accent_style = gs.ui_theme.accent_style().with_fg(self.mode.fg_color);
         let backend = gs.backend();
         backend.freeze();
         rect.draw_borders(None, None, backend);

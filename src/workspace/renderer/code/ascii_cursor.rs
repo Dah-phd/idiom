@@ -1,6 +1,7 @@
 use super::{WRAP_CLOSE, WRAP_OPEN};
 use crate::{
     ext_tui::{CrossTerm, StyleExt},
+    global_state::GlobalState,
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::{ContentStyle, Stylize};
@@ -12,20 +13,20 @@ pub fn render(
     ctx: &mut LineContext,
     line_width: usize,
     select: Option<Range<usize>>,
-    backend: &mut CrossTerm,
+    gs: &mut GlobalState,
 ) {
     if line_width > line.char_len() {
         match select {
-            Some(select) => self::select(line, ctx, select, backend),
-            None => self::basic(line, ctx, backend),
+            Some(select) => self::select(line, ctx, select, gs),
+            None => self::basic(line, ctx, gs.backend()),
         }
         if let Some(diagnostics) = line.diagnostics.as_ref() {
-            diagnostics.inline_render(line_width - line.char_len(), backend);
+            diagnostics.inline_render(line_width - line.char_len(), gs.backend());
         }
     } else {
         match select {
-            Some(select) => self::partial_select(line, ctx, line_width, select, backend),
-            None => self::partial(line, ctx, line_width, backend),
+            Some(select) => self::partial_select(line, ctx, line_width, select, gs),
+            None => self::partial(line, ctx, line_width, gs.backend()),
         }
     }
 }
@@ -89,8 +90,10 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut CrossTerm) {
 }
 
 #[inline]
-pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, backend: &mut CrossTerm) {
-    let select_color = ctx.lexer.theme.selected;
+pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, gs: &mut GlobalState) {
+    let select_color = gs.theme.selected;
+    let backend = gs.backend();
+
     let mut reset_style = ContentStyle::default();
     let mut iter_tokens = line.iter_tokens();
     let mut counter = 0;
@@ -235,8 +238,9 @@ pub fn partial_select(
     ctx: &LineContext,
     line_width: usize,
     select: Range<usize>,
-    backend: &mut CrossTerm,
+    gs: &mut GlobalState,
 ) {
+    let backend = &mut gs.backend;
     let cursor_idx = ctx.cursor_char();
     let (mut idx, reduction) = line.generate_skipped_chars_simple(cursor_idx, line_width);
     if idx != 0 {
@@ -247,7 +251,7 @@ pub fn partial_select(
     let mut lined_up = None;
     let mut tokens = line.iter_tokens();
     let mut cursor = idx;
-    let select_color = ctx.lexer.theme.selected;
+    let select_color = gs.theme.selected;
     let mut reset_style = ContentStyle::default();
     if select.start <= idx && idx < select.end {
         reset_style.set_bg(Some(select_color));

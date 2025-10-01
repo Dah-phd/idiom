@@ -1,5 +1,6 @@
 use crate::{
-    ext_tui::{CrossTerm, StyleExt},
+    ext_tui::StyleExt,
+    global_state::GlobalState,
     workspace::{
         line::{EditorLine, LineContext},
         CursorPosition,
@@ -17,15 +18,15 @@ pub fn render(
     line_width: usize,
     cursors: Vec<CursorPosition>,
     selects: Vec<Range<usize>>,
-    backend: &mut CrossTerm,
+    gs: &mut GlobalState,
 ) {
     if line_width > line.char_len() {
-        basic(line, ctx, cursors, selects, backend);
+        basic(line, ctx, cursors, selects, gs);
         if let Some(diagnostics) = line.diagnostics.as_ref() {
-            diagnostics.inline_render(line_width - line.char_len(), backend);
+            diagnostics.inline_render(line_width - line.char_len(), gs.backend());
         }
     } else {
-        self::partial(line, ctx, line_width, cursors, selects, backend);
+        self::partial(line, ctx, line_width, cursors, selects, gs);
     }
 }
 
@@ -34,10 +35,11 @@ pub fn basic(
     ctx: &LineContext,
     cursors: Vec<CursorPosition>,
     selects: Vec<Range<usize>>,
-    backend: &mut CrossTerm,
+    gs: &mut GlobalState,
 ) {
+    let select_color = gs.theme.selected;
+    let backend = gs.backend();
     let char_position = ctx.lexer.char_lsp_pos;
-    let select_color = ctx.lexer.theme.selected;
     let mut reset_style = ContentStyle::default();
     let mut tokens = line.iter_tokens();
     let mut counter = 0;
@@ -130,8 +132,9 @@ pub fn partial(
     mut line_width: usize,
     cursors: Vec<CursorPosition>,
     selects: Vec<Range<usize>>,
-    backend: &mut CrossTerm,
+    gs: &mut GlobalState,
 ) {
+    let backend = &mut gs.backend;
     let last_idx = cursors.last().map(|c| c.char).unwrap_or_default();
 
     let char_position = ctx.lexer.char_lsp_pos;
@@ -156,7 +159,7 @@ pub fn partial(
         cursor += content.next().map(|(ch, ..)| char_position(ch)).unwrap_or_default();
     }
 
-    let select_color = ctx.lexer.theme.selected;
+    let select_color = gs.theme.selected;
     let mut reset_style = ContentStyle::default();
     if select.start <= idx && idx < select.end {
         reset_style.set_bg(Some(select_color));

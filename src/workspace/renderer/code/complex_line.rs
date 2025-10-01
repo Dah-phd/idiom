@@ -1,6 +1,7 @@
 use super::WRAP_CLOSE;
 use crate::{
     ext_tui::{CrossTerm, StyleExt},
+    global_state::GlobalState,
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::{ContentStyle, Stylize};
@@ -76,10 +77,11 @@ pub fn complex_line_with_select(
     mut line_width: usize,
     select: Range<usize>,
     ctx: &mut LineContext,
-    backend: &mut CrossTerm,
+    gs: &mut GlobalState,
 ) -> Option<usize> {
     let char_position = ctx.lexer.char_lsp_pos;
-    let select_color = ctx.lexer.theme.selected;
+    let select_color = gs.theme.selected;
+    let backend = gs.backend();
     let mut reset_style = ContentStyle::default();
     let mut iter_tokens = code.iter_tokens();
     let mut counter = 0;

@@ -296,8 +296,6 @@ mod tests {
     use super::super::edits::Edit;
     use super::ActionBuffer;
     use crate::configs::FileType;
-    use crate::ext_tui::CrossTerm;
-    use crate::global_state::GlobalState;
     use crate::syntax::{
         tests::{char_lsp_utf8, encode_pos_utf8},
         Lexer,
@@ -305,14 +303,12 @@ mod tests {
     use crate::workspace::actions::buffer::DelBuffer;
     use crate::workspace::line::EditorLine;
     use crate::workspace::{cursor::Cursor, CursorPosition};
-    use idiom_tui::{layout::Rect, Backend};
     use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
     use std::path::PathBuf;
 
     fn create_lexer() -> Lexer {
-        let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
         let path = PathBuf::new();
-        Lexer::with_context(FileType::Rust, &path, &mut gs)
+        Lexer::with_context(FileType::Rust, &path)
     }
 
     fn create_lexer_utf8() -> Lexer {

@@ -9,6 +9,7 @@ use parser::{parse, Block, ListItem, Span};
 
 use crate::{
     ext_tui::CrossTerm,
+    global_state::GlobalState,
     syntax::tokens::{calc_wrap_line, calc_wrap_line_capped},
     workspace::{
         cursor::Cursor,
@@ -279,12 +280,12 @@ pub fn cursor(
     skip: usize,
     ctx: &mut LineContext,
     lines: &mut RectIter,
-    backend: &mut CrossTerm,
+    gs: &mut GlobalState,
 ) {
     text.cached.cursor(lines.next_line_idx(), ctx.cursor_char(), skip, select.clone());
     match text.is_simple() {
-        true => ascii::cursor(text, select, skip, lines, ctx, backend),
-        false => complex::cursor(text, select, skip, lines, ctx, backend),
+        true => ascii::cursor(text, select, skip, lines, ctx, gs),
+        false => complex::cursor(text, select, skip, lines, ctx, gs),
     }
 }
 
@@ -294,17 +295,17 @@ pub fn line(
     select: Option<Range<usize>>,
     ctx: &mut LineContext,
     lines: &mut RectIter,
-    backend: &mut CrossTerm,
+    gs: &mut GlobalState,
 ) {
     text.cached.line(lines.next_line_idx(), select.clone());
     match text.is_simple() {
         true => match select {
-            Some(select) => ascii::line_with_select(text, select, lines, ctx, backend),
-            None => ascii::line(text, lines, ctx, backend),
+            Some(select) => ascii::line_with_select(text, select, lines, ctx, gs),
+            None => ascii::line(text, lines, ctx, gs.backend()),
         },
         false => match select {
-            Some(select) => complex::line_with_select(text, select, lines, ctx, backend),
-            None => complex::line(text, lines, ctx, backend),
+            Some(select) => complex::line_with_select(text, select, lines, ctx, gs),
+            None => complex::line(text, lines, ctx, gs.backend()),
         },
     }
 }

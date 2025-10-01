@@ -30,7 +30,7 @@ impl GoToLinePopup {
     pub fn run_inplace(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         let Some(editor) = workspace.get_active() else { return };
         let current_line = editor.cursor.line;
-        let Some(mut popup) = GoToLinePopup::new(current_line, *gs.editor_area(), gs.theme.accent_style()) else {
+        let Some(mut popup) = GoToLinePopup::new(current_line, *gs.editor_area(), gs.ui_theme.accent_style()) else {
             return;
         };
         if let Err(error) = popup.run(gs, workspace, tree, term) {
@@ -128,7 +128,7 @@ impl FindPopup {
     }
 
     pub fn run_inplace(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
-        let Some(mut popup) = FindPopup::new(*gs.editor_area(), gs.theme.accent_style()) else {
+        let Some(mut popup) = FindPopup::new(*gs.editor_area(), gs.ui_theme.accent_style()) else {
             return;
         };
         let run_result = Popup::run(&mut popup, gs, workspace, tree, term);

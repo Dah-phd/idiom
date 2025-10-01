@@ -37,7 +37,7 @@ fn generate_complex_lines() -> Vec<EditorLine> {
 #[test]
 fn cursor_render() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
-    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let mut lexer = mock_utf8_lexer(FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.set_position(CursorPosition { line: 0, char: 39 });
 
@@ -46,7 +46,7 @@ fn cursor_render() {
     let mut text =
         EditorLine::from("**The project is currently in development - so if you want to try it do it with caution.**");
     assert!(text.is_simple());
-    ascii::cursor(&mut text, None, 0, &mut lines, &mut ctx, gs.backend());
+    ascii::cursor(&mut text, None, 0, &mut lines, &mut ctx, &mut gs);
     let mut rendered = gs.backend().drain();
 
     let first_line = "**The project is currently in develop";
@@ -60,7 +60,7 @@ fn cursor_render() {
 #[test]
 fn cursor_complex_render() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
-    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let mut lexer = mock_utf8_lexer(FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.set_position(CursorPosition { line: 0, char: 39 });
 
@@ -69,7 +69,7 @@ fn cursor_complex_render() {
     let mut text =
         EditorLine::from("**The project is currently in devel🔥pment - so if you want to try it do it with caution.**");
     assert!(!text.is_simple());
-    complex::cursor(&mut text, None, 0, &mut lines, &mut ctx, gs.backend());
+    complex::cursor(&mut text, None, 0, &mut lines, &mut ctx, &mut gs);
     let mut rendered = gs.backend().drain();
 
     let first_line = "**The project is currently in devel🔥";
@@ -83,7 +83,7 @@ fn cursor_complex_render() {
 #[test]
 fn cursor_select() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
-    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let mut lexer = mock_utf8_lexer(FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set(CursorPosition::default(), (0, 39).into());
 
@@ -93,11 +93,11 @@ fn cursor_select() {
         EditorLine::from("**The project is currently in development - so if you want to try it do it with caution.**");
     assert!(text.is_simple());
     let select = ctx.select_get_full_line(text.char_len());
-    ascii::cursor(&mut text, select, 0, &mut lines, &mut ctx, gs.backend());
+    ascii::cursor(&mut text, select, 0, &mut lines, &mut ctx, &mut gs);
 
     let mut rendered = gs.backend().drain();
     let first_line = "**The project is currently in develop";
-    let style_select = ctx.lexer.theme.selected;
+    let style_select = gs.theme.selected;
     expect_select(0, 39, style_select, ctx.accent_style, &rendered);
     assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec![first_line.into()]));
     assert_eq!(
@@ -111,7 +111,7 @@ fn cursor_select() {
 #[test]
 fn cursor_complex_select() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
-    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let mut lexer = mock_utf8_lexer(FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set(CursorPosition::default(), (0, 39).into());
 
@@ -121,11 +121,11 @@ fn cursor_complex_select() {
         EditorLine::from("**The project is currently in devel🔥pment - so if you want to try it do it with caution.**");
     assert!(!text.is_simple());
     let select = ctx.select_get_full_line(text.char_len());
-    complex::cursor(&mut text, select, 0, &mut lines, &mut ctx, gs.backend());
+    complex::cursor(&mut text, select, 0, &mut lines, &mut ctx, &mut gs);
     let mut rendered = gs.backend().drain();
 
     let first_line = "**The project is currently in devel🔥";
-    let style_select = ctx.lexer.theme.selected;
+    let style_select = gs.theme.selected;
     expect_select(0, 39, style_select, ctx.accent_style, &rendered);
     assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec![first_line.into()],));
     assert_eq!(
@@ -139,7 +139,7 @@ fn cursor_complex_select() {
 #[test]
 fn simple_line() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
-    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let mut lexer = mock_utf8_lexer(FileType::Rust);
     let cursor = Cursor::default();
 
     let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2, ContentStyle::fg(Color::DarkGrey));
@@ -147,7 +147,7 @@ fn simple_line() {
     let mut texts = generate_lines();
 
     for text in texts.iter_mut() {
-        line(text, None, &mut ctx, &mut lines, gs.backend());
+        line(text, None, &mut ctx, &mut lines, &mut gs);
     }
 
     let mut rendered = gs.backend().drain();
@@ -162,7 +162,7 @@ fn simple_line() {
 #[test]
 fn simple_line_select() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
-    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let mut lexer = mock_utf8_lexer(FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set((1, 7).into(), (2, 60).into());
 
@@ -172,11 +172,11 @@ fn simple_line_select() {
 
     for text in texts.iter_mut() {
         let select = ctx.select_get_full_line(text.char_len());
-        line(text, select, &mut ctx, &mut lines, gs.backend());
+        line(text, select, &mut ctx, &mut lines, &mut gs);
     }
 
     let mut rendered = gs.backend().drain();
-    let style_select = ctx.lexer.theme.selected;
+    let style_select = gs.theme.selected;
     assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["## TADA".into()]));
     expect_select(7, 13, style_select, ctx.accent_style, &rendered);
     assert_eq!(
@@ -191,7 +191,7 @@ fn simple_line_select() {
 #[test]
 fn complex_line() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
-    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let mut lexer = mock_utf8_lexer(FileType::Rust);
     let cursor = Cursor::default();
 
     let mut ctx = LineContext::collect_context(&mut lexer, &cursor, 2, ContentStyle::fg(Color::DarkGrey));
@@ -199,7 +199,7 @@ fn complex_line() {
     let mut texts = generate_complex_lines();
 
     for text in texts.iter_mut() {
-        line(text, None, &mut ctx, &mut lines, gs.backend());
+        line(text, None, &mut ctx, &mut lines, &mut gs);
     }
 
     let mut rendered = gs.backend().drain();
@@ -214,7 +214,7 @@ fn complex_line() {
 #[test]
 fn complex_line_select() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
-    let mut lexer = mock_utf8_lexer(&mut gs, FileType::Rust);
+    let mut lexer = mock_utf8_lexer(FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set((1, 7).into(), (2, 60).into());
 
@@ -224,11 +224,11 @@ fn complex_line_select() {
 
     for text in texts.iter_mut() {
         let select = ctx.select_get_full_line(text.char_len());
-        line(text, select, &mut ctx, &mut lines, gs.backend());
+        line(text, select, &mut ctx, &mut lines, &mut gs);
     }
 
     let mut rendered = gs.backend().drain();
-    let style_select = ctx.lexer.theme.selected;
+    let style_select = gs.theme.selected;
     assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["## 🔥TADA🔥".into()]));
     expect_select(7, 13, style_select, ctx.accent_style, &rendered);
     assert_eq!(

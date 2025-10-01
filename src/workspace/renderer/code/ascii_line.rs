@@ -2,7 +2,8 @@ use std::ops::Range;
 
 use crate::{
     ext_tui::{CrossTerm, StyleExt},
-    syntax::{tokens::TokenLine, Lexer},
+    global_state::GlobalState,
+    syntax::tokens::TokenLine,
 };
 use crossterm::style::ContentStyle;
 use idiom_tui::Backend;
@@ -50,10 +51,10 @@ pub fn ascii_line_with_select(
     content: impl Iterator<Item = char>,
     tokens: &TokenLine,
     select: Range<usize>,
-    lexer: &Lexer,
-    backend: &mut CrossTerm,
+    gs: &mut GlobalState,
 ) {
-    let select_color = lexer.theme.selected;
+    let select_color = gs.theme.selected;
+    let backend = gs.backend();
     let mut reset_style = ContentStyle::default();
     let mut iter_tokens = tokens.iter();
     let mut counter = 0;
