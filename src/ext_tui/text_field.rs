@@ -5,7 +5,7 @@ use crate::{
 };
 use core::{fmt::Display, ops::Range};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use crossterm::style::{Color, ContentStyle};
+use crossterm::style::ContentStyle;
 use idiom_tui::{
     count_as_string,
     layout::{Line, LineBuilder},
@@ -16,19 +16,12 @@ pub struct TextField<T: Default + Clone> {
     text: String,
     char: usize,
     select: Option<(usize, usize)>,
-    select_style: ContentStyle,
     on_text_update: Option<T>,
 }
 
 impl<T: Default + Clone> TextField<T> {
     pub fn new(text: String, on_text_update: Option<T>) -> Self {
-        Self {
-            char: text.len(),
-            text,
-            select: None,
-            on_text_update,
-            select_style: ContentStyle::bg(Color::Rgb { r: 72, g: 72, b: 72 }),
-        }
+        Self { char: text.len(), text, select: None, on_text_update }
     }
 
     #[inline]
@@ -124,7 +117,7 @@ impl<T: Default + Clone> TextField<T> {
                     builder.push_styled(&self.text[end..to], select_style);
                     builder.push(&self.text[to..]);
                 } else {
-                    builder.push_styled(&self.text[from..start], self.select_style);
+                    builder.push_styled(&self.text[from..start], select_style);
                     builder.push_styled(&self.text[cursor], ContentStyle::reversed());
                     builder.push(&self.text[end..]);
                 }
@@ -483,7 +476,7 @@ pub mod test {
     use crate::global_state::{Clipboard, GlobalState};
     use crossterm::{
         event::{KeyCode, KeyEvent, KeyModifiers},
-        style::{Color, ContentStyle},
+        style::ContentStyle,
     };
     use idiom_tui::{
         layout::{Line, Rect},
@@ -549,7 +542,7 @@ pub mod test {
                 (ContentStyle::default(), "<<go to row: 0 col: 1>>".to_owned()),
                 (ContentStyle::default(), " >> ".to_owned()),
                 (ContentStyle::default(), "a a🦀".to_owned()),
-                (ContentStyle::bg(Color::Rgb { r: 72, g: 72, b: 72 }), "🦀ssd".to_owned()),
+                (gs.get_select_style(), "🦀ssd".to_owned()),
                 (ContentStyle::reversed(), " ".to_owned()),
                 (ContentStyle::default(), "asd 🦀s".to_owned()),
                 (ContentStyle::default(), "<<padding: 28>>".to_owned()),
