@@ -3,7 +3,7 @@ use crate::{
     ext_tui::{CrossTerm, StyleExt},
     global_state::Clipboard,
 };
-use core::{ops::Range, fmt::Display};
+use core::{fmt::Display, ops::Range};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{
@@ -459,7 +459,7 @@ pub fn arg_range_at(line: &str, idx: usize) -> Range<usize> {
     }
 }
 
-impl <T: Clone + Default>Display for TextField<T> {
+impl<T: Clone + Default> Display for TextField<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.text.fmt(f)
     }

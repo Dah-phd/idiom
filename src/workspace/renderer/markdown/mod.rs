@@ -52,20 +52,20 @@ const HEADING_NEXT: ContentStyle = ContentStyle {
 
 struct StyledParser<'a, 'b> {
     lines: &'a mut RectIter,
-    ctx: &'a mut LineContext<'b>,
+    ctx: &'a mut LineContext,
     line_width: usize,
     backend: &'a mut CrossTerm,
     wrap_printer: fn(&mut Self, &str, usize) -> Option<usize>, //,usize, &mut RectIter, &mut LineContext, &mut Backend) -> Option<usize>,
 }
 
 impl<'a, 'b> StyledParser<'a, 'b> {
-    fn new_ascii(lines: &'a mut RectIter, ctx: &'a mut LineContext<'b>, backend: &'a mut CrossTerm) -> Option<Self> {
+    fn new_ascii(lines: &'a mut RectIter, ctx: &'a mut LineContext, backend: &'a mut CrossTerm) -> Option<Self> {
         let line = lines.next()?;
         let line_width = ctx.setup_line(line, backend);
         Some(Self { lines, ctx, line_width, backend, wrap_printer: print_split })
     }
 
-    fn new_complex(lines: &'a mut RectIter, ctx: &'a mut LineContext<'b>, backend: &'a mut CrossTerm) -> Option<Self> {
+    fn new_complex(lines: &'a mut RectIter, ctx: &'a mut LineContext, backend: &'a mut CrossTerm) -> Option<Self> {
         let line = lines.next()?;
         let line_width = ctx.setup_line(line, backend);
         Some(Self { lines, ctx, line_width, backend, wrap_printer: print_split_comp })

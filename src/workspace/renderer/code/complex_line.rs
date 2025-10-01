@@ -18,7 +18,7 @@ pub fn complex_line(
     let mut counter = 0;
     let mut last_len = 0;
     let mut lined_up = None;
-    let char_position = ctx.lexer.char_lsp_pos;
+    let char_position = ctx.char_lsp_pos;
 
     if let Some(token) = iter_tokens.next() {
         if token.delta_start == 0 {
@@ -79,7 +79,7 @@ pub fn complex_line_with_select(
     ctx: &mut LineContext,
     gs: &mut GlobalState,
 ) -> Option<usize> {
-    let char_position = ctx.lexer.char_lsp_pos;
+    let char_position = ctx.char_lsp_pos;
     let select_color = gs.theme.selected;
     let backend = gs.backend();
     let mut reset_style = ContentStyle::default();

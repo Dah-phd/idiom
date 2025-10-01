@@ -2,7 +2,6 @@ use super::status::RenderStatus;
 use super::EditorLine;
 use crate::{
     ext_tui::CrossTerm,
-    syntax::Lexer,
     workspace::{cursor::Cursor, CursorPosition},
 };
 use crossterm::style::ContentStyle;
@@ -10,9 +9,9 @@ use idiom_tui::Position;
 use idiom_tui::{layout::Line, Backend};
 use std::{cmp::Ordering, ops::Range};
 
-pub struct LineContext<'a> {
-    pub lexer: &'a mut Lexer,
+pub struct LineContext {
     pub accent_style: ContentStyle,
+    pub char_lsp_pos: fn(char) -> usize,
     line_number: usize,
     line_number_padding: usize,
     line: usize,
@@ -21,21 +20,21 @@ pub struct LineContext<'a> {
     select: Option<(CursorPosition, CursorPosition)>,
 }
 
-impl<'a> LineContext<'a> {
+impl LineContext {
     pub fn collect_context(
-        lexer: &'a mut Lexer,
         cursor: &Cursor,
+        char_lsp_pos: fn(char) -> usize,
         line_number_padding: usize,
         accent_style: ContentStyle,
     ) -> Self {
         let line_number = cursor.at_line;
         let select = cursor.select_get();
         Self {
+            char_lsp_pos,
             line: cursor.line - line_number,
             cursor_line: cursor.line,
             cursor_char: cursor.char,
             select,
-            lexer,
             line_number,
             line_number_padding,
             accent_style,

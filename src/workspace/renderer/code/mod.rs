@@ -47,7 +47,7 @@ pub fn cursor(code: &mut EditorLine, ctx: &mut LineContext, line: Line, gs: &mut
 #[inline(always)]
 pub fn inner_render(
     code: &mut EditorLine,
-    ctx: &mut LineContext<'_>,
+    ctx: &mut LineContext,
     line: Line,
     select: Option<Range<usize>>,
     gs: &mut GlobalState,

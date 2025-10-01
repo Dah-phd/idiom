@@ -38,7 +38,7 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut CrossTerm) {
     let mut last_len = 0;
     let mut lined_up = None;
     let mut idx = 0;
-    let char_position = ctx.lexer.char_lsp_pos;
+    let char_position = ctx.char_lsp_pos;
     let cursor_idx = ctx.cursor_char();
     if let Some(token) = tokens.next() {
         if token.delta_start == 0 {
@@ -95,7 +95,7 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut CrossTerm) {
 pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, gs: &mut GlobalState) {
     let select_color = gs.theme.selected;
     let backend = gs.backend();
-    let char_position = ctx.lexer.char_lsp_pos;
+    let char_position = ctx.char_lsp_pos;
     let mut reset_style = ContentStyle::default();
     let mut tokens = line.iter_tokens();
     let mut counter = 0;
@@ -168,7 +168,7 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, gs: &m
 
 pub fn partial(code: &mut EditorLine, ctx: &mut LineContext, mut line_width: usize, backend: &mut CrossTerm) {
     let cursor_idx = ctx.cursor_char();
-    let char_position = ctx.lexer.char_lsp_pos;
+    let char_position = ctx.char_lsp_pos;
     let mut idx = code.generate_skipped_chars_complex(cursor_idx, line_width);
     let mut content = CharLimitedWidths::new(code.as_str(), 3);
     let mut cursor = 0;
@@ -263,7 +263,7 @@ pub fn partial_select(
 ) {
     let backend = &mut gs.backend;
     let cursor_idx = ctx.cursor_char();
-    let char_position = ctx.lexer.char_lsp_pos;
+    let char_position = ctx.char_lsp_pos;
     let mut idx = code.generate_skipped_chars_complex(cursor_idx, line_width);
     let mut content = CharLimitedWidths::new(code.as_str(), 3);
 

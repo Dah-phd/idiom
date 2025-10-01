@@ -39,7 +39,7 @@ pub fn basic(
 ) {
     let select_color = gs.theme.selected;
     let backend = gs.backend();
-    let char_position = ctx.lexer.char_lsp_pos;
+    let char_position = ctx.char_lsp_pos;
     let mut reset_style = ContentStyle::default();
     let mut tokens = line.iter_tokens();
     let mut counter = 0;
@@ -137,7 +137,7 @@ pub fn partial(
     let backend = &mut gs.backend;
     let last_idx = cursors.last().map(|c| c.char).unwrap_or_default();
 
-    let char_position = ctx.lexer.char_lsp_pos;
+    let char_position = ctx.char_lsp_pos;
 
     // index needs to be generated based on 0 skipped chars on multicursor
     // skipped chars are use to store info on multi cursor
