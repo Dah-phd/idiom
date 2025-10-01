@@ -65,19 +65,18 @@ impl Popup for PopupChoice {
     fn force_render(&mut self, gs: &mut GlobalState) {
         let (height, width) = self.size;
         let mut area = gs.screen().center(height, width);
-        let backend = gs.backend();
         area.bordered();
-        area.draw_borders(None, None, backend);
+        area.draw_borders(None, None, gs.backend());
         match self.title_prefix {
-            Some(prefix) => area.border_title_prefixed(prefix, &self.title, backend),
-            None => area.border_title(&self.title, backend),
+            Some(prefix) => area.border_title_prefixed(prefix, &self.title, gs.backend()),
+            None => area.border_title(&self.title, gs.backend()),
         };
         let mut lines = area.into_iter();
         if let Some(first_line) = lines.next() {
-            self.p_from_message(first_line, backend);
+            self.p_from_message(first_line, gs);
         }
         if let Some(second_line) = lines.next() {
-            self.spans_from_buttons(second_line, backend);
+            self.spans_from_buttons(second_line, gs.backend());
         }
     }
 
@@ -205,12 +204,12 @@ impl PopupChoice {
         }
     }
 
-    fn p_from_message(&self, line: Line, backend: &mut CrossTerm) {
+    fn p_from_message(&self, line: Line, gs: &mut GlobalState) {
         if self.buffer_message {
-            self.message.widget(line, backend);
+            self.message.widget(line, gs);
             return;
         }
-        line.render_centered(self.get_message(), backend);
+        line.render_centered(self.get_message(), gs.backend());
     }
 
     fn spans_from_buttons(&mut self, line: Line, backend: &mut CrossTerm) {

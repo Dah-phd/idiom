@@ -64,13 +64,12 @@ impl SelectorLSP {
 }
 
 impl Popup for SelectorLSP {
-    fn force_render(&mut self, gs: &mut crate::global_state::GlobalState) {
+    fn force_render(&mut self, gs: &mut GlobalState) {
         let mut rect = Self::get_rect(gs);
         let accent = ContentStyle::fg(gs.ui_theme.accent());
-        let backend = gs.backend();
-        rect.draw_borders(None, None, backend);
+        rect.draw_borders(None, None, gs.backend());
         match rect.next_line() {
-            Some(line) => self.pattern.widget(line, backend),
+            Some(line) => self.pattern.widget(line, gs),
             None => return,
         }
         self.state.update_at_line(rect.height as usize);
@@ -78,17 +77,17 @@ impl Popup for SelectorLSP {
         for (idx, (score, text, ..)) in self.file_types.iter().enumerate().skip(self.state.at_line) {
             let Some(line) = lines.next() else { break };
             match idx == self.state.selected {
-                true => line.render_styled(text, self.state.highlight, backend),
+                true => line.render_styled(text, self.state.highlight, gs.backend()),
                 false => {
                     if *score == 0 {
-                        line.render_styled(text, accent, backend);
+                        line.render_styled(text, accent, gs.backend());
                     } else {
-                        line.render(text, backend)
+                        line.render(text, gs.backend())
                     }
                 }
             }
         }
-        lines.clear_to_end(backend);
+        lines.clear_to_end(gs.backend());
     }
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {

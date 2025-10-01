@@ -115,25 +115,24 @@ impl Popup for ActiveFileSearch {
     fn force_render(&mut self, gs: &mut GlobalState) {
         let mut rect = Self::get_rect(gs);
         let accent_style = gs.ui_theme.accent_style().with_fg(self.mode.fg_color);
-        let backend = gs.backend();
-        backend.freeze();
-        rect.draw_borders(None, None, backend);
-        rect.border_title_styled(self.mode.title, accent_style, backend);
+        gs.backend.freeze();
+        rect.draw_borders(None, None, gs.backend());
+        rect.border_title_styled(self.mode.title, accent_style, gs.backend());
         let Some(line) = rect.next_line() else { return };
-        self.pattern.widget_with_count(line, self.options.len(), backend);
+        self.pattern.widget_with_count(line, self.options.len(), gs);
         let Some(line) = rect.next_line() else { return };
-        line.fill(BORDERS.horizontal_top, backend);
+        line.fill(BORDERS.horizontal_top, gs.backend());
 
         if self.options.is_empty() {
             if self.is_searching {
-                self.state.render_list(["Searching ..."].into_iter(), rect, backend);
+                self.state.render_list(["Searching ..."].into_iter(), rect, gs.backend());
             } else {
-                self.state.render_list(["No results found!"].into_iter(), rect, backend);
+                self.state.render_list(["No results found!"].into_iter(), rect, gs.backend());
             }
         } else {
-            self.state.render_list_complex(&self.options, &[build_path_line, build_text_line], rect, backend);
+            self.state.render_list_complex(&self.options, &[build_path_line, build_text_line], rect, gs.backend());
         }
-        backend.unfreeze();
+        gs.backend.unfreeze();
     }
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {

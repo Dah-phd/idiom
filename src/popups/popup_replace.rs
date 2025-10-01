@@ -155,7 +155,7 @@ impl Popup for ReplacePopup {
     }
 
     fn force_render(&mut self, gs: &mut GlobalState) {
-        let backend = gs.backend();
+        let backend = &mut gs.backend;
         let reset = backend.get_style();
         backend.set_style(self.accent);
         let mut lines = self.rect.into_iter();
@@ -164,7 +164,7 @@ impl Popup for ReplacePopup {
             find_builder.push(count_as_string(&self.options).as_str());
             find_builder.push(" > ");
             match self.on_text {
-                false => self.pattern.insert_formatted_text(find_builder),
+                false => self.pattern.insert_formatted_text(find_builder, &gs.theme),
                 true => {
                     find_builder.push(self.pattern.as_str());
                 }
@@ -177,7 +177,7 @@ impl Popup for ReplacePopup {
                 false => {
                     repl_builder.push(self.new_text.as_str());
                 }
-                true => self.new_text.insert_formatted_text(repl_builder),
+                true => self.new_text.insert_formatted_text(repl_builder, &gs.theme),
             }
         }
         backend.set_style(reset);

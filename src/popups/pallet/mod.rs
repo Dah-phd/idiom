@@ -179,27 +179,25 @@ impl Pallet {
 
     fn force_render_as_pallet(&mut self, gs: &mut GlobalState) {
         let mut rect = Self::get_pallet_rect(gs);
-        let backend = gs.backend();
-        rect.draw_borders(None, None, backend);
+        rect.draw_borders(None, None, gs.backend());
 
         let Some(line) = rect.next_line() else { return };
-        self.pattern.widget(line, backend);
+        self.pattern.widget(line, gs);
 
         let options = self.commands.iter().map(|cmd| cmd.1.label);
-        self.state.render_list(options, rect, backend);
+        self.state.render_list(options, rect, gs.backend());
     }
 
     fn force_render_as_cmd(&mut self, gs: &mut GlobalState) {
         let rect = Self::get_cmd_rect(gs);
-        let backend = gs.backend();
-        rect.draw_borders(None, None, backend);
+        rect.draw_borders(None, None, gs.backend());
         let mut lines = rect.into_iter();
 
         let Some(line) = lines.next() else { return };
-        self.pattern.widget(line, backend);
+        self.pattern.widget(line, gs);
 
         let Some(line) = lines.next() else { return };
-        line.render("resolution", backend);
+        line.render("resolution", gs.backend());
     }
 
     pub fn get_pallet_rect(gs: &GlobalState) -> Rect {

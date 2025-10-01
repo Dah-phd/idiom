@@ -1,7 +1,7 @@
 use crate::{
-    configs::EditorAction,
+    configs::{EditorAction, Theme},
     ext_tui::{CrossTerm, StyleExt},
-    global_state::Clipboard,
+    global_state::{Clipboard, GlobalState},
 };
 use core::{fmt::Display, ops::Range};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -69,24 +69,26 @@ impl<T: Default + Clone> TextField<T> {
     }
 
     /// returns blockless paragraph widget " >> inner text"
-    pub fn widget(&self, line: Line, backend: &mut CrossTerm) {
-        let mut builder = line.unsafe_builder(backend);
+    pub fn widget(&self, line: Line, gs: &mut GlobalState) {
+        let mut builder = line.unsafe_builder(&mut gs.backend);
         builder.push(" >> ");
-        self.insert_formatted_text(builder);
+        self.insert_formatted_text(builder, &gs.theme);
     }
 
     /// returns blockless paragraph widget "99+ >> inner text"
     #[allow(dead_code)]
-    pub fn widget_with_count(&self, line: Line, count: usize, backend: &mut CrossTerm) {
-        let mut builder = line.unsafe_builder(backend);
+    pub fn widget_with_count(&self, line: Line, count: usize, gs: &mut GlobalState) {
+        let mut builder = line.unsafe_builder(&mut gs.backend);
         builder.push(count_as_string(count).as_str());
         builder.push(" >> ");
-        self.insert_formatted_text(builder);
+        self.insert_formatted_text(builder, &gs.theme);
     }
 
-    pub fn insert_formatted_text(&self, line_builder: LineBuilder<CrossTerm>) {
+    pub fn insert_formatted_text(&self, line_builder: LineBuilder<CrossTerm>, theme: &Theme) {
         match self.select.as_ref().map(|(f, t)| if f > t { (*t, *f) } else { (*f, *t) }) {
-            Some((from, to)) if from != to => self.text_cursor_select(from, to, line_builder),
+            Some((from, to)) if from != to => {
+                self.text_cursor_select(from, to, line_builder, ContentStyle::bg(theme.selected))
+            }
             _ => self.text_cursor(line_builder),
         };
     }
@@ -106,14 +108,20 @@ impl<T: Default + Clone> TextField<T> {
         };
     }
 
-    fn text_cursor_select(&self, from: usize, to: usize, mut builder: LineBuilder<CrossTerm>) {
+    fn text_cursor_select(
+        &self,
+        from: usize,
+        to: usize,
+        mut builder: LineBuilder<CrossTerm>,
+        select_style: ContentStyle,
+    ) {
         builder.push(self.text[..from].as_ref());
         match self.get_cursor_range() {
             Some(cursor) => {
                 let Range { start, end } = cursor;
                 if from == start {
                     builder.push_styled(&self.text[cursor], ContentStyle::reversed());
-                    builder.push_styled(&self.text[end..to], self.select_style);
+                    builder.push_styled(&self.text[end..to], select_style);
                     builder.push(&self.text[to..]);
                 } else {
                     builder.push_styled(&self.text[from..start], self.select_style);
@@ -122,7 +130,7 @@ impl<T: Default + Clone> TextField<T> {
                 }
             }
             None => {
-                builder.push_styled(self.text[from..to].as_ref(), self.select_style);
+                builder.push_styled(self.text[from..to].as_ref(), select_style);
                 builder.push(self.text[to..].as_ref());
                 builder.push_styled(" ", ContentStyle::reversed());
             }
@@ -475,12 +483,15 @@ impl TextField<()> {
 pub mod test {
     use super::TextField;
     use crate::ext_tui::{CrossTerm, StyleExt};
-    use crate::global_state::Clipboard;
+    use crate::global_state::{Clipboard, GlobalState};
     use crossterm::{
         event::{KeyCode, KeyEvent, KeyModifiers},
         style::{Color, ContentStyle},
     };
-    use idiom_tui::{layout::Line, Backend};
+    use idiom_tui::{
+        layout::{Line, Rect},
+        Backend,
+    };
 
     pub fn pull_select<T: Clone + Default>(text_field: &TextField<T>) -> Option<(usize, usize)> {
         text_field.select
@@ -493,13 +504,13 @@ pub mod test {
     #[test]
     fn render_non_ascii() {
         let mut field = TextField::new("a a🦀🦀ssd asd 🦀s".to_owned(), Some(true));
-        let mut backend = CrossTerm::init();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
         let line = Line { row: 0, col: 1, width: 50 };
-        field.widget(line, &mut backend);
+        field.widget(line, &mut gs);
         let mut cliptboard = Clipboard::default();
 
         assert_eq!(
-            backend.drain(),
+            gs.backend.drain(),
             &[
                 (ContentStyle::default(), "<<go to row: 0 col: 1>>".to_owned()),
                 (ContentStyle::default(), " >> ".to_owned()),
@@ -515,9 +526,9 @@ pub mod test {
         assert!(!field.map(&KeyEvent::new(KeyCode::Right, KeyModifiers::empty()), &mut cliptboard).unwrap());
 
         let line = Line { row: 0, col: 1, width: 50 };
-        field.widget(line, &mut backend);
+        field.widget(line, &mut gs);
         assert_eq!(
-            backend.drain(),
+            gs.backend.drain(),
             &[
                 (ContentStyle::default(), "<<go to row: 0 col: 1>>".to_owned()),
                 (ContentStyle::default(), " >> ".to_owned()),
@@ -534,9 +545,9 @@ pub mod test {
             .unwrap());
 
         let line = Line { row: 0, col: 1, width: 50 };
-        field.widget(line, &mut backend);
+        field.widget(line, &mut gs);
         assert_eq!(
-            backend.drain(),
+            gs.backend.drain(),
             &[
                 (ContentStyle::default(), "<<go to row: 0 col: 1>>".to_owned()),
                 (ContentStyle::default(), " >> ".to_owned()),
@@ -552,13 +563,13 @@ pub mod test {
     #[test]
     fn render_with_number() {
         let field = TextField::new("some text".to_owned(), Some(true));
-        let mut backend = CrossTerm::init();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
         let line = Line { row: 0, col: 1, width: 50 };
 
-        field.widget_with_count(line, 3, &mut backend);
+        field.widget_with_count(line, 3, &mut gs);
 
         assert_eq!(
-            backend.drain(),
+            gs.backend.drain(),
             &[
                 (ContentStyle::default(), "<<go to row: 0 col: 1>>".to_owned()),
                 (ContentStyle::default(), "  3".to_owned()),

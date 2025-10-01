@@ -198,7 +198,7 @@ impl Popup for FindPopup {
     }
 
     fn force_render(&mut self, gs: &mut GlobalState) {
-        let backend = gs.backend();
+        let backend = &mut gs.backend;
         let reset_style = backend.get_style();
         backend.set_style(self.accent);
         {
@@ -206,7 +206,7 @@ impl Popup for FindPopup {
             builder.push(" Found(");
             builder.push(&count_as_string(self.options.len()));
             builder.push(") >> ");
-            self.pattern.insert_formatted_text(builder);
+            self.pattern.insert_formatted_text(builder, &gs.theme);
         }
         backend.set_style(reset_style);
     }

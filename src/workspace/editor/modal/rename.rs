@@ -27,7 +27,7 @@ impl RenameVariable {
     #[inline]
     pub fn render(&mut self, area: &Rect, gs: &mut GlobalState) {
         area.get_line(0).expect("Checked").render(&self.title, &mut gs.backend);
-        self.new_name.widget(area.get_line(1).expect("Checked"), &mut gs.backend);
+        self.new_name.widget(area.get_line(1).expect("Checked"), gs);
     }
 
     pub fn map(&mut self, action: EditorAction, gs: &mut GlobalState) -> ModalMessage {

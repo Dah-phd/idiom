@@ -80,20 +80,19 @@ impl OpenFileSelector {
 }
 
 impl Popup for OpenFileSelector {
-    fn force_render(&mut self, gs: &mut crate::global_state::GlobalState) {
+    fn force_render(&mut self, gs: &mut GlobalState) {
         let mut rect = Self::get_rect(gs);
-        let backend = gs.backend();
-        rect.draw_borders(None, None, backend);
+        rect.draw_borders(None, None, gs.backend());
         match rect.next_line() {
-            Some(line) => self.pattern.widget(line, backend),
+            Some(line) => self.pattern.widget(line, gs),
             None => return,
         }
         match self.paths.is_empty() {
             true => {
-                self.state.render_list(["No child paths found!"].into_iter(), rect, backend);
+                self.state.render_list(["No child paths found!"].into_iter(), rect, gs.backend());
             }
             false => {
-                self.state.render_list(self.paths.iter().map(String::as_str), rect, backend);
+                self.state.render_list(self.paths.iter().map(String::as_str), rect, gs.backend());
             }
         };
     }
