@@ -170,7 +170,7 @@ impl Cursor {
     pub fn screen_up(&mut self, content: &[EditorLine]) {
         self.select = None;
         self.line = self.line.saturating_sub(self.max_rows);
-        self.at_line = self.line.saturating_sub(self.max_rows / 2);
+        self.at_line = self.at_line.saturating_sub(self.max_rows);
         self.adjust_char(&content[self.line]);
     }
 
@@ -222,7 +222,7 @@ impl Cursor {
             return;
         };
         self.line = std::cmp::min(content.len() - 1, self.line + self.max_rows);
-        self.at_line = self.line.saturating_sub(self.max_rows / 2);
+        self.at_line = std::cmp::min(content.len() - 1, self.at_line + self.max_rows);
         self.adjust_char(&content[self.line]);
     }
 
