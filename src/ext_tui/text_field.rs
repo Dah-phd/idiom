@@ -153,53 +153,21 @@ impl<T: Default + Clone> TextField<T> {
                 if key.modifiers == KeyModifiers::CONTROL
                     || key.modifiers == KeyModifiers::CONTROL | KeyModifiers::SHIFT =>
             {
-                if let Some(clip) = self.get_selected() {
-                    clipboard.push(clip);
-                };
-                Some(T::default())
+                self.clipboard_copy(clipboard)
             }
-            KeyCode::Char('x' | 'X') if key.modifiers == KeyModifiers::CONTROL => {
-                if let Some(clip) = self.take_selected() {
-                    clipboard.push(clip);
-                    return Some(self.on_text_update.clone().unwrap_or_default());
-                };
-                Some(T::default())
-            }
-            KeyCode::Char('v' | 'V') if key.modifiers == KeyModifiers::CONTROL => {
-                if let Some(clip) = clipboard.pull() {
-                    if !clip.contains('\n') {
-                        self.take_selected();
-                        self.text.insert_str(self.char, clip.as_str());
-                        self.char += clip.len();
-                        return Some(self.on_text_update.clone().unwrap_or_default());
-                    };
-                };
-                Some(T::default())
-            }
+            KeyCode::Char('x' | 'X') if key.modifiers == KeyModifiers::CONTROL => self.clipboard_cut(clipboard),
+            KeyCode::Char('v' | 'V') if key.modifiers == KeyModifiers::CONTROL => self.clipboard_paste(clipboard),
             KeyCode::Char('a' | 'A') if key.modifiers == KeyModifiers::CONTROL => {
                 self.select_all();
                 Some(T::default())
             }
-            KeyCode::Char(ch) => {
-                self.take_selected();
-                self.text.insert(self.char, ch);
-                self.char += ch.len_utf8();
-                Some(self.on_text_update.clone().unwrap_or_default())
-            }
-            KeyCode::Delete => {
-                if self.take_selected().is_some() {
-                } else if self.char < self.text.len() && !self.text.is_empty() {
-                    self.text.remove(self.char);
-                };
-                Some(self.on_text_update.clone().unwrap_or_default())
-            }
-            KeyCode::Backspace => {
-                if self.take_selected().is_some() {
-                } else if self.char > 0 && !self.text.is_empty() {
-                    self.prev_char();
-                    self.text.remove(self.char);
-                };
-                Some(self.on_text_update.clone().unwrap_or_default())
+            KeyCode::Char(ch) => self.push_char(ch),
+            KeyCode::Delete => self.del(),
+            KeyCode::Backspace => self.backspace(),
+            KeyCode::Home => {
+                self.select = None;
+                self.char = 0;
+                Some(T::default())
             }
             KeyCode::End => {
                 self.select = None;
@@ -214,50 +182,16 @@ impl<T: Default + Clone> TextField<T> {
 
     pub fn map_actions(&mut self, action: EditorAction, clipboard: &mut Clipboard) -> Option<T> {
         match action {
-            EditorAction::Copy => {
-                if let Some(clip) = self.get_selected() {
-                    clipboard.push(clip);
-                };
+            EditorAction::Copy => self.clipboard_copy(clipboard),
+            EditorAction::Cut => self.clipboard_cut(clipboard),
+            EditorAction::Paste => self.clipboard_paste(clipboard),
+            EditorAction::Char(ch) => self.push_char(ch),
+            EditorAction::Delete => self.del(),
+            EditorAction::Backspace => self.backspace(),
+            EditorAction::StartOfLine | EditorAction::StartOfFile => {
+                self.select = None;
+                self.char = 0;
                 Some(T::default())
-            }
-            EditorAction::Cut => {
-                if let Some(clip) = self.take_selected() {
-                    clipboard.push(clip);
-                    return Some(self.on_text_update.clone().unwrap_or_default());
-                };
-                Some(T::default())
-            }
-            EditorAction::Paste => {
-                if let Some(clip) = clipboard.pull() {
-                    if !clip.contains('\n') {
-                        self.take_selected();
-                        self.text.insert_str(self.char, clip.as_str());
-                        self.char += clip.len();
-                        return Some(self.on_text_update.clone().unwrap_or_default());
-                    };
-                };
-                Some(T::default())
-            }
-            EditorAction::Char(ch) => {
-                self.take_selected();
-                self.text.insert(self.char, ch);
-                self.char += ch.len_utf8();
-                Some(self.on_text_update.clone().unwrap_or_default())
-            }
-            EditorAction::Delete => {
-                if self.take_selected().is_some() {
-                } else if self.char < self.text.len() && !self.text.is_empty() {
-                    self.text.remove(self.char);
-                };
-                Some(self.on_text_update.clone().unwrap_or_default())
-            }
-            EditorAction::Backspace => {
-                if self.take_selected().is_some() {
-                } else if self.char > 0 && !self.text.is_empty() {
-                    self.prev_char();
-                    self.text.remove(self.char);
-                };
-                Some(self.on_text_update.clone().unwrap_or_default())
             }
             EditorAction::EndOfLine | EditorAction::EndOfFile => {
                 self.select = None;
@@ -265,8 +199,8 @@ impl<T: Default + Clone> TextField<T> {
                 Some(T::default())
             }
             EditorAction::Left => {
-                self.prev_char();
                 self.select = None;
+                self.prev_char();
                 Some(T::default())
             }
             EditorAction::SelectLeft => {
@@ -277,18 +211,20 @@ impl<T: Default + Clone> TextField<T> {
             }
             EditorAction::JumpLeft => {
                 self.select = None;
+                self.prev_char();
                 self.jump_left();
                 Some(T::default())
             }
             EditorAction::JumpLeftSelect => {
                 self.init_select();
+                self.prev_char();
                 self.jump_left();
                 self.push_select();
                 Some(T::default())
             }
             EditorAction::Right => {
-                self.next_char();
                 self.select = None;
+                self.next_char();
                 Some(T::default())
             }
             EditorAction::SelectRight => {
@@ -299,11 +235,13 @@ impl<T: Default + Clone> TextField<T> {
             }
             EditorAction::JumpRight => {
                 self.select = None;
+                self.next_char();
                 self.jump_right();
                 Some(T::default())
             }
             EditorAction::JumpRightSelect => {
                 self.init_select();
+                self.next_char();
                 self.jump_right();
                 self.push_select();
                 Some(T::default())
@@ -339,6 +277,65 @@ impl<T: Default + Clone> TextField<T> {
         }
         self.select.take();
         self.char = std::cmp::min(rel_char, self.text.len());
+    }
+
+    fn push_char(&mut self, ch: char) -> Option<T> {
+        self.take_selected();
+        self.text.insert(self.char, ch);
+        self.char += ch.len_utf8();
+        Some(self.on_text_update.clone().unwrap_or_default())
+    }
+
+    fn del(&mut self) -> Option<T> {
+        if self.take_selected().is_some() {
+            Some(self.on_text_update.clone().unwrap_or_default())
+        } else if self.char < self.text.len() && !self.text.is_empty() {
+            self.text.remove(self.char);
+            Some(self.on_text_update.clone().unwrap_or_default())
+        } else {
+            Some(T::default())
+        }
+    }
+
+    fn backspace(&mut self) -> Option<T> {
+        if self.take_selected().is_some() {
+            Some(self.on_text_update.clone().unwrap_or_default())
+        } else if self.char > 0 && !self.text.is_empty() {
+            self.prev_char();
+            self.text.remove(self.char);
+            Some(self.on_text_update.clone().unwrap_or_default())
+        } else {
+            Some(T::default())
+        }
+    }
+
+    fn clipboard_paste(&mut self, clipboard: &mut Clipboard) -> Option<T> {
+        match clipboard.pull() {
+            Some(clip) if !clip.contains('\n') => {
+                self.take_selected();
+                self.text.insert_str(self.char, clip.as_str());
+                self.char += clip.len();
+                Some(self.on_text_update.clone().unwrap_or_default())
+            }
+            _ => Some(T::default()),
+        }
+    }
+
+    fn clipboard_copy(&mut self, clipboard: &mut Clipboard) -> Option<T> {
+        if let Some(clip) = self.get_selected() {
+            clipboard.push(clip);
+        };
+        Some(T::default())
+    }
+
+    fn clipboard_cut(&mut self, clipboard: &mut Clipboard) -> Option<T> {
+        match self.take_selected() {
+            Some(clip) => {
+                clipboard.push(clip);
+                Some(self.on_text_update.clone().unwrap_or_default())
+            }
+            None => Some(T::default()),
+        }
     }
 
     fn get_cursor_range(&self) -> Option<Range<usize>> {
