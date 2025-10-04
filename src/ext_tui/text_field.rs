@@ -12,7 +12,7 @@ use idiom_tui::{
     text_field::{Status, TextField as Field},
 };
 
-fn map_action(text_field: &mut Field, action: EditorAction, clipbaord: &mut Clipboard) -> Option<Status> {
+pub fn map_action(text_field: &mut Field, action: EditorAction, clipbaord: &mut Clipboard) -> Option<Status> {
     match action {
         EditorAction::Copy => {
             if let Some(clip) = text_field.copy() {
@@ -49,7 +49,7 @@ fn map_action(text_field: &mut Field, action: EditorAction, clipbaord: &mut Clip
     }
 }
 
-fn map(text_field: &mut Field, key: KeyEvent, clipbaord: &mut Clipboard) -> Option<Status> {
+pub fn map_key(text_field: &mut Field, key: KeyEvent, clipbaord: &mut Clipboard) -> Option<Status> {
     match key.code {
         KeyCode::Char('c' | 'C')
             if key.modifiers == KeyModifiers::CONTROL
