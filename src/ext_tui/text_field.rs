@@ -565,14 +565,6 @@ pub mod test {
         Backend,
     };
 
-    pub fn pull_select<T: Clone + Default>(text_field: &TextField<T>) -> Option<(usize, usize)> {
-        text_field.select
-    }
-
-    pub fn pull_char<T: Clone + Default>(text_field: &TextField<T>) -> usize {
-        text_field.char
-    }
-
     #[test]
     fn render_non_ascii() {
         let mut field = TextField::new("a a🦀🦀ssd asd 🦀s".to_owned(), Some(true));

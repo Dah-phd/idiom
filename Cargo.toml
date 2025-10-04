@@ -18,7 +18,7 @@ authors = ["Daniel Nikolaev <toolsproed@gmail.com>"]
 
 [dependencies]
 # intern crates
-idiom_tui = "0.1.1"
+idiom_tui = "0.1.2"
 # extern crates
 bitflags = "2.9.1"
 clap = {version = "4.5.43", features = ["derive"]}
