@@ -1,20 +1,25 @@
 use super::{Components, Popup, Status};
 use crate::{
     embeded_term::EditorTerminal,
-    ext_tui::{text_field::TextField, State},
+    ext_tui::{text_field::map_key, State, StyleExt},
     global_state::{GlobalState, IdiomEvent},
     tree::Tree,
     workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use idiom_tui::{layout::Rect, Position};
+use crossterm::style::ContentStyle;
+use idiom_tui::{
+    layout::Rect,
+    text_field::{Status as InputStatus, TextField},
+    Position,
+};
 use std::{
     fs::DirEntry,
     path::{PathBuf, MAIN_SEPARATOR},
 };
 
 pub struct OpenFileSelector {
-    pattern: TextField<bool>,
+    pattern: TextField,
     state: State,
     paths: Vec<String>,
 }
@@ -26,7 +31,7 @@ impl OpenFileSelector {
         if path.is_dir() && !text.ends_with(MAIN_SEPARATOR) {
             text.push(MAIN_SEPARATOR)
         }
-        let pattern = TextField::new(text, Some(true));
+        let pattern = TextField::new(text);
         let mut new = Self { pattern, state: State::new(), paths: vec![] };
         new.solve_comletions();
         if let Err(error) = new.run(gs, ws, tree, term) {
@@ -84,7 +89,7 @@ impl Popup for OpenFileSelector {
         let mut rect = Self::get_rect(gs);
         rect.draw_borders(None, None, gs.backend());
         match rect.next_line() {
-            Some(line) => self.pattern.widget(line, gs),
+            Some(line) => self.pattern.widget(line, ContentStyle::reversed(), gs.get_select_style(), gs.backend()),
             None => return,
         }
         match self.paths.is_empty() {
@@ -110,13 +115,6 @@ impl Popup for OpenFileSelector {
                 self.solve_comletions();
             }
         }
-        if let Some(updated) = self.pattern.map(&key, &mut gs.clipboard) {
-            if updated {
-                self.solve_comletions();
-            }
-            self.force_render(gs);
-            return Status::Pending;
-        }
         match key {
             KeyEvent { code: KeyCode::Up, .. } => {
                 self.state.prev(self.paths.len());
@@ -135,7 +133,17 @@ impl Popup for OpenFileSelector {
                 }
                 self.resolve_completion();
             }
-            _ => {}
+            _ => {
+                match map_key(&mut self.pattern, key, &mut gs.clipboard) {
+                    Some(InputStatus::Skipped) | None => {}
+                    Some(InputStatus::Updated) => {
+                        self.solve_comletions();
+                        self.force_render(gs);
+                    }
+                    Some(InputStatus::UpdatedCursor) => self.force_render(gs),
+                }
+                return Status::Pending;
+            }
         }
         self.force_render(gs);
         Status::Pending
@@ -186,7 +194,7 @@ impl Popup for OpenFileSelector {
     fn render(&mut self, _: &mut GlobalState) {}
 
     fn paste_passthrough(&mut self, clip: String, _: &mut Components) -> bool {
-        if !self.pattern.paste_passthrough(clip) {
+        if !self.pattern.paste_passthrough(clip).is_updated() {
             return false;
         }
         self.solve_comletions();

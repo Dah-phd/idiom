@@ -143,16 +143,14 @@ impl Popup for ReplacePopup {
                     false => map_key(&mut self.pattern, key, &mut gs.clipboard),
                 };
                 match result {
+                    Some(InputStatus::Skipped) | None => {}
                     Some(InputStatus::Updated) => {
                         self.options.clear();
                         editor.find(self.pattern.as_str(), &mut self.options);
                         self.state = self.options.len().saturating_sub(1);
                         self.force_render(gs);
                     }
-                    Some(InputStatus::UpdatedCursor) => {
-                        self.force_render(gs);
-                    }
-                    Some(InputStatus::Skipped) | None => {}
+                    Some(InputStatus::UpdatedCursor) => self.force_render(gs),
                 }
             }
         }

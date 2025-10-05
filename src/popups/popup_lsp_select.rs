@@ -12,7 +12,7 @@ use crossterm::style::ContentStyle;
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use idiom_tui::{
     layout::{IterLines, Rect},
-    text_field::TextField,
+    text_field::{Status as InputStatus, TextField},
     Position,
 };
 
@@ -94,16 +94,6 @@ impl Popup for SelectorLSP {
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         let Components { gs, .. } = components;
 
-        if let Some(status) = map_key(&mut self.pattern, key, &mut gs.clipboard) {
-            if !status.is_updated() {
-                return Status::Pending;
-            }
-            if status.is_text_updated() {
-                self.filter(&gs.matcher);
-            }
-            self.force_render(gs);
-            return Status::Pending;
-        }
         match key {
             KeyEvent { code: KeyCode::Up, .. } => {
                 self.state.prev(self.file_types.len());
@@ -115,7 +105,17 @@ impl Popup for SelectorLSP {
                 gs.event.push(IdiomEvent::SetLSP(self.finish()));
                 return Status::Finished;
             }
-            _ => return Status::Pending,
+            _ => {
+                match map_key(&mut self.pattern, key, &mut gs.clipboard) {
+                    Some(InputStatus::Skipped) | None => {}
+                    Some(InputStatus::Updated) => {
+                        self.filter(&gs.matcher);
+                        self.force_render(gs)
+                    }
+                    Some(InputStatus::UpdatedCursor) => self.force_render(gs),
+                }
+                return Status::Pending;
+            }
         }
         self.force_render(gs);
         Status::Pending

@@ -154,27 +154,10 @@ impl Popup for FindPopup {
             }
             return Status::Finished;
         }
-        if let Some(status) = map_key(&mut self.pattern, key, &mut gs.clipboard) {
-            match status {
-                InputStatus::Updated => {
-                    if let Some(editor) = ws.get_active() {
-                        self.options.clear();
-                        editor.find(self.pattern.as_str(), &mut self.options);
-                    }
-                    self.state = self.options.len().saturating_sub(1);
-                    self.force_render(gs);
-                }
-                InputStatus::UpdatedCursor => {
-                    self.force_render(gs);
-                }
-                InputStatus::Skipped => {}
-            }
-            return Status::Pending;
-        }
         let select_result = match key.code {
             KeyCode::Enter | KeyCode::Down => next_option(&self.options, &mut self.state),
             KeyCode::Up => prev_option(&self.options, &mut self.state),
-            KeyCode::Esc | KeyCode::Left => return Status::Finished,
+            KeyCode::Esc => return Status::Finished,
             KeyCode::Tab => {
                 if let Some(editor) = ws.get_active() {
                     gs.insert_mode();
@@ -191,7 +174,21 @@ impl Popup for FindPopup {
                 }
                 return Status::Finished;
             }
-            _ => return Status::Pending,
+            _ => {
+                match map_key(&mut self.pattern, key, &mut gs.clipboard) {
+                    Some(InputStatus::Skipped) | None => {}
+                    Some(InputStatus::Updated) => {
+                        if let Some(editor) = ws.get_active() {
+                            self.options.clear();
+                            editor.find(self.pattern.as_str(), &mut self.options);
+                        }
+                        self.state = self.options.len().saturating_sub(1);
+                        self.force_render(gs);
+                    }
+                    Some(InputStatus::UpdatedCursor) => self.force_render(gs),
+                }
+                return Status::Pending;
+            }
         };
         let Some(editor) = ws.get_active() else {
             return Status::Finished;
