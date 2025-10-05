@@ -1,6 +1,6 @@
 use crate::{
     embeded_term::EditorTerminal,
-    ext_tui::text_field::TextField,
+    ext_tui::{text_field::map_key, StyleExt},
     global_state::GlobalState,
     tree::Tree,
     workspace::{CursorPosition, Workspace},
@@ -9,7 +9,11 @@ use crossterm::{
     event::{KeyCode, KeyEvent, KeyModifiers},
     style::ContentStyle,
 };
-use idiom_tui::{layout::Rect, Backend};
+use idiom_tui::{
+    layout::Rect,
+    text_field::{Status as InputStatus, TextField},
+    Backend,
+};
 
 use super::{
     utils::{count_as_string, next_option, prev_option},
@@ -18,8 +22,8 @@ use super::{
 
 pub struct ReplacePopup {
     pub options: Vec<(CursorPosition, CursorPosition)>,
-    pub pattern: TextField<bool>,
-    pub new_text: TextField<bool>,
+    pub pattern: TextField,
+    pub new_text: TextField,
     pub on_text: bool,
     pub state: usize,
     accent: ContentStyle,
@@ -38,8 +42,8 @@ impl ReplacePopup {
             accent: gs.ui_theme.accent_style(),
             on_text: false,
             options: Vec::new(),
-            pattern: TextField::new(String::new(), Some(true)),
-            new_text: TextField::new(String::new(), Some(true)),
+            pattern: TextField::default(),
+            new_text: TextField::default(),
             state: usize::default(),
         };
 
@@ -60,8 +64,8 @@ impl ReplacePopup {
         }
         Some(Self {
             on_text: true,
-            pattern: TextField::new(pattern, Some(true)),
-            new_text: TextField::new(String::new(), Some(true)),
+            pattern: TextField::new(pattern),
+            new_text: TextField::default(),
             options,
             state: 0,
             accent,
@@ -134,17 +138,22 @@ impl Popup for ReplacePopup {
                 }
             }
             _ => {
-                if Some(true)
-                    == match self.on_text {
-                        true => self.new_text.map(&key, &mut gs.clipboard),
-                        false => self.pattern.map(&key, &mut gs.clipboard),
+                let result = match self.on_text {
+                    true => map_key(&mut self.new_text, key, &mut gs.clipboard),
+                    false => map_key(&mut self.pattern, key, &mut gs.clipboard),
+                };
+                match result {
+                    Some(InputStatus::Updated) => {
+                        self.options.clear();
+                        editor.find(self.pattern.as_str(), &mut self.options);
+                        self.state = self.options.len().saturating_sub(1);
+                        self.force_render(gs);
                     }
-                {
-                    self.options.clear();
-                    editor.find(self.pattern.as_str(), &mut self.options);
-                    self.state = self.options.len().saturating_sub(1);
+                    Some(InputStatus::UpdatedCursor) => {
+                        self.force_render(gs);
+                    }
+                    Some(InputStatus::Skipped) | None => {}
                 }
-                self.force_render(gs);
             }
         }
         Status::Pending
@@ -164,7 +173,11 @@ impl Popup for ReplacePopup {
             find_builder.push(count_as_string(&self.options).as_str());
             find_builder.push(" > ");
             match self.on_text {
-                false => self.pattern.insert_formatted_text(find_builder, &gs.theme),
+                false => self.pattern.insert_formatted_text(
+                    find_builder,
+                    ContentStyle::reversed(),
+                    gs.ui_theme.accent_select_style(),
+                ),
                 true => {
                     find_builder.push(self.pattern.as_str());
                 }
@@ -177,7 +190,11 @@ impl Popup for ReplacePopup {
                 false => {
                     repl_builder.push(self.new_text.as_str());
                 }
-                true => self.new_text.insert_formatted_text(repl_builder, &gs.theme),
+                true => self.new_text.insert_formatted_text(
+                    repl_builder,
+                    ContentStyle::reversed(),
+                    gs.ui_theme.accent_select_style(),
+                ),
             }
         }
         backend.set_style(reset);

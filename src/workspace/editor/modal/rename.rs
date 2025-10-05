@@ -34,7 +34,7 @@ impl RenameVariable {
         self.new_name.widget(
             area.get_line(1).expect("Checked"),
             ContentStyle::reversed(),
-            gs.ui_theme.accent_style_reversed(),
+            gs.ui_theme.accent_select_style(),
             gs.backend(),
         );
     }

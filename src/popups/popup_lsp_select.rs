@@ -2,7 +2,7 @@ use super::{Components, Popup, Status};
 use crate::{
     configs::FileType,
     embeded_term::EditorTerminal,
-    ext_tui::{text_field::TextField, State, StyleExt},
+    ext_tui::{text_field::map_key, State, StyleExt},
     global_state::{GlobalState, IdiomEvent},
     tree::Tree,
     workspace::Workspace,
@@ -12,11 +12,12 @@ use crossterm::style::ContentStyle;
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use idiom_tui::{
     layout::{IterLines, Rect},
+    text_field::TextField,
     Position,
 };
 
 pub struct SelectorLSP {
-    pattern: TextField<bool>,
+    pattern: TextField,
     state: State,
     file_types: Vec<(i64, &'static str, FileType)>,
 }
@@ -28,7 +29,7 @@ impl SelectorLSP {
             .map(|x| (0, x.into(), x))
             .chain([(0, "markdown", FileType::MarkDown), (0, "no LSP", FileType::Text)])
             .collect();
-        let pattern = TextField::new(String::new(), Some(true));
+        let pattern = TextField::default();
         let mut new = Self { pattern, state: State::default(), file_types };
 
         if let Err(error) = new.run(gs, ws, tree, term) {
@@ -69,7 +70,7 @@ impl Popup for SelectorLSP {
         let accent = ContentStyle::fg(gs.ui_theme.accent());
         rect.draw_borders(None, None, gs.backend());
         match rect.next_line() {
-            Some(line) => self.pattern.widget(line, gs),
+            Some(line) => self.pattern.widget(line, ContentStyle::reversed(), gs.get_select_style(), gs.backend()),
             None => return,
         }
         self.state.update_at_line(rect.height as usize);
@@ -93,8 +94,11 @@ impl Popup for SelectorLSP {
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         let Components { gs, .. } = components;
 
-        if let Some(updated) = self.pattern.map(&key, &mut gs.clipboard) {
-            if updated {
+        if let Some(status) = map_key(&mut self.pattern, key, &mut gs.clipboard) {
+            if !status.is_updated() {
+                return Status::Pending;
+            }
+            if status.is_text_updated() {
                 self.filter(&gs.matcher);
             }
             self.force_render(gs);
@@ -153,7 +157,7 @@ impl Popup for SelectorLSP {
     fn render(&mut self, _: &mut GlobalState) {}
 
     fn paste_passthrough(&mut self, clip: String, c: &mut Components) -> bool {
-        if !self.pattern.paste_passthrough(clip) {
+        if !self.pattern.paste_passthrough(clip).is_updated() {
             return false;
         }
         self.filter(&c.gs.matcher);
