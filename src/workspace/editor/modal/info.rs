@@ -106,7 +106,7 @@ impl Info {
             Mode::Select => {
                 let selected = self.state.at_line + rel_index;
                 self.state.select(selected, self.len());
-                !matches!(self.finish(gs), ModalMessage::Taken | ModalMessage::None)
+                !matches!(self.finish(gs), ModalMessage::Taken | ModalMessage::Skipped)
             }
         }
     }

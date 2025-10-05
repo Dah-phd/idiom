@@ -49,6 +49,10 @@ impl RenameVariable {
         }
     }
 
+    pub fn paste(&mut self, clip: &str) {
+        self.new_name.paste_passthrough(clip.into());
+    }
+
     pub fn mouse_click(&mut self, rel_char: usize) {
         if let Some(checked_rel_char) = rel_char.checked_sub(TEXT_FIELD_RENDER_OFFSET) {
             if self.new_name.cursor() == checked_rel_char {

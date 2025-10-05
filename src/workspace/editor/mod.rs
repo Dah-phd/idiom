@@ -401,7 +401,14 @@ impl Editor {
     }
 
     #[inline(always)]
-    pub fn paste(&mut self, clip: String) {
+    pub fn paste(&mut self, clip: String, gs: &mut GlobalState) {
+        let (taken, modal_rect) = self.modal.paste_if_exists(&clip);
+        if let Some(rect) = modal_rect {
+            self.clear_lines_cache(rect, gs);
+        }
+        if taken {
+            return;
+        }
         (self.controls.paste)(self, clip)
     }
 

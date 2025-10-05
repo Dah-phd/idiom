@@ -209,13 +209,13 @@ pub fn map_term(
 }
 
 pub fn paste_passthrough_editor(
-    _gs: &mut GlobalState,
+    gs: &mut GlobalState,
     clip: String,
     workspace: &mut Workspace,
     _tmux: &mut EditorTerminal,
 ) {
     if let Some(editor) = workspace.get_active() {
-        editor.paste(clip);
+        editor.paste(clip, gs);
     }
 }
 

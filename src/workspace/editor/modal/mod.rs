@@ -21,7 +21,7 @@ use rename::RenameVariable;
 #[derive(Default, Debug)]
 pub enum ModalMessage {
     #[default]
-    None,
+    Skipped,
     Done,
     Taken,
     TakenDone,
@@ -78,6 +78,27 @@ impl EditorModal {
     }
 
     #[inline]
+    pub fn paste_if_exists(&mut self, clip: &str) -> (bool, Option<Rect>) {
+        let Some(modal) = self.inner.as_mut() else {
+            return (false, None);
+        };
+        match modal {
+            LSPModal::RenameVar(modal) => {
+                modal.paste(clip);
+                (true, self.last_render.take())
+            }
+            LSPModal::Info(..) => {
+                self.inner.take();
+                (false, self.last_render.take())
+            }
+            LSPModal::AutoComplete(..) => {
+                self.inner.take();
+                (false, self.last_render.take())
+            }
+        }
+    }
+
+    #[inline]
     pub fn map_if_exists(editor: &mut Editor, action: EditorAction, gs: &mut GlobalState) -> (bool, Option<Rect>) {
         let Some(modal) = editor.modal.inner.as_mut() else {
             return (false, None);
@@ -91,7 +112,7 @@ impl EditorModal {
             },
         };
         match message {
-            ModalMessage::None => (false, editor.modal.last_render.take()),
+            ModalMessage::Skipped => (false, editor.modal.last_render.take()),
             ModalMessage::Taken => (true, editor.modal.last_render.take()),
             ModalMessage::TakenDone => {
                 editor.modal.inner.take();
