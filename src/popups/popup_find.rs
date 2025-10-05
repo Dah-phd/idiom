@@ -6,7 +6,7 @@ use super::{
 };
 use crate::{
     embeded_term::EditorTerminal,
-    ext_tui::{text_field::TextField, StyleExt},
+    ext_tui::{text_field::map_key, StyleExt},
     global_state::GlobalState,
     tree::Tree,
     workspace::{CursorPosition, Workspace},
@@ -16,6 +16,7 @@ use crossterm::style::ContentStyle;
 use idiom_tui::{
     count_as_string,
     layout::{Line, Rect},
+    text_field::{Status as InputStatus, TextField},
     Backend,
 };
 
@@ -114,7 +115,7 @@ impl Popup for GoToLinePopup {
 
 pub struct FindPopup {
     pub options: Vec<(CursorPosition, CursorPosition)>,
-    pub pattern: TextField<bool>,
+    pub pattern: TextField,
     pub state: usize,
     accent: ContentStyle,
     render_line: Line,
@@ -123,7 +124,7 @@ pub struct FindPopup {
 impl FindPopup {
     pub fn new(editor_area: Rect, accent: ContentStyle) -> Option<Self> {
         let render_line = editor_area.right_top_corner(1, 50).into_iter().next()?;
-        let pattern = TextField::new(String::new(), Some(true));
+        let pattern = TextField::default();
         Some(Self { options: Vec::new(), pattern, state: 0, accent, render_line })
     }
 
@@ -153,13 +154,21 @@ impl Popup for FindPopup {
             }
             return Status::Finished;
         }
-        if Some(true) == self.pattern.map(&key, &mut gs.clipboard) {
-            if let Some(editor) = ws.get_active() {
-                self.options.clear();
-                editor.find(self.pattern.as_str(), &mut self.options);
+        if let Some(status) = map_key(&mut self.pattern, key, &mut gs.clipboard) {
+            match status {
+                InputStatus::Updated => {
+                    if let Some(editor) = ws.get_active() {
+                        self.options.clear();
+                        editor.find(self.pattern.as_str(), &mut self.options);
+                    }
+                    self.state = self.options.len().saturating_sub(1);
+                    self.force_render(gs);
+                }
+                InputStatus::UpdatedCursor => {
+                    self.force_render(gs);
+                }
+                InputStatus::Skipped => {}
             }
-            self.state = self.options.len().saturating_sub(1);
-            self.force_render(gs);
             return Status::Pending;
         }
         let select_result = match key.code {
@@ -206,7 +215,7 @@ impl Popup for FindPopup {
             builder.push(" Found(");
             builder.push(&count_as_string(self.options.len()));
             builder.push(") >> ");
-            self.pattern.insert_formatted_text(builder, &gs.theme);
+            self.pattern.insert_formatted_text(builder, ContentStyle::reversed(), gs.ui_theme.accent_select_style());
         }
         backend.set_style(reset_style);
     }
