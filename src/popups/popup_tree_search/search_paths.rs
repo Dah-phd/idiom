@@ -1,14 +1,17 @@
 use super::{Components, Popup, Status};
 use crate::{
     embeded_term::EditorTerminal,
-    ext_tui::{text_field::TextField, State, StyleExt},
+    ext_tui::{text_field::map_key, State, StyleExt},
     global_state::{GlobalState, IdiomEvent},
     tree::{Tree, TreePath},
     workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use crossterm::style::Color;
-use idiom_tui::layout::{Rect, BORDERS};
+use crossterm::style::{Color, ContentStyle};
+use idiom_tui::{
+    layout::{Rect, BORDERS},
+    text_field::{Status as InputStatus, TextField},
+};
 use std::{path::PathBuf, sync::Arc, time::Duration};
 use std::{sync::Mutex, time::Instant};
 use tokio::task::JoinHandle;
@@ -22,7 +25,7 @@ pub struct ActivePathSearch {
     options_buffer: Arc<Mutex<Vec<PathBuf>>>,
     clock: Option<Instant>,
     state: State,
-    pattern: TextField<bool>,
+    pattern: TextField,
     join_handle: Option<JoinHandle<()>>,
     tree: TreePath,
 }
@@ -34,7 +37,7 @@ impl ActivePathSearch {
             options_buffer: Arc::default(),
             clock: None,
             state: State::default(),
-            pattern: TextField::new(String::new(), Some(true)),
+            pattern: TextField::new(String::new()),
             join_handle: None,
             tree: tree.shallow_copy_root_tree_path(),
         };
@@ -50,7 +53,7 @@ impl ActivePathSearch {
         self.options.clear();
         self.state.reset();
 
-        if self.pattern.text.len() < 2 {
+        if self.pattern.len() < 2 {
             self.clock = None;
         } else {
             self.clock = Some(Instant::now());
@@ -77,23 +80,28 @@ impl ActivePathSearch {
 impl Popup for ActivePathSearch {
     fn force_render(&mut self, gs: &mut GlobalState) {
         let mut rect = Self::get_rect(gs);
-        let accent_style = gs.theme.accent_style().with_fg(Color::Blue);
-        let backend = gs.backend();
-        rect.draw_borders(None, None, backend);
-        rect.border_title_styled(PATH_SEARCH_TITLE, accent_style, backend);
+        let accent_style = gs.ui_theme.accent_style().with_fg(Color::Blue);
+        rect.draw_borders(None, None, gs.backend());
+        rect.border_title_styled(PATH_SEARCH_TITLE, accent_style, gs.backend());
 
         let Some(line) = rect.next_line() else { return };
-        self.pattern.widget_with_count(line, self.options.len(), backend);
+        self.pattern.widget_with_count(
+            line,
+            self.options.len(),
+            ContentStyle::reversed(),
+            gs.get_select_style(),
+            gs.backend(),
+        );
         let Some(line) = rect.next_line() else { return };
-        line.fill(BORDERS.horizontal_top, backend);
+        line.fill(BORDERS.horizontal_top, gs.backend());
 
         if self.clock.is_some() || self.join_handle.is_some() {
-            self.state.render_list(["Searching ..."].into_iter(), rect, backend);
+            self.state.render_list(["Searching ..."].into_iter(), rect, gs.backend());
             return;
         }
 
         if self.options.is_empty() {
-            self.state.render_list(["No results found!"].into_iter(), rect, backend);
+            self.state.render_list(["No results found!"].into_iter(), rect, gs.backend());
         } else {
             self.state.render_list_complex(
                 &self.options,
@@ -101,25 +109,19 @@ impl Popup for ActivePathSearch {
                     builder.push(&format!("{}", path.display()));
                 }],
                 rect,
-                backend,
+                gs.backend(),
             );
         };
     }
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         let Components { gs, .. } = components;
-        if let Some(update) = self.pattern.map(&key, &mut gs.clipboard) {
-            if update {
-                self.collect_data();
-            }
-            self.force_render(gs);
-            return Status::Pending;
-        }
+
         match key.code {
             KeyCode::Up => self.state.prev(self.options.len()),
             KeyCode::Down => self.state.next(self.options.len()),
             KeyCode::Tab => {
-                gs.event.push(IdiomEvent::SearchFiles(self.pattern.text.to_owned()));
+                gs.event.push(IdiomEvent::SearchFiles(self.pattern.as_str().to_string()));
                 return Status::Finished;
             }
             KeyCode::Enter => {
@@ -128,7 +130,17 @@ impl Popup for ActivePathSearch {
                 }
                 return Status::Finished;
             }
-            _ => return Status::Pending,
+            _ => {
+                match map_key(&mut self.pattern, key, &mut gs.clipboard) {
+                    Some(InputStatus::Skipped) | None => {}
+                    Some(InputStatus::UpdatedCursor) => self.force_render(gs),
+                    Some(InputStatus::Updated) => {
+                        self.collect_data();
+                        self.force_render(gs);
+                    }
+                }
+                return Status::Pending;
+            }
         }
         self.force_render(gs);
         Status::Pending
@@ -158,9 +170,9 @@ impl Popup for ActivePathSearch {
     fn render(&mut self, gs: &mut GlobalState) {
         if matches!(self.clock, Some(inst) if inst.elapsed() >= WAIT_ON_UPDATE) {
             self.clock = None;
-            if !self.pattern.text.is_empty() {
+            if !self.pattern.as_str().is_empty() {
                 let root_tree = self.tree.clone();
-                let pattern = self.pattern.text.to_owned();
+                let pattern = self.pattern.as_str().to_string();
                 let buffer = Arc::clone(&self.options_buffer);
                 self.join_handle.replace(tokio::task::spawn(async move {
                     if let Ok(options) = root_tree.search_tree_paths(&pattern) {
@@ -191,7 +203,7 @@ impl Popup for ActivePathSearch {
     }
 
     fn paste_passthrough(&mut self, clip: String, _: &mut Components) -> bool {
-        if self.pattern.paste_passthrough(clip) {
+        if self.pattern.paste_passthrough(clip).is_updated() {
             self.collect_data();
             return true;
         }

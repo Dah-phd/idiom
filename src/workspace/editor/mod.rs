@@ -58,7 +58,7 @@ impl Editor {
         Ok(Self {
             cursor: Cursor::sized(*gs.editor_area(), line_number_offset),
             line_number_padding: line_number_offset,
-            lexer: Lexer::with_context(file_type, &path, gs),
+            lexer: Lexer::with_context(file_type, &path),
             content,
             renderer: Renderer::code(),
             actions: Actions::new(cfg.get_indent_cfg(file_type)),
@@ -83,7 +83,7 @@ impl Editor {
         Ok(Self {
             cursor,
             line_number_padding: line_number_offset,
-            lexer: Lexer::text_lexer(&path, gs),
+            lexer: Lexer::text_lexer(&path),
             content,
             renderer: Renderer::text(),
             actions: Actions::new(cfg.default_indent_cfg()),
@@ -108,7 +108,7 @@ impl Editor {
         Ok(Self {
             cursor,
             line_number_padding: line_number_offset,
-            lexer: Lexer::text_lexer(&path, gs),
+            lexer: Lexer::text_lexer(&path),
             content,
             renderer: Renderer::markdown(),
             actions: Actions::new(cfg.default_indent_cfg()),
@@ -187,17 +187,17 @@ impl Editor {
         match self.file_type.family() {
             FileFamily::Text => {
                 self.renderer = Renderer::text();
-                self.lexer = Lexer::text_lexer(&self.path, gs);
+                self.lexer = Lexer::text_lexer(&self.path);
                 calc_wraps(&mut self.content, self.cursor.text_width);
             }
             FileFamily::MarkDown => {
                 self.renderer = Renderer::markdown();
-                self.lexer = Lexer::md_lexer(&self.path, gs);
+                self.lexer = Lexer::md_lexer(&self.path);
                 calc_wraps(&mut self.content, self.cursor.text_width);
             }
             FileFamily::Code(..) => {
                 self.renderer = Renderer::code();
-                self.lexer = Lexer::with_context(file_type, &self.path, gs);
+                self.lexer = Lexer::with_context(file_type, &self.path);
             }
         };
         gs.force_screen_rebuild();
@@ -401,7 +401,14 @@ impl Editor {
     }
 
     #[inline(always)]
-    pub fn paste(&mut self, clip: String) {
+    pub fn paste(&mut self, clip: String, gs: &mut GlobalState) {
+        let (taken, modal_rect) = self.modal.paste_if_exists(&clip);
+        if let Some(rect) = modal_rect {
+            self.clear_lines_cache(rect, gs);
+        }
+        if taken {
+            return;
+        }
         (self.controls.paste)(self, clip)
     }
 

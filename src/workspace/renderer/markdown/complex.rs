@@ -1,6 +1,7 @@
 use super::StyledParser;
 use crate::{
     ext_tui::{CrossTerm, StyleExt},
+    global_state::GlobalState,
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::ContentStyle;
@@ -19,12 +20,13 @@ pub fn line_with_select(
     select: Range<usize>,
     lines: &mut RectIter,
     ctx: &mut LineContext,
-    backend: &mut CrossTerm,
+    gs: &mut GlobalState,
 ) {
+    let select_color = gs.theme.selected;
+    let backend = gs.backend();
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
     let mut remaining_width = line_width;
-    let select_color = ctx.lexer.theme.selected;
 
     for (idx, (text, current_width)) in CharLimitedWidths::new(text.as_str(), 3).enumerate() {
         if remaining_width < current_width {
@@ -53,11 +55,11 @@ pub fn cursor(
     skip: usize,
     lines: &mut RectIter,
     ctx: &mut LineContext,
-    backend: &mut CrossTerm,
+    gs: &mut GlobalState,
 ) {
     match select {
-        Some(select) => self::select(text, select, skip, lines, ctx, backend),
-        None => self::basic(text, skip, lines, ctx, backend),
+        Some(select) => self::select(text, select, skip, lines, ctx, gs),
+        None => self::basic(text, skip, lines, ctx, gs.backend()),
     }
 }
 
@@ -118,12 +120,13 @@ pub fn select(
     mut skip: usize,
     lines: &mut RectIter,
     ctx: &mut LineContext,
-    backend: &mut CrossTerm,
+    gs: &mut GlobalState,
 ) {
+    let select_color = gs.theme.selected;
+    let backend = gs.backend();
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
     let cursor_idx = ctx.cursor_char();
-    let select_color = ctx.lexer.theme.selected;
     let mut content = CharLimitedWidths::new(text.as_str(), 3);
     let mut idx = 0;
     let mut remaining_width = line_width;

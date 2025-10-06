@@ -2,7 +2,7 @@ use super::{Components, Popup, Status};
 use crate::{
     configs::FileType,
     embeded_term::EditorTerminal,
-    ext_tui::{text_field::TextField, State, StyleExt},
+    ext_tui::{text_field::map_key, State, StyleExt},
     global_state::{GlobalState, IdiomEvent},
     tree::Tree,
     workspace::Workspace,
@@ -12,11 +12,12 @@ use crossterm::style::ContentStyle;
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use idiom_tui::{
     layout::{IterLines, Rect},
+    text_field::{Status as InputStatus, TextField},
     Position,
 };
 
 pub struct SelectorLSP {
-    pattern: TextField<bool>,
+    pattern: TextField,
     state: State,
     file_types: Vec<(i64, &'static str, FileType)>,
 }
@@ -28,7 +29,7 @@ impl SelectorLSP {
             .map(|x| (0, x.into(), x))
             .chain([(0, "markdown", FileType::MarkDown), (0, "no LSP", FileType::Text)])
             .collect();
-        let pattern = TextField::new(String::new(), Some(true));
+        let pattern = TextField::default();
         let mut new = Self { pattern, state: State::default(), file_types };
 
         if let Err(error) = new.run(gs, ws, tree, term) {
@@ -43,7 +44,7 @@ impl SelectorLSP {
     fn filter(&mut self, matcher: &SkimMatcherV2) {
         self.state.select(0, self.file_types.len());
         for (score, label, ..) in self.file_types.iter_mut() {
-            *score = matcher.fuzzy_match(label, &self.pattern.text).unwrap_or_default();
+            *score = matcher.fuzzy_match(label, self.pattern.as_str()).unwrap_or_default();
         }
         self.file_types.sort_by(|(idx, ..), (rhidx, ..)| rhidx.cmp(idx));
     }
@@ -64,13 +65,12 @@ impl SelectorLSP {
 }
 
 impl Popup for SelectorLSP {
-    fn force_render(&mut self, gs: &mut crate::global_state::GlobalState) {
+    fn force_render(&mut self, gs: &mut GlobalState) {
         let mut rect = Self::get_rect(gs);
-        let accent = ContentStyle::fg(gs.theme.accent());
-        let backend = gs.backend();
-        rect.draw_borders(None, None, backend);
+        let accent = ContentStyle::fg(gs.ui_theme.accent());
+        rect.draw_borders(None, None, gs.backend());
         match rect.next_line() {
-            Some(line) => self.pattern.widget(line, backend),
+            Some(line) => self.pattern.widget(line, ContentStyle::reversed(), gs.get_select_style(), gs.backend()),
             None => return,
         }
         self.state.update_at_line(rect.height as usize);
@@ -78,29 +78,22 @@ impl Popup for SelectorLSP {
         for (idx, (score, text, ..)) in self.file_types.iter().enumerate().skip(self.state.at_line) {
             let Some(line) = lines.next() else { break };
             match idx == self.state.selected {
-                true => line.render_styled(text, self.state.highlight, backend),
+                true => line.render_styled(text, self.state.highlight, gs.backend()),
                 false => {
                     if *score == 0 {
-                        line.render_styled(text, accent, backend);
+                        line.render_styled(text, accent, gs.backend());
                     } else {
-                        line.render(text, backend)
+                        line.render(text, gs.backend())
                     }
                 }
             }
         }
-        lines.clear_to_end(backend);
+        lines.clear_to_end(gs.backend());
     }
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         let Components { gs, .. } = components;
 
-        if let Some(updated) = self.pattern.map(&key, &mut gs.clipboard) {
-            if updated {
-                self.filter(&gs.matcher);
-            }
-            self.force_render(gs);
-            return Status::Pending;
-        }
         match key {
             KeyEvent { code: KeyCode::Up, .. } => {
                 self.state.prev(self.file_types.len());
@@ -112,7 +105,17 @@ impl Popup for SelectorLSP {
                 gs.event.push(IdiomEvent::SetLSP(self.finish()));
                 return Status::Finished;
             }
-            _ => return Status::Pending,
+            _ => {
+                match map_key(&mut self.pattern, key, &mut gs.clipboard) {
+                    Some(InputStatus::Skipped) | None => {}
+                    Some(InputStatus::Updated) => {
+                        self.filter(&gs.matcher);
+                        self.force_render(gs)
+                    }
+                    Some(InputStatus::UpdatedCursor) => self.force_render(gs),
+                }
+                return Status::Pending;
+            }
         }
         self.force_render(gs);
         Status::Pending
@@ -154,7 +157,7 @@ impl Popup for SelectorLSP {
     fn render(&mut self, _: &mut GlobalState) {}
 
     fn paste_passthrough(&mut self, clip: String, c: &mut Components) -> bool {
-        if !self.pattern.paste_passthrough(clip) {
+        if !self.pattern.paste_passthrough(clip).is_updated() {
             return false;
         }
         self.filter(&c.gs.matcher);

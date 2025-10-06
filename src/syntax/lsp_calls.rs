@@ -1,4 +1,5 @@
 use crate::{
+    configs::Theme,
     global_state::{GlobalState, IdiomEvent},
     lsp::{LSPClient, LSPResponse, LSPResponseType, LSPResult},
     popups::popups_tree::refrence_selector,
@@ -23,7 +24,7 @@ use super::{
 
 /// maps LSP state without runtime checks
 #[inline]
-pub fn map_lsp(lexer: &mut Lexer, client: LSPClient) {
+pub fn map_lsp(lexer: &mut Lexer, client: LSPClient, theme: &Theme) {
     lexer.lsp = true;
 
     lexer.context = context;
@@ -43,7 +44,7 @@ pub fn map_lsp(lexer: &mut Lexer, client: LSPClient) {
 
     // tokens
     if let Some(tc) = client.capabilities.semantic_tokens_provider.as_ref() {
-        lexer.legend.map_styles(lexer.lang.file_type, &lexer.theme, tc);
+        lexer.legend.map_styles(lexer.lang.file_type, theme, tc);
         lexer.tokens = tokens;
         if client.capabilities.semantic_tokens_provider.as_ref().map(range_tokens_are_supported).unwrap_or_default() {
             lexer.tokens_partial = tokens_partial;
@@ -176,10 +177,10 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
                             }
                         }
                         LSPResponse::Hover(hover) => {
-                            modal.map_hover(hover, &lexer.theme);
+                            modal.map_hover(hover, &gs.theme);
                         }
                         LSPResponse::SignatureHelp(signature) => {
-                            modal.map_signatures(signature, &lexer.theme);
+                            modal.map_signatures(signature, &gs.theme);
                         }
                         LSPResponse::Renames(workspace_edit) => {
                             gs.event.push(workspace_edit.into());

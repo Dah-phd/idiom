@@ -1,6 +1,7 @@
 use super::{WRAP_CLOSE, WRAP_OPEN};
 use crate::{
-    ext_tui::{CrossTerm, StyleExt},
+    ext_tui::StyleExt,
+    global_state::GlobalState,
     workspace::{
         line::{EditorLine, LineContext},
         CursorPosition,
@@ -16,27 +17,23 @@ pub fn render(
     line_width: usize,
     cursors: Vec<CursorPosition>,
     selects: Vec<Range<usize>>,
-    backend: &mut CrossTerm,
+    gs: &mut GlobalState,
 ) {
     if line_width > line.char_len() {
-        basic(line, ctx, cursors, selects, backend);
+        basic(line, cursors, selects, gs);
         if let Some(diagnostics) = line.diagnostics.as_ref() {
-            diagnostics.inline_render(line_width - line.char_len(), backend);
+            diagnostics.inline_render(line_width - line.char_len(), gs.backend());
         }
     } else {
-        self::partial(line, ctx, line_width, cursors, selects, backend);
+        self::partial(line, ctx, line_width, cursors, selects, gs);
     }
 }
 
 #[inline]
-pub fn basic(
-    line: &EditorLine,
-    ctx: &LineContext,
-    cursors: Vec<CursorPosition>,
-    selects: Vec<Range<usize>>,
-    backend: &mut CrossTerm,
-) {
-    let select_color = ctx.lexer.theme.selected;
+pub fn basic(line: &EditorLine, cursors: Vec<CursorPosition>, selects: Vec<Range<usize>>, gs: &mut GlobalState) {
+    let select_color = gs.theme.selected;
+    let backend = gs.backend();
+
     let mut reset_style = ContentStyle::default();
     let mut iter_tokens = line.iter_tokens();
     let mut counter = 0;
@@ -125,9 +122,10 @@ pub fn partial(
     line_width: usize,
     cursors: Vec<CursorPosition>,
     selects: Vec<Range<usize>>,
-    backend: &mut CrossTerm,
+    gs: &mut GlobalState,
 ) {
     let last_idx = cursors.last().map(|c| c.char).unwrap_or_default();
+    let backend = &mut gs.backend;
 
     // index needs to be generated based on 0 skipped chars on multicursor
     // skipped chars are use to store info on multi cursor
@@ -156,7 +154,7 @@ pub fn partial(
     let mut lined_up = None;
     let mut tokens = line.iter_tokens();
     let mut cursor = idx;
-    let select_color = ctx.lexer.theme.selected;
+    let select_color = gs.theme.selected;
     let mut reset_style = ContentStyle::default();
 
     let mut select_iter = selects.into_iter();

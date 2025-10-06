@@ -4,32 +4,29 @@ use super::{popup_file_open::OpenFileSelector, Command, CommandResult, Component
 use crate::{
     configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
     embeded_term::EditorTerminal,
-    ext_tui::{text_field::TextField, State},
+    ext_tui::{text_field::map_key, State, StyleExt},
     global_state::{GlobalState, IdiomEvent},
     tree::Tree,
     workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::style::ContentStyle;
 use fuzzy_matcher::FuzzyMatcher;
-use idiom_tui::{layout::Rect, Position};
+use idiom_tui::{
+    layout::Rect,
+    text_field::{Status as InputStatus, TextField},
+    Position,
+};
 
 pub struct Pallet {
     commands: Vec<(i64, Command)>,
-    pattern: TextField<bool>,
+    pattern: TextField,
     state: State,
 }
 
 impl Popup for Pallet {
     fn force_render(&mut self, gs: &mut GlobalState) {
-        let mut rect = Self::get_rect(gs);
-        let backend = gs.backend();
-        rect.draw_borders(None, None, backend);
-        match rect.next_line() {
-            Some(line) => self.pattern.widget(line, backend),
-            None => return,
-        }
-        let options = self.commands.iter().map(|cmd| cmd.1.label);
-        self.state.render_list(options, rect, backend);
+        self.force_render_as_pallet(gs);
     }
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut super::Components) -> Status {
@@ -39,19 +36,6 @@ impl Popup for Pallet {
             return Status::Finished;
         }
 
-        if let Some(updated) = self.pattern.map(&key, &mut gs.clipboard) {
-            if updated {
-                for (score, cmd) in self.commands.iter_mut() {
-                    *score = match gs.matcher.fuzzy_match(cmd.label, &self.pattern.text) {
-                        Some(new_score) => new_score,
-                        None => i64::MAX,
-                    };
-                }
-                self.commands.sort_by(|(score, _), (rhscore, _)| score.cmp(rhscore));
-            }
-            self.force_render(gs);
-            return Status::Pending;
-        }
         match key.code {
             KeyCode::Enter => {
                 match self.commands.remove(self.state.selected).1.execute() {
@@ -66,7 +50,17 @@ impl Popup for Pallet {
             KeyCode::Down | KeyCode::Char('d') | KeyCode::Char('D') => {
                 self.state.next(self.commands.len());
             }
-            _ => (),
+            _ => {
+                match map_key(&mut self.pattern, key, &mut gs.clipboard) {
+                    Some(InputStatus::Skipped) | None => {}
+                    Some(InputStatus::UpdatedCursor) => self.force_render(gs),
+                    Some(InputStatus::Updated) => {
+                        self.sort_commands_by_pattern(gs);
+                        self.force_render(gs);
+                    }
+                }
+                return Status::Pending;
+            }
         }
         self.force_render(gs);
         Status::Pending
@@ -105,16 +99,10 @@ impl Popup for Pallet {
     }
 
     fn paste_passthrough(&mut self, clip: String, components: &mut super::Components) -> bool {
-        if !self.pattern.paste_passthrough(clip) {
+        if !self.pattern.paste_passthrough(clip).is_updated() {
             return false;
         }
-        for (score, cmd) in self.commands.iter_mut() {
-            *score = match components.gs.matcher.fuzzy_match(cmd.label, &self.pattern.text) {
-                Some(new_score) => new_score,
-                None => i64::MAX,
-            };
-        }
-        self.commands.sort_by(|(score, _), (rhscore, _)| score.cmp(rhscore));
+        self.sort_commands_by_pattern(components.gs);
         true
     }
 
@@ -146,20 +134,38 @@ impl Pallet {
         .map(|cmd| (0, cmd))
         .collect();
 
-        Pallet { commands, pattern: TextField::new(String::new(), Some(true)), state: State::new() }
+        Pallet { commands, pattern: TextField::default(), state: State::new() }
     }
 
-    #[inline]
     pub fn run(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         let git_tui = gs.git_tui.to_owned();
         if let Err(error) = Pallet::new(git_tui).run(gs, ws, tree, term) {
             gs.error(error);
-        };
+        }
     }
 
-    #[inline]
+    pub fn run_as_command(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
+        let git_tui = gs.git_tui.to_owned();
+        let mut pallet = Pallet::new(git_tui);
+        pallet.pattern.text_set(":".to_owned());
+        if let Err(error) = pallet.run(gs, ws, tree, term) {
+            gs.error(error);
+        }
+    }
+
+    fn sort_commands_by_pattern(&mut self, gs: &GlobalState) {
+        for (score, cmd) in self.commands.iter_mut() {
+            *score = match gs.matcher.fuzzy_match(cmd.label, self.pattern.as_str()) {
+                Some(new_score) => new_score,
+                None => i64::MAX,
+            };
+        }
+        self.state.select(0, self.commands.len());
+        self.commands.sort_by(|(score, _), (rhscore, _)| score.cmp(rhscore));
+    }
+
     fn get_command_idx(&self, row: u16, column: u16, gs: &GlobalState) -> Option<usize> {
-        let Position { row, .. } = Self::get_rect(gs).relative_position(row, column)?;
+        let Position { row, .. } = Self::get_pallet_rect(gs).relative_position(row, column)?;
         let line = row as usize;
         let command_idx = self.state.at_line + line.checked_sub(1)?;
         if self.commands.len() <= command_idx {
@@ -168,7 +174,18 @@ impl Pallet {
         Some(command_idx)
     }
 
-    pub fn get_rect(gs: &GlobalState) -> Rect {
+    fn force_render_as_pallet(&mut self, gs: &mut GlobalState) {
+        let mut rect = Self::get_pallet_rect(gs);
+        rect.draw_borders(None, None, gs.backend());
+
+        let Some(line) = rect.next_line() else { return };
+        self.pattern.widget(line, ContentStyle::reversed(), gs.get_select_style(), gs.backend());
+
+        let options = self.commands.iter().map(|cmd| cmd.1.label);
+        self.state.render_list(options, rect, gs.backend());
+    }
+
+    pub fn get_pallet_rect(gs: &GlobalState) -> Rect {
         gs.screen().top(15).vcenter(100).with_borders()
     }
 }

@@ -17,11 +17,10 @@ use std::path::PathBuf;
 pub fn mock_editor(content: Vec<String>) -> Editor {
     let ft = FileType::Rust;
     let path = PathBuf::from("test-path");
-    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let content: Vec<EditorLine> = content.into_iter().map(EditorLine::from).collect();
     Editor {
         line_number_padding: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
-        lexer: Lexer::with_context(ft, &path, &mut gs),
+        lexer: Lexer::with_context(ft, &path),
         file_type: ft,
         display: "".to_string(),
         path,

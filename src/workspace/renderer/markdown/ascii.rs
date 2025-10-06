@@ -1,6 +1,7 @@
 use super::StyledParser;
 use crate::{
     ext_tui::{CrossTerm, StyleExt},
+    global_state::GlobalState,
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::ContentStyle;
@@ -19,18 +20,19 @@ pub fn line_with_select(
     select: Range<usize>,
     lines: &mut RectIter,
     ctx: &mut LineContext,
-    backend: &mut CrossTerm,
+    gs: &mut GlobalState,
 ) {
+    let select_color = gs.theme.selected;
+    let backend = gs.backend();
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
 
     if text.char_len() == 0 {
-        backend.print_styled(" ", ContentStyle::bg(ctx.lexer.theme.selected));
+        backend.print_styled(" ", ContentStyle::bg(select_color));
         return;
     }
 
     let mut line_end = line_width;
-    let select_color = ctx.lexer.theme.selected;
 
     for (idx, text) in text.chars().enumerate() {
         if idx == line_end {
@@ -58,11 +60,11 @@ pub fn cursor(
     skip: usize,
     lines: &mut RectIter,
     ctx: &mut LineContext,
-    backend: &mut CrossTerm,
+    gs: &mut GlobalState,
 ) {
     match select {
-        Some(select) => self::select(text, skip, select, lines, ctx, backend),
-        None => self::basic(text, skip, lines, ctx, backend),
+        Some(select) => self::select(text, skip, select, lines, ctx, gs),
+        None => self::basic(text, skip, lines, ctx, gs.backend()),
     }
 }
 
@@ -99,12 +101,13 @@ pub fn select(
     select: Range<usize>,
     lines: &mut RectIter,
     ctx: &mut LineContext,
-    backend: &mut CrossTerm,
+    gs: &mut GlobalState,
 ) {
+    let select_color = gs.theme.selected;
+    let backend = gs.backend();
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
     let cursor_idx = ctx.cursor_char();
-    let select_color = ctx.lexer.theme.selected;
     let mut idx = skip * line_width;
     let mut line_end = line_width + idx;
 

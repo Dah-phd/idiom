@@ -86,7 +86,7 @@ impl Tree {
     pub fn fast_render(&mut self, gs: &mut GlobalState) {
         if self.rebuild {
             self.rebuild = false;
-            let accent = Some(gs.theme.accent());
+            let accent = Some(gs.ui_theme.accent());
             gs.backend().set_bg(accent);
             render::render_tree(self, gs);
             gs.backend().reset_style();

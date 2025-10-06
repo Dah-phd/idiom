@@ -1,6 +1,10 @@
 ## Includes only major changes (manual updates)
 # Version 0.7.0
-- idiom_command
+- idiom_command added
+
+# Version 0.6.3
+- added support for non ascii in text_field
+- moved to using TextField from idiom_tui
 
 # Version 0.6.2
 - fixed todo left in last release

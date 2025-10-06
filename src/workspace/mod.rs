@@ -342,7 +342,7 @@ impl Workspace {
         };
 
         // set initial tokens while LSP is indexing
-        crate::lsp::init_local_tokens(editor.file_type, &mut editor.content, &editor.lexer.theme);
+        crate::lsp::init_local_tokens(editor.file_type, &mut editor.content, &gs.theme);
         match self.lsp_servers.entry(editor.file_type) {
             Entry::Vacant(entry) => match LSP::new(lsp_cmd, editor.file_type).await {
                 Ok(lsp) => {
@@ -520,7 +520,7 @@ impl Workspace {
 
     pub fn refresh_cfg(&mut self, new_editor_key_map: EditorKeyMap, gs: &mut GlobalState) -> &mut EditorConfigs {
         self.key_map = new_editor_key_map;
-        gs.unwrap_or_default(self.base_configs.refresh(), ".config: ");
+        self.base_configs = gs.reload_confgs();
         for editor in self.editors.iter_mut() {
             editor.refresh_cfg(&self.base_configs);
             editor.lexer.reload_theme(gs);

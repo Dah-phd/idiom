@@ -1,20 +1,25 @@
 use super::{Components, Popup, Status};
 use crate::{
     embeded_term::EditorTerminal,
-    ext_tui::{text_field::TextField, State},
+    ext_tui::{text_field::map_key, State, StyleExt},
     global_state::{GlobalState, IdiomEvent},
     tree::Tree,
     workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
-use idiom_tui::{layout::Rect, Position};
+use crossterm::style::ContentStyle;
+use idiom_tui::{
+    layout::Rect,
+    text_field::{Status as InputStatus, TextField},
+    Position,
+};
 use std::{
     fs::DirEntry,
     path::{PathBuf, MAIN_SEPARATOR},
 };
 
 pub struct OpenFileSelector {
-    pattern: TextField<bool>,
+    pattern: TextField,
     state: State,
     paths: Vec<String>,
 }
@@ -26,7 +31,7 @@ impl OpenFileSelector {
         if path.is_dir() && !text.ends_with(MAIN_SEPARATOR) {
             text.push(MAIN_SEPARATOR)
         }
-        let pattern = TextField::new(text, Some(true));
+        let pattern = TextField::new(text);
         let mut new = Self { pattern, state: State::new(), paths: vec![] };
         new.solve_comletions();
         if let Err(error) = new.run(gs, ws, tree, term) {
@@ -37,7 +42,7 @@ impl OpenFileSelector {
     fn solve_comletions(&mut self) {
         self.paths.clear();
         self.state.reset();
-        let path = PathBuf::from(&self.pattern.text);
+        let path = PathBuf::from(self.pattern.as_str());
         match path.is_dir() {
             true => {
                 if let Ok(entries) = path.read_dir() {
@@ -46,14 +51,14 @@ impl OpenFileSelector {
             }
             false => {
                 if let Some(entries) = path.parent().and_then(|parent| parent.read_dir().ok()) {
-                    self.paths.extend(entries.flatten().filter_map(|de| checked_string(de, &self.pattern.text)));
+                    self.paths.extend(entries.flatten().filter_map(|de| checked_string(de, self.pattern.as_str())));
                 }
             }
         }
     }
 
     fn resolve_completion(&mut self) {
-        let match_idx = self.paths.iter().position(|txt| txt.starts_with(&self.pattern.text));
+        let match_idx = self.paths.iter().position(|txt| txt.starts_with(self.pattern.as_str()));
         if let Some(idx) = match_idx {
             let mut text = self.paths.remove(idx);
             if PathBuf::from(&text).is_dir() {
@@ -80,20 +85,19 @@ impl OpenFileSelector {
 }
 
 impl Popup for OpenFileSelector {
-    fn force_render(&mut self, gs: &mut crate::global_state::GlobalState) {
+    fn force_render(&mut self, gs: &mut GlobalState) {
         let mut rect = Self::get_rect(gs);
-        let backend = gs.backend();
-        rect.draw_borders(None, None, backend);
+        rect.draw_borders(None, None, gs.backend());
         match rect.next_line() {
-            Some(line) => self.pattern.widget(line, backend),
+            Some(line) => self.pattern.widget(line, ContentStyle::reversed(), gs.get_select_style(), gs.backend()),
             None => return,
         }
         match self.paths.is_empty() {
             true => {
-                self.state.render_list(["No child paths found!"].into_iter(), rect, backend);
+                self.state.render_list(["No child paths found!"].into_iter(), rect, gs.backend());
             }
             false => {
-                self.state.render_list(self.paths.iter().map(String::as_str), rect, backend);
+                self.state.render_list(self.paths.iter().map(String::as_str), rect, gs.backend());
             }
         };
     }
@@ -111,13 +115,6 @@ impl Popup for OpenFileSelector {
                 self.solve_comletions();
             }
         }
-        if let Some(updated) = self.pattern.map(&key, &mut gs.clipboard) {
-            if updated {
-                self.solve_comletions();
-            }
-            self.force_render(gs);
-            return Status::Pending;
-        }
         match key {
             KeyEvent { code: KeyCode::Up, .. } => {
                 self.state.prev(self.paths.len());
@@ -129,14 +126,24 @@ impl Popup for OpenFileSelector {
                 self.resolve_completion();
             }
             KeyEvent { code: KeyCode::Enter, .. } => {
-                let path = PathBuf::from(&self.pattern.text);
+                let path = PathBuf::from(self.pattern.as_str());
                 if path.is_file() {
-                    gs.event.push(IdiomEvent::OpenAtLine(PathBuf::from(self.pattern.text.as_str()), 0));
+                    gs.event.push(IdiomEvent::OpenAtLine(PathBuf::from(self.pattern.as_str()), 0));
                     return Status::Finished;
                 }
                 self.resolve_completion();
             }
-            _ => {}
+            _ => {
+                match map_key(&mut self.pattern, key, &mut gs.clipboard) {
+                    Some(InputStatus::Skipped) | None => {}
+                    Some(InputStatus::Updated) => {
+                        self.solve_comletions();
+                        self.force_render(gs);
+                    }
+                    Some(InputStatus::UpdatedCursor) => self.force_render(gs),
+                }
+                return Status::Pending;
+            }
         }
         self.force_render(gs);
         Status::Pending
@@ -187,7 +194,7 @@ impl Popup for OpenFileSelector {
     fn render(&mut self, _: &mut GlobalState) {}
 
     fn paste_passthrough(&mut self, clip: String, _: &mut Components) -> bool {
-        if !self.pattern.paste_passthrough(clip) {
+        if !self.pattern.paste_passthrough(clip).is_updated() {
             return false;
         }
         self.solve_comletions();

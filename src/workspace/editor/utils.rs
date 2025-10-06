@@ -81,9 +81,9 @@ pub fn editor_from_data(
     gs: &mut GlobalState,
 ) -> Editor {
     let (renderer, lexer) = match file_type.family() {
-        FileFamily::Text => (Renderer::text(), Lexer::text_lexer(&path, gs)),
-        FileFamily::MarkDown => (Renderer::markdown(), Lexer::md_lexer(&path, gs)),
-        FileFamily::Code(file_type) => (Renderer::code(), Lexer::with_context(file_type, &path, gs)),
+        FileFamily::Text => (Renderer::text(), Lexer::text_lexer(&path)),
+        FileFamily::MarkDown => (Renderer::markdown(), Lexer::md_lexer(&path)),
+        FileFamily::Code(file_type) => (Renderer::code(), Lexer::with_context(file_type, &path)),
     };
 
     let display = build_display(&path);
