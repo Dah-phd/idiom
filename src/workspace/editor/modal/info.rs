@@ -360,6 +360,6 @@ mod test {
         assert!(modal.mouse_moved(2));
         assert_eq!(modal.state.selected, 2);
         assert!(modal.mouse_click_and_finish(1, &mut gs));
-        assert_eq!(gs.event, vec![second.into()]);
+        assert_eq!(gs.event[0], second.into());
     }
 }

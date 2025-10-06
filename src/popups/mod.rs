@@ -150,7 +150,7 @@ impl Command {
     }
 }
 
-#[derive(Debug, Clone)]
+// #[derive(Debug, Clone)]
 enum CommandResult {
     Simple(IdiomEvent),
     BigCB(fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal)),

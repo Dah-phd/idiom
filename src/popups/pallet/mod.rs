@@ -105,7 +105,7 @@ impl Popup for Pallet {
         if !self.pattern.paste_passthrough(clip).is_updated() {
             return false;
         }
-        self.sort_commands_by_pattern(&components.gs);
+        self.sort_commands_by_pattern(components.gs);
         true
     }
 

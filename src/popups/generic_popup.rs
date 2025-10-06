@@ -1,6 +1,6 @@
 use crate::{
     embeded_term::EditorTerminal,
-    ext_tui::{text_field::TextField, CrossTerm, StyleExt},
+    ext_tui::{text_field::map_key, CrossTerm, StyleExt},
     global_state::GlobalState,
     popups::{Components, Popup, Status},
     tree::Tree,
@@ -10,7 +10,10 @@ use crossterm::{
     event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind},
     style::ContentStyle,
 };
-use idiom_tui::layout::Line;
+use idiom_tui::{
+    layout::Line,
+    text_field::{Status as InputStatus, TextField},
+};
 use std::ops::Range;
 
 #[allow(unpredictable_function_pointer_comparisons)]
@@ -29,7 +32,7 @@ impl std::fmt::Debug for CommandButton {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PopupChoice {
-    pub message: TextField<()>,
+    pub message: TextField,
     buffer_message: bool,
     title_prefix: Option<&'static str>,
     title: String,
@@ -81,29 +84,31 @@ impl Popup for PopupChoice {
     }
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
-        self.mark_as_updated();
         if let Some(button) =
             self.buttons.iter().find(|button| matches!(&button.key, Some(key_code) if key_code.contains(&key.code)))
         {
             (button.command)(self, components);
             return Status::Finished;
         }
-        if self.buffer_message && self.message.map(&key, &mut components.gs.clipboard).is_some() {
-            return Status::Pending;
-        }
         match key.code {
             KeyCode::Enter => {
                 (self.buttons[self.state].command)(self, components);
                 return Status::Finished;
             }
-            KeyCode::Left | KeyCode::BackTab => {
-                self.prev();
+            KeyCode::BackTab => self.prev(),
+            KeyCode::Tab => self.next(),
+            _ if self.buffer_message => {
+                let status = map_key(&mut self.message, key, &mut components.gs.clipboard);
+                if matches!(status, Some(InputStatus::Skipped) | None) {
+                    return Status::Pending;
+                }
             }
-            KeyCode::Right | KeyCode::Tab => {
-                self.next();
-            }
-            _ => (),
+            // mapped if buffer_message is off
+            KeyCode::Left => self.prev(),
+            KeyCode::Right => self.next(),
+            _ => return Status::Pending,
         }
+        self.mark_as_updated();
         Status::Pending
     }
 
@@ -149,7 +154,7 @@ impl PopupChoice {
     ) -> Self {
         let size = size.unwrap_or((6, 40));
         let title = title.unwrap_or("Prompt".to_owned());
-        let message = TextField::basic(message);
+        let message = TextField::new(message);
         Self {
             message,
             title_prefix,
@@ -173,7 +178,7 @@ impl PopupChoice {
     ) -> Self {
         let size = size.unwrap_or((6, 40));
         let title = title.unwrap_or("Prompt".to_owned());
-        let message = TextField::basic(message);
+        let message = TextField::new(message);
         Self {
             message,
             title_prefix,
@@ -206,7 +211,7 @@ impl PopupChoice {
 
     fn p_from_message(&self, line: Line, gs: &mut GlobalState) {
         if self.buffer_message {
-            self.message.widget(line, gs);
+            self.message.widget(line, ContentStyle::reversed(), gs.get_select_style(), gs.backend());
             return;
         }
         line.render_centered(self.get_message(), gs.backend());
