@@ -26,7 +26,10 @@ pub struct Pallet {
 
 impl Popup for Pallet {
     fn force_render(&mut self, gs: &mut GlobalState) {
-        self.force_render_as_pallet(gs);
+        match self.is_in_cmd_mode() {
+            true => self.force_render_as_cmd(gs),
+            false => self.force_render_as_pallet(gs),
+        }
     }
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut super::Components) -> Status {
@@ -165,6 +168,9 @@ impl Pallet {
     }
 
     fn get_command_idx(&self, row: u16, column: u16, gs: &GlobalState) -> Option<usize> {
+        if self.is_in_cmd_mode() {
+            return None;
+        }
         let Position { row, .. } = Self::get_pallet_rect(gs).relative_position(row, column)?;
         let line = row as usize;
         let command_idx = self.state.at_line + line.checked_sub(1)?;
@@ -172,6 +178,10 @@ impl Pallet {
             return None;
         }
         Some(command_idx)
+    }
+
+    fn is_in_cmd_mode(&self) -> bool {
+        self.pattern.as_str().starts_with(':')
     }
 
     fn force_render_as_pallet(&mut self, gs: &mut GlobalState) {
@@ -185,8 +195,24 @@ impl Pallet {
         self.state.render_list(options, rect, gs.backend());
     }
 
+    fn force_render_as_cmd(&mut self, gs: &mut GlobalState) {
+        let rect = Self::get_cmd_rect(gs);
+        rect.draw_borders(None, None, gs.backend());
+        let mut lines = rect.into_iter();
+
+        let Some(line) = lines.next() else { return };
+        self.pattern.widget(line, ContentStyle::reversed(), gs.get_select_style(), gs.backend());
+
+        let Some(line) = lines.next() else { return };
+        line.render("resolution", gs.backend());
+    }
+
     pub fn get_pallet_rect(gs: &GlobalState) -> Rect {
         gs.screen().top(15).vcenter(100).with_borders()
+    }
+
+    pub fn get_cmd_rect(gs: &GlobalState) -> Rect {
+        gs.screen().top(4).vcenter(100).with_borders()
     }
 }
 
