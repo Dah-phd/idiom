@@ -82,6 +82,11 @@ pub trait Popup {
                     Event::Resize(width, height) => {
                         let (width, height) = checked_new_screen_size(width, height, components.gs.backend());
                         components.gs.full_resize(height, width);
+                        components.gs.force_area_calc();
+                        components
+                            .ws
+                            .resize_all(components.gs.editor_area().width, components.gs.editor_area().height as usize);
+                        components.term.resize(*components.gs.editor_area());
                         if !self.resize_success(components.gs) {
                             return Ok(());
                         };

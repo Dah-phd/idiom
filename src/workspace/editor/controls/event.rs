@@ -111,6 +111,7 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::Down => editor.cursor.down(&editor.content),
         EditorAction::Left => editor.cursor.left(&editor.content),
         EditorAction::Right => editor.cursor.right(&editor.content),
+        EditorAction::MarkWord => todo!(),
         EditorAction::SelectUp => editor.cursor.select_up(&editor.content),
         EditorAction::SelectDown => editor.cursor.select_down(&editor.content),
         EditorAction::SelectLeft => editor.cursor.select_left(&editor.content),
@@ -317,6 +318,9 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             for cursor in editor.controls.cursors.iter_mut() {
                 cursor.right(&editor.content);
             }
+        }
+        EditorAction::MarkWord => {
+            todo!();
         }
         EditorAction::SelectUp => {
             for cursor in editor.controls.cursors.iter_mut() {

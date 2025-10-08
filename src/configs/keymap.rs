@@ -18,6 +18,7 @@ pub enum EditorAction {
     Down,
     Left,
     Right,
+    MarkWord,
     SelectUp,
     SelectDown,
     SelectLeft,
@@ -75,6 +76,7 @@ pub struct EditorUserKeyMap {
     down: String,
     left: String,
     right: String,
+    mark_word: String,
     select_up: String,
     select_down: String,
     select_left: String,
@@ -132,6 +134,7 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
         insert_key_event(&mut hash, &val.down, EditorAction::Down);
         insert_key_event(&mut hash, &val.left, EditorAction::Left);
         insert_key_event(&mut hash, &val.right, EditorAction::Right);
+        insert_key_event(&mut hash, &val.mark_word, EditorAction::MarkWord);
         insert_key_event(&mut hash, &val.select_up, EditorAction::SelectUp);
         insert_key_event(&mut hash, &val.select_down, EditorAction::SelectDown);
         insert_key_event(&mut hash, &val.select_left, EditorAction::SelectLeft);
@@ -190,6 +193,7 @@ impl Default for EditorUserKeyMap {
             down: DOWN.to_owned(),
             left: LEFT.to_owned(),
             right: RIGHT.to_owned(),
+            mark_word: format!("{CTRL} && m"),
             select_up: format!("{SHIFT} && {UP}"),
             select_down: format!("{SHIFT} && {DOWN}"),
             select_left: format!("{SHIFT} && {LEFT}"),
