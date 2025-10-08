@@ -18,17 +18,23 @@ use idiom_tui::{
     Position,
 };
 
+enum Mode {
+    Cmd,
+    EasyAccess,
+}
+
 pub struct Pallet {
     commands: Vec<(i64, Command)>,
     pattern: TextField,
     state: State,
+    mode: Mode,
 }
 
 impl Popup for Pallet {
     fn force_render(&mut self, gs: &mut GlobalState) {
-        match self.is_in_cmd_mode() {
-            true => self.force_render_as_cmd(gs),
-            false => self.force_render_as_pallet(gs),
+        match self.mode {
+            Mode::EasyAccess => self.force_render_as_pallet(gs),
+            Mode::Cmd => self.force_render_as_cmd(gs),
         }
     }
 
@@ -47,11 +53,21 @@ impl Popup for Pallet {
                 }
                 return Status::Finished;
             }
-            KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
+            KeyCode::Up => {
                 self.state.prev(self.commands.len());
             }
-            KeyCode::Down | KeyCode::Char('d') | KeyCode::Char('D') => {
+            KeyCode::Down => {
                 self.state.next(self.commands.len());
+            }
+            KeyCode::Backspace if self.pattern.is_empty() && matches!(self.mode, Mode::Cmd) => {
+                self.mode = Mode::EasyAccess;
+                gs.draw(ws, tree, term);
+                gs.force_screen_rebuild();
+            }
+            KeyCode::Char(':') if self.pattern.is_empty() && matches!(self.mode, Mode::EasyAccess) => {
+                self.mode = Mode::Cmd;
+                gs.draw(ws, tree, term);
+                gs.force_screen_rebuild();
             }
             _ => {
                 match map_key(&mut self.pattern, key, &mut gs.clipboard) {
@@ -117,7 +133,7 @@ impl Popup for Pallet {
 }
 
 impl Pallet {
-    pub fn new(git_tui: Option<String>) -> Self {
+    fn new(git_tui: Option<String>, mode: Mode) -> Self {
         let commands = [
             Some(Command::components("Open file", OpenFileSelector::run)),
             Some(Command::components("Open embeded terminal", change_state::open_embeded_terminal)),
@@ -137,20 +153,19 @@ impl Pallet {
         .map(|cmd| (0, cmd))
         .collect();
 
-        Pallet { commands, pattern: TextField::default(), state: State::new() }
+        Pallet { commands, pattern: TextField::default(), state: State::new(), mode }
     }
 
     pub fn run(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         let git_tui = gs.git_tui.to_owned();
-        if let Err(error) = Pallet::new(git_tui).run(gs, ws, tree, term) {
+        if let Err(error) = Pallet::new(git_tui, Mode::EasyAccess).run(gs, ws, tree, term) {
             gs.error(error);
         }
     }
 
     pub fn run_as_command(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         let git_tui = gs.git_tui.to_owned();
-        let mut pallet = Pallet::new(git_tui);
-        pallet.pattern.text_set(":".to_owned());
+        let mut pallet = Pallet::new(git_tui, Mode::Cmd);
         if let Err(error) = pallet.run(gs, ws, tree, term) {
             gs.error(error);
         }
@@ -168,7 +183,7 @@ impl Pallet {
     }
 
     fn get_command_idx(&self, row: u16, column: u16, gs: &GlobalState) -> Option<usize> {
-        if self.is_in_cmd_mode() {
+        if matches!(self.mode, Mode::Cmd) {
             return None;
         }
         let Position { row, .. } = Self::get_pallet_rect(gs).relative_position(row, column)?;
@@ -178,10 +193,6 @@ impl Pallet {
             return None;
         }
         Some(command_idx)
-    }
-
-    fn is_in_cmd_mode(&self) -> bool {
-        self.pattern.as_str().starts_with(':')
     }
 
     fn force_render_as_pallet(&mut self, gs: &mut GlobalState) {
@@ -201,7 +212,11 @@ impl Pallet {
         let mut lines = rect.into_iter();
 
         let Some(line) = lines.next() else { return };
-        self.pattern.widget(line, ContentStyle::reversed(), gs.get_select_style(), gs.backend());
+
+        let select = gs.get_select_style();
+        let mut line_builder = line.unsafe_builder(gs.backend());
+        line_builder.push(" : ");
+        self.pattern.insert_formatted_text(line_builder, ContentStyle::reversed(), select);
 
         let Some(line) = lines.next() else { return };
         line.render("resolution", gs.backend());
