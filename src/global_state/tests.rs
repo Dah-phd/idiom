@@ -20,7 +20,7 @@ fn full_draw_select(h: u16, w: u16) -> GlobalState {
     let mut term = EditorTerminal::new(Some(String::new()));
     assert_eq!(gs.tree_area, Rect::default());
     assert_eq!(gs.editor_area, Rect::default());
-    gs.full_resize(h, w);
+    gs.full_resize(&mut ws, &mut term, h, w);
     gs.draw(&mut ws, &mut tree, &mut term);
     gs
 }
@@ -39,27 +39,31 @@ fn full_draw_insert(h: u16, w: u16) -> GlobalState {
     let mut term = EditorTerminal::new(Some(String::new()));
     assert_eq!(gs.tree_area, Rect::default());
     assert_eq!(gs.editor_area, Rect::default());
-    gs.full_resize(h, w);
+    gs.full_resize(&mut ws, &mut term, h, w);
     gs.draw(&mut ws, &mut tree, &mut term);
     gs
 }
 
 fn force_calc_select(h: u16, w: u16) -> GlobalState {
     let mut gs = GlobalState::new(Rect::new(0, 0, w as usize, h), CrossTerm::init());
+    let mut ws = mock_ws(vec![]);
+    let mut term = EditorTerminal::new(Some(String::new()));
     assert_eq!(gs.tree_area, Rect::default());
     assert_eq!(gs.editor_area, Rect::default());
-    gs.full_resize(80, 80);
+    gs.full_resize(&mut ws, &mut term, 80, 80);
     gs.force_area_calc();
     gs
 }
 
 fn force_calc_insert(h: u16, w: u16) -> GlobalState {
     let mut gs = GlobalState::new(Rect::new(0, 0, w as usize, h), CrossTerm::init());
+    let mut ws = mock_ws(vec![]);
+    let mut term = EditorTerminal::new(Some(String::new()));
     assert_eq!(gs.tree_area, Rect::default());
     assert_eq!(gs.editor_area, Rect::default());
     gs.toggle_tree();
     gs.insert_mode();
-    gs.full_resize(80, 80);
+    gs.full_resize(&mut ws, &mut term, 80, 80);
     gs.force_area_calc();
     gs
 }

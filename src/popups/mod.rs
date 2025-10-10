@@ -1,5 +1,6 @@
 pub mod generic_popup;
 pub mod generic_selector;
+pub mod mark_word;
 pub mod menu;
 pub mod pallet;
 pub mod popup_file_open;
@@ -80,13 +81,7 @@ pub trait Popup {
                         }
                     }
                     Event::Resize(width, height) => {
-                        let (width, height) = checked_new_screen_size(width, height, components.gs.backend());
-                        components.gs.full_resize(height, width);
-                        components.gs.force_area_calc();
-                        components
-                            .ws
-                            .resize_all(components.gs.editor_area().width, components.gs.editor_area().height as usize);
-                        components.term.resize(*components.gs.editor_area());
+                        components.gs.full_resize(components.ws, components.term, width, height);
                         if !self.resize_success(components.gs) {
                             return Ok(());
                         };
@@ -164,7 +159,23 @@ enum CommandResult {
 type Width = u16;
 type Height = u16;
 
-pub fn get_new_screen_size(backend: &mut CrossTerm) -> IdiomResult<(Width, Height)> {
+pub fn get_init_screen(backend: &mut CrossTerm) -> IdiomResult<Rect> {
+    let init = CrossTerm::screen()?;
+    if init.width < MIN_WIDTH as usize || init.height < MIN_HEIGHT {
+        get_new_screen_size(backend).map(Rect::from)
+    } else {
+        Ok(init)
+    }
+}
+
+pub fn checked_new_screen_size(width: Width, height: Height, backend: &mut CrossTerm) -> (Width, Height) {
+    if width >= MIN_WIDTH && height >= MIN_HEIGHT {
+        return (width, height);
+    }
+    get_new_screen_size(backend).expect("Manual action")
+}
+
+fn get_new_screen_size(backend: &mut CrossTerm) -> IdiomResult<(Width, Height)> {
     loop {
         if crossterm::event::poll(Duration::from_millis(200))? {
             match crossterm::event::read()? {
@@ -190,20 +201,4 @@ pub fn get_new_screen_size(backend: &mut CrossTerm) -> IdiomResult<(Width, Heigh
         }
         backend.flush_buf();
     }
-}
-
-pub fn get_init_screen(backend: &mut CrossTerm) -> IdiomResult<Rect> {
-    let init = CrossTerm::screen()?;
-    if init.width < MIN_WIDTH as usize || init.height < MIN_HEIGHT {
-        get_new_screen_size(backend).map(Rect::from)
-    } else {
-        Ok(init)
-    }
-}
-
-pub fn checked_new_screen_size(width: Width, height: Height, backend: &mut CrossTerm) -> (Width, Height) {
-    if width >= MIN_WIDTH && height >= MIN_HEIGHT {
-        return (width, height);
-    }
-    get_new_screen_size(backend).expect("Manual action")
 }

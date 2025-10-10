@@ -5,7 +5,7 @@ use crate::{
     ext_tui::CrossTerm,
     global_state::{GlobalState, IdiomEvent},
     popups::{
-        get_init_screen, get_new_screen_size,
+        get_init_screen,
         pallet::Pallet,
         popup_find::{FindPopup, GoToLinePopup},
         popup_replace::ReplacePopup,
@@ -150,18 +150,10 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
                         };
                     }
                 }
-                Event::Resize(mut width, mut height) => {
-                    if width < MIN_WIDTH || height < MIN_HEIGHT {
-                        let (new_width, new_height) = get_new_screen_size(gs.backend())?;
-                        width = new_width;
-                        height = new_height;
-                    }
-                    gs.full_resize(height, width);
-                    gs.force_area_calc();
-                    workspace.resize_all(gs.editor_area().width, gs.editor_area().height as usize);
-                    term.resize(*gs.editor_area());
-                }
                 Event::Mouse(event) => gs.map_mouse(event, &mut tree, &mut workspace, &mut term),
+                Event::Resize(width, height) => {
+                    gs.full_resize(&mut workspace, &mut term, width, height);
+                }
                 Event::Paste(clip) => {
                     gs.passthrough_paste(clip, &mut workspace, &mut term);
                 }

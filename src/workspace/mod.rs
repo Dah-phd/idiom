@@ -17,7 +17,7 @@ use crossterm::event::KeyEvent;
 use crossterm::style::{Color, ContentStyle};
 pub use cursor::{Cursor, CursorPosition};
 pub use editor::{editor_from_data, Editor};
-use idiom_tui::Backend;
+use idiom_tui::{layout::Rect, Backend};
 use line::EditorLine;
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
 use std::{
@@ -90,9 +90,9 @@ impl Workspace {
     }
 
     #[inline]
-    pub fn resize_all(&mut self, width: usize, height: usize) {
+    pub fn resize_all(&mut self, editor_area: Rect) {
         for editor in self.editors.iter_mut() {
-            editor.resize(width, height);
+            editor.resize(editor_area.width, editor_area.height as usize);
         }
     }
 

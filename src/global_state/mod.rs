@@ -15,6 +15,7 @@ use crate::{
     ext_tui::{CrossTerm, StyleExt},
     lsp::{LSPError, LSPResult},
     popups::{
+        checked_new_screen_size,
         menu::{menu_context_editor_inplace, menu_context_tree_inplace},
         Popup,
     },
@@ -313,12 +314,16 @@ impl GlobalState {
         self.messages.render(self.ui_theme.accent_style(), &mut self.backend);
     }
 
-    #[inline]
-    pub fn full_resize(&mut self, height: u16, width: u16) {
+    /// perform full resize on all componenets
+    pub fn full_resize(&mut self, workspace: &mut Workspace, term: &mut EditorTerminal, width: u16, height: u16) {
+        let (width, height) = checked_new_screen_size(width, height, self.backend());
         let tree_rate = (self.tree_size * 100) / self.screen_rect.width;
         self.screen_rect = (width, height).into();
         self.tree_size = std::cmp::max((tree_rate * self.screen_rect.width) / 100, Mode::len());
         self.draw_callback = draw::full_rebuild;
+        self.force_area_calc();
+        workspace.resize_all(self.editor_area);
+        term.resize(self.editor_area);
     }
 
     #[inline]

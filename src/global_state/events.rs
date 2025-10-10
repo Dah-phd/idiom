@@ -62,7 +62,7 @@ impl IdiomEvent {
                 tree.map_action(action, gs);
             }
             IdiomEvent::EmbededApp(cmd) => {
-                if let Err(error) = run_embeded_tui(cmd.as_deref(), gs) {
+                if let Err(error) = run_embeded_tui(cmd.as_deref(), ws, term, gs) {
                     gs.error(error);
                 };
                 gs.draw_callback = super::draw::full_rebuild;

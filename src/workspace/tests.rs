@@ -29,7 +29,7 @@ pub fn mock_ws(content: Vec<String>) -> Workspace {
         map_callback: map_editor,
         tab_style: ContentStyle::default(),
     };
-    ws.resize_all(60, 90);
+    ws.resize_all(Rect::new(0, 0, 90, 60));
     ws
 }
 
