@@ -157,7 +157,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
                 Event::Paste(clip) => {
                     gs.passthrough_paste(clip, &mut workspace, &mut term);
                 }
-                _ => (),
+                Event::FocusGained | Event::FocusLost => (),
             }
         }
 

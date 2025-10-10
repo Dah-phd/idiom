@@ -93,7 +93,7 @@ pub trait Popup {
                             self.force_render(components.gs);
                         };
                     }
-                    _ => (),
+                    Event::FocusLost | Event::FocusGained => (),
                 };
             }
             self.render(components.gs);
