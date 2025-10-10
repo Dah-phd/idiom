@@ -133,15 +133,15 @@ impl FindPopup {
             return;
         };
         let Some(editor) = workspace.get_active() else { return };
-        if editor.cursor.select_is_none() {
-            editor.select_token();
-        };
         popup.find_word_from_select(editor);
         let run_result = Popup::run(&mut popup, gs, workspace, tree, term);
         gs.log_if_error(run_result);
     }
 
-    fn find_word_from_select(&mut self, editor: &Editor) {
+    fn find_word_from_select(&mut self, editor: &mut Editor) {
+        if editor.cursor.select_is_none() {
+            editor.select_token();
+        };
         let Some((from, to)) = editor.cursor.select_get() else {
             return;
         };
@@ -170,6 +170,7 @@ impl Popup for FindPopup {
                 std::mem::take(&mut self.options),
                 *gs.editor_area(),
                 self.accent,
+                self.state,
             ) {
                 if let Err(error) = popup.run(gs, ws, tree, term) {
                     gs.error(error);

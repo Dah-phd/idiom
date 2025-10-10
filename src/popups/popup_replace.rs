@@ -3,7 +3,7 @@ use crate::{
     ext_tui::{text_field::map_key, StyleExt},
     global_state::GlobalState,
     tree::Tree,
-    workspace::{CursorPosition, Workspace},
+    workspace::{CursorPosition, Editor, Workspace},
 };
 use crossterm::{
     event::{KeyCode, KeyEvent, KeyModifiers},
@@ -47,6 +47,9 @@ impl ReplacePopup {
             state: usize::default(),
         };
 
+        let Some(editor) = workspace.get_active() else { return };
+        popup.find_word_from_select(editor);
+
         if let Err(error) = popup.run(gs, workspace, tree, term) {
             gs.error(error);
         }
@@ -57,6 +60,7 @@ impl ReplacePopup {
         options: Vec<(CursorPosition, CursorPosition)>,
         editor_area: Rect,
         accent: ContentStyle,
+        state: usize,
     ) -> Option<Self> {
         let rect = editor_area.right_top_corner(2, 50);
         if rect.height < 2 {
@@ -67,7 +71,7 @@ impl ReplacePopup {
             pattern: TextField::new(pattern),
             new_text: TextField::default(),
             options,
-            state: 0,
+            state,
             accent,
             rect,
         })
@@ -83,6 +87,27 @@ impl ReplacePopup {
 
     fn get_state(&self) -> Option<(CursorPosition, CursorPosition)> {
         self.options.get(self.state).cloned()
+    }
+
+    fn find_word_from_select(&mut self, editor: &mut Editor) {
+        if editor.cursor.select_is_none() {
+            editor.select_token();
+        };
+        let Some((from, to)) = editor.cursor.select_get() else {
+            return;
+        };
+        if from.line != to.line {
+            return;
+        }
+        let Some(word) = editor.content.get(from.line).and_then(|line| line.get(from.char, to.char)) else {
+            return;
+        };
+        self.pattern.text_set(word.to_owned());
+        self.options.clear();
+        editor.find(self.pattern.as_str(), &mut self.options);
+        if let Some(from_state) = self.options.iter().position(|(f, t)| f == &from && t == &to) {
+            self.state = from_state;
+        }
     }
 }
 
