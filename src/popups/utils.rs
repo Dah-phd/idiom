@@ -27,15 +27,28 @@ pub fn prev_option<T: Clone>(options: &[T], state: &mut usize) -> Option<T> {
     options.get(*state).cloned()
 }
 
-pub fn count_as_string<T>(options: &[T]) -> String {
+/// does not check for match between position and iter len
+/// returned len is always 5
+pub fn position_with_count_text<T>(index: usize, options: &[T]) -> String {
     let len = options.len();
-    if len < 10 {
-        format!("  {len}")
-    } else if len < 100 {
-        format!(" {len}")
-    } else {
-        String::from("99+")
+    if len > 99 {
+        return String::from("..99+");
     }
+
+    if len == 0 {
+        return String::from(" --- ");
+    }
+
+    let position = index + 1;
+    if len < 10 {
+        return format!("  {position}/{len}");
+    }
+
+    if position < 10 {
+        return format!(" {position}/{len}");
+    }
+
+    format!("{position}/{len}")
 }
 
 /// returns the postion of current select
@@ -53,6 +66,7 @@ pub fn infer_word_search_positon(
     }
     let word = editor.content.get(from.line).and_then(|line| line.get(from.char, to.char))?;
     pattern.text_set(word.to_owned());
+    pattern.select_all();
     buffer.clear();
     editor.find(pattern.as_str(), buffer);
     buffer.iter().position(|(f, t)| f == &from && t == &to)
@@ -60,7 +74,7 @@ pub fn infer_word_search_positon(
 
 #[cfg(test)]
 mod test {
-    use super::infer_word_search_positon;
+    use super::{infer_word_search_positon, position_with_count_text};
     use crate::workspace::{editor::tests::mock_editor, CursorPosition};
     use idiom_tui::text_field::TextField;
 
@@ -92,5 +106,14 @@ mod test {
         ];
         assert_eq!(editor.cursor.select_get(), Some(expect[expect_state]));
         assert_eq!(buffer, expect);
+    }
+
+    #[test]
+    fn test_position_count_as_text() {
+        assert_eq!(position_with_count_text(3, &[0; 100]), String::from("..99+"));
+        assert_eq!(position_with_count_text(3, &[0; 20]), String::from(" 4/20"));
+        assert_eq!(position_with_count_text(9, &[0; 99]), String::from("10/99"));
+        assert_eq!(position_with_count_text(50, &[0; 99]), String::from("51/99"));
+        assert_eq!(position_with_count_text(5, &[0; 9]), String::from("  6/9"));
     }
 }

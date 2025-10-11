@@ -1,7 +1,7 @@
 use super::{
     generic_selector::PopupSelector,
     popup_replace::ReplacePopup,
-    utils::{infer_word_search_positon, next_option, prev_option},
+    utils::{infer_word_search_positon, next_option, position_with_count_text, prev_option},
     Components, Popup, Status,
 };
 use crate::{
@@ -14,7 +14,6 @@ use crate::{
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
 use idiom_tui::{
-    count_as_string,
     layout::{Line, Rect},
     text_field::{Status as InputStatus, TextField},
     Backend,
@@ -123,7 +122,7 @@ pub struct FindPopup {
 
 impl FindPopup {
     pub fn new(editor_area: Rect, accent: ContentStyle) -> Option<Self> {
-        let render_line = editor_area.right_top_corner(1, 50).into_iter().next()?;
+        let render_line = editor_area.right_top_corner(1, 70).into_iter().next()?;
         let pattern = TextField::default();
         Some(Self { options: Vec::new(), pattern, state: 0, accent, render_line })
     }
@@ -214,9 +213,9 @@ impl Popup for FindPopup {
         backend.set_style(self.accent);
         {
             let mut builder = self.render_line.clone().unsafe_builder(backend);
-            builder.push(" Found(");
-            builder.push(&count_as_string(self.options.len()));
-            builder.push(") >> ");
+            builder.push(" ");
+            builder.push(&position_with_count_text(self.state, &self.options));
+            builder.push(" > ");
             self.pattern.insert_formatted_text(builder, ContentStyle::reversed(), gs.ui_theme.accent_select_style());
         }
         backend.set_style(reset_style);
@@ -225,7 +224,7 @@ impl Popup for FindPopup {
     fn render(&mut self, _gs: &mut GlobalState) {}
 
     fn resize_success(&mut self, gs: &mut GlobalState) -> bool {
-        match gs.editor_area().right_top_corner(1, 50).into_iter().next() {
+        match gs.editor_area().right_top_corner(1, 70).into_iter().next() {
             Some(render_line) => {
                 self.render_line = render_line;
                 true

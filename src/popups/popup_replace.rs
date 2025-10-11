@@ -16,7 +16,7 @@ use idiom_tui::{
 };
 
 use super::{
-    utils::{count_as_string, infer_word_search_positon, next_option, prev_option},
+    utils::{infer_word_search_positon, next_option, position_with_count_text, prev_option},
     Components, Popup, Status,
 };
 
@@ -32,7 +32,7 @@ pub struct ReplacePopup {
 
 impl ReplacePopup {
     pub fn run_inplace(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
-        let rect = gs.editor_area().right_top_corner(2, 50);
+        let rect = gs.editor_area().right_top_corner(2, 70);
         if rect.height < 2 {
             return;
         }
@@ -64,7 +64,7 @@ impl ReplacePopup {
         accent: ContentStyle,
         state: usize,
     ) -> Option<Self> {
-        let rect = editor_area.right_top_corner(2, 50);
+        let rect = editor_area.right_top_corner(2, 70);
         if rect.height < 2 {
             return None;
         }
@@ -175,7 +175,7 @@ impl Popup for ReplacePopup {
         let mut lines = self.rect.into_iter();
         if let Some(line) = lines.next() {
             let mut find_builder = line.unsafe_builder(backend);
-            find_builder.push(count_as_string(&self.options).as_str());
+            find_builder.push(&position_with_count_text(self.state, &self.options));
             find_builder.push(" > ");
             match self.on_text {
                 false => self.pattern.insert_formatted_text(
@@ -190,7 +190,7 @@ impl Popup for ReplacePopup {
         };
         if let Some(line) = lines.next() {
             let mut repl_builder = line.unsafe_builder(backend);
-            repl_builder.push("Rep > ");
+            repl_builder.push(" Rep >> ");
             match self.on_text {
                 false => {
                     repl_builder.push(self.new_text.as_str());
@@ -208,7 +208,7 @@ impl Popup for ReplacePopup {
     fn render(&mut self, _gs: &mut GlobalState) {}
 
     fn resize_success(&mut self, gs: &mut GlobalState) -> bool {
-        let rect = gs.editor_area().right_top_corner(2, 50);
+        let rect = gs.editor_area().right_top_corner(2, 70);
         if rect.height < 2 {
             return false;
         }
