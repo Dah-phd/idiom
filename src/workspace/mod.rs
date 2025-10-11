@@ -4,13 +4,13 @@ pub mod editor;
 pub mod line;
 pub mod renderer;
 pub mod utils;
-use crate::popups::popups_editor::file_updated;
 use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
     error::{IdiomError, IdiomResult},
     ext_tui::StyleExt,
     global_state::{GlobalState, IdiomEvent},
     lsp::LSP,
+    popups::popups_editor::file_updated,
     utils::TrackedList,
 };
 use crossterm::event::KeyEvent;

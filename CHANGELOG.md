@@ -1,6 +1,7 @@
 ## Includes only major changes (manual updates)
 # Version 0.7.0
-- idiom_command added
+- added IdiomCommand
+- added MarkWord
 
 # Version 0.6.3
 - added support for non ascii in text_field

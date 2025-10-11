@@ -4,7 +4,7 @@ use super::{
 };
 use crate::{
     configs::EditorAction,
-    global_state::{GlobalState, IdiomEvent},
+    global_state::{GlobalState, IdiomEvent, StartInplacePopup},
     workspace::{
         actions::transaction,
         cursor::{CursorPosition, PositionedWord, WordRange},
@@ -111,7 +111,11 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::Down => editor.cursor.down(&editor.content),
         EditorAction::Left => editor.cursor.left(&editor.content),
         EditorAction::Right => editor.cursor.right(&editor.content),
-        EditorAction::MarkWord => todo!(),
+        EditorAction::MarkWord => {
+            if editor.file_type.is_code() {
+                gs.event.push(IdiomEvent::InplacePopup(StartInplacePopup::MarkWord));
+            }
+        }
         EditorAction::SelectUp => editor.cursor.select_up(&editor.content),
         EditorAction::SelectDown => editor.cursor.select_down(&editor.content),
         EditorAction::SelectLeft => editor.cursor.select_left(&editor.content),
@@ -320,7 +324,9 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             }
         }
         EditorAction::MarkWord => {
-            todo!();
+            if editor.file_type.is_code() {
+                gs.event.push(IdiomEvent::InplacePopup(StartInplacePopup::MarkWord));
+            }
         }
         EditorAction::SelectUp => {
             for cursor in editor.controls.cursors.iter_mut() {

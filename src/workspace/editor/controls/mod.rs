@@ -31,6 +31,15 @@ pub struct ControlMap {
 }
 
 impl ControlMap {
+    pub fn get_base_cursor_position(&self) -> Option<CursorPosition> {
+        for cursor in self.cursors.iter() {
+            if cursor.max_rows != 0 {
+                return Some(cursor.get_position());
+            }
+        }
+        None
+    }
+
     pub fn try_multi_cursor(editor: &mut Editor) -> bool {
         if !editor.renderer.try_multi_cursor(editor.file_type) {
             return false;

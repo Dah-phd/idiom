@@ -110,7 +110,6 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     modal.render_if_exist(relative_pos, gs);
 }
 
-#[inline(always)]
 fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, modal, .. } = editor;
 
@@ -196,7 +195,6 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     gs.render_stats(content.len(), controls.cursors.len(), cursor.into());
 }
 
-#[inline(always)]
 fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
     let Editor { modal, lexer, cursor, content, line_number_padding, last_render_at_line, controls, .. } = editor;
 
@@ -248,7 +246,6 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
 
     let accent_style = gs.ui_theme.accent_fg();
 
-    last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(cursor, lexer.char_lsp_pos, *line_number_padding, accent_style);
 
@@ -281,7 +278,6 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
     gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
 }
 
-#[inline(always)]
 fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
 
@@ -318,11 +314,10 @@ fn md_render(editor: &mut Editor, gs: &mut GlobalState) {
 }
 
 fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
-    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
+    let Editor { lexer, cursor, content, line_number_padding, .. } = editor;
 
     let accent_style = gs.ui_theme.accent_fg();
 
-    last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(cursor, lexer.char_lsp_pos, *line_number_padding, accent_style);
 
@@ -355,7 +350,6 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
 
     let accent_style = gs.ui_theme.accent_fg();
 
-    last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(cursor, lexer.char_lsp_pos, *line_number_padding, accent_style);
 

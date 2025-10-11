@@ -28,7 +28,7 @@ use crossterm::{
     event::{KeyEvent, MouseEvent},
     style::ContentStyle,
 };
-pub use events::IdiomEvent;
+pub use events::{IdiomEvent, StartInplacePopup};
 use idiom_tui::{
     layout::{Line, Rect},
     Backend, Position,

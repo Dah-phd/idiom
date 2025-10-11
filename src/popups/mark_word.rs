@@ -24,7 +24,11 @@ pub fn render_marked_word(
     term: &mut EditorTerminal,
 ) -> crate::error::IdiomResult<()> {
     let Some(editor) = ws.get_active() else { return Ok(()) };
-    let Some(word) = PositionedWord::find_at(&editor.content, editor.cursor.get_position()) else {
+    if !editor.file_type.is_code() {
+        return Ok(());
+    };
+    let position = editor.controls.get_base_cursor_position().unwrap_or(editor.cursor.get_position());
+    let Some(word) = PositionedWord::find_at(&editor.content, position) else {
         return Ok(());
     };
     let screen_text = editor.content.iter().enumerate().skip(editor.cursor.at_line).take(editor.cursor.max_rows);

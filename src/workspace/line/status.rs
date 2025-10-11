@@ -205,4 +205,16 @@ mod test {
         assert_eq!(cached.skipped_chars(), 7);
         assert!(cached.should_render_line(3, &None));
     }
+
+    #[test]
+    fn guard_should_render_vs_should_render_and_update() {
+        let mut cached = RenderStatus::default();
+        let select = Some(5..10);
+        cached.cursor(3, 2, 0, select.clone());
+        assert!(!cached.should_render_cursor(3, 2, &select));
+        assert!(!cached.should_render_cursor_or_update(3, 2, select));
+        assert!(cached.should_render_cursor(4, 1, &None));
+        assert!(cached.should_render_cursor_or_update(4, 1, None));
+        assert!(!cached.should_render_cursor(4, 1, &None));
+    }
 }

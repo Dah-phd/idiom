@@ -1,16 +1,18 @@
 use super::{GlobalState, Mode};
+use crate::configs::FileType;
 use crate::configs::{EditorAction, TreeAction};
 use crate::embeded_term::EditorTerminal;
 use crate::embeded_tui::run_embeded_tui;
 use crate::lsp::TreeDiagnostics;
 use crate::popups::generic_selector::PopupSelector;
+use crate::popups::mark_word::render_marked_word;
 use crate::popups::pallet::Pallet;
-use crate::popups::PopupChoice;
-use crate::popups::{popup_tree_search::ActiveFileSearch, Popup};
+use crate::popups::popup_tree_search::ActiveFileSearch;
+use crate::popups::{Popup, PopupChoice};
 use crate::tree::Tree;
 use crate::workspace::line::EditorLine;
+use crate::workspace::CursorPosition;
 use crate::workspace::Workspace;
-use crate::{configs::FileType, workspace::CursorPosition};
 use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, Range, WorkspaceEdit};
 use std::path::PathBuf;
 
@@ -19,6 +21,7 @@ pub enum StartInplacePopup {
     Pop(PopupChoice),
     RefSelector(PopupSelector<(String, PathBuf, Range)>),
     Mesasge(PopupSelector<String>),
+    MarkWord,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -82,6 +85,11 @@ impl IdiomEvent {
                     if let Err(error) = popup.run(gs, ws, tree, term) {
                         gs.error(error);
                     };
+                }
+                StartInplacePopup::MarkWord => {
+                    if let Err(error) = render_marked_word(gs, ws, tree, term) {
+                        gs.error(error);
+                    }
                 }
             },
             IdiomEvent::SearchFiles(pattern) => {
