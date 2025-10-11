@@ -254,7 +254,7 @@ pub fn repositioning(cursor: &mut Cursor, content: &mut [EditorLine]) -> Option<
         if cursor.at_line == cursor.line {
             return None;
         }
-        row_sum -= 1 + content[cursor.at_line].tokens.char_len();
+        row_sum -= 1 + content[cursor.at_line].tokens().char_len();
         cursor.at_line += 1;
     }
     None
@@ -268,7 +268,7 @@ fn calc_rows(content: &mut [EditorLine], cursor: &Cursor) -> usize {
         if idx != cursor.line {
             calc_wrap_line(text, text_width);
         }
-        buf += 1 + text.tokens.char_len();
+        buf += 1 + text.tokens().char_len();
     }
     buf
 }

@@ -76,13 +76,13 @@ fn render_with_select(
     if code.is_simple() {
         if line_width > code.char_len() {
             let content = code.chars();
-            ascii_line::ascii_line_with_select(content, &code.tokens, select, gs);
+            ascii_line::ascii_line_with_select(content, code.tokens(), select, gs);
             if let Some(diagnostic) = code.diagnostics.as_ref() {
                 diagnostic.inline_render(line_width - code.char_len(), gs.backend())
             }
         } else {
             let content = code.chars().take(line_width.saturating_sub(1));
-            ascii_line::ascii_line_with_select(content, &code.tokens, select, gs);
+            ascii_line::ascii_line_with_select(content, code.tokens(), select, gs);
             gs.backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
         }
         return;
@@ -103,13 +103,13 @@ fn render_no_select(code: &mut EditorLine, line_width: usize, ctx: &mut LineCont
         // ascii (byte idx based) render
         match line_width > code.len() {
             true => {
-                ascii_line::ascii_line(code.as_str(), &code.tokens, backend);
+                ascii_line::ascii_line(code.as_str(), code.tokens(), backend);
                 if let Some(diagnostic) = code.diagnostics.as_ref() {
                     diagnostic.inline_render(line_width - code.char_len(), backend)
                 }
             }
             false => {
-                ascii_line::ascii_line(&code.as_str()[..line_width.saturating_sub(1)], &code.tokens, backend);
+                ascii_line::ascii_line(&code.as_str()[..line_width.saturating_sub(1)], code.tokens(), backend);
                 backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
             }
         }

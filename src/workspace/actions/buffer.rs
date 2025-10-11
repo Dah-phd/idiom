@@ -183,14 +183,16 @@ impl BackspaceBuffer {
         let range = if chars_after_indent.is_empty() {
             self.last -= indent.len();
             self.text.push_str(indent);
-            text.tokens.remove_tokens_till(indent.len());
+            // replace till will force the cache update
+            text.tokens_mut_unchecked().remove_tokens_till(indent.len());
             text.replace_till(indent.len(), "");
             Range::new(Position::new(line, self.last as u32), Position::new(line, char as u32))
         } else if chars_after_indent.chars().all(|c| c.is_whitespace()) {
             let removed_count = chars_after_indent.len();
             self.last -= removed_count;
             self.text.push_str(&text[self.last..char]);
-            text.tokens.remove_tokens_till(removed_count);
+            // replace till will force the cache update
+            text.tokens_mut_unchecked().remove_tokens_till(removed_count);
             text.replace_till(removed_count, "");
             Range::new(Position::new(line, self.last as u32), Position::new(line, char as u32))
         } else {

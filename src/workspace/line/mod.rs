@@ -18,7 +18,7 @@ pub struct EditorLine {
     // keeps trach of utf8 char len
     char_len: usize,
     // syntax
-    pub tokens: TokenLine,
+    tokens: TokenLine,
     pub diagnostics: Option<DiagnosticLine>,
     // used for caching - 0 is reseved for file tabs and can be used to reset line
     pub cached: RenderStatus,
@@ -366,10 +366,21 @@ impl EditorLine {
         self.diagnostics.replace(diagnostics);
     }
 
-    #[inline(always)]
+    /// does not mark the line for render
+    #[inline]
+    pub fn tokens_mut_unchecked(&mut self) -> &mut TokenLine {
+        &mut self.tokens
+    }
+
+    #[inline]
     pub fn tokens_mut(&mut self) -> &mut TokenLine {
         self.cached.reset();
         &mut self.tokens
+    }
+
+    #[inline]
+    pub fn tokens(&self) -> &TokenLine {
+        &self.tokens
     }
 
     #[inline]

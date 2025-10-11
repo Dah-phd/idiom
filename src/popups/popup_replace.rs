@@ -175,6 +175,7 @@ impl Popup for ReplacePopup {
         let mut lines = self.rect.into_iter();
         if let Some(line) = lines.next() {
             let mut find_builder = line.unsafe_builder(backend);
+            find_builder.push(" ");
             find_builder.push(&position_with_count_text(self.state, &self.options));
             find_builder.push(" > ");
             match self.on_text {
@@ -190,7 +191,7 @@ impl Popup for ReplacePopup {
         };
         if let Some(line) = lines.next() {
             let mut repl_builder = line.unsafe_builder(backend);
-            repl_builder.push(" Rep >> ");
+            repl_builder.push(" Rep >>> ");
             match self.on_text {
                 false => {
                     repl_builder.push(self.new_text.as_str());

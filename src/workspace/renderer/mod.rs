@@ -264,13 +264,13 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
                 text::cursor(text, select, skip, &mut ctx, &mut lines, gs);
             } else {
                 ctx.skip_line();
-                lines.forward(1 + text.tokens.char_len());
+                lines.forward(1 + text.tokens().char_len());
             }
         } else if text.cached.should_render_line(lines.next_line_idx(), &select) {
             text::line(text, select, &mut ctx, &mut lines, gs)
         } else {
             ctx.skip_line();
-            lines.forward(1 + text.tokens.char_len());
+            lines.forward(1 + text.tokens().char_len());
         }
     }
 
@@ -371,13 +371,13 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
                 markdown::cursor(text, select, skip, &mut ctx, &mut lines, gs);
             } else {
                 ctx.skip_line();
-                lines.forward(1 + text.tokens.char_len());
+                lines.forward(1 + text.tokens().char_len());
             }
         } else if text.cached.should_render_line(lines.next_line_idx(), &select) {
             markdown::line(text, select, &mut ctx, &mut lines, gs)
         } else {
             ctx.skip_line();
-            lines.forward(1 + text.tokens.char_len());
+            lines.forward(1 + text.tokens().char_len());
         }
     }
 
