@@ -3,7 +3,7 @@ use crate::{
     ext_tui::{text_field::map_key, StyleExt},
     global_state::GlobalState,
     tree::Tree,
-    workspace::{CursorPosition, Editor, Workspace},
+    workspace::{CursorPosition, Workspace},
 };
 use crossterm::{
     event::{KeyCode, KeyEvent, KeyModifiers},
@@ -16,7 +16,7 @@ use idiom_tui::{
 };
 
 use super::{
-    utils::{count_as_string, next_option, prev_option},
+    utils::{count_as_string, infer_word_search_positon, next_option, prev_option},
     Components, Popup, Status,
 };
 
@@ -48,7 +48,9 @@ impl ReplacePopup {
         };
 
         let Some(editor) = workspace.get_active() else { return };
-        popup.find_word_from_select(editor);
+        if let Some(state) = infer_word_search_positon(editor, &mut popup.pattern, &mut popup.options) {
+            popup.state = state;
+        }
 
         if let Err(error) = popup.run(gs, workspace, tree, term) {
             gs.error(error);
@@ -88,27 +90,6 @@ impl ReplacePopup {
     fn get_state(&self) -> Option<(CursorPosition, CursorPosition)> {
         self.options.get(self.state).cloned()
     }
-
-    fn find_word_from_select(&mut self, editor: &mut Editor) {
-        if editor.cursor.select_is_none() {
-            editor.select_token();
-        };
-        let Some((from, to)) = editor.cursor.select_get() else {
-            return;
-        };
-        if from.line != to.line {
-            return;
-        }
-        let Some(word) = editor.content.get(from.line).and_then(|line| line.get(from.char, to.char)) else {
-            return;
-        };
-        self.pattern.text_set(word.to_owned());
-        self.options.clear();
-        editor.find(self.pattern.as_str(), &mut self.options);
-        if let Some(from_state) = self.options.iter().position(|(f, t)| f == &from && t == &to) {
-            self.state = from_state;
-        }
-    }
 }
 
 impl Popup for ReplacePopup {
@@ -131,6 +112,7 @@ impl Popup for ReplacePopup {
                     editor.go_to_select(from, to);
                     editor.render(gs);
                 } else {
+                    gs.backend.unfreeze();
                     return Status::Finished;
                 }
                 self.force_render(gs);

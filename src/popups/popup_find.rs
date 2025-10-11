@@ -1,7 +1,7 @@
 use super::{
     generic_selector::PopupSelector,
     popup_replace::ReplacePopup,
-    utils::{next_option, prev_option},
+    utils::{infer_word_search_positon, next_option, prev_option},
     Components, Popup, Status,
 };
 use crate::{
@@ -9,7 +9,7 @@ use crate::{
     ext_tui::{text_field::map_key, StyleExt},
     global_state::GlobalState,
     tree::Tree,
-    workspace::{CursorPosition, Editor, Workspace},
+    workspace::{CursorPosition, Workspace},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
@@ -133,30 +133,11 @@ impl FindPopup {
             return;
         };
         let Some(editor) = workspace.get_active() else { return };
-        popup.find_word_from_select(editor);
+        if let Some(state) = infer_word_search_positon(editor, &mut popup.pattern, &mut popup.options) {
+            popup.state = state;
+        }
         let run_result = Popup::run(&mut popup, gs, workspace, tree, term);
         gs.log_if_error(run_result);
-    }
-
-    fn find_word_from_select(&mut self, editor: &mut Editor) {
-        if editor.cursor.select_is_none() {
-            editor.select_token();
-        };
-        let Some((from, to)) = editor.cursor.select_get() else {
-            return;
-        };
-        if from.line != to.line {
-            return;
-        }
-        let Some(word) = editor.content.get(from.line).and_then(|line| line.get(from.char, to.char)) else {
-            return;
-        };
-        self.pattern.text_set(word.to_owned());
-        self.options.clear();
-        editor.find(self.pattern.as_str(), &mut self.options);
-        if let Some(from_state) = self.options.iter().position(|(f, t)| f == &from && t == &to) {
-            self.state = from_state;
-        }
     }
 }
 
