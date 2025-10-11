@@ -20,7 +20,7 @@ pub fn render(
             Some(select) => self::select(line, ctx, select, gs),
             None => self::basic(line, ctx, gs.backend()),
         }
-        if let Some(diagnostics) = line.diagnostics.as_ref() {
+        if let Some(diagnostics) = line.diagnostics() {
             diagnostics.inline_render(line_width - line.char_len(), gs.backend());
         }
     } else {

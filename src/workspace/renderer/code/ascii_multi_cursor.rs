@@ -21,7 +21,7 @@ pub fn render(
 ) {
     if line_width > line.char_len() {
         basic(line, cursors, selects, gs);
-        if let Some(diagnostics) = line.diagnostics.as_ref() {
+        if let Some(diagnostics) = line.diagnostics() {
             diagnostics.inline_render(line_width - line.char_len(), gs.backend());
         }
     } else {

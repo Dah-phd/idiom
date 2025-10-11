@@ -21,7 +21,7 @@ pub fn render(
             Some(select) => self::select(line, ctx, select, gs),
             None => self::basic(line, ctx, gs.backend()),
         }
-        if let Some(diagnostic) = line.diagnostics.as_ref() {
+        if let Some(diagnostic) = line.diagnostics() {
             diagnostic.inline_render(remainder, gs.backend());
         }
     } else {

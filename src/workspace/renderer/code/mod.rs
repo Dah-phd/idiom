@@ -77,7 +77,7 @@ fn render_with_select(
         if line_width > code.char_len() {
             let content = code.chars();
             ascii_line::ascii_line_with_select(content, code.tokens(), select, gs);
-            if let Some(diagnostic) = code.diagnostics.as_ref() {
+            if let Some(diagnostic) = code.diagnostics() {
                 diagnostic.inline_render(line_width - code.char_len(), gs.backend())
             }
         } else {
@@ -92,7 +92,7 @@ fn render_with_select(
         return;
     };
 
-    if let Some(diagnostics) = code.diagnostics.as_ref() {
+    if let Some(diagnostics) = code.diagnostics() {
         diagnostics.inline_render(max_width, gs.backend());
     }
 }
@@ -104,7 +104,7 @@ fn render_no_select(code: &mut EditorLine, line_width: usize, ctx: &mut LineCont
         match line_width > code.len() {
             true => {
                 ascii_line::ascii_line(code.as_str(), code.tokens(), backend);
-                if let Some(diagnostic) = code.diagnostics.as_ref() {
+                if let Some(diagnostic) = code.diagnostics() {
                     diagnostic.inline_render(line_width - code.char_len(), backend)
                 }
             }
@@ -120,7 +120,7 @@ fn render_no_select(code: &mut EditorLine, line_width: usize, ctx: &mut LineCont
         return;
     };
 
-    if let Some(diagnostics) = code.diagnostics.as_ref() {
+    if let Some(diagnostics) = code.diagnostics() {
         diagnostics.inline_render(max_width, backend);
     }
 }

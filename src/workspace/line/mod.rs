@@ -19,7 +19,7 @@ pub struct EditorLine {
     char_len: usize,
     // syntax
     tokens: TokenLine,
-    pub diagnostics: Option<DiagnosticLine>,
+    diagnostics: Option<DiagnosticLine>,
     // used for caching - 0 is reseved for file tabs and can be used to reset line
     pub cached: RenderStatus,
 }
@@ -386,6 +386,11 @@ impl EditorLine {
     #[inline]
     pub fn iter_tokens(&self) -> impl Iterator<Item = &Token> {
         self.tokens.iter()
+    }
+
+    #[inline]
+    pub fn diagnostics(&self) -> &Option<DiagnosticLine> {
+        &self.diagnostics
     }
 
     #[inline]
