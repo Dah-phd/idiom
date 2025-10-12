@@ -1,6 +1,8 @@
-use crate::ext_tui::StyleExt;
+use crate::ext_tui::{CrossTerm, StyleExt};
+use crate::global_state::GlobalState;
 use crate::workspace::editor::tests::mock_editor;
 use crossterm::style::{Color, ContentStyle};
+use idiom_tui::{layout::Rect, Backend};
 
 pub fn expect_select(
     mut start_char: usize,
@@ -102,4 +104,30 @@ pub fn parse_complex_line(rendered: &mut Vec<(ContentStyle, String)>) -> (Option
         parsed.push(current);
     }
     (line_idx, parsed)
+}
+
+#[test]
+fn test_has_render_cache() {
+    let mut editor = mock_editor(vec![
+        "test".into(),
+        String::new(),
+        "more test text".into(),
+        "4 lines are enough".into(),
+    ]);
+    editor.cursor.text_width = 80;
+    editor.cursor.max_rows = 10;
+    let mut gs = GlobalState::new(Rect::new(0, 0, 80, 10), CrossTerm::init());
+    gs.force_area_calc();
+
+    assert!(!editor.has_render_cache());
+    editor.render(&mut gs);
+    assert!(editor.has_render_cache());
+    editor.content[1].insert_str(0, "fill");
+    assert!(!editor.has_render_cache());
+    editor.render(&mut gs);
+    assert!(editor.has_render_cache());
+    editor.cursor.set_position((1, 2).into());
+    editor.select_word();
+    assert!(editor.cursor.select_get().is_some());
+    assert!(editor.has_render_cache());
 }

@@ -212,7 +212,7 @@ impl Editor {
         gs.force_screen_rebuild();
     }
 
-    pub fn select_token(&mut self) {
+    pub fn select_word(&mut self) {
         let Some(range) = WordRange::find_at(&self.content, self.cursor.get_position()) else {
             return;
         };
@@ -471,7 +471,7 @@ impl Editor {
         }
         let position = self.mouse_parse(position);
         if self.cursor.select_is_none() && self.cursor == position {
-            self.select_token();
+            self.select_word();
             return;
         }
         self.cursor.select_drop();

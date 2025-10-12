@@ -4,7 +4,7 @@ use std::ops::Range;
 
 pub type Reduction = usize;
 
-#[derive(Default, PartialEq)]
+#[derive(Default, PartialEq, Debug, Clone)]
 pub enum RenderStatus {
     Cursor {
         line: u16,
