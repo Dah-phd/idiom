@@ -145,6 +145,14 @@ impl Editor {
         (self.renderer.fast_render)(self, gs)
     }
 
+    /// check that lines have render cache
+    /// estimates if there has been changes to the data within content
+    #[inline]
+    pub fn has_render_cache(&self) -> bool {
+        let render_line_maches = matches!(self.last_render_at_line, Some(val) if val == self.cursor.at_line);
+        render_line_maches && Renderer::all_lines_cached(self)
+    }
+
     pub fn clear_ui(&mut self, gs: &GlobalState) {
         if let Some(rect) = self.modal.drop() {
             self.clear_lines_cache(rect, gs);

@@ -31,6 +31,30 @@ impl Renderer {
         Self { render: md_render, fast_render: fast_md_render }
     }
 
+    pub fn all_lines_cached(editor: &Editor) -> bool {
+        match editor.file_type.is_code() {
+            true => editor
+                .content
+                .iter()
+                .skip(editor.cursor.at_line)
+                .take(editor.cursor.max_rows)
+                .all(|line| !line.cached.is_none()),
+            false => {
+                let mut rows = editor.cursor.max_rows;
+                let idx = editor.cursor.at_line;
+                while rows != 0 {
+                    let Some(line) = editor.content.get(idx) else { break };
+                    if line.cached.is_none() {
+                        return false;
+                    }
+                    let estimated_wraps = line.len().div_ceil(editor.cursor.text_width);
+                    rows = rows.saturating_sub(estimated_wraps);
+                }
+                true
+            }
+        }
+    }
+
     pub fn try_multi_cursor(&mut self, file_type: FileType) -> bool {
         if !file_type.is_code() {
             return false;
@@ -314,10 +338,11 @@ fn md_render(editor: &mut Editor, gs: &mut GlobalState) {
 }
 
 fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
-    let Editor { lexer, cursor, content, line_number_padding, .. } = editor;
+    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
 
     let accent_style = gs.ui_theme.accent_fg();
 
+    last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(cursor, lexer.char_lsp_pos, *line_number_padding, accent_style);
 

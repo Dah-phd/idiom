@@ -26,6 +26,11 @@ impl RenderStatus {
         *self = Self::None;
     }
 
+    #[inline]
+    pub fn is_none(&self) -> bool {
+        matches!(self, RenderStatus::None)
+    }
+
     #[inline(always)]
     pub fn line(&mut self, line: u16, select: Option<Range<usize>>) {
         *self = Self::Line { line, select }
