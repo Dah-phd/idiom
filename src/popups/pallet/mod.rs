@@ -158,7 +158,7 @@ impl Pallet {
 
     pub fn run(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         let git_tui = gs.git_tui.to_owned();
-        if let Err(error) = Pallet::new(git_tui, Mode::EasyAccess).run(gs, ws, tree, term) {
+        if let Err(error) = Pallet::new(git_tui, Mode::EasyAccess).main_loop(gs, ws, tree, term) {
             gs.error(error);
         }
     }
@@ -166,7 +166,7 @@ impl Pallet {
     pub fn run_as_command(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         let git_tui = gs.git_tui.to_owned();
         let mut pallet = Pallet::new(git_tui, Mode::Cmd);
-        if let Err(error) = pallet.run(gs, ws, tree, term) {
+        if let Err(error) = pallet.main_loop(gs, ws, tree, term) {
             gs.error(error);
         }
     }

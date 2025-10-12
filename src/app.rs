@@ -80,7 +80,8 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
                                         1 => gs.insert_mode(),
                                         _ => {
                                             let mut selector = selector_editors(tabs);
-                                            let result = selector.run(&mut gs, &mut workspace, &mut tree, &mut term);
+                                            let result =
+                                                selector.main_loop(&mut gs, &mut workspace, &mut tree, &mut term);
                                             gs.log_if_error(result);
                                         }
                                     }

@@ -6,8 +6,10 @@ use super::{
 };
 use crate::{
     embeded_term::EditorTerminal,
+    error::{IdiomError, IdiomResult},
     ext_tui::{text_field::map_key, StyleExt},
     global_state::GlobalState,
+    syntax::Lexer,
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
@@ -33,7 +35,7 @@ impl GoToLinePopup {
         let Some(mut popup) = GoToLinePopup::new(current_line, *gs.editor_area(), gs.ui_theme.accent_style()) else {
             return;
         };
-        if let Err(error) = popup.run(gs, workspace, tree, term) {
+        if let Err(error) = popup.main_loop(gs, workspace, tree, term) {
             gs.error(error);
         }
     }
@@ -135,7 +137,7 @@ impl FindPopup {
         if let Some(state) = infer_word_search_positon(editor, &mut popup.pattern, &mut popup.options) {
             popup.state = state;
         }
-        let run_result = Popup::run(&mut popup, gs, workspace, tree, term);
+        let run_result = Popup::main_loop(&mut popup, gs, workspace, tree, term);
         gs.log_if_error(run_result);
     }
 }
@@ -152,7 +154,7 @@ impl Popup for FindPopup {
                 self.accent,
                 self.state,
             ) {
-                if let Err(error) = popup.run(gs, ws, tree, term) {
+                if let Err(error) = popup.main_loop(gs, ws, tree, term) {
                     gs.error(error);
                 };
             }
@@ -172,7 +174,7 @@ impl Popup for FindPopup {
                         go_to_select_command,
                         None,
                     );
-                    if let Err(error) = popup.run(gs, ws, tree, term) {
+                    if let Err(error) = popup.main_loop(gs, ws, tree, term) {
                         gs.error(error);
                     };
                 }
@@ -182,10 +184,11 @@ impl Popup for FindPopup {
                 match map_key(&mut self.pattern, key, &mut gs.clipboard) {
                     Some(InputStatus::Skipped) | None => {}
                     Some(InputStatus::Updated) => {
-                        if let Some(editor) = ws.get_active() {
-                            self.options.clear();
-                            editor.find(self.pattern.as_str(), &mut self.options);
-                        }
+                        self.options.clear();
+                        let Some(editor) = ws.get_active() else {
+                            return Status::Finished;
+                        };
+                        editor.find(self.pattern.as_str(), &mut self.options);
                         self.state = self.options.len().saturating_sub(1);
                         self.force_render(gs);
                     }
@@ -205,6 +208,24 @@ impl Popup for FindPopup {
             gs.backend.unfreeze();
         }
         Status::Pending
+    }
+
+    fn main_loop_handler(&mut self, components: &mut Components) -> IdiomResult<()> {
+        let Some(editor) = components.ws.get_active() else {
+            return Err(IdiomError::any("No active editor!"));
+        };
+        Lexer::context(editor, components.gs);
+        if !editor.has_render_cache() {
+            let mut new_options = vec![];
+            editor.find(self.pattern.as_str(), &mut new_options);
+            if new_options != self.options {
+                self.options = new_options;
+                self.state = self.options.len().saturating_sub(1);
+            }
+            editor.render(components.gs);
+            self.force_render(components.gs);
+        }
+        Ok(())
     }
 
     fn force_render(&mut self, gs: &mut GlobalState) {

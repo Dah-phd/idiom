@@ -337,34 +337,6 @@ fn md_render(editor: &mut Editor, gs: &mut GlobalState) {
     md_full_render(editor, gs, skip);
 }
 
-fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
-    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
-
-    let accent_style = gs.ui_theme.accent_fg();
-
-    last_render_at_line.replace(cursor.at_line);
-    let mut lines = gs.editor_area().into_iter();
-    let mut ctx = LineContext::collect_context(cursor, lexer.char_lsp_pos, *line_number_padding, accent_style);
-
-    for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
-        if lines.is_finished() {
-            break;
-        }
-        let select = ctx.select_get_full_line(text.char_len());
-        if ctx.has_cursor(line_idx) {
-            markdown::cursor(text, select, skip, &mut ctx, &mut lines, gs);
-        } else {
-            markdown::line(text, select, &mut ctx, &mut lines, gs)
-        }
-    }
-
-    for line in lines {
-        line.render_empty(&mut gs.backend);
-    }
-
-    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
-}
-
 fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
 
@@ -397,6 +369,34 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
         } else {
             ctx.skip_line();
             lines.forward(1 + text.tokens().char_len());
+        }
+    }
+
+    for line in lines {
+        line.render_empty(&mut gs.backend);
+    }
+
+    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
+}
+
+fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
+    let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
+
+    let accent_style = gs.ui_theme.accent_fg();
+
+    last_render_at_line.replace(cursor.at_line);
+    let mut lines = gs.editor_area().into_iter();
+    let mut ctx = LineContext::collect_context(cursor, lexer.char_lsp_pos, *line_number_padding, accent_style);
+
+    for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
+        if lines.is_finished() {
+            break;
+        }
+        let select = ctx.select_get_full_line(text.char_len());
+        if ctx.has_cursor(line_idx) {
+            markdown::cursor(text, select, skip, &mut ctx, &mut lines, gs);
+        } else {
+            markdown::line(text, select, &mut ctx, &mut lines, gs)
         }
     }
 

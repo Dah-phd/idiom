@@ -145,6 +145,7 @@ impl Editor {
         (self.renderer.fast_render)(self, gs)
     }
 
+    /// Main usecase is after manual Lexer::context to check if update is needed
     /// check that lines have render cache
     /// estimates if there has been changes to the data within content
     #[inline]

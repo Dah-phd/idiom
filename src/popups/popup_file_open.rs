@@ -34,7 +34,7 @@ impl OpenFileSelector {
         let pattern = TextField::new(text);
         let mut new = Self { pattern, state: State::new(), paths: vec![] };
         new.solve_comletions();
-        if let Err(error) = new.run(gs, ws, tree, term) {
+        if let Err(error) = new.main_loop(gs, ws, tree, term) {
             gs.error(error);
         };
     }

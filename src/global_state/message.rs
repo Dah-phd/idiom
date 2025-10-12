@@ -9,6 +9,7 @@ use std::{
 
 const MSG_DURATION: Duration = Duration::from_secs(2);
 const ERR_LOG_LIMIT: usize = 100;
+const LIMIT_MSG_LIST: usize = 3;
 
 #[derive(Debug)]
 pub struct Messages {
@@ -34,6 +35,7 @@ impl Messages {
 
     pub fn render(&mut self, accent_style: ContentStyle, backend: &mut CrossTerm) {
         if self.is_expaired() {
+            self.limit_message_que();
             match self.messages.pop() {
                 Some(message) => {
                     self.last_message = message;
@@ -77,8 +79,10 @@ impl Messages {
     }
 
     pub fn message(&mut self, message: String) {
-        self.messages.insert(0, Message::msg(message));
-        self.active = true;
+        if let Some(msg) = Message::msg(message) {
+            self.messages.insert(0, msg);
+            self.active = true;
+        }
     }
 
     pub fn error(&mut self, error: String) {
@@ -92,7 +96,12 @@ impl Messages {
     }
 
     pub fn success(&mut self, message: String) {
-        self.push_ahead(Message::success(message));
+        if self.error_log.len() > ERR_LOG_LIMIT {
+            self.error_log.pop_front();
+        }
+        if let Some(msg) = Message::success(message) {
+            self.push_ahead(msg);
+        }
     }
 
     #[inline]
@@ -105,6 +114,13 @@ impl Messages {
                 }
                 T::default()
             }
+        }
+    }
+
+    fn limit_message_que(&mut self) {
+        if self.messages.len() > LIMIT_MSG_LIST {
+            self.messages.retain(|m| m.is_err());
+            self.messages.truncate(LIMIT_MSG_LIST);
         }
     }
 
@@ -156,15 +172,17 @@ impl Message {
     }
 
     const fn empty() -> Self {
-        Self::msg(String::new())
+        Self::Text(String::new())
     }
 
-    const fn msg(message: String) -> Self {
-        Self::Text(message)
+    fn msg(message: String) -> Option<Self> {
+        let first_line = message.lines().next()?.to_owned();
+        Some(Self::Text(first_line))
     }
 
-    const fn success(message: String) -> Self {
-        Self::Success(message)
+    fn success(message: String) -> Option<Self> {
+        let first_line = message.lines().next()?.to_owned();
+        Some(Self::Success(first_line))
     }
 
     fn err(error: String) -> Option<Self> {

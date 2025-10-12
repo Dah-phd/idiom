@@ -32,7 +32,7 @@ impl SelectorLSP {
         let pattern = TextField::default();
         let mut new = Self { pattern, state: State::default(), file_types };
 
-        if let Err(error) = new.run(gs, ws, tree, term) {
+        if let Err(error) = new.main_loop(gs, ws, tree, term) {
             gs.error(error);
         };
     }

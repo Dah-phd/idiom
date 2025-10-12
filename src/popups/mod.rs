@@ -55,19 +55,20 @@ impl Components<'_> {
 }
 
 pub trait Popup {
-    fn run(
+    /// default main loop
+    fn main_loop(
         &mut self,
         gs: &mut GlobalState,
         ws: &mut Workspace,
         tree: &mut Tree,
         term: &mut EditorTerminal,
     ) -> IdiomResult<()> {
-        // executed when finish
         let mut components = Components { gs, ws, tree, term };
         components.re_draw();
         self.force_render(components.gs);
         components.gs.backend.flush_buf();
         loop {
+            self.main_loop_handler(&mut components)?;
             if crossterm::event::poll(MIN_FRAMERATE)? {
                 match crossterm::event::read()? {
                     Event::Key(key) => {
@@ -99,6 +100,12 @@ pub trait Popup {
             self.render(components.gs);
             components.gs.backend.flush_buf();
         }
+    }
+
+    /// extend the main loop => default to noop
+    /// you can break main loop by sending errror
+    fn main_loop_handler(&mut self, _components: &mut Components) -> IdiomResult<()> {
+        Ok(())
     }
 
     fn paste_passthrough(&mut self, _clip: String, _components: &mut Components) -> bool {

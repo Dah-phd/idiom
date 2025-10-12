@@ -72,17 +72,17 @@ impl IdiomEvent {
             }
             IdiomEvent::InplacePopup(pop) => match pop {
                 StartInplacePopup::Pop(mut popup) => {
-                    if let Err(error) = popup.run(gs, ws, tree, term) {
+                    if let Err(error) = popup.main_loop(gs, ws, tree, term) {
                         gs.error(error);
                     };
                 }
                 StartInplacePopup::RefSelector(mut popup) => {
-                    if let Err(error) = popup.run(gs, ws, tree, term) {
+                    if let Err(error) = popup.main_loop(gs, ws, tree, term) {
                         gs.error(error);
                     };
                 }
                 StartInplacePopup::Mesasge(mut popup) => {
-                    if let Err(error) = popup.run(gs, ws, tree, term) {
+                    if let Err(error) = popup.main_loop(gs, ws, tree, term) {
                         gs.error(error);
                     };
                 }

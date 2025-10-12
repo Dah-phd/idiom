@@ -248,7 +248,7 @@ impl GlobalState {
                 let position = CursorPosition { line, char };
                 let accent_style = self.ui_theme.accent_style_reversed();
                 let mut menu = menu_context_tree_inplace(position, self.screen_rect, accent_style);
-                menu.run(self, ws, tree, term)
+                menu.main_loop(self, ws, tree, term)
             }
             Mode::Insert => {
                 let Some(editor) = ws.get_active() else { return };
@@ -256,7 +256,7 @@ impl GlobalState {
                 let col = (editor.cursor.char + editor.line_number_padding + 1) as u16;
                 let accent_style = self.ui_theme.accent_style();
                 let mut menu = menu_context_editor_inplace(Position { row, col }, self.editor_area, accent_style);
-                menu.run(self, ws, tree, term)
+                menu.main_loop(self, ws, tree, term)
             }
         };
         if let Err(error) = result {

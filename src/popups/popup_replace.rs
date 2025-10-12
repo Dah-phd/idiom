@@ -1,7 +1,9 @@
 use crate::{
     embeded_term::EditorTerminal,
+    error::{IdiomError, IdiomResult},
     ext_tui::{text_field::map_key, StyleExt},
     global_state::GlobalState,
+    syntax::Lexer,
     tree::Tree,
     workspace::{CursorPosition, Workspace},
 };
@@ -52,7 +54,7 @@ impl ReplacePopup {
             popup.state = state;
         }
 
-        if let Err(error) = popup.run(gs, workspace, tree, term) {
+        if let Err(error) = popup.main_loop(gs, workspace, tree, term) {
             gs.error(error);
         }
     }
@@ -95,10 +97,20 @@ impl ReplacePopup {
 impl Popup for ReplacePopup {
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         let Components { gs, ws, .. } = components;
-
         let Some(editor) = ws.get_active() else {
             return Status::Finished;
         };
+        Lexer::context(editor, gs);
+        if !editor.has_render_cache() {
+            let mut new_options = vec![];
+            editor.find(self.pattern.as_str(), &mut new_options);
+            if new_options != self.options {
+                self.options = new_options;
+                self.state = self.options.len().saturating_sub(1);
+            }
+            editor.render(gs);
+            self.force_render(gs);
+        }
 
         match key.code {
             KeyCode::Char('h' | 'H') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -166,6 +178,24 @@ impl Popup for ReplacePopup {
 
     fn map_mouse(&mut self, _: crossterm::event::MouseEvent, _: &mut Components) -> Status {
         Status::Pending
+    }
+
+    fn main_loop_handler(&mut self, components: &mut Components) -> IdiomResult<()> {
+        let Some(editor) = components.ws.get_active() else {
+            return Err(IdiomError::any("No active editor!"));
+        };
+        Lexer::context(editor, components.gs);
+        if !editor.has_render_cache() {
+            let mut new_options = vec![];
+            editor.find(self.pattern.as_str(), &mut new_options);
+            if new_options != self.options {
+                self.options = new_options;
+                self.state = self.options.len().saturating_sub(1);
+            }
+            editor.render(components.gs);
+            self.force_render(components.gs);
+        }
+        Ok(())
     }
 
     fn force_render(&mut self, gs: &mut GlobalState) {

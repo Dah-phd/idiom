@@ -276,7 +276,7 @@ pub fn save_and_exit(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, 
         Some((4, 40)),
     );
 
-    if let Err(error) = popup.run(gs, ws, tree, term) {
+    if let Err(error) = popup.main_loop(gs, ws, tree, term) {
         gs.error(error);
     };
 

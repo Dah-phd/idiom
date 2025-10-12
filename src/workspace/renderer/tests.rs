@@ -1,4 +1,5 @@
 use crate::ext_tui::StyleExt;
+use crate::workspace::editor::tests::mock_editor;
 use crossterm::style::{Color, ContentStyle};
 
 pub fn expect_select(
