@@ -22,7 +22,9 @@ pub fn render(
     if line_width > line.char_len() {
         basic(line, cursors, selects, gs);
         if let Some(diagnostics) = line.diagnostics() {
-            diagnostics.inline_render(line_width - line.char_len(), gs.backend());
+            let padded_len = line.char_len() + 1;
+            let diagnostic_width = line_width - padded_len;
+            diagnostics.render_in_cursor(diagnostic_width, gs.backend());
         }
     } else {
         self::partial(line, ctx, line_width, cursors, selects, gs);
@@ -112,6 +114,8 @@ pub fn basic(line: &EditorLine, cursors: Vec<CursorPosition>, selects: Vec<Range
     }
     if idx <= cursor_idx && cursor_idx != usize::MAX {
         backend.print_styled(" ", ContentStyle::reversed());
+    } else {
+        backend.print(" ");
     }
     backend.reset_style();
 }

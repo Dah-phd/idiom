@@ -618,7 +618,18 @@ fn token_replace_till() {
 fn diagnostic_inline() {
     let mut backend = CrossTerm::init();
     let dline = create_dline();
-    dline.inline_render(200, &mut backend);
+    dline.render_in_line(200, &mut backend);
+    assert_eq!(
+        backend.drain(),
+        [(ContentStyle::ital().with_fg(crossterm::style::Color::Red), String::from("     first err"))]
+    );
+}
+
+#[test]
+fn diagnostic_incursor() {
+    let mut backend = CrossTerm::init();
+    let dline = create_dline();
+    dline.render_in_cursor(200, &mut backend);
     assert_eq!(
         backend.drain(),
         [(ContentStyle::ital().with_fg(crossterm::style::Color::Red), String::from("    first err"))]

@@ -21,7 +21,9 @@ pub fn render(
             None => self::basic(line, ctx, gs.backend()),
         }
         if let Some(diagnostics) = line.diagnostics() {
-            diagnostics.inline_render(line_width - line.char_len(), gs.backend());
+            let padded_len = line.char_len() + 1;
+            let diagnostic_width = line_width - padded_len;
+            diagnostics.render_in_cursor(diagnostic_width, gs.backend());
         }
     } else {
         match select {
@@ -85,6 +87,8 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut CrossTerm) {
     }
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
+    } else {
+        backend.print(" ");
     }
     backend.reset_style();
 }
@@ -156,6 +160,8 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, gs: &m
     }
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
+    } else {
+        backend.print(" ");
     }
     backend.reset_style();
 }

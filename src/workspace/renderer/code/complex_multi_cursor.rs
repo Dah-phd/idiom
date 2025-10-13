@@ -10,7 +10,7 @@ use crossterm::style::{ContentStyle, Stylize};
 use idiom_tui::{utils::CharLimitedWidths, Backend};
 use std::ops::Range;
 
-use super::{WRAP_CLOSE, WRAP_OPEN};
+use super::{width_remainder, WRAP_CLOSE, WRAP_OPEN};
 
 pub fn render(
     line: &mut EditorLine,
@@ -20,10 +20,10 @@ pub fn render(
     selects: Vec<Range<usize>>,
     gs: &mut GlobalState,
 ) {
-    if line_width > line.char_len() {
+    if let Some(remainder) = width_remainder(line, line_width) {
         basic(line, ctx, cursors, selects, gs);
         if let Some(diagnostics) = line.diagnostics() {
-            diagnostics.inline_render(line_width - line.char_len(), gs.backend());
+            diagnostics.render_in_cursor(remainder - 1, gs.backend());
         }
     } else {
         self::partial(line, ctx, line_width, cursors, selects, gs);
@@ -122,7 +122,9 @@ pub fn basic(
     }
     if idx <= cursor_idx && cursor_idx != usize::MAX {
         backend.print_styled(" ", ContentStyle::reversed());
-    }
+    } else {
+        backend.print(" ");
+    };
     backend.reset_style();
 }
 

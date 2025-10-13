@@ -1,5 +1,9 @@
 use super::{diagnostics::DiagnosticData, Legend};
-use crate::{ext_tui::StyleExt, workspace::cursor::Cursor, workspace::line::EditorLine};
+use crate::{
+    ext_tui::StyleExt,
+    workspace::cursor::{Cursor, WordRange},
+    workspace::line::EditorLine,
+};
 use crossterm::style::ContentStyle;
 use lsp_types::SemanticToken;
 use unicode_width::UnicodeWidthChar;
@@ -54,7 +58,7 @@ pub fn set_tokens_partial(tokens: Vec<SemanticToken>, max_lines: usize, legend: 
     }
 }
 
-#[derive(Default, PartialEq, Debug)]
+#[derive(Default, PartialEq, Debug, Clone)]
 pub struct TokenLine {
     inner: Vec<Token>,
 }
@@ -180,6 +184,26 @@ impl TokenLine {
         }
     }
 
+    /// force word in token line making sure it will fit with other tokens
+    pub fn set_word_checked(&mut self, word: WordRange, style: ContentStyle) {
+        // pub len: usize,
+        // pub delta_start: usize,
+        let Some(len) = word.to.checked_sub(word.from) else {
+            return;
+        };
+        if self.is_empty() {
+            self.inner.push(Token { len, delta_start: word.from, style });
+            return;
+        }
+        todo!("unfinished method");
+        let mut start_count = word.from;
+        let mut tokens = self.inner.iter_mut().peekable();
+        match tokens.next() {
+            Some(token) => {}
+            None => {}
+        }
+    }
+
     pub fn push(&mut self, token: Token) {
         self.inner.push(token);
     }
@@ -193,7 +217,7 @@ impl TokenLine {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Token {
     pub len: usize,
     pub delta_start: usize,

@@ -18,6 +18,7 @@ use std::ops::Range;
 const WRAP_OPEN: char = '<';
 const WRAP_CLOSE: char = '>';
 
+/// if val is 0, it returns None
 #[inline(always)]
 pub fn width_remainder(line: &EditorLine, line_width: usize) -> Option<usize> {
     let mut current_with = 0;
@@ -78,7 +79,8 @@ fn render_with_select(
             let content = code.chars();
             ascii_line::ascii_line_with_select(content, code.tokens(), select, gs);
             if let Some(diagnostic) = code.diagnostics() {
-                diagnostic.inline_render(line_width - code.char_len(), gs.backend())
+                let diagnostic_width = line_width - code.char_len();
+                diagnostic.render_in_line(diagnostic_width, gs.backend())
             }
         } else {
             let content = code.chars().take(line_width.saturating_sub(1));
@@ -93,7 +95,7 @@ fn render_with_select(
     };
 
     if let Some(diagnostics) = code.diagnostics() {
-        diagnostics.inline_render(max_width, gs.backend());
+        diagnostics.render_in_line(max_width, gs.backend());
     }
 }
 
@@ -101,17 +103,15 @@ fn render_with_select(
 fn render_no_select(code: &mut EditorLine, line_width: usize, ctx: &mut LineContext, backend: &mut CrossTerm) {
     if code.is_simple() {
         // ascii (byte idx based) render
-        match line_width > code.len() {
-            true => {
-                ascii_line::ascii_line(code.as_str(), code.tokens(), backend);
-                if let Some(diagnostic) = code.diagnostics() {
-                    diagnostic.inline_render(line_width - code.char_len(), backend)
-                }
+        if line_width > code.len() {
+            ascii_line::ascii_line(code.as_str(), code.tokens(), backend);
+            if let Some(diagnostic) = code.diagnostics() {
+                let diagnosic_width = line_width - code.char_len();
+                diagnostic.render_in_line(diagnosic_width, backend)
             }
-            false => {
-                ascii_line::ascii_line(&code.as_str()[..line_width.saturating_sub(1)], code.tokens(), backend);
-                backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
-            }
+        } else {
+            ascii_line::ascii_line(&code.as_str()[..line_width.saturating_sub(1)], code.tokens(), backend);
+            backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
         }
         return;
     }
@@ -121,7 +121,7 @@ fn render_no_select(code: &mut EditorLine, line_width: usize, ctx: &mut LineCont
     };
 
     if let Some(diagnostics) = code.diagnostics() {
-        diagnostics.inline_render(max_width, backend);
+        diagnostics.render_in_line(max_width, backend);
     }
 }
 

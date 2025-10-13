@@ -89,7 +89,7 @@ impl DiagnosticData {
         severity: DiagnosticSeverity,
         style: ContentStyle,
     ) -> Self {
-        let inline_text = message.lines().next().map(|s| format!("    {s}")).unwrap_or_default();
+        let inline_text = message.lines().next().map(|s| format!("     {s}")).unwrap_or_default();
         Self {
             start: range.start.character as usize,
             end: if range.start.line == range.end.line { Some(range.end.character as usize) } else { None },
@@ -130,13 +130,25 @@ impl DiagnosticLine {
 
     /// Prints truncated text based on info from diagnostics
     #[inline(always)]
-    pub fn inline_render(&self, max_width: usize, backend: &mut CrossTerm) {
-        if max_width < 5 {
+    pub fn render_in_line(&self, max_width: usize, backend: &mut CrossTerm) {
+        if max_width < 7 {
             return;
         }
         if let Some(first_diagnostic) = self.data.first() {
             let style = first_diagnostic.text_style();
             let text = first_diagnostic.inline_text.truncate_width(max_width - 1).1;
+            backend.print_styled(text, style);
+        }
+    }
+
+    #[inline(always)]
+    pub fn render_in_cursor(&self, max_width: usize, backend: &mut CrossTerm) {
+        if max_width < 6 {
+            return;
+        }
+        if let Some(first_diagnostic) = self.data.first() {
+            let style = first_diagnostic.text_style();
+            let text = first_diagnostic.inline_text.as_str()[1..].truncate_width(max_width - 1).1;
             backend.print_styled(text, style);
         }
     }
