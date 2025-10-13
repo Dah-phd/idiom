@@ -245,7 +245,8 @@ pub fn calc_wraps(content: &mut [EditorLine], text_width: usize) {
 
 pub fn calc_wrap_line(text: &mut EditorLine, text_width: usize) -> usize {
     if text.is_simple() {
-        let token = Token { len: 0, delta_start: text.len() / text_width, style: ContentStyle::default() };
+        let token =
+            Token { len: 0, delta_start: text.len().saturating_sub(1) / text_width, style: ContentStyle::default() };
         let tokens = text.tokens_mut_unchecked();
         tokens.clear();
         tokens.push(token);
@@ -299,10 +300,13 @@ pub fn calc_wrap_line_capped(text: &mut EditorLine, cursor: &Cursor) -> Option<u
             }
             counter -= w;
         }
-        text.tokens_mut_unchecked().push(wraps);
+        if counter == 0 {
+            wraps.delta_start += 1;
+        }
         if prev_idx_break < cursor_char {
             cursor_at_row += 1;
         }
+        text.tokens_mut_unchecked().push(wraps);
         if cursor_at_row > max_rows {
             return Some(cursor_at_row - max_rows);
         }

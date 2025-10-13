@@ -121,8 +121,15 @@ pub fn basic(
         }
         idx += 1;
     }
+    if remaining_width == 0 {
+        if let Some(line) = lines.next() {
+            ctx.wrap_line(line, backend);
+        }
+    }
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
+    } else {
+        backend.print(" ");
     }
     backend.reset_style();
 }
@@ -191,8 +198,16 @@ pub fn select(
         }
         idx += 1;
     }
+
+    if remaining_width == 0 {
+        if let Some(line) = lines.next() {
+            ctx.wrap_line(line, backend);
+        }
+    }
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
+    } else {
+        backend.print(" ");
     }
     backend.reset_style();
 }

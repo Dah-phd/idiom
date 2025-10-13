@@ -8,7 +8,7 @@ use crate::{
     global_state::GlobalState,
     syntax::Lexer,
 };
-use idiom_tui::layout::IterLines;
+use idiom_tui::{layout::IterLines, Backend};
 
 /// Component containing logic regarding rendering
 /// In order to escape complicated state machines and any form on polymorphism,
@@ -267,12 +267,13 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
     if !matches!(last_render_at_line, Some(idx) if *idx == cursor.at_line) {
         return text_full_render(editor, gs, skip);
     }
-
     let accent_style = gs.ui_theme.accent_fg();
 
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(cursor, lexer.char_lsp_pos, *line_number_padding, accent_style);
+    ctx.correct_last_line_match(content, lines.len());
 
+    gs.backend.freeze();
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
             break;
@@ -300,6 +301,7 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
     }
 
     gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
+    gs.backend.unfreeze();
 }
 
 fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
@@ -311,6 +313,7 @@ fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(cursor, lexer.char_lsp_pos, *line_number_padding, accent_style);
 
+    gs.backend.freeze();
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
             break;
@@ -328,6 +331,7 @@ fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     }
 
     gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
+    gs.backend.unfreeze();
 }
 
 // MARKDOWN
@@ -341,6 +345,7 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
 
     let skip = markdown::repositioning(cursor, content).unwrap_or_default();
+    gs.backend.freeze();
     if !matches!(last_render_at_line, Some(idx) if *idx == cursor.at_line) {
         return md_full_render(editor, gs, skip);
     }
@@ -377,6 +382,7 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
     }
 
     gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
+    gs.backend.unfreeze();
 }
 
 fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {

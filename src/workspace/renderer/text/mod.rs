@@ -35,7 +35,9 @@ pub fn repositioning(cursor: &mut Cursor, content: &mut [EditorLine]) -> Option<
 }
 
 fn calc_rows(content: &mut [EditorLine], cursor: &Cursor) -> usize {
-    let take = (cursor.line + 1) - cursor.at_line;
+    // offset by 2 to ensure the line below is also recalculated
+    // that will prevent artefacts when next line is saturated and cursor caused it to exapand
+    let take = (cursor.line + 2) - cursor.at_line;
     let text_width = cursor.text_width;
     let mut buf = 0;
     for (idx, text) in content.iter_mut().enumerate().skip(cursor.at_line).take(take) {
