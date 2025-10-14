@@ -35,6 +35,48 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
     }
 }
 
+pub fn mock_editor_text_render(content: Vec<String>) -> Editor {
+    let ft = FileType::Text;
+    let path = PathBuf::from("test-path");
+    let content: Vec<EditorLine> = content.into_iter().map(EditorLine::from).collect();
+    Editor {
+        line_number_padding: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
+        lexer: Lexer::text_lexer(&path),
+        file_type: ft,
+        display: "".to_string(),
+        path,
+        update_status: FileUpdate::None,
+        cursor: Cursor::default(),
+        modal: EditorModal::default(),
+        actions: Actions::default(),
+        controls: controls::ControlMap::default(),
+        content,
+        renderer: Renderer::text(),
+        last_render_at_line: None,
+    }
+}
+
+pub fn mock_editor_md_render(content: Vec<String>) -> Editor {
+    let ft = FileType::MarkDown;
+    let path = PathBuf::from("test-path");
+    let content: Vec<EditorLine> = content.into_iter().map(EditorLine::from).collect();
+    Editor {
+        line_number_padding: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
+        lexer: Lexer::md_lexer(&path),
+        file_type: ft,
+        display: "".to_string(),
+        path,
+        update_status: FileUpdate::None,
+        cursor: Cursor::default(),
+        modal: EditorModal::default(),
+        actions: Actions::default(),
+        controls: controls::ControlMap::default(),
+        content,
+        renderer: Renderer::markdown(),
+        last_render_at_line: None,
+    }
+}
+
 pub fn select_eq(select: (CursorPosition, CursorPosition), editor: &Editor) -> bool {
     if let Some((p1, p2)) = editor.cursor.select_get() {
         return p1 == select.0 && p2 == select.1;
