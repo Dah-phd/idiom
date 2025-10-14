@@ -522,3 +522,280 @@ fn test_cursor_line_oversize_full_last_wrap() {
 
     assert_eq!(text, cursor_on_last_wrap);
 }
+
+#[test]
+fn test_full_end_line_complex() {
+    let mut gs = GlobalState::new(Rect::new(0, 0, 47, 6), CrossTerm::init());
+    gs.force_area_calc();
+    let mut editor = mock_editor_text_render(vec![
+        "GlobalState::new(Rect::new(0, 0, 30, 60), Cro🦀Term::init())".into(), // 60 len
+        "n/a".into(),
+    ]);
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+    editor.render(&mut gs);
+    // style is ignored
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+    #[rustfmt::skip]
+    assert_eq!(
+        text,
+        [
+            "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
+            "?","l","o","b","a","l","S","t","a","t","e",":",":","n","e","w","(","R","e","c","t",":",":","n","e","w","(","0",","," ",
+            "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
+            "0",","," ","3","0",","," ","6","0",")",","," ","C","r","o","🦀","T","e","r","m",":",":","i","n","i","t","(",")",")",
+            "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
+            " ", // padding due to prev line filled up
+            "<<reset style>>", // end of cursor line
+            "<<go to row: 4 col: 15>>", "2 ", "<<clear EOL>>",
+            "n/a",
+            "<<set style>>", "<<go to row: 5 col: 14>>", "<<padding: 33>>",
+            "<<go to row: 5 col: 22>>", "  Doc Len 2, Ln 1, Col 1 ",
+            "<<go to row: 5 col: 14>>", "<<padding: 8>>", "<<set style>>",
+            "<<go to row: 5 col: 14>>", "<<padding: 8>>", "<<reset style>>", 
+            "<<reset style>>",
+            "<<unfreeze>>"
+        ]
+    );
+
+    editor.map(crate::configs::EditorAction::EndOfLine, &mut gs);
+    editor.map(crate::configs::EditorAction::Right, &mut gs);
+    editor.render(&mut gs);
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+
+    #[rustfmt::skip]
+    assert_eq!(
+        text,
+        [
+            "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
+            "GlobalState::new(Rect::new(0, ",
+            "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
+            "0, 30, 60), Cro🦀Term::init())",
+            "<<go to row: 3 col: 15>>", "2 ", "<<clear EOL>>",
+            "?", "/", "a", " ",  // prev line now has one less line because is no longer cursor
+            "<<reset style>>",
+            "<<go to row: 4 col: 15>>", "<<padding: 32>>", "<<set style>>",
+            "<<go to row: 5 col: 14>>", "<<padding: 33>>",
+            "<<go to row: 5 col: 22>>", "  Doc Len 2, Ln 2, Col 1 ",
+            "<<go to row: 5 col: 14>>", "<<padding: 8>>",
+            "<<reset style>>",
+            "<<unfreeze>>"
+        ]
+    );
+}
+
+#[test]
+fn test_cursor_line_oversize_complex() {
+    let mut gs = GlobalState::new(Rect::new(0, 0, 25, 5), CrossTerm::init());
+    gs.force_area_calc();
+    let mut editor = mock_editor_text_render(vec![
+        "let mut gs = GlobalState::new(Rect::new(0, 0, 30, 60), CrossTerm::in🦀());".into(),
+        "n/a".into(),
+        "n/a".into(),
+    ]);
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+
+    editor.render(&mut gs);
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+
+    #[rustfmt::skip]
+    assert_eq!(text, [
+        "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
+        "?", "e", "t", " ", "m", "u", "t", " ",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
+        "g", "s", " ", "=", " ", "G", "l", "o",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
+        "b", "a", "l", "S", "t", "a", "t", "e", " ", 
+        "<<reset style>>", "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", "n 1, Col 1 ", "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 0>>", "<<reset style>>",
+        "<<reset style>>",  "<<unfreeze>>", 
+    ]);
+
+    editor.map(crate::configs::EditorAction::Down, &mut gs);
+
+    editor.render(&mut gs);
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+
+    #[rustfmt::skip]
+    assert_eq!(text, [
+        "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
+        "l", "e", "t", " ", "m", "u", "t", " ",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
+        "?", "s", " ", "=", " ", "G", "l", "o",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
+        "b", "a", "l", "S", "t", "a", "t", "e", " ",
+        "<<reset style>>", "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", "n 1, Col 9 ",
+        "<<reset style>>", "<<unfreeze>>"
+    ]);
+
+    editor.map(crate::configs::EditorAction::Down, &mut gs);
+    editor.map(crate::configs::EditorAction::Down, &mut gs);
+    editor.map(crate::configs::EditorAction::Down, &mut gs);
+    editor.map(crate::configs::EditorAction::Down, &mut gs);
+    editor.map(crate::configs::EditorAction::Down, &mut gs);
+    editor.map(crate::configs::EditorAction::Down, &mut gs);
+
+    editor.render(&mut gs);
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+
+    #[rustfmt::skip]
+    assert_eq!(text, [
+        "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
+        "0", ",", " ", "0", ",", " ", "3", "0",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
+        ",", " ", "6", "0", ")", ",", " ", "C",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
+        "?", "o", "s", "s", "T", "e", "r", "m", " ",
+        "<<reset style>>", "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", " 1, Col 57 ",
+        "<<reset style>>", "<<unfreeze>>"
+    ]);
+    
+    editor.map(crate::configs::EditorAction::EndOfLine, &mut gs);
+
+    editor.render(&mut gs);
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+
+    #[rustfmt::skip]
+    let cursor_on_last_wrap = [
+        "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
+        ":", ":", "i", "n", "🦀", "(", ")",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
+        ")", ";", "?",
+        "<<reset style>>", "<<go to row: 3 col: 15>>", "2 ", "<<clear EOL>>",
+        "n/a",
+        "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", " 1, Col 74 ",
+        "<<reset style>>", "<<unfreeze>>"
+    ];
+
+    assert_eq!(text, cursor_on_last_wrap);
+
+    editor.map(crate::configs::EditorAction::Right, &mut gs);
+
+    editor.render(&mut gs);
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+
+    #[rustfmt::skip]
+    assert_eq!(text, [
+        "<<freeze>>", "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>",
+        "?", "/", "a", " ",
+        "<<reset style>>", "<<go to row: 2 col: 15>>", "3 ", "<<clear EOL>>",
+        "n/a", "<<go to row: 3 col: 15>>", "<<padding: 10>>",
+        "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", "n 2, Col 1 ",
+        "<<reset style>>", "<<unfreeze>>"    
+    ]);
+
+    editor.map(crate::configs::EditorAction::Left, &mut gs);
+
+    editor.render(&mut gs);
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+
+    assert_eq!(text, cursor_on_last_wrap);
+}
+
+
+#[test]
+fn test_cursor_line_oversize_full_last_wrap_complex() {
+    let mut gs = GlobalState::new(Rect::new(0, 0, 25, 5), CrossTerm::init());
+    gs.force_area_calc();
+    let mut editor = mock_editor_text_render(vec![
+        "let mut gs = Gl🦀balState::new(Rect::new(0, 0, 30, 60), CrossTerm::🦀it()); //e".into(),
+        "n/a".into(),
+        "n/a".into(),
+    ]);
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+
+    editor.render(&mut gs);
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+
+    #[rustfmt::skip]
+    assert_eq!(text, [
+        "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
+        "?", "e", "t", " ", "m", "u", "t", " ",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
+        "g", "s", " ", "=", " ", "G", "l",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
+        "🦀", "b", "a", "l", "S", "t", "a", " ",
+        "<<reset style>>", "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", "n 1, Col 1 ",
+        "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 0>>", "<<reset style>>",
+        "<<reset style>>", "<<unfreeze>>"
+    ]);
+
+    editor.map(crate::configs::EditorAction::Down, &mut gs);
+
+    editor.render(&mut gs);
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+
+    #[rustfmt::skip]
+    assert_eq!(text, [
+        "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
+        "l", "e", "t", " ", "m", "u", "t", " ",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
+        "?", "s", " ", "=", " ", "G", "l", "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
+        "🦀", "b", "a", "l", "S", "t", "a", " ",
+        "<<reset style>>", "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", "n 1, Col 9 ",
+        "<<reset style>>", "<<unfreeze>>"
+    ]);
+
+    editor.map(crate::configs::EditorAction::Down, &mut gs);
+    editor.map(crate::configs::EditorAction::Down, &mut gs);
+    editor.map(crate::configs::EditorAction::Down, &mut gs);
+    editor.map(crate::configs::EditorAction::Down, &mut gs);
+    editor.map(crate::configs::EditorAction::Down, &mut gs);
+    editor.map(crate::configs::EditorAction::Down, &mut gs);
+    editor.map(crate::configs::EditorAction::Down, &mut gs);
+    editor.map(crate::configs::EditorAction::Down, &mut gs);
+
+    editor.render(&mut gs);
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+
+    #[rustfmt::skip]
+    assert_eq!(text, [
+        "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
+        "r", "m", ":", ":", "🦀", "i", "t",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
+        "(", ")", ")", "?", " ", "/", "/", "e",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
+        " ",
+        "<<reset style>>", "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", " 1, Col 73 ",
+        "<<reset style>>", "<<unfreeze>>"
+    ]);
+
+    editor.map(crate::configs::EditorAction::EndOfLine, &mut gs);
+
+    editor.render(&mut gs);
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+
+    #[rustfmt::skip]
+    let cursor_on_last_wrap = [
+        "<<freeze>>","<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
+        "r", "m", ":", ":", "🦀", "i", "t",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
+        "(", ")", ")", ";", " ", "/", "/", "e",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
+        "?",
+        "<<reset style>>", "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", " 1, Col 78 ",
+        "<<reset style>>", "<<unfreeze>>"
+    ];
+
+    assert_eq!(text, cursor_on_last_wrap);
+
+    editor.map(crate::configs::EditorAction::Right, &mut gs);
+
+    editor.render(&mut gs);
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+
+    #[rustfmt::skip]
+    assert_eq!(text, [
+        "<<freeze>>", "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>",
+        "?", "/", "a", " ",
+        "<<reset style>>", "<<go to row: 2 col: 15>>", "3 ", "<<clear EOL>>",
+        "n/a", "<<go to row: 3 col: 15>>", "<<padding: 10>>",
+        "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", "n 2, Col 1 ",
+        "<<reset style>>", "<<unfreeze>>"
+    ]);
+
+    editor.map(crate::configs::EditorAction::Left, &mut gs);
+
+    editor.render(&mut gs);
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+
+    assert_eq!(text, cursor_on_last_wrap);
+}

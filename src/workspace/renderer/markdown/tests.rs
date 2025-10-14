@@ -8,6 +8,7 @@ use crate::{
     syntax::tests::mock_utf8_lexer,
     workspace::{
         cursor::Cursor,
+        editor::tests::mock_editor_md_render,
         line::{EditorLine, LineContext},
         CursorPosition,
     },
@@ -278,4 +279,10 @@ fn example_parsed_code() {
             String::from("Linux Fedora derivate (Nobara)")
         )])])],
     );
+}
+
+#[test]
+fn test_md_editor() {
+    let mut editor = mock_editor_md_render(vec![]);
+    todo!("add more tests")
 }
