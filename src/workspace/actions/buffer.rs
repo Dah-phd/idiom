@@ -86,7 +86,7 @@ impl DelBuffer {
         } else {
             Position::new(line as u32, (lexer.encode_position)(cursor.char, &text[..]) as u32)
         };
-        let removed = text.remove(char);
+        let removed = text.remove(char, lexer.char_lsp_pos);
         let end = Position::new(change_start.line, change_start.character + ((lexer.char_lsp_pos)(removed)) as u32);
         (
             Self { line, char, change_start, text: String::from(removed) },
@@ -105,7 +105,7 @@ impl DelBuffer {
         lexer: &Lexer,
     ) -> (Option<Edit>, TextDocumentContentChangeEvent) {
         if cursor.line == self.line && cursor.char == self.char {
-            let removed = text.remove(cursor.char);
+            let removed = text.remove(cursor.char, lexer.char_lsp_pos);
             let end_character = self.change_start.character + ((lexer.char_lsp_pos)(removed)) as u32;
             let end = Position::new(self.change_start.line, end_character);
             self.text.push(removed);
@@ -197,7 +197,7 @@ impl BackspaceBuffer {
             Range::new(Position::new(line, self.last as u32), Position::new(line, char as u32))
         } else {
             self.last -= 1;
-            let ch = text.remove(self.last);
+            let ch = text.remove(self.last, lexer.char_lsp_pos);
             self.text.push(ch);
             let character = match text.is_simple() {
                 true => self.last,
@@ -242,7 +242,7 @@ impl TextBuffer {
         } else {
             cursor.into()
         };
-        text.insert(cursor.char, ch);
+        text.insert_simple(cursor.char, ch);
         cursor.add_to_char(1);
         (
             Self { line: cursor.line, last: cursor.char, char, text: String::from(ch) },
@@ -267,7 +267,7 @@ impl TextBuffer {
                 false => cursor.into(),
             };
             self.text.push(ch);
-            text.insert(cursor.char, ch);
+            text.insert_simple(cursor.char, ch);
             cursor.add_to_char(1);
             self.last = cursor.char;
             return (

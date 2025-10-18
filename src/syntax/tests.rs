@@ -549,6 +549,11 @@ fn token_dec() {
 }
 
 #[test]
+fn token_dec_utf() {
+    todo!("create test");
+}
+
+#[test]
 fn token_motions() {
     let mut token_line = TokenLine::default();
     token_line.push(Token { delta_start: 0, len: 3, style: ContentStyle::default() });

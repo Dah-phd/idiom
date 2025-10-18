@@ -139,10 +139,10 @@ fn merge_next_line() {
 fn indent_unindent() {
     let mut content = create_content();
     let cfg = IndentConfigs::default();
-    Edit::unindent(7, &mut content[7], &cfg.indent);
+    Edit::unindent(7, &mut content[7], &cfg.indent, |_| 1);
     match_line(&content[7], &"this is the first scope");
     let mut this_line: EditorLine = "     text".into();
-    Edit::unindent(0, &mut this_line, &cfg.indent);
+    Edit::unindent(0, &mut this_line, &cfg.indent, |_| 1);
     match_line(&this_line, &"    text");
 }
 

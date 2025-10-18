@@ -24,12 +24,12 @@ fn trim_counted() {
 fn test_insert() {
     let mut line = EditorLine::new("text".to_owned());
     assert!(line.char_len() == 4);
-    line.insert(2, 'e');
+    line.insert_simple(2, 'e');
     assert!(line.is_simple());
-    line.insert(2, '🚀');
+    line.insert_simple(2, '🚀');
     assert!(line.char_len() == 6);
     assert!(!line.is_simple());
-    line.insert(3, 'x');
+    line.insert_simple(3, 'x');
     assert!(line.char_len() == 7);
     assert!(&line.to_string() == "te🚀xext");
 }
@@ -49,10 +49,10 @@ fn test_insert_str() {
 #[test]
 fn test_push() {
     let mut line = EditorLine::new("text".to_owned());
-    line.push('1');
+    line.push_simple('1');
     assert!(line.is_simple());
     assert!(line.char_len() == 5);
-    line.push('🚀');
+    line.push_simple('🚀');
     assert!(!line.is_simple());
     assert!(line.to_string().len() == 9);
     assert!(line.char_len() == 6);
@@ -124,10 +124,10 @@ fn test_remove() {
     let mut line = EditorLine::new("text🚀123".to_owned());
     assert!(!line.is_simple());
     assert!(line.char_len() == 8);
-    assert!('1' == line.remove(5));
+    assert!('1' == line.remove(5, |_| 1));
     assert!(line.char_len() == 7);
     assert!(!line.is_simple());
-    assert!('🚀' == line.remove(4));
+    assert!('🚀' == line.remove(4, |_| 1));
     assert!(line.is_simple());
     assert!(line.char_len() == 6);
     assert!(&line.to_string() == "text23");

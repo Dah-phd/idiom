@@ -51,7 +51,12 @@ impl Edit {
         Self::without_select(cursor, 2, 1, String::new(), "\n".to_owned())
     }
 
-    pub fn unindent(line: usize, text: &mut EditorLine, indent: &str) -> Option<(Offset, Self)> {
+    pub fn unindent(
+        line: usize,
+        text: &mut EditorLine,
+        indent: &str,
+        char_lsp_pos: fn(char) -> usize,
+    ) -> Option<(Offset, Self)> {
         let mut idx = 0;
         while text[idx..].starts_with(indent) {
             idx += indent.len();
@@ -59,7 +64,7 @@ impl Edit {
         if text[idx..].starts_with(' ') {
             let mut reverse = String::new();
             while text[idx..].starts_with(' ') {
-                reverse.push(text.remove(idx));
+                reverse.push(text.remove(idx, char_lsp_pos));
             }
             return Some((
                 Offset::Neg(reverse.len()),

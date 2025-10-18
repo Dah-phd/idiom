@@ -131,8 +131,9 @@ impl EditorLine {
         self.content.find(pat)
     }
 
+    // no need to handle non ascii inserts because - triggers from keyboard
     #[inline]
-    pub fn insert(&mut self, idx: usize, ch: char) {
+    pub fn insert_simple(&mut self, idx: usize, ch: char) {
         self.cached.reset();
         self.tokens.increment_before(idx);
         if self.char_len == self.content.len() {
@@ -145,8 +146,9 @@ impl EditorLine {
         }
     }
 
+    // no need to handle non ascii inserts because - triggers from keyboard
     #[inline]
-    pub fn push(&mut self, ch: char) {
+    pub fn push_simple(&mut self, ch: char) {
         self.cached.reset();
         self.tokens.increment_before(self.char_len);
         self.char_len += 1;
@@ -190,15 +192,19 @@ impl EditorLine {
     }
 
     #[inline]
-    pub fn remove(&mut self, idx: usize) -> char {
+    pub fn remove(&mut self, idx: usize, char_lsp_pos: fn(char) -> usize) -> char {
         self.cached.reset();
-        self.tokens.decrement_at(idx);
         if self.content.len() == self.char_len {
+            self.tokens.decrement_at(idx);
             self.char_len -= 1;
             return self.content.remove(idx);
         }
         self.char_len -= 1;
-        self.content.utf8_remove(idx)
+        let ch = self.content.utf8_remove(idx);
+        for _ in 0..char_lsp_pos(ch) {
+            self.tokens.decrement_at(idx);
+        }
+        ch
     }
 
     #[inline]
