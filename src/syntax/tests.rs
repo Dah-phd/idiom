@@ -550,7 +550,35 @@ fn token_dec() {
 
 #[test]
 fn token_dec_utf() {
-    todo!("create test");
+    let mut eline_utf8 = EditorLine::from("let d = \"🚀text\";");
+    let tokens = eline_utf8.tokens_mut();
+    tokens.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() }); // let
+    tokens.push(Token { len: 1, delta_start: 4, style: ContentStyle::default() }); // b
+    tokens.push(Token { len: 1, delta_start: 4, style: ContentStyle::reversed() }); // "
+    tokens.push(Token { len: 8, delta_start: 1, style: ContentStyle::reversed() }); // 🚀text
+    tokens.push(Token { len: 1, delta_start: 8, style: ContentStyle::reversed() }); // "
+    let txt = eline_utf8.remove(9, |x| x.len_utf8());
+    assert_eq!(txt, '🚀');
+    let token = eline_utf8.tokens().iter().nth(3).unwrap();
+    let token_next = eline_utf8.tokens().iter().nth(4).unwrap();
+    assert_eq!(token.len, 4);
+    assert_eq!(token.delta_start, 1);
+    assert_eq!(token_next.delta_start, 4);
+
+    let mut eline_utf16 = EditorLine::from("let d = \"🚀text\";");
+    let tokens = eline_utf16.tokens_mut();
+    tokens.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() }); // let
+    tokens.push(Token { len: 1, delta_start: 4, style: ContentStyle::default() }); // b
+    tokens.push(Token { len: 1, delta_start: 4, style: ContentStyle::reversed() }); // "
+    tokens.push(Token { len: 6, delta_start: 1, style: ContentStyle::reversed() }); // 🚀text
+    tokens.push(Token { len: 1, delta_start: 6, style: ContentStyle::reversed() }); // "
+    let txt = eline_utf16.remove(9, |x| x.len_utf16());
+    assert_eq!(txt, '🚀');
+    let token = eline_utf16.tokens().iter().nth(3).unwrap();
+    let token_next = eline_utf16.tokens().iter().nth(4).unwrap();
+    assert_eq!(token.len, 4);
+    assert_eq!(token.delta_start, 1);
+    assert_eq!(token_next.delta_start, 4);
 }
 
 #[test]
