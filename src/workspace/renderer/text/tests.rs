@@ -647,7 +647,7 @@ fn test_cursor_line_oversize_complex() {
         "<<reset style>>", "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", " 1, Col 57 ",
         "<<reset style>>", "<<unfreeze>>"
     ]);
-    
+
     editor.map(crate::configs::EditorAction::EndOfLine, &mut gs);
 
     editor.render(&mut gs);
@@ -689,7 +689,6 @@ fn test_cursor_line_oversize_complex() {
 
     assert_eq!(text, cursor_on_last_wrap);
 }
-
 
 #[test]
 fn test_cursor_line_oversize_full_last_wrap_complex() {

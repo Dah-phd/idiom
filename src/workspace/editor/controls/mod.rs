@@ -260,8 +260,8 @@ fn multi_cursor_word_select(editor: &mut Editor, word: PositionedWord) {
         editor.controls.cursors.insert(0, new_cursor);
         return;
     }
-    let top_content = editor.content.iter().enumerate().take(word.range().line);
-    let content_iter = editor.content.iter().enumerate().skip(word.range().line + 1).chain(top_content);
+    let top_content = editor.content.iter().enumerate().take(word.line());
+    let content_iter = editor.content.iter().enumerate().skip(word.line() + 1).chain(top_content);
     for new_range in word.iter_word_ranges(content_iter) {
         let (new_from, new_to) = new_range.as_select();
         if new_from > from {

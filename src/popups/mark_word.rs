@@ -91,9 +91,10 @@ pub fn render_marked_word(
 fn perform_render(editor: &mut Editor, ranges: &[WordRange], gs: &mut GlobalState) {
     let mut stored_tokens = vec![];
     for range in ranges {
-        let line = &mut editor.content[range.line];
+        let range_line = range.line();
+        let line = &mut editor.content[range_line];
         let mut new_tokens = line.tokens().clone();
-        stored_tokens.push((range.line, std::mem::replace(line.tokens_mut(), new_tokens)));
+        stored_tokens.push((range_line, std::mem::replace(line.tokens_mut(), new_tokens)));
     }
 
     editor.render(gs);
@@ -105,6 +106,6 @@ fn perform_render(editor: &mut Editor, ranges: &[WordRange], gs: &mut GlobalStat
 
 fn clear_marked_cache(editor: &mut Editor, ranges: Vec<WordRange>) {
     for range in ranges {
-        editor.content[range.line].cached.reset();
+        editor.content[range.line()].cached.reset();
     }
 }

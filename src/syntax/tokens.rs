@@ -188,15 +188,17 @@ impl TokenLine {
     pub fn set_word_checked(&mut self, word: WordRange, style: ContentStyle) {
         // pub len: usize,
         // pub delta_start: usize,
-        let Some(len) = word.to.checked_sub(word.from) else {
+        let from = word.from();
+        let to = word.to();
+        let Some(len) = to.checked_sub(from) else {
             return;
         };
         if self.is_empty() {
-            self.inner.push(Token { len, delta_start: word.from, style });
+            self.inner.push(Token { len, delta_start: from, style });
             return;
         }
         todo!("unfinished method");
-        let mut start_count = word.from;
+        let mut start_count = from;
         let mut tokens = self.inner.iter_mut().peekable();
         match tokens.next() {
             Some(token) => {}

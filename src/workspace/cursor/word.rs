@@ -21,6 +21,11 @@ impl PositionedWord {
     }
 
     #[inline]
+    pub fn line(&self) -> usize {
+        self.range.line
+    }
+
+    #[inline]
     pub fn len(&self) -> usize {
         self.text.len()
     }
@@ -28,6 +33,21 @@ impl PositionedWord {
     #[inline]
     pub fn char_len(&self) -> usize {
         self.range.to - self.range.from
+    }
+
+    #[inline]
+    pub fn char_range(&self) -> std::ops::Range<usize> {
+        self.range.from..self.range.to
+    }
+
+    #[inline]
+    pub fn from(&self) -> usize {
+        self.range.from
+    }
+
+    #[inline]
+    pub fn to(&self) -> usize {
+        self.range.to
     }
 
     #[inline]
@@ -115,9 +135,9 @@ impl PositionedWord {
 /// word location
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct WordRange {
-    pub line: usize,
-    pub from: usize,
-    pub to: usize,
+    line: usize,
+    from: usize,
+    to: usize,
 }
 
 impl WordRange {
@@ -148,6 +168,13 @@ impl WordRange {
         } else {
             None
         }
+    }
+
+    pub fn new_checked(line: usize, from: usize, to: usize) -> Option<Self> {
+        if to > from {
+            return Some(Self { line, from, to });
+        }
+        None
     }
 
     pub fn find_text_at(content: &[EditorLine], position: CursorPosition) -> Option<&str> {
@@ -192,6 +219,26 @@ impl WordRange {
     #[inline]
     pub fn get_text_uncheded<'a>(&self, content: &'a [EditorLine]) -> &'a str {
         &content[self.line][self.from..self.to]
+    }
+
+    #[inline]
+    pub fn line(&self) -> usize {
+        self.line
+    }
+
+    #[inline]
+    pub fn from(&self) -> usize {
+        self.from
+    }
+
+    #[inline]
+    pub fn to(&self) -> usize {
+        self.to
+    }
+
+    #[inline]
+    pub fn char_range(&self) -> std::ops::Range<usize> {
+        self.from..self.to
     }
 
     pub fn as_select(&self) -> Select {

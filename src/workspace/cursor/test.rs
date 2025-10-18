@@ -2,9 +2,9 @@ use super::word::{PositionedWord, WordRange};
 use crate::workspace::EditorLine;
 
 fn match_char_range_to_word_range(range: WordRange, char_idx: usize, content: &[EditorLine]) {
-    let char_range = WordRange::find_char_range(&content[range.line], char_idx).unwrap();
-    assert_eq!(range.from, char_range.from);
-    assert_eq!(range.to, char_range.to);
+    let char_range = WordRange::find_char_range(&content[range.line()], char_idx).unwrap();
+    assert_eq!(range.from(), char_range.from);
+    assert_eq!(range.to(), char_range.to);
 }
 
 #[test]
@@ -16,15 +16,15 @@ fn positioned_word_creation() {
     ];
     let word = PositionedWord::find_at(&content, (0, 4).into()).unwrap();
     assert_eq!(word.as_str(), "word");
-    assert_eq!(word.range().line, 0);
-    assert_eq!(word.range().from, 3);
-    assert_eq!(word.range().to, 7);
+    assert_eq!(word.line(), 0);
+    assert_eq!(word.from(), 3);
+    assert_eq!(word.to(), 7);
 
     let word = PositionedWord::find_at(&content, (1, 28).into()).unwrap();
     assert_eq!(word.as_str(), "word");
-    assert_eq!(word.range().line, 1);
-    assert_eq!(word.range().from, 27);
-    assert_eq!(word.range().to, 31);
+    assert_eq!(word.line(), 1);
+    assert_eq!(word.from(), 27);
+    assert_eq!(word.to(), 31);
 }
 
 #[test]
@@ -33,13 +33,13 @@ fn test_word_range_at() {
     let char_idx = 4;
     let line_idx = 0;
     let wr = WordRange::find_at(&content, (line_idx, char_idx).into()).unwrap();
-    assert_eq!(wr, WordRange { line: line_idx, from: 4, to: 8 });
-    assert_eq!(&content[line_idx][wr.from..wr.to], "word");
+    assert_eq!(wr, WordRange::new_checked(line_idx, 4, 8).unwrap());
+    assert_eq!(&content[line_idx][wr.char_range()], "word");
     match_char_range_to_word_range(wr, char_idx, &content);
     let content = vec![EditorLine::from("let __word__ = \"word\";")];
     let wr = WordRange::find_at(&content, (line_idx, char_idx).into()).unwrap();
-    assert_eq!(wr, WordRange { line: line_idx, from: 4, to: 12 });
-    assert_eq!(&content[line_idx][wr.from..wr.to], "__word__");
+    assert_eq!(wr, WordRange::new_checked(line_idx, 4, 12).unwrap());
+    assert_eq!(&content[line_idx][wr.char_range()], "__word__");
     match_char_range_to_word_range(wr, char_idx, &content);
     let content = vec![EditorLine::from("let (__word__,) = \"word\";")];
     let wr = WordRange::find_at(&content, (line_idx, char_idx).into());
@@ -65,10 +65,10 @@ fn test_iter_word_selects() {
     let line_order = [3, 4, 0, 1, 2, 2];
     assert_eq!(selects.len(), line_order.len());
     for (idx, range) in selects.into_iter().enumerate() {
-        assert_eq!(range.line, line_order[idx]);
-        assert_eq!(range.line, line_order[idx]);
-        assert_eq!(content[range.line].get(range.from, range.to), Some(word.as_str()));
-        match_char_range_to_word_range(range, range.from, &content);
+        assert_eq!(range.line(), line_order[idx]);
+        assert_eq!(range.line(), line_order[idx]);
+        assert_eq!(content[range.line()].get(range.from(), range.to()), Some(word.as_str()));
+        match_char_range_to_word_range(range, range.from(), &content);
     }
 }
 
@@ -85,9 +85,9 @@ fn test_find_word_inline_from() {
     let selects = word.find_word_inline_after(&content).unwrap().collect::<Vec<_>>();
     assert_eq!(selects.len(), 1);
     for range in selects {
-        assert_eq!(range, WordRange { line: 0, from: 36, to: 40 });
-        assert_eq!(content[range.line].get(range.from, range.to), Some(word.as_str()));
-        match_char_range_to_word_range(range, range.from, &content);
+        assert_eq!(range, WordRange::new_checked(0, 36, 40).unwrap());
+        assert_eq!(content[range.line()].get(range.from(), range.to()), Some(word.as_str()));
+        match_char_range_to_word_range(range, range.from(), &content);
     }
 
     let word = PositionedWord::find_at(&content, (1, 4).into()).unwrap();
@@ -95,14 +95,14 @@ fn test_find_word_inline_from() {
     let selects = word.find_word_inline_after(&content).unwrap().collect::<Vec<_>>();
     assert_eq!(selects.len(), 2);
     let expected = [
-        WordRange { line: 1, from: 25, to: 29 },
-        WordRange { line: 1, from: 38, to: 42 },
+        WordRange::new_checked(1, 25, 29).unwrap(),
+        WordRange::new_checked(1, 38, 42).unwrap(),
     ];
     for (idx, range) in selects.into_iter().enumerate() {
         // only 2 offset for the emoji + /s
         assert_eq!(range, expected[idx]);
-        assert_eq!(content[range.line].get(range.from, range.to), Some(word.as_str()));
-        match_char_range_to_word_range(range, range.from, &content);
+        assert_eq!(content[range.line()].get(range.from(), range.to()), Some(word.as_str()));
+        match_char_range_to_word_range(range, range.from(), &content);
     }
 
     let word = PositionedWord::find_at(&content, (2, 23).into()).unwrap();
@@ -111,9 +111,9 @@ fn test_find_word_inline_from() {
     assert_eq!(selects.len(), 1);
     for range in selects {
         // only 2 offset for the emoji + /s
-        assert_eq!(range, WordRange { line: 2, from: 30, to: 34 });
-        assert_eq!(content[range.line].get(range.from, range.to), Some(word.as_str()));
-        match_char_range_to_word_range(range, range.from, &content);
+        assert_eq!(range, WordRange::new_checked(2, 30, 34).unwrap());
+        assert_eq!(content[range.line()].get(range.from(), range.to()), Some(word.as_str()));
+        match_char_range_to_word_range(range, range.from(), &content);
     }
 
     let word = PositionedWord::find_at(&content, (3, 23).into()).unwrap();
@@ -135,8 +135,8 @@ fn test_find_word_inline_to() {
     let selects = word.find_word_inline_before(&content).unwrap().collect::<Vec<_>>();
     assert_eq!(selects.len(), 1);
     for range in selects {
-        assert_eq!(range, WordRange { line: 0, from: 4, to: 8 });
-        assert_eq!(content[range.line].get(range.from, range.to), Some(word.as_str()));
+        assert_eq!(range, WordRange::new_checked(0, 4, 8).unwrap());
+        assert_eq!(content[range.line()].get(range.from(), range.to()), Some(word.as_str()));
     }
 
     let word = PositionedWord::find_at(&content, (1, 40).into()).unwrap();
@@ -144,13 +144,13 @@ fn test_find_word_inline_to() {
     let selects = word.find_word_inline_before(&content).unwrap().collect::<Vec<_>>();
     assert_eq!(selects.len(), 2);
     let expected = [
-        WordRange { line: 1, from: 4, to: 8 },
-        WordRange { line: 1, from: 25, to: 29 },
+        WordRange::new_checked(1, 4, 8).unwrap(),
+        WordRange::new_checked(1, 25, 29).unwrap(),
     ];
     for (idx, range) in selects.into_iter().enumerate() {
         assert_eq!(range, expected[idx]);
-        assert_eq!(content[range.line].get(range.from, range.to), Some(word.as_str()));
-        match_char_range_to_word_range(range, range.from, &content);
+        assert_eq!(content[range.line()].get(range.from(), range.to()), Some(word.as_str()));
+        match_char_range_to_word_range(range, range.from(), &content);
     }
 
     let word = PositionedWord::find_at(&content, (2, 33).into()).unwrap();
@@ -158,13 +158,13 @@ fn test_find_word_inline_to() {
     let selects = word.find_word_inline_before(&content).unwrap().collect::<Vec<_>>();
     assert_eq!(selects.len(), 2);
     let expected = [
-        WordRange { line: 2, from: 10, to: 14 },
-        WordRange { line: 2, from: 22, to: 26 },
+        WordRange::new_checked(2, 10, 14).unwrap(),
+        WordRange::new_checked(2, 22, 26).unwrap(),
     ];
     for (idx, range) in selects.into_iter().enumerate() {
         assert_eq!(range, expected[idx]);
-        assert_eq!(content[range.line].get(range.from, range.to), Some(word.as_str()));
-        match_char_range_to_word_range(range, range.from, &content);
+        assert_eq!(content[range.line()].get(range.from(), range.to()), Some(word.as_str()));
+        match_char_range_to_word_range(range, range.from(), &content);
     }
 }
 
@@ -188,10 +188,10 @@ fn test_word_range() {
         assert_eq!(word, unchecked);
         let (from, to) = range.as_select();
         assert_eq!(from.line, to.line);
-        assert_eq!(range.line, from.line);
-        assert_eq!(range.from, from.char);
-        assert_eq!(range.to, to.char);
+        assert_eq!(range.line(), from.line);
+        assert_eq!(range.from(), from.char);
+        assert_eq!(range.to(), to.char);
         assert_eq!(word, content[from.line].get(from.char, to.char).unwrap());
-        match_char_range_to_word_range(range, range.from, &content);
+        match_char_range_to_word_range(range, range.from(), &content);
     }
 }
