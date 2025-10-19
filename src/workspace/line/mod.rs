@@ -138,11 +138,11 @@ impl EditorLine {
         self.char_len += 1;
         if self.char_len == self.content.len() {
             // base update on delta start
-            self.tokens.increment_before(idx);
+            self.tokens.increment_before_encoded(idx);
             self.content.insert(idx, ch);
         } else {
             let encoded_idx = (encoding.insert_char_with_idx)(&mut self.content, idx, ch);
-            self.tokens.increment_before(encoded_idx);
+            self.tokens.increment_before_encoded(encoded_idx);
         }
     }
 
@@ -150,7 +150,7 @@ impl EditorLine {
     #[inline]
     pub fn push_simple(&mut self, ch: char) {
         self.cached.reset();
-        self.tokens.increment_before(self.char_len);
+        self.tokens.increment_before_encoded(self.char_len);
         self.char_len += 1;
         self.content.push(ch);
     }
@@ -195,14 +195,14 @@ impl EditorLine {
     pub fn remove(&mut self, idx: usize, encoding: &Encoding) -> char {
         self.cached.reset();
         if self.content.len() == self.char_len {
-            self.tokens.decrement_at(idx);
+            self.tokens.decrement_at_encoded(idx);
             self.char_len -= 1;
             self.content.remove(idx)
         } else {
             self.char_len -= 1;
             let (encoded_idx, ch) = (encoding.remove_char_with_idx)(&mut self.content, idx);
             for _ in 0..(encoding.char_len)(ch) {
-                self.tokens.decrement_at(encoded_idx);
+                self.tokens.decrement_at_encoded(encoded_idx);
             }
             ch
         }

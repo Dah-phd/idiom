@@ -508,13 +508,51 @@ fn token_inc() {
     let mut expected = TokenLine::default();
     expected.push(Token { len: 4, delta_start: 0, style: ContentStyle::default() });
     expected.push(Token { len: 4, delta_start: 5, style: ContentStyle::default() });
-    token_line.increment_before(3);
+    token_line.increment_before_encoded(3);
     assert_eq!(token_line, expected);
-    token_line.increment_before(5);
+    token_line.increment_before_encoded(5);
     let mut token_line = TokenLine::default();
     token_line.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() });
     token_line.push(Token { len: 5, delta_start: 5, style: ContentStyle::default() });
     assert_eq!(token_line, token_line);
+}
+
+#[test]
+fn token_inc_encoded() {
+    let mut eline_utf8 = EditorLine::from("let d = \"🚀🚀\".hars();");
+    let tokens = eline_utf8.tokens_mut();
+    tokens.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() }); // let
+    tokens.push(Token { len: 1, delta_start: 4, style: ContentStyle::default() }); // b
+    tokens.push(Token { len: 1, delta_start: 4, style: ContentStyle::reversed() }); // "
+    tokens.push(Token { len: 8, delta_start: 1, style: ContentStyle::reversed() }); // 🚀🚀
+    tokens.push(Token { len: 1, delta_start: 8, style: ContentStyle::reversed() }); // "
+    tokens.push(Token { len: 5, delta_start: 1, style: ContentStyle::bold() }); // .hars
+    tokens.push(Token { len: 1, delta_start: 7, style: ContentStyle::bold() }); // ;
+                                                                                // simple handles only keyboard imputs
+    eline_utf8.insert_simple(13, 'c', &Encoding::utf8());
+    assert_eq!(eline_utf8.as_str(), "let d = \"🚀🚀\".chars();");
+    let token = eline_utf8.tokens().iter().nth(5).unwrap();
+    let token_next = eline_utf8.tokens().iter().nth(6).unwrap();
+    assert_eq!(token.len, 6);
+    assert_eq!(token.delta_start, 1);
+    assert_eq!(token_next.delta_start, 8);
+
+    let mut eline_utf16 = EditorLine::from("let d = \"🚀🚀\".hars();");
+    let tokens = eline_utf16.tokens_mut();
+    tokens.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() }); // let
+    tokens.push(Token { len: 1, delta_start: 4, style: ContentStyle::default() }); // b
+    tokens.push(Token { len: 1, delta_start: 4, style: ContentStyle::reversed() }); // "
+    tokens.push(Token { len: 4, delta_start: 1, style: ContentStyle::reversed() }); // 🚀t
+    tokens.push(Token { len: 1, delta_start: 4, style: ContentStyle::reversed() }); // "
+    tokens.push(Token { len: 5, delta_start: 1, style: ContentStyle::bold() }); // .hars
+    tokens.push(Token { len: 1, delta_start: 7, style: ContentStyle::bold() }); // ;
+    eline_utf16.insert_simple(13, 'c', &Encoding::utf16());
+    assert_eq!(eline_utf8.as_str(), "let d = \"🚀🚀\".chars();");
+    let token = eline_utf16.tokens().iter().nth(5).unwrap();
+    let token_next = eline_utf16.tokens().iter().nth(6).unwrap();
+    assert_eq!(token.len, 6);
+    assert_eq!(token.delta_start, 1);
+    assert_eq!(token_next.delta_start, 8);
 }
 
 #[test]
@@ -523,30 +561,30 @@ fn token_dec() {
     let mut token_line = TokenLine::default();
     token_line.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() });
     token_line.push(Token { len: 4, delta_start: 3, style: ContentStyle::default() });
-    tl.decrement_at(3);
+    tl.decrement_at_encoded(3);
     assert_eq!(tl, token_line);
 
     tl.push(Token { len: 4, delta_start: 5, style: ContentStyle::reversed() });
     let mut token_line = TokenLine::default();
     token_line.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() });
     token_line.push(Token { len: 4, delta_start: 3, style: ContentStyle::reversed() });
-    tl.decrement_at(3);
-    tl.decrement_at(3);
-    tl.decrement_at(3);
-    tl.decrement_at(3);
-    tl.decrement_at(3);
+    tl.decrement_at_encoded(3);
+    tl.decrement_at_encoded(3);
+    tl.decrement_at_encoded(3);
+    tl.decrement_at_encoded(3);
+    tl.decrement_at_encoded(3);
     assert_eq!(tl, token_line);
 
     let mut token_line = TokenLine::default();
     token_line.push(Token { len: 4, delta_start: 0, style: ContentStyle::reversed() });
-    tl.decrement_at(0);
-    tl.decrement_at(0);
-    tl.decrement_at(0);
+    tl.decrement_at_encoded(0);
+    tl.decrement_at_encoded(0);
+    tl.decrement_at_encoded(0);
     assert_eq!(tl, token_line);
 }
 
 #[test]
-fn token_dec_utf() {
+fn token_dec_encoded() {
     let mut eline_utf8 = EditorLine::from("let d = \"🚀text\";");
     let tokens = eline_utf8.tokens_mut();
     tokens.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() }); // let
@@ -579,6 +617,39 @@ fn token_dec_utf() {
 }
 
 #[test]
+fn token_dec_encoded_with_prefix() {
+    let mut eline_utf8 = EditorLine::from("let d = \"🚀🚀text\";");
+    let tokens = eline_utf8.tokens_mut();
+    tokens.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() }); // let
+    tokens.push(Token { len: 1, delta_start: 4, style: ContentStyle::default() }); // b
+    tokens.push(Token { len: 1, delta_start: 4, style: ContentStyle::reversed() }); // "
+    tokens.push(Token { len: 12, delta_start: 1, style: ContentStyle::reversed() }); // 🚀🚀text
+    tokens.push(Token { len: 1, delta_start: 12, style: ContentStyle::reversed() }); // "
+    let txt = eline_utf8.remove(10, &Encoding::utf8());
+    assert_eq!(txt, '🚀');
+    let token = eline_utf8.tokens().iter().nth(3).unwrap();
+    let token_next = eline_utf8.tokens().iter().nth(4).unwrap();
+    assert_eq!(token.len, 8);
+    assert_eq!(token.delta_start, 1);
+    assert_eq!(token_next.delta_start, 8);
+
+    let mut eline_utf16 = EditorLine::from("let d = \"🚀🚀text\";");
+    let tokens = eline_utf16.tokens_mut();
+    tokens.push(Token { len: 3, delta_start: 0, style: ContentStyle::default() }); // let
+    tokens.push(Token { len: 1, delta_start: 4, style: ContentStyle::default() }); // b
+    tokens.push(Token { len: 1, delta_start: 4, style: ContentStyle::reversed() }); // "
+    tokens.push(Token { len: 8, delta_start: 1, style: ContentStyle::reversed() }); // 🚀text
+    tokens.push(Token { len: 1, delta_start: 8, style: ContentStyle::reversed() }); // "
+    let txt = eline_utf16.remove(10, &Encoding::utf16());
+    assert_eq!(txt, '🚀');
+    let token = eline_utf16.tokens().iter().nth(3).unwrap();
+    let token_next = eline_utf16.tokens().iter().nth(4).unwrap();
+    assert_eq!(token.len, 6);
+    assert_eq!(token.delta_start, 1);
+    assert_eq!(token_next.delta_start, 6);
+}
+
+#[test]
 fn token_motions() {
     let mut token_line = TokenLine::default();
     token_line.push(Token { delta_start: 0, len: 3, style: ContentStyle::default() });
@@ -586,22 +657,22 @@ fn token_motions() {
     token_line.push(Token { delta_start: 7, len: 6, style: ContentStyle::reversed() });
     token_line.push(Token { delta_start: 8, len: 4, style: ContentStyle::slowblink() });
     token_line.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
-    token_line.decrement_at(28);
-    token_line.decrement_at(27);
-    token_line.decrement_at(26);
-    token_line.decrement_at(25);
-    token_line.decrement_at(24);
-    token_line.decrement_at(23);
+    token_line.decrement_at_encoded(28);
+    token_line.decrement_at_encoded(27);
+    token_line.decrement_at_encoded(26);
+    token_line.decrement_at_encoded(25);
+    token_line.decrement_at_encoded(24);
+    token_line.decrement_at_encoded(23);
     // whole token deleted
     assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 4, style: ContentStyle::slowblink() });
-    token_line.decrement_at(22);
+    token_line.decrement_at_encoded(22);
     // reaching prev token
     assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 3, style: ContentStyle::slowblink() });
-    token_line.increment_before(21);
+    token_line.increment_before_encoded(21);
     // increased last prev token size on dec we remove char pos, on inc we inc after the position so 22 becomes 23
     assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 4, style: ContentStyle::slowblink() });
-    token_line.increment_before(24);
-    token_line.increment_before(25);
+    token_line.increment_before_encoded(24);
+    token_line.increment_before_encoded(25);
     // increments passed prev token - so no size change
     assert_eq!(token_line.iter().last().unwrap(), &Token { delta_start: 8, len: 4, style: ContentStyle::slowblink() });
 }
@@ -609,16 +680,16 @@ fn token_motions() {
 #[test]
 fn token_insert() {
     let mut token_line = create_tokens();
-    token_line.increment_before(0);
+    token_line.increment_before_encoded(0);
     assert_eq!(token_line.iter().next(), Some(&Token { len: 3, delta_start: 1, style: ContentStyle::default() }));
-    token_line.decrement_at(0);
+    token_line.decrement_at_encoded(0);
     assert_eq!(token_line, create_tokens());
-    token_line.increment_before(4);
+    token_line.increment_before_encoded(4);
     let mut expect = TokenLine::default();
     expect.push(Token { delta_start: 0, len: 3, style: ContentStyle::default() });
     expect.push(Token { delta_start: 5, len: 4, style: ContentStyle::default() });
     assert_eq!(token_line, expect);
-    token_line.decrement_at(4);
+    token_line.decrement_at_encoded(4);
     assert_eq!(token_line, create_tokens());
 }
 
