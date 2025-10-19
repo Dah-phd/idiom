@@ -2,8 +2,8 @@ use super::{meta::EditMetaData, Actions};
 use crate::configs::{FileType, IndentConfigs};
 use crate::lsp::LSPResult;
 use crate::syntax::{
-    tests::{char_lsp_pos, encode_pos_utf32, intercept_sync, intercept_sync_rev},
-    Lexer,
+    tests::{intercept_sync, intercept_sync_rev},
+    Encoding, Lexer,
 };
 use crate::workspace::actions::Action;
 use crate::workspace::actions::Edit;
@@ -139,10 +139,11 @@ fn merge_next_line() {
 fn indent_unindent() {
     let mut content = create_content();
     let cfg = IndentConfigs::default();
-    Edit::unindent(7, &mut content[7], &cfg.indent, |_| 1);
+    let encoding = Encoding::utf32();
+    Edit::unindent(7, &mut content[7], &cfg.indent, &encoding);
     match_line(&content[7], &"this is the first scope");
     let mut this_line: EditorLine = "     text".into();
-    Edit::unindent(0, &mut this_line, &cfg.indent, |_| 1);
+    Edit::unindent(0, &mut this_line, &cfg.indent, &encoding);
     match_line(&this_line, &"    text");
 }
 
@@ -480,8 +481,9 @@ fn push_char_with_closing_and_select() {
     assert_eq!(content[0].as_str(), end);
 }
 
-fn probe_char_closing_with_select(_: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
-    let (meta, edit) = action.change_event(encode_pos_utf32, char_lsp_pos, content);
+fn probe_char_closing_with_select(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
+    let encoding = lexer.encoding();
+    let (meta, edit) = action.change_event(encoding.encode_position, encoding.char_len, content);
     assert_eq!(meta.start_line, 0);
     assert_eq!(meta.from, 1);
     assert_eq!(meta.from, meta.to);
@@ -492,8 +494,9 @@ fn probe_char_closing_with_select(_: &mut Lexer, action: &Action, content: &[Edi
     Ok(())
 }
 
-fn probe_char_closing_with_select_rev(_: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
-    let (meta, edit) = action.change_event_rev(encode_pos_utf32, char_lsp_pos, content);
+fn probe_char_closing_with_select_rev(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
+    let encoding = lexer.encoding();
+    let (meta, edit) = action.change_event_rev(encoding.encode_position, encoding.char_len, content);
     assert_eq!(meta.start_line, 0);
     assert_eq!(meta.from, 1);
     assert_eq!(meta.from, meta.to);

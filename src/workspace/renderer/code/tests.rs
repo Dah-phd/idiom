@@ -31,7 +31,8 @@ fn test_cursor() {
     let mut cursor = Cursor::default();
     cursor.set_position((0, 12).into());
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut ctx =
+        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut code = EditorLine::from("let mut gs = GlobalState::new(Backend::init()).unwrap();");
 
     let line = Line { row: 0, col: 0, width: 40 };
@@ -51,7 +52,8 @@ fn test_cursor_complex() {
     let mut cursor = Cursor::default();
     cursor.set_position((0, 12).into());
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut ctx =
+        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut code = EditorLine::from("let mut gs🧛 = GlobalState::new(Backend::init()).unwrap();");
 
     let line = Line { row: 0, col: 0, width: 40 };
@@ -71,7 +73,8 @@ fn test_cursor_select() {
     let mut cursor = Cursor::default();
     cursor.select_set((0, 4).into(), (0, 15).into());
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut ctx =
+        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut code = EditorLine::from("let mut gs = GlobalState::new(Backend::init()).unwrap();");
     let line = Line { row: 0, col: 0, width: 40 };
     rend_cursor(&mut code, &mut ctx, line, &mut gs);
@@ -94,7 +97,8 @@ fn test_cursor_select_complex() {
     let mut cursor = Cursor::default();
     cursor.select_set((0, 4).into(), (0, 15).into());
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut ctx =
+        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut code = EditorLine::from("let mut gs🧛 = GlobalState::new(Backend::init()).unwrap();");
     let line = Line { row: 0, col: 0, width: 40 };
     rend_cursor(&mut code, &mut ctx, line, &mut gs);
@@ -117,7 +121,8 @@ fn wrap_cursor() {
     let mut cursor = Cursor::default();
     cursor.select_set((0, 20).into(), (0, 35).into());
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut ctx =
+        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut code = EditorLine::from("let mut gs = GlobalState::new(Backend::init()).unwrap();");
     let line = Line { row: 0, col: 0, width: 20 };
     rend_cursor(&mut code, &mut ctx, line, &mut gs);
@@ -140,7 +145,8 @@ fn wrap_cursor_complex() {
     let mut cursor = Cursor::default();
     cursor.select_set((0, 20).into(), (0, 35).into());
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut ctx =
+        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut code = EditorLine::from("let mut gsormandaaseaseaeas🧛fda🧛 = GlobalState::new(Backend::init()).unwrap();");
     let line = Line { row: 0, col: 0, width: 20 };
     rend_cursor(&mut code, &mut ctx, line, &mut gs);
@@ -168,7 +174,7 @@ fn test_line_render_utf8() {
     let (tokens, text) = create_token_pairs_utf8();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 2, ContentStyle::default());
+    let mut ctx = LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::default());
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
@@ -189,7 +195,7 @@ fn test_line_render_utf16() {
     let (tokens, text) = create_token_pairs_utf16();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 2, ContentStyle::default());
+    let mut ctx = LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::default());
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
@@ -210,7 +216,7 @@ fn test_line_render_utf32() {
     let (tokens, text) = create_token_pairs_utf32();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 2, ContentStyle::default());
+    let mut ctx = LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::default());
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
@@ -233,7 +239,7 @@ fn test_line_render_shrunk_utf8() {
     let (tokens, text) = create_token_pairs_utf8();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 2, ContentStyle::default());
+    let mut ctx = LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::default());
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: limit };
@@ -256,7 +262,7 @@ fn test_line_render_shrunk_utf16() {
     let (tokens, text) = create_token_pairs_utf16();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 2, ContentStyle::default());
+    let mut ctx = LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::default());
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: limit };
@@ -279,7 +285,7 @@ fn test_line_render_shrunk_utf32() {
     let (tokens, text) = create_token_pairs_utf32();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 2, ContentStyle::default());
+    let mut ctx = LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::default());
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: limit };
@@ -301,7 +307,7 @@ fn test_line_render_select_utf8() {
     let (tokens, text) = create_token_pairs_utf8();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 2, ContentStyle::default());
+    let mut ctx = LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::default());
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
@@ -323,7 +329,7 @@ fn test_line_render_select_utf16() {
     let (tokens, text) = create_token_pairs_utf16();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 2, ContentStyle::default());
+    let mut ctx = LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::default());
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
@@ -345,7 +351,7 @@ fn test_line_render_select_utf32() {
     let (tokens, text) = create_token_pairs_utf32();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 2, ContentStyle::default());
+    let mut ctx = LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::default());
 
     for (idx, code_line) in content.iter_mut().enumerate() {
         let line = Line { row: idx as u16, col: 0, width: 100 };
@@ -370,7 +376,7 @@ fn test_line_wrapping_utf8() {
     let (tokens, text) = longline_token_pair_utf8();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 1, ContentStyle::default());
+    let mut ctx = LineContext::collect_context(&cursor, lexer.encoding().char_len, 1, ContentStyle::default());
     let line = lines.next().unwrap();
     let select = ctx.select_get(line.width);
     inner_render(&mut content[0], &mut ctx, line, select, &mut gs);
@@ -395,7 +401,7 @@ fn test_line_wrapping_utf16() {
     let (tokens, text) = longline_token_pair_utf16();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 1, ContentStyle::default());
+    let mut ctx = LineContext::collect_context(&cursor, lexer.encoding().char_len, 1, ContentStyle::default());
     let line = lines.next().unwrap();
     let select = ctx.select_get(line.width);
     inner_render(&mut content[0], &mut ctx, line, select, &mut gs);
@@ -420,7 +426,7 @@ fn test_line_wrapping_utf32() {
     let (tokens, text) = longline_token_pair_utf32();
     let mut content = zip_text_tokens(text, tokens);
 
-    let mut ctx = LineContext::collect_context(&cursor, lexer.char_lsp_pos, 1, ContentStyle::default());
+    let mut ctx = LineContext::collect_context(&cursor, lexer.encoding().char_len, 1, ContentStyle::default());
     let line = lines.next().unwrap();
     let select = ctx.select_get(line.width);
     inner_render(&mut content[0], &mut ctx, line, select, &mut gs);

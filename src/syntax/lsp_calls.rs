@@ -3,7 +3,7 @@ use crate::{
     global_state::{GlobalState, IdiomEvent},
     lsp::{LSPClient, LSPResponse, LSPResponseType, LSPResult},
     popups::popups_tree::refrence_selector,
-    syntax::Lexer,
+    syntax::{Encoding, Lexer},
     workspace::{
         actions::{Action, EditMetaData},
         line::EditorLine,
@@ -104,16 +104,13 @@ pub fn map_lsp(lexer: &mut Lexer, client: LSPClient, theme: &Theme) {
 
     match client.capabilities.position_encoding.as_ref().map(|encode| encode.as_str()) {
         Some("utf-8") => {
-            lexer.encode_position = encode_pos_utf8;
-            lexer.char_lsp_pos = char_lsp_utf8;
+            lexer.encoding = Encoding::utf8();
         }
         Some("utf-32") => {
-            lexer.encode_position = encode_pos_utf32;
-            lexer.char_lsp_pos = char_lsp_pos;
+            lexer.encoding = Encoding::utf32();
         }
         _ => {
-            lexer.encode_position = encode_pos_utf16;
-            lexer.char_lsp_pos = char_lsp_utf16;
+            lexer.encoding = Encoding::utf16();
         }
     }
 
@@ -135,8 +132,7 @@ pub fn remove_lsp(lexer: &mut Lexer) {
     lexer.signatures = info_position_dead;
     lexer.sync = sync_edits_dead;
     lexer.sync_rev = sync_edits_dead_rev;
-    lexer.encode_position = encode_pos_utf32;
-    lexer.char_lsp_pos = char_lsp_pos;
+    lexer.encoding = Encoding::utf32();
 }
 
 pub fn context_local(_: &mut Editor, _: &mut GlobalState) {}
@@ -260,7 +256,7 @@ pub fn sync_changes(lexer: &mut Lexer, change_events: Vec<TextDocumentContentCha
 
 pub fn sync_edits(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
     lexer.version += 1;
-    let (meta, change_events) = action.change_event(lexer.encode_position, lexer.char_lsp_pos, content);
+    let (meta, change_events) = action.change_event(lexer.encoding.encode_position, lexer.encoding.char_len, content);
     lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
     match lexer.meta.take() {
         Some(existing_meta) => lexer.meta.replace(existing_meta + meta),
@@ -271,7 +267,8 @@ pub fn sync_edits(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) ->
 
 pub fn sync_edits_rev(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
     lexer.version += 1;
-    let (meta, change_events) = action.change_event_rev(lexer.encode_position, lexer.char_lsp_pos, content);
+    let (meta, change_events) =
+        action.change_event_rev(lexer.encoding.encode_position, lexer.encoding.char_len, content);
     lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
     match lexer.meta.take() {
         Some(existing_meta) => lexer.meta.replace(existing_meta + meta),
@@ -386,36 +383,6 @@ fn range_tokens_are_supported(provider: &SemanticTokensServerCapabilities) -> bo
             data.semantic_tokens_options.range.unwrap_or_default()
         }
     }
-}
-
-#[inline]
-pub fn encode_pos_utf8(char_idx: usize, from_str: &str) -> usize {
-    from_str.chars().take(char_idx).fold(0, |sum, ch| sum + ch.len_utf8())
-}
-
-#[inline]
-pub fn encode_pos_utf16(char_idx: usize, from_str: &str) -> usize {
-    from_str.chars().take(char_idx).fold(0, |sum, ch| sum + ch.len_utf16())
-}
-
-#[inline]
-pub fn encode_pos_utf32(char_idx: usize, _: &str) -> usize {
-    char_idx
-}
-
-#[inline]
-pub fn char_lsp_pos(_: char) -> usize {
-    1
-}
-
-#[inline]
-pub fn char_lsp_utf8(ch: char) -> usize {
-    ch.len_utf8()
-}
-
-#[inline]
-pub fn char_lsp_utf16(ch: char) -> usize {
-    ch.len_utf16()
 }
 
 #[inline(always)]

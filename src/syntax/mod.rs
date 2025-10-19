@@ -1,4 +1,5 @@
 pub mod diagnostics;
+mod encoding;
 pub mod langs;
 pub mod legend;
 mod lsp_calls;
@@ -14,12 +15,12 @@ use crate::{
     },
 };
 pub use diagnostics::{set_diganostics, DiagnosticInfo, DiagnosticLine, Fix};
+pub use encoding::Encoding;
 pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
-    as_url, char_lsp_pos, completable_dead, context_local, encode_pos_utf32, get_autocomplete_dead, info_position_dead,
-    map_lsp, remove_lsp, sync_changes_dead, sync_edits_dead, sync_edits_dead_rev, sync_tokens_dead, tokens_dead,
-    tokens_partial_dead,
+    as_url, completable_dead, context_local, get_autocomplete_dead, info_position_dead, map_lsp, remove_lsp,
+    sync_changes_dead, sync_edits_dead, sync_edits_dead_rev, sync_tokens_dead, tokens_dead, tokens_partial_dead,
 };
 use lsp_types::{PublishDiagnosticsParams, Range, TextDocumentContentChangeEvent, Uri};
 use std::path::{Path, PathBuf};
@@ -51,8 +52,7 @@ pub struct Lexer {
     sync: fn(&mut Self, &Action, &[EditorLine]) -> LSPResult<()>,
     sync_rev: fn(&mut Self, &Action, &[EditorLine]) -> LSPResult<()>,
     meta: Option<EditMetaData>,
-    pub encode_position: fn(usize, &str) -> usize,
-    pub char_lsp_pos: fn(char) -> usize,
+    encoding: Encoding,
 }
 
 impl Lexer {
@@ -82,8 +82,7 @@ impl Lexer {
             sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
             sync_rev: sync_edits_dead_rev,
-            encode_position: encode_pos_utf32,
-            char_lsp_pos,
+            encoding: Encoding::utf32(),
             question_lsp: false,
         }
     }
@@ -114,8 +113,7 @@ impl Lexer {
             sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
             sync_rev: sync_edits_dead_rev,
-            encode_position: encode_pos_utf32,
-            char_lsp_pos,
+            encoding: Encoding::utf32(),
             question_lsp: false,
         }
     }
@@ -146,8 +144,7 @@ impl Lexer {
             sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
             sync_rev: sync_edits_dead_rev,
-            encode_position: encode_pos_utf32,
-            char_lsp_pos,
+            encoding: Encoding::utf32(),
             question_lsp: false,
         }
     }
@@ -155,6 +152,11 @@ impl Lexer {
     #[inline]
     pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
         (editor.lexer.context)(editor, gs);
+    }
+
+    #[inline]
+    pub fn encoding(&self) -> &Encoding {
+        &self.encoding
     }
 
     #[inline]
@@ -233,7 +235,7 @@ impl Lexer {
 
     #[inline(always)]
     pub fn char_lsp_pos(&self, ch: char) -> usize {
-        (self.char_lsp_pos)(ch)
+        (self.encoding.char_len)(ch)
     }
 
     #[inline]

@@ -1,4 +1,5 @@
 use super::EditorLine;
+use crate::syntax::Encoding;
 
 #[test]
 fn test_get() {
@@ -24,12 +25,13 @@ fn trim_counted() {
 fn test_insert() {
     let mut line = EditorLine::new("text".to_owned());
     assert!(line.char_len() == 4);
-    line.insert_simple(2, 'e');
+    let encoding = Encoding::utf32();
+    line.insert_simple(2, 'e', &encoding);
     assert!(line.is_simple());
-    line.insert_simple(2, '🚀');
+    line.insert_simple(2, '🚀', &encoding);
     assert!(line.char_len() == 6);
     assert!(!line.is_simple());
-    line.insert_simple(3, 'x');
+    line.insert_simple(3, 'x', &encoding);
     assert!(line.char_len() == 7);
     assert!(&line.to_string() == "te🚀xext");
 }
@@ -122,12 +124,13 @@ fn test_replace_from() {
 #[test]
 fn test_remove() {
     let mut line = EditorLine::new("text🚀123".to_owned());
+    let encoding = Encoding::utf32();
     assert!(!line.is_simple());
     assert!(line.char_len() == 8);
-    assert!('1' == line.remove(5, |_| 1));
+    assert!('1' == line.remove(5, &encoding));
     assert!(line.char_len() == 7);
     assert!(!line.is_simple());
-    assert!('🚀' == line.remove(4, |_| 1));
+    assert!('🚀' == line.remove(4, &encoding));
     assert!(line.is_simple());
     assert!(line.char_len() == 6);
     assert!(&line.to_string() == "text23");

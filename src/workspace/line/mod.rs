@@ -2,7 +2,7 @@ mod context;
 mod status;
 use status::{Reduction, RenderStatus};
 
-use crate::syntax::{tokens::TokenLine, DiagnosticLine, Lang, Token};
+use crate::syntax::{tokens::TokenLine, DiagnosticLine, Encoding, Lang, Token};
 pub use context::LineContext;
 use idiom_tui::{utils::UTFSafeStringExt, UTFSafe};
 use std::{
@@ -133,16 +133,16 @@ impl EditorLine {
 
     // no need to handle non ascii inserts because - triggers from keyboard
     #[inline]
-    pub fn insert_simple(&mut self, idx: usize, ch: char) {
+    pub fn insert_simple(&mut self, idx: usize, ch: char, encoding: &Encoding) {
         self.cached.reset();
-        self.tokens.increment_before(idx);
+        self.char_len += 1;
         if self.char_len == self.content.len() {
             // base update on delta start
-            self.char_len += 1;
+            self.tokens.increment_before(idx);
             self.content.insert(idx, ch);
         } else {
-            self.char_len += 1;
-            self.content.insert_at_char(idx, ch);
+            let encoded_idx = (encoding.insert_char_with_idx)(&mut self.content, idx, ch);
+            self.tokens.increment_before(encoded_idx);
         }
     }
 
@@ -192,19 +192,20 @@ impl EditorLine {
     }
 
     #[inline]
-    pub fn remove(&mut self, idx: usize, char_lsp_pos: fn(char) -> usize) -> char {
+    pub fn remove(&mut self, idx: usize, encoding: &Encoding) -> char {
         self.cached.reset();
         if self.content.len() == self.char_len {
             self.tokens.decrement_at(idx);
             self.char_len -= 1;
-            return self.content.remove(idx);
+            self.content.remove(idx)
+        } else {
+            self.char_len -= 1;
+            let (encoded_idx, ch) = (encoding.remove_char_with_idx)(&mut self.content, idx);
+            for _ in 0..(encoding.char_len)(ch) {
+                self.tokens.decrement_at(encoded_idx);
+            }
+            ch
         }
-        self.char_len -= 1;
-        let ch = self.content.remove_at_char(idx);
-        for _ in 0..char_lsp_pos(ch) {
-            self.tokens.decrement_at(idx);
-        }
-        ch
     }
 
     #[inline]

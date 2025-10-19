@@ -1,8 +1,7 @@
 pub use super::{
     diagnostics::DiagnosticLine,
-    lsp_calls::{char_lsp_pos, char_lsp_utf16, char_lsp_utf8, encode_pos_utf16, encode_pos_utf32, encode_pos_utf8},
     tokens::{set_tokens, TokenLine},
-    Legend, Lexer, Token,
+    Encoding, Legend, Lexer, Token,
 };
 use crate::{
     configs::FileType,
@@ -460,15 +459,13 @@ pub fn zip_text_tokens(text: Vec<String>, tokens: Vec<SemanticToken>) -> Vec<Edi
 
 pub fn mock_utf8_lexer(file_type: FileType) -> Lexer {
     let mut lexer = Lexer::with_context(file_type, PathBuf::new().as_path());
-    lexer.encode_position = encode_pos_utf8;
-    lexer.char_lsp_pos = char_lsp_utf8;
+    lexer.encoding = Encoding::utf8();
     lexer
 }
 
 pub fn mock_utf16_lexer(file_type: FileType) -> Lexer {
     let mut lexer = Lexer::with_context(file_type, PathBuf::new().as_path());
-    lexer.encode_position = encode_pos_utf16;
-    lexer.char_lsp_pos = char_lsp_utf16;
+    lexer.encoding = Encoding::utf16();
     lexer
 }
 
@@ -557,7 +554,7 @@ fn token_dec_utf() {
     tokens.push(Token { len: 1, delta_start: 4, style: ContentStyle::reversed() }); // "
     tokens.push(Token { len: 8, delta_start: 1, style: ContentStyle::reversed() }); // 🚀text
     tokens.push(Token { len: 1, delta_start: 8, style: ContentStyle::reversed() }); // "
-    let txt = eline_utf8.remove(9, |x| x.len_utf8());
+    let txt = eline_utf8.remove(9, &Encoding::utf8());
     assert_eq!(txt, '🚀');
     let token = eline_utf8.tokens().iter().nth(3).unwrap();
     let token_next = eline_utf8.tokens().iter().nth(4).unwrap();
@@ -572,7 +569,7 @@ fn token_dec_utf() {
     tokens.push(Token { len: 1, delta_start: 4, style: ContentStyle::reversed() }); // "
     tokens.push(Token { len: 6, delta_start: 1, style: ContentStyle::reversed() }); // 🚀text
     tokens.push(Token { len: 1, delta_start: 6, style: ContentStyle::reversed() }); // "
-    let txt = eline_utf16.remove(9, |x| x.len_utf16());
+    let txt = eline_utf16.remove(9, &Encoding::utf16());
     assert_eq!(txt, '🚀');
     let token = eline_utf16.tokens().iter().nth(3).unwrap();
     let token_next = eline_utf16.tokens().iter().nth(4).unwrap();

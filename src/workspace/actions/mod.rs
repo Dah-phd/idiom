@@ -207,7 +207,7 @@ impl Actions {
                 }
                 let mut edits = Vec::new();
                 for (line_idx, text) in content.iter_mut().enumerate().skip(from.line).take(edit_lines) {
-                    if let Some((offset, edit)) = Edit::unindent(line_idx, text, &self.cfg.indent, lexer.char_lsp_pos) {
+                    if let Some((offset, edit)) = Edit::unindent(line_idx, text, &self.cfg.indent, lexer.encoding()) {
                         if from.line == line_idx {
                             from.char = offset.offset(from.char);
                         }
@@ -230,7 +230,7 @@ impl Actions {
                 let line = cursor.line;
                 match content
                     .get_mut(line)
-                    .and_then(|text| Edit::unindent(line, text, &self.cfg.indent, lexer.char_lsp_pos))
+                    .and_then(|text| Edit::unindent(line, text, &self.cfg.indent, lexer.encoding()))
                 {
                     Some((offset, edit)) => {
                         self.push_done(edit, lexer, content);
@@ -339,8 +339,8 @@ impl Actions {
         match cursor.select_take_direction() {
             Some((from, to, dir)) => match get_closing_char(ch) {
                 Some(closing) => {
-                    content[to.line].insert_simple(to.char, closing);
-                    content[from.line].insert_simple(from.char, ch);
+                    content[to.line].insert_simple(to.char, closing, lexer.encoding());
+                    content[from.line].insert_simple(from.char, ch, lexer.encoding());
                     let first_edit = Edit::record_in_line_insertion(to, closing.into());
                     let second_edit = Edit::record_in_line_insertion(from, ch.into());
                     let new_from = CursorPosition { line: from.line, char: from.char + 1 };

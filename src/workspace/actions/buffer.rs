@@ -81,13 +81,14 @@ impl DelBuffer {
     fn new(cursor: &Cursor, text: &mut EditorLine, lexer: &Lexer) -> (Self, TextDocumentContentChangeEvent) {
         let line = cursor.line;
         let char = cursor.char;
+        let encoding = lexer.encoding();
         let change_start = if text.is_simple() {
             Position::new(line as u32, cursor.char as u32)
         } else {
-            Position::new(line as u32, (lexer.encode_position)(cursor.char, &text[..]) as u32)
+            Position::new(line as u32, (encoding.encode_position)(cursor.char, &text[..]) as u32)
         };
-        let removed = text.remove(char, lexer.char_lsp_pos);
-        let end = Position::new(change_start.line, change_start.character + ((lexer.char_lsp_pos)(removed)) as u32);
+        let removed = text.remove(char, encoding);
+        let end = Position::new(change_start.line, change_start.character + ((encoding.char_len)(removed)) as u32);
         (
             Self { line, char, change_start, text: String::from(removed) },
             TextDocumentContentChangeEvent {
@@ -105,8 +106,9 @@ impl DelBuffer {
         lexer: &Lexer,
     ) -> (Option<Edit>, TextDocumentContentChangeEvent) {
         if cursor.line == self.line && cursor.char == self.char {
-            let removed = text.remove(cursor.char, lexer.char_lsp_pos);
-            let end_character = self.change_start.character + ((lexer.char_lsp_pos)(removed)) as u32;
+            let encoding = lexer.encoding();
+            let removed = text.remove(cursor.char, encoding);
+            let end_character = self.change_start.character + ((encoding.char_len)(removed)) as u32;
             let end = Position::new(self.change_start.line, end_character);
             self.text.push(removed);
             return (
@@ -196,15 +198,16 @@ impl BackspaceBuffer {
             text.replace_till(removed_count, "");
             Range::new(Position::new(line, self.last as u32), Position::new(line, char as u32))
         } else {
+            let encoding = lexer.encoding();
             self.last -= 1;
-            let ch = text.remove(self.last, lexer.char_lsp_pos);
+            let ch = text.remove(self.last, encoding);
             self.text.push(ch);
             let character = match text.is_simple() {
                 true => self.last,
-                false => (lexer.encode_position)(self.last, text.as_str()),
+                false => (encoding.encode_position)(self.last, text.as_str()),
             };
             let start = Position::new(line, character as u32);
-            let end = Position::new(line, (character + (lexer.char_lsp_pos)(ch)) as u32);
+            let end = Position::new(line, (character + (encoding.char_len)(ch)) as u32);
             Range::new(start, end)
         };
         TextDocumentContentChangeEvent { text: String::new(), range: Some(range), range_length: None }
@@ -238,11 +241,11 @@ impl TextBuffer {
     ) -> (Self, TextDocumentContentChangeEvent) {
         let char = cursor.char;
         let pos = if cursor.char != 0 && !text.is_simple() {
-            Position::new(cursor.line as u32, (lexer.encode_position)(cursor.char, &text[..]) as u32)
+            Position::new(cursor.line as u32, (lexer.encoding().encode_position)(cursor.char, &text[..]) as u32)
         } else {
             cursor.into()
         };
-        text.insert_simple(cursor.char, ch);
+        text.insert_simple(cursor.char, ch, lexer.encoding());
         cursor.add_to_char(1);
         (
             Self { line: cursor.line, last: cursor.char, char, text: String::from(ch) },
@@ -263,11 +266,13 @@ impl TextBuffer {
     ) -> (Option<Edit>, TextDocumentContentChangeEvent) {
         if cursor.line == self.line && cursor.char == self.last && (ch.is_alphabetic() || ch == '_') {
             let pos = match cursor.char != 0 && !text.is_simple() {
-                true => Position::new(cursor.line as u32, (lexer.encode_position)(cursor.char, &text[..]) as u32),
+                true => {
+                    Position::new(cursor.line as u32, (lexer.encoding().encode_position)(cursor.char, &text[..]) as u32)
+                }
                 false => cursor.into(),
             };
             self.text.push(ch);
-            text.insert_simple(cursor.char, ch);
+            text.insert_simple(cursor.char, ch, lexer.encoding());
             cursor.add_to_char(1);
             self.last = cursor.char;
             return (
@@ -298,31 +303,15 @@ mod tests {
     use super::super::edits::Edit;
     use super::ActionBuffer;
     use crate::configs::FileType;
-    use crate::syntax::{
-        tests::{char_lsp_utf8, encode_pos_utf8},
-        Lexer,
-    };
+    use crate::syntax::tests::{mock_utf32_lexer, mock_utf8_lexer};
     use crate::workspace::actions::buffer::DelBuffer;
     use crate::workspace::line::EditorLine;
     use crate::workspace::{cursor::Cursor, CursorPosition};
     use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
-    use std::path::PathBuf;
-
-    fn create_lexer() -> Lexer {
-        let path = PathBuf::new();
-        Lexer::with_context(FileType::Rust, &path)
-    }
-
-    fn create_lexer_utf8() -> Lexer {
-        let mut lexer = create_lexer();
-        lexer.encode_position = encode_pos_utf8;
-        lexer.char_lsp_pos = char_lsp_utf8;
-        lexer
-    }
 
     #[test]
     fn del() {
-        let lexer = create_lexer();
+        let lexer = mock_utf32_lexer(FileType::Rust);
         let mut code_text = EditorLine::new("0123456789".to_owned());
         let mut buf = ActionBuffer::None;
         let mut cursor = Cursor::default();
@@ -369,7 +358,7 @@ mod tests {
 
     #[test]
     fn del_complx() {
-        let lexer = create_lexer_utf8();
+        let lexer = mock_utf8_lexer(FileType::Rust);
         let mut code_text = EditorLine::new("012🙀4567🙀9".to_owned());
         let mut buf = ActionBuffer::None;
         let mut cursor = Cursor::default();
@@ -412,7 +401,7 @@ mod tests {
 
     #[test]
     fn backspace() {
-        let lexer = create_lexer();
+        let lexer = mock_utf32_lexer(FileType::Rust);
         let mut code_text = EditorLine::new("          1".to_owned());
         let indent = "    ";
         let mut buf = ActionBuffer::None;
@@ -435,7 +424,7 @@ mod tests {
 
     #[test]
     fn backspace_indent() {
-        let lexer = create_lexer_utf8();
+        let lexer = mock_utf8_lexer(FileType::Rust);
         let mut code_text = EditorLine::new("          🙀".to_owned());
         let indent = "    ";
         let mut buf = ActionBuffer::None;
@@ -470,7 +459,7 @@ mod tests {
 
     #[test]
     fn backspace_complex() {
-        let lexer = create_lexer_utf8();
+        let lexer = mock_utf8_lexer(FileType::Rust);
         let mut code_text = EditorLine::new("        🙀🙀1🙀2".to_owned());
         let indent = "    ";
         let mut buf = ActionBuffer::None;
@@ -515,7 +504,7 @@ mod tests {
 
     #[test]
     fn text() {
-        let lexer = create_lexer();
+        let lexer = mock_utf32_lexer(FileType::Rust);
         let mut buf = ActionBuffer::None;
         let mut cursor = Cursor::default();
         let mut code_text = EditorLine::from("");
@@ -565,7 +554,7 @@ mod tests {
 
     #[test]
     fn test_complex() {
-        let lexer = create_lexer_utf8();
+        let lexer = mock_utf8_lexer(FileType::Rust);
         let mut buf = ActionBuffer::None;
         let mut cursor = Cursor::default();
         cursor.set_position((0, 6).into());

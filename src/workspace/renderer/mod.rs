@@ -103,7 +103,7 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     let accent_style = gs.ui_theme.accent_fg();
 
     let mut lines = gs.editor_area().into_iter();
-    let mut ctx = LineContext::collect_context(cursor, lexer.char_lsp_pos, *line_number_padding, accent_style);
+    let mut ctx = LineContext::collect_context(cursor, lexer.encoding().char_len, *line_number_padding, accent_style);
     ctx.correct_last_line_match(content, lines.len());
 
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
@@ -141,7 +141,7 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
 
     last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
-    let mut ctx = LineContext::collect_context(cursor, lexer.char_lsp_pos, *line_number_padding, accent_style);
+    let mut ctx = LineContext::collect_context(cursor, lexer.encoding().char_len, *line_number_padding, accent_style);
 
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         let line = match lines.next() {
@@ -187,7 +187,7 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     let accent_style = gs.ui_theme.accent_fg();
 
     let mut lines = gs.editor_area().into_iter();
-    let mut ctx = LineContext::collect_context(cursor, lexer.char_lsp_pos, *line_number_padding, accent_style);
+    let mut ctx = LineContext::collect_context(cursor, lexer.encoding().char_len, *line_number_padding, accent_style);
     ctx.correct_last_line_match(content, lines.len());
 
     let mut is_rendered_cursor = false;
@@ -226,7 +226,7 @@ fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
 
     last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
-    let mut ctx = LineContext::collect_context(cursor, lexer.char_lsp_pos, *line_number_padding, accent_style);
+    let mut ctx = LineContext::collect_context(cursor, lexer.encoding().char_len, *line_number_padding, accent_style);
 
     ctx.init_multic_mod(&controls.cursors);
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
@@ -270,7 +270,7 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
     let accent_style = gs.ui_theme.accent_fg();
 
     let mut lines = gs.editor_area().into_iter();
-    let mut ctx = LineContext::collect_context(cursor, lexer.char_lsp_pos, *line_number_padding, accent_style);
+    let mut ctx = LineContext::collect_context(cursor, lexer.encoding().char_len, *line_number_padding, accent_style);
     ctx.correct_last_line_match(content, lines.len());
 
     gs.backend.freeze();
@@ -311,7 +311,7 @@ fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
 
     last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
-    let mut ctx = LineContext::collect_context(cursor, lexer.char_lsp_pos, *line_number_padding, accent_style);
+    let mut ctx = LineContext::collect_context(cursor, lexer.encoding().char_len, *line_number_padding, accent_style);
 
     gs.backend.freeze();
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
@@ -353,7 +353,7 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
     let accent_style = gs.ui_theme.accent_fg();
 
     let mut lines = gs.editor_area().into_iter();
-    let mut ctx = LineContext::collect_context(cursor, lexer.char_lsp_pos, *line_number_padding, accent_style);
+    let mut ctx = LineContext::collect_context(cursor, lexer.encoding().char_len, *line_number_padding, accent_style);
 
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
@@ -392,7 +392,7 @@ fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
 
     last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
-    let mut ctx = LineContext::collect_context(cursor, lexer.char_lsp_pos, *line_number_padding, accent_style);
+    let mut ctx = LineContext::collect_context(cursor, lexer.encoding().char_len, *line_number_padding, accent_style);
 
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {

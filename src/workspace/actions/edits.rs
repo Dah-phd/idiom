@@ -8,7 +8,7 @@ use idiom_tui::UTFSafe;
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 use std::fmt::Debug;
 
-use crate::{configs::IndentConfigs, utils::Offset};
+use crate::{configs::IndentConfigs, syntax::Encoding, utils::Offset};
 
 #[derive(Debug)]
 pub struct Edit {
@@ -51,12 +51,7 @@ impl Edit {
         Self::without_select(cursor, 2, 1, String::new(), "\n".to_owned())
     }
 
-    pub fn unindent(
-        line: usize,
-        text: &mut EditorLine,
-        indent: &str,
-        char_lsp_pos: fn(char) -> usize,
-    ) -> Option<(Offset, Self)> {
+    pub fn unindent(line: usize, text: &mut EditorLine, indent: &str, encoding: &Encoding) -> Option<(Offset, Self)> {
         let mut idx = 0;
         while text[idx..].starts_with(indent) {
             idx += indent.len();
@@ -64,7 +59,7 @@ impl Edit {
         if text[idx..].starts_with(' ') {
             let mut reverse = String::new();
             while text[idx..].starts_with(' ') {
-                reverse.push(text.remove(idx, char_lsp_pos));
+                reverse.push(text.remove(idx, encoding));
             }
             return Some((
                 Offset::Neg(reverse.len()),
