@@ -1,7 +1,7 @@
 use crate::configs::Theme;
 use crate::ext_tui::{StyleExt, StyledLine, Text};
 use crate::syntax::Legend;
-use idiom_tui::UTF8Safe;
+use idiom_tui::UTFSafe;
 
 use super::create_semantic_capabilities;
 use super::GenericToken;
@@ -29,12 +29,12 @@ impl Highlighter {
         let mut end = 0;
         for pos_token in self.tokens.pop().into_iter().flatten() {
             if end < pos_token.from {
-                match text.utf8_get(end, pos_token.from) {
+                match text.get_char_range(end, pos_token.from) {
                     Some(chunk) => {
                         styled_line.push(chunk.to_string().into());
                     }
                     None => {
-                        if let Some(chunk) = text.utf8_get_from(end) {
+                        if let Some(chunk) = text.get_from_char(end) {
                             styled_line.push(chunk.to_string().into());
                         }
                         return styled_line.into();
@@ -42,20 +42,20 @@ impl Highlighter {
                 }
             }
             let color = self.legend.parse_to_color(pos_token.token_type as usize, pos_token.modifier);
-            match text.utf8_get(pos_token.from, pos_token.from + pos_token.len) {
+            match text.get_char_range(pos_token.from, pos_token.from + pos_token.len) {
                 Some(chunk) => {
                     styled_line.push(Text::new(chunk.to_string(), Some(ContentStyle::fg(color))));
                     end = pos_token.from + pos_token.len;
                 }
                 None => {
-                    if let Some(chunk) = text.utf8_get_from(pos_token.from) {
+                    if let Some(chunk) = text.get_from_char(pos_token.from) {
                         styled_line.push(Text::new(chunk.to_string(), Some(ContentStyle::fg(color))));
                     }
                     return styled_line.into();
                 }
             }
         }
-        if let Some(chunk) = text.utf8_get_from(end) {
+        if let Some(chunk) = text.get_from_char(end) {
             styled_line.push(chunk.to_string().into());
         }
         styled_line.into()

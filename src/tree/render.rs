@@ -81,7 +81,7 @@ fn print_styled_path(
 #[cfg(test)]
 mod test {
     use super::{ARROW_WIDTH, DOWN, MIN_ARROW_LINE_WIDTH, MIN_OFFSET, UP};
-    use idiom_tui::UTF8Safe;
+    use idiom_tui::UTFSafe;
 
     #[test]
     fn ensure_const_fit() {

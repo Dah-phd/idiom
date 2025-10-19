@@ -1,6 +1,6 @@
 use crate::ext_tui::{CrossTerm, StyleExt};
 use crossterm::style::{Color, ContentStyle};
-use idiom_tui::{layout::Line, Backend, UTF8Safe};
+use idiom_tui::{layout::Line, Backend, UTFSafe};
 use std::{
     collections::VecDeque,
     error::Error,

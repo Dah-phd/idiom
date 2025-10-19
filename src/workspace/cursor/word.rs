@@ -1,6 +1,6 @@
 use super::{CharRange, CursorPosition, Select};
 use crate::workspace::EditorLine;
-use idiom_tui::UTF8Safe;
+use idiom_tui::UTFSafe;
 
 /// owns text and location
 pub struct PositionedWord {

@@ -4,7 +4,7 @@ use status::{Reduction, RenderStatus};
 
 use crate::syntax::{tokens::TokenLine, DiagnosticLine, Lang, Token};
 pub use context::LineContext;
-use idiom_tui::{utils::UTF8SafeStringExt, UTF8Safe};
+use idiom_tui::{utils::UTFSafeStringExt, UTFSafe};
 use std::{
     fmt::Display,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
@@ -59,7 +59,7 @@ impl EditorLine {
         if self.char_len == self.content.len() {
             return self.content.get(from..to);
         }
-        self.content.utf8_get(from, to)
+        self.content.get_char_range(from, to)
     }
 
     #[inline]
@@ -67,7 +67,7 @@ impl EditorLine {
         if self.char_len == self.content.len() {
             return self.content.get(from..);
         }
-        self.content.utf8_get_from(from)
+        self.content.get_from_char(from)
     }
 
     #[inline]
@@ -75,7 +75,7 @@ impl EditorLine {
         if self.char_len == self.content.len() {
             return self.content.get(..to);
         }
-        self.content.utf8_get_to(to)
+        self.content.get_to_char(to)
     }
 
     #[inline]
@@ -88,7 +88,7 @@ impl EditorLine {
         }
         self.char_len += string.char_len();
         self.char_len -= to;
-        self.content.utf8_replace_till(to, string)
+        self.content.replace_till_char(to, string)
     }
 
     #[inline]
@@ -100,7 +100,7 @@ impl EditorLine {
             return self.content.push_str(string);
         }
         self.char_len = from + string.char_len();
-        self.content.utf8_replace_from(from, string)
+        self.content.replace_from_char(from, string)
     }
 
     #[inline]
@@ -113,7 +113,7 @@ impl EditorLine {
         }
         self.char_len += string.char_len();
         self.char_len -= range.len();
-        self.content.utf8_replace_range(range, string)
+        self.content.replace_char_range(range, string)
     }
 
     #[inline]
@@ -142,7 +142,7 @@ impl EditorLine {
             self.content.insert(idx, ch);
         } else {
             self.char_len += 1;
-            self.content.utf8_insert(idx, ch);
+            self.content.insert_at_char(idx, ch);
         }
     }
 
@@ -163,7 +163,7 @@ impl EditorLine {
             self.content.insert_str(idx, string);
         } else {
             self.char_len += string.char_len();
-            self.content.utf8_insert_str(idx, string);
+            self.content.insert_str_at_char(idx, string);
         }
     }
 
@@ -200,7 +200,7 @@ impl EditorLine {
             return self.content.remove(idx);
         }
         self.char_len -= 1;
-        let ch = self.content.utf8_remove(idx);
+        let ch = self.content.remove_at_char(idx);
         for _ in 0..char_lsp_pos(ch) {
             self.tokens.decrement_at(idx);
         }
@@ -262,7 +262,7 @@ impl EditorLine {
                 ..Default::default()
             };
         }
-        let content = self.content.utf8_split_off(at);
+        let content = self.content.split_off_at_char(at);
         if !content.is_empty() {
             self.char_len = self.content.char_len();
             self.tokens.clear();
@@ -275,7 +275,7 @@ impl EditorLine {
         if self.content.len() == self.char_len {
             self.content.split_at(mid)
         } else {
-            self.content.utf8_split_at(mid)
+            self.content.split_at_char(mid)
         }
     }
 
@@ -447,7 +447,7 @@ impl Index<Range<usize>> for EditorLine {
         if self.char_len == self.content.len() {
             &self.content[index]
         } else {
-            self.content.utf8_unsafe_get(index.start, index.end)
+            self.content.unchecked_get_char_range(index.start, index.end)
         }
     }
 }
@@ -459,7 +459,7 @@ impl Index<RangeTo<usize>> for EditorLine {
         if self.char_len == self.content.len() {
             &self.content[index]
         } else {
-            self.content.utf8_unsafe_get_to(index.end)
+            self.content.unchecked_get_to_char(index.end)
         }
     }
 }
@@ -471,7 +471,7 @@ impl Index<RangeFrom<usize>> for EditorLine {
         if self.char_len == self.content.len() {
             &self.content[index]
         } else {
-            self.content.utf8_unsafe_get_from(index.start)
+            self.content.unchecked_get_from_char(index.start)
         }
     }
 }

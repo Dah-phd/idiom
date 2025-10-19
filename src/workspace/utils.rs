@@ -2,7 +2,7 @@ use crate::{
     configs::IndentConfigs,
     workspace::{cursor::CursorPosition, line::EditorLine},
 };
-use idiom_tui::UTF8Safe;
+use idiom_tui::UTFSafe;
 
 #[inline(always)]
 pub fn insert_clip(clip: &str, content: &mut Vec<EditorLine>, mut cursor: CursorPosition) -> CursorPosition {

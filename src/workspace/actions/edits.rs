@@ -4,7 +4,7 @@ use super::super::{
     utils::{clip_content, insert_clip, insert_lines_indented, is_scope, remove_content},
 };
 use super::EditMetaData;
-use idiom_tui::UTF8Safe;
+use idiom_tui::UTFSafe;
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 use std::fmt::Debug;
 
