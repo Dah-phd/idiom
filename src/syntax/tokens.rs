@@ -1,7 +1,7 @@
 use super::{diagnostics::DiagnosticData, Legend};
 use crate::{
     ext_tui::StyleExt,
-    workspace::cursor::{Cursor, WordRange},
+    workspace::cursor::{Cursor, EncodedWordRange},
     workspace::line::EditorLine,
 };
 use crossterm::style::ContentStyle;
@@ -181,24 +181,22 @@ impl TokenLine {
     }
 
     /// force word in token line making sure it will fit with other tokens
-    pub fn set_word_checked(&mut self, word: WordRange, style: ContentStyle) {
-        // pub len: usize,
-        // pub delta_start: usize,
-        let from = word.from();
-        let to = word.to();
-        let Some(len) = to.checked_sub(from) else {
-            return;
-        };
-        if self.is_empty() {
-            self.inner.push(Token { len, delta_start: from, style });
-            return;
+    pub fn set_encoded_word_checked(&mut self, word: &EncodedWordRange, style: ContentStyle) {
+        let mut ranges = vec![];
+        let mut at_number = 0;
+        // coerce to ranges
+        for token in self.inner.drain(..) {
+            at_number += token.delta_start;
+            ranges.push((at_number, at_number + token.len, token.style));
         }
-        todo!("unfinished method");
-        let mut start_count = from;
-        let mut tokens = self.inner.iter_mut().peekable();
-        match tokens.next() {
-            Some(token) => {}
-            None => {}
+
+        todo!();
+
+        // return to delta token
+        let mut last_start = 0;
+        for (start, end, style) in ranges.into_iter() {
+            self.inner.push(Token { len: end - start, delta_start: start - last_start, style });
+            last_start = start;
         }
     }
 

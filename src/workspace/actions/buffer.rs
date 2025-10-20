@@ -85,7 +85,7 @@ impl DelBuffer {
         let change_start = if text.is_simple() {
             Position::new(line as u32, cursor.char as u32)
         } else {
-            Position::new(line as u32, (encoding.encode_position)(cursor.char, &text[..]) as u32)
+            Position::new(line as u32, (encoding.encode_position)(cursor.char, text.as_str()) as u32)
         };
         let removed = text.remove(char, encoding);
         let end = Position::new(change_start.line, change_start.character + ((encoding.char_len)(removed)) as u32);
@@ -240,12 +240,13 @@ impl TextBuffer {
         lexer: &Lexer,
     ) -> (Self, TextDocumentContentChangeEvent) {
         let char = cursor.char;
+        let encoding = lexer.encoding();
         let pos = if cursor.char != 0 && !text.is_simple() {
-            Position::new(cursor.line as u32, (lexer.encoding().encode_position)(cursor.char, &text[..]) as u32)
+            Position::new(cursor.line as u32, (encoding.encode_position)(cursor.char, text.as_str()) as u32)
         } else {
             cursor.into()
         };
-        text.insert_simple(cursor.char, ch, lexer.encoding());
+        text.insert_simple(cursor.char, ch, encoding);
         cursor.add_to_char(1);
         (
             Self { line: cursor.line, last: cursor.char, char, text: String::from(ch) },
@@ -265,14 +266,13 @@ impl TextBuffer {
         lexer: &Lexer,
     ) -> (Option<Edit>, TextDocumentContentChangeEvent) {
         if cursor.line == self.line && cursor.char == self.last && (ch.is_alphabetic() || ch == '_') {
+            let encoding = lexer.encoding();
             let pos = match cursor.char != 0 && !text.is_simple() {
-                true => {
-                    Position::new(cursor.line as u32, (lexer.encoding().encode_position)(cursor.char, &text[..]) as u32)
-                }
+                true => Position::new(cursor.line as u32, (encoding.encode_position)(cursor.char, &text[..]) as u32),
                 false => cursor.into(),
             };
             self.text.push(ch);
-            text.insert_simple(cursor.char, ch, lexer.encoding());
+            text.insert_simple(cursor.char, ch, encoding);
             cursor.add_to_char(1);
             self.last = cursor.char;
             return (

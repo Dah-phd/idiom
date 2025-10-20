@@ -7,6 +7,7 @@ use crate::{
     configs::FileType,
     ext_tui::{CrossTerm, StyleExt},
     lsp::LSPResult,
+    workspace::cursor::EncodedWordRange,
     workspace::{actions::Action, line::EditorLine},
 };
 use crossterm::style::{Color, ContentStyle};
@@ -647,6 +648,76 @@ fn token_dec_encoded_with_prefix() {
     assert_eq!(token.len, 6);
     assert_eq!(token.delta_start, 1);
     assert_eq!(token_next.delta_start, 6);
+}
+
+#[test]
+fn insert_encoded_word_ds() {
+    let mut token_line = TokenLine::default();
+    token_line.push(Token { delta_start: 0, len: 3, style: ContentStyle::reversed() });
+    token_line.push(Token { delta_start: 4, len: 4, style: ContentStyle::reversed() });
+    token_line.push(Token { delta_start: 7, len: 6, style: ContentStyle::reversed() });
+    token_line.push(Token { delta_start: 8, len: 4, style: ContentStyle::reversed() });
+    token_line.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
+    token_line.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
+
+    token_line.set_encoded_word_checked(&EncodedWordRange::new(0, 10, 12), ContentStyle::slowblink());
+
+    let mut expected = TokenLine::default();
+    expected.push(Token { delta_start: 0, len: 3, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 4, len: 4, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 6, len: 12, style: ContentStyle::slowblink() });
+    expected.push(Token { delta_start: 12, len: 1, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 2, len: 5, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
+
+    assert_eq!(token_line, expected);
+}
+
+#[test]
+fn insert_encoded_word_len() {
+    let mut token_line = TokenLine::default();
+    token_line.push(Token { delta_start: 0, len: 3, style: ContentStyle::reversed() });
+    token_line.push(Token { delta_start: 4, len: 4, style: ContentStyle::reversed() });
+    token_line.push(Token { delta_start: 7, len: 6, style: ContentStyle::reversed() });
+    token_line.push(Token { delta_start: 8, len: 4, style: ContentStyle::reversed() });
+    token_line.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
+    token_line.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
+
+    token_line.set_encoded_word_checked(&EncodedWordRange::new(0, 12, 10), ContentStyle::slowblink());
+
+    let mut expected = TokenLine::default();
+    expected.push(Token { delta_start: 0, len: 3, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 4, len: 4, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 7, len: 1, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 1, len: 10, style: ContentStyle::slowblink() });
+    expected.push(Token { delta_start: 10, len: 1, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 2, len: 5, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
+
+    assert_eq!(token_line, expected);
+}
+
+#[test]
+fn insert_encoded_word_equat_len() {
+    let mut token_line = TokenLine::default();
+    token_line.push(Token { delta_start: 0, len: 3, style: ContentStyle::reversed() });
+    token_line.push(Token { delta_start: 4, len: 4, style: ContentStyle::reversed() });
+    token_line.push(Token { delta_start: 7, len: 6, style: ContentStyle::reversed() });
+    token_line.push(Token { delta_start: 8, len: 4, style: ContentStyle::reversed() });
+    token_line.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
+    token_line.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
+
+    token_line.set_encoded_word_checked(&EncodedWordRange::new(0, 11, 11), ContentStyle::slowblink());
+
+    let mut expected = TokenLine::default();
+    expected.push(Token { delta_start: 0, len: 3, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 4, len: 4, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 7, len: 11, style: ContentStyle::slowblink() });
+    expected.push(Token { delta_start: 11, len: 1, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 2, len: 5, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
+
+    assert_eq!(token_line, expected);
 }
 
 #[test]

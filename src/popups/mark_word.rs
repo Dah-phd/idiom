@@ -1,22 +1,29 @@
 use crate::{
     embeded_term::EditorTerminal,
+    ext_tui::StyleExt,
     global_state::GlobalState,
     syntax::Lexer,
     tree::Tree,
     workspace::{
-        cursor::{PositionedWord, WordRange},
+        cursor::{EncodedWordRange, PositionedWord},
         Editor, Workspace,
     },
 };
 use crossterm::{
     self,
     event::{poll, read, Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent},
-    style::{Color, ContentStyle},
+    style::{Attribute, Attributes, Color, ContentStyle},
 };
 use std::time::Duration;
 
 const FRAME_RATE: Duration = Duration::from_millis(250);
 const UNFOCUSSED_FRAME_RAGE: Duration = Duration::from_secs(5);
+const STYLE_BASE: ContentStyle = ContentStyle {
+    attributes: Attributes::none().with(Attribute::Bold).with(Attribute::Underlined).with(Attribute::Italic),
+    background_color: None,
+    foreground_color: None,
+    underline_color: None,
+};
 
 /// Not a real popup
 /// uses similar structure to show marked word
@@ -36,7 +43,7 @@ pub fn render_marked_word(
         return Ok(());
     };
     let screen_text = editor.content.iter().enumerate().skip(editor.cursor.at_line).take(editor.cursor.max_rows);
-    let ranges = word.iter_word_ranges(screen_text).collect::<Vec<_>>();
+    let ranges = word.iter_encoded_word_ranges(screen_text, editor.lexer.encoding()).collect::<Vec<_>>();
     if ranges.is_empty() {
         return Ok(());
     };
@@ -76,10 +83,10 @@ pub fn render_marked_word(
             }
         }
         Lexer::context(editor, gs);
-        if editor.has_render_cache() {
+        if !editor.has_render_cache() {
             let screen_text =
                 editor.content.iter().enumerate().skip(editor.cursor.at_line).take(editor.cursor.max_rows);
-            let new_ranges = word.iter_word_ranges(screen_text).collect::<Vec<_>>();
+            let new_ranges = word.iter_encoded_word_ranges(screen_text, editor.lexer.encoding()).collect::<Vec<_>>();
             if ranges != new_ranges {
                 return Ok(());
             }
@@ -88,12 +95,13 @@ pub fn render_marked_word(
     }
 }
 
-fn perform_render(editor: &mut Editor, ranges: &[WordRange], gs: &mut GlobalState) {
+fn perform_render(editor: &mut Editor, ranges: &[EncodedWordRange], gs: &mut GlobalState) {
     let mut stored_tokens = vec![];
-    for range in ranges {
-        let range_line = range.line();
+    for word in ranges {
+        let range_line = word.line();
         let line = &mut editor.content[range_line];
         let mut new_tokens = line.tokens().clone();
+        new_tokens.set_encoded_word_checked(word, STYLE_BASE.with_fg(gs.ui_theme.accent()));
         stored_tokens.push((range_line, std::mem::replace(line.tokens_mut(), new_tokens)));
     }
 
@@ -104,7 +112,7 @@ fn perform_render(editor: &mut Editor, ranges: &[WordRange], gs: &mut GlobalStat
     }
 }
 
-fn clear_marked_cache(editor: &mut Editor, ranges: Vec<WordRange>) {
+fn clear_marked_cache(editor: &mut Editor, ranges: Vec<EncodedWordRange>) {
     for range in ranges {
         editor.content[range.line()].cached.reset();
     }

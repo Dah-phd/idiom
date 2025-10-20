@@ -7,7 +7,7 @@ use lsp_types::Position;
 use serde::{Deserialize, Serialize};
 
 pub use positions::{CharRange, CursorPosition, Select, SelectPosition};
-pub use word::{PositionedWord, WordRange};
+pub use word::{EncodedWordRange, PositionedWord, WordRange};
 
 #[derive(Debug, Default, Deserialize, Serialize, Clone, PartialEq)]
 pub struct Cursor {

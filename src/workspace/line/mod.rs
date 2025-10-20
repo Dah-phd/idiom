@@ -256,19 +256,15 @@ impl EditorLine {
                 self.char_len = self.content.len();
                 self.tokens.clear();
             }
-            return Self {
-                char_len: content.len(),
-                content,
-                diagnostics: self.diagnostics.take(),
-                ..Default::default()
-            };
+            Self { char_len: content.len(), content, ..Default::default() }
+        } else {
+            let content = self.content.split_off_at_char(at);
+            if !content.is_empty() {
+                self.char_len = self.content.char_len();
+                self.tokens.clear();
+            }
+            Self { char_len: content.char_len(), content, ..Default::default() }
         }
-        let content = self.content.split_off_at_char(at);
-        if !content.is_empty() {
-            self.char_len = self.content.char_len();
-            self.tokens.clear();
-        }
-        Self { char_len: content.char_len(), content, diagnostics: self.diagnostics.take(), ..Default::default() }
     }
 
     #[inline]
