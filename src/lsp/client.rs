@@ -2,7 +2,8 @@ use super::{
     local::{build_with_enrichment, create_semantic_capabilities, start_lsp_handler},
     messages::DiagnosticHandle,
     payload::Payload,
-    EditorDiagnostics, LSPError, LSPNotification, LSPRequest, LSPResult, Response, Responses, TreeDiagnostics,
+    EditorDiagnostics, LSPError, LSPNotification, LSPRequest, LSPResponse, LSPResult, Requests, Responses,
+    TreeDiagnostics,
 };
 use crate::{configs::FileType, utils::split_arc, workspace::CursorPosition};
 use lsp_types::{
@@ -32,7 +33,7 @@ use tokio::{
 /// Diagnostics are received from Diagnostic objec stored in hashmap based on path.
 pub struct LSPClient {
     diagnostics: Arc<Mutex<DiagnosticHandle>>,
-    responses: Arc<Mutex<HashMap<i64, Response>>>,
+    responses: Arc<Responses>,
     channel: UnboundedSender<Payload>,
     id_gen: MonoID,
     // can handle some requests, syntax and autocomplete
@@ -58,12 +59,14 @@ impl LSPClient {
         stdin: ChildStdin,
         file_type: FileType,
         diagnostics: Arc<Mutex<DiagnosticHandle>>,
+        requests: Arc<Requests>,
         responses: Arc<Responses>,
         mut capabilities: ServerCapabilities,
     ) -> LSPResult<(JoinHandle<LSPResult<()>>, Self)> {
         let (channel, rx) = unbounded_channel::<Payload>();
 
-        let lsp_send_handler = build_with_enrichment(rx, stdin, file_type, Arc::clone(&responses), &mut capabilities);
+        let lsp_send_handler =
+            build_with_enrichment(rx, stdin, file_type, requests, Arc::clone(&responses), &mut capabilities);
 
         let notification: LSPNotification<Initialized> = LSPNotification::with(InitializedParams {});
         channel.send(notification.stringify()?.into())?;
@@ -111,7 +114,7 @@ impl LSPClient {
     }
 
     #[inline]
-    pub fn get_responses(&self) -> Option<MutexGuard<'_, HashMap<i64, Response>>> {
+    pub fn get_responses(&self) -> Option<MutexGuard<'_, HashMap<i64, LSPResponse>>> {
         self.responses.try_lock().ok()
     }
 
@@ -134,9 +137,9 @@ impl LSPClient {
     }
 
     #[inline]
-    pub fn request_partial_tokens(&mut self, uri: Uri, range: Range) -> LSPResult<i64> {
+    pub fn request_partial_tokens(&mut self, uri: Uri, range: Range, max_lines: usize) -> LSPResult<i64> {
         let id = self.id_gen.next_id();
-        self.channel.send(Payload::PartialTokens(uri, range, id))?;
+        self.channel.send(Payload::PartialTokens(uri, range, id, max_lines))?;
         Ok(id)
     }
 
@@ -148,9 +151,9 @@ impl LSPClient {
     }
 
     #[inline]
-    pub fn request_completions(&mut self, uri: Uri, c: CursorPosition) -> LSPResult<i64> {
+    pub fn request_completions(&mut self, uri: Uri, c: CursorPosition, line: String) -> LSPResult<i64> {
         let id = self.id_gen.next_id();
-        self.channel.send(Payload::Completion(uri, c, id))?;
+        self.channel.send(Payload::Completion(uri, c, id, line))?;
         Ok(id)
     }
 

@@ -188,52 +188,34 @@ impl Diagnostic {
 
 #[derive(Debug)]
 pub enum LSPResponseType {
-    Completion(i64, String, CursorPosition),
-    Hover(i64),
-    SignatureHelp(i64),
-    References(i64),
-    Renames(i64),
-    Tokens(i64),
-    TokensPartial {
-        id: i64,
-        max_lines: usize,
-    },
-    #[allow(dead_code)]
-    Definition(i64),
-    Declaration(i64),
+    Completion(String, CursorPosition),
+    Hover,
+    SignatureHelp,
+    References,
+    Renames,
+    Tokens,
+    TokensPartial { max_lines: usize },
+    Definition,
+    Declaration,
 }
 
 impl LSPResponseType {
-    pub fn id(&self) -> &i64 {
-        match self {
-            Self::Completion(id, ..) => id,
-            Self::Hover(id) => id,
-            Self::SignatureHelp(id) => id,
-            Self::References(id) => id,
-            Self::Renames(id) => id,
-            Self::Tokens(id) => id,
-            Self::TokensPartial { id, .. } => id,
-            Self::Definition(id) => id,
-            Self::Declaration(id) => id,
-        }
-    }
-
     pub fn parse(&self, value: Option<Value>) -> Option<LSPResponse> {
         Some(match self {
-            Self::Completion(.., line, idx) => match from_value::<CompletionResponse>(value?).ok()? {
-                CompletionResponse::Array(arr) => LSPResponse::Completion(arr, line.to_owned(), *idx),
-                CompletionResponse::List(ls) => LSPResponse::Completion(ls.items, line.to_owned(), *idx),
+            Self::Completion(.., line, cursor) => match from_value::<CompletionResponse>(value?).ok()? {
+                CompletionResponse::Array(arr) => LSPResponse::Completion(arr, line.to_owned(), *cursor),
+                CompletionResponse::List(ls) => LSPResponse::Completion(ls.items, line.to_owned(), *cursor),
             },
-            Self::Hover(..) => LSPResponse::Hover(from_value(value?).ok()?),
-            Self::SignatureHelp(..) => LSPResponse::SignatureHelp(from_value(value?).ok()?),
-            Self::References(..) => LSPResponse::References(from_value(value?).ok()?),
-            Self::Renames(..) => LSPResponse::Renames(from_value(value?).ok()?),
-            Self::Tokens(..) => LSPResponse::Tokens(from_value(value?).ok()?),
+            Self::Hover => LSPResponse::Hover(from_value(value?).ok()?),
+            Self::SignatureHelp => LSPResponse::SignatureHelp(from_value(value?).ok()?),
+            Self::References => LSPResponse::References(from_value(value?).ok()?),
+            Self::Renames => LSPResponse::Renames(from_value(value?).ok()?),
+            Self::Tokens => LSPResponse::Tokens(from_value(value?).ok()?),
             Self::TokensPartial { max_lines, .. } => {
                 LSPResponse::TokensPartial { result: from_value(value?).ok()?, max_lines: *max_lines }
             }
-            Self::Definition(..) => LSPResponse::Definition(from_value(value?).ok()?),
-            Self::Declaration(..) => LSPResponse::Declaration(from_value(value?).ok()?),
+            Self::Definition => LSPResponse::Definition(from_value(value?).ok()?),
+            Self::Declaration => LSPResponse::Declaration(from_value(value?).ok()?),
         })
     }
 }
@@ -254,14 +236,14 @@ impl Display for LSPResponseType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LSPResponseType::Completion(..) => f.write_str("Completion"),
-            LSPResponseType::Declaration(..) => f.write_str("Declaration"),
-            LSPResponseType::Definition(..) => f.write_str("Definition"),
-            LSPResponseType::Hover(..) => f.write_str("Hover"),
-            LSPResponseType::Renames(..) => f.write_str("Renames"),
-            LSPResponseType::SignatureHelp(..) => f.write_str("SignatureHelp"),
-            LSPResponseType::Tokens(..) => f.write_str("Tokens"),
+            LSPResponseType::Declaration => f.write_str("Declaration"),
+            LSPResponseType::Definition => f.write_str("Definition"),
+            LSPResponseType::Hover => f.write_str("Hover"),
+            LSPResponseType::Renames => f.write_str("Renames"),
+            LSPResponseType::SignatureHelp => f.write_str("SignatureHelp"),
+            LSPResponseType::Tokens => f.write_str("Tokens"),
             LSPResponseType::TokensPartial { .. } => f.write_str("TokensPartial"),
-            LSPResponseType::References(..) => f.write_str("References"),
+            LSPResponseType::References => f.write_str("References"),
         }
     }
 }

@@ -163,69 +163,62 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     // responses
     if let Some(mut responses) = client.get_responses() {
         let unresolved_requests = &mut lexer.requests;
-        for request in std::mem::take(unresolved_requests) {
-            if let Some(response) = responses.remove(request.id()) {
-                match request.parse(response.result) {
-                    Some(result) => match result {
-                        LSPResponse::Completion(completions, line, c) => {
-                            if editor.cursor.line == c.line {
-                                modal.auto_complete(completions, line, c, &gs.matcher);
+        for (id, req_type) in std::mem::take(unresolved_requests) {
+            if let Some(response) = responses.remove(&id) {
+                match response {
+                    LSPResponse::Completion(completions, line, c) => {
+                        if editor.cursor.line == c.line {
+                            modal.auto_complete(completions, line, c, &gs.matcher);
+                        }
+                    }
+                    LSPResponse::Hover(hover) => {
+                        modal.map_hover(hover, &gs.theme);
+                    }
+                    LSPResponse::SignatureHelp(signature) => {
+                        modal.map_signatures(signature, &gs.theme);
+                    }
+                    LSPResponse::Renames(workspace_edit) => {
+                        gs.event.push(workspace_edit.into());
+                    }
+                    LSPResponse::Tokens(tokens) => {
+                        match tokens {
+                            SemanticTokensResult::Partial(data) => {
+                                set_tokens(data.data, &lexer.legend, content);
+                            }
+                            SemanticTokensResult::Tokens(data) => {
+                                set_tokens(data.data, &lexer.legend, content);
+                                gs.success("LSP tokens mapped! Refresh UI to remove artifacts (default F5)");
+                            }
+                        };
+                    }
+                    LSPResponse::TokensPartial { result, max_lines } => {
+                        let tokens = match result {
+                            SemanticTokensRangeResult::Partial(data) => data.data,
+                            SemanticTokensRangeResult::Tokens(data) => data.data,
+                        };
+                        set_tokens_partial(tokens, max_lines, &lexer.legend, content);
+                    }
+                    LSPResponse::References(locations) => {
+                        if let Some(mut locations) = locations {
+                            if locations.len() == 1 {
+                                gs.event.push(locations.remove(0).into());
+                            } else {
+                                gs.event.push(refrence_selector(locations).into())
                             }
                         }
-                        LSPResponse::Hover(hover) => {
-                            modal.map_hover(hover, &gs.theme);
-                        }
-                        LSPResponse::SignatureHelp(signature) => {
-                            modal.map_signatures(signature, &gs.theme);
-                        }
-                        LSPResponse::Renames(workspace_edit) => {
-                            gs.event.push(workspace_edit.into());
-                        }
-                        LSPResponse::Tokens(tokens) => {
-                            match tokens {
-                                SemanticTokensResult::Partial(data) => {
-                                    set_tokens(data.data, &lexer.legend, content);
-                                }
-                                SemanticTokensResult::Tokens(data) => {
-                                    set_tokens(data.data, &lexer.legend, content);
-                                    gs.success("LSP tokens mapped! Refresh UI to remove artifacts (default F5)");
-                                }
-                            };
-                        }
-                        LSPResponse::TokensPartial { result, max_lines } => {
-                            let tokens = match result {
-                                SemanticTokensRangeResult::Partial(data) => data.data,
-                                SemanticTokensRangeResult::Tokens(data) => data.data,
-                            };
-                            set_tokens_partial(tokens, max_lines, &lexer.legend, content);
-                        }
-                        LSPResponse::References(locations) => {
-                            if let Some(mut locations) = locations {
-                                if locations.len() == 1 {
-                                    gs.event.push(locations.remove(0).into());
-                                } else {
-                                    gs.event.push(refrence_selector(locations).into())
-                                }
-                            }
-                        }
-                        LSPResponse::Declaration(declaration) => {
-                            gs.try_tree_event(declaration);
-                        }
-                        LSPResponse::Definition(definition) => {
-                            gs.try_tree_event(definition);
-                        }
-                    },
-                    None => {
-                        if let Some(err) = response.error {
-                            gs.error(format!("{request}: {err}"));
-                        }
+                    }
+                    LSPResponse::Declaration(declaration) => {
+                        gs.try_tree_event(declaration);
+                    }
+                    LSPResponse::Definition(definition) => {
+                        gs.try_tree_event(definition);
                     }
                 }
             } else {
-                if matches!(request, LSPResponseType::Tokens(..)) {
+                if matches!(req_type, LSPResponseType::Tokens) {
                     lexer.meta = None;
                 }
-                unresolved_requests.push(request);
+                unresolved_requests.push((id, req_type));
             }
         }
     }
@@ -296,12 +289,16 @@ pub fn sync_edits_dead_rev(_lexer: &mut Lexer, _action: &Action, _content: &[Edi
 }
 
 pub fn completable(lexer: &Lexer, char_idx: usize, line: &EditorLine) -> bool {
-    !lexer.requests.iter().any(|req| matches!(req, LSPResponseType::Completion(..)))
+    !lexer.requests.iter().any(|req| matches!(req.1, LSPResponseType::Completion(..)))
         && lexer.lang.completable(line, char_idx)
 }
 
 pub fn get_autocomplete(lexer: &mut Lexer, c: CursorPosition, line: String, gs: &mut GlobalState) {
-    match lexer.client.request_completions(lexer.uri.clone(), c).map(|id| LSPResponseType::Completion(id, line, c)) {
+    match lexer
+        .client
+        .request_completions(lexer.uri.clone(), c, line.to_owned())
+        .map(|id| (id, LSPResponseType::Completion(line, c)))
+    {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }
@@ -313,61 +310,61 @@ pub fn completable_dead(_lexer: &Lexer, _idx: usize, _line: &EditorLine) -> bool
 
 pub fn get_autocomplete_dead(_: &mut Lexer, _: CursorPosition, _: String, _: &mut GlobalState) {}
 
-pub fn tokens(lexer: &mut Lexer) -> LSPResult<LSPResponseType> {
-    lexer.client.request_full_tokens(lexer.uri.clone()).map(LSPResponseType::Tokens)
+pub fn tokens(lexer: &mut Lexer) -> LSPResult<(i64, LSPResponseType)> {
+    lexer.client.request_full_tokens(lexer.uri.clone()).map(|id| (id, LSPResponseType::Tokens))
 }
 
-pub fn tokens_dead(_: &mut Lexer) -> LSPResult<LSPResponseType> {
-    Ok(LSPResponseType::Tokens(0))
+pub fn tokens_dead(_: &mut Lexer) -> LSPResult<(i64, LSPResponseType)> {
+    Ok((0, LSPResponseType::Tokens))
 }
 
-pub fn tokens_partial(lexer: &mut Lexer, range: Range, max_lines: usize) -> LSPResult<LSPResponseType> {
+pub fn tokens_partial(lexer: &mut Lexer, range: Range, max_lines: usize) -> LSPResult<(i64, LSPResponseType)> {
     lexer
         .client
-        .request_partial_tokens(lexer.uri.clone(), range)
-        .map(|id| LSPResponseType::TokensPartial { id, max_lines })
+        .request_partial_tokens(lexer.uri.clone(), range, max_lines)
+        .map(|id| (id, LSPResponseType::TokensPartial { max_lines }))
 }
 
-pub fn tokens_partial_redirect(lexer: &mut Lexer, _: Range, _: usize) -> LSPResult<LSPResponseType> {
+pub fn tokens_partial_redirect(lexer: &mut Lexer, _: Range, _: usize) -> LSPResult<(i64, LSPResponseType)> {
     tokens(lexer)
 }
 
-pub fn tokens_partial_dead(_: &mut Lexer, _: Range, _: usize) -> LSPResult<LSPResponseType> {
-    Ok(LSPResponseType::TokensPartial { id: 0, max_lines: 0 })
+pub fn tokens_partial_dead(_: &mut Lexer, _: Range, _: usize) -> LSPResult<(i64, LSPResponseType)> {
+    Ok((0, LSPResponseType::TokensPartial { max_lines: 0 }))
 }
 
 pub fn info_position_dead(_: &mut Lexer, _: CursorPosition, _: &mut GlobalState) {}
 
 pub fn references(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalState) {
-    match lexer.client.request_references(lexer.uri.clone(), c).map(LSPResponseType::References) {
+    match lexer.client.request_references(lexer.uri.clone(), c).map(|id| (id, LSPResponseType::References)) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }
 }
 
 pub fn definitions(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalState) {
-    match lexer.client.request_definitions(lexer.uri.clone(), c).map(LSPResponseType::Definition) {
+    match lexer.client.request_definitions(lexer.uri.clone(), c).map(|id| (id, LSPResponseType::Definition)) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }
 }
 
 pub fn declarations(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalState) {
-    match lexer.client.request_declarations(lexer.uri.clone(), c).map(LSPResponseType::Declaration) {
+    match lexer.client.request_declarations(lexer.uri.clone(), c).map(|id| (id, LSPResponseType::Declaration)) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }
 }
 
 pub fn hover(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalState) {
-    match lexer.client.request_hover(lexer.uri.clone(), c).map(LSPResponseType::Hover) {
+    match lexer.client.request_hover(lexer.uri.clone(), c).map(|id| (id, LSPResponseType::Hover)) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }
 }
 
 pub fn signatures(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalState) {
-    match lexer.client.request_signitures(lexer.uri.clone(), c).map(LSPResponseType::SignatureHelp) {
+    match lexer.client.request_signitures(lexer.uri.clone(), c).map(|id| (id, LSPResponseType::SignatureHelp)) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }

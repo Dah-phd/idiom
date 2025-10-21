@@ -35,13 +35,13 @@ pub struct Lexer {
     pub path: PathBuf,
     question_lsp: bool,
     version: i32,
-    requests: Vec<LSPResponseType>,
+    requests: Vec<(i64, LSPResponseType)>,
     client: LSPClient,
     context: fn(&mut Editor, &mut GlobalState),
     completable_: fn(&Self, char_idx: usize, line: &EditorLine) -> bool,
     autocomplete: fn(&mut Self, CursorPosition, String, &mut GlobalState),
-    tokens: fn(&mut Self) -> LSPResult<LSPResponseType>,
-    tokens_partial: fn(&mut Self, Range, usize) -> LSPResult<LSPResponseType>,
+    tokens: fn(&mut Self) -> LSPResult<(i64, LSPResponseType)>,
+    tokens_partial: fn(&mut Self, Range, usize) -> LSPResult<(i64, LSPResponseType)>,
     references: fn(&mut Self, CursorPosition, &mut GlobalState),
     definitions: fn(&mut Self, CursorPosition, &mut GlobalState),
     declarations: fn(&mut Self, CursorPosition, &mut GlobalState),
@@ -259,7 +259,8 @@ impl Lexer {
         if self.client.capabilities.rename_provider.is_none() {
             return Err(LSPError::missing_capability("renames"));
         }
-        let request = self.client.request_rename(self.uri.clone(), c, new_name).map(LSPResponseType::Renames)?;
+        let request =
+            self.client.request_rename(self.uri.clone(), c, new_name).map(|id| (id, LSPResponseType::Renames))?;
         self.requests.push(request);
         Ok(())
     }
