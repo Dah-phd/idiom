@@ -8,6 +8,32 @@ use crossterm::style::ContentStyle;
 use lsp_types::SemanticToken;
 use unicode_width::UnicodeWidthChar;
 
+/// perform check and reformat on delta to ensure on overlap is happening
+pub fn reforamt_delta_tokens(tokens: &mut Vec<SemanticToken>) {
+    let mut last_len = 0;
+    let mut idx = 0;
+    loop {
+        let Some(token) = tokens.get_mut(idx) else { return };
+        if token.delta_line != 0 {
+            last_len = 0;
+        };
+        if last_len > token.delta_start {
+            let diff = last_len - token.delta_start;
+            token.delta_start = last_len;
+            if diff > token.length {
+                /// figure out how to parse the whole line and ensure no overlapping
+                todo!("figure out hadler")
+            } else {
+                token.length -= diff;
+                last_len = token.length;
+            };
+        } else {
+            last_len = token.length;
+        }
+        idx += 1;
+    }
+}
+
 pub fn set_tokens(tokens: Vec<SemanticToken>, legend: &Legend, content: &mut [EditorLine]) {
     let mut tokens = tokens.into_iter();
 

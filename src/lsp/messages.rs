@@ -4,7 +4,7 @@ use lsp_types::{
     CompletionItem, CompletionResponse, DiagnosticSeverity, GotoDefinitionResponse, Hover, Location,
     PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, Uri, WorkspaceEdit,
 };
-use serde_json::{from_value, Value};
+use serde_json::{from_value, Result as SerdeResult, Value};
 use std::{
     collections::{hash_map::Entry, HashMap},
     fmt::Display,
@@ -13,7 +13,7 @@ use std::{
 
 use crate::{
     lsp::{LSPError, LSPResult},
-    syntax::DiagnosticLine,
+    syntax::{tokens::reforamt_delta_tokens, DiagnosticLine},
     workspace::CursorPosition,
 };
 
@@ -200,22 +200,34 @@ pub enum LSPResponseType {
 }
 
 impl LSPResponseType {
-    pub fn parse(&self, value: Option<Value>) -> Option<LSPResponse> {
-        Some(match self {
-            Self::Completion(.., line, cursor) => match from_value::<CompletionResponse>(value?).ok()? {
+    pub fn parse(&self, value: Value) -> SerdeResult<LSPResponse> {
+        Ok(match self {
+            Self::Completion(.., line, cursor) => match from_value::<CompletionResponse>(value)? {
                 CompletionResponse::Array(arr) => LSPResponse::Completion(arr, line.to_owned(), *cursor),
                 CompletionResponse::List(ls) => LSPResponse::Completion(ls.items, line.to_owned(), *cursor),
             },
-            Self::Hover => LSPResponse::Hover(from_value(value?).ok()?),
-            Self::SignatureHelp => LSPResponse::SignatureHelp(from_value(value?).ok()?),
-            Self::References => LSPResponse::References(from_value(value?).ok()?),
-            Self::Renames => LSPResponse::Renames(from_value(value?).ok()?),
-            Self::Tokens => LSPResponse::Tokens(from_value(value?).ok()?),
-            Self::TokensPartial { max_lines, .. } => {
-                LSPResponse::TokensPartial { result: from_value(value?).ok()?, max_lines: *max_lines }
+            Self::Hover => LSPResponse::Hover(from_value(value)?),
+            Self::SignatureHelp => LSPResponse::SignatureHelp(from_value(value)?),
+            Self::References => LSPResponse::References(from_value(value)?),
+            Self::Renames => LSPResponse::Renames(from_value(value)?),
+            Self::Tokens => {
+                let mut tokens = from_value(value)?;
+                match &mut tokens {
+                    SemanticTokensResult::Tokens(tokens) => reforamt_delta_tokens(&mut tokens.data),
+                    SemanticTokensResult::Partial(tokens) => reforamt_delta_tokens(&mut tokens.data),
+                };
+                LSPResponse::Tokens(tokens)
             }
-            Self::Definition => LSPResponse::Definition(from_value(value?).ok()?),
-            Self::Declaration => LSPResponse::Declaration(from_value(value?).ok()?),
+            Self::TokensPartial { max_lines, .. } => {
+                let mut result = from_value(value)?;
+                match &mut result {
+                    SemanticTokensRangeResult::Tokens(tokens) => reforamt_delta_tokens(&mut tokens.data),
+                    SemanticTokensRangeResult::Partial(tokens) => reforamt_delta_tokens(&mut tokens.data),
+                }
+                LSPResponse::TokensPartial { result, max_lines: *max_lines }
+            }
+            Self::Definition => LSPResponse::Definition(from_value(value)?),
+            Self::Declaration => LSPResponse::Declaration(from_value(value)?),
         })
     }
 }
@@ -230,6 +242,7 @@ pub enum LSPResponse {
     TokensPartial { result: SemanticTokensRangeResult, max_lines: usize },
     Definition(GotoDefinitionResponse),
     Declaration(GotoDeclarationResponse),
+    Error(String),
 }
 
 impl Display for LSPResponseType {

@@ -70,10 +70,15 @@ impl LSP {
                         let Some(request) = sent_handler.lock().unwrap().remove(&inner.id) else {
                             continue;
                         };
-                        let Some(result) = request.parse(inner.result) else {
-                            continue;
-                        };
-                        responses_handler.lock().unwrap().insert(inner.id, result);
+                        if let Some(response) = inner.result {
+                            let response = match request.parse(response) {
+                                Ok(response) => response,
+                                Err(error) => LSPResponse::Error(error.to_string()),
+                            };
+                            responses_handler.lock().unwrap().insert(inner.id, response);
+                        } else if let Some(error) = inner.error {
+                            responses_handler.lock().unwrap().insert(inner.id, LSPResponse::Error(error.to_string()));
+                        }
                     }
                     LSPMessage::Diagnostic(uri, params) => {
                         diagnostics_handler.lock().unwrap().insert(uri, params);

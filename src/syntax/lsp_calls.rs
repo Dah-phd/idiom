@@ -213,6 +213,9 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
                     LSPResponse::Definition(definition) => {
                         gs.try_tree_event(definition);
                     }
+                    LSPResponse::Error(text) => {
+                        gs.error(text);
+                    }
                 }
             } else {
                 if matches!(req_type, LSPResponseType::Tokens) {
