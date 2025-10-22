@@ -13,7 +13,7 @@ use std::{
 
 use crate::{
     lsp::{LSPError, LSPResult},
-    syntax::{tokens::reforamt_delta_tokens, DiagnosticLine},
+    syntax::{tokens::validate_and_format_delta_tokens, DiagnosticLine},
     workspace::CursorPosition,
 };
 
@@ -213,16 +213,16 @@ impl LSPResponseType {
             Self::Tokens => {
                 let mut tokens = from_value(value)?;
                 match &mut tokens {
-                    SemanticTokensResult::Tokens(tokens) => reforamt_delta_tokens(&mut tokens.data),
-                    SemanticTokensResult::Partial(tokens) => reforamt_delta_tokens(&mut tokens.data),
+                    SemanticTokensResult::Tokens(tokens) => validate_and_format_delta_tokens(&mut tokens.data),
+                    SemanticTokensResult::Partial(tokens) => validate_and_format_delta_tokens(&mut tokens.data),
                 };
                 LSPResponse::Tokens(tokens)
             }
             Self::TokensPartial { max_lines, .. } => {
                 let mut result = from_value(value)?;
                 match &mut result {
-                    SemanticTokensRangeResult::Tokens(tokens) => reforamt_delta_tokens(&mut tokens.data),
-                    SemanticTokensRangeResult::Partial(tokens) => reforamt_delta_tokens(&mut tokens.data),
+                    SemanticTokensRangeResult::Tokens(tokens) => validate_and_format_delta_tokens(&mut tokens.data),
+                    SemanticTokensRangeResult::Partial(tokens) => validate_and_format_delta_tokens(&mut tokens.data),
                 }
                 LSPResponse::TokensPartial { result, max_lines: *max_lines }
             }
