@@ -587,6 +587,66 @@ fn validate_and_fix_tokens() {
 }
 
 #[test]
+fn test_clear_empty_tokens() {
+    let mut invalid = vec![
+        SemanticToken { delta_line: 0, delta_start: 0, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+        SemanticToken { delta_line: 0, delta_start: 3, length: 0, token_type: 6, token_modifiers_bitset: 0 },
+        SemanticToken { delta_line: 0, delta_start: 0, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+        SemanticToken { delta_line: 0, delta_start: 3, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+        SemanticToken { delta_line: 0, delta_start: 3, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+        SemanticToken { delta_line: 0, delta_start: 3, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+    ];
+
+    let expected = vec![
+        SemanticToken { delta_line: 0, delta_start: 0, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+        SemanticToken { delta_line: 0, delta_start: 3, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+        SemanticToken { delta_line: 0, delta_start: 3, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+        SemanticToken { delta_line: 0, delta_start: 3, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+        SemanticToken { delta_line: 0, delta_start: 3, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+    ];
+
+    assert_ne!(expected, invalid);
+    validate_and_format_delta_tokens(&mut invalid);
+    assert_eq!(expected, invalid);
+
+    let mut invalid = vec![
+        SemanticToken { delta_line: 0, delta_start: 3, length: 0, token_type: 6, token_modifiers_bitset: 0 },
+        SemanticToken { delta_line: 1, delta_start: 3, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+    ];
+
+    let expected =
+        vec![SemanticToken { delta_line: 1, delta_start: 3, length: 3, token_type: 6, token_modifiers_bitset: 0 }];
+
+    assert_ne!(expected, invalid);
+    validate_and_format_delta_tokens(&mut invalid);
+    assert_eq!(expected, invalid);
+}
+
+#[test]
+fn test_clear_delta_start_empty_overlap() {
+    let mut invalid = vec![
+        SemanticToken { delta_line: 0, delta_start: 0, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+        SemanticToken { delta_line: 0, delta_start: 0, length: 3, token_type: 6, token_modifiers_bitset: 0 }, // drop due to overlpa
+        SemanticToken { delta_line: 0, delta_start: 3, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+        SemanticToken { delta_line: 0, delta_start: 3, length: 0, token_type: 6, token_modifiers_bitset: 0 }, // drop and pass start
+        SemanticToken { delta_line: 0, delta_start: 0, length: 0, token_type: 6, token_modifiers_bitset: 0 }, // drop and pass start
+        SemanticToken { delta_line: 0, delta_start: 3, length: 3, token_type: 6, token_modifiers_bitset: 0 }, // enlarge start from prev
+        SemanticToken { delta_line: 0, delta_start: 3, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+    ];
+
+    let expected = vec![
+        SemanticToken { delta_line: 0, delta_start: 0, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+        SemanticToken { delta_line: 0, delta_start: 3, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+        SemanticToken { delta_line: 0, delta_start: 6, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+        SemanticToken { delta_line: 0, delta_start: 3, length: 3, token_type: 6, token_modifiers_bitset: 0 },
+    ];
+
+    assert_ne!(expected, invalid);
+    validate_and_format_delta_tokens(&mut invalid);
+    assert_eq!(expected, invalid);
+}
+
+#[test]
 fn token_inc() {
     let mut token_line = create_tokens();
     let mut expected = TokenLine::default();

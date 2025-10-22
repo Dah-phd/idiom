@@ -19,10 +19,26 @@ pub fn validate_and_format_delta_tokens(tokens: &mut Vec<SemanticToken>) {
             last_len = 0;
         }
 
-        if last_len > token.delta_start {
-            last_len = token.delta_start;
-            if let Some(prev_token) = tokens.get_mut(idx - 1) {
-                prev_token.length = last_len;
+        // drop empty token and extend next delta start
+        if token.length == 0 {
+            let removed = tokens.remove(idx);
+            if let Some(next_token) = tokens.get_mut(idx) {
+                if next_token.delta_line != 0 {
+                    continue;
+                }
+                next_token.delta_start += removed.delta_start;
+            }
+            continue;
+        // fix overlapps
+        } else if last_len > token.delta_start {
+            if token.delta_start == 0 {
+                tokens.remove(idx);
+                continue;
+            } else {
+                last_len = token.delta_start;
+                if let Some(prev_token) = tokens.get_mut(idx - 1) {
+                    prev_token.length = last_len;
+                }
             }
         } else {
             last_len = token.length;
