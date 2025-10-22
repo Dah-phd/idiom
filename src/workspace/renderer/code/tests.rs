@@ -22,6 +22,228 @@ use idiom_tui::{
     Backend,
 };
 
+fn test_line_wrap(mut render_data: Vec<(ContentStyle, String)>) {
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(1));
+    assert_eq!(line, vec!["fn", " ", "get_long_line", "() ", "->", " ", "String", " {"]);
+    let (line_num, line) = parse_complex_line(&mut render_data);
+    assert_eq!(line_num, Some(2));
+    assert_eq!(
+        line,
+        vec![
+            "    ",
+            "let",
+            " ",
+            "b",
+            " ",
+            "=",
+            " ",
+            "\"text🚀text🚀text🚀text🚀text🚀text",
+            ">"
+        ]
+    );
+    assert!(render_data.is_empty());
+}
+
+fn test_content(mut render_data: Vec<(ContentStyle, String)>) {
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(1));
+    assert_eq!(line, vec!["use", " ", "super", "::", "code", "::", "CodeLine", ";"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(2));
+    assert_eq!(line, vec!["use", " ", "super", "::", "EditorLine", ";"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(3));
+    let expect: Vec<&str> = vec![];
+    assert_eq!(line, expect);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(4));
+    assert_eq!(line, vec!["#", "[", "test", "]"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(5));
+    assert_eq!(line, vec!["fn", " ", "test_insert", "() {"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(6));
+    assert_eq!(
+        line,
+        vec![
+            "    ", "let", " ", "mut", " ", "line", " ", "=", " ", "CodeLine", "::", "new", "(", "\"text\"", ".",
+            "to_owned", "());"
+        ]
+    );
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(7));
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "4", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(8));
+    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'e'", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(9));
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "is_ascii", "());"]);
+    let (line_num, line) = parse_complex_line(&mut render_data);
+    assert_eq!(line_num, Some(10));
+    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'🚀'", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(11));
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "6", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(12));
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "!", "line", ".", "is_ascii", "());"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(13));
+    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "3", ", ", "'x'", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(14));
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "7", ");"]);
+    let (line_num, line) = parse_complex_line(&mut render_data);
+    assert_eq!(line_num, Some(15));
+    assert_eq!(
+        line,
+        vec![
+            "    ",
+            "assert",
+            "!",
+            "(",
+            "&",
+            "line",
+            ".",
+            "to_string",
+            "() ",
+            "=",
+            "=",
+            " ",
+            "\"te🚀xext\"",
+            ");",
+        ]
+    );
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(16));
+    assert_eq!(line, vec!["}"]);
+}
+
+fn test_content_select(mut render_data: Vec<(ContentStyle, String)>) {
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(1));
+    assert_eq!(line, vec!["use", " ", "super", "::", "code", "::", "CodeLine", ";"]);
+    // select start char 10 split token
+    let (line_num, line) = parse_complex_line(&mut render_data);
+    assert_eq!(line_num, Some(2));
+    assert_eq!(line, vec!["use", " ", "super", ":", ":", "EditorLine", ";"]);
+    let (line_num, line) = parse_complex_line(&mut render_data);
+    assert_eq!(line_num, Some(3));
+    assert_eq!(line, vec![" "]);
+    let (line_num, line) = parse_complex_line(&mut render_data);
+    assert_eq!(line_num, Some(4));
+    assert_eq!(line, vec!["#", "[", "test", "]"]);
+    // select end char 6 split token
+    let (line_num, line) = parse_complex_line(&mut render_data);
+    assert_eq!(line_num, Some(5));
+    assert_eq!(line, vec!["fn", " ", "tes", "t_insert", "() {"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(6));
+    assert_eq!(
+        line,
+        vec![
+            "    ", "let", " ", "mut", " ", "line", " ", "=", " ", "CodeLine", "::", "new", "(", "\"text\"", ".",
+            "to_owned", "());"
+        ]
+    );
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(7));
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "4", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(8));
+    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'e'", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(9));
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "is_ascii", "());"]);
+    let (line_num, line) = parse_complex_line(&mut render_data);
+    assert_eq!(line_num, Some(10));
+    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'🚀'", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(11));
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "6", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(12));
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "!", "line", ".", "is_ascii", "());"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(13));
+    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "3", ", ", "'x'", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(14));
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "7", ");"]);
+    let (line_num, line) = parse_complex_line(&mut render_data);
+    assert_eq!(line_num, Some(15));
+    #[rustfmt::skip]
+    assert_eq!(
+        line,
+        vec![ "    ", "assert", "!", "(", "&", "line", ".", "to_string", "() ", "=", "=", " ", "\"te🚀xext\"", ");",]
+    );
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(16));
+    assert_eq!(line, vec!["}"]);
+}
+
+#[inline]
+fn test_content_shrunk(mut render_data: Vec<(ContentStyle, String)>) {
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(1));
+    assert_eq!(line, vec!["use", " ", "super", "::", "code", "::", "CodeLine", ";"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(2));
+    assert_eq!(line, vec!["use", " ", "super", "::", "EditorLine", ";"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(3));
+    let expect: Vec<&str> = vec![];
+    assert_eq!(line, expect);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(4));
+    assert_eq!(line, vec!["#", "[", "test", "]"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(5));
+    assert_eq!(line, vec!["fn", " ", "test_insert", "() {"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(6));
+    assert_eq!(
+        line,
+        vec!["    ", "let", " ", "mut", " ", "line", " ", "=", " ", "CodeLine", "::", "new", "(", "\"text", ">",]
+    );
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(7));
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "4", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(8));
+    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'e'", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(9));
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "is_ascii", "());"]);
+    let (line_num, line) = parse_complex_line(&mut render_data);
+    assert_eq!(line_num, Some(10));
+    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'🚀'", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(11));
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "6", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(12));
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "!", "line", ".", "is_ascii", "());"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(13));
+    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "3", ", ", "'x'", ");"]);
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(14));
+    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "7", ");"]);
+    let (line_num, line) = parse_complex_line(&mut render_data);
+    assert_eq!(line_num, Some(15));
+    #[rustfmt::skip]
+    assert_eq!(
+        line,
+        vec![ "    ", "assert", "!", "(", "&", "line", ".", "to_string", "() ", "=", "=", " ", "\"te🚀", ">"]
+    );
+    let (line_num, line) = parse_simple_line(&mut render_data);
+    assert_eq!(line_num, Some(16));
+    assert_eq!(line, vec!["}"]);
+}
+
 /// BASIC CURSOR TEST
 
 #[test]
@@ -435,254 +657,4 @@ fn test_line_wrapping_utf32() {
     rend_cursor(text, &mut ctx, line, &mut gs);
 
     test_line_wrap(gs.backend.drain());
-}
-
-fn test_content(mut render_data: Vec<(ContentStyle, String)>) {
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(1));
-    assert_eq!(line, vec!["use", " ", "super", "::", "code", "::", "CodeLine", ";"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(2));
-    assert_eq!(line, vec!["use", " ", "super", "::", "EditorLine", ";"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(3));
-    let expect: Vec<&str> = vec![];
-    assert_eq!(line, expect);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(4));
-    assert_eq!(line, vec!["#", "[", "test", "]"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(5));
-    assert_eq!(line, vec!["fn", " ", "test_insert", "() {"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(6));
-    assert_eq!(
-        line,
-        vec![
-            "    ", "let", " ", "mut", " ", "line", " ", "=", " ", "CodeLine", "::", "new", "(", "\"text\"", ".",
-            "to_owned", "());"
-        ]
-    );
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(7));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "4", ");"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(8));
-    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'e'", ");"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(9));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "is_ascii", "());"]);
-    let (line_num, line) = parse_complex_line(&mut render_data);
-    assert_eq!(line_num, Some(10));
-    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'🚀'", ");"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(11));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "6", ");"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(12));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "!", "line", ".", "is_ascii", "());"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(13));
-    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "3", ", ", "'x'", ");"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(14));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "7", ");"]);
-    let (line_num, line) = parse_complex_line(&mut render_data);
-    assert_eq!(line_num, Some(15));
-    assert_eq!(
-        line,
-        vec![
-            "    ",
-            "assert",
-            "!",
-            "(",
-            "&",
-            "line",
-            ".",
-            "to_string",
-            "() ",
-            "=",
-            "=",
-            " ",
-            "\"te🚀xext\"",
-            ");",
-        ]
-    );
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(16));
-    assert_eq!(line, vec!["}"]);
-}
-
-fn test_content_select(mut render_data: Vec<(ContentStyle, String)>) {
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(1));
-    assert_eq!(line, vec!["use", " ", "super", "::", "code", "::", "CodeLine", ";"]);
-    // select start char 10 split token
-    let (line_num, line) = parse_complex_line(&mut render_data);
-    assert_eq!(line_num, Some(2));
-    assert_eq!(line, vec!["use", " ", "super", ":", ":", "EditorLine", ";"]);
-    let (line_num, line) = parse_complex_line(&mut render_data);
-    assert_eq!(line_num, Some(3));
-    assert_eq!(line, vec![" "]);
-    let (line_num, line) = parse_complex_line(&mut render_data);
-    assert_eq!(line_num, Some(4));
-    assert_eq!(line, vec!["#", "[", "test", "]"]);
-    // select end char 6 split token
-    let (line_num, line) = parse_complex_line(&mut render_data);
-    assert_eq!(line_num, Some(5));
-    assert_eq!(line, vec!["fn", " ", "tes", "t_insert", "() {"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(6));
-    assert_eq!(
-        line,
-        vec![
-            "    ", "let", " ", "mut", " ", "line", " ", "=", " ", "CodeLine", "::", "new", "(", "\"text\"", ".",
-            "to_owned", "());"
-        ]
-    );
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(7));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "4", ");"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(8));
-    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'e'", ");"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(9));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "is_ascii", "());"]);
-    let (line_num, line) = parse_complex_line(&mut render_data);
-    assert_eq!(line_num, Some(10));
-    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'🚀'", ");"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(11));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "6", ");"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(12));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "!", "line", ".", "is_ascii", "());"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(13));
-    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "3", ", ", "'x'", ");"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(14));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "7", ");"]);
-    let (line_num, line) = parse_complex_line(&mut render_data);
-    assert_eq!(line_num, Some(15));
-    assert_eq!(
-        line,
-        vec![
-            "    ",
-            "assert",
-            "!",
-            "(",
-            "&",
-            "line",
-            ".",
-            "to_string",
-            "() ",
-            "=",
-            "=",
-            " ",
-            "\"te🚀xext\"",
-            ");",
-        ]
-    );
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(16));
-    assert_eq!(line, vec!["}"]);
-}
-
-#[inline]
-fn test_content_shrunk(mut render_data: Vec<(ContentStyle, String)>) {
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(1));
-    assert_eq!(line, vec!["use", " ", "super", "::", "code", "::", "CodeLine", ";"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(2));
-    assert_eq!(line, vec!["use", " ", "super", "::", "EditorLine", ";"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(3));
-    let expect: Vec<&str> = vec![];
-    assert_eq!(line, expect);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(4));
-    assert_eq!(line, vec!["#", "[", "test", "]"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(5));
-    assert_eq!(line, vec!["fn", " ", "test_insert", "() {"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(6));
-    assert_eq!(
-        line,
-        vec!["    ", "let", " ", "mut", " ", "line", " ", "=", " ", "CodeLine", "::", "new", "(", "\"text", ">",]
-    );
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(7));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "4", ");"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(8));
-    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'e'", ");"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(9));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "is_ascii", "());"]);
-    let (line_num, line) = parse_complex_line(&mut render_data);
-    assert_eq!(line_num, Some(10));
-    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'🚀'", ");"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(11));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "6", ");"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(12));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "!", "line", ".", "is_ascii", "());"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(13));
-    assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "3", ", ", "'x'", ");"]);
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(14));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "7", ");"]);
-    let (line_num, line) = parse_complex_line(&mut render_data);
-    assert_eq!(line_num, Some(15));
-    assert_eq!(
-        line,
-        vec![
-            "    ",
-            "assert",
-            "!",
-            "(",
-            "&",
-            "line",
-            ".",
-            "to_string",
-            "() ",
-            "=",
-            "=",
-            " ",
-            "\"te🚀",
-            ">"
-        ]
-    );
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(16));
-    assert_eq!(line, vec!["}"]);
-}
-
-fn test_line_wrap(mut render_data: Vec<(ContentStyle, String)>) {
-    let (line_num, line) = parse_simple_line(&mut render_data);
-    assert_eq!(line_num, Some(1));
-    assert_eq!(line, vec!["fn", " ", "get_long_line", "() ", "->", " ", "String", " {"]);
-    let (line_num, line) = parse_complex_line(&mut render_data);
-    assert_eq!(line_num, Some(2));
-    assert_eq!(
-        line,
-        vec![
-            "    ",
-            "let",
-            " ",
-            "b",
-            " ",
-            "=",
-            " ",
-            "\"text🚀text🚀text🚀text🚀text🚀text",
-            ">"
-        ]
-    );
-    assert!(render_data.is_empty());
 }
