@@ -794,7 +794,7 @@ fn token_dec_encoded_with_prefix() {
 }
 
 #[test]
-fn insert_encoded_word_ds() {
+fn insert_encoded_word_1() {
     let mut token_line = TokenLine::default();
     token_line.push(Token { delta_start: 0, len: 3, style: ContentStyle::reversed() });
     token_line.push(Token { delta_start: 4, len: 4, style: ContentStyle::reversed() });
@@ -803,21 +803,22 @@ fn insert_encoded_word_ds() {
     token_line.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
     token_line.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
 
-    token_line.set_encoded_word_checked(&EncodedWordRange::new(0, 10, 12), ContentStyle::slowblink());
+    token_line.set_encoded_word_checked(&EncodedWordRange::new(0, 10, 13), ContentStyle::slowblink());
 
     let mut expected = TokenLine::default();
     expected.push(Token { delta_start: 0, len: 3, style: ContentStyle::reversed() });
     expected.push(Token { delta_start: 4, len: 4, style: ContentStyle::reversed() });
-    expected.push(Token { delta_start: 6, len: 12, style: ContentStyle::slowblink() });
-    expected.push(Token { delta_start: 12, len: 1, style: ContentStyle::reversed() });
-    expected.push(Token { delta_start: 2, len: 5, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 6, len: 3, style: ContentStyle::slowblink() });
+    expected.push(Token { delta_start: 3, len: 4, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 6, len: 4, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
     expected.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
 
     assert_eq!(token_line, expected);
 }
 
 #[test]
-fn insert_encoded_word_len() {
+fn insert_encoded_word_2() {
     let mut token_line = TokenLine::default();
     token_line.push(Token { delta_start: 0, len: 3, style: ContentStyle::reversed() });
     token_line.push(Token { delta_start: 4, len: 4, style: ContentStyle::reversed() });
@@ -826,22 +827,21 @@ fn insert_encoded_word_len() {
     token_line.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
     token_line.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
 
-    token_line.set_encoded_word_checked(&EncodedWordRange::new(0, 12, 10), ContentStyle::slowblink());
+    token_line.set_encoded_word_checked(&EncodedWordRange::new(0, 10, 20), ContentStyle::slowblink());
 
     let mut expected = TokenLine::default();
     expected.push(Token { delta_start: 0, len: 3, style: ContentStyle::reversed() });
     expected.push(Token { delta_start: 4, len: 4, style: ContentStyle::reversed() });
-    expected.push(Token { delta_start: 7, len: 1, style: ContentStyle::reversed() });
-    expected.push(Token { delta_start: 1, len: 10, style: ContentStyle::slowblink() });
-    expected.push(Token { delta_start: 10, len: 1, style: ContentStyle::reversed() });
-    expected.push(Token { delta_start: 2, len: 5, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 6, len: 10, style: ContentStyle::slowblink() });
+    expected.push(Token { delta_start: 10, len: 3, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 4, len: 5, style: ContentStyle::reversed() });
     expected.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
 
     assert_eq!(token_line, expected);
 }
 
 #[test]
-fn insert_encoded_word_equat_len() {
+fn insert_encoded_word_3() {
     let mut token_line = TokenLine::default();
     token_line.push(Token { delta_start: 0, len: 3, style: ContentStyle::reversed() });
     token_line.push(Token { delta_start: 4, len: 4, style: ContentStyle::reversed() });
@@ -850,14 +850,15 @@ fn insert_encoded_word_equat_len() {
     token_line.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
     token_line.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
 
-    token_line.set_encoded_word_checked(&EncodedWordRange::new(0, 11, 11), ContentStyle::slowblink());
+    token_line.set_encoded_word_checked(&EncodedWordRange::new(0, 8, 15), ContentStyle::slowblink());
 
     let mut expected = TokenLine::default();
     expected.push(Token { delta_start: 0, len: 3, style: ContentStyle::reversed() });
     expected.push(Token { delta_start: 4, len: 4, style: ContentStyle::reversed() });
-    expected.push(Token { delta_start: 7, len: 11, style: ContentStyle::slowblink() });
-    expected.push(Token { delta_start: 11, len: 1, style: ContentStyle::reversed() });
-    expected.push(Token { delta_start: 2, len: 5, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 4, len: 7, style: ContentStyle::slowblink() });
+    expected.push(Token { delta_start: 7, len: 2, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 4, len: 4, style: ContentStyle::reversed() });
+    expected.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
     expected.push(Token { delta_start: 5, len: 5, style: ContentStyle::reversed() });
 
     assert_eq!(token_line, expected);

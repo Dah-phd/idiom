@@ -229,7 +229,31 @@ impl TokenLine {
             ranges.push((at_number, at_number + token.len, token.style));
         }
 
-        todo!();
+        match ranges.iter().position(|(start, end, ..)| word.start() <= *start || word.start() <= *end) {
+            None => {
+                ranges.push((word.start(), word.end(), style));
+            }
+            Some(mut pos) => {
+                if word.start() > ranges[pos].0 {
+                    ranges[pos].1 = word.start();
+                    pos += 1;
+                };
+                ranges.insert(pos, (word.start(), word.end(), style));
+                pos += 1;
+                while let Some(next) = ranges.get_mut(pos) {
+                    if next.1 <= word.end() {
+                        ranges.remove(pos);
+                        continue;
+                    }
+                    if next.0 <= word.end() {
+                        next.0 = word.end();
+                    }
+                    break;
+                    
+                }
+            }
+        };
+        
 
         // return to delta token
         let mut last_start = 0;

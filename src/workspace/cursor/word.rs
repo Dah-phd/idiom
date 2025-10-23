@@ -173,6 +173,16 @@ pub struct EncodedWordRange {
 
 impl EncodedWordRange {
     #[inline]
+    fn len(&self) -> usize {
+        self.end - self.start       
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
     pub fn line(&self) -> usize {
         self.line
     }
