@@ -174,7 +174,7 @@ pub struct EncodedWordRange {
 impl EncodedWordRange {
     #[inline]
     fn len(&self) -> usize {
-        self.end - self.start       
+        self.end - self.start
     }
 
     #[inline]

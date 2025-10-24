@@ -249,11 +249,9 @@ impl TokenLine {
                         next.0 = word.end();
                     }
                     break;
-                    
                 }
             }
         };
-        
 
         // return to delta token
         let mut last_start = 0;

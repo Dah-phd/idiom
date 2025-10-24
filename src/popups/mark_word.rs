@@ -2,7 +2,7 @@ use crate::{
     embeded_term::EditorTerminal,
     ext_tui::StyleExt,
     global_state::GlobalState,
-    syntax::Lexer,
+    syntax::{tokens::TokenLine, Lexer},
     tree::Tree,
     workspace::{
         cursor::{EncodedWordRange, PositionedWord},
@@ -11,8 +11,8 @@ use crate::{
 };
 use crossterm::{
     self,
-    event::{poll, read, Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent},
-    style::{Attribute, Attributes, Color, ContentStyle},
+    event::{poll, read, Event},
+    style::{Attribute, Attributes, ContentStyle},
 };
 use std::time::Duration;
 
@@ -96,13 +96,18 @@ pub fn render_marked_word(
 }
 
 fn perform_render(editor: &mut Editor, ranges: &[EncodedWordRange], gs: &mut GlobalState) {
-    let mut stored_tokens = vec![];
+    let style = STYLE_BASE.with_fg(gs.ui_theme.accent());
+    let mut stored_tokens: Vec<(usize, TokenLine)> = vec![];
     for word in ranges {
         let range_line = word.line();
         let line = &mut editor.content[range_line];
-        let mut new_tokens = line.tokens().clone();
-        new_tokens.set_encoded_word_checked(word, STYLE_BASE.with_fg(gs.ui_theme.accent()));
-        stored_tokens.push((range_line, std::mem::replace(line.tokens_mut(), new_tokens)));
+        if stored_tokens.iter().any(|(line, _)| line == &range_line) {
+            line.tokens_mut_unchecked().set_encoded_word_checked(word, style);
+        } else {
+            let mut new_tokens = line.tokens().clone();
+            new_tokens.set_encoded_word_checked(word, style);
+            stored_tokens.push((range_line, std::mem::replace(line.tokens_mut(), new_tokens)));
+        }
     }
 
     editor.render(gs);
