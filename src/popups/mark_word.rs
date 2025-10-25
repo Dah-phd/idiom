@@ -5,7 +5,7 @@ use crate::{
     syntax::{tokens::TokenLine, Lexer},
     tree::Tree,
     workspace::{
-        cursor::{EncodedWordRange, PositionedWord},
+        cursor::{CursorPosition, EncodedWordRange, PositionedWord},
         Editor, Workspace,
     },
 };
@@ -39,7 +39,9 @@ pub fn render_marked_word(
         return Ok(());
     };
 
-    let Some(ranges) = find_ranges(editor) else { return Ok(()) };
+    let Some(ranges) = find_ranges(editor) else {
+        return Ok(());
+    };
     perform_render(editor, &ranges, gs);
 
     let mut frame_rate = Duration::from_millis(250);
@@ -77,7 +79,9 @@ pub fn render_marked_word(
         }
         Lexer::context(editor, gs);
         if !editor.has_render_cache() {
-            let Some(new_ranges) = find_ranges(editor) else { return Ok(()) };
+            let Some(new_ranges) = find_ranges(editor) else {
+                return Ok(());
+            };
             if ranges != new_ranges {
                 return Ok(());
             }
@@ -116,52 +120,15 @@ fn clear_marked_cache(editor: &mut Editor, ranges: Vec<EncodedWordRange>) {
 
 fn find_ranges(editor: &Editor) -> Option<Vec<EncodedWordRange>> {
     let position = editor.controls.get_base_cursor_position().unwrap_or(editor.cursor.get_position());
-    if let Some(ch_at_cursor) = editor.content[position.line].get_char(position.char) {
-        if let Some(opener) = get_opening(ch_at_cursor) {
-            let mut counter = 0_usize;
-            let mut char_idx = position.char;
-            for ch in editor.content[position.line][..position.char].chars().rev() {
-                char_idx -= 1;
-                if ch == opener {
-                    if counter == 0 {
-                        todo!("retunr");
-                    }
-                    counter -= 1;
-                }
-                if ch == ch_at_cursor {
-                    counter += 1;
-                }
-            }
-            let line_diff = position.line.saturating_sub(editor.cursor.at_line + 1);
-            if line_diff != 0 {
-                for (idx, line) in editor.content.iter().enumerate().skip(editor.cursor.at_line).take(line_diff).rev() {
-                    char_idx = line.char_len();
-                    if char_idx == 0 {
-                        continue;
-                    }
-                    for ch in line.chars().rev() {
-                        char_idx -= 1;
-                        if ch == opener {
-                            if counter == 0 {
-                                todo!("retunr");
-                            }
-                            counter -= 1;
-                        }
-                        if ch == ch_at_cursor {
-                            counter += 1;
-                        }
-                    }
-                }
-            }
-        } else if let Some(closer) = get_closing(ch_at_cursor) {
-            let line_diff = position.line.saturating_sub(editor.cursor.at_line);
-            let mut counter = 0;
-            let mut line = position.line;
-            
-        }
+    if let Some(ranges) = try_find_brackets(editor, position) {
+        return Some(ranges);
     }
     let Some(word) = PositionedWord::find_at(&editor.content, position) else {
-        return None;
+        if position.char == 0 {
+            return None;
+        }
+        let prev_position = CursorPosition { line: position.line, char: position.char + 1 };
+        return try_find_brackets(editor, prev_position);
     };
     let screen_text = editor.content.iter().enumerate().skip(editor.cursor.at_line).take(editor.cursor.max_rows);
     let ranges = word.iter_encoded_word_ranges(screen_text, editor.lexer.encoding()).collect::<Vec<_>>();
@@ -171,21 +138,30 @@ fn find_ranges(editor: &Editor) -> Option<Vec<EncodedWordRange>> {
     Some(ranges)
 }
 
+fn try_find_brackets(editor: &Editor, position: CursorPosition) -> Option<Vec<EncodedWordRange>> {
+    let ch_at_start = editor.content[position.line].get_char(position.char)?;
+    if let Some(opening) = get_opening(ch_at_start) {
+        let mut counter = 0;
+    } else if let Some(closing) = get_closing(ch_at_start) {
+        let mut counter = 0;
+    }
+    None
+}
+
 fn get_closing(ch: char) -> Option<char> {
     match ch {
         '{' => Some('}'),
         '(' => Some(')'),
         '[' => Some(']'),
-        _ => None
+        _ => None,
     }
 }
-
 
 fn get_opening(ch: char) -> Option<char> {
     match ch {
         '}' => Some('{'),
         ')' => Some('('),
         ']' => Some('['),
-        _ => None
+        _ => None,
     }
 }

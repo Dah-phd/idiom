@@ -173,11 +173,21 @@ pub struct EncodedWordRange {
 
 impl EncodedWordRange {
     #[inline]
+    fn new_checked(line: usize, start: usize, end: usize) -> Option<Self> {
+        if start == end || start > end {
+            return None;
+        }
+        Some(Self { line, start, end })
+    }
+
+    #[inline]
+    #[allow(dead_code)]
     fn len(&self) -> usize {
         self.end - self.start
     }
 
     #[inline]
+    #[allow(dead_code)]
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
