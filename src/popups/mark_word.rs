@@ -38,15 +38,8 @@ pub fn render_marked_word(
     if !editor.file_type.is_code() {
         return Ok(());
     };
-    let position = editor.controls.get_base_cursor_position().unwrap_or(editor.cursor.get_position());
-    let Some(word) = PositionedWord::find_at(&editor.content, position) else {
-        return Ok(());
-    };
-    let screen_text = editor.content.iter().enumerate().skip(editor.cursor.at_line).take(editor.cursor.max_rows);
-    let ranges = word.iter_encoded_word_ranges(screen_text, editor.lexer.encoding()).collect::<Vec<_>>();
-    if ranges.is_empty() {
-        return Ok(());
-    };
+
+    let Some(ranges) = find_ranges(editor) else { return Ok(()) };
     perform_render(editor, &ranges, gs);
 
     let mut frame_rate = Duration::from_millis(250);
@@ -84,9 +77,7 @@ pub fn render_marked_word(
         }
         Lexer::context(editor, gs);
         if !editor.has_render_cache() {
-            let screen_text =
-                editor.content.iter().enumerate().skip(editor.cursor.at_line).take(editor.cursor.max_rows);
-            let new_ranges = word.iter_encoded_word_ranges(screen_text, editor.lexer.encoding()).collect::<Vec<_>>();
+            let Some(new_ranges) = find_ranges(editor) else { return Ok(()) };
             if ranges != new_ranges {
                 return Ok(());
             }
@@ -120,5 +111,81 @@ fn perform_render(editor: &mut Editor, ranges: &[EncodedWordRange], gs: &mut Glo
 fn clear_marked_cache(editor: &mut Editor, ranges: Vec<EncodedWordRange>) {
     for range in ranges {
         editor.content[range.line()].cached.reset();
+    }
+}
+
+fn find_ranges(editor: &Editor) -> Option<Vec<EncodedWordRange>> {
+    let position = editor.controls.get_base_cursor_position().unwrap_or(editor.cursor.get_position());
+    if let Some(ch_at_cursor) = editor.content[position.line].get_char(position.char) {
+        if let Some(opener) = get_opening(ch_at_cursor) {
+            let mut counter = 0_usize;
+            let mut char_idx = position.char;
+            for ch in editor.content[position.line][..position.char].chars().rev() {
+                char_idx -= 1;
+                if ch == opener {
+                    if counter == 0 {
+                        todo!("retunr");
+                    }
+                    counter -= 1;
+                }
+                if ch == ch_at_cursor {
+                    counter += 1;
+                }
+            }
+            let line_diff = position.line.saturating_sub(editor.cursor.at_line + 1);
+            if line_diff != 0 {
+                for (idx, line) in editor.content.iter().enumerate().skip(editor.cursor.at_line).take(line_diff).rev() {
+                    char_idx = line.char_len();
+                    if char_idx == 0 {
+                        continue;
+                    }
+                    for ch in line.chars().rev() {
+                        char_idx -= 1;
+                        if ch == opener {
+                            if counter == 0 {
+                                todo!("retunr");
+                            }
+                            counter -= 1;
+                        }
+                        if ch == ch_at_cursor {
+                            counter += 1;
+                        }
+                    }
+                }
+            }
+        } else if let Some(closer) = get_closing(ch_at_cursor) {
+            let line_diff = position.line.saturating_sub(editor.cursor.at_line);
+            let mut counter = 0;
+            let mut line = position.line;
+            
+        }
+    }
+    let Some(word) = PositionedWord::find_at(&editor.content, position) else {
+        return None;
+    };
+    let screen_text = editor.content.iter().enumerate().skip(editor.cursor.at_line).take(editor.cursor.max_rows);
+    let ranges = word.iter_encoded_word_ranges(screen_text, editor.lexer.encoding()).collect::<Vec<_>>();
+    if ranges.is_empty() {
+        return None;
+    };
+    Some(ranges)
+}
+
+fn get_closing(ch: char) -> Option<char> {
+    match ch {
+        '{' => Some('}'),
+        '(' => Some(')'),
+        '[' => Some(']'),
+        _ => None
+    }
+}
+
+
+fn get_opening(ch: char) -> Option<char> {
+    match ch {
+        '}' => Some('{'),
+        ')' => Some('('),
+        ']' => Some('['),
+        _ => None
     }
 }

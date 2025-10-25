@@ -55,6 +55,18 @@ impl EditorLine {
     }
 
     #[inline]
+    pub fn get_char(&self, pos: usize) -> Option<char> {
+        if self.is_simple() {
+            if self.content.len() <= pos {
+                return None;
+            }
+            Some(self.content.as_bytes()[pos] as char)
+        } else {
+            self.chars().nth(pos)
+        }
+    }
+
+    #[inline]
     pub fn get(&self, from: usize, to: usize) -> Option<&str> {
         if self.char_len == self.content.len() {
             return self.content.get(from..to);
