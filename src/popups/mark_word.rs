@@ -14,6 +14,7 @@ use crossterm::{
     event::{poll, read, Event},
     style::{Attribute, Attributes, ContentStyle},
 };
+use idiom_tui::Backend;
 use std::time::Duration;
 
 const FRAME_RATE: Duration = Duration::from_millis(250);
@@ -105,7 +106,10 @@ fn perform_render(editor: &mut Editor, ranges: &[EncodedWordRange], gs: &mut Glo
         }
     }
 
+    gs.backend.freeze();
     editor.render(gs);
+    gs.backend.flush_buf();
+    gs.backend.unfreeze();
 
     for (idx, tokens) in stored_tokens {
         *editor.content[idx].tokens_mut_unchecked() = tokens;
@@ -141,10 +145,91 @@ fn find_ranges(editor: &Editor) -> Option<Vec<EncodedWordRange>> {
 fn try_find_brackets(editor: &Editor, position: CursorPosition) -> Option<Vec<EncodedWordRange>> {
     let ch_at_start = editor.content[position.line].get_char(position.char)?;
     if let Some(opening) = get_opening(ch_at_start) {
-        let mut counter = 0;
+        let mut counter = 0_usize;
+        let mut char_idx = position.char;
+        let first_line = &editor.content[position.line][..position.char];
+        for ch in first_line.chars().rev() {
+            char_idx -= 1;
+            if ch == ch_at_start {
+                counter += 1;
+            } else if ch == opening {
+                if counter == 0 {
+                    let start = (editor.lexer.encoding().str_len)(&editor.content[position.line][..char_idx]);
+                    let start_closing = (editor.lexer.encoding().str_len)(first_line);
+                    return Some(vec![
+                        EncodedWordRange::new_checked(position.line, start, start + 1)?,
+                        EncodedWordRange::new_checked(position.line, start_closing, start_closing + 1)?,
+                    ]);
+                }
+                counter -= 1;
+            }
+        }
+
+        let limit = position.line.checked_sub(editor.cursor.at_line)?;
+        for (line_idx, eline) in editor.content.iter().enumerate().skip(editor.cursor.at_line).take(limit).rev() {
+            char_idx = eline.char_len();
+            for ch in eline.chars().rev() {
+                char_idx -= 1;
+                if ch == ch_at_start {
+                    counter += 1;
+                } else if ch == opening {
+                    if counter == 0 {
+                        let start = (editor.lexer.encoding().str_len)(&editor.content[line_idx][..char_idx]);
+                        let start_closing = (editor.lexer.encoding().str_len)(first_line);
+                        return Some(vec![
+                            EncodedWordRange::new_checked(line_idx, start, start + 1)?,
+                            EncodedWordRange::new_checked(position.line, start_closing, start_closing + 1)?,
+                        ]);
+                    }
+                    counter -= 1;
+                }
+            }
+        }
     } else if let Some(closing) = get_closing(ch_at_start) {
-        let mut counter = 0;
+        let mut counter = 0_usize;
+        let mut char_idx = position.char + 1;
+        let first_line = &editor.content[position.line][..position.char];
+        for ch in editor.content[position.line][char_idx..].chars() {
+            if ch == ch_at_start {
+                counter += 1;
+            } else if ch == closing {
+                let start = (editor.lexer.encoding().str_len)(first_line);
+                let start_closing = (editor.lexer.encoding().str_len)(&editor.content[position.line][..char_idx]);
+                if counter == 0 {
+                    return Some(vec![
+                        EncodedWordRange::new_checked(position.line, start, start + 1)?,
+                        EncodedWordRange::new_checked(position.line, start_closing, start_closing + 1)?,
+                    ]);
+                }
+                counter -= 1;
+            }
+            char_idx += 1;
+        }
+
+        let skip = position.line + 1;
+        let last_line = editor.cursor.at_line + editor.cursor.max_rows;
+        let limit = last_line.checked_sub(skip)?;
+        for (line_idx, eline) in editor.content.iter().enumerate().skip(skip).take(limit) {
+            char_idx = 0;
+            for ch in eline.chars() {
+                if ch == ch_at_start {
+                    counter += 1;
+                } else if ch == closing {
+                    if counter == 0 {
+                        let start = (editor.lexer.encoding().str_len)(first_line);
+                        let start_closing = (editor.lexer.encoding().str_len)(&editor.content[line_idx][..char_idx]);
+                        return Some(vec![
+                            EncodedWordRange::new_checked(position.line, start, start + 1)?,
+                            EncodedWordRange::new_checked(line_idx, start_closing, start_closing + 1)?,
+                        ]);
+                    }
+                    counter -= 1;
+                }
+                char_idx += 1;
+            }
+        }
     }
+
     None
 }
 
@@ -163,5 +248,22 @@ fn get_opening(ch: char) -> Option<char> {
         ')' => Some('('),
         ']' => Some('['),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::workspace::line::EditorLine;
+
+    #[test]
+    fn test_eline_slicing() {
+        let eline = EditorLine::from("🦀asd");
+        assert_eq!("🦀", &eline[..1]);
+        assert_eq!("🦀asd", &eline[0..]);
+        assert_eq!("", &eline[..0]);
+        let eline = EditorLine::from("1asd");
+        assert_eq!("1", &eline[..1]);
+        assert_eq!("1asd", &eline[0..]);
+        assert_eq!("", &eline[..0]);
     }
 }
