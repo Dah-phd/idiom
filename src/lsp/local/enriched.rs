@@ -29,6 +29,7 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::{io::AsyncWriteExt, process::ChildStdin, sync::mpsc::UnboundedReceiver, task::JoinHandle};
 
 type UtfEncoder = fn(lsp_types::Position, &[String]) -> CursorPosition;
+type PassthroughMessage = Option<(String, Option<(i64, LSPResponseType)>)>;
 
 pub fn build_with_enrichment(
     mut rx: UnboundedReceiver<Payload>,
@@ -358,7 +359,7 @@ impl<T: LangStream> EnrichedLSP<T> {
         Ok(())
     }
 
-    fn pre_process(&mut self, payload: Payload) -> LSPResult<Option<(String, Option<(i64, LSPResponseType)>)>> {
+    fn pre_process(&mut self, payload: Payload) -> LSPResult<PassthroughMessage> {
         match payload {
             Payload::Direct(data) => {
                 self.direct_parsing(&data)?;

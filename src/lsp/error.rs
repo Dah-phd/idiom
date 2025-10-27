@@ -10,7 +10,7 @@ pub enum LSPError {
     ResponseError(String),
     InternalError(String),
     JsonError(#[from] serde_json::error::Error),
-    SendError(#[from] tokio::sync::mpsc::error::SendError<Payload>),
+    SendError(String),
     ServerCapability(String),
     IOError(#[from] std::io::Error),
     JsonRCPStderr(#[from] lsp_stream::RCPError),
@@ -59,5 +59,11 @@ impl Display for LSPError {
                 Display::fmt(err, f)
             }
         }
+    }
+}
+
+impl From<tokio::sync::mpsc::error::SendError<Payload>> for LSPError {
+    fn from(value: tokio::sync::mpsc::error::SendError<Payload>) -> Self {
+        Self::SendError(value.to_string())
     }
 }

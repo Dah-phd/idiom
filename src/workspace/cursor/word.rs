@@ -174,7 +174,7 @@ pub struct EncodedWordRange {
 impl EncodedWordRange {
     #[inline]
     pub fn new_checked(line: usize, start: usize, end: usize) -> Option<Self> {
-        if start == end || start > end {
+        if start >= end {
             return None;
         }
         Some(Self { line, start, end })

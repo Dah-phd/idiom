@@ -212,6 +212,18 @@ impl Editor {
         gs.force_screen_rebuild();
     }
 
+    #[inline]
+    pub fn force_single_cursor(&mut self) {
+        ControlMap::ensure_single_cursor(self);
+    }
+
+    pub fn select_scope(&mut self) {
+        ControlMap::ensure_single_cursor(self);
+        let start_line = &self.content[self.cursor.line];
+        let (start, end) = start_line.split_at(self.cursor.char);
+        todo!();
+    }
+
     pub fn select_word(&mut self) {
         let Some(range) = WordRange::find_at(&self.content, self.cursor.get_position()) else {
             return;
