@@ -253,7 +253,16 @@ fn get_opening(ch: char) -> Option<char> {
 
 #[cfg(test)]
 mod test {
-    use crate::workspace::line::EditorLine;
+    use super::try_find_brackets;
+    use crate::workspace::{
+        cursor::{CursorPosition, EncodedWordRange},
+        line::EditorLine,
+    };
+    use crate::{
+        configs::FileType,
+        syntax::tests::{mock_utf16_lexer, mock_utf8_lexer},
+        workspace::editor::tests::mock_editor,
+    };
 
     #[test]
     fn test_eline_slicing() {
@@ -265,5 +274,21 @@ mod test {
         assert_eq!("1", &eline[..1]);
         assert_eq!("1asd", &eline[0..]);
         assert_eq!("", &eline[..0]);
+    }
+
+    #[test]
+    fn test_try_find_brackets() {
+        let mut editor = mock_editor(vec!["data 🦀 {".to_owned(), "    text".to_owned(), " mm: 🦀 }".to_owned()]);
+
+        let res = try_find_brackets(&editor, CursorPosition { line: 2, char: 7 });
+        assert_eq!(res, Some(vec![EncodedWordRange::new(0, 7, 8), EncodedWordRange::new(2, 7, 8),]));
+
+        editor.lexer = mock_utf16_lexer(FileType::Rust);
+        let res = try_find_brackets(&editor, CursorPosition { line: 2, char: 7 });
+        assert_eq!(res, Some(vec![EncodedWordRange::new(0, 8, 9), EncodedWordRange::new(2, 8, 9),]));
+
+        editor.lexer = mock_utf8_lexer(FileType::Rust);
+        let res = try_find_brackets(&editor, CursorPosition { line: 2, char: 7 });
+        assert_eq!(res, Some(vec![EncodedWordRange::new(0, 10, 11), EncodedWordRange::new(2, 10, 11),]));
     }
 }
