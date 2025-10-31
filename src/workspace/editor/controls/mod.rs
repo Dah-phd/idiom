@@ -40,6 +40,18 @@ impl ControlMap {
         None
     }
 
+    pub fn apply<F>(editor: &mut Editor, mut callback: F)
+    where
+        F: FnMut(&mut Actions, &mut Lexer, &mut Vec<EditorLine>, &mut Cursor),
+    {
+        let controls = &mut editor.controls;
+        if controls.cursors.is_empty() {
+            (callback)(&mut editor.actions, &mut editor.lexer, &mut editor.content, &mut editor.cursor);
+        } else {
+            apply_multi_cursor_transaction(editor, callback);
+        }
+    }
+
     pub fn try_multi_cursor(editor: &mut Editor) -> bool {
         if !editor.renderer.try_multi_cursor(editor.file_type) {
             return false;

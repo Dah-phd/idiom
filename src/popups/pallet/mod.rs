@@ -141,7 +141,7 @@ impl Pallet {
             Some(Command::pass_event("Open terminal", IdiomEvent::EmbededApp(None))),
             Some(Command::components("Select LSP", change_state::select_lsp)),
             Some(Command::components("UPPERCASE", formatting::uppercase)),
-            Some(Command::components("LOWERCASE", formatting::lowercase)),
+            Some(Command::components("lowercase", formatting::lowercase)),
             Command::cfg_open("Open editor configs", EDITOR_CFG_FILE),
             Command::cfg_open("Open keymap config", KEY_MAP),
             Command::cfg_open("Open theme config", THEME_FILE),

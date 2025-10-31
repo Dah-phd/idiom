@@ -127,7 +127,7 @@ fn test_has_render_cache() {
     editor.render(&mut gs);
     assert!(editor.has_render_cache());
     editor.cursor.set_position((1, 2).into());
-    editor.select_word();
+    editor.cursor.select_word(&editor.content);
     assert!(editor.cursor.select_get().is_some());
     assert!(editor.has_render_cache());
 }

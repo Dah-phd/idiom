@@ -1,31 +1,30 @@
-use crate::{embeded_term::EditorTerminal, global_state::GlobalState, tree::Tree, workspace::Workspace};
+use crate::{
+    embeded_term::EditorTerminal,
+    global_state::GlobalState,
+    tree::Tree,
+    workspace::{utils::copy_content, Workspace},
+};
 
 pub fn uppercase(_gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tree, _term: &mut EditorTerminal) {
-    if let Some(editor) = ws.get_active() {
-        editor.force_single_cursor();
-        if editor.cursor.select_is_none() {
-            editor.select_word();
+    let Some(editor) = ws.get_active() else { return };
+    editor.apply(|actions, lexer, content, cursor| {
+        if cursor.select_is_none() {
+            cursor.select_word(content);
         }
-        if editor.cursor.select_is_none() {
-            return;
-        }
-        if let Some(clip) = editor.copy() {
-            editor.insert_snippet(clip.to_uppercase(), None);
-        }
-    }
+        let Some((from, to)) = cursor.select_get() else { return };
+        let clip = copy_content(from, to, content);
+        actions.insert_snippet(cursor, clip.to_uppercase(), None, content, lexer);
+    });
 }
 
 pub fn lowercase(_gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tree, _term: &mut EditorTerminal) {
-    if let Some(editor) = ws.get_active() {
-        editor.force_single_cursor();
-        if editor.cursor.select_is_none() {
-            editor.select_word();
+    let Some(editor) = ws.get_active() else { return };
+    editor.apply(|actions, lexer, content, cursor| {
+        if cursor.select_is_none() {
+            cursor.select_word(content);
         }
-        if editor.cursor.select_is_none() {
-            return;
-        }
-        if let Some(clip) = editor.copy() {
-            editor.insert_snippet(clip.to_lowercase(), None);
-        }
-    }
+        let Some((from, to)) = cursor.select_get() else { return };
+        let clip = copy_content(from, to, content);
+        actions.insert_snippet(cursor, clip.to_lowercase(), None, content, lexer);
+    });
 }

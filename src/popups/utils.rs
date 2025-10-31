@@ -58,7 +58,7 @@ pub fn infer_word_search_positon(
     buffer: &mut Vec<(CursorPosition, CursorPosition)>,
 ) -> Option<usize> {
     if editor.cursor.select_is_none() {
-        editor.select_word();
+        editor.cursor.select_word(&editor.content);
     };
     let (from, to) = editor.cursor.select_get()?;
     if from.line != to.line {

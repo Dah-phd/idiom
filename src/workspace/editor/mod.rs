@@ -3,7 +3,7 @@ mod modal;
 mod utils;
 use super::{
     actions::Actions,
-    cursor::{Cursor, CursorPosition, WordRange},
+    cursor::{Cursor, CursorPosition},
     line::EditorLine,
     renderer::Renderer,
     utils::find_line_start,
@@ -217,19 +217,18 @@ impl Editor {
         ControlMap::ensure_single_cursor(self);
     }
 
+    pub fn apply<F>(&mut self, callback: F)
+    where
+        F: FnMut(&mut Actions, &mut Lexer, &mut Vec<EditorLine>, &mut Cursor),
+    {
+        ControlMap::apply(self, callback);
+    }
+
     pub fn select_scope(&mut self) {
         ControlMap::ensure_single_cursor(self);
         let start_line = &self.content[self.cursor.line];
         let (start, end) = start_line.split_at(self.cursor.char);
         todo!();
-    }
-
-    pub fn select_word(&mut self) {
-        let Some(range) = WordRange::find_at(&self.content, self.cursor.get_position()) else {
-            return;
-        };
-        let (from, to) = range.as_select();
-        self.cursor.select_set(from, to);
     }
 
     fn select_line(&mut self) {
@@ -483,7 +482,7 @@ impl Editor {
         }
         let position = self.mouse_parse(position);
         if self.cursor.select_is_none() && self.cursor == position {
-            self.select_word();
+            self.cursor.select_word(&self.content);
             return;
         }
         self.cursor.select_drop();

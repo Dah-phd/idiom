@@ -477,6 +477,14 @@ impl Cursor {
         self.select
     }
 
+    pub fn select_word(&mut self, content: &[EditorLine]) {
+        let Some(range) = WordRange::find_at(content, self.get_position()) else {
+            return;
+        };
+        let (from, to) = range.as_select();
+        self.select_set(from, to);
+    }
+
     pub fn reset(&mut self) {
         self.line = 0;
         self.char = 0;
