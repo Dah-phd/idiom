@@ -9,7 +9,7 @@ use super::{
     utils::find_line_start,
 };
 use crate::{
-    configs::{EditorAction, EditorConfigs, FileFamily, FileType, IndentConfigs},
+    configs::{EditorAction, EditorConfigs, FileFamily, FileType, IndentConfigs, ScopeType},
     error::{IdiomError, IdiomResult},
     global_state::GlobalState,
     lsp::LSPError,
@@ -227,9 +227,125 @@ impl Editor {
 
     pub fn select_scope(&mut self) {
         ControlMap::ensure_single_cursor(self);
-        let start_line = &self.content[self.cursor.line];
-        let (start, end) = start_line.split_at(self.cursor.char);
-        todo!();
+        match self.file_type.scope_type() {
+            ScopeType::Text => self.select_line(),
+            ScopeType::Indent => {
+                let start_line = &self.content[self.cursor.line];
+                let expect_indent = start_line.as_str().chars().take_while(|c| c.is_whitespace()).collect::<String>();
+                if expect_indent.is_empty() {
+                    self.select_all();
+                    return;
+                }
+                let mut from = CursorPosition { line: self.cursor.line, char: 0 };
+                let mut to = CursorPosition { line: self.cursor.line, char: start_line.char_len() };
+                for (idx, line) in self.content.iter().enumerate().take(self.cursor.line).rev() {
+                    if line.as_str().chars().all(|c| c.is_whitespace()) {
+                        continue;
+                    }
+                    // bigger indents are also included
+                    if !line.starts_with(&expect_indent) {
+                        break;
+                    }
+                    from.line = idx;
+                }
+                for (idx, line) in self.content.iter().enumerate().skip(self.cursor.line + 1) {
+                    if line.as_str().chars().all(|c| c.is_whitespace()) {
+                        continue;
+                    }
+                    // bigger indents are also included
+                    if !line.starts_with(&expect_indent) {
+                        break;
+                    }
+                    to.line = idx;
+                    to.char = line.char_len();
+                }
+                self.cursor.select_set(from, to);
+            }
+            ScopeType::Marked { opening, closing } => {
+                let start_line = &self.content[self.cursor.line];
+                let (start, end) = start_line.split_at(self.cursor.char);
+                let mut maybe_from = None;
+                let mut maybe_to = None;
+                let mut idx = self.cursor.char;
+                let mut counter_from = 0;
+                let mut counter_to = 0;
+                for ch in start.chars().rev() {
+                    if ch == closing {
+                        counter_from += 1;
+                    } else if ch == opening {
+                        if counter_from > 0 {
+                            counter_from -= 1;
+                        } else {
+                            maybe_from = Some(CursorPosition { line: self.cursor.line, char: idx });
+                            break;
+                        }
+                    }
+                    idx -= 1;
+                }
+                idx = self.cursor.char;
+                for ch in end.chars() {
+                    // do stuff
+                    if ch == opening {
+                        counter_to += 1;
+                    } else if ch == closing {
+                        if counter_to > 0 {
+                            counter_to -= 1;
+                        } else {
+                            maybe_to = Some(CursorPosition { line: self.cursor.line, char: idx });
+                            break;
+                        }
+                    }
+                    idx += 1;
+                }
+                if maybe_from.is_none() {
+                    for (line_idx, line) in self.content.iter().enumerate().take(self.cursor.line).rev() {
+                        idx = line.char_len();
+                        for ch in line.chars().rev() {
+                            if ch == closing {
+                                counter_from += 1;
+                            } else if ch == opening {
+                                if counter_from > 0 {
+                                    counter_from -= 1;
+                                } else {
+                                    maybe_from = Some(CursorPosition { line: line_idx, char: idx });
+                                    break;
+                                }
+                            }
+                            idx -= 1;
+                        }
+                        if maybe_from.is_some() {
+                            break;
+                        }
+                    }
+                }
+                if maybe_to.is_none() {
+                    for (line_idx, line) in self.content.iter().enumerate().skip(self.cursor.line + 1) {
+                        idx = 0;
+                        for ch in line.chars() {
+                            if ch == opening {
+                                counter_to += 1;
+                            } else if ch == closing {
+                                if counter_to > 0 {
+                                    counter_to -= 1;
+                                } else {
+                                    maybe_to = Some(CursorPosition { line: line_idx, char: idx });
+                                    break;
+                                }
+                            }
+                            idx += 1;
+                        }
+                        if maybe_to.is_some() {
+                            break;
+                        }
+                    }
+                }
+                match (maybe_from, maybe_to) {
+                    (Some(from), Some(to)) => self.cursor.select_set(from, to),
+                    (None, None) => self.select_all(),
+                    _ => (),
+                }
+            }
+        };
     }
 
     fn select_line(&mut self) {

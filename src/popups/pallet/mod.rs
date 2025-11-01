@@ -47,9 +47,18 @@ impl Popup for Pallet {
 
         match key.code {
             KeyCode::Enter => {
-                match self.commands.remove(self.state.selected).1.execute() {
-                    CommandResult::Simple(event) => gs.event.push(event),
-                    CommandResult::BigCB(cb) => cb(gs, ws, tree, term),
+                match self.mode {
+                    Mode::EasyAccess => match self.commands.remove(self.state.selected).1.execute() {
+                        CommandResult::Simple(event) => gs.event.push(event),
+                        CommandResult::BigCB(cb) => cb(gs, ws, tree, term),
+                    },
+                    Mode::Cmd => {
+                        if self.pattern.as_str() == "ss" {
+                            if let Some(editor) = ws.get_active() {
+                                editor.select_scope();
+                            }
+                        }
+                    }
                 }
                 return Status::Finished;
             }
