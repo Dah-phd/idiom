@@ -173,8 +173,9 @@ impl Editor {
         }
     }
 
+    #[inline]
     pub fn cursors(&self) -> &[Cursor] {
-        &self.controls.cursors
+        self.controls.cursors()
     }
 
     // MAPPING
@@ -321,13 +322,9 @@ impl Editor {
             gs.error(format!("Failed to load file {error}"));
             return;
         };
+        ControlMap::force_singel_cursor_reset(self);
         self.actions.clear();
-        self.cursor.reset();
         self.lexer.close();
-        if !self.controls.cursors.is_empty() {
-            self.controls.cursors.clear();
-            self.renderer.single_cursor(self.file_type);
-        }
         let content = match std::fs::read_to_string(&self.path) {
             Ok(content) => content,
             Err(err) => {
@@ -373,9 +370,7 @@ impl Editor {
         self.cursor.max_rows = height;
         self.line_number_padding = calc_line_number_offset(self.content.len());
         self.cursor.text_width = width.saturating_sub(self.line_number_padding + 1);
-        for pos in self.controls.cursors.iter_mut() {
-            pos.text_width = self.cursor.text_width;
-        }
+        self.controls.set_cursors_text_width(self.cursor.text_width);
     }
 
     // EDITS (control map pass through)

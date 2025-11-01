@@ -27,10 +27,22 @@ pub struct ControlMap {
     pub copy: fn(&mut Editor) -> Option<String>,
     pub cut: fn(&mut Editor) -> Option<String>,
     pub paste: fn(&mut Editor, String),
-    pub cursors: Vec<Cursor>,
+    cursors: Vec<Cursor>,
 }
 
 impl ControlMap {
+    #[inline]
+    pub fn cursors(&self) -> &[Cursor] {
+        &self.cursors
+    }
+
+    #[inline]
+    pub fn set_cursors_text_width(&mut self, text_width: usize) {
+        for cursor in self.cursors.iter_mut() {
+            cursor.text_width = text_width;
+        }
+    }
+
     pub fn get_base_cursor_position(&self) -> Option<CursorPosition> {
         for cursor in self.cursors.iter() {
             if cursor.max_rows != 0 {
@@ -49,6 +61,7 @@ impl ControlMap {
             (callback)(&mut editor.actions, &mut editor.lexer, &mut editor.content, &mut editor.cursor);
         } else {
             apply_multi_cursor_transaction(editor, callback);
+            Self::consolidate_cursors(editor);
         }
     }
 
@@ -77,6 +90,59 @@ impl ControlMap {
             return;
         }
         Self::single_cursor(editor);
+    }
+
+    pub fn force_singel_cursor_reset(editor: &mut Editor) {
+        editor.cursor.reset();
+        if editor.controls.cursors.is_empty() {
+            return;
+        }
+        editor.controls.cursors.clear();
+        editor.controls.single_cursor_map();
+        editor.renderer.single_cursor(editor.file_type);
+    }
+
+    pub fn consolidate_cursors(editor: &mut Editor) {
+        let mut idx = 1;
+
+        let cursors = &mut editor.controls.cursors;
+        cursors.sort_by(sort_cursors);
+
+        while idx < cursors.len() {
+            unsafe {
+                let [cursor, other] = cursors.get_disjoint_unchecked_mut([idx - 1, idx]);
+                if cursor.merge_if_intersect(other) {
+                    cursor.max_rows = std::cmp::max(cursor.max_rows, other.max_rows);
+                    cursors.remove(idx);
+                } else {
+                    idx += 1;
+                }
+            }
+        }
+        if cursors.len() < 2 {
+            ControlMap::single_cursor(editor);
+        }
+    }
+
+    pub fn consolidate_cursors_per_line(editor: &mut Editor) {
+        let mut idx = 1;
+        let cursors = &mut editor.controls.cursors;
+        cursors.sort_by(sort_cursors);
+
+        while idx < cursors.len() {
+            unsafe {
+                let [cursor, other] = cursors.get_disjoint_unchecked_mut([idx - 1, idx]);
+                if cursor.line == other.line {
+                    cursor.max_rows = std::cmp::max(cursor.max_rows, other.max_rows);
+                    cursors.remove(idx);
+                } else {
+                    idx += 1;
+                }
+            }
+        }
+        if cursors.len() < 2 {
+            ControlMap::single_cursor(editor);
+        }
     }
 
     fn multi_cursor_map(&mut self) {
@@ -126,27 +192,6 @@ impl Default for ControlMap {
     }
 }
 
-pub fn consolidate_cursors_per_line(editor: &mut Editor) {
-    let mut idx = 1;
-    let cursors = &mut editor.controls.cursors;
-    cursors.sort_by(sort_cursors);
-
-    while idx < cursors.len() {
-        unsafe {
-            let [cursor, other] = cursors.get_disjoint_unchecked_mut([idx - 1, idx]);
-            if cursor.line == other.line {
-                cursor.max_rows = std::cmp::max(cursor.max_rows, other.max_rows);
-                cursors.remove(idx);
-            } else {
-                idx += 1;
-            }
-        }
-    }
-    if cursors.len() < 2 {
-        ControlMap::single_cursor(editor);
-    }
-}
-
 pub fn filter_multi_cursors_per_line_if_no_select(editor: &Editor) -> Vec<Cursor> {
     let mut filtered = vec![];
     let mut index = 0;
@@ -177,28 +222,6 @@ pub fn filter_multi_cursors_per_line_if_no_select(editor: &Editor) -> Vec<Cursor
             index += 1;
         };
         filtered.push(cursor);
-    }
-}
-
-pub fn consolidate_cursors(editor: &mut Editor) {
-    let mut idx = 1;
-
-    let cursors = &mut editor.controls.cursors;
-    cursors.sort_by(sort_cursors);
-
-    while idx < cursors.len() {
-        unsafe {
-            let [cursor, other] = cursors.get_disjoint_unchecked_mut([idx - 1, idx]);
-            if cursor.merge_if_intersect(other) {
-                cursor.max_rows = std::cmp::max(cursor.max_rows, other.max_rows);
-                cursors.remove(idx);
-            } else {
-                idx += 1;
-            }
-        }
-    }
-    if cursors.len() < 2 {
-        ControlMap::single_cursor(editor);
     }
 }
 
@@ -325,4 +348,20 @@ fn with_new_line_if_not(mut text: String) -> String {
         text.push('\n');
     }
     text
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ControlMap;
+    use crate::workspace::Cursor;
+
+    impl ControlMap {
+        pub fn mock_cursors(&mut self, cursors: Vec<Cursor>) {
+            self.cursors = cursors;
+        }
+
+        pub fn mock_update_cursors(&mut self) -> &mut Vec<Cursor> {
+            &mut self.cursors
+        }
+    }
 }

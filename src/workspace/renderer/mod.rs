@@ -192,13 +192,13 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
 
     let mut is_rendered_cursor = false;
 
-    ctx.init_multic_mod(&controls.cursors);
+    ctx.init_multic_mod(controls.cursors());
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         let line = match lines.next() {
             None => break,
             Some(line) => line,
         };
-        is_rendered_cursor |= code::fast_render_is_cursor(text, &controls.cursors, line, line_idx, &mut ctx, gs);
+        is_rendered_cursor |= code::fast_render_is_cursor(text, controls.cursors(), line, line_idx, &mut ctx, gs);
     }
 
     if is_rendered_cursor {
@@ -216,7 +216,7 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
         let relative_pos = ctx.get_modal_relative_position();
         modal.render_if_exist(relative_pos, gs);
     }
-    gs.render_stats(content.len(), controls.cursors.len(), cursor.into());
+    gs.render_stats(content.len(), controls.cursors().len(), cursor.into());
 }
 
 fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
@@ -228,13 +228,13 @@ fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(cursor, lexer.encoding().char_len, *line_number_padding, accent_style);
 
-    ctx.init_multic_mod(&controls.cursors);
+    ctx.init_multic_mod(controls.cursors());
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         let line = match lines.next() {
             None => break,
             Some(line) => line,
         };
-        if let Some((cursors, selects)) = ctx.multic_line_setup(&controls.cursors, line.width) {
+        if let Some((cursors, selects)) = ctx.multic_line_setup(controls.cursors(), line.width) {
             code::multi_cursor(text, &mut ctx, line, gs, cursors, selects);
         } else if ctx.has_cursor(line_idx) {
             code::cursor(text, &mut ctx, line, gs);
@@ -248,7 +248,7 @@ fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
         line.render_empty(&mut gs.backend);
     }
 
-    gs.render_stats(content.len(), controls.cursors.len(), cursor.into());
+    gs.render_stats(content.len(), controls.cursors().len(), cursor.into());
     let relative_pos = ctx.get_modal_relative_position();
     modal.forece_render_if_exists(relative_pos, gs);
 }

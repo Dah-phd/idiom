@@ -87,6 +87,8 @@ impl Actions {
         self.push_done(action, lexer, content);
     }
 
+    /// inserts code snippet, deriving position and replacing current word with it
+    /// evade usage outside of autocomplete
     pub fn insert_snippet(
         &mut self,
         c: &mut Cursor,

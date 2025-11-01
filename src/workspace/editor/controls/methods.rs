@@ -47,7 +47,9 @@ pub fn multic_insert_snippet_with_select(
 ) {
     apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
         actions.insert_snippet_with_select(cursor, snippet.clone(), cursor_offset, len, content, lexer);
-    })
+    });
+    // ensure some strange select will not cause cursor collision
+    ControlMap::consolidate_cursors(editor);
 }
 
 pub fn replace_token(editor: &mut Editor, new: String) {

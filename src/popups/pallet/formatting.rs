@@ -12,8 +12,8 @@ pub fn uppercase(_gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tree, _t
             cursor.select_word(content);
         }
         let Some((from, to)) = cursor.select_get() else { return };
-        let clip = copy_content(from, to, content);
-        actions.insert_snippet(cursor, clip.to_uppercase(), None, content, lexer);
+        let clip = copy_content(from, to, content).to_uppercase();
+        actions.replace_select(from, to, clip, cursor, content, lexer);
     });
 }
 
@@ -24,7 +24,7 @@ pub fn lowercase(_gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tree, _t
             cursor.select_word(content);
         }
         let Some((from, to)) = cursor.select_get() else { return };
-        let clip = copy_content(from, to, content);
-        actions.insert_snippet(cursor, clip.to_lowercase(), None, content, lexer);
+        let clip = copy_content(from, to, content).to_lowercase();
+        actions.replace_select(from, to, clip, cursor, content, lexer);
     });
 }

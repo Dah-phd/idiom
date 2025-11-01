@@ -3,7 +3,10 @@ use super::super::{
     editor::{utils::build_display, FileUpdate},
     Editor,
 };
-use super::{calc_line_number_offset, controls};
+use super::{
+    calc_line_number_offset,
+    controls::{filter_multi_cursors_per_line_if_no_select, ControlMap},
+};
 use crate::{
     configs::FileType,
     ext_tui::CrossTerm,
@@ -28,7 +31,7 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
         cursor: Cursor::default(),
         modal: EditorModal::default(),
         actions: Actions::default(),
-        controls: controls::ControlMap::default(),
+        controls: ControlMap::default(),
         content,
         renderer: Renderer::code(),
         last_render_at_line: None,
@@ -49,7 +52,7 @@ pub fn mock_editor_text_render(content: Vec<String>) -> Editor {
         cursor: Cursor::default(),
         modal: EditorModal::default(),
         actions: Actions::default(),
-        controls: controls::ControlMap::default(),
+        controls: ControlMap::default(),
         content,
         renderer: Renderer::text(),
         last_render_at_line: None,
@@ -70,7 +73,7 @@ pub fn mock_editor_md_render(content: Vec<String>) -> Editor {
         cursor: Cursor::default(),
         modal: EditorModal::default(),
         actions: Actions::default(),
-        controls: controls::ControlMap::default(),
+        controls: ControlMap::default(),
         content,
         renderer: Renderer::markdown(),
         last_render_at_line: None,
@@ -86,6 +89,15 @@ pub fn select_eq(select: (CursorPosition, CursorPosition), editor: &Editor) -> b
 
 pub fn pull_line(editor: &Editor, idx: usize) -> Option<String> {
     editor.content.get(idx).map(|line| line.to_string())
+}
+
+fn make_cursor(line: usize, char: usize) -> Cursor {
+    let mut cursor = Cursor::default();
+    cursor.at_line = line;
+    cursor.line = line;
+    cursor.char = char;
+    cursor.text_width = 120;
+    cursor
 }
 
 #[test]
@@ -119,16 +131,8 @@ fn test_line_number_calcs() {
 
 #[test]
 fn merge_multi_cursors() {
-    fn make_cursor(line: usize, char: usize) -> Cursor {
-        let mut cursor = Cursor::default();
-        cursor.at_line = line;
-        cursor.line = line;
-        cursor.char = char;
-        cursor
-    }
-
     let mut editor = mock_editor(vec![]);
-    editor.controls.cursors.extend([
+    editor.controls.mock_update_cursors().extend([
         Cursor::default(),
         Cursor::default(),
         make_cursor(2, 2),
@@ -137,9 +141,9 @@ fn merge_multi_cursors() {
         make_cursor(3, 3),
         make_cursor(4, 2),
     ]);
-    controls::consolidate_cursors(&mut editor);
+    ControlMap::consolidate_cursors(&mut editor);
     assert_eq!(
-        editor.controls.cursors,
+        editor.controls.cursors(),
         vec![
             make_cursor(4, 2),
             make_cursor(3, 3),
@@ -173,7 +177,7 @@ fn filter_per_line_if_no_select() {
     exepct_second.max_rows = second_cursor.max_rows;
 
     let mut editor = mock_editor(vec![]);
-    editor.controls.cursors = vec![
+    editor.controls.mock_cursors(vec![
         with_select(CursorPosition { line: 11, char: 9 }, CursorPosition { line: 11, char: 10 }),
         with_select(CursorPosition { line: 11, char: 3 }, CursorPosition { line: 11, char: 8 }),
         with_select(CursorPosition { line: 10, char: 12 }, CursorPosition { line: 10, char: 15 }),
@@ -184,9 +188,9 @@ fn filter_per_line_if_no_select() {
         second_no_select,
         second_cursor,
         Cursor::default(),
-    ];
+    ]);
 
-    let cursors = controls::filter_multi_cursors_per_line_if_no_select(&editor);
+    let cursors = filter_multi_cursors_per_line_if_no_select(&editor);
     assert_eq!(
         cursors,
         vec![
@@ -225,27 +229,27 @@ fn token_if_already_selected() {
 
     // second invoke
     _ = editor.map(crate::configs::EditorAction::SelectToken, &mut gs);
-    assert_eq!(editor.controls.cursors.len(), 2);
-    assert_eq!(editor.controls.cursors.iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
+    assert_eq!(editor.controls.cursors().len(), 2);
+    assert_eq!(editor.controls.cursors().iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
 
     _ = editor.map(crate::configs::EditorAction::SelectToken, &mut gs);
     expected.push((CursorPosition { line: 0, char: 4 }, CursorPosition { line: 0, char: 8 }));
-    assert_eq!(editor.controls.cursors.iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
+    assert_eq!(editor.controls.cursors().iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
 
     _ = editor.map(crate::configs::EditorAction::SelectToken, &mut gs);
     expected.insert(expected.len() - 1, (CursorPosition { line: 1, char: 18 }, CursorPosition { line: 1, char: 22 }));
-    assert_eq!(editor.controls.cursors.iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
+    assert_eq!(editor.controls.cursors().iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
 
     _ = editor.map(crate::configs::EditorAction::SelectToken, &mut gs);
     expected.insert(expected.len() - 2, (CursorPosition { line: 2, char: 15 }, CursorPosition { line: 2, char: 19 }));
-    assert_eq!(editor.controls.cursors.iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
+    assert_eq!(editor.controls.cursors().iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
 
     _ = editor.map(crate::configs::EditorAction::SelectToken, &mut gs);
     expected.insert(expected.len() - 3, (CursorPosition { line: 2, char: 29 }, CursorPosition { line: 2, char: 33 }));
-    assert_eq!(editor.controls.cursors.iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
+    assert_eq!(editor.controls.cursors().iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
 
     _ = editor.map(crate::configs::EditorAction::SelectToken, &mut gs);
-    assert_eq!(editor.controls.cursors.iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
+    assert_eq!(editor.controls.cursors().iter().flat_map(|c| c.select_get()).collect::<Vec<_>>(), expected);
 }
 
 #[test]
@@ -254,4 +258,45 @@ fn test_token_next() {
     assert_eq!(text_line.get(2, 7), Some("split"));
     assert_eq!(text_line.get_from(7), Some(" here"));
     assert_eq!(text_line.get_to(2), Some("a="));
+}
+
+#[test]
+fn test_apply() {
+    let mut editor = mock_editor(vec![
+        "this is line".to_owned(),
+        "this is long line with many many cursors".to_owned(),
+        "this is line not so long".to_owned(),
+        "this is line".to_owned(),
+    ]);
+
+    // cursor consolidated
+    editor.controls.mock_update_cursors().extend([
+        make_cursor(3, 4),
+        make_cursor(2, 17),
+        make_cursor(2, 4),
+        make_cursor(1, 18),
+        make_cursor(1, 10),
+        make_cursor(1, 4),
+        make_cursor(0, 4),
+    ]);
+
+    editor.apply(|act, lex, cont, cur| {
+        let from = cur.get_position();
+        let to = CursorPosition { line: from.line, char: from.char + 2 };
+        cur.select_set(from, to);
+        let text = crate::workspace::utils::copy_content(from, to, cont).to_uppercase();
+        act.replace_select(from, to, text, cur, cont, lex);
+    });
+
+    let result = editor.content.iter().map(|el| el.as_str()).collect::<Vec<_>>();
+
+    assert_eq!(
+        result,
+        vec![
+            "this Is line",
+            "this Is loNG line WIth many many cursors",
+            "this Is line not SO long",
+            "this Is line"
+        ]
+    );
 }

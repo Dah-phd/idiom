@@ -1,6 +1,7 @@
 use super::{
-    apply_multi_cursor_transaction, consolidate_cursors, consolidate_cursors_per_line, multi_cursor_word_select,
-    ControlMap,
+    apply_multi_cursor_transaction,
+    methods::{copy, cut, multic_copy, multic_cut, multic_paste, paste},
+    multi_cursor_word_select, ControlMap,
 };
 use crate::{
     configs::EditorAction,
@@ -90,18 +91,18 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         }
         EditorAction::Paste => {
             if let Some(clip) = gs.clipboard.pull() {
-                (editor.controls.paste)(editor, clip);
+                paste(editor, clip);
                 return true;
             }
         }
         EditorAction::Cut => {
-            if let Some(clip) = (editor.controls.cut)(editor) {
+            if let Some(clip) = cut(editor) {
                 gs.clipboard.push(clip);
                 return true;
             }
         }
         EditorAction::Copy => {
-            if let Some(clip) = (editor.controls.copy)(editor) {
+            if let Some(clip) = copy(editor) {
                 gs.clipboard.push(clip);
                 return true;
             }
@@ -219,7 +220,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             actions.indent(cursor, content, lexer);
         }),
         EditorAction::RemoveLine => {
-            consolidate_cursors_per_line(editor);
+            ControlMap::consolidate_cursors_per_line(editor);
             apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
                 actions.del(cursor, content, lexer);
             });
@@ -288,16 +289,16 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         }
         EditorAction::Paste => {
             if let Some(clip) = gs.clipboard.pull() {
-                (editor.controls.paste)(editor, clip);
+                multic_paste(editor, clip);
             }
         }
         EditorAction::Cut => {
-            if let Some(clip) = (editor.controls.cut)(editor) {
+            if let Some(clip) = multic_cut(editor) {
                 gs.clipboard.push(clip);
             }
         }
         EditorAction::Copy => {
-            if let Some(clip) = (editor.controls.copy)(editor) {
+            if let Some(clip) = multic_copy(editor) {
                 gs.clipboard.push(clip);
                 return true;
             }
@@ -508,7 +509,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
         }
         EditorAction::Close => return false,
     }
-    consolidate_cursors(editor);
+    ControlMap::consolidate_cursors(editor);
     editor.actions.push_buffer(&mut editor.lexer);
     true
 }
