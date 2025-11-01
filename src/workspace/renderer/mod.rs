@@ -216,7 +216,7 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
         let relative_pos = ctx.get_modal_relative_position();
         modal.render_if_exist(relative_pos, gs);
     }
-    gs.render_stats(content.len(), controls.cursors().len(), cursor.into());
+    gs.render_stats(content.len(), controls.cursors_count(), cursor.into());
 }
 
 fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {

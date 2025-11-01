@@ -37,6 +37,16 @@ impl ControlMap {
     }
 
     #[inline]
+    pub fn cursors_count(&self) -> usize {
+        self.cursors.len()
+    }
+
+    #[inline]
+    pub fn is_multicursor(&self) -> bool {
+        !self.cursors.is_empty()
+    }
+
+    #[inline]
     pub fn set_cursors_text_width(&mut self, text_width: usize) {
         for cursor in self.cursors.iter_mut() {
             cursor.text_width = text_width;
