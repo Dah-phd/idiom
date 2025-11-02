@@ -3,20 +3,20 @@ use crate::{
     ext_tui::StyleExt,
     global_state::GlobalState,
     workspace::{
+        cursor::CharRange,
         line::{EditorLine, LineContext},
         CursorPosition,
     },
 };
 use crossterm::style::{ContentStyle, Stylize};
 use idiom_tui::Backend;
-use std::ops::Range;
 
 pub fn render(
     line: &mut EditorLine,
     ctx: &mut LineContext,
     line_width: usize,
     cursors: Vec<CursorPosition>,
-    selects: Vec<Range<usize>>,
+    selects: Vec<CharRange>,
     gs: &mut GlobalState,
 ) {
     if line_width > line.char_len() {
@@ -32,7 +32,7 @@ pub fn render(
 }
 
 #[inline]
-pub fn basic(line: &EditorLine, cursors: Vec<CursorPosition>, selects: Vec<Range<usize>>, gs: &mut GlobalState) {
+pub fn basic(line: &EditorLine, cursors: Vec<CursorPosition>, selects: Vec<CharRange>, gs: &mut GlobalState) {
     let select_color = gs.theme.selected;
     let backend = gs.backend();
 
@@ -60,16 +60,16 @@ pub fn basic(line: &EditorLine, cursors: Vec<CursorPosition>, selects: Vec<Range
         last_len = token.len;
     };
     for text in line.chars() {
-        if select.start == idx {
+        if select.from == idx {
             reset_style.set_bg(Some(select_color));
             backend.set_bg(Some(select_color));
         }
-        if select.end == idx {
+        if select.to == idx {
             reset_style.set_bg(None);
             backend.set_bg(None);
             if let Some(new_select) = select_iter.next() {
                 select = new_select;
-                if select.start == idx {
+                if select.from == idx {
                     reset_style.set_bg(Some(select_color));
                     backend.set_bg(Some(select_color));
                 }
@@ -125,7 +125,7 @@ pub fn partial(
     ctx: &LineContext,
     line_width: usize,
     cursors: Vec<CursorPosition>,
-    selects: Vec<Range<usize>>,
+    selects: Vec<CharRange>,
     gs: &mut GlobalState,
 ) {
     let last_idx = cursors.last().map(|c| c.char).unwrap_or_default();
@@ -164,7 +164,7 @@ pub fn partial(
     let mut select_iter = selects.into_iter();
     let mut select = select_iter.next().unwrap_or_default();
 
-    if select.start <= idx && idx < select.end {
+    if select.from <= idx && idx < select.to {
         reset_style.set_bg(Some(select_color));
         backend.set_bg(Some(select_color));
     }
@@ -186,16 +186,16 @@ pub fn partial(
 
     let content = unsafe { line.as_str().get_unchecked(idx..) };
     for text in content.chars().take(line_width.saturating_sub(reduction)) {
-        if select.start == idx {
+        if select.from == idx {
             reset_style.set_bg(Some(select_color));
             backend.set_bg(Some(select_color));
         }
-        if select.end == idx {
+        if select.to == idx {
             reset_style.set_bg(None);
             backend.set_bg(None);
             if let Some(new_select) = select_iter.next() {
                 select = new_select;
-                if select.start == idx {
+                if select.from == idx {
                     reset_style.set_bg(Some(select_color));
                     backend.set_bg(Some(select_color));
                 }

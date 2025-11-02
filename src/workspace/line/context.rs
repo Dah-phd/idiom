@@ -2,12 +2,15 @@ use super::status::RenderStatus;
 use super::EditorLine;
 use crate::{
     ext_tui::CrossTerm,
-    workspace::{cursor::Cursor, CursorPosition},
+    workspace::{
+        cursor::{CharRange, Cursor},
+        CursorPosition,
+    },
 };
 use crossterm::style::ContentStyle;
 use idiom_tui::Position;
 use idiom_tui::{layout::Line, Backend};
-use std::{cmp::Ordering, ops::Range};
+use std::cmp::Ordering;
 
 pub struct LineContext {
     pub accent_style: ContentStyle,
@@ -97,13 +100,8 @@ impl LineContext {
         backend.clear_to_eol();
     }
 
-    #[inline]
-    pub fn select_get(&self, width: usize) -> Option<Range<usize>> {
-        build_select_buffer(self.select, self.line_number, width - (self.line_number_padding + 1))
-    }
-
     #[inline(always)]
-    pub fn select_get_full_line(&self, char_len: usize) -> Option<Range<usize>> {
+    pub fn select_get(&self, char_len: usize) -> Option<CharRange> {
         build_select_buffer(self.select, self.line_number, char_len)
     }
 
@@ -129,7 +127,7 @@ impl LineContext {
         &mut self,
         cursors: &[Cursor],
         width: usize,
-    ) -> Option<(Vec<CursorPosition>, Vec<Range<usize>>)> {
+    ) -> Option<(Vec<CursorPosition>, Vec<CharRange>)> {
         let mut positions = vec![];
         let mut selects = vec![];
         for cursor in cursors.iter().rev() {
@@ -172,12 +170,12 @@ pub fn build_select_buffer(
     select: Option<(CursorPosition, CursorPosition)>,
     at_line: usize,
     max_len: usize,
-) -> Option<Range<usize>> {
+) -> Option<CharRange> {
     select.and_then(|(from, to)| match (from.line.cmp(&at_line), at_line.cmp(&to.line)) {
         (Ordering::Greater, ..) | (.., Ordering::Greater) => None,
-        (Ordering::Less, Ordering::Less) => Some(0..max_len),
-        (Ordering::Equal, Ordering::Equal) => Some(from.char..to.char),
-        (Ordering::Equal, ..) => Some(from.char..max_len),
-        (.., Ordering::Equal) => Some(0..to.char),
+        (Ordering::Less, Ordering::Less) => Some(CharRange { from: 0, to: max_len }),
+        (Ordering::Equal, Ordering::Equal) => Some(CharRange { from: from.char, to: to.char }),
+        (Ordering::Equal, ..) => Some(CharRange { from: from.char, to: max_len }),
+        (.., Ordering::Equal) => Some(CharRange { from: 0, to: to.char }),
     })
 }

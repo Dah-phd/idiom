@@ -1,11 +1,11 @@
 use crate::{
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
+    workspace::cursor::CharRange,
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::{ContentStyle, Stylize};
 use idiom_tui::{utils::CharLimitedWidths, Backend};
-use std::ops::Range;
 
 use super::{width_remainder, WRAP_CLOSE, WRAP_OPEN};
 
@@ -13,7 +13,7 @@ pub fn render(
     line: &mut EditorLine,
     ctx: &mut LineContext,
     line_width: usize,
-    select: Option<Range<usize>>,
+    select: Option<CharRange>,
     gs: &mut GlobalState,
 ) {
     if let Some(remainder) = width_remainder(line, line_width) {
@@ -94,7 +94,7 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut CrossTerm) {
     backend.reset_style();
 }
 
-pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, gs: &mut GlobalState) {
+pub fn select(line: &EditorLine, ctx: &LineContext, select: CharRange, gs: &mut GlobalState) {
     let select_color = gs.theme.selected;
     let backend = gs.backend();
     let char_position = ctx.char_lsp_pos;
@@ -118,11 +118,11 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: Range<usize>, gs: &m
     };
 
     for text in line.chars() {
-        if select.start == idx {
+        if select.from == idx {
             backend.set_bg(Some(select_color));
             reset_style.set_bg(Some(select_color));
         }
-        if select.end == idx {
+        if select.to == idx {
             backend.set_bg(None);
             reset_style.set_bg(None);
         }
@@ -261,7 +261,7 @@ pub fn partial(code: &mut EditorLine, ctx: &mut LineContext, mut line_width: usi
 pub fn partial_select(
     code: &mut EditorLine,
     ctx: &mut LineContext,
-    select: Range<usize>,
+    select: CharRange,
     mut line_width: usize,
     gs: &mut GlobalState,
 ) {
@@ -278,7 +278,7 @@ pub fn partial_select(
 
     let select_color = gs.theme.selected;
     let mut reset_style = ContentStyle::default();
-    if select.start <= idx && idx < select.end {
+    if select.from <= idx && idx < select.to {
         reset_style.set_bg(Some(select_color));
         backend.set_bg(Some(select_color));
     }
@@ -309,11 +309,11 @@ pub fn partial_select(
     };
 
     for (text, char_width) in content {
-        if select.start == idx {
+        if select.from == idx {
             backend.set_bg(Some(select_color));
             reset_style.set_bg(Some(select_color));
         }
-        if select.end == idx {
+        if select.to == idx {
             backend.set_bg(None);
             reset_style.set_bg(None);
         }

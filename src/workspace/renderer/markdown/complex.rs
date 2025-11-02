@@ -2,11 +2,11 @@ use super::StyledParser;
 use crate::{
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
+    workspace::cursor::CharRange,
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::ContentStyle;
 use idiom_tui::{layout::RectIter, utils::CharLimitedWidths, Backend};
-use std::ops::Range;
 
 pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
     if let Some(parser) = StyledParser::new_complex(lines, ctx, backend) {
@@ -17,7 +17,7 @@ pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, 
 
 pub fn line_with_select(
     text: &mut EditorLine,
-    select: Range<usize>,
+    select: CharRange,
     lines: &mut RectIter,
     ctx: &mut LineContext,
     gs: &mut GlobalState,
@@ -38,10 +38,10 @@ pub fn line_with_select(
             remaining_width = line_width;
         }
         remaining_width -= current_width;
-        if select.start == idx {
+        if select.from == idx {
             backend.set_bg(Some(select_color));
         }
-        if select.end == idx {
+        if select.to == idx {
             backend.reset_style();
         }
         backend.print(text);
@@ -51,7 +51,7 @@ pub fn line_with_select(
 
 pub fn cursor(
     text: &mut EditorLine,
-    select: Option<Range<usize>>,
+    select: Option<CharRange>,
     skip: usize,
     lines: &mut RectIter,
     ctx: &mut LineContext,
@@ -116,7 +116,7 @@ pub fn basic(
 #[inline]
 pub fn select(
     text: &mut EditorLine,
-    select: Range<usize>,
+    select: CharRange,
     mut skip: usize,
     lines: &mut RectIter,
     ctx: &mut LineContext,
@@ -138,7 +138,7 @@ pub fn select(
                 remaining_width = line_width - char_w;
                 skip -= 1;
                 if skip == 0 {
-                    if idx > select.start && select.end > idx {
+                    if idx > select.from && select.to > idx {
                         backend.set_bg(Some(select_color));
                     }
                     backend.print(ch);
@@ -162,10 +162,10 @@ pub fn select(
 
         remaining_width -= current_width;
 
-        if select.start == idx {
+        if select.from == idx {
             backend.set_bg(Some(select_color));
         }
-        if select.end == idx {
+        if select.to == idx {
             backend.set_bg(None);
         }
 

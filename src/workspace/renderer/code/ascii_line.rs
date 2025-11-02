@@ -1,9 +1,8 @@
-use std::ops::Range;
-
 use crate::{
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
     syntax::tokens::TokenLine,
+    workspace::cursor::CharRange,
 };
 use crossterm::style::ContentStyle;
 use idiom_tui::Backend;
@@ -50,7 +49,7 @@ pub fn ascii_line(content: &str, tokens: &TokenLine, backend: &mut CrossTerm) {
 pub fn ascii_line_with_select(
     content: impl Iterator<Item = char>,
     tokens: &TokenLine,
-    select: Range<usize>,
+    select: CharRange,
     gs: &mut GlobalState,
 ) {
     let select_color = gs.theme.selected;
@@ -71,11 +70,11 @@ pub fn ascii_line_with_select(
         last_len = token.len;
     };
     for (idx, text) in content.enumerate() {
-        if select.start == idx {
+        if select.from == idx {
             backend.set_bg(Some(select_color));
             reset_style.set_bg(Some(select_color));
         }
-        if select.end == idx {
+        if select.to == idx {
             backend.set_bg(None);
             reset_style.set_bg(None);
         }

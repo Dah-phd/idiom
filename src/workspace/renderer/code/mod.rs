@@ -5,15 +5,14 @@ pub mod complex_cursor;
 pub mod complex_line;
 pub mod complex_multi_cursor;
 
-use crate::ext_tui::CrossTerm;
+use crate::ext_tui::{CrossTerm, StyleExt};
 use crate::global_state::GlobalState;
 use crate::workspace::{
-    cursor::{Cursor, CursorPosition},
+    cursor::{CharRange, Cursor, CursorPosition},
     line::{EditorLine, LineContext},
 };
-use crossterm::style::Stylize;
+use crossterm::style::{ContentStyle, Stylize};
 use idiom_tui::{layout::Line, utils::CharLimitedWidths, Backend};
-use std::ops::Range;
 
 const WRAP_OPEN: char = '<';
 const WRAP_CLOSE: char = '>';
@@ -34,7 +33,7 @@ pub fn width_remainder(line: &EditorLine, line_width: usize) -> Option<usize> {
 #[inline(always)]
 pub fn cursor(code: &mut EditorLine, ctx: &mut LineContext, line: Line, gs: &mut GlobalState) {
     let line_row = line.row;
-    let select = ctx.select_get(line.width);
+    let select = ctx.select_get(code.char_len());
     let line_width = ctx.setup_cursor(line, gs.backend());
     code.cached.cursor(line_row, ctx.cursor_char(), 0, select.clone());
     if code.is_simple() {
@@ -50,7 +49,7 @@ pub fn inner_render(
     code: &mut EditorLine,
     ctx: &mut LineContext,
     line: Line,
-    select: Option<Range<usize>>,
+    select: Option<CharRange>,
     gs: &mut GlobalState,
 ) {
     let cache_line = line.row;
@@ -66,36 +65,45 @@ pub fn inner_render(
 fn render_with_select(
     code: &mut EditorLine,
     line_width: usize,
-    select: Range<usize>,
+    select: CharRange,
     ctx: &mut LineContext,
     gs: &mut GlobalState,
 ) {
-    if code.char_len() == 0 && select.end != 0 {
+    if code.char_len() == 0 {
         gs.backend.print_styled(" ", gs.get_select_style());
         return;
     }
     if code.is_simple() {
         if line_width > code.char_len() {
-            let content = code.chars();
-            ascii_line::ascii_line_with_select(content, code.tokens(), select, gs);
-            if let Some(diagnostic) = code.diagnostics() {
-                let diagnostic_width = line_width - code.char_len();
-                diagnostic.render_pad_5(diagnostic_width, gs.backend())
+            if code.char_len() == select.from {
+                ascii_line::ascii_line(code.as_str(), code.tokens(), gs.backend());
+                let select_style = ContentStyle::bg(gs.theme.selected);
+                gs.backend().print_styled(" ", select_style);
+                if let Some(diagnostic) = code.diagnostics() {
+                    let diagnostic_width = line_width - code.char_len();
+                    diagnostic.render_pad_5(diagnostic_width, gs.backend())
+                }
+            } else {
+                let content = code.chars();
+                ascii_line::ascii_line_with_select(content, code.tokens(), select, gs);
+                if let Some(diagnostic) = code.diagnostics() {
+                    let diagnostic_width = line_width - code.char_len();
+                    diagnostic.render_pad_5(diagnostic_width, gs.backend())
+                }
             }
         } else {
             let content = code.chars().take(line_width.saturating_sub(1));
             ascii_line::ascii_line_with_select(content, code.tokens(), select, gs);
             gs.backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
         }
-        return;
-    }
+    } else {
+        let Some(max_width) = complex_line::complex_line_with_select(code, line_width, select, ctx, gs) else {
+            return;
+        };
 
-    let Some(max_width) = complex_line::complex_line_with_select(code, line_width, select, ctx, gs) else {
-        return;
-    };
-
-    if let Some(diagnostics) = code.diagnostics() {
-        diagnostics.render_pad_5(max_width, gs.backend());
+        if let Some(diagnostics) = code.diagnostics() {
+            diagnostics.render_pad_5(max_width, gs.backend());
+        }
     }
 }
 
@@ -113,21 +121,20 @@ fn render_no_select(code: &mut EditorLine, line_width: usize, ctx: &mut LineCont
             ascii_line::ascii_line(&code.as_str()[..line_width.saturating_sub(1)], code.tokens(), backend);
             backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
         }
-        return;
-    }
+    } else {
+        let Some(max_width) = complex_line::complex_line(code, line_width, ctx, backend) else {
+            return;
+        };
 
-    let Some(max_width) = complex_line::complex_line(code, line_width, ctx, backend) else {
-        return;
-    };
-
-    if let Some(diagnostics) = code.diagnostics() {
-        diagnostics.render_pad_5(max_width, backend);
+        if let Some(diagnostics) = code.diagnostics() {
+            diagnostics.render_pad_5(max_width, backend);
+        }
     }
 }
 
 #[inline(always)]
 pub fn cursor_fast(code: &mut EditorLine, ctx: &mut LineContext, line: Line, gs: &mut GlobalState) {
-    let select = ctx.select_get(line.width);
+    let select = ctx.select_get(code.char_len());
     if !code.cached.should_render_cursor_or_update(line.row, ctx.cursor_char(), select.clone()) {
         ctx.skip_line();
         return;
@@ -158,7 +165,7 @@ pub fn fast_render_is_cursor(
         };
         multi_cursor(text, ctx, line, gs, cursors, selects);
     } else if ctx.has_cursor(line_idx) {
-        let select = ctx.select_get(line.width);
+        let select = ctx.select_get(text.char_len());
         if !text.cached.should_render_cursor_or_update(line.row, ctx.cursor_char(), select.clone()) {
             ctx.skip_line();
             return false;
@@ -172,7 +179,7 @@ pub fn fast_render_is_cursor(
         }
         gs.backend.reset_style();
     } else {
-        let select = ctx.select_get(line.width);
+        let select = ctx.select_get(text.char_len());
         if text.cached.should_render_line(line.row, &select) {
             inner_render(text, ctx, line, select, gs);
         } else {
@@ -190,7 +197,7 @@ pub fn multi_cursor(
     line: Line,
     gs: &mut GlobalState,
     cursors: Vec<CursorPosition>,
-    selects: Vec<Range<usize>>,
+    selects: Vec<CharRange>,
 ) {
     let line_width = ctx.setup_cursor(line, gs.backend());
     match code.is_simple() {

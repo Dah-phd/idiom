@@ -114,7 +114,7 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
         if ctx.has_cursor(line_idx) {
             code::cursor_fast(text, &mut ctx, line, gs);
         } else {
-            let select = ctx.select_get(line.width);
+            let select = ctx.select_get(text.char_len());
             if text.cached.should_render_line(line.row, &select) {
                 code::inner_render(text, &mut ctx, line, select, gs);
             } else {
@@ -151,7 +151,7 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
         if ctx.has_cursor(line_idx) {
             code::cursor(text, &mut ctx, line, gs);
         } else {
-            let select = ctx.select_get(line.width);
+            let select = ctx.select_get(text.char_len());
             code::inner_render(text, &mut ctx, line, select, gs);
         }
     }
@@ -239,7 +239,7 @@ fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
         } else if ctx.has_cursor(line_idx) {
             code::cursor(text, &mut ctx, line, gs);
         } else {
-            let select = ctx.select_get(line.width);
+            let select = ctx.select_get(text.char_len());
             code::inner_render(text, &mut ctx, line, select, gs);
         }
     }
@@ -278,7 +278,7 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
         if lines.is_finished() {
             break;
         }
-        let select = ctx.select_get_full_line(text.char_len());
+        let select = ctx.select_get(text.char_len());
         if ctx.has_cursor(line_idx) {
             if text.cached.should_render_cursor(lines.next_line_idx(), ctx.cursor_char(), &select)
                 || text.cached.skipped_chars() != skip
@@ -318,7 +318,7 @@ fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
         if lines.is_finished() {
             break;
         }
-        let select = ctx.select_get_full_line(text.char_len());
+        let select = ctx.select_get(text.char_len());
         if ctx.has_cursor(line_idx) {
             text::cursor(text, select, skip, &mut ctx, &mut lines, gs);
         } else {
@@ -359,7 +359,7 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
         if lines.is_finished() {
             break;
         }
-        let select = ctx.select_get_full_line(text.char_len());
+        let select = ctx.select_get(text.char_len());
         if ctx.has_cursor(line_idx) {
             if text.cached.should_render_cursor(lines.next_line_idx(), ctx.cursor_char(), &select)
                 || text.cached.skipped_chars() != skip
@@ -398,7 +398,7 @@ fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
         if lines.is_finished() {
             break;
         }
-        let select = ctx.select_get_full_line(text.char_len());
+        let select = ctx.select_get(text.char_len());
         if ctx.has_cursor(line_idx) {
             markdown::cursor(text, select, skip, &mut ctx, &mut lines, gs);
         } else {

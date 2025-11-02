@@ -2,8 +2,6 @@ mod ascii;
 mod complex;
 mod parser;
 
-use std::ops::Range;
-
 use crossterm::style::{Attribute, Attributes, Color, ContentStyle, Stylize};
 use parser::{parse, Block, ListItem, Span};
 
@@ -12,7 +10,7 @@ use crate::{
     global_state::GlobalState,
     syntax::tokens::{calc_wrap_line, calc_wrap_line_capped},
     workspace::{
-        cursor::Cursor,
+        cursor::{CharRange, Cursor},
         line::{EditorLine, LineContext},
     },
 };
@@ -276,7 +274,7 @@ fn calc_rows(content: &mut [EditorLine], cursor: &Cursor) -> usize {
 #[inline(always)]
 pub fn cursor(
     text: &mut EditorLine,
-    select: Option<Range<usize>>,
+    select: Option<CharRange>,
     skip: usize,
     ctx: &mut LineContext,
     lines: &mut RectIter,
@@ -292,7 +290,7 @@ pub fn cursor(
 #[inline(always)]
 pub fn line(
     text: &mut EditorLine,
-    select: Option<Range<usize>>,
+    select: Option<CharRange>,
     ctx: &mut LineContext,
     lines: &mut RectIter,
     gs: &mut GlobalState,

@@ -1,6 +1,5 @@
-use crate::workspace::CursorPosition;
+use crate::workspace::cursor::{CharRange, CursorPosition};
 use idiom_tui::utils::CharLimitedWidths;
-use std::ops::Range;
 
 pub type Reduction = usize;
 
@@ -10,11 +9,11 @@ pub enum RenderStatus {
         line: u16,
         char: usize,
         skipped_chars: usize,
-        select: Option<Range<usize>>,
+        select: Option<CharRange>,
     },
     Line {
         line: u16,
-        select: Option<Range<usize>>,
+        select: Option<CharRange>,
     },
     #[default]
     None,
@@ -32,22 +31,22 @@ impl RenderStatus {
     }
 
     #[inline(always)]
-    pub fn line(&mut self, line: u16, select: Option<Range<usize>>) {
+    pub fn line(&mut self, line: u16, select: Option<CharRange>) {
         *self = Self::Line { line, select }
     }
 
     #[inline(always)]
-    pub fn cursor(&mut self, line: u16, char: usize, skipped_chars: usize, select: Option<Range<usize>>) {
+    pub fn cursor(&mut self, line: u16, char: usize, skipped_chars: usize, select: Option<CharRange>) {
         *self = Self::Cursor { line, char, skipped_chars, select };
     }
 
     #[inline(always)]
-    pub fn should_render_line(&self, new_line: u16, new_select: &Option<Range<usize>>) -> bool {
+    pub fn should_render_line(&self, new_line: u16, new_select: &Option<CharRange>) -> bool {
         !matches!(self, Self::Line { line, select } if *line == new_line && select == new_select )
     }
 
     #[inline(always)]
-    pub fn should_render_cursor(&self, new_line: u16, new_char: usize, new_select: &Option<Range<usize>>) -> bool {
+    pub fn should_render_cursor(&self, new_line: u16, new_char: usize, new_select: &Option<CharRange>) -> bool {
         !matches!(
             self,
             Self::Cursor { line, char, skipped_chars: _, select }
@@ -62,7 +61,7 @@ impl RenderStatus {
         &mut self,
         new_line: u16,
         new_char: usize,
-        new_select: Option<Range<usize>>,
+        new_select: Option<CharRange>,
     ) -> bool {
         if let Self::Cursor { line, char, skipped_chars, select } = self {
             if *char == new_char && *line == new_line && select == &new_select {
@@ -87,7 +86,7 @@ impl RenderStatus {
         &mut self,
         new_line: u16,
         cursors: &[CursorPosition],
-        selects: &[Range<usize>],
+        selects: &[CharRange],
     ) -> bool {
         let multi_cursor = Self::Cursor {
             // line stores number of cursors
@@ -97,7 +96,7 @@ impl RenderStatus {
             // last char
             skipped_chars: cursors.last().map(|c| c.char).unwrap_or_default(),
             // select sum
-            select: selects.iter().cloned().reduce(|r, s| (r.start + s.start)..(r.end + s.end)),
+            select: selects.iter().cloned().reduce(|r, s| CharRange { from: r.from + s.from, to: r.to + s.to }),
         };
         if self == &multi_cursor {
             return false;
@@ -197,7 +196,7 @@ impl RenderStatus {
 
 #[cfg(test)]
 mod test {
-    use super::RenderStatus;
+    use super::{CharRange, RenderStatus};
 
     #[test]
     fn test_cache() {
@@ -214,7 +213,7 @@ mod test {
     #[test]
     fn guard_should_render_vs_should_render_and_update() {
         let mut cached = RenderStatus::default();
-        let select = Some(5..10);
+        let select = Some(CharRange { from: 5, to: 10 });
         cached.cursor(3, 2, 0, select.clone());
         assert!(!cached.should_render_cursor(3, 2, &select));
         assert!(!cached.should_render_cursor_or_update(3, 2, select));

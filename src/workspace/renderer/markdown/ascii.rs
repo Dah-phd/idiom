@@ -2,11 +2,11 @@ use super::StyledParser;
 use crate::{
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
+    workspace::cursor::CharRange,
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::ContentStyle;
 use idiom_tui::{layout::RectIter, Backend};
-use std::ops::Range;
 
 pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
     if let Some(parser) = StyledParser::new_ascii(lines, ctx, backend) {
@@ -17,7 +17,7 @@ pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, 
 
 pub fn line_with_select(
     text: &mut EditorLine,
-    select: Range<usize>,
+    select: CharRange,
     lines: &mut RectIter,
     ctx: &mut LineContext,
     gs: &mut GlobalState,
@@ -43,10 +43,10 @@ pub fn line_with_select(
             backend.set_style(reset_style);
             line_end += line_width;
         }
-        if select.start == idx {
+        if select.from == idx {
             backend.set_bg(Some(select_color));
         }
-        if select.end == idx {
+        if select.to == idx {
             backend.reset_style();
         }
         backend.print(text);
@@ -56,7 +56,7 @@ pub fn line_with_select(
 
 pub fn cursor(
     text: &mut EditorLine,
-    select: Option<Range<usize>>,
+    select: Option<CharRange>,
     skip: usize,
     lines: &mut RectIter,
     ctx: &mut LineContext,
@@ -98,7 +98,7 @@ pub fn basic(text: &mut EditorLine, skip: usize, lines: &mut RectIter, ctx: &mut
 pub fn select(
     text: &mut EditorLine,
     skip: usize,
-    select: Range<usize>,
+    select: CharRange,
     lines: &mut RectIter,
     ctx: &mut LineContext,
     gs: &mut GlobalState,
@@ -111,7 +111,7 @@ pub fn select(
     let mut idx = skip * line_width;
     let mut line_end = line_width + idx;
 
-    if select.start < idx && idx < select.end {
+    if select.from < idx && idx < select.to {
         backend.set_bg(Some(select_color));
     }
 
@@ -124,10 +124,10 @@ pub fn select(
             backend.set_style(reset_style);
             line_end += line_width;
         }
-        if select.start == idx {
+        if select.from == idx {
             backend.set_bg(Some(select_color));
         }
-        if select.end == idx {
+        if select.to == idx {
             backend.set_bg(None);
         }
 

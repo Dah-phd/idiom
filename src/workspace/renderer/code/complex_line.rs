@@ -2,11 +2,11 @@ use super::WRAP_CLOSE;
 use crate::{
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
+    workspace::cursor::CharRange,
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::{ContentStyle, Stylize};
 use idiom_tui::{utils::CharLimitedWidths, Backend};
-use std::ops::Range;
 
 pub fn complex_line(
     code: &EditorLine,
@@ -75,7 +75,7 @@ pub fn complex_line(
 pub fn complex_line_with_select(
     code: &EditorLine,
     mut line_width: usize,
-    select: Range<usize>,
+    select: CharRange,
     ctx: &mut LineContext,
     gs: &mut GlobalState,
 ) -> Option<usize> {
@@ -107,11 +107,11 @@ pub fn complex_line_with_select(
         } else {
             line_width -= width;
         }
-        if select.start == idx {
+        if select.from == idx {
             backend.set_bg(Some(select_color));
             reset_style.set_bg(Some(select_color));
         }
-        if select.end == idx {
+        if select.to == idx {
             backend.set_bg(None);
             reset_style.set_bg(None);
         }
