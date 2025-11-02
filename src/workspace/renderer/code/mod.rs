@@ -30,7 +30,6 @@ pub fn width_remainder(line: &EditorLine, line_width: usize) -> Option<usize> {
     Some(line_width - current_with)
 }
 
-
 // ensures cursor is rendered
 #[inline]
 pub fn repositioning(cursor: &mut Cursor) {
@@ -71,7 +70,6 @@ pub fn cursor_fast(code: &mut EditorLine, ctx: &mut LineContext, line: Line, gs:
     }
     gs.backend.reset_style();
 }
-
 
 #[inline]
 pub fn multi_cursor(
@@ -121,7 +119,7 @@ pub fn fast_render_is_cursor(
     } else {
         let select = ctx.select_get(text.char_len());
         if text.cached.should_render_line(line.row, &select) {
-            inner_render(text, ctx, line, select, gs);
+            line_render(text, ctx, line, select, gs);
         } else {
             ctx.skip_line();
         }
@@ -131,7 +129,7 @@ pub fn fast_render_is_cursor(
 }
 
 #[inline]
-pub fn inner_render(
+pub fn line_render(
     code: &mut EditorLine,
     ctx: &mut LineContext,
     line: Line,
@@ -150,7 +148,7 @@ pub fn inner_render(
             } else {
                 render_select_complex(code, line_width, select, ctx, gs);
             }
-        },
+        }
         None => {
             if code.is_simple() {
                 // ascii (byte idx based) render
@@ -168,12 +166,12 @@ pub fn inner_render(
                 let Some(max_width) = complex_line::complex_line(code, line_width, ctx, gs.backend()) else {
                     return;
                 };
-        
+
                 if let Some(diagnostics) = code.diagnostics() {
                     diagnostics.render_pad_5(max_width, gs.backend());
                 }
             }
-        },
+        }
     }
 }
 
@@ -243,7 +241,7 @@ fn render_select_complex(
         gs.backend().print_styled(" ", select_style);
         if let Some(diagnostics) = code.diagnostics() {
             diagnostics.render_pad_4(max_width, gs.backend());
-        }    
+        }
     } else {
         let Some(max_width) = complex_line::complex_line_with_select(code, line_width, select, ctx, gs) else {
             return;

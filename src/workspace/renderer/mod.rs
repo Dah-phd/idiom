@@ -116,7 +116,7 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
         } else {
             let select = ctx.select_get(text.char_len());
             if text.cached.should_render_line(line.row, &select) {
-                code::inner_render(text, &mut ctx, line, select, gs);
+                code::line_render(text, &mut ctx, line, select, gs);
             } else {
                 ctx.skip_line();
             }
@@ -152,7 +152,7 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
             code::cursor(text, &mut ctx, line, gs);
         } else {
             let select = ctx.select_get(text.char_len());
-            code::inner_render(text, &mut ctx, line, select, gs);
+            code::line_render(text, &mut ctx, line, select, gs);
         }
     }
 
@@ -240,7 +240,7 @@ fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
             code::cursor(text, &mut ctx, line, gs);
         } else {
             let select = ctx.select_get(text.char_len());
-            code::inner_render(text, &mut ctx, line, select, gs);
+            code::line_render(text, &mut ctx, line, select, gs);
         }
     }
 
