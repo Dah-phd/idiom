@@ -8,6 +8,7 @@ use crate::syntax::tests::{
     zip_text_tokens,
 };
 use crate::workspace::cursor::Cursor;
+use crate::workspace::editor::tests::mock_editor;
 use crate::workspace::line::LineContext;
 use crate::workspace::renderer::tests::count_to_cursor;
 use crate::workspace::CursorPosition;
@@ -21,6 +22,36 @@ use idiom_tui::{
     layout::{Line, Rect},
     Backend,
 };
+use lsp_types::SemanticToken;
+
+fn consolidate_backend_drain(
+    drain: Vec<(ContentStyle, String)>,
+    cursor: ContentStyle,
+    select: Color,
+) -> Vec<(ContentStyle, String)> {
+    let mut buf = vec![];
+    let mut text_buf = String::new();
+    let mut style_buf = ContentStyle::default();
+    for (mut style, text) in drain.into_iter() {
+        if style != cursor {
+            if style.background_color == Some(select) {
+                style = ContentStyle::bg(select);
+            } else {
+                style = ContentStyle::default();
+            }
+        }
+        if style == style_buf {
+            text_buf.push_str(text.as_str());
+        } else {
+            if !text_buf.is_empty() {
+                buf.push((style_buf, std::mem::take(&mut text_buf)));
+            }
+            text_buf = text;
+            style_buf = style;
+        }
+    }
+    buf
+}
 
 fn test_line_wrap(mut render_data: Vec<(ContentStyle, String)>) {
     let (line_num, line) = parse_simple_line(&mut render_data);
@@ -658,3 +689,205 @@ fn test_line_wrapping_utf32() {
 
     test_line_wrap(gs.backend.drain());
 }
+
+#[test]
+fn test_select_padding() {
+    let mut editor = mock_editor(vec![]);
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 7), CrossTerm::init());
+    gs.force_area_calc();
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+
+    let base_text = vec![
+        String::from("from os import environ"),
+        String::from("variable_data = environ.get(\"crab\", \"crab\")"),
+        String::new(),
+        String::from(' '),
+        String::from("print(f\"{varialbe_data} .. rocket\")"),
+    ];
+
+    let content = zip_text_tokens(
+        base_text.clone(),
+        vec![
+            SemanticToken { length: 4, token_type: 2, ..Default::default() },
+            SemanticToken { delta_start: 5, length: 2, token_type: 3, ..Default::default() },
+            SemanticToken { delta_start: 3, length: 6, token_type: 2, ..Default::default() },
+            SemanticToken { delta_start: 7, length: 7, token_type: 3, ..Default::default() },
+            SemanticToken { delta_line: 1, length: 13, token_type: 4, ..Default::default() },
+            SemanticToken { delta_start: 16, length: 7, token_type: 3, ..Default::default() },
+            SemanticToken { delta_start: 8, length: 3, token_type: 8, ..Default::default() },
+            SemanticToken { delta_start: 4, length: 6, token_type: 13, ..Default::default() },
+            SemanticToken { delta_start: 8, length: 6, token_type: 13, ..Default::default() },
+            SemanticToken { delta_line: 3, length: 5, token_type: 6, ..Default::default() },
+            SemanticToken { delta_start: 7, length: 27, token_type: 14, ..Default::default() },
+        ],
+    );
+    editor.content = content;
+    editor.file_type = FileType::Python;
+    editor.lexer = mock_utf32_lexer(FileType::Python);
+    editor.cursor.select_set((2, 10).into(), (0, 4).into());
+    editor.render(&mut gs);
+    _ = gs.backend.drain(); // ensuore all lines are rendered
+    editor.render(&mut gs);
+
+    let select_style = ContentStyle::bg(gs.theme.selected);
+    let cursor = ContentStyle::reversed();
+
+    let expected = vec![
+        (ContentStyle::default(), "<<go to row: 1 col: 19>>1 <<clear EOL>><<set style>>from".to_owned()),
+        (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>><<set style>>".to_owned()),
+        (cursor, " ".to_owned()),
+        (select_style, "<<updated style>>os<<set style>> <<updated style>>import<<set style>> <<updated style>>environ".to_owned()), 
+        (ContentStyle::default(), "<<reset style>>".to_owned()), 
+        (select_style, "~".to_owned()), 
+        (ContentStyle::default(), "<<reset style>><<go to row: 2 col: 19>>2 <<clear EOL>><<set style>>".to_owned()), 
+        (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>variable_data<<set style>> = <<updated style>>environ<<set style>>.<<updated style>>get<<set style>>(<<updated style>>\"crab\"<<set style>>, <<updated style>>\"crab\"<<set style>>)".to_owned()), 
+        (ContentStyle::default(), "<<reset style>>".to_owned()), 
+        (select_style, "~".to_owned()), 
+        (ContentStyle::default(), "<<go to row: 3 col: 19>>3 <<clear EOL>>".to_owned()), 
+        (select_style, "~".to_owned()),
+        (ContentStyle::default(), "<<go to row: 4 col: 19>>4 <<clear EOL>> <<go to row: 5 col: 19>>5 <<clear EOL>>print(f\"{varialbe_data} .. rocket\")".to_owned()),
+        (select_style, "<<set style>>".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
+        (select_style, "<<padding: 102>>".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 106>>".to_owned()),
+        (select_style, "(73 selected) ".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 81>>".to_owned()),
+        (select_style, "  Doc Len 5, Ln 1, Col 5 ".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
+        (select_style, "<<padding: 63>>".to_owned()),
+    ];
+    let result = consolidate_backend_drain(gs.backend.drain(), ContentStyle::reversed(), gs.theme.selected);
+    assert_eq!(&result, &expected);
+
+    editor.lexer = mock_utf16_lexer(FileType::Python);
+    editor.render(&mut gs);
+    let result = consolidate_backend_drain(gs.backend.drain(), ContentStyle::reversed(), gs.theme.selected);
+    assert_eq!(&expected[20..], &result[20..]);
+
+    editor.lexer = mock_utf8_lexer(FileType::Python);
+    editor.render(&mut gs);
+    let result = consolidate_backend_drain(gs.backend.drain(), ContentStyle::reversed(), gs.theme.selected);
+    assert_eq!(&expected, &result);
+}
+
+#[test]
+fn test_select_padding_complex() {
+    let mut editor = mock_editor(vec![]);
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 7), CrossTerm::init());
+    gs.force_area_calc();
+    let select_style = ContentStyle::bg(gs.theme.selected);
+    let cursor = ContentStyle::reversed();
+
+    let base_text = vec![
+        String::from("from os import environ;"),
+        String::from("variable_data = environ.get(\"🦀\", \"🦀\")"),
+        String::new(),
+        String::from(' '),
+        String::from("print(f\"{varialbe_data} .. 🚀\")"),
+    ];
+
+    let expected = vec![
+        (ContentStyle::default(), "<<go to row: 1 col: 19>>1 <<clear EOL>><<set style>>from".to_owned()),
+        (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>><<set style>>".to_owned()),
+        (cursor, " ".to_owned()),
+        (select_style, "<<updated style>>os<<set style>> <<updated style>>import<<set style>> <<updated style>>environ<<set style>>;".to_owned()),
+        (ContentStyle::default(), "<<reset style>>".to_owned()),
+        (select_style, "~".to_owned()),
+        (ContentStyle::default(), "<<reset style>><<go to row: 2 col: 19>>2 <<clear EOL>><<set style>>".to_owned()),
+        (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>variable_data<<set style>> = <<updated style>>environ<<set style>>.<<updated style>>get<<set style>>(<<updated style>>\"🦀\"<<set style>>, <<updated style>>\"🦀\"<<set style>>)".to_owned()),
+        (ContentStyle::default(), "<<reset style>>".to_owned()),
+        (select_style, "~".to_owned()),
+        (ContentStyle::default(), "<<go to row: 3 col: 19>>3 <<clear EOL>>".to_owned()),
+        (select_style, "~".to_owned()),
+        (ContentStyle::default(), "<<go to row: 4 col: 19>>4 <<clear EOL>> <<go to row: 5 col: 19>>5 <<clear EOL>><<set style>>print<<reset style>>(f<<set style>>\"{varialbe_data} .. 🚀\"<<reset style>>)<<reset style>>".to_owned()),
+        (select_style, "<<set style>>".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
+        (select_style, "<<padding: 102>>".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 106>>".to_owned()),
+        (select_style, "(68 selected) ".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 81>>".to_owned()),
+        (select_style, "  Doc Len 5, Ln 1, Col 5 ".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
+        (select_style, "<<padding: 63>>".to_owned()),
+    ];
+
+    let content = zip_text_tokens(
+        base_text.clone(),
+        vec![
+            SemanticToken { length: 4, token_type: 2, ..Default::default() },
+            SemanticToken { delta_start: 5, length: 2, token_type: 3, ..Default::default() },
+            SemanticToken { delta_start: 3, length: 6, token_type: 2, ..Default::default() },
+            SemanticToken { delta_start: 7, length: 7, token_type: 3, ..Default::default() },
+            SemanticToken { delta_line: 1, length: 13, token_type: 4, ..Default::default() },
+            SemanticToken { delta_start: 16, length: 7, token_type: 3, ..Default::default() },
+            SemanticToken { delta_start: 8, length: 3, token_type: 8, ..Default::default() },
+            SemanticToken { delta_start: 4, length: 3, token_type: 13, ..Default::default() },
+            SemanticToken { delta_start: 5, length: 3, token_type: 13, ..Default::default() },
+            SemanticToken { delta_line: 3, length: 5, token_type: 6, ..Default::default() },
+            SemanticToken { delta_start: 7, length: 22, token_type: 14, ..Default::default() },
+        ],
+    );
+    editor.content = content;
+    editor.file_type = FileType::Python;
+    editor.lexer = mock_utf32_lexer(FileType::Python);
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+    editor.cursor.select_set((2, 10).into(), (0, 4).into());
+    editor.render(&mut gs);
+    gs.backend.drain(); // ensure all rect are calculated
+    editor.render(&mut gs);
+
+    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    assert_eq!(&result, &expected);
+
+    let content = zip_text_tokens(
+        base_text.clone(),
+        vec![
+            SemanticToken { length: 4, token_type: 2, ..Default::default() },
+            SemanticToken { delta_start: 5, length: 2, token_type: 3, ..Default::default() },
+            SemanticToken { delta_start: 3, length: 6, token_type: 2, ..Default::default() },
+            SemanticToken { delta_start: 7, length: 7, token_type: 3, ..Default::default() },
+            SemanticToken { delta_line: 1, length: 13, token_type: 4, ..Default::default() },
+            SemanticToken { delta_start: 16, length: 7, token_type: 3, ..Default::default() },
+            SemanticToken { delta_start: 8, length: 3, token_type: 8, ..Default::default() },
+            SemanticToken { delta_start: 4, length: 4, token_type: 13, ..Default::default() },
+            SemanticToken { delta_start: 6, length: 4, token_type: 13, ..Default::default() },
+            SemanticToken { delta_line: 3, length: 5, token_type: 6, ..Default::default() },
+            SemanticToken { delta_start: 7, length: 23, token_type: 14, ..Default::default() },
+        ],
+    );
+    editor.content = content;
+    editor.lexer = mock_utf16_lexer(FileType::Python);
+    editor.render(&mut gs);
+
+    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    assert_eq!(&result, &expected);
+
+    let content = zip_text_tokens(
+        base_text.clone(),
+        vec![
+            SemanticToken { length: 4, token_type: 2, ..Default::default() },
+            SemanticToken { delta_start: 5, length: 2, token_type: 3, ..Default::default() },
+            SemanticToken { delta_start: 3, length: 6, token_type: 2, ..Default::default() },
+            SemanticToken { delta_start: 7, length: 7, token_type: 3, ..Default::default() },
+            SemanticToken { delta_line: 1, length: 13, token_type: 4, ..Default::default() },
+            SemanticToken { delta_start: 16, length: 7, token_type: 3, ..Default::default() },
+            SemanticToken { delta_start: 8, length: 3, token_type: 8, ..Default::default() },
+            SemanticToken { delta_start: 4, length: 6, token_type: 13, ..Default::default() },
+            SemanticToken { delta_start: 8, length: 6, token_type: 13, ..Default::default() },
+            SemanticToken { delta_line: 3, length: 5, token_type: 6, ..Default::default() },
+            SemanticToken { delta_start: 7, length: 25, token_type: 14, ..Default::default() },
+        ],
+    );
+    editor.content = content;
+    editor.lexer = mock_utf8_lexer(FileType::Python);
+    editor.render(&mut gs);
+
+    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    assert_eq!(&result, &expected);
+}
+
+#[test]
+fn test_wrap_select() {}
+
+#[test]
+fn test_wrap_select_complex() {}
