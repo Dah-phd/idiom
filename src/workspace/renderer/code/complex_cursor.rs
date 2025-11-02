@@ -22,7 +22,7 @@ pub fn render(
             None => self::basic(line, ctx, gs.backend()),
         }
         if let Some(diagnostic) = line.diagnostics() {
-            diagnostic.render_in_cursor(remainder - 1, gs.backend());
+            diagnostic.render_pad_4(remainder - 1, gs.backend());
         }
     } else {
         match select {

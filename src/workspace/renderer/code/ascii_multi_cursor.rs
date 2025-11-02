@@ -24,7 +24,7 @@ pub fn render(
         if let Some(diagnostics) = line.diagnostics() {
             let padded_len = line.char_len() + 1;
             let diagnostic_width = line_width - padded_len;
-            diagnostics.render_in_cursor(diagnostic_width, gs.backend());
+            diagnostics.render_pad_4(diagnostic_width, gs.backend());
         }
     } else {
         self::partial(line, ctx, line_width, cursors, selects, gs);

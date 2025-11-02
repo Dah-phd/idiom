@@ -130,7 +130,7 @@ impl DiagnosticLine {
 
     /// Prints truncated text based on info from diagnostics
     #[inline(always)]
-    pub fn render_in_line(&self, max_width: usize, backend: &mut CrossTerm) {
+    pub fn render_pad_5(&self, max_width: usize, backend: &mut CrossTerm) {
         if max_width < 7 {
             return;
         }
@@ -142,7 +142,7 @@ impl DiagnosticLine {
     }
 
     #[inline(always)]
-    pub fn render_in_cursor(&self, max_width: usize, backend: &mut CrossTerm) {
+    pub fn render_pad_4(&self, max_width: usize, backend: &mut CrossTerm) {
         if max_width < 6 {
             return;
         }

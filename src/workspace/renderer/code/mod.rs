@@ -80,7 +80,7 @@ fn render_with_select(
             ascii_line::ascii_line_with_select(content, code.tokens(), select, gs);
             if let Some(diagnostic) = code.diagnostics() {
                 let diagnostic_width = line_width - code.char_len();
-                diagnostic.render_in_line(diagnostic_width, gs.backend())
+                diagnostic.render_pad_5(diagnostic_width, gs.backend())
             }
         } else {
             let content = code.chars().take(line_width.saturating_sub(1));
@@ -95,7 +95,7 @@ fn render_with_select(
     };
 
     if let Some(diagnostics) = code.diagnostics() {
-        diagnostics.render_in_line(max_width, gs.backend());
+        diagnostics.render_pad_5(max_width, gs.backend());
     }
 }
 
@@ -107,7 +107,7 @@ fn render_no_select(code: &mut EditorLine, line_width: usize, ctx: &mut LineCont
             ascii_line::ascii_line(code.as_str(), code.tokens(), backend);
             if let Some(diagnostic) = code.diagnostics() {
                 let diagnosic_width = line_width - code.char_len();
-                diagnostic.render_in_line(diagnosic_width, backend)
+                diagnostic.render_pad_5(diagnosic_width, backend)
             }
         } else {
             ascii_line::ascii_line(&code.as_str()[..line_width.saturating_sub(1)], code.tokens(), backend);
@@ -121,7 +121,7 @@ fn render_no_select(code: &mut EditorLine, line_width: usize, ctx: &mut LineCont
     };
 
     if let Some(diagnostics) = code.diagnostics() {
-        diagnostics.render_in_line(max_width, backend);
+        diagnostics.render_pad_5(max_width, backend);
     }
 }
 

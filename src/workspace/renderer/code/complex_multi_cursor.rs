@@ -23,7 +23,7 @@ pub fn render(
     if let Some(remainder) = width_remainder(line, line_width) {
         basic(line, ctx, cursors, selects, gs);
         if let Some(diagnostics) = line.diagnostics() {
-            diagnostics.render_in_cursor(remainder - 1, gs.backend());
+            diagnostics.render_pad_4(remainder - 1, gs.backend());
         }
     } else {
         self::partial(line, ctx, line_width, cursors, selects, gs);
