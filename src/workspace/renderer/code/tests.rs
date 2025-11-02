@@ -128,13 +128,13 @@ fn test_content_select(mut render_data: Vec<(ContentStyle, String)>) {
     // select start char 10 split token
     let (line_num, line) = parse_complex_line(&mut render_data);
     assert_eq!(line_num, Some(2));
-    assert_eq!(line, vec!["use", " ", "super", ":", ":", "EditorLine", ";"]);
+    assert_eq!(line, vec!["use", " ", "super", ":", ":", "EditorLine", ";", " "]);
     let (line_num, line) = parse_complex_line(&mut render_data);
     assert_eq!(line_num, Some(3));
     assert_eq!(line, vec![" "]);
     let (line_num, line) = parse_complex_line(&mut render_data);
     assert_eq!(line_num, Some(4));
-    assert_eq!(line, vec!["#", "[", "test", "]"]);
+    assert_eq!(line, vec!["#", "[", "test", "]", " "]);
     // select end char 6 split token
     let (line_num, line) = parse_complex_line(&mut render_data);
     assert_eq!(line_num, Some(5));
