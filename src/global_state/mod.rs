@@ -117,6 +117,16 @@ impl GlobalState {
         ContentStyle::bg(self.theme.selected)
     }
 
+    #[inline]
+    pub fn get_accented_select(&self) -> ContentStyle {
+        ContentStyle {
+            foreground_color: Some(self.ui_theme.accent_select()),
+            background_color: Some(self.theme.selected),
+            attributes: Default::default(),
+            underline_color: None,
+        }
+    }
+
     pub fn get_key_maps(&mut self) -> (GeneralKeyMap, EditorKeyMap, TreeKeyMap) {
         self.unwrap_or_default(KeyMap::new(), KEY_MAP).unpack()
     }

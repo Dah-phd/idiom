@@ -1,4 +1,4 @@
-use super::{WRAP_CLOSE, WRAP_OPEN};
+use super::{pad_select, WRAP_CLOSE, WRAP_OPEN};
 use crate::{
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
@@ -158,12 +158,14 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: CharRange, gs: &mut 
         }
         idx += 1;
     }
+    backend.reset_style();
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
+    } else if select.to >= line.char_len() {
+        pad_select(gs);
     } else {
         backend.print(" ");
     }
-    backend.reset_style();
 }
 
 #[inline(always)]

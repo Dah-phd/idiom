@@ -5,13 +5,12 @@ pub mod complex_cursor;
 pub mod complex_line;
 pub mod complex_multi_cursor;
 
-use crate::ext_tui::StyleExt;
 use crate::global_state::GlobalState;
 use crate::workspace::{
     cursor::{CharRange, Cursor, CursorPosition},
     line::{EditorLine, LineContext},
 };
-use crossterm::style::{ContentStyle, Stylize};
+use crossterm::style::Stylize;
 use idiom_tui::{layout::Line, utils::CharLimitedWidths, Backend};
 
 const WRAP_OPEN: char = '<';
@@ -142,7 +141,7 @@ pub fn line_render(
     match select {
         Some(select) => {
             if code.char_len() == 0 {
-                gs.backend.print_styled(" ", gs.get_select_style());
+                pad_select(gs);
             } else if code.is_simple() {
                 render_select_ascii(code, line_width, select, ctx, gs);
             } else {
@@ -186,8 +185,7 @@ fn render_select_ascii(
     if line_width > code.char_len() {
         if select.from >= code.char_len() {
             ascii_line::ascii_line(code.as_str(), code.tokens(), gs.backend());
-            let select_style = ContentStyle::bg(gs.theme.selected);
-            gs.backend().print_styled(" ", select_style);
+            pad_select(gs);
             if let Some(diagnostic) = code.diagnostics() {
                 let diagnostic_width = line_width - code.char_len();
                 diagnostic.render_pad_4(diagnostic_width, gs.backend())
@@ -195,8 +193,7 @@ fn render_select_ascii(
         } else if select.to >= code.char_len() {
             let content = code.chars();
             ascii_line::ascii_line_with_select(content, code.tokens(), select, gs);
-            let select_style = ContentStyle::bg(gs.theme.selected);
-            gs.backend().print_styled(" ", select_style);
+            pad_select(gs);
             if let Some(diagnostic) = code.diagnostics() {
                 let diagnostic_width = line_width - code.char_len();
                 diagnostic.render_pad_4(diagnostic_width, gs.backend())
@@ -228,8 +225,7 @@ fn render_select_complex(
         let Some(max_width) = complex_line::complex_line(code, line_width, ctx, gs.backend()) else {
             return;
         };
-        let select_style = ContentStyle::bg(gs.theme.selected);
-        gs.backend().print_styled(" ", select_style);
+        pad_select(gs);
         if let Some(diagnostics) = code.diagnostics() {
             diagnostics.render_pad_4(max_width, gs.backend());
         }
@@ -237,8 +233,7 @@ fn render_select_complex(
         let Some(max_width) = complex_line::complex_line_with_select(code, line_width, select, ctx, gs) else {
             return;
         };
-        let select_style = ContentStyle::bg(gs.theme.selected);
-        gs.backend().print_styled(" ", select_style);
+        pad_select(gs);
         if let Some(diagnostics) = code.diagnostics() {
             diagnostics.render_pad_4(max_width, gs.backend());
         }
@@ -251,6 +246,11 @@ fn render_select_complex(
             diagnostics.render_pad_5(max_width, gs.backend());
         }
     }
+}
+
+fn pad_select(gs: &mut GlobalState) {
+    let select_style = gs.get_accented_select();
+    gs.backend().print_styled("~", select_style);
 }
 
 #[cfg(test)]

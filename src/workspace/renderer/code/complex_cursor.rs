@@ -7,7 +7,7 @@ use crate::{
 use crossterm::style::{ContentStyle, Stylize};
 use idiom_tui::{utils::CharLimitedWidths, Backend};
 
-use super::{width_remainder, WRAP_CLOSE, WRAP_OPEN};
+use super::{pad_select, width_remainder, WRAP_CLOSE, WRAP_OPEN};
 
 pub fn render(
     line: &mut EditorLine,
@@ -162,12 +162,14 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: CharRange, gs: &mut 
 
         idx += 1;
     }
+    backend.reset_style();
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
+    } else if select.to >= line.char_len() {
+        pad_select(gs);
     } else {
         backend.print(" ");
     }
-    backend.reset_style();
 }
 
 pub fn partial(code: &mut EditorLine, ctx: &mut LineContext, mut line_width: usize, backend: &mut CrossTerm) {
