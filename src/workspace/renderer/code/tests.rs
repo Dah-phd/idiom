@@ -736,16 +736,30 @@ fn test_select_padding() {
         (ContentStyle::default(), "<<go to row: 1 col: 19>>1 <<clear EOL>><<set style>>from".to_owned()),
         (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>><<set style>>".to_owned()),
         (cursor, " ".to_owned()),
-        (select_style, "<<updated style>>os<<set style>> <<updated style>>import<<set style>> <<updated style>>environ".to_owned()), 
-        (ContentStyle::default(), "<<reset style>>".to_owned()), 
-        (select_style, "~".to_owned()), 
-        (ContentStyle::default(), "<<reset style>><<go to row: 2 col: 19>>2 <<clear EOL>><<set style>>".to_owned()), 
-        (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>variable_data<<set style>> = <<updated style>>environ<<set style>>.<<updated style>>get<<set style>>(<<updated style>>\"crab\"<<set style>>, <<updated style>>\"crab\"<<set style>>)".to_owned()), 
-        (ContentStyle::default(), "<<reset style>>".to_owned()), 
-        (select_style, "~".to_owned()), 
-        (ContentStyle::default(), "<<go to row: 3 col: 19>>3 <<clear EOL>>".to_owned()), 
+        (
+            select_style,
+            "<<updated style>>os<<set style>> <<updated style>>import<<set style>> <<updated style>>environ".to_owned(),
+        ),
+        (ContentStyle::default(), "<<reset style>>".to_owned()),
         (select_style, "~".to_owned()),
-        (ContentStyle::default(), "<<go to row: 4 col: 19>>4 <<clear EOL>> <<go to row: 5 col: 19>>5 <<clear EOL>>print(f\"{varialbe_data} .. rocket\")".to_owned()),
+        (ContentStyle::default(), "<<reset style>><<go to row: 2 col: 19>>2 <<clear EOL>><<set style>>".to_owned()),
+        (
+            select_style,
+            "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>variable_data<<set style>> = <<updated style>>\
+            environ<<set style>>.<<updated style>>get<<set style>>(<<updated style>>\"crab\"<<set style>>, \
+            <<updated style>>\"crab\"<<set style>>)"
+                .to_owned(),
+        ),
+        (ContentStyle::default(), "<<reset style>>".to_owned()),
+        (select_style, "~".to_owned()),
+        (ContentStyle::default(), "<<go to row: 3 col: 19>>3 <<clear EOL>>".to_owned()),
+        (select_style, "~".to_owned()),
+        (
+            ContentStyle::default(),
+            "<<go to row: 4 col: 19>>4 <<clear EOL>> <<go to row: 5 col: 19>>5 \
+            <<clear EOL>>print(f\"{varialbe_data} .. rocket\")"
+                .to_owned(),
+        ),
         (select_style, "<<set style>>".to_owned()),
         (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
         (select_style, "<<padding: 102>>".to_owned()),
@@ -790,16 +804,33 @@ fn test_select_padding_complex() {
         (ContentStyle::default(), "<<go to row: 1 col: 19>>1 <<clear EOL>><<set style>>from".to_owned()),
         (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>><<set style>>".to_owned()),
         (cursor, " ".to_owned()),
-        (select_style, "<<updated style>>os<<set style>> <<updated style>>import<<set style>> <<updated style>>environ<<set style>>;".to_owned()),
+        (
+            select_style,
+            "<<updated style>>os<<set style>> <<updated style>>import<<set style>> \
+            <<updated style>>environ<<set style>>;"
+                .to_owned(),
+        ),
         (ContentStyle::default(), "<<reset style>>".to_owned()),
         (select_style, "~".to_owned()),
         (ContentStyle::default(), "<<reset style>><<go to row: 2 col: 19>>2 <<clear EOL>><<set style>>".to_owned()),
-        (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>variable_data<<set style>> = <<updated style>>environ<<set style>>.<<updated style>>get<<set style>>(<<updated style>>\"🦀\"<<set style>>, <<updated style>>\"🦀\"<<set style>>)".to_owned()),
+        (
+            select_style,
+            "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>variable_data<<set style>> = <<updated style>>\
+            environ<<set style>>.<<updated style>>get<<set style>>(<<updated style>>\"🦀\"<<set style>>, \
+            <<updated style>>\"🦀\"<<set style>>)"
+                .to_owned(),
+        ),
         (ContentStyle::default(), "<<reset style>>".to_owned()),
         (select_style, "~".to_owned()),
         (ContentStyle::default(), "<<go to row: 3 col: 19>>3 <<clear EOL>>".to_owned()),
         (select_style, "~".to_owned()),
-        (ContentStyle::default(), "<<go to row: 4 col: 19>>4 <<clear EOL>> <<go to row: 5 col: 19>>5 <<clear EOL>><<set style>>print<<reset style>>(f<<set style>>\"{varialbe_data} .. 🚀\"<<reset style>>)<<reset style>>".to_owned()),
+        (
+            ContentStyle::default(),
+            "<<go to row: 4 col: 19>>4 <<clear EOL>> <<go to row: 5 col: 19>>5 <<clear EOL>>\
+            <<set style>>print<<reset style>>(f<<set style>>\"{varialbe_data} .. 🚀\"\
+            <<reset style>>)<<reset style>>"
+                .to_owned(),
+        ),
         (select_style, "<<set style>>".to_owned()),
         (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
         (select_style, "<<padding: 102>>".to_owned()),
@@ -887,7 +918,396 @@ fn test_select_padding_complex() {
 }
 
 #[test]
-fn test_wrap_select() {}
+fn test_select_end_line_end() {
+    let mut editor = mock_editor(vec![]);
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 7), CrossTerm::init());
+    gs.force_area_calc();
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+    editor.cursor.select_set((0, 24).into(), (1, 40).into());
+    let select_style = ContentStyle::bg(gs.theme.selected);
+    let cursor = ContentStyle::reversed();
+
+    let base_text = vec![
+        String::from("use std::time::Duration;"),
+        String::from("const DUR: Duration = Duration::from_secs(69)"),
+    ];
+    editor.content = zip_text_tokens(
+        base_text.clone(),
+        vec![
+            SemanticToken { length: 3, token_type: 2, ..Default::default() },
+            SemanticToken { delta_start: 4, length: 3, token_type: 3, ..Default::default() },
+            SemanticToken { delta_start: 5, length: 4, token_type: 3, ..Default::default() },
+            SemanticToken { delta_start: 6, length: 8, token_type: 3, ..Default::default() },
+            SemanticToken { delta_line: 1, length: 5, token_type: 3, ..Default::default() },
+            SemanticToken { delta_start: 6, length: 3, token_type: 4, ..Default::default() },
+            SemanticToken { delta_start: 5, length: 8, token_type: 1, ..Default::default() },
+            SemanticToken { delta_start: 11, length: 8, token_type: 1, ..Default::default() },
+            SemanticToken { delta_start: 10, length: 9, token_type: 10, ..Default::default() },
+            SemanticToken { delta_start: 10, length: 2, token_type: 22, ..Default::default() },
+        ],
+    );
+
+    let expect = vec![
+        (ContentStyle::default(), "<<go to row: 1 col: 19>>1 <<clear EOL>>use std::time::Duration;".to_owned()),
+        (select_style, "~".to_owned()),
+        (ContentStyle::default(), "<<go to row: 2 col: 19>>2 <<clear EOL>><<set style>>".to_owned()),
+        (
+            select_style,
+            "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>const<<set style>> <<updated style>>\
+            DUR<<set style>>: <<updated style>>Duration<<set style>> = <<updated style>>\
+            Duration<<set style>>::<<updated style>>from_sec"
+                .to_owned(),
+        ),
+        (ContentStyle::default(), "<<set bg None>>".to_owned()),
+        (cursor, "s".to_owned()),
+        (
+            ContentStyle::default(),
+            "<<set style>>(<<updated style>>69<<set style>>)<<reset style>> <<reset style>>\
+            <<go to row: 3 col: 19>><<padding: 101>><<go to row: 4 col: 19>><<padding: 101>><<go to row: 5 col: 19>>\
+            <<padding: 101>>"
+                .to_owned(),
+        ),
+        (select_style, "<<set style>>".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
+        (select_style, "<<padding: 102>>".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 106>>".to_owned()),
+        (select_style, "(41 selected) ".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 80>>".to_owned()),
+        (select_style, "  Doc Len 2, Ln 2, Col 41 ".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
+        (select_style, "<<padding: 62>>".to_owned()),
+    ];
+
+    editor.lexer = mock_utf32_lexer(FileType::Rust);
+    editor.render(&mut gs);
+    gs.backend.drain();
+
+    editor.render(&mut gs);
+    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    assert_eq!(&result, &expect);
+
+    editor.lexer = mock_utf16_lexer(FileType::Rust);
+    editor.render(&mut gs);
+    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    assert_eq!(&result, &expect);
+
+    editor.lexer = mock_utf8_lexer(FileType::Rust);
+    editor.render(&mut gs);
+    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    assert_eq!(&result, &expect);
+}
 
 #[test]
-fn test_wrap_select_complex() {}
+fn test_select_end_line_end_complex() {
+    let mut editor = mock_editor(vec![]);
+    let mut gs = GlobalState::new(Rect::new(0, 0, 120, 7), CrossTerm::init());
+    gs.force_area_calc();
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+    editor.cursor.select_set((0, 15).into(), (1, 23).into());
+    let select_style = ContentStyle::bg(gs.theme.selected);
+    let cursor = ContentStyle::reversed();
+
+    let base_text = vec![
+        String::from("/// some docs 🦀"),
+        String::from("const ROCKET: &str = \"🚀\";"),
+    ];
+    editor.content = zip_text_tokens(
+        base_text.clone(),
+        vec![
+            SemanticToken { length: 15, token_type: 9, ..Default::default() },
+            SemanticToken { delta_line: 1, length: 5, token_type: 3, ..Default::default() },
+            SemanticToken { delta_start: 6, length: 6, token_type: 4, ..Default::default() },
+            SemanticToken { delta_start: 9, length: 3, token_type: 1, ..Default::default() },
+            SemanticToken { delta_start: 6, length: 3, token_type: 13, ..Default::default() },
+        ],
+    );
+
+    let expect = vec![
+        (
+            ContentStyle::default(),
+            "<<go to row: 1 col: 19>>1 <<clear EOL>><<set style>>/// some docs 🦀\
+            <<reset style>>"
+                .to_owned(),
+        ),
+        (select_style, "~".to_owned()),
+        (ContentStyle::default(), "<<go to row: 2 col: 19>>2 <<clear EOL>><<set style>>".to_owned()),
+        (
+            select_style,
+            "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>const<<set style>> <<updated style>>\
+            ROCKET<<set style>>: &<<updated style>>str<<set style>> = <<updated style>>\"🚀"
+                .to_owned(),
+        ),
+        (ContentStyle::default(), "<<set bg None>>".to_owned()),
+        (cursor, "\"".to_owned()),
+        (
+            ContentStyle::default(),
+            "<<set style>>;<<reset style>> <<reset style>><<go to row: 3 col: 19>>\
+            <<padding: 101>><<go to row: 4 col: 19>><<padding: 101>>\
+            <<go to row: 5 col: 19>><<padding: 101>>"
+                .to_owned(),
+        ),
+        (select_style, "<<set style>>".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
+        (select_style, "<<padding: 102>>".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 106>>".to_owned()),
+        (select_style, "(24 selected) ".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 80>>".to_owned()),
+        (select_style, "  Doc Len 2, Ln 2, Col 24 ".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
+        (select_style, "<<padding: 62>>".to_owned()),
+    ];
+
+    editor.lexer = mock_utf32_lexer(FileType::Rust);
+    editor.render(&mut gs);
+    gs.backend.drain();
+
+    editor.render(&mut gs);
+    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    assert_eq!(&result, &expect);
+
+    editor.content = zip_text_tokens(
+        base_text.clone(),
+        vec![
+            SemanticToken { length: 15, ..Default::default() },
+            SemanticToken { delta_line: 1, length: 5, token_type: 3, ..Default::default() },
+            SemanticToken { delta_start: 6, length: 6, token_type: 4, ..Default::default() },
+            SemanticToken { delta_start: 9, length: 3, token_type: 1, ..Default::default() },
+            SemanticToken { delta_start: 6, length: 4, token_type: 13, ..Default::default() },
+        ],
+    );
+    editor.lexer = mock_utf16_lexer(FileType::Rust);
+    editor.render(&mut gs);
+    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    assert_eq!(&result, &expect);
+
+    editor.content = zip_text_tokens(
+        base_text.clone(),
+        vec![
+            SemanticToken { length: 15, ..Default::default() },
+            SemanticToken { delta_line: 1, length: 5, token_type: 3, ..Default::default() },
+            SemanticToken { delta_start: 6, length: 6, token_type: 4, ..Default::default() },
+            SemanticToken { delta_start: 9, length: 3, token_type: 1, ..Default::default() },
+            SemanticToken { delta_start: 6, length: 6, token_type: 13, ..Default::default() },
+        ],
+    );
+    editor.lexer = mock_utf8_lexer(FileType::Rust);
+    editor.render(&mut gs);
+    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    assert_eq!(&result, &expect);
+}
+
+#[test]
+fn test_wrap_select() {
+    let mut editor = mock_editor(vec![]);
+    let mut gs = GlobalState::new(Rect::new(0, 0, 45, 7), CrossTerm::init());
+    gs.force_area_calc();
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+    editor.cursor.select_set((1, 5).into(), (1, 0).into());
+    let select_style = ContentStyle::bg(gs.theme.selected);
+    let cursor = ContentStyle::reversed();
+
+    let base_text = vec![
+        String::from("/// text to get wrapping docs crab"),
+        String::from("/// rocket "),
+    ];
+    editor.content = zip_text_tokens(
+        base_text.clone(),
+        vec![
+            SemanticToken { length: 15, token_type: 9, ..Default::default() },
+            SemanticToken { delta_line: 1, length: 7, token_type: 9, ..Default::default() },
+        ],
+    );
+
+    editor.render(&mut gs);
+    editor.map(crate::configs::EditorAction::SelectLeft, &mut gs);
+    editor.fast_render(&mut gs);
+    editor.map(crate::configs::EditorAction::SelectLeft, &mut gs);
+    editor.fast_render(&mut gs);
+    editor.map(crate::configs::EditorAction::SelectLeft, &mut gs);
+    gs.backend.drain();
+
+    let expect = vec![
+        (
+            ContentStyle::default(),
+            "<<go to row: 1 col: 15>>1 <<clear EOL>><\
+            <<updated style>>to get<<set style>> wrapping docs cr"
+                .to_owned(),
+        ),
+        (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>".to_owned()),
+        (cursor, "a".to_owned()),
+        (select_style, "b".to_owned()),
+        (
+            ContentStyle::default(),
+            "<<reset style>><<reset style>><<go to row: 3 col: 15>><<padding: 30>>\
+            <<go to row: 4 col: 15>><<padding: 30>><<go to row: 5 col: 15>><<padding: 30>>"
+                .to_owned(),
+        ),
+        (select_style, "<<set style>>".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 14>>".to_owned()),
+        (select_style, "<<padding: 31>>".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 32>>".to_owned()),
+        (select_style, "(8 selected) ".to_owned()),
+        (ContentStyle::default(), "<<go to row: 6 col: 14>>".to_owned()),
+        (select_style, "n 2, Ln 1, Col 33 ".to_owned()),
+    ];
+    editor.fast_render(&mut gs);
+    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    assert_eq!(&result, &expect);
+}
+
+#[test]
+fn test_wrap_select_complex() {
+    let mut editor = mock_editor(vec![]);
+    let mut gs = GlobalState::new(Rect::new(0, 0, 45, 7), CrossTerm::init());
+    gs.force_area_calc();
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+    let select_style = ContentStyle::bg(gs.theme.selected);
+    let cursor = ContentStyle::reversed();
+
+    let base_text = vec![
+        String::from("/// text to get wrapping docs 🦀"),
+        String::from("/// 🚀  "),
+    ];
+    editor.content = zip_text_tokens(
+        base_text.clone(),
+        vec![
+            SemanticToken { length: 15, token_type: 9, ..Default::default() },
+            SemanticToken { delta_line: 1, length: 7, token_type: 9, ..Default::default() },
+        ],
+    );
+
+    editor.lexer = mock_utf32_lexer(FileType::Rust);
+
+    editor.cursor.select_set((1, 5).into(), (1, 0).into());
+    editor.render(&mut gs);
+    editor.map(crate::configs::EditorAction::SelectLeft, &mut gs);
+    editor.fast_render(&mut gs);
+    editor.map(crate::configs::EditorAction::SelectLeft, &mut gs);
+    editor.fast_render(&mut gs);
+    editor.map(crate::configs::EditorAction::SelectLeft, &mut gs);
+
+    gs.backend.drain();
+    editor.fast_render(&mut gs);
+    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    assert_eq!(
+        result,
+        vec![
+            (
+                ContentStyle::default(),
+                "<<go to row: 1 col: 15>>1 <<clear EOL>><<updated style>><t to get\
+            <<set style>> wrapping docs"
+                    .to_owned()
+            ),
+            (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>".to_owned()),
+            (cursor, " ".to_owned()),
+            (select_style, "🦀".to_owned()),
+            (
+                ContentStyle::default(),
+                "<<reset style>><<reset style>><<go to row: 3 col: 15>><<padding: 30>>\
+            <<go to row: 4 col: 15>><<padding: 30>><<go to row: 5 col: 15>><<padding: 30>>"
+                    .to_owned()
+            ),
+            (select_style, "<<set style>>".to_owned()),
+            (ContentStyle::default(), "<<go to row: 6 col: 14>>".to_owned()),
+            (select_style, "<<padding: 31>>".to_owned()),
+            (ContentStyle::default(), "<<go to row: 6 col: 32>>".to_owned()),
+            (select_style, "(8 selected) ".to_owned()),
+            (ContentStyle::default(), "<<go to row: 6 col: 14>>".to_owned()),
+            (select_style, "n 2, Ln 1, Col 30 ".to_owned())
+        ]
+    );
+
+    editor.content = zip_text_tokens(
+        base_text.clone(),
+        vec![
+            SemanticToken { length: 16, token_type: 9, ..Default::default() },
+            SemanticToken { delta_line: 1, length: 8, token_type: 9, ..Default::default() },
+        ],
+    );
+
+    editor.cursor.select_set((1, 5).into(), (1, 0).into());
+    editor.render(&mut gs);
+    editor.map(crate::configs::EditorAction::SelectLeft, &mut gs);
+    editor.fast_render(&mut gs);
+    editor.map(crate::configs::EditorAction::SelectLeft, &mut gs);
+    editor.fast_render(&mut gs);
+    editor.map(crate::configs::EditorAction::SelectLeft, &mut gs);
+
+    editor.lexer = mock_utf16_lexer(FileType::Rust);
+    gs.backend.drain();
+    editor.fast_render(&mut gs);
+    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    assert_eq!(
+        result,
+        vec![
+            (
+                ContentStyle::default(),
+                "<<go to row: 1 col: 15>>1 <<clear EOL>><<updated style>><t to get <<set style>>wrapping docs"
+                    .to_owned()
+            ),
+            (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>".to_owned()),
+            (cursor, " ".to_owned()),
+            (select_style, "🦀".to_owned()),
+            (
+                ContentStyle::default(),
+                "<<reset style>><<reset style>><<go to row: 3 col: 15>><<padding: 30>>\
+            <<go to row: 4 col: 15>><<padding: 30>><<go to row: 5 col: 15>><<padding: 30>>"
+                    .to_owned()
+            ),
+            (select_style, "<<set style>>".to_owned()),
+            (ContentStyle::default(), "<<go to row: 6 col: 14>>".to_owned()),
+            (select_style, "<<padding: 31>>".to_owned()),
+            (ContentStyle::default(), "<<go to row: 6 col: 32>>".to_owned()),
+            (select_style, "(8 selected) ".to_owned()),
+            (ContentStyle::default(), "<<go to row: 6 col: 14>>".to_owned()),
+            (select_style, "n 2, Ln 1, Col 30 ".to_owned())
+        ]
+    );
+
+    editor.content = zip_text_tokens(
+        base_text.clone(),
+        vec![
+            SemanticToken { length: 18, token_type: 9, ..Default::default() },
+            SemanticToken { delta_line: 1, length: 10, token_type: 9, ..Default::default() },
+        ],
+    );
+
+    editor.cursor.select_set((1, 5).into(), (1, 0).into());
+    editor.render(&mut gs);
+    editor.map(crate::configs::EditorAction::SelectLeft, &mut gs);
+    editor.fast_render(&mut gs);
+    editor.map(crate::configs::EditorAction::SelectLeft, &mut gs);
+    editor.fast_render(&mut gs);
+    editor.map(crate::configs::EditorAction::SelectLeft, &mut gs);
+
+    editor.lexer = mock_utf8_lexer(FileType::Rust);
+    gs.backend.drain();
+    editor.fast_render(&mut gs);
+    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    assert_eq!(
+        result,
+        vec![
+            (
+                ContentStyle::default(),
+                "<<go to row: 1 col: 15>>1 <<clear EOL>><<updated style>><t to get wr<<set style>>apping docs"
+                    .to_owned()
+            ),
+            (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>".to_owned()),
+            (cursor, " ".to_owned()),
+            (select_style, "🦀".to_owned()),
+            (
+                ContentStyle::default(),
+                "<<reset style>><<reset style>><<go to row: 3 col: 15>><<padding: 30>>\
+            <<go to row: 4 col: 15>><<padding: 30>><<go to row: 5 col: 15>><<padding: 30>>"
+                    .to_owned()
+            ),
+            (select_style, "<<set style>>".to_owned()),
+            (ContentStyle::default(), "<<go to row: 6 col: 14>>".to_owned()),
+            (select_style, "<<padding: 31>>".to_owned()),
+            (ContentStyle::default(), "<<go to row: 6 col: 32>>".to_owned()),
+            (select_style, "(8 selected) ".to_owned()),
+            (ContentStyle::default(), "<<go to row: 6 col: 14>>".to_owned()),
+            (select_style, "n 2, Ln 1, Col 30 ".to_owned())
+        ]
+    );
+}
