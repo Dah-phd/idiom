@@ -1,8 +1,7 @@
-use super::{pad_select, WRAP_CLOSE, WRAP_OPEN};
+use super::{SelectManager, WRAP_CLOSE, WRAP_OPEN};
 use crate::{
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
-    workspace::cursor::CharRange,
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::{ContentStyle, Stylize};
@@ -12,7 +11,7 @@ pub fn render(
     line: &mut EditorLine,
     ctx: &mut LineContext,
     line_width: usize,
-    select: Option<CharRange>,
+    select: Option<SelectManager>,
     gs: &mut GlobalState,
 ) {
     if line_width > line.char_len() {
@@ -94,10 +93,8 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut CrossTerm) {
 }
 
 #[inline]
-pub fn select(line: &EditorLine, ctx: &LineContext, select: CharRange, gs: &mut GlobalState) {
-    let select_color = gs.theme.selected;
+pub fn select(line: &EditorLine, ctx: &LineContext, mut select: SelectManager, gs: &mut GlobalState) {
     let backend = gs.backend();
-
     let mut reset_style = ContentStyle::default();
     let mut iter_tokens = line.iter_tokens();
     let mut counter = 0;
@@ -116,14 +113,7 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: CharRange, gs: &mut 
         last_len = token.len;
     };
     for text in line.chars() {
-        if select.from == idx {
-            backend.set_bg(Some(select_color));
-            reset_style.set_bg(Some(select_color));
-        }
-        if select.to == idx {
-            backend.set_bg(None);
-            reset_style.set_bg(None);
-        }
+        select.set_style(idx, &mut reset_style, backend);
         if counter == 0 {
             match lined_up.take() {
                 None => match iter_tokens.next() {
@@ -161,10 +151,8 @@ pub fn select(line: &EditorLine, ctx: &LineContext, select: CharRange, gs: &mut 
     backend.reset_style();
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
-    } else if select.to >= line.char_len() {
-        pad_select(gs);
     } else {
-        backend.print(" ");
+        select.pad(gs);
     }
 }
 
@@ -245,7 +233,7 @@ pub fn partial_select(
     line: &mut EditorLine,
     ctx: &LineContext,
     line_width: usize,
-    select: CharRange,
+    mut select: SelectManager,
     gs: &mut GlobalState,
 ) {
     let backend = &mut gs.backend;
@@ -259,12 +247,9 @@ pub fn partial_select(
     let mut lined_up = None;
     let mut tokens = line.iter_tokens();
     let mut cursor = idx;
-    let select_color = gs.theme.selected;
     let mut reset_style = ContentStyle::default();
-    if select.from <= idx && idx < select.to {
-        reset_style.set_bg(Some(select_color));
-        backend.set_bg(Some(select_color));
-    }
+
+    select.go_to_index(idx, &mut reset_style, backend);
 
     for token in tokens.by_ref() {
         if token.delta_start + token.len > cursor {
@@ -283,15 +268,7 @@ pub fn partial_select(
 
     let content = unsafe { line.as_str().get_unchecked(idx..) };
     for text in content.chars().take(line_width.saturating_sub(reduction)) {
-        if select.from == idx {
-            reset_style.set_bg(Some(select_color));
-            backend.set_bg(Some(select_color));
-        }
-        if select.to == idx {
-            reset_style.set_bg(None);
-            backend.set_bg(None);
-        }
-
+        select.set_style(idx, &mut reset_style, backend);
         if counter == 0 {
             match lined_up.take() {
                 None => match tokens.next() {

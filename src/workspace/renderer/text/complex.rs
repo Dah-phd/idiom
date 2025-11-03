@@ -1,7 +1,8 @@
+use super::SelectManagerSimple;
 use crate::{
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
-    workspace::cursor::CharRange,
+    workspace::cursor::CharRangeUnbound,
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::ContentStyle;
@@ -28,12 +29,11 @@ pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, 
 
 pub fn line_with_select(
     text: &mut EditorLine,
-    select: CharRange,
+    mut select: SelectManagerSimple,
     lines: &mut RectIter,
     ctx: &mut LineContext,
     gs: &mut GlobalState,
 ) {
-    let select_color = gs.theme.selected;
     let backend = gs.backend();
 
     let Some(line) = lines.next() else { return };
@@ -52,12 +52,7 @@ pub fn line_with_select(
 
         remaining_width -= current_width;
 
-        if select.from == idx {
-            backend.set_bg(Some(select_color));
-        }
-        if select.to == idx {
-            backend.reset_style();
-        }
+        select.set_style(idx, backend);
         backend.print(text);
     }
     backend.reset_style();
@@ -65,13 +60,13 @@ pub fn line_with_select(
 
 pub fn cursor(
     text: &mut EditorLine,
-    select: Option<CharRange>,
+    select: Option<CharRangeUnbound>,
     skip: usize,
     lines: &mut RectIter,
     ctx: &mut LineContext,
     gs: &mut GlobalState,
 ) {
-    match select {
+    match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
         Some(select) => self::select(text, select, skip, lines, ctx, gs),
         None => self::basic(text, skip, lines, ctx, gs.backend()),
     }
@@ -137,13 +132,12 @@ pub fn basic(
 #[inline]
 pub fn select(
     text: &mut EditorLine,
-    select: CharRange,
+    mut select: SelectManagerSimple,
     mut skip: usize,
     lines: &mut RectIter,
     ctx: &mut LineContext,
     gs: &mut GlobalState,
 ) {
-    let select_color = gs.theme.selected;
     let backend = gs.backend();
 
     let Some(line) = lines.next() else { return };
@@ -160,9 +154,7 @@ pub fn select(
                 remaining_width = line_width - char_w;
                 skip -= 1;
                 if skip == 0 {
-                    if idx > select.from && select.to > idx {
-                        backend.set_bg(Some(select_color));
-                    }
+                    select.go_to_index(idx, backend);
                     backend.print(ch);
                     break;
                 }
@@ -184,13 +176,7 @@ pub fn select(
 
         remaining_width -= current_width;
 
-        if select.from == idx {
-            backend.set_bg(Some(select_color));
-        }
-        if select.to == idx {
-            backend.set_bg(None);
-        }
-
+        select.set_style(idx, backend);
         if cursor_idx == idx {
             backend.print_styled(text, ContentStyle::reversed())
         } else {

@@ -1,8 +1,7 @@
-use super::WRAP_CLOSE;
+use super::{SelectManager, WRAP_CLOSE};
 use crate::{
-    ext_tui::{CrossTerm, StyleExt},
+    ext_tui::CrossTerm,
     global_state::GlobalState,
-    workspace::cursor::CharRange,
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::{ContentStyle, Stylize};
@@ -75,12 +74,11 @@ pub fn complex_line(
 pub fn complex_line_with_select(
     code: &EditorLine,
     mut line_width: usize,
-    select: CharRange,
+    mut select: SelectManager,
     ctx: &mut LineContext,
     gs: &mut GlobalState,
 ) -> Option<usize> {
     let char_position = ctx.char_lsp_pos;
-    let select_color = gs.theme.selected;
     let backend = gs.backend();
     let mut reset_style = ContentStyle::default();
     let mut iter_tokens = code.iter_tokens();
@@ -107,14 +105,7 @@ pub fn complex_line_with_select(
         } else {
             line_width -= width;
         }
-        if select.from == idx {
-            backend.set_bg(Some(select_color));
-            reset_style.set_bg(Some(select_color));
-        }
-        if select.to == idx {
-            backend.set_bg(None);
-            reset_style.set_bg(None);
-        }
+        select.set_style(idx, &mut reset_style, backend);
         if counter == 0 {
             match lined_up.take() {
                 None => match iter_tokens.next() {
@@ -146,5 +137,6 @@ pub fn complex_line_with_select(
     }
 
     backend.reset_style();
+    select.pad(gs);
     Some(line_width)
 }

@@ -3,7 +3,7 @@ use super::EditorLine;
 use crate::{
     ext_tui::CrossTerm,
     workspace::{
-        cursor::{CharRange, Cursor},
+        cursor::{CharRange, CharRangeUnbound, Cursor},
         CursorPosition,
     },
 };
@@ -101,8 +101,8 @@ impl LineContext {
     }
 
     #[inline(always)]
-    pub fn select_get(&self, char_len: usize) -> Option<CharRange> {
-        build_select_buffer(self.select, self.line_number, char_len)
+    pub fn select_get(&self) -> Option<CharRangeUnbound> {
+        build_select_buffer(self.select, self.line_number)
     }
 
     #[inline(always)]
@@ -149,7 +149,9 @@ impl LineContext {
             let max_len = width - (self.line_number_padding + 1);
             let select_ranges = selects
                 .into_iter()
-                .flat_map(|select| build_select_buffer(Some(select), self.line_number, max_len))
+                .flat_map(|select| {
+                    build_select_buffer(Some(select), self.line_number).map(|range| range.bound(max_len))
+                })
                 .collect();
             if let Some(last) = positions.last() {
                 self.cursor_line = last.line;
@@ -169,13 +171,12 @@ impl LineContext {
 pub fn build_select_buffer(
     select: Option<(CursorPosition, CursorPosition)>,
     at_line: usize,
-    max_len: usize,
-) -> Option<CharRange> {
+) -> Option<CharRangeUnbound> {
     select.and_then(|(from, to)| match (from.line.cmp(&at_line), at_line.cmp(&to.line)) {
         (Ordering::Greater, ..) | (.., Ordering::Greater) => None,
-        (Ordering::Less, Ordering::Less) => Some(CharRange { from: 0, to: max_len }),
-        (Ordering::Equal, Ordering::Equal) => Some(CharRange { from: from.char, to: to.char }),
-        (Ordering::Equal, ..) => Some(CharRange { from: from.char, to: max_len }),
-        (.., Ordering::Equal) => Some(CharRange { from: 0, to: to.char }),
+        (Ordering::Less, Ordering::Less) => Some(CharRangeUnbound { from: None, to: None }),
+        (Ordering::Equal, Ordering::Equal) => Some(CharRangeUnbound { from: Some(from.char), to: Some(to.char) }),
+        (Ordering::Equal, ..) => Some(CharRangeUnbound { from: Some(from.char), to: None }),
+        (.., Ordering::Equal) => Some(CharRangeUnbound { from: None, to: Some(to.char) }),
     })
 }

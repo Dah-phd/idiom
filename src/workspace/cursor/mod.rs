@@ -6,7 +6,7 @@ use idiom_tui::layout::Rect;
 use lsp_types::Position;
 use serde::{Deserialize, Serialize};
 
-pub use positions::{CharRange, CursorPosition, Select, SelectPosition};
+pub use positions::{CharRange, CharRangeUnbound, CursorPosition, Select, SelectPosition};
 pub use word::{EncodedWordRange, PositionedWord, WordRange};
 
 #[derive(Debug, Default, Deserialize, Serialize, Clone, PartialEq)]

@@ -1,9 +1,5 @@
-use crate::{
-    ext_tui::{CrossTerm, StyleExt},
-    global_state::GlobalState,
-    syntax::tokens::TokenLine,
-    workspace::cursor::CharRange,
-};
+use super::SelectManager;
+use crate::{ext_tui::CrossTerm, global_state::GlobalState, syntax::tokens::TokenLine};
 use crossterm::style::ContentStyle;
 use idiom_tui::Backend;
 
@@ -49,10 +45,9 @@ pub fn ascii_line(content: &str, tokens: &TokenLine, backend: &mut CrossTerm) {
 pub fn ascii_line_with_select(
     content: impl Iterator<Item = char>,
     tokens: &TokenLine,
-    select: CharRange,
+    mut select: SelectManager,
     gs: &mut GlobalState,
 ) {
-    let select_color = gs.theme.selected;
     let backend = gs.backend();
     let mut reset_style = ContentStyle::default();
     let mut iter_tokens = tokens.iter();
@@ -70,14 +65,7 @@ pub fn ascii_line_with_select(
         last_len = token.len;
     };
     for (idx, text) in content.enumerate() {
-        if select.from == idx {
-            backend.set_bg(Some(select_color));
-            reset_style.set_bg(Some(select_color));
-        }
-        if select.to == idx {
-            backend.set_bg(None);
-            reset_style.set_bg(None);
-        }
+        select.set_style(idx, &mut reset_style, backend);
         if counter == 0 {
             match lined_up.take() {
                 Some(style) => {
@@ -108,4 +96,5 @@ pub fn ascii_line_with_select(
         backend.print(text);
     }
     backend.reset_style();
+    select.pad(gs);
 }

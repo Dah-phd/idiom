@@ -1,7 +1,8 @@
+use super::{pad_select, SelectManagerSimple};
 use crate::{
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
-    workspace::cursor::CharRange,
+    workspace::cursor::CharRangeUnbound,
     workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::ContentStyle;
@@ -24,19 +25,18 @@ pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, 
 
 pub fn line_with_select(
     text: &mut EditorLine,
-    select: CharRange,
+    mut select: SelectManagerSimple,
     lines: &mut RectIter,
     ctx: &mut LineContext,
     gs: &mut GlobalState,
 ) {
-    let select_color = gs.theme.selected;
     let backend = gs.backend();
 
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
 
     if text.char_len() == 0 {
-        backend.print_styled(" ", ContentStyle::bg(select_color));
+        pad_select(gs);
         return;
     }
 
@@ -51,12 +51,7 @@ pub fn line_with_select(
             backend.set_style(reset_style);
             line_end += line_width;
         }
-        if select.from == idx {
-            backend.set_bg(Some(select_color));
-        }
-        if select.to == idx {
-            backend.reset_style();
-        }
+        select.set_style(idx, backend);
         backend.print(text);
     }
     backend.reset_style();
@@ -64,13 +59,13 @@ pub fn line_with_select(
 
 pub fn cursor(
     text: &mut EditorLine,
-    select: Option<CharRange>,
+    select: Option<CharRangeUnbound>,
     skip: usize,
     lines: &mut RectIter,
     ctx: &mut LineContext,
     gs: &mut GlobalState,
 ) {
-    match select {
+    match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
         Some(select) => self::select(text, skip, select, lines, ctx, gs),
         None => self::basic(text, skip, lines, ctx, gs.backend()),
     }
@@ -115,12 +110,11 @@ pub fn basic(text: &mut EditorLine, skip: usize, lines: &mut RectIter, ctx: &mut
 pub fn select(
     text: &mut EditorLine,
     skip: usize,
-    select: CharRange,
+    mut select: SelectManagerSimple,
     lines: &mut RectIter,
     ctx: &mut LineContext,
     gs: &mut GlobalState,
 ) {
-    let select_color = gs.theme.selected;
     let backend = gs.backend();
 
     let Some(line) = lines.next() else { return };
@@ -129,9 +123,7 @@ pub fn select(
     let mut idx = skip * line_width;
     let mut line_end = line_width + idx;
 
-    if select.from < idx && idx < select.to {
-        backend.set_bg(Some(select_color));
-    }
+    select.go_to_index(idx, backend);
 
     for text in text.chars().skip(idx) {
         if idx == line_end {
@@ -142,13 +134,7 @@ pub fn select(
             backend.set_style(reset_style);
             line_end += line_width;
         }
-        if select.from == idx {
-            backend.set_bg(Some(select_color));
-        }
-        if select.to == idx {
-            backend.set_bg(None);
-        }
-
+        select.set_style(idx, backend);
         if cursor_idx == idx {
             backend.print_styled(text, ContentStyle::reversed())
         } else {

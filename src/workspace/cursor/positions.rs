@@ -20,8 +20,52 @@ impl CharRange {
         self.from == self.to
     }
 
+    pub fn len(&self) -> usize {
+        self.to - self.from
+    }
+
     pub fn into_select(self, line: usize) -> Select {
         (CursorPosition { line, char: self.from }, CursorPosition { line, char: self.to })
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct CharRangeUnbound {
+    pub from: Option<usize>,
+    pub to: Option<usize>,
+}
+
+#[allow(dead_code)]
+impl CharRangeUnbound {
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        let start = self.from.unwrap_or_default();
+        self.to == Some(start)
+    }
+
+    #[inline]
+    pub fn is_all(&self) -> bool {
+        self.from.is_none() && self.to.is_none()
+    }
+
+    #[inline]
+    pub fn has_bound_start(&self) -> bool {
+        self.from.is_some()
+    }
+
+    #[inline]
+    pub fn start(&self) -> usize {
+        self.from.unwrap_or_default()
+    }
+
+    #[inline]
+    pub fn end(&self) -> Option<usize> {
+        self.to
+    }
+
+    #[inline]
+    pub fn bound(self, max_range: usize) -> CharRange {
+        CharRange { from: self.from.unwrap_or_default(), to: self.to.unwrap_or(max_range) }
     }
 }
 

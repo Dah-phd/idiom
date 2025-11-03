@@ -1,24 +1,23 @@
 mod ascii;
 mod complex;
 mod parser;
-
-use crossterm::style::{Attribute, Attributes, Color, ContentStyle, Stylize};
-use parser::{parse, Block, ListItem, Span};
-
+use super::utils::{pad_select, SelectManagerSimple};
 use crate::{
     ext_tui::CrossTerm,
     global_state::GlobalState,
     syntax::tokens::{calc_wrap_line, calc_wrap_line_capped},
     workspace::{
-        cursor::{CharRange, Cursor},
+        cursor::{CharRangeUnbound, Cursor},
         line::{EditorLine, LineContext},
     },
 };
+use crossterm::style::{Attribute, Attributes, Color, ContentStyle, Stylize};
 use idiom_tui::{
     layout::{IterLines, RectIter},
     utils::CharLimitedWidths,
     Backend,
 };
+use parser::{parse, Block, ListItem, Span};
 
 const HEADING: ContentStyle = ContentStyle {
     foreground_color: Some(Color::DarkRed),
@@ -274,7 +273,7 @@ fn calc_rows(content: &mut [EditorLine], cursor: &Cursor) -> usize {
 #[inline(always)]
 pub fn cursor(
     text: &mut EditorLine,
-    select: Option<CharRange>,
+    select: Option<CharRangeUnbound>,
     skip: usize,
     ctx: &mut LineContext,
     lines: &mut RectIter,
@@ -290,18 +289,18 @@ pub fn cursor(
 #[inline(always)]
 pub fn line(
     text: &mut EditorLine,
-    select: Option<CharRange>,
+    select: Option<CharRangeUnbound>,
     ctx: &mut LineContext,
     lines: &mut RectIter,
     gs: &mut GlobalState,
 ) {
     text.cached.line(lines.next_line_idx(), select.clone());
     match text.is_simple() {
-        true => match select {
+        true => match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
             Some(select) => ascii::line_with_select(text, select, lines, ctx, gs),
             None => ascii::line(text, lines, ctx, gs.backend()),
         },
-        false => match select {
+        false => match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
             Some(select) => complex::line_with_select(text, select, lines, ctx, gs),
             None => complex::line(text, lines, ctx, gs.backend()),
         },
