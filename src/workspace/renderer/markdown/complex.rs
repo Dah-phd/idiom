@@ -41,6 +41,11 @@ pub fn line_with_select(
         backend.print(text);
     }
     backend.reset_style();
+    if remaining_width == 0 {
+        let Some(line) = lines.next() else { return };
+        ctx.wrap_line(line, backend);
+    }
+    select.pad(gs);
 }
 
 pub fn cursor(
@@ -101,10 +106,16 @@ pub fn basic(
         }
         idx += 1;
     }
+    backend.reset_style();
+    if remaining_width == 0 {
+        let Some(line) = lines.next() else { return };
+        ctx.wrap_line(line, backend);
+    }
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
+    } else {
+        backend.print(" ");
     }
-    backend.reset_style();
 }
 
 #[inline]
@@ -161,8 +172,14 @@ pub fn select(
         }
         idx += 1;
     }
+    backend.reset_style();
+    if remaining_width == 0 {
+        let Some(line) = lines.next() else { return };
+        ctx.wrap_line(line, backend);
+    }
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
+    } else {
+        select.pad(gs);
     }
-    backend.reset_style();
 }

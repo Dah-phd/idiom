@@ -33,7 +33,8 @@ pub fn line_with_select(
 
     let mut line_end = line_width;
 
-    for (idx, text) in text.chars().enumerate() {
+    let mut idx = 0;
+    for text in text.chars() {
         if idx == line_end {
             let Some(line) = lines.next() else { return };
             let reset_style = backend.get_style();
@@ -44,8 +45,14 @@ pub fn line_with_select(
         }
         select.set_style(idx, backend);
         backend.print(text);
+        idx += 1;
     }
     backend.reset_style();
+    if idx >= line_end {
+        let Some(line) = lines.next() else { return };
+        ctx.wrap_line(line, backend);
+    }
+    select.pad(gs);
 }
 
 pub fn cursor(
@@ -82,10 +89,16 @@ pub fn basic(text: &mut EditorLine, skip: usize, lines: &mut RectIter, ctx: &mut
         }
         idx += 1;
     }
+    backend.reset_style();
+    if idx >= line_end {
+        let Some(line) = lines.next() else { return };
+        ctx.wrap_line(line, backend);
+    }
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
+    } else {
+        backend.print(" ");
     }
-    backend.reset_style();
 }
 
 #[inline]
@@ -125,9 +138,14 @@ pub fn select(
         idx += 1;
     }
 
+    backend.reset_style();
+    if idx >= line_end {
+        let Some(line) = lines.next() else { return };
+        ctx.wrap_line(line, backend);
+    }
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
+    } else {
+        select.pad(gs);
     }
-
-    backend.reset_style();
 }

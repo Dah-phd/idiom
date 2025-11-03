@@ -76,6 +76,10 @@ impl<'a, 'b> StyledParser<'a, 'b> {
                 None => return,
             }
         }
+        if limit == 0 {
+            let Some(line) = self.lines.next() else { return };
+            self.ctx.wrap_line(line, self.backend);
+        }
     }
 
     fn print_block(&mut self, block: Block, mut limit: usize) -> Option<usize> {
