@@ -185,10 +185,10 @@ fn simple_line_select() {
     let mut rendered = gs.backend().drain();
     let style_select = gs.theme.selected;
     assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["## TADA".into()]));
-    expect_select(7, 13, style_select, ctx.accent_style, &rendered);
+    expect_select(7, 14, style_select, ctx.accent_style, &rendered);
     assert_eq!(
         parse_complex_line(&mut rendered),
-        (Some(2), ["- write", " tests"].into_iter().map(String::from).collect())
+        (Some(2), ["- write", " tests", "~"].into_iter().map(String::from).collect())
     );
     expect_select(0, 37, style_select, ctx.accent_style, &rendered);
     assert_eq!(parse_complex_line(&mut rendered), (Some(3), vec!["- lsp server cold start, maybe? \"jedi".into()]));
@@ -239,10 +239,10 @@ fn complex_line_select() {
     let mut rendered = gs.backend().drain();
     let style_select = gs.theme.selected;
     assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["## 🔥TADA🔥".into()]));
-    expect_select(7, 13, style_select, ctx.accent_style, &rendered);
+    expect_select(7, 14, style_select, ctx.accent_style, &rendered);
     assert_eq!(
         parse_complex_line(&mut rendered),
-        (Some(2), ["- write", " tests"].into_iter().map(String::from).collect())
+        (Some(2), ["- write", " tests", "~"].into_iter().map(String::from).collect())
     );
     expect_select(0, 36, style_select, ctx.accent_style, &rendered);
     assert_eq!(parse_complex_line(&mut rendered), (Some(3), vec!["- lsp server cold start, maybe? \"j🔥d".into()]));
@@ -300,18 +300,14 @@ fn test_full_end_line() {
     assert_eq!(
         text,
         [
-            "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
-            "GlobalState::new(Rect::new(0, ",
-            "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
-            "0, 30, 60), CrossTerm::init())",
-            "<<go to row: 3 col: 15>>", "2 ", "<<clear EOL>>",
-            "?", "/", "a", " ",  // prev line now has one less line because is no longer cursor
-            "<<reset style>>",
-            "<<go to row: 4 col: 15>>", "<<padding: 32>>", "<<set style>>",
+            "<<freeze>>",
+            "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "GlobalState::new(Rect::new(0, ",
+            "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "0, 30, 60), CrossTerm::init())",
+            "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
+            "<<go to row: 4 col: 15>>", "2 ", "<<clear EOL>>", "?", "/", "a", " ", "<<reset style>>", "<<set style>>",
             "<<go to row: 5 col: 14>>", "<<padding: 33>>",
             "<<go to row: 5 col: 22>>", "  Doc Len 2, Ln 2, Col 1 ",
-            "<<go to row: 5 col: 14>>", "<<padding: 8>>",
-            "<<reset style>>",
+            "<<go to row: 5 col: 14>>", "<<padding: 8>>", "<<reset style>>",
             "<<unfreeze>>"
         ]
     );
@@ -574,18 +570,14 @@ fn test_full_end_line_complex() {
     assert_eq!(
         text,
         [
-            "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
-            "GlobalState::new(Rect::new(0, ",
-            "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
-            "0, 30, 60), Cro🦀Term::init())",
-            "<<go to row: 3 col: 15>>", "2 ", "<<clear EOL>>",
-            "?", "/", "a", " ",  // prev line now has one less line because is no longer cursor
-            "<<reset style>>",
-            "<<go to row: 4 col: 15>>", "<<padding: 32>>", "<<set style>>",
+            "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "GlobalState::new(Rect::new(0, ",
+            "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "0, 30, 60), Cro🦀Term::init())",
+            "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", // last line is filled to end
+            "<<go to row: 4 col: 15>>", "2 ", "<<clear EOL>>", "?", "/", "a", " ", "<<reset style>>", "<<set style>>",
             "<<go to row: 5 col: 14>>", "<<padding: 33>>",
             "<<go to row: 5 col: 22>>", "  Doc Len 2, Ln 2, Col 1 ",
             "<<go to row: 5 col: 14>>", "<<padding: 8>>",
-            "<<reset style>>",
+            "<<reset style>>", 
             "<<unfreeze>>"
         ]
     );

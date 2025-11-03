@@ -19,11 +19,18 @@ pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, 
 
     let Some(chunk) = chunks.next() else { return };
     backend.print(chunk.text);
+    let mut last_chunk_w = chunk.width;
 
     for chunk in chunks {
         let Some(line) = lines.next() else { return };
         ctx.wrap_line(line, backend);
         backend.print(chunk.text);
+        last_chunk_w = chunk.width;
+    }
+
+    if last_chunk_w == line_width {
+        let Some(line) = lines.next() else { return };
+        ctx.wrap_line(line, backend);
     }
 }
 
@@ -56,6 +63,11 @@ pub fn line_with_select(
         backend.print(text);
     }
     backend.reset_style();
+    if remaining_width == 0 {
+        let Some(line) = lines.next() else { return };
+        ctx.wrap_line(line, backend);
+    }
+    select.pad(gs);
 }
 
 pub fn cursor(

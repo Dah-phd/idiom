@@ -302,8 +302,7 @@ pub fn calc_wraps(content: &mut [EditorLine], text_width: usize) {
 
 pub fn calc_wrap_line(text: &mut EditorLine, text_width: usize) -> usize {
     if text.is_simple() {
-        let token =
-            Token { len: 0, delta_start: text.len().saturating_sub(1) / text_width, style: ContentStyle::default() };
+        let token = Token { len: 0, delta_start: text.len() / text_width, style: ContentStyle::default() };
         let tokens = text.tokens_mut_unchecked();
         tokens.clear();
         tokens.push(token);
@@ -317,7 +316,8 @@ pub fn complex_wrap_calc(text: &mut EditorLine, text_width: usize) {
     text.tokens_mut_unchecked().clear();
     let mut counter = text_width;
     let mut wraps = Token { delta_start: 0, len: 0, style: ContentStyle::default() };
-    for ch in text.chars() {
+    // added padding
+    for ch in text.chars().chain(['~']) {
         let w = UnicodeWidthChar::width(ch).unwrap_or_default();
         if w > counter {
             counter = text_width;
@@ -334,7 +334,8 @@ pub fn calc_wrap_line_capped(text: &mut EditorLine, cursor: &Cursor) -> Option<u
     let max_rows = cursor.max_rows;
     text.tokens_mut_unchecked().clear();
     if text.is_simple() {
-        let token = Token { len: 0, delta_start: text.len() / text_width, style: ContentStyle::default() };
+        // added padding
+        let token = Token { len: 0, delta_start: (text.len() + 1) / text_width, style: ContentStyle::default() };
         text.tokens_mut_unchecked().push(token);
         let cursor_at_row = 2 + cursor_char / text_width;
         if cursor_at_row > max_rows {
@@ -345,7 +346,8 @@ pub fn calc_wrap_line_capped(text: &mut EditorLine, cursor: &Cursor) -> Option<u
         let mut cursor_at_row = 1;
         let mut prev_idx_break = 0;
         let mut wraps = Token { delta_start: 0, len: 0, style: ContentStyle::default() };
-        for (idx, ch) in text.chars().enumerate() {
+        // added padding
+        for (idx, ch) in text.chars().chain(['~']).enumerate() {
             let w = UnicodeWidthChar::width(ch).unwrap_or_default();
             if w > counter {
                 counter = text_width;
