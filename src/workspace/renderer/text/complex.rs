@@ -184,7 +184,7 @@ pub fn select(
         }
         idx += 1;
     }
-
+    backend.reset_style();
     if remaining_width == 0 {
         if let Some(line) = lines.next() {
             ctx.wrap_line(line, backend);
@@ -193,7 +193,6 @@ pub fn select(
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
     } else {
-        backend.print(" ");
+        select.pad(gs);
     }
-    backend.reset_style();
 }

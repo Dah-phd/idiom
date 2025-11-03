@@ -108,7 +108,7 @@ fn cursor_select() {
         parse_complex_line(&mut rendered),
         (None, vec!["me".into(), "nt - so if you want to try it do it".into()])
     );
-    assert_eq!(parse_complex_line(&mut rendered), (None, vec![" with caution.** ".into()]));
+    assert_eq!(parse_complex_line(&mut rendered), (None, vec![" with caution.**".into(), " ".into()]));
     assert!(rendered.is_empty())
 }
 
@@ -137,7 +137,7 @@ fn cursor_complex_select() {
         parse_complex_line(&mut rendered),
         (None, vec!["pme".into(), "nt - so if you want to try it do i".into()])
     );
-    assert_eq!(parse_complex_line(&mut rendered), (None, vec!["t with caution.** ".into()]));
+    assert_eq!(parse_complex_line(&mut rendered), (None, vec!["t with caution.**".into(), " ".into()]));
     assert!(rendered.is_empty())
 }
 
