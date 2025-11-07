@@ -8,7 +8,7 @@ use crate::{
 use crossterm::style::ContentStyle;
 use idiom_tui::{layout::RectIter, utils::ByteChunks, Backend};
 
-pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
+pub fn line(text: &EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
     let mut chunks = ByteChunks::new(text.as_str(), line_width);
@@ -31,7 +31,7 @@ pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, 
 }
 
 pub fn line_with_select(
-    text: &mut EditorLine,
+    text: &EditorLine,
     mut select: SelectManagerSimple,
     lines: &mut RectIter,
     ctx: &mut LineContext,
@@ -85,7 +85,7 @@ pub fn cursor(
     }
 }
 
-pub fn basic(text: &mut EditorLine, skip: usize, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
+pub fn basic(text: &EditorLine, skip: usize, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
     let cursor_idx = ctx.cursor_char();
     let line_width = match lines.next() {
         Some(line) => ctx.setup_line(line, backend),
@@ -122,7 +122,7 @@ pub fn basic(text: &mut EditorLine, skip: usize, lines: &mut RectIter, ctx: &mut
 
 #[inline]
 pub fn select(
-    text: &mut EditorLine,
+    text: &EditorLine,
     skip: usize,
     mut select: SelectManagerSimple,
     lines: &mut RectIter,

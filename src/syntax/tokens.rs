@@ -293,14 +293,106 @@ impl Token {
     }
 }
 
-/// In plain text condition TokenLine is used to store wrapped lines, without affecting the code editing
-pub fn calc_wraps(content: &mut [EditorLine], text_width: usize) {
-    for text in content.iter_mut() {
-        calc_wrap_line(text, text_width);
+pub struct WrapData {
+    wraps: usize,
+    text_width: usize,
+}
+
+impl WrapData {
+    #[inline]
+    pub fn new(text_width: usize) -> Self {
+        Self { wraps: 0, text_width }
+    }
+
+    #[inline]
+    pub fn count(&self) -> usize {
+        self.wraps
+    }
+
+    #[inline]
+    pub fn store(&self, text: &mut EditorLine) {
+        let tokens = text.tokens_mut_unchecked();
+        tokens.clear();
+        tokens.push(Token { len: self.text_width, delta_start: self.wraps, style: ContentStyle::default() });
+    }
+
+    pub fn from_text_cached(text: &mut EditorLine, text_width: usize) -> Self {
+        let tokens = text.tokens();
+        // if tokens are with len 1 and cache is intact - stored value should be correct
+        if text.is_simple() {
+            let new = Self { wraps: 1 + (text.len() / text_width), text_width };
+            new.store(text);
+            return new;
+        }
+        // use cache for non ascii
+        if !text.cached.is_none() && tokens.len() == 1 {
+            let token = &tokens.inner[0];
+            if token.len == text_width {
+                return Self { wraps: token.delta_start, text_width };
+            }
+        }
+        // non ascii
+        let mut wraps = 1;
+        let mut counter = text_width;
+        for ch in text.chars().chain(['~']) {
+            let w = UnicodeWidthChar::width(ch).unwrap_or_default();
+            if w > counter {
+                counter = text_width;
+                wraps += 1;
+            }
+            counter -= w;
+        }
+        let new = Self { wraps, text_width };
+        new.store(text);
+        new
+    }
+
+    pub fn calc_wraps_to_cursor(cursor: &Cursor, content: &[EditorLine]) -> usize {
+        let text = &content[cursor.line];
+
+        if text.is_simple() {
+            return 1 + (cursor.char / cursor.text_width);
+        }
+        let mut counter = cursor.text_width;
+        let mut wraps = 1;
+        for ch in text.chars().take(cursor.char).chain(['~']) {
+            let w = UnicodeWidthChar::width(ch).unwrap_or_default();
+            if w > counter {
+                counter = cursor.text_width;
+                wraps += 1;
+            }
+            counter -= w;
+        }
+        wraps
     }
 }
 
-pub fn calc_wrap_line(text: &mut EditorLine, text_width: usize) -> usize {
+/// In plain text condition TokenLine is used to store wrapped lines, without affecting the code editing
+pub fn calc_wraps(content: &mut [EditorLine], text_width: usize) {
+    for text in content.iter_mut() {
+        calc_wraps_raw_text(text, text_width);
+    }
+}
+
+pub fn calc_wraps_in_text(text: &mut EditorLine, text_width: usize) -> usize {
+    if text.is_simple() {
+        let token = Token { len: 0, delta_start: text.len() / text_width, style: ContentStyle::default() };
+        let tokens = text.tokens_mut_unchecked();
+        tokens.clear();
+        tokens.push(token);
+    } else {
+        complex_wrap_calc(text, text_width);
+    }
+    text.tokens().char_len()
+}
+
+pub fn set_wrap_count(text: &mut EditorLine, count: usize) {
+    let tokens = text.tokens_mut_unchecked();
+    tokens.clear();
+    tokens.push(Token { len: 0, delta_start: count, style: ContentStyle::default() });
+}
+
+pub fn calc_wraps_raw_text(text: &mut EditorLine, text_width: usize) -> usize {
     if text.is_simple() {
         let token = Token { len: 0, delta_start: text.len() / text_width, style: ContentStyle::default() };
         let tokens = text.tokens_mut_unchecked();

@@ -43,16 +43,6 @@ impl SelectManagerSimple {
     }
 
     #[inline]
-    pub fn is_unbound(&self) -> bool {
-        self.unbound
-    }
-
-    #[inline]
-    pub fn start(&self) -> usize {
-        self.from
-    }
-
-    #[inline]
     pub fn go_to_index(&mut self, idx: usize, backend: &mut CrossTerm) {
         // whole line is selected
         if self.unbound {
@@ -126,11 +116,6 @@ impl SelectManager {
                 pad: pad_select,
             }),
         }
-    }
-
-    #[inline]
-    pub fn is_unbound(&self) -> bool {
-        self.unbound
     }
 
     #[inline]

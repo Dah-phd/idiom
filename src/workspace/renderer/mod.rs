@@ -7,7 +7,7 @@ use super::{line::LineContext, Editor};
 use crate::{
     configs::{FileFamily, FileType},
     global_state::GlobalState,
-    syntax::Lexer,
+    syntax::{tokens::WrapData, Lexer},
 };
 use idiom_tui::{layout::IterLines, Backend};
 
@@ -257,14 +257,14 @@ fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
 // TEXT
 
 fn text_render(editor: &mut Editor, gs: &mut GlobalState) {
-    let skip = text::repositioning(&mut editor.cursor, &mut editor.content).unwrap_or_default();
+    let skip = text::new_reposition(&mut editor.cursor, &mut editor.content).unwrap_or_default();
     text_full_render(editor, gs, skip);
 }
 
 fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
 
-    let skip = text::repositioning(cursor, content).unwrap_or_default();
+    let skip = text::new_reposition(cursor, content).unwrap_or_default();
     if !matches!(last_render_at_line, Some(idx) if *idx == cursor.at_line) {
         return text_full_render(editor, gs, skip);
     }
@@ -287,13 +287,13 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
                 text::cursor(text, select, skip, &mut ctx, &mut lines, gs);
             } else {
                 ctx.skip_line();
-                lines.forward(1 + text.tokens().char_len());
+                lines.forward(WrapData::from_text_cached(text, cursor.text_width).count());
             }
         } else if text.cached.should_render_line(lines.next_line_idx(), &select) {
-            text::line(text, select, &mut ctx, &mut lines, gs)
+            text::line(text, select, &mut ctx, &mut lines, gs);
         } else {
             ctx.skip_line();
-            lines.forward(1 + text.tokens().char_len());
+            lines.forward(WrapData::from_text_cached(text, cursor.text_width).count());
         }
     }
 

@@ -5,7 +5,7 @@ use super::utils::{pad_select, SelectManagerSimple};
 use crate::{
     ext_tui::CrossTerm,
     global_state::GlobalState,
-    syntax::tokens::{calc_wrap_line, calc_wrap_line_capped},
+    syntax::tokens::{calc_wrap_line_capped, calc_wraps_raw_text},
     workspace::{
         cursor::{CharRangeUnbound, Cursor},
         line::{EditorLine, LineContext},
@@ -267,7 +267,7 @@ fn calc_rows(content: &mut [EditorLine], cursor: &Cursor) -> usize {
     let mut buf = 0;
     for (idx, text) in content.iter_mut().enumerate().skip(cursor.at_line).take(take) {
         if idx != cursor.line {
-            calc_wrap_line(text, text_width);
+            calc_wraps_raw_text(text, text_width);
         }
         buf += 1 + text.tokens().char_len();
     }

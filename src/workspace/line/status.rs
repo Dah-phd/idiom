@@ -201,7 +201,7 @@ impl RenderStatus {
 
 #[cfg(test)]
 mod test {
-    use super::{CharRange, CharRangeUnbound, RenderStatus};
+    use super::{CharRangeUnbound, RenderStatus};
 
     #[test]
     fn test_cache() {
