@@ -87,7 +87,7 @@ impl TuiCodec {
 
 fn code_render(editor: &mut Editor, gs: &mut GlobalState) {
     Lexer::context(editor, gs);
-    code::repositioning(&mut editor.cursor);
+    code::reposition(&mut editor.cursor);
     code_render_full(editor, gs);
 }
 
@@ -96,7 +96,7 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
 
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, modal, .. } = editor;
 
-    code::repositioning(cursor);
+    code::reposition(cursor);
     if !matches!(last_render_at_line, Some(idx) if *idx == cursor.at_line) {
         return code_render_full(editor, gs);
     }
@@ -170,7 +170,7 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
 
 fn multi_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     Lexer::context(editor, gs);
-    code::repositioning(&mut editor.cursor);
+    code::reposition(&mut editor.cursor);
     multi_code_render_full(editor, gs);
 }
 
@@ -179,7 +179,7 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
 
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, controls, modal, .. } = editor;
 
-    code::repositioning(cursor);
+    code::reposition(cursor);
 
     if !matches!(last_render_at_line, Some(idx) if *idx == cursor.at_line) {
         return multi_code_render_full(editor, gs);

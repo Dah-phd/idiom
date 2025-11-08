@@ -32,7 +32,7 @@ pub fn width_remainder(line: &EditorLine, line_width: usize) -> Option<usize> {
 
 // ensures cursor is rendered
 #[inline]
-pub fn repositioning(cursor: &mut Cursor) {
+pub fn reposition(cursor: &mut Cursor) {
     if cursor.line < cursor.at_line {
         cursor.at_line = cursor.line;
     } else if cursor.line + 1 >= cursor.max_rows + cursor.at_line {

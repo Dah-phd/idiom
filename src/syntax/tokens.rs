@@ -300,8 +300,8 @@ pub struct WrapData {
 
 impl WrapData {
     #[inline]
-    pub fn new(text_width: usize) -> Self {
-        Self { wraps: 0, text_width }
+    pub fn new(wraps: usize, text_width: usize) -> Self {
+        Self { wraps, text_width }
     }
 
     #[inline]

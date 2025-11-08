@@ -1,8 +1,15 @@
 use crate::ext_tui::{CrossTerm, StyleExt};
 use crate::global_state::GlobalState;
-use crate::workspace::cursor::CharRangeUnbound;
+use crate::syntax::tokens::WrapData;
+use crate::workspace::{
+    cursor::CharRangeUnbound,
+    line::{EditorLine, LineContext},
+};
 use crossterm::style::{Color, ContentStyle};
-use idiom_tui::Backend;
+use idiom_tui::{
+    layout::{IterLines, RectIter},
+    Backend,
+};
 
 pub struct SelectManagerSimple {
     unbound: bool,
@@ -225,7 +232,7 @@ fn select_style_no_end_no_reset(idx: usize, backend: &mut CrossTerm, select: &mu
 
 fn select_style_no_op_no_reset(_: usize, _: &mut CrossTerm, _: &mut SelectManagerSimple) {}
 
-fn pad(gs: &mut GlobalState) {
+pub fn pad(gs: &mut GlobalState) {
     gs.backend.print(" ")
 }
 
@@ -234,13 +241,31 @@ pub fn pad_select(gs: &mut GlobalState) {
     gs.backend().print_styled("~", select_style);
 }
 
+#[inline]
+pub fn try_cache_wrap_data_from_lines(
+    text: &mut EditorLine,
+    len_pre_render: usize,
+    lines: &RectIter,
+    ctx: &LineContext,
+) {
+    // line could have been partially rendered
+    let len_post_render = lines.len();
+    if len_post_render == 0 {
+        return;
+    }
+    let text_width = lines.width() - ctx.line_prefix_len();
+    WrapData::new(len_pre_render - len_post_render, text_width).store(text);
+}
+
 #[cfg(test)]
 mod test {
     use super::SelectManager;
     use crate::ext_tui::CrossTerm;
+    use crate::global_state::GlobalState;
     use crate::workspace::cursor::CharRangeUnbound;
+    use crate::workspace::editor::tests::mock_editor_text_render;
     use crossterm::style::{Color, ContentStyle};
-    use idiom_tui::Backend;
+    use idiom_tui::{layout::Rect, Backend};
 
     #[test]
     fn test_go_to_index() {
@@ -274,5 +299,18 @@ mod test {
                 assert_eq!(reset_style.background_color, None);
             }
         }
+    }
+
+    #[test]
+    fn test_try_wrap_data_from_lines() {
+        let mut gs = GlobalState::new(Rect::new(0, 0, 25, 5), CrossTerm::init());
+        gs.force_area_calc();
+        let mut editor = mock_editor_text_render(vec![
+            "let mut gs = GlobalState::new(Rect::new(0, 0, 30, 60), CrossTerm::init());".into(),
+            "n/a".into(),
+            "n/a".into(),
+        ]);
+        editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+        todo!()
     }
 }

@@ -12,7 +12,7 @@ use idiom_tui::{
     Backend,
 };
 
-pub fn line(text: &EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
+pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
     let mut chunks = WriteChunks::new(text.as_str(), line_width);

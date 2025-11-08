@@ -1,7 +1,7 @@
 mod ascii;
 mod complex;
 
-use super::utils::{pad_select, SelectManagerSimple};
+use super::utils::{pad_select, try_cache_wrap_data_from_lines, SelectManagerSimple};
 use crate::{
     global_state::GlobalState,
     syntax::tokens::WrapData,
@@ -46,7 +46,11 @@ pub fn cursor(
     text.cached.cursor(lines.next_line_idx(), ctx.cursor_char(), skip, select.clone());
     match text.is_simple() {
         true => ascii::cursor(text, select, skip, lines, ctx, gs),
-        false => complex::cursor(text, select, skip, lines, ctx, gs),
+        false => {
+            let len_pre_render = lines.len();
+            complex::cursor(text, select, skip, lines, ctx, gs);
+            try_cache_wrap_data_from_lines(text, len_pre_render, lines, ctx);
+        }
     }
 }
 
@@ -64,10 +68,14 @@ pub fn line(
             Some(select) => ascii::line_with_select(text, select, lines, ctx, gs),
             None => ascii::line(text, lines, ctx, gs.backend()),
         },
-        false => match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
-            Some(select) => complex::line_with_select(text, select, lines, ctx, gs),
-            None => complex::line(text, lines, ctx, gs.backend()),
-        },
+        false => {
+            let len_pre_render = lines.len();
+            match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
+                Some(select) => complex::line_with_select(text, select, lines, ctx, gs),
+                None => complex::line(text, lines, ctx, gs.backend()),
+            }
+            try_cache_wrap_data_from_lines(text, len_pre_render, lines, ctx);
+        }
     }
 }
 

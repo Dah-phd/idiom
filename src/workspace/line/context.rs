@@ -73,6 +73,11 @@ impl LineContext {
         self.cursor_char
     }
 
+    #[inline(always)]
+    pub fn line_prefix_len(&self) -> usize {
+        self.line_number_padding + 1
+    }
+
     #[inline]
     pub fn setup_cursor(&mut self, line: Line, backend: &mut CrossTerm) -> usize {
         self.line_number += 1;

@@ -1,7 +1,7 @@
-use crossterm::style::{Color, ContentStyle};
-
-use super::super::tests::{expect_cursor, expect_select, parse_complex_line};
-use super::{ascii, complex, line};
+use super::{
+    super::tests::{expect_cursor, expect_select, parse_complex_line},
+    ascii, complex, line,
+};
 use crate::{
     configs::FileType,
     ext_tui::{CrossTerm, StyleExt},
@@ -14,6 +14,7 @@ use crate::{
         CursorPosition,
     },
 };
+use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{
     layout::{Borders, Rect},
     Backend,
