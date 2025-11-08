@@ -45,7 +45,6 @@ pub enum EditorAction {
     EndOfFile,
     StartOfLine,
     StartOfFile,
-    IdiomCommand,
     FindReferences,
     GoToDeclaration,
     Help,
@@ -103,7 +102,6 @@ pub struct EditorUserKeyMap {
     end_of_file: String,
     start_of_line: String,
     start_of_file: String,
-    idiom_command: String,
     find_references: String,
     go_to_declaration: String,
     help: String,
@@ -161,7 +159,6 @@ impl From<EditorUserKeyMap> for HashMap<KeyEvent, EditorAction> {
         insert_key_event(&mut hash, &val.end_of_file, EditorAction::EndOfFile);
         insert_key_event(&mut hash, &val.start_of_line, EditorAction::StartOfLine);
         insert_key_event(&mut hash, &val.start_of_file, EditorAction::StartOfFile);
-        insert_key_event(&mut hash, &val.idiom_command, EditorAction::IdiomCommand);
         insert_key_event(&mut hash, &val.find_references, EditorAction::FindReferences);
         insert_key_event(&mut hash, &val.go_to_declaration, EditorAction::GoToDeclaration);
         insert_key_event(&mut hash, &val.help, EditorAction::Help);
@@ -220,7 +217,6 @@ impl Default for EditorUserKeyMap {
             end_of_file: format!("{CTRL} && {END}"),
             start_of_line: HOME.to_owned(),
             start_of_file: format!("{CTRL} && {HOME}"),
-            idiom_command: format!("{CTRL} && ;"),
             find_references: format!("{F}9"),
             go_to_declaration: format!("{F}12"),
             help: format!("{F}1"),
@@ -245,6 +241,7 @@ impl Default for EditorUserKeyMap {
 pub enum GeneralAction {
     GoToTabs,
     InvokePallet,
+    CommandPallet,
     SelectOpenEditor,
     SaveAll,
     FileTreeModeOrCancelInput,
@@ -273,6 +270,7 @@ pub enum GeneralAction {
 pub struct GeneralUserKeyMap {
     go_to_editor_tabs: String,
     invoke_pallet: String,
+    command_pallet: String,
     select_open_editor: String,
     save_all: String,
     cancel: String,
@@ -302,6 +300,7 @@ impl From<GeneralUserKeyMap> for HashMap<KeyEvent, GeneralAction> {
         let mut hash = HashMap::default();
         insert_key_event(&mut hash, &val.go_to_editor_tabs, GeneralAction::GoToTabs);
         insert_key_event(&mut hash, &val.invoke_pallet, GeneralAction::InvokePallet);
+        insert_key_event(&mut hash, &val.command_pallet, GeneralAction::CommandPallet);
         insert_key_event(&mut hash, &val.select_open_editor, GeneralAction::SelectOpenEditor);
         insert_key_event(&mut hash, &val.save_all, GeneralAction::SaveAll);
         insert_key_event(&mut hash, &val.cancel, GeneralAction::FileTreeModeOrCancelInput);
@@ -332,6 +331,7 @@ impl Default for GeneralUserKeyMap {
         Self {
             go_to_editor_tabs: TAB.to_owned(),
             invoke_pallet: format!("{CTRL} && p || {CTRL} && {SHIFT} && p"),
+            command_pallet: format!("{CTRL} && ;"),
             select_open_editor: format!("{CTRL} && {TAB} || {CTRL} && {UP} || {CTRL} && {DOWN}"),
             save_all: format!("{CTRL} && s"),
             cancel: ESC.to_owned(),

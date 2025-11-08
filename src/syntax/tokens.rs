@@ -374,24 +374,6 @@ pub fn calc_wraps(content: &mut [EditorLine], text_width: usize) {
     }
 }
 
-pub fn calc_wraps_in_text(text: &mut EditorLine, text_width: usize) -> usize {
-    if text.is_simple() {
-        let token = Token { len: 0, delta_start: text.len() / text_width, style: ContentStyle::default() };
-        let tokens = text.tokens_mut_unchecked();
-        tokens.clear();
-        tokens.push(token);
-    } else {
-        complex_wrap_calc(text, text_width);
-    }
-    text.tokens().char_len()
-}
-
-pub fn set_wrap_count(text: &mut EditorLine, count: usize) {
-    let tokens = text.tokens_mut_unchecked();
-    tokens.clear();
-    tokens.push(Token { len: 0, delta_start: count, style: ContentStyle::default() });
-}
-
 pub fn calc_wraps_raw_text(text: &mut EditorLine, text_width: usize) -> usize {
     if text.is_simple() {
         let token = Token { len: 0, delta_start: text.len() / text_width, style: ContentStyle::default() };

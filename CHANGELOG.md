@@ -2,6 +2,8 @@
 # Version 0.7.0
 - added IdiomCommand
 - added MarkWord
+- reworked select handles
+- reworked rendering logic
 
 # Version 0.6.3
 - added support for non ascii in text_field
