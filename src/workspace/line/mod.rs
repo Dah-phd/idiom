@@ -443,8 +443,8 @@ impl From<String> for EditorLine {
     }
 }
 
-impl From<&'static str> for EditorLine {
-    fn from(value: &'static str) -> Self {
+impl From<&str> for EditorLine {
+    fn from(value: &str) -> Self {
         value.to_owned().into()
     }
 }
