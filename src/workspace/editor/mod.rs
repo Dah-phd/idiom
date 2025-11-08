@@ -5,7 +5,7 @@ use super::{
     actions::Actions,
     cursor::{Cursor, CursorPosition},
     line::EditorLine,
-    renderer::Renderer,
+    renderer::TuiCodec,
     utils::find_line_start,
 };
 use crate::{
@@ -41,7 +41,7 @@ pub struct Editor {
     pub controls: ControlMap,
     pub modal: EditorModal,
     actions: Actions,
-    renderer: Renderer,
+    renderer: TuiCodec,
 }
 
 impl Editor {
@@ -60,7 +60,7 @@ impl Editor {
             line_number_padding: line_number_offset,
             lexer: Lexer::with_context(file_type, &path),
             content,
-            renderer: Renderer::code(),
+            renderer: TuiCodec::code(),
             actions: Actions::new(cfg.get_indent_cfg(file_type)),
             controls: ControlMap::default(),
             file_type,
@@ -85,7 +85,7 @@ impl Editor {
             line_number_padding: line_number_offset,
             lexer: Lexer::text_lexer(&path),
             content,
-            renderer: Renderer::text(),
+            renderer: TuiCodec::text(),
             actions: Actions::new(cfg.default_indent_cfg()),
             controls: ControlMap::default(),
             file_type: FileType::Text,
@@ -110,7 +110,7 @@ impl Editor {
             line_number_padding: line_number_offset,
             lexer: Lexer::text_lexer(&path),
             content,
-            renderer: Renderer::markdown(),
+            renderer: TuiCodec::markdown(),
             actions: Actions::new(cfg.default_indent_cfg()),
             controls: ControlMap::default(),
             file_type: FileType::MarkDown,
@@ -151,7 +151,7 @@ impl Editor {
     #[inline]
     pub fn has_render_cache(&self) -> bool {
         let render_line_maches = matches!(self.last_render_at_line, Some(val) if val == self.cursor.at_line);
-        render_line_maches && Renderer::all_lines_cached(self)
+        render_line_maches && TuiCodec::all_lines_cached(self)
     }
 
     pub fn clear_ui(&mut self, gs: &GlobalState) {
@@ -196,17 +196,17 @@ impl Editor {
         self.file_type = file_type;
         match self.file_type.family() {
             FileFamily::Text => {
-                self.renderer = Renderer::text();
+                self.renderer = TuiCodec::text();
                 self.lexer = Lexer::text_lexer(&self.path);
                 calc_wraps(&mut self.content, self.cursor.text_width);
             }
             FileFamily::MarkDown => {
-                self.renderer = Renderer::markdown();
+                self.renderer = TuiCodec::markdown();
                 self.lexer = Lexer::md_lexer(&self.path);
                 calc_wraps(&mut self.content, self.cursor.text_width);
             }
             FileFamily::Code(..) => {
-                self.renderer = Renderer::code();
+                self.renderer = TuiCodec::code();
                 self.lexer = Lexer::with_context(file_type, &self.path);
             }
         };

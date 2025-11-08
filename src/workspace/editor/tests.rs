@@ -12,7 +12,7 @@ use crate::{
     ext_tui::CrossTerm,
     global_state::GlobalState,
     syntax::Lexer,
-    workspace::{actions::Actions, editor::EditorModal, line::EditorLine, renderer::Renderer},
+    workspace::{actions::Actions, editor::EditorModal, line::EditorLine, renderer::TuiCodec},
 };
 use idiom_tui::{layout::Rect, Backend};
 use std::path::PathBuf;
@@ -33,7 +33,7 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
         actions: Actions::default(),
         controls: ControlMap::default(),
         content,
-        renderer: Renderer::code(),
+        renderer: TuiCodec::code(),
         last_render_at_line: None,
     }
 }
@@ -54,7 +54,7 @@ pub fn mock_editor_text_render(content: Vec<String>) -> Editor {
         actions: Actions::default(),
         controls: ControlMap::default(),
         content,
-        renderer: Renderer::text(),
+        renderer: TuiCodec::text(),
         last_render_at_line: None,
     }
 }
@@ -75,7 +75,7 @@ pub fn mock_editor_md_render(content: Vec<String>) -> Editor {
         actions: Actions::default(),
         controls: ControlMap::default(),
         content,
-        renderer: Renderer::markdown(),
+        renderer: TuiCodec::markdown(),
         last_render_at_line: None,
     }
 }

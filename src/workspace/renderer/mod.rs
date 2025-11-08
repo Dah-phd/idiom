@@ -14,12 +14,12 @@ use idiom_tui::{layout::IterLines, Backend};
 /// Component containing logic regarding rendering
 /// In order to escape complicated state machines and any form on polymorphism,
 /// it derives the correct function pointers on file opening.
-pub struct Renderer {
+pub struct TuiCodec {
     pub render: fn(&mut Editor, &mut GlobalState),
     pub fast_render: fn(&mut Editor, &mut GlobalState),
 }
 
-impl Renderer {
+impl TuiCodec {
     pub fn code() -> Self {
         Self { render: code_render, fast_render: fast_code_render }
     }

@@ -1,6 +1,6 @@
 use super::{
     calc_wraps, controls::ControlMap, Actions, Cursor, Editor, EditorConfigs, EditorLine, EditorModal, FileFamily,
-    FileType, GlobalState, Lexer, Renderer,
+    FileType, GlobalState, Lexer, TuiCodec,
 };
 use crate::error::{IdiomError, IdiomResult};
 use std::{
@@ -81,9 +81,9 @@ pub fn editor_from_data(
     gs: &mut GlobalState,
 ) -> Editor {
     let (renderer, lexer) = match file_type.family() {
-        FileFamily::Text => (Renderer::text(), Lexer::text_lexer(&path)),
-        FileFamily::MarkDown => (Renderer::markdown(), Lexer::md_lexer(&path)),
-        FileFamily::Code(file_type) => (Renderer::code(), Lexer::with_context(file_type, &path)),
+        FileFamily::Text => (TuiCodec::text(), Lexer::text_lexer(&path)),
+        FileFamily::MarkDown => (TuiCodec::markdown(), Lexer::md_lexer(&path)),
+        FileFamily::Code(file_type) => (TuiCodec::code(), Lexer::with_context(file_type, &path)),
     };
 
     let display = build_display(&path);
