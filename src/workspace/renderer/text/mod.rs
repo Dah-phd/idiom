@@ -12,7 +12,7 @@ use crate::{
 };
 use idiom_tui::layout::{IterLines, RectIter};
 
-pub fn new_reposition(cursor: &mut Cursor, content: &mut [EditorLine]) -> Option<usize> {
+pub fn reposition(cursor: &mut Cursor, content: &mut [EditorLine]) -> Option<usize> {
     let cursor_wraps = WrapData::calc_wraps_to_cursor(cursor, content);
     if cursor_wraps > cursor.max_rows {
         cursor.at_line = cursor.line;

@@ -257,14 +257,14 @@ fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
 // TEXT
 
 fn text_render(editor: &mut Editor, gs: &mut GlobalState) {
-    let skip = text::new_reposition(&mut editor.cursor, &mut editor.content).unwrap_or_default();
+    let skip = text::reposition(&mut editor.cursor, &mut editor.content).unwrap_or_default();
     text_full_render(editor, gs, skip);
 }
 
 fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
 
-    let skip = text::new_reposition(cursor, content).unwrap_or_default();
+    let skip = text::reposition(cursor, content).unwrap_or_default();
     if !matches!(last_render_at_line, Some(idx) if *idx == cursor.at_line) {
         return text_full_render(editor, gs, skip);
     }

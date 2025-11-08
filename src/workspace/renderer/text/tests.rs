@@ -366,13 +366,13 @@ fn test_cursor_line_oversize() {
 
     #[rustfmt::skip]
     assert_eq!(text, [
-        "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
-        "c", "t", ":", ":", "n", "e", "w", "(",
-        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
-        "?", ",", " ", "0", ",", " ", "3", "0",
-        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
-        ",", " ", "6", "0", ")", ",", " ", "C", " ",
-        "<<reset style>>", "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", " 1, Col 41 ",
+        "<<freeze>>",
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", ":", ":", "n", "e", "w", "(", "R", "e",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "c", "t", ":", ":", "n", "e", "w", "(",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "?", ",", " ", "0", ",", " ", "3", "0", " ",
+        "<<reset style>>", "<<set style>>",
+        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
+        "<<go to row: 4 col: 14>>", " 1, Col 41 ",
         "<<reset style>>", "<<unfreeze>>"
     ]);
 
@@ -383,14 +383,14 @@ fn test_cursor_line_oversize() {
 
     #[rustfmt::skip]
     let cursor_on_last_wrap = [
-        "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
-        ":", ":", "i", "n", "i", "t", "(", ")",
-        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
-        ")", ";", "?",
-        "<<reset style>>", "<<go to row: 3 col: 15>>", "2 ", "<<clear EOL>>",
-        "n/a",
-        "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", " 1, Col 75 ", "<<reset style>>",
-        "<<unfreeze>>"
+        "<<freeze>>",
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "r", "o", "s", "s", "T", "e", "r", "m",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", ":", ":", "i", "n", "i", "t", "(", ")",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", ")", ";", "?",
+        "<<reset style>>", "<<set style>>",
+        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
+        "<<go to row: 4 col: 14>>", " 1, Col 75 ",
+        "<<reset style>>", "<<unfreeze>>"
     ];
 
     assert_eq!(text, cursor_on_last_wrap);
@@ -475,13 +475,13 @@ fn test_cursor_line_oversize_full_last_wrap() {
 
     #[rustfmt::skip]
     assert_eq!(text, [
-        "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
-        ":", ":", "i", "n", "i", "t", "(", ")",
-        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
-        "?", ";", " ", "/", "/", "e", "n", "d",
-        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
-        " ",
-        "<<reset style>>", "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", " 1, Col 73 ",
+        "<<freeze>>",
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "r", "o", "s", "s", "T", "e", "r", "m",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", ":", ":", "i", "n", "i", "t", "(", ")",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "?", ";", " ", "/", "/", "e", "n", "d", " ",
+        "<<reset style>>", "<<set style>>",
+        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
+        "<<go to row: 4 col: 14>>", " 1, Col 73 ",
         "<<reset style>>", "<<unfreeze>>"
     ]);
 
@@ -492,13 +492,13 @@ fn test_cursor_line_oversize_full_last_wrap() {
 
     #[rustfmt::skip]
     let cursor_on_last_wrap = [
-        "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
-        ")", ";", " ", "/", "/", "e", "n", "d",
-        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
-        "?",
-        "<<reset style>>","<<go to row: 3 col: 15>>", "2 ", "<<clear EOL>>",
-        "n/a",
-        "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", " 1, Col 81 ",
+        "<<freeze>>",
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", ":", ":", "i", "n", "i", "t", "(", ")",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", ")", ";", " ", "/", "/", "e", "n", "d",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "?",
+        "<<reset style>>", "<<set style>>",
+        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
+        "<<go to row: 4 col: 14>>", " 1, Col 81 ",
         "<<reset style>>", "<<unfreeze>>"
     ];
 
@@ -638,13 +638,13 @@ fn test_cursor_line_oversize_complex() {
 
     #[rustfmt::skip]
     assert_eq!(text, [
-        "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
-        "0", ",", " ", "0", ",", " ", "3", "0",
-        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
-        ",", " ", "6", "0", ")", ",", " ", "C",
-        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
-        "?", "o", "s", "s", "T", "e", "r", "m", " ",
-        "<<reset style>>", "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", " 1, Col 57 ",
+        "<<freeze>>",
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "0", ",", " ", "0", ",", " ", "3", "0",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", ",", " ", "6", "0", ")", ",", " ", "C",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "?", "o", "s", "s", "T", "e", "r", "m", " ",
+        "<<reset style>>", "<<set style>>",
+        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
+        "<<go to row: 4 col: 14>>", " 1, Col 57 ",
         "<<reset style>>", "<<unfreeze>>"
     ]);
 
@@ -655,13 +655,13 @@ fn test_cursor_line_oversize_complex() {
 
     #[rustfmt::skip]
     let cursor_on_last_wrap = [
-        "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
-        ":", ":", "i", "n", "🦀", "(", ")",
-        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
-        ")", ";", "?",
-        "<<reset style>>", "<<go to row: 3 col: 15>>", "2 ", "<<clear EOL>>",
-        "n/a",
-        "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", " 1, Col 74 ",
+        "<<freeze>>",
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "r", "o", "s", "s", "T", "e", "r", "m",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", ":", ":", "i", "n", "🦀", "(", ")",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", ")", ";", "?",
+        "<<reset style>>", "<<set style>>",
+        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
+        "<<go to row: 4 col: 14>>", " 1, Col 74 ",
         "<<reset style>>", "<<unfreeze>>"
     ];
 
@@ -724,12 +724,13 @@ fn test_cursor_line_oversize_full_last_wrap_complex() {
 
     #[rustfmt::skip]
     assert_eq!(text, [
-        "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
-        "l", "e", "t", " ", "m", "u", "t", " ",
-        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
-        "?", "s", " ", "=", " ", "G", "l", "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
-        "🦀", "b", "a", "l", "S", "t", "a", " ",
-        "<<reset style>>", "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", "n 1, Col 9 ",
+        "<<freeze>>",
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "l", "e", "t", " ", "m", "u", "t", " ",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "?", "s", " ", "=", " ", "G", "l",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "🦀", "b", "a", "l", "S", "t", "a", " ",
+        "<<reset style>>", "<<set style>>",
+        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
+        "<<go to row: 4 col: 14>>", "n 1, Col 9 ",
         "<<reset style>>", "<<unfreeze>>"
     ]);
 
@@ -747,13 +748,13 @@ fn test_cursor_line_oversize_full_last_wrap_complex() {
 
     #[rustfmt::skip]
     assert_eq!(text, [
-        "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
-        "r", "m", ":", ":", "🦀", "i", "t",
-        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
-        "(", ")", ")", "?", " ", "/", "/", "e",
-        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
-        " ",
-        "<<reset style>>", "<<set style>>", "<<go to row: 4 col: 14>>", "<<padding: 11>>", "<<go to row: 4 col: 14>>", " 1, Col 73 ",
+        "<<freeze>>",
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", " ", "C", "r", "o", "s", "s", "T", "e",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "r", "m", ":", ":", "🦀", "i", "t",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "(", ")", ")", "?", " ", "/", "/", "e", " ",
+        "<<reset style>>", "<<set style>>",
+        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
+        "<<go to row: 4 col: 14>>", " 1, Col 73 ",
         "<<reset style>>", "<<unfreeze>>"
     ]);
 
