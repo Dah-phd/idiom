@@ -259,13 +259,16 @@ pub fn try_cache_wrap_data_from_lines(
 
 #[cfg(test)]
 mod test {
-    use super::SelectManager;
+    use super::{super::text, SelectManager, WrapData};
     use crate::ext_tui::CrossTerm;
     use crate::global_state::GlobalState;
-    use crate::workspace::cursor::CharRangeUnbound;
-    use crate::workspace::editor::tests::mock_editor_text_render;
+    use crate::workspace::{
+        cursor::CharRangeUnbound,
+        editor::{tests::mock_editor_text_render, Editor},
+        line::LineContext,
+    };
     use crossterm::style::{Color, ContentStyle};
-    use idiom_tui::{layout::Rect, Backend};
+    use idiom_tui::{layout::Rect, Backend, UTFSafe};
 
     #[test]
     fn test_go_to_index() {
@@ -302,15 +305,69 @@ mod test {
     }
 
     #[test]
-    fn test_try_wrap_data_from_lines() {
-        let mut gs = GlobalState::new(Rect::new(0, 0, 25, 5), CrossTerm::init());
+    fn test_try_wrap_data_from_lines_integraion() {
+        let mut gs = GlobalState::new(Rect::new(0, 0, 49, 10), CrossTerm::init());
         gs.force_area_calc();
         let mut editor = mock_editor_text_render(vec![
-            "let mut gs = GlobalState::new(Rect::new(0, 0, 30, 60), CrossTerm::init());".into(),
-            "n/a".into(),
-            "n/a".into(),
+            "let mut gs = GlobalState::new();".into(),
+            "let mut 🦀 = GlobalState::new();".into(),
+            "".into(),
         ]);
         editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
-        todo!()
+        editor.cursor.set_position((2, 0).into());
+        let Editor { lexer, cursor, content, line_number_padding, .. } = &mut editor;
+        assert_eq!(content[0].as_str().width(), 32);
+        assert_eq!(content[1].as_str().width(), 32);
+        let char_len = lexer.encoding().char_len;
+        let mut ctx = LineContext::collect_context(cursor, char_len, *line_number_padding, gs.ui_theme.accent_fg());
+
+        let mut lines = gs.editor_area().into_iter();
+        let f_text = &mut content[0];
+        text::line(f_text, None, &mut ctx, &mut lines, &mut gs);
+        assert_eq!(None, WrapData::pull_cache(f_text));
+        assert_eq!(WrapData::from_text_cached(f_text, cursor.text_width), WrapData::new(2, 32));
+        f_text.tokens_mut().clear();
+        text::cursor(f_text, None, 0, &mut ctx, &mut lines, &mut gs);
+        assert_eq!(None, WrapData::pull_cache(f_text));
+        assert_eq!(WrapData::from_text_cached(f_text, cursor.text_width), WrapData::new(2, 32));
+
+        // try wrap data is collected only on complex lines
+        let s_text = &mut content[1];
+        text::line(s_text, None, &mut ctx, &mut lines, &mut gs);
+        assert_eq!(Some(WrapData::new(2, 32)), WrapData::pull_cache(s_text));
+        s_text.tokens_mut().clear();
+        text::cursor(s_text, None, 0, &mut ctx, &mut lines, &mut gs);
+        assert_eq!(WrapData::from_text_cached(s_text, cursor.text_width), WrapData::new(2, 32));
+
+        for text in content.iter_mut() {
+            text.tokens_mut().clear();
+            assert_eq!(None, WrapData::pull_cache(text));
+        }
+
+        drop(gs);
+        let mut gs = GlobalState::new(Rect::new(0, 0, 50, 10), CrossTerm::init());
+        gs.force_area_calc();
+        editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+        let Editor { lexer, cursor, content, line_number_padding, .. } = &mut editor;
+        let char_len = lexer.encoding().char_len;
+        let mut ctx = LineContext::collect_context(cursor, char_len, *line_number_padding, gs.ui_theme.accent_fg());
+
+        let mut lines = gs.editor_area().into_iter();
+        let f_text = &mut content[0];
+        text::line(f_text, None, &mut ctx, &mut lines, &mut gs);
+        assert_eq!(None, WrapData::pull_cache(f_text));
+        assert_eq!(WrapData::from_text_cached(f_text, cursor.text_width), WrapData::new(1, 33));
+        f_text.tokens_mut().clear();
+        text::cursor(f_text, None, 0, &mut ctx, &mut lines, &mut gs);
+        assert_eq!(None, WrapData::pull_cache(f_text));
+        assert_eq!(WrapData::from_text_cached(f_text, cursor.text_width), WrapData::new(1, 33));
+
+        // try wrap data is collected only on complex lines
+        let s_text = &mut content[1];
+        text::line(s_text, None, &mut ctx, &mut lines, &mut gs);
+        assert_eq!(Some(WrapData::new(1, 33)), WrapData::pull_cache(s_text));
+        s_text.tokens_mut().clear();
+        text::cursor(s_text, None, 0, &mut ctx, &mut lines, &mut gs);
+        assert_eq!(WrapData::from_text_cached(s_text, cursor.text_width), WrapData::new(1, 33));
     }
 }

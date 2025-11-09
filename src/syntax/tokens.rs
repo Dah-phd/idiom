@@ -293,6 +293,7 @@ impl Token {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct WrapData {
     wraps: usize,
     text_width: usize,
@@ -445,4 +446,21 @@ pub fn calc_wrap_line_capped(text: &mut EditorLine, cursor: &Cursor) -> Option<u
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::WrapData;
+    use crate::workspace::line::EditorLine;
+
+    impl WrapData {
+        pub fn pull_cache(text: &EditorLine) -> Option<WrapData> {
+            let tokens = text.tokens();
+            if !text.cached.is_none() && tokens.len() == 1 {
+                let token = &tokens.inner[0];
+                return Some(Self { wraps: token.delta_start, text_width: token.len });
+            }
+            None
+        }
+    }
 }
