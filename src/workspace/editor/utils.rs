@@ -1,6 +1,6 @@
 use super::{
-    calc_wraps, controls::ControlMap, Actions, Cursor, Editor, EditorConfigs, EditorLine, EditorModal, FileFamily,
-    FileType, GlobalState, Lexer, TuiCodec,
+    controls::ControlMap, Actions, Cursor, Editor, EditorConfigs, EditorLine, EditorModal, FileFamily, FileType,
+    GlobalState, Lexer, TuiCodec,
 };
 use crate::error::{IdiomError, IdiomResult};
 use std::{
@@ -110,11 +110,5 @@ pub fn editor_from_data(
         path,
     };
     editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
-
-    // precal wraps for redndering of non code
-    if !editor.file_type.is_code() {
-        calc_wraps(&mut editor.content, editor.cursor.text_width);
-    }
-
     editor
 }

@@ -5,7 +5,7 @@ use super::utils::{pad_select, SelectManagerSimple};
 use crate::{
     ext_tui::CrossTerm,
     global_state::GlobalState,
-    syntax::tokens::{calc_wrap_line_capped, calc_wraps_raw_text},
+    syntax::tokens::WrapData,
     workspace::{
         cursor::{CharRangeUnbound, Cursor},
         line::{EditorLine, LineContext},
@@ -241,37 +241,26 @@ fn print_split_comp(parser: &mut StyledParser, text: &str, mut limit: usize) -> 
     Some(limit)
 }
 
-pub fn repositioning(cursor: &mut Cursor, content: &mut [EditorLine]) -> Option<usize> {
-    if let Some(skipped) = calc_wrap_line_capped(&mut content[cursor.line], cursor) {
+pub fn reposition(cursor: &mut Cursor, content: &mut [EditorLine]) -> Option<usize> {
+    let cursor_wraps = WrapData::calc_wraps_to_cursor_cached(cursor, content);
+    if cursor_wraps > cursor.max_rows {
         cursor.at_line = cursor.line;
-        return Some(skipped);
-    };
+        return Some(cursor_wraps - cursor.max_rows);
+    }
     if cursor.at_line > cursor.line {
         cursor.at_line = cursor.line;
         return None;
     }
-    let mut row_sum = calc_rows(content, cursor);
-    while row_sum > cursor.max_rows {
-        if cursor.at_line == cursor.line {
-            return None;
+    let mut free_rows = cursor.max_rows - cursor_wraps;
+    for (idx, text) in content.iter_mut().enumerate().skip(cursor.at_line).take(cursor.line - cursor.at_line).rev() {
+        let wraps = WrapData::from_text_cached(text, cursor.text_width).count();
+        if wraps > free_rows {
+            cursor.at_line = idx + 1;
+            break;
         }
-        row_sum -= 1 + content[cursor.at_line].tokens().char_len();
-        cursor.at_line += 1;
+        free_rows -= wraps;
     }
     None
-}
-
-fn calc_rows(content: &mut [EditorLine], cursor: &Cursor) -> usize {
-    let take = (cursor.line + 1) - cursor.at_line;
-    let text_width = cursor.text_width;
-    let mut buf = 0;
-    for (idx, text) in content.iter_mut().enumerate().skip(cursor.at_line).take(take) {
-        if idx != cursor.line {
-            calc_wraps_raw_text(text, text_width);
-        }
-        buf += 1 + text.tokens().char_len();
-    }
-    buf
 }
 
 #[inline(always)]

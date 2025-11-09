@@ -338,14 +338,14 @@ fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
 // MARKDOWN
 
 fn md_render(editor: &mut Editor, gs: &mut GlobalState) {
-    let skip = markdown::repositioning(&mut editor.cursor, &mut editor.content).unwrap_or_default();
+    let skip = markdown::reposition(&mut editor.cursor, &mut editor.content).unwrap_or_default();
     md_full_render(editor, gs, skip);
 }
 
 fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
 
-    let skip = markdown::repositioning(cursor, content).unwrap_or_default();
+    let skip = markdown::reposition(cursor, content).unwrap_or_default();
     gs.backend.freeze();
     if !matches!(last_render_at_line, Some(idx) if *idx == cursor.at_line) {
         return md_full_render(editor, gs, skip);

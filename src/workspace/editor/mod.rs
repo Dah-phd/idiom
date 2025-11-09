@@ -13,7 +13,7 @@ use crate::{
     error::{IdiomError, IdiomResult},
     global_state::GlobalState,
     lsp::LSPError,
-    syntax::{tokens::calc_wraps, Lexer},
+    syntax::Lexer,
 };
 use controls::ControlMap;
 use idiom_tui::{layout::Rect, Position};
@@ -75,11 +75,10 @@ impl Editor {
     pub fn from_path_text(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
         big_file_protection(&path)?;
         gs.message(WARN_TXT);
-        let mut content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
+        let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
         let cursor = Cursor::sized(*gs.editor_area(), line_number_offset);
-        calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
             cursor,
             line_number_padding: line_number_offset,
@@ -100,11 +99,10 @@ impl Editor {
     pub fn from_path_md(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
         big_file_protection(&path)?;
         gs.message(WARN_MD);
-        let mut content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
+        let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
         let cursor = Cursor::sized(*gs.editor_area(), line_number_offset);
-        calc_wraps(&mut content, cursor.text_width);
         Ok(Self {
             cursor,
             line_number_padding: line_number_offset,
@@ -198,16 +196,23 @@ impl Editor {
             FileFamily::Text => {
                 self.renderer = TuiCodec::text();
                 self.lexer = Lexer::text_lexer(&self.path);
-                calc_wraps(&mut self.content, self.cursor.text_width);
+                for text in self.content.iter_mut() {
+                    text.tokens_mut().clear();
+                }
             }
             FileFamily::MarkDown => {
                 self.renderer = TuiCodec::markdown();
                 self.lexer = Lexer::md_lexer(&self.path);
-                calc_wraps(&mut self.content, self.cursor.text_width);
+                for text in self.content.iter_mut() {
+                    text.tokens_mut().clear();
+                }
             }
             FileFamily::Code(..) => {
                 self.renderer = TuiCodec::code();
                 self.lexer = Lexer::with_context(file_type, &self.path);
+                for text in self.content.iter_mut() {
+                    text.tokens_mut().clear();
+                }
             }
         };
         gs.force_screen_rebuild();
