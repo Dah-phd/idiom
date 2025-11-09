@@ -42,7 +42,6 @@ pub fn line_with_select(
     gs: &mut GlobalState,
 ) {
     let backend = gs.backend();
-
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
     let mut remaining_width = line_width;
@@ -148,7 +147,6 @@ pub fn select(
     gs: &mut GlobalState,
 ) {
     let backend = gs.backend();
-
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
     let cursor_idx = ctx.cursor_char();

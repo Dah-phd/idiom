@@ -38,7 +38,6 @@ pub fn line_with_select(
     gs: &mut GlobalState,
 ) {
     let backend = gs.backend();
-
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
 
@@ -86,11 +85,9 @@ pub fn cursor(
 }
 
 pub fn basic(text: &EditorLine, skip: usize, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
+    let Some(line) = lines.next() else { return };
+    let line_width = ctx.setup_line(line, backend);
     let cursor_idx = ctx.cursor_char();
-    let line_width = match lines.next() {
-        Some(line) => ctx.setup_line(line, backend),
-        None => return,
-    };
     let mut idx = skip * line_width;
     let mut line_end = line_width + idx;
     for text in text.chars().skip(idx) {
@@ -127,7 +124,6 @@ pub fn select(
     gs: &mut GlobalState,
 ) {
     let backend = gs.backend();
-
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
     let cursor_idx = ctx.cursor_char();

@@ -365,7 +365,7 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
             if text.cached.should_render_cursor(lines.next_line_idx(), ctx.cursor_char(), &select)
                 || text.cached.skipped_chars() != skip
             {
-                markdown::cursor(text, select, skip, &mut ctx, &mut lines, gs);
+                text::cursor(text, select, skip, &mut ctx, &mut lines, gs);
             } else {
                 ctx.skip_line();
                 lines.forward(1 + text.tokens().char_len());
@@ -401,7 +401,7 @@ fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
         }
         let select = ctx.select_get();
         if ctx.has_cursor(line_idx) {
-            markdown::cursor(text, select, skip, &mut ctx, &mut lines, gs);
+            text::cursor(text, select, skip, &mut ctx, &mut lines, gs);
         } else {
             markdown::line(text, select, &mut ctx, &mut lines, gs)
         }

@@ -275,22 +275,6 @@ fn calc_rows(content: &mut [EditorLine], cursor: &Cursor) -> usize {
 }
 
 #[inline(always)]
-pub fn cursor(
-    text: &mut EditorLine,
-    select: Option<CharRangeUnbound>,
-    skip: usize,
-    ctx: &mut LineContext,
-    lines: &mut RectIter,
-    gs: &mut GlobalState,
-) {
-    text.cached.cursor(lines.next_line_idx(), ctx.cursor_char(), skip, select.clone());
-    match text.is_simple() {
-        true => ascii::cursor(text, select, skip, lines, ctx, gs),
-        false => complex::cursor(text, select, skip, lines, ctx, gs),
-    }
-}
-
-#[inline(always)]
 pub fn line(
     text: &mut EditorLine,
     select: Option<CharRangeUnbound>,
