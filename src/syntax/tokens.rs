@@ -486,7 +486,7 @@ pub fn calc_wrap_line_capped(text: &mut EditorLine, cursor: &Cursor) -> Option<u
 #[cfg(test)]
 mod tests {
     use super::WrapData;
-    use crate::workspace::line::EditorLine;
+    use crate::workspace::{line::EditorLine, Cursor};
 
     impl WrapData {
         pub fn pull_cache(text: &EditorLine) -> Option<WrapData> {
@@ -497,5 +497,40 @@ mod tests {
             }
             None
         }
+    }
+
+    #[test]
+    fn test_cached_cursor_wraps() {
+        let mut cursor = Cursor::default();
+        cursor.text_width = 30;
+        cursor.max_rows = 30;
+        cursor.char = 20;
+
+        let text = EditorLine::from(
+            "unit test text, make sure render caching works, I have to add some emoji to be sure this si comple - 🦀",
+        );
+        let mut content = vec![text];
+
+        assert!(WrapData::get_cached_cursor_wraps(&content[0], &cursor).is_none());
+        assert_eq!(WrapData::calc_wraps_to_cursor_cached(&cursor, &mut content), 1);
+        assert!(WrapData::get_cached_cursor_wraps(&content[0], &cursor).is_none());
+        content[0].cached.cursor(0, 20, 3, None);
+        assert_eq!(WrapData::get_cached_cursor_wraps(&content[0], &cursor), Some(1));
+
+        cursor.char += 1;
+        assert!(WrapData::get_cached_cursor_wraps(&content[0], &cursor).is_none());
+        content[0].cached.cursor(0, 21, 3, None);
+        assert_eq!(WrapData::get_cached_cursor_wraps(&content[0], &cursor), Some(1));
+
+        cursor.char = 76;
+        assert!(WrapData::get_cached_cursor_wraps(&content[0], &cursor).is_none());
+        assert_eq!(WrapData::calc_wraps_to_cursor_cached(&cursor, &mut content), 3);
+        content[0].cached.cursor(0, 76, 3, None);
+        assert_eq!(WrapData::get_cached_cursor_wraps(&content[0], &cursor), Some(3));
+
+        cursor.text_width = 22;
+        assert!(WrapData::get_cached_cursor_wraps(&content[0], &cursor).is_none());
+        assert_eq!(WrapData::calc_wraps_to_cursor_cached(&cursor, &mut content), 4);
+        assert_eq!(WrapData::get_cached_cursor_wraps(&content[0], &cursor), Some(4));
     }
 }
