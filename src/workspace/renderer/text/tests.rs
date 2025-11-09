@@ -559,7 +559,8 @@ fn test_full_end_line_complex() {
 
     #[rustfmt::skip]
     assert_eq!(text, [
-        "<<freeze>>", "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "GlobalState::new(Rect::new(0, ",
+        "<<freeze>>",
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "GlobalState::new(Rect::new(0, ",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "0, 30, 60), Cro🦀Term::init())",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", // last line is filled to end
         "<<go to row: 4 col: 15>>", "2 ", "<<clear EOL>>", "?", "/", "a", " ",
@@ -794,4 +795,146 @@ fn test_cursor_line_oversize_full_last_wrap_complex() {
     let text = drain_as_raw_text_qmark_cursor(&mut gs);
 
     assert_eq!(text, cursor_on_last_wrap);
+}
+
+#[test]
+fn test_select_reset_style() {
+    let mut gs = GlobalState::new(Rect::new(0, 0, 25, 5), CrossTerm::init());
+    gs.force_area_calc();
+    let mut editor = mock_editor_text_render(vec![
+        "".into(),
+        "GlobalState::new(Rect::new(0, 0, 30, 60), CrossTerm::init())".into(), // 60 len
+        "n/a".into(),
+        "n/a".into(),
+    ]);
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+    editor.cursor.select_set((1, 10).into(), (0, 0).into());
+    editor.render(&mut gs);
+
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+    #[rustfmt::skip]
+    assert_eq!(text, [
+        "<<freeze>>",
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>", "<<reset style>>", "?",
+        "<<go to row: 2 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>", "G", "l", "o", "b", "a", "l", "S", "t",
+        "<<reset style>>", // expected on wrap
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", "a", "t", "<<set bg None>>", "e", ":", ":", "n", "e", "w",
+        "<<reset style>>", // expected when breaking lines
+        "<<set style>>",
+        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
+        "<<go to row: 4 col: 14>>", " selected) ",
+        "<<go to row: 4 col: 14>>", "", "<<set style>>",
+        "<<go to row: 4 col: 14>>", "<<padding: 0>>", "<<reset style>>",
+        "<<reset style>>", "<<unfreeze>>"
+    ]);
+
+    editor.cursor.select_set((0, 0).into(), (2, 3).into());
+    editor.render(&mut gs);
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+
+    #[rustfmt::skip]
+    assert_eq!(text, [
+        "<<freeze>>",
+        "<<go to row: 1 col: 15>>", "3 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>", "n", "/", "a",
+        "<<reset style>>", "?",  // reset before cursor
+        "<<go to row: 2 col: 15>>", "4 ", "<<clear EOL>>", "n/a",
+        "<<go to row: 3 col: 15>>", "<<padding: 10>>", "<<set style>>",
+        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
+        "<<go to row: 4 col: 14>>", " selected) ",
+        "<<go to row: 4 col: 14>>", "",
+        "<<reset style>>", "<<unfreeze>>"
+    ]);
+
+    editor.cursor.select_set((0, 0).into(), (1, 25).into());
+    editor.render(&mut gs);
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+
+    #[rustfmt::skip]
+    assert_eq!(text, [
+        "<<freeze>>",
+        "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>", "a", "t", "e", ":", ":", "n", "e", "w",
+        "<<reset style>>",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", "(", "R", "e", "c", "t", ":", ":", "n",
+        "<<reset style>>",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", "e", "<<set bg None>>", "?", "(", "0", ",", " ", "0", ",",
+        "<<reset style>>",
+        "<<set style>>",
+        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
+        "<<go to row: 4 col: 14>>", " selected) ",
+        "<<go to row: 4 col: 14>>", "",
+        "<<reset style>>", "<<unfreeze>>"
+    ]);
+}
+
+#[test]
+fn test_select_reset_style_complex() {
+    let mut gs = GlobalState::new(Rect::new(0, 0, 25, 5), CrossTerm::init());
+    gs.force_area_calc();
+    let mut editor = mock_editor_text_render(vec![
+        "".into(),
+        "let mut gs = GlobalState::new(Rect::new(0, 0, 30, 60), Cro🦀Term::in🦀());".into(),
+        "n/a".into(),
+        "n/a".into(),
+    ]);
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+    editor.cursor.select_set((1, 10).into(), (0, 0).into());
+    editor.render(&mut gs);
+
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+    #[rustfmt::skip]
+    assert_eq!(text, [
+        "<<freeze>>",
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>",
+        "<<reset style>>", "?",
+        "<<go to row: 2 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>", "l", "e", "t", " ", "m", "u", "t", " ",
+        "<<reset style>>", // expected on wrap
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", "g", "s", "<<set bg None>>", " ", "=", " ", "G", "l", "o",
+        "<<reset style>>", // expected when breaking lines
+        "<<set style>>",
+        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
+        "<<go to row: 4 col: 14>>", " selected) ",
+        "<<go to row: 4 col: 14>>", "", "<<set style>>",
+        "<<go to row: 4 col: 14>>", "<<padding: 0>>", "<<reset style>>",
+        "<<reset style>>", "<<unfreeze>>"
+    ]);
+
+    editor.cursor.select_set((0, 0).into(), (1, 72).into());
+    editor.render(&mut gs);
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+
+    #[rustfmt::skip]
+    assert_eq!(text, [
+        "<<freeze>>",
+        "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>", "r", "o", "🦀", "T", "e", "r", "m",
+        "<<reset style>>",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", ":", ":", "i", "n", "🦀", "(", ")",
+        "<<reset style>>",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", ")", ";",
+        "<<reset style>>", "?",
+        "<<set style>>",
+        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
+        "<<go to row: 4 col: 14>>", " selected) ",
+        "<<go to row: 4 col: 14>>", "",
+        "<<reset style>>", "<<unfreeze>>"
+    ]);
+
+    editor.cursor.select_set((0, 0).into(), (1, 25).into());
+    editor.render(&mut gs);
+    let text = drain_as_raw_text_qmark_cursor(&mut gs);
+
+    #[rustfmt::skip]
+    assert_eq!(text, [
+        "<<freeze>>",
+        "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>", "g", "s", " ", "=", " ", "G", "l", "o",
+        "<<reset style>>",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", "b", "a", "l", "S", "t", "a", "t", "e",
+        "<<reset style>>",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", ":", "<<set bg None>>", "?", "n", "e", "w", "(", "R", "e",
+        "<<reset style>>",
+        "<<set style>>",
+        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
+        "<<go to row: 4 col: 14>>", " selected) ",
+        "<<go to row: 4 col: 14>>", "",
+        "<<reset style>>", "<<unfreeze>>"
+    ]);
 }
