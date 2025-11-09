@@ -1,6 +1,6 @@
 mod context;
 mod status;
-use status::{Reduction, RenderStatus};
+pub use status::{Reduction, RenderStatus};
 
 use crate::syntax::{tokens::TokenLine, DiagnosticLine, Encoding, Lang, Token};
 pub use context::LineContext;

@@ -2,7 +2,7 @@ use super::{diagnostics::DiagnosticData, Legend};
 use crate::{
     ext_tui::StyleExt,
     workspace::cursor::{Cursor, EncodedWordRange},
-    workspace::line::EditorLine,
+    workspace::line::{EditorLine, RenderStatus},
 };
 use crossterm::style::ContentStyle;
 use lsp_types::SemanticToken;
@@ -360,14 +360,8 @@ impl WrapData {
         }
 
         // caching makes sense only on non ascii - basic should be enough
-        if let Some(prev_char) = text.cached.cursor_char() {
-            let tokens = text.tokens();
-            if tokens.len() == 2 {
-                let Token { len: old_text_width, delta_start: wraps, .. } = tokens.inner[1];
-                if old_text_width == cursor.text_width && prev_char == cursor.char {
-                    return wraps;
-                }
-            }
+        if let Some(wraps) = Self::get_cached_cursor_wraps(text, cursor) {
+            return wraps;
         }
 
         let mut counter = cursor.text_width;
@@ -388,6 +382,24 @@ impl WrapData {
         }
         tokens.push(Token { len: cursor.text_width, delta_start: wraps, style: ContentStyle::default() });
         wraps
+    }
+
+    #[inline]
+    fn get_cached_cursor_wraps(text: &EditorLine, cursor: &Cursor) -> Option<usize> {
+        let RenderStatus::Cursor { char: prev_char, .. } = text.cached else {
+            return None;
+        };
+        let tokens = text.tokens();
+        // cursor wraps not cached
+        if tokens.len() != 2 {
+            return None;
+        }
+        let Token { len: old_text_width, delta_start: wraps, .. } = tokens.inner[1];
+        // width not matching or char not matching
+        if old_text_width != cursor.text_width || prev_char != cursor.char {
+            return None;
+        }
+        Some(wraps)
     }
 }
 
