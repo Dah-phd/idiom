@@ -30,6 +30,14 @@ impl RenderStatus {
         matches!(self, RenderStatus::None)
     }
 
+    #[inline]
+    pub fn cursor_char(&self) -> Option<usize> {
+        if let RenderStatus::Cursor { char, .. } = self {
+            return Some(*char);
+        }
+        None
+    }
+
     #[inline(always)]
     pub fn line(&mut self, line: u16, select: Option<CharRangeUnbound>) {
         *self = Self::Line { line, select }

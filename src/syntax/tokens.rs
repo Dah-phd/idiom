@@ -313,26 +313,30 @@ impl WrapData {
     #[inline]
     pub fn store(&self, text: &mut EditorLine) {
         let tokens = text.tokens_mut_unchecked();
-        tokens.clear();
-        tokens.push(Token { len: self.text_width, delta_start: self.wraps, style: ContentStyle::default() });
+        let token = Token { len: self.text_width, delta_start: self.wraps, style: ContentStyle::default() };
+        if tokens.inner.is_empty() {
+            tokens.push(token);
+        } else {
+            tokens.inner[0] = token;
+        }
     }
 
     pub fn from_text_cached(text: &mut EditorLine, text_width: usize) -> Self {
-        let tokens = text.tokens();
-        // if tokens are with len 1 and cache is intact - stored value should be correct
         if text.is_simple() {
             let new = Self { wraps: 1 + (text.len() / text_width), text_width };
             new.store(text);
             return new;
         }
+
         // use cache for non ascii
-        if !text.cached.is_none() && tokens.len() == 1 {
+        let tokens = text.tokens();
+        if !text.cached.is_none() && !tokens.is_empty() {
             let token = &tokens.inner[0];
             if token.len == text_width {
                 return Self { wraps: token.delta_start, text_width };
             }
         }
-        // non ascii
+
         let mut wraps = 1;
         let mut counter = text_width;
         for ch in text.chars().chain(['~']) {
@@ -348,12 +352,24 @@ impl WrapData {
         new
     }
 
-    pub fn calc_wraps_to_cursor(cursor: &Cursor, content: &[EditorLine]) -> usize {
-        let text = &content[cursor.line];
+    pub fn calc_wraps_to_cursor_cached(cursor: &Cursor, content: &mut [EditorLine]) -> usize {
+        let text = &mut content[cursor.line];
 
         if text.is_simple() {
             return 1 + (cursor.char / cursor.text_width);
         }
+
+        // caching makes sense only on non ascii - basic should be enough
+        if let Some(prev_char) = text.cached.cursor_char() {
+            let tokens = text.tokens();
+            if tokens.len() == 2 {
+                let Token { len: old_text_width, delta_start: wraps, .. } = tokens.inner[1];
+                if old_text_width == cursor.text_width && prev_char == cursor.char {
+                    return wraps;
+                }
+            }
+        }
+
         let mut counter = cursor.text_width;
         let mut wraps = 1;
         for ch in text.chars().take(cursor.char).chain(['~']) {
@@ -364,6 +380,13 @@ impl WrapData {
             }
             counter -= w;
         }
+        let tokens = text.tokens_mut_unchecked();
+        if tokens.inner.is_empty() {
+            tokens.inner.push(Token { len: 0, delta_start: 0, style: ContentStyle::default() });
+        } else {
+            tokens.inner.truncate(1);
+        }
+        tokens.push(Token { len: cursor.text_width, delta_start: wraps, style: ContentStyle::default() });
         wraps
     }
 }

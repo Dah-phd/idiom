@@ -13,7 +13,7 @@ use crate::{
 use idiom_tui::layout::{IterLines, RectIter};
 
 pub fn reposition(cursor: &mut Cursor, content: &mut [EditorLine]) -> Option<usize> {
-    let cursor_wraps = WrapData::calc_wraps_to_cursor(cursor, content);
+    let cursor_wraps = WrapData::calc_wraps_to_cursor_cached(cursor, content);
     if cursor_wraps > cursor.max_rows {
         cursor.at_line = cursor.line;
         return Some(cursor_wraps - cursor.max_rows);

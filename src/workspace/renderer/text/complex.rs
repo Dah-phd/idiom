@@ -49,16 +49,15 @@ pub fn line_with_select(
 
     for (idx, (text, current_width)) in CharLimitedWidths::new(text.as_str(), 3).enumerate() {
         if remaining_width < current_width {
-            let Some(line) = lines.next() else { return };
             let reset_style = backend.get_style();
             backend.reset_style();
+            let Some(line) = lines.next() else { return };
             ctx.wrap_line(line, backend);
             backend.set_style(reset_style);
             remaining_width = line_width;
         }
 
         remaining_width -= current_width;
-
         select.set_style(idx, backend);
         backend.print(text);
     }
@@ -116,7 +115,7 @@ pub fn basic(
 
     for (text, current_width) in content {
         if remaining_width < current_width {
-            let Some(line) = lines.next() else { break };
+            let Some(line) = lines.next() else { return };
             ctx.wrap_line(line, backend);
             remaining_width = line_width;
         }
@@ -129,16 +128,14 @@ pub fn basic(
         idx += 1;
     }
     if remaining_width == 0 {
-        if let Some(line) = lines.next() {
-            ctx.wrap_line(line, backend);
-        }
+        let Some(line) = lines.next() else { return };
+        ctx.wrap_line(line, backend);
     }
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
     } else {
         backend.print(" ");
     }
-    backend.reset_style();
 }
 
 #[inline]
@@ -178,16 +175,15 @@ pub fn select(
 
     for (text, current_width) in content {
         if remaining_width < current_width {
-            let Some(line) = lines.next() else { break };
             let reset_style = backend.get_style();
             backend.reset_style();
+            let Some(line) = lines.next() else { return };
             ctx.wrap_line(line, backend);
             backend.set_style(reset_style);
             remaining_width = line_width;
         }
 
         remaining_width -= current_width;
-
         select.set_style(idx, backend);
         if cursor_idx == idx {
             backend.print_styled(text, ContentStyle::reversed())
@@ -198,9 +194,8 @@ pub fn select(
     }
     backend.reset_style();
     if remaining_width == 0 {
-        if let Some(line) = lines.next() {
-            ctx.wrap_line(line, backend);
-        }
+        let Some(line) = lines.next() else { return };
+        ctx.wrap_line(line, backend);
     }
     if idx <= cursor_idx {
         backend.print_styled(" ", ContentStyle::reversed());
