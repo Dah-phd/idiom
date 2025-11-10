@@ -36,17 +36,11 @@ mod test {
 
     #[test]
     fn ignores_closing_hashes() {
-        assert_eq!(
-            parse_atx_header("### Test ###"),
-            Some(Header(vec![Text("Test".to_owned())], 3))
-        );
+        assert_eq!(parse_atx_header("### Test ###"), Some(Header(vec![Text("Test".to_owned())], 3)));
 
         assert_eq!(parse_atx_header("# Test #"), Some(Header(vec![Text("Test".to_owned())], 1)));
 
-        assert_eq!(
-            parse_atx_header("###### Test ##"),
-            Some(Header(vec![Text("Test".to_owned())], 6))
-        );
+        assert_eq!(parse_atx_header("###### Test ##"), Some(Header(vec![Text("Test".to_owned())], 6)));
 
         assert_eq!(
             parse_atx_header("### Test and a pretty long sentence #########"),

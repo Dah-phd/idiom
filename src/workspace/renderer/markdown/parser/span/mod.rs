@@ -73,20 +73,8 @@ mod test {
 
     #[test]
     fn finds_code() {
-        assert_eq!(
-            parse_spans("this `is a` test"),
-            vec![
-                Text("this ".to_owned()),
-                Text(" test".to_owned())
-            ]
-        );
-        assert_eq!(
-            parse_spans("this ``is a`` test"),
-            vec![
-                Text("this ".to_owned()),
-                Text(" test".to_owned())
-            ]
-        );
+        assert_eq!(parse_spans("this `is a` test"), vec![Text("this ".to_owned()), Text(" test".to_owned())]);
+        assert_eq!(parse_spans("this ``is a`` test"), vec![Text("this ".to_owned()), Text(" test".to_owned())]);
     }
 
     #[test]
