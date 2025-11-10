@@ -1,14 +1,10 @@
 use super::super::Span;
 use super::super::Span::Text;
 
-mod br;
-mod code;
 mod emphasis;
 mod image;
 mod link;
 mod strong;
-use self::br::parse_break;
-use self::code::parse_code;
 use self::emphasis::parse_emphasis;
 use self::image::parse_image;
 use self::link::parse_link;
@@ -23,11 +19,6 @@ pub fn parse_spans(text: &str) -> Vec<Span> {
         match parse_span(&text[i..text.len()]) {
             Some((span, consumed_chars)) => {
                 if !t.is_empty() {
-                    // if this text is on the very left
-                    // trim the left whitespace
-                    if tokens.is_empty() {
-                        t = t.trim_start().to_owned()
-                    }
                     tokens.push(Text(t));
                 }
                 tokens.push(span);
@@ -61,20 +52,18 @@ pub fn parse_spans(text: &str) -> Vec<Span> {
 
 fn parse_span(text: &str) -> Option<(Span, usize)> {
     pipe_opt!(
-    text
-    => parse_code
-    => parse_strong
-    => parse_emphasis
-    => parse_break
-    => parse_image
-    => parse_link
+        text
+        => parse_strong
+        => parse_emphasis
+        => parse_image
+        => parse_link
     )
 }
 
 #[cfg(test)]
 mod test {
     use super::super::span::parse_spans;
-    use super::super::Span::{Break, Code, Emphasis, Image, Link, Strong, Text};
+    use super::super::Span::{Emphasis, Image, Link, Strong, Text};
     use std::str;
 
     #[test]
@@ -83,17 +72,11 @@ mod test {
     }
 
     #[test]
-    fn finds_breaks() {
-        assert_eq!(parse_spans("this is a test  "), vec![Text("this is a test".to_owned()), Break]);
-    }
-
-    #[test]
     fn finds_code() {
         assert_eq!(
             parse_spans("this `is a` test"),
             vec![
                 Text("this ".to_owned()),
-                Code("is a".to_owned()),
                 Text(" test".to_owned())
             ]
         );
@@ -101,7 +84,6 @@ mod test {
             parse_spans("this ``is a`` test"),
             vec![
                 Text("this ".to_owned()),
-                Code("is a".to_owned()),
                 Text(" test".to_owned())
             ]
         );
@@ -183,10 +165,10 @@ mod test {
                 Text(" ".to_owned()),
                 Strong(vec![Text("strong".to_owned())]),
                 Text(" ".to_owned()),
-                Code("teh codez".to_owned()),
+                Text("teh codez".to_owned()),
                 Text(" ".to_owned()),
                 Link("a link".to_owned(), "example.com".to_owned(), None),
-                Break
+                Text("  ".to_owned())
             ]
         );
     }

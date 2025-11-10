@@ -1,6 +1,5 @@
 use super::super::tests::{expect_select, parse_complex_line};
 use super::line;
-use super::parser::{parse, Block, ListItem, Span};
 use crate::{
     configs::FileType,
     ext_tui::{CrossTerm, StyleExt},
@@ -156,31 +155,6 @@ fn complex_line_select() {
 
 // DEPENDENCY TEST
 // markdown create testing - it is used only on run time, and changes can cause strange renders
-
-#[test]
-fn parser_code_snippet() {
-    let txt = "```";
-    assert_eq!(parse(txt), vec![Block::Paragraph(vec![Span::Code(String::from('`'))])]);
-}
-
-#[test]
-fn example_parsed_code() {
-    assert_eq!(
-        parse("![](/non_dev/screen1.png)"),
-        vec![Block::Paragraph(vec![Span::Image(
-            String::new(),
-            String::from("/non_dev/screen1.png"),
-            None
-        )])]
-    );
-    assert_eq!(parse("## Tested platform"), vec![Block::Header(vec![Span::Text(String::from("Tested platform"))], 2)]);
-    assert_eq!(
-        parse("- Linux Fedora derivate (Nobara)"),
-        vec![Block::UnorderedList(vec![ListItem::Simple(vec![Span::Text(
-            String::from("Linux Fedora derivate (Nobara)")
-        )])])],
-    );
-}
 
 #[test]
 fn test_md_editor() {

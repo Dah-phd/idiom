@@ -17,7 +17,7 @@ use idiom_tui::{
     utils::CharLimitedWidths,
     Backend,
 };
-use parser::{parse, Block, ListItem, Span};
+use parser::{parse, Block, Span};
 
 const HEADING: ContentStyle = ContentStyle {
     foreground_color: Some(Color::DarkRed),
@@ -70,12 +70,11 @@ impl<'a, 'b> StyledParser<'a, 'b> {
 
     fn render(mut self, content: &str) {
         let mut limit = self.line_width;
-        for block in parse(content) {
-            match self.print_block(block, limit) {
-                Some(remining) => limit = remining,
-                None => return,
-            }
-        }
+        let block = parse(content);
+        match self.print_block(block, limit) {
+            Some(new_limit) => limit = new_limit,
+            None => return,
+        };
         if limit == 0 {
             let Some(line) = self.lines.next() else { return };
             self.ctx.wrap_line(line, self.backend);
@@ -100,45 +99,19 @@ impl<'a, 'b> StyledParser<'a, 'b> {
                     limit = self.print_span(span, limit)?;
                 }
             }
+            Block::Blockquote(text, nesting) => {
+                self.backend.set_style(self.ctx.accent_style);
+                limit = (self.wrap_printer)(self, &text, limit)?;
+            }
             Block::Hr => {
                 self.backend.print((0..limit).map(|_| '-').collect::<String>());
                 limit = 0;
             }
-            Block::CodeBlock(x, y) => {
-                limit = (self.wrap_printer)(self, &format!(" X X X {x:?} {y}"), limit)?;
+            Block::CodeBlock(Some(lang)) => {
+                limit = (self.wrap_printer)(self, &format!(">>> {lang}"), limit)?;
             }
-            Block::OrderedList(items, list_type) => {
-                limit = (self.wrap_printer)(self, &format!(" {}.", list_type.0), limit)?;
-                for item in items {
-                    limit = self.print_list_item(item, limit)?;
-                }
-            }
-            Block::UnorderedList(items) => {
-                limit = (self.wrap_printer)(self, " > ", limit)?;
-                for item in items {
-                    limit = self.print_list_item(item, limit)?;
-                }
-            }
-            Block::Blockquote(blocks) => {
-                for block in blocks {
-                    limit = self.print_block(block, limit)?;
-                }
-            }
-        }
-        Some(limit)
-    }
-
-    fn print_list_item(&mut self, item: ListItem, mut limit: usize) -> Option<usize> {
-        match item {
-            ListItem::Simple(spans) => {
-                for span in spans {
-                    limit = self.print_span(span, limit)?;
-                }
-            }
-            ListItem::Paragraph(parag) => {
-                for block in parag {
-                    limit = self.print_block(block, limit)?;
-                }
+            Block::CodeBlock(None) => {
+                limit = (self.wrap_printer)(self, "<<<", limit)?;
             }
         }
         Some(limit)
@@ -163,12 +136,6 @@ impl<'a, 'b> StyledParser<'a, 'b> {
                 }
                 self.backend.set_style(style);
             }
-            Span::Code(text) => {
-                limit = match text.as_str() {
-                    "`" => (self.wrap_printer)(self, ">>> ", limit)?,
-                    _ => (self.wrap_printer)(self, &text, limit)?,
-                }
-            }
             Span::Image(name, path, _) => {
                 limit = match name.is_empty() {
                     true => (self.wrap_printer)(self, "Image", limit)?,
@@ -184,11 +151,6 @@ impl<'a, 'b> StyledParser<'a, 'b> {
                 };
                 limit = (self.wrap_printer)(self, " > ", limit)?;
                 limit = (self.wrap_printer)(self, &link, limit)?;
-            }
-            Span::Break => {
-                let line = self.lines.next()?;
-                self.ctx.wrap_line(line, self.backend);
-                limit = self.line_width;
             }
         }
         Some(limit)
