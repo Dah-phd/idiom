@@ -1,17 +1,13 @@
 use super::super::Block;
-use super::super::Block::Hr;
-use lazy_static::lazy_static;
-use regex::Regex;
 
-pub fn parse_hr(line: &str) -> Option<Block> {
-    lazy_static! {
-        static ref HORIZONTAL_RULE: Regex = Regex::new(r"^(===+)$|^(---+)$").expect("Pattern already testsed!");
+pub fn parse_hr<'a>(line: &'a str) -> Option<Block<'a>> {
+    if line.len() < 3 {
+        return None;
     }
-
-    if HORIZONTAL_RULE.is_match(line) {
-        return Some(Hr);
+    if !line.chars().all(|c| c == '-') && !line.chars().all(|c| c == '=') {
+        return None;
     }
-    None
+    Some(Block::Hr)
 }
 
 #[cfg(test)]

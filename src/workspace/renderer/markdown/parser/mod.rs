@@ -7,9 +7,9 @@ mod span;
 
 #[allow(missing_docs)]
 #[derive(Debug, PartialEq, Clone)]
-pub enum Block {
-    Header(Vec<Span>, usize),
-    Paragraph(Vec<Span>),
+pub enum Block<'a> {
+    Header(Vec<Span<'a>>, usize),
+    Paragraph(Vec<Span<'a>>),
     Blockquote(String, usize),
     CodeBlock(Option<String>),
     Hr,
@@ -17,14 +17,14 @@ pub enum Block {
 
 #[allow(missing_docs)]
 #[derive(Debug, PartialEq, Clone)]
-pub enum Span {
-    Text(String),
+pub enum Span<'a> {
+    Text(&'a str),
     Link(String, String, Option<String>),
     Image(String, String, Option<String>),
-    Emphasis(Vec<Span>),
-    Strong(Vec<Span>),
+    Emphasis(Vec<Span<'a>>),
+    Strong(Vec<Span<'a>>),
 }
 
-pub fn parse(md: &str) -> Block {
+pub fn parse<'a>(md: &'a str) -> Block<'a> {
     block::parse_blocks(md).unwrap_or(Block::Paragraph(span::parse_spans(md)))
 }

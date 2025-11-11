@@ -11,46 +11,37 @@ use self::link::parse_link;
 use self::strong::parse_strong;
 use pipeline::{pipe_fun, pipe_opt};
 
-pub fn parse_spans(text: &str) -> Vec<Span> {
+pub fn parse_spans<'a>(text: &'a str) -> Vec<Span<'a>> {
     let mut tokens = vec![];
-    let mut t = String::new();
-    let mut i = 0;
-    while i < text.len() {
-        match parse_span(&text[i..text.len()]) {
+    let mut text_span_len = 0;
+    let mut char_idx = 0;
+    while char_idx < text.len() {
+        match parse_span(&text[char_idx..]) {
             Some((span, consumed_chars)) => {
-                if !t.is_empty() {
-                    tokens.push(Text(t));
+                if text_span_len != 0 {
+                    tokens.push(Text(&text[(char_idx - text_span_len)..char_idx]));
                 }
                 tokens.push(span);
-                t = String::new();
-                i += consumed_chars;
+                text_span_len = 0;
+                char_idx += consumed_chars;
             }
             None => {
-                let mut e = i + 1;
-                while !text.is_char_boundary(e) {
-                    e += 1;
+                char_idx += 1;
+                text_span_len += 1;
+                while !text.is_char_boundary(char_idx) {
+                    char_idx += 1;
+                    text_span_len += 1;
                 }
-
-                t.push_str(&text[i..e]);
-                i += e - i;
             }
         }
     }
-    if !t.is_empty() {
-        // if this text is on the very left
-        // trim the left whitespace
-        if tokens.is_empty() {
-            t = t.trim_start().to_owned();
-        }
-        // we're at the very end of this line,
-        // trim trailing whitespace
-        t = t.trim_end().to_owned();
-        tokens.push(Text(t));
+    if text_span_len != 0 {
+        tokens.push(Text(&text[(text.len() - text_span_len)..char_idx]));
     }
     tokens
 }
 
-fn parse_span(text: &str) -> Option<(Span, usize)> {
+fn parse_span<'a>(text: &'a str) -> Option<(Span<'a>, usize)> {
     pipe_opt!(
         text
         => parse_strong
@@ -68,53 +59,25 @@ mod test {
 
     #[test]
     fn converts_into_text() {
-        assert_eq!(parse_spans("this is a test"), vec![Text("this is a test".to_owned())]);
+        assert_eq!(parse_spans("this is a test"), vec![Text("this is a test")]);
     }
 
     #[test]
     fn finds_code() {
-        assert_eq!(parse_spans("this `is a` test"), vec![Text("this ".to_owned()), Text(" test".to_owned())]);
-        assert_eq!(parse_spans("this ``is a`` test"), vec![Text("this ".to_owned()), Text(" test".to_owned())]);
+        assert_eq!(parse_spans("this `is a` test"), vec![Text("this `is a` test")]);
+        assert_eq!(parse_spans("this ``is a`` test"), vec![Text("this ``is a`` test")]);
     }
 
     #[test]
     fn finds_emphasis() {
-        assert_eq!(
-            parse_spans("this _is a_ test"),
-            vec![
-                Text("this ".to_owned()),
-                Emphasis(vec![Text("is a".to_owned())]),
-                Text(" test".to_owned())
-            ]
-        );
-        assert_eq!(
-            parse_spans("this *is a* test"),
-            vec![
-                Text("this ".to_owned()),
-                Emphasis(vec![Text("is a".to_owned())]),
-                Text(" test".to_owned())
-            ]
-        );
+        assert_eq!(parse_spans("this _is a_ test"), vec![Text("this "), Emphasis(vec![Text("is a")]), Text(" test")]);
+        assert_eq!(parse_spans("this *is a* test"), vec![Text("this "), Emphasis(vec![Text("is a")]), Text(" test")]);
     }
 
     #[test]
     fn finds_strong() {
-        assert_eq!(
-            parse_spans("this __is a__ test"),
-            vec![
-                Text("this ".to_owned()),
-                Strong(vec![Text("is a".to_owned())]),
-                Text(" test".to_owned())
-            ]
-        );
-        assert_eq!(
-            parse_spans("this **is a** test"),
-            vec![
-                Text("this ".to_owned()),
-                Strong(vec![Text("is a".to_owned())]),
-                Text(" test".to_owned())
-            ]
-        );
+        assert_eq!(parse_spans("this __is a__ test"), vec![Text("this "), Strong(vec![Text("is a")]), Text(" test")]);
+        assert_eq!(parse_spans("this **is a** test"), vec![Text("this "), Strong(vec![Text("is a")]), Text(" test")]);
     }
 
     #[test]
@@ -122,9 +85,9 @@ mod test {
         assert_eq!(
             parse_spans("this is [an example](example.com) test"),
             vec![
-                Text("this is ".to_owned()),
+                Text("this is "),
                 Link("an example".to_owned(), "example.com".to_owned(), None),
-                Text(" test".to_owned())
+                Text(" test")
             ]
         );
     }
@@ -134,9 +97,9 @@ mod test {
         assert_eq!(
             parse_spans("this is ![an example](example.com) test"),
             vec![
-                Text("this is ".to_owned()),
+                Text("this is "),
                 Image("an example".to_owned(), "example.com".to_owned(), None),
-                Text(" test".to_owned())
+                Text(" test")
             ]
         );
     }
@@ -146,17 +109,17 @@ mod test {
         assert_eq!(
             parse_spans("some text ![an image](image.com) _emphasis_ __strong__ `teh codez` [a link](example.com)  "),
             vec![
-                Text("some text ".to_owned()),
+                Text("some text "),
                 Image("an image".to_owned(), "image.com".to_owned(), None),
-                Text(" ".to_owned()),
-                Emphasis(vec![Text("emphasis".to_owned())]),
-                Text(" ".to_owned()),
-                Strong(vec![Text("strong".to_owned())]),
-                Text(" ".to_owned()),
-                Text("teh codez".to_owned()),
-                Text(" ".to_owned()),
+                Text(" "),
+                Emphasis(vec![Text("emphasis")]),
+                Text(" "),
+                Strong(vec![Text("strong")]),
+                Text(" "),
+                Text("teh codez"),
+                Text(" "),
                 Link("a link".to_owned(), "example.com".to_owned(), None),
-                Text("  ".to_owned())
+                Text("  ")
             ]
         );
     }

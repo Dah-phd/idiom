@@ -4,7 +4,7 @@ use super::super::Span::Emphasis;
 use lazy_static::lazy_static;
 use regex::Regex;
 
-pub fn parse_emphasis(text: &str) -> Option<(Span, usize)> {
+pub fn parse_emphasis<'a>(text: &'a str) -> Option<(Span<'a>, usize)> {
     lazy_static! {
         static ref EMPHASIS_UNDERSCORE: Regex = Regex::new(r"^_(?P<text>.+?)_").expect("Pattern tested!");
         static ref EMPHASIS_STAR: Regex = Regex::new(r"^\*(?P<text>.+?)\*").expect("Pattern tested!");
@@ -22,26 +22,17 @@ mod test {
 
     #[test]
     fn finds_emphasis() {
-        assert_eq!(
-            parse_emphasis("_testing things_ test"),
-            Some((Emphasis(vec![Text("testing things".to_owned())]), 16))
-        );
+        assert_eq!(parse_emphasis("_testing things_ test"), Some((Emphasis(vec![Text("testing things")]), 16)));
 
-        assert_eq!(
-            parse_emphasis("*testing things* test"),
-            Some((Emphasis(vec![Text("testing things".to_owned())]), 16))
-        );
+        assert_eq!(parse_emphasis("*testing things* test"), Some((Emphasis(vec![Text("testing things")]), 16)));
 
-        assert_eq!(
-            parse_emphasis("_testing things_ things_ test"),
-            Some((Emphasis(vec![Text("testing things".to_owned())]), 16))
-        );
+        assert_eq!(parse_emphasis("_testing things_ things_ test"), Some((Emphasis(vec![Text("testing things")]), 16)));
 
-        assert_eq!(parse_emphasis("_w_ things_ test"), Some((Emphasis(vec![Text("w".to_owned())]), 3)));
+        assert_eq!(parse_emphasis("_w_ things_ test"), Some((Emphasis(vec![Text("w")]), 3)));
 
-        assert_eq!(parse_emphasis("*w* things* test"), Some((Emphasis(vec![Text("w".to_owned())]), 3)));
+        assert_eq!(parse_emphasis("*w* things* test"), Some((Emphasis(vec![Text("w")]), 3)));
 
-        assert_eq!(parse_emphasis("_w__ testing things test"), Some((Emphasis(vec![Text("w".to_owned())]), 3)));
+        assert_eq!(parse_emphasis("_w__ testing things test"), Some((Emphasis(vec![Text("w")]), 3)));
     }
 
     #[test]

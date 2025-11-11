@@ -1,6 +1,6 @@
 use super::super::Block;
 
-pub fn parse_blockquote(line: &str) -> Option<Block> {
+pub fn parse_blockquote<'a>(line: &'a str) -> Option<Block<'a>> {
     let mut nesting = 0;
 
     for ch in line.chars() {

@@ -1,7 +1,4 @@
 use super::super::Block;
-use super::super::Block::Paragraph;
-use super::super::Span::Text;
-use super::span::parse_spans;
 use pipeline::{pipe_fun, pipe_opt};
 
 mod atx_header;
@@ -13,7 +10,7 @@ use self::blockquote::parse_blockquote;
 use self::code_block::parse_code_block;
 use self::hr::parse_hr;
 
-pub fn parse_blocks(line: &str) -> Option<Block> {
+pub fn parse_blocks<'a>(line: &'a str) -> Option<Block<'a>> {
     pipe_opt!(
         line
         => parse_hr

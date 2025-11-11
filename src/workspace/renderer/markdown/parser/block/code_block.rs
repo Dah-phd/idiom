@@ -1,6 +1,6 @@
 use super::super::Block;
 
-pub fn parse_code_block(line: &str) -> Option<Block> {
+pub fn parse_code_block<'a>(line: &'a str) -> Option<Block<'a>> {
     if !line.starts_with("```") {
         return None;
     }

@@ -3,7 +3,7 @@ use super::super::Span::Image;
 use lazy_static::lazy_static;
 use regex::Regex;
 
-pub fn parse_image(text: &str) -> Option<(Span, usize)> {
+pub fn parse_image<'a>(text: &'a str) -> Option<(Span<'a>, usize)> {
     lazy_static! {
         static ref IMAGE: Regex =
             Regex::new("^!\\[(?P<text>.*?)\\]\\((?P<url>.*?)(?:\\s\"(?P<title>.*?)\")?\\)").expect("Pattern tested");

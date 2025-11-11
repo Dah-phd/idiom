@@ -3,7 +3,7 @@ use super::super::Span::Link;
 use lazy_static::lazy_static;
 use regex::Regex;
 
-pub fn parse_link(text: &str) -> Option<(Span, usize)> {
+pub fn parse_link<'a>(text: &'a str) -> Option<(Span<'a>, usize)> {
     lazy_static! {
         static ref LINK: Regex =
             Regex::new("^\\[(?P<text>.*?)\\]\\((?P<url>.*?)(?:\\s\"(?P<title>.*?)\")?\\)").expect("Pattern tested");
