@@ -152,6 +152,7 @@ impl<'a, 'b> StyledParser<'a, 'b> {
                 limit = (self.wrap_printer)(self, " > ", limit)?;
                 limit = (self.wrap_printer)(self, &link, limit)?;
             }
+            Span::Code(text) => limit = (self.wrap_printer)(self, &text, limit)?,
         }
         Some(limit)
     }

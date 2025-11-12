@@ -23,6 +23,7 @@ pub enum Span<'a> {
     Image(String, String, Option<String>),
     Emphasis(Vec<Span<'a>>),
     Strong(Vec<Span<'a>>),
+    Code(&'a str),
 }
 
 pub fn parse<'a>(md: &'a str) -> Block<'a> {
