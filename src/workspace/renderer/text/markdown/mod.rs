@@ -1,22 +1,9 @@
-mod ascii;
-mod complex;
+pub mod ascii;
+pub mod complex;
 mod parser;
-use super::utils::{pad_select, SelectManagerSimple};
-use crate::{
-    ext_tui::CrossTerm,
-    global_state::GlobalState,
-    syntax::tokens::WrapData,
-    workspace::{
-        cursor::{CharRangeUnbound, Cursor},
-        line::{EditorLine, LineContext},
-    },
-};
+use crate::{ext_tui::CrossTerm, workspace::line::LineContext};
 use crossterm::style::{Attribute, Attributes, Color, ContentStyle, Stylize};
-use idiom_tui::{
-    layout::{IterLines, RectIter},
-    utils::CharLimitedWidths,
-    Backend,
-};
+use idiom_tui::{layout::RectIter, utils::CharLimitedWidths, Backend};
 use parser::{parse, Block, Span};
 
 const HEADING: ContentStyle = ContentStyle {
@@ -202,49 +189,6 @@ fn print_split_comp(parser: &mut StyledParser, text: &str, mut limit: usize) -> 
         }
     }
     Some(limit)
-}
-
-pub fn reposition(cursor: &mut Cursor, content: &mut [EditorLine]) -> Option<usize> {
-    let cursor_wraps = WrapData::calc_wraps_to_cursor_cached(cursor, content);
-    if cursor_wraps > cursor.max_rows {
-        cursor.at_line = cursor.line;
-        return Some(cursor_wraps - cursor.max_rows);
-    }
-    if cursor.at_line > cursor.line {
-        cursor.at_line = cursor.line;
-        return None;
-    }
-    let mut free_rows = cursor.max_rows - cursor_wraps;
-    for (idx, text) in content.iter_mut().enumerate().skip(cursor.at_line).take(cursor.line - cursor.at_line).rev() {
-        let wraps = WrapData::from_text_cached(text, cursor.text_width).count();
-        if wraps > free_rows {
-            cursor.at_line = idx + 1;
-            break;
-        }
-        free_rows -= wraps;
-    }
-    None
-}
-
-#[inline(always)]
-pub fn line(
-    text: &mut EditorLine,
-    select: Option<CharRangeUnbound>,
-    ctx: &mut LineContext,
-    lines: &mut RectIter,
-    gs: &mut GlobalState,
-) {
-    text.cached.line(lines.next_line_idx(), select.clone());
-    match text.is_simple() {
-        true => match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
-            Some(select) => ascii::line_with_select(text, select, lines, ctx, gs),
-            None => ascii::line(text, lines, ctx, gs.backend()),
-        },
-        false => match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
-            Some(select) => complex::line_with_select(text, select, lines, ctx, gs),
-            None => complex::line(text, lines, ctx, gs.backend()),
-        },
-    }
 }
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
-use super::super::tests::{expect_select, parse_complex_line};
-use super::line;
+use super::super::super::tests::{expect_select, parse_complex_line};
+use super::super::md_line;
 use crate::{
     configs::FileType,
     ext_tui::{CrossTerm, StyleExt},
@@ -45,7 +45,7 @@ fn simple_line() {
     let mut texts = generate_lines();
 
     for text in texts.iter_mut() {
-        line(text, None, &mut ctx, &mut lines, &mut gs);
+        md_line(text, None, &mut ctx, &mut lines, &mut gs);
     }
 
     let mut rendered = gs.backend().drain();
@@ -77,7 +77,7 @@ fn simple_line_select() {
 
     for text in texts.iter_mut() {
         let select = ctx.select_get();
-        line(text, select, &mut ctx, &mut lines, &mut gs);
+        md_line(text, select, &mut ctx, &mut lines, &mut gs);
     }
 
     let mut rendered = gs.backend().drain();
@@ -105,7 +105,7 @@ fn complex_line() {
     let mut texts = generate_complex_lines();
 
     for text in texts.iter_mut() {
-        line(text, None, &mut ctx, &mut lines, &mut gs);
+        md_line(text, None, &mut ctx, &mut lines, &mut gs);
     }
 
     let mut rendered = gs.backend().drain();
@@ -137,7 +137,7 @@ fn complex_line_select() {
 
     for text in texts.iter_mut() {
         let select = ctx.select_get();
-        line(text, select, &mut ctx, &mut lines, &mut gs);
+        md_line(text, select, &mut ctx, &mut lines, &mut gs);
     }
 
     let mut rendered = gs.backend().drain();

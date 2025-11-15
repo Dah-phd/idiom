@@ -1,5 +1,6 @@
 mod ascii;
 mod complex;
+mod markdown;
 
 use super::utils::{pad_select, try_cache_wrap_data_from_lines, SelectManagerSimple};
 use crate::{
@@ -76,6 +77,27 @@ pub fn line(
             }
             try_cache_wrap_data_from_lines(text, len_pre_render, lines, ctx);
         }
+    }
+}
+
+#[inline(always)]
+pub fn md_line(
+    text: &mut EditorLine,
+    select: Option<CharRangeUnbound>,
+    ctx: &mut LineContext,
+    lines: &mut RectIter,
+    gs: &mut GlobalState,
+) {
+    text.cached.line(lines.next_line_idx(), select.clone());
+    match text.is_simple() {
+        true => match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
+            Some(select) => ascii::line_with_select(text, select, lines, ctx, gs),
+            None => markdown::ascii::line(text, lines, ctx, gs.backend()),
+        },
+        false => match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
+            Some(select) => complex::line_with_select(text, select, lines, ctx, gs),
+            None => markdown::complex::line(text, lines, ctx, gs.backend()),
+        },
     }
 }
 
