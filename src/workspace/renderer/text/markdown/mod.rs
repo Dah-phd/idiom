@@ -1,7 +1,9 @@
-pub mod ascii;
-pub mod complex;
 mod parser;
-use crate::{ext_tui::CrossTerm, workspace::line::LineContext};
+use crate::{
+    ext_tui::{iter::TakeLiens, CrossTerm},
+    syntax::tokens::WrapData,
+    workspace::line::{EditorLine, LineContext},
+};
 use crossterm::style::{Attribute, Attributes, Color, ContentStyle, Stylize};
 use idiom_tui::{layout::RectIter, utils::CharLimitedWidths, Backend};
 use parser::{parse, Block, Span};
@@ -189,6 +191,42 @@ fn print_split_comp(parser: &mut StyledParser, text: &str, mut limit: usize) -> 
         }
     }
     Some(limit)
+}
+
+pub fn ascii_line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
+    if let Some(parser) = StyledParser::new_ascii(lines, ctx, backend) {
+        parser.render(text.as_str());
+    }
+    backend.reset_style();
+}
+
+pub fn ascii_line_exact(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
+    let Some(line) = lines.next() else { return };
+    let text_width = ctx.setup_line(line, backend);
+    let wraps = WrapData::from_text_cached(text, text_width).count() - 1; // first in setup
+    let take = TakeLiens::new(lines, wraps);
+    todo!();
+    for remaining_line in take {
+        ctx.wrap_line(remaining_line, backend);
+    }
+}
+
+pub fn complex_line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
+    if let Some(parser) = StyledParser::new_complex(lines, ctx, backend) {
+        parser.render(text.as_str());
+    }
+    backend.reset_style();
+}
+
+pub fn complex_line_exact(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
+    let Some(line) = lines.next() else { return };
+    let text_width = ctx.setup_line(line, backend);
+    let wraps = WrapData::from_text_cached(text, text_width).count() - 1; // first in setup
+    let take = TakeLiens::new(lines, wraps);
+    todo!();
+    for remaining_line in take {
+        ctx.wrap_line(remaining_line, backend);
+    }
 }
 
 #[cfg(test)]

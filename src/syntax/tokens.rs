@@ -360,7 +360,7 @@ impl WrapData {
         }
 
         // caching makes sense only on non ascii - basic should be enough
-        if let Some(wraps) = Self::get_cached_cursor_wraps(text, cursor) {
+        if let Some(wraps) = Self::get_cached_wraps_to_cursor(text, cursor) {
             return wraps;
         }
 
@@ -385,7 +385,7 @@ impl WrapData {
     }
 
     #[inline]
-    fn get_cached_cursor_wraps(text: &EditorLine, cursor: &Cursor) -> Option<usize> {
+    fn get_cached_wraps_to_cursor(text: &EditorLine, cursor: &Cursor) -> Option<usize> {
         let RenderStatus::Cursor { char: prev_char, .. } = text.cached else {
             return None;
         };
@@ -431,26 +431,26 @@ mod tests {
         );
         let mut content = vec![text];
 
-        assert!(WrapData::get_cached_cursor_wraps(&content[0], &cursor).is_none());
+        assert!(WrapData::get_cached_wraps_to_cursor(&content[0], &cursor).is_none());
         assert_eq!(WrapData::calc_wraps_to_cursor_cached(&cursor, &mut content), 1);
-        assert!(WrapData::get_cached_cursor_wraps(&content[0], &cursor).is_none());
+        assert!(WrapData::get_cached_wraps_to_cursor(&content[0], &cursor).is_none());
         content[0].cached.cursor(0, 20, 3, None);
-        assert_eq!(WrapData::get_cached_cursor_wraps(&content[0], &cursor), Some(1));
+        assert_eq!(WrapData::get_cached_wraps_to_cursor(&content[0], &cursor), Some(1));
 
         cursor.char += 1;
-        assert!(WrapData::get_cached_cursor_wraps(&content[0], &cursor).is_none());
+        assert!(WrapData::get_cached_wraps_to_cursor(&content[0], &cursor).is_none());
         content[0].cached.cursor(0, 21, 3, None);
-        assert_eq!(WrapData::get_cached_cursor_wraps(&content[0], &cursor), Some(1));
+        assert_eq!(WrapData::get_cached_wraps_to_cursor(&content[0], &cursor), Some(1));
 
         cursor.char = 76;
-        assert!(WrapData::get_cached_cursor_wraps(&content[0], &cursor).is_none());
+        assert!(WrapData::get_cached_wraps_to_cursor(&content[0], &cursor).is_none());
         assert_eq!(WrapData::calc_wraps_to_cursor_cached(&cursor, &mut content), 3);
         content[0].cached.cursor(0, 76, 3, None);
-        assert_eq!(WrapData::get_cached_cursor_wraps(&content[0], &cursor), Some(3));
+        assert_eq!(WrapData::get_cached_wraps_to_cursor(&content[0], &cursor), Some(3));
 
         cursor.text_width = 22;
-        assert!(WrapData::get_cached_cursor_wraps(&content[0], &cursor).is_none());
+        assert!(WrapData::get_cached_wraps_to_cursor(&content[0], &cursor).is_none());
         assert_eq!(WrapData::calc_wraps_to_cursor_cached(&cursor, &mut content), 4);
-        assert_eq!(WrapData::get_cached_cursor_wraps(&content[0], &cursor), Some(4));
+        assert_eq!(WrapData::get_cached_wraps_to_cursor(&content[0], &cursor), Some(4));
     }
 }

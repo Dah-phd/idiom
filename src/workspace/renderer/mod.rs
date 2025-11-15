@@ -354,6 +354,7 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
 
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(cursor, lexer.encoding().char_len, *line_number_padding, accent_style);
+    let mut cursor_rendered = false;
 
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
@@ -361,6 +362,7 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
         }
         let select = ctx.select_get();
         if ctx.has_cursor(line_idx) {
+            cursor_rendered = true;
             if text.cached.should_render_cursor(lines.next_line_idx(), ctx.cursor_char(), &select)
                 || text.cached.skipped_chars() != skip
             {
@@ -393,6 +395,7 @@ fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     last_render_at_line.replace(cursor.at_line);
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(cursor, lexer.encoding().char_len, *line_number_padding, accent_style);
+    let mut cursor_rendered = false;
 
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
@@ -400,6 +403,7 @@ fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
         }
         let select = ctx.select_get();
         if ctx.has_cursor(line_idx) {
+            cursor_rendered = true;
             text::cursor(text, select, skip, &mut ctx, &mut lines, gs);
         } else {
             text::md_line(text, select, &mut ctx, &mut lines, gs)

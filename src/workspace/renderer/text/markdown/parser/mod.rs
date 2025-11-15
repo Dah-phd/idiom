@@ -5,7 +5,10 @@
 mod block;
 mod span;
 
-#[allow(missing_docs)]
+pub fn parse<'a>(md: &'a str) -> Block<'a> {
+    block::parse_blocks(md).unwrap_or(Block::Paragraph(span::parse_spans(md)))
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Block<'a> {
     Header(Vec<Span<'a>>, usize),
@@ -15,7 +18,12 @@ pub enum Block<'a> {
     Hr,
 }
 
-#[allow(missing_docs)]
+impl<'a> Block<'a> {
+    pub fn render(&'a self) {
+        todo!()
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Span<'a> {
     Text(&'a str),
@@ -26,6 +34,8 @@ pub enum Span<'a> {
     Code(&'a str),
 }
 
-pub fn parse<'a>(md: &'a str) -> Block<'a> {
-    block::parse_blocks(md).unwrap_or(Block::Paragraph(span::parse_spans(md)))
+impl<'a> Span<'a> {
+    pub fn render(&'a self) {
+        todo!()
+    }
 }

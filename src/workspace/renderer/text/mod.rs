@@ -92,11 +92,32 @@ pub fn md_line(
     match text.is_simple() {
         true => match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
             Some(select) => ascii::line_with_select(text, select, lines, ctx, gs),
-            None => markdown::ascii::line(text, lines, ctx, gs.backend()),
+            None => markdown::ascii_line(text, lines, ctx, gs.backend()),
         },
         false => match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
             Some(select) => complex::line_with_select(text, select, lines, ctx, gs),
-            None => markdown::complex::line(text, lines, ctx, gs.backend()),
+            None => markdown::complex_line(text, lines, ctx, gs.backend()),
+        },
+    }
+}
+
+#[inline(always)]
+pub fn md_line_exact_styled_wraps(
+    text: &mut EditorLine,
+    select: Option<CharRangeUnbound>,
+    ctx: &mut LineContext,
+    lines: &mut RectIter,
+    gs: &mut GlobalState,
+) {
+    text.cached.line(lines.next_line_idx(), select.clone());
+    match text.is_simple() {
+        true => match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
+            Some(select) => ascii::line_with_select(text, select, lines, ctx, gs),
+            None => markdown::ascii_line(text, lines, ctx, gs.backend()),
+        },
+        false => match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
+            Some(select) => complex::line_with_select(text, select, lines, ctx, gs),
+            None => markdown::complex_line(text, lines, ctx, gs.backend()),
         },
     }
 }

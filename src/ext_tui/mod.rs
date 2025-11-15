@@ -8,6 +8,7 @@ mod crossterm_backend;
 #[cfg(not(test))]
 pub use crossterm_backend::CrossTerm;
 
+pub mod iter;
 pub mod pty;
 pub mod text_field;
 
