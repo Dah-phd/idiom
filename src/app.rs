@@ -20,7 +20,7 @@ use crate::{
 use crossterm::event::Event;
 use std::{path::PathBuf, time::Duration};
 
-pub const MIN_FRAMERATE: Duration = Duration::from_millis(8);
+pub const MIN_FRAMERATE: Duration = Duration::from_millis(16);
 pub const MIN_HEIGHT: u16 = 6;
 pub const MIN_WIDTH: u16 = 40;
 
