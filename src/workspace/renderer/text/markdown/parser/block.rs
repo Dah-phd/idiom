@@ -31,9 +31,9 @@ pub fn parse_code_block<'a>(line: &'a str) -> Option<Block<'a>> {
         return None;
     }
     if line.len() == 3 {
-        Some(Block::CodeBlock(None))
+        Some(Block::Code(None))
     } else {
-        Some(Block::CodeBlock(Some(line[3..].to_owned())))
+        Some(Block::Code(Some(line[3..].to_owned())))
     }
 }
 
@@ -65,7 +65,7 @@ pub fn parse_atx_header<'a>(line: &'a str) -> Option<Block<'a>> {
     if level == 0 {
         return None;
     }
-    Some(Block::Header(parse_spans(&line[level..].trim_start()), level))
+    Some(Block::Header(parse_spans(line[level..].trim_end_matches('#').trim()), level))
 }
 
 #[cfg(test)]

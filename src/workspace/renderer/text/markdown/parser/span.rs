@@ -131,7 +131,7 @@ mod test {
 
     #[test]
     fn finds_breaks() {
-        assert_eq!(parse_spans("this is a test  "), vec![Text("this is a test")]);
+        assert_eq!(parse_spans("this is a test  "), vec![Text("this is a test  ")]);
     }
 
     #[test]
@@ -191,6 +191,7 @@ mod test {
                 Code("teh codez"),
                 Text(" "),
                 Link("a link".to_owned(), "example.com".to_owned(), None),
+                Text("  "),
             ]
         );
     }

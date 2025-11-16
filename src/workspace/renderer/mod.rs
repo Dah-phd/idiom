@@ -372,7 +372,11 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
                 lines.forward(WrapData::from_text_cached(text, cursor.text_width).count());
             }
         } else if text.cached.should_render_line(lines.next_line_idx(), &select) {
-            text::md_line(text, select, &mut ctx, &mut lines, gs)
+            if cursor_rendered {
+                text::md_line(text, select, &mut ctx, &mut lines, gs);
+            } else {
+                text::md_line_exact_styled_wraps(text, select, &mut ctx, &mut lines, gs);
+            }
         } else {
             ctx.skip_line();
             lines.forward(WrapData::from_text_cached(text, cursor.text_width).count());
@@ -405,8 +409,10 @@ fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
         if ctx.has_cursor(line_idx) {
             cursor_rendered = true;
             text::cursor(text, select, skip, &mut ctx, &mut lines, gs);
+        } else if cursor_rendered {
+            text::md_line(text, select, &mut ctx, &mut lines, gs);
         } else {
-            text::md_line(text, select, &mut ctx, &mut lines, gs)
+            text::md_line_exact_styled_wraps(text, select, &mut ctx, &mut lines, gs);
         }
     }
 

@@ -50,15 +50,15 @@ fn simple_line() {
 
     let mut rendered = gs.backend().drain();
     assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["TADA".into()]));
-    assert_eq!(parse_complex_line(&mut rendered), (Some(2), vec![" > write tests".into()]));
-    assert_eq!(parse_complex_line(&mut rendered), (Some(3), vec![" > lsp server cold start, maybe? \"jed".into()]));
+    assert_eq!(parse_complex_line(&mut rendered), (Some(2), vec!["- write tests".into()]));
+    assert_eq!(parse_complex_line(&mut rendered), (Some(3), vec!["- lsp server cold start, maybe? \"jedi".into()]));
     assert_eq!(
         parse_complex_line(&mut rendered),
-        (None, ["i-language server\" ", "starts slow", ", but ", "o"].into_iter().map(String::from).collect())
+        (None, ["-language server\" ", "starts slow", ", but ", "on"].into_iter().map(String::from).collect())
     );
     assert_eq!(
         parse_complex_line(&mut rendered),
-        (None, ["nce", " it starts ", "it", " should ", "continue", " end"].into_iter().map(String::from).collect())
+        (None, ["ce", " it starts ", "it", " should ", "continue", " end"].into_iter().map(String::from).collect())
     );
     assert!(rendered.is_empty())
 }
@@ -110,15 +110,15 @@ fn complex_line() {
 
     let mut rendered = gs.backend().drain();
     assert_eq!(parse_complex_line(&mut rendered), (Some(1), vec!["🔥TADA🔥".into()]));
-    assert_eq!(parse_complex_line(&mut rendered), (Some(2), vec![" > write tests".into()]));
-    assert_eq!(parse_complex_line(&mut rendered), (Some(3), vec![" > lsp server cold start, maybe? \"j🔥".into()]));
+    assert_eq!(parse_complex_line(&mut rendered), (Some(2), vec!["- write tests".into()]));
+    assert_eq!(parse_complex_line(&mut rendered), (Some(3), vec!["- lsp server cold start, maybe? \"j🔥d".into()]));
     assert_eq!(
         parse_complex_line(&mut rendered),
-        (None, ["di-language server\" ", "starts slow", ", but "].into_iter().map(String::from).collect())
+        (None, ["i-language server\" ", "starts slow", ", but ", "o"].into_iter().map(String::from).collect())
     );
     assert_eq!(
         parse_complex_line(&mut rendered),
-        (None, ["once", " it starts ", "it", " should ", "continue", " end"].into_iter().map(String::from).collect())
+        (None, ["nce", " it starts ", "it", " should ", "continue", " end"].into_iter().map(String::from).collect())
     );
     assert!(rendered.is_empty())
 }
