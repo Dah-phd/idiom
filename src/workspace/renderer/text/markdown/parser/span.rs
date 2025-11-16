@@ -1,9 +1,4 @@
 use super::super::Span;
-use super::super::Span::Text;
-
-use pipeline::{pipe_fun, pipe_opt};
-
-use super::super::Span::{Code, Emphasis, Image, Link, Strong};
 use lazy_static::lazy_static;
 use regex::Regex;
 
@@ -15,7 +10,7 @@ pub fn parse_spans<'a>(text: &'a str) -> Vec<Span<'a>> {
         match parse_span(&text[char_idx..]) {
             Some((span, consumed_chars)) => {
                 if text_span_len != 0 {
-                    tokens.push(Text(&text[(char_idx - text_span_len)..char_idx]));
+                    tokens.push(Span::Text(&text[(char_idx - text_span_len)..char_idx]));
                 }
                 tokens.push(span);
                 text_span_len = 0;
@@ -32,20 +27,13 @@ pub fn parse_spans<'a>(text: &'a str) -> Vec<Span<'a>> {
         }
     }
     if text_span_len != 0 {
-        tokens.push(Text(&text[(text.len() - text_span_len)..char_idx]));
+        tokens.push(Span::Text(&text[(text.len() - text_span_len)..char_idx]));
     }
     tokens
 }
 
 fn parse_span<'a>(text: &'a str) -> Option<(Span<'a>, usize)> {
-    pipe_opt!(
-        text
-        => parse_code
-        => parse_strong
-        => parse_emphasis
-        => parse_image
-        => parse_link
-    )
+    parse_code(text).or(parse_strong(text)).or(parse_emphasis(text)).or(parse_image(text)).or(parse_link(text))
 }
 
 pub fn parse_image<'a>(text: &'a str) -> Option<(Span<'a>, usize)> {
@@ -60,7 +48,7 @@ pub fn parse_image<'a>(text: &'a str) -> Option<(Span<'a>, usize)> {
     let title = caps.name("title").map(|mat| mat.as_str().to_owned());
     // TODO correctly get whitespace length between url and title
     let len = text.len() + url.len() + 5 + title.clone().map_or(0, |t| t.len() + 3);
-    Some((Image(text, url, title), len))
+    Some((Span::Image(text, url, title), len))
 }
 
 pub fn parse_strong<'a>(text: &'a str) -> Option<(Span<'a>, usize)> {
@@ -72,7 +60,7 @@ pub fn parse_strong<'a>(text: &'a str) -> Option<(Span<'a>, usize)> {
     let caps = STRONG_UNDERSCORE.captures(text).or(STRONG_STAR.captures(text))?;
 
     let text = caps.name("text")?.as_str();
-    Some((Strong(parse_spans(text)), text.len() + 4))
+    Some((Span::Strong(parse_spans(text)), text.len() + 4))
 }
 
 pub fn parse_emphasis<'a>(text: &'a str) -> Option<(Span<'a>, usize)> {
@@ -83,7 +71,7 @@ pub fn parse_emphasis<'a>(text: &'a str) -> Option<(Span<'a>, usize)> {
     let caps = EMPHASIS_UNDERSCORE.captures(text).or(EMPHASIS_STAR.captures(text))?;
 
     let t = caps.name("text")?.as_str();
-    Some((Emphasis(parse_spans(t)), t.len() + 2))
+    Some((Span::Emphasis(parse_spans(t)), t.len() + 2))
 }
 
 pub fn parse_link<'a>(text: &'a str) -> Option<(Span<'a>, usize)> {
@@ -99,7 +87,7 @@ pub fn parse_link<'a>(text: &'a str) -> Option<(Span<'a>, usize)> {
     // let title = caps.name("title").map(|t| t.to_owned());
     // TODO correctly get whitespace length between url and title
     let len = text.len() + url.len() + 4 + title.clone().map_or(0, |t| t.len() + 3);
-    Some((Link(text, url, title), len))
+    Some((Span::Link(text, url, title), len))
 }
 
 pub fn parse_code<'a>(text: &'a str) -> Option<(Span<'a>, usize)> {
@@ -110,11 +98,11 @@ pub fn parse_code<'a>(text: &'a str) -> Option<(Span<'a>, usize)> {
 
     if let Some(caps) = CODE_DOUBLE.captures(text) {
         let t = caps.name("text")?.as_str();
-        return Some((Code(t), t.len() + 4));
+        return Some((Span::Code(t), t.len() + 4));
     }
     if let Some(caps) = CODE_SINGLE.captures(text) {
         let t = caps.name("text")?.as_str();
-        return Some((Code(t), t.len() + 2));
+        return Some((Span::Code(t), t.len() + 2));
     }
     None
 }

@@ -1,4 +1,5 @@
-use pipeline::{pipe_fun, pipe_opt};
+use super::super::Block;
+use super::span::parse_spans;
 
 pub fn parse_blockquote<'a>(line: &'a str) -> Option<Block<'a>> {
     let mut nesting = 0;
@@ -13,17 +14,24 @@ pub fn parse_blockquote<'a>(line: &'a str) -> Option<Block<'a>> {
     if nesting == 0 {
         return None;
     }
-    Some(Block::Blockquote(String::from(&line[nesting..]), nesting))
+    let spans = parse_spans(&line[nesting..]);
+    Some(Block::Blockquote(spans, nesting))
 }
 
-pub fn parse_blocks<'a>(line: &'a str) -> Option<Block<'a>> {
-    pipe_opt!(
-        line
-        => parse_hr
-        => parse_atx_header
-        => parse_code_block
-        => parse_blockquote
-    )
+pub fn parse_blocks<'a>(line: &'a str) -> Block<'a> {
+    if let Some(val) = parse_hr(line) {
+        return val;
+    }
+    if let Some(val) = parse_atx_header(line) {
+        return val;
+    }
+    if let Some(val) = parse_code_block(line) {
+        return val;
+    }
+    if let Some(val) = parse_blockquote(line) {
+        return val;
+    }
+    Block::Paragraph(parse_spans(line))
 }
 
 pub fn parse_code_block<'a>(line: &'a str) -> Option<Block<'a>> {
@@ -46,9 +54,6 @@ pub fn parse_hr<'a>(line: &'a str) -> Option<Block<'a>> {
     }
     Some(Block::Hr)
 }
-
-use super::super::Block;
-use super::span::parse_spans;
 
 pub fn parse_atx_header<'a>(line: &'a str) -> Option<Block<'a>> {
     let mut level = 0;

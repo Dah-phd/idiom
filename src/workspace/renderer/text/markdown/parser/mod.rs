@@ -2,18 +2,15 @@ mod block;
 mod span;
 use super::{HEADING, HEADING_2, HEADING_3, HEADING_NEXT};
 use crate::{ext_tui::CrossTerm, workspace::line::LineContext};
+pub use block::parse_blocks;
 use crossterm::style::Stylize;
-use idiom_tui::{layout::Line, utils::CharLimitedWidths, Backend};
-
-pub fn parse<'a>(md: &'a str) -> Block<'a> {
-    block::parse_blocks(md).unwrap_or(Block::Paragraph(span::parse_spans(md)))
-}
+use idiom_tui::{layout::Line, utils::CharLimitedWidths, Backend, UTFSafe};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Block<'a> {
     Header(Vec<Span<'a>>, usize),
     Paragraph(Vec<Span<'a>>),
-    Blockquote(String, usize),
+    Blockquote(Vec<Span<'a>>, usize),
     Code(Option<String>),
     Hr,
 }
@@ -29,13 +26,13 @@ impl<'a> Block<'a> {
     ) -> Option<usize> {
         match self {
             Block::Header(header, level) => {
+                match level {
+                    1 => backend.set_style(HEADING),
+                    2 => backend.set_style(HEADING_2),
+                    3 => backend.set_style(HEADING_3),
+                    _ => backend.set_style(HEADING_NEXT),
+                }
                 for span in header {
-                    match level {
-                        1 => backend.set_style(HEADING),
-                        2 => backend.set_style(HEADING_2),
-                        3 => backend.set_style(HEADING_3),
-                        _ => backend.set_style(HEADING_NEXT),
-                    }
                     limit = span.render(limit, text_width, lines, ctx, backend)?;
                 }
             }
@@ -44,12 +41,15 @@ impl<'a> Block<'a> {
                     limit = span.render(limit, text_width, lines, ctx, backend)?;
                 }
             }
-            Block::Blockquote(text, nesting) => {
+            Block::Blockquote(spans, nesting) => {
                 backend.set_style(ctx.accent_style);
-                limit = print_split(text, limit, text_width, lines, ctx, backend)?;
+                limit = print_split_ascii(&format!("{:|>1$}", "", nesting), limit, text_width, lines, ctx, backend)?;
+                for span in spans {
+                    limit = span.render(limit, text_width, lines, ctx, backend)?;
+                }
             }
             Block::Hr => {
-                backend.print((0..limit).map(|_| '-').collect::<String>());
+                backend.print(format!("{:->1$}", "", limit));
                 limit = 0;
             }
             Block::Code(Some(lang)) => {
@@ -87,12 +87,15 @@ impl<'a> Block<'a> {
                     limit = span.render_ascii(limit, text_width, lines, ctx, backend)?;
                 }
             }
-            Block::Blockquote(text, nesting) => {
+            Block::Blockquote(spans, nesting) => {
                 backend.set_style(ctx.accent_style);
-                limit = print_split_ascii(text, limit, text_width, lines, ctx, backend)?;
+                limit = print_split_ascii(&format!("{:|>1$}", "", nesting), limit, text_width, lines, ctx, backend)?;
+                for span in spans {
+                    limit = span.render_ascii(limit, text_width, lines, ctx, backend)?;
+                }
             }
             Block::Hr => {
-                backend.print((0..limit).map(|_| '-').collect::<String>());
+                backend.print(format!("{:->1$}", "", limit));
                 limit = 0;
             }
             Block::Code(Some(lang)) => {
@@ -144,20 +147,32 @@ impl<'a> Span<'a> {
                 backend.set_style(style);
             }
             Span::Image(name, path, _) => {
+                let style = backend.get_style();
+                backend.set_style(style.underlined());
                 limit = match name.is_empty() {
                     true => print_split_ascii("Image", limit, text_width, lines, ctx, backend)?,
                     false => print_split(name, limit, text_width, lines, ctx, backend)?,
                 };
-                limit = print_split_ascii(" > ", limit, text_width, lines, ctx, backend)?;
-                limit = print_split(path, limit, text_width, lines, ctx, backend)?;
+                backend.set_style(style);
+                backend.pad(4);
+                if limit > 6 {
+                    backend.print_styled(path.truncate_width(limit - 4).1, ctx.accent_style.italic());
+                }
+                limit = 0;
             }
             Span::Link(name, link, _) => {
+                let style = backend.get_style();
+                backend.set_style(style.underlined());
                 limit = match name.is_empty() {
                     true => print_split_ascii("Link", limit, text_width, lines, ctx, backend)?,
                     false => print_split(name, limit, text_width, lines, ctx, backend)?,
                 };
-                limit = print_split_ascii(" > ", limit, text_width, lines, ctx, backend)?;
-                limit = print_split(link, limit, text_width, lines, ctx, backend)?;
+                backend.set_style(style);
+                backend.pad(4);
+                if limit > 6 {
+                    backend.print_styled(link.truncate_width(limit - 4).1, ctx.accent_style.italic());
+                }
+                limit = 0;
             }
             Span::Code(text) => limit = print_split(text, limit, text_width, lines, ctx, backend)?,
         }
@@ -191,20 +206,34 @@ impl<'a> Span<'a> {
                 backend.set_style(style);
             }
             Span::Image(name, path, _) => {
+                let style = backend.get_style();
+                backend.set_style(style.underlined());
                 limit = match name.is_empty() {
                     true => print_split_ascii("Image", limit, text_width, lines, ctx, backend)?,
                     false => print_split_ascii(name, limit, text_width, lines, ctx, backend)?,
                 };
-                limit = print_split_ascii(" > ", limit, text_width, lines, ctx, backend)?;
-                limit = print_split_ascii(path, limit, text_width, lines, ctx, backend)?;
+                backend.set_style(style);
+                backend.pad(4);
+                if limit > 6 {
+                    let end = std::cmp::min(limit - 4, path.len());
+                    backend.print_styled(&path[..end], ctx.accent_style.italic());
+                }
+                limit = 0;
             }
             Span::Link(name, link, _) => {
+                let style = backend.get_style();
+                backend.set_style(style.underlined());
                 limit = match name.is_empty() {
                     true => print_split_ascii("Link", limit, text_width, lines, ctx, backend)?,
                     false => print_split_ascii(name, limit, text_width, lines, ctx, backend)?,
                 };
-                limit = print_split_ascii(" > ", limit, text_width, lines, ctx, backend)?;
-                limit = print_split_ascii(link, limit, text_width, lines, ctx, backend)?;
+                backend.set_style(style);
+                backend.pad(4);
+                if limit > 6 {
+                    let end = std::cmp::min(limit - 4, link.len());
+                    backend.print_styled(&link[..end], ctx.accent_style.italic());
+                }
+                limit = 0;
             }
             Span::Code(text) => limit = print_split_ascii(text, limit, text_width, lines, ctx, backend)?,
         }
