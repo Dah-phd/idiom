@@ -250,7 +250,7 @@ fn complex_line_select() {
     expect_select(0, 24, style_select, ctx.accent_style, &rendered);
 }
 
-fn drain_as_raw_text_qmark_cursor(gs: &mut GlobalState) -> Vec<String> {
+pub fn drain_as_raw_text_qmark_cursor(gs: &mut GlobalState) -> Vec<String> {
     gs.backend()
         .drain()
         .into_iter()

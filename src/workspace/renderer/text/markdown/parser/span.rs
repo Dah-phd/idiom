@@ -46,7 +46,6 @@ pub fn parse_image<'a>(text: &'a str) -> Option<(Span<'a>, usize)> {
     let text = if let Some(mat) = caps.name("text") { mat.as_str().to_owned() } else { "".to_owned() };
     let url = if let Some(mat) = caps.name("url") { mat.as_str().to_owned() } else { "".to_owned() };
     let title = caps.name("title").map(|mat| mat.as_str().to_owned());
-    // TODO correctly get whitespace length between url and title
     let len = text.len() + url.len() + 5 + title.clone().map_or(0, |t| t.len() + 3);
     Some((Span::Image(text, url, title), len))
 }

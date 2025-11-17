@@ -18,7 +18,7 @@ pub fn parse_blockquote<'a>(line: &'a str) -> Option<Block<'a>> {
     Some(Block::Blockquote(spans, nesting))
 }
 
-pub fn parse_blocks<'a>(line: &'a str) -> Block<'a> {
+pub fn parse_block<'a>(line: &'a str) -> Block<'a> {
     if let Some(val) = parse_hr(line) {
         return val;
     }

@@ -2,7 +2,7 @@ mod block;
 mod span;
 use super::{HEADING, HEADING_2, HEADING_3, HEADING_NEXT};
 use crate::{ext_tui::CrossTerm, workspace::line::LineContext};
-pub use block::parse_blocks;
+pub use block::parse_block;
 use crossterm::style::Stylize;
 use idiom_tui::{layout::Line, utils::CharLimitedWidths, Backend, UTFSafe};
 

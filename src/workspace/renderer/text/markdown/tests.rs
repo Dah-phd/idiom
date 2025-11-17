@@ -1,10 +1,16 @@
-use super::super::super::tests::{expect_select, parse_complex_line};
-use super::super::md_line;
+use super::{
+    super::{
+        super::tests::{expect_select, parse_complex_line},
+        md_line,
+        tests::drain_as_raw_text_qmark_cursor,
+    },
+    ascii_line, ascii_line_exact, complex_line, complex_line_exact,
+};
 use crate::{
     configs::FileType,
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
-    syntax::tests::mock_utf8_lexer,
+    syntax::{tests::mock_utf8_lexer, tokens::WrapData},
     workspace::{
         cursor::Cursor,
         editor::tests::mock_editor_md_render,
@@ -13,7 +19,7 @@ use crate::{
 };
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{
-    layout::{Borders, Rect},
+    layout::{Borders, IterLines, Rect},
     Backend,
 };
 
@@ -94,7 +100,7 @@ fn simple_line_select() {
 }
 
 #[test]
-fn complex_line() {
+fn test_complex_line() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
     let lexer = mock_utf8_lexer(FileType::Rust);
     let cursor = Cursor::default();
@@ -155,6 +161,143 @@ fn complex_line_select() {
 
 // DEPENDENCY TEST
 // markdown create testing - it is used only on run time, and changes can cause strange renders
+
+#[test]
+fn test_exact_md_ascii() {
+    let mut gs = GlobalState::new(Rect::new(0, 0, 45, 60), CrossTerm::init());
+    gs.force_area_calc();
+    let mut editor = mock_editor_md_render(vec![
+        "content **content** _asdwa_ asdwadasjukhdfajskfhgasjkf".into(),
+        "![c](https://codeberg.org)".into(),
+        "".into(),
+    ]);
+    let ea = gs.editor_area();
+    editor.resize(ea.width, ea.height as usize);
+    editor.cursor.set_position((1, 0).into());
+
+    let mut ctx = LineContext::collect_context(
+        &editor.cursor,
+        editor.lexer.encoding().char_len,
+        2,
+        ContentStyle::fg(Color::DarkGrey),
+    );
+    let mut lines = ea.into_iter();
+    let mut after_lines = ea.into_iter();
+    let text_width = lines.width() - ctx.line_prefix_len();
+
+    let text = &mut editor.content[0];
+    let wd = WrapData::from_text_cached(text, text_width);
+    assert_eq!(wd.count(), 3);
+    ascii_line_exact(text, &mut lines, &mut ctx, gs.backend());
+    let result = drain_as_raw_text_qmark_cursor(&mut gs);
+    #[rustfmt::skip]
+    assert_eq!(result, [
+        "<<go to row: 1 col: 15>>", " 1 ", "<<clear EOL>>", "content ", "<<set style>>", "content", "<<set style>>", " ", "<<set style>>", "asdwa", "<<set style>>", " asdwa",
+        "<<go to row: 2 col: 15>>", "   ", "<<clear EOL>>", "dasjukhdfajskfhgasjkf", "<<reset style>>",
+        "<<go to row: 3 col: 15>>", "   ", "<<clear EOL>>"  // empty for required len
+    ]);
+
+    ascii_line(text, &mut after_lines, &mut ctx, gs.backend());
+    let result = drain_as_raw_text_qmark_cursor(&mut gs);
+    #[rustfmt::skip]
+    assert_eq!(result, [
+        "<<go to row: 1 col: 15>>", " 2 ", "<<clear EOL>>", "content ", "<<set style>>", "content", "<<set style>>", " ", "<<set style>>", "asdwa", "<<set style>>", " asdwa",
+        "<<go to row: 2 col: 15>>", "   ", "<<clear EOL>>", "dasjukhdfajskfhgasjkf", "<<reset style>>",
+    ]);
+
+    let text = &mut editor.content[1];
+    let wd = WrapData::from_text_cached(text, text_width);
+    assert_eq!(wd.count(), 1);
+    ascii_line_exact(text, &mut lines, &mut ctx, gs.backend());
+    let result = drain_as_raw_text_qmark_cursor(&mut gs);
+    #[rustfmt::skip]
+    assert_eq!(result, [
+        "<<go to row: 4 col: 15>>", " 3 ", "<<clear EOL>>", "<<set style>>", "c", "<<set style>>", "<<padding: 4>>", "https://codeberg.org", "<<reset style>>"
+    ]);
+
+    ascii_line(text, &mut after_lines, &mut ctx, gs.backend());
+    let result = drain_as_raw_text_qmark_cursor(&mut gs);
+    #[rustfmt::skip]
+    assert_eq!(result, [
+        "<<go to row: 3 col: 15>>", " 4 ", "<<clear EOL>>", "<<set style>>", "c", "<<set style>>", "<<padding: 4>>", "https://codeberg.org", "<<reset style>>"
+    ]);
+}
+
+#[test]
+fn test_exact_md_complex() {
+    let mut gs = GlobalState::new(Rect::new(0, 0, 45, 60), CrossTerm::init());
+    gs.force_area_calc();
+    let mut editor = mock_editor_md_render(vec![
+        "content **con🦀nt** _a🦀wa_ asdwadasjukhdfajskfhgasjkf".into(),
+        "![cb](https://code🦀rg.org/cr🦀ab-empji🦀/)".into(),
+        "".into(),
+    ]);
+    let ea = gs.editor_area();
+    editor.resize(ea.width, ea.height as usize);
+    editor.cursor.set_position((1, 0).into());
+
+    let mut ctx = LineContext::collect_context(
+        &editor.cursor,
+        editor.lexer.encoding().char_len,
+        2,
+        ContentStyle::fg(Color::DarkGrey),
+    );
+    let mut lines = ea.into_iter();
+    let mut after_lines = ea.into_iter();
+    let text_width = lines.width() - ctx.line_prefix_len();
+
+    let text = &mut editor.content[0];
+    let wd = WrapData::from_text_cached(text, text_width);
+    assert_eq!(wd.count(), 3);
+    complex_line_exact(text, &mut lines, &mut ctx, gs.backend());
+    let result = drain_as_raw_text_qmark_cursor(&mut gs);
+    #[rustfmt::skip]
+    assert_eq!(result, [
+        "<<go to row: 1 col: 15>>", " 1 ", "<<clear EOL>>",
+        "c","o","n","t","e","n","t"," ",
+        "<<set style>>", "c","o","n","🦀","n","t",
+        "<<set style>>", " ",
+        "<<set style>>", "a","🦀","w","a",
+        "<<set style>>", " ","a","s","d","w","a",
+        "<<go to row: 2 col: 15>>", "   ", "<<clear EOL>>",
+        "d","a","s","j","u","k","h","d","f","a","j","s","k","f","h","g","a","s","j","k","f", "<<reset style>>",
+        "<<go to row: 3 col: 15>>", "   ", "<<clear EOL>>"  // empty for required len
+    ]);
+
+    complex_line(text, &mut after_lines, &mut ctx, gs.backend());
+    let result = drain_as_raw_text_qmark_cursor(&mut gs);
+    #[rustfmt::skip]
+    assert_eq!(result, [
+        "<<go to row: 1 col: 15>>", " 2 ", "<<clear EOL>>",
+        "c","o","n","t","e","n","t"," ",
+        "<<set style>>", "c","o","n","🦀","n","t",
+        "<<set style>>", " ",
+        "<<set style>>", "a","🦀","w","a",
+        "<<set style>>", " ","a","s","d","w","a",
+        "<<go to row: 2 col: 15>>", "   ", "<<clear EOL>>",
+        "d","a","s","j","u","k","h","d","f","a","j","s","k","f","h","g","a","s","j","k","f", "<<reset style>>",
+    ]);
+
+    let text = &mut editor.content[1];
+    let wd = WrapData::from_text_cached(text, text_width);
+    assert_eq!(wd.count(), 2);
+    complex_line_exact(text, &mut lines, &mut ctx, gs.backend());
+    let result = drain_as_raw_text_qmark_cursor(&mut gs);
+    #[rustfmt::skip]
+    assert_eq!(result, [
+        "<<go to row: 4 col: 15>>", " 3 ", "<<clear EOL>>", "<<set style>>", "c", "b", "<<set style>>",
+        "<<padding: 4>>", "https://code🦀rg.org/", "<<reset style>>", // link text
+        "<<go to row: 5 col: 15>>", "   ", "<<clear EOL>>" // link is always single line
+    ]);
+
+    complex_line(text, &mut after_lines, &mut ctx, gs.backend());
+    let result = drain_as_raw_text_qmark_cursor(&mut gs);
+    #[rustfmt::skip]
+    assert_eq!(result, [
+        "<<go to row: 3 col: 15>>", " 4 ", "<<clear EOL>>", "<<set style>>", "c", "b", "<<set style>>",
+        "<<padding: 4>>", "https://code🦀rg.org/", "<<reset style>>", // link text
+    ]);
+}
 
 #[test]
 fn test_md_editor() {
