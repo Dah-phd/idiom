@@ -1,5 +1,5 @@
-use super::super::Block;
 use super::span::parse_spans;
+use super::Block;
 
 pub fn parse_blockquote<'a>(line: &'a str) -> Option<Block<'a>> {
     let mut nesting = 0;
@@ -75,9 +75,9 @@ pub fn parse_atx_header<'a>(line: &'a str) -> Option<Block<'a>> {
 
 #[cfg(test)]
 mod test {
-    use super::super::super::Span::Text;
     use super::super::Block::Header;
     use super::super::Block::Hr;
+    use super::super::Span::Text;
     use super::parse_atx_header;
     use super::parse_hr;
 

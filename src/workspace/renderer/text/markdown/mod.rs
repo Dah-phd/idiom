@@ -1,12 +1,16 @@
+mod block;
 mod parser;
+mod span;
+
 use crate::{
     ext_tui::{iter::TakeLiens, CrossTerm},
     syntax::tokens::WrapData,
     workspace::line::{EditorLine, LineContext},
 };
+use block::parse_block;
 use crossterm::style::{Attribute, Attributes, Color, ContentStyle};
 use idiom_tui::{layout::RectIter, Backend};
-pub use parser::{parse_block, Block, Span};
+pub use parser::{Block, Span};
 
 const HEADING: ContentStyle = ContentStyle {
     foreground_color: Some(Color::DarkRed),

@@ -1,4 +1,4 @@
-use super::super::Span;
+use super::Span;
 use lazy_static::lazy_static;
 use regex::Regex;
 
