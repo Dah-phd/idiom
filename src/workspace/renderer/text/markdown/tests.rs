@@ -301,6 +301,97 @@ fn test_exact_md_complex() {
 
 #[test]
 fn test_md_editor() {
-    let mut editor = mock_editor_md_render(vec![]);
-    todo!("add more tests")
+    let mut gs = GlobalState::new(Rect::new(0, 0, 45, 20), CrossTerm::init());
+    gs.force_area_calc();
+    let mut editor = mock_editor_md_render(vec![
+        "content **content** _asdwa_ asdwadasjukhdfajskfhgasjkfad".into(), // multiline
+        "![c](https://codeberg.org/ad)".into(),
+        "".into(),
+        "content **content** _asdwa_ asdwadasjukhdfajskfhgasjkfad".into(), // multi line
+        "![c](https://codeberg.org/ad)".into(),
+    ]);
+    let ea = gs.editor_area();
+    editor.resize(ea.width, ea.height as usize);
+    editor.cursor.set_position((2, 0).into());
+
+    editor.render(&mut gs);
+    let result = drain_as_raw_text_qmark_cursor(&mut gs);
+    #[rustfmt::skip]
+    assert_eq!(result, [
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "content ", "<<set style>>", "content", "<<set style>>", " ", "<<set style>>", "asdwa", "<<set style>>", " asdwad",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "asjukhdfajskfhgasjkfad", "<<reset style>>",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
+        "<<go to row: 4 col: 15>>", "2 ", "<<clear EOL>>", "<<set style>>", "c", "<<set style>>", "<<padding: 4>>", "https://codeberg.org/ad", "<<reset style>>",
+        "<<go to row: 5 col: 15>>", "  ", "<<clear EOL>>",
+        "<<go to row: 6 col: 15>>", "3 ", "<<clear EOL>>", "?",
+        "<<go to row: 7 col: 15>>", "4 ", "<<clear EOL>>", "content ", "<<set style>>", "content", "<<set style>>", " ", "<<set style>>", "asdwa", "<<set style>>", " asdwad",
+        "<<go to row: 8 col: 15>>", "  ", "<<clear EOL>>", "asjukhdfajskfhgasjkfad", "<<reset style>>",
+        "<<go to row: 9 col: 15>>", "5 ", "<<clear EOL>>", "<<set style>>", "c", "<<set style>>", "<<padding: 4>>", "https://codeberg.org/ad", "<<reset style>>",
+        "<<go to row: 10 col: 15>>", "<<padding: 30>>", "<<go to row: 11 col: 15>>", "<<padding: 30>>",
+        "<<go to row: 12 col: 15>>", "<<padding: 30>>", "<<go to row: 13 col: 15>>", "<<padding: 30>>",
+        "<<go to row: 14 col: 15>>", "<<padding: 30>>", "<<go to row: 15 col: 15>>", "<<padding: 30>>",
+        "<<go to row: 16 col: 15>>", "<<padding: 30>>", "<<go to row: 17 col: 15>>", "<<padding: 30>>",
+        "<<go to row: 18 col: 15>>", "<<padding: 30>>",
+        "<<set style>>",
+        "<<go to row: 19 col: 14>>", "<<padding: 31>>",
+        "<<go to row: 19 col: 20>>", "  Doc Len 5, Ln 3, Col 1 ",
+        "<<go to row: 19 col: 14>>", "<<padding: 6>>", "<<set style>>",
+        "<<go to row: 19 col: 14>>", "<<padding: 6>>", "<<reset style>>",
+        "<<reset style>>"
+    ]);
+}
+
+#[test]
+fn test_md_editor_complex() {
+    let mut gs = GlobalState::new(Rect::new(0, 0, 45, 20), CrossTerm::init());
+    gs.force_area_calc();
+    let mut editor = mock_editor_md_render(vec![
+        "content **con🦀nt** _a🦀wa_ asdwadasjukhdfajskfhgasjkfad".into(),
+        "![cb](https://code🦀rg.org/cr🦀ab-empji🦀/ad)".into(),
+        "".into(),
+        "content **con🦀nt** _a🦀wa_ asdwadasjukhdfajskfhgasjkfad".into(),
+        "![cb](https://code🦀rg.org/cr🦀ab-empji🦀/ad)".into(),
+    ]);
+    let ea = gs.editor_area();
+    editor.resize(ea.width, ea.height as usize);
+    editor.cursor.set_position((2, 0).into());
+
+    editor.render(&mut gs);
+    let result = drain_as_raw_text_qmark_cursor(&mut gs);
+    #[rustfmt::skip]
+    let expect = [
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
+        "c", "o", "n", "t", "e", "n", "t", " ",
+        "<<set style>>", "c", "o", "n", "🦀", "n", "t",
+        "<<set style>>", " ",
+        "<<set style>>", "a", "🦀", "w", "a",
+        "<<set style>>", " ", "a", "s", "d", "w", "a", "d",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "a", "s", "j", "u", "k", "h", "d", "f", "a", "j", "s", "k", "f", "h", "g", "a", "s", "j", "k", "f", "a", "d", "<<reset style>>",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
+        "<<go to row: 4 col: 15>>", "2 ", "<<clear EOL>>", "<<set style>>", "c", "b", "<<set style>>", "<<padding: 4>>", "https://code🦀rg.org/c", "<<reset style>>",
+        "<<go to row: 5 col: 15>>", "  ", "<<clear EOL>>", "<<go to row: 6 col: 15>>", "3 ", "<<clear EOL>>", "?",
+        "<<go to row: 7 col: 15>>", "4 ", "<<clear EOL>>",
+        "c", "o", "n", "t", "e", "n", "t", " ",
+        "<<set style>>", "c", "o", "n", "🦀", "n", "t",
+        "<<set style>>", " ",
+        "<<set style>>", "a", "🦀", "w", "a",
+        "<<set style>>", " ", "a", "s", "d", "w", "a", "d",
+        "<<go to row: 8 col: 15>>", "  ", "<<clear EOL>>", "a", "s", "j", "u", "k", "h", "d", "f", "a", "j", "s", "k", "f", "h", "g", "a", "s", "j", "k", "f", "a", "d", "<<reset style>>",
+        "<<go to row: 9 col: 15>>", "5 ", "<<clear EOL>>", "<<set style>>", "c", "b", "<<set style>>", "<<padding: 4>>", "https://code🦀rg.org/c", "<<reset style>>",
+        "<<go to row: 10 col: 15>>", "<<padding: 30>>",
+        "<<go to row: 11 col: 15>>", "<<padding: 30>>",
+        "<<go to row: 12 col: 15>>", "<<padding: 30>>",
+        "<<go to row: 13 col: 15>>", "<<padding: 30>>",
+        "<<go to row: 14 col: 15>>", "<<padding: 30>>",
+        "<<go to row: 15 col: 15>>", "<<padding: 30>>",
+        "<<go to row: 16 col: 15>>", "<<padding: 30>>",
+        "<<go to row: 17 col: 15>>", "<<padding: 30>>",
+        "<<go to row: 18 col: 15>>", "<<padding: 30>>",
+        "<<set style>>",
+        "<<go to row: 19 col: 14>>", "<<padding: 31>>",
+        "<<go to row: 19 col: 20>>", "  Doc Len 5, Ln 3, Col 1 ",
+        "<<go to row: 19 col: 14>>", "<<padding: 6>>", "<<set style>>",
+        "<<go to row: 19 col: 14>>", "<<padding: 6>>", "<<reset style>>", "<<reset style>>"        
+    ];
+    assert_eq!(result, expect);
 }
