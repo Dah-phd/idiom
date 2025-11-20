@@ -217,24 +217,19 @@ mod test {
             parse_image("![an example](example.com) test"),
             Some((Image("an example".to_owned(), "example.com".to_owned(), None), 26))
         );
-
         assert_eq!(
             parse_image("![](example.com) test"),
             Some((Image("".to_owned(), "example.com".to_owned(), None), 16))
         );
-
         assert_eq!(
             parse_image("![an example]() test"),
             Some((Image("an example".to_owned(), "".to_owned(), None), 15))
         );
-
         assert_eq!(parse_image("![]() test"), Some((Image("".to_owned(), "".to_owned(), None), 5)));
-
         assert_eq!(
             parse_image("![an example](example.com \"Title\") test"),
             Some((Image("an example".to_owned(), "example.com".to_owned(), Some("Title".to_owned())), 34))
         );
-
         assert_eq!(
             parse_image("![an example](example.com) test [a link](example.com)"),
             Some((Image("an example".to_owned(), "example.com".to_owned(), None), 26))
@@ -258,18 +253,13 @@ mod test {
             parse_link("[an example](example.com) test"),
             Some((Link("an example".to_owned(), "example.com".to_owned(), None), 25))
         );
-
         assert_eq!(parse_link("[](example.com) test"), Some((Link("".to_owned(), "example.com".to_owned(), None), 15)));
-
         assert_eq!(parse_link("[an example]() test"), Some((Link("an example".to_owned(), "".to_owned(), None), 14)));
-
         assert_eq!(parse_link("[]() test"), Some((Link("".to_owned(), "".to_owned(), None), 4)));
-
         assert_eq!(
             parse_link("[an example](example.com \"Title\") test"),
             Some((Link("an example".to_owned(), "example.com".to_owned(), Some("Title".to_owned())), 33))
         );
-
         assert_eq!(
             parse_link("[an example](example.com) test [a link](example.com)"),
             Some((Link("an example".to_owned(), "example.com".to_owned(), None), 25))
@@ -290,15 +280,10 @@ mod test {
     #[test]
     fn finds_strong_unit() {
         assert_eq!(parse_strong("__testing things__ test"), Some((Strong(vec![Text("testing things")]), 18)));
-
         assert_eq!(parse_strong("**testing things** test"), Some((Strong(vec![Text("testing things")]), 18)));
-
         assert_eq!(parse_strong("__testing things__ things__ test"), Some((Strong(vec![Text("testing things")]), 18)));
-
         assert_eq!(parse_strong("__w__ things_ test"), Some((Strong(vec![Text("w")]), 5)));
-
         assert_eq!(parse_strong("**w** things** test"), Some((Strong(vec![Text("w")]), 5)));
-
         assert_eq!(parse_strong("__w___ testing things test"), Some((Strong(vec![Text("w")]), 5)));
     }
 

@@ -4,7 +4,7 @@ use crossterm::style::Stylize;
 use idiom_tui::{layout::Line, utils::CharLimitedWidths, Backend, UTFSafe};
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Block<'a> {
+pub enum Tag<'a> {
     Header(Vec<Span<'a>>, usize),
     Paragraph(Vec<Span<'a>>),
     Blockquote(Vec<Span<'a>>, usize),
@@ -12,7 +12,7 @@ pub enum Block<'a> {
     Hr,
 }
 
-impl<'a> Block<'a> {
+impl<'a> Tag<'a> {
     pub fn render(
         &'a self,
         mut limit: usize,
@@ -22,7 +22,7 @@ impl<'a> Block<'a> {
         backend: &'a mut CrossTerm,
     ) -> Option<usize> {
         match self {
-            Block::Header(header, level) => {
+            Tag::Header(header, level) => {
                 match level {
                     1 => backend.set_style(HEADING),
                     2 => backend.set_style(HEADING_2),
@@ -33,26 +33,26 @@ impl<'a> Block<'a> {
                     limit = span.render(limit, text_width, lines, ctx, backend)?;
                 }
             }
-            Block::Paragraph(parag) => {
+            Tag::Paragraph(parag) => {
                 for span in parag {
                     limit = span.render(limit, text_width, lines, ctx, backend)?;
                 }
             }
-            Block::Blockquote(spans, nesting) => {
+            Tag::Blockquote(spans, nesting) => {
                 backend.set_style(ctx.accent_style);
                 limit = print_split_ascii(&format!("{:|>1$}", "", nesting), limit, text_width, lines, ctx, backend)?;
                 for span in spans {
                     limit = span.render(limit, text_width, lines, ctx, backend)?;
                 }
             }
-            Block::Hr => {
+            Tag::Hr => {
                 backend.print(format!("{:->1$}", "", limit));
                 limit = 0;
             }
-            Block::Code(Some(lang)) => {
+            Tag::Code(Some(lang)) => {
                 limit = print_split(&format!(">>> {lang}"), limit, text_width, lines, ctx, backend)?;
             }
-            Block::Code(None) => {
+            Tag::Code(None) => {
                 limit = print_split_ascii("<<<", limit, text_width, lines, ctx, backend)?;
             }
         }
@@ -68,7 +68,7 @@ impl<'a> Block<'a> {
         backend: &'a mut CrossTerm,
     ) -> Option<usize> {
         match self {
-            Block::Header(header, level) => {
+            Tag::Header(header, level) => {
                 for span in header {
                     match level {
                         1 => backend.set_style(HEADING),
@@ -79,26 +79,26 @@ impl<'a> Block<'a> {
                     limit = span.render_ascii(limit, text_width, lines, ctx, backend)?;
                 }
             }
-            Block::Paragraph(parag) => {
+            Tag::Paragraph(parag) => {
                 for span in parag {
                     limit = span.render_ascii(limit, text_width, lines, ctx, backend)?;
                 }
             }
-            Block::Blockquote(spans, nesting) => {
+            Tag::Blockquote(spans, nesting) => {
                 backend.set_style(ctx.accent_style);
                 limit = print_split_ascii(&format!("{:|>1$}", "", nesting), limit, text_width, lines, ctx, backend)?;
                 for span in spans {
                     limit = span.render_ascii(limit, text_width, lines, ctx, backend)?;
                 }
             }
-            Block::Hr => {
+            Tag::Hr => {
                 backend.print(format!("{:->1$}", "", limit));
                 limit = 0;
             }
-            Block::Code(Some(lang)) => {
+            Tag::Code(Some(lang)) => {
                 limit = print_split_ascii(&format!(">>> {lang}"), limit, text_width, lines, ctx, backend)?;
             }
-            Block::Code(None) => {
+            Tag::Code(None) => {
                 limit = print_split_ascii("<<<", limit, text_width, lines, ctx, backend)?;
             }
         }
