@@ -125,6 +125,9 @@ impl Default for UITheme {
 
 impl UITheme {
     pub fn new() -> Result<Self, toml::de::Error> {
+        #[cfg(test)]
+        return Ok(Self::default());
+        #[allow(unreachable_code)]
         load_or_create_config(THEME_UI)
     }
 

@@ -815,8 +815,8 @@ fn test_select_reset_style() {
     #[rustfmt::skip]
     assert_eq!(text, [
         "<<freeze>>",
-        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>", "<<reset style>>", "?",
-        "<<go to row: 2 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>", "G", "l", "o", "b", "a", "l", "S", "t",
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>", "<<reset style>>", "?",
+        "<<go to row: 2 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>", "G", "l", "o", "b", "a", "l", "S", "t",
         "<<reset style>>", // expected on wrap
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", "a", "t", "<<set bg None>>", "e", ":", ":", "n", "e", "w",
         "<<reset style>>", // expected when breaking lines
@@ -835,7 +835,7 @@ fn test_select_reset_style() {
     #[rustfmt::skip]
     assert_eq!(text, [
         "<<freeze>>",
-        "<<go to row: 1 col: 15>>", "3 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>", "n", "/", "a",
+        "<<go to row: 1 col: 15>>", "3 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>", "n", "/", "a",
         "<<reset style>>", "?",  // reset before cursor
         "<<go to row: 2 col: 15>>", "4 ", "<<clear EOL>>", "n/a",
         "<<go to row: 3 col: 15>>", "<<padding: 10>>", "<<set style>>",
@@ -852,7 +852,7 @@ fn test_select_reset_style() {
     #[rustfmt::skip]
     assert_eq!(text, [
         "<<freeze>>",
-        "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>", "a", "t", "e", ":", ":", "n", "e", "w",
+        "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>", "a", "t", "e", ":", ":", "n", "e", "w",
         "<<reset style>>",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", "(", "R", "e", "c", "t", ":", ":", "n",
         "<<reset style>>",
@@ -884,9 +884,9 @@ fn test_select_reset_style_complex() {
     #[rustfmt::skip]
     assert_eq!(text, [
         "<<freeze>>",
-        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>",
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>",
         "<<reset style>>", "?",
-        "<<go to row: 2 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>", "l", "e", "t", " ", "m", "u", "t", " ",
+        "<<go to row: 2 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>", "l", "e", "t", " ", "m", "u", "t", " ",
         "<<reset style>>", // expected on wrap
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", "g", "s", "<<set bg None>>", " ", "=", " ", "G", "l", "o",
         "<<reset style>>", // expected when breaking lines
@@ -905,7 +905,7 @@ fn test_select_reset_style_complex() {
     #[rustfmt::skip]
     assert_eq!(text, [
         "<<freeze>>",
-        "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>", "r", "o", "🦀", "T", "e", "r", "m",
+        "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>", "r", "o", "🦀", "T", "e", "r", "m",
         "<<reset style>>",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", ":", ":", "i", "n", "🦀", "(", ")",
         "<<reset style>>",
@@ -925,7 +925,7 @@ fn test_select_reset_style_complex() {
     #[rustfmt::skip]
     assert_eq!(text, [
         "<<freeze>>",
-        "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>", "g", "s", " ", "=", " ", "G", "l", "o",
+        "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>", "g", "s", " ", "=", " ", "G", "l", "o",
         "<<reset style>>",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", "b", "a", "l", "S", "t", "a", "t", "e",
         "<<reset style>>",
