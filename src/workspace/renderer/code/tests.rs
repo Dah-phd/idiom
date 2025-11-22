@@ -24,21 +24,19 @@ use idiom_tui::{
 };
 use lsp_types::SemanticToken;
 
-fn consolidate_backend_drain(
-    drain: Vec<(ContentStyle, String)>,
-    cursor: ContentStyle,
-    select: Color,
-) -> Vec<(ContentStyle, String)> {
+fn consolidate_backend_drain(drain: Vec<(ContentStyle, String)>) -> Vec<(ContentStyle, String)> {
     let mut buf = vec![];
     let mut text_buf = String::new();
     let mut style_buf = ContentStyle::default();
     for (mut style, text) in drain.into_iter() {
-        if style != cursor {
-            if style.background_color == Some(select) {
-                style = ContentStyle::bg(select);
-            } else {
-                style = ContentStyle::default();
-            }
+        if style.foreground_color == Some(Color::Reset) {
+            style.foreground_color.take();
+        }
+        if style.background_color == Some(Color::Reset) {
+            style.background_color.take();
+        }
+        if style.underline_color == Some(Color::Reset) {
+            style.underline_color.take();
         }
         if style == style_buf {
             text_buf.push_str(text.as_str());
@@ -771,17 +769,17 @@ fn test_select_padding() {
         (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
         (select_style, "<<padding: 63>>".to_owned()),
     ];
-    let result = consolidate_backend_drain(gs.backend.drain(), ContentStyle::reversed(), gs.theme.selected);
+    let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(&result, &expected);
 
     editor.lexer = mock_utf16_lexer(FileType::Python);
     editor.render(&mut gs);
-    let result = consolidate_backend_drain(gs.backend.drain(), ContentStyle::reversed(), gs.theme.selected);
+    let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(&expected[20..], &result[20..]);
 
     editor.lexer = mock_utf8_lexer(FileType::Python);
     editor.render(&mut gs);
-    let result = consolidate_backend_drain(gs.backend.drain(), ContentStyle::reversed(), gs.theme.selected);
+    let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(&expected, &result);
 }
 
@@ -868,7 +866,7 @@ fn test_select_padding_complex() {
     gs.backend.drain(); // ensure all rect are calculated
     editor.render(&mut gs);
 
-    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(&result, &expected);
 
     let content = zip_text_tokens(
@@ -891,7 +889,7 @@ fn test_select_padding_complex() {
     editor.lexer = mock_utf16_lexer(FileType::Python);
     editor.render(&mut gs);
 
-    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(&result, &expected);
 
     let content = zip_text_tokens(
@@ -914,7 +912,7 @@ fn test_select_padding_complex() {
     editor.lexer = mock_utf8_lexer(FileType::Python);
     editor.render(&mut gs);
 
-    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(&result, &expected);
 }
 
@@ -984,17 +982,17 @@ fn test_select_end_line_end() {
     gs.backend.drain();
 
     editor.render(&mut gs);
-    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(&result, &expect);
 
     editor.lexer = mock_utf16_lexer(FileType::Rust);
     editor.render(&mut gs);
-    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(&result, &expect);
 
     editor.lexer = mock_utf8_lexer(FileType::Rust);
     editor.render(&mut gs);
-    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(&result, &expect);
 }
 
@@ -1063,7 +1061,7 @@ fn test_select_end_line_end_complex() {
     gs.backend.drain();
 
     editor.render(&mut gs);
-    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(&result, &expect);
 
     editor.content = zip_text_tokens(
@@ -1078,7 +1076,7 @@ fn test_select_end_line_end_complex() {
     );
     editor.lexer = mock_utf16_lexer(FileType::Rust);
     editor.render(&mut gs);
-    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(&result, &expect);
 
     editor.content = zip_text_tokens(
@@ -1093,7 +1091,7 @@ fn test_select_end_line_end_complex() {
     );
     editor.lexer = mock_utf8_lexer(FileType::Rust);
     editor.render(&mut gs);
-    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(&result, &expect);
 }
 
@@ -1105,7 +1103,6 @@ fn test_wrap_select() {
     editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
     editor.cursor.select_set((1, 5).into(), (1, 0).into());
     let select_style = ContentStyle::bg(gs.theme.selected);
-    let cursor = ContentStyle::reversed();
 
     let base_text = vec![
         String::from("/// text to get wrapping docs crab"),
@@ -1128,31 +1125,30 @@ fn test_wrap_select() {
     gs.backend.drain();
 
     let expect = vec![
+        (ContentStyle::default(), "<<go to row: 1 col: 15>>1 <<clear EOL>>".into()),
+        (ContentStyle::reversed().with_fg(gs.ui_theme.accent()), "<".into()),
+        (ContentStyle::default(), "<<updated style>>to get<<set style>> wrapping docs cr".into()),
+        (select_style, "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>".into()),
+        (ContentStyle::reversed(), "a".into()),
+        (select_style, "b".into()),
         (
             ContentStyle::default(),
-            "<<go to row: 1 col: 15>>1 <<clear EOL>><\
-            <<updated style>>to get<<set style>> wrapping docs cr"
-                .to_owned(),
+            "<<reset style>><<reset style>>\
+            <<go to row: 3 col: 15>><<padding: 30>>\
+            <<go to row: 4 col: 15>><<padding: 30>>\
+            <<go to row: 5 col: 15>><<padding: 30>>"
+                .into(),
         ),
-        (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>".to_owned()),
-        (cursor, "a".to_owned()),
-        (select_style, "b".to_owned()),
-        (
-            ContentStyle::default(),
-            "<<reset style>><<reset style>><<go to row: 3 col: 15>><<padding: 30>>\
-            <<go to row: 4 col: 15>><<padding: 30>><<go to row: 5 col: 15>><<padding: 30>>"
-                .to_owned(),
-        ),
-        (select_style, "<<set style>>".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 14>>".to_owned()),
-        (select_style, "<<padding: 31>>".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 32>>".to_owned()),
-        (select_style, "(8 selected) ".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 14>>".to_owned()),
-        (select_style, "n 2, Ln 1, Col 33 ".to_owned()),
+        (ContentStyle::default().with_bg(gs.ui_theme.accent()), "<<set style>>".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 14>>".into()),
+        (ContentStyle::default().with_bg(gs.ui_theme.accent()), "<<padding: 31>>".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 32>>".into()),
+        (ContentStyle::default().with_bg(gs.ui_theme.accent()), "(8 selected) ".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 14>>".into()),
+        (ContentStyle::default().with_bg(gs.ui_theme.accent()), "n 2, Ln 0, Col 32 ".into()),
     ];
     editor.fast_render(&mut gs);
-    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(&result, &expect);
 }
 
@@ -1189,7 +1185,7 @@ fn test_wrap_select_complex() {
 
     gs.backend.drain();
     editor.fast_render(&mut gs);
-    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(
         result,
         vec![
@@ -1237,7 +1233,7 @@ fn test_wrap_select_complex() {
     editor.lexer = mock_utf16_lexer(FileType::Rust);
     gs.backend.drain();
     editor.fast_render(&mut gs);
-    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(
         result,
         vec![
@@ -1284,7 +1280,7 @@ fn test_wrap_select_complex() {
     editor.lexer = mock_utf8_lexer(FileType::Rust);
     gs.backend.drain();
     editor.fast_render(&mut gs);
-    let result = consolidate_backend_drain(gs.backend.drain(), cursor, gs.theme.selected);
+    let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(
         result,
         vec![

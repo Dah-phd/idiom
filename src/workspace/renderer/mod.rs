@@ -99,7 +99,6 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     if !matches!(last_render_at_line, Some(idx) if *idx == cursor.at_line) {
         return code_render_full(editor, gs);
     }
-
     let accent_style = gs.ui_theme.accent_fg();
 
     let mut lines = gs.editor_area().into_iter();
@@ -128,7 +127,6 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
             line.render_empty(&mut gs.backend);
         }
     }
-
     gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
     let relative_pos = ctx.get_modal_relative_position();
     modal.render_if_exist(relative_pos, gs);
