@@ -729,45 +729,47 @@ fn test_select_padding() {
     editor.render(&mut gs);
 
     let select_style = ContentStyle::bg(gs.theme.selected);
-    let cursor = ContentStyle::reversed();
 
     let expected = vec![
-        (ContentStyle::default(), "<<go to row: 1 col: 19>>1 <<clear EOL>><<set style>>from".to_owned()),
-        (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>><<set style>>".to_owned()),
-        (cursor, " ".to_owned()),
+        (ContentStyle::default(), "<<go to row: 1 col: 19>>1 <<clear EOL>><<set style>>from".into()),
+        (select_style, "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>><<set style>>".into()),
+        (ContentStyle::reversed(), " ".into()),
         (
             select_style,
-            "<<updated style>>os<<set style>> <<updated style>>import<<set style>> <<updated style>>environ".to_owned(),
+            "<<updated style>>os<<set style>> <<updated style>>import<<set style>> <<updated style>>environ".into(),
         ),
-        (ContentStyle::default(), "<<reset style>>".to_owned()),
-        (select_style, "~".to_owned()),
-        (ContentStyle::default(), "<<reset style>><<go to row: 2 col: 19>>2 <<clear EOL>><<set style>>".to_owned()),
+        (ContentStyle::default(), "<<reset style>>".into()),
+        (gs.get_accented_select(), "~".into()),
+        (ContentStyle::default(), "<<reset style>><<go to row: 2 col: 19>>".into()),
+        (gs.ui_theme.accent_fg(), "2 ".into()),
+        (ContentStyle::default(), "<<clear EOL>><<set style>>".into()),
         (
             select_style,
-            "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>variable_data<<set style>> = <<updated style>>\
-            environ<<set style>>.<<updated style>>get<<set style>>(<<updated style>>\"crab\"<<set style>>, \
-            <<updated style>>\"crab\"<<set style>>)"
-                .to_owned(),
+            "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>variable_data<<set style>> = <<updated style>>environ\
+            <<set style>>.<<updated style>>get<<set style>>(<<updated style>>\"crab\"\
+            <<set style>>, <<updated style>>\"crab\"<<set style>>)"
+                .into(),
         ),
-        (ContentStyle::default(), "<<reset style>>".to_owned()),
-        (select_style, "~".to_owned()),
-        (ContentStyle::default(), "<<go to row: 3 col: 19>>3 <<clear EOL>>".to_owned()),
-        (select_style, "~".to_owned()),
-        (
-            ContentStyle::default(),
-            "<<go to row: 4 col: 19>>4 <<clear EOL>> <<go to row: 5 col: 19>>5 \
-            <<clear EOL>>print(f\"{varialbe_data} .. rocket\")"
-                .to_owned(),
-        ),
-        (select_style, "<<set style>>".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
-        (select_style, "<<padding: 102>>".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 106>>".to_owned()),
-        (select_style, "(73 selected) ".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 81>>".to_owned()),
-        (select_style, "  Doc Len 5, Ln 1, Col 5 ".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
-        (select_style, "<<padding: 63>>".to_owned()),
+        (ContentStyle::default(), "<<reset style>>".into()),
+        (gs.get_accented_select(), "~".into()),
+        (ContentStyle::default(), "<<go to row: 3 col: 19>>".into()),
+        (gs.ui_theme.accent_fg(), "3 ".into()),
+        (ContentStyle::default(), "<<clear EOL>>".into()),
+        (gs.get_accented_select(), "~".into()),
+        (ContentStyle::default(), "<<go to row: 4 col: 19>>".into()),
+        (gs.ui_theme.accent_fg(), "4 ".into()),
+        (ContentStyle::default(), "<<clear EOL>> <<go to row: 5 col: 19>>".into()),
+        (gs.ui_theme.accent_fg(), "5 ".into()),
+        (ContentStyle::default(), "<<clear EOL>>print(f\"{varialbe_data} .. rocket\")".into()),
+        (gs.ui_theme.accent_style(), "<<set style>>".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 18>>".into()),
+        (gs.ui_theme.accent_style(), "<<padding: 102>>".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 106>>".into()),
+        (gs.ui_theme.accent_style(), "(73 selected) ".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 81>>".into()),
+        (gs.ui_theme.accent_style(), "  Doc Len 5, Ln 0, Col 4 ".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 18>>".into()),
+        (gs.ui_theme.accent_style(), "<<padding: 63>>".into()),
     ];
     let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(&result, &expected);
@@ -789,7 +791,6 @@ fn test_select_padding_complex() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 7), CrossTerm::init());
     gs.force_area_calc();
     let select_style = ContentStyle::bg(gs.theme.selected);
-    let cursor = ContentStyle::reversed();
 
     let base_text = vec![
         String::from("from os import environ;"),
@@ -800,45 +801,52 @@ fn test_select_padding_complex() {
     ];
 
     let expected = vec![
-        (ContentStyle::default(), "<<go to row: 1 col: 19>>1 <<clear EOL>><<set style>>from".to_owned()),
-        (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>><<set style>>".to_owned()),
-        (cursor, " ".to_owned()),
+        (ContentStyle::default(), "<<go to row: 1 col: 19>>1 <<clear EOL>><<set style>>from".into()),
+        (select_style, "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>><<set style>>".into()),
+        (ContentStyle::reversed(), " ".into()),
         (
             select_style,
-            "<<updated style>>os<<set style>> <<updated style>>import<<set style>> \
-            <<updated style>>environ<<set style>>;"
-                .to_owned(),
+            "<<updated style>>os<<set style>> <<updated style>>import\
+            <<set style>> <<updated style>>environ<<set style>>;"
+                .into(),
         ),
-        (ContentStyle::default(), "<<reset style>>".to_owned()),
-        (select_style, "~".to_owned()),
-        (ContentStyle::default(), "<<reset style>><<go to row: 2 col: 19>>2 <<clear EOL>><<set style>>".to_owned()),
+        (ContentStyle::default(), "<<reset style>>".into()),
+        (gs.get_accented_select(), "~".into()),
+        (ContentStyle::default(), "<<reset style>><<go to row: 2 col: 19>>".into()),
+        (gs.ui_theme.accent_fg(), "2 ".into()),
+        (ContentStyle::default(), "<<clear EOL>><<set style>>".into()),
         (
             select_style,
-            "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>variable_data<<set style>> = <<updated style>>\
-            environ<<set style>>.<<updated style>>get<<set style>>(<<updated style>>\"🦀\"<<set style>>, \
-            <<updated style>>\"🦀\"<<set style>>)"
-                .to_owned(),
+            "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>variable_data<<set style>> = \
+            <<updated style>>environ<<set style>>.<<updated style>>get<<set style>>(\
+            <<updated style>>\"🦀\"<<set style>>, <<updated style>>\"🦀\"<<set style>>)"
+                .into(),
         ),
-        (ContentStyle::default(), "<<reset style>>".to_owned()),
-        (select_style, "~".to_owned()),
-        (ContentStyle::default(), "<<go to row: 3 col: 19>>3 <<clear EOL>>".to_owned()),
-        (select_style, "~".to_owned()),
+        (ContentStyle::default(), "<<reset style>>".into()),
+        (gs.get_accented_select(), "~".into()),
+        (ContentStyle::default(), "<<go to row: 3 col: 19>>".into()),
+        (gs.ui_theme.accent_fg(), "3 ".into()),
+        (ContentStyle::default(), "<<clear EOL>>".into()),
+        (gs.get_accented_select(), "~".into()),
+        (ContentStyle::default(), "<<go to row: 4 col: 19>>".into()),
+        (gs.ui_theme.accent_fg(), "4 ".into()),
+        (ContentStyle::default(), "<<clear EOL>> <<go to row: 5 col: 19>>".into()),
+        (gs.ui_theme.accent_fg(), "5 ".into()),
         (
             ContentStyle::default(),
-            "<<go to row: 4 col: 19>>4 <<clear EOL>> <<go to row: 5 col: 19>>5 <<clear EOL>>\
-            <<set style>>print<<reset style>>(f<<set style>>\"{varialbe_data} .. 🚀\"\
+            "<<clear EOL>><<set style>>print<<reset style>>(f<<set style>>\"{varialbe_data} .. 🚀\"\
             <<reset style>>)<<reset style>>"
-                .to_owned(),
+                .into(),
         ),
-        (select_style, "<<set style>>".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
-        (select_style, "<<padding: 102>>".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 106>>".to_owned()),
-        (select_style, "(68 selected) ".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 81>>".to_owned()),
-        (select_style, "  Doc Len 5, Ln 1, Col 5 ".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
-        (select_style, "<<padding: 63>>".to_owned()),
+        (gs.ui_theme.accent_style(), "<<set style>>".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 18>>".into()),
+        (gs.ui_theme.accent_style(), "<<padding: 102>>".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 106>>".into()),
+        (gs.ui_theme.accent_style(), "(68 selected) ".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 81>>".into()),
+        (gs.ui_theme.accent_style(), "  Doc Len 5, Ln 0, Col 4 ".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 18>>".into()),
+        (gs.ui_theme.accent_style(), "<<padding: 63>>".into()),
     ];
 
     let content = zip_text_tokens(
@@ -924,7 +932,6 @@ fn test_select_end_line_end() {
     editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
     editor.cursor.select_set((0, 24).into(), (1, 40).into());
     let select_style = ContentStyle::bg(gs.theme.selected);
-    let cursor = ContentStyle::reversed();
 
     let base_text = vec![
         String::from("use std::time::Duration;"),
@@ -947,34 +954,36 @@ fn test_select_end_line_end() {
     );
 
     let expect = vec![
-        (ContentStyle::default(), "<<go to row: 1 col: 19>>1 <<clear EOL>>use std::time::Duration;".to_owned()),
-        (select_style, "~".to_owned()),
-        (ContentStyle::default(), "<<go to row: 2 col: 19>>2 <<clear EOL>><<set style>>".to_owned()),
+        (ContentStyle::default(), "<<go to row: 1 col: 19>>".into()),
+        (gs.ui_theme.accent_fg(), "1 ".into()),
+        (ContentStyle::default(), "<<clear EOL>>use std::time::Duration;".into()),
+        (gs.get_accented_select(), "~".into()),
+        (ContentStyle::default(), "<<go to row: 2 col: 19>>2 <<clear EOL>><<set style>>".into()),
         (
             select_style,
-            "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>const<<set style>> <<updated style>>\
-            DUR<<set style>>: <<updated style>>Duration<<set style>> = <<updated style>>\
-            Duration<<set style>>::<<updated style>>from_sec"
-                .to_owned(),
+            "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>const<<set style>> \
+            <<updated style>>DUR<<set style>>: <<updated style>>Duration\
+            <<set style>> = <<updated style>>Duration<<set style>>::<<updated style>>from_sec"
+                .into(),
         ),
-        (ContentStyle::default(), "<<set bg None>>".to_owned()),
-        (cursor, "s".to_owned()),
+        (ContentStyle::default(), "<<set bg None>>".into()),
+        (ContentStyle::reversed(), "s".into()),
         (
             ContentStyle::default(),
-            "<<set style>>(<<updated style>>69<<set style>>)<<reset style>> <<reset style>>\
-            <<go to row: 3 col: 19>><<padding: 101>><<go to row: 4 col: 19>><<padding: 101>><<go to row: 5 col: 19>>\
-            <<padding: 101>>"
-                .to_owned(),
+            "<<set style>>(<<updated style>>69<<set style>>)<<reset style>> \
+            <<reset style>><<go to row: 3 col: 19>><<padding: 101>>\
+            <<go to row: 4 col: 19>><<padding: 101>><<go to row: 5 col: 19>><<padding: 101>>"
+                .into(),
         ),
-        (select_style, "<<set style>>".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
-        (select_style, "<<padding: 102>>".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 106>>".to_owned()),
-        (select_style, "(41 selected) ".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 80>>".to_owned()),
-        (select_style, "  Doc Len 2, Ln 2, Col 41 ".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
-        (select_style, "<<padding: 62>>".to_owned()),
+        (gs.ui_theme.accent_style(), "<<set style>>".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 18>>".into()),
+        (gs.ui_theme.accent_style(), "<<padding: 102>>".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 106>>".into()),
+        (gs.ui_theme.accent_style(), "(41 selected) ".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 80>>".into()),
+        (gs.ui_theme.accent_style(), "  Doc Len 2, Ln 1, Col 40 ".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 18>>".into()),
+        (gs.ui_theme.accent_style(), "<<padding: 62>>".into()),
     ];
 
     editor.lexer = mock_utf32_lexer(FileType::Rust);
@@ -1004,7 +1013,6 @@ fn test_select_end_line_end_complex() {
     editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
     editor.cursor.select_set((0, 15).into(), (1, 23).into());
     let select_style = ContentStyle::bg(gs.theme.selected);
-    let cursor = ContentStyle::reversed();
 
     let base_text = vec![
         String::from("/// some docs 🦀"),
@@ -1022,38 +1030,34 @@ fn test_select_end_line_end_complex() {
     );
 
     let expect = vec![
-        (
-            ContentStyle::default(),
-            "<<go to row: 1 col: 19>>1 <<clear EOL>><<set style>>/// some docs 🦀\
-            <<reset style>>"
-                .to_owned(),
-        ),
-        (select_style, "~".to_owned()),
-        (ContentStyle::default(), "<<go to row: 2 col: 19>>2 <<clear EOL>><<set style>>".to_owned()),
+        (ContentStyle::default(), "<<go to row: 1 col: 19>>".into()),
+        (gs.ui_theme.accent_fg(), "1 ".into()),
+        (ContentStyle::default(), "<<clear EOL>><<set style>>/// some docs 🦀<<reset style>>".into()),
+        (gs.get_accented_select(), "~".into()),
+        (ContentStyle::default(), "<<go to row: 2 col: 19>>2 <<clear EOL>><<set style>>".into()),
         (
             select_style,
-            "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>const<<set style>> <<updated style>>\
-            ROCKET<<set style>>: &<<updated style>>str<<set style>> = <<updated style>>\"🚀"
-                .to_owned(),
+            "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>const<<set style>> <<updated style>>ROCKET\
+            <<set style>>: &<<updated style>>str<<set style>> = <<updated style>>\"🚀"
+                .into(),
         ),
-        (ContentStyle::default(), "<<set bg None>>".to_owned()),
-        (cursor, "\"".to_owned()),
+        (ContentStyle::default(), "<<set bg None>>".into()),
+        (ContentStyle::reversed(), "\"".into()),
         (
             ContentStyle::default(),
-            "<<set style>>;<<reset style>> <<reset style>><<go to row: 3 col: 19>>\
-            <<padding: 101>><<go to row: 4 col: 19>><<padding: 101>>\
-            <<go to row: 5 col: 19>><<padding: 101>>"
-                .to_owned(),
+            "<<set style>>;<<reset style>> <<reset style>><<go to row: 3 col: 19>><<padding: 101>>\
+            <<go to row: 4 col: 19>><<padding: 101>><<go to row: 5 col: 19>><<padding: 101>>"
+                .into(),
         ),
-        (select_style, "<<set style>>".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
-        (select_style, "<<padding: 102>>".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 106>>".to_owned()),
-        (select_style, "(24 selected) ".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 80>>".to_owned()),
-        (select_style, "  Doc Len 2, Ln 2, Col 24 ".to_owned()),
-        (ContentStyle::default(), "<<go to row: 6 col: 18>>".to_owned()),
-        (select_style, "<<padding: 62>>".to_owned()),
+        (gs.ui_theme.accent_style(), "<<set style>>".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 18>>".into()),
+        (gs.ui_theme.accent_style(), "<<padding: 102>>".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 106>>".into()),
+        (gs.ui_theme.accent_style(), "(24 selected) ".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 80>>".into()),
+        (gs.ui_theme.accent_style(), "  Doc Len 2, Ln 1, Col 23 ".into()),
+        (ContentStyle::default(), "<<go to row: 6 col: 18>>".into()),
+        (gs.ui_theme.accent_style(), "<<padding: 62>>".into()),
     ];
 
     editor.lexer = mock_utf32_lexer(FileType::Rust);
@@ -1159,7 +1163,6 @@ fn test_wrap_select_complex() {
     gs.force_area_calc();
     editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
     let select_style = ContentStyle::bg(gs.theme.selected);
-    let cursor = ContentStyle::reversed();
 
     let base_text = vec![
         String::from("/// text to get wrapping docs 🦀"),
@@ -1189,28 +1192,20 @@ fn test_wrap_select_complex() {
     assert_eq!(
         result,
         vec![
-            (
-                ContentStyle::default(),
-                "<<go to row: 1 col: 15>>1 <<clear EOL>><<updated style>><t to get\
-            <<set style>> wrapping docs"
-                    .to_owned()
-            ),
-            (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>".to_owned()),
-            (cursor, " ".to_owned()),
-            (select_style, "🦀".to_owned()),
-            (
-                ContentStyle::default(),
-                "<<reset style>><<reset style>><<go to row: 3 col: 15>><<padding: 30>>\
-            <<go to row: 4 col: 15>><<padding: 30>><<go to row: 5 col: 15>><<padding: 30>>"
-                    .to_owned()
-            ),
-            (select_style, "<<set style>>".to_owned()),
-            (ContentStyle::default(), "<<go to row: 6 col: 14>>".to_owned()),
-            (select_style, "<<padding: 31>>".to_owned()),
-            (ContentStyle::default(), "<<go to row: 6 col: 32>>".to_owned()),
-            (select_style, "(8 selected) ".to_owned()),
-            (ContentStyle::default(), "<<go to row: 6 col: 14>>".to_owned()),
-            (select_style, "n 2, Ln 1, Col 30 ".to_owned())
+            (ContentStyle::default(), "<<go to row: 1 col: 15>>1 <<clear EOL>><<updated style>>".into()),
+            (ContentStyle::reversed().with_fg(gs.ui_theme.accent()), "<".into()),
+            (ContentStyle::default(), "t to get<<set style>> wrapping docs".into()),
+            (select_style, "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>".into()),
+            (ContentStyle::reversed(), " ".into()),
+            (select_style, "🦀".into()),
+            (ContentStyle::default(), "<<reset style>><<reset style>><<go to row: 3 col: 15>><<padding: 30>><<go to row: 4 col: 15>><<padding: 30>><<go to row: 5 col: 15>><<padding: 30>>".into()),
+            (gs.ui_theme.accent_style(), "<<set style>>".into()),
+            (ContentStyle::default(), "<<go to row: 6 col: 14>>".into()),
+            (gs.ui_theme.accent_style(), "<<padding: 31>>".into()),
+            (ContentStyle::default(), "<<go to row: 6 col: 32>>".into()),
+            (gs.ui_theme.accent_style(), "(8 selected) ".into()),
+            (ContentStyle::default(), "<<go to row: 6 col: 14>>".into()),
+            (gs.ui_theme.accent_style(), "n 2, Ln 0, Col 29 ".into())
         ]
     );
 
@@ -1237,27 +1232,25 @@ fn test_wrap_select_complex() {
     assert_eq!(
         result,
         vec![
-            (
-                ContentStyle::default(),
-                "<<go to row: 1 col: 15>>1 <<clear EOL>><<updated style>><t to get <<set style>>wrapping docs"
-                    .to_owned()
-            ),
-            (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>".to_owned()),
-            (cursor, " ".to_owned()),
-            (select_style, "🦀".to_owned()),
+            (ContentStyle::default(), "<<go to row: 1 col: 15>>1 <<clear EOL>><<updated style>>".into()),
+            (ContentStyle::reversed().with_fg(gs.ui_theme.accent()), "<".into()),
+            (ContentStyle::default(), "t to get <<set style>>wrapping docs".into()),
+            (select_style, "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>".into()),
+            (ContentStyle::reversed(), " ".into()),
+            (select_style, "🦀".into()),
             (
                 ContentStyle::default(),
                 "<<reset style>><<reset style>><<go to row: 3 col: 15>><<padding: 30>>\
-            <<go to row: 4 col: 15>><<padding: 30>><<go to row: 5 col: 15>><<padding: 30>>"
-                    .to_owned()
+                <<go to row: 4 col: 15>><<padding: 30>><<go to row: 5 col: 15>><<padding: 30>>"
+                    .into()
             ),
-            (select_style, "<<set style>>".to_owned()),
-            (ContentStyle::default(), "<<go to row: 6 col: 14>>".to_owned()),
-            (select_style, "<<padding: 31>>".to_owned()),
-            (ContentStyle::default(), "<<go to row: 6 col: 32>>".to_owned()),
-            (select_style, "(8 selected) ".to_owned()),
-            (ContentStyle::default(), "<<go to row: 6 col: 14>>".to_owned()),
-            (select_style, "n 2, Ln 1, Col 30 ".to_owned())
+            (gs.ui_theme.accent_style(), "<<set style>>".into()),
+            (ContentStyle::default(), "<<go to row: 6 col: 14>>".into()),
+            (gs.ui_theme.accent_style(), "<<padding: 31>>".into()),
+            (ContentStyle::default(), "<<go to row: 6 col: 32>>".into()),
+            (gs.ui_theme.accent_style(), "(8 selected) ".into()),
+            (ContentStyle::default(), "<<go to row: 6 col: 14>>".into()),
+            (gs.ui_theme.accent_style(), "n 2, Ln 0, Col 29 ".into())
         ]
     );
 
@@ -1284,27 +1277,25 @@ fn test_wrap_select_complex() {
     assert_eq!(
         result,
         vec![
-            (
-                ContentStyle::default(),
-                "<<go to row: 1 col: 15>>1 <<clear EOL>><<updated style>><t to get wr<<set style>>apping docs"
-                    .to_owned()
-            ),
-            (select_style, "<<set bg Some(Rgb { r: 27, g: 67, b: 50 })>>".to_owned()),
-            (cursor, " ".to_owned()),
-            (select_style, "🦀".to_owned()),
+            (ContentStyle::default(), "<<go to row: 1 col: 15>>1 <<clear EOL>><<updated style>>".into()),
+            (ContentStyle::reversed().with_fg(gs.ui_theme.accent()), "<".into()),
+            (ContentStyle::default(), "t to get wr<<set style>>apping docs".into()),
+            (select_style, "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>".into()),
+            (ContentStyle::reversed(), " ".into()),
+            (select_style, "🦀".into()),
             (
                 ContentStyle::default(),
                 "<<reset style>><<reset style>><<go to row: 3 col: 15>><<padding: 30>>\
-            <<go to row: 4 col: 15>><<padding: 30>><<go to row: 5 col: 15>><<padding: 30>>"
-                    .to_owned()
+                <<go to row: 4 col: 15>><<padding: 30>><<go to row: 5 col: 15>><<padding: 30>>"
+                    .into()
             ),
-            (select_style, "<<set style>>".to_owned()),
-            (ContentStyle::default(), "<<go to row: 6 col: 14>>".to_owned()),
-            (select_style, "<<padding: 31>>".to_owned()),
-            (ContentStyle::default(), "<<go to row: 6 col: 32>>".to_owned()),
-            (select_style, "(8 selected) ".to_owned()),
-            (ContentStyle::default(), "<<go to row: 6 col: 14>>".to_owned()),
-            (select_style, "n 2, Ln 1, Col 30 ".to_owned())
+            (gs.ui_theme.accent_style(), "<<set style>>".into()),
+            (ContentStyle::default(), "<<go to row: 6 col: 14>>".into()),
+            (gs.ui_theme.accent_style(), "<<padding: 31>>".into()),
+            (ContentStyle::default(), "<<go to row: 6 col: 32>>".into()),
+            (gs.ui_theme.accent_style(), "(8 selected) ".into()),
+            (ContentStyle::default(), "<<go to row: 6 col: 14>>".into()),
+            (gs.ui_theme.accent_style(), "n 2, Ln 0, Col 29 ".into()),
         ]
     );
 }
