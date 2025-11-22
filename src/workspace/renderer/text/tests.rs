@@ -279,7 +279,7 @@ fn test_full_end_line() {
         "<<go to row: 4 col: 15>>", "2 ", "<<clear EOL>>", "n/a",
         "<<set style>>",
         "<<go to row: 5 col: 14>>", "<<padding: 33>>",
-        "<<go to row: 5 col: 22>>", "  Doc Len 2, Ln 1, Col 1 ",
+        "<<go to row: 5 col: 22>>", "  Doc Len 2, Ln 0, Col 0 ",
         "<<go to row: 5 col: 14>>", "<<padding: 8>>", "<<set style>>",
         "<<go to row: 5 col: 14>>", "<<padding: 8>>", "<<reset style>>", 
         "<<reset style>>", "<<unfreeze>>"
@@ -299,7 +299,7 @@ fn test_full_end_line() {
         "<<go to row: 4 col: 15>>", "2 ", "<<clear EOL>>", "?", "/", "a", " ",
         "<<set style>>",
         "<<go to row: 5 col: 14>>", "<<padding: 33>>",
-        "<<go to row: 5 col: 22>>", "  Doc Len 2, Ln 2, Col 1 ",
+        "<<go to row: 5 col: 22>>", "  Doc Len 2, Ln 1, Col 0 ",
         "<<go to row: 5 col: 14>>", "<<padding: 8>>", "<<reset style>>",
         "<<unfreeze>>"
     ]);
@@ -327,7 +327,7 @@ fn test_cursor_line_oversize() {
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "b", "a", "l", "S", "t", "a", "t", "e",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 1, Col 1 ", "<<set style>>",
+        "<<go to row: 4 col: 14>>", "n 0, Col 0 ", "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 0>>", "<<reset style>>",
         "<<reset style>>",  "<<unfreeze>>", 
     ]);
@@ -345,7 +345,7 @@ fn test_cursor_line_oversize() {
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "b", "a", "l", "S", "t", "a", "t", "e",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 1, Col 9 ",
+        "<<go to row: 4 col: 14>>", "n 0, Col 8 ",
         "<<reset style>>", "<<unfreeze>>"
     ]);
 
@@ -365,7 +365,7 @@ fn test_cursor_line_oversize() {
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "?", ",", " ", "0", ",", " ", "3", "0",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " 1, Col 41 ",
+        "<<go to row: 4 col: 14>>", " 0, Col 40 ",
         "<<reset style>>", "<<unfreeze>>"
     ]);
 
@@ -382,7 +382,7 @@ fn test_cursor_line_oversize() {
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", ")", ";", "?",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " 1, Col 75 ",
+        "<<go to row: 4 col: 14>>", " 0, Col 74 ",
         "<<reset style>>", "<<unfreeze>>"
     ];
 
@@ -400,7 +400,7 @@ fn test_cursor_line_oversize() {
         "<<go to row: 2 col: 15>>", "3 ", "<<clear EOL>>", "n/a",
         "<<go to row: 3 col: 15>>", "<<padding: 10>>", "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 2, Col 1 ",
+        "<<go to row: 4 col: 14>>", "n 1, Col 0 ",
         "<<reset style>>", "<<unfreeze>>"
     ]);
 
@@ -434,7 +434,7 @@ fn test_cursor_line_oversize_full_last_wrap() {
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "b", "a", "l", "S", "t", "a", "t", "e",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 1, Col 1 ", "<<set style>>",
+        "<<go to row: 4 col: 14>>", "n 0, Col 0 ", "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 0>>", "<<reset style>>",
         "<<reset style>>",  "<<unfreeze>>",
     ]);
@@ -452,7 +452,7 @@ fn test_cursor_line_oversize_full_last_wrap() {
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "b", "a", "l", "S", "t", "a", "t", "e",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 1, Col 9 ",
+        "<<go to row: 4 col: 14>>", "n 0, Col 8 ",
         "<<reset style>>", "<<unfreeze>>"
     ]);
 
@@ -476,7 +476,7 @@ fn test_cursor_line_oversize_full_last_wrap() {
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "?", ";", " ", "/", "/", "e", "n", "d",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " 1, Col 73 ",
+        "<<go to row: 4 col: 14>>", " 0, Col 72 ",
         "<<reset style>>", "<<unfreeze>>"
     ]);
 
@@ -493,7 +493,7 @@ fn test_cursor_line_oversize_full_last_wrap() {
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "?",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " 1, Col 81 ",
+        "<<go to row: 4 col: 14>>", " 0, Col 80 ",
         "<<reset style>>", "<<unfreeze>>"
     ];
 
@@ -512,7 +512,7 @@ fn test_cursor_line_oversize_full_last_wrap() {
         "<<go to row: 3 col: 15>>", "<<padding: 10>>",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 2, Col 1 ",
+        "<<go to row: 4 col: 14>>", "n 1, Col 0 ",
         "<<reset style>>", "<<unfreeze>>"
     ]);
 
@@ -545,7 +545,7 @@ fn test_full_end_line_complex() {
         "<<go to row: 4 col: 15>>", "2 ", "<<clear EOL>>", "n/a",
         "<<set style>>",
         "<<go to row: 5 col: 14>>", "<<padding: 33>>",
-        "<<go to row: 5 col: 22>>", "  Doc Len 2, Ln 1, Col 1 ",
+        "<<go to row: 5 col: 22>>", "  Doc Len 2, Ln 0, Col 0 ",
         "<<go to row: 5 col: 14>>", "<<padding: 8>>", "<<set style>>",
         "<<go to row: 5 col: 14>>", "<<padding: 8>>", "<<reset style>>", 
         "<<reset style>>",
@@ -566,7 +566,7 @@ fn test_full_end_line_complex() {
         "<<go to row: 4 col: 15>>", "2 ", "<<clear EOL>>", "?", "/", "a", " ",
         "<<set style>>",
         "<<go to row: 5 col: 14>>", "<<padding: 33>>",
-        "<<go to row: 5 col: 22>>", "  Doc Len 2, Ln 2, Col 1 ",
+        "<<go to row: 5 col: 22>>", "  Doc Len 2, Ln 1, Col 0 ",
         "<<go to row: 5 col: 14>>", "<<padding: 8>>",
         "<<reset style>>", 
         "<<unfreeze>>"
@@ -595,7 +595,7 @@ fn test_cursor_line_oversize_complex() {
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "b", "a", "l", "S", "t", "a", "t", "e",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 1, Col 1 ", "<<set style>>",
+        "<<go to row: 4 col: 14>>", "n 0, Col 0 ", "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 0>>", "<<reset style>>",
         "<<reset style>>",  "<<unfreeze>>", 
     ]);
@@ -613,7 +613,7 @@ fn test_cursor_line_oversize_complex() {
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "b", "a", "l", "S", "t", "a", "t", "e",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 1, Col 9 ",
+        "<<go to row: 4 col: 14>>", "n 0, Col 8 ",
         "<<reset style>>", "<<unfreeze>>"
     ]);
 
@@ -635,7 +635,7 @@ fn test_cursor_line_oversize_complex() {
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "?", "o", "s", "s", "T", "e", "r", "m",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " 1, Col 57 ",
+        "<<go to row: 4 col: 14>>", " 0, Col 56 ",
         "<<reset style>>", "<<unfreeze>>"
     ]);
 
@@ -652,7 +652,7 @@ fn test_cursor_line_oversize_complex() {
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", ")", ";", "?",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " 1, Col 74 ",
+        "<<go to row: 4 col: 14>>", " 0, Col 73 ",
         "<<reset style>>", "<<unfreeze>>"
     ];
 
@@ -671,7 +671,7 @@ fn test_cursor_line_oversize_complex() {
         "<<go to row: 3 col: 15>>", "<<padding: 10>>",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 2, Col 1 ",
+        "<<go to row: 4 col: 14>>", "n 1, Col 0 ",
         "<<reset style>>", "<<unfreeze>>"    
     ]);
 
@@ -706,7 +706,7 @@ fn test_cursor_line_oversize_full_last_wrap_complex() {
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "🦀", "b", "a", "l", "S", "t", "a",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 1, Col 1 ", "<<set style>>",
+        "<<go to row: 4 col: 14>>", "n 0, Col 0 ", "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 0>>", "<<reset style>>",
         "<<reset style>>", "<<unfreeze>>"
     ]);
@@ -725,7 +725,7 @@ fn test_cursor_line_oversize_full_last_wrap_complex() {
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "🦀", "b", "a", "l", "S", "t", "a",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 1, Col 9 ",
+        "<<go to row: 4 col: 14>>", "n 0, Col 8 ",
         "<<reset style>>", "<<unfreeze>>"
     ]);
 
@@ -749,7 +749,7 @@ fn test_cursor_line_oversize_full_last_wrap_complex() {
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "(", ")", ")", "?", " ", "/", "/", "e",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " 1, Col 73 ",
+        "<<go to row: 4 col: 14>>", " 0, Col 72 ",
         "<<reset style>>", "<<unfreeze>>"
     ]);
 
@@ -766,7 +766,7 @@ fn test_cursor_line_oversize_full_last_wrap_complex() {
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "?",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " 1, Col 78 ",
+        "<<go to row: 4 col: 14>>", " 0, Col 77 ",
         "<<reset style>>", "<<unfreeze>>"
     ];
 
@@ -785,7 +785,7 @@ fn test_cursor_line_oversize_full_last_wrap_complex() {
         "<<go to row: 3 col: 15>>", "<<padding: 10>>",
         "<<set style>>",
         "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 2, Col 1 ",
+        "<<go to row: 4 col: 14>>", "n 1, Col 0 ",
         "<<reset style>>", "<<unfreeze>>"
     ]);
 

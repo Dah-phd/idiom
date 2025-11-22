@@ -334,7 +334,7 @@ fn test_md_editor() {
         "<<go to row: 18 col: 15>>", "<<padding: 30>>",
         "<<set style>>",
         "<<go to row: 19 col: 14>>", "<<padding: 31>>",
-        "<<go to row: 19 col: 20>>", "  Doc Len 5, Ln 3, Col 1 ",
+        "<<go to row: 19 col: 20>>", "  Doc Len 5, Ln 2, Col 0 ",
         "<<go to row: 19 col: 14>>", "<<padding: 6>>", "<<set style>>",
         "<<go to row: 19 col: 14>>", "<<padding: 6>>", "<<reset style>>",
         "<<reset style>>"
@@ -389,7 +389,7 @@ fn test_md_editor_complex() {
         "<<go to row: 18 col: 15>>", "<<padding: 30>>",
         "<<set style>>",
         "<<go to row: 19 col: 14>>", "<<padding: 31>>",
-        "<<go to row: 19 col: 20>>", "  Doc Len 5, Ln 3, Col 1 ",
+        "<<go to row: 19 col: 20>>", "  Doc Len 5, Ln 2, Col 0 ",
         "<<go to row: 19 col: 14>>", "<<padding: 6>>", "<<set style>>",
         "<<go to row: 19 col: 14>>", "<<padding: 6>>", "<<reset style>>", "<<reset style>>"        
     ];

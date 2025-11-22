@@ -297,7 +297,7 @@ impl GlobalState {
         if select_len != 0 {
             rev_builder.push(&format!("({select_len} selected) "));
         }
-        rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {} ", cursor.line + 1, cursor.char + 1));
+        rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {} ", cursor.line, cursor.char));
         self.messages.set_line(rev_builder.into_line());
         self.messages.fast_render(self.ui_theme.accent_style(), &mut self.backend);
         self.backend.reset_style();
