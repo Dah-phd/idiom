@@ -1,7 +1,4 @@
-use super::super::{
-    editor_line::EditorLine,
-    workspace::utils::{clip_content, insert_clip, insert_lines_indented, is_scope, remove_content},
-};
+use super::utils::{clip_content, insert_clip, insert_lines_indented, is_scope, remove_content};
 use super::EditMetaData;
 use idiom_tui::UTFSafe;
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
@@ -10,6 +7,7 @@ use std::fmt::Debug;
 use crate::{
     configs::IndentConfigs,
     cursor::{CursorPosition, WordRange},
+    editor_line::EditorLine,
     syntax::Encoding,
     utils::Offset,
 };

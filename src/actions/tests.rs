@@ -1,4 +1,8 @@
-use super::{meta::EditMetaData, Actions};
+use super::{
+    meta::EditMetaData,
+    utils::{clip_content, copy_content, get_closing_char_from_context, insert_clip, remove_content},
+    Actions,
+};
 use crate::actions::Action;
 use crate::actions::Edit;
 use crate::configs::{FileType, IndentConfigs};
@@ -176,7 +180,7 @@ fn remove_from_line() {
 }
 
 #[test]
-fn insert_clip() {
+fn edit_insert_clip() {
     let mut content = create_content();
     let clippy = "text".to_owned();
     let big_clippy = "text\n\ntext\n".to_owned();
@@ -504,4 +508,103 @@ fn probe_char_closing_with_select_rev(lexer: &mut Lexer, action: &Action, conten
     assert_eq!(edit[1].range, Some(Range::new(Position::new(0, 4), Position::new(0, 5))),);
     assert_eq!(&edit[1].text, "");
     Ok(())
+}
+
+/// UTILS
+
+#[test]
+fn test_insert_clip() {
+    // ensure utf8 safety on critical func
+    let mut content = vec![EditorLine::new("one🚀line".to_owned())];
+    let cursor = CursorPosition { line: 0, char: 4 };
+    let cursor = insert_clip("first\nsecond\nrocket🚀", &mut content, cursor);
+    assert_eq!(&content[0].to_string(), "one🚀first");
+    assert_eq!(&content[1].to_string(), "second");
+    assert_eq!(&content[2].to_string(), "rocket🚀line");
+    assert_eq!(cursor, CursorPosition { line: 2, char: 7 });
+    // single line
+    let cursor = insert_clip("single", &mut content, cursor);
+    assert_eq!(&content[2].to_string(), "rocket🚀singleline");
+    assert_eq!(cursor, CursorPosition { line: 2, char: 13 });
+    // end on new line
+    let cursor = insert_clip("text\n", &mut content, CursorPosition { line: 0, char: 0 });
+    assert_eq!(&content[0].to_string(), "text");
+    assert_eq!(&content[1].to_string(), "one🚀first");
+    assert_eq!(cursor, CursorPosition { line: 1, char: 0 });
+}
+
+#[test]
+fn test_remove_content() {
+    // ensure utf8 safety on critical func
+    let mut content = create_content();
+    let from = CursorPosition { line: 4, char: 1 };
+    remove_content(from, CursorPosition { line: 5, char: 15 }, &mut content);
+    assert_eq!(&content[4].to_string(), "🚀 everywhere in the end");
+    // within line
+    remove_content(from, CursorPosition { line: 4, char: 10 }, &mut content);
+    assert_eq!(&content[4].to_string(), "🚀re in the end");
+    // end on new line
+    remove_content(from, CursorPosition { line: 5, char: 0 }, &mut content);
+    assert_eq!(&content[4].to_string(), "🚀i will have to have some scopes {");
+}
+
+#[test]
+fn test_clip_content() {
+    // ensure utf8 safety on critical func
+    let mut content = create_content();
+    let from = CursorPosition { line: 4, char: 1 };
+    let clip = clip_content(from, CursorPosition { line: 5, char: 15 }, &mut content);
+    assert_eq!(&content[4].to_string(), "🚀 everywhere in the end");
+    assert_eq!(&clip, " things will get really complicated especially with all the utf8 chars and utf16 pos encoding\nthere will be 🚀");
+    // within line
+    let clip2 = clip_content(from, CursorPosition { line: 4, char: 10 }, &mut content);
+    assert_eq!(&content[4].to_string(), "🚀re in the end");
+    assert_eq!(&clip2, " everywhe");
+    // end on new line
+    let clip3 = clip_content(CursorPosition { line: 0, char: 0 }, CursorPosition { line: 1, char: 0 }, &mut content);
+    assert_eq!(&content[0].to_string(), "more lines of code should be here but only text");
+    assert_eq!(&clip3, "here comes the text\n");
+}
+
+#[test]
+fn test_copy_content() {
+    let content = create_content();
+    let clip = copy_content(CursorPosition { line: 4, char: 1 }, CursorPosition { line: 5, char: 15 }, &content);
+    assert_eq!(&clip, " things will get really complicated especially with all the utf8 chars and utf16 pos encoding\nthere will be 🚀");
+    // within line
+    let clip2 = copy_content(CursorPosition { line: 5, char: 14 }, CursorPosition { line: 5, char: 15 }, &content);
+    assert_eq!(&clip2, "🚀");
+    // end on new line
+    let clip3 = copy_content(CursorPosition { line: 0, char: 0 }, CursorPosition { line: 1, char: 0 }, &content);
+    assert_eq!(&clip3, "here comes the text\n");
+}
+
+#[test]
+fn get_closing_context() {
+    for (brack, rev) in "{([\"'".chars().zip("})]\"'".chars()) {
+        for next_c in ";:.=, {}[]()".chars() {
+            let text = EditorLine::from(format!(" {next_c} "));
+            assert_eq!(Some(rev), get_closing_char_from_context(brack, &text, 1));
+        }
+        for next_c in ";:.=, {}[]()".chars() {
+            let text = EditorLine::from(format!("{next_c}{next_c} "));
+            assert_eq!(Some(rev), get_closing_char_from_context(brack, &text, 1));
+        }
+    }
+    for next_c in "asdb1234".chars() {
+        let text = EditorLine::from(format!(" {next_c} "));
+        assert_eq!(None, get_closing_char_from_context('[', &text, 1));
+    }
+    for next_c in "asdb1234".chars() {
+        let text = EditorLine::from(format!("{next_c}  "));
+        assert_eq!(Some(')'), get_closing_char_from_context('(', &text, 1));
+    }
+    for next_c in "asdb1234".chars() {
+        let text = EditorLine::from(format!("{next_c}  "));
+        assert_eq!(None, get_closing_char_from_context('"', &text, 1));
+    }
+    for sandwich_c in "bamwqer_235".chars() {
+        let text = EditorLine::from(format!("{sandwich_c}{sandwich_c} "));
+        assert_eq!(None, get_closing_char_from_context('"', &text, 1));
+    }
 }

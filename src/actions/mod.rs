@@ -2,11 +2,9 @@ mod buffer;
 mod edits;
 mod meta;
 pub mod transaction;
+mod utils;
 
-use super::{
-    editor_line::EditorLine,
-    workspace::utils::{get_closing_char, get_closing_char_from_context, is_closing_repeat},
-};
+use super::editor_line::EditorLine;
 use crate::{
     configs::IndentConfigs,
     cursor::{Cursor, CursorPosition, Select},
@@ -17,6 +15,8 @@ use buffer::ActionBuffer;
 pub use edits::Edit;
 use lsp_types::TextEdit;
 pub use meta::{Action, EditMetaData};
+pub use utils::{copy_content, find_line_start};
+use utils::{get_closing_char, get_closing_char_from_context, is_closing_repeat};
 
 #[derive(Default)]
 pub struct Actions {

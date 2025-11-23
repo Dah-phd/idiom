@@ -3,7 +3,7 @@ mod modal;
 mod renderer;
 mod utils;
 use crate::{
-    actions::Actions,
+    actions::{find_line_start, Actions},
     configs::{EditorAction, EditorConfigs, FileFamily, FileType, IndentConfigs, ScopeType},
     cursor::{Cursor, CursorPosition},
     editor_line::EditorLine,
@@ -11,7 +11,6 @@ use crate::{
     global_state::GlobalState,
     lsp::LSPError,
     syntax::Lexer,
-    workspace::utils::find_line_start,
 };
 use controls::ControlMap;
 use idiom_tui::{layout::Rect, Position};

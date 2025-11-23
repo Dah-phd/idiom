@@ -1,8 +1,5 @@
 use crate::{
-    embeded_term::EditorTerminal,
-    global_state::GlobalState,
-    tree::Tree,
-    workspace::{utils::copy_content, Workspace},
+    actions::copy_content, embeded_term::EditorTerminal, global_state::GlobalState, tree::Tree, workspace::Workspace,
 };
 
 pub fn uppercase(_gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tree, _term: &mut EditorTerminal) {

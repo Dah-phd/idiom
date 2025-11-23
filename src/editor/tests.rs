@@ -283,7 +283,7 @@ fn test_apply() {
         let from = cur.get_position();
         let to = CursorPosition { line: from.line, char: from.char + 2 };
         cur.select_set(from, to);
-        let text = crate::workspace::utils::copy_content(from, to, cont).to_uppercase();
+        let text = crate::actions::copy_content(from, to, cont).to_uppercase();
         act.replace_select(from, to, text, cur, cont, lex);
     });
 
