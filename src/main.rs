@@ -1,6 +1,7 @@
 mod app;
 mod cli;
 mod configs;
+mod editor;
 mod embeded_term;
 mod embeded_tui;
 mod error;

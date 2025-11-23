@@ -1,4 +1,5 @@
 use crate::{
+    editor::Editor,
     embeded_term::EditorTerminal,
     ext_tui::StyleExt,
     global_state::GlobalState,
@@ -6,7 +7,7 @@ use crate::{
     tree::Tree,
     workspace::{
         cursor::{CursorPosition, EncodedWordRange, PositionedWord},
-        Editor, Workspace,
+        Workspace,
     },
 };
 use crossterm::{
@@ -260,8 +261,8 @@ mod test {
     };
     use crate::{
         configs::FileType,
+        editor::tests::mock_editor,
         syntax::tests::{mock_utf16_lexer, mock_utf8_lexer},
-        workspace::editor::tests::mock_editor,
     };
 
     #[test]

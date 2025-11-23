@@ -5,11 +5,11 @@ use super::{
 };
 use crate::{
     configs::EditorAction,
+    editor::{Editor, EditorModal},
     global_state::{GlobalState, IdiomEvent, StartInplacePopup},
     workspace::{
         actions::transaction,
         cursor::{CursorPosition, PositionedWord, WordRange},
-        editor::{Editor, EditorModal},
     },
 };
 

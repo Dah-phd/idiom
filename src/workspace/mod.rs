@@ -1,11 +1,10 @@
 pub mod actions;
 pub mod cursor;
-pub mod editor;
 pub mod line;
-pub mod renderer;
 pub mod utils;
 use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
+    editor::{editor_from_data, Editor},
     error::{IdiomError, IdiomResult},
     ext_tui::StyleExt,
     global_state::{GlobalState, IdiomEvent},
@@ -16,7 +15,6 @@ use crate::{
 use crossterm::event::KeyEvent;
 use crossterm::style::{Color, ContentStyle};
 pub use cursor::{Cursor, CursorPosition};
-pub use editor::{editor_from_data, Editor};
 use idiom_tui::{layout::Rect, Backend};
 use line::EditorLine;
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
@@ -342,7 +340,7 @@ impl Workspace {
         };
 
         // set initial tokens while LSP is indexing
-        crate::lsp::init_local_tokens(editor.file_type, &mut editor.content, &gs.theme);
+        editor.force_local_lsp_tokens(gs);
         match self.lsp_servers.entry(editor.file_type) {
             Entry::Vacant(entry) => match LSP::new(lsp_cmd, editor.file_type).await {
                 Ok(lsp) => {

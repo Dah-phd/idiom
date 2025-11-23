@@ -1,5 +1,6 @@
 use crate::{
     configs::Theme,
+    editor::Editor,
     global_state::{GlobalState, IdiomEvent},
     lsp::{LSPClient, LSPResponse, LSPResponseType, LSPResult},
     popups::popups_tree::refrence_selector,
@@ -7,7 +8,7 @@ use crate::{
     workspace::{
         actions::{Action, EditMetaData},
         line::EditorLine,
-        CursorPosition, Editor,
+        CursorPosition,
     },
 };
 use core::str::FromStr;

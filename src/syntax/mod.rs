@@ -6,12 +6,13 @@ mod lsp_calls;
 pub mod tokens;
 use crate::{
     configs::{FileType, Theme},
+    editor::Editor,
     global_state::{GlobalState, IdiomEvent},
     lsp::{LSPClient, LSPError, LSPResponseType, LSPResult},
     workspace::{
         actions::{Action, EditMetaData},
         line::EditorLine,
-        CursorPosition, Editor,
+        CursorPosition,
     },
 };
 pub use diagnostics::{set_diganostics, DiagnosticInfo, DiagnosticLine, Fix};

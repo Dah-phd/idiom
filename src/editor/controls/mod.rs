@@ -3,12 +3,12 @@ mod methods;
 
 use crate::{
     configs::EditorAction,
+    editor::{Editor, EditorLine},
     global_state::GlobalState,
     syntax::Lexer,
     workspace::{
         actions::{transaction, Actions},
         cursor::{Cursor, CursorPosition, PositionedWord},
-        Editor, EditorLine,
     },
 };
 use lsp_types::TextEdit;

@@ -1,5 +1,4 @@
 use super::{
-    editor::Editor,
     line::EditorLine,
     map_editor,
     utils::{clip_content, copy_content, get_closing_char_from_context, insert_clip, remove_content},
@@ -7,13 +6,13 @@ use super::{
 };
 use crate::{
     configs::{test::mock_editor_key_map, EditorConfigs},
+    editor::{
+        tests::{mock_editor, pull_line, select_eq},
+        Editor,
+    },
     ext_tui::CrossTerm,
     global_state::GlobalState,
-    workspace::{
-        actions::tests::create_content,
-        editor::tests::{mock_editor, pull_line, select_eq},
-        Cursor, CursorPosition,
-    },
+    workspace::{actions::tests::create_content, Cursor, CursorPosition},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::ContentStyle;

@@ -1,4 +1,4 @@
-use crate::workspace::{CursorPosition, Editor};
+use crate::{editor::Editor, workspace::CursorPosition};
 use idiom_tui::text_field::TextField;
 
 pub fn next_option<T: Clone>(options: &[T], state: &mut usize) -> Option<T> {
@@ -75,7 +75,7 @@ pub fn infer_word_search_positon(
 #[cfg(test)]
 mod test {
     use super::{infer_word_search_positon, position_with_count_text};
-    use crate::workspace::{editor::tests::mock_editor, CursorPosition};
+    use crate::{editor::tests::mock_editor, workspace::CursorPosition};
     use idiom_tui::text_field::TextField;
 
     #[test]

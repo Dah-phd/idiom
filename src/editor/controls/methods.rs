@@ -1,7 +1,10 @@
 use super::{
     apply_multi_cursor_transaction, filter_multi_cursors_per_line_if_no_select, with_new_line_if_not, ControlMap,
 };
-use crate::workspace::{utils::copy_content, CursorPosition, Editor};
+use crate::{
+    editor::Editor,
+    workspace::{utils::copy_content, CursorPosition},
+};
 use lsp_types::TextEdit;
 use std::cmp::Ordering;
 

@@ -1,11 +1,11 @@
 mod controls;
 mod modal;
+mod renderer;
 mod utils;
-use super::{
+use crate::workspace::{
     actions::Actions,
     cursor::{Cursor, CursorPosition},
     line::EditorLine,
-    renderer::TuiCodec,
     utils::find_line_start,
 };
 use crate::{
@@ -19,6 +19,7 @@ use controls::ControlMap;
 use idiom_tui::{layout::Rect, Position};
 use lsp_types::TextEdit;
 pub use modal::EditorModal;
+use renderer::TuiCodec;
 use std::path::PathBuf;
 pub use utils::editor_from_data;
 use utils::{big_file_protection, build_display, calc_line_number_offset, FileUpdate};
@@ -169,6 +170,11 @@ impl Editor {
         for line in self.content.iter_mut().skip(self.cursor.at_line + skip_offset).take(rect.width) {
             line.cached.reset();
         }
+    }
+
+    #[inline]
+    pub fn force_local_lsp_tokens(&mut self, gs: &GlobalState) {
+        crate::lsp::init_local_tokens(self.file_type, &mut self.content, &gs.theme);
     }
 
     #[inline]

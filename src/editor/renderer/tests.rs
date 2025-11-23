@@ -1,6 +1,6 @@
+use crate::editor::tests::mock_editor;
 use crate::ext_tui::{CrossTerm, StyleExt};
 use crate::global_state::GlobalState;
-use crate::workspace::editor::tests::mock_editor;
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{layout::Rect, Backend};
 

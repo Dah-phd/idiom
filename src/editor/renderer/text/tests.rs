@@ -4,12 +4,12 @@ use super::{
 };
 use crate::{
     configs::FileType,
+    editor::tests::mock_editor_text_render,
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
     syntax::tests::mock_utf8_lexer,
     workspace::{
         cursor::Cursor,
-        editor::tests::mock_editor_text_render,
         line::{EditorLine, LineContext},
         CursorPosition,
     },

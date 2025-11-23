@@ -1,18 +1,19 @@
-use super::super::{
-    cursor::{Cursor, CursorPosition, WordRange},
-    editor::{utils::build_display, FileUpdate},
-    Editor,
-};
+use super::super::editor::{utils::build_display, FileUpdate};
 use super::{
     calc_line_number_offset,
     controls::{filter_multi_cursors_per_line_if_no_select, ControlMap},
+    Editor, EditorModal, TuiCodec,
 };
 use crate::{
     configs::FileType,
     ext_tui::CrossTerm,
     global_state::GlobalState,
     syntax::Lexer,
-    workspace::{actions::Actions, editor::EditorModal, line::EditorLine, renderer::TuiCodec},
+    workspace::{
+        actions::Actions,
+        cursor::{Cursor, CursorPosition, WordRange},
+        line::EditorLine,
+    },
 };
 use idiom_tui::{layout::Rect, Backend};
 use std::path::PathBuf;
@@ -110,7 +111,7 @@ fn test_update_path() {
 
 #[test]
 fn test_display() {
-    let buf = PathBuf::from("./src/workspace/editor/mod.rs").canonicalize().unwrap();
+    let buf = PathBuf::from("./src/editor/mod.rs").canonicalize().unwrap();
     assert_eq!(build_display(buf.as_path()), "editor/mod.rs");
     assert_eq!(build_display(PathBuf::from("bumba").as_path()), "bumba");
 }

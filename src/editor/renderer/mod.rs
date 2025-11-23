@@ -2,11 +2,12 @@ mod code;
 mod text;
 mod utils;
 
-use super::{line::LineContext, Editor};
 use crate::{
     configs::{FileFamily, FileType},
+    editor::Editor,
     global_state::GlobalState,
     syntax::{tokens::WrapData, Lexer},
+    workspace::line::LineContext,
 };
 use idiom_tui::{layout::IterLines, Backend};
 
@@ -127,9 +128,9 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
             line.render_empty(&mut gs.backend);
         }
     }
-    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
     let relative_pos = ctx.get_modal_relative_position();
     modal.render_if_exist(relative_pos, gs);
+    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
 }
 
 fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
@@ -158,9 +159,9 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
         line.render_empty(&mut gs.backend);
     }
 
-    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
     let relative_pos = ctx.get_modal_relative_position();
     modal.forece_render_if_exists(relative_pos, gs);
+    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
 }
 
 // CODE RENDER MULTICURSOR
@@ -246,9 +247,9 @@ fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
         line.render_empty(&mut gs.backend);
     }
 
-    gs.render_stats(content.len(), controls.cursors().len(), cursor.into());
     let relative_pos = ctx.get_modal_relative_position();
     modal.forece_render_if_exists(relative_pos, gs);
+    gs.render_stats(content.len(), controls.cursors().len(), cursor.into());
 }
 
 // TEXT

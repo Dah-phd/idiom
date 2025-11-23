@@ -2,15 +2,15 @@ use super::{
     super::tests::{expect_cursor, expect_select, parse_complex_line, parse_simple_line},
     cursor as rend_cursor, line_render,
 };
+use crate::editor::renderer::tests::count_to_cursor;
+use crate::editor::tests::mock_editor;
 use crate::syntax::tests::{
     create_token_pairs_utf16, create_token_pairs_utf32, create_token_pairs_utf8, longline_token_pair_utf16,
     longline_token_pair_utf32, longline_token_pair_utf8, mock_utf16_lexer, mock_utf32_lexer, mock_utf8_lexer,
     zip_text_tokens,
 };
 use crate::workspace::cursor::Cursor;
-use crate::workspace::editor::tests::mock_editor;
 use crate::workspace::line::LineContext;
-use crate::workspace::renderer::tests::count_to_cursor;
 use crate::workspace::CursorPosition;
 use crate::{configs::FileType, workspace::line::EditorLine};
 use crate::{

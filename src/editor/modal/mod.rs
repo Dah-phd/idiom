@@ -4,12 +4,10 @@ mod rename;
 
 use crate::{
     configs::{EditorAction, Theme},
+    editor::{Editor, EditorLine},
     global_state::GlobalState,
     syntax::DiagnosticInfo,
-    workspace::{
-        cursor::{CursorPosition, PositionedWord, WordRange},
-        Editor, EditorLine,
-    },
+    workspace::cursor::{CursorPosition, PositionedWord, WordRange},
 };
 use completion::AutoComplete;
 use fuzzy_matcher::skim::SkimMatcherV2;

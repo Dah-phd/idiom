@@ -260,13 +260,10 @@ pub fn try_cache_wrap_data_from_lines(
 #[cfg(test)]
 mod test {
     use super::{super::text, SelectManager, WrapData};
+    use crate::editor::{tests::mock_editor_text_render, Editor};
     use crate::ext_tui::CrossTerm;
     use crate::global_state::GlobalState;
-    use crate::workspace::{
-        cursor::CharRangeUnbound,
-        editor::{tests::mock_editor_text_render, Editor},
-        line::LineContext,
-    };
+    use crate::workspace::{cursor::CharRangeUnbound, line::LineContext};
     use crossterm::style::{Color, ContentStyle};
     use idiom_tui::{layout::Rect, Backend, UTFSafe};
 
