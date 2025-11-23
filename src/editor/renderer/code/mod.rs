@@ -7,9 +7,9 @@ pub mod complex_multi_cursor;
 
 use super::utils::{pad_select, SelectManager};
 use crate::global_state::GlobalState;
-use crate::workspace::{
+use crate::{
     cursor::{CharRange, CharRangeUnbound, Cursor, CursorPosition},
-    line::{EditorLine, LineContext},
+    editor_line::{EditorLine, LineContext},
 };
 use crossterm::style::Stylize;
 use idiom_tui::{layout::Line, utils::CharLimitedWidths, Backend};

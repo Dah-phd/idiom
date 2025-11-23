@@ -5,7 +5,7 @@ use super::{
     EditorDiagnostics, LSPError, LSPNotification, LSPRequest, LSPResponse, LSPResult, Requests, Responses,
     TreeDiagnostics,
 };
-use crate::{configs::FileType, utils::split_arc, workspace::CursorPosition};
+use crate::{configs::FileType, cursor::CursorPosition, utils::split_arc};
 use lsp_types::{
     notification::{DidCloseTextDocument, DidOpenTextDocument, DidRenameFiles, DidSaveTextDocument, Exit, Initialized},
     request::Shutdown,

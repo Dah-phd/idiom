@@ -1,15 +1,14 @@
 use super::{meta::EditMetaData, Actions};
+use crate::actions::Action;
+use crate::actions::Edit;
 use crate::configs::{FileType, IndentConfigs};
+use crate::cursor::{Cursor, CursorPosition};
+use crate::editor_line::EditorLine;
 use crate::lsp::LSPResult;
 use crate::syntax::{
     tests::{intercept_sync, intercept_sync_rev},
     Encoding, Lexer,
 };
-use crate::workspace::actions::Action;
-use crate::workspace::actions::Edit;
-use crate::workspace::cursor::Cursor;
-use crate::workspace::line::EditorLine;
-use crate::workspace::CursorPosition;
 use lsp_types::{Position, Range};
 use std::path::PathBuf;
 

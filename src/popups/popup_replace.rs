@@ -1,11 +1,12 @@
 use crate::{
+    cursor::CursorPosition,
     embeded_term::EditorTerminal,
     error::{IdiomError, IdiomResult},
     ext_tui::{text_field::map_key, StyleExt},
     global_state::GlobalState,
     syntax::Lexer,
     tree::Tree,
-    workspace::{CursorPosition, Workspace},
+    workspace::Workspace,
 };
 use crossterm::{
     event::{KeyCode, KeyEvent, KeyModifiers},

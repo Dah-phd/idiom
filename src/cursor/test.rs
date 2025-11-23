@@ -1,5 +1,5 @@
 use super::word::{PositionedWord, WordRange};
-use crate::workspace::EditorLine;
+use crate::editor_line::EditorLine;
 
 fn match_char_range_to_word_range(range: WordRange, char_idx: usize, content: &[EditorLine]) {
     let char_range = WordRange::find_char_range(&content[range.line()], char_idx).unwrap();

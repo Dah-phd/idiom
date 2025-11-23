@@ -1,7 +1,10 @@
+mod actions;
 mod app;
 mod cli;
 mod configs;
+mod cursor;
 mod editor;
+mod editor_line;
 mod embeded_term;
 mod embeded_tui;
 mod error;

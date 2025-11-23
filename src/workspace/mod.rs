@@ -1,10 +1,9 @@
-pub mod actions;
-pub mod cursor;
-pub mod line;
 pub mod utils;
 use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
+    cursor::Cursor,
     editor::{editor_from_data, Editor},
+    editor_line::EditorLine,
     error::{IdiomError, IdiomResult},
     ext_tui::StyleExt,
     global_state::{GlobalState, IdiomEvent},
@@ -14,9 +13,7 @@ use crate::{
 };
 use crossterm::event::KeyEvent;
 use crossterm::style::{Color, ContentStyle};
-pub use cursor::{Cursor, CursorPosition};
 use idiom_tui::{layout::Rect, Backend};
-use line::EditorLine;
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
 use std::{
     collections::{hash_map::Entry, HashMap},

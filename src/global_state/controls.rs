@@ -154,7 +154,7 @@ pub fn mouse_handler(
                     }
                 }
             } else if let Some(position) = gs.tree_area.relative_position(event.row, event.column) {
-                let mut position = crate::workspace::CursorPosition::from(position);
+                let mut position = crate::cursor::CursorPosition::from(position);
                 position.line += 1;
                 if tree.mouse_menu_setup_select(position.line) {
                     let accent_style = gs.ui_theme.accent_style_reversed();

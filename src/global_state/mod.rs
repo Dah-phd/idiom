@@ -10,6 +10,7 @@ use crate::{
         EditorConfigs, EditorKeyMap, FileType, GeneralKeyMap, KeyMap, Theme, TreeKeyMap, UITheme, EDITOR_CFG_FILE,
         KEY_MAP, THEME_FILE, THEME_UI,
     },
+    cursor::CursorPosition,
     embeded_term::EditorTerminal,
     error::IdiomResult,
     ext_tui::{CrossTerm, StyleExt},
@@ -20,7 +21,7 @@ use crate::{
         Popup,
     },
     tree::Tree,
-    workspace::{CursorPosition, Workspace},
+    workspace::Workspace,
 };
 pub use clipboard::Clipboard;
 pub use controls::Mode;

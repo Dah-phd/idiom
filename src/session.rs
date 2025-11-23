@@ -1,7 +1,8 @@
 use crate::configs::{FileType, APP_FOLDER};
+use crate::cursor::Cursor;
 use crate::error::{IdiomError, IdiomResult};
 use crate::global_state::{GlobalState, IdiomEvent};
-use crate::workspace::{cursor::Cursor, Workspace};
+use crate::workspace::Workspace;
 use dirs::data_local_dir;
 use serde::{Deserialize, Serialize};
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -277,13 +278,11 @@ mod tests {
         StoreFileData,
     };
     use crate::configs::FileType;
+    use crate::cursor::Cursor;
     use crate::ext_tui::CrossTerm;
     use crate::global_state::GlobalState;
     use crate::utils::test::TempDir;
-    use crate::workspace::{
-        cursor::Cursor,
-        tests::{mock_ws, mock_ws_empty},
-    };
+    use crate::workspace::tests::{mock_ws, mock_ws_empty};
     use idiom_tui::{layout::Rect, Backend};
     use std::path::PathBuf;
 

@@ -11,12 +11,12 @@ use super::{
 };
 use crate::{
     configs::FileType,
+    cursor::CursorPosition,
     lsp::{
         local::{Definitions, LangStream, PositionedToken, Responses},
         payload::Payload,
         LSPError, LSPResponse, LSPResponseType, LSPResult, Requests,
     },
-    workspace::CursorPosition,
 };
 use lsp_types::{
     notification::{DidOpenTextDocument, Notification},

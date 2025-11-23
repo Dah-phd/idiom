@@ -6,7 +6,10 @@ use std::{
 
 use lsp_types::TextDocumentContentChangeEvent;
 
-use crate::workspace::{cursor::Select, line::EditorLine, CursorPosition};
+use crate::{
+    cursor::{CursorPosition, Select},
+    editor_line::EditorLine,
+};
 
 use super::Edit;
 

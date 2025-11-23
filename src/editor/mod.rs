@@ -2,18 +2,16 @@ mod controls;
 mod modal;
 mod renderer;
 mod utils;
-use crate::workspace::{
-    actions::Actions,
-    cursor::{Cursor, CursorPosition},
-    line::EditorLine,
-    utils::find_line_start,
-};
 use crate::{
+    actions::Actions,
     configs::{EditorAction, EditorConfigs, FileFamily, FileType, IndentConfigs, ScopeType},
+    cursor::{Cursor, CursorPosition},
+    editor_line::EditorLine,
     error::{IdiomError, IdiomResult},
     global_state::GlobalState,
     lsp::LSPError,
     syntax::Lexer,
+    workspace::utils::find_line_start,
 };
 use controls::ControlMap;
 use idiom_tui::{layout::Rect, Position};

@@ -4,12 +4,10 @@ mod markdown;
 
 use super::utils::{pad_select, try_cache_wrap_data_from_lines, SelectManagerSimple};
 use crate::{
+    cursor::{CharRangeUnbound, Cursor},
+    editor_line::{EditorLine, LineContext},
     global_state::GlobalState,
     syntax::tokens::WrapData,
-    workspace::{
-        cursor::{CharRangeUnbound, Cursor},
-        line::{EditorLine, LineContext},
-    },
 };
 use idiom_tui::layout::{IterLines, RectIter};
 

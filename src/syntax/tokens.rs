@@ -1,8 +1,8 @@
 use super::{diagnostics::DiagnosticData, Legend};
 use crate::{
+    cursor::{Cursor, EncodedWordRange},
+    editor_line::{EditorLine, RenderStatus},
     ext_tui::StyleExt,
-    workspace::cursor::{Cursor, EncodedWordRange},
-    workspace::line::{EditorLine, RenderStatus},
 };
 use crossterm::style::ContentStyle;
 use lsp_types::SemanticToken;
@@ -406,7 +406,7 @@ impl WrapData {
 #[cfg(test)]
 mod tests {
     use super::WrapData;
-    use crate::workspace::{line::EditorLine, Cursor};
+    use crate::{cursor::Cursor, editor_line::EditorLine};
 
     impl WrapData {
         pub fn pull_cache(text: &EditorLine) -> Option<WrapData> {

@@ -1,7 +1,4 @@
-use crate::{
-    configs::IndentConfigs,
-    workspace::{cursor::CursorPosition, line::EditorLine},
-};
+use crate::{configs::IndentConfigs, cursor::CursorPosition, editor_line::EditorLine};
 use idiom_tui::UTFSafe;
 
 #[inline(always)]

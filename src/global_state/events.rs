@@ -1,6 +1,8 @@
 use super::{GlobalState, Mode};
 use crate::configs::FileType;
 use crate::configs::{EditorAction, TreeAction};
+use crate::cursor::CursorPosition;
+use crate::editor_line::EditorLine;
 use crate::embeded_term::EditorTerminal;
 use crate::embeded_tui::run_embeded_tui;
 use crate::lsp::TreeDiagnostics;
@@ -10,8 +12,6 @@ use crate::popups::pallet::Pallet;
 use crate::popups::popup_tree_search::ActiveFileSearch;
 use crate::popups::{Popup, PopupChoice};
 use crate::tree::Tree;
-use crate::workspace::line::EditorLine;
-use crate::workspace::CursorPosition;
 use crate::workspace::Workspace;
 use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, Range, WorkspaceEdit};
 use std::path::PathBuf;

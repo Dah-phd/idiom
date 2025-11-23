@@ -4,13 +4,11 @@ use super::{
     multi_cursor_word_select, ControlMap,
 };
 use crate::{
+    actions::transaction,
     configs::EditorAction,
+    cursor::{CursorPosition, PositionedWord, WordRange},
     editor::{Editor, EditorModal},
     global_state::{GlobalState, IdiomEvent, StartInplacePopup},
-    workspace::{
-        actions::transaction,
-        cursor::{CursorPosition, PositionedWord, WordRange},
-    },
 };
 
 pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut GlobalState) -> bool {

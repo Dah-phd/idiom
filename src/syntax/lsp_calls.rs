@@ -1,15 +1,13 @@
 use crate::{
+    actions::{Action, EditMetaData},
     configs::Theme,
+    cursor::CursorPosition,
     editor::Editor,
+    editor_line::EditorLine,
     global_state::{GlobalState, IdiomEvent},
     lsp::{LSPClient, LSPResponse, LSPResponseType, LSPResult},
     popups::popups_tree::refrence_selector,
     syntax::{Encoding, Lexer},
-    workspace::{
-        actions::{Action, EditMetaData},
-        line::EditorLine,
-        CursorPosition,
-    },
 };
 use core::str::FromStr;
 use lsp_types::{

@@ -1,18 +1,19 @@
 use super::{
-    line::EditorLine,
     map_editor,
     utils::{clip_content, copy_content, get_closing_char_from_context, insert_clip, remove_content},
     Workspace,
 };
 use crate::{
+    actions::tests::create_content,
     configs::{test::mock_editor_key_map, EditorConfigs},
+    cursor::{Cursor, CursorPosition},
     editor::{
         tests::{mock_editor, pull_line, select_eq},
         Editor,
     },
+    editor_line::EditorLine,
     ext_tui::CrossTerm,
     global_state::GlobalState,
-    workspace::{actions::tests::create_content, Cursor, CursorPosition},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::style::ContentStyle;

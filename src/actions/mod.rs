@@ -4,11 +4,15 @@ mod meta;
 pub mod transaction;
 
 use super::{
-    cursor::{Cursor, CursorPosition, Select},
-    line::EditorLine,
-    utils::{get_closing_char, get_closing_char_from_context, is_closing_repeat},
+    editor_line::EditorLine,
+    workspace::utils::{get_closing_char, get_closing_char_from_context, is_closing_repeat},
 };
-use crate::{configs::IndentConfigs, syntax::Lexer, utils::Offset};
+use crate::{
+    configs::IndentConfigs,
+    cursor::{Cursor, CursorPosition, Select},
+    syntax::Lexer,
+    utils::Offset,
+};
 use buffer::ActionBuffer;
 pub use edits::Edit;
 use lsp_types::TextEdit;

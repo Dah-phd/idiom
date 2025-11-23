@@ -1,5 +1,9 @@
-use super::super::{actions::Edit, line::EditorLine, CursorPosition};
-use crate::{syntax::Lexer, workspace::cursor::Cursor};
+use crate::{
+    actions::Edit,
+    cursor::{Cursor, CursorPosition},
+    editor_line::EditorLine,
+    syntax::Lexer,
+};
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 
 #[derive(Default, Debug)]
@@ -302,11 +306,11 @@ impl From<TextBuffer> for Option<Edit> {
 mod tests {
     use super::super::edits::Edit;
     use super::ActionBuffer;
+    use crate::actions::buffer::DelBuffer;
     use crate::configs::FileType;
+    use crate::cursor::{Cursor, CursorPosition};
+    use crate::editor_line::EditorLine;
     use crate::syntax::tests::{mock_utf32_lexer, mock_utf8_lexer};
-    use crate::workspace::actions::buffer::DelBuffer;
-    use crate::workspace::line::EditorLine;
-    use crate::workspace::{cursor::Cursor, CursorPosition};
     use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 
     #[test]

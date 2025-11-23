@@ -1,5 +1,5 @@
 use super::{LangStream, PositionedToken};
-use crate::workspace::CursorPosition;
+use crate::cursor::CursorPosition;
 use idiom_tui::utils::{UTFSafe, UTFSafeStringExt};
 use lsp_types::{
     SemanticToken, SemanticTokenType, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
@@ -198,8 +198,8 @@ mod test {
     use lsp_types::SemanticToken;
 
     use crate::{
+        cursor::CursorPosition,
         lsp::local::{tokens::python::PyToken, LangStream, LocalLSP, PositionedToken},
-        workspace::CursorPosition,
     };
 
     use super::{full_tokens, utf16_encoder, utf8_encoder};

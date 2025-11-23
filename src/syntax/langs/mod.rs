@@ -2,9 +2,9 @@ mod rust;
 use super::{Fix, GlobalState};
 use crate::{
     configs::{FileType, Theme},
+    editor_line::EditorLine,
     ext_tui::{StyleExt, StyledLine, Text},
     global_state::IdiomEvent,
-    workspace::line::EditorLine,
 };
 use crossterm::style::{Color, ContentStyle};
 use lsp_types::DiagnosticRelatedInformation;

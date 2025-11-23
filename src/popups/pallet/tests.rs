@@ -1,10 +1,11 @@
 use super::formatting::{lowercase, uppercase};
 use crate::{
+    cursor::CursorPosition,
     embeded_term::EditorTerminal,
     ext_tui::CrossTerm,
     global_state::GlobalState,
     tree::tests::mock_tree,
-    workspace::{tests::mock_ws, CursorPosition, Workspace},
+    workspace::{tests::mock_ws, Workspace},
 };
 use idiom_tui::{layout::Rect, Backend};
 

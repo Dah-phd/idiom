@@ -5,9 +5,9 @@ mod utils;
 use crate::{
     configs::{FileFamily, FileType},
     editor::Editor,
+    editor_line::LineContext,
     global_state::GlobalState,
     syntax::{tokens::WrapData, Lexer},
-    workspace::line::LineContext,
 };
 use idiom_tui::{layout::IterLines, Backend};
 

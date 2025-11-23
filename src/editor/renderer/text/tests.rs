@@ -4,15 +4,12 @@ use super::{
 };
 use crate::{
     configs::FileType,
+    cursor::{Cursor, CursorPosition},
     editor::tests::mock_editor_text_render,
+    editor_line::{EditorLine, LineContext},
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
     syntax::tests::mock_utf8_lexer,
-    workspace::{
-        cursor::Cursor,
-        line::{EditorLine, LineContext},
-        CursorPosition,
-    },
 };
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{

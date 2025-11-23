@@ -2,14 +2,12 @@ mod event;
 mod methods;
 
 use crate::{
+    actions::{transaction, Actions},
     configs::EditorAction,
+    cursor::{Cursor, CursorPosition, PositionedWord},
     editor::{Editor, EditorLine},
     global_state::GlobalState,
     syntax::Lexer,
-    workspace::{
-        actions::{transaction, Actions},
-        cursor::{Cursor, CursorPosition, PositionedWord},
-    },
 };
 use lsp_types::TextEdit;
 
@@ -363,7 +361,7 @@ fn with_new_line_if_not(mut text: String) -> String {
 #[cfg(test)]
 mod tests {
     use super::ControlMap;
-    use crate::workspace::Cursor;
+    use crate::cursor::Cursor;
 
     impl ControlMap {
         pub fn mock_cursors(&mut self, cursors: Vec<Cursor>) {

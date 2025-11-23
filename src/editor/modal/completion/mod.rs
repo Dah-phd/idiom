@@ -1,8 +1,6 @@
 mod snippets;
 use super::ModalMessage;
-use crate::{
-    configs::EditorAction, ext_tui::State, global_state::GlobalState, syntax::Lang, workspace::CursorPosition,
-};
+use crate::{configs::EditorAction, cursor::CursorPosition, ext_tui::State, global_state::GlobalState, syntax::Lang};
 use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
 use idiom_tui::layout::{IterLines, Rect};
 use lsp_types::CompletionItem;

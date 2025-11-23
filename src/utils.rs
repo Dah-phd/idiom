@@ -1,6 +1,6 @@
 use crate::{
+    editor_line::EditorLine,
     error::{IdiomError, IdiomResult},
-    workspace::line::EditorLine,
 };
 use std::{
     ops::{Add, Sub},

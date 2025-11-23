@@ -1,14 +1,18 @@
 use super::super::{
-    cursor::{CursorPosition, WordRange},
-    line::EditorLine,
-    utils::{clip_content, insert_clip, insert_lines_indented, is_scope, remove_content},
+    editor_line::EditorLine,
+    workspace::utils::{clip_content, insert_clip, insert_lines_indented, is_scope, remove_content},
 };
 use super::EditMetaData;
 use idiom_tui::UTFSafe;
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 use std::fmt::Debug;
 
-use crate::{configs::IndentConfigs, syntax::Encoding, utils::Offset};
+use crate::{
+    configs::IndentConfigs,
+    cursor::{CursorPosition, WordRange},
+    syntax::Encoding,
+    utils::Offset,
+};
 
 #[derive(Debug)]
 pub struct Edit {

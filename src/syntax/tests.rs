@@ -4,11 +4,12 @@ pub use super::{
     Encoding, Legend, Lexer, Token,
 };
 use crate::{
+    actions::Action,
     configs::FileType,
+    cursor::EncodedWordRange,
+    editor_line::EditorLine,
     ext_tui::{CrossTerm, StyleExt},
     lsp::LSPResult,
-    workspace::cursor::EncodedWordRange,
-    workspace::{actions::Action, line::EditorLine},
 };
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::Backend;

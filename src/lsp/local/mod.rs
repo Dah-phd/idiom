@@ -20,7 +20,7 @@ pub use utils::create_semantic_capabilities;
 use utils::{full_tokens, partial_tokens, swap_content};
 
 use super::{payload::Payload, LSPError, LSPResponse, LSPResult, Responses};
-use crate::{configs::FileType, workspace::CursorPosition};
+use crate::{configs::FileType, cursor::CursorPosition};
 
 use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification},

@@ -1,11 +1,8 @@
 use super::status::RenderStatus;
 use super::EditorLine;
 use crate::{
+    cursor::{CharRange, CharRangeUnbound, Cursor, CursorPosition},
     ext_tui::CrossTerm,
-    workspace::{
-        cursor::{CharRange, CharRangeUnbound, Cursor},
-        CursorPosition,
-    },
 };
 use crossterm::style::ContentStyle;
 use idiom_tui::Position;

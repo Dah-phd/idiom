@@ -5,15 +5,13 @@ use super::{
     Editor, EditorModal, TuiCodec,
 };
 use crate::{
+    actions::Actions,
     configs::FileType,
+    cursor::{Cursor, CursorPosition, WordRange},
+    editor_line::EditorLine,
     ext_tui::CrossTerm,
     global_state::GlobalState,
     syntax::Lexer,
-    workspace::{
-        actions::Actions,
-        cursor::{Cursor, CursorPosition, WordRange},
-        line::EditorLine,
-    },
 };
 use idiom_tui::{layout::Rect, Backend};
 use std::path::PathBuf;

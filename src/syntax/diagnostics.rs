@@ -1,7 +1,7 @@
+use crate::editor_line::EditorLine;
 use crate::ext_tui::CrossTerm;
 use crate::global_state::IdiomEvent;
 use crate::syntax::Lang;
-use crate::workspace::line::EditorLine;
 use crossterm::style::{Attribute, Attributes, Color, ContentStyle};
 use idiom_tui::{Backend, UTFSafe};
 use lsp_types::{DiagnosticRelatedInformation, DiagnosticSeverity};

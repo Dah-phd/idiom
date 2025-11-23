@@ -1,4 +1,4 @@
-use crate::workspace::cursor::{CharRange, CharRangeUnbound, CursorPosition};
+use crate::cursor::{CharRange, CharRangeUnbound, CursorPosition};
 use idiom_tui::utils::CharLimitedWidths;
 
 pub type Reduction = usize;

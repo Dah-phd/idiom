@@ -3,11 +3,12 @@ mod formatting;
 use super::{popup_file_open::OpenFileSelector, Command, CommandResult, Components, Popup, Status};
 use crate::{
     configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
+    editor_line::EditorLine,
     embeded_term::EditorTerminal,
     ext_tui::{text_field::map_key, State, StyleExt},
     global_state::{GlobalState, IdiomEvent},
     tree::Tree,
-    workspace::{line::EditorLine, Workspace},
+    workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;

@@ -2,9 +2,9 @@ mod cursor;
 mod parser;
 
 use crate::{
+    cursor::CursorPosition,
     error::{IdiomError, IdiomResult},
     ext_tui::{CrossTerm, StyleExt},
-    workspace::CursorPosition,
 };
 use crossterm::{
     event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind},

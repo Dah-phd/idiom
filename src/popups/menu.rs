@@ -1,8 +1,8 @@
 use super::{Components, Popup, Status};
 use crate::configs::{EditorAction, TreeAction};
+use crate::cursor::CursorPosition;
 use crate::ext_tui::State;
 use crate::global_state::GlobalState;
-use crate::workspace::CursorPosition;
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
 use idiom_tui::{layout::Rect, Backend, Position};

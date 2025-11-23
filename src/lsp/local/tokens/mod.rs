@@ -8,8 +8,8 @@ pub mod rust;
 pub mod ts;
 use crate::{
     configs::{FileType, Theme},
+    editor_line::EditorLine,
     syntax::{tokens::set_tokens, Legend},
-    workspace::line::EditorLine,
 };
 use idiom_tui::UTFSafe;
 use logos::{Logos, Span};

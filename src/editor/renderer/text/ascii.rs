@@ -1,9 +1,9 @@
 use super::{pad_select, SelectManagerSimple};
 use crate::{
+    cursor::CharRangeUnbound,
+    editor_line::{EditorLine, LineContext},
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
-    workspace::cursor::CharRangeUnbound,
-    workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::ContentStyle;
 use idiom_tui::{layout::RectIter, utils::ByteChunks, Backend};

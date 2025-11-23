@@ -3,9 +3,9 @@ mod span;
 mod tag;
 
 use crate::{
+    editor_line::{EditorLine, LineContext},
     ext_tui::{iter::TakeLiens, CrossTerm},
     syntax::tokens::WrapData,
-    workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::{Attribute, Attributes, Color, ContentStyle};
 use idiom_tui::{layout::RectIter, Backend};

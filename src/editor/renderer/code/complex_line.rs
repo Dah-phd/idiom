@@ -1,8 +1,8 @@
 use super::{SelectManager, WRAP_CLOSE};
 use crate::{
+    editor_line::{EditorLine, LineContext},
     ext_tui::CrossTerm,
     global_state::GlobalState,
-    workspace::line::{EditorLine, LineContext},
 };
 use crossterm::style::{ContentStyle, Stylize};
 use idiom_tui::{utils::CharLimitedWidths, Backend};

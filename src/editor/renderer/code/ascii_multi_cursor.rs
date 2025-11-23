@@ -1,12 +1,9 @@
 use super::{WRAP_CLOSE, WRAP_OPEN};
 use crate::{
+    cursor::{CharRange, CursorPosition},
+    editor_line::{EditorLine, LineContext},
     ext_tui::StyleExt,
     global_state::GlobalState,
-    workspace::{
-        cursor::CharRange,
-        line::{EditorLine, LineContext},
-        CursorPosition,
-    },
 };
 use crossterm::style::{ContentStyle, Stylize};
 use idiom_tui::Backend;

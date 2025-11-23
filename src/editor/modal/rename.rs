@@ -1,9 +1,9 @@
 use super::{ModalAction, ModalMessage};
 use crate::{
     configs::EditorAction,
+    cursor::CursorPosition,
     ext_tui::{text_field::map_action, StyleExt},
     global_state::GlobalState,
-    workspace::CursorPosition,
 };
 use crossterm::style::ContentStyle;
 use idiom_tui::{layout::Rect, text_field::TextField};
@@ -67,7 +67,7 @@ impl RenameVariable {
 #[cfg(test)]
 mod test {
     use super::{RenameVariable, TEXT_FIELD_RENDER_OFFSET};
-    use crate::workspace::CursorPosition;
+    use crate::cursor::CursorPosition;
 
     #[test]
     fn mause() {

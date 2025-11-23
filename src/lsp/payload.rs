@@ -1,6 +1,6 @@
 use crate::{
+    cursor::CursorPosition,
     lsp::{LSPError, LSPNotification, LSPRequest, LSPResponseType},
-    workspace::CursorPosition,
 };
 use lsp_types::{
     notification::DidChangeTextDocument,

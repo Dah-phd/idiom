@@ -1,7 +1,7 @@
 mod positions;
 mod word;
 
-use crate::{utils::Direction, workspace::line::EditorLine};
+use crate::{editor_line::EditorLine, utils::Direction};
 use idiom_tui::layout::Rect;
 use lsp_types::Position;
 use serde::{Deserialize, Serialize};

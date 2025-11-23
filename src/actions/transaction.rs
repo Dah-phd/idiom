@@ -1,11 +1,9 @@
 use super::Actions;
 use crate::{
+    actions::{Action, Edit, EditorLine},
+    cursor::{Cursor, CursorPosition},
     syntax::{Lexer, SyncCallbacks},
     utils::Offset,
-    workspace::{
-        actions::{Action, Edit, EditorLine},
-        Cursor, CursorPosition,
-    },
 };
 
 /// performs multiple actions merged into single edit

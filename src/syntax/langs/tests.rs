@@ -1,6 +1,6 @@
 use crate::{
     configs::{FileType, Theme},
-    workspace::line::EditorLine,
+    editor_line::EditorLine,
 };
 use idiom_tui::{widgets::Writable, UTFSafe};
 

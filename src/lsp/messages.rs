@@ -12,9 +12,9 @@ use std::{
 };
 
 use crate::{
+    cursor::CursorPosition,
     lsp::{LSPError, LSPResult},
     syntax::{tokens::validate_and_format_delta_tokens, DiagnosticLine},
-    workspace::CursorPosition,
 };
 
 use super::lsp_stream::StdErrMessage;

@@ -1,5 +1,5 @@
 use super::as_url;
-use crate::{lsp::LSPResult, workspace::CursorPosition};
+use crate::{cursor::CursorPosition, lsp::LSPResult};
 
 use lsp_types::{self as lsp, Uri};
 use lsp_types::{

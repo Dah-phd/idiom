@@ -5,15 +5,13 @@ pub mod legend;
 mod lsp_calls;
 pub mod tokens;
 use crate::{
+    actions::{Action, EditMetaData},
     configs::{FileType, Theme},
+    cursor::CursorPosition,
     editor::Editor,
+    editor_line::EditorLine,
     global_state::{GlobalState, IdiomEvent},
     lsp::{LSPClient, LSPError, LSPResponseType, LSPResult},
-    workspace::{
-        actions::{Action, EditMetaData},
-        line::EditorLine,
-        CursorPosition,
-    },
 };
 pub use diagnostics::{set_diganostics, DiagnosticInfo, DiagnosticLine, Fix};
 pub use encoding::Encoding;

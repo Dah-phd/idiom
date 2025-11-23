@@ -1,14 +1,12 @@
 use crate::{
+    cursor::{CursorPosition, EncodedWordRange, PositionedWord},
     editor::Editor,
     embeded_term::EditorTerminal,
     ext_tui::StyleExt,
     global_state::GlobalState,
     syntax::{tokens::TokenLine, Lexer},
     tree::Tree,
-    workspace::{
-        cursor::{CursorPosition, EncodedWordRange, PositionedWord},
-        Workspace,
-    },
+    workspace::Workspace,
 };
 use crossterm::{
     self,
@@ -255,13 +253,11 @@ fn get_opening(ch: char) -> Option<char> {
 #[cfg(test)]
 mod test {
     use super::try_find_brackets;
-    use crate::workspace::{
-        cursor::{CursorPosition, EncodedWordRange},
-        line::EditorLine,
-    };
     use crate::{
         configs::FileType,
+        cursor::{CursorPosition, EncodedWordRange},
         editor::tests::mock_editor,
+        editor_line::EditorLine,
         syntax::tests::{mock_utf16_lexer, mock_utf8_lexer},
     };
 
