@@ -32,7 +32,7 @@ use crossterm::{
 pub use events::{IdiomEvent, StartInplacePopup};
 use idiom_tui::{
     layout::{Line, Rect},
-    Backend, Position,
+    Backend,
 };
 
 use draw::Components;
@@ -263,10 +263,9 @@ impl GlobalState {
             }
             Mode::Insert => {
                 let Some(editor) = ws.get_active() else { return };
-                let row = (editor.cursor.line - editor.cursor.at_line) as u16;
-                let col = (editor.cursor.char + editor.line_number_padding + 1) as u16;
+                let position = editor.get_cursor_rel_render_position();
                 let accent_style = self.ui_theme.accent_style();
-                let mut menu = menu_context_editor_inplace(Position { row, col }, self.editor_area, accent_style);
+                let mut menu = menu_context_editor_inplace(position, self.editor_area, accent_style);
                 menu.main_loop(self, ws, tree, term)
             }
         };
@@ -284,24 +283,6 @@ impl GlobalState {
     pub fn draw(&mut self, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         (self.draw_callback)(self, workspace, tree, term);
         self.backend.flush_buf();
-    }
-
-    pub fn render_stats(&mut self, len: usize, select_len: usize, cursor: CursorPosition) {
-        let mut line = self.footer_line.clone();
-        if self.components.contains(Components::TREE) || self.is_select() {
-            line += self.tree_size;
-        } else {
-            line += Mode::len();
-        }
-        self.backend.set_style(self.ui_theme.accent_style());
-        let mut rev_builder = line.unsafe_builder_rev(&mut self.backend);
-        if select_len != 0 {
-            rev_builder.push(&format!("({select_len} selected) "));
-        }
-        rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {} ", cursor.line, cursor.char));
-        self.messages.set_line(rev_builder.into_line());
-        self.messages.fast_render(self.ui_theme.accent_style(), &mut self.backend);
-        self.backend.reset_style();
     }
 
     pub fn fast_render_message_with_preserved_cursor(&mut self) {
@@ -357,6 +338,42 @@ impl GlobalState {
         };
         (self.tab_area, self.editor_area) = screen.split_vertical_rel(1);
         self.editor_area.left_border();
+    }
+
+    pub fn render_stats(&mut self, len: usize, select_len: usize, cursor: CursorPosition) {
+        let mut line = self.footer_line.clone();
+        if self.components.contains(Components::TREE) || self.is_select() {
+            line += self.tree_size;
+        } else {
+            line += Mode::len();
+        }
+        self.backend.set_style(self.ui_theme.accent_style());
+        let mut rev_builder = line.unsafe_builder_rev(&mut self.backend);
+        if select_len != 0 {
+            rev_builder.push(&format!("({select_len} selected) "));
+        }
+        rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {} ", cursor.line, cursor.char));
+        self.messages.set_line(rev_builder.into_line());
+        self.messages.fast_render(self.ui_theme.accent_style(), &mut self.backend);
+        self.backend.reset_style();
+    }
+
+    pub fn force_render_stats(&mut self, len: usize, select_len: usize, cursor: CursorPosition) {
+        let mut line = self.footer_line.clone();
+        if self.components.contains(Components::TREE) || self.is_select() {
+            line += self.tree_size;
+        } else {
+            line += Mode::len();
+        }
+        self.backend.set_style(self.ui_theme.accent_style());
+        let mut rev_builder = line.unsafe_builder_rev(&mut self.backend);
+        if select_len != 0 {
+            rev_builder.push(&format!("({select_len} selected) "));
+        }
+        rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {} ", cursor.line, cursor.char));
+        self.messages.set_line(rev_builder.into_line());
+        self.messages.render(self.ui_theme.accent_style(), &mut self.backend);
+        self.backend.reset_style();
     }
 
     pub fn clear_stats(&mut self) {

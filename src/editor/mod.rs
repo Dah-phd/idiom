@@ -34,8 +34,8 @@ pub struct Editor {
     pub cursor: Cursor,
     pub content: Vec<EditorLine>,
     pub update_status: FileUpdate,
-    pub line_number_padding: usize,
-    pub last_render_at_line: Option<usize>,
+    line_number_padding: usize,
+    last_render_at_line: Option<usize>,
     pub controls: ControlMap,
     pub modal: EditorModal,
     actions: Actions,
@@ -423,6 +423,12 @@ impl Editor {
             }
         }
         buffer
+    }
+
+    pub fn get_cursor_rel_render_position(&self) -> Position {
+        let row = (self.cursor.line - self.cursor.at_line) as u16;
+        let col = (self.cursor.char + self.line_number_padding + 1) as u16;
+        Position { row, col }
     }
 
     pub fn is_saved(&self) -> IdiomResult<bool> {
