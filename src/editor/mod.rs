@@ -18,8 +18,8 @@ use lsp_types::TextEdit;
 pub use modal::EditorModal;
 use renderer::TuiCodec;
 use std::path::PathBuf;
-pub use utils::editor_from_data;
 use utils::{big_file_protection, build_display, calc_line_number_offset, FileUpdate};
+pub use utils::{editor_from_data, EditorStats};
 
 const WARN_TXT: &str = "The file is opened in text mode, \
     beware idiom is not designed with plain text performance in mind!";
@@ -121,18 +121,18 @@ impl Editor {
     // RENDER
 
     #[inline]
-    pub fn render(&mut self, gs: &mut GlobalState) {
+    pub fn render(&mut self, gs: &mut GlobalState) -> EditorStats {
         let new_offset = calc_line_number_offset(self.content.len());
         if new_offset != self.line_number_padding {
             self.line_number_padding = new_offset;
             self.last_render_at_line.take();
         };
-        (self.renderer.render)(self, gs);
+        (self.renderer.render)(self, gs)
     }
 
     /// renders only updated lines
     #[inline]
-    pub fn fast_render(&mut self, gs: &mut GlobalState) {
+    pub fn fast_render(&mut self, gs: &mut GlobalState) -> EditorStats {
         let new_offset = calc_line_number_offset(self.content.len());
         if new_offset != self.line_number_padding {
             self.line_number_padding = new_offset;

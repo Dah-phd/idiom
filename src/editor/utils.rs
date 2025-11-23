@@ -1,12 +1,19 @@
 use super::{
-    controls::ControlMap, Actions, Cursor, Editor, EditorConfigs, EditorLine, EditorModal, FileFamily, FileType,
-    GlobalState, Lexer, TuiCodec,
+    controls::ControlMap, Actions, Cursor, CursorPosition, Editor, EditorConfigs, EditorLine, EditorModal, FileFamily,
+    FileType, GlobalState, Lexer, TuiCodec,
 };
 use crate::error::{IdiomError, IdiomResult};
 use std::{
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR},
 };
+
+#[derive(Debug, PartialEq)]
+pub struct EditorStats {
+    pub len: usize,
+    pub select_len: usize,
+    pub position: CursorPosition,
+}
 
 pub enum FileUpdate {
     None,

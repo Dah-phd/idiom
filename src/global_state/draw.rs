@@ -33,37 +33,39 @@ pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut 
     let mut screen = gs.screen_rect;
     gs.footer_line = screen.pop_line();
 
-    let screen = if gs.components.contains(Components::TREE) || gs.is_select() {
+    let (screen, msg_line) = if gs.components.contains(Components::TREE) || gs.is_select() {
         gs.draw_callback = draw_with_tree;
 
         let (mode_line, msg_line) = gs.footer_line.clone().split_rel(gs.tree_size);
         gs.mode.render(mode_line, &mut gs.backend);
-        gs.messages.set_line(msg_line);
         let (mut tree_area, tab_area) = screen.split_horizont_rel(gs.tree_size);
         if let Some(line) = tree_area.next_line() {
             render_logo(line, gs);
         }
         gs.tree_area = tree_area;
         tree.render(gs);
-        tab_area
+        (tab_area, msg_line)
     } else {
         gs.draw_callback = draw;
 
         let (mode_line, msg_line) = gs.footer_line.clone().split_rel(Mode::len());
         gs.mode.render(mode_line, &mut gs.backend);
-        gs.messages.set_line(msg_line);
         let (tree_area, tab_area) = screen.split_horizont_rel(0);
         gs.tree_area = tree_area;
-        tab_area
+        (tab_area, msg_line)
     };
 
-    gs.messages.render(gs.ui_theme.accent_style(), &mut gs.backend);
     (gs.tab_area, gs.editor_area) = screen.split_vertical_rel(1);
     gs.editor_area.left_border();
 
     workspace.render(gs);
     if let Some(editor) = workspace.get_active() {
-        editor.render(gs);
+        let stats = editor.render(gs);
+        gs.messages.set_line(msg_line);
+        gs.force_render_stats(stats.len, stats.select_len, stats.position);
+    } else {
+        gs.messages.set_line(msg_line);
+        gs.messages.render(gs.ui_theme.accent_style(), &mut gs.backend);
     }
 
     // term override
@@ -78,7 +80,10 @@ pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut 
 pub fn draw(gs: &mut GlobalState, workspace: &mut Workspace, _tree: &mut Tree, _term: &mut EditorTerminal) {
     workspace.fast_render(gs);
     match workspace.get_active() {
-        Some(editor) => editor.fast_render(gs),
+        Some(editor) => {
+            let stats = editor.fast_render(gs);
+            gs.render_stats(stats.len, stats.select_len, stats.position);
+        }
         None => gs.messages.fast_render(gs.ui_theme.accent_style(), &mut gs.backend),
     }
 }
@@ -87,7 +92,10 @@ pub fn draw_with_tree(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mu
     tree.fast_render(gs);
     workspace.fast_render(gs);
     match workspace.get_active() {
-        Some(editor) => editor.fast_render(gs),
+        Some(editor) => {
+            let stats = editor.fast_render(gs);
+            gs.render_stats(stats.len, stats.select_len, stats.position);
+        }
         None => gs.messages.fast_render(gs.ui_theme.accent_style(), &mut gs.backend),
     }
 }

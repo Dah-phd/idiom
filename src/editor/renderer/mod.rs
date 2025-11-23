@@ -4,6 +4,7 @@ mod utils;
 
 use crate::{
     configs::{FileFamily, FileType},
+    editor::utils::EditorStats,
     editor::Editor,
     editor_line::LineContext,
     global_state::GlobalState,
@@ -15,8 +16,8 @@ use idiom_tui::{layout::IterLines, Backend};
 /// In order to escape complicated state machines and any form on polymorphism,
 /// it derives the correct function pointers on file opening.
 pub struct TuiCodec {
-    pub render: fn(&mut Editor, &mut GlobalState),
-    pub fast_render: fn(&mut Editor, &mut GlobalState),
+    pub render: fn(&mut Editor, &mut GlobalState) -> EditorStats,
+    pub fast_render: fn(&mut Editor, &mut GlobalState) -> EditorStats,
 }
 
 impl TuiCodec {
@@ -85,13 +86,13 @@ impl TuiCodec {
 
 // CODE
 
-fn code_render(editor: &mut Editor, gs: &mut GlobalState) {
+fn code_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
     Lexer::context(editor, gs);
     code::reposition(&mut editor.cursor);
-    code_render_full(editor, gs);
+    code_render_full(editor, gs)
 }
 
-fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
+fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
     Lexer::context(editor, gs);
 
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, modal, .. } = editor;
@@ -130,10 +131,10 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
     }
     let relative_pos = ctx.get_modal_relative_position();
     modal.render_if_exist(relative_pos, gs);
-    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
+    EditorStats { len: content.len(), select_len: cursor.select_len(content), position: cursor.into() }
 }
 
-fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
+fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, modal, .. } = editor;
 
     let accent_style = gs.ui_theme.accent_fg();
@@ -161,18 +162,18 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
 
     let relative_pos = ctx.get_modal_relative_position();
     modal.forece_render_if_exists(relative_pos, gs);
-    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
+    EditorStats { len: content.len(), select_len: cursor.select_len(content), position: cursor.into() }
 }
 
 // CODE RENDER MULTICURSOR
 
-fn multi_code_render(editor: &mut Editor, gs: &mut GlobalState) {
+fn multi_code_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
     Lexer::context(editor, gs);
     code::reposition(&mut editor.cursor);
-    multi_code_render_full(editor, gs);
+    multi_code_render_full(editor, gs)
 }
 
-fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
+fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
     Lexer::context(editor, gs);
 
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, controls, modal, .. } = editor;
@@ -215,10 +216,10 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) {
         let relative_pos = ctx.get_modal_relative_position();
         modal.render_if_exist(relative_pos, gs);
     }
-    gs.render_stats(content.len(), controls.cursors_count(), cursor.into());
+    EditorStats { len: content.len(), select_len: controls.cursors_count(), position: cursor.into() }
 }
 
-fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
+fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
     let Editor { modal, lexer, cursor, content, line_number_padding, last_render_at_line, controls, .. } = editor;
 
     let accent_style = gs.ui_theme.accent_fg();
@@ -249,17 +250,17 @@ fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) {
 
     let relative_pos = ctx.get_modal_relative_position();
     modal.forece_render_if_exists(relative_pos, gs);
-    gs.render_stats(content.len(), controls.cursors().len(), cursor.into());
+    EditorStats { len: content.len(), select_len: controls.cursors_count(), position: cursor.into() }
 }
 
 // TEXT
 
-fn text_render(editor: &mut Editor, gs: &mut GlobalState) {
+fn text_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
     let skip = text::reposition(&mut editor.cursor, &mut editor.content).unwrap_or_default();
-    text_full_render(editor, gs, skip);
+    text_full_render(editor, gs, skip)
 }
 
-fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
+fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
 
     let skip = text::reposition(cursor, content).unwrap_or_default();
@@ -299,11 +300,11 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) {
         line.render_empty(&mut gs.backend);
     }
 
-    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
     gs.backend.unfreeze();
+    EditorStats { len: content.len(), select_len: cursor.select_len(content), position: cursor.into() }
 }
 
-fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
+fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) -> EditorStats {
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
 
     let accent_style = gs.ui_theme.accent_fg();
@@ -329,32 +330,31 @@ fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
         line.render_empty(&mut gs.backend);
     }
 
-    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
     gs.backend.unfreeze();
+    EditorStats { len: content.len(), select_len: cursor.select_len(content), position: cursor.into() }
 }
 
 // MARKDOWN
 
-fn md_render(editor: &mut Editor, gs: &mut GlobalState) {
+fn md_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
     let skip = text::reposition(&mut editor.cursor, &mut editor.content).unwrap_or_default();
-    md_full_render(editor, gs, skip);
+    md_full_render(editor, gs, skip)
 }
 
-fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
+fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
 
     let skip = text::reposition(cursor, content).unwrap_or_default();
-    gs.backend.freeze();
     if !matches!(last_render_at_line, Some(idx) if *idx == cursor.at_line) {
         return md_full_render(editor, gs, skip);
     }
-
     let accent_style = gs.ui_theme.accent_fg();
 
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = LineContext::collect_context(cursor, lexer.encoding().char_len, *line_number_padding, accent_style);
     let mut cursor_rendered = false;
 
+    gs.backend.freeze();
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
             break;
@@ -386,11 +386,11 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) {
         line.render_empty(&mut gs.backend);
     }
 
-    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
     gs.backend.unfreeze();
+    EditorStats { len: content.len(), select_len: cursor.select_len(content), position: cursor.into() }
 }
 
-fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
+fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) -> EditorStats {
     let Editor { lexer, cursor, content, line_number_padding, last_render_at_line, .. } = editor;
 
     let accent_style = gs.ui_theme.accent_fg();
@@ -400,6 +400,7 @@ fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
     let mut ctx = LineContext::collect_context(cursor, lexer.encoding().char_len, *line_number_padding, accent_style);
     let mut cursor_rendered = false;
 
+    gs.backend.freeze();
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
             break;
@@ -419,7 +420,8 @@ fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) {
         line.render_empty(&mut gs.backend);
     }
 
-    gs.render_stats(content.len(), cursor.select_len(content), cursor.into());
+    gs.backend.unfreeze();
+    EditorStats { len: content.len(), select_len: cursor.select_len(content), position: cursor.into() }
 }
 
 #[cfg(test)]
