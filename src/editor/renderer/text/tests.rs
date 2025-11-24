@@ -270,16 +270,15 @@ fn test_full_end_line() {
     #[rustfmt::skip]
     assert_eq!(text, [
         "<<freeze>>",
-        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "?","l","o","b","a","l","S","t","a","t","e",":",":","n","e","w","(","R","e","c","t",":",":","n","e","w","(","0",","," ",
-        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "0",","," ","3","0",","," ","6","0",")",","," ","C","r","o","s","s","T","e","r","m",":",":","i","n","i","t","(",")",")",
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
+        "?","l","o","b","a","l","S","t","a","t","e",":",":","n","e",
+        "w","(","R","e","c","t",":",":","n","e","w","(","0",","," ",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
+        "0",","," ","3","0",","," ","6","0",")",","," ","C","r","o",
+        "s","s","T","e","r","m",":",":","i","n","i","t","(",")",")",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", " ", // padding due to prev line filled up
         "<<go to row: 4 col: 15>>", "2 ", "<<clear EOL>>", "n/a",
-        "<<set style>>",
-        "<<go to row: 5 col: 14>>", "<<padding: 33>>",
-        "<<go to row: 5 col: 22>>", "  Doc Len 2, Ln 0, Col 0 ",
-        "<<go to row: 5 col: 14>>", "<<padding: 8>>", "<<set style>>",
-        "<<go to row: 5 col: 14>>", "<<padding: 8>>", "<<reset style>>", 
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ]);
 
     editor.map(crate::configs::EditorAction::EndOfLine, &mut gs);
@@ -294,10 +293,6 @@ fn test_full_end_line() {
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "0, 30, 60), CrossTerm::init())",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
         "<<go to row: 4 col: 15>>", "2 ", "<<clear EOL>>", "?", "/", "a", " ",
-        "<<set style>>",
-        "<<go to row: 5 col: 14>>", "<<padding: 33>>",
-        "<<go to row: 5 col: 22>>", "  Doc Len 2, Ln 1, Col 0 ",
-        "<<go to row: 5 col: 14>>", "<<padding: 8>>", "<<reset style>>",
         "<<unfreeze>>"
     ]);
 }
@@ -322,11 +317,7 @@ fn test_cursor_line_oversize() {
         "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "?", "e", "t", " ", "m", "u", "t", " ",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "g", "s", " ", "=", " ", "G", "l", "o",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "b", "a", "l", "S", "t", "a", "t", "e",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 0, Col 0 ", "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 0>>", "<<reset style>>",
-        "<<reset style>>",  "<<unfreeze>>", 
+        "<<unfreeze>>",
     ]);
 
     editor.map(crate::configs::EditorAction::Down, &mut gs);
@@ -340,10 +331,7 @@ fn test_cursor_line_oversize() {
         "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "l", "e", "t", " ", "m", "u", "t", " ",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "?", "s", " ", "=", " ", "G", "l", "o",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "b", "a", "l", "S", "t", "a", "t", "e",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 0, Col 8 ",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ]);
 
     editor.map(crate::configs::EditorAction::Down, &mut gs);
@@ -360,10 +348,7 @@ fn test_cursor_line_oversize() {
         "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", ":", ":", "n", "e", "w", "(", "R", "e",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "c", "t", ":", ":", "n", "e", "w", "(",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "?", ",", " ", "0", ",", " ", "3", "0",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " 0, Col 40 ",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ]);
 
     editor.map(crate::configs::EditorAction::EndOfLine, &mut gs);
@@ -377,10 +362,7 @@ fn test_cursor_line_oversize() {
         "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "r", "o", "s", "s", "T", "e", "r", "m",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", ":", ":", "i", "n", "i", "t", "(", ")",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", ")", ";", "?",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " 0, Col 74 ",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ];
 
     assert_eq!(text, cursor_on_last_wrap);
@@ -395,10 +377,8 @@ fn test_cursor_line_oversize() {
         "<<freeze>>",
         "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>", "?", "/", "a", " ",
         "<<go to row: 2 col: 15>>", "3 ", "<<clear EOL>>", "n/a",
-        "<<go to row: 3 col: 15>>", "<<padding: 10>>", "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 1, Col 0 ",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<go to row: 3 col: 15>>", "<<padding: 10>>", 
+        "<<unfreeze>>"
     ]);
 
     editor.map(crate::configs::EditorAction::Left, &mut gs);
@@ -429,11 +409,7 @@ fn test_cursor_line_oversize_full_last_wrap() {
         "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "?", "e", "t", " ", "m", "u", "t", " ",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "g", "s", " ", "=", " ", "G", "l", "o",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "b", "a", "l", "S", "t", "a", "t", "e",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 0, Col 0 ", "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 0>>", "<<reset style>>",
-        "<<reset style>>",  "<<unfreeze>>",
+        "<<unfreeze>>",
     ]);
 
     editor.map(crate::configs::EditorAction::Down, &mut gs);
@@ -447,10 +423,7 @@ fn test_cursor_line_oversize_full_last_wrap() {
         "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "l", "e", "t", " ", "m", "u", "t", " ",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "?", "s", " ", "=", " ", "G", "l", "o",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "b", "a", "l", "S", "t", "a", "t", "e",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 0, Col 8 ",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ]);
 
     editor.map(crate::configs::EditorAction::Down, &mut gs);
@@ -471,10 +444,7 @@ fn test_cursor_line_oversize_full_last_wrap() {
         "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "r", "o", "s", "s", "T", "e", "r", "m",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", ":", ":", "i", "n", "i", "t", "(", ")",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "?", ";", " ", "/", "/", "e", "n", "d",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " 0, Col 72 ",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ]);
 
     editor.map(crate::configs::EditorAction::EndOfLine, &mut gs);
@@ -488,10 +458,7 @@ fn test_cursor_line_oversize_full_last_wrap() {
         "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", ":", ":", "i", "n", "i", "t", "(", ")",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", ")", ";", " ", "/", "/", "e", "n", "d",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "?",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " 0, Col 80 ",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ];
 
     assert_eq!(text, cursor_on_last_wrap);
@@ -507,10 +474,7 @@ fn test_cursor_line_oversize_full_last_wrap() {
         "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>", "?", "/", "a", " ",
         "<<go to row: 2 col: 15>>", "3 ", "<<clear EOL>>", "n/a",
         "<<go to row: 3 col: 15>>", "<<padding: 10>>",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 1, Col 0 ",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ]);
 
     editor.map(crate::configs::EditorAction::Left, &mut gs);
@@ -536,16 +500,14 @@ fn test_full_end_line_complex() {
     #[rustfmt::skip]
     assert_eq!(text, [
         "<<freeze>>",
-        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "?","l","o","b","a","l","S","t","a","t","e",":",":","n","e","w","(","R","e","c","t",":",":","n","e","w","(","0",","," ",
-        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "0",","," ","3","0",","," ","6","0",")",","," ","C","r","o","🦀","T","e","r","m",":",":","i","n","i","t","(",")",")",
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
+        "?","l","o","b","a","l","S","t","a","t","e",":",":","n","e",
+        "w","(","R","e","c","t",":",":","n","e","w","(","0",","," ",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
+        "0",","," ","3","0",","," ","6","0",")",","," ","C","r","o",
+        "🦀","T","e","r","m",":",":","i","n","i","t","(",")",")",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", " ", // padding due to prev line filled up
         "<<go to row: 4 col: 15>>", "2 ", "<<clear EOL>>", "n/a",
-        "<<set style>>",
-        "<<go to row: 5 col: 14>>", "<<padding: 33>>",
-        "<<go to row: 5 col: 22>>", "  Doc Len 2, Ln 0, Col 0 ",
-        "<<go to row: 5 col: 14>>", "<<padding: 8>>", "<<set style>>",
-        "<<go to row: 5 col: 14>>", "<<padding: 8>>", "<<reset style>>", 
-        "<<reset style>>",
         "<<unfreeze>>"
     ]);
 
@@ -561,11 +523,6 @@ fn test_full_end_line_complex() {
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "0, 30, 60), Cro🦀Term::init())",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", // last line is filled to end
         "<<go to row: 4 col: 15>>", "2 ", "<<clear EOL>>", "?", "/", "a", " ",
-        "<<set style>>",
-        "<<go to row: 5 col: 14>>", "<<padding: 33>>",
-        "<<go to row: 5 col: 22>>", "  Doc Len 2, Ln 1, Col 0 ",
-        "<<go to row: 5 col: 14>>", "<<padding: 8>>",
-        "<<reset style>>", 
         "<<unfreeze>>"
     ]);
 }
@@ -590,11 +547,7 @@ fn test_cursor_line_oversize_complex() {
         "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "?", "e", "t", " ", "m", "u", "t", " ",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "g", "s", " ", "=", " ", "G", "l", "o",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "b", "a", "l", "S", "t", "a", "t", "e",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 0, Col 0 ", "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 0>>", "<<reset style>>",
-        "<<reset style>>",  "<<unfreeze>>", 
+        "<<unfreeze>>", 
     ]);
 
     editor.map(crate::configs::EditorAction::Down, &mut gs);
@@ -608,10 +561,7 @@ fn test_cursor_line_oversize_complex() {
         "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "l", "e", "t", " ", "m", "u", "t", " ",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "?", "s", " ", "=", " ", "G", "l", "o",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "b", "a", "l", "S", "t", "a", "t", "e",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 0, Col 8 ",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ]);
 
     editor.map(crate::configs::EditorAction::Down, &mut gs);
@@ -630,10 +580,7 @@ fn test_cursor_line_oversize_complex() {
         "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "0", ",", " ", "0", ",", " ", "3", "0",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", ",", " ", "6", "0", ")", ",", " ", "C",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "?", "o", "s", "s", "T", "e", "r", "m",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " 0, Col 56 ",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ]);
 
     editor.map(crate::configs::EditorAction::EndOfLine, &mut gs);
@@ -647,10 +594,7 @@ fn test_cursor_line_oversize_complex() {
         "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "r", "o", "s", "s", "T", "e", "r", "m",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", ":", ":", "i", "n", "🦀", "(", ")",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", ")", ";", "?",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " 0, Col 73 ",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ];
 
     assert_eq!(text, cursor_on_last_wrap);
@@ -666,10 +610,7 @@ fn test_cursor_line_oversize_complex() {
         "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>", "?", "/", "a", " ",
         "<<go to row: 2 col: 15>>", "3 ", "<<clear EOL>>", "n/a",
         "<<go to row: 3 col: 15>>", "<<padding: 10>>",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 1, Col 0 ",
-        "<<reset style>>", "<<unfreeze>>"    
+        "<<unfreeze>>"    
     ]);
 
     editor.map(crate::configs::EditorAction::Left, &mut gs);
@@ -701,11 +642,7 @@ fn test_cursor_line_oversize_full_last_wrap_complex() {
         // last skipped due to emoji width
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "g", "s", " ", "=", " ", "G", "l",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "🦀", "b", "a", "l", "S", "t", "a",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 0, Col 0 ", "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 0>>", "<<reset style>>",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ]);
 
     editor.map(crate::configs::EditorAction::Down, &mut gs);
@@ -720,10 +657,7 @@ fn test_cursor_line_oversize_full_last_wrap_complex() {
         // last skipped due to emoji width
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "?", "s", " ", "=", " ", "G", "l",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "🦀", "b", "a", "l", "S", "t", "a",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 0, Col 8 ",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ]);
 
     editor.map(crate::configs::EditorAction::Down, &mut gs);
@@ -744,10 +678,7 @@ fn test_cursor_line_oversize_full_last_wrap_complex() {
         "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", " ", "C", "r", "o", "s", "s", "T", "e",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "r", "m", ":", ":", "🦀", "i", "t",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "(", ")", ")", "?", " ", "/", "/", "e",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " 0, Col 72 ",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ]);
 
     editor.map(crate::configs::EditorAction::EndOfLine, &mut gs);
@@ -761,10 +692,7 @@ fn test_cursor_line_oversize_full_last_wrap_complex() {
         "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "r", "m", ":", ":", "🦀", "i", "t",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "(", ")", ")", ";", " ", "/", "/", "e",
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "?",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " 0, Col 77 ",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ];
 
     assert_eq!(text, cursor_on_last_wrap);
@@ -780,10 +708,7 @@ fn test_cursor_line_oversize_full_last_wrap_complex() {
         "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>", "?", "/", "a", " ",
         "<<go to row: 2 col: 15>>", "3 ", "<<clear EOL>>", "n/a",
         "<<go to row: 3 col: 15>>", "<<padding: 10>>",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", "n 1, Col 0 ",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ]);
 
     editor.map(crate::configs::EditorAction::Left, &mut gs);
@@ -817,12 +742,7 @@ fn test_select_reset_style() {
         "<<reset style>>", // expected on wrap
         "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", "a", "t", "<<set bg None>>", "e", ":", ":", "n", "e", "w",
         "<<reset style>>", // expected when breaking lines
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " selected) ",
-        "<<go to row: 4 col: 14>>", "", "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 0>>", "<<reset style>>",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ]);
 
     editor.cursor.select_set((0, 0).into(), (2, 3).into());
@@ -835,11 +755,8 @@ fn test_select_reset_style() {
         "<<go to row: 1 col: 15>>", "3 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>", "n", "/", "a",
         "<<reset style>>", "?",  // reset before cursor
         "<<go to row: 2 col: 15>>", "4 ", "<<clear EOL>>", "n/a",
-        "<<go to row: 3 col: 15>>", "<<padding: 10>>", "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " selected) ",
-        "<<go to row: 4 col: 14>>", "",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<go to row: 3 col: 15>>", "<<padding: 10>>",
+        "<<unfreeze>>"
     ]);
 
     editor.cursor.select_set((0, 0).into(), (1, 25).into());
@@ -849,17 +766,16 @@ fn test_select_reset_style() {
     #[rustfmt::skip]
     assert_eq!(text, [
         "<<freeze>>",
-        "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>", "a", "t", "e", ":", ":", "n", "e", "w",
+        "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>",
+        "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>", "a", "t", "e", ":", ":", "n", "e", "w",
         "<<reset style>>",
-        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", "(", "R", "e", "c", "t", ":", ":", "n",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
+        "<<set style>>", "(", "R", "e", "c", "t", ":", ":", "n",
         "<<reset style>>",
-        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", "e", "<<set bg None>>", "?", "(", "0", ",", " ", "0", ",",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
+        "<<set style>>", "e", "<<set bg None>>", "?", "(", "0", ",", " ", "0", ",",
         "<<reset style>>",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " selected) ",
-        "<<go to row: 4 col: 14>>", "",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ]);
 }
 
@@ -881,18 +797,16 @@ fn test_select_reset_style_complex() {
     #[rustfmt::skip]
     assert_eq!(text, [
         "<<freeze>>",
-        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>",
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
+        "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>",
         "<<reset style>>", "?",
-        "<<go to row: 2 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>", "l", "e", "t", " ", "m", "u", "t", " ",
+        "<<go to row: 2 col: 15>>", "2 ", "<<clear EOL>>",
+        "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>", "l", "e", "t", " ", "m", "u", "t", " ",
         "<<reset style>>", // expected on wrap
-        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", "g", "s", "<<set bg None>>", " ", "=", " ", "G", "l", "o",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
+        "<<set style>>", "g", "s", "<<set bg None>>", " ", "=", " ", "G", "l", "o",
         "<<reset style>>", // expected when breaking lines
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " selected) ",
-        "<<go to row: 4 col: 14>>", "", "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 0>>", "<<reset style>>",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<unfreeze>>"
     ]);
 
     editor.cursor.select_set((0, 0).into(), (1, 72).into());
@@ -902,17 +816,13 @@ fn test_select_reset_style_complex() {
     #[rustfmt::skip]
     assert_eq!(text, [
         "<<freeze>>",
-        "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>", "r", "o", "🦀", "T", "e", "r", "m",
-        "<<reset style>>",
-        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", ":", ":", "i", "n", "🦀", "(", ")",
-        "<<reset style>>",
-        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", ")", ";",
-        "<<reset style>>", "?",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " selected) ",
-        "<<go to row: 4 col: 14>>", "",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>",
+        "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>", "r", "o", "🦀", "T", "e", "r", "m", "<<reset style>>",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
+        "<<set style>>", ":", ":", "i", "n", "🦀", "(", ")", "<<reset style>>",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
+        "<<set style>>", ")", ";", "<<reset style>>", "?",
+        "<<unfreeze>>"
     ]);
 
     editor.cursor.select_set((0, 0).into(), (1, 25).into());
@@ -922,16 +832,12 @@ fn test_select_reset_style_complex() {
     #[rustfmt::skip]
     assert_eq!(text, [
         "<<freeze>>",
-        "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>", "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>", "g", "s", " ", "=", " ", "G", "l", "o",
-        "<<reset style>>",
-        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", "b", "a", "l", "S", "t", "a", "t", "e",
-        "<<reset style>>",
-        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>", "<<set style>>", ":", "<<set bg None>>", "?", "n", "e", "w", "(", "R", "e",
-        "<<reset style>>",
-        "<<set style>>",
-        "<<go to row: 4 col: 14>>", "<<padding: 11>>",
-        "<<go to row: 4 col: 14>>", " selected) ",
-        "<<go to row: 4 col: 14>>", "",
-        "<<reset style>>", "<<unfreeze>>"
+        "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>",
+        "<<set bg Some(Rgb { r: 72, g: 72, b: 72 })>>", "g", "s", " ", "=", " ", "G", "l", "o", "<<reset style>>",
+        "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>",
+        "<<set style>>", "b", "a", "l", "S", "t", "a", "t", "e", "<<reset style>>",
+        "<<go to row: 3 col: 15>>", "  ", "<<clear EOL>>",
+        "<<set style>>", ":", "<<set bg None>>", "?", "n", "e", "w", "(", "R", "e", "<<reset style>>",
+        "<<unfreeze>>"
     ]);
 }

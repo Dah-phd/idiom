@@ -47,6 +47,9 @@ fn consolidate_backend_drain(drain: Vec<(ContentStyle, String)>) -> Vec<(Content
             style_buf = style;
         }
     }
+    if !text_buf.is_empty() {
+        buf.push((style_buf, text_buf));
+    }
     buf
 }
 
@@ -760,15 +763,6 @@ fn test_select_padding() {
         (ContentStyle::default(), "<<clear EOL>> <<go to row: 5 col: 19>>".into()),
         (gs.ui_theme.accent_fg(), "5 ".into()),
         (ContentStyle::default(), "<<clear EOL>>print(f\"{varialbe_data} .. rocket\")".into()),
-        (gs.ui_theme.accent_style(), "<<set style>>".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 18>>".into()),
-        (gs.ui_theme.accent_style(), "<<padding: 102>>".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 106>>".into()),
-        (gs.ui_theme.accent_style(), "(73 selected) ".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 81>>".into()),
-        (gs.ui_theme.accent_style(), "  Doc Len 5, Ln 0, Col 4 ".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 18>>".into()),
-        (gs.ui_theme.accent_style(), "<<padding: 63>>".into()),
     ];
     let result = consolidate_backend_drain(gs.backend.drain());
     assert_eq!(&result, &expected);
@@ -837,15 +831,6 @@ fn test_select_padding_complex() {
             <<reset style>>)<<reset style>>"
                 .into(),
         ),
-        (gs.ui_theme.accent_style(), "<<set style>>".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 18>>".into()),
-        (gs.ui_theme.accent_style(), "<<padding: 102>>".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 106>>".into()),
-        (gs.ui_theme.accent_style(), "(68 selected) ".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 81>>".into()),
-        (gs.ui_theme.accent_style(), "  Doc Len 5, Ln 0, Col 4 ".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 18>>".into()),
-        (gs.ui_theme.accent_style(), "<<padding: 63>>".into()),
     ];
 
     let content = zip_text_tokens(
@@ -974,15 +959,6 @@ fn test_select_end_line_end() {
             <<go to row: 4 col: 19>><<padding: 101>><<go to row: 5 col: 19>><<padding: 101>>"
                 .into(),
         ),
-        (gs.ui_theme.accent_style(), "<<set style>>".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 18>>".into()),
-        (gs.ui_theme.accent_style(), "<<padding: 102>>".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 106>>".into()),
-        (gs.ui_theme.accent_style(), "(41 selected) ".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 80>>".into()),
-        (gs.ui_theme.accent_style(), "  Doc Len 2, Ln 1, Col 40 ".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 18>>".into()),
-        (gs.ui_theme.accent_style(), "<<padding: 62>>".into()),
     ];
 
     editor.lexer = mock_utf32_lexer(FileType::Rust);
@@ -1048,15 +1024,6 @@ fn test_select_end_line_end_complex() {
             <<go to row: 4 col: 19>><<padding: 101>><<go to row: 5 col: 19>><<padding: 101>>"
                 .into(),
         ),
-        (gs.ui_theme.accent_style(), "<<set style>>".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 18>>".into()),
-        (gs.ui_theme.accent_style(), "<<padding: 102>>".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 106>>".into()),
-        (gs.ui_theme.accent_style(), "(24 selected) ".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 80>>".into()),
-        (gs.ui_theme.accent_style(), "  Doc Len 2, Ln 1, Col 23 ".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 18>>".into()),
-        (gs.ui_theme.accent_style(), "<<padding: 62>>".into()),
     ];
 
     editor.lexer = mock_utf32_lexer(FileType::Rust);
@@ -1142,13 +1109,6 @@ fn test_wrap_select() {
             <<go to row: 5 col: 15>><<padding: 30>>"
                 .into(),
         ),
-        (ContentStyle::default().with_bg(gs.ui_theme.accent()), "<<set style>>".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 14>>".into()),
-        (ContentStyle::default().with_bg(gs.ui_theme.accent()), "<<padding: 31>>".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 32>>".into()),
-        (ContentStyle::default().with_bg(gs.ui_theme.accent()), "(8 selected) ".into()),
-        (ContentStyle::default(), "<<go to row: 6 col: 14>>".into()),
-        (ContentStyle::default().with_bg(gs.ui_theme.accent()), "n 2, Ln 0, Col 32 ".into()),
     ];
     editor.fast_render(&mut gs);
     let result = consolidate_backend_drain(gs.backend.drain());
@@ -1198,13 +1158,6 @@ fn test_wrap_select_complex() {
             (ContentStyle::reversed(), " ".into()),
             (select_style, "🦀".into()),
             (ContentStyle::default(), "<<reset style>><<reset style>><<go to row: 3 col: 15>><<padding: 30>><<go to row: 4 col: 15>><<padding: 30>><<go to row: 5 col: 15>><<padding: 30>>".into()),
-            (gs.ui_theme.accent_style(), "<<set style>>".into()),
-            (ContentStyle::default(), "<<go to row: 6 col: 14>>".into()),
-            (gs.ui_theme.accent_style(), "<<padding: 31>>".into()),
-            (ContentStyle::default(), "<<go to row: 6 col: 32>>".into()),
-            (gs.ui_theme.accent_style(), "(8 selected) ".into()),
-            (ContentStyle::default(), "<<go to row: 6 col: 14>>".into()),
-            (gs.ui_theme.accent_style(), "n 2, Ln 0, Col 29 ".into())
         ]
     );
 
@@ -1243,13 +1196,6 @@ fn test_wrap_select_complex() {
                 <<go to row: 4 col: 15>><<padding: 30>><<go to row: 5 col: 15>><<padding: 30>>"
                     .into()
             ),
-            (gs.ui_theme.accent_style(), "<<set style>>".into()),
-            (ContentStyle::default(), "<<go to row: 6 col: 14>>".into()),
-            (gs.ui_theme.accent_style(), "<<padding: 31>>".into()),
-            (ContentStyle::default(), "<<go to row: 6 col: 32>>".into()),
-            (gs.ui_theme.accent_style(), "(8 selected) ".into()),
-            (ContentStyle::default(), "<<go to row: 6 col: 14>>".into()),
-            (gs.ui_theme.accent_style(), "n 2, Ln 0, Col 29 ".into())
         ]
     );
 
@@ -1288,13 +1234,6 @@ fn test_wrap_select_complex() {
                 <<go to row: 4 col: 15>><<padding: 30>><<go to row: 5 col: 15>><<padding: 30>>"
                     .into()
             ),
-            (gs.ui_theme.accent_style(), "<<set style>>".into()),
-            (ContentStyle::default(), "<<go to row: 6 col: 14>>".into()),
-            (gs.ui_theme.accent_style(), "<<padding: 31>>".into()),
-            (ContentStyle::default(), "<<go to row: 6 col: 32>>".into()),
-            (gs.ui_theme.accent_style(), "(8 selected) ".into()),
-            (ContentStyle::default(), "<<go to row: 6 col: 14>>".into()),
-            (gs.ui_theme.accent_style(), "n 2, Ln 0, Col 29 ".into()),
         ]
     );
 }
