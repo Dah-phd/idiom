@@ -9,11 +9,11 @@ use super::{
 use crate::{
     configs::FileType,
     cursor::Cursor,
+    editor::syntax::{tests::mock_utf8_lexer, tokens::WrapData},
     editor::tests::mock_editor_md_render,
     editor_line::{EditorLine, LineContext},
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
-    syntax::{tests::mock_utf8_lexer, tokens::WrapData},
 };
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{

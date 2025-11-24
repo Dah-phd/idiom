@@ -1,10 +1,10 @@
 use crate::{
     cursor::{CursorPosition, EncodedWordRange, PositionedWord},
+    editor::syntax::{tokens::TokenLine, Lexer},
     editor::Editor,
     embeded_term::EditorTerminal,
     ext_tui::StyleExt,
     global_state::GlobalState,
-    syntax::{tokens::TokenLine, Lexer},
     tree::Tree,
     workspace::Workspace,
 };
@@ -95,7 +95,7 @@ fn perform_render(editor: &mut Editor, ranges: &[EncodedWordRange], gs: &mut Glo
     let mut stored_tokens: Vec<(usize, TokenLine)> = vec![];
     for word in ranges {
         let range_line = word.line();
-        let line = &mut editor.content[range_line];
+        let line = &mut editor.unsafe_content_mut()[range_line];
         if stored_tokens.iter().any(|(line, _)| line == &range_line) {
             line.tokens_mut_unchecked().set_encoded_word_checked(word, style);
         } else {
@@ -111,30 +111,30 @@ fn perform_render(editor: &mut Editor, ranges: &[EncodedWordRange], gs: &mut Glo
     gs.backend.unfreeze();
 
     for (idx, tokens) in stored_tokens {
-        *editor.content[idx].tokens_mut_unchecked() = tokens;
+        *editor.unsafe_content_mut()[idx].tokens_mut_unchecked() = tokens;
     }
 }
 
 fn clear_marked_cache(editor: &mut Editor, ranges: Vec<EncodedWordRange>) {
     for range in ranges {
-        editor.content[range.line()].cached.reset();
+        editor.unsafe_content_mut()[range.line()].cached.reset();
     }
 }
 
 fn find_ranges(editor: &Editor) -> Option<Vec<EncodedWordRange>> {
-    let position = editor.controls().get_base_cursor_position().unwrap_or(editor.cursor.get_position());
+    let position = editor.controls().get_base_cursor_position().unwrap_or(editor.cursor().get_position());
     if let Some(ranges) = try_find_brackets(editor, position) {
         return Some(ranges);
     }
-    let Some(word) = PositionedWord::find_at(&editor.content, position) else {
+    let Some(word) = PositionedWord::find_at(editor.content(), position) else {
         if position.char == 0 {
             return None;
         }
         let prev_position = CursorPosition { line: position.line, char: position.char + 1 };
         return try_find_brackets(editor, prev_position);
     };
-    let screen_text = editor.content.iter().enumerate().skip(editor.cursor.at_line).take(editor.cursor.max_rows);
-    let ranges = word.iter_encoded_word_ranges(screen_text, editor.lexer.encoding()).collect::<Vec<_>>();
+    let screen_text = editor.content().iter().enumerate().skip(editor.cursor().at_line).take(editor.cursor().max_rows);
+    let ranges = word.iter_encoded_word_ranges(screen_text, editor.lexer().encoding()).collect::<Vec<_>>();
     if ranges.is_empty() {
         return None;
     };
@@ -142,19 +142,19 @@ fn find_ranges(editor: &Editor) -> Option<Vec<EncodedWordRange>> {
 }
 
 fn try_find_brackets(editor: &Editor, position: CursorPosition) -> Option<Vec<EncodedWordRange>> {
-    let ch_at_start = editor.content[position.line].get_char(position.char)?;
+    let ch_at_start = editor.content()[position.line].get_char(position.char)?;
     if let Some(opening) = get_opening(ch_at_start) {
         let mut counter = 0_usize;
         let mut char_idx = position.char;
-        let first_line = &editor.content[position.line][..position.char];
+        let first_line = &editor.content()[position.line][..position.char];
         for ch in first_line.chars().rev() {
             char_idx -= 1;
             if ch == ch_at_start {
                 counter += 1;
             } else if ch == opening {
                 if counter == 0 {
-                    let start = (editor.lexer.encoding().str_len)(&editor.content[position.line][..char_idx]);
-                    let start_closing = (editor.lexer.encoding().str_len)(first_line);
+                    let start = (editor.lexer().encoding().str_len)(&editor.content()[position.line][..char_idx]);
+                    let start_closing = (editor.lexer().encoding().str_len)(first_line);
                     return Some(vec![
                         EncodedWordRange::new_checked(position.line, start, start + 1)?,
                         EncodedWordRange::new_checked(position.line, start_closing, start_closing + 1)?,
@@ -164,8 +164,8 @@ fn try_find_brackets(editor: &Editor, position: CursorPosition) -> Option<Vec<En
             }
         }
 
-        let limit = position.line.checked_sub(editor.cursor.at_line)?;
-        for (line_idx, eline) in editor.content.iter().enumerate().skip(editor.cursor.at_line).take(limit).rev() {
+        let limit = position.line.checked_sub(editor.cursor().at_line)?;
+        for (line_idx, eline) in editor.content().iter().enumerate().skip(editor.cursor().at_line).take(limit).rev() {
             char_idx = eline.char_len();
             for ch in eline.chars().rev() {
                 char_idx -= 1;
@@ -173,8 +173,8 @@ fn try_find_brackets(editor: &Editor, position: CursorPosition) -> Option<Vec<En
                     counter += 1;
                 } else if ch == opening {
                     if counter == 0 {
-                        let start = (editor.lexer.encoding().str_len)(&editor.content[line_idx][..char_idx]);
-                        let start_closing = (editor.lexer.encoding().str_len)(first_line);
+                        let start = (editor.lexer().encoding().str_len)(&editor.content()[line_idx][..char_idx]);
+                        let start_closing = (editor.lexer().encoding().str_len)(first_line);
                         return Some(vec![
                             EncodedWordRange::new_checked(line_idx, start, start + 1)?,
                             EncodedWordRange::new_checked(position.line, start_closing, start_closing + 1)?,
@@ -187,13 +187,13 @@ fn try_find_brackets(editor: &Editor, position: CursorPosition) -> Option<Vec<En
     } else if let Some(closing) = get_closing(ch_at_start) {
         let mut counter = 0_usize;
         let mut char_idx = position.char + 1;
-        let first_line = &editor.content[position.line][..position.char];
-        for ch in editor.content[position.line][char_idx..].chars() {
+        let first_line = &editor.content()[position.line][..position.char];
+        for ch in editor.content()[position.line][char_idx..].chars() {
             if ch == ch_at_start {
                 counter += 1;
             } else if ch == closing {
-                let start = (editor.lexer.encoding().str_len)(first_line);
-                let start_closing = (editor.lexer.encoding().str_len)(&editor.content[position.line][..char_idx]);
+                let start = (editor.lexer().encoding().str_len)(first_line);
+                let start_closing = (editor.lexer().encoding().str_len)(&editor.content()[position.line][..char_idx]);
                 if counter == 0 {
                     return Some(vec![
                         EncodedWordRange::new_checked(position.line, start, start + 1)?,
@@ -206,17 +206,18 @@ fn try_find_brackets(editor: &Editor, position: CursorPosition) -> Option<Vec<En
         }
 
         let skip = position.line + 1;
-        let last_line = editor.cursor.at_line + editor.cursor.max_rows;
+        let last_line = editor.cursor().at_line + editor.cursor().max_rows;
         let limit = last_line.checked_sub(skip)?;
-        for (line_idx, eline) in editor.content.iter().enumerate().skip(skip).take(limit) {
+        for (line_idx, eline) in editor.content().iter().enumerate().skip(skip).take(limit) {
             char_idx = 0;
             for ch in eline.chars() {
                 if ch == ch_at_start {
                     counter += 1;
                 } else if ch == closing {
                     if counter == 0 {
-                        let start = (editor.lexer.encoding().str_len)(first_line);
-                        let start_closing = (editor.lexer.encoding().str_len)(&editor.content[line_idx][..char_idx]);
+                        let start = (editor.lexer().encoding().str_len)(first_line);
+                        let start_closing =
+                            (editor.lexer().encoding().str_len)(&editor.content()[line_idx][..char_idx]);
                         return Some(vec![
                             EncodedWordRange::new_checked(position.line, start, start + 1)?,
                             EncodedWordRange::new_checked(line_idx, start_closing, start_closing + 1)?,
@@ -256,9 +257,9 @@ mod test {
     use crate::{
         configs::FileType,
         cursor::{CursorPosition, EncodedWordRange},
+        editor::syntax::tests::{mock_utf16_lexer, mock_utf8_lexer},
         editor::tests::mock_editor,
         editor_line::EditorLine,
-        syntax::tests::{mock_utf16_lexer, mock_utf8_lexer},
     };
 
     #[test]
@@ -280,11 +281,11 @@ mod test {
         let res = try_find_brackets(&editor, CursorPosition { line: 2, char: 7 });
         assert_eq!(res, Some(vec![EncodedWordRange::new(0, 7, 8), EncodedWordRange::new(2, 7, 8),]));
 
-        editor.lexer = mock_utf16_lexer(FileType::Rust);
+        editor.set_lexer(mock_utf16_lexer(FileType::Rust));
         let res = try_find_brackets(&editor, CursorPosition { line: 2, char: 7 });
         assert_eq!(res, Some(vec![EncodedWordRange::new(0, 8, 9), EncodedWordRange::new(2, 8, 9),]));
 
-        editor.lexer = mock_utf8_lexer(FileType::Rust);
+        editor.set_lexer(mock_utf8_lexer(FileType::Rust));
         let res = try_find_brackets(&editor, CursorPosition { line: 2, char: 7 });
         assert_eq!(res, Some(vec![EncodedWordRange::new(0, 10, 11), EncodedWordRange::new(2, 10, 11),]));
     }

@@ -1,8 +1,8 @@
 use crate::{
     actions::Edit,
     cursor::{Cursor, CursorPosition},
+    editor::syntax::Lexer,
     editor_line::EditorLine,
-    syntax::Lexer,
 };
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 
@@ -309,8 +309,8 @@ mod tests {
     use crate::actions::buffer::DelBuffer;
     use crate::configs::FileType;
     use crate::cursor::{Cursor, CursorPosition};
+    use crate::editor::syntax::tests::{mock_utf32_lexer, mock_utf8_lexer};
     use crate::editor_line::EditorLine;
-    use crate::syntax::tests::{mock_utf32_lexer, mock_utf8_lexer};
     use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 
     #[test]

@@ -13,7 +13,6 @@ mod global_state;
 mod lsp;
 mod popups;
 mod session;
-mod syntax;
 mod tree;
 mod utils;
 mod workspace;

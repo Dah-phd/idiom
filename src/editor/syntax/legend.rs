@@ -1,4 +1,4 @@
-use crate::{configs::FileType, syntax::Theme};
+use crate::{configs::FileType, editor::syntax::Theme};
 use crossterm::style::Color;
 use lsp_types::SemanticTokensServerCapabilities;
 

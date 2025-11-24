@@ -1,5 +1,5 @@
 use super::EditorLine;
-use crate::syntax::Encoding;
+use crate::editor::syntax::Encoding;
 
 #[test]
 fn test_get() {

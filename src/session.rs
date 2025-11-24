@@ -25,12 +25,12 @@ impl<'a> StoreFileData<'a> {
         ws.iter()
             .map(|editor| {
                 let store_content = !editor.is_saved().unwrap_or_default();
-                let content = store_content.then_some(editor.content.iter().map(|l| l.as_str()).collect());
+                let content = store_content.then_some(editor.content().iter().map(|l| l.as_str()).collect());
                 StoreFileData {
                     content,
                     file_type: editor.file_type,
                     path: editor.path().to_owned(),
-                    cursor: editor.cursor.clone(),
+                    cursor: editor.cursor().clone(),
                 }
             })
             .collect()
@@ -304,8 +304,8 @@ mod tests {
         load_session_if_exists(temp_dir.path().to_owned(), &mut receiver_ws, &mut gs).await;
         assert!(!receiver_ws.is_empty());
         // confirm stored is same as loaded
-        let expected_content = ws.get_active().unwrap().content.iter().map(|l| l.as_str()).collect::<Vec<_>>();
-        let content = receiver_ws.get_active().unwrap().content.iter().map(|l| l.as_str()).collect::<Vec<_>>();
+        let expected_content = ws.get_active().unwrap().content().iter().map(|l| l.as_str()).collect::<Vec<_>>();
+        let content = receiver_ws.get_active().unwrap().content().iter().map(|l| l.as_str()).collect::<Vec<_>>();
         assert_eq!(content, expected_content);
     }
 

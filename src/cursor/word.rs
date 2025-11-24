@@ -1,5 +1,5 @@
 use super::{CharRange, CursorPosition, Select};
-use crate::{editor_line::EditorLine, syntax::Encoding};
+use crate::{editor::syntax::Encoding, editor_line::EditorLine};
 use idiom_tui::UTFSafe;
 
 /// owns text and location

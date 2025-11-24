@@ -7,8 +7,8 @@ use std::fmt::Debug;
 use crate::{
     configs::IndentConfigs,
     cursor::{CursorPosition, WordRange},
+    editor::syntax::Encoding,
     editor_line::EditorLine,
-    syntax::Encoding,
     utils::Offset,
 };
 

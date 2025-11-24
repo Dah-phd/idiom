@@ -8,7 +8,7 @@ use super::editor_line::EditorLine;
 use crate::{
     configs::IndentConfigs,
     cursor::{Cursor, CursorPosition, Select},
-    syntax::Lexer,
+    editor::syntax::Lexer,
     utils::Offset,
 };
 use buffer::ActionBuffer;

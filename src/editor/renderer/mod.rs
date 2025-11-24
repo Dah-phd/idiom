@@ -5,10 +5,12 @@ mod utils;
 use crate::{
     configs::{FileFamily, FileType},
     editor::utils::EditorStats,
-    editor::Editor,
+    editor::{
+        syntax::{tokens::WrapData, Lexer},
+        Editor,
+    },
     editor_line::LineContext,
     global_state::GlobalState,
-    syntax::{tokens::WrapData, Lexer},
 };
 use idiom_tui::{layout::IterLines, Backend};
 

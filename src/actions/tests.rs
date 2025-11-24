@@ -7,12 +7,12 @@ use crate::actions::Action;
 use crate::actions::Edit;
 use crate::configs::{FileType, IndentConfigs};
 use crate::cursor::{Cursor, CursorPosition};
-use crate::editor_line::EditorLine;
-use crate::lsp::LSPResult;
-use crate::syntax::{
+use crate::editor::syntax::{
     tests::{intercept_sync, intercept_sync_rev},
     Encoding, Lexer,
 };
+use crate::editor_line::EditorLine;
+use crate::lsp::LSPResult;
 use lsp_types::{Position, Range};
 use std::path::PathBuf;
 

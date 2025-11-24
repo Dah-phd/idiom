@@ -2,6 +2,7 @@ use super::super::editor::{utils::build_display, FileUpdate};
 use super::{
     calc_line_number_offset,
     controls::{filter_multi_cursors_per_line_if_no_select, ControlMap},
+    syntax::Lexer,
     Editor, EditorModal, TuiCodec,
 };
 use crate::{
@@ -11,10 +12,15 @@ use crate::{
     editor_line::EditorLine,
     ext_tui::CrossTerm,
     global_state::GlobalState,
-    syntax::Lexer,
 };
 use idiom_tui::{layout::Rect, Backend};
 use std::path::PathBuf;
+
+impl Editor {
+    pub fn set_lexer(&mut self, lexer: Lexer) {
+        self.lexer = lexer;
+    }
+}
 
 pub fn mock_editor(content: Vec<String>) -> Editor {
     let ft = FileType::Rust;

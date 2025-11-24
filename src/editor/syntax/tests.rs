@@ -955,7 +955,7 @@ fn diagnostic_incursor() {
 
 #[test]
 fn dianostic_info() {
-    use crate::syntax::{FileType, Lang};
+    use crate::editor::syntax::{FileType, Lang};
 
     let lang = Lang::from(FileType::Rust);
     let dline = create_dline();

@@ -1,8 +1,8 @@
 use crate::cursor::CharRangeUnbound;
+use crate::editor::syntax::tokens::WrapData;
 use crate::editor_line::{EditorLine, LineContext};
 use crate::ext_tui::{CrossTerm, StyleExt};
 use crate::global_state::GlobalState;
-use crate::syntax::tokens::WrapData;
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{
     layout::{IterLines, RectIter},

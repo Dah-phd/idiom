@@ -57,14 +57,14 @@ pub fn infer_word_search_positon(
     pattern: &mut TextField,
     buffer: &mut Vec<(CursorPosition, CursorPosition)>,
 ) -> Option<usize> {
-    if editor.cursor.select_is_none() {
-        editor.cursor.select_word(&editor.content);
+    if editor.cursor().select_is_none() {
+        editor.select_word();
     };
-    let (from, to) = editor.cursor.select_get()?;
+    let (from, to) = editor.cursor().select_get()?;
     if from.line != to.line {
         return None;
     }
-    let word = editor.content.get(from.line).and_then(|line| line.get(from.char, to.char))?;
+    let word = editor.content().get(from.line).and_then(|line| line.get(from.char, to.char))?;
     pattern.text_set(word.to_owned());
     pattern.select_all();
     buffer.clear();
@@ -91,8 +91,8 @@ mod test {
             "/// last ref to data".into(),
             String::new(),
         ]);
-        editor.cursor.line = 3;
-        editor.cursor.char = 18;
+        editor.unsafe_cursor_mut().line = 3;
+        editor.unsafe_cursor_mut().char = 18;
         let mut pattern = TextField::default();
         let mut buffer = vec![];
         let state = infer_word_search_positon(&mut editor, &mut pattern, &mut buffer);
@@ -104,7 +104,7 @@ mod test {
             (CursorPosition { line: 3, char: 15 }, CursorPosition { line: 3, char: 19 }),
             (CursorPosition { line: 7, char: 16 }, CursorPosition { line: 7, char: 20 }),
         ];
-        assert_eq!(editor.cursor.select_get(), Some(expect[expect_state]));
+        assert_eq!(editor.cursor().select_get(), Some(expect[expect_state]));
         assert_eq!(buffer, expect);
     }
 

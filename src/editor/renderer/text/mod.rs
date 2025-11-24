@@ -5,9 +5,9 @@ mod markdown;
 use super::utils::{pad_select, try_cache_wrap_data_from_lines, SelectManagerSimple};
 use crate::{
     cursor::{CharRangeUnbound, Cursor},
+    editor::syntax::tokens::WrapData,
     editor_line::{EditorLine, LineContext},
     global_state::GlobalState,
-    syntax::tokens::WrapData,
 };
 use idiom_tui::layout::{IterLines, RectIter};
 

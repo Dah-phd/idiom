@@ -5,9 +5,8 @@ mod rename;
 use crate::{
     configs::{EditorAction, Theme},
     cursor::{CursorPosition, PositionedWord, WordRange},
-    editor::{Editor, EditorLine},
+    editor::{syntax::DiagnosticInfo, Editor, EditorLine},
     global_state::GlobalState,
-    syntax::DiagnosticInfo,
 };
 use completion::AutoComplete;
 use fuzzy_matcher::skim::SkimMatcherV2;
@@ -147,11 +146,6 @@ impl EditorModal {
                 (true, editor.modal.last_render.take())
             }
         }
-    }
-
-    #[inline]
-    pub fn take_render_cache(&mut self) -> Option<Rect> {
-        self.last_render.take()
     }
 
     #[inline]

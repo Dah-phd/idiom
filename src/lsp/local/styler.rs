@@ -1,6 +1,6 @@
 use crate::configs::Theme;
+use crate::editor::syntax::Legend;
 use crate::ext_tui::{StyleExt, StyledLine, Text};
-use crate::syntax::Legend;
 use idiom_tui::UTFSafe;
 
 use super::create_semantic_capabilities;

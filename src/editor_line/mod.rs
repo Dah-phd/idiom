@@ -2,7 +2,7 @@ mod context;
 mod status;
 pub use status::{Reduction, RenderStatus};
 
-use crate::syntax::{tokens::TokenLine, DiagnosticLine, Encoding, Lang, Token};
+use crate::editor::syntax::{tokens::TokenLine, DiagnosticInfo, DiagnosticLine, Encoding, Lang, Token};
 pub use context::LineContext;
 use idiom_tui::{utils::UTFSafeStringExt, UTFSafe};
 use std::{
@@ -381,7 +381,9 @@ impl EditorLine {
         self.diagnostics.replace(diagnostics);
     }
 
-    /// does not mark the line for render
+    /// does not mark the line for render may cause render artefacts
+    /// also the tokesn are not verified - may cause panics
+    /// proceed with caution
     #[inline]
     pub fn tokens_mut_unchecked(&mut self) -> &mut TokenLine {
         &mut self.tokens
@@ -409,7 +411,7 @@ impl EditorLine {
     }
 
     #[inline]
-    pub fn diagnostic_info(&self, lang: &Lang) -> Option<crate::syntax::DiagnosticInfo> {
+    pub fn diagnostic_info(&self, lang: &Lang) -> Option<DiagnosticInfo> {
         self.diagnostics.as_ref().map(|d| d.collect_info(lang))
     }
 

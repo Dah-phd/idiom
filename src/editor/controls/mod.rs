@@ -5,9 +5,8 @@ use crate::{
     actions::{transaction, Actions},
     configs::EditorAction,
     cursor::{Cursor, CursorPosition, PositionedWord},
-    editor::{Editor, EditorLine},
+    editor::{syntax::Lexer, Editor, EditorLine},
     global_state::GlobalState,
-    syntax::Lexer,
 };
 use lsp_types::TextEdit;
 

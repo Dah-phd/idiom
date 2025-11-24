@@ -1,6 +1,7 @@
 mod controls;
 mod modal;
 mod renderer;
+pub mod syntax;
 mod utils;
 use crate::{
     actions::{find_line_start, Actions},
@@ -9,8 +10,7 @@ use crate::{
     editor_line::EditorLine,
     error::{IdiomError, IdiomResult},
     global_state::GlobalState,
-    lsp::LSPError,
-    syntax::Lexer,
+    lsp::{LSPClient, LSPError},
 };
 use controls::ControlMap;
 use idiom_tui::{layout::Rect, Position};
@@ -18,6 +18,7 @@ use lsp_types::TextEdit;
 pub use modal::EditorModal;
 use renderer::TuiCodec;
 use std::path::PathBuf;
+use syntax::Lexer;
 use utils::{big_file_protection, build_display, calc_line_number_offset, FileUpdate};
 pub use utils::{editor_from_data, EditorStats};
 
@@ -28,18 +29,18 @@ const WARN_MD: &str = "The file is opened in markdown mode, \
 
 pub struct Editor {
     pub file_type: FileType,
+    lexer: Lexer,
+    pub update_status: FileUpdate,
+    cursor: Cursor,
+    content: Vec<EditorLine>,
+    controls: ControlMap,
+    renderer: TuiCodec,
+    actions: Actions,
+    modal: EditorModal,
     display: String,
     path: PathBuf,
-    pub lexer: Lexer,
-    pub cursor: Cursor,
-    pub content: Vec<EditorLine>,
-    pub update_status: FileUpdate,
     line_number_padding: usize,
     last_render_at_line: Option<usize>,
-    controls: ControlMap,
-    pub modal: EditorModal,
-    actions: Actions,
-    renderer: TuiCodec,
 }
 
 impl Editor {
@@ -118,12 +119,48 @@ impl Editor {
         })
     }
 
+    // GETTERS
+
+    #[inline]
     pub fn name(&self) -> &str {
         self.display.as_str()
     }
 
+    #[inline]
     pub fn path(&self) -> &PathBuf {
         &self.path
+    }
+
+    #[inline]
+    pub fn cursor(&self) -> &Cursor {
+        &self.cursor
+    }
+
+    #[inline]
+    pub fn unsafe_cursor_mut(&mut self) -> &mut Cursor {
+        &mut self.cursor
+    }
+
+    #[inline]
+    pub fn content(&self) -> &[EditorLine] {
+        &self.content
+    }
+
+    /// access content outside of Editor API
+    /// proceed with caution
+    #[inline]
+    pub fn unsafe_content_mut(&mut self) -> &mut [EditorLine] {
+        &mut self.content
+    }
+
+    #[inline]
+    pub fn controls(&self) -> &ControlMap {
+        &self.controls
+    }
+
+    #[inline]
+    pub fn lexer(&self) -> &Lexer {
+        &self.lexer
     }
 
     // RENDER
@@ -198,6 +235,15 @@ impl Editor {
         self.display = build_display(&new_path);
         self.path = new_path;
         self.lexer.update_path(&self.path)
+    }
+
+    pub fn lsp_set(&mut self, client: LSPClient, gs: &mut GlobalState) {
+        self.lexer.set_lsp_client(client, self.stringify(), gs);
+    }
+
+    #[inline]
+    pub fn lsp_local(&mut self, gs: &mut GlobalState) {
+        self.lexer.local_lsp(self.file_type, self.stringify(), gs)
     }
 
     pub fn file_type_set(&mut self, file_type: FileType, cfg: IndentConfigs, gs: &mut GlobalState) {
@@ -364,7 +410,12 @@ impl Editor {
         };
     }
 
-    fn select_line(&mut self) {
+    #[inline]
+    pub fn select_word(&mut self) {
+        self.cursor.select_word(&self.content);
+    }
+
+    pub fn select_line(&mut self) {
         let start = CursorPosition { line: self.cursor.line, char: 0 };
         let next_line = self.cursor.line + 1;
         if self.content.len() > next_line {
@@ -379,7 +430,7 @@ impl Editor {
     }
 
     #[inline(always)]
-    fn select_all(&mut self) {
+    pub fn select_all(&mut self) {
         self.cursor.select_set(
             CursorPosition::default(),
             CursorPosition {
@@ -431,14 +482,6 @@ impl Editor {
             }
         }
         buffer
-    }
-
-    pub fn content(&self) -> &[EditorLine] {
-        &self.content
-    }
-
-    pub fn controls(&self) -> &ControlMap {
-        &self.controls
     }
 
     pub fn get_cursor_rel_render_position(&self) -> Position {
@@ -502,8 +545,9 @@ impl Editor {
         Some(content)
     }
 
-    pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs) {
+    pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs, gs: &mut GlobalState) {
         self.actions.cfg = new_cfg.get_indent_cfg(self.file_type);
+        self.lexer.reload_theme(gs);
     }
 
     pub fn stringify(&self) -> String {

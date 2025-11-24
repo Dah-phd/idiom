@@ -13,8 +13,8 @@ use std::{
 
 use crate::{
     cursor::CursorPosition,
+    editor::syntax::{tokens::validate_and_format_delta_tokens, DiagnosticLine},
     lsp::{LSPError, LSPResult},
-    syntax::{tokens::validate_and_format_delta_tokens, DiagnosticLine},
 };
 
 use super::lsp_stream::StdErrMessage;

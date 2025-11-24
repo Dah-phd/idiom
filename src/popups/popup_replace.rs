@@ -1,10 +1,10 @@
 use crate::{
     cursor::CursorPosition,
+    editor::syntax::Lexer,
     embeded_term::EditorTerminal,
     error::{IdiomError, IdiomResult},
     ext_tui::{text_field::map_key, StyleExt},
     global_state::GlobalState,
-    syntax::Lexer,
     tree::Tree,
     workspace::Workspace,
 };

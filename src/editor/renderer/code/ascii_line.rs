@@ -1,5 +1,5 @@
 use super::SelectManager;
-use crate::{ext_tui::CrossTerm, global_state::GlobalState, syntax::tokens::TokenLine};
+use crate::{editor::syntax::tokens::TokenLine, ext_tui::CrossTerm, global_state::GlobalState};
 use crossterm::style::ContentStyle;
 use idiom_tui::Backend;
 

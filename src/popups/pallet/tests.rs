@@ -10,7 +10,7 @@ use crate::{
 use idiom_tui::{layout::Rect, Backend};
 
 fn to_str_list<'a>(ws: &'a mut Workspace) -> Vec<&'a str> {
-    ws.get_active().unwrap().content.iter().map(|el| el.as_str()).collect()
+    ws.get_active().unwrap().content().iter().map(|el| el.as_str()).collect()
 }
 
 #[test]
@@ -23,14 +23,14 @@ fn uppercase_test() {
     assert_eq!(to_str_list(&mut ws), [""]);
 
     let mut ws = mock_ws(vec![" test ".to_string()]);
-    ws.get_active().unwrap().cursor.char = 2;
+    ws.get_active().unwrap().unsafe_cursor_mut().char = 2;
     uppercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [" TEST "]);
 
     let mut ws = mock_ws(vec![" test_part ".to_string()]);
     ws.get_active()
         .unwrap()
-        .cursor
+        .unsafe_cursor_mut()
         .select_set(CursorPosition { line: 0, char: 4 }, CursorPosition { line: 0, char: 7 });
     uppercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [" tesT_Part "]);
@@ -42,7 +42,7 @@ fn uppercase_test() {
     ]);
     ws.get_active()
         .unwrap()
-        .cursor
+        .unsafe_cursor_mut()
         .select_set(CursorPosition { line: 0, char: 8 }, CursorPosition { line: 2, char: 5 });
     uppercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [" test on MANY LINES", " MORE LINES ", " MORE lines "]);
@@ -58,14 +58,14 @@ fn lowercase_test() {
     assert_eq!(to_str_list(&mut ws), [""]);
 
     let mut ws = mock_ws(vec![" TEST ".to_string()]);
-    ws.get_active().unwrap().cursor.char = 2;
+    ws.get_active().unwrap().unsafe_cursor_mut().char = 2;
     lowercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [" test "]);
 
     let mut ws = mock_ws(vec![" TEST_PART ".to_string()]);
     ws.get_active()
         .unwrap()
-        .cursor
+        .unsafe_cursor_mut()
         .select_set(CursorPosition { line: 0, char: 4 }, CursorPosition { line: 0, char: 7 });
     lowercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [" TESt_pART "]);
@@ -77,7 +77,7 @@ fn lowercase_test() {
     ]);
     ws.get_active()
         .unwrap()
-        .cursor
+        .unsafe_cursor_mut()
         .select_set(CursorPosition { line: 0, char: 8 }, CursorPosition { line: 2, char: 5 });
     lowercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [" TEST ON many lines", " more lines ", " more lines "]);

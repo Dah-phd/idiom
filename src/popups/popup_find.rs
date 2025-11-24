@@ -6,11 +6,11 @@ use super::{
 };
 use crate::{
     cursor::CursorPosition,
+    editor::syntax::Lexer,
     embeded_term::EditorTerminal,
     error::{IdiomError, IdiomResult},
     ext_tui::{text_field::map_key, StyleExt},
     global_state::GlobalState,
-    syntax::Lexer,
     tree::Tree,
     workspace::Workspace,
 };
@@ -32,7 +32,7 @@ pub struct GoToLinePopup {
 impl GoToLinePopup {
     pub fn run_inplace(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         let Some(editor) = workspace.get_active() else { return };
-        let current_line = editor.cursor.line;
+        let current_line = editor.cursor().line;
         let Some(mut popup) = GoToLinePopup::new(current_line, *gs.editor_area(), gs.ui_theme.accent_style()) else {
             return;
         };

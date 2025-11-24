@@ -2,7 +2,7 @@ use super::Actions;
 use crate::{
     actions::{Action, Edit, EditorLine},
     cursor::{Cursor, CursorPosition},
-    syntax::{Lexer, SyncCallbacks},
+    editor::syntax::{Lexer, SyncCallbacks},
     utils::Offset,
 };
 

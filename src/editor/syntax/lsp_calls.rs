@@ -2,12 +2,14 @@ use crate::{
     actions::{Action, EditMetaData},
     configs::Theme,
     cursor::CursorPosition,
-    editor::Editor,
+    editor::{
+        syntax::{Encoding, Lexer},
+        Editor,
+    },
     editor_line::EditorLine,
     global_state::{GlobalState, IdiomEvent},
     lsp::{LSPClient, LSPResponse, LSPResponseType, LSPResult},
     popups::popups_tree::refrence_selector,
-    syntax::{Encoding, Lexer},
 };
 use core::str::FromStr;
 use lsp_types::{

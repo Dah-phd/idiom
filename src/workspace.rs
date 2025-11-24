@@ -328,7 +328,7 @@ impl Workspace {
         }
         let lsp_cmd = match self.base_configs.derive_lsp(&editor.file_type) {
             None => {
-                editor.lexer.local_lsp(editor.file_type, editor.stringify(), gs);
+                editor.lsp_local(gs);
                 return;
             }
             Some(cmd) => cmd,
@@ -340,19 +340,19 @@ impl Workspace {
             Entry::Vacant(entry) => match LSP::new(lsp_cmd, editor.file_type).await {
                 Ok(lsp) => {
                     let client = lsp.aquire_client();
-                    editor.lexer.set_lsp_client(client, editor.stringify(), gs);
+                    editor.lsp_set(client, gs);
                     for editor in self.editors.iter_mut().filter(|e| e.file_type == editor.file_type) {
-                        editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);
+                        editor.lsp_set(lsp.aquire_client(), gs);
                     }
                     entry.insert(lsp);
                 }
                 Err(err) => {
                     gs.error(err.to_string());
-                    editor.lexer.local_lsp(editor.file_type, editor.stringify(), gs);
+                    editor.lsp_local(gs);
                 }
             },
             Entry::Occupied(entry) => {
-                editor.lexer.set_lsp_client(entry.get().aquire_client(), editor.stringify(), gs);
+                editor.lsp_set(entry.get().aquire_client(), gs);
             }
         }
     }
@@ -371,7 +371,7 @@ impl Workspace {
         let lsp_cmd = match self.base_configs.derive_lsp(&file_type) {
             Some(lsp_cmd) => lsp_cmd,
             None => {
-                _ = self.get_active().map(|e| e.lexer.local_lsp(file_type, e.stringify(), gs));
+                _ = self.get_active().map(|e| e.lsp_local(gs));
                 return Ok(());
             }
         };
@@ -381,19 +381,19 @@ impl Workspace {
                 let lsp = match LSP::new(lsp_cmd, file_type).await {
                     Ok(lsp) => lsp,
                     Err(err) => {
-                        _ = self.get_active().map(|e| e.lexer.local_lsp(file_type, e.stringify(), gs));
+                        _ = self.get_active().map(|e| e.lsp_local(gs));
                         return Err(IdiomError::LSP(err));
                     }
                 };
                 for editor in self.editors.iter_mut().filter(|e| e.file_type == file_type) {
-                    editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);
+                    editor.lsp_set(lsp.aquire_client(), gs);
                 }
                 entry.insert(lsp);
                 Ok(())
             }
             Entry::Occupied(entry) => {
                 let client = entry.get().aquire_client();
-                _ = self.get_active().map(|e| e.lexer.set_lsp_client(client, e.stringify(), gs));
+                _ = self.get_active().map(|e| e.lsp_set(client, gs));
                 Ok(())
             }
         }
@@ -419,7 +419,7 @@ impl Workspace {
     pub fn full_sync(&mut self, file_type: &FileType, gs: &mut GlobalState) {
         if let Some(lsp) = self.lsp_servers.get(file_type) {
             for editor in self.editors.iter_mut().filter(|e| &e.file_type == file_type) {
-                editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);
+                editor.lsp_set(lsp.aquire_client(), gs);
             }
         }
     }
@@ -515,11 +515,10 @@ impl Workspace {
         self.key_map = new_editor_key_map;
         self.base_configs = gs.reload_confgs();
         for editor in self.editors.iter_mut() {
-            editor.refresh_cfg(&self.base_configs);
-            editor.lexer.reload_theme(gs);
+            editor.refresh_cfg(&self.base_configs, gs);
             if let Some(lsp) = self.lsp_servers.get(&editor.file_type) {
-                if !editor.lexer.lsp {
-                    editor.lexer.set_lsp_client(lsp.aquire_client(), editor.stringify(), gs);
+                if !editor.lexer().lsp {
+                    editor.lsp_set(lsp.aquire_client(), gs);
                 }
             }
         }
@@ -678,7 +677,7 @@ pub mod tests {
     }
 
     fn assert_position(ws: &mut Workspace, position: CursorPosition) {
-        let current: CursorPosition = (&active(ws).cursor).into();
+        let current = active(ws).cursor().get_position();
         assert_eq!(current, position);
     }
 
@@ -792,7 +791,7 @@ pub mod tests {
         let mut ws = base_ws();
         let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
         gs.insert_mode();
-        let base_line = active(&mut ws).content[0].to_string();
+        let base_line = active(&mut ws).content()[0].to_string();
         assert_eq!(pull_line(active(&mut ws), 0).unwrap(), base_line);
         press(&mut ws, KeyCode::End, &mut gs);
         assert_position(&mut ws, CursorPosition { char: base_line.len(), line: 0 });
@@ -811,25 +810,25 @@ pub mod tests {
             CursorPosition { line: 0, char: base_line.len() },
         );
         assert_eq!(test_cursor.char, base_line.len());
-        assert!(test_cursor.matches_content(&active(&mut ws).content));
+        assert!(test_cursor.matches_content(&active(&mut ws).content()));
         test_cursor.select_set(
             CursorPosition { line: 0, char: base_line.len() },
             CursorPosition { line: 0, char: base_line.len() - 1 },
         );
         assert_eq!(test_cursor.char, base_line.len() - 1);
-        assert!(test_cursor.matches_content(&active(&mut ws).content));
+        assert!(test_cursor.matches_content(&active(&mut ws).content()));
         test_cursor.select_set(
             CursorPosition { line: 0, char: base_line.len() },
             CursorPosition { line: 0, char: base_line.len() + 1 },
         );
         assert_eq!(test_cursor.char, base_line.len() + 1);
-        assert!(!test_cursor.matches_content(&active(&mut ws).content));
+        assert!(!test_cursor.matches_content(&active(&mut ws).content()));
         test_cursor.select_set(
             CursorPosition { line: 0, char: base_line.len() + 1 },
             CursorPosition { line: 0, char: base_line.len() },
         );
         assert_eq!(test_cursor.char, base_line.len());
-        assert!(!test_cursor.matches_content(&active(&mut ws).content));
+        assert!(!test_cursor.matches_content(&active(&mut ws).content()));
     }
 
     #[test]
@@ -862,30 +861,30 @@ pub mod tests {
         let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
 
         gs.insert_mode();
-        let last_line = active(&mut ws).content.len() - 1;
-        let base_line = active(&mut ws).content[last_line].to_string();
+        let last_line = active(&mut ws).content().len() - 1;
+        let base_line = active(&mut ws).content()[last_line].to_string();
         let mut test_cursor = Cursor::default();
         let all = (CursorPosition::default(), CursorPosition { char: base_line.len(), line: last_line });
 
         ctrl_press(&mut ws, KeyCode::Char('a'), &mut gs);
         assert_position(&mut ws, CursorPosition { char: base_line.len(), line: last_line });
         assert!(select_eq(all, active(&mut ws)));
-        active(&mut ws).cursor.select_set(all.1, all.0); // swap select 'from' and 'to'
+        active(&mut ws).unsafe_cursor_mut().select_set(all.1, all.0); // swap select 'from' and 'to'
         shift_press(&mut ws, KeyCode::Down, &mut gs);
         assert!(select_eq((CursorPosition { line: 1, char: 0 }, all.1), active(&mut ws)));
         shift_press(&mut ws, KeyCode::Left, &mut gs);
         assert!(select_eq(
-            (CursorPosition { line: 0, char: active(&mut ws).content[0].char_len() }, all.1),
+            (CursorPosition { line: 0, char: active(&mut ws).content()[0].char_len() }, all.1),
             active(&mut ws)
         ));
-        test_cursor.select_set(CursorPosition { line: 0, char: active(&mut ws).content[0].char_len() }, all.1);
-        assert!(test_cursor.matches_content(&active(&mut ws).content));
-        test_cursor.select_set(CursorPosition { line: 0, char: active(&mut ws).content[0].char_len() + 1 }, all.1);
-        assert!(!test_cursor.matches_content(&active(&mut ws).content));
+        test_cursor.select_set(CursorPosition { line: 0, char: active(&mut ws).content()[0].char_len() }, all.1);
+        assert!(test_cursor.matches_content(&active(&mut ws).content()));
+        test_cursor.select_set(CursorPosition { line: 0, char: active(&mut ws).content()[0].char_len() + 1 }, all.1);
+        assert!(!test_cursor.matches_content(&active(&mut ws).content()));
         test_cursor.select_set(all.0, all.1);
-        assert!(test_cursor.matches_content(&active(&mut ws).content));
+        assert!(test_cursor.matches_content(&active(&mut ws).content()));
         test_cursor.select_set(all.0, CursorPosition { line: all.1.line + 1, char: 0 });
-        assert!(!test_cursor.matches_content(&active(&mut ws).content));
+        assert!(!test_cursor.matches_content(&active(&mut ws).content()));
     }
 
     #[test]
@@ -929,14 +928,14 @@ pub mod tests {
         ctrl_press(&mut ws, KeyCode::Right, &mut gs);
         press(&mut ws, KeyCode::Char('{'), &mut gs);
         press(&mut ws, KeyCode::Enter, &mut gs);
-        assert_eq!(CursorPosition { line: 5, char: 4 }, (&ws.get_active().unwrap().cursor).into());
+        assert_eq!(CursorPosition { line: 5, char: 4 }, ws.get_active().unwrap().cursor().get_position());
         assert_eq!(pull_line(active(&mut ws), 4).unwrap(), "next{");
         assert_eq!(pull_line(active(&mut ws), 5).unwrap(), "    ");
         assert_eq!(pull_line(active(&mut ws), 6).unwrap(), "} line");
         // scopes depth
         press(&mut ws, KeyCode::Char('['), &mut gs);
         press(&mut ws, KeyCode::Enter, &mut gs);
-        assert_eq!(CursorPosition { line: 6, char: 8 }, (&ws.get_active().unwrap().cursor).into());
+        assert_eq!(CursorPosition { line: 6, char: 8 }, ws.get_active().unwrap().cursor().get_position());
         assert_eq!(pull_line(active(&mut ws), 5).unwrap(), "    [");
         assert_eq!(pull_line(active(&mut ws), 6).unwrap(), "        ");
         assert_eq!(pull_line(active(&mut ws), 7).unwrap(), "    ]");

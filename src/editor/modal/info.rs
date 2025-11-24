@@ -1,10 +1,10 @@
 use super::ModalMessage;
 use crate::{
     configs::{EditorAction, Theme},
+    editor::syntax::{DiagnosticInfo, Fix},
     ext_tui::{State, StyleExt, StyledLine},
     global_state::GlobalState,
     lsp::Highlighter,
-    syntax::{DiagnosticInfo, Fix},
 };
 use crossterm::style::ContentStyle;
 use idiom_tui::{
@@ -324,9 +324,9 @@ fn parse_markedstr(value: MarkedString, sty: &mut Highlighter, lines: &mut Vec<S
 mod test {
     use super::{Info, ModalMessage, Mode};
     use crate::configs::{EditorAction, Theme};
+    use crate::editor::syntax::{DiagnosticInfo, Fix};
     use crate::ext_tui::CrossTerm;
     use crate::global_state::GlobalState;
-    use crate::syntax::{DiagnosticInfo, Fix};
     use idiom_tui::{layout::Rect, Backend};
     use lsp_types::Hover;
 
