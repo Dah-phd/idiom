@@ -29,7 +29,7 @@ impl<'a> StoreFileData<'a> {
                 StoreFileData {
                     content,
                     file_type: editor.file_type,
-                    path: editor.path.clone(),
+                    path: editor.path().to_owned(),
                     cursor: editor.cursor.clone(),
                 }
             })
@@ -198,7 +198,7 @@ async fn load_session_if_exists(store: PathBuf, ws: &mut Workspace, gs: &mut Glo
         _ = std::fs::remove_dir_all(path);
 
         let Some(editor) = ws.get_active() else { return };
-        gs.event.push(IdiomEvent::SelectPath(editor.path.to_owned()));
+        gs.event.push(IdiomEvent::SelectPath(editor.path().to_owned()));
 
         if gs.is_select() {
             gs.insert_mode();
@@ -290,7 +290,7 @@ mod tests {
     async fn store_and_load() {
         let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
         let mut ws = mock_ws(vec![String::from("test data"), String::from("second line")]);
-        assert_eq!(ws.get_active().unwrap().path, PathBuf::from("test-path"));
+        assert_eq!(ws.get_active().unwrap().path(), &PathBuf::from("test-path"));
         assert!(!StoreFileData::from_workspace(&ws).is_empty());
         let mut receiver_ws = mock_ws_empty();
         assert!(receiver_ws.is_empty());

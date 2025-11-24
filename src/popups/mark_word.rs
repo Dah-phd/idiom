@@ -122,7 +122,7 @@ fn clear_marked_cache(editor: &mut Editor, ranges: Vec<EncodedWordRange>) {
 }
 
 fn find_ranges(editor: &Editor) -> Option<Vec<EncodedWordRange>> {
-    let position = editor.controls.get_base_cursor_position().unwrap_or(editor.cursor.get_position());
+    let position = editor.controls().get_base_cursor_position().unwrap_or(editor.cursor.get_position());
     if let Some(ranges) = try_find_brackets(editor, position) {
         return Some(ranges);
     }

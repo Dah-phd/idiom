@@ -28,15 +28,15 @@ const WARN_MD: &str = "The file is opened in markdown mode, \
 
 pub struct Editor {
     pub file_type: FileType,
-    pub display: String,
-    pub path: PathBuf,
+    display: String,
+    path: PathBuf,
     pub lexer: Lexer,
     pub cursor: Cursor,
     pub content: Vec<EditorLine>,
     pub update_status: FileUpdate,
     line_number_padding: usize,
     last_render_at_line: Option<usize>,
-    pub controls: ControlMap,
+    controls: ControlMap,
     pub modal: EditorModal,
     actions: Actions,
     renderer: TuiCodec,
@@ -116,6 +116,14 @@ impl Editor {
             last_render_at_line: None,
             modal: EditorModal::default(),
         })
+    }
+
+    pub fn name(&self) -> &str {
+        self.display.as_str()
+    }
+
+    pub fn path(&self) -> &PathBuf {
+        &self.path
     }
 
     // RENDER
@@ -423,6 +431,14 @@ impl Editor {
             }
         }
         buffer
+    }
+
+    pub fn content(&self) -> &[EditorLine] {
+        &self.content
+    }
+
+    pub fn controls(&self) -> &ControlMap {
+        &self.controls
     }
 
     pub fn get_cursor_rel_render_position(&self) -> Position {

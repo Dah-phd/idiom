@@ -110,7 +110,7 @@ pub fn mouse_handler(
                         _ => editor.mouse_click(position, gs),
                     };
                     gs.insert_mode();
-                    match tree.select_by_path(&editor.path) {
+                    match tree.select_by_path(editor.path()) {
                         Ok(..) => ws.toggle_editor(),
                         Err(error) => gs.error(error),
                     };

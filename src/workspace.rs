@@ -48,9 +48,9 @@ impl Workspace {
             {
                 let mut builder = line.unsafe_builder(&mut gs.backend);
                 builder.push_styled(" ", self.tab_style);
-                builder.push_styled(&editor.display, self.tab_style);
+                builder.push_styled(editor.name(), self.tab_style);
                 for editor in self.editors.iter().skip(1) {
-                    if !builder.push(" | ") || !builder.push(&editor.display) {
+                    if !builder.push(" | ") || !builder.push(editor.name()) {
                         break;
                     };
                 }
@@ -100,7 +100,7 @@ impl Workspace {
     }
 
     pub fn tabs(&self) -> Vec<String> {
-        self.editors.iter().map(|editor| editor.display.to_owned()).collect()
+        self.editors.iter().map(|editor| editor.name().to_owned()).collect()
     }
 
     #[inline(always)]
@@ -111,9 +111,9 @@ impl Workspace {
     #[inline]
     pub fn rename_editors(&mut self, from_path: PathBuf, to_path: PathBuf, gs: &mut GlobalState) {
         if to_path.is_dir() {
-            for editor in self.editors.iter_mut().filter(|e| e.path.starts_with(&from_path)) {
+            for editor in self.editors.iter_mut().filter(|e| e.path().starts_with(&from_path)) {
                 let mut updated_path = PathBuf::new();
-                let mut old = editor.path.iter();
+                let mut old = editor.path().iter();
                 for (new_part, ..) in to_path.iter().zip(&mut old) {
                     updated_path.push(new_part);
                 }
@@ -122,7 +122,7 @@ impl Workspace {
                 }
                 gs.log_if_lsp_error(editor.update_path(updated_path), editor.file_type);
             }
-        } else if let Some(editor) = self.editors.find(|e| e.path == from_path) {
+        } else if let Some(editor) = self.editors.find(|e| e.path() == &from_path) {
             gs.log_if_lsp_error(editor.update_path(to_path), editor.file_type);
         }
     }
@@ -133,9 +133,9 @@ impl Workspace {
         }
         let mut editor = self.editors.remove(idx);
         editor.clear_screen_cache(gs);
-        gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
+        gs.event.push(IdiomEvent::SelectPath(editor.path().to_owned()));
         if editor.update_status.collect() {
-            gs.event.push(file_updated(editor.path.clone()).into());
+            gs.event.push(file_updated(editor.path().to_owned()).into());
         }
         self.editors.insert(0, editor);
     }
@@ -233,9 +233,8 @@ impl Workspace {
             ResourceOp::Rename(rename) => {
                 std::fs::rename(rename.old_uri.path().as_str(), rename.new_uri.path().as_str())?;
                 if let Some(editor) = self.get_editor(rename.old_uri.path().as_str()) {
-                    let path = PathBuf::from(rename.new_uri.path().as_str());
-                    editor.display = path.display().to_string();
-                    editor.path = path;
+                    let new_path = PathBuf::from(rename.new_uri.path().as_str());
+                    editor.update_path(new_path)?;
                 }
             }
         }
@@ -244,7 +243,7 @@ impl Workspace {
 
     fn get_editor<T: Into<PathBuf>>(&mut self, path: T) -> Option<&mut Editor> {
         let path: PathBuf = path.into();
-        self.editors.iter_mut().find(|editor| editor.path == path)
+        self.editors.iter_mut().find(|editor| editor.path() == &path)
     }
 
     // EDITOR BUILDERS
@@ -290,11 +289,11 @@ impl Workspace {
 
     pub async fn new_from(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<bool> {
         let file_path = file_path.canonicalize()?;
-        if let Some(idx) = self.editors.iter().position(|e| e.path == file_path) {
+        if let Some(idx) = self.editors.iter().position(|e| e.path() == &file_path) {
             let mut editor = self.editors.remove(idx);
             editor.clear_screen_cache(gs);
             if editor.update_status.collect() {
-                gs.event.push(file_updated(editor.path.clone()).into());
+                gs.event.push(file_updated(editor.path().to_owned()).into());
             }
             self.editors.insert(0, editor);
             return Ok(false);
@@ -427,7 +426,7 @@ impl Workspace {
 
     pub fn notify_update(&mut self, path: PathBuf, gs: &mut GlobalState) {
         for (idx, editor) in self.editors.iter_mut().enumerate() {
-            if editor.path == path {
+            if editor.path() == &path {
                 let save_status_result = editor.is_saved();
                 if gs.unwrap_or_default(save_status_result, FILE_STATUS_ERR) {
                     return;
@@ -445,7 +444,7 @@ impl Workspace {
         self.toggle_tabs();
         let mut cols_len = 0;
         for (editor_idx, editor) in self.editors.iter().enumerate() {
-            cols_len += editor.display.len() + 3;
+            cols_len += editor.name().len() + 3;
             if col_idx < cols_len {
                 return Some(editor_idx);
             };
@@ -469,7 +468,7 @@ impl Workspace {
             Some(editor) => {
                 editor.clear_screen_cache(gs);
                 if editor.update_status.collect() {
-                    gs.event.push(file_updated(editor.path.clone()).into());
+                    gs.event.push(file_updated(editor.path().to_owned()).into());
                 }
             }
         }
@@ -496,10 +495,10 @@ impl Workspace {
         }
         let mut editor =
             if idx >= self.editors.len() { self.editors.pop().expect("garded") } else { self.editors.remove(idx) };
-        gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
+        gs.event.push(IdiomEvent::SelectPath(editor.path().to_owned()));
         editor.clear_screen_cache(gs);
         if editor.update_status.collect() {
-            gs.event.push(file_updated(editor.path.clone()).into());
+            gs.event.push(file_updated(editor.path().to_owned()).into());
         }
         self.editors.insert(0, editor);
         self.toggle_editor();
@@ -573,16 +572,16 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
                 let editor = &mut ws.editors.inner_mut_no_update()[0];
                 editor.clear_screen_cache(gs);
                 if editor.update_status.collect() {
-                    gs.event.push(file_updated(editor.path.clone()).into());
+                    gs.event.push(file_updated(editor.path().to_owned()).into());
                 }
-                gs.event.push(IdiomEvent::SelectPath(ws.editors.inner()[0].path.clone()));
+                gs.event.push(IdiomEvent::SelectPath(ws.editors.inner()[0].path().to_owned()));
             }
             EditorAction::Left | EditorAction::Unintent => {
                 if let Some(mut editor) = ws.editors.pop() {
-                    gs.event.push(IdiomEvent::SelectPath(editor.path.clone()));
+                    gs.event.push(IdiomEvent::SelectPath(editor.path().to_owned()));
                     editor.clear_screen_cache(gs);
                     if editor.update_status.collect() {
-                        gs.event.push(file_updated(editor.path.clone()).into());
+                        gs.event.push(file_updated(editor.path().to_owned()).into());
                     }
                     ws.editors.insert(0, editor);
                 }
