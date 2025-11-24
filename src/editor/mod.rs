@@ -28,9 +28,9 @@ const WARN_MD: &str = "The file is opened in markdown mode, \
     beware idiom is not designed with MD performance in mind!";
 
 pub struct Editor {
-    pub file_type: FileType,
-    lexer: Lexer,
     pub update_status: FileUpdate,
+    file_type: FileType,
+    lexer: Lexer,
     cursor: Cursor,
     content: Vec<EditorLine>,
     controls: ControlMap,
@@ -161,6 +161,11 @@ impl Editor {
     #[inline]
     pub fn lexer(&self) -> &Lexer {
         &self.lexer
+    }
+
+    #[inline]
+    pub fn file_type(&self) -> &FileType {
+        &self.file_type
     }
 
     // RENDER

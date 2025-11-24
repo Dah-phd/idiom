@@ -120,10 +120,10 @@ impl Workspace {
                 for remaining_part in old {
                     updated_path.push(remaining_part)
                 }
-                gs.log_if_lsp_error(editor.update_path(updated_path), editor.file_type);
+                gs.log_if_lsp_error(editor.update_path(updated_path), *editor.file_type());
             }
         } else if let Some(editor) = self.editors.find(|e| e.path() == &from_path) {
-            gs.log_if_lsp_error(editor.update_path(to_path), editor.file_type);
+            gs.log_if_lsp_error(editor.update_path(to_path), *editor.file_type());
         }
     }
 
@@ -323,10 +323,10 @@ impl Workspace {
     // LSP HANDLES
 
     async fn lsp_enroll(&mut self, editor: &mut Editor, gs: &mut GlobalState) {
-        if !editor.file_type.is_code() {
+        if !editor.file_type().is_code() {
             return; // no lsp for text / markdown files
         }
-        let lsp_cmd = match self.base_configs.derive_lsp(&editor.file_type) {
+        let lsp_cmd = match self.base_configs.derive_lsp(editor.file_type()) {
             None => {
                 editor.lsp_local(gs);
                 return;
@@ -336,12 +336,12 @@ impl Workspace {
 
         // set initial tokens while LSP is indexing
         editor.force_local_lsp_tokens(gs);
-        match self.lsp_servers.entry(editor.file_type) {
-            Entry::Vacant(entry) => match LSP::new(lsp_cmd, editor.file_type).await {
+        match self.lsp_servers.entry(*editor.file_type()) {
+            Entry::Vacant(entry) => match LSP::new(lsp_cmd, *editor.file_type()).await {
                 Ok(lsp) => {
                     let client = lsp.aquire_client();
                     editor.lsp_set(client, gs);
-                    for editor in self.editors.iter_mut().filter(|e| e.file_type == editor.file_type) {
+                    for editor in self.editors.iter_mut().filter(|e| e.file_type() == editor.file_type()) {
                         editor.lsp_set(lsp.aquire_client(), gs);
                     }
                     entry.insert(lsp);
@@ -385,7 +385,7 @@ impl Workspace {
                         return Err(IdiomError::LSP(err));
                     }
                 };
-                for editor in self.editors.iter_mut().filter(|e| e.file_type == file_type) {
+                for editor in self.editors.iter_mut().filter(|e| *e.file_type() == file_type) {
                     editor.lsp_set(lsp.aquire_client(), gs);
                 }
                 entry.insert(lsp);
@@ -418,7 +418,7 @@ impl Workspace {
     #[inline]
     pub fn full_sync(&mut self, file_type: &FileType, gs: &mut GlobalState) {
         if let Some(lsp) = self.lsp_servers.get(file_type) {
-            for editor in self.editors.iter_mut().filter(|e| &e.file_type == file_type) {
+            for editor in self.editors.iter_mut().filter(|e| e.file_type() == file_type) {
                 editor.lsp_set(lsp.aquire_client(), gs);
             }
         }
@@ -516,7 +516,7 @@ impl Workspace {
         self.base_configs = gs.reload_confgs();
         for editor in self.editors.iter_mut() {
             editor.refresh_cfg(&self.base_configs, gs);
-            if let Some(lsp) = self.lsp_servers.get(&editor.file_type) {
+            if let Some(lsp) = self.lsp_servers.get(editor.file_type()) {
                 if !editor.lexer().lsp {
                     editor.lsp_set(lsp.aquire_client(), gs);
                 }

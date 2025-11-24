@@ -35,7 +35,7 @@ pub fn render_marked_word(
     term: &mut EditorTerminal,
 ) -> crate::error::IdiomResult<()> {
     let Some(editor) = ws.get_active() else { return Ok(()) };
-    if !editor.file_type.is_code() {
+    if !editor.file_type().is_code() {
         return Ok(());
     };
 

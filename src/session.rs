@@ -28,7 +28,7 @@ impl<'a> StoreFileData<'a> {
                 let content = store_content.then_some(editor.content().iter().map(|l| l.as_str()).collect());
                 StoreFileData {
                     content,
-                    file_type: editor.file_type,
+                    file_type: *editor.file_type(),
                     path: editor.path().to_owned(),
                     cursor: editor.cursor().clone(),
                 }
