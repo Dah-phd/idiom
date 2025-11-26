@@ -1,4 +1,7 @@
-use crate::ext_tui::{CrossTerm, StyleExt};
+use crate::{
+    editor::EditorStats,
+    ext_tui::{CrossTerm, StyleExt},
+};
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{layout::Line, Backend, UTFSafe};
 use std::{
@@ -12,70 +15,72 @@ const ERR_LOG_LIMIT: usize = 100;
 const LIMIT_MSG_LIST: usize = 3;
 
 #[derive(Debug)]
-pub struct Messages {
-    clock: Instant,
-    active: bool,
+pub struct FootBar {
+    pub line: Line,
+    stats: Option<DocumentStats>,
+    message: Option<Message>,
     messages: Vec<Message>,
-    last_message: Message,
-    line: Line,
     error_log: VecDeque<String>,
+    active: bool,
+    clock: Instant,
 }
 
-impl Messages {
+impl FootBar {
     pub fn new() -> Self {
         Self {
-            clock: Instant::now() - MSG_DURATION,
-            active: false,
-            messages: Vec::new(),
-            last_message: Message::empty(),
-            line: Line::empty(),
-            error_log: VecDeque::new(),
+            stats: Default::default(),
+            message: Default::default(),
+            messages: Default::default(),
+            line: Default::default(),
+            error_log: Default::default(),
+            active: Default::default(),
+            clock: Instant::now(),
         }
     }
 
-    pub fn render(&mut self, accent_style: ContentStyle, backend: &mut CrossTerm) {
-        if self.is_expaired() {
-            self.limit_message_que();
-            match self.messages.pop() {
-                Some(message) => {
-                    self.last_message = message;
-                    self.clock = Instant::now();
-                    self.last_message.render(self.line.clone(), accent_style, backend);
-                }
-                None => {
-                    self.active = false;
-                    backend.set_style(accent_style);
-                    self.line.clone().render_empty(backend);
-                    backend.reset_style()
-                }
+    pub fn fast_render(&mut self, stats: Option<EditorStats>, accent_style: ContentStyle, backend: &mut CrossTerm) {
+        match (self.stats.as_ref(), stats.as_ref()) {
+            (Some(doc_stats), Some(new_stats)) if &doc_stats.stats == new_stats => {}
+            (None, None) => {}
+            _ => {
+                return self.render(stats, accent_style, backend);
             }
-        } else {
-            self.last_message.render(self.line.clone(), accent_style, backend);
         }
-    }
-
-    #[inline]
-    pub fn should_render(&self) -> bool {
-        self.active
-    }
-
-    pub fn fast_render(&mut self, accent_style: ContentStyle, backend: &mut CrossTerm) {
         if !self.active {
             return;
         }
-        self.render(accent_style, backend);
+        if !self.is_expaired() {
+            return;
+        };
+        self.next_message();
+        self.force_rerender(accent_style, backend);
+    }
+
+    #[inline]
+    pub fn render(&mut self, stats: Option<EditorStats>, accent_style: ContentStyle, backend: &mut CrossTerm) {
+        self.stats = stats.map(DocumentStats::new);
+        if self.is_expaired() {
+            self.next_message();
+        }
+        self.force_rerender(accent_style, backend);
+    }
+
+    pub fn force_rerender(&mut self, accent_style: ContentStyle, backend: &mut CrossTerm) {
+        backend.set_style(accent_style);
+        backend.go_to(self.line.row, self.line.col);
+        backend.clear_to_eol();
+        let line = match self.stats.as_ref() {
+            None => self.line.clone(),
+            Some(stats) => stats.render_with_remainder(self.line.clone(), backend),
+        };
+        if let Some(msg) = self.message.as_ref() {
+            msg.render(line, accent_style, backend);
+        }
+        backend.reset_style();
     }
 
     pub fn get_logs(&self) -> impl Iterator<Item = &String> {
         self.error_log.iter()
-    }
-
-    pub fn set_line(&mut self, line: Line) {
-        if self.line == line {
-            return;
-        }
-        self.active = true;
-        self.line = line;
     }
 
     pub fn message(&mut self, message: String) {
@@ -117,6 +122,21 @@ impl Messages {
         }
     }
 
+    fn next_message(&mut self) {
+        self.limit_message_que();
+        match self.messages.pop() {
+            Some(message) => {
+                self.message.replace(message);
+                self.active = true;
+                self.clock = Instant::now();
+            }
+            None => {
+                self.message = None;
+                self.active = false;
+            }
+        }
+    }
+
     fn limit_message_que(&mut self) {
         if self.messages.len() > LIMIT_MSG_LIST {
             self.messages.retain(|m| m.is_err());
@@ -133,6 +153,40 @@ impl Messages {
     #[inline]
     fn is_expaired(&self) -> bool {
         self.clock.elapsed() > MSG_DURATION
+    }
+}
+
+#[derive(Debug)]
+pub struct DocumentStats {
+    text: String,
+    stats: EditorStats,
+}
+
+impl DocumentStats {
+    fn new(stats: EditorStats) -> Self {
+        let text = match stats.select_len != 0 {
+            true => format!(
+                "  Doc Len {}, Ln {}, Col {} ({} selected) ",
+                stats.len, stats.position.line, stats.position.char, stats.select_len,
+            ),
+            false => format!("  Doc Len {}, Ln {}, Col {} ", stats.len, stats.position.line, stats.position.char,),
+        };
+        Self { text, stats }
+    }
+
+    fn render_with_remainder(&self, mut line: Line, backend: &mut CrossTerm) -> Line {
+        match line.width < self.text.len() {
+            true => {
+                line.width = 0;
+                backend.print(&self.text[(self.text.len() - line.width)..]);
+            }
+            false => {
+                line.width -= self.text.len();
+                backend.go_to(line.row, line.col + line.width as u16);
+                backend.print(&self.text);
+            }
+        }
+        line
     }
 }
 
@@ -169,10 +223,6 @@ impl Message {
 
     const fn is_err(&self) -> bool {
         matches!(self, Self::Error(..))
-    }
-
-    const fn empty() -> Self {
-        Self::Text(String::new())
     }
 
     fn msg(message: String) -> Option<Self> {

@@ -3,7 +3,7 @@ mod clipboard;
 mod controls;
 mod draw;
 mod events;
-mod message;
+mod footbar;
 
 use crate::{
     configs::{
@@ -11,6 +11,7 @@ use crate::{
         KEY_MAP, THEME_FILE, THEME_UI,
     },
     cursor::CursorPosition,
+    editor::EditorStats,
     embeded_term::EditorTerminal,
     error::IdiomResult,
     ext_tui::{CrossTerm, StyleExt},
@@ -36,8 +37,8 @@ use idiom_tui::{
 };
 
 use draw::Components;
+use footbar::FootBar;
 use fuzzy_matcher::skim::SkimMatcherV2;
-use message::Messages;
 
 type KeyMapCallback = fn(&KeyEvent, &mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool;
 type MouseMapCallback = fn(MouseEvent, &mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal);
@@ -57,7 +58,7 @@ pub struct GlobalState {
     editor_area: Rect,
     footer_line: Line,
     pub git_tui: Option<String>,
-    messages: Messages,
+    messages: FootBar,
     mode: Mode,
     tree_size: usize,
     key_mapper: KeyMapCallback,
@@ -69,7 +70,7 @@ pub struct GlobalState {
 
 impl GlobalState {
     pub fn new(screen_rect: Rect, backend: CrossTerm) -> Self {
-        let mut messages = Messages::new();
+        let mut messages = FootBar::new();
         let ui_theme = messages.unwrap_or_default(UITheme::new(), THEME_UI);
         let theme = messages.unwrap_or_default(Theme::new(), THEME_FILE);
         Self {
@@ -286,11 +287,9 @@ impl GlobalState {
     }
 
     pub fn fast_render_message_with_preserved_cursor(&mut self) {
-        if self.messages.should_render() {
-            self.backend.save_cursor();
-            self.messages.render(self.ui_theme.accent_style(), &mut self.backend);
-            self.backend.restore_cursor();
-        }
+        self.backend.save_cursor();
+        self.messages.fast_render(None, self.ui_theme.accent_style(), &mut self.backend);
+        self.backend.restore_cursor();
     }
 
     pub fn render_footer_standalone(&mut self) {
@@ -302,8 +301,8 @@ impl GlobalState {
             self.footer_line.clone().split_rel(Mode::len())
         };
         self.mode.render(mode_line, &mut self.backend);
-        self.messages.set_line(msg_line);
-        self.messages.render(self.ui_theme.accent_style(), &mut self.backend);
+        self.messages.line = msg_line;
+        self.messages.render(None, self.ui_theme.accent_style(), &mut self.backend);
     }
 
     /// perform full resize on all componenets
@@ -340,55 +339,16 @@ impl GlobalState {
         self.editor_area.left_border();
     }
 
-    pub fn render_stats(&mut self, len: usize, select_len: usize, cursor: CursorPosition) {
-        let mut line = self.footer_line.clone();
-        if self.components.contains(Components::TREE) || self.is_select() {
-            line += self.tree_size;
-        } else {
-            line += Mode::len();
-        }
-        self.backend.set_style(self.ui_theme.accent_style());
-        let mut rev_builder = line.unsafe_builder_rev(&mut self.backend);
-        if select_len != 0 {
-            rev_builder.push(&format!("({select_len} selected) "));
-        }
-        rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {} ", cursor.line, cursor.char));
-        self.messages.set_line(rev_builder.into_line());
-        self.messages.fast_render(self.ui_theme.accent_style(), &mut self.backend);
-        self.backend.reset_style();
+    pub fn render_stats(&mut self, stats: EditorStats) {
+        self.messages.fast_render(Some(stats), self.ui_theme.accent_style(), &mut self.backend);
     }
 
-    pub fn force_render_stats(&mut self, len: usize, select_len: usize, cursor: CursorPosition) {
-        let mut line = self.footer_line.clone();
-        if self.components.contains(Components::TREE) || self.is_select() {
-            line += self.tree_size;
-        } else {
-            line += Mode::len();
-        }
-        self.backend.set_style(self.ui_theme.accent_style());
-        let mut rev_builder = line.unsafe_builder_rev(&mut self.backend);
-        if select_len != 0 {
-            rev_builder.push(&format!("({select_len} selected) "));
-        }
-        rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {} ", cursor.line, cursor.char));
-        self.messages.set_line(rev_builder.into_line());
-        self.messages.render(self.ui_theme.accent_style(), &mut self.backend);
-        self.backend.reset_style();
+    pub fn force_render_stats(&mut self, stats: EditorStats) {
+        self.messages.render(Some(stats), self.ui_theme.accent_style(), &mut self.backend);
     }
 
     pub fn clear_stats(&mut self) {
-        let mut line = self.footer_line.clone();
-        let accent_style = self.ui_theme.accent_style();
-        if self.components.contains(Components::TREE) || self.is_select() {
-            line += self.tree_size;
-        } else {
-            line += Mode::len();
-        }
-        self.backend.set_style(accent_style);
-        self.backend.go_to(line.row, line.col);
-        self.backend.clear_to_eol();
-        self.backend.reset_style();
-        self.messages.render(accent_style, &mut self.backend);
+        self.messages.render(None, self.ui_theme.accent_style(), &mut self.backend);
     }
 
     // SCREEN ACCESS
