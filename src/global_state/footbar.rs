@@ -34,7 +34,7 @@ impl FootBar {
             line: Default::default(),
             error_log: Default::default(),
             active: Default::default(),
-            clock: Instant::now(),
+            clock: Instant::now() - Duration::from_secs(4),
         }
     }
 
@@ -208,17 +208,11 @@ impl Message {
             Message::Text(text) => (None, text.as_str()),
         };
 
-        let (pad_width, text) = text.truncate_width(width - 2);
-        let reset_style = backend.get_style();
+        let (.., text) = text.truncate_width(width - 2);
         accent_style.set_fg(color);
-        backend.set_style(accent_style);
         backend.go_to(row, col);
         backend.pad(2);
-        backend.print(text);
-        if pad_width != 0 {
-            backend.pad(pad_width);
-        }
-        backend.set_style(reset_style);
+        backend.print_styled(text, accent_style);
     }
 
     const fn is_err(&self) -> bool {

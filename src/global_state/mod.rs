@@ -52,13 +52,13 @@ pub struct GlobalState {
     pub matcher: SkimMatcherV2,
     pub event: Vec<IdiomEvent>,
     pub clipboard: Clipboard,
+    pub git_tui: Option<String>,
     screen_rect: Rect,
     tree_area: Rect,
     tab_area: Rect,
     editor_area: Rect,
     footer_line: Line,
-    pub git_tui: Option<String>,
-    messages: FootBar,
+    footer: FootBar,
     mode: Mode,
     tree_size: usize,
     key_mapper: KeyMapCallback,
@@ -92,7 +92,7 @@ impl GlobalState {
             editor_area: Rect::default(),
             footer_line: Line::default(),
             matcher: SkimMatcherV2::default(),
-            messages,
+            footer: messages,
             components: Components::default(),
         }
     }
@@ -288,7 +288,7 @@ impl GlobalState {
 
     pub fn fast_render_message_with_preserved_cursor(&mut self) {
         self.backend.save_cursor();
-        self.messages.fast_render(None, self.ui_theme.accent_style(), &mut self.backend);
+        self.footer.fast_render(None, self.ui_theme.accent_style(), &mut self.backend);
         self.backend.restore_cursor();
     }
 
@@ -301,8 +301,8 @@ impl GlobalState {
             self.footer_line.clone().split_rel(Mode::len())
         };
         self.mode.render(mode_line, &mut self.backend);
-        self.messages.line = msg_line;
-        self.messages.render(None, self.ui_theme.accent_style(), &mut self.backend);
+        self.footer.line = msg_line;
+        self.footer.render(None, self.ui_theme.accent_style(), &mut self.backend);
     }
 
     /// perform full resize on all componenets
@@ -340,15 +340,15 @@ impl GlobalState {
     }
 
     pub fn render_stats(&mut self, stats: EditorStats) {
-        self.messages.fast_render(Some(stats), self.ui_theme.accent_style(), &mut self.backend);
+        self.footer.fast_render(Some(stats), self.ui_theme.accent_style(), &mut self.backend);
     }
 
     pub fn force_render_stats(&mut self, stats: EditorStats) {
-        self.messages.render(Some(stats), self.ui_theme.accent_style(), &mut self.backend);
+        self.footer.render(Some(stats), self.ui_theme.accent_style(), &mut self.backend);
     }
 
     pub fn clear_stats(&mut self) {
-        self.messages.render(None, self.ui_theme.accent_style(), &mut self.backend);
+        self.footer.render(None, self.ui_theme.accent_style(), &mut self.backend);
     }
 
     // SCREEN ACCESS
@@ -377,23 +377,23 @@ impl GlobalState {
 
     #[inline]
     pub fn message(&mut self, msg: impl Into<String>) {
-        self.messages.message(msg.into());
+        self.footer.message(msg.into());
     }
 
     #[inline]
     pub fn error(&mut self, error: impl ToString) {
-        self.messages.error(error.to_string());
+        self.footer.error(error.to_string());
     }
 
     #[inline]
     pub fn success(&mut self, msg: impl Into<String>) {
-        self.messages.success(msg.into());
+        self.footer.success(msg.into());
     }
 
     /// unwrap or default with logged error
     #[inline]
     pub fn unwrap_or_default<T: Default, E: Error>(&mut self, result: Result<T, E>, prefix: &str) -> T {
-        self.messages.unwrap_or_default(result, prefix)
+        self.footer.unwrap_or_default(result, prefix)
     }
 
     /// logs IdiomError and drops the result
@@ -418,7 +418,7 @@ impl GlobalState {
         match err {
             LSPError::Null => (),
             LSPError::InternalError(message) => {
-                self.messages.error(message);
+                self.footer.error(message);
                 self.event.push(IdiomEvent::CheckLSP(file_type));
             }
             _ => self.error(err),

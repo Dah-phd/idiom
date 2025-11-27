@@ -127,7 +127,7 @@ impl IdiomEvent {
                         id += 1;
                     }
                     let content: Vec<EditorLine> =
-                        gs.messages.get_logs().map(ToOwned::to_owned).map(EditorLine::from).collect();
+                        gs.footer.get_logs().map(ToOwned::to_owned).map(EditorLine::from).collect();
                     if !content.is_empty() {
                         ws.new_text_from_data(path, content, None, gs);
                     } else {
