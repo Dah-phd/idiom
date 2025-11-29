@@ -90,11 +90,11 @@ pub fn md_line(
     match text.is_simple() {
         true => match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
             Some(select) => ascii::line_with_select(text, select, lines, ctx, gs),
-            None => markdown::ascii_line(text, lines, ctx, gs.backend()),
+            None => markdown::ascii_line_exact(text, lines, ctx, gs.backend()),
         },
         false => match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
             Some(select) => complex::line_with_select(text, select, lines, ctx, gs),
-            None => markdown::complex_line(text, lines, ctx, gs.backend()),
+            None => markdown::complex_line_exact(text, lines, ctx, gs.backend()),
         },
     }
 }

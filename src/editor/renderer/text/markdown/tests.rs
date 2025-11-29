@@ -4,7 +4,7 @@ use super::{
         md_line,
         tests::drain_as_raw_text_qmark_cursor,
     },
-    ascii_line, ascii_line_exact, complex_line, complex_line_exact,
+    ascii_line_exact, complex_line_exact,
 };
 use crate::{
     configs::FileType,
@@ -180,7 +180,6 @@ fn test_exact_md_ascii() {
         ContentStyle::fg(Color::DarkGrey),
     );
     let mut lines = ea.into_iter();
-    let mut after_lines = ea.into_iter();
     let text_width = lines.width() - ctx.line_prefix_len();
 
     let text = &mut editor.content[0];
@@ -195,14 +194,6 @@ fn test_exact_md_ascii() {
         "<<go to row: 3 col: 15>>", "   ", "<<clear EOL>>"  // empty for required len
     ]);
 
-    ascii_line(text, &mut after_lines, &mut ctx, gs.backend());
-    let result = drain_as_raw_text_qmark_cursor(&mut gs);
-    #[rustfmt::skip]
-    assert_eq!(result, [
-        "<<go to row: 1 col: 15>>", " 2 ", "<<clear EOL>>", "content ", "<<set style>>", "content", "<<set style>>", " ", "<<set style>>", "asdwa", "<<set style>>", " asdwa",
-        "<<go to row: 2 col: 15>>", "   ", "<<clear EOL>>", "dasjukhdfajskfhgasjkf", "<<reset style>>",
-    ]);
-
     let text = &mut editor.content[1];
     let wd = WrapData::from_text_cached(text, text_width);
     assert_eq!(wd.count(), 1);
@@ -210,14 +201,7 @@ fn test_exact_md_ascii() {
     let result = drain_as_raw_text_qmark_cursor(&mut gs);
     #[rustfmt::skip]
     assert_eq!(result, [
-        "<<go to row: 4 col: 15>>", " 3 ", "<<clear EOL>>", "<<set style>>", "c", "<<set style>>", "<<padding: 4>>", "https://codeberg.org", "<<reset style>>"
-    ]);
-
-    ascii_line(text, &mut after_lines, &mut ctx, gs.backend());
-    let result = drain_as_raw_text_qmark_cursor(&mut gs);
-    #[rustfmt::skip]
-    assert_eq!(result, [
-        "<<go to row: 3 col: 15>>", " 4 ", "<<clear EOL>>", "<<set style>>", "c", "<<set style>>", "<<padding: 4>>", "https://codeberg.org", "<<reset style>>"
+        "<<go to row: 4 col: 15>>", " 2 ", "<<clear EOL>>", "<<set style>>", "c", "<<set style>>", "<<padding: 4>>", "https://codeberg.org", "<<reset style>>"
     ]);
 }
 
@@ -241,7 +225,6 @@ fn test_exact_md_complex() {
         ContentStyle::fg(Color::DarkGrey),
     );
     let mut lines = ea.into_iter();
-    let mut after_lines = ea.into_iter();
     let text_width = lines.width() - ctx.line_prefix_len();
 
     let text = &mut editor.content[0];
@@ -262,20 +245,6 @@ fn test_exact_md_complex() {
         "<<go to row: 3 col: 15>>", "   ", "<<clear EOL>>"  // empty for required len
     ]);
 
-    complex_line(text, &mut after_lines, &mut ctx, gs.backend());
-    let result = drain_as_raw_text_qmark_cursor(&mut gs);
-    #[rustfmt::skip]
-    assert_eq!(result, [
-        "<<go to row: 1 col: 15>>", " 2 ", "<<clear EOL>>",
-        "c","o","n","t","e","n","t"," ",
-        "<<set style>>", "c","o","n","🦀","n","t",
-        "<<set style>>", " ",
-        "<<set style>>", "a","🦀","w","a",
-        "<<set style>>", " ","a","s","d","w","a",
-        "<<go to row: 2 col: 15>>", "   ", "<<clear EOL>>",
-        "d","a","s","j","u","k","h","d","f","a","j","s","k","f","h","g","a","s","j","k","f", "<<reset style>>",
-    ]);
-
     let text = &mut editor.content[1];
     let wd = WrapData::from_text_cached(text, text_width);
     assert_eq!(wd.count(), 2);
@@ -283,17 +252,9 @@ fn test_exact_md_complex() {
     let result = drain_as_raw_text_qmark_cursor(&mut gs);
     #[rustfmt::skip]
     assert_eq!(result, [
-        "<<go to row: 4 col: 15>>", " 3 ", "<<clear EOL>>", "<<set style>>", "c", "b", "<<set style>>",
+        "<<go to row: 4 col: 15>>", " 2 ", "<<clear EOL>>", "<<set style>>", "c", "b", "<<set style>>",
         "<<padding: 4>>", "https://code🦀rg.org/", "<<reset style>>", // link text
         "<<go to row: 5 col: 15>>", "   ", "<<clear EOL>>" // link is always single line
-    ]);
-
-    complex_line(text, &mut after_lines, &mut ctx, gs.backend());
-    let result = drain_as_raw_text_qmark_cursor(&mut gs);
-    #[rustfmt::skip]
-    assert_eq!(result, [
-        "<<go to row: 3 col: 15>>", " 4 ", "<<clear EOL>>", "<<set style>>", "c", "b", "<<set style>>",
-        "<<padding: 4>>", "https://code🦀rg.org/", "<<reset style>>", // link text
     ]);
 }
 
@@ -329,9 +290,10 @@ fn test_md_editor() {
         "content ","<<set style>>","content","<<set style>>"," ","<<set style>>","asdwa","<<set style>>"," asdwad",
         "<<go to row: 8 col: 15>>", "  ", "<<clear EOL>>",
         "asjukhdfajskfhgasjkfad","<<reset style>>",
-        "<<go to row: 9 col: 15>>", "5 ", "<<clear EOL>>",
+        "<<go to row: 9 col: 15>>", "  ", "<<clear EOL>>",
+        "<<go to row: 10 col: 15>>", "5 ", "<<clear EOL>>",
         "<<set style>>","c","<<set style>>","<<padding: 4>>","https://codeberg.org/ad","<<reset style>>",
-        "<<go to row: 10 col: 15>>", "<<padding: 30>>", "<<go to row: 11 col: 15>>", "<<padding: 30>>",
+        "<<go to row: 11 col: 15>>", "  ", "<<clear EOL>>",
         "<<go to row: 12 col: 15>>", "<<padding: 30>>", "<<go to row: 13 col: 15>>", "<<padding: 30>>",
         "<<go to row: 14 col: 15>>", "<<padding: 30>>", "<<go to row: 15 col: 15>>", "<<padding: 30>>",
         "<<go to row: 16 col: 15>>", "<<padding: 30>>", "<<go to row: 17 col: 15>>", "<<padding: 30>>",
@@ -379,16 +341,13 @@ fn test_md_editor_complex() {
         "<<set style>>", " ", "a", "s", "d", "w", "a", "d",
         "<<go to row: 8 col: 15>>", "  ", "<<clear EOL>>",
         "a","s","j","u","k","h","d","f","a","j","s","k","f","h","g","a","s","j","k","f","a","d","<<reset style>>",
-        "<<go to row: 9 col: 15>>", "5 ", "<<clear EOL>>",
+        "<<go to row: 9 col: 15>>", "  ", "<<clear EOL>>",
+        "<<go to row: 10 col: 15>>", "5 ", "<<clear EOL>>",
         "<<set style>>", "c", "b", "<<set style>>", "<<padding: 4>>", "https://code🦀rg.org/c", "<<reset style>>",
-        "<<go to row: 10 col: 15>>", "<<padding: 30>>",
-        "<<go to row: 11 col: 15>>", "<<padding: 30>>",
-        "<<go to row: 12 col: 15>>", "<<padding: 30>>",
-        "<<go to row: 13 col: 15>>", "<<padding: 30>>",
-        "<<go to row: 14 col: 15>>", "<<padding: 30>>",
-        "<<go to row: 15 col: 15>>", "<<padding: 30>>",
-        "<<go to row: 16 col: 15>>", "<<padding: 30>>",
-        "<<go to row: 17 col: 15>>", "<<padding: 30>>",
+        "<<go to row: 11 col: 15>>", "  ", "<<clear EOL>>",
+        "<<go to row: 12 col: 15>>", "<<padding: 30>>", "<<go to row: 13 col: 15>>", "<<padding: 30>>",
+        "<<go to row: 14 col: 15>>", "<<padding: 30>>", "<<go to row: 15 col: 15>>", "<<padding: 30>>",
+        "<<go to row: 16 col: 15>>", "<<padding: 30>>", "<<go to row: 17 col: 15>>", "<<padding: 30>>",
         "<<go to row: 18 col: 15>>", "<<padding: 30>>",
         "<<unfreeze>>",
     ];

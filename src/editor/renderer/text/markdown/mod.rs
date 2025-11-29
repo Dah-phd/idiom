@@ -40,13 +40,6 @@ const HEADING_NEXT: ContentStyle = ContentStyle {
     attributes: Attributes::none().with(Attribute::Bold).with(Attribute::Italic).with(Attribute::Underlined),
 };
 
-pub fn ascii_line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
-    let Some(line) = lines.next() else { return };
-    let text_width = ctx.setup_line(line, backend);
-    parse_tag(text.as_str()).render_ascii(text_width, text_width, lines, ctx, backend);
-    backend.reset_style();
-}
-
 pub fn ascii_line_exact(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
     let Some(line) = lines.next() else { return };
     let text_width = ctx.setup_line(line, backend);
@@ -57,13 +50,6 @@ pub fn ascii_line_exact(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut L
     for remaining_line in take_lines {
         ctx.wrap_line(remaining_line, backend);
     }
-}
-
-pub fn complex_line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
-    let Some(line) = lines.next() else { return };
-    let text_width = ctx.setup_line(line, backend);
-    parse_tag(text.as_str()).render(text_width, text_width, lines, ctx, backend);
-    backend.reset_style();
 }
 
 pub fn complex_line_exact(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
