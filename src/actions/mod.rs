@@ -343,7 +343,7 @@ impl Actions {
 
     pub fn push_char(&mut self, ch: char, cursor: &mut Cursor, content: &mut Vec<EditorLine>, lexer: &mut Lexer) {
         match cursor.select_take_direction() {
-            Some((from, to, dir)) => match get_closing_char(ch) {
+            Some(((from, to), dir)) => match get_closing_char(ch) {
                 Some(closing) => {
                     content[to.line].insert_simple(to.char, closing, lexer.encoding());
                     content[from.line].insert_simple(from.char, ch, lexer.encoding());

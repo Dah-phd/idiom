@@ -1,5 +1,9 @@
 use super::word::{PositionedWord, WordRange};
-use crate::editor_line::EditorLine;
+use super::{
+    positions::{checked_select, checked_select_with_direction},
+    CursorPosition,
+};
+use crate::{editor_line::EditorLine, utils::Direction};
 
 fn match_char_range_to_word_range(range: WordRange, char_idx: usize, content: &[EditorLine]) {
     let char_range = WordRange::find_char_range(&content[range.line()], char_idx).unwrap();
@@ -166,6 +170,72 @@ fn test_find_word_inline_to() {
         assert_eq!(content[range.line()].get(range.from(), range.to()), Some(word.as_str()));
         match_char_range_to_word_range(range, range.from(), &content);
     }
+}
+
+#[test]
+fn test_checked_select() {
+    let pos = CursorPosition { line: 1, char: 0 };
+    let pos2 = CursorPosition { line: 2, char: 0 };
+    assert!(pos < pos2);
+    let select = checked_select(pos, pos2);
+    assert_eq!(Some((pos, pos2)), select);
+
+    let pos = CursorPosition { line: 2, char: 0 };
+    let pos2 = CursorPosition { line: 1, char: 0 };
+    assert!(pos > pos2);
+    let select = checked_select(pos, pos2);
+    assert_eq!(Some((pos2, pos)), select);
+
+    let pos = CursorPosition { line: 2, char: 0 };
+    let pos2 = CursorPosition { line: 2, char: 5 };
+    assert!(pos < pos2);
+    let select = checked_select(pos, pos2);
+    assert_eq!(Some((pos, pos2)), select);
+
+    let pos = CursorPosition { line: 2, char: 10 };
+    let pos2 = CursorPosition { line: 2, char: 5 };
+    assert!(pos > pos2);
+    let select = checked_select(pos, pos2);
+    assert_eq!(Some((pos2, pos)), select);
+
+    let pos = CursorPosition { line: 2, char: 0 };
+    let pos2 = CursorPosition { line: 2, char: 0 };
+    assert!(pos == pos2);
+    let select = checked_select(pos, pos2);
+    assert_eq!(None, select);
+}
+
+#[test]
+fn test_checked_select_direction() {
+    let pos = CursorPosition { line: 1, char: 0 };
+    let pos2 = CursorPosition { line: 2, char: 0 };
+    assert!(pos < pos2);
+    let select = checked_select_with_direction(pos, pos2);
+    assert_eq!(Some(((pos, pos2), Direction::Normal)), select);
+
+    let pos = CursorPosition { line: 2, char: 0 };
+    let pos2 = CursorPosition { line: 1, char: 0 };
+    assert!(pos > pos2);
+    let select = checked_select_with_direction(pos, pos2);
+    assert_eq!(Some(((pos2, pos), Direction::Reversed)), select);
+
+    let pos = CursorPosition { line: 2, char: 0 };
+    let pos2 = CursorPosition { line: 2, char: 5 };
+    assert!(pos < pos2);
+    let select = checked_select_with_direction(pos, pos2);
+    assert_eq!(Some(((pos, pos2), Direction::Normal)), select);
+
+    let pos = CursorPosition { line: 2, char: 5 };
+    let pos2 = CursorPosition { line: 2, char: 1 };
+    assert!(pos > pos2);
+    let select = checked_select_with_direction(pos, pos2);
+    assert_eq!(Some(((pos2, pos), Direction::Reversed)), select);
+
+    let pos = CursorPosition { line: 2, char: 0 };
+    let pos2 = CursorPosition { line: 2, char: 0 };
+    assert!(pos == pos2);
+    let select = checked_select_with_direction(pos, pos2);
+    assert_eq!(None, select);
 }
 
 #[test]

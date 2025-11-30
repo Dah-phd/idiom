@@ -1,4 +1,6 @@
+use crate::utils::Direction;
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 
 pub type Select = (CursorPosition, CursorPosition);
 
@@ -69,32 +71,20 @@ impl CharRangeUnbound {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct SelectPosition {
-    pub from: CursorPosition,
-    pub to: CursorPosition,
-    swaped: bool,
+#[inline]
+pub fn checked_select(from: CursorPosition, to: CursorPosition) -> Option<Select> {
+    match from.cmp(&to) {
+        Ordering::Greater => Some((to, from)),
+        Ordering::Equal => None,
+        Ordering::Less => Some((from, to)),
+    }
 }
 
-impl SelectPosition {
-    pub fn cursor_pos(&self) -> CursorPosition {
-        match self.swaped {
-            true => self.from,
-            false => self.to,
-        }
-    }
-
-    pub fn init_pos(&self) -> CursorPosition {
-        match self.swaped {
-            true => self.to,
-            false => self.from,
-        }
-    }
-
-    pub fn init_to_cursor(&self) -> (CursorPosition, CursorPosition) {
-        match self.swaped {
-            true => (self.to, self.from),
-            false => (self.from, self.to),
-        }
+#[inline]
+pub fn checked_select_with_direction(from: CursorPosition, to: CursorPosition) -> Option<(Select, Direction)> {
+    match from.cmp(&to) {
+        Ordering::Greater => Some(((to, from), Direction::Reversed)),
+        Ordering::Equal => None,
+        Ordering::Less => Some(((from, to), Direction::Normal)),
     }
 }

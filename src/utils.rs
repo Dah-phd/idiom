@@ -225,6 +225,7 @@ impl From<usize> for Offset {
 /// Example with selecting of value, in order to be able to parse text effectively
 /// it makes sense to start from smaller value, in certain cases also the information
 /// regarding the original state is need - that is the used case for the Direction.
+#[derive(Debug, PartialEq)]
 pub enum Direction {
     Normal,
     Reversed,

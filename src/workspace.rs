@@ -1045,14 +1045,14 @@ pub mod tests {
         let mut test_cursor = Cursor::default();
         let position_l3 = CursorPosition { line: 3, char: 2 };
         test_cursor.select_set(position_l3, CursorPosition::default());
-        let (from, to, dir) = test_cursor.select_get_direction().unwrap();
+        let ((from, to), dir) = test_cursor.select_get_direction().unwrap();
         assert_eq!((from, to), (CursorPosition::default(), position_l3));
         dir.apply_ordered(from, to, |first, second| {
             assert_eq!((first, second), (position_l3, CursorPosition::default()))
         });
 
         test_cursor.select_set(CursorPosition::default(), position_l3);
-        let (from, to, dir) = test_cursor.select_get_direction().unwrap();
+        let ((from, to), dir) = test_cursor.select_get_direction().unwrap();
         assert_eq!((from, to), (CursorPosition::default(), position_l3));
         dir.apply_ordered(from, to, |first, second| {
             assert_eq!((first, second), (CursorPosition::default(), position_l3))
@@ -1064,14 +1064,14 @@ pub mod tests {
         let mut test_cursor = Cursor::default();
         let position_l3 = CursorPosition { line: 3, char: 2 };
         test_cursor.select_set(position_l3, CursorPosition::default());
-        let (from, to, dir) = test_cursor.select_take_direction().unwrap();
+        let ((from, to), dir) = test_cursor.select_take_direction().unwrap();
         assert_eq!((from, to), (CursorPosition::default(), position_l3));
         dir.apply_ordered(from, to, |first, second| {
             assert_eq!((first, second), (position_l3, CursorPosition::default()))
         });
 
         test_cursor.select_set(CursorPosition::default(), position_l3);
-        let (from, to, dir) = test_cursor.select_take_direction().unwrap();
+        let ((from, to), dir) = test_cursor.select_take_direction().unwrap();
         assert_eq!((from, to), (CursorPosition::default(), position_l3));
         dir.apply_ordered(from, to, |first, second| {
             assert_eq!((first, second), (CursorPosition::default(), position_l3))

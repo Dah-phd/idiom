@@ -6,7 +6,9 @@ use idiom_tui::layout::Rect;
 use lsp_types::Position;
 use serde::{Deserialize, Serialize};
 
-pub use positions::{CharRange, CharRangeUnbound, CursorPosition, Select, SelectPosition};
+pub use positions::{
+    checked_select, checked_select_with_direction, CharRange, CharRangeUnbound, CursorPosition, Select,
+};
 pub use word::{EncodedWordRange, PositionedWord, WordRange};
 
 #[derive(Debug, Default, Deserialize, Serialize, Clone, PartialEq)]
@@ -402,56 +404,28 @@ impl Cursor {
     pub fn select_get(&self) -> Option<Select> {
         match self.select.as_ref() {
             None => None,
-            Some(from) => {
-                let cursor = CursorPosition::from(self);
-                if from.line > self.line || from.line == self.line && from.char > self.char {
-                    Some((cursor, *from))
-                } else {
-                    Some((*from, cursor))
-                }
-            }
+            Some(from) => checked_select(*from, CursorPosition::from(self)),
         }
     }
 
-    pub fn select_get_direction(&self) -> Option<(CursorPosition, CursorPosition, Direction)> {
+    pub fn select_get_direction(&self) -> Option<(Select, Direction)> {
         match self.select.as_ref() {
             None => None,
-            Some(from) => {
-                let cursor = CursorPosition::from(self);
-                if from.line > self.line || from.line == self.line && from.char > self.char {
-                    Some((cursor, *from, Direction::Reversed))
-                } else {
-                    Some((*from, cursor, Direction::Normal))
-                }
-            }
+            Some(from) => checked_select_with_direction(*from, CursorPosition::from(self)),
         }
     }
 
     pub fn select_take(&mut self) -> Option<Select> {
         match self.select.take() {
             None => None,
-            Some(from) => {
-                let cursor = CursorPosition { line: self.line, char: self.char };
-                if from.line > self.line || from.line == self.line && from.char > self.char {
-                    Some((cursor, from))
-                } else {
-                    Some((from, cursor))
-                }
-            }
+            Some(from) => checked_select(from, CursorPosition::from(self)),
         }
     }
 
-    pub fn select_take_direction(&mut self) -> Option<(CursorPosition, CursorPosition, Direction)> {
+    pub fn select_take_direction(&mut self) -> Option<(Select, Direction)> {
         match self.select.take() {
             None => None,
-            Some(from) => {
-                let to = CursorPosition { line: self.line, char: self.char };
-                if from > to {
-                    Some((to, from, Direction::Reversed))
-                } else {
-                    Some((from, to, Direction::Normal))
-                }
-            }
+            Some(from) => checked_select_with_direction(from, CursorPosition::from(self)),
         }
     }
 
@@ -469,12 +443,6 @@ impl Cursor {
                 len + to.char
             })
             .unwrap_or_default()
-    }
-
-    /// retrn the starting point of select
-    /// the value can be smaller or bigger than current poistion
-    pub fn select_from_raw(&self) -> Option<CursorPosition> {
-        self.select
     }
 
     pub fn select_word(&mut self, content: &[EditorLine]) {
@@ -599,18 +567,6 @@ impl Cursor {
     }
 }
 
-impl From<SelectPosition> for (CursorPosition, CursorPosition) {
-    fn from(value: SelectPosition) -> Self {
-        (value.from, value.to)
-    }
-}
-
-impl From<&SelectPosition> for (CursorPosition, CursorPosition) {
-    fn from(value: &SelectPosition) -> Self {
-        (value.from, value.to)
-    }
-}
-
 impl From<&mut Cursor> for CursorPosition {
     fn from(value: &mut Cursor) -> Self {
         Self { line: value.line, char: value.char }
@@ -668,12 +624,6 @@ impl From<&Position> for CursorPosition {
 impl PartialEq<CursorPosition> for Cursor {
     fn eq(&self, position: &CursorPosition) -> bool {
         self.line == position.line && self.char == position.char
-    }
-}
-
-impl From<&mut SelectPosition> for (CursorPosition, CursorPosition) {
-    fn from(value: &mut SelectPosition) -> Self {
-        (value.from, value.to)
     }
 }
 
