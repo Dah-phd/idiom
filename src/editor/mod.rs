@@ -195,7 +195,7 @@ impl Editor {
     /// check that lines have render cache
     /// estimates if there has been changes to the data within content
     #[inline]
-    pub fn has_render_cache(&self) -> bool {
+    pub fn has_render_cache(&mut self) -> bool {
         let render_line_maches = matches!(self.last_render_at_line, Some(val) if val == self.cursor.at_line);
         render_line_maches && TuiCodec::all_lines_cached(self)
     }

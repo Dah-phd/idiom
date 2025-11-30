@@ -35,7 +35,7 @@ impl TuiCodec {
         Self { render: md_render, fast_render: fast_md_render }
     }
 
-    pub fn all_lines_cached(editor: &Editor) -> bool {
+    pub fn all_lines_cached(editor: &mut Editor) -> bool {
         match editor.file_type.is_code() {
             true => editor
                 .content
@@ -45,14 +45,15 @@ impl TuiCodec {
                 .all(|line| !line.cached.is_none()),
             false => {
                 let mut rows = editor.cursor.max_rows;
-                let idx = editor.cursor.at_line;
+                let mut idx = editor.cursor.at_line;
                 while rows != 0 {
-                    let Some(line) = editor.content.get(idx) else { break };
+                    let Some(line) = editor.content.get_mut(idx) else { break };
                     if line.cached.is_none() {
                         return false;
                     }
-                    let estimated_wraps = line.len().div_ceil(editor.cursor.text_width);
-                    rows = rows.saturating_sub(estimated_wraps);
+                    let wraps = WrapData::from_text_cached(line, editor.cursor.text_width).count();
+                    rows = rows.saturating_sub(wraps);
+                    idx += 1;
                 }
                 true
             }
