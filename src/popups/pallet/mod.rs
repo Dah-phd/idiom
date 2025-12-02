@@ -1,15 +1,16 @@
 mod change_state;
+mod command_patterns;
 mod formatting;
 use super::{popup_file_open::OpenFileSelector, Command, CommandResult, Components, Popup, Status};
 use crate::{
     configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
-    editor_line::EditorLine,
     embeded_term::EditorTerminal,
     ext_tui::{text_field::map_key, State, StyleExt},
     global_state::{GlobalState, IdiomEvent},
     tree::Tree,
     workspace::Workspace,
 };
+use command_patterns::Pattern;
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
 use fuzzy_matcher::FuzzyMatcher;
@@ -18,8 +19,6 @@ use idiom_tui::{
     text_field::{Status as InputStatus, TextField},
     Position,
 };
-use std::path::PathBuf;
-use std::process::{Command as SysCommand, Stdio};
 
 enum Mode {
     Cmd,
@@ -56,69 +55,8 @@ impl Popup for Pallet {
                         CommandResult::BigCB(cb) => cb(gs, ws, tree, term),
                     },
                     Mode::Cmd => {
-                        if self.pattern.as_str() == "ss" {
-                            if let Some(editor) = ws.get_active() {
-                                editor.select_scope();
-                            }
-                        } else if self.pattern.as_str().starts_with("e|") {
-                            let full_cmd = &self.pattern.as_str()[2..];
-                            if full_cmd.is_empty() {
-                                return Status::Finished;
-                            }
-                            let name: String = full_cmd
-                                .chars()
-                                .map(|c| if c.is_ascii_alphabetic() || c.is_ascii_digit() { c } else { '_' })
-                                .collect();
-
-                            let mut cmd_split = full_cmd.split(" ");
-                            let Some(cmd) = cmd_split.next() else {
-                                return Status::Finished;
-                            };
-                            match PathBuf::from("./").canonicalize() {
-                                Ok(base_path) => {
-                                    let mut path = base_path.clone();
-                                    path.push(format!("{name}.out"));
-                                    let mut id = 0_usize;
-                                    while path.exists() {
-                                        path = base_path.clone();
-                                        path.push(format!("{name}_{id}.out"));
-                                        id += 1;
-                                    }
-                                    let child = SysCommand::new(cmd)
-                                        .args(cmd_split)
-                                        .stdout(Stdio::piped())
-                                        .stderr(Stdio::piped())
-                                        .spawn();
-
-                                    match child.and_then(|c| c.wait_with_output()) {
-                                        Ok(out) => {
-                                            let mut content = vec![];
-                                            if out.status.success() {
-                                                // adds errors on top
-                                                content.extend(
-                                                    String::from_utf8_lossy(&out.stderr).lines().map(EditorLine::from),
-                                                );
-                                                content.extend(
-                                                    String::from_utf8_lossy(&out.stdout).lines().map(EditorLine::from),
-                                                );
-                                            } else {
-                                                // adds out on top
-                                                content.extend(
-                                                    String::from_utf8_lossy(&out.stdout).lines().map(EditorLine::from),
-                                                );
-                                                content.extend(
-                                                    String::from_utf8_lossy(&out.stderr).lines().map(EditorLine::from),
-                                                );
-                                            }
-                                            if !content.is_empty() {
-                                                ws.new_text_from_data(path, content, None, gs);
-                                            }
-                                        }
-                                        Err(error) => gs.error(error),
-                                    }
-                                }
-                                Err(error) => gs.error(error),
-                            }
+                        if let Some(cmd_pattern) = Pattern::parse(self.pattern.as_str()) {
+                            cmd_pattern.execute(ws, gs);
                         }
                     }
                 }
