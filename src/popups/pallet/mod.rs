@@ -224,11 +224,14 @@ impl Pallet {
 
         let select = gs.get_select_style();
         let mut line_builder = line.unsafe_builder(gs.backend());
-        line_builder.push(" : ");
+        line_builder.push(" i: ");
         self.pattern.insert_formatted_text(line_builder, ContentStyle::reversed(), select);
 
         let Some(line) = lines.next() else { return };
-        line.render("resolution", gs.backend());
+        match Pattern::parse(self.pattern.as_str()) {
+            Some(cmd_pattern) => line.render(&cmd_pattern.to_string(), gs.backend()),
+            None => line.render(" ...", gs.backend()),
+        };
     }
 
     pub fn get_pallet_rect(gs: &GlobalState) -> Rect {

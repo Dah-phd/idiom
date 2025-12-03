@@ -93,14 +93,43 @@ impl<'a> Pattern<'a> {
     }
 }
 
+impl ToString for Pattern<'_> {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Select(pat) => format!(" select {} ", pat.as_str()),
+            Self::Pipe { cmd, target } => format!(" pipe {} > {} ", cmd, target.as_str()),
+        }
+    }
+}
+
 pub enum PipeTarget {
     File,
     Term,
     Null,
 }
 
+impl PipeTarget {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::File => "editor",
+            Self::Term => "term",
+            Self::Null => "/dev/null",
+        }
+    }
+}
+
 pub enum SelectPat {
     Scope,
     Word,
     File,
+}
+
+impl SelectPat {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Scope => "scope",
+            Self::Word => "word",
+            Self::File => "all",
+        }
+    }
 }
