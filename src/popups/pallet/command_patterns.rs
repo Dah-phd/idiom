@@ -1,4 +1,5 @@
-use crate::{editor_line::EditorLine, global_state::GlobalState, workspace::Workspace};
+use super::Components;
+use crate::editor_line::EditorLine;
 use std::{
     path::PathBuf,
     process::{Command, Stdio},
@@ -20,20 +21,24 @@ impl<'a> Pattern<'a> {
                 _ => None,
             },
             '>' => match chars.next()? {
-                'f' | 'e' => {
+                'e' | 'f' => {
                     let cmd = &text[2..];
                     if cmd.is_empty() {
                         return None;
                     }
-                    Some(Self::Pipe { cmd, target: PipeTarget::Null })
+                    Some(Self::Pipe { cmd, target: PipeTarget::File })
                 }
-                _ => None,
+                _ => {
+                    let cmd = &text[1..];
+                    Some(Self::Pipe { cmd, target: PipeTarget::Term })
+                }
             },
             _ => None,
         }
     }
 
-    pub fn execute(self, ws: &mut Workspace, gs: &mut GlobalState) {
+    pub fn execute(self, components: &mut Components) {
+        let Components { gs, ws, term, .. } = components;
         match self {
             Self::Select(pattern) => {
                 let Some(editor) = ws.get_active() else { return };
@@ -44,9 +49,14 @@ impl<'a> Pattern<'a> {
                 }
             }
             Self::Pipe { cmd, target } => {
-                if cmd.is_empty() {
-                    return;
-                }
+                match target {
+                    PipeTarget::Term => {
+                        gs.push_embeded_command(cmd.to_owned(), term);
+                        return;
+                    }
+                    PipeTarget::File => (),
+                };
+
                 let name: String =
                     cmd.chars().map(|c| if c.is_ascii_alphabetic() || c.is_ascii_digit() { c } else { '_' }).collect();
 
@@ -105,7 +115,6 @@ impl ToString for Pattern<'_> {
 pub enum PipeTarget {
     File,
     Term,
-    Null,
 }
 
 impl PipeTarget {
@@ -113,7 +122,6 @@ impl PipeTarget {
         match self {
             Self::File => "editor",
             Self::Term => "term",
-            Self::Null => "/dev/null",
         }
     }
 }

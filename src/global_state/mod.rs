@@ -243,6 +243,15 @@ impl GlobalState {
         self.config_controls();
     }
 
+    pub fn push_embeded_command(&mut self, cmd: String, term: &mut EditorTerminal) {
+        self.draw_callback = draw::full_rebuild;
+        self.components.insert(Components::TERM);
+        term.activate(self.editor_area);
+        self.config_controls();
+        term.paste_passthrough(cmd);
+        term.map(&KeyEvent::new(crossterm::event::KeyCode::Enter, crossterm::event::KeyModifiers::NONE), self);
+    }
+
     pub fn try_tree_event(&mut self, value: impl TryInto<IdiomEvent>) {
         if let Ok(event) = value.try_into() {
             self.event.push(event);

@@ -40,7 +40,7 @@ impl Popup for Pallet {
         }
     }
 
-    fn map_keyboard(&mut self, key: KeyEvent, components: &mut super::Components) -> Status {
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         let Components { gs, ws, tree, term } = components;
 
         if self.commands.is_empty() {
@@ -56,7 +56,7 @@ impl Popup for Pallet {
                     },
                     Mode::Cmd => {
                         if let Some(cmd_pattern) = Pattern::parse(self.pattern.as_str()) {
-                            cmd_pattern.execute(ws, gs);
+                            cmd_pattern.execute(components);
                         }
                     }
                 }
