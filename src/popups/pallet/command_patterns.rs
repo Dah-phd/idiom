@@ -7,32 +7,53 @@ use std::{
 
 pub enum Pattern<'a> {
     Select(SelectPat),
-    Pipe { cmd: &'a str, target: PipeTarget },
+    Pipe { cmd: &'a str, src: Option<SelectPat>, target: PipeTarget },
 }
 
 impl<'a> Pattern<'a> {
     pub fn parse(text: &'a str) -> Option<Self> {
         let mut chars = text.chars();
         match chars.next()? {
-            's' => match chars.next() {
+            's' if text.len() == 2 => match chars.next() {
+                Some('f' | 'e' | 'a') => Some(Self::Select(SelectPat::File)),
                 Some('s') | None => Some(Self::Select(SelectPat::Scope)),
                 Some('w') => Some(Self::Select(SelectPat::Word)),
-                Some('f' | 'e' | 'a') => Some(Self::Select(SelectPat::File)),
+                Some('l') => Some(Self::Select(SelectPat::Line)),
                 _ => None,
             },
-            '>' => match chars.next()? {
-                'e' | 'f' => {
-                    let cmd = &text[2..];
-                    if cmd.is_empty() {
-                        return None;
-                    }
-                    Some(Self::Pipe { cmd, target: PipeTarget::File })
+            '!' if text.len() == 2 => Some(Self::Pipe { cmd: &text[1..], src: None, target: PipeTarget::Term }),
+            '!' if text.len() > 2 => {
+                let mut src = None;
+                let remaining_cmd = match text[1..].split_once('|') {
+                    Some((prefix, cmd)) => match prefix.trim() {
+                        "f" | "e" | "a" => {
+                            src = Some(SelectPat::File);
+                            cmd
+                        }
+                        "s" => {
+                            src = Some(SelectPat::Scope);
+                            cmd
+                        }
+                        "w" => {
+                            src = Some(SelectPat::Word);
+                            cmd
+                        }
+                        "l" => {
+                            src = Some(SelectPat::Line);
+                            cmd
+                        }
+                        _ => &text[1..],
+                    },
+                    None => &text[1..],
+                };
+                match remaining_cmd.split_once('>') {
+                    Some((cmd, target)) => match target.trim().is_empty() {
+                        true => Some(Self::Pipe { cmd, target: PipeTarget::File, src }),
+                        false => Some(Self::Pipe { cmd, target: PipeTarget::Term, src }),
+                    },
+                    None => Some(Self::Pipe { cmd: remaining_cmd, target: PipeTarget::Term, src }),
                 }
-                _ => {
-                    let cmd = &text[1..];
-                    Some(Self::Pipe { cmd, target: PipeTarget::Term })
-                }
-            },
+            }
             _ => None,
         }
     }
@@ -46,12 +67,32 @@ impl<'a> Pattern<'a> {
                     SelectPat::Scope => editor.select_scope(),
                     SelectPat::File => editor.select_all(),
                     SelectPat::Word => editor.select_word(),
+                    SelectPat::Line => editor.select_line(),
                 }
             }
-            Self::Pipe { cmd, target } => {
+            Self::Pipe { cmd, target, src } => {
+                let (cmd, arg) = match src {
+                    Some(source) => {
+                        let Some(editor) = ws.get_active() else { return };
+                        match source {
+                            SelectPat::Scope => editor.select_scope(),
+                            SelectPat::Word => editor.select_word(),
+                            SelectPat::Line => editor.select_line(),
+                            SelectPat::File => editor.select_all(),
+                        };
+                        let Some(clip) = editor.copy() else { return };
+                        let updated = clip.replace('"', "\\\"");
+                        ("echo", format!("\"{updated}\" | {cmd}"))
+                    }
+                    None => {
+                        let Some((cmd, arg)) = cmd.split_once(" ") else { return };
+                        (cmd, arg.to_owned())
+                    }
+                };
+
                 match target {
                     PipeTarget::Term => {
-                        gs.push_embeded_command(cmd.to_owned(), term);
+                        gs.push_embeded_command(format!("{cmd} {arg}"), term);
                         return;
                     }
                     PipeTarget::File => (),
@@ -60,10 +101,6 @@ impl<'a> Pattern<'a> {
                 let name: String =
                     cmd.chars().map(|c| if c.is_ascii_alphabetic() || c.is_ascii_digit() { c } else { '_' }).collect();
 
-                let mut cmd_split = cmd.split(" ");
-                let Some(cmd) = cmd_split.next() else {
-                    return;
-                };
                 match PathBuf::from("./").canonicalize() {
                     Ok(base_path) => {
                         let mut path = base_path.clone();
@@ -74,10 +111,14 @@ impl<'a> Pattern<'a> {
                             path.push(format!("{name}_{id}.out"));
                             id += 1;
                         }
-                        let child =
-                            Command::new(cmd).args(cmd_split).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn();
+                        let result = Command::new(cmd)
+                            .arg(arg)
+                            .stdout(Stdio::piped())
+                            .stderr(Stdio::piped())
+                            .spawn()
+                            .and_then(|c| c.wait_with_output());
 
-                        match child.and_then(|c| c.wait_with_output()) {
+                        match result {
                             Ok(out) => {
                                 let mut content = vec![];
                                 if out.status.success() {
@@ -107,7 +148,10 @@ impl ToString for Pattern<'_> {
     fn to_string(&self) -> String {
         match self {
             Self::Select(pat) => format!(" select {} ", pat.as_str()),
-            Self::Pipe { cmd, target } => format!(" pipe {} > {} ", cmd, target.as_str()),
+            Self::Pipe { cmd, src, target } => match src {
+                Some(src) => format!(" pipe {} into {} > {} ", src.as_str(), cmd, target.as_str()),
+                None => format!(" run {} > {} ", cmd, target.as_str()),
+            },
         }
     }
 }
@@ -130,6 +174,7 @@ pub enum SelectPat {
     Scope,
     Word,
     File,
+    Line,
 }
 
 impl SelectPat {
@@ -138,6 +183,7 @@ impl SelectPat {
             Self::Scope => "scope",
             Self::Word => "word",
             Self::File => "all",
+            Self::Line => "line",
         }
     }
 }
