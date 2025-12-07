@@ -10,7 +10,7 @@ use crate::{
 };
 use crossterm::{
     self,
-    event::{poll, read, Event},
+    event::{poll, read, Event, MouseEvent, MouseEventKind},
     style::{Attribute, Attributes, ContentStyle},
 };
 use idiom_tui::Backend;
@@ -49,14 +49,15 @@ pub fn render_marked_word(
     loop {
         if poll(frame_rate)? {
             match read()? {
-                Event::Key(event) => {
-                    clear_marked_cache(editor, ranges);
-                    _ = gs.map_key(&event, ws, tree, term);
-                    return Ok(());
-                }
+                Event::Mouse(MouseEvent { kind: MouseEventKind::Moved, .. }) => (),
                 Event::Mouse(event) => {
                     clear_marked_cache(editor, ranges);
                     gs.map_mouse(event, tree, ws, term);
+                    return Ok(());
+                }
+                Event::Key(event) => {
+                    clear_marked_cache(editor, ranges);
+                    _ = gs.map_key(&event, ws, tree, term);
                     return Ok(());
                 }
                 Event::Paste(clip) => {

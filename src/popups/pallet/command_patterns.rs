@@ -1,5 +1,7 @@
 use super::Components;
-use crate::{editor_line::EditorLine, ext_tui::pty::PtyShell};
+use crate::{app::MIN_FRAMERATE, editor_line::EditorLine, ext_tui::pty::PtyShell};
+use crossterm::event::Event;
+use idiom_tui::Backend;
 use portable_pty::CommandBuilder;
 use std::path::PathBuf;
 
@@ -74,7 +76,7 @@ impl<'a> Pattern<'a> {
                 }
             }
             Self::Pipe { cmd, target, src } => {
-                let cmd = match src {
+                let base_cmd = match src {
                     Some(source) => {
                         let Some(editor) = ws.get_active() else { return };
                         match source {
@@ -92,35 +94,74 @@ impl<'a> Pattern<'a> {
 
                 match target {
                     PipeTarget::Term => {
-                        gs.push_embeded_command(cmd, term);
+                        gs.push_embeded_command(base_cmd, term);
                         return;
                     }
                     PipeTarget::File => (),
                 };
 
-                let name: String =
-                    cmd.chars().map(|c| if c.is_ascii_alphabetic() || c.is_ascii_digit() { c } else { '_' }).collect();
+                let name: String = base_cmd
+                    .chars()
+                    .map(|c| if c.is_ascii_alphabetic() || c.is_ascii_digit() { c } else { '_' })
+                    .collect();
 
                 let mut builder_cmd = CommandBuilder::new(RUNNER);
                 builder_cmd.arg("-c");
-                builder_cmd.arg(cmd);
+                builder_cmd.arg(base_cmd);
 
                 let mut shell = match PtyShell::new(builder_cmd, *gs.editor_area()) {
-                    Ok(shell) => {
-                        gs.force_screen_rebuild();
-                        shell
-                    }
+                    Ok(shell) => shell,
                     Err(error) => {
                         gs.error(error);
                         return;
                     }
                 };
 
+                if let Some(line) = gs.tab_area().get_line(0) {
+                    line.render(cmd, gs.backend());
+                }
+
                 shell.render(gs.backend());
                 loop {
                     match shell.try_wait() {
                         Ok(None) => {
+                            match crossterm::event::poll(MIN_FRAMERATE) {
+                                Ok(true) => match crossterm::event::read() {
+                                    Ok(Event::FocusGained | Event::FocusLost) => (),
+                                    Ok(Event::Mouse(..)) => (),
+                                    Ok(Event::Paste(clip)) => {
+                                        if let Err(error) = shell.paste(clip) {
+                                            gs.error(error);
+                                            return;
+                                        }
+                                    }
+                                    Ok(Event::Resize(width, height)) => {
+                                        gs.full_resize(ws, term, width, height);
+                                        if let Err(error) = shell.resize(*gs.editor_area()) {
+                                            gs.error(error);
+                                            return;
+                                        };
+                                    }
+                                    Ok(Event::Key(key)) => {
+                                        if let Err(error) = shell.map_key(&key, gs.backend()) {
+                                            gs.error(error);
+                                            return;
+                                        }
+                                    }
+                                    Err(error) => {
+                                        gs.error(error);
+                                        return;
+                                    }
+                                },
+                                Ok(false) => (),
+                                Err(error) => {
+                                    gs.error(error);
+                                    return;
+                                }
+                            }
+                            gs.backend.freeze();
                             shell.fast_render(gs.backend());
+                            gs.backend.unfreeze();
                         }
                         Ok(Some((status, logs))) => {
                             match PathBuf::from("./").canonicalize() {
