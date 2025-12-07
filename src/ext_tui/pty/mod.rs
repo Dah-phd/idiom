@@ -13,7 +13,7 @@ use crossterm::{
 use cursor::{CursorState, Position, Select};
 use idiom_tui::{layout::Rect, Backend};
 use parser::{get_ctrl_char, parse_cell_style, TrackedParser};
-use portable_pty::{native_pty_system, Child, CommandBuilder, PtyPair, PtySize};
+use portable_pty::{native_pty_system, Child, CommandBuilder, ExitStatus, PtyPair, PtySize};
 use std::io::{Read, Write};
 use tokio::task::JoinHandle;
 
@@ -182,6 +182,11 @@ impl PtyShell {
             _ => return Message::Unmapped,
         }
         Message::Mapped
+    }
+
+    pub fn try_wait(&mut self) -> IdiomResult<Option<(ExitStatus, String)>> {
+        let result = self.child.try_wait().map_err(IdiomError::any)?;
+        Ok(result.map(|status| (status, self.parser.content())))
     }
 
     pub fn paste(&mut self, clip: String) -> std::io::Result<()> {

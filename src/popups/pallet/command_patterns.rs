@@ -1,9 +1,12 @@
 use super::Components;
-use crate::editor_line::EditorLine;
-use std::{
-    path::PathBuf,
-    process::{Command, Stdio},
-};
+use crate::{editor_line::EditorLine, ext_tui::pty::PtyShell};
+use portable_pty::CommandBuilder;
+use std::path::PathBuf;
+
+#[cfg(unix)]
+const RUNNER: &str = "sh";
+#[cfg(windows)]
+const RUNNER: &str = "cmd";
 
 pub enum Pattern<'a> {
     Select(SelectPat),
@@ -71,7 +74,7 @@ impl<'a> Pattern<'a> {
                 }
             }
             Self::Pipe { cmd, target, src } => {
-                let (cmd, arg) = match src {
+                let cmd = match src {
                     Some(source) => {
                         let Some(editor) = ws.get_active() else { return };
                         match source {
@@ -82,17 +85,14 @@ impl<'a> Pattern<'a> {
                         };
                         let Some(clip) = editor.copy() else { return };
                         let updated = clip.replace('"', "\\\"");
-                        ("echo", format!("\"{updated}\" | {cmd}"))
+                        format!("echo \"{updated}\" | {cmd}")
                     }
-                    None => {
-                        let Some((cmd, arg)) = cmd.split_once(" ") else { return };
-                        (cmd, arg.to_owned())
-                    }
+                    None => cmd.to_owned(),
                 };
 
                 match target {
                     PipeTarget::Term => {
-                        gs.push_embeded_command(format!("{cmd} {arg}"), term);
+                        gs.push_embeded_command(cmd, term);
                         return;
                     }
                     PipeTarget::File => (),
@@ -101,43 +101,50 @@ impl<'a> Pattern<'a> {
                 let name: String =
                     cmd.chars().map(|c| if c.is_ascii_alphabetic() || c.is_ascii_digit() { c } else { '_' }).collect();
 
-                match PathBuf::from("./").canonicalize() {
-                    Ok(base_path) => {
-                        let mut path = base_path.clone();
-                        path.push(format!("{name}.out"));
-                        let mut id = 0_usize;
-                        while path.exists() {
-                            path = base_path.clone();
-                            path.push(format!("{name}_{id}.out"));
-                            id += 1;
-                        }
-                        let result = Command::new(cmd)
-                            .arg(arg)
-                            .stdout(Stdio::piped())
-                            .stderr(Stdio::piped())
-                            .spawn()
-                            .and_then(|c| c.wait_with_output());
+                let mut builder_cmd = CommandBuilder::new(RUNNER);
+                builder_cmd.arg("-c");
+                builder_cmd.arg(cmd);
 
-                        match result {
-                            Ok(out) => {
-                                let mut content = vec![];
-                                if out.status.success() {
-                                    // adds errors on top
-                                    content.extend(String::from_utf8_lossy(&out.stderr).lines().map(EditorLine::from));
-                                    content.extend(String::from_utf8_lossy(&out.stdout).lines().map(EditorLine::from));
-                                } else {
-                                    // adds out on top
-                                    content.extend(String::from_utf8_lossy(&out.stdout).lines().map(EditorLine::from));
-                                    content.extend(String::from_utf8_lossy(&out.stderr).lines().map(EditorLine::from));
-                                }
-                                if !content.is_empty() {
+                let mut shell = match PtyShell::new(builder_cmd, *gs.editor_area()) {
+                    Ok(shell) => {
+                        gs.force_screen_rebuild();
+                        shell
+                    }
+                    Err(error) => {
+                        gs.error(error);
+                        return;
+                    }
+                };
+
+                shell.render(gs.backend());
+                loop {
+                    match shell.try_wait() {
+                        Ok(None) => {
+                            shell.fast_render(gs.backend());
+                        }
+                        Ok(Some((status, logs))) => {
+                            match PathBuf::from("./").canonicalize() {
+                                Ok(base_path) => {
+                                    let mut path = base_path.clone();
+                                    path.push(format!("{name}.out"));
+                                    let mut id = 0_usize;
+                                    while path.exists() {
+                                        path = base_path.clone();
+                                        path.push(format!("{name}_{id}.out"));
+                                        id += 1;
+                                    }
+                                    let content = logs.lines().map(EditorLine::from).collect();
                                     ws.new_text_from_data(path, content, None, gs);
                                 }
+                                Err(error) => gs.error(error),
                             }
-                            Err(error) => gs.error(error),
+                            return;
+                        }
+                        Err(error) => {
+                            gs.error(error);
+                            return;
                         }
                     }
-                    Err(error) => gs.error(error),
                 }
             }
         }

@@ -53,6 +53,18 @@ impl TrackedParser {
         true
     }
 
+    #[must_use]
+    pub fn content(&mut self) -> String {
+        let mut lock = match self.buffers.lock() {
+            Ok(lock) => lock,
+            Err(err) => err.into_inner(),
+        };
+        let bytes = lock.drain(..).collect::<Vec<u8>>();
+        drop(lock);
+        self.inner.process(&bytes);
+        self.inner.screen().contents()
+    }
+
     pub fn screen(&self) -> &Screen {
         self.inner.screen()
     }
