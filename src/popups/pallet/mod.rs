@@ -1,12 +1,12 @@
 mod change_state;
 mod command_patterns;
 mod formatting;
-use super::{popup_file_open::OpenFileSelector, Command, CommandResult, Components, Popup, Status};
 use crate::{
     configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
     embeded_term::EditorTerminal,
     ext_tui::{text_field::map_key, State, StyleExt},
     global_state::{GlobalState, IdiomEvent},
+    popups::{popup_file_open::OpenFileSelector, Command, CommandResult, Components, Popup, Status},
     tree::Tree,
     workspace::Workspace,
 };

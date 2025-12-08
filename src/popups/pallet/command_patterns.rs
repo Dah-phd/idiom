@@ -1,14 +1,9 @@
 use super::Components;
-use crate::{app::MIN_FRAMERATE, editor_line::EditorLine, ext_tui::pty::PtyShell};
+use crate::{app::MIN_FRAMERATE, editor_line::EditorLine, ext_tui::pty::PtyShell, utils::SHELL};
 use crossterm::event::Event;
 use idiom_tui::Backend;
 use portable_pty::CommandBuilder;
 use std::path::PathBuf;
-
-#[cfg(unix)]
-const RUNNER: &str = "sh";
-#[cfg(windows)]
-const RUNNER: &str = "cmd";
 
 pub enum Pattern<'a> {
     Select(SelectPat),
@@ -105,7 +100,7 @@ impl<'a> Pattern<'a> {
                     .map(|c| if c.is_ascii_alphabetic() || c.is_ascii_digit() { c } else { '_' })
                     .collect();
 
-                let mut builder_cmd = CommandBuilder::new(RUNNER);
+                let mut builder_cmd = CommandBuilder::new(SHELL);
                 builder_cmd.arg("-c");
                 builder_cmd.arg(base_cmd);
 

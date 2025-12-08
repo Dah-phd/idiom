@@ -8,6 +8,11 @@ use std::{
     sync::Arc,
 };
 
+#[cfg(unix)]
+pub const SHELL: &str = "sh";
+#[cfg(windows)]
+pub const SHELL: &str = "cmd";
+
 pub struct TrackedList<T> {
     inner: Vec<T>,
     updated: bool,
