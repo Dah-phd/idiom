@@ -1,5 +1,14 @@
 use super::Components;
-use crate::{app::MIN_FRAMERATE, editor_line::EditorLine, ext_tui::pty::PtyShell, utils::SHELL};
+use crate::{
+    app::MIN_FRAMERATE,
+    editor_line::EditorLine,
+    embeded_term::EditorTerminal,
+    error::{IdiomError, IdiomResult},
+    ext_tui::pty::PtyShell,
+    global_state::GlobalState,
+    utils::SHELL,
+    workspace::Workspace,
+};
 use crossterm::event::Event;
 use idiom_tui::Backend;
 use portable_pty::CommandBuilder;
@@ -71,117 +80,8 @@ impl<'a> Pattern<'a> {
                 }
             }
             Self::Pipe { cmd, target, src } => {
-                let base_cmd = match src {
-                    Some(source) => {
-                        let Some(editor) = ws.get_active() else { return };
-                        match source {
-                            SelectPat::Scope => editor.select_scope(),
-                            SelectPat::Word => editor.select_word(),
-                            SelectPat::Line => editor.select_line(),
-                            SelectPat::File => editor.select_all(),
-                        };
-                        let Some(clip) = editor.copy() else { return };
-                        let updated = clip.replace('"', "\\\"");
-                        format!("echo \"{updated}\" | {cmd}")
-                    }
-                    None => cmd.to_owned(),
-                };
-
-                match target {
-                    PipeTarget::Term => {
-                        gs.push_embeded_command(base_cmd, term);
-                        return;
-                    }
-                    PipeTarget::File => (),
-                };
-
-                let name: String = base_cmd
-                    .chars()
-                    .map(|c| if c.is_ascii_alphabetic() || c.is_ascii_digit() { c } else { '_' })
-                    .collect();
-
-                let mut builder_cmd = CommandBuilder::new(SHELL);
-                builder_cmd.arg("-c");
-                builder_cmd.arg(base_cmd);
-
-                let mut shell = match PtyShell::new(builder_cmd, *gs.editor_area()) {
-                    Ok(shell) => shell,
-                    Err(error) => {
-                        gs.error(error);
-                        return;
-                    }
-                };
-
-                if let Some(line) = gs.tab_area().get_line(0) {
-                    line.render(cmd, gs.backend());
-                }
-
-                shell.render(gs.backend());
-                loop {
-                    match shell.try_wait() {
-                        Ok(None) => {
-                            match crossterm::event::poll(MIN_FRAMERATE) {
-                                Ok(true) => match crossterm::event::read() {
-                                    Ok(Event::FocusGained | Event::FocusLost) => (),
-                                    Ok(Event::Mouse(..)) => (),
-                                    Ok(Event::Paste(clip)) => {
-                                        if let Err(error) = shell.paste(clip) {
-                                            gs.error(error);
-                                            return;
-                                        }
-                                    }
-                                    Ok(Event::Resize(width, height)) => {
-                                        gs.full_resize(ws, term, width, height);
-                                        if let Err(error) = shell.resize(*gs.editor_area()) {
-                                            gs.error(error);
-                                            return;
-                                        };
-                                    }
-                                    Ok(Event::Key(key)) => {
-                                        if let Err(error) = shell.map_key(&key, gs.backend()) {
-                                            gs.error(error);
-                                            return;
-                                        }
-                                    }
-                                    Err(error) => {
-                                        gs.error(error);
-                                        return;
-                                    }
-                                },
-                                Ok(false) => (),
-                                Err(error) => {
-                                    gs.error(error);
-                                    return;
-                                }
-                            }
-                            gs.backend.freeze();
-                            shell.fast_render(gs.backend());
-                            gs.backend.unfreeze();
-                        }
-                        Ok(Some((status, logs))) => {
-                            match PathBuf::from("./").canonicalize() {
-                                Ok(base_path) => {
-                                    let mut path = base_path.clone();
-                                    path.push(format!("{name}.out"));
-                                    let mut id = 0_usize;
-                                    while path.exists() {
-                                        path = base_path.clone();
-                                        path.push(format!("{name}_{id}.out"));
-                                        id += 1;
-                                    }
-                                    let content = logs.lines().map(EditorLine::from).collect();
-                                    ws.new_text_from_data(path, content, None, gs);
-                                }
-                                Err(error) => gs.error(error),
-                            }
-                            return;
-                        }
-                        Err(error) => {
-                            gs.error(error);
-                            return;
-                        }
-                    }
-                }
+                let result = shell_executor(cmd, src, target, ws, term, gs);
+                gs.log_if_error(result);
             }
         }
     }
@@ -227,6 +127,89 @@ impl SelectPat {
             Self::Word => "word",
             Self::File => "all",
             Self::Line => "line",
+        }
+    }
+}
+
+fn shell_executor(
+    cmd: &str,
+    src: Option<SelectPat>,
+    target: PipeTarget,
+    ws: &mut Workspace,
+    term: &mut EditorTerminal,
+    gs: &mut GlobalState,
+) -> IdiomResult<()> {
+    let base_cmd = match src {
+        Some(source) => {
+            let editor = ws.get_active().ok_or(IdiomError::any("No files open in editor!"))?;
+            match source {
+                SelectPat::Scope => editor.select_scope(),
+                SelectPat::Word => editor.select_word(),
+                SelectPat::Line => editor.select_line(),
+                SelectPat::File => editor.select_all(),
+            };
+            let clip = editor.copy().ok_or(IdiomError::any("Unable to pull data from editor!"))?;
+            let updated = clip.replace('"', "\\\"");
+            format!("echo \"{updated}\" | {cmd}")
+        }
+        None => cmd.to_owned(),
+    };
+
+    if let PipeTarget::Term = target {
+        gs.push_embeded_command(base_cmd, term);
+        return Ok(());
+    }
+
+    let name: String =
+        base_cmd.chars().map(|c| if c.is_ascii_alphabetic() || c.is_ascii_digit() { c } else { '_' }).collect();
+
+    let mut builder_cmd = CommandBuilder::new(SHELL);
+    builder_cmd.arg("-c");
+    builder_cmd.arg(base_cmd);
+
+    let mut shell = PtyShell::new(builder_cmd, *gs.editor_area())?;
+
+    if let Some(line) = gs.tab_area().get_line(0) {
+        line.render(cmd, gs.backend());
+    }
+
+    shell.render(gs.backend());
+    loop {
+        match shell.try_wait()? {
+            None => {
+                if crossterm::event::poll(MIN_FRAMERATE)? {
+                    match crossterm::event::read()? {
+                        Event::FocusGained | Event::FocusLost => (),
+                        Event::Mouse(..) => (),
+                        Event::Paste(clip) => shell.paste(clip)?,
+                        Event::Key(key) => shell.map_key(&key, gs.backend())?,
+                        Event::Resize(width, height) => {
+                            gs.full_resize(ws, term, width, height);
+                            shell.resize(*gs.editor_area()).map_err(|err| IdiomError::any(err))?;
+                        }
+                    }
+                }
+                gs.backend.freeze();
+                shell.fast_render(gs.backend());
+                gs.backend.unfreeze();
+            }
+            Some((status, logs)) => {
+                if !status.success() {
+                    gs.error(format!("CMD STATUS: {}", status));
+                }
+                let base_path = PathBuf::from("./").canonicalize()?;
+                let mut path = base_path.clone();
+                path.push(format!("{name}.out"));
+                let mut id = 0_usize;
+                while path.exists() {
+                    path = base_path.clone();
+                    path.push(format!("{name}_{id}.out"));
+                    id += 1;
+                }
+                let content = logs.lines().map(EditorLine::from).collect();
+                ws.new_text_from_data(path, content, None, gs);
+                return Ok(());
+            }
         }
     }
 }
