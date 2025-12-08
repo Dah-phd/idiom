@@ -1,6 +1,7 @@
 use super::Components;
 use crate::{
     app::MIN_FRAMERATE,
+    editor::Editor,
     editor_line::EditorLine,
     embeded_term::EditorTerminal,
     error::{IdiomError, IdiomResult},
@@ -16,7 +17,7 @@ use std::path::PathBuf;
 
 pub enum Pattern<'a> {
     Select(SelectPat),
-    Pipe { cmd: &'a str, src: Option<SelectPat>, target: PipeTarget },
+    Pipe { cmd: &'a str, src: Option<Source>, target: PipeTarget },
 }
 
 impl<'a> Pattern<'a> {
@@ -35,20 +36,24 @@ impl<'a> Pattern<'a> {
                 let mut src = None;
                 let remaining_cmd = match text[1..].split_once('|') {
                     Some((prefix, cmd)) => match prefix.trim() {
-                        "f" | "e" | "a" => {
-                            src = Some(SelectPat::File);
-                            cmd
-                        }
                         "s" => {
-                            src = Some(SelectPat::Scope);
+                            src = Some(Source::Select { generator: None });
                             cmd
                         }
-                        "w" => {
-                            src = Some(SelectPat::Word);
+                        "sf" | "se" | "sa" => {
+                            src = Some(Source::Select { generator: Some(SelectPat::File) });
                             cmd
                         }
-                        "l" => {
-                            src = Some(SelectPat::Line);
+                        "ss" => {
+                            src = Some(Source::Select { generator: Some(SelectPat::Scope) });
+                            cmd
+                        }
+                        "sw" => {
+                            src = Some(Source::Select { generator: Some(SelectPat::Word) });
+                            cmd
+                        }
+                        "sl" => {
+                            src = Some(Source::Select { generator: Some(SelectPat::Line) });
                             cmd
                         }
                         _ => &text[1..],
@@ -72,12 +77,7 @@ impl<'a> Pattern<'a> {
         match self {
             Self::Select(pattern) => {
                 let Some(editor) = ws.get_active() else { return };
-                match pattern {
-                    SelectPat::Scope => editor.select_scope(),
-                    SelectPat::File => editor.select_all(),
-                    SelectPat::Word => editor.select_word(),
-                    SelectPat::Line => editor.select_line(),
-                }
+                pattern.execute(editor);
             }
             Self::Pipe { cmd, target, src } => {
                 let result = shell_executor(cmd, src, target, ws, term, gs);
@@ -105,10 +105,23 @@ pub enum PipeTarget {
 }
 
 impl PipeTarget {
-    fn as_str(&self) -> &str {
+    const fn as_str(&self) -> &str {
         match self {
             Self::File => "editor",
             Self::Term => "term",
+        }
+    }
+}
+
+pub enum Source {
+    Select { generator: Option<SelectPat> },
+}
+
+impl Source {
+    const fn as_str(&self) -> &str {
+        match self {
+            Self::Select { generator: None } => "select",
+            Self::Select { generator: Some(pat) } => pat.as_str(),
         }
     }
 }
@@ -121,7 +134,7 @@ pub enum SelectPat {
 }
 
 impl SelectPat {
-    fn as_str(&self) -> &str {
+    const fn as_str(&self) -> &str {
         match self {
             Self::Scope => "scope",
             Self::Word => "word",
@@ -129,11 +142,20 @@ impl SelectPat {
             Self::Line => "line",
         }
     }
+
+    fn execute(&self, editor: &mut Editor) {
+        match self {
+            SelectPat::Scope => editor.select_scope(),
+            SelectPat::Word => editor.select_word(),
+            SelectPat::Line => editor.select_line(),
+            SelectPat::File => editor.select_all(),
+        }
+    }
 }
 
 fn shell_executor(
     cmd: &str,
-    src: Option<SelectPat>,
+    src: Option<Source>,
     target: PipeTarget,
     ws: &mut Workspace,
     term: &mut EditorTerminal,
@@ -143,14 +165,18 @@ fn shell_executor(
         Some(source) => {
             let editor = ws.get_active().ok_or(IdiomError::any("No files open in editor!"))?;
             match source {
-                SelectPat::Scope => editor.select_scope(),
-                SelectPat::Word => editor.select_word(),
-                SelectPat::Line => editor.select_line(),
-                SelectPat::File => editor.select_all(),
-            };
-            let clip = editor.copy().ok_or(IdiomError::any("Unable to pull data from editor!"))?;
-            let updated = clip.replace('"', "\\\"");
-            format!("echo \"{updated}\" | {cmd}")
+                Source::Select { generator } => {
+                    if let Some(generator) = generator {
+                        generator.execute(editor);
+                    }
+                    let clip = editor.copy().ok_or(IdiomError::any("Unable to pull data from editor!"))?;
+                    let updated = clip.replace('"', "\\\"");
+                    match cmd.trim().is_empty() {
+                        true => format!("echo \"{updated}\""),
+                        false => format!("echo \"{updated}\" | {cmd}"),
+                    }
+                }
+            }
         }
         None => cmd.to_owned(),
     };
@@ -160,8 +186,10 @@ fn shell_executor(
         return Ok(());
     }
 
-    let name: String =
-        base_cmd.chars().map(|c| if c.is_ascii_alphabetic() || c.is_ascii_digit() { c } else { '_' }).collect();
+    let name = base_cmd
+        .chars()
+        .map(|c| if c.is_ascii_alphabetic() || c.is_ascii_digit() { c } else { '_' })
+        .collect::<String>();
 
     let mut builder_cmd = CommandBuilder::new(SHELL);
     builder_cmd.arg("-c");
