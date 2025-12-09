@@ -10,12 +10,14 @@ use crate::ext_tui::StyleExt;
 
 pub struct TrackedParser {
     buffers: Arc<Mutex<Vec<u8>>>,
+    scrollback: usize,
     inner: Parser,
 }
 
 impl TrackedParser {
     pub fn new(rows: u16, cols: u16) -> Self {
-        Self { inner: Parser::new(rows, cols, 2000), buffers: Arc::default() }
+        let scrollback = 2000;
+        Self { inner: Parser::new(rows, cols, scrollback), buffers: Arc::default(), scrollback }
     }
 
     pub fn resize(&mut self, rows: u16, cols: u16) {
@@ -54,7 +56,7 @@ impl TrackedParser {
     }
 
     #[must_use]
-    pub fn content(&mut self) -> String {
+    pub fn full_content(&mut self) -> String {
         let mut lock = match self.buffers.lock() {
             Ok(lock) => lock,
             Err(err) => err.into_inner(),
@@ -62,7 +64,12 @@ impl TrackedParser {
         let bytes = lock.drain(..).collect::<Vec<u8>>();
         drop(lock);
         self.inner.process(&bytes);
-        self.inner.screen().contents()
+        let screen = self.inner.screen_mut();
+        // do not resize for partial content (screen)
+        let (rows, cols) = screen.size();
+        screen.set_size(rows + self.scrollback as u16, cols);
+        screen.set_scrollback(self.scrollback + rows as usize);
+        screen.contents()
     }
 
     pub fn screen(&self) -> &Screen {

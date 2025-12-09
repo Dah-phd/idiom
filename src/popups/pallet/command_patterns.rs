@@ -36,23 +36,23 @@ impl<'a> Pattern<'a> {
                 let mut src = None;
                 let remaining_cmd = match text[1..].split_once('|') {
                     Some((prefix, cmd)) => match prefix.trim() {
-                        "s" => {
+                        "#s" => {
                             src = Some(Source::Select { generator: None });
                             cmd
                         }
-                        "sf" | "se" | "sa" => {
+                        "#sf" | "#se" | "#sa" => {
                             src = Some(Source::Select { generator: Some(SelectPat::File) });
                             cmd
                         }
-                        "ss" => {
+                        "#ss" => {
                             src = Some(Source::Select { generator: Some(SelectPat::Scope) });
                             cmd
                         }
-                        "sw" => {
+                        "#sw" => {
                             src = Some(Source::Select { generator: Some(SelectPat::Word) });
                             cmd
                         }
-                        "sl" => {
+                        "#sl" => {
                             src = Some(Source::Select { generator: Some(SelectPat::Line) });
                             cmd
                         }
@@ -61,9 +61,10 @@ impl<'a> Pattern<'a> {
                     None => &text[1..],
                 };
                 match remaining_cmd.split_once('>') {
-                    Some((cmd, target)) => match target.trim().is_empty() {
-                        true => Some(Self::Pipe { cmd, target: PipeTarget::File, src }),
-                        false => Some(Self::Pipe { cmd, target: PipeTarget::Term, src }),
+                    Some((cmd, target)) => match target.trim() {
+                        "#" => Some(Self::Pipe { cmd, target: PipeTarget::New, src }),
+                        "#s" => Some(Self::Pipe { cmd, target: PipeTarget::Select, src }),
+                        _ => Some(Self::Pipe { cmd, target: PipeTarget::Term, src }),
                     },
                     None => Some(Self::Pipe { cmd: remaining_cmd, target: PipeTarget::Term, src }),
                 }
@@ -100,14 +101,16 @@ impl ToString for Pattern<'_> {
 }
 
 pub enum PipeTarget {
-    File,
+    New,
+    Select,
     Term,
 }
 
 impl PipeTarget {
     const fn as_str(&self) -> &str {
         match self {
-            Self::File => "editor",
+            Self::New => "editor",
+            Self::Select => "replace select",
             Self::Term => "term",
         }
     }
@@ -222,9 +225,24 @@ fn shell_executor(
                 gs.backend.unfreeze();
             }
             Some((status, logs)) => {
-                if !status.success() {
-                    gs.error(format!("CMD STATUS: {}", status));
+                match target {
+                    PipeTarget::New => {
+                        if !status.success() {
+                            gs.error(format!("CMD STATUS: {}", status));
+                        }
+                    }
+                    PipeTarget::Select => {
+                        if !status.success() {
+                            gs.error(format!("CMD STATUS: {}", status));
+                        } else {
+                            let editor = ws.get_active().ok_or(IdiomError::any("No files open in editor!"))?;
+                            editor.paste(logs, gs);
+                        }
+                        return Ok(());
+                    }
+                    _ => {}
                 }
+
                 let base_path = PathBuf::from("./").canonicalize()?;
                 let mut path = base_path.clone();
                 path.push(format!("{name}.out"));

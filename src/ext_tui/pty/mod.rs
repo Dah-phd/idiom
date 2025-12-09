@@ -184,9 +184,10 @@ impl PtyShell {
         Message::Mapped
     }
 
+    #[must_use]
     pub fn try_wait(&mut self) -> IdiomResult<Option<(ExitStatus, String)>> {
         let result = self.child.try_wait().map_err(IdiomError::any)?;
-        Ok(result.map(|status| (status, self.parser.content())))
+        Ok(result.map(|status| (status, self.parser.full_content())))
     }
 
     pub fn paste(&mut self, clip: String) -> std::io::Result<()> {
