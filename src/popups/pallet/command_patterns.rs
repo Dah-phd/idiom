@@ -93,8 +93,8 @@ impl ToString for Pattern<'_> {
         match self {
             Self::Select(pat) => format!(" select {} ", pat.as_str()),
             Self::Pipe { cmd, src, target } => match src {
-                Some(src) => format!(" pipe {} into {} > {} ", src.as_str(), cmd, target.as_str()),
-                None => format!(" run {} > {} ", cmd, target.as_str()),
+                Some(src) => format!(" pipe {} into {} > {} ", src.as_str(), cmd.trim(), target.as_str()),
+                None => format!(" run {} > {} ", cmd.trim(), target.as_str()),
             },
         }
     }
@@ -173,7 +173,7 @@ fn shell_executor(
                         generator.execute(editor);
                     }
                     let clip = editor.copy().ok_or(IdiomError::any("Unable to pull data from editor!"))?;
-                    let updated = clip.replace('"', "\\\"");
+                    let updated = clip.replace('\\', "\\\\").replace('"', "\\\"");
                     match cmd.trim().is_empty() {
                         true => format!("echo \"{updated}\""),
                         false => format!("echo \"{updated}\" | {cmd}"),
@@ -189,10 +189,19 @@ fn shell_executor(
         return Ok(());
     }
 
-    let name = base_cmd
+    let mut name = cmd
+        .trim()
         .chars()
         .map(|c| if c.is_ascii_alphabetic() || c.is_ascii_digit() { c } else { '_' })
+        .skip_while(|c| c == &'_')
+        .take(20)
         .collect::<String>();
+
+    match name.len() {
+        0 => name.push_str("shell_cmd"),
+        1..6 => name.push_str("_cmd"),
+        _ => (),
+    }
 
     let mut builder_cmd = CommandBuilder::new(SHELL);
     builder_cmd.arg("-c");
