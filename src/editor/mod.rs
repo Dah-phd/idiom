@@ -294,6 +294,22 @@ impl Editor {
         ControlMap::apply(self, callback);
     }
 
+    pub fn select_between_inclusive(&mut self, open: char, close: char) {
+        ControlMap::ensure_single_cursor(self);
+        let Some((from, to)) = select_between_chars(self, open, close) else {
+            return;
+        };
+        self.cursor.select_set(from, to);
+    }
+
+    pub fn select_between(&mut self, open: char, close: char) {
+        ControlMap::ensure_single_cursor(self);
+        let Some((from, to)) = select_between_chars(self, open, close) else {
+            return;
+        };
+        self.cursor.select_set(from, to);
+    }
+
     pub fn select_scope(&mut self) {
         ControlMap::ensure_single_cursor(self);
         let select = match self.file_type.scope_type() {

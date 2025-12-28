@@ -265,3 +265,41 @@ fn test_word_range() {
         match_char_range_to_word_range(range, range.from(), &content);
     }
 }
+
+#[test]
+fn test_cursor_pos_next() {
+    let content = vec![
+        EditorLine::from(""),
+        EditorLine::from(""),
+        EditorLine::from(""),
+        EditorLine::from("123"),
+        EditorLine::from(""),
+    ];
+    let cur = CursorPosition { line: 0, char: 0 };
+    let next = cur.next(&content).unwrap();
+    assert_eq!(next, CursorPosition { line: 3, char: 0 });
+    let next = next.next(&content).unwrap();
+    assert_eq!(next, CursorPosition { line: 3, char: 1 });
+    let next = next.next(&content).unwrap();
+    assert_eq!(next, CursorPosition { line: 3, char: 2 });
+    assert_eq!(next.next(&content), None);
+}
+
+#[test]
+fn test_cursor_pos_prev() {
+    let content = vec![
+        EditorLine::from(""),
+        EditorLine::from("123"),
+        EditorLine::from(""),
+        EditorLine::from(""),
+        EditorLine::from(""),
+    ];
+    let cur = CursorPosition { line: 4, char: 0 };
+    let prev = cur.prev(&content).unwrap();
+    assert_eq!(prev, CursorPosition { line: 1, char: 2 });
+    let prev = prev.prev(&content).unwrap();
+    assert_eq!(prev, CursorPosition { line: 1, char: 1 });
+    let prev = prev.prev(&content).unwrap();
+    assert_eq!(prev, CursorPosition { line: 1, char: 0 });
+    assert_eq!(prev.prev(&content), None);
+}

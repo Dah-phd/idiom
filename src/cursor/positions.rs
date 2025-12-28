@@ -1,4 +1,4 @@
-use crate::utils::Direction;
+use crate::{editor_line::EditorLine, utils::Direction};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
@@ -8,6 +8,39 @@ pub type Select = (CursorPosition, CursorPosition);
 pub struct CursorPosition {
     pub line: usize,
     pub char: usize, // this is char position not byte index
+}
+
+impl CursorPosition {
+    pub fn next(self, content: &[EditorLine]) -> Option<Self> {
+        let Self { mut line, mut char } = self;
+        char += 1;
+        let next_chars = content.get(line)?.char_len();
+        if next_chars > char {
+            return Some(Self { line, char });
+        }
+        line += 1;
+        while content.get(line)?.char_len() == 0 {
+            line += 1;
+        }
+        Some(Self { line, char: 0 })
+    }
+
+    pub fn prev(self, content: &[EditorLine]) -> Option<Self> {
+        let Self { mut line, char } = self;
+        if self.char != 0 {
+            if content.get(line)?.char_len() < char {
+                return None;
+            }
+            return Some(Self { line, char: char - 1 });
+        }
+        line = line.checked_sub(1)?;
+        let mut prev_chars = content.get(line)?.char_len();
+        while prev_chars == 0 {
+            line = line.checked_sub(1)?;
+            prev_chars = content[line].char_len();
+        }
+        Some(Self { line, char: prev_chars - 1 })
+    }
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
