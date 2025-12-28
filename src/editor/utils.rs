@@ -78,6 +78,120 @@ pub const fn calc_line_number_offset(len: usize) -> usize {
     }
 }
 
+pub fn select_indent(editor: &Editor) -> Option<(CursorPosition, CursorPosition)> {
+    let start_line = &editor.content[editor.cursor.line];
+    let expect_indent = start_line.as_str().chars().take_while(|c| c.is_whitespace()).collect::<String>();
+    if expect_indent.is_empty() {
+        return None;
+    }
+    let mut from = CursorPosition { line: editor.cursor.line, char: 0 };
+    let mut to = CursorPosition { line: editor.cursor.line, char: start_line.char_len() };
+    for (idx, line) in editor.content.iter().enumerate().take(editor.cursor.line).rev() {
+        if line.as_str().chars().all(|c| c.is_whitespace()) {
+            continue;
+        }
+        // bigger indents are also included
+        if !line.starts_with(&expect_indent) {
+            break;
+        }
+        from.line = idx;
+    }
+    for (idx, line) in editor.content.iter().enumerate().skip(editor.cursor.line + 1) {
+        if line.as_str().chars().all(|c| c.is_whitespace()) {
+            continue;
+        }
+        // bigger indents are also included
+        if !line.starts_with(&expect_indent) {
+            break;
+        }
+        to.line = idx;
+        to.char = line.char_len();
+    }
+    Some((from, to))
+}
+
+pub fn select_between_chars(editor: &Editor, open: char, close: char) -> Option<(CursorPosition, CursorPosition)> {
+    let start_line = &editor.content[editor.cursor.line];
+    let (start, end) = start_line.split_at(editor.cursor.char);
+    let mut maybe_from = None;
+    let mut maybe_to = None;
+    let mut idx = editor.cursor.char;
+    let mut counter_from = 0;
+    let mut counter_to = 0;
+    for ch in start.chars().rev() {
+        if ch == close {
+            counter_from += 1;
+        } else if ch == open {
+            if counter_from > 0 {
+                counter_from -= 1;
+            } else {
+                maybe_from = Some(CursorPosition { line: editor.cursor.line, char: idx });
+                break;
+            }
+        }
+        idx -= 1;
+    }
+    idx = editor.cursor.char;
+    for ch in end.chars() {
+        // do stuff
+        if ch == open {
+            counter_to += 1;
+        } else if ch == close {
+            if counter_to > 0 {
+                counter_to -= 1;
+            } else {
+                maybe_to = Some(CursorPosition { line: editor.cursor.line, char: idx });
+                break;
+            }
+        }
+        idx += 1;
+    }
+    if maybe_from.is_none() {
+        for (line_idx, line) in editor.content.iter().enumerate().take(editor.cursor.line).rev() {
+            idx = line.char_len();
+            for ch in line.chars().rev() {
+                if ch == close {
+                    counter_from += 1;
+                } else if ch == open {
+                    if counter_from > 0 {
+                        counter_from -= 1;
+                    } else {
+                        maybe_from = Some(CursorPosition { line: line_idx, char: idx });
+                        break;
+                    }
+                }
+                idx -= 1;
+            }
+            if maybe_from.is_some() {
+                break;
+            }
+        }
+    }
+    let from = maybe_from?;
+    if maybe_to.is_none() {
+        for (line_idx, line) in editor.content.iter().enumerate().skip(editor.cursor.line + 1) {
+            idx = 0;
+            for ch in line.chars() {
+                if ch == open {
+                    counter_to += 1;
+                } else if ch == close {
+                    if counter_to > 0 {
+                        counter_to -= 1;
+                    } else {
+                        maybe_to = Some(CursorPosition { line: line_idx, char: idx });
+                        break;
+                    }
+                }
+                idx += 1;
+            }
+            if maybe_to.is_some() {
+                break;
+            }
+        }
+    }
+    Some((from, maybe_to?))
+}
+
 /// builds editor from provided data
 pub fn editor_from_data(
     path: PathBuf,

@@ -3,6 +3,7 @@ use super::{
     calc_line_number_offset,
     controls::{filter_multi_cursors_per_line_if_no_select, ControlMap},
     syntax::Lexer,
+    utils::{select_between_chars, select_indent},
     Editor, EditorModal, TuiCodec,
 };
 use crate::{
@@ -304,4 +305,39 @@ fn test_apply() {
             "this Is line"
         ]
     );
+}
+
+#[test]
+fn test_select_indent() {
+    let mut editor = mock_editor(vec![
+        String::from("# no scope"),
+        String::from("with open(\"test.txt\") as f"),
+        String::from("    f.write('asd')"),
+        String::from("    f.write('asd')"),
+        String::from("    f.write('asd')"),
+        String::from(""),
+        String::from("def something_else():"),
+        String::from("    ..."),
+    ]);
+    editor.cursor.set_position((2, 2).into());
+
+    let result = select_indent(&editor);
+    assert_eq!(result, Some((CursorPosition { line: 2, char: 0 }, CursorPosition { line: 4, char: 18 })),);
+}
+
+#[test]
+fn test_select_between_chars() {
+    let mut editor = mock_editor(vec![
+        String::from("// empty"),
+        String::from("fn main() {"),
+        String::from("    {"),
+        String::from("        println!(\"print in scope\");"),
+        String::from("    }"),
+        String::from("    println!(\"print without scope\"))"),
+        String::from("}"),
+    ]);
+    editor.cursor.set_position((5, 3).into());
+
+    let result = select_between_chars(&editor, '{', '}');
+    assert_eq!(result, Some((CursorPosition { line: 1, char: 11 }, CursorPosition { line: 6, char: 0 })));
 }

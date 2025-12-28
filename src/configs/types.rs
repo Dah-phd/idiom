@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 pub enum ScopeType {
-    Marked { opening: char, closing: char },
+    Marked { open: char, close: char },
     Indent,
     Text,
 }
@@ -69,9 +69,12 @@ impl FileType {
     }
 
     pub fn scope_type(&self) -> ScopeType {
+        if !self.is_code() {
+            return ScopeType::Text;
+        }
         match self {
             Self::Python | Self::Nim | Self::Lobster => ScopeType::Indent,
-            _ => ScopeType::Marked { opening: '{', closing: '}' },
+            _ => ScopeType::Marked { open: '{', close: '}' },
         }
     }
 
