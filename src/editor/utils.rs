@@ -119,30 +119,30 @@ pub fn select_between_chars(editor: &Editor, open: char, close: char) -> Option<
     let mut counter_from = 0;
     let mut counter_to = 0;
     for ch in start.chars().rev() {
-        if ch == close {
-            counter_from += 1;
-        } else if ch == open {
+        if ch == open {
             if counter_from > 0 {
                 counter_from -= 1;
             } else {
                 maybe_from = Some(CursorPosition { line: editor.cursor.line, char: idx });
                 break;
             }
+        } else if ch == close {
+            counter_from += 1;
         }
         idx -= 1;
     }
     idx = editor.cursor.char;
     for ch in end.chars() {
         // do stuff
-        if ch == open {
-            counter_to += 1;
-        } else if ch == close {
+        if ch == close {
             if counter_to > 0 {
                 counter_to -= 1;
             } else {
                 maybe_to = Some(CursorPosition { line: editor.cursor.line, char: idx });
                 break;
             }
+        } else if ch == open {
+            counter_to += 1;
         }
         idx += 1;
     }
@@ -150,15 +150,15 @@ pub fn select_between_chars(editor: &Editor, open: char, close: char) -> Option<
         for (line_idx, line) in editor.content.iter().enumerate().take(editor.cursor.line).rev() {
             idx = line.char_len();
             for ch in line.chars().rev() {
-                if ch == close {
-                    counter_from += 1;
-                } else if ch == open {
+                if ch == open {
                     if counter_from > 0 {
                         counter_from -= 1;
                     } else {
                         maybe_from = Some(CursorPosition { line: line_idx, char: idx });
                         break;
                     }
+                } else if ch == close {
+                    counter_from += 1;
                 }
                 idx -= 1;
             }
@@ -172,15 +172,15 @@ pub fn select_between_chars(editor: &Editor, open: char, close: char) -> Option<
         for (line_idx, line) in editor.content.iter().enumerate().skip(editor.cursor.line + 1) {
             idx = 0;
             for ch in line.chars() {
-                if ch == open {
-                    counter_to += 1;
-                } else if ch == close {
+                if ch == close {
                     if counter_to > 0 {
                         counter_to -= 1;
                     } else {
                         maybe_to = Some(CursorPosition { line: line_idx, char: idx });
                         break;
                     }
+                } else if ch == open {
+                    counter_to += 1;
                 }
                 idx += 1;
             }

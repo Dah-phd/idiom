@@ -341,3 +341,17 @@ fn test_select_between_chars() {
     let result = select_between_chars(&editor, '{', '}');
     assert_eq!(result, Some((CursorPosition { line: 1, char: 11 }, CursorPosition { line: 6, char: 0 })));
 }
+
+#[test]
+fn test_select_betwee_same_char() {
+    let mut editor = mock_editor(vec![
+        String::from("let data = \"text\";"),
+        String::from("let data = \"text select here\";"),
+        String::from("let data = \"text\";"),
+        String::from("let data = \"text\";"),
+    ]);
+    editor.cursor.set_position((1, 15).into());
+
+    let result = select_between_chars(&editor, '"', '"');
+    assert_eq!(result, Some((CursorPosition { line: 1, char: 12 }, CursorPosition { line: 1, char: 28 })))
+}
