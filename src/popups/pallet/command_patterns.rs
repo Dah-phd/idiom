@@ -24,13 +24,7 @@ impl<'a> Pattern<'a> {
     pub fn parse(text: &'a str) -> Option<Self> {
         let mut chars = text.chars();
         match chars.next()? {
-            's' if text.len() == 2 => match chars.next() {
-                Some('f' | 'e' | 'a') => Some(Self::Select(SelectPat::File)),
-                Some('s') | None => Some(Self::Select(SelectPat::Scope)),
-                Some('w') => Some(Self::Select(SelectPat::Word)),
-                Some('l') => Some(Self::Select(SelectPat::Line)),
-                _ => None,
-            },
+            's' => SelectPat::parse(&text[1..]).map(Self::Select),
             '!' if text.len() == 2 => Some(Self::Pipe { cmd: &text[1..], src: None, target: PipeTarget::Term }),
             '!' if text.len() > 2 => {
                 let mut src = None;
@@ -134,6 +128,7 @@ pub enum SelectPat {
     Word,
     File,
     Line,
+    Between { open: char, close: char, inclusive: bool },
 }
 
 impl SelectPat {
@@ -143,6 +138,35 @@ impl SelectPat {
             Self::Word => "word",
             Self::File => "all",
             Self::Line => "line",
+            Self::Between { inclusive: true, .. } => "between chars inclusive",
+            Self::Between { inclusive: false, .. } => "between chars",
+        }
+    }
+
+    pub fn parse(text: &str) -> Option<Self> {
+        let trimmed = text.trim_end();
+        match trimmed.len() {
+            0 => Some(Self::Scope),
+            1 => match trimmed.chars().next().unwrap() {
+                'f' | 'e' | 'a' => Some(Self::File),
+                's' => Some(Self::Scope),
+                'w' => Some(Self::Word),
+                'l' => Some(Self::Line),
+                _ => None,
+            },
+            2 => {
+                let mut chars = trimmed.chars();
+                Some(Self::Between { open: chars.next()?, close: chars.next()?, inclusive: false })
+            }
+            3 => {
+                let mut chars = trimmed.chars();
+                let between = Self::Between { open: chars.next()?, close: chars.next()?, inclusive: true };
+                match chars.next() {
+                    Some('+') => Some(between),
+                    _ => None,
+                }
+            }
+            _ => None,
         }
     }
 
@@ -152,6 +176,12 @@ impl SelectPat {
             SelectPat::Word => editor.select_word(),
             SelectPat::Line => editor.select_line(),
             SelectPat::File => editor.select_all(),
+            SelectPat::Between { open, close, inclusive: true } => {
+                editor.select_between_inclusive(*open, *close);
+            }
+            SelectPat::Between { open, close, inclusive: false } => {
+                editor.select_between(*open, *close);
+            }
         }
     }
 }

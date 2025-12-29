@@ -3,7 +3,7 @@ use super::{
     calc_line_number_offset,
     controls::{filter_multi_cursors_per_line_if_no_select, ControlMap},
     syntax::Lexer,
-    utils::{select_between_chars, select_indent},
+    utils::{select_between_chars, select_between_chars_inc, select_indent},
     Editor, EditorModal, TuiCodec,
 };
 use crate::{
@@ -343,6 +343,23 @@ fn test_select_between_chars() {
 }
 
 #[test]
+fn test_select_between_chars_inc() {
+    let mut editor = mock_editor(vec![
+        String::from("// empty"),
+        String::from("fn main() {"),
+        String::from("    {"),
+        String::from("        println!(\"print in scope\");"),
+        String::from("    }"),
+        String::from("    println!(\"print without scope\"))"),
+        String::from("}"),
+    ]);
+    editor.cursor.set_position((5, 3).into());
+
+    let result = select_between_chars_inc(&editor, '{', '}');
+    assert_eq!(result, Some((CursorPosition { line: 1, char: 10 }, CursorPosition { line: 6, char: 1 })));
+}
+
+#[test]
 fn test_select_betwee_same_char() {
     let mut editor = mock_editor(vec![
         String::from("let data = \"text\";"),
@@ -354,4 +371,18 @@ fn test_select_betwee_same_char() {
 
     let result = select_between_chars(&editor, '"', '"');
     assert_eq!(result, Some((CursorPosition { line: 1, char: 12 }, CursorPosition { line: 1, char: 28 })))
+}
+
+#[test]
+fn test_select_betwee_same_char_inc() {
+    let mut editor = mock_editor(vec![
+        String::from("let data = \"text\";"),
+        String::from("let data = \"text select here\";"),
+        String::from("let data = \"text\";"),
+        String::from("let data = \"text\";"),
+    ]);
+    editor.cursor.set_position((1, 15).into());
+
+    let result = select_between_chars_inc(&editor, '"', '"');
+    assert_eq!(result, Some((CursorPosition { line: 1, char: 11 }, CursorPosition { line: 1, char: 29 })))
 }

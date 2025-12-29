@@ -277,11 +277,11 @@ fn test_cursor_pos_next() {
     ];
     let cur = CursorPosition { line: 0, char: 0 };
     let next = cur.next(&content).unwrap();
-    assert_eq!(next, CursorPosition { line: 3, char: 0 });
-    let next = next.next(&content).unwrap();
     assert_eq!(next, CursorPosition { line: 3, char: 1 });
     let next = next.next(&content).unwrap();
     assert_eq!(next, CursorPosition { line: 3, char: 2 });
+    let next = next.next(&content).unwrap();
+    assert_eq!(next, CursorPosition { line: 3, char: 3 });
     assert_eq!(next.next(&content), None);
 }
 

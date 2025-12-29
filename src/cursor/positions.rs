@@ -13,16 +13,16 @@ pub struct CursorPosition {
 impl CursorPosition {
     pub fn next(self, content: &[EditorLine]) -> Option<Self> {
         let Self { mut line, mut char } = self;
-        char += 1;
         let next_chars = content.get(line)?.char_len();
         if next_chars > char {
+            char += 1;
             return Some(Self { line, char });
         }
         line += 1;
         while content.get(line)?.char_len() == 0 {
             line += 1;
         }
-        Some(Self { line, char: 0 })
+        Some(Self { line, char: 1 })
     }
 
     pub fn prev(self, content: &[EditorLine]) -> Option<Self> {

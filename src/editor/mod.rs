@@ -20,7 +20,8 @@ use renderer::TuiCodec;
 use std::path::PathBuf;
 use syntax::Lexer;
 use utils::{
-    big_file_protection, build_display, calc_line_number_offset, select_between_chars, select_indent, FileUpdate,
+    big_file_protection, build_display, calc_line_number_offset, select_between_chars, select_between_chars_inc,
+    select_indent, FileUpdate,
 };
 pub use utils::{editor_from_data, EditorStats};
 
@@ -296,7 +297,7 @@ impl Editor {
 
     pub fn select_between_inclusive(&mut self, open: char, close: char) {
         ControlMap::ensure_single_cursor(self);
-        let Some((from, to)) = select_between_chars(self, open, close) else {
+        let Some((from, to)) = select_between_chars_inc(self, open, close) else {
             return;
         };
         self.cursor.select_set(from, to);

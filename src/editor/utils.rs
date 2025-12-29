@@ -192,6 +192,13 @@ pub fn select_between_chars(editor: &Editor, open: char, close: char) -> Option<
     Some((from, maybe_to?))
 }
 
+pub fn select_between_chars_inc(editor: &Editor, open: char, close: char) -> Option<(CursorPosition, CursorPosition)> {
+    let (from, to) = select_between_chars(editor, open, close)?;
+    let inc_from = from.prev(&editor.content)?;
+    let inc_to = to.next(&editor.content)?;
+    Some((inc_from, inc_to))
+}
+
 /// builds editor from provided data
 pub fn editor_from_data(
     path: PathBuf,
