@@ -24,34 +24,30 @@ impl<'a> Pattern<'a> {
     pub fn parse(text: &'a str) -> Option<Self> {
         let mut chars = text.chars();
         match chars.next()? {
-            's' => SelectPat::parse(&text[1..]).map(Self::Select),
+            's' => SelectPat::parse(text[1..].trim_end()).map(Self::Select),
             '!' if text.len() == 2 => Some(Self::Pipe { cmd: &text[1..], src: None, target: PipeTarget::Term }),
             '!' if text.len() > 2 => {
                 let mut src = None;
                 let remaining_cmd = match text[1..].split_once('|') {
-                    Some((prefix, cmd)) => match prefix.trim() {
-                        "#s" => {
-                            src = Some(Source::Select { generator: None });
-                            cmd
+                    Some((prefix, cmd)) => {
+                        let trimmed = prefix.trim().strip_prefix('#');
+                        match trimmed {
+                            Some("s") => {
+                                src = Some(Source::Select { generator: None });
+                                cmd
+                            }
+                            Some(select_text) if select_text.starts_with('s') => {
+                                match SelectPat::parse(&select_text[1..]) {
+                                    Some(select) => {
+                                        src = Some(Source::Select { generator: Some(select) });
+                                        cmd
+                                    }
+                                    None => &text[1..],
+                                }
+                            }
+                            _ => &text[1..],
                         }
-                        "#sf" | "#se" | "#sa" => {
-                            src = Some(Source::Select { generator: Some(SelectPat::File) });
-                            cmd
-                        }
-                        "#ss" => {
-                            src = Some(Source::Select { generator: Some(SelectPat::Scope) });
-                            cmd
-                        }
-                        "#sw" => {
-                            src = Some(Source::Select { generator: Some(SelectPat::Word) });
-                            cmd
-                        }
-                        "#sl" => {
-                            src = Some(Source::Select { generator: Some(SelectPat::Line) });
-                            cmd
-                        }
-                        _ => &text[1..],
-                    },
+                    }
                     None => &text[1..],
                 };
                 match remaining_cmd.split_once('>') {
@@ -144,10 +140,9 @@ impl SelectPat {
     }
 
     pub fn parse(text: &str) -> Option<Self> {
-        let trimmed = text.trim_end();
-        match trimmed.len() {
+        match text.len() {
             0 => Some(Self::Scope),
-            1 => match trimmed.chars().next().unwrap() {
+            1 => match text.chars().next().unwrap() {
                 'f' | 'e' | 'a' => Some(Self::File),
                 's' => Some(Self::Scope),
                 'w' => Some(Self::Word),
@@ -155,11 +150,11 @@ impl SelectPat {
                 _ => None,
             },
             2 => {
-                let mut chars = trimmed.chars();
+                let mut chars = text.chars();
                 Some(Self::Between { open: chars.next()?, close: chars.next()?, inclusive: false })
             }
             3 => {
-                let mut chars = trimmed.chars();
+                let mut chars = text.chars();
                 let between = Self::Between { open: chars.next()?, close: chars.next()?, inclusive: true };
                 match chars.next() {
                     Some('+') => Some(between),
