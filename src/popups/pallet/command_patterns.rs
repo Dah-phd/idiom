@@ -25,40 +25,27 @@ impl<'a> Pattern<'a> {
         let mut chars = text.chars();
         match chars.next()? {
             's' => SelectPat::parse(text[1..].trim_end()).map(Self::Select),
+
             '!' if text.len() == 2 => Some(Self::Pipe { cmd: &text[1..], src: None, target: PipeTarget::Term }),
+
             '!' if text.len() > 2 => {
-                let mut src = None;
-                let remaining_cmd = match text[1..].split_once('|') {
-                    Some((prefix, cmd)) => {
-                        let trimmed = prefix.trim().strip_prefix('#');
-                        match trimmed {
-                            Some("s") => {
-                                src = Some(Source::Select { generator: None });
-                                cmd
-                            }
-                            Some(select_text) if select_text.starts_with('s') => {
-                                match SelectPat::parse(&select_text[1..]) {
-                                    Some(select) => {
-                                        src = Some(Source::Select { generator: Some(select) });
-                                        cmd
-                                    }
-                                    None => &text[1..],
-                                }
-                            }
-                            _ => &text[1..],
+                let (src, remaining_cmd) = text[1..]
+                    .split_once('|')
+                    .and_then(|(prefix, cmd)| match prefix.trim().strip_prefix('#') {
+                        Some("s") => Some((Some(Source::Select { generator: None }), cmd)),
+                        Some(select_text) if select_text.starts_with('s') => {
+                            Some((Some(Source::Select { generator: Some(SelectPat::parse(&select_text[1..])?) }), cmd))
                         }
-                    }
-                    None => &text[1..],
-                };
-                match remaining_cmd.split_once('>') {
-                    Some((cmd, target)) => match target.trim() {
-                        "#" => Some(Self::Pipe { cmd, target: PipeTarget::New, src }),
-                        "#s" => Some(Self::Pipe { cmd, target: PipeTarget::Select, src }),
-                        _ => Some(Self::Pipe { cmd, target: PipeTarget::Term, src }),
-                    },
+                        _ => None,
+                    })
+                    .unwrap_or((None, &text[1..]));
+
+                match remaining_cmd.split_once('>').map(|(cmd, target)| (cmd, PipeTarget::parse(target.trim()))) {
+                    Some((cmd, target)) => Some(Self::Pipe { cmd, target, src }),
                     None => Some(Self::Pipe { cmd: remaining_cmd, target: PipeTarget::Term, src }),
                 }
             }
+
             _ => None,
         }
     }
@@ -102,6 +89,14 @@ impl PipeTarget {
             Self::New => "editor",
             Self::Select => "replace select",
             Self::Term => "term",
+        }
+    }
+
+    fn parse(target: &str) -> Self {
+        match target {
+            "#" => PipeTarget::New,
+            "#s" => PipeTarget::Select,
+            _ => PipeTarget::Term,
         }
     }
 }
