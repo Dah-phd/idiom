@@ -49,7 +49,7 @@ pub fn render_marked_word(
     loop {
         if poll(frame_rate)? {
             match read()? {
-                Event::Mouse(MouseEvent { kind: MouseEventKind::Moved, .. }) => (),
+                Event::Mouse(MouseEvent { kind: MouseEventKind::Moved | MouseEventKind::Up(..), .. }) => (),
                 Event::Mouse(event) => {
                     clear_marked_cache(editor, ranges);
                     gs.map_mouse(event, tree, ws, term);

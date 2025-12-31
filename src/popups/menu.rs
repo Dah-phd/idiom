@@ -12,7 +12,7 @@ enum Action {
     Editor(EditorAction),
 }
 
-pub fn menu_context_editor_inplace(position: Position, screen: Rect, accent_style: ContentStyle) -> ContextMenu<7> {
+pub fn menu_context_editor_inplace(position: Position, screen: Rect, accent_style: ContentStyle) -> ContextMenu<8> {
     let modal_screen = screen.modal_relative(position.row, position.col, 30, 7);
 
     ContextMenu {
@@ -20,6 +20,7 @@ pub fn menu_context_editor_inplace(position: Position, screen: Rect, accent_styl
             ("Go to Definition", EditorAction::GoToDeclaration.into()),
             ("Find References", EditorAction::FindReferences.into()),
             ("Details / Info", EditorAction::Help.into()),
+            ("Mark word", EditorAction::MarkWord.into()),
             ("Rename", EditorAction::LSPRename.into()),
             ("Cut", EditorAction::Cut.into()),
             ("Copy", EditorAction::Copy.into()),
