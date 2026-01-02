@@ -204,6 +204,7 @@ impl LSPResponseType {
         if value == Value::Null {
             return Ok(LSPResponse::Empty);
         }
+
         Ok(match self {
             Self::Completion(.., line, cursor) => match from_value::<CompletionResponse>(value)? {
                 CompletionResponse::Array(arr) => LSPResponse::Completion(arr, line.to_owned(), *cursor),
