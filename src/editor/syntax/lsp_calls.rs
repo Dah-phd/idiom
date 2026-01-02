@@ -217,6 +217,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
                     LSPResponse::Error(text) => {
                         gs.error(text);
                     }
+                    LSPResponse::Empty => (),
                 }
             } else {
                 if matches!(req_type, LSPResponseType::Tokens) {
