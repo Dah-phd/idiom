@@ -61,16 +61,23 @@ pub fn run_embeded_tui(
                 _ => (),
             }
             gs.backend.freeze();
-            gs.fast_render_message_with_preserved_cursor();
+            render_message_with_saved_cursor(gs);
             tui.render(&mut gs.backend);
             gs.backend.unfreeze();
         } else {
             gs.backend.freeze();
-            gs.fast_render_message_with_preserved_cursor();
+            render_message_with_saved_cursor(gs);
             tui.fast_render(&mut gs.backend);
             gs.backend.unfreeze();
         }
     }
 
     Ok(())
+}
+
+#[inline]
+fn render_message_with_saved_cursor(gs: &mut GlobalState) {
+    gs.backend.save_cursor();
+    gs.render_footer(None);
+    gs.backend.restore_cursor();
 }

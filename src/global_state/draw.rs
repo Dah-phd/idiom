@@ -101,7 +101,9 @@ pub fn draw_with_tree(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mu
 }
 
 pub fn draw_term(gs: &mut GlobalState, _workspace: &mut Workspace, _tree: &mut Tree, term: &mut EditorTerminal) {
-    gs.fast_render_message_with_preserved_cursor();
+    gs.backend.save_cursor();
+    gs.render_footer(None);
+    gs.backend.restore_cursor();
     term.fast_render(gs);
 }
 

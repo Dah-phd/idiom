@@ -295,12 +295,6 @@ impl GlobalState {
         self.backend.flush_buf();
     }
 
-    pub fn fast_render_message_with_preserved_cursor(&mut self) {
-        self.backend.save_cursor();
-        self.footer.fast_render(None, self.ui_theme.accent_style(), &mut self.backend);
-        self.backend.restore_cursor();
-    }
-
     pub fn render_footer_standalone(&mut self) {
         // reset expected line positions
         self.footer_line = self.screen_rect.clone().pop_line();
@@ -348,8 +342,8 @@ impl GlobalState {
         self.editor_area.left_border();
     }
 
-    pub fn render_stats(&mut self, stats: EditorStats) {
-        self.footer.fast_render(Some(stats), self.ui_theme.accent_style(), &mut self.backend);
+    pub fn render_footer(&mut self, stats: Option<EditorStats>) {
+        self.footer.fast_render(stats, self.ui_theme.accent_style(), &mut self.backend);
     }
 
     pub fn force_render_stats(&mut self, stats: EditorStats) {

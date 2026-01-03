@@ -27,7 +27,6 @@ impl<'a> Pattern<'a> {
             's' => SelectPat::parse(text[1..].trim_end()).map(Self::Select),
 
             '!' if text.len() == 2 => Some(Self::Pipe { cmd: &text[1..], src: None, target: PipeTarget::Term }),
-
             '!' if text.len() > 2 => {
                 let (src, remaining_cmd) = text[1..]
                     .split_once('|')
@@ -257,12 +256,12 @@ fn shell_executor(
                 match target {
                     PipeTarget::New => {
                         if !status.success() {
-                            gs.error(format!("CMD STATUS: {}", status));
+                            gs.error(format!("CMD STATUS: {status}"));
                         }
                     }
                     PipeTarget::Select => {
                         if !status.success() {
-                            gs.error(format!("CMD STATUS: {}", status));
+                            gs.error(format!("CMD STATUS: {status}"));
                         } else {
                             let editor = ws.get_active().ok_or(IdiomError::any("No files open in editor!"))?;
                             editor.paste(logs, gs);
