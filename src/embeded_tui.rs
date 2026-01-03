@@ -1,4 +1,5 @@
 use crate::{
+    embeded_term::EditorTerminal,
     error::{IdiomError, IdiomResult},
     ext_tui::{
         pty::{Message, PtyShell, OVERLAY_INFO},
@@ -6,13 +7,19 @@ use crate::{
     },
     global_state::GlobalState,
     popups::checked_new_screen_size,
+    workspace::Workspace,
 };
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use idiom_tui::Backend;
 use std::time::Duration;
 const MIN_FRAMERATE: Duration = Duration::from_millis(8);
 
-pub fn run_embeded_tui(cmd: Option<&str>, gs: &mut GlobalState) -> IdiomResult<()> {
+pub fn run_embeded_tui(
+    cmd: Option<&str>,
+    ws: &mut Workspace,
+    term: &mut EditorTerminal,
+    gs: &mut GlobalState,
+) -> IdiomResult<()> {
     let mut rect = CrossTerm::screen()?;
     rect.height -= 1;
 
@@ -42,7 +49,7 @@ pub fn run_embeded_tui(cmd: Option<&str>, gs: &mut GlobalState) -> IdiomResult<(
                 }
                 Event::Resize(width, height) => {
                     let (width, height) = checked_new_screen_size(width, height, gs.backend());
-                    gs.full_resize(height, width);
+                    gs.full_resize(ws, term, width, height);
                     gs.render_footer_standalone();
                     let mut rect = CrossTerm::screen()?;
                     rect.height -= 1;
@@ -54,16 +61,23 @@ pub fn run_embeded_tui(cmd: Option<&str>, gs: &mut GlobalState) -> IdiomResult<(
                 _ => (),
             }
             gs.backend.freeze();
-            gs.fast_render_message_with_preserved_cursor();
+            render_message_with_saved_cursor(gs);
             tui.render(&mut gs.backend);
             gs.backend.unfreeze();
         } else {
             gs.backend.freeze();
-            gs.fast_render_message_with_preserved_cursor();
+            render_message_with_saved_cursor(gs);
             tui.fast_render(&mut gs.backend);
             gs.backend.unfreeze();
         }
     }
 
     Ok(())
+}
+
+#[inline]
+fn render_message_with_saved_cursor(gs: &mut GlobalState) {
+    gs.backend.save_cursor();
+    gs.render_footer(None);
+    gs.backend.restore_cursor();
 }

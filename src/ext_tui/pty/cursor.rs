@@ -1,4 +1,4 @@
-use crate::{ext_tui::CrossTerm, workspace::CursorPosition};
+use crate::{cursor::CursorPosition, ext_tui::CrossTerm};
 use idiom_tui::{layout::Rect, Backend};
 use std::cmp::Ordering;
 use vt100::Screen;

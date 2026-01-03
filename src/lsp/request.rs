@@ -1,5 +1,5 @@
 use super::as_url;
-use crate::{lsp::LSPResult, workspace::CursorPosition};
+use crate::{cursor::CursorPosition, lsp::LSPResult};
 
 use lsp_types::{self as lsp, Uri};
 use lsp_types::{
@@ -177,6 +177,10 @@ where
                 capabilities: lsp::ClientCapabilities {
                     workspace: Some(lsp::WorkspaceClientCapabilities { ..Default::default() }),
                     text_document: Some(lsp::TextDocumentClientCapabilities {
+                        semantic_tokens: Some(lsp::SemanticTokensClientCapabilities {
+                            overlapping_token_support: Some(false),
+                            ..Default::default()
+                        }),
                         completion: Some(lsp::CompletionClientCapabilities {
                             completion_item: Some(lsp::CompletionItemCapability {
                                 insert_replace_support: Some(true),

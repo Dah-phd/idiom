@@ -5,7 +5,7 @@ use crate::{
     ext_tui::CrossTerm,
     global_state::{GlobalState, IdiomEvent},
     popups::{
-        get_init_screen, get_new_screen_size,
+        get_init_screen,
         pallet::Pallet,
         popup_find::{FindPopup, GoToLinePopup},
         popup_replace::ReplacePopup,
@@ -20,7 +20,7 @@ use crate::{
 use crossterm::event::Event;
 use std::{path::PathBuf, time::Duration};
 
-pub const MIN_FRAMERATE: Duration = Duration::from_millis(8);
+pub const MIN_FRAMERATE: Duration = Duration::from_millis(16);
 pub const MIN_HEIGHT: u16 = 6;
 pub const MIN_WIDTH: u16 = 40;
 
@@ -80,7 +80,8 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
                                         1 => gs.insert_mode(),
                                         _ => {
                                             let mut selector = selector_editors(tabs);
-                                            let result = selector.run(&mut gs, &mut workspace, &mut tree, &mut term);
+                                            let result =
+                                                selector.main_loop(&mut gs, &mut workspace, &mut tree, &mut term);
                                             gs.log_if_error(result);
                                         }
                                     }
@@ -93,6 +94,9 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
                                 }
                                 GeneralAction::InvokePallet => {
                                     Pallet::run(&mut gs, &mut workspace, &mut tree, &mut term);
+                                }
+                                GeneralAction::CommandPallet => {
+                                    Pallet::run_as_command(&mut gs, &mut workspace, &mut tree, &mut term);
                                 }
                                 GeneralAction::ContextMenu => {
                                     gs.context_menu(&mut workspace, &mut tree, &mut term);
@@ -150,22 +154,14 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
                         };
                     }
                 }
-                Event::Resize(mut width, mut height) => {
-                    if width < MIN_WIDTH || height < MIN_HEIGHT {
-                        let (new_width, new_height) = get_new_screen_size(gs.backend())?;
-                        width = new_width;
-                        height = new_height;
-                    }
-                    gs.full_resize(height, width);
-                    gs.force_area_calc();
-                    workspace.resize_all(gs.editor_area().width, gs.editor_area().height as usize);
-                    term.resize(*gs.editor_area());
-                }
                 Event::Mouse(event) => gs.map_mouse(event, &mut tree, &mut workspace, &mut term),
+                Event::Resize(width, height) => {
+                    gs.full_resize(&mut workspace, &mut term, width, height);
+                }
                 Event::Paste(clip) => {
                     gs.passthrough_paste(clip, &mut workspace, &mut term);
                 }
-                _ => (),
+                Event::FocusGained | Event::FocusLost => (),
             }
         }
 

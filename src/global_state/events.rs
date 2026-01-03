@@ -1,16 +1,18 @@
 use super::{GlobalState, Mode};
+use crate::configs::FileType;
 use crate::configs::{EditorAction, TreeAction};
+use crate::cursor::CursorPosition;
+use crate::editor_line::EditorLine;
 use crate::embeded_term::EditorTerminal;
 use crate::embeded_tui::run_embeded_tui;
 use crate::lsp::TreeDiagnostics;
 use crate::popups::generic_selector::PopupSelector;
+use crate::popups::mark_word::render_marked_word;
 use crate::popups::pallet::Pallet;
-use crate::popups::PopupChoice;
-use crate::popups::{popup_tree_search::ActiveFileSearch, Popup};
+use crate::popups::popup_tree_search::ActiveFileSearch;
+use crate::popups::{Popup, PopupChoice};
 use crate::tree::Tree;
-use crate::workspace::line::EditorLine;
 use crate::workspace::Workspace;
-use crate::{configs::FileType, workspace::CursorPosition};
 use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, Range, WorkspaceEdit};
 use std::path::PathBuf;
 
@@ -19,6 +21,7 @@ pub enum StartInplacePopup {
     Pop(PopupChoice),
     RefSelector(PopupSelector<(String, PathBuf, Range)>),
     Mesasge(PopupSelector<String>),
+    MarkWord,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -62,26 +65,31 @@ impl IdiomEvent {
                 tree.map_action(action, gs);
             }
             IdiomEvent::EmbededApp(cmd) => {
-                if let Err(error) = run_embeded_tui(cmd.as_deref(), gs) {
+                if let Err(error) = run_embeded_tui(cmd.as_deref(), ws, term, gs) {
                     gs.error(error);
                 };
                 gs.draw_callback = super::draw::full_rebuild;
             }
             IdiomEvent::InplacePopup(pop) => match pop {
                 StartInplacePopup::Pop(mut popup) => {
-                    if let Err(error) = popup.run(gs, ws, tree, term) {
+                    if let Err(error) = popup.main_loop(gs, ws, tree, term) {
                         gs.error(error);
                     };
                 }
                 StartInplacePopup::RefSelector(mut popup) => {
-                    if let Err(error) = popup.run(gs, ws, tree, term) {
+                    if let Err(error) = popup.main_loop(gs, ws, tree, term) {
                         gs.error(error);
                     };
                 }
                 StartInplacePopup::Mesasge(mut popup) => {
-                    if let Err(error) = popup.run(gs, ws, tree, term) {
+                    if let Err(error) = popup.main_loop(gs, ws, tree, term) {
                         gs.error(error);
                     };
+                }
+                StartInplacePopup::MarkWord => {
+                    if let Err(error) = render_marked_word(gs, ws, tree, term) {
+                        gs.error(error);
+                    }
                 }
             },
             IdiomEvent::SearchFiles(pattern) => {
@@ -119,7 +127,7 @@ impl IdiomEvent {
                         id += 1;
                     }
                     let content: Vec<EditorLine> =
-                        gs.messages.get_logs().map(ToOwned::to_owned).map(EditorLine::from).collect();
+                        gs.footer.get_logs().map(ToOwned::to_owned).map(EditorLine::from).collect();
                     if !content.is_empty() {
                         ws.new_text_from_data(path, content, None, gs);
                     } else {

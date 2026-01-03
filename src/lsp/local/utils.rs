@@ -1,6 +1,6 @@
 use super::{LangStream, PositionedToken};
-use crate::workspace::CursorPosition;
-use idiom_tui::utils::{UTF8Safe, UTF8SafeStringExt};
+use crate::cursor::CursorPosition;
+use idiom_tui::utils::{UTFSafe, UTFSafeStringExt};
 use lsp_types::{
     SemanticToken, SemanticTokenType, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensServerCapabilities,
 };
@@ -51,13 +51,13 @@ pub fn swap_content(content: &mut Vec<String>, clip: &str, from: CursorPosition,
 pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Vec<String>) {
     if from.line == to.line {
         match content.get_mut(from.line) {
-            Some(line) => line.utf8_replace_range(from.char..to.char, ""),
+            Some(line) => line.replace_char_range(from.char..to.char, ""),
             None => content.push(Default::default()),
         };
         return;
     };
     let last_line = content.drain(from.line + 1..=to.line).next_back().expect("Checked above!");
-    content[from.line].utf8_replace_from(from.char, last_line.utf8_unsafe_get_from(to.char));
+    content[from.line].replace_from_char(from.char, last_line.unchecked_get_from_char(to.char));
 }
 
 #[inline(always)]
@@ -65,20 +65,20 @@ pub fn insert_clip(clip: &str, content: &mut Vec<String>, mut cursor: CursorPosi
     let mut lines = clip.split('\n').collect::<Vec<_>>();
     if lines.len() == 1 {
         let text = lines[0];
-        content[cursor.line].utf8_insert_str(cursor.char, lines[0]);
+        content[cursor.line].insert_str_at_char(cursor.char, lines[0]);
         cursor.char += text.char_len();
         return;
     };
 
     let first_line = &mut content[cursor.line];
-    let mut last_line = first_line.utf8_split_off(cursor.char);
+    let mut last_line = first_line.split_off_at_char(cursor.char);
     first_line.push_str(lines.remove(0));
 
     let prefix = lines.remove(lines.len() - 1); // len is already checked
     cursor.line += 1;
     cursor.char = prefix.char_len();
 
-    last_line.utf8_insert_str(0, prefix);
+    last_line.insert_str_at_char(0, prefix);
     content.insert(cursor.line, last_line);
 
     for new_line in lines {
@@ -198,8 +198,8 @@ mod test {
     use lsp_types::SemanticToken;
 
     use crate::{
+        cursor::CursorPosition,
         lsp::local::{tokens::python::PyToken, LangStream, LocalLSP, PositionedToken},
-        workspace::CursorPosition,
     };
 
     use super::{full_tokens, utf16_encoder, utf8_encoder};

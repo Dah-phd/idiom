@@ -1,6 +1,10 @@
+mod actions;
 mod app;
 mod cli;
 mod configs;
+mod cursor;
+mod editor;
+mod editor_line;
 mod embeded_term;
 mod embeded_tui;
 mod error;
@@ -9,7 +13,6 @@ mod global_state;
 mod lsp;
 mod popups;
 mod session;
-mod syntax;
 mod tree;
 mod utils;
 mod workspace;

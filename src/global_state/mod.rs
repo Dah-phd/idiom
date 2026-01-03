@@ -3,23 +3,26 @@ mod clipboard;
 mod controls;
 mod draw;
 mod events;
-mod message;
+mod footbar;
 
 use crate::{
     configs::{
         EditorConfigs, EditorKeyMap, FileType, GeneralKeyMap, KeyMap, Theme, TreeKeyMap, UITheme, EDITOR_CFG_FILE,
         KEY_MAP, THEME_FILE, THEME_UI,
     },
+    cursor::CursorPosition,
+    editor::EditorStats,
     embeded_term::EditorTerminal,
     error::IdiomResult,
     ext_tui::{CrossTerm, StyleExt},
     lsp::{LSPError, LSPResult},
     popups::{
+        checked_new_screen_size,
         menu::{menu_context_editor_inplace, menu_context_tree_inplace},
         Popup,
     },
     tree::Tree,
-    workspace::{CursorPosition, Workspace},
+    workspace::Workspace,
 };
 pub use clipboard::Clipboard;
 pub use controls::Mode;
@@ -27,15 +30,15 @@ use crossterm::{
     event::{KeyEvent, MouseEvent},
     style::ContentStyle,
 };
-pub use events::IdiomEvent;
+pub use events::{IdiomEvent, StartInplacePopup};
 use idiom_tui::{
     layout::{Line, Rect},
-    Backend, Position,
+    Backend,
 };
 
 use draw::Components;
+use footbar::FootBar;
 use fuzzy_matcher::skim::SkimMatcherV2;
-use message::Messages;
 
 type KeyMapCallback = fn(&KeyEvent, &mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal) -> bool;
 type MouseMapCallback = fn(MouseEvent, &mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal);
@@ -49,13 +52,13 @@ pub struct GlobalState {
     pub matcher: SkimMatcherV2,
     pub event: Vec<IdiomEvent>,
     pub clipboard: Clipboard,
+    pub git_tui: Option<String>,
     screen_rect: Rect,
     tree_area: Rect,
     tab_area: Rect,
     editor_area: Rect,
     footer_line: Line,
-    pub git_tui: Option<String>,
-    messages: Messages,
+    footer: FootBar,
     mode: Mode,
     tree_size: usize,
     key_mapper: KeyMapCallback,
@@ -67,7 +70,7 @@ pub struct GlobalState {
 
 impl GlobalState {
     pub fn new(screen_rect: Rect, backend: CrossTerm) -> Self {
-        let mut messages = Messages::new();
+        let mut messages = FootBar::new();
         let ui_theme = messages.unwrap_or_default(UITheme::new(), THEME_UI);
         let theme = messages.unwrap_or_default(Theme::new(), THEME_FILE);
         Self {
@@ -89,7 +92,7 @@ impl GlobalState {
             editor_area: Rect::default(),
             footer_line: Line::default(),
             matcher: SkimMatcherV2::default(),
-            messages,
+            footer: messages,
             components: Components::default(),
         }
     }
@@ -114,6 +117,16 @@ impl GlobalState {
     #[inline]
     pub fn get_select_style(&self) -> ContentStyle {
         ContentStyle::bg(self.theme.selected)
+    }
+
+    #[inline]
+    pub fn get_accented_select(&self) -> ContentStyle {
+        ContentStyle {
+            foreground_color: Some(self.ui_theme.accent_select()),
+            background_color: Some(self.theme.selected),
+            attributes: Default::default(),
+            underline_color: None,
+        }
     }
 
     pub fn get_key_maps(&mut self) -> (GeneralKeyMap, EditorKeyMap, TreeKeyMap) {
@@ -230,6 +243,15 @@ impl GlobalState {
         self.config_controls();
     }
 
+    pub fn push_embeded_command(&mut self, cmd: String, term: &mut EditorTerminal) {
+        self.draw_callback = draw::full_rebuild;
+        self.components.insert(Components::TERM);
+        term.activate(self.editor_area);
+        self.config_controls();
+        term.paste_passthrough(cmd);
+        term.map(&KeyEvent::new(crossterm::event::KeyCode::Enter, crossterm::event::KeyModifiers::NONE), self);
+    }
+
     pub fn try_tree_event(&mut self, value: impl TryInto<IdiomEvent>) {
         if let Ok(event) = value.try_into() {
             self.event.push(event);
@@ -247,15 +269,14 @@ impl GlobalState {
                 let position = CursorPosition { line, char };
                 let accent_style = self.ui_theme.accent_style_reversed();
                 let mut menu = menu_context_tree_inplace(position, self.screen_rect, accent_style);
-                menu.run(self, ws, tree, term)
+                menu.main_loop(self, ws, tree, term)
             }
             Mode::Insert => {
                 let Some(editor) = ws.get_active() else { return };
-                let row = (editor.cursor.line - editor.cursor.at_line) as u16;
-                let col = (editor.cursor.char + editor.line_number_padding + 1) as u16;
+                let position = editor.get_cursor_rel_render_position();
                 let accent_style = self.ui_theme.accent_style();
-                let mut menu = menu_context_editor_inplace(Position { row, col }, self.editor_area, accent_style);
-                menu.run(self, ws, tree, term)
+                let mut menu = menu_context_editor_inplace(position, self.editor_area, accent_style);
+                menu.main_loop(self, ws, tree, term)
             }
         };
         if let Err(error) = result {
@@ -274,32 +295,6 @@ impl GlobalState {
         self.backend.flush_buf();
     }
 
-    pub fn render_stats(&mut self, len: usize, select_len: usize, cursor: CursorPosition) {
-        let mut line = self.footer_line.clone();
-        if self.components.contains(Components::TREE) || self.is_select() {
-            line += self.tree_size;
-        } else {
-            line += Mode::len();
-        }
-        self.backend.set_style(self.ui_theme.accent_style());
-        let mut rev_builder = line.unsafe_builder_rev(&mut self.backend);
-        if select_len != 0 {
-            rev_builder.push(&format!("({select_len} selected) "));
-        }
-        rev_builder.push(&format!("  Doc Len {len}, Ln {}, Col {} ", cursor.line + 1, cursor.char + 1));
-        self.messages.set_line(rev_builder.into_line());
-        self.messages.fast_render(self.ui_theme.accent_style(), &mut self.backend);
-        self.backend.reset_style();
-    }
-
-    pub fn fast_render_message_with_preserved_cursor(&mut self) {
-        if self.messages.should_render() {
-            self.backend.save_cursor();
-            self.messages.render(self.ui_theme.accent_style(), &mut self.backend);
-            self.backend.restore_cursor();
-        }
-    }
-
     pub fn render_footer_standalone(&mut self) {
         // reset expected line positions
         self.footer_line = self.screen_rect.clone().pop_line();
@@ -309,16 +304,20 @@ impl GlobalState {
             self.footer_line.clone().split_rel(Mode::len())
         };
         self.mode.render(mode_line, &mut self.backend);
-        self.messages.set_line(msg_line);
-        self.messages.render(self.ui_theme.accent_style(), &mut self.backend);
+        self.footer.line = msg_line;
+        self.footer.render(None, self.ui_theme.accent_style(), &mut self.backend);
     }
 
-    #[inline]
-    pub fn full_resize(&mut self, height: u16, width: u16) {
+    /// perform full resize on all componenets
+    pub fn full_resize(&mut self, workspace: &mut Workspace, term: &mut EditorTerminal, width: u16, height: u16) {
+        let (width, height) = checked_new_screen_size(width, height, self.backend());
         let tree_rate = (self.tree_size * 100) / self.screen_rect.width;
         self.screen_rect = (width, height).into();
         self.tree_size = std::cmp::max((tree_rate * self.screen_rect.width) / 100, Mode::len());
         self.draw_callback = draw::full_rebuild;
+        self.force_area_calc();
+        workspace.resize_all(self.editor_area);
+        term.resize(self.editor_area);
     }
 
     #[inline]
@@ -343,19 +342,16 @@ impl GlobalState {
         self.editor_area.left_border();
     }
 
+    pub fn render_footer(&mut self, stats: Option<EditorStats>) {
+        self.footer.fast_render(stats, self.ui_theme.accent_style(), &mut self.backend);
+    }
+
+    pub fn force_render_stats(&mut self, stats: EditorStats) {
+        self.footer.render(Some(stats), self.ui_theme.accent_style(), &mut self.backend);
+    }
+
     pub fn clear_stats(&mut self) {
-        let mut line = self.footer_line.clone();
-        let accent_style = self.ui_theme.accent_style();
-        if self.components.contains(Components::TREE) || self.is_select() {
-            line += self.tree_size;
-        } else {
-            line += Mode::len();
-        }
-        self.backend.set_style(accent_style);
-        self.backend.go_to(line.row, line.col);
-        self.backend.clear_to_eol();
-        self.backend.reset_style();
-        self.messages.render(accent_style, &mut self.backend);
+        self.footer.render(None, self.ui_theme.accent_style(), &mut self.backend);
     }
 
     // SCREEN ACCESS
@@ -384,23 +380,23 @@ impl GlobalState {
 
     #[inline]
     pub fn message(&mut self, msg: impl Into<String>) {
-        self.messages.message(msg.into());
+        self.footer.message(msg.into());
     }
 
     #[inline]
     pub fn error(&mut self, error: impl ToString) {
-        self.messages.error(error.to_string());
+        self.footer.error(error.to_string());
     }
 
     #[inline]
     pub fn success(&mut self, msg: impl Into<String>) {
-        self.messages.success(msg.into());
+        self.footer.success(msg.into());
     }
 
     /// unwrap or default with logged error
     #[inline]
     pub fn unwrap_or_default<T: Default, E: Error>(&mut self, result: Result<T, E>, prefix: &str) -> T {
-        self.messages.unwrap_or_default(result, prefix)
+        self.footer.unwrap_or_default(result, prefix)
     }
 
     /// logs IdiomError and drops the result
@@ -425,7 +421,7 @@ impl GlobalState {
         match err {
             LSPError::Null => (),
             LSPError::InternalError(message) => {
-                self.messages.error(message);
+                self.footer.error(message);
                 self.event.push(IdiomEvent::CheckLSP(file_type));
             }
             _ => self.error(err),

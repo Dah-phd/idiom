@@ -1,8 +1,12 @@
 use super::GlobalState;
-use crate::embeded_term::EditorTerminal;
-use crate::ext_tui::CrossTerm;
-use crate::tree::tests::mock_tree;
-use crate::workspace::tests::mock_ws;
+use crate::{
+    editor::EditorStats,
+    embeded_term::EditorTerminal,
+    ext_tui::{CrossTerm, StyleExt},
+    tree::tests::mock_tree,
+    workspace::tests::mock_ws,
+};
+use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{
     layout::{Borders, Line, Rect},
     Backend,
@@ -20,7 +24,7 @@ fn full_draw_select(h: u16, w: u16) -> GlobalState {
     let mut term = EditorTerminal::new(Some(String::new()));
     assert_eq!(gs.tree_area, Rect::default());
     assert_eq!(gs.editor_area, Rect::default());
-    gs.full_resize(h, w);
+    gs.full_resize(&mut ws, &mut term, h, w);
     gs.draw(&mut ws, &mut tree, &mut term);
     gs
 }
@@ -39,27 +43,31 @@ fn full_draw_insert(h: u16, w: u16) -> GlobalState {
     let mut term = EditorTerminal::new(Some(String::new()));
     assert_eq!(gs.tree_area, Rect::default());
     assert_eq!(gs.editor_area, Rect::default());
-    gs.full_resize(h, w);
+    gs.full_resize(&mut ws, &mut term, h, w);
     gs.draw(&mut ws, &mut tree, &mut term);
     gs
 }
 
 fn force_calc_select(h: u16, w: u16) -> GlobalState {
     let mut gs = GlobalState::new(Rect::new(0, 0, w as usize, h), CrossTerm::init());
+    let mut ws = mock_ws(vec![]);
+    let mut term = EditorTerminal::new(Some(String::new()));
     assert_eq!(gs.tree_area, Rect::default());
     assert_eq!(gs.editor_area, Rect::default());
-    gs.full_resize(80, 80);
+    gs.full_resize(&mut ws, &mut term, 80, 80);
     gs.force_area_calc();
     gs
 }
 
 fn force_calc_insert(h: u16, w: u16) -> GlobalState {
     let mut gs = GlobalState::new(Rect::new(0, 0, w as usize, h), CrossTerm::init());
+    let mut ws = mock_ws(vec![]);
+    let mut term = EditorTerminal::new(Some(String::new()));
     assert_eq!(gs.tree_area, Rect::default());
     assert_eq!(gs.editor_area, Rect::default());
     gs.toggle_tree();
     gs.insert_mode();
-    gs.full_resize(80, 80);
+    gs.full_resize(&mut ws, &mut term, 80, 80);
     gs.force_area_calc();
     gs
 }
@@ -124,4 +132,246 @@ fn compare_insert() {
     assert_eq!(force_gs.tab_area, draw_gs.tab_area);
     assert_eq!(force_gs.tree_area, draw_gs.tree_area);
     assert_eq!(force_gs.footer_line, draw_gs.footer_line);
+}
+
+#[test]
+fn footer_render() {
+    let mut gs = GlobalState::new(Rect::new(0, 0, 60, 30), CrossTerm::init());
+    gs.force_area_calc();
+    gs.footer.line = gs.footer();
+
+    gs.footer.render(None, gs.ui_theme.accent_style(), &mut gs.backend);
+    assert_eq!(
+        gs.backend.drain(),
+        [
+            (gs.ui_theme.accent_style(), "<<set style>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (ContentStyle::default(), "<<clear EOL>>".into()),
+            (ContentStyle::default(), "<<reset style>>".into())
+        ]
+    );
+
+    gs.footer.render(
+        Some(EditorStats { len: 300, select_len: 2, position: (0, 1).into() }),
+        gs.ui_theme.accent_style(),
+        &mut gs.backend,
+    );
+    assert_eq!(
+        gs.backend.drain(),
+        [
+            (gs.ui_theme.accent_style(), "<<set style>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (ContentStyle::default(), "<<clear EOL>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 20>>".into()),
+            (gs.ui_theme.accent_style(), "  Doc Len 300, Ln 0, Col 1 (2 selected) ".into()),
+            (ContentStyle::default(), "<<reset style>>".into())
+        ]
+    );
+
+    gs.footer.error("err".into());
+
+    gs.footer.render(None, gs.ui_theme.accent_style(), &mut gs.backend);
+    assert_eq!(
+        gs.backend.drain(),
+        [
+            (gs.ui_theme.accent_style(), "<<set style>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (ContentStyle::default(), "<<clear EOL>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (gs.ui_theme.accent_style(), "<<padding: 2>>".into()),
+            (gs.ui_theme.accent_style().with_fg(Color::Red), "err".into()),
+            (ContentStyle::default(), "<<reset style>>".into())
+        ]
+    );
+
+    gs.footer.render(
+        Some(EditorStats { len: 300, select_len: 0, position: (0, 1).into() }),
+        gs.ui_theme.accent_style(),
+        &mut gs.backend,
+    );
+    assert_eq!(
+        gs.backend.drain(),
+        [
+            (gs.ui_theme.accent_style(), "<<set style>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (ContentStyle::default(), "<<clear EOL>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 33>>".into()),
+            (gs.ui_theme.accent_style(), "  Doc Len 300, Ln 0, Col 1 ".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (gs.ui_theme.accent_style(), "<<padding: 2>>".into()),
+            (gs.ui_theme.accent_style().with_fg(Color::Red), "err".into()),
+            (ContentStyle::default(), "<<reset style>>".into())
+        ]
+    );
+}
+
+#[test]
+fn footer_fast_render() {
+    let mut gs = GlobalState::new(Rect::new(0, 0, 60, 30), CrossTerm::init());
+    gs.force_area_calc();
+    gs.footer.line = gs.footer();
+
+    gs.footer.fast_render(None, gs.ui_theme.accent_style(), &mut gs.backend);
+    assert!(gs.backend.drain().is_empty());
+
+    gs.footer.fast_render(
+        Some(EditorStats { len: 300, select_len: 2, position: (0, 1).into() }),
+        gs.ui_theme.accent_style(),
+        &mut gs.backend,
+    );
+    assert_eq!(
+        gs.backend.drain(),
+        [
+            (gs.ui_theme.accent_style(), "<<set style>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (ContentStyle::default(), "<<clear EOL>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 20>>".into()),
+            (gs.ui_theme.accent_style(), "  Doc Len 300, Ln 0, Col 1 (2 selected) ".into()),
+            (ContentStyle::default(), "<<reset style>>".into())
+        ]
+    );
+
+    gs.footer.fast_render(
+        Some(EditorStats { len: 300, select_len: 2, position: (0, 1).into() }),
+        gs.ui_theme.accent_style(),
+        &mut gs.backend,
+    );
+    assert!(gs.backend.drain().is_empty());
+
+    gs.footer.fast_render(None, gs.ui_theme.accent_style(), &mut gs.backend);
+    assert_eq!(
+        gs.backend.drain(),
+        [
+            (gs.ui_theme.accent_style(), "<<set style>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (ContentStyle::default(), "<<clear EOL>>".into()),
+            (ContentStyle::default(), "<<reset style>>".into())
+        ]
+    );
+
+    gs.footer.fast_render(None, gs.ui_theme.accent_style(), &mut gs.backend);
+    assert!(gs.backend.drain().is_empty());
+
+    gs.footer.error("err".into());
+
+    gs.footer.fast_render(None, gs.ui_theme.accent_style(), &mut gs.backend);
+    assert_eq!(
+        gs.backend.drain(),
+        [
+            (gs.ui_theme.accent_style(), "<<set style>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (ContentStyle::default(), "<<clear EOL>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (gs.ui_theme.accent_style(), "<<padding: 2>>".into()),
+            (gs.ui_theme.accent_style().with_fg(Color::Red), "err".into()),
+            (ContentStyle::default(), "<<reset style>>".into())
+        ]
+    );
+
+    gs.footer.fast_render(None, gs.ui_theme.accent_style(), &mut gs.backend);
+    assert!(gs.backend.drain().is_empty());
+
+    gs.footer.fast_render(
+        Some(EditorStats { len: 300, select_len: 0, position: (0, 1).into() }),
+        gs.ui_theme.accent_style(),
+        &mut gs.backend,
+    );
+    assert_eq!(
+        gs.backend.drain(),
+        [
+            (gs.ui_theme.accent_style(), "<<set style>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (ContentStyle::default(), "<<clear EOL>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 33>>".into()),
+            (gs.ui_theme.accent_style(), "  Doc Len 300, Ln 0, Col 1 ".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (gs.ui_theme.accent_style(), "<<padding: 2>>".into()),
+            (gs.ui_theme.accent_style().with_fg(Color::Red), "err".into()),
+            (ContentStyle::default(), "<<reset style>>".into())
+        ]
+    );
+
+    gs.footer.fast_render(
+        Some(EditorStats { len: 300, select_len: 0, position: (0, 1).into() }),
+        gs.ui_theme.accent_style(),
+        &mut gs.backend,
+    );
+    assert!(gs.backend.drain().is_empty());
+}
+
+#[test]
+fn footer_force_rerender() {
+    let mut gs = GlobalState::new(Rect::new(0, 0, 60, 30), CrossTerm::init());
+    gs.force_area_calc();
+    gs.footer.line = gs.footer();
+
+    gs.footer.force_rerender(gs.ui_theme.accent_style(), &mut gs.backend);
+    assert_eq!(
+        gs.backend.drain(),
+        [
+            (gs.ui_theme.accent_style(), "<<set style>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (ContentStyle::default(), "<<clear EOL>>".into()),
+            (ContentStyle::default(), "<<reset style>>".into())
+        ]
+    );
+
+    gs.footer.render(
+        Some(EditorStats { len: 300, select_len: 2, position: (0, 1).into() }),
+        gs.ui_theme.accent_style(),
+        &mut gs.backend,
+    );
+    gs.backend.drain();
+    gs.footer.force_rerender(gs.ui_theme.accent_style(), &mut gs.backend);
+    assert_eq!(
+        gs.backend.drain(),
+        [
+            (gs.ui_theme.accent_style(), "<<set style>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (ContentStyle::default(), "<<clear EOL>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 20>>".into()),
+            (gs.ui_theme.accent_style(), "  Doc Len 300, Ln 0, Col 1 (2 selected) ".into()),
+            (ContentStyle::default(), "<<reset style>>".into())
+        ]
+    );
+
+    gs.footer.error("err".into());
+    gs.footer.render(None, gs.ui_theme.accent_style(), &mut gs.backend);
+    gs.backend.drain();
+    gs.footer.force_rerender(gs.ui_theme.accent_style(), &mut gs.backend);
+    assert_eq!(
+        gs.backend.drain(),
+        [
+            (gs.ui_theme.accent_style(), "<<set style>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (ContentStyle::default(), "<<clear EOL>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (gs.ui_theme.accent_style(), "<<padding: 2>>".into()),
+            (gs.ui_theme.accent_style().with_fg(Color::Red), "err".into()),
+            (ContentStyle::default(), "<<reset style>>".into())
+        ]
+    );
+
+    gs.footer.render(
+        Some(EditorStats { len: 300, select_len: 0, position: (0, 1).into() }),
+        gs.ui_theme.accent_style(),
+        &mut gs.backend,
+    );
+    gs.backend.drain();
+
+    gs.footer.force_rerender(gs.ui_theme.accent_style(), &mut gs.backend);
+    assert_eq!(
+        gs.backend.drain(),
+        [
+            (gs.ui_theme.accent_style(), "<<set style>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (ContentStyle::default(), "<<clear EOL>>".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 33>>".into()),
+            (gs.ui_theme.accent_style(), "  Doc Len 300, Ln 0, Col 1 ".into()),
+            (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
+            (gs.ui_theme.accent_style(), "<<padding: 2>>".into()),
+            (gs.ui_theme.accent_style().with_fg(Color::Red), "err".into()),
+            (ContentStyle::default(), "<<reset style>>".into())
+        ]
+    );
 }

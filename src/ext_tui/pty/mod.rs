@@ -2,9 +2,9 @@ mod cursor;
 mod parser;
 
 use crate::{
+    cursor::CursorPosition,
     error::{IdiomError, IdiomResult},
     ext_tui::{CrossTerm, StyleExt},
-    workspace::CursorPosition,
 };
 use crossterm::{
     event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind},
@@ -13,7 +13,7 @@ use crossterm::{
 use cursor::{CursorState, Position, Select};
 use idiom_tui::{layout::Rect, Backend};
 use parser::{get_ctrl_char, parse_cell_style, TrackedParser};
-use portable_pty::{native_pty_system, Child, CommandBuilder, PtyPair, PtySize};
+use portable_pty::{native_pty_system, Child, CommandBuilder, ExitStatus, PtyPair, PtySize};
 use std::io::{Read, Write};
 use tokio::task::JoinHandle;
 
@@ -182,6 +182,12 @@ impl PtyShell {
             _ => return Message::Unmapped,
         }
         Message::Mapped
+    }
+
+    #[must_use]
+    pub fn try_wait(&mut self) -> IdiomResult<Option<(ExitStatus, String)>> {
+        let result = self.child.try_wait().map_err(IdiomError::any)?;
+        Ok(result.map(|status| (status, self.parser.full_content())))
     }
 
     pub fn paste(&mut self, clip: String) -> std::io::Result<()> {

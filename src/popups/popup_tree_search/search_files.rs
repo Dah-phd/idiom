@@ -80,7 +80,7 @@ impl ActiveFileSearch {
             return;
         };
 
-        if let Err(error) = new.run(gs, ws, tree, term) {
+        if let Err(error) = new.main_loop(gs, ws, tree, term) {
             gs.error(error);
         };
     }

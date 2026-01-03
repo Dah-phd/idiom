@@ -4,7 +4,7 @@ use lsp_types::{
     CompletionItem, CompletionResponse, DiagnosticSeverity, GotoDefinitionResponse, Hover, Location,
     PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, Uri, WorkspaceEdit,
 };
-use serde_json::{from_value, Value};
+use serde_json::{from_value, Result as SerdeResult, Value};
 use std::{
     collections::{hash_map::Entry, HashMap},
     fmt::Display,
@@ -12,9 +12,9 @@ use std::{
 };
 
 use crate::{
+    cursor::CursorPosition,
+    editor::syntax::{tokens::validate_and_format_delta_tokens, DiagnosticLine},
     lsp::{LSPError, LSPResult},
-    syntax::DiagnosticLine,
-    workspace::CursorPosition,
 };
 
 use super::lsp_stream::StdErrMessage;
@@ -188,52 +188,50 @@ impl Diagnostic {
 
 #[derive(Debug)]
 pub enum LSPResponseType {
-    Completion(i64, String, CursorPosition),
-    Hover(i64),
-    SignatureHelp(i64),
-    References(i64),
-    Renames(i64),
-    Tokens(i64),
-    TokensPartial {
-        id: i64,
-        max_lines: usize,
-    },
-    #[allow(dead_code)]
-    Definition(i64),
-    Declaration(i64),
+    Completion(String, CursorPosition),
+    Hover,
+    SignatureHelp,
+    References,
+    Renames,
+    Tokens,
+    TokensPartial { max_lines: usize },
+    Definition,
+    Declaration,
 }
 
 impl LSPResponseType {
-    pub fn id(&self) -> &i64 {
-        match self {
-            Self::Completion(id, ..) => id,
-            Self::Hover(id) => id,
-            Self::SignatureHelp(id) => id,
-            Self::References(id) => id,
-            Self::Renames(id) => id,
-            Self::Tokens(id) => id,
-            Self::TokensPartial { id, .. } => id,
-            Self::Definition(id) => id,
-            Self::Declaration(id) => id,
+    pub fn parse(&self, value: Value) -> SerdeResult<LSPResponse> {
+        if value == Value::Null {
+            return Ok(LSPResponse::Empty);
         }
-    }
 
-    pub fn parse(&self, value: Option<Value>) -> Option<LSPResponse> {
-        Some(match self {
-            Self::Completion(.., line, idx) => match from_value::<CompletionResponse>(value?).ok()? {
-                CompletionResponse::Array(arr) => LSPResponse::Completion(arr, line.to_owned(), *idx),
-                CompletionResponse::List(ls) => LSPResponse::Completion(ls.items, line.to_owned(), *idx),
+        Ok(match self {
+            Self::Completion(.., line, cursor) => match from_value::<CompletionResponse>(value)? {
+                CompletionResponse::Array(arr) => LSPResponse::Completion(arr, line.to_owned(), *cursor),
+                CompletionResponse::List(ls) => LSPResponse::Completion(ls.items, line.to_owned(), *cursor),
             },
-            Self::Hover(..) => LSPResponse::Hover(from_value(value?).ok()?),
-            Self::SignatureHelp(..) => LSPResponse::SignatureHelp(from_value(value?).ok()?),
-            Self::References(..) => LSPResponse::References(from_value(value?).ok()?),
-            Self::Renames(..) => LSPResponse::Renames(from_value(value?).ok()?),
-            Self::Tokens(..) => LSPResponse::Tokens(from_value(value?).ok()?),
-            Self::TokensPartial { max_lines, .. } => {
-                LSPResponse::TokensPartial { result: from_value(value?).ok()?, max_lines: *max_lines }
+            Self::Hover => LSPResponse::Hover(from_value(value)?),
+            Self::SignatureHelp => LSPResponse::SignatureHelp(from_value(value)?),
+            Self::References => LSPResponse::References(from_value(value)?),
+            Self::Renames => LSPResponse::Renames(from_value(value)?),
+            Self::Tokens => {
+                let mut tokens = from_value(value)?;
+                match &mut tokens {
+                    SemanticTokensResult::Tokens(tokens) => validate_and_format_delta_tokens(&mut tokens.data),
+                    SemanticTokensResult::Partial(tokens) => validate_and_format_delta_tokens(&mut tokens.data),
+                };
+                LSPResponse::Tokens(tokens)
             }
-            Self::Definition(..) => LSPResponse::Definition(from_value(value?).ok()?),
-            Self::Declaration(..) => LSPResponse::Declaration(from_value(value?).ok()?),
+            Self::TokensPartial { max_lines, .. } => {
+                let mut result = from_value(value)?;
+                match &mut result {
+                    SemanticTokensRangeResult::Tokens(tokens) => validate_and_format_delta_tokens(&mut tokens.data),
+                    SemanticTokensRangeResult::Partial(tokens) => validate_and_format_delta_tokens(&mut tokens.data),
+                }
+                LSPResponse::TokensPartial { result, max_lines: *max_lines }
+            }
+            Self::Definition => LSPResponse::Definition(from_value(value)?),
+            Self::Declaration => LSPResponse::Declaration(from_value(value)?),
         })
     }
 }
@@ -248,20 +246,22 @@ pub enum LSPResponse {
     TokensPartial { result: SemanticTokensRangeResult, max_lines: usize },
     Definition(GotoDefinitionResponse),
     Declaration(GotoDeclarationResponse),
+    Empty,
+    Error(String),
 }
 
 impl Display for LSPResponseType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LSPResponseType::Completion(..) => f.write_str("Completion"),
-            LSPResponseType::Declaration(..) => f.write_str("Declaration"),
-            LSPResponseType::Definition(..) => f.write_str("Definition"),
-            LSPResponseType::Hover(..) => f.write_str("Hover"),
-            LSPResponseType::Renames(..) => f.write_str("Renames"),
-            LSPResponseType::SignatureHelp(..) => f.write_str("SignatureHelp"),
-            LSPResponseType::Tokens(..) => f.write_str("Tokens"),
+            LSPResponseType::Declaration => f.write_str("Declaration"),
+            LSPResponseType::Definition => f.write_str("Definition"),
+            LSPResponseType::Hover => f.write_str("Hover"),
+            LSPResponseType::Renames => f.write_str("Renames"),
+            LSPResponseType::SignatureHelp => f.write_str("SignatureHelp"),
+            LSPResponseType::Tokens => f.write_str("Tokens"),
             LSPResponseType::TokensPartial { .. } => f.write_str("TokensPartial"),
-            LSPResponseType::References(..) => f.write_str("References"),
+            LSPResponseType::References => f.write_str("References"),
         }
     }
 }

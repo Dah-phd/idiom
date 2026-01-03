@@ -1,6 +1,11 @@
 ## Includes only major changes (manual updates)
 # Version 0.7.0
-- idiom_command added
+- added IdiomCommand
+- added MarkWord
+- reworked select handles
+- reworked rendering logic
+- fix: empty selects are ignored
+- fix: Empty response handle
 
 # Version 0.6.3
 - added support for non ascii in text_field

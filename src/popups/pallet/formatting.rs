@@ -1,29 +1,27 @@
-use crate::{embeded_term::EditorTerminal, global_state::GlobalState, tree::Tree, workspace::Workspace};
+use crate::{
+    actions::copy_content, embeded_term::EditorTerminal, global_state::GlobalState, tree::Tree, workspace::Workspace,
+};
 
 pub fn uppercase(_gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tree, _term: &mut EditorTerminal) {
-    if let Some(editor) = ws.get_active() {
-        if editor.cursor.select_is_none() {
-            editor.select_token();
+    let Some(editor) = ws.get_active() else { return };
+    editor.apply(|actions, lexer, content, cursor| {
+        if cursor.select_is_none() {
+            cursor.select_word(content);
         }
-        if editor.cursor.select_is_none() {
-            return;
-        }
-        if let Some(clip) = editor.copy() {
-            editor.insert_snippet(clip.to_uppercase(), None);
-        }
-    }
+        let Some((from, to)) = cursor.select_get() else { return };
+        let clip = copy_content(from, to, content).to_uppercase();
+        actions.replace_select(from, to, clip, cursor, content, lexer);
+    });
 }
 
 pub fn lowercase(_gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tree, _term: &mut EditorTerminal) {
-    if let Some(editor) = ws.get_active() {
-        if editor.cursor.select_is_none() {
-            editor.select_token();
+    let Some(editor) = ws.get_active() else { return };
+    editor.apply(|actions, lexer, content, cursor| {
+        if cursor.select_is_none() {
+            cursor.select_word(content);
         }
-        if editor.cursor.select_is_none() {
-            return;
-        }
-        if let Some(clip) = editor.copy() {
-            editor.insert_snippet(clip.to_lowercase(), None);
-        }
-    }
+        let Some((from, to)) = cursor.select_get() else { return };
+        let clip = copy_content(from, to, content).to_lowercase();
+        actions.replace_select(from, to, clip, cursor, content, lexer);
+    });
 }

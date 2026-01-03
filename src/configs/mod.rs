@@ -13,7 +13,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
 pub use theme::Theme;
 pub use theme_ui::UITheme;
-pub use types::{FileFamily, FileType};
+pub use types::{FileFamily, FileType, ScopeType};
 
 pub const APP_FOLDER: &str = "idiom";
 pub const EDITOR_CFG_FILE: &str = "editor.toml";

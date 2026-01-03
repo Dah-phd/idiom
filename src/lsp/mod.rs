@@ -15,7 +15,7 @@ pub use local::{init_local_tokens, Highlighter};
 use lsp_stream::JsonRCP;
 pub use messages::{
     Diagnostic, DiagnosticHandle, DiagnosticType, EditorDiagnostics, LSPMessage, LSPResponse, LSPResponseType,
-    Response, TreeDiagnostics,
+    TreeDiagnostics,
 };
 pub use notification::LSPNotification;
 pub use request::LSPRequest;
@@ -25,7 +25,8 @@ use serde_json::from_value;
 use std::{collections::HashMap, path::Path, process::Stdio, str::FromStr, sync::Mutex};
 use tokio::{io::AsyncWriteExt, process::Child, task::JoinHandle};
 
-pub type Responses = Mutex<HashMap<i64, Response>>;
+pub type Responses = Mutex<HashMap<i64, LSPResponse>>;
+pub type Requests = Mutex<HashMap<i64, LSPResponseType>>;
 
 #[allow(clippy::upper_case_acronyms)]
 pub struct LSP {
@@ -49,6 +50,7 @@ impl LSP {
 
         // setting up storage
         let (responses, responses_handler) = split_arc::<Responses>();
+        let (sent_request, sent_handler) = split_arc::<Requests>();
         let (diagnostics, diagnostics_handler) = split_arc::<Mutex<DiagnosticHandle>>();
 
         // sending init requests
@@ -65,7 +67,18 @@ impl LSP {
             loop {
                 match json_rpc.next().await? {
                     LSPMessage::Response(inner) => {
-                        responses_handler.lock().unwrap().insert(inner.id, inner);
+                        let Some(request) = sent_handler.lock().unwrap().remove(&inner.id) else {
+                            continue;
+                        };
+                        if let Some(response) = inner.result {
+                            let response = match request.parse(response) {
+                                Ok(response) => response,
+                                Err(error) => LSPResponse::Error(format!("LSP PARSE: {error}")),
+                            };
+                            responses_handler.lock().unwrap().insert(inner.id, response);
+                        } else if let Some(error) = inner.error {
+                            responses_handler.lock().unwrap().insert(inner.id, LSPResponse::Error(error.to_string()));
+                        }
                     }
                     LSPMessage::Diagnostic(uri, params) => {
                         diagnostics_handler.lock().unwrap().insert(uri, params);
@@ -84,7 +97,8 @@ impl LSP {
             }
         });
 
-        let (lsp_send_handler, client) = LSPClient::new(stdin, file_type, diagnostics, responses, capabilities)?;
+        let (lsp_send_handler, client) =
+            LSPClient::new(stdin, file_type, diagnostics, sent_request, responses, capabilities)?;
 
         Ok(Self { client, lsp_cmd, inner, lsp_json_handler, lsp_send_handler, attempts: 5 })
     }

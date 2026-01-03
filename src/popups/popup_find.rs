@@ -1,20 +1,22 @@
 use super::{
     generic_selector::PopupSelector,
     popup_replace::ReplacePopup,
-    utils::{next_option, prev_option},
+    utils::{infer_word_search_positon, next_option, position_with_count_text, prev_option},
     Components, Popup, Status,
 };
 use crate::{
+    cursor::CursorPosition,
+    editor::syntax::Lexer,
     embeded_term::EditorTerminal,
+    error::{IdiomError, IdiomResult},
     ext_tui::{text_field::map_key, StyleExt},
     global_state::GlobalState,
     tree::Tree,
-    workspace::{CursorPosition, Workspace},
+    workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
 use idiom_tui::{
-    count_as_string,
     layout::{Line, Rect},
     text_field::{Status as InputStatus, TextField},
     Backend,
@@ -30,11 +32,11 @@ pub struct GoToLinePopup {
 impl GoToLinePopup {
     pub fn run_inplace(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         let Some(editor) = workspace.get_active() else { return };
-        let current_line = editor.cursor.line;
+        let current_line = editor.cursor().line;
         let Some(mut popup) = GoToLinePopup::new(current_line, *gs.editor_area(), gs.ui_theme.accent_style()) else {
             return;
         };
-        if let Err(error) = popup.run(gs, workspace, tree, term) {
+        if let Err(error) = popup.main_loop(gs, workspace, tree, term) {
             gs.error(error);
         }
     }
@@ -123,7 +125,7 @@ pub struct FindPopup {
 
 impl FindPopup {
     pub fn new(editor_area: Rect, accent: ContentStyle) -> Option<Self> {
-        let render_line = editor_area.right_top_corner(1, 50).into_iter().next()?;
+        let render_line = editor_area.right_top_corner(1, 70).into_iter().next()?;
         let pattern = TextField::default();
         Some(Self { options: Vec::new(), pattern, state: 0, accent, render_line })
     }
@@ -132,7 +134,11 @@ impl FindPopup {
         let Some(mut popup) = FindPopup::new(*gs.editor_area(), gs.ui_theme.accent_style()) else {
             return;
         };
-        let run_result = Popup::run(&mut popup, gs, workspace, tree, term);
+        let Some(editor) = workspace.get_active() else { return };
+        if let Some(state) = infer_word_search_positon(editor, &mut popup.pattern, &mut popup.options) {
+            popup.state = state;
+        }
+        let run_result = Popup::main_loop(&mut popup, gs, workspace, tree, term);
         gs.log_if_error(run_result);
     }
 }
@@ -147,8 +153,9 @@ impl Popup for FindPopup {
                 std::mem::take(&mut self.options),
                 *gs.editor_area(),
                 self.accent,
+                self.state,
             ) {
-                if let Err(error) = popup.run(gs, ws, tree, term) {
+                if let Err(error) = popup.main_loop(gs, ws, tree, term) {
                     gs.error(error);
                 };
             }
@@ -168,7 +175,7 @@ impl Popup for FindPopup {
                         go_to_select_command,
                         None,
                     );
-                    if let Err(error) = popup.run(gs, ws, tree, term) {
+                    if let Err(error) = popup.main_loop(gs, ws, tree, term) {
                         gs.error(error);
                     };
                 }
@@ -178,10 +185,11 @@ impl Popup for FindPopup {
                 match map_key(&mut self.pattern, key, &mut gs.clipboard) {
                     Some(InputStatus::Skipped) | None => {}
                     Some(InputStatus::Updated) => {
-                        if let Some(editor) = ws.get_active() {
-                            self.options.clear();
-                            editor.find(self.pattern.as_str(), &mut self.options);
-                        }
+                        self.options.clear();
+                        let Some(editor) = ws.get_active() else {
+                            return Status::Finished;
+                        };
+                        editor.find(self.pattern.as_str(), &mut self.options);
                         self.state = self.options.len().saturating_sub(1);
                         self.force_render(gs);
                     }
@@ -203,15 +211,33 @@ impl Popup for FindPopup {
         Status::Pending
     }
 
+    fn main_loop_handler(&mut self, components: &mut Components) -> IdiomResult<()> {
+        let Some(editor) = components.ws.get_active() else {
+            return Err(IdiomError::any("No active editor!"));
+        };
+        Lexer::context(editor, components.gs);
+        if !editor.has_render_cache() {
+            let mut new_options = vec![];
+            editor.find(self.pattern.as_str(), &mut new_options);
+            if new_options != self.options {
+                self.options = new_options;
+                self.state = self.options.len().saturating_sub(1);
+            }
+            editor.render(components.gs);
+            self.force_render(components.gs);
+        }
+        Ok(())
+    }
+
     fn force_render(&mut self, gs: &mut GlobalState) {
         let backend = &mut gs.backend;
         let reset_style = backend.get_style();
         backend.set_style(self.accent);
         {
             let mut builder = self.render_line.clone().unsafe_builder(backend);
-            builder.push(" Found(");
-            builder.push(&count_as_string(self.options.len()));
-            builder.push(") >> ");
+            builder.push(" ");
+            builder.push(&position_with_count_text(self.state, &self.options));
+            builder.push(" > ");
             self.pattern.insert_formatted_text(builder, ContentStyle::reversed(), gs.ui_theme.accent_select_style());
         }
         backend.set_style(reset_style);
@@ -220,7 +246,7 @@ impl Popup for FindPopup {
     fn render(&mut self, _gs: &mut GlobalState) {}
 
     fn resize_success(&mut self, gs: &mut GlobalState) -> bool {
-        match gs.editor_area().right_top_corner(1, 50).into_iter().next() {
+        match gs.editor_area().right_top_corner(1, 70).into_iter().next() {
             Some(render_line) => {
                 self.render_line = render_line;
                 true

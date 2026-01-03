@@ -1,5 +1,6 @@
 pub mod generic_popup;
 pub mod generic_selector;
+pub mod mark_word;
 pub mod menu;
 pub mod pallet;
 pub mod popup_file_open;
@@ -54,19 +55,20 @@ impl Components<'_> {
 }
 
 pub trait Popup {
-    fn run(
+    /// default main loop
+    fn main_loop(
         &mut self,
         gs: &mut GlobalState,
         ws: &mut Workspace,
         tree: &mut Tree,
         term: &mut EditorTerminal,
     ) -> IdiomResult<()> {
-        // executed when finish
         let mut components = Components { gs, ws, tree, term };
         components.re_draw();
         self.force_render(components.gs);
         components.gs.backend.flush_buf();
         loop {
+            self.main_loop_handler(&mut components)?;
             if crossterm::event::poll(MIN_FRAMERATE)? {
                 match crossterm::event::read()? {
                     Event::Key(key) => {
@@ -80,8 +82,7 @@ pub trait Popup {
                         }
                     }
                     Event::Resize(width, height) => {
-                        let (width, height) = checked_new_screen_size(width, height, components.gs.backend());
-                        components.gs.full_resize(height, width);
+                        components.gs.full_resize(components.ws, components.term, width, height);
                         if !self.resize_success(components.gs) {
                             return Ok(());
                         };
@@ -93,12 +94,18 @@ pub trait Popup {
                             self.force_render(components.gs);
                         };
                     }
-                    _ => (),
+                    Event::FocusLost | Event::FocusGained => (),
                 };
             }
             self.render(components.gs);
             components.gs.backend.flush_buf();
         }
+    }
+
+    /// extend the main loop => default to noop
+    /// you can break main loop by sending errror
+    fn main_loop_handler(&mut self, _components: &mut Components) -> IdiomResult<()> {
+        Ok(())
     }
 
     fn paste_passthrough(&mut self, _clip: String, _components: &mut Components) -> bool {
@@ -159,7 +166,23 @@ enum CommandResult {
 type Width = u16;
 type Height = u16;
 
-pub fn get_new_screen_size(backend: &mut CrossTerm) -> IdiomResult<(Width, Height)> {
+pub fn get_init_screen(backend: &mut CrossTerm) -> IdiomResult<Rect> {
+    let init = CrossTerm::screen()?;
+    if init.width < MIN_WIDTH as usize || init.height < MIN_HEIGHT {
+        get_new_screen_size(backend).map(Rect::from)
+    } else {
+        Ok(init)
+    }
+}
+
+pub fn checked_new_screen_size(width: Width, height: Height, backend: &mut CrossTerm) -> (Width, Height) {
+    if width >= MIN_WIDTH && height >= MIN_HEIGHT {
+        return (width, height);
+    }
+    get_new_screen_size(backend).expect("Manual action")
+}
+
+fn get_new_screen_size(backend: &mut CrossTerm) -> IdiomResult<(Width, Height)> {
     loop {
         if crossterm::event::poll(Duration::from_millis(200))? {
             match crossterm::event::read()? {
@@ -185,20 +208,4 @@ pub fn get_new_screen_size(backend: &mut CrossTerm) -> IdiomResult<(Width, Heigh
         }
         backend.flush_buf();
     }
-}
-
-pub fn get_init_screen(backend: &mut CrossTerm) -> IdiomResult<Rect> {
-    let init = CrossTerm::screen()?;
-    if init.width < MIN_WIDTH as usize || init.height < MIN_HEIGHT {
-        get_new_screen_size(backend).map(Rect::from)
-    } else {
-        Ok(init)
-    }
-}
-
-pub fn checked_new_screen_size(width: Width, height: Height, backend: &mut CrossTerm) -> (Width, Height) {
-    if width >= MIN_WIDTH && height >= MIN_HEIGHT {
-        return (width, height);
-    }
-    get_new_screen_size(backend).expect("Manual action")
 }

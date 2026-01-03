@@ -1,5 +1,8 @@
 # Low config terminal IDE - designed for me
 
+## Second repo
+![codeberg](https://codeberg.org/dah-phd/idiom)
+
 ## Info
 Code editor I develop for myself, both as learning experience and fun side project.
 

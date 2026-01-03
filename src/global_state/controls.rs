@@ -110,7 +110,7 @@ pub fn mouse_handler(
                         _ => editor.mouse_click(position, gs),
                     };
                     gs.insert_mode();
-                    match tree.select_by_path(&editor.path) {
+                    match tree.select_by_path(editor.path()) {
                         Ok(..) => ws.toggle_editor(),
                         Err(error) => gs.error(error),
                     };
@@ -140,7 +140,7 @@ pub fn mouse_handler(
                     editor.mouse_menu_setup(position);
                     let accent_style = gs.ui_theme.accent_style();
                     let mut context_menu = menu_context_editor_inplace(position, gs.editor_area, accent_style);
-                    if let Err(error) = context_menu.run(gs, ws, tree, term) {
+                    if let Err(error) = context_menu.main_loop(gs, ws, tree, term) {
                         gs.error(error);
                     };
                 };
@@ -154,12 +154,12 @@ pub fn mouse_handler(
                     }
                 }
             } else if let Some(position) = gs.tree_area.relative_position(event.row, event.column) {
-                let mut position = crate::workspace::CursorPosition::from(position);
+                let mut position = crate::cursor::CursorPosition::from(position);
                 position.line += 1;
                 if tree.mouse_menu_setup_select(position.line) {
                     let accent_style = gs.ui_theme.accent_style_reversed();
                     let mut context_menu = menu_context_tree_inplace(position, gs.screen_rect, accent_style);
-                    if let Err(error) = context_menu.run(gs, ws, tree, term) {
+                    if let Err(error) = context_menu.main_loop(gs, ws, tree, term) {
                         gs.error(error);
                     };
                 }

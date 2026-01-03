@@ -1,14 +1,16 @@
 mod change_state;
+mod command_patterns;
 mod formatting;
-use super::{popup_file_open::OpenFileSelector, Command, CommandResult, Components, Popup, Status};
 use crate::{
     configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
     embeded_term::EditorTerminal,
     ext_tui::{text_field::map_key, State, StyleExt},
     global_state::{GlobalState, IdiomEvent},
+    popups::{popup_file_open::OpenFileSelector, Command, CommandResult, Components, Popup, Status},
     tree::Tree,
     workspace::Workspace,
 };
+use command_patterns::Pattern;
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
 use fuzzy_matcher::FuzzyMatcher;
@@ -18,18 +20,27 @@ use idiom_tui::{
     Position,
 };
 
+enum Mode {
+    Cmd,
+    EasyAccess,
+}
+
 pub struct Pallet {
     commands: Vec<(i64, Command)>,
     pattern: TextField,
     state: State,
+    mode: Mode,
 }
 
 impl Popup for Pallet {
     fn force_render(&mut self, gs: &mut GlobalState) {
-        self.force_render_as_pallet(gs);
+        match self.mode {
+            Mode::EasyAccess => self.force_render_as_pallet(gs),
+            Mode::Cmd => self.force_render_as_cmd(gs),
+        }
     }
 
-    fn map_keyboard(&mut self, key: KeyEvent, components: &mut super::Components) -> Status {
+    fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         let Components { gs, ws, tree, term } = components;
 
         if self.commands.is_empty() {
@@ -38,17 +49,34 @@ impl Popup for Pallet {
 
         match key.code {
             KeyCode::Enter => {
-                match self.commands.remove(self.state.selected).1.execute() {
-                    CommandResult::Simple(event) => gs.event.push(event),
-                    CommandResult::BigCB(cb) => cb(gs, ws, tree, term),
+                match self.mode {
+                    Mode::EasyAccess => match self.commands.remove(self.state.selected).1.execute() {
+                        CommandResult::Simple(event) => gs.event.push(event),
+                        CommandResult::BigCB(cb) => cb(gs, ws, tree, term),
+                    },
+                    Mode::Cmd => {
+                        if let Some(cmd_pattern) = Pattern::parse(self.pattern.as_str()) {
+                            cmd_pattern.execute(components);
+                        }
+                    }
                 }
                 return Status::Finished;
             }
-            KeyCode::Up | KeyCode::Char('w') | KeyCode::Char('W') => {
+            KeyCode::Up => {
                 self.state.prev(self.commands.len());
             }
-            KeyCode::Down | KeyCode::Char('d') | KeyCode::Char('D') => {
+            KeyCode::Down => {
                 self.state.next(self.commands.len());
+            }
+            KeyCode::Backspace if self.pattern.is_empty() && matches!(self.mode, Mode::Cmd) => {
+                self.mode = Mode::EasyAccess;
+                gs.draw(ws, tree, term);
+                gs.force_screen_rebuild();
+            }
+            KeyCode::Char(':') if self.pattern.is_empty() && matches!(self.mode, Mode::EasyAccess) => {
+                self.mode = Mode::Cmd;
+                gs.draw(ws, tree, term);
+                gs.force_screen_rebuild();
             }
             _ => {
                 match map_key(&mut self.pattern, key, &mut gs.clipboard) {
@@ -114,7 +142,7 @@ impl Popup for Pallet {
 }
 
 impl Pallet {
-    pub fn new(git_tui: Option<String>) -> Self {
+    fn new(git_tui: Option<String>, mode: Mode) -> Self {
         let commands = [
             Some(Command::components("Open file", OpenFileSelector::run)),
             Some(Command::components("Open embeded terminal", change_state::open_embeded_terminal)),
@@ -122,7 +150,7 @@ impl Pallet {
             Some(Command::pass_event("Open terminal", IdiomEvent::EmbededApp(None))),
             Some(Command::components("Select LSP", change_state::select_lsp)),
             Some(Command::components("UPPERCASE", formatting::uppercase)),
-            Some(Command::components("LOWERCASE", formatting::lowercase)),
+            Some(Command::components("lowercase", formatting::lowercase)),
             Command::cfg_open("Open editor configs", EDITOR_CFG_FILE),
             Command::cfg_open("Open keymap config", KEY_MAP),
             Command::cfg_open("Open theme config", THEME_FILE),
@@ -134,21 +162,20 @@ impl Pallet {
         .map(|cmd| (0, cmd))
         .collect();
 
-        Pallet { commands, pattern: TextField::default(), state: State::new() }
+        Pallet { commands, pattern: TextField::default(), state: State::new(), mode }
     }
 
     pub fn run(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         let git_tui = gs.git_tui.to_owned();
-        if let Err(error) = Pallet::new(git_tui).run(gs, ws, tree, term) {
+        if let Err(error) = Pallet::new(git_tui, Mode::EasyAccess).main_loop(gs, ws, tree, term) {
             gs.error(error);
         }
     }
 
     pub fn run_as_command(gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         let git_tui = gs.git_tui.to_owned();
-        let mut pallet = Pallet::new(git_tui);
-        pallet.pattern.text_set(":".to_owned());
-        if let Err(error) = pallet.run(gs, ws, tree, term) {
+        let mut pallet = Pallet::new(git_tui, Mode::Cmd);
+        if let Err(error) = pallet.main_loop(gs, ws, tree, term) {
             gs.error(error);
         }
     }
@@ -165,6 +192,9 @@ impl Pallet {
     }
 
     fn get_command_idx(&self, row: u16, column: u16, gs: &GlobalState) -> Option<usize> {
+        if matches!(self.mode, Mode::Cmd) {
+            return None;
+        }
         let Position { row, .. } = Self::get_pallet_rect(gs).relative_position(row, column)?;
         let line = row as usize;
         let command_idx = self.state.at_line + line.checked_sub(1)?;
@@ -185,8 +215,31 @@ impl Pallet {
         self.state.render_list(options, rect, gs.backend());
     }
 
+    fn force_render_as_cmd(&mut self, gs: &mut GlobalState) {
+        let rect = Self::get_cmd_rect(gs);
+        rect.draw_borders(None, None, gs.backend());
+        let mut lines = rect.into_iter();
+
+        let Some(line) = lines.next() else { return };
+
+        let select = gs.get_select_style();
+        let mut line_builder = line.unsafe_builder(gs.backend());
+        line_builder.push(" i: ");
+        self.pattern.insert_formatted_text(line_builder, ContentStyle::reversed(), select);
+
+        let Some(line) = lines.next() else { return };
+        match Pattern::parse(self.pattern.as_str()) {
+            Some(cmd_pattern) => line.render(&cmd_pattern.to_string(), gs.backend()),
+            None => line.render(" ...", gs.backend()),
+        };
+    }
+
     pub fn get_pallet_rect(gs: &GlobalState) -> Rect {
         gs.screen().top(15).vcenter(100).with_borders()
+    }
+
+    pub fn get_cmd_rect(gs: &GlobalState) -> Rect {
+        gs.screen().top(4).vcenter(100).with_borders()
     }
 }
 

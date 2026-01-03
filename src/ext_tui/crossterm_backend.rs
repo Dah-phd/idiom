@@ -40,10 +40,12 @@ impl PartialEq for CrossTerm {
 }
 
 impl CrossTerm {
+    #[inline]
     pub fn detached_hide_cursor() {
         queue!(std::io::stdout(), Hide).expect(ERR_MSG);
     }
 
+    #[inline]
     pub fn detached_show_cursor() {
         queue!(std::io::stdout(), Show).expect(ERR_MSG);
     }

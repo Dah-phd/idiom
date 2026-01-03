@@ -8,10 +8,11 @@ mod crossterm_backend;
 #[cfg(not(test))]
 pub use crossterm_backend::CrossTerm;
 
+pub mod iter;
 pub mod pty;
 pub mod text_field;
 
-use crate::workspace::CursorPosition;
+use crate::cursor::CursorPosition;
 use crossterm::style::{Attribute, Attributes, Color, ContentStyle};
 use idiom_tui::{
     layout::LineBuilder as BaseLineBuilder,

@@ -6,8 +6,8 @@ use super::{
     types::FileType,
     EDITOR_CFG_FILE,
 };
+use crate::editor_line::EditorLine;
 use crate::utils::{trim_start_inplace, Offset};
-use crate::workspace::line::EditorLine;
 use crate::{global_state::GlobalState, lsp::LSP};
 use regex::Regex;
 use serde::{Deserialize, Serialize};

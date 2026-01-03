@@ -8,10 +8,10 @@ pub mod rust;
 pub mod ts;
 use crate::{
     configs::{FileType, Theme},
-    syntax::{tokens::set_tokens, Legend},
-    workspace::line::EditorLine,
+    editor::syntax::{tokens::set_tokens, Legend},
+    editor_line::EditorLine,
 };
-use idiom_tui::UTF8Safe;
+use idiom_tui::UTFSafe;
 use logos::{Logos, Span};
 use lsp_types::{CompletionItem, InsertTextFormat, SemanticToken};
 

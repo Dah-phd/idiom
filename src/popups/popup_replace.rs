@@ -1,9 +1,12 @@
 use crate::{
+    cursor::CursorPosition,
+    editor::syntax::Lexer,
     embeded_term::EditorTerminal,
+    error::{IdiomError, IdiomResult},
     ext_tui::{text_field::map_key, StyleExt},
     global_state::GlobalState,
     tree::Tree,
-    workspace::{CursorPosition, Workspace},
+    workspace::Workspace,
 };
 use crossterm::{
     event::{KeyCode, KeyEvent, KeyModifiers},
@@ -16,7 +19,7 @@ use idiom_tui::{
 };
 
 use super::{
-    utils::{count_as_string, next_option, prev_option},
+    utils::{infer_word_search_positon, next_option, position_with_count_text, prev_option},
     Components, Popup, Status,
 };
 
@@ -32,7 +35,7 @@ pub struct ReplacePopup {
 
 impl ReplacePopup {
     pub fn run_inplace(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
-        let rect = gs.editor_area().right_top_corner(2, 50);
+        let rect = gs.editor_area().right_top_corner(2, 70);
         if rect.height < 2 {
             return;
         }
@@ -47,7 +50,12 @@ impl ReplacePopup {
             state: usize::default(),
         };
 
-        if let Err(error) = popup.run(gs, workspace, tree, term) {
+        let Some(editor) = workspace.get_active() else { return };
+        if let Some(state) = infer_word_search_positon(editor, &mut popup.pattern, &mut popup.options) {
+            popup.state = state;
+        }
+
+        if let Err(error) = popup.main_loop(gs, workspace, tree, term) {
             gs.error(error);
         }
     }
@@ -57,8 +65,9 @@ impl ReplacePopup {
         options: Vec<(CursorPosition, CursorPosition)>,
         editor_area: Rect,
         accent: ContentStyle,
+        state: usize,
     ) -> Option<Self> {
-        let rect = editor_area.right_top_corner(2, 50);
+        let rect = editor_area.right_top_corner(2, 70);
         if rect.height < 2 {
             return None;
         }
@@ -67,7 +76,7 @@ impl ReplacePopup {
             pattern: TextField::new(pattern),
             new_text: TextField::default(),
             options,
-            state: 0,
+            state,
             accent,
             rect,
         })
@@ -89,10 +98,20 @@ impl ReplacePopup {
 impl Popup for ReplacePopup {
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
         let Components { gs, ws, .. } = components;
-
         let Some(editor) = ws.get_active() else {
             return Status::Finished;
         };
+        Lexer::context(editor, gs);
+        if !editor.has_render_cache() {
+            let mut new_options = vec![];
+            editor.find(self.pattern.as_str(), &mut new_options);
+            if new_options != self.options {
+                self.options = new_options;
+                self.state = self.options.len().saturating_sub(1);
+            }
+            editor.render(gs);
+            self.force_render(gs);
+        }
 
         match key.code {
             KeyCode::Char('h' | 'H') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -106,6 +125,7 @@ impl Popup for ReplacePopup {
                     editor.go_to_select(from, to);
                     editor.render(gs);
                 } else {
+                    gs.backend.unfreeze();
                     return Status::Finished;
                 }
                 self.force_render(gs);
@@ -161,6 +181,24 @@ impl Popup for ReplacePopup {
         Status::Pending
     }
 
+    fn main_loop_handler(&mut self, components: &mut Components) -> IdiomResult<()> {
+        let Some(editor) = components.ws.get_active() else {
+            return Err(IdiomError::any("No active editor!"));
+        };
+        Lexer::context(editor, components.gs);
+        if !editor.has_render_cache() {
+            let mut new_options = vec![];
+            editor.find(self.pattern.as_str(), &mut new_options);
+            if new_options != self.options {
+                self.options = new_options;
+                self.state = self.options.len().saturating_sub(1);
+            }
+            editor.render(components.gs);
+            self.force_render(components.gs);
+        }
+        Ok(())
+    }
+
     fn force_render(&mut self, gs: &mut GlobalState) {
         let backend = &mut gs.backend;
         let reset = backend.get_style();
@@ -168,7 +206,8 @@ impl Popup for ReplacePopup {
         let mut lines = self.rect.into_iter();
         if let Some(line) = lines.next() {
             let mut find_builder = line.unsafe_builder(backend);
-            find_builder.push(count_as_string(&self.options).as_str());
+            find_builder.push(" ");
+            find_builder.push(&position_with_count_text(self.state, &self.options));
             find_builder.push(" > ");
             match self.on_text {
                 false => self.pattern.insert_formatted_text(
@@ -183,7 +222,7 @@ impl Popup for ReplacePopup {
         };
         if let Some(line) = lines.next() {
             let mut repl_builder = line.unsafe_builder(backend);
-            repl_builder.push("Rep > ");
+            repl_builder.push(" Rep >>> ");
             match self.on_text {
                 false => {
                     repl_builder.push(self.new_text.as_str());
@@ -201,7 +240,7 @@ impl Popup for ReplacePopup {
     fn render(&mut self, _gs: &mut GlobalState) {}
 
     fn resize_success(&mut self, gs: &mut GlobalState) -> bool {
-        let rect = gs.editor_area().right_top_corner(2, 50);
+        let rect = gs.editor_area().right_top_corner(2, 70);
         if rect.height < 2 {
             return false;
         }

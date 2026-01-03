@@ -1,0 +1,1102 @@
+use crate::{
+    configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
+    cursor::Cursor,
+    editor::{editor_from_data, Editor},
+    editor_line::EditorLine,
+    error::{IdiomError, IdiomResult},
+    ext_tui::StyleExt,
+    global_state::{GlobalState, IdiomEvent},
+    lsp::LSP,
+    popups::popups_editor::file_updated,
+    utils::TrackedList,
+};
+use crossterm::event::KeyEvent;
+use crossterm::style::{Color, ContentStyle};
+use idiom_tui::{layout::Rect, Backend};
+use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
+use std::{
+    collections::{hash_map::Entry, HashMap},
+    path::PathBuf,
+};
+
+pub const FILE_STATUS_ERR: &str = "File status ERR";
+pub const TAB_SELECT: Color = Color::DarkYellow;
+
+/// implement Drop to attempt keep state upon close/crash
+pub struct Workspace {
+    editors: TrackedList<Editor>,
+    base_configs: EditorConfigs,
+    key_map: EditorKeyMap,
+    tab_style: ContentStyle,
+    lsp_servers: HashMap<FileType, LSP>,
+    map_callback: fn(&mut Self, &KeyEvent, &mut GlobalState) -> bool,
+}
+
+impl Workspace {
+    pub fn new(key_map: EditorKeyMap, base_configs: EditorConfigs, lsp_servers: HashMap<FileType, LSP>) -> Self {
+        let tab_style = ContentStyle::fg(TAB_SELECT);
+        Self { editors: TrackedList::new(), base_configs, key_map, lsp_servers, map_callback: map_editor, tab_style }
+    }
+
+    pub fn render(&mut self, gs: &mut GlobalState) {
+        if let Some(editor) = self.editors.get_mut(0) {
+            let line = match gs.tab_area().into_iter().next() {
+                Some(line) => line,
+                None => return,
+            };
+            gs.backend.set_style(ContentStyle::underlined(None));
+            {
+                let mut builder = line.unsafe_builder(&mut gs.backend);
+                builder.push_styled(" ", self.tab_style);
+                builder.push_styled(editor.name(), self.tab_style);
+                for editor in self.editors.iter().skip(1) {
+                    if !builder.push(" | ") || !builder.push(editor.name()) {
+                        break;
+                    };
+                }
+            }
+            gs.backend.reset_style();
+        } else if let Some(line) = gs.tab_area().into_iter().next() {
+            line.render_empty(&mut gs.backend);
+        }
+    }
+
+    pub fn fast_render(&mut self, gs: &mut GlobalState) {
+        if self.editors.collect_status() {
+            self.render(gs);
+        }
+    }
+
+    pub fn map(&mut self, key: &KeyEvent, gs: &mut GlobalState) -> bool {
+        (self.map_callback)(self, key, gs)
+    }
+
+    pub fn toggle_tabs(&mut self) {
+        self.editors.mark_updated();
+        self.map_callback = map_tabs;
+        self.tab_style = ContentStyle::reversed();
+    }
+
+    pub fn toggle_editor(&mut self) {
+        self.editors.mark_updated();
+        self.map_callback = map_editor;
+        self.tab_style = ContentStyle::fg(Color::DarkYellow);
+    }
+
+    #[inline]
+    pub fn resize_all(&mut self, editor_area: Rect) {
+        for editor in self.editors.iter_mut() {
+            editor.resize(editor_area.width, editor_area.height as usize);
+        }
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.editors.is_empty()
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, Editor> {
+        self.editors.iter()
+    }
+
+    pub fn tabs(&self) -> Vec<String> {
+        self.editors.iter().map(|editor| editor.name().to_owned()).collect()
+    }
+
+    #[inline(always)]
+    pub fn get_active(&mut self) -> Option<&mut Editor> {
+        self.editors.get_mut_no_update(0)
+    }
+
+    #[inline]
+    pub fn rename_editors(&mut self, from_path: PathBuf, to_path: PathBuf, gs: &mut GlobalState) {
+        if to_path.is_dir() {
+            for editor in self.editors.iter_mut().filter(|e| e.path().starts_with(&from_path)) {
+                let mut updated_path = PathBuf::new();
+                let mut old = editor.path().iter();
+                for (new_part, ..) in to_path.iter().zip(&mut old) {
+                    updated_path.push(new_part);
+                }
+                for remaining_part in old {
+                    updated_path.push(remaining_part)
+                }
+                gs.log_if_lsp_error(editor.update_path(updated_path), *editor.file_type());
+            }
+        } else if let Some(editor) = self.editors.find(|e| e.path() == &from_path) {
+            gs.log_if_lsp_error(editor.update_path(to_path), *editor.file_type());
+        }
+    }
+
+    pub fn activate_editor(&mut self, idx: usize, gs: &mut GlobalState) {
+        if idx >= self.editors.len() {
+            return;
+        }
+        let mut editor = self.editors.remove(idx);
+        editor.clear_screen_cache(gs);
+        gs.event.push(IdiomEvent::SelectPath(editor.path().to_owned()));
+        if editor.update_status.collect() {
+            gs.event.push(file_updated(editor.path().to_owned()).into());
+        }
+        self.editors.insert(0, editor);
+    }
+
+    pub fn apply_edits(&mut self, edits: WorkspaceEdit, gs: &mut GlobalState) {
+        if let Some(edits) = edits.changes {
+            for (file_url, file_edits) in edits {
+                if let Some(editor) = self.get_editor(file_url.path().as_str()) {
+                    editor.apply_file_edits(file_edits);
+                } else if let Ok(mut editor) = self.build_basic_editor(PathBuf::from(file_url.path().as_str()), gs) {
+                    editor.apply_file_edits(file_edits);
+                    editor.try_write_file(gs);
+                } else {
+                    gs.error(format!("Unable to build editor for {}", file_url.path()));
+                }
+            }
+        }
+        if let Some(documet_edit) = edits.document_changes {
+            match documet_edit {
+                DocumentChanges::Edits(edits) => {
+                    for text_document_edit in edits {
+                        self.handle_text_document_edit(text_document_edit, gs);
+                    }
+                }
+                DocumentChanges::Operations(operations) => {
+                    for operation in operations {
+                        match operation {
+                            DocumentChangeOperation::Edit(text_document_edit) => {
+                                self.handle_text_document_edit(text_document_edit, gs);
+                            }
+                            DocumentChangeOperation::Op(operation) => {
+                                if let Err(err) = self.handle_tree_operations(operation) {
+                                    gs.error(format!("Failed file tree operation: {err}"));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn handle_text_document_edit(&mut self, mut text_document_edit: TextDocumentEdit, gs: &mut GlobalState) {
+        if let Some(editor) = self.get_editor(text_document_edit.text_document.uri.path().as_str()) {
+            let edits = text_document_edit
+                .edits
+                .drain(..)
+                .map(|edit| match edit {
+                    OneOf::Left(edit) => edit,
+                    OneOf::Right(annotated) => annotated.text_edit,
+                })
+                .collect();
+            editor.apply_file_edits(edits);
+        } else if let Ok(mut editor) =
+            self.build_basic_editor(PathBuf::from(text_document_edit.text_document.uri.path().as_str()), gs)
+        {
+            let edits = text_document_edit
+                .edits
+                .drain(..)
+                .map(|edit| match edit {
+                    OneOf::Left(edit) => edit,
+                    OneOf::Right(annotated) => annotated.text_edit,
+                })
+                .collect();
+            editor.apply_file_edits(edits);
+            editor.try_write_file(gs);
+        } else {
+            gs.error(format!("Unable to build editor for {}", text_document_edit.text_document.uri.path()));
+        };
+    }
+
+    fn handle_tree_operations(&mut self, operation: ResourceOp) -> IdiomResult<()> {
+        match operation {
+            ResourceOp::Create(create) => {
+                let path = PathBuf::from(create.uri.path().as_str());
+                if path.exists() {
+                    if let Some(options) = create.options {
+                        if matches!(options.overwrite, Some(overwrite) if !overwrite)
+                            || matches!(options.ignore_if_exists, Some(ignore) if ignore)
+                        {
+                            return Err(IdiomError::io_exists(format!("File {path:?} already exists!")));
+                        }
+                    }
+                };
+                std::fs::write(path, "")?;
+            }
+            ResourceOp::Delete(delete) => {
+                let search_path = PathBuf::from(delete.uri.as_str()).canonicalize()?;
+                if search_path.is_file() {
+                    std::fs::remove_file(search_path)?;
+                } else {
+                    std::fs::remove_dir_all(search_path)?;
+                }
+            }
+            ResourceOp::Rename(rename) => {
+                std::fs::rename(rename.old_uri.path().as_str(), rename.new_uri.path().as_str())?;
+                if let Some(editor) = self.get_editor(rename.old_uri.path().as_str()) {
+                    let new_path = PathBuf::from(rename.new_uri.path().as_str());
+                    editor.update_path(new_path)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn get_editor<T: Into<PathBuf>>(&mut self, path: T) -> Option<&mut Editor> {
+        let path: PathBuf = path.into();
+        self.editors.iter_mut().find(|editor| editor.path() == &path)
+    }
+
+    // EDITOR BUILDERS
+
+    pub fn new_text_from_data(
+        &mut self,
+        path: PathBuf,
+        content: Vec<EditorLine>,
+        cursor: Option<Cursor>,
+        gs: &mut GlobalState,
+    ) {
+        let editor = editor_from_data(path, FileType::Text, content, cursor, &self.base_configs, gs);
+        self.editors.insert(0, editor);
+    }
+
+    /// it could be the case that the file no longer exits
+    pub async fn new_from_session(
+        &mut self,
+        path: PathBuf,
+        file_type: FileType,
+        cursor: Cursor,
+        content: Option<Vec<String>>,
+        gs: &mut GlobalState,
+    ) -> IdiomResult<()> {
+        let content = match content {
+            None => EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?,
+            Some(lines) => lines.into_iter().map(EditorLine::from).collect(),
+        };
+        let mut editor = editor_from_data(path, file_type, content, Some(cursor), &self.base_configs, gs);
+        self.lsp_enroll(&mut editor, gs).await;
+        self.editors.insert(0, editor);
+        Ok(())
+    }
+
+    pub async fn new_at_line(&mut self, file_path: PathBuf, line: usize, gs: &mut GlobalState) -> IdiomResult<()> {
+        if self.new_from(file_path, gs).await? {
+            if let Some(editor) = self.get_active() {
+                editor.go_to(line);
+            }
+        };
+        Ok(())
+    }
+
+    pub async fn new_from(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<bool> {
+        let file_path = file_path.canonicalize()?;
+        if let Some(idx) = self.editors.iter().position(|e| e.path() == &file_path) {
+            let mut editor = self.editors.remove(idx);
+            editor.clear_screen_cache(gs);
+            if editor.update_status.collect() {
+                gs.event.push(file_updated(editor.path().to_owned()).into());
+            }
+            self.editors.insert(0, editor);
+            return Ok(false);
+        }
+        let editor = self.determine_editor(file_path, gs).await?;
+        self.editors.insert(0, editor);
+        self.toggle_editor();
+        Ok(true)
+    }
+
+    fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
+        Editor::from_path(file_path, FileType::Text, &self.base_configs, gs)
+    }
+
+    async fn determine_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
+        match FileType::derive_type(&file_path) {
+            FileType::Text => Editor::from_path_text(file_path, &self.base_configs, gs),
+            FileType::MarkDown => Editor::from_path_md(file_path, &self.base_configs, gs),
+            file_type => {
+                let mut editor = Editor::from_path(file_path, file_type, &self.base_configs, gs)?;
+                self.lsp_enroll(&mut editor, gs).await;
+                Ok(editor)
+            }
+        }
+    }
+
+    // LSP HANDLES
+
+    async fn lsp_enroll(&mut self, editor: &mut Editor, gs: &mut GlobalState) {
+        if !editor.file_type().is_code() {
+            return; // no lsp for text / markdown files
+        }
+        let lsp_cmd = match self.base_configs.derive_lsp(editor.file_type()) {
+            None => {
+                editor.lsp_local(gs);
+                return;
+            }
+            Some(cmd) => cmd,
+        };
+
+        // set initial tokens while LSP is indexing
+        editor.force_local_lsp_tokens(gs);
+        match self.lsp_servers.entry(*editor.file_type()) {
+            Entry::Vacant(entry) => match LSP::new(lsp_cmd, *editor.file_type()).await {
+                Ok(lsp) => {
+                    let client = lsp.aquire_client();
+                    editor.lsp_set(client, gs);
+                    for editor in self.editors.iter_mut().filter(|e| e.file_type() == editor.file_type()) {
+                        editor.lsp_set(lsp.aquire_client(), gs);
+                    }
+                    entry.insert(lsp);
+                }
+                Err(err) => {
+                    gs.error(err.to_string());
+                    editor.lsp_local(gs);
+                }
+            },
+            Entry::Occupied(entry) => {
+                editor.lsp_set(entry.get().aquire_client(), gs);
+            }
+        }
+    }
+
+    pub async fn force_lsp_type_on_active(&mut self, file_type: FileType, gs: &mut GlobalState) -> IdiomResult<()> {
+        let new_indent_cfg = self.base_configs.get_indent_cfg(file_type);
+        match self.get_active() {
+            Some(editor) => editor.file_type_set(file_type, new_indent_cfg, gs),
+            None => return Err(IdiomError::LSP(crate::lsp::LSPError::Null)),
+        };
+
+        if !file_type.is_code() {
+            return Ok(());
+        }
+
+        let lsp_cmd = match self.base_configs.derive_lsp(&file_type) {
+            Some(lsp_cmd) => lsp_cmd,
+            None => {
+                _ = self.get_active().map(|e| e.lsp_local(gs));
+                return Ok(());
+            }
+        };
+
+        match self.lsp_servers.entry(file_type) {
+            Entry::Vacant(entry) => {
+                let lsp = match LSP::new(lsp_cmd, file_type).await {
+                    Ok(lsp) => lsp,
+                    Err(err) => {
+                        _ = self.get_active().map(|e| e.lsp_local(gs));
+                        return Err(IdiomError::LSP(err));
+                    }
+                };
+                for editor in self.editors.iter_mut().filter(|e| *e.file_type() == file_type) {
+                    editor.lsp_set(lsp.aquire_client(), gs);
+                }
+                entry.insert(lsp);
+                Ok(())
+            }
+            Entry::Occupied(entry) => {
+                let client = entry.get().aquire_client();
+                _ = self.get_active().map(|e| e.lsp_set(client, gs));
+                Ok(())
+            }
+        }
+    }
+
+    #[inline]
+    pub async fn check_lsp(&mut self, file_type: FileType, gs: &mut GlobalState) {
+        if let Some(lsp) = self.lsp_servers.get_mut(&file_type) {
+            match lsp.check_status(file_type).await {
+                Ok(data) => match data {
+                    None => gs.success("LSP function is normal".to_owned()),
+                    Some(err) => {
+                        self.full_sync(&file_type, gs);
+                        gs.success(format!("LSP recoved after: {err}"));
+                    }
+                },
+                Err(err) => gs.error(err.to_string()),
+            }
+        }
+    }
+
+    #[inline]
+    pub fn full_sync(&mut self, file_type: &FileType, gs: &mut GlobalState) {
+        if let Some(lsp) = self.lsp_servers.get(file_type) {
+            for editor in self.editors.iter_mut().filter(|e| e.file_type() == file_type) {
+                editor.lsp_set(lsp.aquire_client(), gs);
+            }
+        }
+    }
+
+    pub fn notify_update(&mut self, path: PathBuf, gs: &mut GlobalState) {
+        for (idx, editor) in self.editors.iter_mut().enumerate() {
+            if editor.path() == &path {
+                let save_status_result = editor.is_saved();
+                if gs.unwrap_or_default(save_status_result, FILE_STATUS_ERR) {
+                    return;
+                }
+                editor.update_status.mark_updated();
+                if idx == 0 && editor.update_status.collect() {
+                    gs.event.push(file_updated(path).into());
+                }
+                return;
+            }
+        }
+    }
+
+    pub fn select_tab_mouse(&mut self, col_idx: usize) -> Option<usize> {
+        self.toggle_tabs();
+        let mut cols_len = 0;
+        for (editor_idx, editor) in self.editors.iter().enumerate() {
+            cols_len += editor.name().len() + 3;
+            if col_idx < cols_len {
+                return Some(editor_idx);
+            };
+        }
+        None
+    }
+
+    pub fn close_active(&mut self, gs: &mut GlobalState) {
+        if self.editors.is_empty() {
+            return;
+        }
+        let editor = self.editors.remove(0);
+        drop(editor);
+        let editor_area = *gs.editor_area();
+        match self.get_active() {
+            None => {
+                gs.clear_stats();
+                editor_area.clear(&mut gs.backend);
+                gs.select_mode();
+            }
+            Some(editor) => {
+                editor.clear_screen_cache(gs);
+                if editor.update_status.collect() {
+                    gs.event.push(file_updated(editor.path().to_owned()).into());
+                }
+            }
+        }
+    }
+
+    pub fn are_updates_saved(&self, gs: &mut GlobalState) -> bool {
+        for editor in self.editors.iter() {
+            let save_status_result = editor.is_saved();
+            if !gs.unwrap_or_default(save_status_result, FILE_STATUS_ERR) {
+                return false;
+            }
+        }
+        true
+    }
+
+    pub fn go_to_tab(&mut self, idx: usize, gs: &mut GlobalState) {
+        if self.editors.is_empty() {
+            return;
+        }
+        if idx == 0 || self.editors.len() == 1 {
+            self.toggle_editor();
+            gs.insert_mode();
+            return;
+        }
+        let mut editor =
+            if idx >= self.editors.len() { self.editors.pop().expect("garded") } else { self.editors.remove(idx) };
+        gs.event.push(IdiomEvent::SelectPath(editor.path().to_owned()));
+        editor.clear_screen_cache(gs);
+        if editor.update_status.collect() {
+            gs.event.push(file_updated(editor.path().to_owned()).into());
+        }
+        self.editors.insert(0, editor);
+        self.toggle_editor();
+        gs.insert_mode();
+    }
+
+    pub fn save_all(&mut self, gs: &mut GlobalState) {
+        for editor in self.editors.iter_mut() {
+            editor.save(gs);
+        }
+    }
+
+    pub fn refresh_cfg(&mut self, new_editor_key_map: EditorKeyMap, gs: &mut GlobalState) -> &mut EditorConfigs {
+        self.key_map = new_editor_key_map;
+        self.base_configs = gs.reload_confgs();
+        for editor in self.editors.iter_mut() {
+            editor.refresh_cfg(&self.base_configs, gs);
+            if let Some(lsp) = self.lsp_servers.get(editor.file_type()) {
+                if !editor.lexer().lsp {
+                    editor.lsp_set(lsp.aquire_client(), gs);
+                }
+            }
+        }
+        &mut self.base_configs
+    }
+}
+
+/// handels keybindings for editor
+fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
+    let editor = match ws.editors.get_mut_no_update(0) {
+        None => return false,
+        Some(editor) => editor,
+    };
+    let action = match ws.key_map.map(key) {
+        None => return false,
+        Some(action) => action,
+    };
+    if !editor.map(action, gs) {
+        match action {
+            EditorAction::Close => ws.close_active(gs),
+            EditorAction::Cancel if ws.editors.len() > 1 => ws.toggle_tabs(),
+            _ => return false,
+        }
+    }
+    true
+}
+
+/// Handles keybinding while on tabs
+fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
+    if let Some(action) = ws.key_map.map(key) {
+        if ws.editors.is_empty() {
+            gs.select_mode();
+            return false;
+        }
+        match action {
+            EditorAction::NewLine => {
+                ws.toggle_editor();
+                if let Some(editor) = ws.get_active() {
+                    editor.clear_ui(gs);
+                }
+            }
+            EditorAction::Up | EditorAction::Down => {
+                ws.toggle_editor();
+                gs.select_mode();
+                return false;
+            }
+            EditorAction::Right | EditorAction::Indent => {
+                let editor = ws.editors.remove(0);
+                ws.editors.push(editor);
+                let editor = &mut ws.editors.inner_mut_no_update()[0];
+                editor.clear_screen_cache(gs);
+                if editor.update_status.collect() {
+                    gs.event.push(file_updated(editor.path().to_owned()).into());
+                }
+                gs.event.push(IdiomEvent::SelectPath(ws.editors.inner()[0].path().to_owned()));
+            }
+            EditorAction::Left | EditorAction::Unintent => {
+                if let Some(mut editor) = ws.editors.pop() {
+                    gs.event.push(IdiomEvent::SelectPath(editor.path().to_owned()));
+                    editor.clear_screen_cache(gs);
+                    if editor.update_status.collect() {
+                        gs.event.push(file_updated(editor.path().to_owned()).into());
+                    }
+                    ws.editors.insert(0, editor);
+                }
+            }
+            EditorAction::Cancel => {
+                ws.toggle_editor();
+                if let Some(editor) = ws.get_active() {
+                    editor.clear_ui(gs);
+                }
+                return false;
+            }
+            EditorAction::Close => {
+                ws.close_active(gs);
+            }
+            _ => (),
+        }
+        return true;
+    }
+    false
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::{map_editor, Workspace};
+    use crate::{
+        configs::{test::mock_editor_key_map, EditorConfigs},
+        cursor::{Cursor, CursorPosition},
+        editor::{
+            tests::{mock_editor, pull_line, select_eq},
+            Editor,
+        },
+        editor_line::EditorLine,
+        ext_tui::CrossTerm,
+        global_state::GlobalState,
+    };
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    use crossterm::style::ContentStyle;
+    use idiom_tui::{layout::Rect, Backend};
+    use std::collections::HashMap;
+
+    pub fn mock_ws(content: Vec<String>) -> Workspace {
+        let mut ws = Workspace {
+            editors: vec![mock_editor(content)].into(),
+            base_configs: EditorConfigs::default(),
+            key_map: mock_editor_key_map(),
+            lsp_servers: HashMap::default(),
+            map_callback: map_editor,
+            tab_style: ContentStyle::default(),
+        };
+        ws.resize_all(Rect::new(0, 0, 90, 60));
+        ws
+    }
+
+    pub fn mock_ws_empty() -> Workspace {
+        Workspace {
+            editors: vec![].into(),
+            base_configs: EditorConfigs::default(),
+            key_map: mock_editor_key_map(),
+            lsp_servers: HashMap::default(),
+            map_callback: map_editor,
+            tab_style: ContentStyle::default(),
+        }
+    }
+
+    fn base_ws() -> Workspace {
+        mock_ws(vec![
+            "hello world!".to_owned(),
+            "next line".to_owned(),
+            "     ".to_owned(),
+            "really long line here".to_owned(),
+            "short one here".to_owned(),
+            "test msg".to_owned(),
+        ])
+    }
+
+    fn active(ws: &mut Workspace) -> &mut Editor {
+        ws.get_active().unwrap()
+    }
+
+    fn press(ws: &mut Workspace, code: KeyCode, gs: &mut GlobalState) {
+        ws.map(&KeyEvent::new(code, KeyModifiers::empty()), gs);
+    }
+
+    fn shift_press(ws: &mut Workspace, code: KeyCode, gs: &mut GlobalState) {
+        ws.map(&KeyEvent::new(code, KeyModifiers::SHIFT), gs);
+    }
+
+    fn ctrl_press(ws: &mut Workspace, code: KeyCode, gs: &mut GlobalState) {
+        ws.map(&KeyEvent::new(code, KeyModifiers::CONTROL), gs);
+    }
+
+    fn ctrl_shift_press(ws: &mut Workspace, code: KeyCode, gs: &mut GlobalState) {
+        ws.map(&KeyEvent::new(code, KeyModifiers::CONTROL.union(KeyModifiers::SHIFT)), gs);
+    }
+
+    fn assert_position(ws: &mut Workspace, position: CursorPosition) {
+        let current = active(ws).cursor().get_position();
+        assert_eq!(current, position);
+    }
+
+    /// ACTIONS
+
+    #[test]
+    fn test_open_scope() {
+        let mut ws = base_ws();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+        gs.insert_mode();
+        press(&mut ws, KeyCode::Char(' '), &mut gs);
+        press(&mut ws, KeyCode::Left, &mut gs);
+        press(&mut ws, KeyCode::Char('{'), &mut gs);
+        press(&mut ws, KeyCode::Char('('), &mut gs);
+        press(&mut ws, KeyCode::Char('['), &mut gs);
+        press(&mut ws, KeyCode::Enter, &mut gs);
+        assert_position(&mut ws, CursorPosition { char: 4, line: 1 });
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "{([");
+        assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "    ");
+        assert_eq!(pull_line(active(&mut ws), 2).unwrap(), "])} hello world!");
+    }
+
+    #[test]
+    fn test_block_closing() {
+        let mut ws = base_ws();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+        gs.insert_mode();
+        press(&mut ws, KeyCode::Char('{'), &mut gs);
+        press(&mut ws, KeyCode::Char('('), &mut gs);
+        press(&mut ws, KeyCode::Char('['), &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "{([hello world!");
+        assert_position(&mut ws, CursorPosition { char: 3, line: 0 });
+    }
+
+    #[test]
+    fn test_allow_closing() {
+        let mut ws = base_ws();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+        gs.insert_mode();
+        press(&mut ws, KeyCode::Char('{'), &mut gs);
+        press(&mut ws, KeyCode::Left, &mut gs);
+        press(&mut ws, KeyCode::Char('{'), &mut gs);
+        press(&mut ws, KeyCode::Char('('), &mut gs);
+        press(&mut ws, KeyCode::Char('['), &mut gs);
+        press(&mut ws, KeyCode::Char('='), &mut gs);
+        press(&mut ws, KeyCode::Left, &mut gs);
+        press(&mut ws, KeyCode::Char('('), &mut gs);
+        press(&mut ws, KeyCode::Char(';'), &mut gs);
+        press(&mut ws, KeyCode::Char('['), &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "{([(;[])=])}{hello world!");
+        assert_position(&mut ws, CursorPosition { char: 6, line: 0 });
+    }
+
+    #[test]
+    fn test_block_quotes() {
+        let mut ws = base_ws();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+        press(&mut ws, KeyCode::Char('"'), &mut gs);
+        press(&mut ws, KeyCode::Char('\''), &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "\"'hello world!");
+        assert_position(&mut ws, CursorPosition { char: 2, line: 0 });
+    }
+
+    #[test]
+    fn test_allow_quotes() {
+        let mut ws = base_ws();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+        press(&mut ws, KeyCode::Char(':'), &mut gs);
+        press(&mut ws, KeyCode::Char(';'), &mut gs);
+        press(&mut ws, KeyCode::Left, &mut gs);
+        press(&mut ws, KeyCode::Char('"'), &mut gs);
+        press(&mut ws, KeyCode::Char('.'), &mut gs);
+        press(&mut ws, KeyCode::Char(','), &mut gs);
+        press(&mut ws, KeyCode::Left, &mut gs);
+        press(&mut ws, KeyCode::Char('\''), &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), ":\".'',\";hello world!");
+        assert_position(&mut ws, CursorPosition { char: 4, line: 0 });
+    }
+
+    #[test]
+    fn test_move() {
+        let mut ws = base_ws();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+        gs.insert_mode();
+        press(&mut ws, KeyCode::Down, &mut gs);
+        assert_position(&mut ws, CursorPosition { char: 0, line: 1 });
+        press(&mut ws, KeyCode::End, &mut gs);
+        assert_position(&mut ws, CursorPosition { char: 9, line: 1 });
+        press(&mut ws, KeyCode::Right, &mut gs);
+        assert_position(&mut ws, CursorPosition { char: 0, line: 2 });
+        press(&mut ws, KeyCode::Left, &mut gs);
+        assert_position(&mut ws, CursorPosition { char: 9, line: 1 });
+        press(&mut ws, KeyCode::Down, &mut gs);
+        press(&mut ws, KeyCode::Down, &mut gs);
+        press(&mut ws, KeyCode::End, &mut gs);
+        assert_position(&mut ws, CursorPosition { char: 21, line: 3 });
+        press(&mut ws, KeyCode::Down, &mut gs);
+        assert_position(&mut ws, CursorPosition { char: 14, line: 4 });
+        press(&mut ws, KeyCode::Left, &mut gs);
+        assert_position(&mut ws, CursorPosition { char: 13, line: 4 });
+        press(&mut ws, KeyCode::Right, &mut gs);
+        assert_position(&mut ws, CursorPosition { char: 14, line: 4 });
+        press(&mut ws, KeyCode::Down, &mut gs);
+        assert_position(&mut ws, CursorPosition { char: 8, line: 5 });
+        press(&mut ws, KeyCode::Up, &mut gs);
+        assert_position(&mut ws, CursorPosition { char: 14, line: 4 });
+    }
+
+    #[test]
+    fn move_checks() {
+        let mut ws = base_ws();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+        gs.insert_mode();
+        let base_line = active(&mut ws).content()[0].to_string();
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), base_line);
+        press(&mut ws, KeyCode::End, &mut gs);
+        assert_position(&mut ws, CursorPosition { char: base_line.len(), line: 0 });
+        press(&mut ws, KeyCode::Right, &mut gs);
+        assert_position(&mut ws, CursorPosition { char: 0, line: 1 });
+        press(&mut ws, KeyCode::Left, &mut gs);
+        assert_position(&mut ws, CursorPosition { char: base_line.len(), line: 0 });
+        shift_press(&mut ws, KeyCode::Left, &mut gs);
+        assert!(select_eq(
+            (CursorPosition { char: base_line.len() - 1, line: 0 }, CursorPosition { char: base_line.len(), line: 0 }),
+            active(&mut ws)
+        ));
+        let mut test_cursor = Cursor::default();
+        test_cursor.select_set(
+            CursorPosition { line: 0, char: base_line.len() - 1 },
+            CursorPosition { line: 0, char: base_line.len() },
+        );
+        assert_eq!(test_cursor.char, base_line.len());
+        assert!(test_cursor.matches_content(&active(&mut ws).content()));
+        test_cursor.select_set(
+            CursorPosition { line: 0, char: base_line.len() },
+            CursorPosition { line: 0, char: base_line.len() - 1 },
+        );
+        assert_eq!(test_cursor.char, base_line.len() - 1);
+        assert!(test_cursor.matches_content(&active(&mut ws).content()));
+        test_cursor.select_set(
+            CursorPosition { line: 0, char: base_line.len() },
+            CursorPosition { line: 0, char: base_line.len() + 1 },
+        );
+        assert_eq!(test_cursor.char, base_line.len() + 1);
+        assert!(!test_cursor.matches_content(&active(&mut ws).content()));
+        test_cursor.select_set(
+            CursorPosition { line: 0, char: base_line.len() + 1 },
+            CursorPosition { line: 0, char: base_line.len() },
+        );
+        assert_eq!(test_cursor.char, base_line.len());
+        assert!(!test_cursor.matches_content(&active(&mut ws).content()));
+    }
+
+    #[test]
+    fn test_select() {
+        let mut ws = base_ws();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+        gs.insert_mode();
+        shift_press(&mut ws, KeyCode::Down, &mut gs);
+        assert!(select_eq((CursorPosition::default(), CursorPosition { line: 1, char: 0 }), active(&mut ws)));
+        shift_press(&mut ws, KeyCode::Left, &mut gs);
+        assert!(select_eq((CursorPosition::default(), CursorPosition { line: 0, char: 12 }), active(&mut ws)));
+        shift_press(&mut ws, KeyCode::Right, &mut gs);
+        assert!(select_eq((CursorPosition::default(), CursorPosition { line: 1, char: 0 }), active(&mut ws)));
+        shift_press(&mut ws, KeyCode::Left, &mut gs);
+        shift_press(&mut ws, KeyCode::Down, &mut gs);
+        assert!(select_eq((CursorPosition::default(), CursorPosition { char: 9, line: 1 }), active(&mut ws)));
+        press(&mut ws, KeyCode::Left, &mut gs);
+        shift_press(&mut ws, KeyCode::Right, &mut gs);
+        assert!(select_eq((CursorPosition { char: 8, line: 1 }, CursorPosition { char: 9, line: 1 }), active(&mut ws)));
+        shift_press(&mut ws, KeyCode::Left, &mut gs);
+        shift_press(&mut ws, KeyCode::Left, &mut gs);
+        assert!(select_eq((CursorPosition { char: 7, line: 1 }, CursorPosition { char: 8, line: 1 }), active(&mut ws)));
+        shift_press(&mut ws, KeyCode::Up, &mut gs);
+        assert!(select_eq((CursorPosition { char: 7, line: 0 }, CursorPosition { char: 8, line: 1 }), active(&mut ws)));
+    }
+
+    #[test]
+    fn select_checks() {
+        let mut ws = base_ws();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+
+        gs.insert_mode();
+        let last_line = active(&mut ws).content().len() - 1;
+        let base_line = active(&mut ws).content()[last_line].to_string();
+        let mut test_cursor = Cursor::default();
+        let all = (CursorPosition::default(), CursorPosition { char: base_line.len(), line: last_line });
+
+        ctrl_press(&mut ws, KeyCode::Char('a'), &mut gs);
+        assert_position(&mut ws, CursorPosition { char: base_line.len(), line: last_line });
+        assert!(select_eq(all, active(&mut ws)));
+        active(&mut ws).unsafe_cursor_mut().select_set(all.1, all.0); // swap select 'from' and 'to'
+        shift_press(&mut ws, KeyCode::Down, &mut gs);
+        assert!(select_eq((CursorPosition { line: 1, char: 0 }, all.1), active(&mut ws)));
+        shift_press(&mut ws, KeyCode::Left, &mut gs);
+        assert!(select_eq(
+            (CursorPosition { line: 0, char: active(&mut ws).content()[0].char_len() }, all.1),
+            active(&mut ws)
+        ));
+        test_cursor.select_set(CursorPosition { line: 0, char: active(&mut ws).content()[0].char_len() }, all.1);
+        assert!(test_cursor.matches_content(&active(&mut ws).content()));
+        test_cursor.select_set(CursorPosition { line: 0, char: active(&mut ws).content()[0].char_len() + 1 }, all.1);
+        assert!(!test_cursor.matches_content(&active(&mut ws).content()));
+        test_cursor.select_set(all.0, all.1);
+        assert!(test_cursor.matches_content(&active(&mut ws).content()));
+        test_cursor.select_set(all.0, CursorPosition { line: all.1.line + 1, char: 0 });
+        assert!(!test_cursor.matches_content(&active(&mut ws).content()));
+    }
+
+    #[test]
+    fn test_chars() {
+        let mut ws = base_ws();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+        gs.insert_mode();
+        press(&mut ws, KeyCode::Char('n'), &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nhello world!");
+        press(&mut ws, KeyCode::Right, &mut gs);
+        press(&mut ws, KeyCode::Char('('), &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh(ello world!");
+        press(&mut ws, KeyCode::Char('{'), &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh({ello world!");
+        press(&mut ws, KeyCode::Char('['), &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh({[ello world!");
+        press(&mut ws, KeyCode::Char('"'), &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh({[\"ello world!");
+        press(&mut ws, KeyCode::Char('\''), &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nh({[\"'ello world!");
+    }
+
+    #[test]
+    fn test_new_line() {
+        let mut ws = base_ws();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+        gs.insert_mode();
+        press(&mut ws, KeyCode::Enter, &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "");
+        assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "hello world!");
+        press(&mut ws, KeyCode::Right, &mut gs);
+        press(&mut ws, KeyCode::Enter, &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "h");
+        assert_eq!(pull_line(active(&mut ws), 2).unwrap(), "ello world!");
+        press(&mut ws, KeyCode::End, &mut gs);
+        press(&mut ws, KeyCode::Enter, &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 2).unwrap(), "ello world!");
+        assert_eq!(pull_line(active(&mut ws), 3).unwrap(), "");
+        // scopes
+        press(&mut ws, KeyCode::Down, &mut gs);
+        ctrl_press(&mut ws, KeyCode::Right, &mut gs);
+        press(&mut ws, KeyCode::Char('{'), &mut gs);
+        press(&mut ws, KeyCode::Enter, &mut gs);
+        assert_eq!(CursorPosition { line: 5, char: 4 }, ws.get_active().unwrap().cursor().get_position());
+        assert_eq!(pull_line(active(&mut ws), 4).unwrap(), "next{");
+        assert_eq!(pull_line(active(&mut ws), 5).unwrap(), "    ");
+        assert_eq!(pull_line(active(&mut ws), 6).unwrap(), "} line");
+        // scopes depth
+        press(&mut ws, KeyCode::Char('['), &mut gs);
+        press(&mut ws, KeyCode::Enter, &mut gs);
+        assert_eq!(CursorPosition { line: 6, char: 8 }, ws.get_active().unwrap().cursor().get_position());
+        assert_eq!(pull_line(active(&mut ws), 5).unwrap(), "    [");
+        assert_eq!(pull_line(active(&mut ws), 6).unwrap(), "        ");
+        assert_eq!(pull_line(active(&mut ws), 7).unwrap(), "    ]");
+    }
+
+    #[test]
+    fn test_del() {
+        let mut ws = base_ws();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+        gs.insert_mode();
+        press(&mut ws, KeyCode::Delete, &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "ello world!");
+        press(&mut ws, KeyCode::End, &mut gs);
+        press(&mut ws, KeyCode::Delete, &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "ello world!next line");
+        assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "     ");
+        press(&mut ws, KeyCode::End, &mut gs);
+        press(&mut ws, KeyCode::Delete, &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "really long line here");
+    }
+
+    #[test]
+    fn test_backspace() {
+        let mut ws = base_ws();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+        gs.insert_mode();
+        press(&mut ws, KeyCode::Backspace, &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "hello world!");
+        press(&mut ws, KeyCode::Down, &mut gs);
+        press(&mut ws, KeyCode::Backspace, &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "hello world!next line");
+        press(&mut ws, KeyCode::Backspace, &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "hello worldnext line");
+        press(&mut ws, KeyCode::Down, &mut gs);
+        press(&mut ws, KeyCode::End, &mut gs);
+        press(&mut ws, KeyCode::Backspace, &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "    ");
+        press(&mut ws, KeyCode::Backspace, &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "");
+    }
+
+    #[test]
+    fn test_cut_paste() {
+        let mut ws = base_ws();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+        gs.insert_mode();
+        ctrl_press(&mut ws, KeyCode::Char('x'), &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "next line");
+        ctrl_press(&mut ws, KeyCode::Right, &mut gs);
+        shift_press(&mut ws, KeyCode::Down, &mut gs);
+        shift_press(&mut ws, KeyCode::Down, &mut gs);
+        ctrl_press(&mut ws, KeyCode::Char('x'), &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "nextly long line here");
+        shift_press(&mut ws, KeyCode::Down, &mut gs); // with select
+        ctrl_press(&mut ws, KeyCode::Char('v'), &mut gs);
+        assert_eq!(pull_line(active(&mut ws), 0).unwrap(), "next line");
+        assert_eq!(pull_line(active(&mut ws), 1).unwrap(), "     ");
+        assert_eq!(pull_line(active(&mut ws), 2).unwrap(), "realt one here");
+    }
+
+    #[test]
+    fn test_jump_select() {
+        let mut ws = base_ws();
+        let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
+        gs.insert_mode();
+        ctrl_shift_press(&mut ws, KeyCode::Right, &mut gs);
+        select_eq((CursorPosition::default(), CursorPosition { line: 0, char: 5 }), active(&mut ws));
+        ctrl_shift_press(&mut ws, KeyCode::Right, &mut gs);
+        select_eq((CursorPosition::default(), CursorPosition { line: 0, char: 11 }), active(&mut ws));
+        shift_press(&mut ws, KeyCode::Down, &mut gs);
+        select_eq((CursorPosition::default(), CursorPosition { line: 1, char: 9 }), active(&mut ws));
+        shift_press(&mut ws, KeyCode::Down, &mut gs);
+        shift_press(&mut ws, KeyCode::Down, &mut gs);
+        select_eq((CursorPosition::default(), CursorPosition { line: 3, char: 11 }), active(&mut ws));
+    }
+
+    #[test]
+    fn cursor_postion_confirm() {
+        let eq = CursorPosition { line: 3, char: 10 };
+        assert_eq!(eq, eq);
+        assert!(eq >= eq);
+        assert!(eq <= eq);
+        assert!((eq <= eq));
+        assert!((eq >= eq));
+
+        let smol = CursorPosition { line: 3, char: 10 };
+        let big = CursorPosition { line: 4, char: 1 };
+        assert!(big >= smol);
+        assert!(big > smol);
+        assert!((big > smol));
+        assert!((big >= smol));
+        assert_eq!(std::cmp::max(smol, big), big);
+        assert_eq!(std::cmp::min(smol, big), smol);
+
+        let smol = CursorPosition { line: 3, char: 10 };
+        let big = CursorPosition { line: 3, char: 11 };
+        assert!(big >= smol);
+        assert!((big > smol));
+        assert!((big > smol));
+        assert!((big >= smol));
+        assert_eq!(std::cmp::max(smol, big), big);
+        assert_eq!(std::cmp::min(smol, big), smol);
+    }
+
+    #[test]
+    fn cursor_directions_get() {
+        let mut test_cursor = Cursor::default();
+        let position_l3 = CursorPosition { line: 3, char: 2 };
+        test_cursor.select_set(position_l3, CursorPosition::default());
+        let ((from, to), dir) = test_cursor.select_get_direction().unwrap();
+        assert_eq!((from, to), (CursorPosition::default(), position_l3));
+        dir.apply_ordered(from, to, |first, second| {
+            assert_eq!((first, second), (position_l3, CursorPosition::default()))
+        });
+
+        test_cursor.select_set(CursorPosition::default(), position_l3);
+        let ((from, to), dir) = test_cursor.select_get_direction().unwrap();
+        assert_eq!((from, to), (CursorPosition::default(), position_l3));
+        dir.apply_ordered(from, to, |first, second| {
+            assert_eq!((first, second), (CursorPosition::default(), position_l3))
+        });
+    }
+
+    #[test]
+    fn cursor_directions_take() {
+        let mut test_cursor = Cursor::default();
+        let position_l3 = CursorPosition { line: 3, char: 2 };
+        test_cursor.select_set(position_l3, CursorPosition::default());
+        let ((from, to), dir) = test_cursor.select_take_direction().unwrap();
+        assert_eq!((from, to), (CursorPosition::default(), position_l3));
+        dir.apply_ordered(from, to, |first, second| {
+            assert_eq!((first, second), (position_l3, CursorPosition::default()))
+        });
+
+        test_cursor.select_set(CursorPosition::default(), position_l3);
+        let ((from, to), dir) = test_cursor.select_take_direction().unwrap();
+        assert_eq!((from, to), (CursorPosition::default(), position_l3));
+        dir.apply_ordered(from, to, |first, second| {
+            assert_eq!((first, second), (CursorPosition::default(), position_l3))
+        });
+    }
+
+    #[test]
+    fn match_content() {
+        let content: Vec<EditorLine> =
+            ["test", "test2", "test3", "end line"].into_iter().map(|s| EditorLine::from(String::from(s))).collect();
+
+        let mut cursor = Cursor::default();
+        cursor.select_set(CursorPosition { line: 3, char: 5 }, CursorPosition { line: 3, char: 9 });
+        cursor.match_content(&content);
+        assert_eq!(
+            cursor.select_get(),
+            Some((CursorPosition { line: 3, char: 5 }, CursorPosition { line: 3, char: 8 }))
+        );
+        cursor.select_set(CursorPosition { line: 3, char: 9 }, CursorPosition { line: 3, char: 9 });
+        cursor.match_content(&content);
+        assert_eq!(cursor.get_position(), CursorPosition { line: 3, char: 8 });
+        assert_eq!(None, cursor.select_get());
+        cursor.select_set(CursorPosition { line: 2, char: 3 }, CursorPosition { line: 4, char: 9 });
+        cursor.match_content(&content);
+        assert_eq!(cursor.get_position(), CursorPosition { line: 3, char: 8 });
+        assert_eq!(None, cursor.select_get());
+    }
+}

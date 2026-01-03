@@ -8,6 +8,7 @@ use idiom_tui::layout::{Line, Rect, BORDERS};
 
 #[derive(Default)]
 pub struct EditorTerminal {
+    last_rect: Rect,
     terminal: Option<PtyShell>,
     shell: Option<String>,
     border: Option<Line>,
@@ -53,7 +54,10 @@ impl EditorTerminal {
             {
                 self.terminal.replace(term);
             }
+        } else if self.last_rect != rect {
+            self.resize(rect);
         }
+        self.last_rect = rect;
     }
 
     fn kill(&mut self, _gs: &mut GlobalState) {
