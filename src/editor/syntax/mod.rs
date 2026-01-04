@@ -11,14 +11,14 @@ use crate::{
     editor::Editor,
     editor_line::EditorLine,
     global_state::{GlobalState, IdiomEvent},
-    lsp::{LSPClient, LSPError, LSPResponseType, LSPResult},
+    lsp::{LSPClient, LSPError, LSPResult},
 };
 pub use diagnostics::{set_diganostics, DiagnosticInfo, DiagnosticLine, Fix};
 pub use encoding::Encoding;
 pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
-    as_url, completable_dead, context_local, formatting_dead, get_autocomplete_dead, info_position_dead, map_lsp,
+    as_url, completable_disable, context_local, formatting_dead, get_autocomplete_dead, info_position_dead, map_lsp,
     remove_lsp, sync_changes_dead, sync_edits_dead, sync_edits_dead_rev, sync_tokens_dead, tokens_dead,
     tokens_partial_dead,
 };
@@ -35,13 +35,13 @@ pub struct Lexer {
     pub path: PathBuf,
     question_lsp: bool,
     version: i32,
-    requests: Vec<(i64, LSPResponseType)>,
+    requests: Vec<i64>,
     client: LSPClient,
     context: fn(&mut Editor, &mut GlobalState),
     completable: fn(&Self, char_idx: usize, line: &EditorLine) -> bool,
     autocomplete: fn(&mut Self, CursorPosition, String, &mut GlobalState),
-    tokens: fn(&mut Self) -> LSPResult<(i64, LSPResponseType)>,
-    tokens_partial: fn(&mut Self, Range, usize) -> LSPResult<(i64, LSPResponseType)>,
+    tokens: fn(&mut Self) -> LSPResult<i64>,
+    tokens_partial: fn(&mut Self, Range, usize) -> LSPResult<i64>,
     references: fn(&mut Self, CursorPosition, &mut GlobalState),
     definitions: fn(&mut Self, CursorPosition, &mut GlobalState),
     declarations: fn(&mut Self, CursorPosition, &mut GlobalState),
@@ -70,7 +70,7 @@ impl Lexer {
             lsp: false,
             client: LSPClient::placeholder(),
             context: context_local,
-            completable: completable_dead,
+            completable: completable_disable,
             autocomplete: get_autocomplete_dead,
             tokens: tokens_dead,
             tokens_partial: tokens_partial_dead,
@@ -102,7 +102,7 @@ impl Lexer {
             lsp: false,
             client: LSPClient::placeholder(),
             context: context_local,
-            completable: completable_dead,
+            completable: completable_disable,
             autocomplete: get_autocomplete_dead,
             tokens: tokens_dead,
             tokens_partial: tokens_partial_dead,
@@ -134,7 +134,7 @@ impl Lexer {
             lsp: false,
             client: LSPClient::placeholder(),
             context: context_local,
-            completable: completable_dead,
+            completable: completable_disable,
             autocomplete: get_autocomplete_dead,
             tokens: tokens_dead,
             tokens_partial: tokens_partial_dead,
@@ -263,8 +263,7 @@ impl Lexer {
         if self.client.capabilities.rename_provider.is_none() {
             return Err(LSPError::missing_capability("renames"));
         }
-        let request =
-            self.client.request_rename(self.uri.clone(), c, new_name).map(|id| (id, LSPResponseType::Renames))?;
+        let request = self.client.request_rename(self.uri.clone(), c, new_name)?;
         self.requests.push(request);
         Ok(())
     }
