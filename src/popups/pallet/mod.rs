@@ -182,10 +182,7 @@ impl Pallet {
 
     fn sort_commands_by_pattern(&mut self, gs: &GlobalState) {
         for (score, cmd) in self.commands.iter_mut() {
-            *score = match gs.matcher.fuzzy_match(cmd.label, self.pattern.as_str()) {
-                Some(new_score) => new_score,
-                None => i64::MAX,
-            };
+            *score = gs.matcher.fuzzy_match(cmd.label, self.pattern.as_str()).unwrap_or(i64::MAX);
         }
         self.state.select(0, self.commands.len());
         self.commands.sort_by(|(score, _), (rhscore, _)| score.cmp(rhscore));

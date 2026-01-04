@@ -64,13 +64,13 @@ impl<'a> Pattern<'a> {
     }
 }
 
-impl ToString for Pattern<'_> {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for Pattern<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Select(pat) => format!(" select {} ", pat.as_str()),
+            Self::Select(pat) => write!(f, " select {} ", pat.as_str()),
             Self::Pipe { cmd, src, target } => match src {
-                Some(src) => format!(" pipe {} into {} > {} ", src.as_str(), cmd.trim(), target.as_str()),
-                None => format!(" run {} > {} ", cmd.trim(), target.as_str()),
+                Some(src) => write!(f, " pipe {} into {} > {} ", src.as_str(), cmd.trim(), target.as_str()),
+                None => write!(f, " run {} > {} ", cmd.trim(), target.as_str()),
             },
         }
     }
@@ -244,7 +244,7 @@ fn shell_executor(
                         Event::Key(key) => shell.map_key(&key, gs.backend())?,
                         Event::Resize(width, height) => {
                             gs.full_resize(ws, term, width, height);
-                            shell.resize(*gs.editor_area()).map_err(|err| IdiomError::any(err))?;
+                            shell.resize(*gs.editor_area()).map_err(IdiomError::any)?;
                         }
                     }
                 }

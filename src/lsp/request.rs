@@ -177,6 +177,7 @@ where
                 capabilities: lsp::ClientCapabilities {
                     workspace: Some(lsp::WorkspaceClientCapabilities { ..Default::default() }),
                     text_document: Some(lsp::TextDocumentClientCapabilities {
+                        formatting: Some(lsp::DocumentFormattingClientCapabilities::default()),
                         semantic_tokens: Some(lsp::SemanticTokensClientCapabilities {
                             overlapping_token_support: Some(false),
                             ..Default::default()
