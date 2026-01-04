@@ -18,9 +18,9 @@ pub use encoding::Encoding;
 pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
-    as_url, completable_disable, context_local, formatting_dead, get_autocomplete_dead, info_position_dead, map_lsp,
-    remove_lsp, sync_changes_dead, sync_edits_dead, sync_edits_dead_rev, sync_tokens_dead, tokens_dead,
-    tokens_partial_dead,
+    as_url, completable, completable_disable, context_local, formatting_dead, get_autocomplete_dead,
+    info_position_dead, map_lsp, remove_lsp, sync_changes_dead, sync_edits_dead, sync_edits_dead_rev, sync_tokens_dead,
+    tokens_dead, tokens_partial_dead,
 };
 use lsp_types::{PublishDiagnosticsParams, Range, TextDocumentContentChangeEvent, Uri};
 use std::path::{Path, PathBuf};
@@ -167,6 +167,9 @@ impl Lexer {
     pub fn refresh_lsp(&mut self, gs: &mut GlobalState) {
         self.requests.clear();
         self.client.clear_requests();
+        if self.client.capabilities.completion_provider.is_some() {
+            self.completable = completable;
+        }
         match (self.tokens)(self) {
             Ok(request) => self.requests.push(request),
             Err(error) => gs.error(error),

@@ -18,7 +18,7 @@ use lsp_types::{
 };
 use std::path::Path;
 
-use super::{
+use crate::editor::syntax::{
     set_diganostics,
     tokens::{set_tokens, set_tokens_partial},
 };
@@ -146,22 +146,17 @@ pub fn remove_lsp(lexer: &mut Lexer) {
 pub fn context_local(_: &mut Editor, _: &mut GlobalState) {}
 
 pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
-    let lexer = &mut editor.lexer;
-    let client = &mut lexer.client;
-    let content = &mut editor.content;
-    let modal = &mut editor.modal;
-
-    if lexer.question_lsp && client.is_closed() {
+    if editor.lexer.question_lsp && editor.lexer.client.is_closed() {
         gs.error("LSP failure ...");
         gs.event.push(crate::global_state::IdiomEvent::CheckLSP(editor.file_type));
         return;
     }
 
     // diagnostics
-    let (editor_diagnostics, tree_diagnostics) = client.get_diagnostics(&lexer.uri);
+    let (editor_diagnostics, tree_diagnostics) = editor.lexer.client.get_diagnostics(&editor.lexer.uri);
     if let Some(diagnostics) = editor_diagnostics {
-        set_diganostics(content, diagnostics);
-        modal.cleanr_render_cache(); // force rebuild
+        set_diganostics(&mut editor.content, diagnostics);
+        editor.modal.cleanr_render_cache(); // force rebuild
     }
 
     if let Some(tree_diagnostics) = tree_diagnostics {
@@ -169,91 +164,33 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     }
 
     // responses
-    let Some(mut responses) = client.get_responses() else {
-        return;
-    };
-    for id in std::mem::take(&mut lexer.requests) {
-        let Some(response) = responses.remove(&id) else {
-            lexer.requests.push(id);
-            continue;
-        };
-        match response {
-            LSPResponse::Completion(completions, line, c) => {
-                if editor.cursor.line == c.line {
-                    modal.auto_complete(completions, line, c, &gs.matcher);
-                }
-            }
-            LSPResponse::Hover(hover) => modal.map_hover(hover, &gs.theme),
-            LSPResponse::SignatureHelp(signature) => modal.map_signatures(signature, &gs.theme),
-            LSPResponse::Renames(workspace_edit) => gs.event.push(workspace_edit.into()),
-            LSPResponse::Formatting { edits, save } => {
-                if save {
-                    gs.event.push(crate::global_state::IdiomEvent::Save)
-                };
-                gs.event.push(WorkspaceEdit::new([(lexer.uri.clone(), edits)].into_iter().collect()).into());
-            }
-            LSPResponse::Tokens(tokens) => {
-                match tokens {
-                    SemanticTokensResult::Partial(data) => set_tokens(data.data, &lexer.legend, content),
-                    SemanticTokensResult::Tokens(data) => {
-                        set_tokens(data.data, &lexer.legend, content);
-                        gs.success("LSP tokens mapped! Refresh UI to remove artifacts (default F5)");
-                    }
-                };
-            }
-            LSPResponse::TokensPartial { result, max_lines } => {
-                let tokens = match result {
-                    SemanticTokensRangeResult::Partial(data) => data.data,
-                    SemanticTokensRangeResult::Tokens(data) => data.data,
-                };
-                set_tokens_partial(tokens, max_lines, &lexer.legend, content);
-            }
-            LSPResponse::References(locations) => {
-                if let Some(mut locations) = locations {
-                    if locations.len() == 1 {
-                        gs.event.push(locations.remove(0).into());
-                    } else {
-                        gs.event.push(refrence_selector(locations).into())
-                    }
-                }
-            }
-            LSPResponse::Declaration(declaration) => gs.try_tree_event(declaration),
-            LSPResponse::Definition(definition) => gs.try_tree_event(definition),
-            LSPResponse::Error(text) => gs.error(text),
-            LSPResponse::Empty => (),
-        }
-    }
-    drop(responses);
+    handle_responses(editor, gs);
 
-    if let Some(meta) = lexer.meta.take() {
+    if let Some(meta) = editor.lexer.meta.take() {
         let max_lines = (meta.start_line + meta.to) - 1;
-        if max_lines >= content.len() {
+        if max_lines >= editor.content.len() {
             return;
         }
-        match (lexer.tokens_partial)(lexer, meta.into(), max_lines) {
-            Ok(request) => lexer.requests.push(request),
-            Err(error) => gs.send_error(error, lexer.lang.file_type),
+        match (editor.lexer.tokens_partial)(&mut editor.lexer, meta.into(), max_lines) {
+            Ok(request) => editor.lexer.requests.push(request),
+            Err(error) => gs.send_error(error, editor.lexer.lang.file_type),
         };
     }
 }
 
+/// ignores partial tokens
 pub fn context_awaiting_tokens(editor: &mut Editor, gs: &mut GlobalState) {
-    let lexer = &mut editor.lexer;
-    let client = &mut lexer.client;
-    let content = &mut editor.content;
-    let modal = &mut editor.modal;
-
-    if lexer.question_lsp && client.is_closed() {
+    if editor.lexer.question_lsp && editor.lexer.client.is_closed() {
         gs.error("LSP failure ...");
         gs.event.push(crate::global_state::IdiomEvent::CheckLSP(editor.file_type));
         return;
     }
 
     // diagnostics
-    let (editor_diagnostics, tree_diagnostics) = client.get_diagnostics(&lexer.uri);
+    let (editor_diagnostics, tree_diagnostics) = editor.lexer.client.get_diagnostics(&editor.lexer.uri);
     if let Some(diagnostics) = editor_diagnostics {
-        set_diganostics(content, diagnostics);
-        modal.cleanr_render_cache(); // force rebuild
+        set_diganostics(&mut editor.content, diagnostics);
+        editor.modal.cleanr_render_cache(); // force rebuild
     }
 
     if let Some(tree_diagnostics) = tree_diagnostics {
@@ -261,16 +198,26 @@ pub fn context_awaiting_tokens(editor: &mut Editor, gs: &mut GlobalState) {
     }
 
     // responses
-    let Some(mut responses) = client.get_responses() else {
+    handle_responses(editor, gs);
+}
+
+#[inline(always)]
+fn handle_responses(editor: &mut Editor, gs: &mut GlobalState) {
+    let Some(mut responses) = editor.lexer.client.get_responses() else {
         return;
     };
-    for id in std::mem::take(&mut lexer.requests) {
+
+    let modal = &mut editor.modal;
+    let content = &mut editor.content;
+
+    for id in std::mem::take(&mut editor.lexer.requests) {
         let Some(response) = responses.remove(&id) else {
-            lexer.requests.push(id);
+            editor.lexer.requests.push(id);
             continue;
         };
         match response {
             LSPResponse::Completion(completions, line, c) => {
+                editor.lexer.completable = completable;
                 if editor.cursor.line == c.line {
                     modal.auto_complete(completions, line, c, &gs.matcher);
                 }
@@ -282,24 +229,24 @@ pub fn context_awaiting_tokens(editor: &mut Editor, gs: &mut GlobalState) {
                 if save {
                     gs.event.push(crate::global_state::IdiomEvent::Save)
                 };
-                gs.event.push(WorkspaceEdit::new([(lexer.uri.clone(), edits)].into_iter().collect()).into());
+                gs.event.push(WorkspaceEdit::new([(editor.lexer.uri.clone(), edits)].into_iter().collect()).into());
             }
             LSPResponse::Tokens(tokens) => {
                 match tokens {
-                    SemanticTokensResult::Partial(data) => set_tokens(data.data, &lexer.legend, content),
+                    SemanticTokensResult::Partial(data) => set_tokens(data.data, &editor.lexer.legend, content),
                     SemanticTokensResult::Tokens(data) => {
-                        set_tokens(data.data, &lexer.legend, content);
+                        set_tokens(data.data, &editor.lexer.legend, content);
                         gs.success("LSP tokens mapped! Refresh UI to remove artifacts (default F5)");
                     }
                 };
-                lexer.context = context;
+                editor.lexer.context = context;
             }
             LSPResponse::TokensPartial { result, max_lines } => {
                 let tokens = match result {
                     SemanticTokensRangeResult::Partial(data) => data.data,
                     SemanticTokensRangeResult::Tokens(data) => data.data,
                 };
-                set_tokens_partial(tokens, max_lines, &lexer.legend, content);
+                set_tokens_partial(tokens, max_lines, &editor.lexer.legend, content);
             }
             LSPResponse::References(locations) => {
                 if let Some(mut locations) = locations {
@@ -317,6 +264,8 @@ pub fn context_awaiting_tokens(editor: &mut Editor, gs: &mut GlobalState) {
         }
     }
 }
+
+// HANDLERS
 
 pub fn sync_changes(lexer: &mut Lexer, change_events: Vec<TextDocumentContentChangeEvent>) -> LSPResult<()> {
     lexer.version += 1;
