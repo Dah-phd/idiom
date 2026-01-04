@@ -188,7 +188,10 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
                     LSPResponse::Renames(workspace_edit) => {
                         gs.event.push(workspace_edit.into());
                     }
-                    LSPResponse::Formatting(edits) => {
+                    LSPResponse::Formatting { edits, save } => {
+                        if save {
+                            gs.event.push(crate::global_state::IdiomEvent::Save);
+                        }
                         gs.event.push(WorkspaceEdit::new([(lexer.uri.clone(), edits)].into_iter().collect()).into());
                     }
                     LSPResponse::Tokens(tokens) => {
@@ -348,14 +351,14 @@ pub fn tokens_partial_dead(_: &mut Lexer, _: Range, _: usize) -> LSPResult<(i64,
     Ok((0, LSPResponseType::TokensPartial { max_lines: 0 }))
 }
 
-pub fn formatting(lexer: &mut Lexer, indent: usize, gs: &mut GlobalState) {
-    match lexer.client.formatting(lexer.uri.clone(), indent).map(|id| (id, LSPResponseType::Formatting)) {
+pub fn formatting(lexer: &mut Lexer, indent: usize, save: bool, gs: &mut GlobalState) {
+    match lexer.client.formatting(lexer.uri.clone(), indent, save).map(|id| (id, LSPResponseType::Formatting(save))) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }
 }
 
-pub fn formatting_dead(_: &mut Lexer, _: usize, _: &mut GlobalState) {}
+pub fn formatting_dead(_: &mut Lexer, _: usize, _: bool, _: &mut GlobalState) {}
 
 pub fn info_position_dead(_: &mut Lexer, _: CursorPosition, _: &mut GlobalState) {}
 

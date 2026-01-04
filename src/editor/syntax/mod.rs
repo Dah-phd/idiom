@@ -47,7 +47,7 @@ pub struct Lexer {
     declarations: fn(&mut Self, CursorPosition, &mut GlobalState),
     hover: fn(&mut Self, CursorPosition, &mut GlobalState),
     signatures: fn(&mut Self, CursorPosition, &mut GlobalState),
-    formatting: fn(&mut Self, usize, &mut GlobalState),
+    formatting: fn(&mut Self, usize, bool, &mut GlobalState),
     sync_tokens: fn(&mut Self, EditMetaData),
     sync_changes: fn(&mut Self, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
     sync: fn(&mut Self, &Action, &[EditorLine]) -> LSPResult<()>,
@@ -280,8 +280,8 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn formatting(&mut self, indent: usize, gs: &mut GlobalState) {
-        (self.formatting)(self, indent, gs);
+    pub fn formatting(&mut self, indent: usize, save: bool, gs: &mut GlobalState) {
+        (self.formatting)(self, indent, save, gs);
     }
 
     pub fn reload_theme(&mut self, gs: &mut GlobalState) {

@@ -164,14 +164,13 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
             editor.modal.start_renames(&editor.content, position);
         }
         EditorAction::RefreshUI => editor.lexer.refresh_lsp(gs),
-        EditorAction::Save => editor.save(gs),
         EditorAction::Cancel => {
             if editor.cursor.select_take().is_none() {
                 editor.actions.push_buffer(&mut editor.lexer);
                 return false;
             }
         }
-        EditorAction::Close => return false,
+        EditorAction::Close | EditorAction::Save => return false,
     }
     editor.actions.push_buffer(&mut editor.lexer);
     true
@@ -488,7 +487,6 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             }
         }
         EditorAction::RefreshUI => editor.lexer.refresh_lsp(gs),
-        EditorAction::Save => editor.save(gs),
         EditorAction::EndOfFile
         | EditorAction::StartOfFile
         | EditorAction::SelectAll
@@ -503,7 +501,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             ControlMap::single_cursor(editor);
             return true;
         }
-        EditorAction::Close => return false,
+        EditorAction::Close | EditorAction::Save => return false,
     }
     ControlMap::consolidate_cursors(editor);
     editor.actions.push_buffer(&mut editor.lexer);

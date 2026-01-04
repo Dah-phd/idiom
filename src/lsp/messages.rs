@@ -198,7 +198,7 @@ pub enum LSPResponseType {
     TokensPartial { max_lines: usize },
     Definition,
     Declaration,
-    Formatting,
+    Formatting(bool),
 }
 
 impl LSPResponseType {
@@ -234,7 +234,7 @@ impl LSPResponseType {
             }
             Self::Definition => LSPResponse::Definition(from_value(value)?),
             Self::Declaration => LSPResponse::Declaration(from_value(value)?),
-            Self::Formatting => LSPResponse::Formatting(from_value(value)?),
+            Self::Formatting(save) => LSPResponse::Formatting { edits: from_value(value)?, save: *save },
         })
     }
 }
@@ -249,7 +249,7 @@ pub enum LSPResponse {
     TokensPartial { result: SemanticTokensRangeResult, max_lines: usize },
     Definition(GotoDefinitionResponse),
     Declaration(GotoDeclarationResponse),
-    Formatting(Vec<TextEdit>),
+    Formatting { edits: Vec<TextEdit>, save: bool },
     Empty,
     Error(String),
 }
@@ -266,7 +266,7 @@ impl Display for LSPResponseType {
             LSPResponseType::Tokens => f.write_str("Tokens"),
             LSPResponseType::TokensPartial { .. } => f.write_str("TokensPartial"),
             LSPResponseType::References => f.write_str("References"),
-            LSPResponseType::Formatting => f.write_str("Formatting"),
+            LSPResponseType::Formatting(..) => f.write_str("Formatting"),
         }
     }
 }

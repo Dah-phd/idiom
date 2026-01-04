@@ -29,6 +29,7 @@ pub enum Payload {
         uri: Uri,
         id: i64,
         indent: usize,
+        save: bool,
     },
     /// Send serialized
     Direct(String),
@@ -81,9 +82,9 @@ impl Payload {
             Payload::SignatureHelp(uri, c, id) => LSPRequest::<SignatureHelpRequest>::signature_help(uri, c, id)
                 .stringify()
                 .map(|text| (text, Some((id, LSPResponseType::SignatureHelp)))),
-            Payload::Formatting { uri, id, indent } => LSPRequest::<Formatting>::formatting(uri, indent, id)
+            Payload::Formatting { uri, id, indent, save } => LSPRequest::<Formatting>::formatting(uri, indent, id)
                 .stringify()
-                .map(|text| (text, Some((id, LSPResponseType::Formatting)))),
+                .map(|text| (text, Some((id, LSPResponseType::Formatting(save))))),
         }
     }
 }

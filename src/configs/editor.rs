@@ -14,8 +14,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EditorConfigs {
-    #[serde(default, skip)]
-    pub format_on_save: bool,
     #[serde(default = "get_indent_spaces")]
     pub indent_spaces: usize,
     #[serde(default = "get_indent_after")]
@@ -26,6 +24,8 @@ pub struct EditorConfigs {
     pub shell: Option<String>,
     pub git_tui: Option<String>,
     /// GENERAL
+    #[serde(default, skip)]
+    pub format_on_save: bool,
     pub max_sessions: Option<usize>,
     /// LSP
     rust_lsp: Option<String>,

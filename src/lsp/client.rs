@@ -163,9 +163,9 @@ impl LSPClient {
         Ok(id)
     }
 
-    pub fn formatting(&mut self, uri: Uri, indent: usize) -> LSPResult<i64> {
+    pub fn formatting(&mut self, uri: Uri, indent: usize, save: bool) -> LSPResult<i64> {
         let id = self.id_gen.next_id();
-        self.channel.send(Payload::Formatting { uri, id, indent })?;
+        self.channel.send(Payload::Formatting { uri, id, indent, save })?;
         Ok(id)
     }
 
