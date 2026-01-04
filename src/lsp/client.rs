@@ -163,6 +163,12 @@ impl LSPClient {
         Ok(id)
     }
 
+    pub fn formatting(&mut self, uri: Uri, indent: usize) -> LSPResult<i64> {
+        let id = self.id_gen.next_id();
+        self.channel.send(Payload::Formatting { uri, id, indent })?;
+        Ok(id)
+    }
+
     pub fn request_signitures(&mut self, uri: Uri, c: CursorPosition) -> LSPResult<i64> {
         let id = self.id_gen.next_id();
         self.channel.send(Payload::SignatureHelp(uri, c, id))?;

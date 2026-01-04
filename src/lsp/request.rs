@@ -4,12 +4,12 @@ use crate::{cursor::CursorPosition, lsp::LSPResult};
 use lsp_types::{self as lsp, Uri};
 use lsp_types::{
     request::{
-        Completion, GotoDeclaration, GotoDeclarationParams, GotoDefinition, HoverRequest, Initialize, References,
-        Rename, SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
+        Completion, Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition, HoverRequest, Initialize,
+        References, Rename, SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
     },
-    CompletionParams, GotoDefinitionParams, HoverParams, Range, ReferenceContext, ReferenceParams, RenameParams,
-    SemanticTokensParams, SemanticTokensRangeParams, SignatureHelpParams, TextDocumentIdentifier,
-    TextDocumentPositionParams, WorkspaceFolder,
+    CompletionParams, DocumentFormattingParams, GotoDefinitionParams, HoverParams, Range, ReferenceContext,
+    ReferenceParams, RenameParams, SemanticTokensParams, SemanticTokensRangeParams, SignatureHelpParams,
+    TextDocumentIdentifier, TextDocumentPositionParams, WorkspaceFolder,
 };
 use serde::Serialize;
 use serde_json::to_string;
@@ -67,6 +67,24 @@ where
                     position: c.into(),
                 },
                 new_name,
+                work_done_progress_params: lsp::WorkDoneProgressParams::default(),
+            },
+        )
+    }
+
+    pub fn formatting(uri: Uri, indent: usize, id: i64) -> LSPRequest<Formatting> {
+        LSPRequest::with(
+            id,
+            DocumentFormattingParams {
+                text_document: TextDocumentIdentifier { uri },
+                options: lsp::FormattingOptions {
+                    tab_size: indent as u32,
+                    insert_spaces: true,
+                    trim_final_newlines: Some(false),
+                    trim_trailing_whitespace: Some(true),
+                    insert_final_newline: Some(true),
+                    properties: std::collections::HashMap::default(),
+                },
                 work_done_progress_params: lsp::WorkDoneProgressParams::default(),
             },
         )

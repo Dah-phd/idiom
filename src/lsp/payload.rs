@@ -5,8 +5,8 @@ use crate::{
 use lsp_types::{
     notification::DidChangeTextDocument,
     request::{
-        Completion, GotoDeclaration, GotoDefinition, HoverRequest, References, Rename, SemanticTokensFullRequest,
-        SemanticTokensRangeRequest, SignatureHelpRequest,
+        Completion, Formatting, GotoDeclaration, GotoDefinition, HoverRequest, References, Rename,
+        SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
     },
     Range, TextDocumentContentChangeEvent, Uri,
 };
@@ -25,6 +25,11 @@ pub enum Payload {
     Declaration(Uri, CursorPosition, i64),
     Hover(Uri, CursorPosition, i64),
     SignatureHelp(Uri, CursorPosition, i64),
+    Formatting {
+        uri: Uri,
+        id: i64,
+        indent: usize,
+    },
     /// Send serialized
     Direct(String),
 }
@@ -76,6 +81,9 @@ impl Payload {
             Payload::SignatureHelp(uri, c, id) => LSPRequest::<SignatureHelpRequest>::signature_help(uri, c, id)
                 .stringify()
                 .map(|text| (text, Some((id, LSPResponseType::SignatureHelp)))),
+            Payload::Formatting { uri, id, indent } => LSPRequest::<Formatting>::formatting(uri, indent, id)
+                .stringify()
+                .map(|text| (text, Some((id, LSPResponseType::Formatting)))),
         }
     }
 }

@@ -2,7 +2,8 @@ use lsp_types::{
     notification::{Notification, PublishDiagnostics},
     request::GotoDeclarationResponse,
     CompletionItem, CompletionResponse, DiagnosticSeverity, GotoDefinitionResponse, Hover, Location,
-    PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, Uri, WorkspaceEdit,
+    PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, TextEdit, Uri,
+    WorkspaceEdit,
 };
 use serde_json::{from_value, Result as SerdeResult, Value};
 use std::{
@@ -197,6 +198,7 @@ pub enum LSPResponseType {
     TokensPartial { max_lines: usize },
     Definition,
     Declaration,
+    Formatting,
 }
 
 impl LSPResponseType {
@@ -232,6 +234,7 @@ impl LSPResponseType {
             }
             Self::Definition => LSPResponse::Definition(from_value(value)?),
             Self::Declaration => LSPResponse::Declaration(from_value(value)?),
+            Self::Formatting => LSPResponse::Formatting(from_value(value)?),
         })
     }
 }
@@ -246,6 +249,7 @@ pub enum LSPResponse {
     TokensPartial { result: SemanticTokensRangeResult, max_lines: usize },
     Definition(GotoDefinitionResponse),
     Declaration(GotoDeclarationResponse),
+    Formatting(Vec<TextEdit>),
     Empty,
     Error(String),
 }
@@ -262,6 +266,7 @@ impl Display for LSPResponseType {
             LSPResponseType::Tokens => f.write_str("Tokens"),
             LSPResponseType::TokensPartial { .. } => f.write_str("TokensPartial"),
             LSPResponseType::References => f.write_str("References"),
+            LSPResponseType::Formatting => f.write_str("Formatting"),
         }
     }
 }

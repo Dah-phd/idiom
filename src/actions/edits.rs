@@ -2,7 +2,7 @@ use super::utils::{clip_content, insert_clip, insert_lines_indented, is_scope, r
 use super::EditMetaData;
 use idiom_tui::UTFSafe;
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
-use std::fmt::Debug;
+use std::{cmp::Ordering, fmt::Debug};
 
 use crate::{
     configs::IndentConfigs,
@@ -150,6 +150,33 @@ impl Edit {
         let start_line = from.line;
         let meta = EditMetaData { start_line, from: (to.line - from.line) + 1, to: (end.line - from.line) + 1 };
         Self { cursor: from, meta, reverse: reverse_text_edit, text: clip, select: Some((from, to)), new_select: None }
+    }
+
+    /// ensures select exists
+    #[inline]
+    pub fn replace_select_checked(
+        from: CursorPosition,
+        to: CursorPosition,
+        clip: String,
+        content: &mut Vec<EditorLine>,
+    ) -> Option<Self> {
+        match to.line.cmp(&content.len()) {
+            Ordering::Less => (),
+            Ordering::Equal if to.char == 0 => content.push("".into()),
+            _ => return None,
+        };
+        let reverse_text_edit = clip_content(from, to, content);
+        let end = if !clip.is_empty() { insert_clip(&clip, content, from) } else { from };
+        let start_line = from.line;
+        let meta = EditMetaData { start_line, from: (to.line - from.line) + 1, to: (end.line - from.line) + 1 };
+        Some(Self {
+            cursor: from,
+            meta,
+            reverse: reverse_text_edit,
+            text: clip,
+            select: Some((from, to)),
+            new_select: None,
+        })
     }
 
     #[inline]

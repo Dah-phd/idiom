@@ -18,8 +18,9 @@ pub use encoding::Encoding;
 pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
-    as_url, completable_dead, context_local, get_autocomplete_dead, info_position_dead, map_lsp, remove_lsp,
-    sync_changes_dead, sync_edits_dead, sync_edits_dead_rev, sync_tokens_dead, tokens_dead, tokens_partial_dead,
+    as_url, completable_dead, context_local, formatting_dead, get_autocomplete_dead, info_position_dead, map_lsp,
+    remove_lsp, sync_changes_dead, sync_edits_dead, sync_edits_dead_rev, sync_tokens_dead, tokens_dead,
+    tokens_partial_dead,
 };
 use lsp_types::{PublishDiagnosticsParams, Range, TextDocumentContentChangeEvent, Uri};
 use std::path::{Path, PathBuf};
@@ -37,7 +38,7 @@ pub struct Lexer {
     requests: Vec<(i64, LSPResponseType)>,
     client: LSPClient,
     context: fn(&mut Editor, &mut GlobalState),
-    completable_: fn(&Self, char_idx: usize, line: &EditorLine) -> bool,
+    completable: fn(&Self, char_idx: usize, line: &EditorLine) -> bool,
     autocomplete: fn(&mut Self, CursorPosition, String, &mut GlobalState),
     tokens: fn(&mut Self) -> LSPResult<(i64, LSPResponseType)>,
     tokens_partial: fn(&mut Self, Range, usize) -> LSPResult<(i64, LSPResponseType)>,
@@ -46,6 +47,7 @@ pub struct Lexer {
     declarations: fn(&mut Self, CursorPosition, &mut GlobalState),
     hover: fn(&mut Self, CursorPosition, &mut GlobalState),
     signatures: fn(&mut Self, CursorPosition, &mut GlobalState),
+    formatting: fn(&mut Self, usize, &mut GlobalState),
     sync_tokens: fn(&mut Self, EditMetaData),
     sync_changes: fn(&mut Self, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
     sync: fn(&mut Self, &Action, &[EditorLine]) -> LSPResult<()>,
@@ -68,7 +70,7 @@ impl Lexer {
             lsp: false,
             client: LSPClient::placeholder(),
             context: context_local,
-            completable_: completable_dead,
+            completable: completable_dead,
             autocomplete: get_autocomplete_dead,
             tokens: tokens_dead,
             tokens_partial: tokens_partial_dead,
@@ -77,6 +79,7 @@ impl Lexer {
             declarations: info_position_dead,
             hover: info_position_dead,
             signatures: info_position_dead,
+            formatting: formatting_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
@@ -99,7 +102,7 @@ impl Lexer {
             lsp: false,
             client: LSPClient::placeholder(),
             context: context_local,
-            completable_: completable_dead,
+            completable: completable_dead,
             autocomplete: get_autocomplete_dead,
             tokens: tokens_dead,
             tokens_partial: tokens_partial_dead,
@@ -108,6 +111,7 @@ impl Lexer {
             declarations: info_position_dead,
             hover: info_position_dead,
             signatures: info_position_dead,
+            formatting: formatting_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
@@ -130,7 +134,7 @@ impl Lexer {
             lsp: false,
             client: LSPClient::placeholder(),
             context: context_local,
-            completable_: completable_dead,
+            completable: completable_dead,
             autocomplete: get_autocomplete_dead,
             tokens: tokens_dead,
             tokens_partial: tokens_partial_dead,
@@ -139,6 +143,7 @@ impl Lexer {
             declarations: info_position_dead,
             hover: info_position_dead,
             signatures: info_position_dead,
+            formatting: formatting_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
@@ -239,7 +244,7 @@ impl Lexer {
 
     #[inline]
     pub fn should_autocomplete(&self, char_idx: usize, line: &EditorLine) -> bool {
-        (self.completable_)(self, char_idx, line)
+        (self.completable)(self, char_idx, line)
     }
 
     #[inline]
@@ -272,6 +277,11 @@ impl Lexer {
     #[inline]
     pub fn go_to_reference(&mut self, c: CursorPosition, gs: &mut GlobalState) {
         (self.references)(self, c, gs);
+    }
+
+    #[inline]
+    pub fn formatting(&mut self, indent: usize, gs: &mut GlobalState) {
+        (self.formatting)(self, indent, gs);
     }
 
     pub fn reload_theme(&mut self, gs: &mut GlobalState) {

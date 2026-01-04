@@ -13,8 +13,8 @@ use crate::{
 };
 use core::str::FromStr;
 use lsp_types::{
-    Range, SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
-    TextDocumentContentChangeEvent, Uri,
+    OneOf, Range, SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
+    TextDocumentContentChangeEvent, Uri, WorkspaceEdit,
 };
 use std::path::Path;
 
@@ -32,7 +32,7 @@ pub fn map_lsp(lexer: &mut Lexer, client: LSPClient, theme: &Theme) {
 
     if let Some(provider) = client.capabilities.completion_provider.as_ref() {
         lexer.autocomplete = get_autocomplete;
-        lexer.completable_ = completable;
+        lexer.completable = completable;
         if let Some(chars) = provider.trigger_characters.as_ref() {
             if !chars.is_empty() {
                 lexer.lang.compl_trigger_chars.clear();
@@ -115,6 +115,13 @@ pub fn map_lsp(lexer: &mut Lexer, client: LSPClient, theme: &Theme) {
         }
     }
 
+    if let Some(formatter) = client.capabilities.document_formatting_provider.as_ref() {
+        match formatter {
+            OneOf::Left(true) | OneOf::Right(..) => lexer.formatting = formatting,
+            _ => lexer.formatting = formatting_dead,
+        }
+    }
+
     lexer.client = client;
 }
 
@@ -122,7 +129,7 @@ pub fn remove_lsp(lexer: &mut Lexer) {
     lexer.lsp = false;
     lexer.client = LSPClient::placeholder();
     lexer.context = context_local;
-    lexer.completable_ = completable_dead;
+    lexer.completable = completable_dead;
     lexer.autocomplete = get_autocomplete_dead;
     lexer.tokens = tokens_dead;
     lexer.tokens_partial = tokens_partial_dead;
@@ -180,6 +187,9 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
                     }
                     LSPResponse::Renames(workspace_edit) => {
                         gs.event.push(workspace_edit.into());
+                    }
+                    LSPResponse::Formatting(edits) => {
+                        gs.event.push(WorkspaceEdit::new([(lexer.uri.clone(), edits)].into_iter().collect()).into());
                     }
                     LSPResponse::Tokens(tokens) => {
                         match tokens {
@@ -337,6 +347,15 @@ pub fn tokens_partial_redirect(lexer: &mut Lexer, _: Range, _: usize) -> LSPResu
 pub fn tokens_partial_dead(_: &mut Lexer, _: Range, _: usize) -> LSPResult<(i64, LSPResponseType)> {
     Ok((0, LSPResponseType::TokensPartial { max_lines: 0 }))
 }
+
+pub fn formatting(lexer: &mut Lexer, indent: usize, gs: &mut GlobalState) {
+    match lexer.client.formatting(lexer.uri.clone(), indent).map(|id| (id, LSPResponseType::Formatting)) {
+        Ok(request) => lexer.requests.push(request),
+        Err(err) => gs.send_error(err, lexer.lang.file_type),
+    }
+}
+
+pub fn formatting_dead(_: &mut Lexer, _: usize, _: &mut GlobalState) {}
 
 pub fn info_position_dead(_: &mut Lexer, _: CursorPosition, _: &mut GlobalState) {}
 
