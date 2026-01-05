@@ -55,6 +55,8 @@ impl TrackedParser {
         true
     }
 
+    /// Get full content of the pty
+    /// that will drain the inner lock and collect all data
     #[must_use]
     pub fn full_content(&mut self) -> String {
         let mut lock = match self.buffers.lock() {

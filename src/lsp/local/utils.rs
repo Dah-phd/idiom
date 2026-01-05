@@ -64,9 +64,7 @@ pub fn remove_content(from: CursorPosition, to: CursorPosition, content: &mut Ve
 pub fn insert_clip(clip: &str, content: &mut Vec<String>, mut cursor: CursorPosition) {
     let mut lines = clip.split('\n').collect::<Vec<_>>();
     if lines.len() == 1 {
-        let text = lines[0];
         content[cursor.line].insert_str_at_char(cursor.char, lines[0]);
-        cursor.char += text.char_len();
         return;
     };
 

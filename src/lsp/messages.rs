@@ -2,7 +2,8 @@ use lsp_types::{
     notification::{Notification, PublishDiagnostics},
     request::GotoDeclarationResponse,
     CompletionItem, CompletionResponse, DiagnosticSeverity, GotoDefinitionResponse, Hover, Location,
-    PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, Uri, WorkspaceEdit,
+    PublishDiagnosticsParams, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, TextEdit, Uri,
+    WorkspaceEdit,
 };
 use serde_json::{from_value, Result as SerdeResult, Value};
 use std::{
@@ -12,7 +13,6 @@ use std::{
 };
 
 use crate::{
-    cursor::CursorPosition,
     editor::syntax::{tokens::validate_and_format_delta_tokens, DiagnosticLine},
     lsp::{LSPError, LSPResult},
 };
@@ -188,7 +188,7 @@ impl Diagnostic {
 
 #[derive(Debug)]
 pub enum LSPResponseType {
-    Completion(String, CursorPosition),
+    Completion(usize),
     Hover,
     SignatureHelp,
     References,
@@ -197,6 +197,7 @@ pub enum LSPResponseType {
     TokensPartial { max_lines: usize },
     Definition,
     Declaration,
+    Formatting(bool),
 }
 
 impl LSPResponseType {
@@ -206,9 +207,9 @@ impl LSPResponseType {
         }
 
         Ok(match self {
-            Self::Completion(.., line, cursor) => match from_value::<CompletionResponse>(value)? {
-                CompletionResponse::Array(arr) => LSPResponse::Completion(arr, line.to_owned(), *cursor),
-                CompletionResponse::List(ls) => LSPResponse::Completion(ls.items, line.to_owned(), *cursor),
+            Self::Completion(.., line_idx) => match from_value::<CompletionResponse>(value)? {
+                CompletionResponse::Array(arr) => LSPResponse::Completion(arr, *line_idx),
+                CompletionResponse::List(ls) => LSPResponse::Completion(ls.items, *line_idx),
             },
             Self::Hover => LSPResponse::Hover(from_value(value)?),
             Self::SignatureHelp => LSPResponse::SignatureHelp(from_value(value)?),
@@ -232,12 +233,13 @@ impl LSPResponseType {
             }
             Self::Definition => LSPResponse::Definition(from_value(value)?),
             Self::Declaration => LSPResponse::Declaration(from_value(value)?),
+            Self::Formatting(save) => LSPResponse::Formatting { edits: from_value(value)?, save: *save },
         })
     }
 }
 
 pub enum LSPResponse {
-    Completion(Vec<CompletionItem>, String, CursorPosition),
+    Completion(Vec<CompletionItem>, usize),
     Hover(Hover),
     SignatureHelp(SignatureHelp),
     References(Option<Vec<Location>>),
@@ -246,6 +248,7 @@ pub enum LSPResponse {
     TokensPartial { result: SemanticTokensRangeResult, max_lines: usize },
     Definition(GotoDefinitionResponse),
     Declaration(GotoDeclarationResponse),
+    Formatting { edits: Vec<TextEdit>, save: bool },
     Empty,
     Error(String),
 }
@@ -262,6 +265,7 @@ impl Display for LSPResponseType {
             LSPResponseType::Tokens => f.write_str("Tokens"),
             LSPResponseType::TokensPartial { .. } => f.write_str("TokensPartial"),
             LSPResponseType::References => f.write_str("References"),
+            LSPResponseType::Formatting(..) => f.write_str("Formatting"),
         }
     }
 }

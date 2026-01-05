@@ -538,6 +538,12 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
     };
     if !editor.map(action, gs) {
         match action {
+            EditorAction::Save => {
+                editor.save(gs);
+                if ws.base_configs.format_on_save {
+                    editor.call_formatter_and_save(gs);
+                }
+            }
             EditorAction::Close => ws.close_active(gs),
             EditorAction::Cancel if ws.editors.len() > 1 => ws.toggle_tabs(),
             _ => return false,

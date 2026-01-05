@@ -67,11 +67,11 @@ impl LSP {
             loop {
                 match json_rpc.next().await? {
                     LSPMessage::Response(inner) => {
-                        let Some(request) = sent_handler.lock().unwrap().remove(&inner.id) else {
+                        let Some(resp_type) = sent_handler.lock().unwrap().remove(&inner.id) else {
                             continue;
                         };
                         if let Some(response) = inner.result {
-                            let response = match request.parse(response) {
+                            let response = match resp_type.parse(response) {
                                 Ok(response) => response,
                                 Err(error) => LSPResponse::Error(format!("LSP PARSE: {error}")),
                             };

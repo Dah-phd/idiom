@@ -102,9 +102,9 @@ impl<T: LangStream> LocalLSP<T> {
                 self.text = full_text.split('\n').map(ToOwned::to_owned).collect();
                 T::parse(self.text.iter().map(|t| t.as_str()), &mut self.tokens, PositionedToken::<T>::utf32);
             }
-            Payload::Completion(_, cursor, id, line) => {
+            Payload::Completion(_, cursor, id) => {
                 let items = self.definitions.to_completions(&self.tokens);
-                self.responses.lock().unwrap().insert(id, LSPResponse::Completion(items, line, cursor));
+                self.responses.lock().unwrap().insert(id, LSPResponse::Completion(items, cursor.line));
             }
             _ => {}
         };

@@ -149,6 +149,7 @@ impl Pallet {
             git_tui.map(|git_tui| Command::pass_event("Open Git TUI", IdiomEvent::EmbededApp(Some(git_tui)))),
             Some(Command::pass_event("Open terminal", IdiomEvent::EmbededApp(None))),
             Some(Command::components("Select LSP", change_state::select_lsp)),
+            Some(Command::components("Format Document", formatting::call_formatting)),
             Some(Command::components("UPPERCASE", formatting::uppercase)),
             Some(Command::components("lowercase", formatting::lowercase)),
             Command::cfg_open("Open editor configs", EDITOR_CFG_FILE),
@@ -182,10 +183,7 @@ impl Pallet {
 
     fn sort_commands_by_pattern(&mut self, gs: &GlobalState) {
         for (score, cmd) in self.commands.iter_mut() {
-            *score = match gs.matcher.fuzzy_match(cmd.label, self.pattern.as_str()) {
-                Some(new_score) => new_score,
-                None => i64::MAX,
-            };
+            *score = gs.matcher.fuzzy_match(cmd.label, self.pattern.as_str()).unwrap_or(i64::MAX);
         }
         self.state.select(0, self.commands.len());
         self.commands.sort_by(|(score, _), (rhscore, _)| score.cmp(rhscore));

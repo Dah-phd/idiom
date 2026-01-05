@@ -25,3 +25,8 @@ pub fn lowercase(_gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tree, _t
         actions.replace_select(from, to, clip, cursor, content, lexer);
     });
 }
+
+pub fn call_formatting(gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tree, _term: &mut EditorTerminal) {
+    let Some(editor) = ws.get_active() else { return };
+    editor.call_formatter(gs);
+}

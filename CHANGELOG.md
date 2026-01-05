@@ -1,4 +1,9 @@
 ## Includes only major changes (manual updates)
+# Version 0.7.1
+- added formatting to pallet
+- added formatting on save
+- cleanup lsp handles
+
 # Version 0.7.0
 - added IdiomCommand
 - added MarkWord

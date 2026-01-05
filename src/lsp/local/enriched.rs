@@ -281,8 +281,8 @@ impl<T: LangStream> EnrichedLSP<T> {
         let mut local_lsp = Self::from_encoding(responses, encoding);
         local_lsp.definitions = T::init_definitions();
         while let Some(payload) = rx.recv().await {
-            if let Payload::Completion(uri, cursor, id, line) = payload {
-                local_lsp.autocomplete(uri, cursor, id, line);
+            if let Payload::Completion(uri, cursor, id) = payload {
+                local_lsp.autocomplete(uri, cursor, id);
             } else if let Some((msg, request)) = local_lsp.pre_process(payload)? {
                 lsp_stdin.write_all(msg.as_bytes()).await?;
                 lsp_stdin.flush().await?;
@@ -337,8 +337,8 @@ impl<T: LangStream> EnrichedLSP<T> {
         let mut local_lsp = Self::from_encoding(responses, encoding);
         local_lsp.definitions = T::init_definitions();
         while let Some(payload) = rx.recv().await {
-            if let Payload::Completion(uri, cursor, id, line) = payload {
-                local_lsp.autocomplete(uri, cursor, id, line);
+            if let Payload::Completion(uri, cursor, id) = payload {
+                local_lsp.autocomplete(uri, cursor, id);
             } else if let Payload::Sync(uri, version, change_events) = payload {
                 let doc = local_lsp
                     .documents
@@ -403,12 +403,12 @@ impl<T: LangStream> EnrichedLSP<T> {
         }
     }
 
-    fn autocomplete(&mut self, uri: Uri, cursor: CursorPosition, id: i64, line: String) {
+    fn autocomplete(&mut self, uri: Uri, cursor: CursorPosition, id: i64) {
         let completion_response = match self.documents.get(&uri) {
             Some(doc) => self.definitions.to_completions(&doc.tokens),
             None => vec![],
         };
-        self.responses.lock().unwrap().insert(id, LSPResponse::Completion(completion_response, line, cursor));
+        self.responses.lock().unwrap().insert(id, LSPResponse::Completion(completion_response, cursor.line));
     }
 
     fn direct_parsing(&mut self, data: &str) -> Result<(), LSPError> {

@@ -25,9 +25,8 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
             editor.actions.push_char(ch, &mut editor.cursor, &mut editor.content, &mut editor.lexer);
             let line = &editor.content[editor.cursor.line];
             if !editor.modal.is_autocomplete() && editor.lexer.should_autocomplete(editor.cursor.char, line) {
-                let line = line.to_string();
                 editor.actions.push_buffer(&mut editor.lexer);
-                editor.lexer.get_autocomplete(editor.cursor.get_position(), line, gs);
+                editor.lexer.get_autocomplete(editor.cursor.get_position(), gs);
             }
             return true;
         }
@@ -164,14 +163,13 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
             editor.modal.start_renames(&editor.content, position);
         }
         EditorAction::RefreshUI => editor.lexer.refresh_lsp(gs),
-        EditorAction::Save => editor.save(gs),
         EditorAction::Cancel => {
             if editor.cursor.select_take().is_none() {
                 editor.actions.push_buffer(&mut editor.lexer);
                 return false;
             }
         }
-        EditorAction::Close => return false,
+        EditorAction::Close | EditorAction::Save => return false,
     }
     editor.actions.push_buffer(&mut editor.lexer);
     true
@@ -195,13 +193,13 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 if cursor.max_rows != 0 {
                     let line = &content[cursor.line];
                     if !modal_is_autocomplete && lexer.should_autocomplete(cursor.char, line) {
-                        auto_complete = Some((cursor.get_position(), line.to_string()));
+                        auto_complete = Some(cursor.get_position());
                     }
                 }
             });
-            if let Some((position, line)) = auto_complete {
+            if let Some(position) = auto_complete {
                 editor.cursor.set_position(position);
-                editor.lexer.get_autocomplete(position, line, gs);
+                editor.lexer.get_autocomplete(position, gs);
             }
         }
         EditorAction::Backspace => apply_multi_cursor_transaction(editor, |actions, lexer, content, cursor| {
@@ -488,7 +486,6 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             }
         }
         EditorAction::RefreshUI => editor.lexer.refresh_lsp(gs),
-        EditorAction::Save => editor.save(gs),
         EditorAction::EndOfFile
         | EditorAction::StartOfFile
         | EditorAction::SelectAll
@@ -503,7 +500,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
             ControlMap::single_cursor(editor);
             return true;
         }
-        EditorAction::Close => return false,
+        EditorAction::Close | EditorAction::Save => return false,
     }
     ControlMap::consolidate_cursors(editor);
     editor.actions.push_buffer(&mut editor.lexer);

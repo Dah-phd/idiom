@@ -521,14 +521,14 @@ impl Actions {
         cursor.select_take();
         let actions: Vec<Edit> = edits
             .into_iter()
-            .map(|e| {
+            .flat_map(|e| {
                 let from = CursorPosition::from(e.range.start);
                 let to = CursorPosition::from(e.range.end);
-                let edit = Edit::replace_select(from, to, e.new_text, content);
+                let edit = Edit::replace_select_checked(from, to, e.new_text, content)?;
                 if from.line <= cursor.line && cursor.line <= to.line {
                     cursor.set_position(edit.end_position());
                 }
-                edit
+                Some(edit)
             })
             .collect();
         self.push_done(actions, lexer, content);

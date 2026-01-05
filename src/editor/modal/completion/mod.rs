@@ -16,9 +16,9 @@ pub struct AutoComplete {
 }
 
 impl AutoComplete {
-    pub fn new(completions: Vec<CompletionItem>, line: String, c: CursorPosition, matcher: &SkimMatcherV2) -> Self {
+    pub fn new(completions: Vec<CompletionItem>, line: &str, pos: CursorPosition, matcher: &SkimMatcherV2) -> Self {
         let mut filter = String::new();
-        for ch in line.chars().take(c.char) {
+        for ch in line.chars().take(pos.char) {
             if ch.is_alphabetic() || ch == '_' {
                 filter.push(ch);
             } else {

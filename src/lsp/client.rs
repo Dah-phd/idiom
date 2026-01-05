@@ -151,15 +151,21 @@ impl LSPClient {
     }
 
     #[inline]
-    pub fn request_completions(&mut self, uri: Uri, c: CursorPosition, line: String) -> LSPResult<i64> {
+    pub fn request_completions(&mut self, uri: Uri, c: CursorPosition) -> LSPResult<i64> {
         let id = self.id_gen.next_id();
-        self.channel.send(Payload::Completion(uri, c, id, line))?;
+        self.channel.send(Payload::Completion(uri, c, id))?;
         Ok(id)
     }
 
     pub fn request_rename(&mut self, uri: Uri, c: CursorPosition, new_name: String) -> LSPResult<i64> {
         let id = self.id_gen.next_id();
         self.channel.send(Payload::Rename(uri, c, new_name, id))?;
+        Ok(id)
+    }
+
+    pub fn formatting(&mut self, uri: Uri, indent: usize, save: bool) -> LSPResult<i64> {
+        let id = self.id_gen.next_id();
+        self.channel.send(Payload::Formatting { uri, id, indent, save })?;
         Ok(id)
     }
 

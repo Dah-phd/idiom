@@ -245,6 +245,14 @@ impl Editor {
         self.lexer.update_path(&self.path)
     }
 
+    pub fn call_formatter(&mut self, gs: &mut GlobalState) {
+        self.lexer.formatting(self.actions.cfg.indent.len(), false, gs);
+    }
+
+    pub fn call_formatter_and_save(&mut self, gs: &mut GlobalState) {
+        self.lexer.formatting(self.actions.cfg.indent.len(), true, gs);
+    }
+
     pub fn lsp_set(&mut self, client: LSPClient, gs: &mut GlobalState) {
         self.lexer.set_lsp_client(client, self.stringify(), gs);
     }

@@ -5,8 +5,8 @@ use crate::{
 use lsp_types::{
     notification::DidChangeTextDocument,
     request::{
-        Completion, GotoDeclaration, GotoDefinition, HoverRequest, References, Rename, SemanticTokensFullRequest,
-        SemanticTokensRangeRequest, SignatureHelpRequest,
+        Completion, Formatting, GotoDeclaration, GotoDefinition, HoverRequest, References, Rename,
+        SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
     },
     Range, TextDocumentContentChangeEvent, Uri,
 };
@@ -18,13 +18,19 @@ pub enum Payload {
     /// Requests
     Tokens(Uri, i64),
     PartialTokens(Uri, Range, i64, usize),
-    Completion(Uri, CursorPosition, i64, String),
+    Completion(Uri, CursorPosition, i64),
     Rename(Uri, CursorPosition, String, i64),
     References(Uri, CursorPosition, i64),
     Definition(Uri, CursorPosition, i64),
     Declaration(Uri, CursorPosition, i64),
     Hover(Uri, CursorPosition, i64),
     SignatureHelp(Uri, CursorPosition, i64),
+    Formatting {
+        uri: Uri,
+        id: i64,
+        indent: usize,
+        save: bool,
+    },
     /// Send serialized
     Direct(String),
 }
@@ -56,9 +62,9 @@ impl Payload {
             Payload::Declaration(uri, c, id) => LSPRequest::<GotoDeclaration>::declaration(uri, c, id)
                 .stringify()
                 .map(|text| (text, Some((id, LSPResponseType::Declaration)))),
-            Payload::Completion(uri, c, id, line) => LSPRequest::<Completion>::completion(uri, c, id)
+            Payload::Completion(uri, c, id) => LSPRequest::<Completion>::completion(uri, c, id)
                 .stringify()
-                .map(|text| (text, Some((id, LSPResponseType::Completion(line, c))))),
+                .map(|text| (text, Some((id, LSPResponseType::Completion(c.line))))),
             Payload::Tokens(uri, id) => LSPRequest::<SemanticTokensFullRequest>::semantics_full(uri, id)
                 .stringify()
                 .map(|text| (text, Some((id, LSPResponseType::Tokens)))),
@@ -76,6 +82,9 @@ impl Payload {
             Payload::SignatureHelp(uri, c, id) => LSPRequest::<SignatureHelpRequest>::signature_help(uri, c, id)
                 .stringify()
                 .map(|text| (text, Some((id, LSPResponseType::SignatureHelp)))),
+            Payload::Formatting { uri, id, indent, save } => LSPRequest::<Formatting>::formatting(uri, indent, id)
+                .stringify()
+                .map(|text| (text, Some((id, LSPResponseType::Formatting(save))))),
         }
     }
 }
