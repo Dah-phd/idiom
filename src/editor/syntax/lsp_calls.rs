@@ -193,10 +193,10 @@ fn handle_responses(editor: &mut Editor, gs: &mut GlobalState) {
             continue;
         };
         match response {
-            LSPResponse::Completion(completions, line, c) => {
-                editor.lexer.completable = completable;
-                if editor.cursor.line == c.line {
-                    modal.auto_complete(completions, line, c, &gs.matcher);
+            LSPResponse::Completion(completions, line_idx) => {
+                if editor.cursor.line == line_idx {
+                    let line = content[line_idx].as_str();
+                    modal.auto_complete(completions, line, editor.cursor.get_position(), &gs.matcher);
                 }
             }
             LSPResponse::Hover(hover) => modal.map_hover(hover, &gs.theme),
@@ -318,14 +318,14 @@ pub fn completable_disable(_: &Lexer, _: usize, _: &EditorLine) -> bool {
     false
 }
 
-pub fn get_autocomplete(lexer: &mut Lexer, c: CursorPosition, line: String, gs: &mut GlobalState) {
-    match lexer.client.request_completions(lexer.uri.clone(), c, line.to_owned()) {
+pub fn get_autocomplete(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalState) {
+    match lexer.client.request_completions(lexer.uri.clone(), c) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }
 }
 
-pub fn get_autocomplete_dead(_: &mut Lexer, _: CursorPosition, _: String, _: &mut GlobalState) {}
+pub fn get_autocomplete_dead(_: &mut Lexer, _: CursorPosition, _: &mut GlobalState) {}
 
 pub fn tokens(lexer: &mut Lexer) -> LSPResult<i64> {
     lexer.context = context_awaiting_tokens;

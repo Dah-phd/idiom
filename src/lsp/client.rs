@@ -151,9 +151,9 @@ impl LSPClient {
     }
 
     #[inline]
-    pub fn request_completions(&mut self, uri: Uri, c: CursorPosition, line: String) -> LSPResult<i64> {
+    pub fn request_completions(&mut self, uri: Uri, c: CursorPosition) -> LSPResult<i64> {
         let id = self.id_gen.next_id();
-        self.channel.send(Payload::Completion(uri, c, id, line))?;
+        self.channel.send(Payload::Completion(uri, c, id))?;
         Ok(id)
     }
 

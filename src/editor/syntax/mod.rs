@@ -39,7 +39,7 @@ pub struct Lexer {
     client: LSPClient,
     context: fn(&mut Editor, &mut GlobalState),
     completable: fn(&Self, char_idx: usize, line: &EditorLine) -> bool,
-    autocomplete: fn(&mut Self, CursorPosition, String, &mut GlobalState),
+    autocomplete: fn(&mut Self, CursorPosition, &mut GlobalState),
     tokens: fn(&mut Self) -> LSPResult<i64>,
     tokens_partial: fn(&mut Self, Range, usize) -> LSPResult<i64>,
     references: fn(&mut Self, CursorPosition, &mut GlobalState),
@@ -251,8 +251,8 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn get_autocomplete(&mut self, c: CursorPosition, line: String, gs: &mut GlobalState) {
-        (self.autocomplete)(self, c, line, gs)
+    pub fn get_autocomplete(&mut self, c: CursorPosition, gs: &mut GlobalState) {
+        (self.autocomplete)(self, c, gs)
     }
 
     #[inline]

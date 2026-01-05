@@ -248,11 +248,11 @@ impl EditorModal {
     pub fn auto_complete(
         &mut self,
         completions: Vec<CompletionItem>,
-        line: String,
-        c: CursorPosition,
+        line: &str,
+        pos: CursorPosition,
         matcher: &SkimMatcherV2,
     ) {
-        self.inner = LSPModal::auto_complete(completions, line, c, matcher);
+        self.inner = LSPModal::auto_complete(completions, line, pos, matcher);
     }
 
     pub fn start_renames(&mut self, content: &[EditorLine], position: CursorPosition) {
@@ -309,11 +309,11 @@ impl LSPModal {
 
     pub fn auto_complete(
         completions: Vec<CompletionItem>,
-        line: String,
-        c: CursorPosition,
+        line: &str,
+        pos: CursorPosition,
         matcher: &SkimMatcherV2,
     ) -> Option<Self> {
-        let modal = AutoComplete::new(completions, line, c, matcher);
+        let modal = AutoComplete::new(completions, line, pos, matcher);
         if modal.len() != 0 {
             return Some(LSPModal::AutoComplete(modal));
         }

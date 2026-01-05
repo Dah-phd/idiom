@@ -18,7 +18,7 @@ pub enum Payload {
     /// Requests
     Tokens(Uri, i64),
     PartialTokens(Uri, Range, i64, usize),
-    Completion(Uri, CursorPosition, i64, String),
+    Completion(Uri, CursorPosition, i64),
     Rename(Uri, CursorPosition, String, i64),
     References(Uri, CursorPosition, i64),
     Definition(Uri, CursorPosition, i64),
@@ -62,9 +62,9 @@ impl Payload {
             Payload::Declaration(uri, c, id) => LSPRequest::<GotoDeclaration>::declaration(uri, c, id)
                 .stringify()
                 .map(|text| (text, Some((id, LSPResponseType::Declaration)))),
-            Payload::Completion(uri, c, id, line) => LSPRequest::<Completion>::completion(uri, c, id)
+            Payload::Completion(uri, c, id) => LSPRequest::<Completion>::completion(uri, c, id)
                 .stringify()
-                .map(|text| (text, Some((id, LSPResponseType::Completion(line, c))))),
+                .map(|text| (text, Some((id, LSPResponseType::Completion(c.line))))),
             Payload::Tokens(uri, id) => LSPRequest::<SemanticTokensFullRequest>::semantics_full(uri, id)
                 .stringify()
                 .map(|text| (text, Some((id, LSPResponseType::Tokens)))),

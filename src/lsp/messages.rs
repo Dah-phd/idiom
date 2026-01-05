@@ -13,7 +13,6 @@ use std::{
 };
 
 use crate::{
-    cursor::CursorPosition,
     editor::syntax::{tokens::validate_and_format_delta_tokens, DiagnosticLine},
     lsp::{LSPError, LSPResult},
 };
@@ -189,7 +188,7 @@ impl Diagnostic {
 
 #[derive(Debug)]
 pub enum LSPResponseType {
-    Completion(String, CursorPosition),
+    Completion(usize),
     Hover,
     SignatureHelp,
     References,
@@ -208,9 +207,9 @@ impl LSPResponseType {
         }
 
         Ok(match self {
-            Self::Completion(.., line, cursor) => match from_value::<CompletionResponse>(value)? {
-                CompletionResponse::Array(arr) => LSPResponse::Completion(arr, line.to_owned(), *cursor),
-                CompletionResponse::List(ls) => LSPResponse::Completion(ls.items, line.to_owned(), *cursor),
+            Self::Completion(.., line_idx) => match from_value::<CompletionResponse>(value)? {
+                CompletionResponse::Array(arr) => LSPResponse::Completion(arr, *line_idx),
+                CompletionResponse::List(ls) => LSPResponse::Completion(ls.items, *line_idx),
             },
             Self::Hover => LSPResponse::Hover(from_value(value)?),
             Self::SignatureHelp => LSPResponse::SignatureHelp(from_value(value)?),
@@ -240,7 +239,7 @@ impl LSPResponseType {
 }
 
 pub enum LSPResponse {
-    Completion(Vec<CompletionItem>, String, CursorPosition),
+    Completion(Vec<CompletionItem>, usize),
     Hover(Hover),
     SignatureHelp(SignatureHelp),
     References(Option<Vec<Location>>),
