@@ -3,7 +3,11 @@ use crate::{
     configs::Theme,
     cursor::CursorPosition,
     editor::{
-        syntax::{Encoding, Lexer},
+        syntax::{
+            set_diganostics,
+            tokens::{set_tokens, set_tokens_partial},
+            Encoding, Lexer,
+        },
         Editor,
     },
     editor_line::EditorLine,
@@ -17,11 +21,6 @@ use lsp_types::{
     TextDocumentContentChangeEvent, Uri, WorkspaceEdit,
 };
 use std::path::Path;
-
-use crate::editor::syntax::{
-    set_diganostics,
-    tokens::{set_tokens, set_tokens_partial},
-};
 
 /// maps LSP state without runtime checks
 #[inline]
@@ -152,18 +151,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
         return;
     }
 
-    // diagnostics
-    let (editor_diagnostics, tree_diagnostics) = editor.lexer.client.get_diagnostics(&editor.lexer.uri);
-    if let Some(diagnostics) = editor_diagnostics {
-        set_diganostics(&mut editor.content, diagnostics);
-        editor.modal.cleanr_render_cache(); // force rebuild
-    }
-
-    if let Some(tree_diagnostics) = tree_diagnostics {
-        gs.event.push(IdiomEvent::TreeDiagnostics(tree_diagnostics));
-    }
-
-    // responses
+    handle_diagnosticts(editor, gs);
     handle_responses(editor, gs);
 
     if let Some(meta) = editor.lexer.meta.take() {
@@ -186,18 +174,7 @@ pub fn context_awaiting_tokens(editor: &mut Editor, gs: &mut GlobalState) {
         return;
     }
 
-    // diagnostics
-    let (editor_diagnostics, tree_diagnostics) = editor.lexer.client.get_diagnostics(&editor.lexer.uri);
-    if let Some(diagnostics) = editor_diagnostics {
-        set_diganostics(&mut editor.content, diagnostics);
-        editor.modal.cleanr_render_cache(); // force rebuild
-    }
-
-    if let Some(tree_diagnostics) = tree_diagnostics {
-        gs.event.push(IdiomEvent::TreeDiagnostics(tree_diagnostics));
-    }
-
-    // responses
+    handle_diagnosticts(editor, gs);
     handle_responses(editor, gs);
 }
 
@@ -262,6 +239,19 @@ fn handle_responses(editor: &mut Editor, gs: &mut GlobalState) {
             LSPResponse::Error(text) => gs.error(text),
             LSPResponse::Empty => (),
         }
+    }
+}
+
+#[inline(always)]
+fn handle_diagnosticts(editor: &mut Editor, gs: &mut GlobalState) {
+    let (editor_diagnostics, tree_diagnostics) = editor.lexer.client.get_diagnostics(&editor.lexer.uri);
+    if let Some(diagnostics) = editor_diagnostics {
+        set_diganostics(&mut editor.content, diagnostics);
+        editor.modal.cleanr_render_cache(); // force rebuild
+    }
+
+    if let Some(tree_diagnostics) = tree_diagnostics {
+        gs.event.push(IdiomEvent::TreeDiagnostics(tree_diagnostics));
     }
 }
 
