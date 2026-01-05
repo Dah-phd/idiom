@@ -320,10 +320,7 @@ pub fn completable_disable(_: &Lexer, _: usize, _: &EditorLine) -> bool {
 
 pub fn get_autocomplete(lexer: &mut Lexer, c: CursorPosition, line: String, gs: &mut GlobalState) {
     match lexer.client.request_completions(lexer.uri.clone(), c, line.to_owned()) {
-        Ok(request) => {
-            lexer.completable = completable_disable;
-            lexer.requests.push(request);
-        }
+        Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
     }
 }

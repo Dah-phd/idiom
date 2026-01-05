@@ -219,6 +219,7 @@ impl EditorModal {
         modal.mouse_moved(position).then_some(self.last_render.take()?)
     }
 
+    #[inline]
     pub fn is_autocomplete(&self) -> bool {
         matches!(self.inner, Some(LSPModal::AutoComplete(..)))
     }
