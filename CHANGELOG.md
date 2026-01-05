@@ -1,8 +1,12 @@
 ## Includes only major changes (manual updates)
+# Version 0.7.2
+- reduced completion calls
+
 # Version 0.7.1
 - added formatting to pallet
 - added formatting on save
 - cleanup lsp handles
+- fixed completion stuck
 
 # Version 0.7.0
 - added IdiomCommand
