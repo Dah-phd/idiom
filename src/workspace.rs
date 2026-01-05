@@ -552,6 +552,10 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
     true
 }
 
+fn map_post_save(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
+    todo!("")
+}
+
 /// Handles keybinding while on tabs
 fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
     if let Some(action) = ws.key_map.map(key) {

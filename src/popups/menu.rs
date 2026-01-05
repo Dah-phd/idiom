@@ -13,7 +13,7 @@ enum Action {
 }
 
 pub fn menu_context_editor_inplace(position: Position, screen: Rect, accent_style: ContentStyle) -> ContextMenu<8> {
-    let modal_screen = screen.modal_relative(position.row, position.col, 30, 7);
+    let modal_screen = screen.modal_relative(position.row, position.col, 30, 8);
 
     ContextMenu {
         commands: [
