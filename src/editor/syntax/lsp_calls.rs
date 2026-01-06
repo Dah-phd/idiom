@@ -194,6 +194,7 @@ fn handle_responses(editor: &mut Editor, gs: &mut GlobalState) {
         };
         match response {
             LSPResponse::Completion(completions, line_idx) => {
+                editor.lexer.completion_cache = None;
                 if editor.cursor.line == line_idx {
                     let line = content[line_idx].as_str();
                     modal.auto_complete(completions, line, editor.cursor.get_position(), &gs.matcher);

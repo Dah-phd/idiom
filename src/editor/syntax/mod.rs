@@ -7,7 +7,7 @@ pub mod tokens;
 use crate::{
     actions::{Action, EditMetaData},
     configs::{FileType, Theme},
-    cursor::CursorPosition,
+    cursor::{Cursor, CursorPosition},
     editor::Editor,
     editor_line::EditorLine,
     global_state::{GlobalState, IdiomEvent},
@@ -36,6 +36,7 @@ pub struct Lexer {
     question_lsp: bool,
     version: i32,
     requests: Vec<i64>,
+    completion_cache: Option<CursorPosition>,
     client: LSPClient,
     context: fn(&mut Editor, &mut GlobalState),
     completable: fn(&Self, char_idx: usize, line: &EditorLine) -> bool,
@@ -65,6 +66,7 @@ impl Lexer {
             path: path.into(),
             version: 0,
             requests: Vec::new(),
+            completion_cache: None,
             diagnostics: None,
             meta: None,
             lsp: false,
@@ -97,6 +99,7 @@ impl Lexer {
             path: path.into(),
             version: 0,
             requests: Vec::new(),
+            completion_cache: None,
             diagnostics: None,
             meta: None,
             lsp: false,
@@ -129,6 +132,7 @@ impl Lexer {
             path: path.into(),
             version: 0,
             requests: Vec::new(),
+            completion_cache: None,
             diagnostics: None,
             meta: None,
             lsp: false,
@@ -167,6 +171,7 @@ impl Lexer {
     pub fn refresh_lsp(&mut self, gs: &mut GlobalState) {
         self.requests.clear();
         self.client.clear_requests();
+        self.completion_cache = None;
         if self.client.capabilities.completion_provider.is_some() {
             self.completable = completable;
         }
@@ -246,8 +251,14 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn should_autocomplete(&self, char_idx: usize, line: &EditorLine) -> bool {
-        (self.completable)(self, char_idx, line)
+    pub fn should_autocomplete(&mut self, cursor: &Cursor, line: &EditorLine) -> bool {
+        match self.completion_cache.replace(cursor.get_position()) {
+            Some(pos) => {
+                let is_cache_invalid = pos.line != cursor.line || pos.char + 1 != cursor.char;
+                is_cache_invalid && (self.completable)(self, cursor.char, line)
+            }
+            None => (self.completable)(self, cursor.char, line),
+        }
     }
 
     #[inline]

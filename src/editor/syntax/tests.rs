@@ -6,7 +6,7 @@ pub use super::{
 use crate::{
     actions::Action,
     configs::FileType,
-    cursor::EncodedWordRange,
+    cursor::{Cursor, EncodedWordRange},
     editor_line::EditorLine,
     ext_tui::{CrossTerm, StyleExt},
     lsp::LSPResult,
@@ -970,4 +970,26 @@ fn dianostic_info() {
             ("hint".to_owned(), Color::DarkGrey)
         ]
     );
+}
+
+#[test]
+fn test_mock() {
+    fn mocked_comp(_: &Lexer, _: usize, _: &EditorLine) -> bool {
+        true
+    }
+    let mut lexer = mock_utf8_lexer(FileType::Rust);
+    lexer.completable = mocked_comp;
+    lexer.completion_cache = Some((0, 1).into());
+
+    let eline = EditorLine::from("");
+    let mut cursor = Cursor::default();
+    cursor.set_char(2);
+
+    assert!(!lexer.should_autocomplete(&cursor, &eline));
+    assert!(lexer.should_autocomplete(&cursor, &eline));
+
+    cursor.set_position((1, 3).into());
+    assert!(lexer.should_autocomplete(&cursor, &eline));
+    cursor.set_char(cursor.char + 1);
+    assert!(!lexer.should_autocomplete(&cursor, &eline));
 }
