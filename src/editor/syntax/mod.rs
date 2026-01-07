@@ -251,11 +251,15 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn should_autocomplete(&mut self, cursor: &Cursor, line: &EditorLine) -> bool {
-        match self.completion_cache.replace(cursor.get_position()) {
+    pub fn should_autocomplete(&mut self, cursor: &Cursor, line: &EditorLine, ch: char) -> bool {
+        match self.completion_cache.as_mut() {
             Some(pos) => {
-                let is_cache_invalid = pos.line != cursor.line || pos.char + 1 != cursor.char;
-                is_cache_invalid && (self.completable)(self, cursor.char, line)
+                if pos.line == cursor.line && pos.char + 1 == cursor.char && ch.is_alphabetic() {
+                    pos.char = cursor.char;
+                    return false;
+                }
+                self.completion_cache = None;
+                (self.completable)(self, cursor.char, line)
             }
             None => (self.completable)(self, cursor.char, line),
         }
@@ -263,6 +267,7 @@ impl Lexer {
 
     #[inline]
     pub fn get_autocomplete(&mut self, c: CursorPosition, gs: &mut GlobalState) {
+        self.completion_cache = Some(c);
         (self.autocomplete)(self, c, gs)
     }
 

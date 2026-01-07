@@ -24,7 +24,7 @@ pub struct EditorConfigs {
     pub shell: Option<String>,
     pub git_tui: Option<String>,
     /// GENERAL
-    #[serde(default, skip)]
+    #[serde(default)]
     pub format_on_save: bool,
     pub max_sessions: Option<usize>,
     /// LSP

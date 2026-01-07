@@ -150,6 +150,7 @@ impl Pallet {
             Some(Command::pass_event("Open terminal", IdiomEvent::EmbededApp(None))),
             Some(Command::components("Select LSP", change_state::select_lsp)),
             Some(Command::components("Format Document", formatting::call_formatting)),
+            Some(Command::components("Save without formatting", formatting::save_without_formatting)),
             Some(Command::components("UPPERCASE", formatting::uppercase)),
             Some(Command::components("lowercase", formatting::lowercase)),
             Command::cfg_open("Open editor configs", EDITOR_CFG_FILE),
