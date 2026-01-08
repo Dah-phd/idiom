@@ -99,7 +99,7 @@ pub fn map_lsp(lexer: &mut Lexer, client: LSPClient, theme: &Theme) {
         lexer.sync_tokens = sync_tokens_dead;
         lexer.sync_changes = sync_changes_dead;
         lexer.sync = sync_edits_dead;
-        lexer.sync_rev = sync_edits_dead_rev;
+        lexer.sync_rev = sync_edits_rev_dead;
     }
 
     match client.capabilities.position_encoding.as_ref().map(|encode| encode.as_str()) {
@@ -138,7 +138,7 @@ pub fn remove_lsp(lexer: &mut Lexer) {
     lexer.hover = info_position_dead;
     lexer.signatures = info_position_dead;
     lexer.sync = sync_edits_dead;
-    lexer.sync_rev = sync_edits_dead_rev;
+    lexer.sync_rev = sync_edits_rev_dead;
     lexer.encoding = Encoding::utf32();
 }
 
@@ -307,7 +307,7 @@ pub fn sync_edits_dead(_lexer: &mut Lexer, _action: &Action, _content: &[EditorL
 }
 
 #[inline(always)]
-pub fn sync_edits_dead_rev(_lexer: &mut Lexer, _action: &Action, _content: &[EditorLine]) -> LSPResult<()> {
+pub fn sync_edits_rev_dead(_lexer: &mut Lexer, _action: &Action, _content: &[EditorLine]) -> LSPResult<()> {
     Ok(())
 }
 

@@ -988,14 +988,14 @@ fn test_mock() {
     let mut cursor = Cursor::default();
     cursor.set_char(2);
 
-    assert!(!lexer.should_autocomplete(&cursor, &eline, 'a'));
-    assert!(lexer.should_autocomplete(&cursor, &eline, 'a'));
+    assert!(!lexer.is_completable(&cursor, &eline, 'a'));
+    assert!(lexer.is_completable(&cursor, &eline, 'a'));
 
     cursor.set_position((1, 3).into());
-    assert!(lexer.should_autocomplete(&cursor, &eline, 'a'));
+    assert!(lexer.is_completable(&cursor, &eline, 'a'));
     lexer.get_autocomplete(cursor.get_position(), &mut gs);
     cursor.set_char(cursor.char + 1);
-    assert!(!lexer.should_autocomplete(&cursor, &eline, 'a'));
+    assert!(!lexer.is_completable(&cursor, &eline, 'a'));
     cursor.set_char(cursor.char + 1);
-    assert!(lexer.should_autocomplete(&cursor, &eline, ' '));
+    assert!(lexer.is_completable(&cursor, &eline, ' '));
 }

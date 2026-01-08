@@ -462,7 +462,7 @@ impl Editor {
     }
 
     pub fn try_write_file(&self, gs: &mut GlobalState) -> Option<String> {
-        let content = self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n");
+        let content = self.content.iter().map(|l| l.as_str()).collect::<Vec<_>>().join("\n");
         if let Err(error) = std::fs::write(&self.path, &content) {
             gs.error(error);
             return None;

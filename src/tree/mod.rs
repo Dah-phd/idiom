@@ -428,7 +428,7 @@ impl Tree {
             }
             Ok(false) => {
                 self.state.reset();
-                Err(IdiomError::io_not_found("Unable to select file! Setting first as selected"))
+                Err(IdiomError::io_not_found("Unable to select file!"))
             }
             Err(err) => {
                 self.error_reset();

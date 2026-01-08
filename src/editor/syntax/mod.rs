@@ -19,7 +19,7 @@ pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
     as_url, completable, completable_disable, context_local, formatting_dead, get_autocomplete_dead,
-    info_position_dead, map_lsp, remove_lsp, sync_changes_dead, sync_edits_dead, sync_edits_dead_rev, sync_tokens_dead,
+    info_position_dead, map_lsp, remove_lsp, sync_changes_dead, sync_edits_dead, sync_edits_rev_dead, sync_tokens_dead,
     tokens_dead, tokens_partial_dead,
 };
 use lsp_types::{PublishDiagnosticsParams, Range, TextDocumentContentChangeEvent, Uri};
@@ -85,7 +85,7 @@ impl Lexer {
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
-            sync_rev: sync_edits_dead_rev,
+            sync_rev: sync_edits_rev_dead,
             encoding: Encoding::utf32(),
             question_lsp: false,
         }
@@ -118,7 +118,7 @@ impl Lexer {
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
-            sync_rev: sync_edits_dead_rev,
+            sync_rev: sync_edits_rev_dead,
             encoding: Encoding::utf32(),
             question_lsp: false,
         }
@@ -151,7 +151,7 @@ impl Lexer {
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
             sync: sync_edits_dead,
-            sync_rev: sync_edits_dead_rev,
+            sync_rev: sync_edits_rev_dead,
             encoding: Encoding::utf32(),
             question_lsp: false,
         }
@@ -251,7 +251,7 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn should_autocomplete(&mut self, cursor: &Cursor, line: &EditorLine, ch: char) -> bool {
+    pub fn is_completable(&mut self, cursor: &Cursor, line: &EditorLine, ch: char) -> bool {
         match self.completion_cache.as_mut() {
             Some(pos) => {
                 if pos.line == cursor.line && pos.char + 1 == cursor.char && ch.is_alphabetic() {
@@ -358,7 +358,7 @@ impl SyncCallbacks {
     pub fn take(lexer: &mut Lexer) -> Self {
         Self {
             sync: std::mem::replace(&mut lexer.sync, lsp_calls::sync_edits_dead),
-            sync_rev: std::mem::replace(&mut lexer.sync_rev, lsp_calls::sync_edits_dead_rev),
+            sync_rev: std::mem::replace(&mut lexer.sync_rev, lsp_calls::sync_edits_rev_dead),
             sync_changes: std::mem::replace(&mut lexer.sync_changes, lsp_calls::sync_changes_dead),
             sync_tokens: std::mem::replace(&mut lexer.sync_tokens, lsp_calls::sync_tokens_dead),
         }
