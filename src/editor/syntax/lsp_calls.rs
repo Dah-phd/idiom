@@ -176,6 +176,7 @@ pub fn context_awaiting_tokens(editor: &mut Editor, gs: &mut GlobalState) {
 
     handle_diagnosticts(editor, gs);
     handle_responses(editor, gs);
+    editor.lexer.meta = None;
 }
 
 #[inline(always)]
@@ -330,6 +331,7 @@ pub fn get_autocomplete_dead(_: &mut Lexer, _: CursorPosition, _: &mut GlobalSta
 
 pub fn tokens(lexer: &mut Lexer) -> LSPResult<i64> {
     lexer.context = context_awaiting_tokens;
+    lexer.meta = None;
     lexer.client.request_full_tokens(lexer.uri.clone())
 }
 

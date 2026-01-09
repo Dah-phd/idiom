@@ -73,11 +73,12 @@ impl LSP {
                         if let Some(response) = inner.result {
                             let response = match resp_type.parse(response) {
                                 Ok(response) => response,
-                                Err(error) => LSPResponse::Error(format!("LSP PARSE: {error}")),
+                                Err(error) => LSPResponse::Error(format!("LSP PARSE({resp_type:?}): {error}")),
                             };
                             responses_handler.lock().unwrap().insert(inner.id, response);
                         } else if let Some(error) = inner.error {
-                            responses_handler.lock().unwrap().insert(inner.id, LSPResponse::Error(error.to_string()));
+                            let err = LSPResponse::Error(format!("{resp_type:?}: {error}"));
+                            responses_handler.lock().unwrap().insert(inner.id, err);
                         }
                     }
                     LSPMessage::Diagnostic(uri, params) => {
