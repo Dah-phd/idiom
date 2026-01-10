@@ -290,6 +290,7 @@ impl Display for LSPResponseType {
 #[cfg(test)]
 mod tests {
     use super::LSPResponseType;
+    use assert_enum_variants::assert_enum_variants;
     use lsp_types::{Diagnostic, DiagnosticSeverity};
 
     #[test]
@@ -320,6 +321,12 @@ mod tests {
 
     #[test]
     fn lsp_reponse_type_null_hanbdle() {
+        // ensure this test passes only when all variants are present
+        // if new is added is should be included in the nullability test below
+        assert_enum_variants!(LSPResponseType, {
+            Completion, Declaration, Definition, Hover, Renames, SignatureHelp, Tokens, TokensPartial, References, Formatting
+        });
+
         assert!(LSPResponseType::Completion(0).parse(serde_json::Value::Null).is_ok());
         assert!(LSPResponseType::Declaration.parse(serde_json::Value::Null).is_ok());
         assert!(LSPResponseType::Definition.parse(serde_json::Value::Null).is_ok());

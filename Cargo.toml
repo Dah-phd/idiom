@@ -54,3 +54,6 @@ debug = true
 [profile.release]
 strip = true
 lto = true
+
+[dev-dependencies]
+assert_enum_variants = "0.1.2"
