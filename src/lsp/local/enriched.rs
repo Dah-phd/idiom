@@ -371,7 +371,7 @@ impl<T: LangStream> EnrichedLSP<T> {
                     None => vec![],
                 };
                 let tokens = SemanticTokensResult::Tokens(SemanticTokens { result_id: None, data });
-                self.responses.lock().unwrap().insert(id, LSPResponse::Tokens(tokens));
+                self.responses.lock().unwrap().insert(id, LSPResponse::Tokens(Ok(tokens)));
                 Ok(None)
             }
             Payload::PartialTokens(uri, range, id, max_lines) => {
@@ -523,7 +523,7 @@ mod test {
         lsp.pre_process(Payload::Tokens(key.to_owned(), 0)).unwrap();
 
         let full_tokens = match lsp.responses.lock().unwrap().remove(&0).unwrap() {
-            LSPResponse::Tokens(lsp_types::SemanticTokensResult::Tokens(data)) => data.data,
+            LSPResponse::Tokens(Ok(lsp_types::SemanticTokensResult::Tokens(data))) => data.data,
             _ => panic!("Expected Tokens response"),
         };
 
@@ -585,7 +585,7 @@ mod test {
         lsp.pre_process(Payload::Tokens(key.to_owned(), 0)).unwrap();
 
         let full_tokens = match lsp.responses.lock().unwrap().remove(&0).unwrap() {
-            LSPResponse::Tokens(lsp_types::SemanticTokensResult::Tokens(data)) => data.data,
+            LSPResponse::Tokens(Ok(lsp_types::SemanticTokensResult::Tokens(data))) => data.data,
             _ => panic!("Expected Tokens response"),
         };
 
@@ -647,7 +647,7 @@ mod test {
         lsp.pre_process(Payload::Tokens(key.to_owned(), 0)).unwrap();
 
         let full_tokens = match lsp.responses.lock().unwrap().remove(&0).unwrap() {
-            LSPResponse::Tokens(lsp_types::SemanticTokensResult::Tokens(data)) => data.data,
+            LSPResponse::Tokens(Ok(lsp_types::SemanticTokensResult::Tokens(data))) => data.data,
             _ => panic!("Expected Tokens response"),
         };
 

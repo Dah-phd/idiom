@@ -18,9 +18,9 @@ pub use encoding::Encoding;
 pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
-    as_url, completable, completable_disable, context_local, formatting_dead, get_autocomplete_dead,
-    info_position_dead, map_lsp, remove_lsp, sync_changes_dead, sync_edits_dead, sync_edits_rev_dead, sync_tokens_dead,
-    tokens_dead, tokens_partial_dead,
+    as_url, completable_disable, context_local, formatting_dead, get_autocomplete_dead, info_position_dead, map_lsp,
+    remove_lsp, sync_changes_dead, sync_edits_dead, sync_edits_rev_dead, sync_tokens_dead, tokens_dead,
+    tokens_partial_dead,
 };
 use lsp_types::{PublishDiagnosticsParams, Range, TextDocumentContentChangeEvent, Uri};
 use std::path::{Path, PathBuf};
@@ -41,8 +41,8 @@ pub struct Lexer {
     context: fn(&mut Editor, &mut GlobalState),
     completable: fn(&Self, char_idx: usize, line: &EditorLine) -> bool,
     autocomplete: fn(&mut Self, CursorPosition, &mut GlobalState),
-    tokens: fn(&mut Self) -> LSPResult<i64>,
-    tokens_partial: fn(&mut Self, Range, usize) -> LSPResult<i64>,
+    tokens: fn(&mut Self, &mut GlobalState),
+    tokens_partial: fn(&mut Self, Range, usize, &mut GlobalState),
     references: fn(&mut Self, CursorPosition, &mut GlobalState),
     definitions: fn(&mut Self, CursorPosition, &mut GlobalState),
     declarations: fn(&mut Self, CursorPosition, &mut GlobalState),
@@ -170,15 +170,9 @@ impl Lexer {
     #[inline]
     pub fn refresh_lsp(&mut self, gs: &mut GlobalState) {
         self.requests.clear();
-        self.client.clear_requests();
+        self.client.clear_responses();
         self.completion_cache = None;
-        if self.client.capabilities.completion_provider.is_some() {
-            self.completable = completable;
-        }
-        match (self.tokens)(self) {
-            Ok(request) => self.requests.push(request),
-            Err(error) => gs.error(error),
-        }
+        (self.tokens)(self, gs);
     }
 
     /// sync tokens from LSP shorthand for request call
@@ -211,10 +205,7 @@ impl Lexer {
         }
         map_lsp(self, client, &gs.theme);
         gs.success("LSP mapped!");
-        match (self.tokens)(self) {
-            Ok(request) => self.requests.push(request),
-            Err(err) => gs.send_error(err, self.lang.file_type),
-        };
+        (self.tokens)(self, gs);
     }
 
     pub fn local_lsp(&mut self, file_type: FileType, content: String, gs: &mut GlobalState) {
@@ -223,10 +214,7 @@ impl Lexer {
         match self.client.file_did_open(self.uri.clone(), file_type, content) {
             Ok(_) => {
                 gs.success("Starting local LSP - internal system to provide basic language feature");
-                match (self.tokens)(self) {
-                    Ok(request) => self.requests.push(request),
-                    Err(err) => gs.send_error(err, file_type),
-                }
+                (self.tokens)(self, gs);
             }
             // can be reached only due to internal code issue
             Err(error) => {
@@ -307,10 +295,7 @@ impl Lexer {
             if let Some(capabilities) = &self.client.capabilities.semantic_tokens_provider {
                 self.legend.map_styles(self.lang.file_type, &gs.theme, capabilities);
             }
-            match (self.tokens)(self) {
-                Ok(request) => self.requests.push(request),
-                Err(error) => gs.send_error(error, self.lang.file_type),
-            };
+            (self.tokens)(self, gs);
         };
     }
 
@@ -322,20 +307,15 @@ impl Lexer {
             } else {
                 gs.success("LSP running ...");
             }
-            match (self.tokens)(self) {
-                Ok(request) => self.requests.push(request),
-                Err(error) => gs.send_error(error, self.lang.file_type),
-            };
+            (self.tokens)(self, gs);
         }
     }
 
-    pub fn reopen(&mut self, content: String, file_type: FileType) -> Result<(), LSPError> {
+    pub fn reopen(&mut self, content: String, file_type: FileType, gs: &mut GlobalState) -> Result<(), LSPError> {
         if !self.lsp {
             return Ok(());
         };
-        if let Ok(request) = (self.tokens)(self) {
-            self.requests.push(request);
-        }
+        (self.tokens)(self, gs);
         self.client.file_did_open(self.uri.clone(), file_type, content)
     }
 

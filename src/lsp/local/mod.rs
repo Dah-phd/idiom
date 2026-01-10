@@ -77,7 +77,7 @@ impl<T: LangStream> LocalLSP<T> {
             Payload::Tokens(_, id) => {
                 let tokens =
                     SemanticTokensResult::Tokens(SemanticTokens { result_id: None, data: full_tokens(&self.tokens) });
-                self.responses.lock().unwrap().insert(id, LSPResponse::Tokens(tokens));
+                self.responses.lock().unwrap().insert(id, LSPResponse::Tokens(Ok(tokens)));
             }
             Payload::PartialTokens(_, range, id, max_lines) => {
                 let start = CursorPosition::from(range.start);

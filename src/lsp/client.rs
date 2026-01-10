@@ -119,7 +119,7 @@ impl LSPClient {
     }
 
     /// ensures old requests that may not have been handled due to tab change are cleared
-    pub fn clear_requests(&self) {
+    pub fn clear_responses(&self) {
         self.responses.lock().unwrap().clear();
     }
 

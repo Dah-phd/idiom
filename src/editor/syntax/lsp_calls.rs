@@ -147,7 +147,7 @@ pub fn context_local(_: &mut Editor, _: &mut GlobalState) {}
 pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     if editor.lexer.question_lsp && editor.lexer.client.is_closed() {
         gs.error("LSP failure ...");
-        gs.event.push(crate::global_state::IdiomEvent::CheckLSP(editor.file_type));
+        gs.event.push(IdiomEvent::CheckLSP(editor.file_type));
         return;
     }
 
@@ -159,10 +159,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
         if max_lines >= editor.content.len() {
             return;
         }
-        match (editor.lexer.tokens_partial)(&mut editor.lexer, meta.into(), max_lines) {
-            Ok(request) => editor.lexer.requests.push(request),
-            Err(error) => gs.send_error(error, editor.lexer.lang.file_type),
-        };
+        (editor.lexer.tokens_partial)(&mut editor.lexer, meta.into(), max_lines, gs);
     }
 }
 
@@ -170,7 +167,7 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
 pub fn context_awaiting_tokens(editor: &mut Editor, gs: &mut GlobalState) {
     if editor.lexer.question_lsp && editor.lexer.client.is_closed() {
         gs.error("LSP failure ...");
-        gs.event.push(crate::global_state::IdiomEvent::CheckLSP(editor.file_type));
+        gs.event.push(IdiomEvent::CheckLSP(editor.file_type));
         return;
     }
 
@@ -206,19 +203,27 @@ fn handle_responses(editor: &mut Editor, gs: &mut GlobalState) {
             LSPResponse::Renames(workspace_edit) => gs.event.push(workspace_edit.into()),
             LSPResponse::Formatting { edits, save } => {
                 if save {
-                    gs.event.push(crate::global_state::IdiomEvent::Save)
+                    gs.event.push(IdiomEvent::Save)
                 };
                 gs.event.push(WorkspaceEdit::new([(editor.lexer.uri.clone(), edits)].into_iter().collect()).into());
             }
-            LSPResponse::Tokens(tokens) => {
-                match tokens {
-                    SemanticTokensResult::Partial(data) => set_tokens(data.data, &editor.lexer.legend, content),
-                    SemanticTokensResult::Tokens(data) => {
-                        set_tokens(data.data, &editor.lexer.legend, content);
-                        gs.success("LSP tokens mapped! Refresh UI to remove artifacts (default F5)");
+            LSPResponse::Tokens(token_result) => {
+                editor.lexer.context = context;
+                match token_result {
+                    Ok(tokens) => match tokens {
+                        SemanticTokensResult::Partial(data) => set_tokens(data.data, &editor.lexer.legend, content),
+                        SemanticTokensResult::Tokens(data) => {
+                            set_tokens(data.data, &editor.lexer.legend, content);
+                            gs.success("LSP tokens mapped! Refresh UI to remove artifacts (default F5)");
+                        }
+                    },
+                    // should almost never happen
+                    Err(error) => {
+                        // force refresh LSP
+                        gs.error(error);
+                        gs.event.push(IdiomEvent::EditorActionCall(crate::configs::EditorAction::RefreshUI));
                     }
                 };
-                editor.lexer.context = context;
             }
             LSPResponse::TokensPartial { result, max_lines } => {
                 let tokens = match result {
@@ -329,27 +334,31 @@ pub fn get_autocomplete(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalSta
 
 pub fn get_autocomplete_dead(_: &mut Lexer, _: CursorPosition, _: &mut GlobalState) {}
 
-pub fn tokens(lexer: &mut Lexer) -> LSPResult<i64> {
-    lexer.context = context_awaiting_tokens;
-    lexer.meta = None;
-    lexer.client.request_full_tokens(lexer.uri.clone())
+pub fn tokens(lexer: &mut Lexer, gs: &mut GlobalState) {
+    match lexer.client.request_full_tokens(lexer.uri.clone()) {
+        Ok(request) => {
+            lexer.context = context_awaiting_tokens;
+            lexer.meta = None;
+            lexer.requests.push(request);
+        }
+        Err(err) => gs.send_error(err, lexer.lang.file_type),
+    }
 }
 
-pub fn tokens_dead(_: &mut Lexer) -> LSPResult<i64> {
-    Ok(0)
+pub fn tokens_dead(_: &mut Lexer, _: &mut GlobalState) {}
+
+pub fn tokens_partial(lexer: &mut Lexer, range: Range, max_lines: usize, gs: &mut GlobalState) {
+    match lexer.client.request_partial_tokens(lexer.uri.clone(), range, max_lines) {
+        Ok(request) => lexer.requests.push(request),
+        Err(err) => gs.send_error(err, lexer.lang.file_type),
+    }
 }
 
-pub fn tokens_partial(lexer: &mut Lexer, range: Range, max_lines: usize) -> LSPResult<i64> {
-    lexer.client.request_partial_tokens(lexer.uri.clone(), range, max_lines)
+pub fn tokens_partial_redirect(lexer: &mut Lexer, _: Range, _: usize, gs: &mut GlobalState) {
+    (lexer.tokens)(lexer, gs)
 }
 
-pub fn tokens_partial_redirect(lexer: &mut Lexer, _: Range, _: usize) -> LSPResult<i64> {
-    tokens(lexer)
-}
-
-pub fn tokens_partial_dead(_: &mut Lexer, _: Range, _: usize) -> LSPResult<i64> {
-    Ok(0)
-}
+pub fn tokens_partial_dead(_: &mut Lexer, _: Range, _: usize, _: &mut GlobalState) {}
 
 pub fn formatting(lexer: &mut Lexer, indent: usize, save: bool, gs: &mut GlobalState) {
     match lexer.client.formatting(lexer.uri.clone(), indent, save) {

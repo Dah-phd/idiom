@@ -46,7 +46,7 @@ impl LSP {
         // splitting subprocess
         let mut json_rpc = JsonRCP::new(&mut inner)?;
         let mut stdin =
-            inner.stdin.take().ok_or(LSPError::InternalError("Failed to take stdin of JsonRCP (LSP)".to_owned()))?;
+            inner.stdin.take().ok_or(LSPError::InternalError(String::from("Failed to take stdin of JsonRCP (LSP)")))?;
 
         // setting up storage
         let (responses, responses_handler) = split_arc::<Responses>();
@@ -77,8 +77,18 @@ impl LSP {
                             };
                             responses_handler.lock().unwrap().insert(inner.id, response);
                         } else if let Some(error) = inner.error {
-                            let err = LSPResponse::Error(format!("{resp_type:?}: {error}"));
-                            responses_handler.lock().unwrap().insert(inner.id, err);
+                            let response = match resp_type {
+                                LSPResponseType::Tokens => LSPResponse::Tokens(Err(error.to_string())),
+                                // value was modified before returning range
+                                // could cause artefacts - F5 refreshes all
+                                LSPResponseType::TokensPartial { .. }
+                                    if LSPResponse::err_msg_contains(&error, "content modified") =>
+                                {
+                                    LSPResponse::Empty
+                                }
+                                _ => LSPResponse::Error(format!("{resp_type:?}: {error}")),
+                            };
+                            responses_handler.lock().unwrap().insert(inner.id, response);
                         }
                     }
                     LSPMessage::Diagnostic(uri, params) => {
