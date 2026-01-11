@@ -289,7 +289,7 @@ impl Display for LSPResponseType {
 
 #[cfg(test)]
 mod tests {
-    use super::LSPResponseType;
+    use super::{LSPResponse, LSPResponseType};
     use assert_enum_variants::assert_enum_variants;
     use lsp_types::{Diagnostic, DiagnosticSeverity};
 
@@ -335,7 +335,10 @@ mod tests {
         assert!(LSPResponseType::SignatureHelp.parse(serde_json::Value::Null).is_ok());
         assert!(LSPResponseType::Tokens.parse(serde_json::Value::Null).is_ok());
         assert!(LSPResponseType::TokensPartial { max_lines: 0 }.parse(serde_json::Value::Null).is_ok());
-        assert!(LSPResponseType::References.parse(serde_json::Value::Null).is_ok());
+        assert!(matches!(
+            LSPResponseType::References.parse(serde_json::Value::Null),
+            Ok(LSPResponse::References(None))
+        ));
         assert!(LSPResponseType::Formatting(false).parse(serde_json::Value::Null).is_ok());
     }
 }
