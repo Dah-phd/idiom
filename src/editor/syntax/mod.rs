@@ -176,12 +176,20 @@ impl Lexer {
     }
 
     /// sync tokens from LSP shorthand for request call
+    #[inline(always)]
     pub fn sync_tokens(&mut self, meta: EditMetaData) {
         (self.sync_tokens)(self, meta);
     }
 
+    #[inline(always)]
     pub fn sync_changes(&mut self, change_events: Vec<TextDocumentContentChangeEvent>) {
         self.question_lsp = (self.sync_changes)(self, change_events).is_err();
+    }
+
+    #[inline(always)]
+    pub fn sync_changes_from_action(&mut self, action: &Action, content: &[EditorLine]) {
+        let changes = action.text_changes(self.encoding.encode_position, self.encoding.char_len, content);
+        self.sync_changes(changes);
     }
 
     /// sync event

@@ -1,4 +1,5 @@
 use super::{
+    edits::NewLineResult,
     meta::EditMetaData,
     utils::{clip_content, copy_content, get_closing_char_from_context, insert_clip, remove_content},
     Actions,
@@ -66,7 +67,9 @@ fn new_line() {
     let cfg = IndentConfigs::default();
 
     let mut content = vec![EditorLine::new("        ".to_owned())];
-    let (cursor, edit) = Edit::new_line(CursorPosition { line: 0, char: 8 }, &cfg, &mut content);
+    let NewLineResult { empty_split, position: cursor, edit } =
+        Edit::new_line(CursorPosition { line: 0, char: 8 }, &cfg, &mut content);
+    assert!(empty_split);
     assert_eq!(cursor, CursorPosition { line: 1, char: 8 });
     assert_eq!(content.len(), 2);
     assert_eq!(&content[0].to_string(), "");
@@ -78,13 +81,18 @@ fn new_line() {
     let mut content = create_content();
 
     // simple new line
-    let (cursor, edit) = Edit::new_line(CursorPosition { line: 0, char: 4 }, &cfg, &mut content);
+    let NewLineResult { empty_split, position: cursor, edit } =
+        Edit::new_line(CursorPosition { line: 0, char: 4 }, &cfg, &mut content);
+    assert!(!empty_split);
     let mut edits = vec![edit];
     assert_eq!(CursorPosition { line: 1, char: 0 }, cursor);
 
     // scope
     edits.push(Edit::insert_clip(cursor, "{}".to_owned(), &mut content));
-    let (cursor, edit) = Edit::new_line(CursorPosition { line: 1, char: 1 }, &cfg, &mut content);
+    let NewLineResult { empty_split, position: cursor, edit } =
+        Edit::new_line(CursorPosition { line: 1, char: 1 }, &cfg, &mut content);
+    assert!(!empty_split);
+
     edits.push(edit);
     assert_eq!(CursorPosition { line: 2, char: 4 }, cursor);
     assert_eq!(&content[1].to_string(), "{");
@@ -93,7 +101,10 @@ fn new_line() {
 
     // double scope
     edits.push(Edit::insert_clip(cursor, "[]".to_owned(), &mut content));
-    let (cursor, edit) = Edit::new_line(CursorPosition { line: 2, char: 5 }, &cfg, &mut content);
+    let NewLineResult { empty_split, position: cursor, edit } =
+        Edit::new_line(CursorPosition { line: 2, char: 5 }, &cfg, &mut content);
+    assert!(!empty_split);
+
     edits.push(edit);
     assert_eq!(CursorPosition { line: 3, char: 8 }, cursor);
     assert_eq!(&content[1].to_string(), "{");
@@ -347,6 +358,14 @@ fn insert_snippet() {
 }
 
 /// MetaData
+
+#[test]
+fn meta_data_rev() {
+    let meta = EditMetaData { start_line: 11, from: 1, to: 3 };
+    assert_eq!(meta.from, meta.rev().to);
+    assert_eq!(meta.to, meta.rev().from);
+    assert_eq!(meta.start_line, meta.rev().start_line);
+}
 
 #[test]
 fn add_meta_data() {

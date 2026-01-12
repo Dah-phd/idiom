@@ -94,6 +94,7 @@ impl Cursor {
         }
     }
 
+    #[inline(always)]
     pub fn get_position(&self) -> CursorPosition {
         self.into()
     }
