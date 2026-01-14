@@ -402,8 +402,8 @@ impl Actions {
             cursor.add_to_char(1);
             return;
         }
-        let (maybe_edit, event) = self.buffer.push(ch, cursor, text, lexer);
-        lexer.sync_changes(vec![event]);
+        let (maybe_edit, change_event) = self.buffer.push(ch, cursor, text, lexer);
+        lexer.sync_changes(vec![change_event]);
         if let Some(edit) = maybe_edit {
             lexer.sync_tokens(edit.meta);
             self.done.push(edit.into());

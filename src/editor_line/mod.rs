@@ -262,6 +262,9 @@ impl EditorLine {
     #[inline]
     pub fn split_off(&mut self, at: usize) -> Self {
         self.cached.reset();
+        if at == 0 {
+            return std::mem::take(self);
+        }
         if self.content.len() == self.char_len {
             let content = self.content.split_off(at);
             if !content.is_empty() {
@@ -296,6 +299,11 @@ impl EditorLine {
     #[inline(always)]
     pub fn char_len(&self) -> usize {
         self.char_len
+    }
+
+    #[inline(always)]
+    pub fn is_empry(&self) -> bool {
+        self.content.is_empty()
     }
 
     #[inline]

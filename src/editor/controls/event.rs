@@ -25,7 +25,6 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
             editor.actions.push_char(ch, &mut editor.cursor, &mut editor.content, &mut editor.lexer);
             let line = &editor.content[editor.cursor.line];
             if !editor.modal.is_autocomplete() && editor.lexer.is_completable(&editor.cursor, line, ch) {
-                editor.actions.push_buffer(&mut editor.lexer);
                 editor.lexer.get_autocomplete(editor.cursor.get_position(), gs);
             }
             return true;

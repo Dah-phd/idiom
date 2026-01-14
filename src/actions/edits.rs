@@ -209,7 +209,7 @@ impl Edit {
         let mut text = String::from('\n');
         let prev_line = &mut content[position.line];
         let mut line = prev_line.split_off(position.char);
-        let empty_split = line.chars().all(|c| c == ' ');
+        let empty_split = line.chars().all(|c| c == ' ') || prev_line.is_empry();
         let indent = cfg.derive_indent_from(prev_line);
         line.insert_str(0, &indent);
         position.line += 1;
@@ -247,7 +247,7 @@ impl Edit {
         let mut text = String::from('\n');
         let prev_line = &mut content[position.line];
         let mut line = prev_line.split_off(position.char);
-        let empty_split = line.chars().all(|c| c == ' ');
+        let empty_split = line.chars().all(|c| c == ' ') || prev_line.is_empry();
         let indent = cfg.derive_indent_from(prev_line);
         line.insert_str(0, &indent);
         position.line += 1;
