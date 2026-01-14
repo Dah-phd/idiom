@@ -1,5 +1,7 @@
 use idiom_tui::UTFSafeStringExt;
 
+/// string encoding (LSP)
+/// utf8 / utf16 / utf32
 pub struct Encoding {
     pub char_len: fn(char) -> usize,
     pub str_len: fn(&str) -> usize,

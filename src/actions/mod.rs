@@ -261,7 +261,7 @@ impl Actions {
                 let NewLineResult { empty_split, position, edit } = Edit::new_line(from, &self.cfg, content);
                 cursor.set_position(position);
                 match empty_split {
-                    true => self.push_done_without_tokens(edit, lexer, content),
+                    true => self.push_done_without_tokens(vec![cut_edit, edit], lexer, content),
                     false => self.push_done(vec![cut_edit, edit], lexer, content),
                 };
             }
@@ -289,7 +289,7 @@ impl Actions {
                 let NewLineResult { empty_split, position, edit } = Edit::new_line_raw(from, &self.cfg, content);
                 cursor.set_position(position);
                 match empty_split {
-                    true => self.push_done_without_tokens(edit, lexer, content),
+                    true => self.push_done_without_tokens(vec![cut_edit, edit], lexer, content),
                     false => self.push_done(vec![cut_edit, edit], lexer, content),
                 };
             }
@@ -569,11 +569,10 @@ impl Actions {
     }
 
     pub fn push_buffer(&mut self, lexer: &mut Lexer) {
-        if let Some(action) = self.buffer.collect() {
-            lexer.sync_tokens(action.meta);
-            self.undone.clear();
-            self.done.push(action.into());
-        }
+        let Some(action) = self.buffer.collect() else { return };
+        lexer.sync_tokens(action.meta);
+        self.undone.clear();
+        self.done.push(action.into());
     }
 
     pub fn clear(&mut self) {

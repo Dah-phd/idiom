@@ -26,8 +26,6 @@ pub const MIN_HEIGHT: u16 = 6;
 pub const MIN_WIDTH: u16 = 40;
 
 pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomResult<()> {
-    // builtin cursor is not used - cursor is positioned during render
-
     let screen_rect = get_init_screen(&mut backend)?;
     let mut gs = GlobalState::new(screen_rect, backend);
     let (mut general_key_map, editor_key_map, tree_key_map) = gs.get_key_maps();

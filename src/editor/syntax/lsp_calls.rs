@@ -262,11 +262,31 @@ fn handle_diagnosticts(editor: &mut Editor, gs: &mut GlobalState) {
     }
 }
 
-// HANDLERS
+// SYNC
+
+#[inline]
+pub fn sync_tokens_dead(_lexer: &mut Lexer, _meta: EditMetaData) {}
+
+pub fn sync_tokens(lexer: &mut Lexer, meta: EditMetaData) {
+    match lexer.meta.take() {
+        Some(existing_meta) => lexer.meta.replace(existing_meta + meta),
+        None => lexer.meta.replace(meta),
+    };
+}
+
+#[inline]
+pub fn sync_changes_dead(_lexer: &mut Lexer, _change_events: Vec<TextDocumentContentChangeEvent>) -> LSPResult<()> {
+    Ok(())
+}
 
 pub fn sync_changes(lexer: &mut Lexer, change_events: Vec<TextDocumentContentChangeEvent>) -> LSPResult<()> {
     lexer.version += 1;
     lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)
+}
+
+#[inline]
+pub fn sync_edits_dead(_lexer: &mut Lexer, _action: &Action, _content: &[EditorLine]) -> LSPResult<()> {
+    Ok(())
 }
 
 pub fn sync_edits(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
@@ -277,6 +297,11 @@ pub fn sync_edits(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) ->
         Some(existing_meta) => lexer.meta.replace(existing_meta + meta),
         None => lexer.meta.replace(meta),
     };
+    Ok(())
+}
+
+#[inline]
+pub fn sync_edits_rev_dead(_lexer: &mut Lexer, _action: &Action, _content: &[EditorLine]) -> LSPResult<()> {
     Ok(())
 }
 
@@ -292,30 +317,36 @@ pub fn sync_edits_rev(lexer: &mut Lexer, action: &Action, content: &[EditorLine]
     Ok(())
 }
 
-pub fn sync_tokens(lexer: &mut Lexer, meta: EditMetaData) {
-    match lexer.meta.take() {
-        Some(existing_meta) => lexer.meta.replace(existing_meta + meta),
-        None => lexer.meta.replace(meta),
-    };
+// TOKENS
+
+pub fn tokens_dead(_: &mut Lexer, _: &mut GlobalState) {}
+
+pub fn tokens(lexer: &mut Lexer, gs: &mut GlobalState) {
+    match lexer.client.request_full_tokens(lexer.uri.clone()) {
+        Ok(request) => {
+            lexer.context = context_awaiting_tokens;
+            lexer.meta = None;
+            lexer.requests.push(request);
+        }
+        Err(err) => gs.send_error(err, lexer.lang.file_type),
+    }
 }
 
-#[inline(always)]
-pub fn sync_tokens_dead(_lexer: &mut Lexer, _meta: EditMetaData) {}
+pub fn tokens_partial_dead(_: &mut Lexer, _: Range, _: usize, _: &mut GlobalState) {}
 
-#[inline(always)]
-pub fn sync_changes_dead(_lexer: &mut Lexer, _change_events: Vec<TextDocumentContentChangeEvent>) -> LSPResult<()> {
-    Ok(())
+pub fn tokens_partial(lexer: &mut Lexer, range: Range, max_lines: usize, gs: &mut GlobalState) {
+    match lexer.client.request_partial_tokens(lexer.uri.clone(), range, max_lines) {
+        Ok(request) => lexer.requests.push(request),
+        Err(err) => gs.send_error(err, lexer.lang.file_type),
+    }
 }
 
-#[inline(always)]
-pub fn sync_edits_dead(_lexer: &mut Lexer, _action: &Action, _content: &[EditorLine]) -> LSPResult<()> {
-    Ok(())
+/// partial tokens not supported
+pub fn tokens_partial_redirect(lexer: &mut Lexer, _: Range, _: usize, gs: &mut GlobalState) {
+    (lexer.tokens)(lexer, gs)
 }
 
-#[inline(always)]
-pub fn sync_edits_rev_dead(_lexer: &mut Lexer, _action: &Action, _content: &[EditorLine]) -> LSPResult<()> {
-    Ok(())
-}
+// COMPLETION
 
 pub fn completable(lexer: &Lexer, char_idx: usize, line: &EditorLine) -> bool {
     lexer.lang.completable(line, char_idx)
@@ -334,31 +365,7 @@ pub fn get_autocomplete(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalSta
 
 pub fn get_autocomplete_dead(_: &mut Lexer, _: CursorPosition, _: &mut GlobalState) {}
 
-pub fn tokens(lexer: &mut Lexer, gs: &mut GlobalState) {
-    match lexer.client.request_full_tokens(lexer.uri.clone()) {
-        Ok(request) => {
-            lexer.context = context_awaiting_tokens;
-            lexer.meta = None;
-            lexer.requests.push(request);
-        }
-        Err(err) => gs.send_error(err, lexer.lang.file_type),
-    }
-}
-
-pub fn tokens_dead(_: &mut Lexer, _: &mut GlobalState) {}
-
-pub fn tokens_partial(lexer: &mut Lexer, range: Range, max_lines: usize, gs: &mut GlobalState) {
-    match lexer.client.request_partial_tokens(lexer.uri.clone(), range, max_lines) {
-        Ok(request) => lexer.requests.push(request),
-        Err(err) => gs.send_error(err, lexer.lang.file_type),
-    }
-}
-
-pub fn tokens_partial_redirect(lexer: &mut Lexer, _: Range, _: usize, gs: &mut GlobalState) {
-    (lexer.tokens)(lexer, gs)
-}
-
-pub fn tokens_partial_dead(_: &mut Lexer, _: Range, _: usize, _: &mut GlobalState) {}
+// FORMATTING
 
 pub fn formatting(lexer: &mut Lexer, indent: usize, save: bool, gs: &mut GlobalState) {
     match lexer.client.formatting(lexer.uri.clone(), indent, save) {
@@ -368,6 +375,8 @@ pub fn formatting(lexer: &mut Lexer, indent: usize, save: bool, gs: &mut GlobalS
 }
 
 pub fn formatting_dead(_: &mut Lexer, _: usize, _: bool, _: &mut GlobalState) {}
+
+// INFO
 
 pub fn info_position_dead(_: &mut Lexer, _: CursorPosition, _: &mut GlobalState) {}
 

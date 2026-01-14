@@ -33,28 +33,46 @@ pub struct Lexer {
     pub lsp: bool,
     pub uri: Uri,
     pub path: PathBuf,
-    question_lsp: bool,
     version: i32,
-    requests: Vec<i64>,
-    completion_cache: Option<CursorPosition>,
+    encoding: Encoding,
     client: LSPClient,
+    requests: Vec<i64>,
+
+    /// for status check on LSP
+    question_lsp: bool,
+    completion_cache: Option<CursorPosition>,
+    meta: Option<EditMetaData>,
+
+    /// sync editor to lsp
     context: fn(&mut Editor, &mut GlobalState),
+
+    /// LSP request / notification callbacks
+
+    /// check and get if autocomplete is needed
+    /// if completable -> autocomplete
     completable: fn(&Self, char_idx: usize, line: &EditorLine) -> bool,
     autocomplete: fn(&mut Self, CursorPosition, &mut GlobalState),
+
     tokens: fn(&mut Self, &mut GlobalState),
     tokens_partial: fn(&mut Self, Range, usize, &mut GlobalState),
+
     references: fn(&mut Self, CursorPosition, &mut GlobalState),
     definitions: fn(&mut Self, CursorPosition, &mut GlobalState),
     declarations: fn(&mut Self, CursorPosition, &mut GlobalState),
     hover: fn(&mut Self, CursorPosition, &mut GlobalState),
     signatures: fn(&mut Self, CursorPosition, &mut GlobalState),
+
     formatting: fn(&mut Self, usize, bool, &mut GlobalState),
+
+    /// SYNC
+    /// get partial tokens based on EditMetaData
     sync_tokens: fn(&mut Self, EditMetaData),
+    /// sync change events to lsp
     sync_changes: fn(&mut Self, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
+    /// sync changes + sync_tokens
     sync: fn(&mut Self, &Action, &[EditorLine]) -> LSPResult<()>,
+    /// sync_changes + sync_tokens on reverted action
     sync_rev: fn(&mut Self, &Action, &[EditorLine]) -> LSPResult<()>,
-    meta: Option<EditMetaData>,
-    encoding: Encoding,
 }
 
 impl Lexer {
