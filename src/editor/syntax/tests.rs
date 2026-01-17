@@ -4,7 +4,7 @@ pub use super::{
     Encoding, Legend, Lexer, Token,
 };
 use crate::{
-    actions::Action,
+    actions::{Action, Edit, EditMetaData},
     configs::FileType,
     cursor::{Cursor, EncodedWordRange},
     editor_line::EditorLine,
@@ -14,7 +14,7 @@ use crate::{
 };
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::Backend;
-use lsp_types::SemanticToken;
+use lsp_types::{SemanticToken, TextDocumentContentChangeEvent};
 use std::path::PathBuf;
 
 pub fn intercept_sync(lexer: &mut Lexer, sync: fn(&mut Lexer, &Action, &[EditorLine]) -> LSPResult<()>) {
@@ -23,6 +23,17 @@ pub fn intercept_sync(lexer: &mut Lexer, sync: fn(&mut Lexer, &Action, &[EditorL
 
 pub fn intercept_sync_rev(lexer: &mut Lexer, sync: fn(&mut Lexer, &Action, &[EditorLine]) -> LSPResult<()>) {
     lexer.sync_rev = sync;
+}
+
+pub fn intercept_sync_changes(
+    lexer: &mut Lexer,
+    sync_changes: fn(&mut Lexer, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
+) {
+    lexer.sync_changes = sync_changes;
+}
+
+pub fn intercept_tokens(lexer: &mut Lexer, sync_tokens: fn(&mut Lexer, EditMetaData)) {
+    lexer.sync_tokens = sync_tokens;
 }
 
 fn get_text() -> Vec<String> {
@@ -998,4 +1009,58 @@ fn test_mock() {
     assert!(!lexer.is_completable(&cursor, &eline, 'a'));
     cursor.set_char(cursor.char + 1);
     assert!(lexer.is_completable(&cursor, &eline, ' '));
+}
+
+#[test]
+fn test_sync_struct() {
+    use super::lsp_calls::{sync_action, sync_changes, sync_tokens};
+
+    let meta = EditMetaData { start_line: 3, from: 2, to: 1 };
+
+    let edit = Edit {
+        meta: meta,
+        cursor: (3, 0).into(),
+        reverse: "bumba\n".into(),
+        text: "".into(),
+        select: None,
+        new_select: None,
+    };
+
+    let expect = String::from(
+        "Content-Length: 212\r\n\r\n{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didChange\",\
+        \"params\":{\"textDocument\":{\"uri\":\"file://\",\"version\":1},\"contentChanges\":\
+        [{\"range\":{\"start\":{\"line\":3,\"character\":0},\"end\":{\"line\":4,\"character\":0}},\
+        \"text\":\"\"}]}}",
+    );
+
+    let content = vec![
+        EditorLine::from("asd"),
+        EditorLine::from("mnambasdfa"),
+        EditorLine::from("mnambasdfabumba"),
+        EditorLine::from("test"),
+        EditorLine::from("end"),
+    ];
+    let action = Action::Single(edit);
+
+    let mut lexer_part = mock_utf16_lexer(FileType::Rust);
+    intercept_tokens(&mut lexer_part, sync_tokens);
+    intercept_sync_changes(&mut lexer_part, sync_changes);
+    let mut lexer_full = mock_utf16_lexer(FileType::Rust);
+    intercept_sync(&mut lexer_full, sync_action);
+
+    let mut rx_part = lexer_part.client.get_receiver();
+    let mut rx_full = lexer_full.client.get_receiver();
+
+    lexer_part.sync_changes_from_action(&action, &content);
+
+    let payload = rx_part.try_recv().unwrap();
+    assert_eq!(payload.try_stringify().unwrap().0, expect.as_str());
+    assert!(lexer_part.meta.is_none());
+    lexer_part.sync_tokens(action.map_to_meta());
+    assert_eq!(lexer_part.meta, Some(meta));
+
+    lexer_full.sync(&action, &content);
+    let payload = rx_full.try_recv().unwrap();
+    assert_eq!(payload.try_stringify().unwrap().0, expect.as_str());
+    assert_eq!(lexer_part.meta, Some(meta));
 }

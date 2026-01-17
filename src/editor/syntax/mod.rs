@@ -19,7 +19,7 @@ pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
     as_url, completable_disable, context_local, formatting_dead, get_autocomplete_dead, info_position_dead, map_lsp,
-    remove_lsp, sync_changes_dead, sync_edits_dead, sync_edits_rev_dead, sync_tokens_dead, tokens_dead,
+    remove_lsp, sync_action_dead, sync_changes_dead, sync_edits_rev_dead, sync_tokens_dead, tokens_dead,
     tokens_partial_dead,
 };
 use lsp_types::{PublishDiagnosticsParams, Range, TextDocumentContentChangeEvent, Uri};
@@ -102,7 +102,7 @@ impl Lexer {
             formatting: formatting_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
-            sync: sync_edits_dead,
+            sync: sync_action_dead,
             sync_rev: sync_edits_rev_dead,
             encoding: Encoding::utf32(),
             question_lsp: false,
@@ -135,7 +135,7 @@ impl Lexer {
             formatting: formatting_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
-            sync: sync_edits_dead,
+            sync: sync_action_dead,
             sync_rev: sync_edits_rev_dead,
             encoding: Encoding::utf32(),
             question_lsp: false,
@@ -168,7 +168,7 @@ impl Lexer {
             formatting: formatting_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
-            sync: sync_edits_dead,
+            sync: sync_action_dead,
             sync_rev: sync_edits_rev_dead,
             encoding: Encoding::utf32(),
             question_lsp: false,
@@ -363,7 +363,7 @@ pub struct SyncCallbacks {
 impl SyncCallbacks {
     pub fn take(lexer: &mut Lexer) -> Self {
         Self {
-            sync: std::mem::replace(&mut lexer.sync, lsp_calls::sync_edits_dead),
+            sync: std::mem::replace(&mut lexer.sync, lsp_calls::sync_action_dead),
             sync_rev: std::mem::replace(&mut lexer.sync_rev, lsp_calls::sync_edits_rev_dead),
             sync_changes: std::mem::replace(&mut lexer.sync_changes, lsp_calls::sync_changes_dead),
             sync_tokens: std::mem::replace(&mut lexer.sync_tokens, lsp_calls::sync_tokens_dead),

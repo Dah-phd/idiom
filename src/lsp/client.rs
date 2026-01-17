@@ -274,7 +274,16 @@ impl MonoID {
 
 #[cfg(test)]
 mod test {
-    use super::{LSPClient, MonoID};
+    use super::{LSPClient, MonoID, Payload};
+    use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
+
+    impl LSPClient {
+        pub fn get_receiver(&mut self) -> UnboundedReceiver<Payload> {
+            let (channel, rx) = unbounded_channel::<Payload>();
+            self.channel = channel;
+            return rx;
+        }
+    }
 
     #[test]
     fn test_gen_id() {
