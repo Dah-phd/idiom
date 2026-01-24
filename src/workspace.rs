@@ -39,7 +39,8 @@ impl Workspace {
     }
 
     pub fn render(&mut self, gs: &mut GlobalState) {
-        if let Some(editor) = self.editors.get_mut(0) {
+        let mut editors = self.editors.iter();
+        if let Some(editor) = editors.next() {
             let line = match gs.tab_area().into_iter().next() {
                 Some(line) => line,
                 None => return,
@@ -47,12 +48,10 @@ impl Workspace {
             gs.backend.set_style(ContentStyle::underlined(None));
             {
                 let mut builder = line.unsafe_builder(&mut gs.backend);
-                builder.push_styled(" ", self.tab_style);
+                builder.push("[ ");
                 builder.push_styled(editor.name(), self.tab_style);
-                for editor in self.editors.iter().skip(1) {
-                    if !builder.push(" | ") || !builder.push(editor.name()) {
-                        break;
-                    };
+                if editors.all(|editor| builder.push(" | ") && builder.push(editor.name())) {
+                    builder.push(" ]");
                 }
             }
             gs.backend.reset_style();
@@ -80,7 +79,7 @@ impl Workspace {
     pub fn toggle_editor(&mut self) {
         self.editors.mark_updated();
         self.map_callback = map_editor;
-        self.tab_style = ContentStyle::fg(Color::DarkYellow);
+        self.tab_style = ContentStyle::fg(TAB_SELECT);
     }
 
     #[inline]
