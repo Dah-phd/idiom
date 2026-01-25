@@ -139,8 +139,10 @@ impl Editor {
         &self.cursor
     }
 
+    /// access content outside of Editor API
+    /// proceed with caution
     #[inline]
-    pub fn unsafe_cursor_mut(&mut self) -> &mut Cursor {
+    pub unsafe fn cursor_mut(&mut self) -> &mut Cursor {
         &mut self.cursor
     }
 
@@ -152,7 +154,7 @@ impl Editor {
     /// access content outside of Editor API
     /// proceed with caution
     #[inline]
-    pub fn unsafe_content_mut(&mut self) -> &mut [EditorLine] {
+    pub unsafe fn content_mut(&mut self) -> &mut [EditorLine] {
         &mut self.content
     }
 

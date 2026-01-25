@@ -276,7 +276,8 @@ pub fn sync_tokens(lexer: &mut Lexer, meta: EditMetaData) {
 }
 
 #[inline]
-pub fn sync_changes_dead(_lexer: &mut Lexer, _change_events: Vec<TextDocumentContentChangeEvent>) -> LSPResult<()> {
+pub fn sync_changes_dead(lexer: &mut Lexer, _change_events: Vec<TextDocumentContentChangeEvent>) -> LSPResult<()> {
+    lexer.version += 1;
     Ok(())
 }
 

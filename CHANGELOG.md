@@ -1,6 +1,7 @@
 ## Includes only major changes (manual updates)
 # Version 0.7.2
 - reduced completion calls
+- fixed tab render
 
 # Version 0.7.1
 - added formatting to pallet

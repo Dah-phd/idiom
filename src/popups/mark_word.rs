@@ -96,7 +96,7 @@ fn perform_render(editor: &mut Editor, ranges: &[EncodedWordRange], gs: &mut Glo
     let mut stored_tokens: Vec<(usize, TokenLine)> = vec![];
     for word in ranges {
         let range_line = word.line();
-        let line = &mut editor.unsafe_content_mut()[range_line];
+        let line = unsafe { &mut editor.content_mut()[range_line] };
         if stored_tokens.iter().any(|(line, _)| line == &range_line) {
             line.tokens_mut_unchecked().set_encoded_word_checked(word, style);
         } else {
@@ -112,13 +112,13 @@ fn perform_render(editor: &mut Editor, ranges: &[EncodedWordRange], gs: &mut Glo
     gs.backend.unfreeze();
 
     for (idx, tokens) in stored_tokens {
-        *editor.unsafe_content_mut()[idx].tokens_mut_unchecked() = tokens;
+        unsafe { *editor.content_mut()[idx].tokens_mut_unchecked() = tokens };
     }
 }
 
 fn clear_marked_cache(editor: &mut Editor, ranges: Vec<EncodedWordRange>) {
     for range in ranges {
-        editor.unsafe_content_mut()[range.line()].cached.reset();
+        unsafe { editor.content_mut()[range.line()].cached.reset() };
     }
 }
 

@@ -874,7 +874,7 @@ pub mod tests {
         ctrl_press(&mut ws, KeyCode::Char('a'), &mut gs);
         assert_position(&mut ws, CursorPosition { char: base_line.len(), line: last_line });
         assert!(select_eq(all, active(&mut ws)));
-        active(&mut ws).unsafe_cursor_mut().select_set(all.1, all.0); // swap select 'from' and 'to'
+        unsafe { active(&mut ws).cursor_mut().select_set(all.1, all.0) }; // swap select 'from' and 'to'
         shift_press(&mut ws, KeyCode::Down, &mut gs);
         assert!(select_eq((CursorPosition { line: 1, char: 0 }, all.1), active(&mut ws)));
         shift_press(&mut ws, KeyCode::Left, &mut gs);

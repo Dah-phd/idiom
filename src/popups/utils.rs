@@ -91,8 +91,10 @@ mod test {
             "/// last ref to data".into(),
             String::new(),
         ]);
-        editor.unsafe_cursor_mut().line = 3;
-        editor.unsafe_cursor_mut().char = 18;
+        unsafe {
+            editor.cursor_mut().line = 3;
+            editor.cursor_mut().char = 18;
+        };
         let mut pattern = TextField::default();
         let mut buffer = vec![];
         let state = infer_word_search_positon(&mut editor, &mut pattern, &mut buffer);

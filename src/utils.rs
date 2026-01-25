@@ -137,6 +137,7 @@ impl<T> TrackedList<T> {
         None
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
         self.updated = true;
