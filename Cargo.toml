@@ -20,8 +20,8 @@ authors = ["Daniel Nikolaev <toolsproed@gmail.com>"]
 # intern crates
 idiom_tui = "1.0.0"
 # extern crates
-bitflags = "2.9.1"
-clap = {version = "4.5.43", features = ["derive"]}
+bitflags = "2.10.0"
+clap = {version = "4.5.54", features = ["derive"]}
 coolor = "1.0.0"
 copypasta = "0.10.2"
 crossterm = "0.29.0"
@@ -34,13 +34,13 @@ notify = { version = "8.2.0", default-features = false, features = ["macos_kqueu
 portable-pty = "0.9.0"
 regex = "1.11.1"
 serde = { version = "1.0.218", features = ["derive"] }
-serde_json = "1.0.142"
+serde_json = "1.0.149"
 strip-ansi-escapes = "0.2.1"
-thiserror = "2.0.12"
+thiserror = "2.0.18"
 toml = "0.9.5"
-tokio = { version="1.47.1", features=["rt", "macros", "rt-multi-thread", "process", "io-util"] }
-tokio-util = { version="0.7.16", features = ["codec", "io"] }
-tokio-stream = "0.1.17"
+tokio = { version="1.49.0", features=["rt", "macros", "rt-multi-thread", "process", "io-util"] }
+tokio-util = { version="0.7.18", features = ["codec", "io"] }
+tokio-stream = "0.1.18"
 unicode-width = "0.2.1"
 vt100 = "0.16.2"
 lazy_static = "1.5.0"

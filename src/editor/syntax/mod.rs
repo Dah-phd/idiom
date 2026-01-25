@@ -186,6 +186,11 @@ impl Lexer {
     }
 
     #[inline]
+    pub fn file_version(&self) -> i32 {
+        self.version
+    }
+
+    #[inline]
     pub fn refresh_lsp(&mut self, gs: &mut GlobalState) {
         self.requests.clear();
         self.client.clear_responses();

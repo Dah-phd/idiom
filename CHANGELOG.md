@@ -2,6 +2,7 @@
 # Version 0.7.2
 - reduced completion calls
 - fixed tab render
+- added mark for unsaved files
 
 # Version 0.7.1
 - added formatting to pallet

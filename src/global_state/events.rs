@@ -166,12 +166,7 @@ impl IdiomEvent {
                             tree.sync(gs);
                             if !new_path.is_dir() {
                                 match ws.new_at_line(new_path.clone(), 0, gs).await {
-                                    Ok(..) => {
-                                        gs.insert_mode();
-                                        if let Some(editor) = ws.get_active() {
-                                            editor.update_status.deny();
-                                        }
-                                    }
+                                    Ok(..) => gs.insert_mode(),
                                     Err(error) => gs.error(error),
                                 };
                             }

@@ -1,4 +1,4 @@
-use super::super::editor::{utils::build_display, FileUpdate};
+use super::super::editor::utils::build_display;
 use super::{
     calc_line_number_offset,
     controls::{filter_multi_cursors_per_line_if_no_select, ControlMap},
@@ -33,7 +33,7 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
         file_type: ft,
         display: "".to_string(),
         path,
-        update_status: FileUpdate::None,
+        saved_version: 0,
         cursor: Cursor::default(),
         modal: EditorModal::default(),
         actions: Actions::default(),
@@ -54,7 +54,7 @@ pub fn mock_editor_text_render(content: Vec<String>) -> Editor {
         file_type: ft,
         display: "".to_string(),
         path,
-        update_status: FileUpdate::None,
+        saved_version: 0,
         cursor: Cursor::default(),
         modal: EditorModal::default(),
         actions: Actions::default(),
@@ -75,7 +75,7 @@ pub fn mock_editor_md_render(content: Vec<String>) -> Editor {
         file_type: ft,
         display: "".to_string(),
         path,
-        update_status: FileUpdate::None,
+        saved_version: 0,
         cursor: Cursor::default(),
         modal: EditorModal::default(),
         actions: Actions::default(),

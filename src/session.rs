@@ -24,7 +24,7 @@ impl<'a> StoreFileData<'a> {
     fn from_workspace(ws: &'a Workspace) -> Vec<Self> {
         ws.iter()
             .map(|editor| {
-                let store_content = !editor.is_saved().unwrap_or_default();
+                let store_content = !editor.is_saved();
                 let content = store_content.then_some(editor.content().iter().map(|l| l.as_str()).collect());
                 StoreFileData {
                     content,
@@ -290,7 +290,9 @@ mod tests {
     async fn store_and_load() {
         let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
         let mut ws = mock_ws(vec![String::from("test data"), String::from("second line")]);
-        assert_eq!(ws.get_active().unwrap().path(), &PathBuf::from("test-path"));
+        let active_editor = ws.get_active().unwrap();
+        active_editor.map(crate::configs::EditorAction::Char('a'), &mut gs);
+        assert_eq!(active_editor.path(), &PathBuf::from("test-path"));
         assert!(!StoreFileData::from_workspace(&ws).is_empty());
         let mut receiver_ws = mock_ws_empty();
         assert!(receiver_ws.is_empty());

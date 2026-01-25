@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use syntax::Lexer;
 use utils::{
     big_file_protection, build_display, calc_line_number_offset, select_between_chars, select_between_chars_inc,
-    select_indent, FileUpdate,
+    select_indent,
 };
 pub use utils::{editor_from_data, EditorStats};
 
@@ -29,9 +29,10 @@ const WARN_TXT: &str = "The file is opened in text mode, \
     beware idiom is not designed with plain text performance in mind!";
 const WARN_MD: &str = "The file is opened in markdown mode, \
     beware idiom is not designed with MD performance in mind!";
+const FILE_UPDATED_VERSION: i32 = -1;
 
 pub struct Editor {
-    pub update_status: FileUpdate,
+    saved_version: i32,
     file_type: FileType,
     lexer: Lexer,
     cursor: Cursor,
@@ -67,7 +68,7 @@ impl Editor {
             controls: ControlMap::default(),
             file_type,
             display,
-            update_status: FileUpdate::None,
+            saved_version: 0,
             path,
             last_render_at_line: None,
             modal: EditorModal::default(),
@@ -91,7 +92,7 @@ impl Editor {
             controls: ControlMap::default(),
             file_type: FileType::Text,
             display,
-            update_status: FileUpdate::None,
+            saved_version: 0,
             path,
             last_render_at_line: None,
             modal: EditorModal::default(),
@@ -115,7 +116,7 @@ impl Editor {
             controls: ControlMap::default(),
             file_type: FileType::MarkDown,
             display,
-            update_status: FileUpdate::None,
+            saved_version: 0,
             path,
             last_render_at_line: None,
             modal: EditorModal::default(),
@@ -171,6 +172,21 @@ impl Editor {
     #[inline]
     pub fn file_type(&self) -> &FileType {
         &self.file_type
+    }
+
+    #[inline]
+    pub fn version(&self) -> i32 {
+        self.lexer.file_version()
+    }
+
+    #[inline]
+    pub fn file_status_is_update(&self) -> bool {
+        FILE_UPDATED_VERSION == self.saved_version
+    }
+
+    #[inline]
+    pub fn file_status_mark_updated(&mut self) {
+        self.saved_version = FILE_UPDATED_VERSION;
     }
 
     // RENDER
@@ -417,7 +433,11 @@ impl Editor {
         Position { row, col }
     }
 
-    pub fn is_saved(&self) -> IdiomResult<bool> {
+    pub fn is_saved(&self) -> bool {
+        self.saved_version == self.lexer.file_version()
+    }
+
+    pub fn is_saved_check_content(&self) -> IdiomResult<bool> {
         // for most source code files direct read should be faster
         let file_content = std::fs::read_to_string(&self.path)?;
 
@@ -457,7 +477,7 @@ impl Editor {
 
     pub fn save(&mut self, gs: &mut GlobalState) {
         if let Some(content) = self.try_write_file(gs) {
-            self.update_status.deny();
+            self.saved_version = self.lexer.file_version();
             self.lexer.save_and_check_lsp(content, gs);
             gs.success(format!("SAVED {}", self.path.display()));
         }

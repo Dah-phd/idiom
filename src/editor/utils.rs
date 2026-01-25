@@ -15,36 +15,6 @@ pub struct EditorStats {
     pub position: CursorPosition,
 }
 
-pub enum FileUpdate {
-    None,
-    Updated,
-    Deny,
-}
-
-impl FileUpdate {
-    pub fn deny(&mut self) {
-        *self = Self::Deny
-    }
-
-    pub fn collect(&mut self) -> bool {
-        match self {
-            Self::Updated => {
-                *self = Self::None;
-                true
-            }
-            _ => false,
-        }
-    }
-
-    pub fn mark_updated(&mut self) {
-        match self {
-            Self::None => *self = Self::Updated,
-            Self::Deny => *self = Self::None,
-            _ => (),
-        }
-    }
-}
-
 pub fn build_display(path: &Path) -> String {
     let mut buffer = Vec::new();
     let mut text_path = path.display().to_string();
@@ -225,7 +195,7 @@ pub fn editor_from_data(
     let mut editor = Editor {
         actions: Actions::new(cfg.get_indent_cfg(file_type)),
         controls: ControlMap::default(),
-        update_status: FileUpdate::None,
+        saved_version: 0,
         renderer,
         last_render_at_line: None,
         cursor,

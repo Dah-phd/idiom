@@ -35,7 +35,14 @@ pub struct Workspace {
 impl Workspace {
     pub fn new(key_map: EditorKeyMap, base_configs: EditorConfigs, lsp_servers: HashMap<FileType, LSP>) -> Self {
         let tab_style = ContentStyle::fg(TAB_SELECT);
-        Self { editors: TrackedList::new(), base_configs, key_map, lsp_servers, map_callback: map_editor, tab_style }
+        Self {
+            editors: TrackedList::new(),
+            base_configs,
+            key_map,
+            lsp_servers,
+            map_callback: map_editor_post_save,
+            tab_style,
+        }
     }
 
     pub fn render(&mut self, gs: &mut GlobalState) {
@@ -50,8 +57,9 @@ impl Workspace {
                 let mut builder = line.unsafe_builder(&mut gs.backend);
                 builder.push("[ ");
                 builder.push_styled(editor.name(), self.tab_style);
-                if editors.all(|editor| builder.push(" | ") && builder.push(editor.name())) {
-                    builder.push(" ]");
+                builder.push(saved_mark(editor));
+                if editors.all(|e| builder.push("| ") && builder.push(e.name()) && builder.push(saved_mark(e))) {
+                    builder.push("]");
                 }
             }
             gs.backend.reset_style();
@@ -78,7 +86,7 @@ impl Workspace {
 
     pub fn toggle_editor(&mut self) {
         self.editors.mark_updated();
-        self.map_callback = map_editor;
+        self.map_callback = map_editor_post_save;
         self.tab_style = ContentStyle::fg(TAB_SELECT);
     }
 
@@ -133,7 +141,7 @@ impl Workspace {
         let mut editor = self.editors.remove(idx);
         editor.clear_screen_cache(gs);
         gs.event.push(IdiomEvent::SelectPath(editor.path().to_owned()));
-        if editor.update_status.collect() {
+        if editor.file_status_is_update() {
             gs.event.push(file_updated(editor.path().to_owned()).into());
         }
         self.editors.insert(0, editor);
@@ -291,7 +299,7 @@ impl Workspace {
         if let Some(idx) = self.editors.iter().position(|e| e.path() == &file_path) {
             let mut editor = self.editors.remove(idx);
             editor.clear_screen_cache(gs);
-            if editor.update_status.collect() {
+            if editor.file_status_is_update() {
                 gs.event.push(file_updated(editor.path().to_owned()).into());
             }
             self.editors.insert(0, editor);
@@ -426,12 +434,12 @@ impl Workspace {
     pub fn notify_update(&mut self, path: PathBuf, gs: &mut GlobalState) {
         for (idx, editor) in self.editors.iter_mut().enumerate() {
             if editor.path() == &path {
-                let save_status_result = editor.is_saved();
+                let save_status_result = editor.is_saved_check_content();
                 if gs.unwrap_or_default(save_status_result, FILE_STATUS_ERR) {
                     return;
                 }
-                editor.update_status.mark_updated();
-                if idx == 0 && editor.update_status.collect() {
+                editor.file_status_mark_updated();
+                if idx == 0 && editor.file_status_is_update() {
                     gs.event.push(file_updated(path).into());
                 }
                 return;
@@ -466,21 +474,11 @@ impl Workspace {
             }
             Some(editor) => {
                 editor.clear_screen_cache(gs);
-                if editor.update_status.collect() {
+                if editor.file_status_is_update() {
                     gs.event.push(file_updated(editor.path().to_owned()).into());
                 }
             }
         }
-    }
-
-    pub fn are_updates_saved(&self, gs: &mut GlobalState) -> bool {
-        for editor in self.editors.iter() {
-            let save_status_result = editor.is_saved();
-            if !gs.unwrap_or_default(save_status_result, FILE_STATUS_ERR) {
-                return false;
-            }
-        }
-        true
     }
 
     pub fn go_to_tab(&mut self, idx: usize, gs: &mut GlobalState) {
@@ -496,7 +494,7 @@ impl Workspace {
             if idx >= self.editors.len() { self.editors.pop().expect("garded") } else { self.editors.remove(idx) };
         gs.event.push(IdiomEvent::SelectPath(editor.path().to_owned()));
         editor.clear_screen_cache(gs);
-        if editor.update_status.collect() {
+        if editor.file_status_is_update() {
             gs.event.push(file_updated(editor.path().to_owned()).into());
         }
         self.editors.insert(0, editor);
@@ -539,6 +537,7 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
         match action {
             EditorAction::Save => {
                 editor.save(gs);
+                ws.map_callback = map_editor_post_save;
                 if ws.base_configs.format_on_save {
                     editor.call_formatter_and_save(gs);
                 }
@@ -549,6 +548,17 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
         }
     }
     true
+}
+
+fn map_editor_post_save(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
+    let result = map_editor(ws, key, gs);
+    if let Some(editor) = ws.get_active() {
+        if !editor.is_saved() {
+            ws.map_callback = map_editor;
+            ws.editors.mark_updated();
+        }
+    }
+    result
 }
 
 /// Handles keybinding while on tabs
@@ -575,7 +585,7 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
                 ws.editors.push(editor);
                 let editor = &mut ws.editors.inner_mut_no_update()[0];
                 editor.clear_screen_cache(gs);
-                if editor.update_status.collect() {
+                if editor.file_status_is_update() {
                     gs.event.push(file_updated(editor.path().to_owned()).into());
                 }
                 gs.event.push(IdiomEvent::SelectPath(ws.editors.inner()[0].path().to_owned()));
@@ -584,7 +594,7 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
                 if let Some(mut editor) = ws.editors.pop() {
                     gs.event.push(IdiomEvent::SelectPath(editor.path().to_owned()));
                     editor.clear_screen_cache(gs);
-                    if editor.update_status.collect() {
+                    if editor.file_status_is_update() {
                         gs.event.push(file_updated(editor.path().to_owned()).into());
                     }
                     ws.editors.insert(0, editor);
@@ -605,6 +615,14 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
         return true;
     }
     false
+}
+
+#[inline]
+fn saved_mark(editor: &Editor) -> &str {
+    match editor.is_saved() {
+        true => " ",
+        false => "*",
+    }
 }
 
 #[cfg(test)]
