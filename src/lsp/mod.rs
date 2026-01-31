@@ -12,7 +12,7 @@ use crate::utils::split_arc;
 pub use client::LSPClient;
 pub use error::{LSPError, LSPResult};
 pub use local::{init_local_tokens, Highlighter};
-use lsp_stream::JsonRCP;
+use lsp_stream::JsonRPC;
 pub use messages::{
     Diagnostic, DiagnosticHandle, DiagnosticType, EditorDiagnostics, LSPMessage, LSPResponse, LSPResponseType,
     TreeDiagnostics,
@@ -21,7 +21,7 @@ pub use notification::LSPNotification;
 pub use request::LSPRequest;
 
 use lsp_types::{request::Initialize, InitializeResult, Uri};
-use serde_json::from_value;
+use serde_json::{from_value, Value};
 use std::{collections::HashMap, path::Path, process::Stdio, str::FromStr, sync::Mutex};
 use tokio::{io::AsyncWriteExt, process::Child, task::JoinHandle};
 
@@ -44,7 +44,7 @@ impl LSP {
         let mut inner = server.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::piped()).spawn()?;
 
         // splitting subprocess
-        let mut json_rpc = JsonRCP::new(&mut inner)?;
+        let mut json_rpc = JsonRPC::new(&mut inner)?;
         let mut stdin =
             inner.stdin.take().ok_or(LSPError::InternalError(String::from("Failed to take stdin of JsonRCP (LSP)")))?;
 
@@ -56,11 +56,9 @@ impl LSP {
         // sending init requests
         stdin.write_all(LSPRequest::<Initialize>::init_request()?.stringify()?.as_bytes()).await?;
         stdin.flush().await?;
-        let mut init_response = json_rpc.next::<LSPMessage>().await?;
-        while !matches!(init_response, LSPMessage::Response(..)) {
-            init_response = json_rpc.next().await?;
-        }
-        let capabilities = from_value::<InitializeResult>(init_response.unwrap()?)?.capabilities;
+
+        let init_response = skip_to_response(&mut json_rpc).await?;
+        let capabilities = from_value::<InitializeResult>(init_response)?.capabilities;
 
         // starting response handler
         let lsp_json_handler = tokio::task::spawn(async move {
@@ -158,4 +156,18 @@ impl LSP {
 #[inline(always)]
 pub fn as_url(path: &Path) -> Uri {
     Uri::from_str(format!("file://{}", path.display()).as_str()).expect("Path should always be parsable!")
+}
+
+/// get the Value representation of the response or error
+#[inline]
+async fn skip_to_response(rpc: &mut JsonRPC) -> LSPResult<Value> {
+    loop {
+        let LSPMessage::Response(resp) = rpc.next::<LSPMessage>().await? else {
+            continue;
+        };
+        return match resp.result {
+            Some(result) => Ok(result),
+            None => Err(LSPError::ResponseError(format!("{:?}", resp.error))),
+        };
+    }
 }

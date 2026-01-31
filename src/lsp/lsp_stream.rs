@@ -18,7 +18,7 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 ///  * stream end
 ///  * bad bytes received from Codec
 ///  * failure to parse message len
-pub struct JsonRCP {
+pub struct JsonRPC {
     inner: FramedRead<ChildStdout, BytesCodec>,
     stderr: JoinHandle<()>,
     errors: Arc<Mutex<Vec<String>>>,
@@ -28,7 +28,7 @@ pub struct JsonRCP {
     expected_len: usize,
 }
 
-impl JsonRCP {
+impl JsonRPC {
     pub fn new(child: &mut Child) -> Result<Self, RCPError> {
         let inner = child.stdout.take().ok_or(RCPError::StdoutTaken)?;
         let mut stderr = FramedRead::new(child.stderr.take().ok_or(RCPError::StderrTaken)?, BytesCodec::new());
@@ -150,7 +150,7 @@ fn into_guard<'a, T>(mutex: &'a Mutex<T>) -> MutexGuard<'a, T> {
     }
 }
 
-impl Drop for JsonRCP {
+impl Drop for JsonRPC {
     fn drop(&mut self) {
         self.stderr.abort();
     }

@@ -12,10 +12,7 @@ use std::{
     path::PathBuf,
 };
 
-use crate::{
-    editor::syntax::{tokens::validate_and_format_delta_tokens, DiagnosticLine},
-    lsp::{LSPError, LSPResult},
-};
+use crate::editor::syntax::{tokens::validate_and_format_delta_tokens, DiagnosticLine};
 
 use super::lsp_stream::StdErrMessage;
 
@@ -25,26 +22,6 @@ pub enum LSPMessage {
     Diagnostic(Uri, Diagnostic),
     Unknown(Value),
     Error(String),
-}
-
-impl LSPMessage {
-    pub fn unwrap(self) -> LSPResult<Value> {
-        // gets value within if data is know at check time
-        // errors on response error
-        match self {
-            Self::Unknown(raw) => Some(raw),
-            Self::Response(resp) => {
-                if resp.result.is_some() {
-                    resp.result
-                } else {
-                    return Err(LSPError::ResponseError(format!("{:?}", resp.error)));
-                }
-            }
-            Self::Request(request) => request.params,
-            _ => None,
-        }
-        .ok_or(LSPError::internal("Called unwrap on LSPMessage type not supporting the operand!"))
-    }
 }
 
 impl From<Value> for LSPMessage {
@@ -87,6 +64,7 @@ impl From<StdErrMessage> for LSPMessage {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Request {
     pub _id: String,
