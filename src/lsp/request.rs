@@ -198,6 +198,7 @@ where
                         formatting: Some(lsp::DocumentFormattingClientCapabilities::default()),
                         semantic_tokens: Some(lsp::SemanticTokensClientCapabilities {
                             overlapping_token_support: Some(false),
+                            multiline_token_support: Some(false),
                             ..Default::default()
                         }),
                         completion: Some(lsp::CompletionClientCapabilities {
