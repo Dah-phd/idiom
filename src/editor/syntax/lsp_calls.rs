@@ -217,7 +217,6 @@ fn handle_responses(editor: &mut Editor, gs: &mut GlobalState) {
                             gs.success("LSP tokens mapped! Refresh UI to remove artifacts (default F5)");
                         }
                     },
-                    // should almost never happen
                     Err(error) => {
                         // force refresh LSP
                         gs.error(error);
