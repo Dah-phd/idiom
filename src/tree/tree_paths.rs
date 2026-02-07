@@ -1,25 +1,21 @@
-use ignore::{gitignore::Gitignore, Match};
-use tokio::task::JoinSet;
-
+use super::{watcher::TreeWatcher, PathParser};
 use crate::{
+    configs::{ERR, WARN},
     error::IdiomResult,
     ext_tui::{CrossTerm, StyleExt},
     lsp::DiagnosticType,
     utils::get_nested_paths,
 };
-use crossterm::style::{Color, ContentStyle};
+use crossterm::style::ContentStyle;
 use idiom_tui::layout::Line;
+use ignore::{gitignore::Gitignore, Match};
 use std::{
     cmp::Ordering,
     collections::HashSet,
     path::{Path, PathBuf},
     sync::Arc,
 };
-
-use super::{watcher::TreeWatcher, PathParser};
-
-const ERR: Color = Color::Red;
-const WAR: Color = Color::DarkYellow;
+use tokio::task::JoinSet;
 
 #[derive(Debug, Clone)]
 pub enum TreePath {
@@ -54,8 +50,8 @@ impl TreePath {
             TreePath::Folder { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
         };
         match diagnostic {
+            DiagnosticType::Warn => line.render_styled(display, base_style.with_fg(WARN), backend),
             DiagnosticType::Err => line.render_styled(display, base_style.with_fg(ERR), backend),
-            DiagnosticType::Warn => line.render_styled(display, base_style.with_fg(WAR), backend),
             DiagnosticType::None => line.render_styled(display, base_style, backend),
         };
     }

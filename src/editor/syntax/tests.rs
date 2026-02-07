@@ -5,14 +5,14 @@ pub use super::{
 };
 use crate::{
     actions::{Action, Edit, EditMetaData},
-    configs::FileType,
+    configs::{FileType, ERR, MUTED, WARN},
     cursor::{Cursor, EncodedWordRange},
     editor_line::EditorLine,
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
     lsp::LSPResult,
 };
-use crossterm::style::{Color, ContentStyle};
+use crossterm::style::ContentStyle;
 use idiom_tui::Backend;
 use lsp_types::{SemanticToken, TextDocumentContentChangeEvent};
 use std::path::PathBuf;
@@ -948,10 +948,7 @@ fn diagnostic_inline() {
     let mut backend = CrossTerm::init();
     let dline = create_dline();
     dline.render_pad_5(200, &mut backend);
-    assert_eq!(
-        backend.drain(),
-        [(ContentStyle::ital().with_fg(crossterm::style::Color::Red), String::from("     first err"))]
-    );
+    assert_eq!(backend.drain(), [(ContentStyle::ital().with_fg(ERR), String::from("     first err"))]);
 }
 
 #[test]
@@ -959,10 +956,7 @@ fn diagnostic_incursor() {
     let mut backend = CrossTerm::init();
     let dline = create_dline();
     dline.render_pad_4(200, &mut backend);
-    assert_eq!(
-        backend.drain(),
-        [(ContentStyle::ital().with_fg(crossterm::style::Color::Red), String::from("    first err"))]
-    );
+    assert_eq!(backend.drain(), [(ContentStyle::ital().with_fg(ERR), String::from("    first err"))]);
 }
 
 #[test]
@@ -976,10 +970,10 @@ fn dianostic_info() {
     assert_eq!(
         info.messages,
         [
-            ("first err".to_owned(), Color::Red),
-            ("big err".to_owned(), Color::Red),
-            ("warn".to_owned(), Color::DarkYellow),
-            ("hint".to_owned(), Color::DarkGrey)
+            ("first err".to_owned(), ERR),
+            ("big err".to_owned(), ERR),
+            ("warn".to_owned(), WARN),
+            ("hint".to_owned(), MUTED)
         ]
     );
 }

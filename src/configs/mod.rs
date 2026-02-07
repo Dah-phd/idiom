@@ -5,7 +5,10 @@ mod theme;
 mod theme_ui;
 mod types;
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::{
+    event::{KeyCode, KeyEvent, KeyModifiers},
+    style::Color,
+};
 use dirs::config_dir;
 pub use editor::{EditorConfigs, IndentConfigs};
 pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap, TreeAction, TreeUserKeyMap};
@@ -15,11 +18,17 @@ pub use theme::Theme;
 pub use theme_ui::UITheme;
 pub use types::{FileFamily, FileType, ScopeType};
 
+// file names
 pub const APP_FOLDER: &str = "idiom";
 pub const EDITOR_CFG_FILE: &str = "editor.toml";
 pub const KEY_MAP: &str = "keys.toml";
 pub const THEME_FILE: &str = "theme.toml";
 pub const THEME_UI: &str = "theme_ui.toml";
+
+// static colors
+pub const MUTED: Color = Color::DarkGrey;
+pub const WARN: Color = Color::DarkYellow;
+pub const ERR: Color = Color::Red;
 
 #[derive(Debug)]
 pub struct EditorKeyMap {

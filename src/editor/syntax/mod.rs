@@ -4,6 +4,7 @@ pub mod langs;
 pub mod legend;
 mod lsp_calls;
 pub mod tokens;
+
 use crate::{
     actions::{Action, EditMetaData},
     configs::{FileType, Theme},

@@ -3,6 +3,7 @@ mod controls;
 mod modal;
 pub mod syntax;
 mod utils;
+
 use crate::{
     actions::{find_line_start, Actions},
     configs::{EditorAction, EditorConfigs, FileFamily, FileType, IndentConfigs, ScopeType},

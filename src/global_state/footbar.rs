@@ -1,4 +1,5 @@
 use crate::{
+    configs::ERR,
     editor::EditorStats,
     ext_tui::{CrossTerm, StyleExt},
 };
@@ -203,7 +204,7 @@ impl Message {
         let Line { width, row, col } = line;
 
         let (color, text) = match self {
-            Message::Error(text) => (Some(Color::Red), text.as_str()),
+            Message::Error(text) => (Some(ERR), text.as_str()),
             Message::Success(text) => (Some(Color::Blue), text.as_str()),
             Message::Text(text) => (None, text.as_str()),
         };

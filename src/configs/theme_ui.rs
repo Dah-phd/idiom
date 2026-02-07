@@ -1,6 +1,8 @@
 use super::{load_or_create_config, THEME_UI};
-use crate::error::IdiomError;
-use crate::ext_tui::{background_rgb, parse_raw_rgb, pull_color, serialize_rgb, StyleExt};
+use crate::{
+    error::IdiomError,
+    ext_tui::{background_rgb, parse_raw_rgb, pull_color, serialize_rgb, StyleExt},
+};
 use crossterm::style::{Color, ContentStyle, Stylize};
 use serde::ser::{Serialize, SerializeStruct};
 use serde_json::{Map, Value};

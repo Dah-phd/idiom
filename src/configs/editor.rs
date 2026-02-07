@@ -1,16 +1,18 @@
-use std::collections::HashMap;
-
 use super::{
     defaults::{get_indent_after, get_indent_spaces, get_unident_before},
     load_or_create_config,
     types::FileType,
     EDITOR_CFG_FILE,
 };
-use crate::editor_line::EditorLine;
-use crate::utils::{trim_start_inplace, Offset};
-use crate::{global_state::GlobalState, lsp::LSP};
+use crate::{
+    editor_line::EditorLine,
+    global_state::GlobalState,
+    lsp::LSP,
+    utils::{trim_start_inplace, Offset},
+};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EditorConfigs {

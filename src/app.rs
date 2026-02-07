@@ -17,7 +17,6 @@ use crate::{
     tree::Tree,
     workspace::Workspace,
 };
-
 use crossterm::event::Event;
 use std::{path::PathBuf, time::Duration};
 

@@ -1,12 +1,10 @@
+use super::{clipboard::FileClipboard, watcher::TreeWatcher, Tree, TreePath};
+use crate::{configs::KeyMap, error::IdiomResult, ext_tui::State, lsp::DiagnosticType};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     time::Instant,
 };
-
-use crate::{configs::KeyMap, error::IdiomResult, ext_tui::State, lsp::DiagnosticType};
-
-use super::{clipboard::FileClipboard, watcher::TreeWatcher, Tree, TreePath};
 
 pub fn mock_tree() -> Tree {
     let key_map = KeyMap::default().tree_key_map();
