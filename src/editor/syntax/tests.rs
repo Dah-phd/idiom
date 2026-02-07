@@ -978,7 +978,7 @@ fn dianostic_info() {
         [
             ("first err".to_owned(), Color::Red),
             ("big err".to_owned(), Color::Red),
-            ("warn".to_owned(), Color::Yellow),
+            ("warn".to_owned(), Color::DarkYellow),
             ("hint".to_owned(), Color::DarkGrey)
         ]
     );

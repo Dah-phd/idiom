@@ -93,25 +93,9 @@ impl Serialize for UITheme {
 
 impl Default for UITheme {
     fn default() -> Self {
-        let (accent, accent_select) = match background_rgb() {
-            Some((r, g, b)) => (
-                Color::Rgb {
-                    r: offset_color_part(r, ACCENT_OFFSET),
-                    g: offset_color_part(g, ACCENT_OFFSET),
-                    b: offset_color_part(b, ACCENT_OFFSET),
-                },
-                Color::Rgb {
-                    r: offset_color_part(r, ACCENT_SELECT_OFFSET),
-                    g: offset_color_part(r, ACCENT_SELECT_OFFSET),
-                    b: offset_color_part(r, ACCENT_SELECT_OFFSET),
-                },
-            ),
-            // assume pitch black
-            None => (
-                Color::Rgb { r: ACCENT_OFFSET, g: ACCENT_OFFSET, b: ACCENT_OFFSET },
-                Color::Rgb { r: ACCENT_SELECT_OFFSET, g: ACCENT_SELECT_OFFSET, b: ACCENT_SELECT_OFFSET },
-            ),
-        };
+        let accent = Color::Rgb { r: 27, g: 67, b: 50 };
+        let accent_select = Color::Rgb { r: 67, g: 107, b: 90 };
+
         Self {
             accent_style: ContentStyle::bg(accent),
             accent_style_rev: ContentStyle::bg(accent).reverse(),

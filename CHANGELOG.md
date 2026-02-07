@@ -3,6 +3,8 @@
 - reduced completion calls
 - fixed tab render
 - added mark for unsaved files
+- moved inline warnings to DarkYellow
+- default UI accent moved to statuc colors
 
 # Version 0.7.1
 - added formatting to pallet

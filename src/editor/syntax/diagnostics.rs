@@ -8,7 +8,7 @@ use lsp_types::{DiagnosticRelatedInformation, DiagnosticSeverity};
 
 const ELS_COLOR: Color = Color::DarkGrey;
 const ERR_COLOR: Color = Color::Red;
-const WAR_COLOR: Color = Color::Yellow;
+const WAR_COLOR: Color = Color::DarkYellow;
 
 const ELS_STL: ContentStyle = ContentStyle {
     foreground_color: Some(ELS_COLOR),

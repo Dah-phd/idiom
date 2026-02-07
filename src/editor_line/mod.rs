@@ -263,22 +263,19 @@ impl EditorLine {
     pub fn split_off(&mut self, at: usize) -> Self {
         self.cached.reset();
         if at == 0 {
-            return std::mem::take(self);
-        }
-        if self.content.len() == self.char_len {
-            let content = self.content.split_off(at);
-            if !content.is_empty() {
-                self.char_len = self.content.len();
-                self.tokens.clear();
-            }
-            Self { char_len: content.len(), content, ..Default::default() }
+            std::mem::take(self)
+        } else if at == self.char_len() {
+            Self::default()
         } else {
-            let content = self.content.split_off_at_char(at);
-            if !content.is_empty() {
-                self.char_len = self.content.char_len();
-                self.tokens.clear();
-            }
-            Self { char_len: content.char_len(), content, ..Default::default() }
+            let content = match self.is_simple() {
+                true => self.content.split_off(at),
+                false => self.content.split_off_at_char(at),
+            };
+            let char_len = self.char_len - at;
+            self.char_len = at;
+            self.tokens.clear();
+            self.diagnostics = None;
+            Self { char_len, content, ..Default::default() }
         }
     }
 
