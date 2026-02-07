@@ -1,6 +1,6 @@
-use super::{SelectManager, WRAP_CLOSE, WRAP_OPEN};
+use super::{CodecContext, SelectManager, WRAP_CLOSE, WRAP_OPEN};
 use crate::{
-    editor_line::{EditorLine, LineContext},
+    editor_line::EditorLine,
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
 };
@@ -9,7 +9,7 @@ use idiom_tui::Backend;
 
 pub fn render(
     line: &mut EditorLine,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     line_width: usize,
     select: Option<SelectManager>,
     gs: &mut GlobalState,
@@ -32,7 +32,7 @@ pub fn render(
     }
 }
 
-pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut CrossTerm) {
+pub fn basic(line: &EditorLine, ctx: &CodecContext, backend: &mut CrossTerm) {
     let mut iter_tokens = line.iter_tokens();
     let mut counter = 0;
     let mut last_len = 0;
@@ -93,7 +93,7 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut CrossTerm) {
 }
 
 #[inline]
-pub fn select(line: &EditorLine, ctx: &LineContext, mut select: SelectManager, gs: &mut GlobalState) {
+pub fn select(line: &EditorLine, ctx: &CodecContext, mut select: SelectManager, gs: &mut GlobalState) {
     let backend = gs.backend();
     let mut reset_style = ContentStyle::default();
     let mut iter_tokens = line.iter_tokens();
@@ -157,7 +157,7 @@ pub fn select(line: &EditorLine, ctx: &LineContext, mut select: SelectManager, g
 }
 
 #[inline(always)]
-pub fn partial(line: &mut EditorLine, ctx: &LineContext, line_width: usize, backend: &mut CrossTerm) {
+pub fn partial(line: &mut EditorLine, ctx: &CodecContext, line_width: usize, backend: &mut CrossTerm) {
     let cursor_idx = ctx.cursor_char();
     let (mut idx, reduction) = line.generate_skipped_chars_simple(cursor_idx, line_width);
     if idx != 0 {
@@ -231,7 +231,7 @@ pub fn partial(line: &mut EditorLine, ctx: &LineContext, line_width: usize, back
 
 pub fn partial_select(
     line: &mut EditorLine,
-    ctx: &LineContext,
+    ctx: &CodecContext,
     line_width: usize,
     mut select: SelectManager,
     gs: &mut GlobalState,

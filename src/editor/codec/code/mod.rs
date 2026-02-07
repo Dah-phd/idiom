@@ -5,11 +5,14 @@ pub mod complex_cursor;
 pub mod complex_line;
 pub mod complex_multi_cursor;
 
-use super::utils::{pad_select, SelectManager};
+use super::{
+    utils::{pad_select, SelectManager},
+    CodecContext,
+};
 use crate::global_state::GlobalState;
 use crate::{
     cursor::{CharRange, CharRangeUnbound, Cursor, CursorPosition},
-    editor_line::{EditorLine, LineContext},
+    editor_line::EditorLine,
 };
 use crossterm::style::Stylize;
 use idiom_tui::{layout::Line, utils::CharLimitedWidths, Backend};
@@ -41,7 +44,7 @@ pub fn reposition(cursor: &mut Cursor) {
 }
 
 #[inline]
-pub fn cursor(code: &mut EditorLine, ctx: &mut LineContext, line: Line, gs: &mut GlobalState) {
+pub fn cursor(code: &mut EditorLine, ctx: &mut CodecContext, line: Line, gs: &mut GlobalState) {
     let select = ctx.select_get();
     code.cached.cursor(line.row, ctx.cursor_char(), 0, select.clone());
     let line_width = ctx.setup_cursor(line, gs.backend());
@@ -55,7 +58,7 @@ pub fn cursor(code: &mut EditorLine, ctx: &mut LineContext, line: Line, gs: &mut
 }
 
 #[inline]
-pub fn cursor_fast(code: &mut EditorLine, ctx: &mut LineContext, line: Line, gs: &mut GlobalState) {
+pub fn cursor_fast(code: &mut EditorLine, ctx: &mut CodecContext, line: Line, gs: &mut GlobalState) {
     let select = ctx.select_get();
     if !code.cached.should_render_cursor_or_update(line.row, ctx.cursor_char(), select.clone()) {
         ctx.skip_line();
@@ -75,7 +78,7 @@ pub fn cursor_fast(code: &mut EditorLine, ctx: &mut LineContext, line: Line, gs:
 #[inline]
 pub fn multi_cursor(
     code: &mut EditorLine,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     line: Line,
     gs: &mut GlobalState,
     cursors: Vec<CursorPosition>,
@@ -94,7 +97,7 @@ pub fn fast_render_is_cursor(
     cursors: &[Cursor],
     line: Line,
     line_idx: usize,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) -> bool {
     if let Some((cursors, selects)) = ctx.multic_line_setup(cursors, line.width) {
@@ -132,7 +135,7 @@ pub fn fast_render_is_cursor(
 #[inline]
 pub fn line_render(
     code: &mut EditorLine,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     line: Line,
     select: Option<CharRangeUnbound>,
     gs: &mut GlobalState,
@@ -181,7 +184,7 @@ fn render_select_ascii(
     code: &mut EditorLine,
     line_width: usize,
     select: SelectManager,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) {
     if line_width > code.char_len() {
@@ -212,7 +215,7 @@ fn render_select_complex(
     code: &mut EditorLine,
     line_width: usize,
     select: SelectManager,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) {
     if select.start() >= code.char_len() {

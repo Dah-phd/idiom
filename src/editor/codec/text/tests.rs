@@ -1,13 +1,13 @@
 use super::{
     super::tests::{expect_cursor, expect_select, parse_complex_line},
-    ascii, complex, line,
+    ascii, complex, line, CodecContext,
 };
 use crate::{
     configs::FileType,
     cursor::{Cursor, CursorPosition},
     editor::syntax::tests::mock_utf8_lexer,
     editor::tests::mock_editor_text_render,
-    editor_line::{EditorLine, LineContext},
+    editor_line::EditorLine,
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
 };
@@ -41,7 +41,7 @@ fn cursor_render() {
     cursor.set_position(CursorPosition { line: 0, char: 39 });
 
     let mut ctx =
-        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 3, borders: Borders::empty() }.into_iter();
     let mut text =
         EditorLine::from("**The project is currently in development - so if you want to try it do it with caution.**");
@@ -65,7 +65,7 @@ fn cursor_complex_render() {
     cursor.set_position(CursorPosition { line: 0, char: 39 });
 
     let mut ctx =
-        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 3, borders: Borders::empty() }.into_iter();
     let mut text =
         EditorLine::from("**The project is currently in devel🔥pment - so if you want to try it do it with caution.**");
@@ -89,7 +89,7 @@ fn cursor_select() {
     cursor.select_set(CursorPosition::default(), (0, 39).into());
 
     let mut ctx =
-        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 3, borders: Borders::empty() }.into_iter();
     let mut text =
         EditorLine::from("**The project is currently in development - so if you want to try it do it with caution.**");
@@ -118,7 +118,7 @@ fn cursor_complex_select() {
     cursor.select_set(CursorPosition::default(), (0, 39).into());
 
     let mut ctx =
-        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 3, borders: Borders::empty() }.into_iter();
     let mut text =
         EditorLine::from("**The project is currently in devel🔥pment - so if you want to try it do it with caution.**");
@@ -146,7 +146,7 @@ fn simple_line() {
     let cursor = Cursor::default();
 
     let mut ctx =
-        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 5, borders: Borders::empty() }.into_iter();
     let mut texts = generate_lines();
 
@@ -171,7 +171,7 @@ fn simple_line_select() {
     cursor.select_set((1, 7).into(), (2, 60).into());
 
     let mut ctx =
-        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 5, borders: Borders::empty() }.into_iter();
     let mut texts = generate_lines();
 
@@ -200,7 +200,7 @@ fn complex_line() {
     let cursor = Cursor::default();
 
     let mut ctx =
-        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 5, borders: Borders::empty() }.into_iter();
     let mut texts = generate_complex_lines();
 
@@ -225,7 +225,7 @@ fn complex_line_select() {
     cursor.select_set((1, 7).into(), (2, 60).into());
 
     let mut ctx =
-        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 5, borders: Borders::empty() }.into_iter();
     let mut texts = generate_complex_lines();
 

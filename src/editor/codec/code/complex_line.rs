@@ -1,16 +1,12 @@
-use super::{SelectManager, WRAP_CLOSE};
-use crate::{
-    editor_line::{EditorLine, LineContext},
-    ext_tui::CrossTerm,
-    global_state::GlobalState,
-};
+use super::{super::CodecContext, SelectManager, WRAP_CLOSE};
+use crate::{editor_line::EditorLine, ext_tui::CrossTerm, global_state::GlobalState};
 use crossterm::style::{ContentStyle, Stylize};
 use idiom_tui::{utils::CharLimitedWidths, Backend};
 
 pub fn complex_line(
     code: &EditorLine,
     mut line_width: usize,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     backend: &mut CrossTerm,
 ) -> Option<usize> {
     let mut iter_tokens = code.iter_tokens();
@@ -75,7 +71,7 @@ pub fn complex_line_with_select(
     code: &EditorLine,
     mut line_width: usize,
     mut select: SelectManager,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) -> Option<usize> {
     let char_position = ctx.char_lsp_pos;

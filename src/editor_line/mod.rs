@@ -1,9 +1,7 @@
-mod context;
 mod status;
 pub use status::{Reduction, RenderStatus};
 
 use crate::editor::syntax::{tokens::TokenLine, DiagnosticInfo, DiagnosticLine, Encoding, Lang, Token};
-pub use context::LineContext;
 use idiom_tui::{utils::UTFSafeStringExt, UTFSafe};
 use std::{
     fmt::Display,

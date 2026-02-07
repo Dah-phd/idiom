@@ -1,17 +1,16 @@
+use super::{super::CodecContext, width_remainder, WRAP_CLOSE, WRAP_OPEN};
 use crate::{
     cursor::{CharRange, CursorPosition},
-    editor_line::{EditorLine, LineContext},
+    editor_line::EditorLine,
     ext_tui::StyleExt,
     global_state::GlobalState,
 };
 use crossterm::style::{ContentStyle, Stylize};
 use idiom_tui::{utils::CharLimitedWidths, Backend};
 
-use super::{width_remainder, WRAP_CLOSE, WRAP_OPEN};
-
 pub fn render(
     line: &mut EditorLine,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     line_width: usize,
     cursors: Vec<CursorPosition>,
     selects: Vec<CharRange>,
@@ -29,7 +28,7 @@ pub fn render(
 
 pub fn basic(
     line: &EditorLine,
-    ctx: &LineContext,
+    ctx: &CodecContext,
     cursors: Vec<CursorPosition>,
     selects: Vec<CharRange>,
     gs: &mut GlobalState,
@@ -127,7 +126,7 @@ pub fn basic(
 
 pub fn partial(
     code: &mut EditorLine,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     mut line_width: usize,
     cursors: Vec<CursorPosition>,
     selects: Vec<CharRange>,

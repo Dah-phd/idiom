@@ -1,7 +1,6 @@
-use super::status::RenderStatus;
-use super::EditorLine;
 use crate::{
     cursor::{CharRange, CharRangeUnbound, Cursor, CursorPosition},
+    editor_line::{EditorLine, RenderStatus},
     ext_tui::CrossTerm,
 };
 use crossterm::style::ContentStyle;
@@ -9,7 +8,7 @@ use idiom_tui::Position;
 use idiom_tui::{layout::Line, Backend};
 use std::cmp::Ordering;
 
-pub struct LineContext {
+pub struct CodecContext {
     pub accent_style: ContentStyle,
     pub char_lsp_pos: fn(char) -> usize,
     line_number: usize,
@@ -20,7 +19,7 @@ pub struct LineContext {
     select: Option<(CursorPosition, CursorPosition)>,
 }
 
-impl LineContext {
+impl CodecContext {
     pub fn collect_context(
         cursor: &Cursor,
         char_lsp_pos: fn(char) -> usize,

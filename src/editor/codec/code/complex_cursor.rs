@@ -1,16 +1,15 @@
+use super::{width_remainder, CodecContext, SelectManager, WRAP_CLOSE, WRAP_OPEN};
 use crate::{
-    editor_line::{EditorLine, LineContext},
+    editor_line::EditorLine,
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
 };
 use crossterm::style::{ContentStyle, Stylize};
 use idiom_tui::{utils::CharLimitedWidths, Backend};
 
-use super::{width_remainder, SelectManager, WRAP_CLOSE, WRAP_OPEN};
-
 pub fn render(
     line: &mut EditorLine,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     line_width: usize,
     select: Option<SelectManager>,
     gs: &mut GlobalState,
@@ -31,7 +30,7 @@ pub fn render(
     }
 }
 
-pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut CrossTerm) {
+pub fn basic(line: &EditorLine, ctx: &CodecContext, backend: &mut CrossTerm) {
     let mut tokens = line.iter_tokens();
     let mut counter = 0;
     let mut last_len = 0;
@@ -93,7 +92,7 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut CrossTerm) {
     backend.reset_style();
 }
 
-pub fn select(line: &EditorLine, ctx: &LineContext, mut select: SelectManager, gs: &mut GlobalState) {
+pub fn select(line: &EditorLine, ctx: &CodecContext, mut select: SelectManager, gs: &mut GlobalState) {
     let backend = gs.backend();
     let char_position = ctx.char_lsp_pos;
     let mut reset_style = ContentStyle::default();
@@ -161,7 +160,7 @@ pub fn select(line: &EditorLine, ctx: &LineContext, mut select: SelectManager, g
     }
 }
 
-pub fn partial(code: &mut EditorLine, ctx: &mut LineContext, mut line_width: usize, backend: &mut CrossTerm) {
+pub fn partial(code: &mut EditorLine, ctx: &mut CodecContext, mut line_width: usize, backend: &mut CrossTerm) {
     let cursor_idx = ctx.cursor_char();
     let char_position = ctx.char_lsp_pos;
     let mut idx = code.generate_skipped_chars_complex(cursor_idx, line_width);
@@ -251,7 +250,7 @@ pub fn partial(code: &mut EditorLine, ctx: &mut LineContext, mut line_width: usi
 
 pub fn partial_select(
     code: &mut EditorLine,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     mut select: SelectManager,
     mut line_width: usize,
     gs: &mut GlobalState,

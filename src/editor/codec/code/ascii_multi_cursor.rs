@@ -1,7 +1,7 @@
-use super::{WRAP_CLOSE, WRAP_OPEN};
+use super::{CodecContext, WRAP_CLOSE, WRAP_OPEN};
 use crate::{
     cursor::{CharRange, CursorPosition},
-    editor_line::{EditorLine, LineContext},
+    editor_line::EditorLine,
     ext_tui::StyleExt,
     global_state::GlobalState,
 };
@@ -10,7 +10,7 @@ use idiom_tui::Backend;
 
 pub fn render(
     line: &mut EditorLine,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     line_width: usize,
     cursors: Vec<CursorPosition>,
     selects: Vec<CharRange>,
@@ -119,7 +119,7 @@ pub fn basic(line: &EditorLine, cursors: Vec<CursorPosition>, selects: Vec<CharR
 
 pub fn partial(
     line: &mut EditorLine,
-    ctx: &LineContext,
+    ctx: &CodecContext,
     line_width: usize,
     cursors: Vec<CursorPosition>,
     selects: Vec<CharRange>,

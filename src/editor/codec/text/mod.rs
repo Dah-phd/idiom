@@ -3,10 +3,11 @@ mod complex;
 mod markdown;
 
 use super::utils::{pad_select, try_cache_wrap_data_from_lines, SelectManagerSimple};
+use super::CodecContext;
 use crate::{
     cursor::{CharRangeUnbound, Cursor},
     editor::syntax::tokens::WrapData,
-    editor_line::{EditorLine, LineContext},
+    editor_line::EditorLine,
     global_state::GlobalState,
 };
 use idiom_tui::layout::{IterLines, RectIter};
@@ -38,7 +39,7 @@ pub fn cursor(
     text: &mut EditorLine,
     select: Option<CharRangeUnbound>,
     skip: usize,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     lines: &mut RectIter,
     gs: &mut GlobalState,
 ) {
@@ -57,7 +58,7 @@ pub fn cursor(
 pub fn line(
     text: &mut EditorLine,
     select: Option<CharRangeUnbound>,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     lines: &mut RectIter,
     gs: &mut GlobalState,
 ) {
@@ -82,7 +83,7 @@ pub fn line(
 pub fn md_line(
     text: &mut EditorLine,
     select: Option<CharRangeUnbound>,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     lines: &mut RectIter,
     gs: &mut GlobalState,
 ) {
@@ -103,7 +104,7 @@ pub fn md_line(
 pub fn md_line_exact_styled_wraps(
     text: &mut EditorLine,
     select: Option<CharRangeUnbound>,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     lines: &mut RectIter,
     gs: &mut GlobalState,
 ) {

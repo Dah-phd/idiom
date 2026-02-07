@@ -4,14 +4,14 @@ use super::{
         md_line,
         tests::drain_as_raw_text_qmark_cursor,
     },
-    ascii_line_exact, complex_line_exact,
+    ascii_line_exact, complex_line_exact, CodecContext,
 };
 use crate::{
     configs::FileType,
     cursor::Cursor,
     editor::syntax::{tests::mock_utf8_lexer, tokens::WrapData},
     editor::tests::mock_editor_md_render,
-    editor_line::{EditorLine, LineContext},
+    editor_line::EditorLine,
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
 };
@@ -44,7 +44,7 @@ fn simple_line() {
     let cursor = Cursor::default();
 
     let mut ctx =
-        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 5, borders: Borders::empty() }.into_iter();
     let mut texts = generate_lines();
 
@@ -75,7 +75,7 @@ fn simple_line_select() {
     cursor.select_set((1, 7).into(), (2, 60).into());
 
     let mut ctx =
-        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 5, borders: Borders::empty() }.into_iter();
     let mut texts = generate_lines();
 
@@ -104,7 +104,7 @@ fn test_complex_line() {
     let cursor = Cursor::default();
 
     let mut ctx =
-        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 5, borders: Borders::empty() }.into_iter();
     let mut texts = generate_complex_lines();
 
@@ -135,7 +135,7 @@ fn complex_line_select() {
     cursor.select_set((1, 7).into(), (2, 60).into());
 
     let mut ctx =
-        LineContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 5, borders: Borders::empty() }.into_iter();
     let mut texts = generate_complex_lines();
 
@@ -173,7 +173,7 @@ fn test_exact_md_ascii() {
     editor.resize(ea.width, ea.height as usize);
     editor.cursor.set_position((1, 0).into());
 
-    let mut ctx = LineContext::collect_context(
+    let mut ctx = CodecContext::collect_context(
         &editor.cursor,
         editor.lexer.encoding().char_len,
         2,
@@ -218,7 +218,7 @@ fn test_exact_md_complex() {
     editor.resize(ea.width, ea.height as usize);
     editor.cursor.set_position((1, 0).into());
 
-    let mut ctx = LineContext::collect_context(
+    let mut ctx = CodecContext::collect_context(
         &editor.cursor,
         editor.lexer.encoding().char_len,
         2,
