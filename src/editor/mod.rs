@@ -1,6 +1,6 @@
+mod codec;
 mod controls;
 mod modal;
-mod renderer;
 pub mod syntax;
 mod utils;
 use crate::{
@@ -12,11 +12,11 @@ use crate::{
     global_state::GlobalState,
     lsp::{LSPClient, LSPError},
 };
+use codec::TuiCodec;
 use controls::ControlMap;
 use idiom_tui::{layout::Rect, Position};
 use lsp_types::TextEdit;
 pub use modal::EditorModal;
-use renderer::TuiCodec;
 use std::path::PathBuf;
 use syntax::Lexer;
 use utils::{
@@ -38,7 +38,7 @@ pub struct Editor {
     cursor: Cursor,
     content: Vec<EditorLine>,
     controls: ControlMap,
-    renderer: TuiCodec,
+    codec: TuiCodec,
     actions: Actions,
     modal: EditorModal,
     display: String,
@@ -63,7 +63,7 @@ impl Editor {
             line_number_padding: line_number_offset,
             lexer: Lexer::with_context(file_type, &path),
             content,
-            renderer: TuiCodec::code(),
+            codec: TuiCodec::code(),
             actions: Actions::new(cfg.get_indent_cfg(file_type)),
             controls: ControlMap::default(),
             file_type,
@@ -87,7 +87,7 @@ impl Editor {
             line_number_padding: line_number_offset,
             lexer: Lexer::text_lexer(&path),
             content,
-            renderer: TuiCodec::text(),
+            codec: TuiCodec::text(),
             actions: Actions::new(cfg.default_indent_cfg()),
             controls: ControlMap::default(),
             file_type: FileType::Text,
@@ -111,7 +111,7 @@ impl Editor {
             line_number_padding: line_number_offset,
             lexer: Lexer::text_lexer(&path),
             content,
-            renderer: TuiCodec::markdown(),
+            codec: TuiCodec::markdown(),
             actions: Actions::new(cfg.default_indent_cfg()),
             controls: ControlMap::default(),
             file_type: FileType::MarkDown,
@@ -198,7 +198,7 @@ impl Editor {
             self.line_number_padding = new_offset;
             self.last_render_at_line.take();
         };
-        (self.renderer.render)(self, gs)
+        (self.codec.render)(self, gs)
     }
 
     /// renders only updated lines
@@ -209,7 +209,7 @@ impl Editor {
             self.line_number_padding = new_offset;
             self.last_render_at_line.take();
         };
-        (self.renderer.fast_render)(self, gs)
+        (self.codec.fast_render)(self, gs)
     }
 
     /// Main usecase is after manual Lexer::context to check if update is needed
@@ -285,21 +285,21 @@ impl Editor {
         self.file_type = file_type;
         match self.file_type.family() {
             FileFamily::Text => {
-                self.renderer = TuiCodec::text();
+                self.codec = TuiCodec::text();
                 self.lexer = Lexer::text_lexer(&self.path);
                 for text in self.content.iter_mut() {
                     text.tokens_mut().clear();
                 }
             }
             FileFamily::MarkDown => {
-                self.renderer = TuiCodec::markdown();
+                self.codec = TuiCodec::markdown();
                 self.lexer = Lexer::md_lexer(&self.path);
                 for text in self.content.iter_mut() {
                     text.tokens_mut().clear();
                 }
             }
             FileFamily::Code(..) => {
-                self.renderer = TuiCodec::code();
+                self.codec = TuiCodec::code();
                 self.lexer = Lexer::with_context(file_type, &self.path);
                 for text in self.content.iter_mut() {
                     text.tokens_mut().clear();

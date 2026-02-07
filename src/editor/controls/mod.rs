@@ -73,7 +73,7 @@ impl ControlMap {
     }
 
     pub fn try_multi_cursor(editor: &mut Editor) -> bool {
-        if !editor.renderer.try_multi_cursor(editor.file_type) {
+        if !editor.codec.try_multi_cursor(editor.file_type) {
             return false;
         };
         editor.controls.cursors.clear();
@@ -89,7 +89,7 @@ impl ControlMap {
         };
         editor.last_render_at_line = None;
         editor.controls.single_cursor_map();
-        editor.renderer.single_cursor(editor.file_type);
+        editor.codec.single_cursor(editor.file_type);
     }
 
     pub fn ensure_single_cursor(editor: &mut Editor) {
@@ -106,7 +106,7 @@ impl ControlMap {
         }
         editor.controls.cursors.clear();
         editor.controls.single_cursor_map();
-        editor.renderer.single_cursor(editor.file_type);
+        editor.codec.single_cursor(editor.file_type);
     }
 
     pub fn consolidate_cursors(editor: &mut Editor) {

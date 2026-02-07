@@ -3,7 +3,7 @@ use super::{
     cursor as rend_cursor, line_render,
 };
 use crate::cursor::{Cursor, CursorPosition};
-use crate::editor::renderer::tests::count_to_cursor;
+use crate::editor::codec::tests::count_to_cursor;
 use crate::editor::syntax::tests::{
     create_token_pairs_utf16, create_token_pairs_utf32, create_token_pairs_utf8, longline_token_pair_utf16,
     longline_token_pair_utf32, longline_token_pair_utf8, mock_utf16_lexer, mock_utf32_lexer, mock_utf8_lexer,

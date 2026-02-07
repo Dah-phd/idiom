@@ -39,7 +39,7 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
         actions: Actions::default(),
         controls: ControlMap::default(),
         content,
-        renderer: TuiCodec::code(),
+        codec: TuiCodec::code(),
         last_render_at_line: None,
     }
 }
@@ -60,7 +60,7 @@ pub fn mock_editor_text_render(content: Vec<String>) -> Editor {
         actions: Actions::default(),
         controls: ControlMap::default(),
         content,
-        renderer: TuiCodec::text(),
+        codec: TuiCodec::text(),
         last_render_at_line: None,
     }
 }
@@ -81,7 +81,7 @@ pub fn mock_editor_md_render(content: Vec<String>) -> Editor {
         actions: Actions::default(),
         controls: ControlMap::default(),
         content,
-        renderer: TuiCodec::markdown(),
+        codec: TuiCodec::markdown(),
         last_render_at_line: None,
     }
 }

@@ -196,7 +196,7 @@ pub fn editor_from_data(
         actions: Actions::new(cfg.get_indent_cfg(file_type)),
         controls: ControlMap::default(),
         saved_version: 0,
-        renderer,
+        codec: renderer,
         last_render_at_line: None,
         cursor,
         line_number_padding: line_number_offset,
