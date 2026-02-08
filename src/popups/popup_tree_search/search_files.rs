@@ -11,7 +11,6 @@ use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{
     layout::{Rect, BORDERS},
     text_field::{Status as InputStatus, TextField},
-    Backend,
 };
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -116,7 +115,6 @@ impl Popup for ActiveFileSearch {
     fn force_render(&mut self, gs: &mut GlobalState) {
         let mut rect = Self::get_rect(gs);
         let accent_style = gs.ui_theme.accent_style().with_fg(self.mode.fg_color);
-        gs.backend.freeze();
         rect.draw_borders(None, None, gs.backend());
         rect.border_title_styled(self.mode.title, accent_style, gs.backend());
         let Some(line) = rect.next_line() else { return };
@@ -139,7 +137,6 @@ impl Popup for ActiveFileSearch {
         } else {
             self.state.render_list_complex(&self.options, &[build_path_line, build_text_line], rect, gs.backend());
         }
-        gs.backend.unfreeze();
     }
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {

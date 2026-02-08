@@ -107,7 +107,6 @@ fn perform_render(editor: &mut Editor, ranges: &[EncodedWordRange], gs: &mut Glo
 
     gs.backend.freeze();
     editor.render(gs);
-    gs.backend.flush_buf();
     gs.backend.unfreeze();
 
     for (idx, tokens) in stored_tokens {

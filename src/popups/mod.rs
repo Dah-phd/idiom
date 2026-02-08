@@ -67,7 +67,7 @@ pub trait Popup {
         components.re_draw();
         self.force_render(components.gs);
         components.gs.backend.flush_buf();
-        loop {
+        let mut main_loop = || loop {
             self.main_loop_handler(&mut components)?;
             if crossterm::event::poll(MIN_FRAMERATE)? {
                 match crossterm::event::read()? {
@@ -98,8 +98,14 @@ pub trait Popup {
                 };
             }
             self.render(components.gs);
-            components.gs.backend.flush_buf();
-        }
+            components.gs.backend.unfreeze();
+            components.gs.backend.freeze();
+        };
+
+        let result = main_loop();
+        // ensure screen is unfrozen upon finish
+        components.gs.backend.unfreeze();
+        result
     }
 
     /// extend the main loop => default to noop
