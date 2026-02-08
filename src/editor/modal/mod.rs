@@ -61,17 +61,9 @@ impl EditorModal {
     }
 
     #[inline]
-    pub fn forece_render_if_exists(&mut self, relative_pos: Position, gs: &mut GlobalState) {
+    pub fn render_if_exists(&mut self, relative_pos: Position, gs: &mut GlobalState) {
         let Some(modal) = self.inner.as_mut() else { return };
         self.last_render = modal.render_at(relative_pos, gs);
-    }
-
-    #[inline]
-    pub fn render_if_exist(&mut self, relative_pos: Position, gs: &mut GlobalState) {
-        let Some(modal) = self.inner.as_mut() else { return };
-        if self.last_render.is_none() {
-            self.last_render = modal.render_at(relative_pos, gs);
-        };
     }
 
     #[inline]

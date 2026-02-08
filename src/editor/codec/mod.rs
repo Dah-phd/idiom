@@ -132,10 +132,10 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
         for line in lines {
             line.render_empty(&mut gs.backend);
         }
+        let relative_pos = ctx.get_modal_relative_position();
+        modal.render_if_exists(relative_pos, gs);
     }
 
-    let relative_pos = ctx.get_modal_relative_position();
-    modal.render_if_exist(relative_pos, gs);
     EditorStats { len: content.len(), select_len: cursor.select_len(content), position: cursor.into() }
 }
 
@@ -166,7 +166,7 @@ fn code_render_full(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
     }
 
     let relative_pos = ctx.get_modal_relative_position();
-    modal.forece_render_if_exists(relative_pos, gs);
+    modal.render_if_exists(relative_pos, gs);
     EditorStats { len: content.len(), select_len: cursor.select_len(content), position: cursor.into() }
 }
 
@@ -206,21 +206,14 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorSt
         is_rendered_cursor |= code::fast_render_is_cursor(text, controls.cursors(), line, line_idx, &mut ctx, gs);
     }
 
-    if is_rendered_cursor {
+    if is_rendered_cursor || !modal.is_rendered() {
         for line in lines {
             line.render_empty(&mut gs.backend);
         }
         let relative_pos = ctx.get_modal_relative_position();
-        modal.forece_render_if_exists(relative_pos, gs);
-    } else {
-        if !modal.is_rendered() {
-            for line in lines {
-                line.render_empty(&mut gs.backend);
-            }
-        }
-        let relative_pos = ctx.get_modal_relative_position();
-        modal.render_if_exist(relative_pos, gs);
+        modal.render_if_exists(relative_pos, gs);
     }
+
     EditorStats { len: content.len(), select_len: controls.cursors_count(), position: cursor.into() }
 }
 
@@ -254,7 +247,7 @@ fn multi_code_render_full(editor: &mut Editor, gs: &mut GlobalState) -> EditorSt
     }
 
     let relative_pos = ctx.get_modal_relative_position();
-    modal.forece_render_if_exists(relative_pos, gs);
+    modal.render_if_exists(relative_pos, gs);
     EditorStats { len: content.len(), select_len: controls.cursors_count(), position: cursor.into() }
 }
 
