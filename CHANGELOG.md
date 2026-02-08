@@ -3,8 +3,9 @@
 - reduced completion calls
 - fixed tab render
 - added mark for unsaved files
+- extracted consts for hardstyle colors
 - moved inline warnings to DarkYellow
-- default UI accent moved to statuc colors
+- marked word is now error-like color
 
 # Version 0.7.1
 - added formatting to pallet
