@@ -291,8 +291,9 @@ impl GlobalState {
 
     #[inline]
     pub fn draw(&mut self, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
+        self.backend.freeze();
         (self.draw_callback)(self, workspace, tree, term);
-        self.backend.flush_buf();
+        self.backend.unfreeze();
     }
 
     pub fn render_footer_standalone(&mut self) {

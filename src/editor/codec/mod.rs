@@ -13,7 +13,7 @@ use crate::{
     global_state::GlobalState,
 };
 use context::CodecContext;
-use idiom_tui::{layout::IterLines, Backend};
+use idiom_tui::layout::IterLines;
 
 /// Component containing logic regarding rendering
 /// In order to escape complicated state machines and any form on polymorphism,
@@ -133,6 +133,7 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
             line.render_empty(&mut gs.backend);
         }
     }
+
     let relative_pos = ctx.get_modal_relative_position();
     modal.render_if_exist(relative_pos, gs);
     EditorStats { len: content.len(), select_len: cursor.select_len(content), position: cursor.into() }
@@ -277,7 +278,6 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
     let mut ctx = CodecContext::collect_context(cursor, lexer.encoding().char_len, *line_number_padding, accent_style);
     ctx.correct_last_line_match(content, lines.len());
 
-    gs.backend.freeze();
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
             break;
@@ -304,7 +304,6 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
         line.render_empty(&mut gs.backend);
     }
 
-    gs.backend.unfreeze();
     EditorStats { len: content.len(), select_len: cursor.select_len(content), position: cursor.into() }
 }
 
@@ -317,7 +316,6 @@ fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) -> E
     let mut lines = gs.editor_area().into_iter();
     let mut ctx = CodecContext::collect_context(cursor, lexer.encoding().char_len, *line_number_padding, accent_style);
 
-    gs.backend.freeze();
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
             break;
@@ -334,7 +332,6 @@ fn text_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) -> E
         line.render_empty(&mut gs.backend);
     }
 
-    gs.backend.unfreeze();
     EditorStats { len: content.len(), select_len: cursor.select_len(content), position: cursor.into() }
 }
 
@@ -358,7 +355,6 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
     let mut ctx = CodecContext::collect_context(cursor, lexer.encoding().char_len, *line_number_padding, accent_style);
     let mut cursor_rendered = false;
 
-    gs.backend.freeze();
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
             break;
@@ -390,7 +386,6 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
         line.render_empty(&mut gs.backend);
     }
 
-    gs.backend.unfreeze();
     EditorStats { len: content.len(), select_len: cursor.select_len(content), position: cursor.into() }
 }
 
@@ -404,7 +399,6 @@ fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) -> Edi
     let mut ctx = CodecContext::collect_context(cursor, lexer.encoding().char_len, *line_number_padding, accent_style);
     let mut cursor_rendered = false;
 
-    gs.backend.freeze();
     for (line_idx, text) in content.iter_mut().enumerate().skip(cursor.at_line) {
         if lines.is_finished() {
             break;
@@ -424,7 +418,6 @@ fn md_full_render(editor: &mut Editor, gs: &mut GlobalState, skip: usize) -> Edi
         line.render_empty(&mut gs.backend);
     }
 
-    gs.backend.unfreeze();
     EditorStats { len: content.len(), select_len: cursor.select_len(content), position: cursor.into() }
 }
 

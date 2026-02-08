@@ -26,8 +26,6 @@ impl Default for Components {
 
 // transition
 pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
-    gs.backend.freeze();
-
     gs.screen_rect.clear(&mut gs.backend);
 
     let mut screen = gs.screen_rect;
@@ -73,8 +71,6 @@ pub fn full_rebuild(gs: &mut GlobalState, workspace: &mut Workspace, tree: &mut 
         gs.draw_callback = draw_term;
         term.render(gs);
     }
-
-    gs.backend.unfreeze();
 }
 
 pub fn draw(gs: &mut GlobalState, workspace: &mut Workspace, _tree: &mut Tree, _term: &mut EditorTerminal) {

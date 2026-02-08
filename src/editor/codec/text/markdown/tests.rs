@@ -277,7 +277,6 @@ fn test_md_editor() {
     let result = drain_as_raw_text_qmark_cursor(&mut gs);
     #[rustfmt::skip]
     assert_eq!(result, [
-        "<<freeze>>",
         "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>",
         "content ","<<set style>>","content","<<set style>>"," ","<<set style>>","asdwa","<<set style>>"," asdwad",
         "<<go to row: 2 col: 15>>", "  ", "<<clear EOL>>", "asjukhdfajskfhgasjkfad", "<<reset style>>",
@@ -298,7 +297,6 @@ fn test_md_editor() {
         "<<go to row: 14 col: 15>>", "<<padding: 30>>", "<<go to row: 15 col: 15>>", "<<padding: 30>>",
         "<<go to row: 16 col: 15>>", "<<padding: 30>>", "<<go to row: 17 col: 15>>", "<<padding: 30>>",
         "<<go to row: 18 col: 15>>", "<<padding: 30>>",
-        "<<unfreeze>>",
     ]);
 }
 
@@ -321,7 +319,6 @@ fn test_md_editor_complex() {
     let result = drain_as_raw_text_qmark_cursor(&mut gs);
     #[rustfmt::skip]
     let expect = [
-        "<<freeze>>",
         "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "c", "o", "n", "t", "e", "n", "t", " ",
         "<<set style>>", "c", "o", "n", "🦀", "n", "t",
         "<<set style>>", " ",
@@ -349,7 +346,6 @@ fn test_md_editor_complex() {
         "<<go to row: 14 col: 15>>", "<<padding: 30>>", "<<go to row: 15 col: 15>>", "<<padding: 30>>",
         "<<go to row: 16 col: 15>>", "<<padding: 30>>", "<<go to row: 17 col: 15>>", "<<padding: 30>>",
         "<<go to row: 18 col: 15>>", "<<padding: 30>>",
-        "<<unfreeze>>",
     ];
     assert_eq!(result, expect);
 }

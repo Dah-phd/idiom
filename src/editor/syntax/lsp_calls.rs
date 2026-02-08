@@ -253,7 +253,7 @@ fn handle_diagnosticts(editor: &mut Editor, gs: &mut GlobalState) {
     let (editor_diagnostics, tree_diagnostics) = editor.lexer.client.get_diagnostics(&editor.lexer.uri);
     if let Some(diagnostics) = editor_diagnostics {
         set_diganostics(&mut editor.content, diagnostics);
-        editor.modal.cleanr_render_cache(); // force rebuild
+        editor.modal.clear_render_cache(); // force rebuild
     }
 
     if let Some(tree_diagnostics) = tree_diagnostics {
