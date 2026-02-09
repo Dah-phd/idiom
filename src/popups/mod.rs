@@ -31,6 +31,8 @@ use dirs::config_dir;
 pub use generic_popup::{save_and_exit, PopupChoice};
 use idiom_tui::{layout::Rect, Backend};
 
+type InplacePopup = Box<dyn FnMut(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal)>;
+
 pub enum Status {
     Finished,
     Pending,
