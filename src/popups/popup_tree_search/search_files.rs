@@ -103,7 +103,7 @@ impl ActiveFileSearch {
         rect.height = rect.height.checked_sub(2)?;
         rect.row += 2;
         let position = rect.relative_position(row, column)?;
-        let idx = (self.state.at_line + position.row as usize) / 2;
+        let idx = self.state.at_line + (position.row as usize / 2);
         if idx >= self.options.len() {
             return None;
         }
