@@ -316,7 +316,7 @@ mod tests {
     #[test]
     fn del() {
         let lexer = mock_utf32_lexer(FileType::Rust);
-        let mut code_text = EditorLine::new("0123456789".to_owned());
+        let mut code_text = EditorLine::new_posix("0123456789".to_owned());
         let mut buf = ActionBuffer::None;
         let mut cursor = Cursor::default();
         cursor.set_char(7);
@@ -363,7 +363,7 @@ mod tests {
     #[test]
     fn del_complx() {
         let lexer = mock_utf8_lexer(FileType::Rust);
-        let mut code_text = EditorLine::new("012🙀4567🙀9".to_owned());
+        let mut code_text = EditorLine::new_posix("012🙀4567🙀9".to_owned());
         let mut buf = ActionBuffer::None;
         let mut cursor = Cursor::default();
         cursor.set_char(7);
@@ -406,7 +406,7 @@ mod tests {
     #[test]
     fn backspace() {
         let lexer = mock_utf32_lexer(FileType::Rust);
-        let mut code_text = EditorLine::new("          1".to_owned());
+        let mut code_text = EditorLine::new_posix("          1".to_owned());
         let indent = "    ";
         let mut buf = ActionBuffer::None;
         let mut cursor = Cursor::default();
@@ -429,7 +429,7 @@ mod tests {
     #[test]
     fn backspace_indent() {
         let lexer = mock_utf8_lexer(FileType::Rust);
-        let mut code_text = EditorLine::new("          🙀".to_owned());
+        let mut code_text = EditorLine::new_posix("          🙀".to_owned());
         let indent = "    ";
         let mut buf = ActionBuffer::None;
         let mut cursor = Cursor::default();
@@ -464,7 +464,7 @@ mod tests {
     #[test]
     fn backspace_complex() {
         let lexer = mock_utf8_lexer(FileType::Rust);
-        let mut code_text = EditorLine::new("        🙀🙀1🙀2".to_owned());
+        let mut code_text = EditorLine::new_posix("        🙀🙀1🙀2".to_owned());
         let indent = "    ";
         let mut buf = ActionBuffer::None;
         let mut cursor = Cursor::default();

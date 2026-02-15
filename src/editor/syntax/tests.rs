@@ -465,7 +465,7 @@ pub fn create_token_pairs_utf32() -> (Vec<SemanticToken>, Vec<String>) {
 }
 
 pub fn zip_text_tokens(text: Vec<String>, tokens: Vec<SemanticToken>) -> Vec<EditorLine> {
-    let mut content = text.into_iter().map(EditorLine::new).collect::<Vec<_>>();
+    let mut content = text.into_iter().map(EditorLine::new_posix).collect::<Vec<_>>();
     let legend = Legend::default();
     set_tokens(tokens, &legend, &mut content);
     content

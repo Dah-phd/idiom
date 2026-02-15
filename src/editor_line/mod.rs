@@ -1,4 +1,6 @@
+mod line_end;
 mod status;
+use line_end::LineParser;
 pub use status::{Reduction, RenderStatus};
 
 use crate::editor::syntax::{tokens::TokenLine, DiagnosticInfo, DiagnosticLine, Encoding, Lang, Token};
@@ -10,10 +12,10 @@ use std::{
 };
 
 /// Used to represent code, has simpler wrapping as cpde lines shoud be shorter than 120 chars in most cases
-#[derive(Default)]
 pub struct EditorLine {
     content: String,
-    // keeps trach of utf8 char len
+    line_end: &'static str,
+    // keeps track of utf8 char len
     char_len: usize,
     // syntax
     tokens: TokenLine,
@@ -22,10 +24,28 @@ pub struct EditorLine {
     pub cached: RenderStatus,
 }
 
+impl Default for EditorLine {
+    fn default() -> Self {
+        Self {
+            content: String::default(),
+            line_end: LineParser::POSIX_NEWLINE.as_str(),
+            char_len: usize::default(),
+            tokens: TokenLine::default(),
+            diagnostics: Option::default(),
+            cached: RenderStatus::default(),
+        }
+    }
+}
+
 impl EditorLine {
     #[inline(always)]
     pub fn as_str(&self) -> &str {
         self.content.as_str()
+    }
+
+    #[inline]
+    pub fn line_end(&self) -> &str {
+        self.line_end
     }
 
     #[inline(always)]
@@ -35,11 +55,8 @@ impl EditorLine {
 
     #[inline]
     pub fn parse_lines<P: AsRef<Path>>(path: P) -> Result<Vec<Self>, String> {
-        Ok(std::fs::read_to_string(path)
-            .map_err(|err| err.to_string())?
-            .split('\n')
-            .map(|line| EditorLine::new(line.to_owned()))
-            .collect())
+        let text = std::fs::read_to_string(path).map_err(|err| err.to_string())?;
+        Ok(LineParser::split_lines(&text).to_editor_lines())
     }
 
     #[inline]
@@ -261,7 +278,9 @@ impl EditorLine {
     pub fn split_off(&mut self, at: usize) -> Self {
         self.cached.reset();
         if at == 0 {
-            std::mem::take(self)
+            let mut split = std::mem::take(self);
+            std::mem::swap(&mut split.line_end, &mut self.line_end);
+            split
         } else if at == self.char_len() {
             Self::default()
         } else {
@@ -350,8 +369,12 @@ impl EditorLine {
         self.content.chars().fold(0, |sum, ch| sum + ch.len_utf16())
     }
 
-    pub fn new(content: String) -> Self {
+    pub fn new_posix(content: String) -> Self {
         Self { char_len: content.char_len(), content, ..Default::default() }
+    }
+
+    pub fn new(content: String, line_end: &'static str) -> Self {
+        Self { char_len: content.char_len(), content, line_end, ..Default::default() }
     }
 
     pub fn empty() -> Self {
@@ -444,7 +467,7 @@ impl Display for EditorLine {
 
 impl From<String> for EditorLine {
     fn from(content: String) -> Self {
-        Self::new(content)
+        Self::new_posix(content)
     }
 }
 

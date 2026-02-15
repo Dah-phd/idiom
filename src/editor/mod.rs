@@ -469,7 +469,7 @@ impl Editor {
                 return;
             }
         };
-        self.content = content.split('\n').map(|line| EditorLine::new(line.to_owned())).collect();
+        self.content = content.split('\n').map(|line| EditorLine::new_posix(line.to_owned())).collect();
         match self.lexer.reopen(content, self.file_type, gs) {
             Ok(()) => gs.success("File rebased!"),
             Err(err) => gs.error(format!("Filed to reactivate LSP after rebase! ERR: {err}")),

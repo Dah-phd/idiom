@@ -55,7 +55,7 @@ fn assert_edits_applicable_with_init_content(
     edits: Vec<Edit>,
 ) {
     // ensure every event can be undone and redone
-    let reseved_content: Vec<EditorLine> = content.iter().map(|cl| EditorLine::new(cl.to_string())).collect();
+    let reseved_content: Vec<EditorLine> = content.iter().map(|cl| EditorLine::new_posix(cl.to_string())).collect();
     for edit in edits.iter().rev() {
         edit.apply_rev(&mut content);
     }
@@ -75,7 +75,7 @@ fn assert_edits_applicable_with_init_content(
 fn new_line() {
     let cfg = IndentConfigs::default();
 
-    let mut content = vec![EditorLine::new("        ".to_owned())];
+    let mut content = vec![EditorLine::new_posix("        ".to_owned())];
     let NewLineResult { empty_split, position, edit } =
         Edit::new_line(CursorPosition { line: 0, char: 8 }, &cfg, &mut content);
     assert!(empty_split);
@@ -565,7 +565,7 @@ fn probe_char_closing_with_select_rev(lexer: &mut Lexer, action: &Action, conten
 #[test]
 fn test_insert_clip() {
     // ensure utf8 safety on critical func
-    let mut content = vec![EditorLine::new("one🚀line".to_owned())];
+    let mut content = vec![EditorLine::new_posix("one🚀line".to_owned())];
     let cursor = CursorPosition { line: 0, char: 4 };
     let cursor = insert_clip("first\nsecond\nrocket🚀", &mut content, cursor);
     assert_eq!(&content[0].to_string(), "one🚀first");
