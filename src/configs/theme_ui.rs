@@ -1,5 +1,5 @@
-use super::{load_or_create_config, THEME_UI};
 use crate::{
+    configs::{load_or_create_config, THEME_UI},
     error::IdiomError,
     ext_tui::{background_rgb, parse_raw_rgb, pull_color, serialize_rgb, StyleExt},
 };
@@ -88,7 +88,8 @@ impl Serialize for UITheme {
         S: serde::Serializer,
     {
         let mut s = serializer.serialize_struct("UITheme", 1)?;
-        s.serialize_field(ACCENT_KEY, &serialize_rgb(ACCENT_OFFSET, ACCENT_OFFSET, ACCENT_OFFSET))?;
+        s.serialize_field(ACCENT_KEY, &serialize_rgb(27, 67, 50))?;
+        s.serialize_field(ACCENT_SELECT_KEY, &serialize_rgb(67, 107, 90))?;
         s.end()
     }
 }
