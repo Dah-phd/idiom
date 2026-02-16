@@ -38,12 +38,48 @@ impl Default for EditorLine {
 }
 
 impl EditorLine {
+    pub fn new_posix(content: String) -> Self {
+        Self { char_len: content.char_len(), content, ..Default::default() }
+    }
+
+    pub fn new(content: String, line_end: &'static str) -> Self {
+        Self { char_len: content.char_len(), content, line_end, ..Default::default() }
+    }
+
+    #[inline(always)]
+    pub fn len(&self) -> usize {
+        self.content.len()
+    }
+
+    #[inline(always)]
+    pub fn char_len(&self) -> usize {
+        self.char_len
+    }
+
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.content.is_empty()
+    }
+
+    #[inline]
+    pub fn is_simple(&self) -> bool {
+        self.content.len() == self.char_len
+    }
+
+    #[inline]
+    pub fn encoded_len(&self, encoding: &Encoding) -> usize {
+        if self.is_simple() {
+            return self.len();
+        }
+        self.chars().map(|c| (encoding.char_len)(c)).sum()
+    }
+
     #[inline(always)]
     pub fn as_str(&self) -> &str {
         self.content.as_str()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn line_end(&self) -> &str {
         self.line_end
     }
@@ -57,11 +93,6 @@ impl EditorLine {
     pub fn parse_lines<P: AsRef<Path>>(path: P) -> Result<Vec<Self>, String> {
         let text = std::fs::read_to_string(path).map_err(|err| err.to_string())?;
         Ok(LineParser::split_lines(&text).to_editor_lines())
-    }
-
-    #[inline]
-    pub fn is_simple(&self) -> bool {
-        self.content.len() == self.char_len
     }
 
     #[inline]
@@ -305,21 +336,6 @@ impl EditorLine {
         }
     }
 
-    #[inline(always)]
-    pub fn len(&self) -> usize {
-        self.content.len()
-    }
-
-    #[inline(always)]
-    pub fn char_len(&self) -> usize {
-        self.char_len
-    }
-
-    #[inline(always)]
-    pub fn is_empry(&self) -> bool {
-        self.content.is_empty()
-    }
-
     #[inline]
     pub fn unsafe_utf8_idx_at(&self, char_idx: usize) -> usize {
         if char_idx > self.char_len {
@@ -367,14 +383,6 @@ impl EditorLine {
     #[inline]
     pub fn utf16_len(&self) -> usize {
         self.content.chars().fold(0, |sum, ch| sum + ch.len_utf16())
-    }
-
-    pub fn new_posix(content: String) -> Self {
-        Self { char_len: content.char_len(), content, ..Default::default() }
-    }
-
-    pub fn new(content: String, line_end: &'static str) -> Self {
-        Self { char_len: content.char_len(), content, line_end, ..Default::default() }
     }
 
     pub fn empty() -> Self {

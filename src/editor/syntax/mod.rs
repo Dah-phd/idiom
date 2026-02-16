@@ -23,7 +23,7 @@ use lsp_calls::{
     remove_lsp, sync_action_dead, sync_changes_dead, sync_edits_rev_dead, sync_tokens_dead, tokens_dead,
     tokens_partial_dead,
 };
-use lsp_types::{PublishDiagnosticsParams, Range, TextDocumentContentChangeEvent, Uri};
+use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent, Uri};
 use std::path::{Path, PathBuf};
 pub use tokens::Token;
 
@@ -55,7 +55,7 @@ pub struct Lexer {
     autocomplete: fn(&mut Self, CursorPosition, &mut GlobalState),
 
     tokens: fn(&mut Self, &mut GlobalState),
-    tokens_partial: fn(&mut Self, Range, usize, &mut GlobalState),
+    tokens_partial: fn(&mut Self, EditMetaData, &[EditorLine], &mut GlobalState),
 
     references: fn(&mut Self, CursorPosition, &mut GlobalState),
     definitions: fn(&mut Self, CursorPosition, &mut GlobalState),

@@ -20,7 +20,7 @@ use lsp_types::{
     OneOf, Range, SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
     TextDocumentContentChangeEvent, Uri, WorkspaceEdit,
 };
-use std::path::Path;
+use std::{cmp::Ordering, path::Path};
 
 /// maps LSP state without runtime checks
 #[inline]
@@ -155,11 +155,8 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     handle_responses(editor, gs);
 
     if let Some(meta) = editor.lexer.meta.take() {
-        let max_lines = (meta.start_line + meta.to) - 1;
-        if max_lines >= editor.content.len() {
-            return;
-        }
-        (editor.lexer.tokens_partial)(&mut editor.lexer, meta.into(), max_lines, gs);
+        let Editor { lexer, content, .. } = editor;
+        (lexer.tokens_partial)(lexer, meta, content, gs);
     }
 }
 
@@ -323,9 +320,35 @@ pub fn tokens(lexer: &mut Lexer, gs: &mut GlobalState) {
     }
 }
 
-pub fn tokens_partial_dead(_: &mut Lexer, _: Range, _: usize, _: &mut GlobalState) {}
+pub fn tokens_partial_dead(_: &mut Lexer, _: EditMetaData, _: &[EditorLine], _: &mut GlobalState) {}
 
-pub fn tokens_partial(lexer: &mut Lexer, range: Range, max_lines: usize, gs: &mut GlobalState) {
+pub fn tokens_partial(lexer: &mut Lexer, meta: EditMetaData, content: &[EditorLine], gs: &mut GlobalState) {
+    // TODO: add tests for the edge cases (already manually tested)
+    let max_lines = (meta.start_line + meta.to) - 1;
+    if max_lines >= content.len() {
+        return;
+    }
+    let mut range = Range::from(meta);
+    let content_len = content.len() as u32;
+    if range.end.line >= content_len {
+        let end_line = content_len.saturating_sub(1);
+        match range.start.line.cmp(&end_line) {
+            Ordering::Less => {
+                let eline = &content[end_line as usize];
+                range.end.line = end_line;
+                range.end.character = eline.encoded_len(lexer.encoding()) as u32;
+            }
+            Ordering::Equal => {
+                let eline = &content[end_line as usize];
+                if eline.is_empty() {
+                    return;
+                }
+                range.end.line = end_line;
+                range.end.character = eline.encoded_len(lexer.encoding()) as u32;
+            }
+            Ordering::Greater => return,
+        }
+    }
     match lexer.client.request_partial_tokens(lexer.uri.clone(), range, max_lines) {
         Ok(request) => lexer.requests.push(request),
         Err(err) => gs.send_error(err, lexer.lang.file_type),
@@ -333,7 +356,7 @@ pub fn tokens_partial(lexer: &mut Lexer, range: Range, max_lines: usize, gs: &mu
 }
 
 /// partial tokens not supported
-pub fn tokens_partial_redirect(lexer: &mut Lexer, _: Range, _: usize, gs: &mut GlobalState) {
+pub fn tokens_partial_redirect(lexer: &mut Lexer, _: EditMetaData, _: &[EditorLine], gs: &mut GlobalState) {
     (lexer.tokens)(lexer, gs)
 }
 

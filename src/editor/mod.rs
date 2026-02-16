@@ -499,9 +499,7 @@ impl Editor {
     }
 
     pub fn stringify(&self) -> String {
-        let mut text = self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n");
-        text.push('\n');
-        text
+        self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n")
     }
 
     pub fn resize(&mut self, width: usize, height: usize) {

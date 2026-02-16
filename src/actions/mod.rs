@@ -546,6 +546,9 @@ impl Actions {
                 Some(edit)
             })
             .collect();
+        if actions.is_empty() {
+            return;
+        }
         self.push_done(actions, lexer, content);
         cursor.match_content(content);
     }

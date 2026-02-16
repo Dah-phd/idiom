@@ -62,7 +62,10 @@ pub fn set_tokens(tokens: Vec<SemanticToken>, legend: &Legend, content: &mut [Ed
     for token in tokens {
         if token.delta_line != 0 {
             line_idx += token.delta_line as usize;
-            token_line = content[line_idx].tokens_mut();
+            token_line = match content.get_mut(line_idx) {
+                Some(l) => l.tokens_mut(),
+                None => return,
+            };
             token_line.clear();
         };
         token_line.push(Token::parse(token, legend));
