@@ -18,7 +18,10 @@ use controls::ControlMap;
 use idiom_tui::{layout::Rect, Position};
 use lsp_types::TextEdit;
 pub use modal::EditorModal;
-use std::path::PathBuf;
+use std::{
+    io::{BufWriter, Write},
+    path::PathBuf,
+};
 use syntax::Lexer;
 use utils::{
     big_file_protection, build_display, calc_line_number_offset, select_between_chars, select_between_chars_inc,
@@ -477,29 +480,51 @@ impl Editor {
     }
 
     pub fn save(&mut self, gs: &mut GlobalState) {
-        if let Some(content) = self.try_write_file(gs) {
-            self.saved_version = self.lexer.file_version();
-            self.lexer.save_and_check_lsp(content, gs);
-            gs.success(format!("SAVED {}", self.path.display()));
+        match self.try_write_file() {
+            Ok(..) => {
+                self.saved_version = self.lexer.file_version();
+                self.lexer.save_and_check_lsp(self.stringify(), gs);
+                gs.success(format!("SAVED {}", self.path.display()));
+            }
+            Err(error) => gs.error(error),
         }
     }
 
-    pub fn try_write_file(&self, gs: &mut GlobalState) -> Option<String> {
-        let content = self.content.iter().map(|l| l.as_str()).collect::<Vec<_>>().join("\n");
-        if let Err(error) = std::fs::write(&self.path, &content) {
-            gs.error(error);
-            return None;
+    pub fn write_file_logged(&self, gs: &mut GlobalState) {
+        match self.try_write_file() {
+            Ok(..) => (),
+            Err(error) => gs.error(error),
         }
-        Some(content)
+    }
+
+    fn try_write_file(&self) -> std::io::Result<()> {
+        let file = std::fs::File::options().write(true).create(true).open(&self.path)?;
+        let mut writer = BufWriter::new(file);
+        let mut content = self.content.iter();
+
+        let Some(fline) = content.next() else {
+            writer.write("".as_bytes())?;
+            return Ok(());
+        };
+        let mut line_end = fline.line_end();
+        writer.write(fline.as_str().as_bytes())?;
+
+        for eline in content {
+            writer.write(line_end.as_bytes())?;
+            writer.write(eline.as_str().as_bytes())?;
+            line_end = eline.line_end();
+        }
+
+        writer.flush()
+    }
+
+    pub fn stringify(&self) -> String {
+        self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n")
     }
 
     pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs, gs: &mut GlobalState) {
         self.actions.cfg = new_cfg.get_indent_cfg(self.file_type);
         self.lexer.reload_theme(gs);
-    }
-
-    pub fn stringify(&self) -> String {
-        self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n")
     }
 
     pub fn resize(&mut self, width: usize, height: usize) {

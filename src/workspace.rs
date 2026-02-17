@@ -154,7 +154,7 @@ impl Workspace {
                     editor.apply_file_edits(file_edits);
                 } else if let Ok(mut editor) = self.build_basic_editor(PathBuf::from(file_url.path().as_str()), gs) {
                     editor.apply_file_edits(file_edits);
-                    editor.try_write_file(gs);
+                    editor.write_file_logged(gs);
                 } else {
                     gs.error(format!("Unable to build editor for {}", file_url.path()));
                 }
@@ -208,7 +208,7 @@ impl Workspace {
                 })
                 .collect();
             editor.apply_file_edits(edits);
-            editor.try_write_file(gs);
+            editor.write_file_logged(gs);
         } else {
             gs.error(format!("Unable to build editor for {}", text_document_edit.text_document.uri.path()));
         };
