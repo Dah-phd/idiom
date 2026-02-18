@@ -1,6 +1,6 @@
 mod line_end;
 mod status;
-use line_end::LineParser;
+use line_end::{LineEnd, LineParser, POSIX_NLINE};
 pub use status::{Reduction, RenderStatus};
 
 use crate::editor::syntax::{tokens::TokenLine, DiagnosticInfo, DiagnosticLine, Encoding, Lang, Token};
@@ -14,7 +14,7 @@ use std::{
 /// Used to represent code, has simpler wrapping as cpde lines shoud be shorter than 120 chars in most cases
 pub struct EditorLine {
     content: String,
-    line_end: &'static str,
+    line_end: LineEnd,
     // keeps track of utf8 char len
     char_len: usize,
     // syntax
@@ -28,7 +28,7 @@ impl Default for EditorLine {
     fn default() -> Self {
         Self {
             content: String::default(),
-            line_end: LineParser::POSIX_NEWLINE.as_str(),
+            line_end: POSIX_NLINE,
             char_len: usize::default(),
             tokens: TokenLine::default(),
             diagnostics: Option::default(),
@@ -42,7 +42,7 @@ impl EditorLine {
         Self { char_len: content.char_len(), content, ..Default::default() }
     }
 
-    pub fn new(content: String, line_end: &'static str) -> Self {
+    pub fn new(content: String, line_end: LineEnd) -> Self {
         Self { char_len: content.char_len(), content, line_end, ..Default::default() }
     }
 
@@ -80,8 +80,13 @@ impl EditorLine {
     }
 
     #[inline(always)]
-    pub fn line_end(&self) -> &str {
-        self.line_end
+    pub fn end(&self) -> &str {
+        self.line_end.text
+    }
+
+    #[inline(always)]
+    pub fn end_view(&self) -> char {
+        self.line_end.char
     }
 
     #[inline(always)]

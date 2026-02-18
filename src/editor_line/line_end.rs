@@ -1,14 +1,20 @@
 use crate::{cursor::CursorPosition, editor_line::EditorLine};
 use logos::Logos;
 
-pub const MSDOS_NLINE: &str = "\r\n";
-pub const RISCOS_NLINE: &str = "\n\r";
-pub const POSIX_NLINE: &str = "\n";
-pub const CARRIAGE_NLINE: &str = "\r";
+#[derive(Debug)]
+pub struct LineEnd {
+    pub text: &'static str,
+    pub char: char,
+}
+
+pub const MSDOS_NLINE: LineEnd = LineEnd { text: "\r\n", char: '⇆' };
+pub const RISCOS_NLINE: LineEnd = LineEnd { text: "\n\r", char: '⇄' };
+pub const POSIX_NLINE: LineEnd = LineEnd { text: "\n", char: ' ' };
+pub const CARRIAGE_NLINE: LineEnd = LineEnd { text: "\r", char: '←' };
 
 #[derive(Debug, Default)]
 pub struct ParsedLines<'a> {
-    content: Vec<(&'a str, &'static str)>,
+    content: Vec<(&'a str, LineEnd)>,
     tabs: Vec<CursorPosition>,
     msdos: Vec<usize>,
     risc_os: Vec<usize>,
@@ -38,16 +44,6 @@ pub enum LineParser {
 }
 
 impl LineParser {
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Self::MSDOS_NEWLINE => MSDOS_NLINE,
-            Self::RISCOS_NEWLINE => RISCOS_NLINE,
-            Self::POSIX_NEWLINE => POSIX_NLINE,
-            Self::CARRIAGE_NEWLINE => CARRIAGE_NLINE,
-            Self::TAB => "\t",
-        }
-    }
-
     pub fn split_lines(text: &str) -> ParsedLines<'_> {
         let mut results = ParsedLines::default();
         let mut lines = Self::lexer(text);
@@ -84,41 +80,5 @@ impl LineParser {
         }
         results.content.push((&text[start..], POSIX_NLINE));
         results
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::{LineParser, Logos, CARRIAGE_NLINE, MSDOS_NLINE, POSIX_NLINE, RISCOS_NLINE};
-
-    #[test]
-    fn guard_line_parser_as_str() {
-        assert_eq!(LineParser::POSIX_NEWLINE.as_str(), POSIX_NLINE);
-        assert_eq!(LineParser::MSDOS_NEWLINE.as_str(), MSDOS_NLINE);
-        assert_eq!(LineParser::RISCOS_NEWLINE.as_str(), RISCOS_NLINE);
-        assert_eq!(LineParser::CARRIAGE_NEWLINE.as_str(), CARRIAGE_NLINE);
-    }
-
-    #[test]
-    fn test_parse() {
-        let text = "a💀w\ndawda\rad";
-        let pp = LineParser::split_lines(text);
-        panic!("{:?}", pp);
-    }
-
-    #[test]
-    fn parser_stable() {
-        let data = "asd\n\tasdawdaw\n\radwadawdawda\r\nadawdadwd\radwa";
-        let tokens = LineParser::lexer(data);
-        assert_eq!(
-            tokens.collect::<Vec<_>>(),
-            [
-                Ok(LineParser::POSIX_NEWLINE),
-                Ok(LineParser::TAB),
-                Ok(LineParser::RISCOS_NEWLINE),
-                Ok(LineParser::MSDOS_NEWLINE),
-                Ok(LineParser::CARRIAGE_NEWLINE)
-            ],
-        );
     }
 }

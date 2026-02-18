@@ -85,9 +85,9 @@ pub fn basic(line: &EditorLine, ctx: &CodecContext, backend: &mut CrossTerm) {
         idx += 1;
     }
     if idx <= cursor_idx {
-        backend.print_styled(" ", ContentStyle::reversed());
+        backend.print_styled(line.end_view(), ContentStyle::reversed());
     } else {
-        backend.print(" ");
+        backend.print(line.end_view());
     }
     backend.reset_style();
 }
@@ -150,7 +150,7 @@ pub fn select(line: &EditorLine, ctx: &CodecContext, mut select: SelectManager, 
     }
     backend.reset_style();
     if idx <= cursor_idx {
-        backend.print_styled(" ", ContentStyle::reversed());
+        backend.print_styled(' ', ContentStyle::reversed());
     } else {
         select.pad(gs);
     }
@@ -223,9 +223,11 @@ pub fn partial(line: &mut EditorLine, ctx: &CodecContext, line_width: usize, bac
     backend.reset_style();
 
     if idx <= cursor_idx {
-        backend.print_styled(" ", ContentStyle::reversed());
+        backend.print_styled(line.end_view(), ContentStyle::reversed());
     } else if line.char_len() > idx {
         backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
+    } else {
+        backend.print(line.end_view());
     }
 }
 
@@ -305,7 +307,7 @@ pub fn partial_select(
     }
     backend.reset_style();
     if idx <= cursor_idx {
-        backend.print_styled(" ", ContentStyle::reversed());
+        backend.print_styled(' ', ContentStyle::reversed());
     } else if line.char_len() > idx {
         backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
     }

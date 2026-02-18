@@ -506,13 +506,13 @@ impl Editor {
             writer.write("".as_bytes())?;
             return Ok(());
         };
-        let mut line_end = fline.line_end();
+        let mut line_end = fline.end();
         writer.write(fline.as_str().as_bytes())?;
 
         for eline in content {
             writer.write(line_end.as_bytes())?;
             writer.write(eline.as_str().as_bytes())?;
-            line_end = eline.line_end();
+            line_end = eline.end();
         }
 
         writer.flush()

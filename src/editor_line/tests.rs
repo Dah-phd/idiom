@@ -1,4 +1,9 @@
-use crate::{editor::syntax::Encoding, editor_line::EditorLine};
+use crate::{
+    editor::syntax::Encoding,
+    editor_line::line_end::{LineParser, CARRIAGE_NLINE, MSDOS_NLINE, POSIX_NLINE, RISCOS_NLINE},
+    editor_line::EditorLine,
+};
+use logos::Logos;
 
 #[test]
 fn test_get() {
@@ -193,4 +198,36 @@ fn test_split_off_ascii() {
     assert_eq!(line.len(), 4);
     assert_eq!(line.to_string(), "text");
     assert_eq!(line.to_string(), "text");
+}
+
+#[test]
+fn test_parse() {
+    let text = "a💀w\ndawda\rad";
+    let content = LineParser::split_lines(text).to_editor_lines();
+    let expect = [
+        EditorLine::new("a💀w".into(), POSIX_NLINE),
+        EditorLine::new("dawda".into(), CARRIAGE_NLINE),
+        EditorLine::new("ad".into(), POSIX_NLINE),
+    ];
+    assert_eq!(content.len(), expect.len());
+    for (real, expect) in content.iter().zip(expect.iter()) {
+        assert_eq!(real.as_str(), expect.as_str());
+        assert_eq!(real.end(), expect.end());
+    }
+}
+
+#[test]
+fn parser_stable() {
+    let data = "asd\n\tasdawdaw\n\radwadawdawda\r\nadawdadwd\radwa";
+    let tokens = LineParser::lexer(data);
+    assert_eq!(
+        tokens.collect::<Vec<_>>(),
+        [
+            Ok(LineParser::POSIX_NEWLINE),
+            Ok(LineParser::TAB),
+            Ok(LineParser::RISCOS_NEWLINE),
+            Ok(LineParser::MSDOS_NEWLINE),
+            Ok(LineParser::CARRIAGE_NEWLINE)
+        ],
+    );
 }

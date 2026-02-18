@@ -108,9 +108,9 @@ pub fn basic(text: &EditorLine, skip: usize, lines: &mut RectIter, ctx: &mut Cod
         ctx.wrap_line(line, backend);
     }
     if idx <= cursor_idx {
-        backend.print_styled(" ", ContentStyle::reversed());
+        backend.print_styled(text.end_view(), ContentStyle::reversed());
     } else {
-        backend.print(" ");
+        backend.print(text.end_view());
     }
 }
 
@@ -155,7 +155,7 @@ pub fn select(
         ctx.wrap_line(line, backend);
     }
     if idx <= cursor_idx {
-        backend.print_styled(" ", ContentStyle::reversed());
+        backend.print_styled(' ', ContentStyle::reversed());
     } else {
         select.pad(gs);
     }
