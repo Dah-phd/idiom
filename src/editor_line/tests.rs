@@ -1,6 +1,6 @@
 use crate::{
     editor::syntax::Encoding,
-    editor_line::line_end::{LineParser, CARRIAGE_NLINE, MSDOS_NLINE, POSIX_NLINE, RISCOS_NLINE},
+    editor_line::parser::{LineParser, CARRIAGE_NLINE, MSDOS_NLINE, POSIX_NLINE, RISCOS_NLINE},
     editor_line::EditorLine,
 };
 use logos::Logos;

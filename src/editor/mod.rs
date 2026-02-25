@@ -504,7 +504,7 @@ impl Editor {
 
         let Some(fline) = content.next() else {
             writer.write("".as_bytes())?;
-            return Ok(());
+            return writer.flush();
         };
         let mut line_end = fline.end();
         writer.write(fline.as_str().as_bytes())?;

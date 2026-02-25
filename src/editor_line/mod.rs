@@ -1,6 +1,6 @@
-mod line_end;
+mod parser;
 mod status;
-use line_end::{LineEnd, LineParser, POSIX_NLINE};
+use parser::{LineEnd, LineParser, POSIX_NLINE};
 pub use status::{Reduction, RenderStatus};
 
 use crate::editor::syntax::{tokens::TokenLine, DiagnosticInfo, DiagnosticLine, Encoding, Lang, Token};
