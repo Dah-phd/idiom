@@ -279,7 +279,6 @@ impl Editor {
         self.lexer.set_lsp_client(client, self.stringify(), gs);
     }
 
-    #[inline]
     pub fn lsp_local(&mut self, gs: &mut GlobalState) {
         self.lexer.local_lsp(self.file_type, self.stringify(), gs)
     }
@@ -483,7 +482,7 @@ impl Editor {
         match self.try_write_file() {
             Ok(..) => {
                 self.saved_version = self.lexer.file_version();
-                self.lexer.save_and_check_lsp(self.stringify(), gs);
+                Lexer::save_and_check_lsp(self, gs);
                 gs.success(format!("SAVED {}", self.path.display()));
             }
             Err(error) => gs.error(error),
@@ -498,20 +497,19 @@ impl Editor {
     }
 
     fn try_write_file(&self) -> std::io::Result<()> {
-        let file = std::fs::File::options().write(true).create(true).open(&self.path)?;
+        let file = std::fs::File::options().write(true).create(true).truncate(true).open(&self.path)?;
         let mut writer = BufWriter::new(file);
         let mut content = self.content.iter();
 
         let Some(fline) = content.next() else {
-            writer.write("".as_bytes())?;
-            return writer.flush();
+            return Ok(());
         };
         let mut line_end = fline.end();
-        writer.write(fline.as_str().as_bytes())?;
+        writer.write_all(fline.as_str().as_bytes())?;
 
         for eline in content {
-            writer.write(line_end.as_bytes())?;
-            writer.write(eline.as_str().as_bytes())?;
+            writer.write_all(line_end.as_bytes())?;
+            writer.write_all(eline.as_str().as_bytes())?;
             line_end = eline.end();
         }
 
@@ -519,7 +517,24 @@ impl Editor {
     }
 
     pub fn stringify(&self) -> String {
-        self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n")
+        let mut content = self.content.iter();
+        let Some(first) = content.next() else {
+            return String::new();
+        };
+
+        let size = self.content.iter().map(|el| el.len() + el.end().len()).sum();
+        let mut text = String::with_capacity(size);
+
+        let mut end = first.end();
+        text.push_str(first.as_str());
+
+        for eline in content {
+            text.push_str(end);
+            text.push_str(eline.as_str());
+            end = eline.end();
+        }
+
+        text
     }
 
     pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs, gs: &mut GlobalState) {

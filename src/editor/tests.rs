@@ -386,3 +386,22 @@ fn test_select_betwee_same_char_inc() {
     let result = select_between_chars_inc(&editor, '"', '"');
     assert_eq!(result, Some((CursorPosition { line: 1, char: 11 }, CursorPosition { line: 1, char: 29 })))
 }
+
+#[test]
+fn test_stringify() {
+    let editor = mock_editor(vec!["ta💀st".into(), "dwadad".into(), "adwdawd".into()]);
+    let text = editor.stringify();
+    assert_eq!(text, String::from("ta💀st\ndwadad\nadwdawd"));
+    assert_eq!(text.capacity(), text.len() + 1);
+
+    let editor = mock_editor(vec!["tast".into(), "dwad".into(), "adwdawd".into()]);
+    let text = editor.stringify();
+    assert_eq!(text, String::from("tast\ndwad\nadwdawd"));
+    assert_eq!(text.capacity(), text.len() + 1);
+
+    let mut editor = mock_editor(vec!["tast".into(), "adwdawd".into()]);
+    editor.content.insert(1, EditorLine::new("dwad".into(), crate::editor_line::tests::RISCOS_NLINE));
+    let text = editor.stringify();
+    assert_eq!(text, String::from("tast\ndwad\n\radwdawd"));
+    assert_eq!(text.capacity(), text.len() + 1);
+}

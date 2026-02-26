@@ -331,15 +331,17 @@ impl Lexer {
         };
     }
 
-    pub fn save_and_check_lsp(&mut self, content: String, gs: &mut GlobalState) {
-        if self.lsp {
+    pub fn save_and_check_lsp(editor: &mut Editor, gs: &mut GlobalState) {
+        if editor.lexer.lsp {
+            let content = editor.stringify();
+            let lexer = &mut editor.lexer;
             gs.message("Checking LSP status (on save) ...");
-            if self.client.file_did_save(self.uri.clone(), content).is_err() && self.client.is_closed() {
-                gs.event.push(IdiomEvent::CheckLSP(self.lang.file_type));
+            if lexer.client.file_did_save(lexer.uri.clone(), content).is_err() && lexer.client.is_closed() {
+                gs.event.push(IdiomEvent::CheckLSP(lexer.lang.file_type));
             } else {
                 gs.success("LSP running ...");
             }
-            (self.tokens)(self, gs);
+            (lexer.tokens)(lexer, gs);
         }
     }
 

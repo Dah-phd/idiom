@@ -1,8 +1,5 @@
-use crate::{
-    editor::syntax::Encoding,
-    editor_line::parser::{LineParser, CARRIAGE_NLINE, MSDOS_NLINE, POSIX_NLINE, RISCOS_NLINE},
-    editor_line::EditorLine,
-};
+pub use crate::editor_line::parser::{LineParser, CARRIAGE_NLINE, MSDOS_NLINE, POSIX_NLINE, RISCOS_NLINE};
+use crate::{editor::syntax::Encoding, editor_line::EditorLine};
 use logos::Logos;
 
 #[test]

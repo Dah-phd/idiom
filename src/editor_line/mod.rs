@@ -540,4 +540,4 @@ impl From<EditorLine> for String {
 }
 
 #[cfg(test)]
-mod tests;
+pub mod tests;
