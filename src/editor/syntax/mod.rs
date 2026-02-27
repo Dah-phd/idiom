@@ -63,7 +63,7 @@ pub struct Lexer {
     hover: fn(&mut Self, CursorPosition, &mut GlobalState),
     signatures: fn(&mut Self, CursorPosition, &mut GlobalState),
 
-    formatting: fn(&mut Self, usize, bool, &mut GlobalState),
+    formatting: fn(&mut Self, usize, bool, &mut GlobalState) -> bool,
 
     /// SYNC
     /// get partial tokens based on EditMetaData
@@ -318,8 +318,8 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn formatting(&mut self, indent: usize, save: bool, gs: &mut GlobalState) {
-        (self.formatting)(self, indent, save, gs);
+    pub fn try_formatting(&mut self, indent: usize, save: bool, gs: &mut GlobalState) -> bool {
+        (self.formatting)(self, indent, save, gs)
     }
 
     pub fn reload_theme(&mut self, gs: &mut GlobalState) {

@@ -16,7 +16,7 @@ use crate::workspace::Workspace;
 use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, Range, WorkspaceEdit};
 use std::path::PathBuf;
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Debug, PartialEq)]
 pub enum StartInplacePopup {
     Pop(PopupChoice),
     RefSelector(PopupSelector<(String, PathBuf, Range)>),
@@ -24,7 +24,7 @@ pub enum StartInplacePopup {
     MarkWord,
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug)]
 pub enum IdiomEvent {
     CreateFileOrFolder { name: String, from_base: bool },
     RenamedFile { from_path: PathBuf, to_path: PathBuf },
@@ -45,12 +45,10 @@ pub enum IdiomEvent {
     CheckLSP(FileType),
     SetLSP(FileType),
     InsertText(String),
-    WorkspaceEdit(WorkspaceEdit),
+    WorkspaceEdit { edits: WorkspaceEdit, save_active: bool },
     ActivateEditor(usize),
     SetMode(Mode),
     IdiomCommand,
-    Save,
-    Rebase,
 }
 
 impl IdiomEvent {
@@ -191,7 +189,12 @@ impl IdiomEvent {
             IdiomEvent::RenamedFile { from_path, to_path } => {
                 ws.rename_editors(from_path, to_path, gs);
             }
-            IdiomEvent::WorkspaceEdit(edits) => ws.apply_edits(edits, gs),
+            IdiomEvent::WorkspaceEdit { edits, save_active } => {
+                ws.apply_edits(edits, gs);
+                if save_active {
+                    ws.save_active(gs);
+                }
+            }
             IdiomEvent::SetMode(mode) => match mode {
                 Mode::Select => gs.select_mode(),
                 Mode::Insert => gs.insert_mode(),
@@ -224,16 +227,6 @@ impl IdiomEvent {
                 }
                 Pallet::run_as_command(gs, ws, tree, term);
             }
-            IdiomEvent::Rebase => {
-                if let Some(editor) = ws.get_active() {
-                    editor.rebase(gs);
-                }
-            }
-            IdiomEvent::Save => {
-                if let Some(editor) = ws.get_active() {
-                    editor.save(gs);
-                }
-            }
         }
     }
 }
@@ -259,9 +252,9 @@ impl From<LocationLink> for IdiomEvent {
     }
 }
 
-impl From<WorkspaceEdit> for IdiomEvent {
-    fn from(value: WorkspaceEdit) -> Self {
-        Self::WorkspaceEdit(value)
+impl From<(WorkspaceEdit, bool)> for IdiomEvent {
+    fn from((edits, save_active): (WorkspaceEdit, bool)) -> Self {
+        Self::WorkspaceEdit { edits, save_active }
     }
 }
 

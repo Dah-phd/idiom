@@ -47,25 +47,24 @@ impl Workspace {
 
     pub fn render(&mut self, gs: &mut GlobalState) {
         let mut editors = self.editors.iter();
-        if let Some(editor) = editors.next() {
-            let line = match gs.tab_area().into_iter().next() {
-                Some(line) => line,
-                None => return,
-            };
-            gs.backend.set_style(ContentStyle::underlined(None));
-            {
-                let mut builder = line.unsafe_builder(&mut gs.backend);
-                builder.push("[ ");
-                builder.push_styled(editor.name(), self.tab_style);
-                builder.push(saved_mark(editor));
-                if editors.all(|e| builder.push("| ") && builder.push(e.name()) && builder.push(saved_mark(e))) {
-                    builder.push("]");
-                }
-            }
-            gs.backend.reset_style();
-        } else if let Some(line) = gs.tab_area().into_iter().next() {
+        let Some(line) = gs.tab_area().into_iter().next() else {
+            return;
+        };
+        let Some(editor) = editors.next() else {
             line.render_empty(&mut gs.backend);
+            return;
+        };
+        gs.backend.set_style(ContentStyle::underlined(None));
+        {
+            let mut builder = line.unsafe_builder(&mut gs.backend);
+            builder.push("[ ");
+            builder.push_styled(editor.name(), self.tab_style);
+            builder.push(saved_mark(editor));
+            if editors.all(|e| builder.push("| ") && builder.push(e.name()) && builder.push(saved_mark(e))) {
+                builder.push("]");
+            }
         }
+        gs.backend.reset_style();
     }
 
     pub fn fast_render(&mut self, gs: &mut GlobalState) {
@@ -113,6 +112,14 @@ impl Workspace {
     #[inline(always)]
     pub fn get_active(&mut self) -> Option<&mut Editor> {
         self.editors.get_mut_no_update(0)
+    }
+
+    #[inline]
+    pub fn save_active(&mut self, gs: &mut GlobalState) {
+        let Some(editor) = self.get_active() else { return };
+        editor.save(gs);
+        self.editors.mark_updated();
+        self.map_callback = map_editor_post_save;
     }
 
     #[inline]
@@ -536,10 +543,10 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
     if !editor.map(action, gs) {
         match action {
             EditorAction::Save => {
-                editor.save(gs);
-                ws.map_callback = map_editor_post_save;
-                if ws.base_configs.format_on_save {
-                    editor.call_formatter_and_save(gs);
+                if !ws.base_configs.format_on_save || !editor.try_formatter_and_save(gs) {
+                    editor.save(gs);
+                    ws.editors.mark_updated();
+                    ws.map_callback = map_editor_post_save;
                 }
             }
             EditorAction::Close => ws.close_active(gs),

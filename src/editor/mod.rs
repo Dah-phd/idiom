@@ -268,11 +268,11 @@ impl Editor {
     }
 
     pub fn call_formatter(&mut self, gs: &mut GlobalState) {
-        self.lexer.formatting(self.actions.cfg.indent.len(), false, gs);
+        self.lexer.try_formatting(self.actions.cfg.indent.len(), false, gs);
     }
 
-    pub fn call_formatter_and_save(&mut self, gs: &mut GlobalState) {
-        self.lexer.formatting(self.actions.cfg.indent.len(), true, gs);
+    pub fn try_formatter_and_save(&mut self, gs: &mut GlobalState) -> bool {
+        self.lexer.try_formatting(self.actions.cfg.indent.len(), true, gs)
     }
 
     pub fn lsp_set(&mut self, client: LSPClient, gs: &mut GlobalState) {
@@ -473,7 +473,10 @@ impl Editor {
         };
         self.content = content.split('\n').map(|line| EditorLine::new_posix(line.to_owned())).collect();
         match self.lexer.reopen(content, self.file_type, gs) {
-            Ok(()) => gs.success("File rebased!"),
+            Ok(()) => {
+                self.saved_version = self.lexer.file_version();
+                gs.success("File rebased!");
+            }
             Err(err) => gs.error(format!("Filed to reactivate LSP after rebase! ERR: {err}")),
         }
     }

@@ -1,4 +1,4 @@
-use crate::{cursor::CursorPosition, editor_line::EditorLine};
+use crate::{editor_line::EditorLine, popups::generic_popup::PopupChoice};
 use logos::Logos;
 
 #[derive(Debug)]
@@ -15,7 +15,7 @@ pub const CARRIAGE_NLINE: LineEnd = LineEnd { text: "\r", char: '←' };
 #[derive(Debug, Default)]
 pub struct ParsedLines<'a> {
     content: Vec<(&'a str, LineEnd)>,
-    tabs: Vec<CursorPosition>,
+    tabs: Vec<usize>,
     msdos: Vec<usize>,
     risc_os: Vec<usize>,
     carriage: Vec<usize>,
@@ -55,7 +55,7 @@ impl LineParser {
             let line_end = match token {
                 Err(..) => continue,
                 Ok(Self::TAB) => {
-                    results.tabs.push(CursorPosition { line, char: 0 });
+                    results.tabs.push(line);
                     continue;
                 }
                 Ok(Self::POSIX_NEWLINE) => POSIX_NLINE,

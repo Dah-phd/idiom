@@ -17,7 +17,7 @@ use idiom_tui::{
 use std::ops::Range;
 
 #[allow(unpredictable_function_pointer_comparisons)]
-#[derive(Clone, PartialEq)]
+#[derive(PartialEq)]
 pub struct CommandButton {
     pub command: fn(&mut PopupChoice, &mut Components),
     pub name: &'static str,
@@ -30,7 +30,7 @@ impl std::fmt::Debug for CommandButton {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct PopupChoice {
     pub message: TextField,
     buffer_message: bool,

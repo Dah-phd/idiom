@@ -197,12 +197,10 @@ fn handle_responses(editor: &mut Editor, gs: &mut GlobalState) {
             }
             LSPResponse::Hover(hover) => modal.map_hover(hover, &gs.theme),
             LSPResponse::SignatureHelp(signature) => modal.map_signatures(signature, &gs.theme),
-            LSPResponse::Renames(workspace_edit) => gs.event.push(workspace_edit.into()),
+            LSPResponse::Renames(workspace_edit) => gs.event.push((workspace_edit, false).into()),
             LSPResponse::Formatting { edits, save } => {
-                if save {
-                    gs.event.push(IdiomEvent::Save)
-                };
-                gs.event.push(WorkspaceEdit::new([(editor.lexer.uri.clone(), edits)].into_iter().collect()).into());
+                let edits = WorkspaceEdit::new([(editor.lexer.uri.clone(), edits)].into_iter().collect());
+                gs.event.push((edits, save).into());
             }
             LSPResponse::Tokens(token_result) => {
                 editor.lexer.context = context;
@@ -381,14 +379,22 @@ pub fn get_autocomplete_dead(_: &mut Lexer, _: CursorPosition, _: &mut GlobalSta
 
 // FORMATTING
 
-pub fn formatting(lexer: &mut Lexer, indent: usize, save: bool, gs: &mut GlobalState) {
+pub fn formatting(lexer: &mut Lexer, indent: usize, save: bool, gs: &mut GlobalState) -> bool {
     match lexer.client.formatting(lexer.uri.clone(), indent, save) {
-        Ok(request) => lexer.requests.push(request),
-        Err(err) => gs.send_error(err, lexer.lang.file_type),
+        Ok(request) => {
+            lexer.requests.push(request);
+            true
+        }
+        Err(err) => {
+            gs.send_error(err, lexer.lang.file_type);
+            false
+        }
     }
 }
 
-pub fn formatting_dead(_: &mut Lexer, _: usize, _: bool, _: &mut GlobalState) {}
+pub fn formatting_dead(_: &mut Lexer, _: usize, _: bool, _: &mut GlobalState) -> bool {
+    false
+}
 
 // INFO
 
