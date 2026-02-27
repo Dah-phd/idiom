@@ -199,12 +199,15 @@ fn test_split_off_ascii() {
 
 #[test]
 fn test_parse() {
-    let text = "a💀w\ndawda\rad";
+    let text = "a💀w\ndawda\radaw\r\nwas\n_💀_\n\r+++";
     let content = LineParser::split_lines(text).to_editor_lines();
     let expect = [
         EditorLine::new("a💀w".into(), POSIX_NLINE),
         EditorLine::new("dawda".into(), CARRIAGE_NLINE),
-        EditorLine::new("ad".into(), POSIX_NLINE),
+        EditorLine::new("adaw".into(), MSDOS_NLINE),
+        EditorLine::new("was".into(), POSIX_NLINE),
+        EditorLine::new("_💀_".into(), RISCOS_NLINE),
+        EditorLine::new("+++".into(), POSIX_NLINE),
     ];
     assert_eq!(content.len(), expect.len());
     for (real, expect) in content.iter().zip(expect.iter()) {
