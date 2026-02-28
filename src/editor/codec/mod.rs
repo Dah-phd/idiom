@@ -19,6 +19,7 @@ use idiom_tui::layout::IterLines;
 /// In order to escape complicated state machines and any form on polymorphism,
 /// it derives the correct function pointers on file opening.
 pub struct TuiCodec {
+    last_render_len: usize,
     last_render_at_line: Option<usize>,
     render: fn(&mut Editor, &mut GlobalState) -> EditorStats,
     fast_render: fn(&mut Editor, &mut GlobalState) -> EditorStats,
@@ -27,21 +28,22 @@ pub struct TuiCodec {
 impl TuiCodec {
     #[inline]
     pub fn code() -> Self {
-        Self { render: code_render, fast_render: fast_code_render, last_render_at_line: None }
+        Self { render: code_render, fast_render: fast_code_render, last_render_at_line: None, last_render_len: 0 }
     }
 
     #[inline]
     pub fn text() -> Self {
-        Self { render: text_render, fast_render: fast_text_render, last_render_at_line: None }
+        Self { render: text_render, fast_render: fast_text_render, last_render_at_line: None, last_render_len: 0 }
     }
 
     #[inline]
     pub fn markdown() -> Self {
-        Self { render: md_render, fast_render: fast_md_render, last_render_at_line: None }
+        Self { render: md_render, fast_render: fast_md_render, last_render_at_line: None, last_render_len: 0 }
     }
 
     #[inline]
     pub fn render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
+        editor.codec.last_render_len = editor.content.len();
         (editor.codec.render)(editor, gs)
     }
 
@@ -57,7 +59,7 @@ impl TuiCodec {
 
     #[inline]
     pub fn is_cached_at_line(&self, at_line: usize) -> bool {
-        matches!(self.last_render_at_line, Some(val) if val == at_line)
+        matches!(self.last_render_at_line, Some(idx) if idx == at_line)
     }
 
     pub fn all_lines_cached(editor: &mut Editor) -> bool {
@@ -110,6 +112,12 @@ impl TuiCodec {
             }
         }
     }
+
+    fn is_full_render_needed(&mut self, content_len: usize, at_line: usize) -> bool {
+        let is_multiline_reduction = self.last_render_len > content_len + 1;
+        self.last_render_len = content_len; // reduction of 1 is allwed with context.correct_last_line_match
+        is_multiline_reduction || !self.is_cached_at_line(at_line)
+    }
 }
 
 // CODE
@@ -126,7 +134,7 @@ fn fast_code_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
     let Editor { lexer, cursor, content, line_number_padding, modal, codec, .. } = editor;
 
     code::reposition(cursor);
-    if !matches!(codec.last_render_at_line, Some(idx) if idx == cursor.at_line) {
+    if codec.is_full_render_needed(content.len(), cursor.at_line) {
         return code_render_full(editor, gs);
     }
     let accent_style = gs.ui_theme.accent_fg();
@@ -209,7 +217,7 @@ fn multi_fast_code_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorSt
 
     code::reposition(cursor);
 
-    if !matches!(codec.last_render_at_line, Some(idx) if idx == cursor.at_line) {
+    if codec.is_full_render_needed(content.len(), cursor.at_line) {
         return multi_code_render_full(editor, gs);
     }
 
@@ -286,7 +294,7 @@ fn fast_text_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
     let Editor { lexer, cursor, content, line_number_padding, codec, .. } = editor;
 
     let skip = text::reposition(cursor, content).unwrap_or_default();
-    if !matches!(codec.last_render_at_line, Some(idx) if idx == cursor.at_line) {
+    if codec.is_full_render_needed(content.len(), cursor.at_line) {
         return text_full_render(editor, gs, skip);
     }
     let accent_style = gs.ui_theme.accent_fg();
@@ -363,7 +371,7 @@ fn fast_md_render(editor: &mut Editor, gs: &mut GlobalState) -> EditorStats {
     let Editor { lexer, cursor, content, line_number_padding, codec, .. } = editor;
 
     let skip = text::reposition(cursor, content).unwrap_or_default();
-    if !matches!(codec.last_render_at_line, Some(idx) if idx == cursor.at_line) {
+    if codec.is_full_render_needed(content.len(), cursor.at_line) {
         return md_full_render(editor, gs, skip);
     }
     let accent_style = gs.ui_theme.accent_fg();

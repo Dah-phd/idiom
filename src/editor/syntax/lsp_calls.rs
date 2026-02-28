@@ -139,6 +139,7 @@ pub fn remove_lsp(lexer: &mut Lexer) {
     lexer.signatures = info_position_dead;
     lexer.sync = sync_action_dead;
     lexer.sync_rev = sync_edits_rev_dead;
+    lexer.formatting = formatting_dead;
     lexer.encoding = Encoding::utf32();
 }
 
