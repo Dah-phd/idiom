@@ -87,8 +87,8 @@ impl ControlMap {
             Some(cursor) => editor.cursor.set_cursor(cursor),
             None => editor.cursor.set_position(CursorPosition::default()),
         };
-        editor.last_render_at_line = None;
         editor.controls.single_cursor_map();
+        editor.codec.clear_cache();
         editor.codec.single_cursor(editor.file_type);
     }
 

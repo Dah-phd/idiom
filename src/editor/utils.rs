@@ -197,7 +197,6 @@ pub fn editor_from_data(
         controls: ControlMap::default(),
         saved_version: 0,
         codec: renderer,
-        last_render_at_line: None,
         cursor,
         line_number_padding: line_number_offset,
         lexer,

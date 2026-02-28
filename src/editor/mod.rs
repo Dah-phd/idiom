@@ -48,7 +48,6 @@ pub struct Editor {
     display: String,
     path: PathBuf,
     line_number_padding: usize,
-    last_render_at_line: Option<usize>,
 }
 
 impl Editor {
@@ -74,7 +73,6 @@ impl Editor {
             display,
             saved_version: 0,
             path,
-            last_render_at_line: None,
             modal: EditorModal::default(),
         })
     }
@@ -98,7 +96,6 @@ impl Editor {
             display,
             saved_version: 0,
             path,
-            last_render_at_line: None,
             modal: EditorModal::default(),
         })
     }
@@ -122,7 +119,6 @@ impl Editor {
             display,
             saved_version: 0,
             path,
-            last_render_at_line: None,
             modal: EditorModal::default(),
         })
     }
@@ -200,9 +196,9 @@ impl Editor {
         let new_offset = calc_line_number_offset(self.content.len());
         if new_offset != self.line_number_padding {
             self.line_number_padding = new_offset;
-            self.last_render_at_line.take();
+            self.codec.clear_cache();
         };
-        (self.codec.render)(self, gs)
+        TuiCodec::render(self, gs)
     }
 
     /// renders only updated lines
@@ -211,9 +207,9 @@ impl Editor {
         let new_offset = calc_line_number_offset(self.content.len());
         if new_offset != self.line_number_padding {
             self.line_number_padding = new_offset;
-            self.last_render_at_line.take();
+            self.codec.clear_cache();
         };
-        (self.codec.fast_render)(self, gs)
+        TuiCodec::fast_render(self, gs)
     }
 
     /// Main usecase is after manual Lexer::context to check if update is needed
@@ -221,8 +217,7 @@ impl Editor {
     /// estimates if there has been changes to the data within content
     #[inline]
     pub fn has_render_cache(&mut self) -> bool {
-        let render_line_maches = matches!(self.last_render_at_line, Some(val) if val == self.cursor.at_line);
-        render_line_maches && TuiCodec::all_lines_cached(self)
+        self.codec.is_cached_at_line(self.cursor.at_line) && TuiCodec::all_lines_cached(self)
     }
 
     pub fn clear_ui(&mut self, gs: &GlobalState) {
@@ -234,7 +229,7 @@ impl Editor {
     #[inline(always)]
     pub fn clear_screen_cache(&mut self, gs: &mut GlobalState) {
         self.lexer.refresh_lsp(gs);
-        self.last_render_at_line = None;
+        self.codec.clear_cache();
     }
 
     pub fn clear_lines_cache(&mut self, rect: Rect, gs: &GlobalState) {
@@ -665,7 +660,7 @@ impl Editor {
 
     pub fn mouse_multi_cursor(&mut self, position: Position) {
         self.modal.drop();
-        self.last_render_at_line = None;
+        self.codec.clear_cache();
         let position = self.mouse_parse(position);
         if self.cursor == position {
             return;

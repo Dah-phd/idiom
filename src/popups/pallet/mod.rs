@@ -2,17 +2,18 @@ mod change_state;
 mod command_patterns;
 mod formatting;
 use crate::{
-    configs::{EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
+    configs::{APP_FOLDER, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
     embeded_term::EditorTerminal,
     ext_tui::{text_field::map_key, State, StyleExt},
     global_state::{GlobalState, IdiomEvent},
-    popups::{popup_file_open::OpenFileSelector, Command, CommandResult, Components, Popup, Status},
+    popups::{popup_file_open::OpenFileSelector, Components, Popup, Status},
     tree::Tree,
     workspace::Workspace,
 };
 use command_patterns::Pattern;
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
+use dirs::config_dir;
 use fuzzy_matcher::FuzzyMatcher;
 use idiom_tui::{
     layout::Rect,
@@ -23,6 +24,40 @@ use idiom_tui::{
 enum Mode {
     Cmd,
     EasyAccess,
+}
+
+struct Command {
+    label: &'static str,
+    result: CommandResult,
+}
+
+impl Command {
+    fn execute(self) -> CommandResult {
+        self.result
+    }
+
+    fn cfg_open(label: &'static str, file_path: &'static str) -> Option<Self> {
+        let mut path = config_dir()?;
+        path.push(APP_FOLDER);
+        path.push(file_path);
+        Some(Command { label, result: CommandResult::Simple(IdiomEvent::OpenAtLine(path, 0)) })
+    }
+
+    fn pass_event(label: &'static str, event: IdiomEvent) -> Self {
+        Command { label, result: CommandResult::Simple(event) }
+    }
+
+    fn components(
+        label: &'static str,
+        cb: fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal),
+    ) -> Self {
+        Command { label, result: CommandResult::BigCB(cb) }
+    }
+}
+
+enum CommandResult {
+    Simple(IdiomEvent),
+    BigCB(fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal)),
 }
 
 pub struct Pallet {
