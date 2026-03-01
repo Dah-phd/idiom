@@ -1,6 +1,10 @@
-use crate::editor::tests::mock_editor;
-use crate::ext_tui::{CrossTerm, StyleExt};
-use crate::global_state::GlobalState;
+use super::TuiCodec;
+use crate::{
+    editor::tests::mock_editor,
+    editor_line::RenderStatus,
+    ext_tui::{CrossTerm, StyleExt},
+    global_state::GlobalState,
+};
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{layout::Rect, Backend};
 
@@ -130,4 +134,72 @@ fn test_has_render_cache() {
     editor.cursor.select_word(&editor.content);
     assert!(editor.cursor.select_get().is_some());
     assert!(editor.has_render_cache());
+}
+
+#[test]
+fn test_is_full_render_or_invalidate_lines() {
+    let mut gs = GlobalState::new(Rect::new(0, 0, 80, 8), CrossTerm::init());
+    gs.force_area_calc();
+
+    let mut editor = mock_editor(vec![
+        "use some_package".into(),
+        String::new(),
+        "fn main() {".into(),
+        "    let data = \"adadwas\";".into(),
+        "    some_pacakge::do_something(data);".into(),
+        "    println!(\"{:?}\", data);".into(),
+        "}".into(),
+        String::new(),
+        "fn main() {".into(),
+        "    let data = \"adadwas\";".into(),
+        "    some_pacakge::do_something(data);".into(),
+        "    println!(\"{:?}\", data);".into(),
+        "}".into(),
+        String::new(),
+        "fn main() {".into(),
+        "    let data = \"adadwas\";".into(),
+        "    some_pacakge::do_something(data);".into(),
+        "    println!(\"{:?}\", data);".into(),
+        "}".into(),
+    ]);
+
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+    assert_eq!(editor.cursor.max_rows, 6);
+
+    editor.render(&mut gs);
+    assert!(!TuiCodec::is_full_render_or_invalidate_lines(&mut editor));
+
+    assert_eq!(editor.content.len(), 19);
+    assert!(!TuiCodec::is_full_render_or_invalidate_lines(&mut editor));
+
+    let four = editor.content.remove(4);
+    let five = editor.content.remove(4);
+    assert_eq!(editor.content.len(), 17);
+    editor.render(&mut gs);
+    assert!(!editor.content[4].cached.is_none() && !editor.content[5].cached.is_none());
+
+    editor.content.insert(4, five);
+    editor.content.insert(4, four);
+    assert!(!editor.content[6].cached.is_none() && !editor.content[7].cached.is_none());
+    let sixth = editor.content[6].to_string();
+    let seventh = editor.content[7].to_string();
+    editor.render(&mut gs);
+
+    editor.content.remove(4);
+    editor.content.remove(4);
+
+    // ensure stuct is correct
+    let mut expect_rend_stat = RenderStatus::None;
+
+    expect_rend_stat.line(5, None);
+    assert_eq!(editor.content[4].cached, expect_rend_stat);
+    assert_eq!(editor.content[4].as_str(), sixth.as_str());
+
+    expect_rend_stat.line(6, None);
+    assert_eq!(editor.content[5].cached, expect_rend_stat);
+    assert_eq!(editor.content[5].as_str(), seventh.as_str());
+
+    assert!(!TuiCodec::is_full_render_or_invalidate_lines(&mut editor));
+    assert!(editor.content[4].cached.is_none());
+    assert!(editor.content[5].cached.is_none());
 }

@@ -38,6 +38,21 @@ fn test_insert() {
 }
 
 #[test]
+fn test_insert_cyrillic() {
+    let mut line = EditorLine::new_posix("text".to_owned());
+    assert!(line.char_len() == 4);
+    let encoding = Encoding::utf32();
+    line.insert_simple(2, 'g', &encoding);
+    assert!(line.is_simple());
+    line.insert_simple(2, 'з', &encoding);
+    assert_eq!(line.char_len(), 6);
+    assert!(!line.is_simple());
+    line.insert_simple(3, 'й', &encoding);
+    assert_eq!(line.char_len(), 7);
+    assert_eq!(&line.to_string(), "teзйgxt");
+}
+
+#[test]
 fn test_insert_str() {
     let mut line = EditorLine::new_posix("text".to_owned());
     line.insert_str(0, "text");
@@ -61,6 +76,21 @@ fn test_push() {
     assert!(line.to_string().len() == 9);
     assert!(line.char_len() == 6);
     assert!(&line.to_string() == "text1🚀");
+}
+
+#[test]
+fn test_push_with_cyrillic() {
+    let encoding = Encoding::utf32();
+    let mut line = EditorLine::new_posix("text".to_owned());
+    line.push_simple('i', &encoding);
+    assert!(line.is_simple());
+    assert!(line.char_len() == 5);
+    line.push_simple('г', &encoding);
+    line.push_simple('г', &encoding);
+    assert!(!line.is_simple());
+    assert_eq!(line.to_string().len(), 9);
+    assert_eq!(line.char_len(), 7);
+    assert_eq!(&line.to_string(), "textiгг");
 }
 
 #[test]

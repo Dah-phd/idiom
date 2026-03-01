@@ -123,8 +123,8 @@ impl TuiCodec {
                     if diff > cursor.max_rows {
                         true
                     } else {
-                        for l in content.iter_mut().take(cursor.at_line + cursor.max_rows).rev().take(diff) {
-                            l.cached.reset();
+                        for eline in content.iter_mut().take(cursor.at_line + cursor.max_rows).rev().take(diff) {
+                            eline.cached.reset();
                         }
                         false
                     }
