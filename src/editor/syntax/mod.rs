@@ -212,7 +212,7 @@ impl Lexer {
 
     #[inline(always)]
     pub fn sync_changes_from_action(&mut self, action: &Action, content: &[EditorLine]) {
-        let changes = action.text_changes(self.encoding.encode_position, self.encoding.char_len, content);
+        let changes = action.text_changes(&self.encoding, content);
         self.sync_changes(changes);
     }
 
@@ -267,7 +267,7 @@ impl Lexer {
 
     #[inline(always)]
     pub fn char_lsp_pos(&self, ch: char) -> usize {
-        (self.encoding.char_len)(ch)
+        self.encoding.char_len(ch)
     }
 
     #[inline]

@@ -12,6 +12,7 @@ use super::{
 use crate::global_state::GlobalState;
 use crate::{
     cursor::{CharRange, CharRangeUnbound, Cursor, CursorPosition},
+    editor::syntax::Encoding,
     editor_line::EditorLine,
 };
 use crossterm::style::Stylize;
@@ -44,21 +45,27 @@ pub fn reposition(cursor: &mut Cursor) {
 }
 
 #[inline]
-pub fn cursor(code: &mut EditorLine, ctx: &mut CodecContext, line: Line, gs: &mut GlobalState) {
+pub fn cursor(code: &mut EditorLine, line: Line, encoding: &Encoding, ctx: &mut CodecContext, gs: &mut GlobalState) {
     let select = ctx.select_get();
     code.cached.cursor(line.row, ctx.cursor_char(), 0, select.clone());
     let line_width = ctx.setup_cursor(line, gs.backend());
     let select = select.and_then(|select| SelectManager::new(select, gs.theme.selected));
     if code.is_simple() {
-        ascii_cursor::render(code, ctx, line_width, select, gs);
+        ascii_cursor::render(code, line_width, select, ctx, gs);
     } else {
-        complex_cursor::render(code, ctx, line_width, select, gs);
+        complex_cursor::render(code, line_width, select, encoding, ctx, gs);
     }
     gs.backend.reset_style();
 }
 
 #[inline]
-pub fn cursor_fast(code: &mut EditorLine, ctx: &mut CodecContext, line: Line, gs: &mut GlobalState) {
+pub fn cursor_fast(
+    code: &mut EditorLine,
+    line: Line,
+    encoding: &Encoding,
+    ctx: &mut CodecContext,
+    gs: &mut GlobalState,
+) {
     let select = ctx.select_get();
     if !code.cached.should_render_cursor_or_update(line.row, ctx.cursor_char(), select.clone()) {
         ctx.skip_line();
@@ -69,8 +76,8 @@ pub fn cursor_fast(code: &mut EditorLine, ctx: &mut CodecContext, line: Line, gs
 
     let select = select.and_then(|select| SelectManager::new(select, gs.theme.selected));
     match code.is_simple() {
-        true => ascii_cursor::render(code, ctx, line_width, select, gs),
-        false => complex_cursor::render(code, ctx, line_width, select, gs),
+        true => ascii_cursor::render(code, line_width, select, ctx, gs),
+        false => complex_cursor::render(code, line_width, select, encoding, ctx, gs),
     }
     gs.backend.reset_style();
 }
@@ -78,16 +85,17 @@ pub fn cursor_fast(code: &mut EditorLine, ctx: &mut CodecContext, line: Line, gs
 #[inline]
 pub fn multi_cursor(
     code: &mut EditorLine,
-    ctx: &mut CodecContext,
     line: Line,
-    gs: &mut GlobalState,
     cursors: Vec<CursorPosition>,
     selects: Vec<CharRange>,
+    encoding: &Encoding,
+    ctx: &mut CodecContext,
+    gs: &mut GlobalState,
 ) {
     let line_width = ctx.setup_cursor(line, gs.backend());
     match code.is_simple() {
-        true => ascii_multi_cursor::render(code, ctx, line_width, cursors, selects, gs),
-        false => complex_multi_cursor::render(code, ctx, line_width, cursors, selects, gs),
+        true => ascii_multi_cursor::render(code, line_width, cursors, selects, ctx, gs),
+        false => complex_multi_cursor::render(code, line_width, cursors, selects, encoding, ctx, gs),
     }
 }
 
@@ -97,6 +105,7 @@ pub fn fast_render_is_cursor(
     cursors: &[Cursor],
     line: Line,
     line_idx: usize,
+    encoding: &Encoding,
     ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) -> bool {
@@ -105,7 +114,7 @@ pub fn fast_render_is_cursor(
             ctx.skip_line();
             return false;
         };
-        multi_cursor(text, ctx, line, gs, cursors, selects);
+        multi_cursor(text, line, cursors, selects, encoding, ctx, gs);
     } else if ctx.has_cursor(line_idx) {
         let select = ctx.select_get();
         if !text.cached.should_render_cursor_or_update(line.row, ctx.cursor_char(), select.clone()) {
@@ -116,14 +125,14 @@ pub fn fast_render_is_cursor(
         let line_width = ctx.setup_cursor(line, gs.backend());
 
         match text.is_simple() {
-            true => ascii_cursor::render(text, ctx, line_width, select, gs),
-            false => complex_cursor::render(text, ctx, line_width, select, gs),
+            true => ascii_cursor::render(text, line_width, select, ctx, gs),
+            false => complex_cursor::render(text, line_width, select, encoding, ctx, gs),
         }
         gs.backend.reset_style();
     } else {
         let select = ctx.select_get();
         if text.cached.should_render_line(line.row, &select) {
-            line_render(text, ctx, line, select, gs);
+            line_render(text, line, select, encoding, ctx, gs);
         } else {
             ctx.skip_line();
         }
@@ -135,9 +144,10 @@ pub fn fast_render_is_cursor(
 #[inline]
 pub fn line_render(
     code: &mut EditorLine,
-    ctx: &mut CodecContext,
     line: Line,
     select: Option<CharRangeUnbound>,
+    encoding: &Encoding,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) {
     let cache_line = line.row;
@@ -150,7 +160,7 @@ pub fn line_render(
             } else if code.is_simple() {
                 render_select_ascii(code, line_width, select, ctx, gs);
             } else {
-                render_select_complex(code, line_width, select, ctx, gs);
+                render_select_complex(code, line_width, select, encoding, ctx, gs);
             }
         }
         None => {
@@ -167,7 +177,7 @@ pub fn line_render(
                     gs.backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
                 }
             } else {
-                let Some(max_width) = complex_line::complex_line(code, line_width, ctx, gs.backend()) else {
+                let Some(max_width) = complex_line::complex_line(code, line_width, encoding, ctx, gs.backend()) else {
                     return;
                 };
 
@@ -215,11 +225,12 @@ fn render_select_complex(
     code: &mut EditorLine,
     line_width: usize,
     select: SelectManager,
+    encoding: &Encoding,
     ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) {
     if select.start() >= code.char_len() {
-        let Some(max_width) = complex_line::complex_line(code, line_width, ctx, gs.backend()) else {
+        let Some(max_width) = complex_line::complex_line(code, line_width, encoding, ctx, gs.backend()) else {
             return;
         };
         select.pad(gs);
@@ -227,7 +238,8 @@ fn render_select_complex(
             diagnostics.render_pad_4(max_width, gs.backend());
         }
     } else {
-        let Some(max_width) = complex_line::complex_line_with_select(code, line_width, select, ctx, gs) else {
+        let Some(max_width) = complex_line::complex_line_with_select(code, line_width, select, encoding, ctx, gs)
+        else {
             return;
         };
         if let Some(diagnostics) = code.diagnostics() {

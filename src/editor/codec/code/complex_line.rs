@@ -1,11 +1,12 @@
 use super::{super::CodecContext, SelectManager, WRAP_CLOSE};
-use crate::{editor_line::EditorLine, ext_tui::CrossTerm, global_state::GlobalState};
+use crate::{editor::syntax::Encoding, editor_line::EditorLine, ext_tui::CrossTerm, global_state::GlobalState};
 use crossterm::style::{ContentStyle, Stylize};
 use idiom_tui::{utils::CharLimitedWidths, Backend};
 
 pub fn complex_line(
     code: &EditorLine,
     mut line_width: usize,
+    encoding: &Encoding,
     ctx: &mut CodecContext,
     backend: &mut CrossTerm,
 ) -> Option<usize> {
@@ -13,7 +14,6 @@ pub fn complex_line(
     let mut counter = 0;
     let mut last_len = 0;
     let mut lined_up = None;
-    let char_position = ctx.char_lsp_pos;
 
     if let Some(token) = iter_tokens.next() {
         if token.delta_start == 0 {
@@ -60,7 +60,7 @@ pub fn complex_line(
             }
         }
 
-        counter = counter.saturating_sub(char_position(text));
+        counter = counter.saturating_sub(encoding.char_len(text));
         backend.print(text);
     }
     backend.reset_style();
@@ -71,10 +71,10 @@ pub fn complex_line_with_select(
     code: &EditorLine,
     mut line_width: usize,
     mut select: SelectManager,
+    encoding: &Encoding,
     ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) -> Option<usize> {
-    let char_position = ctx.char_lsp_pos;
     let backend = gs.backend();
     let mut reset_style = ContentStyle::default();
     let mut iter_tokens = code.iter_tokens();
@@ -128,7 +128,7 @@ pub fn complex_line_with_select(
             }
         }
 
-        counter = counter.saturating_sub(char_position(text));
+        counter = counter.saturating_sub(encoding.char_len(text));
         backend.print(text);
     }
 

@@ -9,14 +9,14 @@ use idiom_tui::Backend;
 
 pub fn render(
     line: &mut EditorLine,
-    ctx: &mut CodecContext,
     line_width: usize,
     select: Option<SelectManager>,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) {
     if line_width > line.char_len() {
         match select {
-            Some(select) => self::select(line, ctx, select, gs),
+            Some(select) => self::select(line, select, ctx, gs),
             None => self::basic(line, ctx, gs.backend()),
         }
         if let Some(diagnostics) = line.diagnostics() {
@@ -26,8 +26,8 @@ pub fn render(
         }
     } else {
         match select {
-            Some(select) => self::partial_select(line, ctx, line_width, select, gs),
-            None => self::partial(line, ctx, line_width, gs.backend()),
+            Some(select) => self::partial_select(line, line_width, select, ctx, gs),
+            None => self::partial(line, line_width, ctx, gs.backend()),
         }
     }
 }
@@ -93,7 +93,7 @@ pub fn basic(line: &EditorLine, ctx: &CodecContext, backend: &mut CrossTerm) {
 }
 
 #[inline]
-pub fn select(line: &EditorLine, ctx: &CodecContext, mut select: SelectManager, gs: &mut GlobalState) {
+pub fn select(line: &EditorLine, mut select: SelectManager, ctx: &CodecContext, gs: &mut GlobalState) {
     let backend = gs.backend();
     let mut reset_style = ContentStyle::default();
     let mut iter_tokens = line.iter_tokens();
@@ -157,7 +157,7 @@ pub fn select(line: &EditorLine, ctx: &CodecContext, mut select: SelectManager, 
 }
 
 #[inline(always)]
-pub fn partial(line: &mut EditorLine, ctx: &CodecContext, line_width: usize, backend: &mut CrossTerm) {
+pub fn partial(line: &mut EditorLine, line_width: usize, ctx: &CodecContext, backend: &mut CrossTerm) {
     let cursor_idx = ctx.cursor_char();
     let (mut idx, reduction) = line.generate_skipped_chars_simple(cursor_idx, line_width);
     if idx != 0 {
@@ -233,9 +233,9 @@ pub fn partial(line: &mut EditorLine, ctx: &CodecContext, line_width: usize, bac
 
 pub fn partial_select(
     line: &mut EditorLine,
-    ctx: &CodecContext,
     line_width: usize,
     mut select: SelectManager,
+    ctx: &CodecContext,
     gs: &mut GlobalState,
 ) {
     let backend = &mut gs.backend;

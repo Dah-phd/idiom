@@ -3,9 +3,7 @@ use super::{
     ascii, complex, line, CodecContext,
 };
 use crate::{
-    configs::FileType,
     cursor::{Cursor, CursorPosition},
-    editor::syntax::tests::mock_utf8_lexer,
     editor::tests::mock_editor_text_render,
     editor_line::EditorLine,
     ext_tui::{CrossTerm, StyleExt},
@@ -36,12 +34,10 @@ fn generate_complex_lines() -> Vec<EditorLine> {
 #[test]
 fn cursor_render() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
-    let lexer = mock_utf8_lexer(FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.set_position(CursorPosition { line: 0, char: 39 });
 
-    let mut ctx =
-        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut ctx = CodecContext::collect_context(&cursor, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 3, borders: Borders::empty() }.into_iter();
     let mut text =
         EditorLine::from("**The project is currently in development - so if you want to try it do it with caution.**");
@@ -60,12 +56,10 @@ fn cursor_render() {
 #[test]
 fn cursor_complex_render() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
-    let lexer = mock_utf8_lexer(FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.set_position(CursorPosition { line: 0, char: 39 });
 
-    let mut ctx =
-        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut ctx = CodecContext::collect_context(&cursor, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 3, borders: Borders::empty() }.into_iter();
     let mut text =
         EditorLine::from("**The project is currently in devel🔥pment - so if you want to try it do it with caution.**");
@@ -84,12 +78,10 @@ fn cursor_complex_render() {
 #[test]
 fn cursor_select() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
-    let lexer = mock_utf8_lexer(FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set(CursorPosition::default(), (0, 39).into());
 
-    let mut ctx =
-        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut ctx = CodecContext::collect_context(&cursor, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 3, borders: Borders::empty() }.into_iter();
     let mut text =
         EditorLine::from("**The project is currently in development - so if you want to try it do it with caution.**");
@@ -113,12 +105,10 @@ fn cursor_select() {
 #[test]
 fn cursor_complex_select() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
-    let lexer = mock_utf8_lexer(FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set(CursorPosition::default(), (0, 39).into());
 
-    let mut ctx =
-        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut ctx = CodecContext::collect_context(&cursor, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 3, borders: Borders::empty() }.into_iter();
     let mut text =
         EditorLine::from("**The project is currently in devel🔥pment - so if you want to try it do it with caution.**");
@@ -142,11 +132,9 @@ fn cursor_complex_select() {
 #[test]
 fn simple_line() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
-    let lexer = mock_utf8_lexer(FileType::Rust);
     let cursor = Cursor::default();
 
-    let mut ctx =
-        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut ctx = CodecContext::collect_context(&cursor, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 5, borders: Borders::empty() }.into_iter();
     let mut texts = generate_lines();
 
@@ -166,12 +154,10 @@ fn simple_line() {
 #[test]
 fn simple_line_select() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
-    let lexer = mock_utf8_lexer(FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set((1, 7).into(), (2, 60).into());
 
-    let mut ctx =
-        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut ctx = CodecContext::collect_context(&cursor, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 5, borders: Borders::empty() }.into_iter();
     let mut texts = generate_lines();
 
@@ -196,11 +182,9 @@ fn simple_line_select() {
 #[test]
 fn complex_line() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
-    let lexer = mock_utf8_lexer(FileType::Rust);
     let cursor = Cursor::default();
 
-    let mut ctx =
-        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut ctx = CodecContext::collect_context(&cursor, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 5, borders: Borders::empty() }.into_iter();
     let mut texts = generate_complex_lines();
 
@@ -220,12 +204,10 @@ fn complex_line() {
 #[test]
 fn complex_line_select() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 120, 60), CrossTerm::init());
-    let lexer = mock_utf8_lexer(FileType::Rust);
     let mut cursor = Cursor::default();
     cursor.select_set((1, 7).into(), (2, 60).into());
 
-    let mut ctx =
-        CodecContext::collect_context(&cursor, lexer.encoding().char_len, 2, ContentStyle::fg(Color::DarkGrey));
+    let mut ctx = CodecContext::collect_context(&cursor, 2, ContentStyle::fg(Color::DarkGrey));
     let mut lines = Rect { row: 0, col: 0, width: 40, height: 5, borders: Borders::empty() }.into_iter();
     let mut texts = generate_complex_lines();
 

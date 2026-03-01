@@ -347,21 +347,17 @@ impl Edit {
     }
 
     #[inline(always)]
-    pub fn text_change(
-        &self,
-        encoding: fn(usize, &str) -> usize,
-        char_lsp: fn(char) -> usize,
-        content: &[EditorLine],
-    ) -> TextDocumentContentChangeEvent {
+    pub fn text_change(&self, encoding: &Encoding, content: &[EditorLine]) -> TextDocumentContentChangeEvent {
         let mut cursor = self.cursor;
         let changed = self.meta.from - 1;
         let text = self.text.to_owned();
-        let mut char = self.reverse.chars().rev().take_while(|ch| ch != &'\n').map(char_lsp).sum::<usize>();
+        let mut char =
+            self.reverse.chars().rev().take_while(|ch| ch != &'\n').map(|c| encoding.char_len(c)).sum::<usize>();
 
         if cursor.char != 0 {
             let editor_line = &content[cursor.line];
             if !editor_line.is_simple() {
-                cursor.char = (encoding)(cursor.char, &editor_line[..]);
+                cursor.char = encoding.encode_position(cursor.char, &editor_line[..]);
             }
         }
 
@@ -374,21 +370,17 @@ impl Edit {
     }
 
     #[inline(always)]
-    pub fn text_change_rev(
-        &self,
-        encoding: fn(usize, &str) -> usize,
-        char_lsp: fn(char) -> usize,
-        content: &[EditorLine],
-    ) -> TextDocumentContentChangeEvent {
+    pub fn text_change_rev(&self, encoding: &Encoding, content: &[EditorLine]) -> TextDocumentContentChangeEvent {
         let mut cursor = self.cursor;
         let changed = self.meta.to - 1;
         let text = self.reverse.to_owned();
-        let mut char = self.text.chars().rev().take_while(|ch| ch != &'\n').map(char_lsp).sum::<usize>();
+        let mut char =
+            self.text.chars().rev().take_while(|ch| ch != &'\n').map(|c| encoding.char_len(c)).sum::<usize>();
 
         if cursor.char != 0 {
             let editor_line = &content[cursor.line];
             if !editor_line.is_simple() {
-                cursor.char = (encoding)(cursor.char, &editor_line[..]);
+                cursor.char = encoding.encode_position(cursor.char, &editor_line[..]);
             }
         }
 

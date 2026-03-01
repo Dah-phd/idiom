@@ -310,11 +310,10 @@ mod test {
         ]);
         editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
         editor.cursor.set_position((2, 0).into());
-        let Editor { lexer, cursor, content, line_number_padding, .. } = &mut editor;
+        let Editor { cursor, content, line_number_padding, .. } = &mut editor;
         assert_eq!(content[0].as_str().width(), 32);
         assert_eq!(content[1].as_str().width(), 32);
-        let char_len = lexer.encoding().char_len;
-        let mut ctx = CodecContext::collect_context(cursor, char_len, *line_number_padding, gs.ui_theme.accent_fg());
+        let mut ctx = CodecContext::collect_context(cursor, *line_number_padding, gs.ui_theme.accent_fg());
 
         let mut lines = gs.editor_area().into_iter();
         let f_text = &mut content[0];
@@ -343,9 +342,8 @@ mod test {
         let mut gs = GlobalState::new(Rect::new(0, 0, 50, 10), CrossTerm::init());
         gs.force_area_calc();
         editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
-        let Editor { lexer, cursor, content, line_number_padding, .. } = &mut editor;
-        let char_len = lexer.encoding().char_len;
-        let mut ctx = CodecContext::collect_context(cursor, char_len, *line_number_padding, gs.ui_theme.accent_fg());
+        let Editor { cursor, content, line_number_padding, .. } = &mut editor;
+        let mut ctx = CodecContext::collect_context(cursor, *line_number_padding, gs.ui_theme.accent_fg());
 
         let mut lines = gs.editor_area().into_iter();
         let f_text = &mut content[0];

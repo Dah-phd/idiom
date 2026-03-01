@@ -152,8 +152,8 @@ fn try_find_brackets(editor: &Editor, position: CursorPosition) -> Option<Vec<En
                 counter += 1;
             } else if ch == opening {
                 if counter == 0 {
-                    let start = (editor.lexer().encoding().str_len)(&editor.content()[position.line][..char_idx]);
-                    let start_closing = (editor.lexer().encoding().str_len)(first_line);
+                    let start = editor.lexer().encoding().str_len(&editor.content()[position.line][..char_idx]);
+                    let start_closing = editor.lexer().encoding().str_len(first_line);
                     return Some(vec![
                         EncodedWordRange::new_checked(position.line, start, start + 1)?,
                         EncodedWordRange::new_checked(position.line, start_closing, start_closing + 1)?,
@@ -172,8 +172,8 @@ fn try_find_brackets(editor: &Editor, position: CursorPosition) -> Option<Vec<En
                     counter += 1;
                 } else if ch == opening {
                     if counter == 0 {
-                        let start = (editor.lexer().encoding().str_len)(&editor.content()[line_idx][..char_idx]);
-                        let start_closing = (editor.lexer().encoding().str_len)(first_line);
+                        let start = editor.lexer().encoding().str_len(&editor.content()[line_idx][..char_idx]);
+                        let start_closing = editor.lexer().encoding().str_len(first_line);
                         return Some(vec![
                             EncodedWordRange::new_checked(line_idx, start, start + 1)?,
                             EncodedWordRange::new_checked(position.line, start_closing, start_closing + 1)?,
@@ -191,8 +191,8 @@ fn try_find_brackets(editor: &Editor, position: CursorPosition) -> Option<Vec<En
             if ch == ch_at_start {
                 counter += 1;
             } else if ch == closing {
-                let start = (editor.lexer().encoding().str_len)(first_line);
-                let start_closing = (editor.lexer().encoding().str_len)(&editor.content()[position.line][..char_idx]);
+                let start = editor.lexer().encoding().str_len(first_line);
+                let start_closing = editor.lexer().encoding().str_len(&editor.content()[position.line][..char_idx]);
                 if counter == 0 {
                     return Some(vec![
                         EncodedWordRange::new_checked(position.line, start, start + 1)?,
@@ -214,9 +214,8 @@ fn try_find_brackets(editor: &Editor, position: CursorPosition) -> Option<Vec<En
                     counter += 1;
                 } else if ch == closing {
                     if counter == 0 {
-                        let start = (editor.lexer().encoding().str_len)(first_line);
-                        let start_closing =
-                            (editor.lexer().encoding().str_len)(&editor.content()[line_idx][..char_idx]);
+                        let start = editor.lexer().encoding().str_len(first_line);
+                        let start_closing = editor.lexer().encoding().str_len(&editor.content()[line_idx][..char_idx]);
                         return Some(vec![
                             EncodedWordRange::new_checked(position.line, start, start + 1)?,
                             EncodedWordRange::new_checked(line_idx, start_closing, start_closing + 1)?,

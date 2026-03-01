@@ -71,7 +71,7 @@ impl EditorLine {
         if self.is_simple() {
             return self.len();
         }
-        self.chars().map(|c| (encoding.char_len)(c)).sum()
+        self.chars().map(|c| encoding.char_len(c)).sum()
     }
 
     #[inline(always)]
@@ -97,7 +97,7 @@ impl EditorLine {
     #[inline]
     pub fn parse_lines<P: AsRef<Path>>(path: P) -> Result<Vec<Self>, String> {
         let text = std::fs::read_to_string(path).map_err(|err| err.to_string())?;
-        Ok(LineParser::split_lines(&text).to_editor_lines())
+        Ok(LineParser::split_lines(&text).into_editor_lines())
     }
 
     #[inline]
@@ -194,26 +194,27 @@ impl EditorLine {
         self.content.find(pat)
     }
 
-    // no need to handle non ascii inserts because - triggers from keyboard
     #[inline]
     pub fn insert_simple(&mut self, idx: usize, ch: char, encoding: &Encoding) {
         self.cached.reset();
-        self.char_len += 1;
         if self.char_len == self.content.len() {
-            // base update on delta start
             self.tokens.increment_before_encoded(idx);
             self.content.insert(idx, ch);
         } else {
-            let encoded_idx = (encoding.insert_char_with_idx)(&mut self.content, idx, ch);
+            let encoded_idx = encoding.insert_char_with_idx(&mut self.content, idx, ch);
             self.tokens.increment_before_encoded(encoded_idx);
         }
+        self.char_len += 1;
     }
 
-    // no need to handle non ascii inserts because - triggers from keyboard
     #[inline]
-    pub fn push_simple(&mut self, ch: char) {
+    pub fn push_simple(&mut self, ch: char, encoding: &Encoding) {
         self.cached.reset();
-        self.tokens.increment_before_encoded(self.char_len);
+        let idx = match self.is_simple() {
+            true => self.char_len,
+            false => encoding.str_len(self.as_str()),
+        };
+        self.tokens.increment_before_encoded(idx);
         self.char_len += 1;
         self.content.push(ch);
     }
@@ -263,8 +264,8 @@ impl EditorLine {
             self.content.remove(idx)
         } else {
             self.char_len -= 1;
-            let (encoded_idx, ch) = (encoding.remove_char_with_idx)(&mut self.content, idx);
-            for _ in 0..(encoding.char_len)(ch) {
+            let (encoded_idx, ch) = encoding.remove_char_with_idx(&mut self.content, idx);
+            for _ in 0..encoding.char_len(ch) {
                 self.tokens.decrement_at_encoded(encoded_idx);
             }
             ch

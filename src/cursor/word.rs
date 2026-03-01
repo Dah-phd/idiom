@@ -61,13 +61,12 @@ impl PositionedWord {
     pub fn iter_encoded_word_ranges<'a, B>(
         &'a self,
         content_iter: B,
-        encoding: &Encoding,
+        encoding: &'a Encoding,
     ) -> impl Iterator<Item = EncodedWordRange> + use<'a, B>
     where
         B: Iterator<Item = (usize, &'a EditorLine)>,
     {
-        let str_len_callback = encoding.str_len;
-        let word_encoded_len = (str_len_callback)(self.text.as_str());
+        let word_encoded_len = encoding.str_len(self.text.as_str());
         content_iter.flat_map(move |(line, text)| {
             text.as_str().match_indices(self.as_str()).flat_map(move |(position, _)| {
                 let prefix = &text.as_str()[..position];
@@ -81,7 +80,7 @@ impl PositionedWord {
                 if text.is_simple() {
                     return Some(EncodedWordRange { line, start: position, end: end_char_idx });
                 }
-                let start = (str_len_callback)(prefix);
+                let start = encoding.str_len(prefix);
                 Some(EncodedWordRange { line, start, end: start + word_encoded_len })
             })
         })

@@ -3,11 +3,11 @@ use idiom_tui::UTFSafeStringExt;
 /// string encoding (LSP)
 /// utf8 / utf16 / utf32
 pub struct Encoding {
-    pub char_len: fn(char) -> usize,
-    pub str_len: fn(&str) -> usize,
-    pub encode_position: fn(usize, &str) -> usize,
-    pub insert_char_with_idx: fn(&mut String, usize, char) -> usize,
-    pub remove_char_with_idx: fn(&mut String, usize) -> (usize, char),
+    char_len: fn(char) -> usize,
+    str_len: fn(&str) -> usize,
+    encode_position: fn(usize, &str) -> usize,
+    insert_char_with_idx: fn(&mut String, usize, char) -> usize,
+    remove_char_with_idx: fn(&mut String, usize) -> (usize, char),
 }
 
 impl Encoding {
@@ -39,6 +39,36 @@ impl Encoding {
             insert_char_with_idx: UTFSafeStringExt::insert_at_char_with_utf8_idx,
             remove_char_with_idx: UTFSafeStringExt::remove_at_char_with_utf8_idx,
         }
+    }
+
+    #[inline(always)]
+    pub fn char_len_cb(&self) -> fn(ch: char) -> usize {
+        self.char_len
+    }
+
+    #[inline(always)]
+    pub fn char_len(&self, ch: char) -> usize {
+        (self.char_len)(ch)
+    }
+
+    #[inline(always)]
+    pub fn str_len(&self, string: &str) -> usize {
+        (self.str_len)(string)
+    }
+
+    #[inline(always)]
+    pub fn encode_position(&self, idx: usize, string: &str) -> usize {
+        (self.encode_position)(idx, string)
+    }
+
+    #[inline(always)]
+    pub fn insert_char_with_idx(&self, string: &mut String, idx: usize, ch: char) -> usize {
+        (self.insert_char_with_idx)(string, idx, ch)
+    }
+
+    #[inline(always)]
+    pub fn remove_char_with_idx(&self, string: &mut String, idx: usize) -> (usize, char) {
+        (self.remove_char_with_idx)(string, idx)
     }
 }
 

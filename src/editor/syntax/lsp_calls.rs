@@ -288,7 +288,7 @@ pub fn sync_action_dead(_lexer: &mut Lexer, _action: &Action, _content: &[Editor
 }
 
 pub fn sync_action(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
-    let (meta, events) = action.change_event(lexer.encoding.encode_position, lexer.encoding.char_len, content);
+    let (meta, events) = action.change_event(&lexer.encoding, content);
     sync_tokens(lexer, meta);
     sync_changes(lexer, events)
 }
@@ -299,7 +299,7 @@ pub fn sync_edits_rev_dead(_lexer: &mut Lexer, _action: &Action, _content: &[Edi
 }
 
 pub fn sync_edits_rev(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
-    let (meta, change) = action.change_event_rev(lexer.encoding.encode_position, lexer.encoding.char_len, content);
+    let (meta, change) = action.change_event_rev(&lexer.encoding, content);
     sync_tokens(lexer, meta);
     sync_changes(lexer, change)
 }

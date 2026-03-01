@@ -536,7 +536,7 @@ fn push_char_with_closing_and_select() {
 
 fn probe_char_closing_with_select(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
     let encoding = lexer.encoding();
-    let (meta, edit) = action.change_event(encoding.encode_position, encoding.char_len, content);
+    let (meta, edit) = action.change_event(encoding, content);
     assert_eq!(meta.start_line, 0);
     assert_eq!(meta.from, 1);
     assert_eq!(meta.from, meta.to);
@@ -549,7 +549,7 @@ fn probe_char_closing_with_select(lexer: &mut Lexer, action: &Action, content: &
 
 fn probe_char_closing_with_select_rev(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
     let encoding = lexer.encoding();
-    let (meta, edit) = action.change_event_rev(encoding.encode_position, encoding.char_len, content);
+    let (meta, edit) = action.change_event_rev(encoding, content);
     assert_eq!(meta.start_line, 0);
     assert_eq!(meta.from, 1);
     assert_eq!(meta.from, meta.to);

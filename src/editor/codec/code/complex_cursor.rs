@@ -1,5 +1,6 @@
 use super::{width_remainder, CodecContext, SelectManager, WRAP_CLOSE, WRAP_OPEN};
 use crate::{
+    editor::syntax::Encoding,
     editor_line::EditorLine,
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
@@ -9,34 +10,34 @@ use idiom_tui::{utils::CharLimitedWidths, Backend};
 
 pub fn render(
     line: &mut EditorLine,
-    ctx: &mut CodecContext,
     line_width: usize,
     select: Option<SelectManager>,
+    encoding: &Encoding,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) {
     if let Some(remainder) = width_remainder(line, line_width) {
         match select {
-            Some(select) => self::select(line, ctx, select, gs),
-            None => self::basic(line, ctx, gs.backend()),
+            Some(select) => self::select(line, select, encoding, ctx, gs),
+            None => self::basic(line, encoding, ctx, gs.backend()),
         }
         if let Some(diagnostic) = line.diagnostics() {
             diagnostic.render_pad_4(remainder - 1, gs.backend());
         }
     } else {
         match select {
-            Some(select) => partial_select(line, ctx, select, line_width, gs),
-            None => partial(line, ctx, line_width, gs.backend()),
+            Some(select) => partial_select(line, select, line_width, encoding, ctx, gs),
+            None => partial(line, line_width, encoding, ctx, gs.backend()),
         }
     }
 }
 
-pub fn basic(line: &EditorLine, ctx: &CodecContext, backend: &mut CrossTerm) {
+pub fn basic(line: &EditorLine, encoding: &Encoding, ctx: &CodecContext, backend: &mut CrossTerm) {
     let mut tokens = line.iter_tokens();
     let mut counter = 0;
     let mut last_len = 0;
     let mut lined_up = None;
     let mut idx = 0;
-    let char_position = ctx.char_lsp_pos;
     let cursor_idx = ctx.cursor_char();
     if let Some(token) = tokens.next() {
         if token.delta_start == 0 {
@@ -74,7 +75,7 @@ pub fn basic(line: &EditorLine, ctx: &CodecContext, backend: &mut CrossTerm) {
                 }
             }
         } else {
-            counter = counter.saturating_sub(char_position(text));
+            counter = counter.saturating_sub(encoding.char_len(text));
         }
 
         if cursor_idx == idx {
@@ -92,9 +93,14 @@ pub fn basic(line: &EditorLine, ctx: &CodecContext, backend: &mut CrossTerm) {
     backend.reset_style();
 }
 
-pub fn select(line: &EditorLine, ctx: &CodecContext, mut select: SelectManager, gs: &mut GlobalState) {
+pub fn select(
+    line: &EditorLine,
+    mut select: SelectManager,
+    encoding: &Encoding,
+    ctx: &CodecContext,
+    gs: &mut GlobalState,
+) {
     let backend = gs.backend();
-    let char_position = ctx.char_lsp_pos;
     let mut reset_style = ContentStyle::default();
     let mut tokens = line.iter_tokens();
     let mut counter = 0;
@@ -141,7 +147,7 @@ pub fn select(line: &EditorLine, ctx: &CodecContext, mut select: SelectManager, 
                 }
             }
         } else {
-            counter = counter.saturating_sub(char_position(text));
+            counter = counter.saturating_sub(encoding.char_len(text));
         }
 
         if cursor_idx == idx {
@@ -160,15 +166,20 @@ pub fn select(line: &EditorLine, ctx: &CodecContext, mut select: SelectManager, 
     }
 }
 
-pub fn partial(code: &mut EditorLine, ctx: &mut CodecContext, mut line_width: usize, backend: &mut CrossTerm) {
+pub fn partial(
+    code: &mut EditorLine,
+    mut line_width: usize,
+    encoding: &Encoding,
+    ctx: &mut CodecContext,
+    backend: &mut CrossTerm,
+) {
     let cursor_idx = ctx.cursor_char();
-    let char_position = ctx.char_lsp_pos;
     let mut idx = code.generate_skipped_chars_complex(cursor_idx, line_width);
     let mut content = CharLimitedWidths::new(code.as_str(), 3);
     let mut cursor = 0;
 
     for _ in 0..idx {
-        cursor += content.next().map(|(ch, ..)| char_position(ch)).unwrap_or_default();
+        cursor += content.next().map(|(ch, ..)| encoding.char_len(ch)).unwrap_or_default();
     }
 
     let mut tokens = code.iter_tokens();
@@ -222,7 +233,7 @@ pub fn partial(code: &mut EditorLine, ctx: &mut CodecContext, mut line_width: us
                 },
             }
         } else {
-            counter = counter.saturating_sub(char_position(text));
+            counter = counter.saturating_sub(encoding.char_len(text));
         }
 
         if char_width > line_width {
@@ -252,20 +263,20 @@ pub fn partial(code: &mut EditorLine, ctx: &mut CodecContext, mut line_width: us
 
 pub fn partial_select(
     code: &mut EditorLine,
-    ctx: &mut CodecContext,
     mut select: SelectManager,
     mut line_width: usize,
+    encoding: &Encoding,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) {
     let backend = &mut gs.backend;
     let cursor_idx = ctx.cursor_char();
-    let char_position = ctx.char_lsp_pos;
     let mut idx = code.generate_skipped_chars_complex(cursor_idx, line_width);
     let mut content = CharLimitedWidths::new(code.as_str(), 3);
 
     let mut cursor = 0;
     for _ in 0..idx {
-        cursor += content.next().map(|(ch, ..)| char_position(ch)).unwrap_or_default();
+        cursor += content.next().map(|(ch, ..)| encoding.char_len(ch)).unwrap_or_default();
     }
 
     let mut reset_style = ContentStyle::default();
@@ -302,7 +313,7 @@ pub fn partial_select(
             match lined_up.take() {
                 Some(style) => {
                     backend.update_style(style);
-                    counter = last_len.saturating_sub(char_position(text));
+                    counter = last_len.saturating_sub(encoding.char_len(text));
                 }
                 None => match tokens.next() {
                     None => {
@@ -311,11 +322,11 @@ pub fn partial_select(
                     }
                     Some(token) => {
                         if token.delta_start > last_len {
-                            counter = token.delta_start.saturating_sub(last_len + char_position(text));
+                            counter = token.delta_start.saturating_sub(last_len + encoding.char_len(text));
                             lined_up.replace(token.style);
                             backend.set_style(reset_style);
                         } else {
-                            counter = token.len.saturating_sub(char_position(text));
+                            counter = token.len.saturating_sub(encoding.char_len(text));
                             backend.update_style(token.style);
                         }
                         last_len = token.len;
@@ -323,7 +334,7 @@ pub fn partial_select(
                 },
             }
         } else {
-            counter = counter.saturating_sub(char_position(text));
+            counter = counter.saturating_sub(encoding.char_len(text));
         }
 
         if char_width > line_width {

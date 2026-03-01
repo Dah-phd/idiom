@@ -89,10 +89,10 @@ impl DelBuffer {
         let change_start = if text.is_simple() {
             Position::new(line as u32, cursor.char as u32)
         } else {
-            Position::new(line as u32, (encoding.encode_position)(cursor.char, text.as_str()) as u32)
+            Position::new(line as u32, encoding.encode_position(cursor.char, text.as_str()) as u32)
         };
         let removed = text.remove(char, encoding);
-        let end = Position::new(change_start.line, change_start.character + ((encoding.char_len)(removed)) as u32);
+        let end = Position::new(change_start.line, change_start.character + (encoding.char_len(removed)) as u32);
         (
             Self { line, char, change_start, text: String::from(removed) },
             TextDocumentContentChangeEvent {
@@ -112,7 +112,7 @@ impl DelBuffer {
         if cursor.line == self.line && cursor.char == self.char {
             let encoding = lexer.encoding();
             let removed = text.remove(cursor.char, encoding);
-            let end_character = self.change_start.character + ((encoding.char_len)(removed)) as u32;
+            let end_character = self.change_start.character + (encoding.char_len(removed)) as u32;
             let end = Position::new(self.change_start.line, end_character);
             self.text.push(removed);
             return (
@@ -208,10 +208,10 @@ impl BackspaceBuffer {
             self.text.push(ch);
             let character = match text.is_simple() {
                 true => self.last,
-                false => (encoding.encode_position)(self.last, text.as_str()),
+                false => encoding.encode_position(self.last, text.as_str()),
             };
             let start = Position::new(line, character as u32);
-            let end = Position::new(line, (character + (encoding.char_len)(ch)) as u32);
+            let end = Position::new(line, (character + encoding.char_len(ch)) as u32);
             Range::new(start, end)
         };
         TextDocumentContentChangeEvent { text: String::new(), range: Some(range), range_length: None }
@@ -246,7 +246,7 @@ impl TextBuffer {
         let char = cursor.char;
         let encoding = lexer.encoding();
         let pos = if cursor.char != 0 && !text.is_simple() {
-            Position::new(cursor.line as u32, (encoding.encode_position)(cursor.char, text.as_str()) as u32)
+            Position::new(cursor.line as u32, encoding.encode_position(cursor.char, text.as_str()) as u32)
         } else {
             cursor.into()
         };
@@ -272,7 +272,7 @@ impl TextBuffer {
         if cursor.line == self.line && cursor.char == self.last && (ch.is_alphabetic() || ch == '_') {
             let encoding = lexer.encoding();
             let pos = match cursor.char != 0 && !text.is_simple() {
-                true => Position::new(cursor.line as u32, (encoding.encode_position)(cursor.char, &text[..]) as u32),
+                true => Position::new(cursor.line as u32, encoding.encode_position(cursor.char, &text[..]) as u32),
                 false => cursor.into(),
             };
             self.text.push(ch);

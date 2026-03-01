@@ -1,5 +1,8 @@
 ## Includes only major changes (manual updates)
 # Version 0.7.2
+- fix issue when removing lines on cached render
+- privatized encoding
+- fixed issue on EditorLine.insert_simple
 - reduced completion calls
 - fixed tab render
 - added mark for unsaved files

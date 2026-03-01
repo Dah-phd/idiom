@@ -51,11 +51,12 @@ fn test_insert_str() {
 
 #[test]
 fn test_push() {
+    let encoding = Encoding::utf32();
     let mut line = EditorLine::new_posix("text".to_owned());
-    line.push_simple('1');
+    line.push_simple('1', &encoding);
     assert!(line.is_simple());
     assert!(line.char_len() == 5);
-    line.push_simple('🚀');
+    line.push_simple('🚀', &encoding);
     assert!(!line.is_simple());
     assert!(line.to_string().len() == 9);
     assert!(line.char_len() == 6);
@@ -200,7 +201,7 @@ fn test_split_off_ascii() {
 #[test]
 fn test_parse() {
     let text = "a💀w\ndawda\radaw\r\nwas\n_💀_\n\r+++";
-    let content = LineParser::split_lines(text).to_editor_lines();
+    let content = LineParser::split_lines(text).into_editor_lines();
     let expect = [
         EditorLine::new("a💀w".into(), POSIX_NLINE),
         EditorLine::new("dawda".into(), CARRIAGE_NLINE),

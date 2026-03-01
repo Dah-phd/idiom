@@ -581,6 +581,7 @@ impl Editor {
 
     #[inline(always)]
     pub fn apply_file_edits(&mut self, edits: Vec<TextEdit>) {
+        self.codec.clear_cache();
         (self.controls.apply_file_edits)(self, edits)
     }
 

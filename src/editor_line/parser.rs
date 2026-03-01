@@ -22,12 +22,12 @@ pub struct ParsedLines<'a> {
 }
 
 impl ParsedLines<'_> {
-    pub fn to_editor_lines(self) -> Vec<EditorLine> {
+    pub fn into_editor_lines(self) -> Vec<EditorLine> {
         self.content.into_iter().map(|(content, line_end)| EditorLine::new(content.into(), line_end)).collect()
     }
 }
 
-#[allow(non_camel_case_types)]
+#[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 #[derive(Debug, Logos, PartialEq)]
 #[logos(skip r#"[^\r\n\t]"#)]
 pub enum LineParser {
