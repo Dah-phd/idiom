@@ -402,3 +402,22 @@ fn test_stringify() {
     assert_eq!(text, String::from("tast\ndwad\n\radwdawd"));
     assert_eq!(text.capacity(), text.len() + 1);
 }
+
+#[test]
+pub fn test_apply_edits_cache_render() {
+    use crate::{editor::tests::mock_editor, ext_tui::CrossTerm, global_state::GlobalState};
+    use idiom_tui::{layout::Rect, Backend};
+
+    let mut gs = GlobalState::new(Rect::new(0, 0, 20, 20), CrossTerm::init());
+    gs.force_area_calc();
+    let mut editor = mock_editor(vec![String::new()]);
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+
+    editor.render(&mut gs);
+    let is_cached = editor.codec.is_cached_at_line(editor.cursor.at_line);
+    assert!(is_cached);
+
+    editor.apply_file_edits(vec![]);
+    let is_cached = editor.codec.is_cached_at_line(editor.cursor.at_line);
+    assert!(!is_cached);
+}

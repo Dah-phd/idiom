@@ -137,6 +137,64 @@ fn test_has_render_cache() {
 }
 
 #[test]
+fn test_is_full_render_or_invalidate_line() {
+    let mut gs = GlobalState::new(Rect::new(0, 0, 80, 8), CrossTerm::init());
+    gs.force_area_calc();
+
+    let mut editor = mock_editor(vec![
+        "use some_package".into(),
+        String::new(),
+        "fn main() {".into(),
+        "    let data = \"adadwas\";".into(),
+        "    some_pacakge::do_something(data);".into(),
+        "    println!(\"{:?}\", data);".into(),
+        "}".into(),
+        String::new(),
+        "fn main() {".into(),
+        "    let data = \"adadwas\";".into(),
+        "    some_pacakge::do_something(data);".into(),
+        "    println!(\"{:?}\", data);".into(),
+        "}".into(),
+        String::new(),
+        "fn main() {".into(),
+        "    let data = \"adadwas\";".into(),
+        "    some_pacakge::do_something(data);".into(),
+        "    println!(\"{:?}\", data);".into(),
+        "}".into(),
+    ]);
+
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+    assert_eq!(editor.cursor.max_rows, 6);
+
+    editor.render(&mut gs);
+    assert!(!TuiCodec::is_full_render_or_invalidate_lines(&mut editor));
+
+    assert_eq!(editor.content.len(), 19);
+    assert!(!TuiCodec::is_full_render_or_invalidate_lines(&mut editor));
+
+    let five = editor.content.remove(5);
+    assert_eq!(editor.content.len(), 18);
+    editor.render(&mut gs);
+    assert!(!editor.content[5].cached.is_none());
+
+    editor.content.insert(5, five);
+    assert!(!editor.content[6].cached.is_none());
+    let sixth = editor.content[6].to_string();
+    editor.render(&mut gs);
+
+    editor.content.remove(5);
+
+    let mut expect_rend_stat = RenderStatus::None;
+    expect_rend_stat.line(6, None);
+
+    assert_eq!(editor.content[5].cached, expect_rend_stat);
+    assert_eq!(editor.content[5].as_str(), sixth.as_str());
+
+    assert!(!TuiCodec::is_full_render_or_invalidate_lines(&mut editor));
+    assert!(editor.content[5].cached.is_none());
+}
+
+#[test]
 fn test_is_full_render_or_invalidate_lines() {
     let mut gs = GlobalState::new(Rect::new(0, 0, 80, 8), CrossTerm::init());
     gs.force_area_calc();
