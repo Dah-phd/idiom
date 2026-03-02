@@ -55,7 +55,9 @@ pub fn set_tokens(tokens: Vec<SemanticToken>, legend: &Legend, content: &mut [Ed
         None => return,
     };
     let mut line_idx = token.delta_line as usize;
-    let mut token_line = content[line_idx].tokens_mut();
+    let Some(mut token_line) = content.get_mut(line_idx).map(EditorLine::tokens_mut) else {
+        return;
+    };
     token_line.clear();
     token_line.push(Token::parse(token, legend));
 
@@ -83,7 +85,9 @@ pub fn set_tokens_partial(tokens: Vec<SemanticToken>, max_lines: usize, legend: 
     if line_idx > max_lines {
         return;
     }
-    let mut token_line = content[line_idx].tokens_mut();
+    let Some(mut token_line) = content.get_mut(line_idx).map(EditorLine::tokens_mut) else {
+        return;
+    };
     token_line.clear();
     token_line.push(Token::parse(token, legend));
 
@@ -93,7 +97,10 @@ pub fn set_tokens_partial(tokens: Vec<SemanticToken>, max_lines: usize, legend: 
             if line_idx > max_lines {
                 return;
             }
-            token_line = content[line_idx].tokens_mut();
+            token_line = match content.get_mut(line_idx) {
+                Some(l) => l.tokens_mut(),
+                None => return,
+            };
             token_line.clear();
         };
         token_line.push(Token::parse(token, legend));
