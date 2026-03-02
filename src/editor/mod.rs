@@ -8,8 +8,8 @@ use crate::{
     actions::{find_line_start, Actions},
     configs::{EditorAction, EditorConfigs, FileFamily, FileType, IndentConfigs, ScopeType},
     cursor::{Cursor, CursorPosition},
-    editor_line::EditorLine,
-    error::{IdiomError, IdiomResult},
+    editor_line::{EditorLine, LineParser},
+    error::IdiomResult,
     global_state::GlobalState,
     lsp::{LSPClient, LSPError},
 };
@@ -58,7 +58,9 @@ impl Editor {
         gs: &mut GlobalState,
     ) -> IdiomResult<Self> {
         big_file_protection(&path)?;
-        let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
+        let indent_cfg = cfg.get_indent_cfg(file_type);
+        let text = std::fs::read_to_string(&path)?;
+        let content = LineParser::split_lines(&text).into_content_or_popup_if_not_formatted(&indent_cfg, gs)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
         Ok(Self {
@@ -67,7 +69,7 @@ impl Editor {
             lexer: Lexer::with_context(file_type, &path),
             content,
             codec: TuiCodec::code(),
-            actions: Actions::new(cfg.get_indent_cfg(file_type)),
+            actions: Actions::new(indent_cfg),
             controls: ControlMap::default(),
             file_type,
             display,
@@ -80,7 +82,9 @@ impl Editor {
     pub fn from_path_text(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
         big_file_protection(&path)?;
         gs.message(WARN_TXT);
-        let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
+        let indent_cfg = cfg.default_indent_cfg();
+        let text = std::fs::read_to_string(&path)?;
+        let content = LineParser::split_lines(&text).into_content_or_popup_if_not_formatted(&indent_cfg, gs)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
         let cursor = Cursor::sized(*gs.editor_area(), line_number_offset);
@@ -90,7 +94,7 @@ impl Editor {
             lexer: Lexer::text_lexer(&path),
             content,
             codec: TuiCodec::text(),
-            actions: Actions::new(cfg.default_indent_cfg()),
+            actions: Actions::new(indent_cfg),
             controls: ControlMap::default(),
             file_type: FileType::Text,
             display,
@@ -103,7 +107,9 @@ impl Editor {
     pub fn from_path_md(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
         big_file_protection(&path)?;
         gs.message(WARN_MD);
-        let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
+        let indent_cfg = cfg.default_indent_cfg();
+        let text = std::fs::read_to_string(&path)?;
+        let content = LineParser::split_lines(&text).into_content_or_popup_if_not_formatted(&indent_cfg, gs)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
         let cursor = Cursor::sized(*gs.editor_area(), line_number_offset);
@@ -113,7 +119,7 @@ impl Editor {
             lexer: Lexer::text_lexer(&path),
             content,
             codec: TuiCodec::markdown(),
-            actions: Actions::new(cfg.default_indent_cfg()),
+            actions: Actions::new(indent_cfg),
             controls: ControlMap::default(),
             file_type: FileType::MarkDown,
             display,

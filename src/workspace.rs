@@ -283,7 +283,7 @@ impl Workspace {
         gs: &mut GlobalState,
     ) -> IdiomResult<()> {
         let content = match content {
-            None => EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?,
+            None => EditorLine::parse_lines_raw(&path)?,
             Some(lines) => lines.into_iter().map(EditorLine::from).collect(),
         };
         let mut editor = editor_from_data(path, file_type, content, Some(cursor), &self.base_configs, gs);

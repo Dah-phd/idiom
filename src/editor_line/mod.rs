@@ -1,9 +1,12 @@
 mod parser;
 mod status;
-use parser::{LineEnd, LineParser, POSIX_NLINE};
+pub use parser::{LineEnd, LineParser, POSIX_NLINE};
 pub use status::{Reduction, RenderStatus};
 
-use crate::editor::syntax::{tokens::TokenLine, DiagnosticInfo, DiagnosticLine, Encoding, Lang, Token};
+use crate::{
+    editor::syntax::{tokens::TokenLine, DiagnosticInfo, DiagnosticLine, Encoding, Lang, Token},
+    error::IdiomResult,
+};
 use idiom_tui::{utils::UTFSafeStringExt, UTFSafe};
 use std::{
     fmt::Display,
@@ -38,6 +41,11 @@ impl Default for EditorLine {
 }
 
 impl EditorLine {
+    pub fn parse_lines_raw<P: AsRef<Path>>(path: P) -> IdiomResult<Vec<EditorLine>> {
+        let text = std::fs::read_to_string(path)?;
+        Ok(LineParser::split_lines(&text).into_editor_lines())
+    }
+
     pub fn new_posix(content: String) -> Self {
         Self { char_len: content.char_len(), content, ..Default::default() }
     }
@@ -92,12 +100,6 @@ impl EditorLine {
     #[inline(always)]
     pub fn content(&self) -> &String {
         &self.content
-    }
-
-    #[inline]
-    pub fn parse_lines<P: AsRef<Path>>(path: P) -> Result<Vec<Self>, String> {
-        let text = std::fs::read_to_string(path).map_err(|err| err.to_string())?;
-        Ok(LineParser::split_lines(&text).into_editor_lines())
     }
 
     #[inline]

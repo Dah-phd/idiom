@@ -49,6 +49,7 @@ pub enum IdiomEvent {
     ActivateEditor(usize),
     SetMode(Mode),
     IdiomCommand,
+    Resize { width: u16, height: u16 },
 }
 
 impl IdiomEvent {
@@ -226,6 +227,9 @@ impl IdiomEvent {
                     return;
                 }
                 Pallet::run_as_command(gs, ws, tree, term);
+            }
+            IdiomEvent::Resize { width, height } => {
+                gs.full_resize(ws, term, width, height);
             }
         }
     }
