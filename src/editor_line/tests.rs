@@ -53,6 +53,26 @@ fn test_insert_cyrillic() {
 }
 
 #[test]
+fn test_insert_simple_check_corect() {
+    let mut line = EditorLine::new_posix("text".to_owned());
+    let mut encoding = Encoding::utf32();
+    encoding.mock_panic_on_insert_char_with_idx();
+    line.insert_simple(2, 'x', &encoding);
+    assert_eq!(line.as_str(), "texxt");
+    line.insert_simple(2, 'г', &encoding);
+    assert_eq!(line.as_str(), "teгxxt");
+}
+
+#[should_panic]
+#[test]
+fn test_insert_simple_check_corect_panic() {
+    let mut line = EditorLine::new_posix("teгxt".to_owned());
+    let mut encoding = Encoding::utf32();
+    encoding.mock_panic_on_insert_char_with_idx();
+    line.insert_simple(2, 'x', &encoding);
+}
+
+#[test]
 fn test_insert_str() {
     let mut line = EditorLine::new_posix("text".to_owned());
     line.insert_str(0, "text");

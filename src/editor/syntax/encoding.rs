@@ -112,3 +112,14 @@ fn encode_pos_utf8(char_idx: usize, from_str: &str) -> usize {
 fn char_lsp_pos(_: char) -> usize {
     1
 }
+
+// mocks used for testing
+#[cfg(test)]
+impl Encoding {
+    pub fn mock_panic_on_insert_char_with_idx(&mut self) {
+        fn panic_insert(_: &mut String, _: usize, _: char) -> usize {
+            panic!("insert called");
+        }
+        self.insert_char_with_idx = panic_insert;
+    }
+}
