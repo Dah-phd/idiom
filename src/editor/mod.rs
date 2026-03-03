@@ -277,6 +277,7 @@ impl Editor {
     }
 
     pub fn lsp_set(&mut self, client: LSPClient, gs: &mut GlobalState) {
+        self.force_local_lsp_tokens(gs);
         self.lexer.set_lsp_client(client, self.stringify(), gs);
     }
 

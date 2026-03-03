@@ -151,14 +151,14 @@ fn read_last_session_working_dir(store: PathBuf) -> IdiomResult<PathBuf> {
 }
 
 #[inline]
-pub async fn load_session(ws: &mut Workspace, gs: &mut GlobalState) {
+pub fn load_session(ws: &mut Workspace, gs: &mut GlobalState) {
     if let Some(store) = get_store_path() {
-        load_session_if_exists(store, ws, gs).await
+        load_session_if_exists(store, ws, gs)
     }
 }
 
 // temp dir testible
-async fn load_session_if_exists(store: PathBuf, ws: &mut Workspace, gs: &mut GlobalState) {
+fn load_session_if_exists(store: PathBuf, ws: &mut Workspace, gs: &mut GlobalState) {
     if !store.exists() {
         return;
     };
@@ -191,7 +191,7 @@ async fn load_session_if_exists(store: PathBuf, ws: &mut Workspace, gs: &mut Glo
         };
 
         for fd in session.into_iter().rev() {
-            if let Err(error) = ws.new_from_session(fd.path, fd.file_type, fd.cursor, fd.content, gs).await {
+            if let Err(error) = ws.new_from_session(fd.path, fd.file_type, fd.cursor, fd.content, gs) {
                 gs.error(error);
             }
         }
@@ -303,7 +303,7 @@ mod tests {
         // check if can be mapped to last session
         assert!(read_last_session_working_dir(temp_dir.path().to_owned()).is_ok());
         // loading session
-        load_session_if_exists(temp_dir.path().to_owned(), &mut receiver_ws, &mut gs).await;
+        load_session_if_exists(temp_dir.path().to_owned(), &mut receiver_ws, &mut gs);
         assert!(!receiver_ws.is_empty());
         // confirm stored is same as loaded
         let expected_content = ws.get_active().unwrap().content().iter().map(|l| l.as_str()).collect::<Vec<_>>();

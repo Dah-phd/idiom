@@ -7,12 +7,11 @@ use super::{
 use crate::{
     editor_line::EditorLine,
     global_state::GlobalState,
-    lsp::LSP,
     utils::{trim_start_inplace, Offset},
 };
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EditorConfigs {
@@ -128,25 +127,7 @@ impl EditorConfigs {
         }
     }
 
-    pub async fn init_preloaded_lsp_servers(
-        &mut self,
-        base_tree_paths: Vec<String>,
-        gs: &mut GlobalState,
-    ) -> HashMap<FileType, LSP> {
-        let mut lsp_servers = HashMap::new();
-        for (ft, lsp_cmd) in self.derive_lsp_preloads(base_tree_paths, gs) {
-            gs.success(format!("Preloading {lsp_cmd}"));
-            match LSP::new(lsp_cmd, ft).await {
-                Ok(lsp) => {
-                    lsp_servers.insert(ft, lsp);
-                }
-                Err(err) => gs.error(format!("Preload filed: {err}")),
-            }
-        }
-        lsp_servers
-    }
-
-    fn derive_lsp_preloads(&mut self, base_tree: Vec<String>, gs: &mut GlobalState) -> Vec<(FileType, String)> {
+    pub fn derive_lsp_preloads(&mut self, base_tree: Vec<String>, gs: &mut GlobalState) -> HashSet<(FileType, String)> {
         [
             (FileType::Rust, self.rust_lsp_preload_if_present.take(), self.rust_lsp.as_ref()),
             (FileType::Zig, self.zig_lsp_preload_if_present.take(), self.zig_lsp.as_ref()),

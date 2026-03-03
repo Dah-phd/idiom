@@ -35,8 +35,8 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
     // INIT COMPONENTS
     let mut tree = Tree::new(tree_key_map, &mut gs);
     let mut term = EditorTerminal::new(integrated_shell);
-    let lsp_servers = base_configs.init_preloaded_lsp_servers(tree.get_base_file_names(), &mut gs).await;
-    let mut workspace = Workspace::new(editor_key_map, base_configs, lsp_servers);
+    let lsp_preloads = base_configs.derive_lsp_preloads(tree.get_base_file_names(), &mut gs);
+    let mut workspace = Workspace::new(editor_key_map, base_configs, lsp_preloads);
 
     // CLI SETUP
     if let Some(path) = open_file {
@@ -48,7 +48,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
     // LOAD SESSION
     if max_sessions != 0 {
         gs.force_area_calc();
-        load_session(&mut workspace, &mut gs).await;
+        load_session(&mut workspace, &mut gs);
     };
 
     loop {
@@ -167,6 +167,10 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
         gs.draw(&mut workspace, &mut tree, &mut term);
 
         // do event exchanges
+        tree.sync(&mut gs);
+        if !workspace.are_all_lsp_servs_running() {
+            workspace.connect_ready_lsp_servs(&mut gs).await;
+        }
         gs.handle_events(&mut tree, &mut workspace, &mut term).await
     }
 }

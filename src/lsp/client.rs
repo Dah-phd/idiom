@@ -113,6 +113,10 @@ impl LSPClient {
         }
     }
 
+    pub fn is_local(&self) -> bool {
+        self.local_lsp.is_some()
+    }
+
     #[inline]
     pub fn get_responses(&self) -> Option<MutexGuard<'_, HashMap<i64, LSPResponse>>> {
         self.responses.try_lock().ok()

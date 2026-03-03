@@ -97,7 +97,7 @@ impl IdiomEvent {
             IdiomEvent::OpenAtLine(path, line) => {
                 let select_result = tree.select_by_path(&path);
                 gs.log_if_error(select_result);
-                match ws.new_at_line(path, line, gs).await {
+                match ws.new_at_line(path, line, gs) {
                     Ok(..) => gs.insert_mode(),
                     Err(error) => gs.error(error),
                 }
@@ -105,7 +105,7 @@ impl IdiomEvent {
             IdiomEvent::OpenAtSelect(path, (from, to)) => {
                 let select_result = tree.select_by_path(&path);
                 gs.log_if_error(select_result);
-                match ws.new_from(path, gs).await {
+                match ws.new_from(path, gs) {
                     Ok(..) => {
                         gs.insert_mode();
                         if let Some(editor) = ws.get_active() {
@@ -164,7 +164,7 @@ impl IdiomEvent {
                         Ok(new_path) => {
                             tree.sync(gs);
                             if !new_path.is_dir() {
-                                match ws.new_at_line(new_path.clone(), 0, gs).await {
+                                match ws.new_at_line(new_path.clone(), 0, gs) {
                                     Ok(..) => gs.insert_mode(),
                                     Err(error) => gs.error(error),
                                 };
@@ -204,7 +204,7 @@ impl IdiomEvent {
                 ws.check_lsp(file_type, gs).await;
             }
             IdiomEvent::SetLSP(file_type) => {
-                if let Err(error) = ws.force_lsp_type_on_active(file_type, gs).await {
+                if let Err(error) = ws.force_lsp_type_on_active(file_type, gs) {
                     if !matches!(error, crate::error::IdiomError::LSP(crate::lsp::LSPError::Null)) {
                         gs.error(error);
                     }

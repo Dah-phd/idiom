@@ -430,7 +430,6 @@ impl GlobalState {
     }
 
     pub async fn handle_events(&mut self, tree: &mut Tree, ws: &mut Workspace, term: &mut EditorTerminal) {
-        tree.sync(self);
         while let Some(event) = self.event.pop() {
             event.handle(self, ws, tree, term).await
         }

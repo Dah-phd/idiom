@@ -256,6 +256,10 @@ impl Lexer {
         };
     }
 
+    pub fn is_external_lsp(&self) -> bool {
+        self.lsp && !self.client.is_local()
+    }
+
     pub fn update_path(&mut self, path: &Path) -> Result<(), LSPError> {
         self.path = path.into();
         let old_uri = std::mem::replace(&mut self.uri, as_url(path));

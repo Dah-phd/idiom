@@ -1,5 +1,6 @@
 ## Includes only major changes (manual updates)
 # Version 0.7.2
+- async start of LSP servers
 - added sanitize popup for tabs or exotic lineends
 - fix issue when removing lines on cached render
 - privatized encoding

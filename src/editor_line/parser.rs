@@ -78,12 +78,12 @@ impl ParsedLines<'_> {
                         gs.event.push(IdiomEvent::Resize { width, height });
                         return Err(IdiomError::GeneralError("File open canceled due to screen resize!".into()));
                     }
-                    Event::Key(KeyEvent { code: KeyCode::Esc, .. }) => {}
+                    Event::Key(KeyEvent { code: KeyCode::Esc, .. }) => break,
                     Event::Key(KeyEvent { code: KeyCode::Enter, .. }) => {
                         return match choice {
                             0 => Ok(true),
                             1 => Ok(false),
-                            _ => Err(IdiomError::GeneralError("File open canceled manually!".into())),
+                            _ => break,
                         };
                     }
                     Event::Key(KeyEvent { code: KeyCode::Up, .. }) => {
@@ -100,6 +100,7 @@ impl ParsedLines<'_> {
                 self.render_popup(choice, gs);
             }
         }
+        Err(IdiomError::GeneralError("File open canceled manually!".into()))
     }
 
     fn render_popup(&self, choice: usize, gs: &mut GlobalState) {

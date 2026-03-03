@@ -6,9 +6,11 @@ mod messages;
 mod notification;
 mod payload;
 mod request;
-mod servers;
-use crate::configs::FileType;
-use crate::utils::split_arc;
+pub mod servers;
+use crate::{
+    configs::{get_config_dir, FileType},
+    utils::{split_arc, SHELL},
+};
 pub use client::LSPClient;
 pub use error::{LSPError, LSPResult};
 pub use local::{init_local_tokens, Highlighter};
@@ -23,7 +25,7 @@ pub use request::LSPRequest;
 use lsp_types::{request::Initialize, InitializeResult, Uri};
 use serde_json::{from_value, Value};
 use std::{collections::HashMap, path::Path, process::Stdio, str::FromStr, sync::Mutex};
-use tokio::{io::AsyncWriteExt, process::Child, task::JoinHandle};
+use tokio::{io::AsyncWriteExt, process::Child, process::Command, task::JoinHandle};
 
 pub type Responses = Mutex<HashMap<i64, LSPResponse>>;
 pub type Requests = Mutex<HashMap<i64, LSPResponseType>>;
@@ -40,7 +42,7 @@ pub struct LSP {
 
 impl LSP {
     pub async fn new(lsp_cmd: String, file_type: FileType) -> LSPResult<Self> {
-        let mut server = servers::server_cmd(&lsp_cmd)?;
+        let mut server = server_cmd(&lsp_cmd)?;
         let mut inner = server.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::piped()).spawn()?;
 
         // splitting subprocess
@@ -145,6 +147,10 @@ impl LSP {
         &self.client
     }
 
+    pub fn is_running(&self) -> bool {
+        !self.lsp_json_handler.is_finished() && !self.lsp_send_handler.is_finished()
+    }
+
     async fn dash_nine(&mut self) -> LSPResult<()> {
         self.lsp_json_handler.abort();
         self.lsp_send_handler.abort();
@@ -156,6 +162,18 @@ impl LSP {
 #[inline(always)]
 pub fn as_url(path: &Path) -> Uri {
     Uri::from_str(format!("file://{}", path.display()).as_str()).expect("Path should always be parsable!")
+}
+
+pub fn server_cmd(lsp: &str) -> LSPResult<Command> {
+    if lsp.contains("${cfg_dir}") {
+        let cfg_dir = get_config_dir().ok_or(LSPError::internal("Failed to find config dir!"))?.display().to_string();
+        let mut cmd = Command::new(SHELL);
+        cmd.arg("-c").arg(lsp.replace("${cfg_dir}", cfg_dir.as_str()));
+        return Ok(cmd);
+    }
+    let mut cmd = Command::new(SHELL);
+    cmd.arg("-c").arg(lsp);
+    Ok(cmd)
 }
 
 /// get the Value representation of the response or error
