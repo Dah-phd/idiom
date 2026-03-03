@@ -118,18 +118,15 @@ impl TuiCodec {
 
         let result = match codec.last_render_at_line {
             Some(idx) if idx == cursor.at_line => {
-                if codec.last_render_len > content.len() {
-                    let diff = codec.last_render_len - content.len();
-                    if diff > cursor.max_rows {
-                        true
-                    } else {
-                        for eline in content.iter_mut().take(cursor.at_line + cursor.max_rows).rev().take(diff) {
+                codec.last_render_len > content.len() && {
+                    let reduction = codec.last_render_len - content.len();
+                    let full_screen_clear = reduction > cursor.max_rows;
+                    if !full_screen_clear {
+                        for eline in content.iter_mut().take(cursor.at_line + cursor.max_rows).rev().take(reduction) {
                             eline.cached.reset();
                         }
-                        false
-                    }
-                } else {
-                    false
+                    };
+                    full_screen_clear
                 }
             }
             _ => true,
