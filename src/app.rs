@@ -36,6 +36,9 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
     let mut tree = Tree::new(tree_key_map, &mut gs);
     let mut term = EditorTerminal::new(integrated_shell);
     let lsp_preloads = base_configs.derive_lsp_preloads(tree.get_base_file_names(), &mut gs);
+    if !lsp_preloads.is_empty() {
+        gs.message(format!("Preloading: {:?}", &lsp_preloads))
+    };
     let mut workspace = Workspace::new(editor_key_map, base_configs, lsp_preloads);
 
     // CLI SETUP
