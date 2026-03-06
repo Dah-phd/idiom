@@ -1,5 +1,11 @@
 pub use crate::editor_line::parser::{LineParser, CARRIAGE_NLINE, MSDOS_NLINE, POSIX_NLINE, RISCOS_NLINE};
-use crate::{editor::syntax::Encoding, editor_line::EditorLine};
+use crate::{
+    editor::{syntax::Encoding, tests::mock_editor_from_elines},
+    editor_line::EditorLine,
+    ext_tui::CrossTerm,
+    global_state::GlobalState,
+};
+use idiom_tui::{layout::Rect, Backend};
 use logos::Logos;
 
 #[test]
@@ -281,4 +287,49 @@ fn parser_stable() {
             Ok(LineParser::CARRIAGE_NEWLINE)
         ],
     );
+}
+
+#[test]
+fn test_render_line_ends() {
+    let data = "aaa\rbbb\r\nccc\n\rddd";
+    let parsed = LineParser::split_lines(&data);
+    let mut editor = mock_editor_from_elines(parsed.into_editor_lines());
+    let mut gs = GlobalState::new(Rect::new(0, 0, 40, 5), CrossTerm::init());
+    gs.force_area_calc();
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+
+    editor.render(&mut gs);
+    let drain = gs.backend().drain();
+
+    #[rustfmt::skip]
+    assert_eq!(drain.iter().map(|(_, txt)| txt.as_str()).collect::<Vec<_>>(), [
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "<<reset style>>",
+        "a", "a", "a", "←", "<<reset style>>", "<<reset style>>",
+        "<<go to row: 2 col: 15>>", "2 ", "<<clear EOL>>", "bbb",
+        "<<go to row: 3 col: 15>>", "3 ", "<<clear EOL>>", "ccc",
+    ]);
+
+    editor.go_to(1);
+    editor.render(&mut gs);
+    let drain = gs.backend().drain();
+
+    #[rustfmt::skip]
+    assert_eq!(drain.iter().map(|(_, txt)| txt.as_str()).collect::<Vec<_>>(), [
+        "<<go to row: 1 col: 15>>", "1 ", "<<clear EOL>>", "aaa",
+        "<<go to row: 2 col: 15>>", "2 ", "<<clear EOL>>", "<<reset style>>",
+        "b", "b", "b", "⇆", "<<reset style>>", "<<reset style>>",
+        "<<go to row: 3 col: 15>>", "3 ", "<<clear EOL>>", "ccc",
+    ]);
+
+    editor.go_to(2);
+    editor.render(&mut gs);
+    let drain = gs.backend().drain();
+
+    #[rustfmt::skip]
+    assert_eq!(drain.iter().map(|(_, txt)| txt.as_str()).collect::<Vec<_>>(), [
+        "<<go to row: 1 col: 15>>", "2 ", "<<clear EOL>>", "bbb",
+        "<<go to row: 2 col: 15>>", "3 ", "<<clear EOL>>", "<<reset style>>",
+        "c", "c", "c", "⇄", "<<reset style>>", "<<reset style>>",
+        "<<go to row: 3 col: 15>>", "4 ", "<<clear EOL>>", "ddd",
+    ]);
 }

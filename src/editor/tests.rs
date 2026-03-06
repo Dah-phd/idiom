@@ -23,10 +23,10 @@ impl Editor {
     }
 }
 
-pub fn mock_editor(content: Vec<String>) -> Editor {
+/// editor for FileType::Rust
+pub fn mock_editor_from_elines(content: Vec<EditorLine>) -> Editor {
     let ft = FileType::Rust;
     let path = PathBuf::from("test-path");
-    let content: Vec<EditorLine> = content.into_iter().map(EditorLine::from).collect();
     Editor {
         line_number_padding: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
         lexer: Lexer::with_context(ft, &path),
@@ -41,6 +41,10 @@ pub fn mock_editor(content: Vec<String>) -> Editor {
         content,
         codec: TuiCodec::code(),
     }
+}
+
+pub fn mock_editor(content: Vec<String>) -> Editor {
+    mock_editor_from_elines(content.into_iter().map(EditorLine::from).collect())
 }
 
 pub fn mock_editor_text_render(content: Vec<String>) -> Editor {
