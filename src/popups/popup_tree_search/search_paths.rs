@@ -126,7 +126,10 @@ impl Popup for ActivePathSearch {
             }
             KeyCode::Enter => {
                 if self.options.len() > self.state.selected {
-                    gs.event.push(IdiomEvent::OpenAtLine(self.options.remove(self.state.selected), 0));
+                    gs.event.push(IdiomEvent::Open {
+                        path: self.options.remove(self.state.selected),
+                        config: Default::default(),
+                    });
                 }
                 return Status::Finished;
             }
@@ -155,7 +158,7 @@ impl Popup for ActivePathSearch {
             },
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } => {
                 if let Some(index) = self.get_option_idx(row, column, gs) {
-                    gs.event.push(IdiomEvent::OpenAtLine(self.options.remove(index), 0));
+                    gs.event.push(IdiomEvent::Open { path: self.options.remove(index), config: Default::default() });
                     return Status::Finished;
                 }
             }

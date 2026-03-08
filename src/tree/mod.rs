@@ -105,7 +105,7 @@ impl Tree {
             TreeAction::Shrink => self.shrink(gs),
             TreeAction::Expand => {
                 if let Some(path) = self.expand_dir_or_get_path(gs) {
-                    gs.event.push(IdiomEvent::OpenAtLine(path, 0));
+                    gs.event.push(IdiomEvent::Open { path, config: Default::default() });
                 }
             }
             TreeAction::Delete => {

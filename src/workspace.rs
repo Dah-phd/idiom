@@ -260,7 +260,7 @@ impl Workspace {
 
     // EDITOR BUILDERS
 
-    pub fn new_text_from_data(
+    pub fn create_text_editor_from_data(
         &mut self,
         path: PathBuf,
         content: Vec<EditorLine>,
@@ -272,7 +272,7 @@ impl Workspace {
     }
 
     /// it could be the case that the file no longer exits
-    pub fn new_from_session(
+    pub fn create_editor_from_session(
         &mut self,
         path: PathBuf,
         file_type: FileType,
@@ -292,30 +292,20 @@ impl Workspace {
         Ok(())
     }
 
-    pub fn new_at_line(&mut self, file_path: PathBuf, line: usize, gs: &mut GlobalState) -> IdiomResult<()> {
-        if self.new_from(file_path, gs)? {
-            if let Some(editor) = self.get_active() {
-                editor.go_to(line);
-            }
-        };
-        Ok(())
-    }
-
-    pub fn new_from(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<bool> {
+    pub fn get_or_create_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<&mut Editor> {
         let file_path = file_path.canonicalize()?;
-        if let Some(idx) = self.editors.iter().position(|e| e.path() == &file_path) {
-            let mut editor = self.editors.remove(idx);
-            editor.clear_screen_cache(gs);
-            if editor.file_status_is_update() {
-                gs.event.push(file_updated(editor.path().to_owned()).into());
+        let editor = match self.editors.remove_if(|e| e.path() == &file_path) {
+            Some(mut editor) => {
+                editor.clear_screen_cache(gs);
+                if editor.file_status_is_update() {
+                    gs.event.push(file_updated(editor.path().to_owned()).into());
+                }
+                editor
             }
-            self.editors.insert(0, editor);
-            return Ok(false);
-        }
-        let editor = self.build_editor(file_path, gs)?;
-        self.editors.insert(0, editor);
+            None => self.build_editor(file_path, gs)?,
+        };
         self.toggle_editor();
-        Ok(true)
+        Ok(self.editors.insert_and_get_mut(0, editor))
     }
 
     fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {

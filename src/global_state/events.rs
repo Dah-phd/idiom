@@ -24,6 +24,17 @@ pub enum StartInplacePopup {
     MarkWord,
 }
 
+#[derive(Debug, PartialEq, Default)]
+pub enum EditorOpenConfig {
+    #[default]
+    None,
+    GoToLine(usize),
+    GoToSelect {
+        from: CursorPosition,
+        to: CursorPosition,
+    },
+}
+
 #[derive(PartialEq, Debug)]
 pub enum IdiomEvent {
     CreateFileOrFolder { name: String, from_base: bool },
@@ -35,8 +46,7 @@ pub enum IdiomEvent {
     TreeActionCall(TreeAction),
     EmbededApp(Option<String>),
     InplacePopup(StartInplacePopup),
-    OpenAtLine(PathBuf, usize),
-    OpenAtSelect(PathBuf, (CursorPosition, CursorPosition)),
+    Open { path: PathBuf, config: EditorOpenConfig },
     OpenLSPErrors,
     SelectPath(PathBuf),
     RenameFile(String),
@@ -94,26 +104,19 @@ impl IdiomEvent {
             IdiomEvent::SearchFiles(pattern) => {
                 ActiveFileSearch::run(pattern, gs, ws, tree, term);
             }
-            IdiomEvent::OpenAtLine(path, line) => {
-                let select_result = tree.select_by_path(&path);
-                gs.log_if_error(select_result);
-                match ws.new_at_line(path, line, gs) {
-                    Ok(..) => gs.insert_mode(),
-                    Err(error) => gs.error(error),
-                }
-            }
-            IdiomEvent::OpenAtSelect(path, (from, to)) => {
-                let select_result = tree.select_by_path(&path);
-                gs.log_if_error(select_result);
-                match ws.new_from(path, gs) {
-                    Ok(..) => {
+            IdiomEvent::Open { path, config } => {
+                gs.log_if_error(tree.select_by_path(&path));
+                match ws.get_or_create_editor(path, gs) {
+                    Ok(editor) => {
                         gs.insert_mode();
-                        if let Some(editor) = ws.get_active() {
-                            editor.go_to_select(from, to);
-                        };
+                        match config {
+                            EditorOpenConfig::None => (),
+                            EditorOpenConfig::GoToLine(line) => editor.go_to(line),
+                            EditorOpenConfig::GoToSelect { from, to } => editor.go_to_select(from, to),
+                        }
                     }
                     Err(error) => gs.error(error),
-                };
+                }
             }
             IdiomEvent::OpenLSPErrors => match PathBuf::from("./").canonicalize() {
                 Ok(base_path) => {
@@ -128,7 +131,7 @@ impl IdiomEvent {
                     let content: Vec<EditorLine> =
                         gs.footer.get_logs().map(ToOwned::to_owned).map(EditorLine::from).collect();
                     if !content.is_empty() {
-                        ws.new_text_from_data(path, content, None, gs);
+                        ws.create_text_editor_from_data(path, content, None, gs);
                     } else {
                         gs.success(" >> no error logs found!");
                     }
@@ -146,8 +149,7 @@ impl IdiomEvent {
                 }
             }
             IdiomEvent::SelectPath(path) => {
-                let result = tree.select_by_path(&path);
-                gs.log_if_error(result);
+                gs.log_if_error(tree.select_by_path(&path));
             }
             IdiomEvent::TreeDiagnostics(new) => {
                 tree.push_diagnostics(new);
@@ -164,14 +166,13 @@ impl IdiomEvent {
                         Ok(new_path) => {
                             tree.sync(gs);
                             if !new_path.is_dir() {
-                                match ws.new_at_line(new_path.clone(), 0, gs) {
+                                match ws.get_or_create_editor(new_path.clone(), gs) {
                                     Ok(..) => gs.insert_mode(),
                                     Err(error) => gs.error(error),
                                 };
                             }
                             tree.sync(gs);
-                            let result = tree.select_by_path(&new_path);
-                            gs.log_if_error(result);
+                            gs.log_if_error(tree.select_by_path(&new_path));
                         }
                         Err(error) => gs.error(error),
                     }
@@ -243,16 +244,22 @@ impl From<PopupChoice> for IdiomEvent {
 
 impl From<Location> for IdiomEvent {
     fn from(loc: Location) -> Self {
-        Self::OpenAtSelect(PathBuf::from(loc.uri.path().as_str()), (loc.range.start.into(), loc.range.end.into()))
+        Self::Open {
+            path: PathBuf::from(loc.uri.path().as_str()),
+            config: EditorOpenConfig::GoToSelect { from: loc.range.start.into(), to: loc.range.end.into() },
+        }
     }
 }
 
 impl From<LocationLink> for IdiomEvent {
     fn from(loc: LocationLink) -> Self {
-        Self::OpenAtSelect(
-            PathBuf::from(loc.target_uri.path().as_str()),
-            (loc.target_range.start.into(), loc.target_range.end.into()),
-        )
+        Self::Open {
+            path: PathBuf::from(loc.target_uri.path().as_str()),
+            config: EditorOpenConfig::GoToSelect {
+                from: loc.target_range.start.into(),
+                to: loc.target_range.end.into(),
+            },
+        }
     }
 }
 

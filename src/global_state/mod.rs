@@ -30,7 +30,7 @@ use crossterm::{
     event::{KeyEvent, MouseEvent},
     style::ContentStyle,
 };
-pub use events::{IdiomEvent, StartInplacePopup};
+pub use events::{EditorOpenConfig, IdiomEvent, StartInplacePopup};
 use idiom_tui::{
     layout::{Line, Rect},
     Backend,

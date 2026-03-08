@@ -44,7 +44,7 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
     // CLI SETUP
     if let Some(path) = open_file {
         tree.select_by_path(&path)?;
-        gs.event.push(IdiomEvent::OpenAtLine(path, 0));
+        gs.event.push(IdiomEvent::Open { path, config: Default::default() });
         gs.toggle_tree();
     }
 

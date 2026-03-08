@@ -40,7 +40,7 @@ impl Command {
         let mut path = config_dir()?;
         path.push(APP_FOLDER);
         path.push(file_path);
-        Some(Command { label, result: CommandResult::Simple(IdiomEvent::OpenAtLine(path, 0)) })
+        Some(Command { label, result: CommandResult::Simple(IdiomEvent::Open { path, config: Default::default() }) })
     }
 
     fn pass_event(label: &'static str, event: IdiomEvent) -> Self {

@@ -2,7 +2,7 @@ use super::{Components, Popup, Status};
 use crate::{
     embeded_term::EditorTerminal,
     ext_tui::{text_field::map_key, LineBuilder, State, StyleExt},
-    global_state::{GlobalState, IdiomEvent},
+    global_state::{EditorOpenConfig, GlobalState, IdiomEvent},
     tree::{Tree, TreePath},
     workspace::Workspace,
 };
@@ -162,7 +162,7 @@ impl Popup for ActiveFileSearch {
             }
             KeyCode::Enter => {
                 let (path, _, line) = self.options.remove(self.state.selected);
-                gs.event.push(IdiomEvent::OpenAtLine(path, line));
+                gs.event.push(IdiomEvent::Open { path, config: EditorOpenConfig::GoToLine(line) });
                 return Status::Finished;
             }
             _ => {
@@ -194,7 +194,7 @@ impl Popup for ActiveFileSearch {
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } => {
                 if let Some(index) = self.get_option_idx(row, column, gs) {
                     let (path, _, line) = self.options.remove(index);
-                    gs.event.push(IdiomEvent::OpenAtLine(path, line));
+                    gs.event.push(IdiomEvent::Open { path, config: EditorOpenConfig::GoToLine(line) });
                     return Status::Finished;
                 }
             }

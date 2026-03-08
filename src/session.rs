@@ -191,7 +191,7 @@ fn load_session_if_exists(store: PathBuf, ws: &mut Workspace, gs: &mut GlobalSta
         };
 
         for fd in session.into_iter().rev() {
-            if let Err(error) = ws.new_from_session(fd.path, fd.file_type, fd.cursor, fd.content, gs) {
+            if let Err(error) = ws.create_editor_from_session(fd.path, fd.file_type, fd.cursor, fd.content, gs) {
                 gs.error(error);
             }
         }
