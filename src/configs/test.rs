@@ -1,5 +1,6 @@
 use super::{EditorKeyMap, EditorUserKeyMap, FileFamily, FileType};
 use assert_enum_variants::assert_enum_variants;
+use std::path::PathBuf;
 
 pub fn mock_editor_key_map() -> EditorKeyMap {
     EditorKeyMap { key_map: EditorUserKeyMap::default().into() }
@@ -58,4 +59,49 @@ fn family() {
     assert!(matches!(FileType::Lobster.family(), FileFamily::Code(..)));
     assert!(matches!(FileType::Json.family(), FileFamily::Code(..)));
     assert!(matches!(FileType::Shell.family(), FileFamily::Code(..)));
+}
+
+fn cmp_code_derive_filetype_to_filefamily_from_path(path: &str, file_type: FileType) {
+    let path = PathBuf::from(path);
+    assert_eq!(FileType::derive_type(path.as_path()), file_type);
+    assert_eq!(FileFamily::derive_type(path.as_path()), FileFamily::Code(file_type));
+}
+
+#[test]
+fn family_derive() {
+    assert_enum_variants!(FileType, {
+        MarkDown, Text, Zig, Rust, Python, TypeScript, JavaScript, Html, Nim, C, Cpp, Yml, Toml, Lobster, Json, Shell
+    });
+
+    let path = PathBuf::from("test.md");
+    assert_eq!(FileFamily::derive_type(path.as_path()), FileFamily::MarkDown);
+    assert_eq!(FileType::derive_type(path.as_path()), FileType::MarkDown);
+
+    let path = PathBuf::from("any_file");
+    assert_eq!(FileFamily::derive_type(path.as_path()), FileFamily::Text);
+    assert_eq!(FileType::derive_type(path.as_path()), FileType::Text);
+
+    let path = PathBuf::from("/home/file.txt");
+    assert_eq!(FileFamily::derive_type(path.as_path()), FileFamily::Text);
+    assert_eq!(FileType::derive_type(path.as_path()), FileType::Text);
+
+    cmp_code_derive_filetype_to_filefamily_from_path("test.rs", FileType::Rust);
+    cmp_code_derive_filetype_to_filefamily_from_path("test.zig", FileType::Zig);
+    cmp_code_derive_filetype_to_filefamily_from_path("test.c", FileType::C);
+    cmp_code_derive_filetype_to_filefamily_from_path("test.cpp", FileType::Cpp);
+    cmp_code_derive_filetype_to_filefamily_from_path("test.nim", FileType::Nim);
+    cmp_code_derive_filetype_to_filefamily_from_path("test.py", FileType::Python);
+    cmp_code_derive_filetype_to_filefamily_from_path("test.pyw", FileType::Python);
+    cmp_code_derive_filetype_to_filefamily_from_path("test.js", FileType::JavaScript);
+    cmp_code_derive_filetype_to_filefamily_from_path("test.jsx", FileType::JavaScript);
+    cmp_code_derive_filetype_to_filefamily_from_path("test.tsx", FileType::TypeScript);
+    cmp_code_derive_filetype_to_filefamily_from_path("test.tsx", FileType::TypeScript);
+    cmp_code_derive_filetype_to_filefamily_from_path("test.yml", FileType::Yml);
+    cmp_code_derive_filetype_to_filefamily_from_path("test.yaml", FileType::Yml);
+    cmp_code_derive_filetype_to_filefamily_from_path("test.toml", FileType::Toml);
+    cmp_code_derive_filetype_to_filefamily_from_path("test.html", FileType::Html);
+    cmp_code_derive_filetype_to_filefamily_from_path("test.lobster", FileType::Lobster);
+    cmp_code_derive_filetype_to_filefamily_from_path("test.json", FileType::Json);
+    cmp_code_derive_filetype_to_filefamily_from_path("test.sh", FileType::Shell);
+    cmp_code_derive_filetype_to_filefamily_from_path(".bashrc", FileType::Shell);
 }

@@ -15,6 +15,35 @@ pub enum FileFamily {
     Code(FileType),
 }
 
+impl FileFamily {
+    pub fn derive_type(path: &Path) -> Self {
+        let Some(extension) = path.extension().and_then(|e| e.to_str()) else {
+            return match path.file_name().and_then(|f| f.to_str()) {
+                Some(".bashrc") => Self::Code(FileType::Shell),
+                _ => Self::Text,
+            };
+        };
+        match extension.to_lowercase().as_str() {
+            "md" => Self::MarkDown,
+            "rs" => Self::Code(FileType::Rust),
+            "zig" => Self::Code(FileType::Zig),
+            "c" => Self::Code(FileType::C),
+            "cpp" => Self::Code(FileType::Cpp),
+            "nim" => Self::Code(FileType::Nim),
+            "py" | "pyw" => Self::Code(FileType::Python),
+            "js" | "jsx" => Self::Code(FileType::JavaScript),
+            "ts" | "tsx" => Self::Code(FileType::TypeScript),
+            "yml" | "yaml" => Self::Code(FileType::Yml),
+            "toml" => Self::Code(FileType::Toml),
+            "html" => Self::Code(FileType::Html),
+            "lobster" => Self::Code(FileType::Lobster),
+            "json" => Self::Code(FileType::Json),
+            "sh" => Self::Code(FileType::Shell),
+            _ => Self::Text,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Hash, Eq, Clone, Copy, Default, Serialize, Deserialize)]
 pub enum FileType {
     #[default]
@@ -39,7 +68,10 @@ pub enum FileType {
 impl FileType {
     pub fn derive_type(path: &Path) -> Self {
         let Some(extension) = path.extension().and_then(|e| e.to_str()) else {
-            return Self::Text;
+            return match path.file_name().and_then(|f| f.to_str()) {
+                Some(".bashrc") => FileType::Shell,
+                _ => Self::Text,
+            };
         };
         match extension.to_lowercase().as_str() {
             "md" => Self::MarkDown,

@@ -1,5 +1,5 @@
 use crate::{
-    configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
+    configs::{EditorAction, EditorConfigs, EditorKeyMap, FileFamily, FileType},
     cursor::Cursor,
     editor::{editor_from_data, Editor},
     editor_line::EditorLine,
@@ -312,7 +312,7 @@ impl Workspace {
             self.editors.insert(0, editor);
             return Ok(false);
         }
-        let editor = self.determine_editor(file_path, gs)?;
+        let editor = self.build_editor(file_path, gs)?;
         self.editors.insert(0, editor);
         self.toggle_editor();
         Ok(true)
@@ -322,11 +322,11 @@ impl Workspace {
         Editor::from_path(file_path, FileType::Text, &self.base_configs, gs)
     }
 
-    fn determine_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
-        match FileType::derive_type(&file_path) {
-            FileType::Text => Editor::from_path_text(file_path, &self.base_configs, gs),
-            FileType::MarkDown => Editor::from_path_md(file_path, &self.base_configs, gs),
-            file_type => {
+    fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
+        match FileFamily::derive_type(&file_path) {
+            FileFamily::Text => Editor::from_path_text(file_path, &self.base_configs, gs),
+            FileFamily::MarkDown => Editor::from_path_md(file_path, &self.base_configs, gs),
+            FileFamily::Code(file_type) => {
                 let mut editor = Editor::from_path(file_path, file_type, &self.base_configs, gs)?;
                 lsp_enroll(&mut editor, &mut self.lsp_servers, &self.base_configs, gs);
                 Ok(editor)

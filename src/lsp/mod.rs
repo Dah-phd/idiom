@@ -96,7 +96,6 @@ impl LSP {
                     }
                     LSPMessage::Request(_inner) => {
                         // TODO: investigate handle
-                        // requests_handler.lock().await.push(inner)
                     }
                     LSPMessage::Error(_err) => {
                         // TODO: investigate handle
@@ -154,8 +153,7 @@ impl LSP {
     async fn dash_nine(&mut self) -> LSPResult<()> {
         self.lsp_json_handler.abort();
         self.lsp_send_handler.abort();
-        self.inner.kill().await?;
-        Ok(())
+        self.inner.kill().await.map_err(LSPError::from)
     }
 }
 
