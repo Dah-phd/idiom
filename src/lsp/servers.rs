@@ -79,9 +79,9 @@ impl LSPServers {
         let Some((lsp_cmd, attempt)) = self.ready_servers.remove(&file_type)?.decompose() else {
             return Some(LSPRunningStatus::Dead);
         };
-        let task = tokio::task::spawn(LSPBuilder::new_attempt(lsp_cmd, file_type, Some(attempt)));
-        if let Some(old) = self.in_waiting.insert(file_type, task) {
-            old.abort();
+        if let Entry::Vacant(lsp_entry) = self.in_waiting.entry(file_type) {
+            let init_task = tokio::task::spawn(LSPBuilder::new_attempt(lsp_cmd, file_type, Some(attempt)));
+            lsp_entry.insert(init_task);
         }
         Some(LSPRunningStatus::Failing)
     }
@@ -107,7 +107,7 @@ impl LSPServers {
                     Err(error) => apply_cb(file_type, Err(error)),
                 },
                 Err(join_error) => {
-                    (apply_cb)(file_type, Err(LSPError::InternalError(format!("Failed to await LSP: {join_error}"))));
+                    (apply_cb)(file_type, Err(LSPError::InternalError(format!("Failed to await LSP: {join_error} >> attmpting recovery ..."))));
                 }
             };
         }
