@@ -1,5 +1,5 @@
 [package]
-rust-version = "1.86"
+rust-version = "1.88"
 name = "idiom"
 version = "0.7.2"
 edition = "2021"

@@ -365,31 +365,23 @@ impl Workspace {
     }
 
     #[inline]
-    pub async fn check_lsp(&mut self, file_type: FileType, gs: &mut GlobalState) {
-        let Some(status) = self.lsp_servers.check_lsp(file_type).await else {
+    pub fn check_lsp(&mut self, file_type: FileType, gs: &mut GlobalState) {
+        let Some(status) = self.lsp_servers.check_running_lsp(file_type) else {
             return;
         };
         match status {
             LSPRunningStatus::Running => gs.success("LSP function is normal".to_owned()),
-            LSPRunningStatus::Dead(err) => {
-                gs.error(format!("{err} >> moving to local LSP!"));
+            LSPRunningStatus::Dead => {
+                gs.error(format!("LSP ({}) failed recovery >> moving to local LSP!", file_type.as_str()));
                 for editor in self.editors.iter_mut().filter(|e| e.file_type() == &file_type) {
                     editor.lsp_local(gs);
                 }
             }
-            LSPRunningStatus::Failing(err) => gs.error(err.to_string()),
-            LSPRunningStatus::Recoverd(err) => {
-                self.full_sync(&file_type, gs);
-                gs.success(format!("LSP recoved after: {err}"));
-            }
-        }
-    }
-
-    #[inline]
-    pub fn full_sync(&mut self, file_type: &FileType, gs: &mut GlobalState) {
-        if let Some(lsp) = self.lsp_servers.get_running(file_type) {
-            for editor in self.editors.iter_mut().filter(|e| e.file_type() == file_type) {
-                editor.lsp_set(lsp.aquire_client(), gs);
+            LSPRunningStatus::Failing => {
+                gs.error(format!("LSP ({}) is failing >> attemping to recover ...", file_type.as_str()));
+                for editor in self.editors.iter_mut().filter(|e| e.file_type() == &file_type) {
+                    editor.lsp_drop();
+                }
             }
         }
     }

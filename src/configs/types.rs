@@ -152,6 +152,10 @@ impl FileType {
             Self::Shell,
         ]
     }
+
+    pub const fn as_str(&self) -> &'static str {
+        ft_to_str(*self)
+    }
 }
 
 impl From<FileFamily> for FileType {
@@ -199,7 +203,7 @@ impl From<FileType> for FileFamily {
     }
 }
 
-const fn ft_to_str(value: FileType) -> &'static str {
+pub const fn ft_to_str(value: FileType) -> &'static str {
     match value {
         FileType::Text | FileType::MarkDown => "unknown file type - error",
         FileType::Rust => "rust",

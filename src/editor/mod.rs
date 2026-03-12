@@ -285,6 +285,13 @@ impl Editor {
         self.lexer.local_lsp(self.file_type, self.stringify(), gs)
     }
 
+    pub fn lsp_drop(&mut self) {
+        match self.file_type.family() {
+            FileFamily::Code(file_type) => self.lexer = Lexer::with_context(file_type, &self.path),
+            _ => {}
+        }
+    }
+
     pub fn file_type_set(&mut self, file_type: FileType, cfg: IndentConfigs, gs: &mut GlobalState) {
         self.actions.cfg = cfg;
         self.file_type = file_type;

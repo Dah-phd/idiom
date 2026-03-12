@@ -174,6 +174,6 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
         if !workspace.are_all_lsp_servs_running() {
             workspace.connect_ready_lsp_servs(&mut gs).await;
         }
-        gs.handle_events(&mut tree, &mut workspace, &mut term).await
+        gs.handle_events(&mut tree, &mut workspace, &mut term);
     }
 }

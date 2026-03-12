@@ -429,9 +429,9 @@ impl GlobalState {
         }
     }
 
-    pub async fn handle_events(&mut self, tree: &mut Tree, ws: &mut Workspace, term: &mut EditorTerminal) {
+    pub fn handle_events(&mut self, tree: &mut Tree, ws: &mut Workspace, term: &mut EditorTerminal) {
         while let Some(event) = self.event.pop() {
-            event.handle(self, ws, tree, term).await
+            event.handle(self, ws, tree, term);
         }
     }
 }

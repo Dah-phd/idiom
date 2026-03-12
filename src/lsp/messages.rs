@@ -1,3 +1,5 @@
+use super::lsp_stream::StdErrMessage;
+use crate::editor::syntax::{tokens::validate_and_format_delta_tokens, DiagnosticLine};
 use lsp_types::{
     notification::{Notification, PublishDiagnostics},
     request::GotoDeclarationResponse,
@@ -11,10 +13,6 @@ use std::{
     fmt::Display,
     path::PathBuf,
 };
-
-use crate::editor::syntax::{tokens::validate_and_format_delta_tokens, DiagnosticLine};
-
-use super::lsp_stream::StdErrMessage;
 
 pub enum LSPMessage {
     Request(Request),

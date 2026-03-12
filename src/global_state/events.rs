@@ -63,7 +63,7 @@ pub enum IdiomEvent {
 }
 
 impl IdiomEvent {
-    pub async fn handle(self, gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
+    pub fn handle(self, gs: &mut GlobalState, ws: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
         match self {
             IdiomEvent::EditorActionCall(action) => {
                 if let Some(editor) = ws.get_active() {
@@ -202,7 +202,7 @@ impl IdiomEvent {
                 Mode::Insert => gs.insert_mode(),
             },
             IdiomEvent::CheckLSP(file_type) => {
-                ws.check_lsp(file_type, gs).await;
+                ws.check_lsp(file_type, gs);
             }
             IdiomEvent::SetLSP(file_type) => {
                 if let Err(error) = ws.force_lsp_type_on_active(file_type, gs) {
