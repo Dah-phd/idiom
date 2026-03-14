@@ -1,6 +1,9 @@
 pub use super::{builder::LSPBuilder, error::LSPError};
 use super::{LSPClient, LSPResult, LSP};
-use crate::configs::{EditorConfigs, FileType};
+use crate::{
+    app::ASYNC_RT,
+    configs::{EditorConfigs, FileType},
+};
 
 use std::collections::{
     hash_map::{Entry, HashMap},
@@ -11,7 +14,7 @@ use tokio::task::JoinHandle;
 pub enum LSPServerStatus {
     None,
     Pending,
-    ReadyClient(LSPClient),
+    ReadyClient(Box<LSPClient>),
 }
 
 pub enum LSPRunningStatus {
@@ -31,7 +34,7 @@ impl LSPServers {
         Self {
             in_waiting: preloads
                 .into_iter()
-                .map(|(file_type, lsp_cmd)| (file_type, tokio::task::spawn(LSPBuilder::new(lsp_cmd, file_type))))
+                .map(|(file_type, lsp_cmd)| (file_type, ASYNC_RT.spawn(LSPBuilder::new(lsp_cmd, file_type))))
                 .collect(),
             ready_servers: HashMap::default(),
         }
@@ -48,7 +51,7 @@ impl LSPServers {
     pub fn get_or_init_server(&mut self, ft: &FileType, cfg: &EditorConfigs) -> LSPServerStatus {
         let attempt = match self.ready_servers.get(ft) {
             Some(lsp) if lsp.is_running() || lsp.attempts != 0 => {
-                return LSPServerStatus::ReadyClient(lsp.aquire_client())
+                return LSPServerStatus::ReadyClient(Box::new(lsp.aquire_client()))
             }
             Some(lsp) if lsp.attempts == 0 => {
                 return LSPServerStatus::None;
@@ -62,7 +65,7 @@ impl LSPServers {
                 return LSPServerStatus::None;
             };
             let file_type = *ft;
-            let init_task = tokio::task::spawn(LSPBuilder::new_attempt(lsp_cmd, file_type, attempt));
+            let init_task = ASYNC_RT.spawn(LSPBuilder::new_attempt(lsp_cmd, file_type, attempt));
             lsp_entry.insert(init_task);
         }
 
@@ -80,7 +83,7 @@ impl LSPServers {
             return Some(LSPRunningStatus::Dead);
         };
         if let Entry::Vacant(lsp_entry) = self.in_waiting.entry(file_type) {
-            let init_task = tokio::task::spawn(LSPBuilder::new_attempt(lsp_cmd, file_type, Some(attempt)));
+            let init_task = ASYNC_RT.spawn(LSPBuilder::new_attempt(lsp_cmd, file_type, Some(attempt)));
             lsp_entry.insert(init_task);
         }
         Some(LSPRunningStatus::Failing)
@@ -90,27 +93,33 @@ impl LSPServers {
         self.in_waiting.is_empty()
     }
 
-    pub async fn apply_started_servers(&mut self, mut apply_cb: impl FnMut(FileType, LSPResult<&mut LSP>)) {
+    pub fn apply_started_servers(&mut self, mut apply_cb: impl FnMut(FileType, LSPResult<&mut LSP>)) {
         let Self { ready_servers, in_waiting } = self;
-        let mut finished = in_waiting.extract_if(|_, v| v.is_finished());
         // explicit handles due to async logic
-        while let Some((file_type, init_task)) = finished.next() {
-            match init_task.await {
-                Ok(preload_result) => match preload_result.and_then(LSPBuilder::spawn) {
-                    Ok(mut lsp) => match ready_servers.entry(file_type) {
-                        Entry::Vacant(entry) => apply_cb(file_type, Ok(entry.insert(lsp))),
-                        Entry::Occupied(mut entry) => {
-                            apply_cb(file_type, Ok(&mut lsp));
-                            _ = entry.insert(lsp);
-                        }
+        ASYNC_RT.block_on(async {
+            for (file_type, init_task) in in_waiting.extract_if(|_, v| v.is_finished()) {
+                match init_task.await {
+                    Ok(preload_result) => match preload_result.and_then(LSPBuilder::spawn) {
+                        Ok(mut lsp) => match ready_servers.entry(file_type) {
+                            Entry::Vacant(entry) => apply_cb(file_type, Ok(entry.insert(lsp))),
+                            Entry::Occupied(mut entry) => {
+                                apply_cb(file_type, Ok(&mut lsp));
+                                _ = entry.insert(lsp);
+                            }
+                        },
+                        Err(error) => apply_cb(file_type, Err(error)),
                     },
-                    Err(error) => apply_cb(file_type, Err(error)),
-                },
-                Err(join_error) => {
-                    (apply_cb)(file_type, Err(LSPError::InternalError(format!("Failed to await LSP: {join_error} >> attmpting recovery ..."))));
-                }
-            };
-        }
+                    Err(join_error) => {
+                        (apply_cb)(
+                            file_type,
+                            Err(LSPError::InternalError(format!(
+                                "Failed to await LSP: {join_error} >> attmpting recovery ..."
+                            ))),
+                        );
+                    }
+                };
+            }
+        })
     }
 }
 

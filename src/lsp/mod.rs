@@ -8,8 +8,6 @@ mod notification;
 mod payload;
 mod request;
 pub mod servers;
-use crate::configs::FileType;
-use builder::LSPBuilder;
 pub use client::LSPClient;
 pub use error::{LSPError, LSPResult};
 pub use local::{init_local_tokens, Highlighter};
@@ -35,12 +33,6 @@ pub struct LSP {
 }
 
 impl LSP {
-    #[allow(dead_code)]
-    pub async fn new(lsp_cmd: String, file_type: FileType) -> LSPResult<Self> {
-        let builder = LSPBuilder::new(lsp_cmd, file_type).await?;
-        builder.spawn()
-    }
-
     pub fn aquire_client(&self) -> LSPClient {
         self.client.clone()
     }

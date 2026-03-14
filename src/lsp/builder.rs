@@ -4,6 +4,7 @@ pub use super::messages::{DiagnosticHandle, LSPMessage, LSPResponse, LSPResponse
 pub use super::request::LSPRequest;
 use super::{LSPClient, LSPResult, Requests, Responses, LSP};
 use crate::{
+    app::ASYNC_RT,
     configs::{get_config_dir, FileType},
     utils::{split_arc, SHELL},
 };
@@ -34,7 +35,7 @@ impl LSPBuilder {
         let mut inner = server.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::piped()).spawn()?;
 
         // splitting subprocess
-        let mut json_rpc = JsonRPC::new(&mut inner)?;
+        let mut json_rpc = JsonRPC::tokio_rt_new(&mut inner)?;
         let mut stdin =
             inner.stdin.take().ok_or(LSPError::InternalError(String::from("Failed to take stdin of JsonRCP (LSP)")))?;
 
@@ -69,7 +70,7 @@ impl LSPBuilder {
         let (diagnostics, diagnostics_handler) = split_arc::<Mutex<DiagnosticHandle>>();
 
         // starting response handler
-        let lsp_json_handler = tokio::task::spawn(async move {
+        let lsp_json_handler = ASYNC_RT.spawn(async move {
             loop {
                 match json_rpc.next().await? {
                     LSPMessage::Response(inner) => {

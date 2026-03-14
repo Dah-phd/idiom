@@ -326,27 +326,23 @@ impl Workspace {
 
     // LSP HANDLES
 
-    #[inline]
-    pub fn are_all_lsp_servs_running(&self) -> bool {
-        self.lsp_servers.are_all_servers_ready()
-    }
-
-    pub async fn connect_ready_lsp_servs(&mut self, gs: &mut GlobalState) {
-        self.lsp_servers
-            .apply_started_servers(|file_type, lsp_result| match lsp_result {
-                Ok(lsp) => {
-                    for editor in self.editors.iter_mut().filter(|e| e.file_type() == &file_type) {
-                        editor.lsp_set(lsp.aquire_client(), gs);
-                    }
+    pub fn connect_ready_lsp_servs(&mut self, gs: &mut GlobalState) {
+        if self.lsp_servers.are_all_servers_ready() {
+            return;
+        }
+        self.lsp_servers.apply_started_servers(|file_type, lsp_result| match lsp_result {
+            Ok(lsp) => {
+                for editor in self.editors.iter_mut().filter(|e| e.file_type() == &file_type) {
+                    editor.lsp_set(lsp.aquire_client(), gs);
                 }
-                Err(error) => {
-                    gs.error(error);
-                    for editor in self.editors.iter_mut().filter(|e| e.file_type() == &file_type) {
-                        editor.lsp_local(gs);
-                    }
+            }
+            Err(error) => {
+                gs.error(error);
+                for editor in self.editors.iter_mut().filter(|e| e.file_type() == &file_type) {
+                    editor.lsp_local(gs);
                 }
-            })
-            .await;
+            }
+        });
     }
 
     pub fn force_lsp_type_on_active(&mut self, file_type: FileType, gs: &mut GlobalState) -> IdiomResult<()> {
@@ -576,7 +572,7 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
 /// helper to match behavior on all lsp application
 fn lsp_enroll(editor: &mut Editor, lsp_servers: &mut LSPServers, cfg: &EditorConfigs, gs: &mut GlobalState) {
     match lsp_servers.get_or_init_server(editor.file_type(), cfg) {
-        LSPServerStatus::ReadyClient(client) => editor.lsp_set(client, gs),
+        LSPServerStatus::ReadyClient(client) => editor.lsp_set(*client, gs),
         LSPServerStatus::None => editor.lsp_local(gs),
         LSPServerStatus::Pending => editor.force_local_lsp_tokens(gs),
     }

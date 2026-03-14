@@ -19,12 +19,19 @@ use crate::{
 };
 use crossterm::event::Event;
 use std::{path::PathBuf, time::Duration};
+use tokio::runtime::Runtime;
 
+// async runtime is mainly used for longrunning task > using manually create rt
+lazy_static::lazy_static! {
+    pub static ref ASYNC_RT: Runtime = {
+        Runtime::new().unwrap()
+    };
+}
 pub const MIN_FRAMERATE: Duration = Duration::from_millis(16);
 pub const MIN_HEIGHT: u16 = 6;
 pub const MIN_WIDTH: u16 = 40;
 
-pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomResult<()> {
+pub fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomResult<()> {
     let screen_rect = get_init_screen(&mut backend)?;
     let mut gs = GlobalState::new(screen_rect, backend);
     let (mut general_key_map, editor_key_map, tree_key_map) = gs.get_key_maps();
@@ -169,11 +176,9 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
         // render updates
         gs.draw(&mut workspace, &mut tree, &mut term);
 
-        // do event exchanges
+        // sync components
         tree.sync(&mut gs);
-        if !workspace.are_all_lsp_servs_running() {
-            workspace.connect_ready_lsp_servs(&mut gs).await;
-        }
+        workspace.connect_ready_lsp_servs(&mut gs);
         gs.handle_events(&mut tree, &mut workspace, &mut term);
     }
 }

@@ -20,7 +20,7 @@ pub use utils::create_semantic_capabilities;
 use utils::{full_tokens, partial_tokens, swap_content};
 
 use super::{payload::Payload, LSPError, LSPResponse, LSPResult, Responses};
-use crate::{configs::FileType, cursor::CursorPosition};
+use crate::{app::ASYNC_RT, configs::FileType, cursor::CursorPosition};
 
 use lsp_types::{
     notification::{DidChangeTextDocument, DidOpenTextDocument, Notification},
@@ -45,14 +45,14 @@ pub fn start_lsp_handler(
     responses: Arc<Responses>,
 ) -> JoinHandle<LSPResult<()>> {
     match file_type {
-        FileType::Python => tokio::task::spawn(async move { LocalLSP::<PyToken>::run(rx, responses).await }),
-        FileType::Lobster => tokio::task::spawn(async move { LocalLSP::<Pincer>::run(rx, responses).await }),
-        FileType::Rust => tokio::task::spawn(async move { LocalLSP::<Rustacean>::run(rx, responses).await }),
-        FileType::JavaScript => tokio::task::spawn(async move { LocalLSP::<TSToken>::run(rx, responses).await }),
-        FileType::TypeScript => tokio::task::spawn(async move { LocalLSP::<TSToken>::run(rx, responses).await }),
-        FileType::Json => tokio::task::spawn(async move { LocalLSP::<JsonValue>::run(rx, responses).await }),
-        FileType::Shell => tokio::task::spawn(async move { LocalLSP::<BashToken>::run(rx, responses).await }),
-        _ => tokio::task::spawn(async move { LocalLSP::<GenericToken>::run(rx, responses).await }),
+        FileType::Python => ASYNC_RT.spawn(async move { LocalLSP::<PyToken>::run(rx, responses).await }),
+        FileType::Lobster => ASYNC_RT.spawn(async move { LocalLSP::<Pincer>::run(rx, responses).await }),
+        FileType::Rust => ASYNC_RT.spawn(async move { LocalLSP::<Rustacean>::run(rx, responses).await }),
+        FileType::JavaScript => ASYNC_RT.spawn(async move { LocalLSP::<TSToken>::run(rx, responses).await }),
+        FileType::TypeScript => ASYNC_RT.spawn(async move { LocalLSP::<TSToken>::run(rx, responses).await }),
+        FileType::Json => ASYNC_RT.spawn(async move { LocalLSP::<JsonValue>::run(rx, responses).await }),
+        FileType::Shell => ASYNC_RT.spawn(async move { LocalLSP::<BashToken>::run(rx, responses).await }),
+        _ => ASYNC_RT.spawn(async move { LocalLSP::<GenericToken>::run(rx, responses).await }),
     }
 }
 

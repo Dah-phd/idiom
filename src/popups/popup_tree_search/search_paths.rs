@@ -1,5 +1,6 @@
 use super::{Components, Popup, Status};
 use crate::{
+    app::ASYNC_RT,
     embeded_term::EditorTerminal,
     ext_tui::{text_field::map_key, State, StyleExt},
     global_state::{GlobalState, IdiomEvent},
@@ -177,7 +178,7 @@ impl Popup for ActivePathSearch {
                 let root_tree = self.tree.clone();
                 let pattern = self.pattern.as_str().to_string();
                 let buffer = Arc::clone(&self.options_buffer);
-                self.join_handle.replace(tokio::task::spawn(async move {
+                self.join_handle.replace(ASYNC_RT.spawn(async move {
                     if let Ok(options) = root_tree.search_tree_paths(&pattern) {
                         let mut lock = match buffer.lock() {
                             Ok(lock) => lock,

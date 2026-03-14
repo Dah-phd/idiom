@@ -286,8 +286,8 @@ mod tests {
     use idiom_tui::{layout::Rect, Backend};
     use std::path::PathBuf;
 
-    #[tokio::test]
-    async fn store_and_load() {
+    #[test]
+    fn store_and_load() {
         let mut gs = GlobalState::new(Rect::default(), CrossTerm::init());
         let mut ws = mock_ws(vec![String::from("test data"), String::from("second line")]);
         let active_editor = ws.get_active().unwrap();

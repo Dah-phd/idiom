@@ -1,5 +1,6 @@
 use super::{watcher::TreeWatcher, PathParser};
 use crate::{
+    app::ASYNC_RT,
     configs::{ERR, WARN},
     error::IdiomResult,
     ext_tui::{CrossTerm, StyleExt},
@@ -203,7 +204,8 @@ impl TreePath {
         SerachResult::Remainder(idx)
     }
 
-    pub fn search_in_files(
+    /// requires tokio runtime
+    fn search_in_files(
         mut self,
         pattern: Arc<str>,
         buffer: &mut JoinSet<Vec<(PathBuf, String, usize)>>,
@@ -216,18 +218,21 @@ impl TreePath {
         let _ = self.expand(); // ignored for now
         match self {
             Self::File { path, .. } => {
-                buffer.spawn(async move {
-                    let maybe_content = std::fs::read_to_string(&path);
-                    let mut buffer = Vec::new();
-                    if let Ok(content) = maybe_content {
-                        for (idx, line) in content.lines().enumerate() {
-                            if line.contains(&*pattern) {
-                                buffer.push((path.clone(), line.trim_start().to_owned(), idx))
+                buffer.spawn_on(
+                    async move {
+                        let maybe_content = std::fs::read_to_string(&path);
+                        let mut buffer = Vec::new();
+                        if let Ok(content) = maybe_content {
+                            for (idx, line) in content.lines().enumerate() {
+                                if line.contains(&*pattern) {
+                                    buffer.push((path.clone(), line.trim_start().to_owned(), idx))
+                                }
                             }
                         }
-                    }
-                    buffer
-                });
+                        buffer
+                    },
+                    ASYNC_RT.handle(),
+                );
             }
             Self::Folder { tree: Some(tree), .. } => {
                 for tree_path in tree {

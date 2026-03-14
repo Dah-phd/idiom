@@ -1,5 +1,6 @@
 use super::{Components, Popup, Status};
 use crate::{
+    app::ASYNC_RT,
     embeded_term::EditorTerminal,
     ext_tui::{text_field::map_key, LineBuilder, State, StyleExt},
     global_state::{EditorOpenConfig, GlobalState, IdiomEvent},
@@ -246,7 +247,7 @@ impl Drop for ActiveFileSearch {
 fn create_async_tree_search_task(tree: TreePath) -> (JoinHandle<()>, UnboundedSender<String>, Receiver<Message>) {
     let (send_results, recv) = tokio::sync::mpsc::channel::<Message>(20);
     let (send, mut recv_requests) = tokio::sync::mpsc::unbounded_channel::<String>();
-    let task = tokio::task::spawn(async move {
+    let task = ASYNC_RT.spawn(async move {
         let mut cache = (vec![], String::new());
         while let Some(pattern) = recv_requests.recv().await {
             if !cache.0.is_empty() && pattern.starts_with(cache.1.as_str()) {

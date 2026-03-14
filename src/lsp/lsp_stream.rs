@@ -29,7 +29,8 @@ pub struct JsonRPC {
 }
 
 impl JsonRPC {
-    pub fn new(child: &mut Child) -> Result<Self, RCPError> {
+    /// can only be called in the context of tokio runtim
+    pub fn tokio_rt_new(child: &mut Child) -> Result<Self, RCPError> {
         let inner = child.stdout.take().ok_or(RCPError::StdoutTaken)?;
         let mut stderr = FramedRead::new(child.stderr.take().ok_or(RCPError::StderrTaken)?, BytesCodec::new());
         let errors = Arc::default();
@@ -41,10 +42,13 @@ impl JsonRPC {
             errors,
             parsed_que: Vec::new(),
             expected_len: 0,
-            stderr: tokio::task::spawn(async move {
+            stderr: tokio::spawn(async move {
+                let mut buffer = Vec::new();
                 while let Some(Ok(err)) = stderr.next().await {
-                    if let Ok(msg) = String::from_utf8(err.into()) {
-                        into_guard(&errors_handler).push(msg);
+                    buffer.extend(err.into_iter());
+                    if let Ok(msg) = std::str::from_utf8(&buffer) {
+                        into_guard(&errors_handler).push(msg.to_owned());
+                        buffer.clear();
                     }
                 }
             }),
@@ -64,15 +68,13 @@ impl JsonRPC {
         }
         while self.parsed_que.is_empty() {
             let bytes = self.inner.next().await.ok_or(RCPError::StreamFinish)??;
-            self.buffer.append(&mut bytes.to_vec());
-            match std::str::from_utf8(&self.buffer) {
-                Ok(msg) => {
-                    self.str_buffer.push_str(msg);
-                    self.buffer.clear();
-                }
-                Err(_) => continue, // buffer is not fully read
+            self.buffer.extend(bytes.into_iter());
+
+            if let Ok(msg) = std::str::from_utf8(&self.buffer) {
+                self.str_buffer.push_str(msg);
+                self.buffer.clear();
+                self.parse()?;
             };
-            self.parse()?;
         }
         Ok(self.parsed_que.remove(0).into())
     }
