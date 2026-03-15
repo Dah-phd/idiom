@@ -49,13 +49,8 @@ impl LSP {
 
 impl Drop for LSP {
     fn drop(&mut self) {
-        if !self.lsp_send_handler.is_finished() {
-            self.lsp_send_handler.abort();
-        }
         self.lsp_send_handler.abort();
-        if !self.lsp_json_handler.is_finished() {
-            self.lsp_json_handler.abort();
-        }
+        self.lsp_json_handler.abort();
     }
 }
 

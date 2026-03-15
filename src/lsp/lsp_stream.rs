@@ -29,7 +29,6 @@ pub struct JsonRPC {
 }
 
 impl JsonRPC {
-    /// can only be called in the context of tokio runtim
     pub fn tokio_rt_new(child: &mut Child) -> Result<Self, RCPError> {
         let inner = child.stdout.take().ok_or(RCPError::StdoutTaken)?;
         let mut stderr = FramedRead::new(child.stderr.take().ok_or(RCPError::StderrTaken)?, BytesCodec::new());

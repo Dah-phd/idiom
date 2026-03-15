@@ -34,7 +34,7 @@ impl LSPServers {
         Self {
             in_waiting: preloads
                 .into_iter()
-                .map(|(file_type, lsp_cmd)| (file_type, ASYNC_RT.spawn(LSPBuilder::new(lsp_cmd, file_type))))
+                .map(|(file_type, lsp_cmd)| (file_type, ASYNC_RT.spawn(LSPBuilder::init_lsp(lsp_cmd, file_type))))
                 .collect(),
             ready_servers: HashMap::default(),
         }
@@ -99,7 +99,7 @@ impl LSPServers {
         ASYNC_RT.block_on(async {
             for (file_type, init_task) in in_waiting.extract_if(|_, v| v.is_finished()) {
                 match init_task.await {
-                    Ok(preload_result) => match preload_result.and_then(LSPBuilder::spawn) {
+                    Ok(preload_result) => match preload_result.and_then(LSPBuilder::finish) {
                         Ok(mut lsp) => match ready_servers.entry(file_type) {
                             Entry::Vacant(entry) => apply_cb(file_type, Ok(entry.insert(lsp))),
                             Entry::Occupied(mut entry) => {
@@ -109,14 +109,10 @@ impl LSPServers {
                         },
                         Err(error) => apply_cb(file_type, Err(error)),
                     },
-                    Err(join_error) => {
-                        (apply_cb)(
-                            file_type,
-                            Err(LSPError::InternalError(format!(
-                                "Failed to await LSP: {join_error} >> attmpting recovery ..."
-                            ))),
-                        );
-                    }
+                    Err(join_error) => (apply_cb)(
+                        file_type,
+                        Err(LSPError::InternalError(format!("Failed to await LSP: {join_error}"))),
+                    ),
                 };
             }
         })
