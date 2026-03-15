@@ -1,5 +1,6 @@
 ## Includes only major changes (manual updates)
 # Version 0.7.2
+- jsonRPC stream reading cleanup
 - async start of LSP servers
 - added sanitize popup for tabs or exotic lineends
 - fix issue when removing lines on cached render

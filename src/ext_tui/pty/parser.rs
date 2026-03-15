@@ -31,7 +31,7 @@ impl TrackedParser {
 
     pub fn scroll_down(&mut self) {
         let cur_scroll = self.inner.screen().scrollback();
-        self.inner.screen_mut().set_scrollback(cur_scroll.checked_sub(1).unwrap_or_default());
+        self.inner.screen_mut().set_scrollback(cur_scroll.saturating_sub(1));
     }
 
     pub fn scroll_to_end(&mut self) {
