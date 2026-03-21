@@ -1,6 +1,7 @@
 mod defaults;
 mod editor;
 mod keymap;
+mod lsp_cfg;
 mod theme;
 mod theme_ui;
 mod types;

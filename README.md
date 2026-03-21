@@ -25,6 +25,17 @@ Python should work for the most part with jedi, but the interaction is not well 
 ### Screen shots
 ![](/non_dev/screen1.png)
 
+## Config guide
+- location {cfg dir}/idiom/
+- files - editor.toml, keys.toml, theme.toml, theme_ui.toml
+### Partial init on start
+- editor.toml
+
+### Full init on start (example inplace)
+- keys.toml
+- theme.toml - style of code
+- theme_ui.toml - style of the editor components
+
 ## Tested platform
 - Linux Fedora derivate (Nobara)
 - Linux Mint

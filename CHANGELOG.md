@@ -1,5 +1,6 @@
 ## Includes only major changes (manual updates)
 # Version 0.7.2
+- restructuring editor configs - moving floating LSP's to LSP group
 - jsonRPC stream reading cleanup
 - async start of LSP servers
 - added sanitize popup for tabs or exotic lineends
