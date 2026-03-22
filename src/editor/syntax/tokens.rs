@@ -23,6 +23,7 @@ pub fn validate_and_format_delta_tokens(tokens: &mut Vec<SemanticToken>) {
         if token.length == 0 {
             let removed = tokens.remove(idx);
             if let Some(next_token) = tokens.get_mut(idx) {
+                next_token.delta_line += removed.delta_line;
                 if next_token.delta_line != 0 {
                     continue;
                 }
