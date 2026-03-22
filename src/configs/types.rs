@@ -30,7 +30,7 @@ impl FileFamily {
             "c" => Self::Code(FileType::C),
             "cpp" => Self::Code(FileType::Cpp),
             "nim" => Self::Code(FileType::Nim),
-            "py" | "pyw" => Self::Code(FileType::Python),
+            "py" | "pyw" | "pyi" => Self::Code(FileType::Python),
             "js" | "jsx" => Self::Code(FileType::JavaScript),
             "ts" | "tsx" => Self::Code(FileType::TypeScript),
             "yml" | "yaml" => Self::Code(FileType::Yml),
