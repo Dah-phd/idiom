@@ -41,6 +41,7 @@ pub enum PyToken {
     #[token("in")]
     #[token("continue")]
     #[token("if")]
+    #[token("is")]
     #[token("elif")]
     #[token("else")]
     #[token("case")]
