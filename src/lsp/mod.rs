@@ -25,7 +25,6 @@ pub type Requests = Mutex<HashMap<i64, LSPResponseType>>;
 #[allow(clippy::upper_case_acronyms)]
 pub struct LSP {
     _inner: Child,
-    lsp_cmd: String,
     client: LSPClient,
     lsp_json_handler: JoinHandle<LSPResult<()>>,
     lsp_send_handler: JoinHandle<LSPResult<()>>,

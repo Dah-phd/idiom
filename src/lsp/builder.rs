@@ -8,9 +8,9 @@ use crate::{
     configs::{get_config_dir, FileType},
     utils::{split_arc, SHELL},
 };
-use lsp_types::{request::Initialize, InitializeResult, ServerCapabilities};
+use lsp_types::{InitializeResult, ServerCapabilities};
 use serde_json::from_value;
-use serde_json::Value;
+use serde_json::{Map, Value};
 use std::{
     process::Stdio,
     sync::{Arc, Mutex},
@@ -21,13 +21,14 @@ use tokio::{
     task::JoinHandle,
 };
 
+pub type InitCfg = Option<Map<String, Value>>;
+
 /// holds all components needed to build LSP before creating of the client and main loop
 /// namely the server command has started successfully (some servers can take their time)
 pub struct LSPBuilder {
     inner: Child,
     stdin: ChildStdin,
     attempt: Option<u8>,
-    lsp_cmd: String,
     file_type: FileType,
     capabilities: ServerCapabilities,
     sent_request: Arc<Requests>,
@@ -37,7 +38,7 @@ pub struct LSPBuilder {
 }
 
 impl LSPBuilder {
-    pub async fn init_lsp(lsp_cmd: String, file_type: FileType) -> LSPResult<LSPBuilder> {
+    pub async fn init_lsp(lsp_cmd: String, init_cfg: InitCfg, file_type: FileType) -> LSPResult<LSPBuilder> {
         let mut server = server_cmd_kill_on_drop(&lsp_cmd)?;
         let mut inner = server.stdout(Stdio::piped()).stderr(Stdio::piped()).stdin(Stdio::piped()).spawn()?;
 
@@ -46,12 +47,24 @@ impl LSPBuilder {
         let mut stdin =
             inner.stdin.take().ok_or(LSPError::InternalError(String::from("Failed to take stdin of JsonRCP (LSP)")))?;
 
+        // init request
+        let disable_tokens = are_semantics_disabled(&init_cfg);
+        let init = match init_cfg {
+            Some(init_cfg) => LSPRequest::init_request_with_mods(init_cfg)?,
+            None => LSPRequest::init_request()?,
+        };
+
         // sending init requests
-        stdin.write_all(LSPRequest::<Initialize>::init_request()?.stringify()?.as_bytes()).await?;
+        stdin.write_all(init.stringify()?.as_bytes()).await?;
         stdin.flush().await?;
 
         let init_response = skip_to_response(&mut json_rpc).await?;
-        let capabilities = from_value::<InitializeResult>(init_response)?.capabilities;
+        let mut capabilities = from_value::<InitializeResult>(init_response)?.capabilities;
+
+        // disable tokens if init_cfg holds logic to remove capability
+        if disable_tokens {
+            capabilities.semantic_tokens_provider.take();
+        }
 
         // setting up storage
         let (responses, responses_handler) = split_arc::<Responses>();
@@ -59,7 +72,6 @@ impl LSPBuilder {
         let (diagnostics, diagnostics_handler) = split_arc::<Mutex<DiagnosticHandle>>();
 
         Ok(LSPBuilder {
-            lsp_cmd,
             file_type,
             capabilities,
             inner,
@@ -77,8 +89,13 @@ impl LSPBuilder {
         })
     }
 
-    pub async fn new_attempt(lsp_cmd: String, file_type: FileType, attempt: Option<u8>) -> LSPResult<LSPBuilder> {
-        let mut builder = Self::init_lsp(lsp_cmd, file_type).await?;
+    pub async fn new_attempt(
+        lsp_cmd: String,
+        init_cfg: InitCfg,
+        file_type: FileType,
+        attempt: Option<u8>,
+    ) -> LSPResult<LSPBuilder> {
+        let mut builder = Self::init_lsp(lsp_cmd, init_cfg, file_type).await?;
         if let Some(attempt) = attempt {
             builder.attempt(attempt);
         }
@@ -92,7 +109,6 @@ impl LSPBuilder {
 
     pub fn finish(self) -> LSPResult<LSP> {
         let LSPBuilder {
-            lsp_cmd,
             file_type,
             capabilities,
             inner,
@@ -107,7 +123,7 @@ impl LSPBuilder {
         let (lsp_send_handler, client) =
             LSPClient::new(stdin, file_type, diagnostics, sent_request, responses, capabilities)?;
 
-        Ok(LSP { client, lsp_cmd, _inner: inner, lsp_json_handler, lsp_send_handler, attempts: attempt.unwrap_or(5) })
+        Ok(LSP { client, _inner: inner, lsp_json_handler, lsp_send_handler, attempts: attempt.unwrap_or(5) })
     }
 }
 
@@ -185,5 +201,34 @@ async fn json_rpc_loop(
                 // TODO: investigate handle
             }
         }
+    }
+}
+
+/// ensures tokens are disabled - so tokens will be generated locally
+fn are_semantics_disabled(init_cfg: &InitCfg) -> bool {
+    match init_cfg {
+        Some(mods) => mods
+            .get("capabilities")
+            .and_then(|cap| cap.as_object()?.get("textDocument"))
+            .and_then(|td| td.as_object()?.get("semanticTokens"))
+            .map(Value::is_null)
+            .unwrap_or_default(),
+        None => false,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::are_semantics_disabled;
+    use crate::configs::{EditorConfigs, FileType};
+
+    #[test]
+    fn test_semantic_check() {
+        let default_cfg = EditorConfigs::default();
+        assert!(!are_semantics_disabled(&None));
+        let py_cfg = default_cfg.derive_lsp(&FileType::Python).unwrap().1;
+        assert!(are_semantics_disabled(&py_cfg));
+        let rust_cfg = default_cfg.derive_lsp(&FileType::Rust).unwrap().1;
+        assert!(!are_semantics_disabled(&rust_cfg));
     }
 }

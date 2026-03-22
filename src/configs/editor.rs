@@ -8,11 +8,12 @@ use crate::{
     configs::lsp_cfg::LSPConfig,
     editor_line::EditorLine,
     global_state::GlobalState,
+    lsp::servers::InitCfg,
     utils::{trim_start_inplace, Offset},
 };
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 #[allow(non_snake_case)]
 #[derive(Debug, Deserialize, Serialize)]
@@ -65,29 +66,29 @@ impl Default for EditorConfigs {
             FileType::Rust.as_str().into(),
             LSPConfig::new("rust-analyzer", Some(vec!["Cargo.toml".to_owned(), "Cargo.lock".to_owned()]), None),
         );
-
         lsp_configs.insert(
             FileType::Python.as_str().into(),
-            LSPConfig::new(
+            LSPConfig::new_no_semantic_tokens(
                 "uv tool run ty server",
                 Some(vec!["pyproject.toml".to_owned(), "pytest.init".to_owned()]),
-                None,
             ),
         );
         lsp_configs.insert(
             FileType::Nim.as_str().into(),
             LSPConfig::new("nimlsp", Some(vec![r".*\.nimble".to_owned()]), None),
         );
-        lsp_configs.insert(FileType::TypeScript.as_str().into(), LSPConfig::new("vtsls --stdio", None, None));
-        lsp_configs.insert(FileType::JavaScript.as_str().into(), LSPConfig::new("vtsls --stdio", None, None));
+        lsp_configs
+            .insert(FileType::TypeScript.as_str().into(), LSPConfig::new_no_semantic_tokens("vtsls --stdio", None));
+        lsp_configs
+            .insert(FileType::JavaScript.as_str().into(), LSPConfig::new_no_semantic_tokens("vtsls --stdio", None));
         Self {
-            format_on_save: true,
+            format_on_save: false,
             indent_spaces: get_indent_spaces(),
             indent_after: String::from("({["),
             unindent_before: String::from("]})"),
             // shell
             shell: None,
-            git_tui: None,
+            git_tui: Some("gitui".to_owned()),
             // general
             max_sessions: Some(10),
             // lsp
@@ -222,13 +223,17 @@ impl EditorConfigs {
         }
     }
 
-    pub fn derive_lsp(&self, file_type: &FileType) -> Option<String> {
+    pub fn derive_lsp(&self, file_type: &FileType) -> Option<(String, InitCfg)> {
         let lsp_configs = self.LSP.as_ref()?;
-        lsp_configs.get(file_type.as_str()).map(LSPConfig::get_cmd)
+        lsp_configs.get(file_type.as_str()).map(LSPConfig::get_cmd_with_configs)
     }
 
     /// consumes preload info - should be invoked only once
-    pub fn derive_lsp_preloads(&mut self, base_tree: Vec<String>, gs: &mut GlobalState) -> HashSet<(FileType, String)> {
+    pub fn derive_lsp_preloads(
+        &mut self,
+        base_tree: Vec<String>,
+        gs: &mut GlobalState,
+    ) -> Vec<(FileType, String, InitCfg)> {
         let Some(lsp_configs) = self.LSP.as_mut() else {
             return Default::default();
         };
@@ -236,18 +241,19 @@ impl EditorConfigs {
             .into_iter()
             .flat_map(|ft| {
                 let lsp = lsp_configs.get_mut(ft.as_str())?;
-                Some((ft, flat_map_preload(lsp, &base_tree, gs)?))
+                let (cmd, init_cfg) = flat_map_preload(lsp, &base_tree, gs)?;
+                Some((ft, cmd, init_cfg))
             })
             .collect()
     }
 }
 
-fn flat_map_preload(lsp: &mut LSPConfig, base_tree: &[String], gs: &mut GlobalState) -> Option<String> {
+fn flat_map_preload(lsp: &mut LSPConfig, base_tree: &[String], gs: &mut GlobalState) -> Option<(String, InitCfg)> {
     for try_re in lsp.take_preloads_markers()?.iter().map(|re| Regex::new(re)) {
         match try_re {
             Ok(file_re) => {
                 if base_tree.iter().any(|path| file_re.is_match(path)) {
-                    return Some(lsp.get_cmd());
+                    return Some(lsp.get_cmd_with_configs());
                 }
             }
             Err(error) => gs.error(error),

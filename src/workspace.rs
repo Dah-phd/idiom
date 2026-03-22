@@ -6,7 +6,7 @@ use crate::{
     error::{IdiomError, IdiomResult},
     ext_tui::StyleExt,
     global_state::{GlobalState, IdiomEvent},
-    lsp::servers::{LSPRunningStatus, LSPServerStatus, LSPServers},
+    lsp::servers::{InitCfg, LSPRunningStatus, LSPServerStatus, LSPServers},
     popups::popups_editor::file_updated,
     utils::TrackedList,
 };
@@ -14,7 +14,7 @@ use crossterm::event::KeyEvent;
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{layout::Rect, Backend};
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
-use std::{collections::HashSet, path::PathBuf};
+use std::path::PathBuf;
 
 pub const FILE_STATUS_ERR: &str = "File status ERR";
 pub const TAB_SELECT: Color = Color::DarkYellow;
@@ -30,7 +30,11 @@ pub struct Workspace {
 }
 
 impl Workspace {
-    pub fn new(key_map: EditorKeyMap, base_configs: EditorConfigs, lsp_preloads: HashSet<(FileType, String)>) -> Self {
+    pub fn new(
+        key_map: EditorKeyMap,
+        base_configs: EditorConfigs,
+        lsp_preloads: Vec<(FileType, String, InitCfg)>,
+    ) -> Self {
         let lsp_servers = LSPServers::new(lsp_preloads);
         let tab_style = ContentStyle::fg(TAB_SELECT);
         Self {
@@ -362,7 +366,7 @@ impl Workspace {
 
     #[inline]
     pub fn check_lsp(&mut self, file_type: FileType, gs: &mut GlobalState) {
-        let Some(status) = self.lsp_servers.check_running_lsp(file_type) else {
+        let Some(status) = self.lsp_servers.check_running_lsp(file_type, &self.base_configs) else {
             return;
         };
         match status {

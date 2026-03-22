@@ -1,14 +1,14 @@
-pub use super::{builder::LSPBuilder, error::LSPError};
+pub use super::{
+    builder::{InitCfg, LSPBuilder},
+    error::LSPError,
+};
 use super::{LSPClient, LSPResult, LSP};
 use crate::{
     app::ASYNC_RT,
     configs::{EditorConfigs, FileType},
 };
 
-use std::collections::{
-    hash_map::{Entry, HashMap},
-    HashSet,
-};
+use std::collections::hash_map::{Entry, HashMap};
 use tokio::task::JoinHandle;
 
 pub enum LSPServerStatus {
@@ -30,11 +30,13 @@ pub struct LSPServers {
 }
 
 impl LSPServers {
-    pub fn new(preloads: HashSet<(FileType, String)>) -> Self {
+    pub fn new(preloads: Vec<(FileType, String, InitCfg)>) -> Self {
         Self {
             in_waiting: preloads
                 .into_iter()
-                .map(|(file_type, lsp_cmd)| (file_type, ASYNC_RT.spawn(LSPBuilder::init_lsp(lsp_cmd, file_type))))
+                .map(|(file_type, lsp_cmd, init_cfg)| {
+                    (file_type, ASYNC_RT.spawn(LSPBuilder::init_lsp(lsp_cmd, init_cfg, file_type)))
+                })
                 .collect(),
             ready_servers: HashMap::default(),
         }
@@ -61,11 +63,11 @@ impl LSPServers {
         };
 
         if let Entry::Vacant(lsp_entry) = self.in_waiting.entry(*ft) {
-            let Some(lsp_cmd) = cfg.derive_lsp(ft) else {
+            let Some((lsp_cmd, init_cfg)) = cfg.derive_lsp(ft) else {
                 return LSPServerStatus::None;
             };
             let file_type = *ft;
-            let init_task = ASYNC_RT.spawn(LSPBuilder::new_attempt(lsp_cmd, file_type, attempt));
+            let init_task = ASYNC_RT.spawn(LSPBuilder::new_attempt(lsp_cmd, init_cfg, file_type, attempt));
             lsp_entry.insert(init_task);
         }
 
@@ -74,16 +76,19 @@ impl LSPServers {
 
     /// performs check on the status of running LSP
     /// even if returned None the LSP could be in pending status
-    pub fn check_running_lsp(&mut self, file_type: FileType) -> Option<LSPRunningStatus> {
+    pub fn check_running_lsp(&mut self, file_type: FileType, cfg: &EditorConfigs) -> Option<LSPRunningStatus> {
         let lsp = self.ready_servers.get_mut(&file_type)?;
         if lsp.is_running() {
             return Some(LSPRunningStatus::Running);
         }
-        let Some((lsp_cmd, attempt)) = self.ready_servers.remove(&file_type)?.decompose() else {
+        let Some(attempt) = self.ready_servers.remove(&file_type)?.decompose() else {
             return Some(LSPRunningStatus::Dead);
         };
         if let Entry::Vacant(lsp_entry) = self.in_waiting.entry(file_type) {
-            let init_task = ASYNC_RT.spawn(LSPBuilder::new_attempt(lsp_cmd, file_type, Some(attempt)));
+            let Some((lsp_cmd, init_cfg)) = cfg.derive_lsp(&file_type) else {
+                return Some(LSPRunningStatus::Dead);
+            };
+            let init_task = ASYNC_RT.spawn(LSPBuilder::new_attempt(lsp_cmd, init_cfg, file_type, Some(attempt)));
             lsp_entry.insert(init_task);
         }
         Some(LSPRunningStatus::Failing)
@@ -120,9 +125,7 @@ impl LSPServers {
 }
 
 impl LSP {
-    fn decompose(mut self) -> Option<(String, u8)> {
-        let attempts = self.attempts.checked_sub(1)?;
-        let lsp_cmd = std::mem::take(&mut self.lsp_cmd);
-        Some((lsp_cmd, attempts))
+    fn decompose(self) -> Option<u8> {
+        self.attempts.checked_sub(1)
     }
 }

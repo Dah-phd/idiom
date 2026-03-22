@@ -30,6 +30,11 @@ Python should work for the most part with jedi, but the interaction is not well 
 - files - editor.toml, keys.toml, theme.toml, theme_ui.toml
 ### Partial init on start
 - editor.toml
+- static values init on creating
+- LSP section paritally init
+- LSP.cmd - start the server process (rust-analyzer is an example)
+- LSP.preload_if_present - list of files if present will trigger init of the LSP
+- LSP.init_cfg - overrides for the LSP init (TOML::String("null") in string is interpreted as JSON::Null) be ware of camelCase!
 
 ### Full init on start (example inplace)
 - keys.toml
@@ -41,7 +46,7 @@ Python should work for the most part with jedi, but the interaction is not well 
 - Linux Mint
 
 ## TODO
-- !reduce completion calls - current impl does not wait response before sending new request
+- add more LSP test, bast case to build "fake LSP process" to check stability
 - try optimize multicursor word selector
 - add mouse tests to mouse effects on modals
 - check on sort text in autocomplete (probably not that useful as request is sent once)

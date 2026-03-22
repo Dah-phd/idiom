@@ -1,18 +1,22 @@
 use super::{EditorKeyMap, EditorUserKeyMap, FileFamily, FileType};
 use assert_enum_variants::assert_enum_variants;
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
 pub fn mock_editor_key_map() -> EditorKeyMap {
     EditorKeyMap { key_map: EditorUserKeyMap::default().into() }
 }
 
 #[test]
-fn ensure_file_types_iter() {
+fn ensure_filt_types_iter_is_unique() {
     // should be all langs (in this case all FileTypes - 2: ignored type)
     assert_enum_variants!(FileType, {
         MarkDown, Text, Zig, Rust, Python, TypeScript, JavaScript, Html, Nim, C, Cpp, Yml, Toml, Lobster, Json, Shell
     });
-    assert_eq!(FileType::iter_langs().len(), 14);
+    let langs = FileType::iter_langs();
+    let iter_len = langs.len();
+    assert_eq!(iter_len, 14);
+    let hash_set = langs.into_iter().collect::<HashSet<_>>();
+    assert_eq!(hash_set.len(), iter_len);
 }
 
 #[test]
