@@ -1,5 +1,6 @@
 ## Includes only major changes (manual updates)
 # Version 0.8.0
+- fix to validate tokens that was causing drop on non-0 delta line and 0 len
 - restructuring editor configs - moving floating LSP's to LSP group
 - jsonRPC stream reading cleanup
 - async start of LSP servers

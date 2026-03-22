@@ -660,6 +660,53 @@ fn test_clear_delta_start_empty_overlap() {
 }
 
 #[test]
+fn test_validate_tokens() {
+    let mut tokens = vec![
+        SemanticToken { delta_line: 0, delta_start: 0, length: 3, token_type: 0, token_modifiers_bitset: 2 },
+        SemanticToken { delta_line: 1, delta_start: 0, length: 0, token_type: 0, token_modifiers_bitset: 2 },
+        SemanticToken { delta_line: 1, delta_start: 0, length: 40, token_type: 0, token_modifiers_bitset: 2 },
+        SemanticToken { delta_line: 1, delta_start: 0, length: 0, token_type: 0, token_modifiers_bitset: 2 },
+        SemanticToken { delta_line: 1, delta_start: 0, length: 78, token_type: 0, token_modifiers_bitset: 2 },
+        SemanticToken { delta_line: 1, delta_start: 0, length: 0, token_type: 0, token_modifiers_bitset: 2 },
+        SemanticToken { delta_line: 1, delta_start: 0, length: 2, token_type: 0, token_modifiers_bitset: 2 },
+        SemanticToken { delta_line: 1, delta_start: 0, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 1, length: 5, token_type: 27, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 6, length: 22, token_type: 40, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 23, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 1, delta_start: 0, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 1, length: 6, token_type: 27, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 7, length: 11, token_type: 40, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 12, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+    ];
+    validate_and_format_delta_tokens(&mut tokens);
+    assert_eq!(
+        tokens,
+        [
+            SemanticToken { delta_line: 0, delta_start: 0, length: 3, token_type: 0, token_modifiers_bitset: 2 },
+            SemanticToken { delta_line: 2, delta_start: 0, length: 40, token_type: 0, token_modifiers_bitset: 2 },
+            SemanticToken { delta_line: 2, delta_start: 0, length: 78, token_type: 0, token_modifiers_bitset: 2 },
+            SemanticToken { delta_line: 2, delta_start: 0, length: 2, token_type: 0, token_modifiers_bitset: 2 },
+            SemanticToken { delta_line: 1, delta_start: 0, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 5, token_type: 27, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 6, length: 22, token_type: 40, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 23, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 1, delta_start: 0, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 6, token_type: 27, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 7, length: 11, token_type: 40, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 12, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+        ]
+    );
+}
+
+#[test]
 fn token_inc() {
     let mut token_line = create_tokens();
     let mut expected = TokenLine::default();
