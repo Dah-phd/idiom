@@ -181,7 +181,7 @@ impl Default for EditorUserKeyMap {
         Self {
             new_line_or_select: ENTER.to_owned(),
             indent: TAB.to_owned(),
-            backspace: BACKSPACE.to_owned(),
+            backspace: format!("{BACKSPACE} || {SHIFT} && {BACKSPACE}"),
             delete: DELETE.to_owned(),
             remove_line: format!("{SHIFT} && {DELETE}"),
             indent_start: format!("{CTRL} && ]"),
