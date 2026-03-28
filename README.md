@@ -1,4 +1,4 @@
-# Low config terminal IDE - designed for me
+# Low config terminal code editor - designed for me
 
 ## Second repo
 ![codeberg](https://codeberg.org/dah-phd/idiom)
@@ -16,7 +16,7 @@ The package can be installed with cargo:
 cargo install idiom
 ```
 
-**Currently best language for usage is Rust or Python. You will need to install the LSP manually.**
+**Currently best language for usage is Rust or Python. You will need to install the LSP manually.**  
 *rust setup* (after installing rustup)
 ```shell
 rustup component add rust-analyzer
@@ -55,15 +55,12 @@ uv tool install ty
 - try optimize multicursor word selector
 - add mouse tests to mouse effects on modals
 - check on sort text in autocomplete (probably not that useful as request is sent once)
-- maybe more autocomplete (even on long words)
+- maybe more autocomplete (even on long words)?
 
 - fix tracking edgecase where file is changed in by other app in select
 - improve cursor handle in embeded tui / terminal
 - write tests
-- lsp server cold start, maybe? "jedi-language server" starts slow
 
 ## Initial target langs
 1. RUST
 2. Python
-3. JS/TS
-4. HTML/JSON/TOML/{YAML/YML}
