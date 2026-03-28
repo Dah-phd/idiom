@@ -263,8 +263,12 @@ impl Pallet {
 
         let Some(line) = lines.next() else { return };
         match Pattern::parse(self.pattern.as_str()) {
-            Some(cmd_pattern) => line.render(&cmd_pattern.to_string(), gs.backend()),
-            None => line.render(" ...", gs.backend()),
+            Some(cmd_pattern) => line.render_styled(&cmd_pattern.to_string(), ContentStyle::ital(), gs.backend()),
+            None => line.render_styled(
+                " Example: !#ss | grep text > #s (pipe scope into grep and replace selected scope)",
+                ContentStyle::ital(),
+                gs.backend(),
+            ),
         };
     }
 

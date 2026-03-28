@@ -16,11 +16,16 @@ The package can be installed with cargo:
 cargo install idiom
 ```
 
-**Currently best language for usage is Rust. You will need to install the LSP manually.**
+**Currently best language for usage is Rust or Python. You will need to install the LSP manually.**
+*rust setup* (after installing rustup)
 ```shell
 rustup component add rust-analyzer
 ```
-Python should work for the most part with jedi, but the interaction is not well optimized. I used the editor for part of its development and optimized the LSP interactions.
+*python setup* (after installing uv)
+```shell
+uv tool install ty
+```
+*More configs can be found is ~/.config/idiom/editor.toml - best to reload after update (or F5 less safe)*
 
 ### Screen shots
 ![](/non_dev/screen1.png)
