@@ -183,10 +183,9 @@ fn handle_responses(editor: &mut Editor, gs: &mut GlobalState) {
     let modal = &mut editor.modal;
     let content = &mut editor.content;
 
-    for id in std::mem::take(&mut editor.lexer.requests) {
-        let Some(response) = responses.remove(&id) else {
-            editor.lexer.requests.push(id);
-            continue;
+    editor.lexer.requests.retain(|id| {
+        let Some(response) = responses.remove(id) else {
+            return true;
         };
         match response {
             LSPResponse::Completion(completions, line_idx) => {
@@ -241,7 +240,8 @@ fn handle_responses(editor: &mut Editor, gs: &mut GlobalState) {
             LSPResponse::Error(text) => gs.error(text),
             LSPResponse::Empty => (),
         }
-    }
+        false
+    });
 }
 
 #[inline(always)]
