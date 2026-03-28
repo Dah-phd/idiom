@@ -119,7 +119,7 @@ pub fn mouse_handler(
                 let pos_line = position.row as usize + 1;
                 gs.event.push(IdiomEvent::SetMode(Mode::Select));
                 if let Some(path) = tree.mouse_select(pos_line, gs) {
-                    gs.event.push(IdiomEvent::OpenAtLine(path, 0));
+                    gs.event.push(IdiomEvent::Open { path, config: Default::default() });
                 }
             } else if let Some(pos) = gs.tab_area.relative_position(event.row, event.column) {
                 if !ws.is_empty() {

@@ -16,20 +16,42 @@ The package can be installed with cargo:
 cargo install idiom
 ```
 
-**Currently best language for usage is Rust. You will need to install the LSP manually.**
+**Currently best language for usage is Rust or Python. You will need to install the LSP manually.**
+*rust setup* (after installing rustup)
 ```shell
 rustup component add rust-analyzer
 ```
-Python should work for the most part with jedi, but the interaction is not well optimized. I used the editor for part of its development and optimized the LSP interactions.
+*python setup* (after installing uv)
+```shell
+uv tool install ty
+```
+*More configs can be found is ~/.config/idiom/editor.toml - best to reload after update (or F5 less safe)*
 
 ### Screen shots
 ![](/non_dev/screen1.png)
+
+## Config guide
+- location {cfg dir}/idiom/
+- files - editor.toml, keys.toml, theme.toml, theme_ui.toml
+### Partial init on start
+- editor.toml
+- static values init on creating
+- LSP section paritally init
+- LSP.cmd - start the server process (rust-analyzer is an example)
+- LSP.preload_if_present - list of files if present will trigger init of the LSP
+- LSP.init_cfg - overrides for the LSP init (TOML::String("null") in string is interpreted as JSON::Null) be ware of camelCase!
+
+### Full init on start (example inplace)
+- keys.toml
+- theme.toml - style of code
+- theme_ui.toml - style of the editor components
 
 ## Tested platform
 - Linux Fedora derivate (Nobara)
 - Linux Mint
 
 ## TODO
+- add more LSP test, bast case to build "fake LSP process" to check stability
 - try optimize multicursor word selector
 - add mouse tests to mouse effects on modals
 - check on sort text in autocomplete (probably not that useful as request is sent once)

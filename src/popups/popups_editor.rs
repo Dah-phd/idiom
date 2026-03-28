@@ -1,7 +1,6 @@
 use super::generic_popup::{CommandButton, PopupChoice};
 use super::generic_selector::PopupSelector;
 use super::Components;
-use crate::global_state::IdiomEvent;
 use crossterm::event::KeyCode;
 use std::path::PathBuf;
 
@@ -27,12 +26,16 @@ pub fn file_updated(path: PathBuf) -> PopupChoice {
         Some(path.display().to_string()),
         vec![
             CommandButton {
-                command: |_, c| c.gs.event.push(IdiomEvent::Save),
+                command: |_, c| c.ws.save_active(c.gs),
                 name: "Overwrite (S)",
                 key: Some(vec![KeyCode::Char('s'), KeyCode::Char('S')]),
             },
             CommandButton {
-                command: |_, c| c.gs.event.push(IdiomEvent::Rebase),
+                command: |_, c| {
+                    if let Some(editor) = c.ws.get_active() {
+                        editor.rebase(c.gs);
+                    }
+                },
                 name: "Rebase (L)",
                 key: Some(vec![KeyCode::Char('l'), KeyCode::Char('L')]),
             },

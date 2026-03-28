@@ -1,6 +1,6 @@
-use super::{SelectManager, WRAP_CLOSE, WRAP_OPEN};
+use super::{CodecContext, SelectManager, WRAP_CLOSE, WRAP_OPEN};
 use crate::{
-    editor_line::{EditorLine, LineContext},
+    editor_line::EditorLine,
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
 };
@@ -9,14 +9,14 @@ use idiom_tui::Backend;
 
 pub fn render(
     line: &mut EditorLine,
-    ctx: &mut LineContext,
     line_width: usize,
     select: Option<SelectManager>,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) {
     if line_width > line.char_len() {
         match select {
-            Some(select) => self::select(line, ctx, select, gs),
+            Some(select) => self::select(line, select, ctx, gs),
             None => self::basic(line, ctx, gs.backend()),
         }
         if let Some(diagnostics) = line.diagnostics() {
@@ -26,13 +26,13 @@ pub fn render(
         }
     } else {
         match select {
-            Some(select) => self::partial_select(line, ctx, line_width, select, gs),
-            None => self::partial(line, ctx, line_width, gs.backend()),
+            Some(select) => self::partial_select(line, line_width, select, ctx, gs),
+            None => self::partial(line, line_width, ctx, gs.backend()),
         }
     }
 }
 
-pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut CrossTerm) {
+pub fn basic(line: &EditorLine, ctx: &CodecContext, backend: &mut CrossTerm) {
     let mut iter_tokens = line.iter_tokens();
     let mut counter = 0;
     let mut last_len = 0;
@@ -85,15 +85,15 @@ pub fn basic(line: &EditorLine, ctx: &LineContext, backend: &mut CrossTerm) {
         idx += 1;
     }
     if idx <= cursor_idx {
-        backend.print_styled(" ", ContentStyle::reversed());
+        backend.print_styled(line.end_view(), ContentStyle::reversed());
     } else {
-        backend.print(" ");
+        backend.print(line.end_view());
     }
     backend.reset_style();
 }
 
 #[inline]
-pub fn select(line: &EditorLine, ctx: &LineContext, mut select: SelectManager, gs: &mut GlobalState) {
+pub fn select(line: &EditorLine, mut select: SelectManager, ctx: &CodecContext, gs: &mut GlobalState) {
     let backend = gs.backend();
     let mut reset_style = ContentStyle::default();
     let mut iter_tokens = line.iter_tokens();
@@ -150,14 +150,14 @@ pub fn select(line: &EditorLine, ctx: &LineContext, mut select: SelectManager, g
     }
     backend.reset_style();
     if idx <= cursor_idx {
-        backend.print_styled(" ", ContentStyle::reversed());
+        backend.print_styled(' ', ContentStyle::reversed());
     } else {
         select.pad(gs);
     }
 }
 
 #[inline(always)]
-pub fn partial(line: &mut EditorLine, ctx: &LineContext, line_width: usize, backend: &mut CrossTerm) {
+pub fn partial(line: &mut EditorLine, line_width: usize, ctx: &CodecContext, backend: &mut CrossTerm) {
     let cursor_idx = ctx.cursor_char();
     let (mut idx, reduction) = line.generate_skipped_chars_simple(cursor_idx, line_width);
     if idx != 0 {
@@ -223,17 +223,19 @@ pub fn partial(line: &mut EditorLine, ctx: &LineContext, line_width: usize, back
     backend.reset_style();
 
     if idx <= cursor_idx {
-        backend.print_styled(" ", ContentStyle::reversed());
+        backend.print_styled(line.end_view(), ContentStyle::reversed());
     } else if line.char_len() > idx {
         backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
+    } else {
+        backend.print(line.end_view());
     }
 }
 
 pub fn partial_select(
     line: &mut EditorLine,
-    ctx: &LineContext,
     line_width: usize,
     mut select: SelectManager,
+    ctx: &CodecContext,
     gs: &mut GlobalState,
 ) {
     let backend = &mut gs.backend;
@@ -305,7 +307,7 @@ pub fn partial_select(
     }
     backend.reset_style();
     if idx <= cursor_idx {
-        backend.print_styled(" ", ContentStyle::reversed());
+        backend.print_styled(' ', ContentStyle::reversed());
     } else if line.char_len() > idx {
         backend.print_styled(WRAP_CLOSE, ctx.accent_style.reverse());
     }

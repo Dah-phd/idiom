@@ -1,9 +1,12 @@
-mod context;
+mod parser;
 mod status;
+pub use parser::{LineEnd, LineParser, POSIX_NLINE};
 pub use status::{Reduction, RenderStatus};
 
-use crate::editor::syntax::{tokens::TokenLine, DiagnosticInfo, DiagnosticLine, Encoding, Lang, Token};
-pub use context::LineContext;
+use crate::{
+    editor::syntax::{tokens::TokenLine, DiagnosticInfo, DiagnosticLine, Encoding, Lang, Token},
+    error::IdiomResult,
+};
 use idiom_tui::{utils::UTFSafeStringExt, UTFSafe};
 use std::{
     fmt::Display,
@@ -12,10 +15,10 @@ use std::{
 };
 
 /// Used to represent code, has simpler wrapping as cpde lines shoud be shorter than 120 chars in most cases
-#[derive(Default)]
 pub struct EditorLine {
     content: String,
-    // keeps trach of utf8 char len
+    line_end: LineEnd,
+    // keeps track of utf8 char len
     char_len: usize,
     // syntax
     tokens: TokenLine,
@@ -24,29 +27,79 @@ pub struct EditorLine {
     pub cached: RenderStatus,
 }
 
+impl Default for EditorLine {
+    fn default() -> Self {
+        Self {
+            content: String::default(),
+            line_end: POSIX_NLINE,
+            char_len: usize::default(),
+            tokens: TokenLine::default(),
+            diagnostics: Option::default(),
+            cached: RenderStatus::default(),
+        }
+    }
+}
+
 impl EditorLine {
+    pub fn parse_lines_raw<P: AsRef<Path>>(path: P) -> IdiomResult<Vec<EditorLine>> {
+        let text = std::fs::read_to_string(path)?;
+        Ok(LineParser::split_lines(&text).into_editor_lines())
+    }
+
+    pub fn new_posix(content: String) -> Self {
+        Self { char_len: content.char_len(), content, ..Default::default() }
+    }
+
+    pub fn new(content: String, line_end: LineEnd) -> Self {
+        Self { char_len: content.char_len(), content, line_end, ..Default::default() }
+    }
+
+    #[inline(always)]
+    pub fn len(&self) -> usize {
+        self.content.len()
+    }
+
+    #[inline(always)]
+    pub fn char_len(&self) -> usize {
+        self.char_len
+    }
+
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.content.is_empty()
+    }
+
+    #[inline]
+    pub fn is_simple(&self) -> bool {
+        self.content.len() == self.char_len
+    }
+
+    #[inline]
+    pub fn encoded_len(&self, encoding: &Encoding) -> usize {
+        if self.is_simple() {
+            return self.len();
+        }
+        self.chars().map(|c| encoding.char_len(c)).sum()
+    }
+
     #[inline(always)]
     pub fn as_str(&self) -> &str {
         self.content.as_str()
     }
 
     #[inline(always)]
+    pub fn end(&self) -> &str {
+        self.line_end.text
+    }
+
+    #[inline(always)]
+    pub fn end_view(&self) -> char {
+        self.line_end.char
+    }
+
+    #[inline(always)]
     pub fn content(&self) -> &String {
         &self.content
-    }
-
-    #[inline]
-    pub fn parse_lines<P: AsRef<Path>>(path: P) -> Result<Vec<Self>, String> {
-        Ok(std::fs::read_to_string(path)
-            .map_err(|err| err.to_string())?
-            .split('\n')
-            .map(|line| EditorLine::new(line.to_owned()))
-            .collect())
-    }
-
-    #[inline]
-    pub fn is_simple(&self) -> bool {
-        self.content.len() == self.char_len
     }
 
     #[inline]
@@ -143,26 +196,27 @@ impl EditorLine {
         self.content.find(pat)
     }
 
-    // no need to handle non ascii inserts because - triggers from keyboard
     #[inline]
     pub fn insert_simple(&mut self, idx: usize, ch: char, encoding: &Encoding) {
         self.cached.reset();
-        self.char_len += 1;
         if self.char_len == self.content.len() {
-            // base update on delta start
             self.tokens.increment_before_encoded(idx);
             self.content.insert(idx, ch);
         } else {
-            let encoded_idx = (encoding.insert_char_with_idx)(&mut self.content, idx, ch);
+            let encoded_idx = encoding.insert_char_with_idx(&mut self.content, idx, ch);
             self.tokens.increment_before_encoded(encoded_idx);
         }
+        self.char_len += 1;
     }
 
-    // no need to handle non ascii inserts because - triggers from keyboard
     #[inline]
-    pub fn push_simple(&mut self, ch: char) {
+    pub fn push_simple(&mut self, ch: char, encoding: &Encoding) {
         self.cached.reset();
-        self.tokens.increment_before_encoded(self.char_len);
+        let idx = match self.is_simple() {
+            true => self.char_len,
+            false => encoding.str_len(self.as_str()),
+        };
+        self.tokens.increment_before_encoded(idx);
         self.char_len += 1;
         self.content.push(ch);
     }
@@ -212,8 +266,8 @@ impl EditorLine {
             self.content.remove(idx)
         } else {
             self.char_len -= 1;
-            let (encoded_idx, ch) = (encoding.remove_char_with_idx)(&mut self.content, idx);
-            for _ in 0..(encoding.char_len)(ch) {
+            let (encoded_idx, ch) = encoding.remove_char_with_idx(&mut self.content, idx);
+            for _ in 0..encoding.char_len(ch) {
                 self.tokens.decrement_at_encoded(encoded_idx);
             }
             ch
@@ -262,20 +316,22 @@ impl EditorLine {
     #[inline]
     pub fn split_off(&mut self, at: usize) -> Self {
         self.cached.reset();
-        if self.content.len() == self.char_len {
-            let content = self.content.split_off(at);
-            if !content.is_empty() {
-                self.char_len = self.content.len();
-                self.tokens.clear();
-            }
-            Self { char_len: content.len(), content, ..Default::default() }
+        if at == 0 {
+            let mut split = std::mem::take(self);
+            std::mem::swap(&mut split.line_end, &mut self.line_end);
+            split
+        } else if at == self.char_len() {
+            Self::default()
         } else {
-            let content = self.content.split_off_at_char(at);
-            if !content.is_empty() {
-                self.char_len = self.content.char_len();
-                self.tokens.clear();
-            }
-            Self { char_len: content.char_len(), content, ..Default::default() }
+            let content = match self.is_simple() {
+                true => self.content.split_off(at),
+                false => self.content.split_off_at_char(at),
+            };
+            let char_len = self.char_len - at;
+            self.char_len = at;
+            self.tokens.clear();
+            self.diagnostics = None;
+            Self { char_len, content, ..Default::default() }
         }
     }
 
@@ -286,16 +342,6 @@ impl EditorLine {
         } else {
             self.content.split_at_char(mid)
         }
-    }
-
-    #[inline(always)]
-    pub fn len(&self) -> usize {
-        self.content.len()
-    }
-
-    #[inline(always)]
-    pub fn char_len(&self) -> usize {
-        self.char_len
     }
 
     #[inline]
@@ -345,10 +391,6 @@ impl EditorLine {
     #[inline]
     pub fn utf16_len(&self) -> usize {
         self.content.chars().fold(0, |sum, ch| sum + ch.len_utf16())
-    }
-
-    pub fn new(content: String) -> Self {
-        Self { char_len: content.char_len(), content, ..Default::default() }
     }
 
     pub fn empty() -> Self {
@@ -441,7 +483,7 @@ impl Display for EditorLine {
 
 impl From<String> for EditorLine {
     fn from(content: String) -> Self {
-        Self::new(content)
+        Self::new_posix(content)
     }
 }
 
@@ -501,4 +543,4 @@ impl From<EditorLine> for String {
 }
 
 #[cfg(test)]
-mod tests;
+pub mod tests;

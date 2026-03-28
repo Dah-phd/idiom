@@ -13,6 +13,7 @@ use crate::{
 };
 use buffer::ActionBuffer;
 pub use edits::Edit;
+use edits::NewLineResult;
 use lsp_types::TextEdit;
 pub use meta::{Action, EditMetaData};
 pub use utils::{copy_content, find_line_start};
@@ -257,14 +258,21 @@ impl Actions {
         match cursor.select_take() {
             Some((from, to)) => {
                 let cut_edit = Edit::remove_select(from, to, content);
-                let (new_position, new_line_edit) = Edit::new_line(from, &self.cfg, content);
-                cursor.set_position(new_position);
-                self.push_done(vec![cut_edit, new_line_edit], lexer, content)
+                let NewLineResult { empty_split, position, edit } = Edit::new_line(from, &self.cfg, content);
+                cursor.set_position(position);
+                match empty_split {
+                    true => self.push_done_without_tokens(vec![cut_edit, edit], lexer, content),
+                    false => self.push_done(vec![cut_edit, edit], lexer, content),
+                };
             }
             None => {
-                let (new_position, edit) = Edit::new_line(cursor.into(), &self.cfg, content);
-                cursor.set_position(new_position);
-                self.push_done(edit, lexer, content);
+                let c_position = cursor.get_position();
+                let NewLineResult { empty_split, position, edit } = Edit::new_line(c_position, &self.cfg, content);
+                cursor.set_position(position);
+                match empty_split {
+                    true => self.push_done_without_tokens(edit, lexer, content),
+                    false => self.push_done(edit, lexer, content),
+                };
             }
         }
     }
@@ -278,14 +286,21 @@ impl Actions {
         match cursor.select_take() {
             Some((from, to)) => {
                 let cut_edit = Edit::remove_select(from, to, content);
-                let (new_position, new_line_edit) = Edit::new_line_raw(from, &self.cfg, content);
-                cursor.set_position(new_position);
-                self.push_done(vec![cut_edit, new_line_edit], lexer, content)
+                let NewLineResult { empty_split, position, edit } = Edit::new_line_raw(from, &self.cfg, content);
+                cursor.set_position(position);
+                match empty_split {
+                    true => self.push_done_without_tokens(vec![cut_edit, edit], lexer, content),
+                    false => self.push_done(vec![cut_edit, edit], lexer, content),
+                };
             }
             None => {
-                let (new_position, edit) = Edit::new_line_raw(cursor.into(), &self.cfg, content);
-                cursor.set_position(new_position);
-                self.push_done(edit, lexer, content);
+                let c_position = cursor.get_position();
+                let NewLineResult { empty_split, position, edit } = Edit::new_line_raw(c_position, &self.cfg, content);
+                cursor.set_position(position);
+                match empty_split {
+                    true => self.push_done_without_tokens(edit, lexer, content),
+                    false => self.push_done(edit, lexer, content),
+                };
             }
         }
     }
@@ -387,8 +402,8 @@ impl Actions {
             cursor.add_to_char(1);
             return;
         }
-        let (maybe_edit, event) = self.buffer.push(ch, cursor, text, lexer);
-        lexer.sync_changes(vec![event]);
+        let (maybe_edit, change_event) = self.buffer.push(ch, cursor, text, lexer);
+        lexer.sync_changes(vec![change_event]);
         if let Some(edit) = maybe_edit {
             lexer.sync_tokens(edit.meta);
             self.done.push(edit.into());
@@ -531,6 +546,9 @@ impl Actions {
                 Some(edit)
             })
             .collect();
+        if actions.is_empty() {
+            return;
+        }
         self.push_done(actions, lexer, content);
         cursor.match_content(content);
     }
@@ -544,12 +562,20 @@ impl Actions {
         self.done.push(action);
     }
 
+    /// does not request new semantic tokens
+    /// use when the change cannot affect the existing tokens
+    fn push_done_without_tokens(&mut self, edit: impl Into<Action>, lexer: &mut Lexer, content: &[EditorLine]) {
+        self.push_buffer(lexer);
+        let action: Action = edit.into();
+        lexer.sync_changes_from_action(&action, content);
+        self.done.push(action);
+    }
+
     pub fn push_buffer(&mut self, lexer: &mut Lexer) {
-        if let Some(action) = self.buffer.collect() {
-            lexer.sync_tokens(action.meta);
-            self.undone.clear();
-            self.done.push(action.into());
-        }
+        let Some(action) = self.buffer.collect() else { return };
+        lexer.sync_tokens(action.meta);
+        self.undone.clear();
+        self.done.push(action.into());
     }
 
     pub fn clear(&mut self) {

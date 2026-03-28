@@ -1,3 +1,5 @@
+use super::lsp_stream::StdErrMessage;
+use crate::editor::syntax::{tokens::validate_and_format_delta_tokens, DiagnosticLine};
 use lsp_types::{
     notification::{Notification, PublishDiagnostics},
     request::GotoDeclarationResponse,
@@ -12,39 +14,12 @@ use std::{
     path::PathBuf,
 };
 
-use crate::{
-    editor::syntax::{tokens::validate_and_format_delta_tokens, DiagnosticLine},
-    lsp::{LSPError, LSPResult},
-};
-
-use super::lsp_stream::StdErrMessage;
-
 pub enum LSPMessage {
     Request(Request),
     Response(Response),
     Diagnostic(Uri, Diagnostic),
     Unknown(Value),
     Error(String),
-}
-
-impl LSPMessage {
-    pub fn unwrap(self) -> LSPResult<Value> {
-        // gets value within if data is know at check time
-        // errors on response error
-        match self {
-            Self::Unknown(raw) => Some(raw),
-            Self::Response(resp) => {
-                if resp.result.is_some() {
-                    resp.result
-                } else {
-                    return Err(LSPError::ResponseError(format!("{:?}", resp.error)));
-                }
-            }
-            Self::Request(request) => request.params,
-            _ => None,
-        }
-        .ok_or(LSPError::internal("Called unwrap on LSPMessage type not supporting the operand!"))
-    }
 }
 
 impl From<Value> for LSPMessage {
@@ -87,6 +62,7 @@ impl From<StdErrMessage> for LSPMessage {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Request {
     pub _id: String,
@@ -202,39 +178,44 @@ pub enum LSPResponseType {
 
 impl LSPResponseType {
     pub fn parse(&self, value: Value) -> SerdeResult<LSPResponse> {
-        if value == Value::Null {
-            return Ok(LSPResponse::Empty);
-        }
-
-        Ok(match self {
-            Self::Completion(.., line_idx) => match from_value::<CompletionResponse>(value)? {
+        match self {
+            Self::Completion(..) if value == Value::Null => Ok(LSPResponse::Empty),
+            Self::Completion(.., line_idx) => from_value::<CompletionResponse>(value).map(|resp| match resp {
                 CompletionResponse::Array(arr) => LSPResponse::Completion(arr, *line_idx),
                 CompletionResponse::List(ls) => LSPResponse::Completion(ls.items, *line_idx),
-            },
-            Self::Hover => LSPResponse::Hover(from_value(value)?),
-            Self::SignatureHelp => LSPResponse::SignatureHelp(from_value(value)?),
-            Self::References => LSPResponse::References(from_value(value)?),
-            Self::Renames => LSPResponse::Renames(from_value(value)?),
-            Self::Tokens => {
-                let mut tokens = from_value(value)?;
+            }),
+            Self::Hover if value == Value::Null => Ok(LSPResponse::Empty),
+            Self::Hover => from_value(value).map(LSPResponse::Hover),
+            Self::SignatureHelp if value == Value::Null => Ok(LSPResponse::Empty),
+            Self::SignatureHelp => from_value(value).map(LSPResponse::SignatureHelp),
+            Self::References => from_value(value).map(LSPResponse::References),
+            Self::Renames if value == Value::Null => Ok(LSPResponse::Empty),
+            Self::Renames => from_value(value).map(LSPResponse::Renames),
+            Self::Definition if value == Value::Null => Ok(LSPResponse::Empty),
+            Self::Definition => from_value(value).map(LSPResponse::Definition),
+            Self::Declaration if value == Value::Null => Ok(LSPResponse::Empty),
+            Self::Declaration => from_value(value).map(LSPResponse::Declaration),
+            Self::Formatting(..) if value == Value::Null => Ok(LSPResponse::Empty),
+            Self::Formatting(save) => from_value(value).map(|edits| LSPResponse::Formatting { edits, save: *save }),
+            Self::Tokens if value == Value::Null => {
+                Ok(LSPResponse::Tokens(Ok(SemanticTokensResult::Tokens(lsp_types::SemanticTokens::default()))))
+            }
+            Self::Tokens => from_value(value).map(|mut tokens| {
                 match &mut tokens {
                     SemanticTokensResult::Tokens(tokens) => validate_and_format_delta_tokens(&mut tokens.data),
                     SemanticTokensResult::Partial(tokens) => validate_and_format_delta_tokens(&mut tokens.data),
                 };
-                LSPResponse::Tokens(tokens)
-            }
-            Self::TokensPartial { max_lines, .. } => {
-                let mut result = from_value(value)?;
+                LSPResponse::Tokens(Ok(tokens))
+            }),
+            Self::TokensPartial { .. } if value == Value::Null => Ok(LSPResponse::Empty),
+            Self::TokensPartial { max_lines, .. } => from_value(value).map(|mut result| {
                 match &mut result {
                     SemanticTokensRangeResult::Tokens(tokens) => validate_and_format_delta_tokens(&mut tokens.data),
                     SemanticTokensRangeResult::Partial(tokens) => validate_and_format_delta_tokens(&mut tokens.data),
-                }
+                };
                 LSPResponse::TokensPartial { result, max_lines: *max_lines }
-            }
-            Self::Definition => LSPResponse::Definition(from_value(value)?),
-            Self::Declaration => LSPResponse::Declaration(from_value(value)?),
-            Self::Formatting(save) => LSPResponse::Formatting { edits: from_value(value)?, save: *save },
-        })
+            }),
+        }
     }
 }
 
@@ -244,13 +225,25 @@ pub enum LSPResponse {
     SignatureHelp(SignatureHelp),
     References(Option<Vec<Location>>),
     Renames(WorkspaceEdit),
-    Tokens(SemanticTokensResult),
+    Tokens(Result<SemanticTokensResult, String>),
     TokensPartial { result: SemanticTokensRangeResult, max_lines: usize },
     Definition(GotoDefinitionResponse),
     Declaration(GotoDeclarationResponse),
     Formatting { edits: Vec<TextEdit>, save: bool },
     Empty,
     Error(String),
+}
+
+impl LSPResponse {
+    pub fn err_msg_contains(value: &Value, pat: &str) -> bool {
+        match value {
+            Value::Object(map) => match map.get("message") {
+                Some(Value::String(text)) => text.contains(pat),
+                _ => false,
+            },
+            _ => false,
+        }
+    }
 }
 
 impl Display for LSPResponseType {
@@ -272,6 +265,8 @@ impl Display for LSPResponseType {
 
 #[cfg(test)]
 mod tests {
+    use super::{LSPResponse, LSPResponseType};
+    use assert_enum_variants::assert_enum_variants;
     use lsp_types::{Diagnostic, DiagnosticSeverity};
 
     #[test]
@@ -298,5 +293,28 @@ mod tests {
                 DiagnosticSeverity::INFORMATION,
             ]
         )
+    }
+
+    #[test]
+    fn lsp_reponse_type_null_hanbdle() {
+        // ensure this test passes only when all variants are present
+        // if new is added is should be included in the nullability test below
+        assert_enum_variants!(LSPResponseType, {
+            Completion, Declaration, Definition, Hover, Renames, SignatureHelp, Tokens, TokensPartial, References, Formatting
+        });
+
+        assert!(LSPResponseType::Completion(0).parse(serde_json::Value::Null).is_ok());
+        assert!(LSPResponseType::Declaration.parse(serde_json::Value::Null).is_ok());
+        assert!(LSPResponseType::Definition.parse(serde_json::Value::Null).is_ok());
+        assert!(LSPResponseType::Hover.parse(serde_json::Value::Null).is_ok());
+        assert!(LSPResponseType::Renames.parse(serde_json::Value::Null).is_ok());
+        assert!(LSPResponseType::SignatureHelp.parse(serde_json::Value::Null).is_ok());
+        assert!(LSPResponseType::Tokens.parse(serde_json::Value::Null).is_ok());
+        assert!(LSPResponseType::TokensPartial { max_lines: 0 }.parse(serde_json::Value::Null).is_ok());
+        assert!(matches!(
+            LSPResponseType::References.parse(serde_json::Value::Null),
+            Ok(LSPResponse::References(None))
+        ));
+        assert!(LSPResponseType::Formatting(false).parse(serde_json::Value::Null).is_ok());
     }
 }

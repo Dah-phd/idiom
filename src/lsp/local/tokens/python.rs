@@ -41,6 +41,7 @@ pub enum PyToken {
     #[token("in")]
     #[token("continue")]
     #[token("if")]
+    #[token("is")]
     #[token("elif")]
     #[token("else")]
     #[token("case")]
@@ -102,6 +103,8 @@ pub enum PyToken {
     #[token("True")]
     #[token("False")]
     Bool,
+    #[token("None")]
+    None,
 
     #[regex(r#"[a-zA-Z_][a-zA-Z_0-9]*"#, |lex| lex.slice().to_owned())]
     Name(String),
@@ -188,6 +191,7 @@ impl LangStream for PyToken {
             | Self::Context
             | Self::SelfRef
             | Self::ClassRef
+            | Self::None
             | Self::Bool
             | Self::NameSpaceKeyWord => 11,
             Self::Comment => 12,

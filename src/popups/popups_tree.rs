@@ -1,6 +1,6 @@
 use super::generic_popup::{CommandButton, PopupChoice};
 use super::generic_selector::PopupSelector;
-use crate::global_state::IdiomEvent;
+use crate::global_state::{EditorOpenConfig, IdiomEvent};
 use lsp_types::{Location, Range};
 use std::path::PathBuf;
 
@@ -10,7 +10,10 @@ pub fn refrence_selector(locations: Vec<Location>) -> PopupSelector<(String, Pat
         |(display, ..), line, backend| line.render(display, backend),
         |popup, c| {
             if let Some((_, path, range)) = popup.options.get(popup.state.selected) {
-                c.gs.event.push(IdiomEvent::OpenAtSelect(path.clone(), (range.start.into(), range.end.into())));
+                c.gs.event.push(IdiomEvent::Open {
+                    path: path.clone(),
+                    config: EditorOpenConfig::GoToSelect { from: range.start.into(), to: range.end.into() },
+                });
             }
         },
         None,

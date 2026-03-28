@@ -113,13 +113,17 @@ impl LSPClient {
         }
     }
 
+    pub fn is_local(&self) -> bool {
+        self.local_lsp.is_some()
+    }
+
     #[inline]
     pub fn get_responses(&self) -> Option<MutexGuard<'_, HashMap<i64, LSPResponse>>> {
         self.responses.try_lock().ok()
     }
 
     /// ensures old requests that may not have been handled due to tab change are cleared
-    pub fn clear_requests(&self) {
+    pub fn clear_responses(&self) {
         self.responses.lock().unwrap().clear();
     }
 
@@ -274,7 +278,16 @@ impl MonoID {
 
 #[cfg(test)]
 mod test {
-    use super::{LSPClient, MonoID};
+    use super::{LSPClient, MonoID, Payload};
+    use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
+
+    impl LSPClient {
+        pub fn get_receiver(&mut self) -> UnboundedReceiver<Payload> {
+            let (channel, rx) = unbounded_channel::<Payload>();
+            self.channel = channel;
+            return rx;
+        }
+    }
 
     #[test]
     fn test_gen_id() {

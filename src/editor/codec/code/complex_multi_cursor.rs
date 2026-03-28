@@ -1,42 +1,42 @@
+use super::{super::CodecContext, width_remainder, WRAP_CLOSE, WRAP_OPEN};
 use crate::{
     cursor::{CharRange, CursorPosition},
-    editor_line::{EditorLine, LineContext},
+    editor::syntax::Encoding,
+    editor_line::EditorLine,
     ext_tui::StyleExt,
     global_state::GlobalState,
 };
 use crossterm::style::{ContentStyle, Stylize};
 use idiom_tui::{utils::CharLimitedWidths, Backend};
 
-use super::{width_remainder, WRAP_CLOSE, WRAP_OPEN};
-
 pub fn render(
     line: &mut EditorLine,
-    ctx: &mut LineContext,
     line_width: usize,
     cursors: Vec<CursorPosition>,
     selects: Vec<CharRange>,
+    encoding: &Encoding,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) {
     if let Some(remainder) = width_remainder(line, line_width) {
-        basic(line, ctx, cursors, selects, gs);
+        basic(line, cursors, selects, encoding, gs);
         if let Some(diagnostics) = line.diagnostics() {
             diagnostics.render_pad_4(remainder - 1, gs.backend());
         }
     } else {
-        self::partial(line, ctx, line_width, cursors, selects, gs);
+        self::partial(line, line_width, cursors, selects, encoding, ctx, gs);
     }
 }
 
 pub fn basic(
     line: &EditorLine,
-    ctx: &LineContext,
     cursors: Vec<CursorPosition>,
     selects: Vec<CharRange>,
+    encoding: &Encoding,
     gs: &mut GlobalState,
 ) {
     let select_color = gs.theme.selected;
     let backend = gs.backend();
-    let char_position = ctx.char_lsp_pos;
     let mut reset_style = ContentStyle::default();
     let mut tokens = line.iter_tokens();
     let mut counter = 0;
@@ -103,7 +103,7 @@ pub fn basic(
                 }
             }
         } else {
-            counter = counter.saturating_sub(char_position(text));
+            counter = counter.saturating_sub(encoding.char_len(text));
         }
 
         if cursor_idx == idx {
@@ -127,16 +127,15 @@ pub fn basic(
 
 pub fn partial(
     code: &mut EditorLine,
-    ctx: &mut LineContext,
     mut line_width: usize,
     cursors: Vec<CursorPosition>,
     selects: Vec<CharRange>,
+    encoding: &Encoding,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) {
     let backend = &mut gs.backend;
     let last_idx = cursors.last().map(|c| c.char).unwrap_or_default();
-
-    let char_position = ctx.char_lsp_pos;
 
     // index needs to be generated based on 0 skipped chars on multicursor
     // skipped chars are use to store info on multi cursor
@@ -155,7 +154,7 @@ pub fn partial(
 
     let mut cursor = 0;
     for _ in 0..idx {
-        cursor += content.next().map(|(ch, ..)| char_position(ch)).unwrap_or_default();
+        cursor += content.next().map(|(ch, ..)| encoding.char_len(ch)).unwrap_or_default();
     }
 
     let select_color = gs.theme.selected;
@@ -221,7 +220,7 @@ pub fn partial(
             match lined_up.take() {
                 Some(style) => {
                     backend.update_style(style);
-                    counter = last_len.saturating_sub(char_position(text));
+                    counter = last_len.saturating_sub(encoding.char_len(text));
                 }
                 None => match tokens.next() {
                     None => {
@@ -230,11 +229,11 @@ pub fn partial(
                     }
                     Some(token) => {
                         if token.delta_start > last_len {
-                            counter = token.delta_start.saturating_sub(last_len + char_position(text));
+                            counter = token.delta_start.saturating_sub(last_len + encoding.char_len(text));
                             lined_up.replace(token.style);
                             backend.set_style(reset_style);
                         } else {
-                            counter = token.len.saturating_sub(char_position(text));
+                            counter = token.len.saturating_sub(encoding.char_len(text));
                             backend.update_style(token.style);
                         }
                         last_len = token.len;
@@ -242,7 +241,7 @@ pub fn partial(
                 },
             }
         } else {
-            counter = counter.saturating_sub(char_position(text));
+            counter = counter.saturating_sub(encoding.char_len(text));
         }
 
         if char_width > line_width {

@@ -1,5 +1,3 @@
-use super::status::RenderStatus;
-use super::EditorLine;
 use crate::{
     cursor::{CharRange, CharRangeUnbound, Cursor, CursorPosition},
     ext_tui::CrossTerm,
@@ -9,9 +7,8 @@ use idiom_tui::Position;
 use idiom_tui::{layout::Line, Backend};
 use std::cmp::Ordering;
 
-pub struct LineContext {
+pub struct CodecContext {
     pub accent_style: ContentStyle,
-    pub char_lsp_pos: fn(char) -> usize,
     line_number: usize,
     line_number_padding: usize,
     line: usize,
@@ -20,17 +17,11 @@ pub struct LineContext {
     select: Option<(CursorPosition, CursorPosition)>,
 }
 
-impl LineContext {
-    pub fn collect_context(
-        cursor: &Cursor,
-        char_lsp_pos: fn(char) -> usize,
-        line_number_padding: usize,
-        accent_style: ContentStyle,
-    ) -> Self {
+impl CodecContext {
+    pub fn collect_context(cursor: &Cursor, line_number_padding: usize, accent_style: ContentStyle) -> Self {
         let line_number = cursor.at_line;
         let select = cursor.select_get();
         Self {
-            char_lsp_pos,
             line: cursor.line - line_number,
             cursor_line: cursor.line,
             cursor_char: cursor.char,
@@ -38,25 +29,6 @@ impl LineContext {
             line_number,
             line_number_padding,
             accent_style,
-        }
-    }
-
-    /// Ensures during deletion of lines, if scrolling has happened that last line will be rendered
-    /// not the most elegant solution - probably should revisit at some point, but good enough
-    /// it does not poison other parts of the logic, except fast render
-    pub fn correct_last_line_match(&self, content: &mut [EditorLine], screen_hight: usize) {
-        let last_line = self.line_number + screen_hight;
-        if last_line < 1 {
-            return;
-        }
-        let dissallowed_rendered_line = match content.get(last_line - 1).map(|el| &el.cached) {
-            Some(RenderStatus::Line { line, .. }) => *line,
-            _ => return,
-        };
-        if let Some(last_line) = content.get_mut(last_line) {
-            if matches!(last_line.cached, RenderStatus::Line { line, .. } if line == dissallowed_rendered_line) {
-                last_line.cached.reset();
-            }
         }
     }
 

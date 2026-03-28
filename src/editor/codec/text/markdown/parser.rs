@@ -1,5 +1,5 @@
-use super::{HEADING, HEADING_2, HEADING_3, HEADING_NEXT};
-use crate::{editor_line::LineContext, ext_tui::CrossTerm};
+use super::{CodecContext, HEADING, HEADING_2, HEADING_3, HEADING_NEXT};
+use crate::ext_tui::CrossTerm;
 use crossterm::style::Stylize;
 use idiom_tui::{layout::Line, utils::CharLimitedWidths, Backend, UTFSafe};
 
@@ -18,7 +18,7 @@ impl<'a> Tag<'a> {
         mut limit: usize,
         text_width: usize,
         lines: &mut impl Iterator<Item = Line>,
-        ctx: &'a mut LineContext,
+        ctx: &'a mut CodecContext,
         backend: &'a mut CrossTerm,
     ) -> Option<usize> {
         match self {
@@ -64,7 +64,7 @@ impl<'a> Tag<'a> {
         mut limit: usize,
         text_width: usize,
         lines: &mut impl Iterator<Item = Line>,
-        ctx: &'a mut LineContext,
+        ctx: &'a mut CodecContext,
         backend: &'a mut CrossTerm,
     ) -> Option<usize> {
         match self {
@@ -122,7 +122,7 @@ impl<'a> Span<'a> {
         mut limit: usize,
         text_width: usize,
         lines: &mut impl Iterator<Item = Line>,
-        ctx: &'a mut LineContext,
+        ctx: &'a mut CodecContext,
         backend: &'a mut CrossTerm,
     ) -> Option<usize> {
         match self {
@@ -181,7 +181,7 @@ impl<'a> Span<'a> {
         mut limit: usize,
         text_width: usize,
         lines: &mut impl Iterator<Item = Line>,
-        ctx: &'a mut LineContext,
+        ctx: &'a mut CodecContext,
         backend: &'a mut CrossTerm,
     ) -> Option<usize> {
         match self {
@@ -243,7 +243,7 @@ fn print_split_ascii(
     limit: usize,
     text_width: usize,
     lines: &mut impl Iterator<Item = Line>,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     backend: &mut CrossTerm,
 ) -> Option<usize> {
     match text.len() > limit {
@@ -278,7 +278,7 @@ fn print_split(
     mut limit: usize,
     text_width: usize,
     lines: &mut impl Iterator<Item = Line>,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     backend: &mut CrossTerm,
 ) -> Option<usize> {
     for (ch, ch_width) in CharLimitedWidths::new(text, 3) {

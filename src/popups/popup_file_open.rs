@@ -128,7 +128,10 @@ impl Popup for OpenFileSelector {
             KeyEvent { code: KeyCode::Enter, .. } => {
                 let path = PathBuf::from(self.pattern.as_str());
                 if path.is_file() {
-                    gs.event.push(IdiomEvent::OpenAtLine(PathBuf::from(self.pattern.as_str()), 0));
+                    gs.event.push(IdiomEvent::Open {
+                        path: PathBuf::from(self.pattern.as_str()),
+                        config: Default::default(),
+                    });
                     return Status::Finished;
                 }
                 self.resolve_completion();
@@ -179,7 +182,7 @@ impl Popup for OpenFileSelector {
         let mut text = self.paths.remove(path_index);
         let path = PathBuf::from(&text);
         if path.is_file() {
-            gs.event.push(IdiomEvent::OpenAtLine(path, 0));
+            gs.event.push(IdiomEvent::Open { path, config: Default::default() });
             return Status::Finished;
         }
         if path.is_dir() && !text.ends_with(MAIN_SEPARATOR) {

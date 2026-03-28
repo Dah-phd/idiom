@@ -24,10 +24,9 @@ use error::IdiomResult;
 use ext_tui::CrossTerm;
 use idiom_tui::Backend;
 
-#[tokio::main(flavor = "multi_thread")]
-async fn main() -> IdiomResult<()> {
+fn main() -> IdiomResult<()> {
     let args = Args::parse();
     let mut backend = CrossTerm::init();
     let open_file = args.collect(&mut backend)?;
-    app(open_file, backend).await
+    app(open_file, backend)
 }

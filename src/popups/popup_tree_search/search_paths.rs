@@ -1,5 +1,6 @@
 use super::{Components, Popup, Status};
 use crate::{
+    app::ASYNC_RT,
     embeded_term::EditorTerminal,
     ext_tui::{text_field::map_key, State, StyleExt},
     global_state::{GlobalState, IdiomEvent},
@@ -126,7 +127,10 @@ impl Popup for ActivePathSearch {
             }
             KeyCode::Enter => {
                 if self.options.len() > self.state.selected {
-                    gs.event.push(IdiomEvent::OpenAtLine(self.options.remove(self.state.selected), 0));
+                    gs.event.push(IdiomEvent::Open {
+                        path: self.options.remove(self.state.selected),
+                        config: Default::default(),
+                    });
                 }
                 return Status::Finished;
             }
@@ -155,7 +159,7 @@ impl Popup for ActivePathSearch {
             },
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } => {
                 if let Some(index) = self.get_option_idx(row, column, gs) {
-                    gs.event.push(IdiomEvent::OpenAtLine(self.options.remove(index), 0));
+                    gs.event.push(IdiomEvent::Open { path: self.options.remove(index), config: Default::default() });
                     return Status::Finished;
                 }
             }
@@ -174,7 +178,7 @@ impl Popup for ActivePathSearch {
                 let root_tree = self.tree.clone();
                 let pattern = self.pattern.as_str().to_string();
                 let buffer = Arc::clone(&self.options_buffer);
-                self.join_handle.replace(tokio::task::spawn(async move {
+                self.join_handle.replace(ASYNC_RT.spawn(async move {
                     if let Ok(options) = root_tree.search_tree_paths(&pattern) {
                         let mut lock = match buffer.lock() {
                             Ok(lock) => lock,

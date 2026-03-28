@@ -72,10 +72,8 @@ impl Popup for GoToLinePopup {
                 return Status::Finished;
             };
             editor.go_to(line);
-            gs.backend.freeze();
             editor.render(gs);
             self.force_render(gs);
-            gs.backend.unfreeze();
         }
         Status::Pending
     }
@@ -203,10 +201,8 @@ impl Popup for FindPopup {
         };
         if let Some((from, to)) = select_result {
             editor.go_to_select(from, to);
-            gs.backend.freeze();
             editor.render(gs);
             self.force_render(gs);
-            gs.backend.unfreeze();
         }
         Status::Pending
     }

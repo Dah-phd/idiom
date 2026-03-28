@@ -4,10 +4,11 @@ pub mod langs;
 pub mod legend;
 mod lsp_calls;
 pub mod tokens;
+
 use crate::{
     actions::{Action, EditMetaData},
     configs::{FileType, Theme},
-    cursor::CursorPosition,
+    cursor::{Cursor, CursorPosition},
     editor::Editor,
     editor_line::EditorLine,
     global_state::{GlobalState, IdiomEvent},
@@ -18,11 +19,11 @@ pub use encoding::Encoding;
 pub use langs::Lang;
 pub use legend::Legend;
 use lsp_calls::{
-    as_url, completable, completable_disable, context_local, formatting_dead, get_autocomplete_dead,
-    info_position_dead, map_lsp, remove_lsp, sync_changes_dead, sync_edits_dead, sync_edits_dead_rev, sync_tokens_dead,
-    tokens_dead, tokens_partial_dead,
+    as_url, completable_disable, context_local, formatting_dead, get_autocomplete_dead, info_position_dead, map_lsp,
+    remove_lsp, sync_action_dead, sync_changes_dead, sync_edits_rev_dead, sync_tokens_dead, tokens_dead,
+    tokens_partial_dead,
 };
-use lsp_types::{PublishDiagnosticsParams, Range, TextDocumentContentChangeEvent, Uri};
+use lsp_types::{PublishDiagnosticsParams, TextDocumentContentChangeEvent, Uri};
 use std::path::{Path, PathBuf};
 pub use tokens::Token;
 
@@ -33,27 +34,46 @@ pub struct Lexer {
     pub lsp: bool,
     pub uri: Uri,
     pub path: PathBuf,
-    question_lsp: bool,
     version: i32,
-    requests: Vec<i64>,
+    encoding: Encoding,
     client: LSPClient,
+    requests: Vec<i64>,
+
+    /// for status check on LSP
+    question_lsp: bool,
+    completion_cache: Option<CursorPosition>,
+    meta: Option<EditMetaData>,
+
+    /// sync editor to lsp
     context: fn(&mut Editor, &mut GlobalState),
+
+    /// LSP request / notification callbacks
+
+    /// check and get if autocomplete is needed
+    /// if completable -> autocomplete
     completable: fn(&Self, char_idx: usize, line: &EditorLine) -> bool,
     autocomplete: fn(&mut Self, CursorPosition, &mut GlobalState),
-    tokens: fn(&mut Self) -> LSPResult<i64>,
-    tokens_partial: fn(&mut Self, Range, usize) -> LSPResult<i64>,
+
+    tokens: fn(&mut Self, &mut GlobalState),
+    tokens_partial: fn(&mut Self, EditMetaData, &[EditorLine], &mut GlobalState),
+
     references: fn(&mut Self, CursorPosition, &mut GlobalState),
     definitions: fn(&mut Self, CursorPosition, &mut GlobalState),
     declarations: fn(&mut Self, CursorPosition, &mut GlobalState),
     hover: fn(&mut Self, CursorPosition, &mut GlobalState),
     signatures: fn(&mut Self, CursorPosition, &mut GlobalState),
-    formatting: fn(&mut Self, usize, bool, &mut GlobalState),
+
+    formatting: fn(&mut Self, usize, bool, &mut GlobalState) -> bool,
+
+    /// SYNC
+    /// get partial tokens based on EditMetaData
     sync_tokens: fn(&mut Self, EditMetaData),
+    /// sync change events to lsp
     sync_changes: fn(&mut Self, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
+    /// sync changes + sync_tokens
     sync: fn(&mut Self, &Action, &[EditorLine]) -> LSPResult<()>,
+    /// sync_changes + sync_tokens on reverted action
     sync_rev: fn(&mut Self, &Action, &[EditorLine]) -> LSPResult<()>,
-    meta: Option<EditMetaData>,
-    encoding: Encoding,
 }
 
 impl Lexer {
@@ -65,6 +85,7 @@ impl Lexer {
             path: path.into(),
             version: 0,
             requests: Vec::new(),
+            completion_cache: None,
             diagnostics: None,
             meta: None,
             lsp: false,
@@ -82,8 +103,8 @@ impl Lexer {
             formatting: formatting_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
-            sync: sync_edits_dead,
-            sync_rev: sync_edits_dead_rev,
+            sync: sync_action_dead,
+            sync_rev: sync_edits_rev_dead,
             encoding: Encoding::utf32(),
             question_lsp: false,
         }
@@ -97,6 +118,7 @@ impl Lexer {
             path: path.into(),
             version: 0,
             requests: Vec::new(),
+            completion_cache: None,
             diagnostics: None,
             meta: None,
             lsp: false,
@@ -114,8 +136,8 @@ impl Lexer {
             formatting: formatting_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
-            sync: sync_edits_dead,
-            sync_rev: sync_edits_dead_rev,
+            sync: sync_action_dead,
+            sync_rev: sync_edits_rev_dead,
             encoding: Encoding::utf32(),
             question_lsp: false,
         }
@@ -129,6 +151,7 @@ impl Lexer {
             path: path.into(),
             version: 0,
             requests: Vec::new(),
+            completion_cache: None,
             diagnostics: None,
             meta: None,
             lsp: false,
@@ -146,8 +169,8 @@ impl Lexer {
             formatting: formatting_dead,
             sync_tokens: sync_tokens_dead,
             sync_changes: sync_changes_dead,
-            sync: sync_edits_dead,
-            sync_rev: sync_edits_dead_rev,
+            sync: sync_action_dead,
+            sync_rev: sync_edits_rev_dead,
             encoding: Encoding::utf32(),
             question_lsp: false,
         }
@@ -164,25 +187,33 @@ impl Lexer {
     }
 
     #[inline]
+    pub fn file_version(&self) -> i32 {
+        self.version
+    }
+
+    #[inline]
     pub fn refresh_lsp(&mut self, gs: &mut GlobalState) {
         self.requests.clear();
-        self.client.clear_requests();
-        if self.client.capabilities.completion_provider.is_some() {
-            self.completable = completable;
-        }
-        match (self.tokens)(self) {
-            Ok(request) => self.requests.push(request),
-            Err(error) => gs.error(error),
-        }
+        self.client.clear_responses();
+        self.completion_cache = None;
+        (self.tokens)(self, gs);
     }
 
     /// sync tokens from LSP shorthand for request call
+    #[inline(always)]
     pub fn sync_tokens(&mut self, meta: EditMetaData) {
         (self.sync_tokens)(self, meta);
     }
 
+    #[inline(always)]
     pub fn sync_changes(&mut self, change_events: Vec<TextDocumentContentChangeEvent>) {
         self.question_lsp = (self.sync_changes)(self, change_events).is_err();
+    }
+
+    #[inline(always)]
+    pub fn sync_changes_from_action(&mut self, action: &Action, content: &[EditorLine]) {
+        let changes = action.text_changes(&self.encoding, content);
+        self.sync_changes(changes);
     }
 
     /// sync event
@@ -206,10 +237,7 @@ impl Lexer {
         }
         map_lsp(self, client, &gs.theme);
         gs.success("LSP mapped!");
-        match (self.tokens)(self) {
-            Ok(request) => self.requests.push(request),
-            Err(err) => gs.send_error(err, self.lang.file_type),
-        };
+        (self.tokens)(self, gs);
     }
 
     pub fn local_lsp(&mut self, file_type: FileType, content: String, gs: &mut GlobalState) {
@@ -218,10 +246,7 @@ impl Lexer {
         match self.client.file_did_open(self.uri.clone(), file_type, content) {
             Ok(_) => {
                 gs.success("Starting local LSP - internal system to provide basic language feature");
-                match (self.tokens)(self) {
-                    Ok(request) => self.requests.push(request),
-                    Err(err) => gs.send_error(err, file_type),
-                }
+                (self.tokens)(self, gs);
             }
             // can be reached only due to internal code issue
             Err(error) => {
@@ -229,6 +254,10 @@ impl Lexer {
                 remove_lsp(self);
             }
         };
+    }
+
+    pub fn is_external_lsp(&self) -> bool {
+        self.lsp && !self.client.is_local()
     }
 
     pub fn update_path(&mut self, path: &Path) -> Result<(), LSPError> {
@@ -242,16 +271,27 @@ impl Lexer {
 
     #[inline(always)]
     pub fn char_lsp_pos(&self, ch: char) -> usize {
-        (self.encoding.char_len)(ch)
+        self.encoding.char_len(ch)
     }
 
     #[inline]
-    pub fn should_autocomplete(&self, char_idx: usize, line: &EditorLine) -> bool {
-        (self.completable)(self, char_idx, line)
+    pub fn is_completable(&mut self, cursor: &Cursor, line: &EditorLine, ch: char) -> bool {
+        match self.completion_cache.as_mut() {
+            Some(pos) => {
+                if pos.line == cursor.line && pos.char + 1 == cursor.char && ch.is_alphabetic() {
+                    pos.char = cursor.char;
+                    return false;
+                }
+                self.completion_cache = None;
+                (self.completable)(self, cursor.char, line)
+            }
+            None => (self.completable)(self, cursor.char, line),
+        }
     }
 
     #[inline]
     pub fn get_autocomplete(&mut self, c: CursorPosition, gs: &mut GlobalState) {
+        self.completion_cache = Some(c);
         (self.autocomplete)(self, c, gs)
     }
 
@@ -282,8 +322,8 @@ impl Lexer {
     }
 
     #[inline]
-    pub fn formatting(&mut self, indent: usize, save: bool, gs: &mut GlobalState) {
-        (self.formatting)(self, indent, save, gs);
+    pub fn try_formatting(&mut self, indent: usize, save: bool, gs: &mut GlobalState) -> bool {
+        (self.formatting)(self, indent, save, gs)
     }
 
     pub fn reload_theme(&mut self, gs: &mut GlobalState) {
@@ -291,35 +331,29 @@ impl Lexer {
             if let Some(capabilities) = &self.client.capabilities.semantic_tokens_provider {
                 self.legend.map_styles(self.lang.file_type, &gs.theme, capabilities);
             }
-            match (self.tokens)(self) {
-                Ok(request) => self.requests.push(request),
-                Err(error) => gs.send_error(error, self.lang.file_type),
-            };
+            (self.tokens)(self, gs);
         };
     }
 
-    pub fn save_and_check_lsp(&mut self, content: String, gs: &mut GlobalState) {
-        if self.lsp {
+    pub fn save_and_check_lsp(editor: &mut Editor, gs: &mut GlobalState) {
+        if editor.lexer.lsp {
+            let content = editor.stringify();
+            let lexer = &mut editor.lexer;
             gs.message("Checking LSP status (on save) ...");
-            if self.client.file_did_save(self.uri.clone(), content).is_err() && self.client.is_closed() {
-                gs.event.push(IdiomEvent::CheckLSP(self.lang.file_type));
+            if lexer.client.file_did_save(lexer.uri.clone(), content).is_err() && lexer.client.is_closed() {
+                gs.event.push(IdiomEvent::CheckLSP(lexer.lang.file_type));
             } else {
                 gs.success("LSP running ...");
             }
-            match (self.tokens)(self) {
-                Ok(request) => self.requests.push(request),
-                Err(error) => gs.send_error(error, self.lang.file_type),
-            };
+            (lexer.tokens)(lexer, gs);
         }
     }
 
-    pub fn reopen(&mut self, content: String, file_type: FileType) -> Result<(), LSPError> {
+    pub fn reopen(&mut self, content: String, file_type: FileType, gs: &mut GlobalState) -> Result<(), LSPError> {
         if !self.lsp {
             return Ok(());
         };
-        if let Ok(request) = (self.tokens)(self) {
-            self.requests.push(request);
-        }
+        (self.tokens)(self, gs);
         self.client.file_did_open(self.uri.clone(), file_type, content)
     }
 
@@ -341,8 +375,8 @@ pub struct SyncCallbacks {
 impl SyncCallbacks {
     pub fn take(lexer: &mut Lexer) -> Self {
         Self {
-            sync: std::mem::replace(&mut lexer.sync, lsp_calls::sync_edits_dead),
-            sync_rev: std::mem::replace(&mut lexer.sync_rev, lsp_calls::sync_edits_dead_rev),
+            sync: std::mem::replace(&mut lexer.sync, lsp_calls::sync_action_dead),
+            sync_rev: std::mem::replace(&mut lexer.sync_rev, lsp_calls::sync_edits_rev_dead),
             sync_changes: std::mem::replace(&mut lexer.sync_changes, lsp_calls::sync_changes_dead),
             sync_tokens: std::mem::replace(&mut lexer.sync_tokens, lsp_calls::sync_tokens_dead),
         }

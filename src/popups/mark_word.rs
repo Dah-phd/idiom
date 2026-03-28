@@ -1,9 +1,9 @@
 use crate::{
+    configs::ERR,
     cursor::{CursorPosition, EncodedWordRange, PositionedWord},
     editor::syntax::{tokens::TokenLine, Lexer},
     editor::Editor,
     embeded_term::EditorTerminal,
-    ext_tui::StyleExt,
     global_state::GlobalState,
     tree::Tree,
     workspace::Workspace,
@@ -18,10 +18,10 @@ use std::time::Duration;
 
 const FRAME_RATE: Duration = Duration::from_millis(250);
 const UNFOCUSSED_FRAME_RAGE: Duration = Duration::from_secs(5);
-const STYLE_BASE: ContentStyle = ContentStyle {
-    attributes: Attributes::none().with(Attribute::Bold).with(Attribute::Underlined).with(Attribute::Italic),
+const MARK_STYLE: ContentStyle = ContentStyle {
+    attributes: Attributes::none().with(Attribute::Bold).with(Attribute::Underlined),
+    foreground_color: Some(ERR),
     background_color: None,
-    foreground_color: None,
     underline_color: None,
 };
 
@@ -92,33 +92,31 @@ pub fn render_marked_word(
 }
 
 fn perform_render(editor: &mut Editor, ranges: &[EncodedWordRange], gs: &mut GlobalState) {
-    let style = STYLE_BASE.with_fg(gs.ui_theme.accent());
     let mut stored_tokens: Vec<(usize, TokenLine)> = vec![];
     for word in ranges {
         let range_line = word.line();
-        let line = &mut editor.unsafe_content_mut()[range_line];
+        let line = unsafe { &mut editor.content_mut()[range_line] };
         if stored_tokens.iter().any(|(line, _)| line == &range_line) {
-            line.tokens_mut_unchecked().set_encoded_word_checked(word, style);
+            line.tokens_mut_unchecked().set_encoded_word_checked(word, MARK_STYLE);
         } else {
             let mut new_tokens = line.tokens().clone();
-            new_tokens.set_encoded_word_checked(word, style);
+            new_tokens.set_encoded_word_checked(word, MARK_STYLE);
             stored_tokens.push((range_line, std::mem::replace(line.tokens_mut(), new_tokens)));
         }
     }
 
     gs.backend.freeze();
     editor.render(gs);
-    gs.backend.flush_buf();
     gs.backend.unfreeze();
 
     for (idx, tokens) in stored_tokens {
-        *editor.unsafe_content_mut()[idx].tokens_mut_unchecked() = tokens;
+        unsafe { *editor.content_mut()[idx].tokens_mut_unchecked() = tokens };
     }
 }
 
 fn clear_marked_cache(editor: &mut Editor, ranges: Vec<EncodedWordRange>) {
     for range in ranges {
-        editor.unsafe_content_mut()[range.line()].cached.reset();
+        unsafe { editor.content_mut()[range.line()].cached.reset() };
     }
 }
 
@@ -154,8 +152,8 @@ fn try_find_brackets(editor: &Editor, position: CursorPosition) -> Option<Vec<En
                 counter += 1;
             } else if ch == opening {
                 if counter == 0 {
-                    let start = (editor.lexer().encoding().str_len)(&editor.content()[position.line][..char_idx]);
-                    let start_closing = (editor.lexer().encoding().str_len)(first_line);
+                    let start = editor.lexer().encoding().str_len(&editor.content()[position.line][..char_idx]);
+                    let start_closing = editor.lexer().encoding().str_len(first_line);
                     return Some(vec![
                         EncodedWordRange::new_checked(position.line, start, start + 1)?,
                         EncodedWordRange::new_checked(position.line, start_closing, start_closing + 1)?,
@@ -174,8 +172,8 @@ fn try_find_brackets(editor: &Editor, position: CursorPosition) -> Option<Vec<En
                     counter += 1;
                 } else if ch == opening {
                     if counter == 0 {
-                        let start = (editor.lexer().encoding().str_len)(&editor.content()[line_idx][..char_idx]);
-                        let start_closing = (editor.lexer().encoding().str_len)(first_line);
+                        let start = editor.lexer().encoding().str_len(&editor.content()[line_idx][..char_idx]);
+                        let start_closing = editor.lexer().encoding().str_len(first_line);
                         return Some(vec![
                             EncodedWordRange::new_checked(line_idx, start, start + 1)?,
                             EncodedWordRange::new_checked(position.line, start_closing, start_closing + 1)?,
@@ -193,8 +191,8 @@ fn try_find_brackets(editor: &Editor, position: CursorPosition) -> Option<Vec<En
             if ch == ch_at_start {
                 counter += 1;
             } else if ch == closing {
-                let start = (editor.lexer().encoding().str_len)(first_line);
-                let start_closing = (editor.lexer().encoding().str_len)(&editor.content()[position.line][..char_idx]);
+                let start = editor.lexer().encoding().str_len(first_line);
+                let start_closing = editor.lexer().encoding().str_len(&editor.content()[position.line][..char_idx]);
                 if counter == 0 {
                     return Some(vec![
                         EncodedWordRange::new_checked(position.line, start, start + 1)?,
@@ -216,9 +214,8 @@ fn try_find_brackets(editor: &Editor, position: CursorPosition) -> Option<Vec<En
                     counter += 1;
                 } else if ch == closing {
                     if counter == 0 {
-                        let start = (editor.lexer().encoding().str_len)(first_line);
-                        let start_closing =
-                            (editor.lexer().encoding().str_len)(&editor.content()[line_idx][..char_idx]);
+                        let start = editor.lexer().encoding().str_len(first_line);
+                        let start_closing = editor.lexer().encoding().str_len(&editor.content()[line_idx][..char_idx]);
                         return Some(vec![
                             EncodedWordRange::new_checked(position.line, start, start + 1)?,
                             EncodedWordRange::new_checked(line_idx, start_closing, start_closing + 1)?,

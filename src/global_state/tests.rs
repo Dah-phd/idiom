@@ -1,12 +1,13 @@
-use super::GlobalState;
 use crate::{
+    configs::ERR,
     editor::EditorStats,
     embeded_term::EditorTerminal,
     ext_tui::{CrossTerm, StyleExt},
+    global_state::GlobalState,
     tree::tests::mock_tree,
     workspace::tests::mock_ws,
 };
-use crossterm::style::{Color, ContentStyle};
+use crossterm::style::ContentStyle;
 use idiom_tui::{
     layout::{Borders, Line, Rect},
     Backend,
@@ -179,7 +180,7 @@ fn footer_render() {
             (ContentStyle::default(), "<<clear EOL>>".into()),
             (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
             (gs.ui_theme.accent_style(), "<<padding: 2>>".into()),
-            (gs.ui_theme.accent_style().with_fg(Color::Red), "err".into()),
+            (gs.ui_theme.accent_style().with_fg(ERR), "err".into()),
             (ContentStyle::default(), "<<reset style>>".into())
         ]
     );
@@ -199,7 +200,7 @@ fn footer_render() {
             (gs.ui_theme.accent_style(), "  Doc Len 300, Ln 0, Col 1 ".into()),
             (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
             (gs.ui_theme.accent_style(), "<<padding: 2>>".into()),
-            (gs.ui_theme.accent_style().with_fg(Color::Red), "err".into()),
+            (gs.ui_theme.accent_style().with_fg(ERR), "err".into()),
             (ContentStyle::default(), "<<reset style>>".into())
         ]
     );
@@ -263,7 +264,7 @@ fn footer_fast_render() {
             (ContentStyle::default(), "<<clear EOL>>".into()),
             (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
             (gs.ui_theme.accent_style(), "<<padding: 2>>".into()),
-            (gs.ui_theme.accent_style().with_fg(Color::Red), "err".into()),
+            (gs.ui_theme.accent_style().with_fg(ERR), "err".into()),
             (ContentStyle::default(), "<<reset style>>".into())
         ]
     );
@@ -286,7 +287,7 @@ fn footer_fast_render() {
             (gs.ui_theme.accent_style(), "  Doc Len 300, Ln 0, Col 1 ".into()),
             (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
             (gs.ui_theme.accent_style(), "<<padding: 2>>".into()),
-            (gs.ui_theme.accent_style().with_fg(Color::Red), "err".into()),
+            (gs.ui_theme.accent_style().with_fg(ERR), "err".into()),
             (ContentStyle::default(), "<<reset style>>".into())
         ]
     );
@@ -347,7 +348,7 @@ fn footer_force_rerender() {
             (ContentStyle::default(), "<<clear EOL>>".into()),
             (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
             (gs.ui_theme.accent_style(), "<<padding: 2>>".into()),
-            (gs.ui_theme.accent_style().with_fg(Color::Red), "err".into()),
+            (gs.ui_theme.accent_style().with_fg(ERR), "err".into()),
             (ContentStyle::default(), "<<reset style>>".into())
         ]
     );
@@ -370,7 +371,7 @@ fn footer_force_rerender() {
             (gs.ui_theme.accent_style(), "  Doc Len 300, Ln 0, Col 1 ".into()),
             (ContentStyle::default(), "<<go to row: 29 col: 0>>".into()),
             (gs.ui_theme.accent_style(), "<<padding: 2>>".into()),
-            (gs.ui_theme.accent_style().with_fg(Color::Red), "err".into()),
+            (gs.ui_theme.accent_style().with_fg(ERR), "err".into()),
             (ContentStyle::default(), "<<reset style>>".into())
         ]
     );

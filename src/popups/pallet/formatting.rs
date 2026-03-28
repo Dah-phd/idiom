@@ -30,3 +30,7 @@ pub fn call_formatting(gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tre
     let Some(editor) = ws.get_active() else { return };
     editor.call_formatter(gs);
 }
+
+pub fn save_without_formatting(gs: &mut GlobalState, ws: &mut Workspace, _tree: &mut Tree, _term: &mut EditorTerminal) {
+    ws.save_active(gs);
+}

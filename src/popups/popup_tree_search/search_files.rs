@@ -1,8 +1,9 @@
 use super::{Components, Popup, Status};
 use crate::{
+    app::ASYNC_RT,
     embeded_term::EditorTerminal,
     ext_tui::{text_field::map_key, LineBuilder, State, StyleExt},
-    global_state::{GlobalState, IdiomEvent},
+    global_state::{EditorOpenConfig, GlobalState, IdiomEvent},
     tree::{Tree, TreePath},
     workspace::Workspace,
 };
@@ -11,7 +12,6 @@ use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{
     layout::{Rect, BORDERS},
     text_field::{Status as InputStatus, TextField},
-    Backend,
 };
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -104,7 +104,7 @@ impl ActiveFileSearch {
         rect.height = rect.height.checked_sub(2)?;
         rect.row += 2;
         let position = rect.relative_position(row, column)?;
-        let idx = (self.state.at_line + position.row as usize) / 2;
+        let idx = self.state.at_line + (position.row as usize / 2);
         if idx >= self.options.len() {
             return None;
         }
@@ -116,7 +116,6 @@ impl Popup for ActiveFileSearch {
     fn force_render(&mut self, gs: &mut GlobalState) {
         let mut rect = Self::get_rect(gs);
         let accent_style = gs.ui_theme.accent_style().with_fg(self.mode.fg_color);
-        gs.backend.freeze();
         rect.draw_borders(None, None, gs.backend());
         rect.border_title_styled(self.mode.title, accent_style, gs.backend());
         let Some(line) = rect.next_line() else { return };
@@ -139,7 +138,6 @@ impl Popup for ActiveFileSearch {
         } else {
             self.state.render_list_complex(&self.options, &[build_path_line, build_text_line], rect, gs.backend());
         }
-        gs.backend.unfreeze();
     }
 
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status {
@@ -165,7 +163,7 @@ impl Popup for ActiveFileSearch {
             }
             KeyCode::Enter => {
                 let (path, _, line) = self.options.remove(self.state.selected);
-                gs.event.push(IdiomEvent::OpenAtLine(path, line));
+                gs.event.push(IdiomEvent::Open { path, config: EditorOpenConfig::GoToLine(line) });
                 return Status::Finished;
             }
             _ => {
@@ -197,7 +195,7 @@ impl Popup for ActiveFileSearch {
             MouseEvent { kind: MouseEventKind::Up(MouseButton::Left), column, row, .. } => {
                 if let Some(index) = self.get_option_idx(row, column, gs) {
                     let (path, _, line) = self.options.remove(index);
-                    gs.event.push(IdiomEvent::OpenAtLine(path, line));
+                    gs.event.push(IdiomEvent::Open { path, config: EditorOpenConfig::GoToLine(line) });
                     return Status::Finished;
                 }
             }
@@ -249,7 +247,7 @@ impl Drop for ActiveFileSearch {
 fn create_async_tree_search_task(tree: TreePath) -> (JoinHandle<()>, UnboundedSender<String>, Receiver<Message>) {
     let (send_results, recv) = tokio::sync::mpsc::channel::<Message>(20);
     let (send, mut recv_requests) = tokio::sync::mpsc::unbounded_channel::<String>();
-    let task = tokio::task::spawn(async move {
+    let task = ASYNC_RT.spawn(async move {
         let mut cache = (vec![], String::new());
         while let Some(pattern) = recv_requests.recv().await {
             if !cache.0.is_empty() && pattern.starts_with(cache.1.as_str()) {

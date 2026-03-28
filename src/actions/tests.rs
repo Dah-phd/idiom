@@ -1,4 +1,5 @@
 use super::{
+    edits::NewLineResult,
     meta::EditMetaData,
     utils::{clip_content, copy_content, get_closing_char_from_context, insert_clip, remove_content},
     Actions,
@@ -35,21 +36,30 @@ fn match_line(l1: &impl ToString, l2: &impl ToString) {
     assert_eq!(l1.to_string(), l2.to_string())
 }
 
-fn assert_initial(content: &[EditorLine]) {
-    let init_state = create_content();
-    assert_eq!(content.len(), init_state.len());
-    for (og, new) in init_state.iter().zip(content.iter()) {
+fn assert_lines_match(content_a: &[EditorLine], content_b: &[EditorLine]) {
+    assert_eq!(content_b.len(), content_b.len());
+    for (og, new) in content_a.iter().zip(content_b.iter()) {
         match_line(og, new);
     }
 }
 
-fn assert_edits_applicable(mut content: Vec<EditorLine>, edits: Vec<Edit>) {
+fn assert_edits_applicable(content: Vec<EditorLine>, edits: Vec<Edit>) {
     // ensure every event can be undone and redone
-    let reseved_content: Vec<EditorLine> = content.iter().map(|cl| EditorLine::new(cl.to_string())).collect();
+    let init_content = create_content();
+    assert_edits_applicable_with_init_content(&init_content, content, edits);
+}
+
+fn assert_edits_applicable_with_init_content(
+    init_content: &[EditorLine],
+    mut content: Vec<EditorLine>,
+    edits: Vec<Edit>,
+) {
+    // ensure every event can be undone and redone
+    let reseved_content: Vec<EditorLine> = content.iter().map(|cl| EditorLine::new_posix(cl.to_string())).collect();
     for edit in edits.iter().rev() {
         edit.apply_rev(&mut content);
     }
-    assert_initial(&content);
+    assert_lines_match(init_content, &content);
     for edit in edits.iter() {
         edit.apply(&mut content);
     }
@@ -65,9 +75,11 @@ fn assert_edits_applicable(mut content: Vec<EditorLine>, edits: Vec<Edit>) {
 fn new_line() {
     let cfg = IndentConfigs::default();
 
-    let mut content = vec![EditorLine::new("        ".to_owned())];
-    let (cursor, edit) = Edit::new_line(CursorPosition { line: 0, char: 8 }, &cfg, &mut content);
-    assert_eq!(cursor, CursorPosition { line: 1, char: 8 });
+    let mut content = vec![EditorLine::new_posix("        ".to_owned())];
+    let NewLineResult { empty_split, position, edit } =
+        Edit::new_line(CursorPosition { line: 0, char: 8 }, &cfg, &mut content);
+    assert!(empty_split);
+    assert_eq!(position, CursorPosition { line: 1, char: 8 });
     assert_eq!(content.len(), 2);
     assert_eq!(&content[0].to_string(), "");
     assert_eq!(&content[1].to_string(), "        ");
@@ -78,30 +90,60 @@ fn new_line() {
     let mut content = create_content();
 
     // simple new line
-    let (cursor, edit) = Edit::new_line(CursorPosition { line: 0, char: 4 }, &cfg, &mut content);
+    let NewLineResult { empty_split, position, edit } =
+        Edit::new_line(CursorPosition { line: 0, char: 4 }, &cfg, &mut content);
+    assert!(!empty_split);
     let mut edits = vec![edit];
-    assert_eq!(CursorPosition { line: 1, char: 0 }, cursor);
+    assert_eq!(position, CursorPosition { line: 1, char: 0 });
 
     // scope
-    edits.push(Edit::insert_clip(cursor, "{}".to_owned(), &mut content));
-    let (cursor, edit) = Edit::new_line(CursorPosition { line: 1, char: 1 }, &cfg, &mut content);
+    edits.push(Edit::insert_clip(position, "{}".to_owned(), &mut content));
+    let NewLineResult { empty_split, position, edit } =
+        Edit::new_line(CursorPosition { line: 1, char: 1 }, &cfg, &mut content);
+    assert!(!empty_split);
+
     edits.push(edit);
-    assert_eq!(CursorPosition { line: 2, char: 4 }, cursor);
+    assert_eq!(position, CursorPosition { line: 2, char: 4 });
     assert_eq!(&content[1].to_string(), "{");
     assert_eq!(&content[2].to_string(), "    ");
     assert_eq!(&content[3].to_string(), "} comes the text");
 
     // double scope
-    edits.push(Edit::insert_clip(cursor, "[]".to_owned(), &mut content));
-    let (cursor, edit) = Edit::new_line(CursorPosition { line: 2, char: 5 }, &cfg, &mut content);
+    edits.push(Edit::insert_clip(position, "[]".to_owned(), &mut content));
+    let NewLineResult { empty_split, position, edit } =
+        Edit::new_line(CursorPosition { line: 2, char: 5 }, &cfg, &mut content);
+    assert!(!empty_split);
+
     edits.push(edit);
-    assert_eq!(CursorPosition { line: 3, char: 8 }, cursor);
+    assert_eq!(position, CursorPosition { line: 3, char: 8 });
     assert_eq!(&content[1].to_string(), "{");
     assert_eq!(&content[2].to_string(), "    [");
     assert_eq!(&content[3].to_string(), "        ");
     assert_eq!(&content[4].to_string(), "    ]");
     assert_eq!(&content[5].to_string(), "} comes the text");
     assert_edits_applicable(content, edits);
+}
+
+#[test]
+fn new_line_empty_split() {
+    let cfg = IndentConfigs::default();
+    let l = "// test        ";
+    let init_content = vec![EditorLine::from(l)];
+    let mut content = vec![EditorLine::from(l)];
+
+    let NewLineResult { empty_split, position, edit } =
+        Edit::new_line(CursorPosition { line: 0, char: 0 }, &cfg, &mut content);
+    let mut edits = vec![edit];
+    assert!(empty_split);
+    assert_eq!(position, CursorPosition { line: 1, char: 0 });
+
+    let NewLineResult { empty_split, position, edit } =
+        Edit::new_line(CursorPosition { line: 1, char: 10 }, &cfg, &mut content);
+    edits.push(edit);
+    assert!(empty_split);
+    assert_eq!(position, CursorPosition { line: 2, char: 0 });
+    assert!(content[2].len() != 0);
+    assert_edits_applicable_with_init_content(&init_content, content, edits);
 }
 
 #[test]
@@ -349,6 +391,14 @@ fn insert_snippet() {
 /// MetaData
 
 #[test]
+fn meta_data_rev() {
+    let meta = EditMetaData { start_line: 11, from: 1, to: 3 };
+    assert_eq!(meta.from, meta.rev().to);
+    assert_eq!(meta.to, meta.rev().from);
+    assert_eq!(meta.start_line, meta.rev().start_line);
+}
+
+#[test]
 fn add_meta_data() {
     assert_eq!(
         EditMetaData::line_changed(1) + EditMetaData::line_changed(1),
@@ -486,7 +536,7 @@ fn push_char_with_closing_and_select() {
 
 fn probe_char_closing_with_select(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
     let encoding = lexer.encoding();
-    let (meta, edit) = action.change_event(encoding.encode_position, encoding.char_len, content);
+    let (meta, edit) = action.change_event(encoding, content);
     assert_eq!(meta.start_line, 0);
     assert_eq!(meta.from, 1);
     assert_eq!(meta.from, meta.to);
@@ -499,7 +549,7 @@ fn probe_char_closing_with_select(lexer: &mut Lexer, action: &Action, content: &
 
 fn probe_char_closing_with_select_rev(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
     let encoding = lexer.encoding();
-    let (meta, edit) = action.change_event_rev(encoding.encode_position, encoding.char_len, content);
+    let (meta, edit) = action.change_event_rev(encoding, content);
     assert_eq!(meta.start_line, 0);
     assert_eq!(meta.from, 1);
     assert_eq!(meta.from, meta.to);
@@ -515,7 +565,7 @@ fn probe_char_closing_with_select_rev(lexer: &mut Lexer, action: &Action, conten
 #[test]
 fn test_insert_clip() {
     // ensure utf8 safety on critical func
-    let mut content = vec![EditorLine::new("one🚀line".to_owned())];
+    let mut content = vec![EditorLine::new_posix("one🚀line".to_owned())];
     let cursor = CursorPosition { line: 0, char: 4 };
     let cursor = insert_clip("first\nsecond\nrocket🚀", &mut content, cursor);
     assert_eq!(&content[0].to_string(), "one🚀first");

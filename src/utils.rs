@@ -73,10 +73,16 @@ impl<T> TrackedList<T> {
         self.updated = true;
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn insert(&mut self, index: usize, element: T) {
         self.updated = true;
-        self.inner.insert(index, element)
+        self.inner.insert(index, element);
+    }
+
+    #[inline]
+    pub fn insert_and_get_mut(&mut self, index: usize, element: T) -> &mut T {
+        self.insert(index, element);
+        &mut self.inner[index]
     }
 
     #[allow(dead_code)]
@@ -137,6 +143,7 @@ impl<T> TrackedList<T> {
         None
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub fn get_mut(&mut self, index: usize) -> Option<&mut T> {
         self.updated = true;
@@ -158,7 +165,14 @@ impl<T> TrackedList<T> {
         result
     }
 
-    #[inline(always)]
+    #[inline]
+    pub fn remove_if(&mut self, predicate: impl FnMut(&T) -> bool) -> Option<T> {
+        let idx = self.inner.iter().position(predicate)?;
+        self.updated = true;
+        Some(self.inner.remove(idx))
+    }
+
+    #[inline]
     pub fn remove(&mut self, index: usize) -> T {
         self.updated = true;
         self.inner.remove(index)
@@ -338,7 +352,7 @@ pub fn to_canon_path(target_dir: &Path) -> IdiomResult<PathBuf> {
 
 #[cfg(test)]
 pub mod test {
-    use super::Direction;
+    use super::{Direction, TrackedList};
     use std::path::{Path, PathBuf};
 
     pub struct TempDir {
@@ -384,5 +398,27 @@ pub mod test {
 
         assert_eq!(norm.apply_ordered(3, 10, |x, y| (outer_val + x) - y), expected);
         assert_eq!(revr.apply_ordered(10, 3, |x, y| (outer_val + x) - y), expected);
+    }
+
+    #[test]
+    fn tracked_list_insert() {
+        let mut tl = TrackedList::new();
+        tl.push(String::from("uno"));
+        tl.push(String::from("dos"));
+        assert!(tl.collect_status());
+        assert!(!tl.collect_status());
+        let mut_ref = tl.insert_and_get_mut(1, String::from("tres"));
+        assert_eq!(mut_ref.as_str(), "tres");
+        mut_ref.push('!');
+        assert_eq!(mut_ref.as_str(), "tres!");
+        assert_eq!(tl.inner, ["uno", "tres!", "dos"]);
+
+        tl.inner_mut().clear();
+        assert!(tl.collect_status());
+        let mut_ref = tl.insert_and_get_mut(0, String::from("tres"));
+        assert_eq!(mut_ref.as_str(), "tres");
+        mut_ref.push('!');
+        assert_eq!(mut_ref.as_str(), "tres!");
+        assert_eq!(tl.inner, ["tres!"]);
     }
 }

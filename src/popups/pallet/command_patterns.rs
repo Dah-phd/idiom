@@ -281,7 +281,7 @@ fn shell_executor(
                     id += 1;
                 }
                 let content = logs.lines().map(EditorLine::from).collect();
-                ws.new_text_from_data(path, content, None, gs);
+                ws.create_text_editor_from_data(path, content, None, gs);
                 return Ok(());
             }
         }

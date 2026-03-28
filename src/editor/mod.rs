@@ -1,27 +1,31 @@
+mod codec;
 mod controls;
 mod modal;
-mod renderer;
 pub mod syntax;
 mod utils;
+
 use crate::{
     actions::{find_line_start, Actions},
     configs::{EditorAction, EditorConfigs, FileFamily, FileType, IndentConfigs, ScopeType},
     cursor::{Cursor, CursorPosition},
-    editor_line::EditorLine,
-    error::{IdiomError, IdiomResult},
+    editor_line::{EditorLine, LineParser},
+    error::IdiomResult,
     global_state::GlobalState,
     lsp::{LSPClient, LSPError},
 };
+use codec::TuiCodec;
 use controls::ControlMap;
 use idiom_tui::{layout::Rect, Position};
 use lsp_types::TextEdit;
 pub use modal::EditorModal;
-use renderer::TuiCodec;
-use std::path::PathBuf;
+use std::{
+    io::{BufWriter, Write},
+    path::PathBuf,
+};
 use syntax::Lexer;
 use utils::{
     big_file_protection, build_display, calc_line_number_offset, select_between_chars, select_between_chars_inc,
-    select_indent, FileUpdate,
+    select_indent,
 };
 pub use utils::{editor_from_data, EditorStats};
 
@@ -29,21 +33,21 @@ const WARN_TXT: &str = "The file is opened in text mode, \
     beware idiom is not designed with plain text performance in mind!";
 const WARN_MD: &str = "The file is opened in markdown mode, \
     beware idiom is not designed with MD performance in mind!";
+const FILE_UPDATED_VERSION: i32 = -1;
 
 pub struct Editor {
-    pub update_status: FileUpdate,
+    saved_version: i32,
     file_type: FileType,
     lexer: Lexer,
     cursor: Cursor,
     content: Vec<EditorLine>,
     controls: ControlMap,
-    renderer: TuiCodec,
+    codec: TuiCodec,
     actions: Actions,
     modal: EditorModal,
     display: String,
     path: PathBuf,
     line_number_padding: usize,
-    last_render_at_line: Option<usize>,
 }
 
 impl Editor {
@@ -54,7 +58,9 @@ impl Editor {
         gs: &mut GlobalState,
     ) -> IdiomResult<Self> {
         big_file_protection(&path)?;
-        let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
+        let indent_cfg = cfg.get_indent_cfg(file_type);
+        let text = std::fs::read_to_string(&path)?;
+        let content = LineParser::split_lines(&text).into_content_or_popup_if_not_formatted(&indent_cfg, gs)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
         Ok(Self {
@@ -62,14 +68,13 @@ impl Editor {
             line_number_padding: line_number_offset,
             lexer: Lexer::with_context(file_type, &path),
             content,
-            renderer: TuiCodec::code(),
-            actions: Actions::new(cfg.get_indent_cfg(file_type)),
+            codec: TuiCodec::code(),
+            actions: Actions::new(indent_cfg),
             controls: ControlMap::default(),
             file_type,
             display,
-            update_status: FileUpdate::None,
+            saved_version: 0,
             path,
-            last_render_at_line: None,
             modal: EditorModal::default(),
         })
     }
@@ -77,7 +82,9 @@ impl Editor {
     pub fn from_path_text(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
         big_file_protection(&path)?;
         gs.message(WARN_TXT);
-        let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
+        let indent_cfg = cfg.default_indent_cfg();
+        let text = std::fs::read_to_string(&path)?;
+        let content = LineParser::split_lines(&text).into_content_or_popup_if_not_formatted(&indent_cfg, gs)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
         let cursor = Cursor::sized(*gs.editor_area(), line_number_offset);
@@ -86,14 +93,13 @@ impl Editor {
             line_number_padding: line_number_offset,
             lexer: Lexer::text_lexer(&path),
             content,
-            renderer: TuiCodec::text(),
-            actions: Actions::new(cfg.default_indent_cfg()),
+            codec: TuiCodec::text(),
+            actions: Actions::new(indent_cfg),
             controls: ControlMap::default(),
             file_type: FileType::Text,
             display,
-            update_status: FileUpdate::None,
+            saved_version: 0,
             path,
-            last_render_at_line: None,
             modal: EditorModal::default(),
         })
     }
@@ -101,7 +107,9 @@ impl Editor {
     pub fn from_path_md(path: PathBuf, cfg: &EditorConfigs, gs: &mut GlobalState) -> IdiomResult<Self> {
         big_file_protection(&path)?;
         gs.message(WARN_MD);
-        let content = EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?;
+        let indent_cfg = cfg.default_indent_cfg();
+        let text = std::fs::read_to_string(&path)?;
+        let content = LineParser::split_lines(&text).into_content_or_popup_if_not_formatted(&indent_cfg, gs)?;
         let display = build_display(&path);
         let line_number_offset = calc_line_number_offset(content.len());
         let cursor = Cursor::sized(*gs.editor_area(), line_number_offset);
@@ -110,14 +118,13 @@ impl Editor {
             line_number_padding: line_number_offset,
             lexer: Lexer::text_lexer(&path),
             content,
-            renderer: TuiCodec::markdown(),
-            actions: Actions::new(cfg.default_indent_cfg()),
+            codec: TuiCodec::markdown(),
+            actions: Actions::new(indent_cfg),
             controls: ControlMap::default(),
             file_type: FileType::MarkDown,
             display,
-            update_status: FileUpdate::None,
+            saved_version: 0,
             path,
-            last_render_at_line: None,
             modal: EditorModal::default(),
         })
     }
@@ -139,8 +146,10 @@ impl Editor {
         &self.cursor
     }
 
+    /// access content outside of Editor API
+    /// proceed with caution
     #[inline]
-    pub fn unsafe_cursor_mut(&mut self) -> &mut Cursor {
+    pub unsafe fn cursor_mut(&mut self) -> &mut Cursor {
         &mut self.cursor
     }
 
@@ -152,7 +161,7 @@ impl Editor {
     /// access content outside of Editor API
     /// proceed with caution
     #[inline]
-    pub fn unsafe_content_mut(&mut self) -> &mut [EditorLine] {
+    pub unsafe fn content_mut(&mut self) -> &mut [EditorLine] {
         &mut self.content
     }
 
@@ -171,6 +180,21 @@ impl Editor {
         &self.file_type
     }
 
+    #[inline]
+    pub fn version(&self) -> i32 {
+        self.lexer.file_version()
+    }
+
+    #[inline]
+    pub fn file_status_is_update(&self) -> bool {
+        FILE_UPDATED_VERSION == self.saved_version
+    }
+
+    #[inline]
+    pub fn file_status_mark_updated(&mut self) {
+        self.saved_version = FILE_UPDATED_VERSION;
+    }
+
     // RENDER
 
     #[inline]
@@ -178,9 +202,9 @@ impl Editor {
         let new_offset = calc_line_number_offset(self.content.len());
         if new_offset != self.line_number_padding {
             self.line_number_padding = new_offset;
-            self.last_render_at_line.take();
+            self.codec.clear_cache();
         };
-        (self.renderer.render)(self, gs)
+        TuiCodec::render(self, gs)
     }
 
     /// renders only updated lines
@@ -189,9 +213,9 @@ impl Editor {
         let new_offset = calc_line_number_offset(self.content.len());
         if new_offset != self.line_number_padding {
             self.line_number_padding = new_offset;
-            self.last_render_at_line.take();
+            self.codec.clear_cache();
         };
-        (self.renderer.fast_render)(self, gs)
+        TuiCodec::fast_render(self, gs)
     }
 
     /// Main usecase is after manual Lexer::context to check if update is needed
@@ -199,8 +223,7 @@ impl Editor {
     /// estimates if there has been changes to the data within content
     #[inline]
     pub fn has_render_cache(&mut self) -> bool {
-        let render_line_maches = matches!(self.last_render_at_line, Some(val) if val == self.cursor.at_line);
-        render_line_maches && TuiCodec::all_lines_cached(self)
+        self.codec.is_cached_at_line(self.cursor.at_line) && TuiCodec::all_lines_cached(self)
     }
 
     pub fn clear_ui(&mut self, gs: &GlobalState) {
@@ -212,7 +235,7 @@ impl Editor {
     #[inline(always)]
     pub fn clear_screen_cache(&mut self, gs: &mut GlobalState) {
         self.lexer.refresh_lsp(gs);
-        self.last_render_at_line = None;
+        self.codec.clear_cache();
     }
 
     pub fn clear_lines_cache(&mut self, rect: Rect, gs: &GlobalState) {
@@ -246,20 +269,27 @@ impl Editor {
     }
 
     pub fn call_formatter(&mut self, gs: &mut GlobalState) {
-        self.lexer.formatting(self.actions.cfg.indent.len(), false, gs);
+        self.lexer.try_formatting(self.actions.cfg.indent.len(), false, gs);
     }
 
-    pub fn call_formatter_and_save(&mut self, gs: &mut GlobalState) {
-        self.lexer.formatting(self.actions.cfg.indent.len(), true, gs);
+    pub fn try_formatter_and_save(&mut self, gs: &mut GlobalState) -> bool {
+        self.lexer.try_formatting(self.actions.cfg.indent.len(), true, gs)
     }
 
     pub fn lsp_set(&mut self, client: LSPClient, gs: &mut GlobalState) {
+        self.force_local_lsp_tokens(gs);
         self.lexer.set_lsp_client(client, self.stringify(), gs);
     }
 
-    #[inline]
     pub fn lsp_local(&mut self, gs: &mut GlobalState) {
         self.lexer.local_lsp(self.file_type, self.stringify(), gs)
+    }
+
+    pub fn lsp_drop(&mut self) {
+        if !self.file_type.is_code() {
+            return;
+        }
+        self.lexer = Lexer::with_context(self.file_type, &self.path);
     }
 
     pub fn file_type_set(&mut self, file_type: FileType, cfg: IndentConfigs, gs: &mut GlobalState) {
@@ -267,21 +297,21 @@ impl Editor {
         self.file_type = file_type;
         match self.file_type.family() {
             FileFamily::Text => {
-                self.renderer = TuiCodec::text();
+                self.codec = TuiCodec::text();
                 self.lexer = Lexer::text_lexer(&self.path);
                 for text in self.content.iter_mut() {
                     text.tokens_mut().clear();
                 }
             }
             FileFamily::MarkDown => {
-                self.renderer = TuiCodec::markdown();
+                self.codec = TuiCodec::markdown();
                 self.lexer = Lexer::md_lexer(&self.path);
                 for text in self.content.iter_mut() {
                     text.tokens_mut().clear();
                 }
             }
             FileFamily::Code(..) => {
-                self.renderer = TuiCodec::code();
+                self.codec = TuiCodec::code();
                 self.lexer = Lexer::with_context(file_type, &self.path);
                 for text in self.content.iter_mut() {
                     text.tokens_mut().clear();
@@ -415,7 +445,11 @@ impl Editor {
         Position { row, col }
     }
 
-    pub fn is_saved(&self) -> IdiomResult<bool> {
+    pub fn is_saved(&self) -> bool {
+        self.saved_version == self.lexer.file_version()
+    }
+
+    pub fn is_saved_check_content(&self) -> IdiomResult<bool> {
         // for most source code files direct read should be faster
         let file_content = std::fs::read_to_string(&self.path)?;
 
@@ -446,39 +480,78 @@ impl Editor {
                 return;
             }
         };
-        self.content = content.split('\n').map(|line| EditorLine::new(line.to_owned())).collect();
-        match self.lexer.reopen(content, self.file_type) {
-            Ok(()) => gs.success("File rebased!"),
+        self.content = content.split('\n').map(|line| EditorLine::new_posix(line.to_owned())).collect();
+        match self.lexer.reopen(content, self.file_type, gs) {
+            Ok(()) => {
+                self.saved_version = self.lexer.file_version();
+                gs.success("File rebased!");
+            }
             Err(err) => gs.error(format!("Filed to reactivate LSP after rebase! ERR: {err}")),
         }
     }
 
     pub fn save(&mut self, gs: &mut GlobalState) {
-        if let Some(content) = self.try_write_file(gs) {
-            self.update_status.deny();
-            self.lexer.save_and_check_lsp(content, gs);
-            gs.success(format!("SAVED {}", self.path.display()));
+        match self.try_write_file() {
+            Ok(..) => {
+                self.saved_version = self.lexer.file_version();
+                Lexer::save_and_check_lsp(self, gs);
+                gs.success(format!("SAVED {}", self.path.display()));
+            }
+            Err(error) => gs.error(error),
         }
     }
 
-    pub fn try_write_file(&self, gs: &mut GlobalState) -> Option<String> {
-        let content = self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n");
-        if let Err(error) = std::fs::write(&self.path, &content) {
-            gs.error(error);
-            return None;
+    pub fn write_file_logged(&self, gs: &mut GlobalState) {
+        match self.try_write_file() {
+            Ok(..) => (),
+            Err(error) => gs.error(error),
         }
-        Some(content)
+    }
+
+    fn try_write_file(&self) -> std::io::Result<()> {
+        let file = std::fs::File::options().write(true).create(true).truncate(true).open(&self.path)?;
+        let mut writer = BufWriter::new(file);
+        let mut content = self.content.iter();
+
+        let Some(fline) = content.next() else {
+            return Ok(());
+        };
+        let mut line_end = fline.end();
+        writer.write_all(fline.as_str().as_bytes())?;
+
+        for eline in content {
+            writer.write_all(line_end.as_bytes())?;
+            writer.write_all(eline.as_str().as_bytes())?;
+            line_end = eline.end();
+        }
+
+        writer.flush()
+    }
+
+    pub fn stringify(&self) -> String {
+        let mut content = self.content.iter();
+        let Some(first) = content.next() else {
+            return String::new();
+        };
+
+        let size = self.content.iter().map(|el| el.len() + el.end().len()).sum();
+        let mut text = String::with_capacity(size);
+
+        let mut end = first.end();
+        text.push_str(first.as_str());
+
+        for eline in content {
+            text.push_str(end);
+            text.push_str(eline.as_str());
+            end = eline.end();
+        }
+
+        text
     }
 
     pub fn refresh_cfg(&mut self, new_cfg: &EditorConfigs, gs: &mut GlobalState) {
         self.actions.cfg = new_cfg.get_indent_cfg(self.file_type);
         self.lexer.reload_theme(gs);
-    }
-
-    pub fn stringify(&self) -> String {
-        let mut text = self.content.iter().map(|l| l.to_string()).collect::<Vec<_>>().join("\n");
-        text.push('\n');
-        text
     }
 
     pub fn resize(&mut self, width: usize, height: usize) {
@@ -522,6 +595,7 @@ impl Editor {
 
     #[inline(always)]
     pub fn apply_file_edits(&mut self, edits: Vec<TextEdit>) {
+        self.codec.clear_cache();
         (self.controls.apply_file_edits)(self, edits)
     }
 
@@ -601,7 +675,7 @@ impl Editor {
 
     pub fn mouse_multi_cursor(&mut self, position: Position) {
         self.modal.drop();
-        self.last_render_at_line = None;
+        self.codec.clear_cache();
         let position = self.mouse_parse(position);
         if self.cursor == position {
             return;

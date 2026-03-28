@@ -12,6 +12,14 @@ use crate::{
     utils::Offset,
 };
 
+pub struct NewLineResult {
+    /// is there any tokens in split off line
+    pub empty_split: bool,
+    /// new cursor position
+    pub position: CursorPosition,
+    pub edit: Edit,
+}
+
 #[derive(Debug)]
 pub struct Edit {
     pub meta: EditMetaData,
@@ -195,20 +203,17 @@ impl Edit {
     }
 
     #[inline]
-    pub fn new_line(
-        mut cursor: CursorPosition,
-        cfg: &IndentConfigs,
-        content: &mut Vec<EditorLine>,
-    ) -> (CursorPosition, Self) {
-        let mut from_cursor = cursor;
+    pub fn new_line(mut position: CursorPosition, cfg: &IndentConfigs, content: &mut Vec<EditorLine>) -> NewLineResult {
+        let mut from_cursor = position;
         let mut reverse = String::new();
         let mut text = String::from('\n');
-        let prev_line = &mut content[cursor.line];
-        let mut line = prev_line.split_off(cursor.char);
+        let prev_line = &mut content[position.line];
+        let mut line = prev_line.split_off(position.char);
+        let empty_split = line.chars().all(|c| c == ' ') || prev_line.is_empty();
         let indent = cfg.derive_indent_from(prev_line);
         line.insert_str(0, &indent);
-        cursor.line += 1;
-        cursor.char = indent.len();
+        position.line += 1;
+        position.char = indent.len();
         text.push_str(&indent);
         // expand scope
         if is_scope(&prev_line[..], &line[..]) {
@@ -216,37 +221,40 @@ impl Edit {
             if indent.len() >= cfg.indent.len() && cfg.unindent_if_before_base_pattern(&mut line) != 0 {
                 text.push_str(&indent[..indent.len() - cfg.indent.len()]);
             }
-            content.insert(cursor.line, line);
-            content.insert(cursor.line, indent.into());
-            return (cursor, Self::without_select(from_cursor, 1, 3, text, reverse));
+            content.insert(position.line, line);
+            content.insert(position.line, indent.into());
+            let edit = Self::without_select(from_cursor, 1, 3, text, reverse);
+            return NewLineResult { empty_split, position, edit };
         }
         if prev_line.chars().all(|c| c.is_whitespace()) && prev_line.char_len().rem_euclid(cfg.indent.len()) == 0 {
             from_cursor.char = 0;
             prev_line.push_content_to_buffer(&mut reverse);
             prev_line.clear();
         }
-        content.insert(cursor.line, line);
-        (cursor, Self::without_select(from_cursor, 1, 2, text, reverse))
+        content.insert(position.line, line);
+        NewLineResult { empty_split, position, edit: Self::without_select(from_cursor, 1, 2, text, reverse) }
     }
 
+    /// does not take into account scope logic
     #[inline]
     pub fn new_line_raw(
-        mut cursor: CursorPosition,
+        mut position: CursorPosition,
         cfg: &IndentConfigs,
         content: &mut Vec<EditorLine>,
-    ) -> (CursorPosition, Self) {
-        let from_cursor = cursor;
+    ) -> NewLineResult {
+        let from_cursor = position;
         let reverse = String::new();
         let mut text = String::from('\n');
-        let prev_line = &mut content[cursor.line];
-        let mut line = prev_line.split_off(cursor.char);
+        let prev_line = &mut content[position.line];
+        let mut line = prev_line.split_off(position.char);
+        let empty_split = line.chars().all(|c| c == ' ') || prev_line.is_empty();
         let indent = cfg.derive_indent_from(prev_line);
         line.insert_str(0, &indent);
-        cursor.line += 1;
-        cursor.char = indent.len();
+        position.line += 1;
+        position.char = indent.len();
         text.push_str(&indent);
-        content.insert(cursor.line, line);
-        (cursor, Self::without_select(from_cursor, 1, 2, text, reverse))
+        content.insert(position.line, line);
+        NewLineResult { empty_split, position, edit: Self::without_select(from_cursor, 1, 2, text, reverse) }
     }
 
     #[inline]
@@ -339,21 +347,17 @@ impl Edit {
     }
 
     #[inline(always)]
-    pub fn text_change(
-        &self,
-        encoding: fn(usize, &str) -> usize,
-        char_lsp: fn(char) -> usize,
-        content: &[EditorLine],
-    ) -> (EditMetaData, TextDocumentContentChangeEvent) {
+    pub fn text_change(&self, encoding: &Encoding, content: &[EditorLine]) -> TextDocumentContentChangeEvent {
         let mut cursor = self.cursor;
         let changed = self.meta.from - 1;
         let text = self.text.to_owned();
-        let mut char = self.reverse.chars().rev().take_while(|ch| ch != &'\n').map(char_lsp).sum::<usize>();
+        let mut char =
+            self.reverse.chars().rev().take_while(|ch| ch != &'\n').map(|c| encoding.char_len(c)).sum::<usize>();
 
         if cursor.char != 0 {
             let editor_line = &content[cursor.line];
             if !editor_line.is_simple() {
-                cursor.char = (encoding)(cursor.char, &editor_line[..]);
+                cursor.char = encoding.encode_position(cursor.char, &editor_line[..]);
             }
         }
 
@@ -362,26 +366,21 @@ impl Edit {
         }
         let end = Position::new((cursor.line + changed) as u32, char as u32);
         let start = Position::from(cursor);
-        (self.meta, TextDocumentContentChangeEvent { range: Some(Range::new(start, end)), text, range_length: None })
+        TextDocumentContentChangeEvent { range: Some(Range::new(start, end)), text, range_length: None }
     }
 
     #[inline(always)]
-    pub fn text_change_rev(
-        &self,
-        encoding: fn(usize, &str) -> usize,
-        char_lsp: fn(char) -> usize,
-        content: &[EditorLine],
-    ) -> (EditMetaData, TextDocumentContentChangeEvent) {
-        let rev_meta = self.meta.rev();
+    pub fn text_change_rev(&self, encoding: &Encoding, content: &[EditorLine]) -> TextDocumentContentChangeEvent {
         let mut cursor = self.cursor;
-        let changed = rev_meta.from - 1;
+        let changed = self.meta.to - 1;
         let text = self.reverse.to_owned();
-        let mut char = self.text.chars().rev().take_while(|ch| ch != &'\n').map(char_lsp).sum::<usize>();
+        let mut char =
+            self.text.chars().rev().take_while(|ch| ch != &'\n').map(|c| encoding.char_len(c)).sum::<usize>();
 
         if cursor.char != 0 {
             let editor_line = &content[cursor.line];
             if !editor_line.is_simple() {
-                cursor.char = (encoding)(cursor.char, &editor_line[..]);
+                cursor.char = encoding.encode_position(cursor.char, &editor_line[..]);
             }
         }
 
@@ -390,6 +389,6 @@ impl Edit {
         }
         let end = Position::new((cursor.line + changed) as u32, char as u32);
         let start = Position::from(cursor);
-        (rev_meta, TextDocumentContentChangeEvent { range: Some(Range::new(start, end)), text, range_length: None })
+        TextDocumentContentChangeEvent { range: Some(Range::new(start, end)), text, range_length: None }
     }
 }

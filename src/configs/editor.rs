@@ -1,18 +1,22 @@
-use std::collections::HashMap;
-
 use super::{
     defaults::{get_indent_after, get_indent_spaces, get_unident_before},
     load_or_create_config,
     types::FileType,
-    EDITOR_CFG_FILE,
+    write_config_file, EDITOR_CFG_FILE,
 };
-use crate::editor_line::EditorLine;
-use crate::utils::{trim_start_inplace, Offset};
-use crate::{global_state::GlobalState, lsp::LSP};
+use crate::{
+    configs::lsp_cfg::LSPConfig,
+    editor_line::EditorLine,
+    global_state::GlobalState,
+    lsp::servers::InitCfg,
+    utils::{trim_start_inplace, Offset},
+};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[allow(non_snake_case)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct EditorConfigs {
     #[serde(default = "get_indent_spaces")]
     pub indent_spaces: usize,
@@ -24,10 +28,13 @@ pub struct EditorConfigs {
     pub shell: Option<String>,
     pub git_tui: Option<String>,
     /// GENERAL
-    #[serde(default, skip)]
+    #[serde(default)]
     pub format_on_save: bool,
     pub max_sessions: Option<usize>,
     /// LSP
+    LSP: Option<HashMap<String, LSPConfig>>,
+
+    /// Deprecated
     rust_lsp: Option<String>,
     rust_lsp_preload_if_present: Option<Vec<String>>,
     zig_lsp: Option<String>,
@@ -54,32 +61,54 @@ pub struct EditorConfigs {
 
 impl Default for EditorConfigs {
     fn default() -> Self {
+        let mut lsp_configs = HashMap::new();
+        lsp_configs.insert(
+            FileType::Rust.as_str().into(),
+            LSPConfig::new("rust-analyzer", Some(vec!["Cargo.toml".to_owned(), "Cargo.lock".to_owned()]), None),
+        );
+        lsp_configs.insert(
+            FileType::Python.as_str().into(),
+            LSPConfig::new_no_semantic_tokens(
+                "uv tool run ty server",
+                Some(vec!["pyproject.toml".to_owned(), "pytest.init".to_owned()]),
+            ),
+        );
+        lsp_configs.insert(
+            FileType::Nim.as_str().into(),
+            LSPConfig::new("nimlsp", Some(vec![r".*\.nimble".to_owned()]), None),
+        );
+        lsp_configs
+            .insert(FileType::TypeScript.as_str().into(), LSPConfig::new_no_semantic_tokens("vtsls --stdio", None));
+        lsp_configs
+            .insert(FileType::JavaScript.as_str().into(), LSPConfig::new_no_semantic_tokens("vtsls --stdio", None));
         Self {
-            format_on_save: true,
+            format_on_save: false,
             indent_spaces: get_indent_spaces(),
             indent_after: String::from("({["),
             unindent_before: String::from("]})"),
             // shell
             shell: None,
-            git_tui: None,
+            git_tui: Some("gitui".to_owned()),
             // general
             max_sessions: Some(10),
             // lsp
-            rust_lsp: Some(String::from("rust-analyzer")),
-            rust_lsp_preload_if_present: Some(vec!["Cargo.toml".to_owned(), "Cargo.lock".to_owned()]),
+            LSP: Some(lsp_configs),
+            // deprecated
+            rust_lsp: None,
+            rust_lsp_preload_if_present: None,
             zig_lsp: None,
-            zig_lsp_preload_if_present: Some(vec!["build.zig".to_owned()]),
-            python_lsp: Some(String::from("jedi-language-server")),
-            python_lsp_preload_if_present: Some(vec!["pyproject.toml".to_owned(), "pytest.init".to_owned()]),
-            nim_lsp: Some(String::from("nimlsp")),
-            nim_lsp_preload_if_present: Some(vec![r".*\.nimble".to_owned()]),
+            zig_lsp_preload_if_present: None,
+            python_lsp: None,
+            python_lsp_preload_if_present: None,
+            nim_lsp: None,
+            nim_lsp_preload_if_present: None,
             c_lsp: None,
             c_lsp_preload_if_present: None,
             cpp_lsp: None,
             cpp_preload_if_present: None,
-            type_script_lsp: Some(String::from("vtsls --stdio")),
+            type_script_lsp: None,
             type_script_preload_if_present: None,
-            java_script_lsp: Some(String::from("vtsls --stdio")),
+            java_script_lsp: None,
             java_script_preload_if_present: None,
             html_lsp: None,
             html_preload_if_present: None,
@@ -93,7 +122,92 @@ impl Default for EditorConfigs {
 
 impl EditorConfigs {
     pub fn new() -> Result<Self, toml::de::Error> {
-        load_or_create_config(EDITOR_CFG_FILE)
+        let mut configs: Self = load_or_create_config(EDITOR_CFG_FILE)?;
+        let lsp_cfgs = configs.LSP.get_or_insert_default();
+
+        let mut backward_comp = false;
+        if let Some(rust) = configs.rust_lsp.take() {
+            backward_comp = true;
+            lsp_cfgs.insert(
+                FileType::Rust.as_str().into(),
+                LSPConfig::new(rust, configs.rust_lsp_preload_if_present.take(), None),
+            );
+        }
+        if let Some(zig) = configs.zig_lsp.take() {
+            backward_comp = true;
+            lsp_cfgs.insert(
+                FileType::Zig.as_str().into(),
+                LSPConfig::new(zig, configs.zig_lsp_preload_if_present.take(), None),
+            );
+        }
+        if let Some(py) = configs.python_lsp.take() {
+            backward_comp = true;
+            lsp_cfgs.insert(
+                FileType::Python.as_str().into(),
+                LSPConfig::new(py, configs.python_lsp_preload_if_present.take(), None),
+            );
+        }
+        if let Some(nim) = configs.nim_lsp.take() {
+            backward_comp = true;
+            lsp_cfgs.insert(
+                FileType::Nim.as_str().into(),
+                LSPConfig::new(nim, configs.nim_lsp_preload_if_present.take(), None),
+            );
+        }
+        if let Some(c_lsp) = configs.c_lsp.take() {
+            backward_comp = true;
+            lsp_cfgs.insert(
+                FileType::C.as_str().into(),
+                LSPConfig::new(c_lsp, configs.c_lsp_preload_if_present.take(), None),
+            );
+        }
+        if let Some(cpp) = configs.cpp_lsp.take() {
+            backward_comp = true;
+            lsp_cfgs.insert(
+                FileType::Cpp.as_str().into(),
+                LSPConfig::new(cpp, configs.cpp_preload_if_present.take(), None),
+            );
+        }
+        if let Some(ts) = configs.type_script_lsp.take() {
+            backward_comp = true;
+            lsp_cfgs.insert(
+                FileType::TypeScript.as_str().into(),
+                LSPConfig::new(ts, configs.type_script_preload_if_present.take(), None),
+            );
+        }
+        if let Some(js) = configs.java_script_lsp.take() {
+            backward_comp = true;
+            lsp_cfgs.insert(
+                FileType::JavaScript.as_str().into(),
+                LSPConfig::new(js, configs.java_script_preload_if_present.take(), None),
+            );
+        }
+        if let Some(html) = configs.html_lsp.take() {
+            backward_comp = true;
+            lsp_cfgs.insert(
+                FileType::Html.as_str().into(),
+                LSPConfig::new(html, configs.html_preload_if_present.take(), None),
+            );
+        }
+        if let Some(toml) = configs.toml_lsp.take() {
+            backward_comp = true;
+            lsp_cfgs.insert(
+                FileType::Toml.as_str().into(),
+                LSPConfig::new(toml, configs.toml_preload_if_present.take(), None),
+            );
+        }
+        if let Some(yaml) = configs.yaml_lsp.take() {
+            backward_comp = true;
+            lsp_cfgs.insert(
+                FileType::Yml.as_str().into(),
+                LSPConfig::new(yaml, configs.yaml_preload_if_present.take(), None),
+            );
+        }
+
+        if backward_comp {
+            _ = write_config_file(EDITOR_CFG_FILE, &configs)
+        }
+        Ok(configs)
     }
 
     pub fn get_indent_cfg(&self, file_type: FileType) -> IndentConfigs {
@@ -109,73 +223,37 @@ impl EditorConfigs {
         }
     }
 
-    pub fn derive_lsp(&self, file_type: &FileType) -> Option<String> {
-        match file_type {
-            FileType::Text | FileType::MarkDown | FileType::Lobster | FileType::Json | FileType::Shell => None,
-            FileType::Rust => self.rust_lsp.to_owned(),
-            FileType::Zig => self.zig_lsp.to_owned(),
-            FileType::Python => self.python_lsp.to_owned(),
-            FileType::Nim => self.nim_lsp.to_owned(),
-            FileType::C => self.c_lsp.to_owned(),
-            FileType::Cpp => self.cpp_lsp.to_owned(),
-            FileType::JavaScript => self.java_script_lsp.to_owned(),
-            FileType::TypeScript => self.type_script_lsp.to_owned(),
-            FileType::Html => self.html_lsp.to_owned(),
-            FileType::Yml => self.yaml_lsp.to_owned(),
-            FileType::Toml => self.toml_lsp.to_owned(),
-        }
+    pub fn derive_lsp(&self, file_type: &FileType) -> Option<(String, InitCfg)> {
+        let lsp_configs = self.LSP.as_ref()?;
+        lsp_configs.get(file_type.as_str()).map(LSPConfig::get_cmd_with_configs)
     }
 
-    pub async fn init_preloaded_lsp_servers(
+    /// consumes preload info - should be invoked only once
+    pub fn derive_lsp_preloads(
         &mut self,
-        base_tree_paths: Vec<String>,
+        base_tree: Vec<String>,
         gs: &mut GlobalState,
-    ) -> HashMap<FileType, LSP> {
-        let mut lsp_servers = HashMap::new();
-        for (ft, lsp_cmd) in self.derive_lsp_preloads(base_tree_paths, gs) {
-            gs.success(format!("Preloading {lsp_cmd}"));
-            match LSP::new(lsp_cmd, ft).await {
-                Ok(lsp) => {
-                    lsp_servers.insert(ft, lsp);
-                }
-                Err(err) => gs.error(format!("Preload filed: {err}")),
-            }
-        }
-        lsp_servers
-    }
-
-    fn derive_lsp_preloads(&mut self, base_tree: Vec<String>, gs: &mut GlobalState) -> Vec<(FileType, String)> {
-        [
-            (FileType::Rust, self.rust_lsp_preload_if_present.take(), self.rust_lsp.as_ref()),
-            (FileType::Zig, self.zig_lsp_preload_if_present.take(), self.zig_lsp.as_ref()),
-            (FileType::Python, self.python_lsp_preload_if_present.take(), self.python_lsp.as_ref()),
-            (FileType::C, self.c_lsp_preload_if_present.take(), self.c_lsp.as_ref()),
-            (FileType::Cpp, self.cpp_preload_if_present.take(), self.cpp_lsp.as_ref()),
-            (FileType::JavaScript, self.java_script_preload_if_present.take(), self.java_script_lsp.as_ref()),
-            (FileType::TypeScript, self.type_script_preload_if_present.take(), self.type_script_lsp.as_ref()),
-            (FileType::Html, self.html_preload_if_present.take(), self.html_lsp.as_ref()),
-            (FileType::Yml, self.yaml_preload_if_present.take(), self.yaml_lsp.as_ref()),
-            (FileType::Toml, self.toml_preload_if_present.take(), self.toml_lsp.as_ref()),
-            (FileType::Nim, self.nim_lsp_preload_if_present.take(), self.nim_lsp.as_ref()),
-        ]
-        .into_iter()
-        .flat_map(|(ft, expected, cmd)| Some((ft, map_preload(&base_tree, expected, cmd, gs)?)))
-        .collect()
+    ) -> Vec<(FileType, String, InitCfg)> {
+        let Some(lsp_configs) = self.LSP.as_mut() else {
+            return Default::default();
+        };
+        FileType::iter_langs()
+            .into_iter()
+            .flat_map(|ft| {
+                let lsp = lsp_configs.get_mut(ft.as_str())?;
+                let (cmd, init_cfg) = flat_map_preload(lsp, &base_tree, gs)?;
+                Some((ft, cmd, init_cfg))
+            })
+            .collect()
     }
 }
 
-fn map_preload(
-    base_tree: &[String],
-    expected: Option<Vec<String>>,
-    cmd: Option<&String>,
-    gs: &mut GlobalState,
-) -> Option<String> {
-    let cmd = cmd?;
-    for try_re in expected?.iter().map(|re| Regex::new(re)) {
+fn flat_map_preload(lsp: &mut LSPConfig, base_tree: &[String], gs: &mut GlobalState) -> Option<(String, InitCfg)> {
+    for try_re in lsp.take_preloads_markers()?.iter().map(|re| Regex::new(re)) {
         match try_re {
             Ok(file_re) => {
                 if base_tree.iter().any(|path| file_re.is_match(path)) {
-                    return Some(cmd.to_owned());
+                    return Some(lsp.get_cmd_with_configs());
                 }
             }
             Err(error) => gs.error(error),

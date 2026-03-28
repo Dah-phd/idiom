@@ -2,9 +2,10 @@ mod parser;
 mod span;
 mod tag;
 
+use super::CodecContext;
 use crate::{
     editor::syntax::tokens::WrapData,
-    editor_line::{EditorLine, LineContext},
+    editor_line::EditorLine,
     ext_tui::{iter::TakeLiens, CrossTerm},
 };
 use crossterm::style::{Attribute, Attributes, Color, ContentStyle};
@@ -40,7 +41,7 @@ const HEADING_NEXT: ContentStyle = ContentStyle {
     attributes: Attributes::none().with(Attribute::Bold).with(Attribute::Italic).with(Attribute::Underlined),
 };
 
-pub fn ascii_line_exact(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
+pub fn ascii_line_exact(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut CodecContext, backend: &mut CrossTerm) {
     let Some(line) = lines.next() else { return };
     let text_width = ctx.setup_line(line, backend);
     let wraps = WrapData::from_text_cached(text, text_width).count() - 1; // first in setup
@@ -52,7 +53,12 @@ pub fn ascii_line_exact(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut L
     }
 }
 
-pub fn complex_line_exact(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
+pub fn complex_line_exact(
+    text: &mut EditorLine,
+    lines: &mut RectIter,
+    ctx: &mut CodecContext,
+    backend: &mut CrossTerm,
+) {
     let Some(line) = lines.next() else { return };
     let text_width = ctx.setup_line(line, backend);
     let wraps = WrapData::from_text_cached(text, text_width).count() - 1; // first in setup

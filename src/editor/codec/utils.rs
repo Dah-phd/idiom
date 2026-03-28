@@ -1,6 +1,6 @@
 use crate::cursor::CharRangeUnbound;
-use crate::editor::syntax::tokens::WrapData;
-use crate::editor_line::{EditorLine, LineContext};
+use crate::editor::{codec::CodecContext, syntax::tokens::WrapData};
+use crate::editor_line::EditorLine;
 use crate::ext_tui::{CrossTerm, StyleExt};
 use crate::global_state::GlobalState;
 use crossterm::style::{Color, ContentStyle};
@@ -244,7 +244,7 @@ pub fn try_cache_wrap_data_from_lines(
     text: &mut EditorLine,
     len_pre_render: usize,
     lines: &RectIter,
-    ctx: &LineContext,
+    ctx: &CodecContext,
 ) {
     // line could have been partially rendered
     let len_post_render = lines.len();
@@ -259,8 +259,7 @@ pub fn try_cache_wrap_data_from_lines(
 mod test {
     use super::{super::text, SelectManager, WrapData};
     use crate::cursor::CharRangeUnbound;
-    use crate::editor::{tests::mock_editor_text_render, Editor};
-    use crate::editor_line::LineContext;
+    use crate::editor::{codec::CodecContext, tests::mock_editor_text_render, Editor};
     use crate::ext_tui::CrossTerm;
     use crate::global_state::GlobalState;
     use crossterm::style::{Color, ContentStyle};
@@ -311,11 +310,10 @@ mod test {
         ]);
         editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
         editor.cursor.set_position((2, 0).into());
-        let Editor { lexer, cursor, content, line_number_padding, .. } = &mut editor;
+        let Editor { cursor, content, line_number_padding, .. } = &mut editor;
         assert_eq!(content[0].as_str().width(), 32);
         assert_eq!(content[1].as_str().width(), 32);
-        let char_len = lexer.encoding().char_len;
-        let mut ctx = LineContext::collect_context(cursor, char_len, *line_number_padding, gs.ui_theme.accent_fg());
+        let mut ctx = CodecContext::collect_context(cursor, *line_number_padding, gs.ui_theme.accent_fg());
 
         let mut lines = gs.editor_area().into_iter();
         let f_text = &mut content[0];
@@ -344,9 +342,8 @@ mod test {
         let mut gs = GlobalState::new(Rect::new(0, 0, 50, 10), CrossTerm::init());
         gs.force_area_calc();
         editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
-        let Editor { lexer, cursor, content, line_number_padding, .. } = &mut editor;
-        let char_len = lexer.encoding().char_len;
-        let mut ctx = LineContext::collect_context(cursor, char_len, *line_number_padding, gs.ui_theme.accent_fg());
+        let Editor { cursor, content, line_number_padding, .. } = &mut editor;
+        let mut ctx = CodecContext::collect_context(cursor, *line_number_padding, gs.ui_theme.accent_fg());
 
         let mut lines = gs.editor_area().into_iter();
         let f_text = &mut content[0];

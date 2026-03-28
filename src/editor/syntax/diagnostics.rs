@@ -1,31 +1,24 @@
-use crate::editor::syntax::Lang;
-use crate::editor_line::EditorLine;
-use crate::ext_tui::CrossTerm;
-use crate::global_state::IdiomEvent;
+use crate::{configs, editor::syntax::Lang, editor_line::EditorLine, ext_tui::CrossTerm, global_state::IdiomEvent};
 use crossterm::style::{Attribute, Attributes, Color, ContentStyle};
 use idiom_tui::{Backend, UTFSafe};
 use lsp_types::{DiagnosticRelatedInformation, DiagnosticSeverity};
 
-const ELS_COLOR: Color = Color::DarkGrey;
-const ERR_COLOR: Color = Color::Red;
-const WAR_COLOR: Color = Color::Yellow;
-
-const ELS_STL: ContentStyle = ContentStyle {
-    foreground_color: Some(ELS_COLOR),
-    background_color: None,
-    attributes: Attributes::none().with(Attribute::Italic),
-    underline_color: None,
-};
-
 const ERR_STL: ContentStyle = ContentStyle {
-    foreground_color: Some(ERR_COLOR),
+    foreground_color: Some(configs::ERR),
     background_color: None,
     attributes: Attributes::none().with(Attribute::Italic),
     underline_color: None,
 };
 
 const WAR_STL: ContentStyle = ContentStyle {
-    foreground_color: Some(WAR_COLOR),
+    foreground_color: Some(configs::WARN),
+    background_color: None,
+    attributes: Attributes::none().with(Attribute::Italic),
+    underline_color: None,
+};
+
+const ELS_STL: ContentStyle = ContentStyle {
+    foreground_color: Some(configs::MUTED),
     background_color: None,
     attributes: Attributes::none().with(Attribute::Italic),
     underline_color: None,
@@ -79,7 +72,7 @@ impl DiagnosticData {
 
     #[inline]
     pub fn text_color(&self) -> Color {
-        self.style.foreground_color.unwrap_or(ELS_COLOR)
+        self.style.foreground_color.unwrap_or(configs::MUTED)
     }
 
     fn new(

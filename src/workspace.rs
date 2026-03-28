@@ -1,12 +1,12 @@
 use crate::{
-    configs::{EditorAction, EditorConfigs, EditorKeyMap, FileType},
+    configs::{EditorAction, EditorConfigs, EditorKeyMap, FileFamily, FileType},
     cursor::Cursor,
     editor::{editor_from_data, Editor},
     editor_line::EditorLine,
     error::{IdiomError, IdiomResult},
     ext_tui::StyleExt,
     global_state::{GlobalState, IdiomEvent},
-    lsp::LSP,
+    lsp::servers::{InitCfg, LSPRunningStatus, LSPServerStatus, LSPServers},
     popups::popups_editor::file_updated,
     utils::TrackedList,
 };
@@ -14,10 +14,7 @@ use crossterm::event::KeyEvent;
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{layout::Rect, Backend};
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    path::PathBuf,
-};
+use std::path::PathBuf;
 
 pub const FILE_STATUS_ERR: &str = "File status ERR";
 pub const TAB_SELECT: Color = Color::DarkYellow;
@@ -28,37 +25,48 @@ pub struct Workspace {
     base_configs: EditorConfigs,
     key_map: EditorKeyMap,
     tab_style: ContentStyle,
-    lsp_servers: HashMap<FileType, LSP>,
+    lsp_servers: LSPServers,
     map_callback: fn(&mut Self, &KeyEvent, &mut GlobalState) -> bool,
 }
 
 impl Workspace {
-    pub fn new(key_map: EditorKeyMap, base_configs: EditorConfigs, lsp_servers: HashMap<FileType, LSP>) -> Self {
+    pub fn new(
+        key_map: EditorKeyMap,
+        base_configs: EditorConfigs,
+        lsp_preloads: Vec<(FileType, String, InitCfg)>,
+    ) -> Self {
+        let lsp_servers = LSPServers::new(lsp_preloads);
         let tab_style = ContentStyle::fg(TAB_SELECT);
-        Self { editors: TrackedList::new(), base_configs, key_map, lsp_servers, map_callback: map_editor, tab_style }
+        Self {
+            editors: TrackedList::new(),
+            base_configs,
+            key_map,
+            lsp_servers,
+            map_callback: map_editor_post_save,
+            tab_style,
+        }
     }
 
     pub fn render(&mut self, gs: &mut GlobalState) {
-        if let Some(editor) = self.editors.get_mut(0) {
-            let line = match gs.tab_area().into_iter().next() {
-                Some(line) => line,
-                None => return,
-            };
-            gs.backend.set_style(ContentStyle::underlined(None));
-            {
-                let mut builder = line.unsafe_builder(&mut gs.backend);
-                builder.push_styled(" ", self.tab_style);
-                builder.push_styled(editor.name(), self.tab_style);
-                for editor in self.editors.iter().skip(1) {
-                    if !builder.push(" | ") || !builder.push(editor.name()) {
-                        break;
-                    };
-                }
-            }
-            gs.backend.reset_style();
-        } else if let Some(line) = gs.tab_area().into_iter().next() {
+        let mut editors = self.editors.iter();
+        let Some(line) = gs.tab_area().into_iter().next() else {
+            return;
+        };
+        let Some(editor) = editors.next() else {
             line.render_empty(&mut gs.backend);
+            return;
+        };
+        gs.backend.set_style(ContentStyle::underlined(None));
+        {
+            let mut builder = line.unsafe_builder(&mut gs.backend);
+            builder.push("[ ");
+            builder.push_styled(editor.name(), self.tab_style);
+            builder.push(saved_mark(editor));
+            if editors.all(|e| builder.push("| ") && builder.push(e.name()) && builder.push(saved_mark(e))) {
+                builder.push("]");
+            }
         }
+        gs.backend.reset_style();
     }
 
     pub fn fast_render(&mut self, gs: &mut GlobalState) {
@@ -79,8 +87,8 @@ impl Workspace {
 
     pub fn toggle_editor(&mut self) {
         self.editors.mark_updated();
-        self.map_callback = map_editor;
-        self.tab_style = ContentStyle::fg(Color::DarkYellow);
+        self.map_callback = map_editor_post_save;
+        self.tab_style = ContentStyle::fg(TAB_SELECT);
     }
 
     #[inline]
@@ -109,6 +117,14 @@ impl Workspace {
     }
 
     #[inline]
+    pub fn save_active(&mut self, gs: &mut GlobalState) {
+        let Some(editor) = self.get_active() else { return };
+        editor.save(gs);
+        self.editors.mark_updated();
+        self.map_callback = map_editor_post_save;
+    }
+
+    #[inline]
     pub fn rename_editors(&mut self, from_path: PathBuf, to_path: PathBuf, gs: &mut GlobalState) {
         if to_path.is_dir() {
             for editor in self.editors.iter_mut().filter(|e| e.path().starts_with(&from_path)) {
@@ -134,7 +150,7 @@ impl Workspace {
         let mut editor = self.editors.remove(idx);
         editor.clear_screen_cache(gs);
         gs.event.push(IdiomEvent::SelectPath(editor.path().to_owned()));
-        if editor.update_status.collect() {
+        if editor.file_status_is_update() {
             gs.event.push(file_updated(editor.path().to_owned()).into());
         }
         self.editors.insert(0, editor);
@@ -147,7 +163,7 @@ impl Workspace {
                     editor.apply_file_edits(file_edits);
                 } else if let Ok(mut editor) = self.build_basic_editor(PathBuf::from(file_url.path().as_str()), gs) {
                     editor.apply_file_edits(file_edits);
-                    editor.try_write_file(gs);
+                    editor.write_file_logged(gs);
                 } else {
                     gs.error(format!("Unable to build editor for {}", file_url.path()));
                 }
@@ -201,7 +217,7 @@ impl Workspace {
                 })
                 .collect();
             editor.apply_file_edits(edits);
-            editor.try_write_file(gs);
+            editor.write_file_logged(gs);
         } else {
             gs.error(format!("Unable to build editor for {}", text_document_edit.text_document.uri.path()));
         };
@@ -248,7 +264,7 @@ impl Workspace {
 
     // EDITOR BUILDERS
 
-    pub fn new_text_from_data(
+    pub fn create_text_editor_from_data(
         &mut self,
         path: PathBuf,
         content: Vec<EditorLine>,
@@ -260,7 +276,7 @@ impl Workspace {
     }
 
     /// it could be the case that the file no longer exits
-    pub async fn new_from_session(
+    pub fn create_editor_from_session(
         &mut self,
         path: PathBuf,
         file_type: FileType,
@@ -269,52 +285,44 @@ impl Workspace {
         gs: &mut GlobalState,
     ) -> IdiomResult<()> {
         let content = match content {
-            None => EditorLine::parse_lines(&path).map_err(IdiomError::GeneralError)?,
+            None => EditorLine::parse_lines_raw(&path)?,
             Some(lines) => lines.into_iter().map(EditorLine::from).collect(),
         };
         let mut editor = editor_from_data(path, file_type, content, Some(cursor), &self.base_configs, gs);
-        self.lsp_enroll(&mut editor, gs).await;
-        self.editors.insert(0, editor);
-        Ok(())
-    }
-
-    pub async fn new_at_line(&mut self, file_path: PathBuf, line: usize, gs: &mut GlobalState) -> IdiomResult<()> {
-        if self.new_from(file_path, gs).await? {
-            if let Some(editor) = self.get_active() {
-                editor.go_to(line);
-            }
-        };
-        Ok(())
-    }
-
-    pub async fn new_from(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<bool> {
-        let file_path = file_path.canonicalize()?;
-        if let Some(idx) = self.editors.iter().position(|e| e.path() == &file_path) {
-            let mut editor = self.editors.remove(idx);
-            editor.clear_screen_cache(gs);
-            if editor.update_status.collect() {
-                gs.event.push(file_updated(editor.path().to_owned()).into());
-            }
-            self.editors.insert(0, editor);
-            return Ok(false);
+        if editor.file_type().is_code() {
+            lsp_enroll(&mut editor, &mut self.lsp_servers, &self.base_configs, gs);
         }
-        let editor = self.determine_editor(file_path, gs).await?;
         self.editors.insert(0, editor);
+        Ok(())
+    }
+
+    pub fn get_or_create_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<&mut Editor> {
+        let file_path = file_path.canonicalize()?;
+        let editor = match self.editors.remove_if(|e| e.path() == &file_path) {
+            Some(mut editor) => {
+                editor.clear_screen_cache(gs);
+                if editor.file_status_is_update() {
+                    gs.event.push(file_updated(editor.path().to_owned()).into());
+                }
+                editor
+            }
+            None => self.build_editor(file_path, gs)?,
+        };
         self.toggle_editor();
-        Ok(true)
+        Ok(self.editors.insert_and_get_mut(0, editor))
     }
 
     fn build_basic_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
         Editor::from_path(file_path, FileType::Text, &self.base_configs, gs)
     }
 
-    async fn determine_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
-        match FileType::derive_type(&file_path) {
-            FileType::Text => Editor::from_path_text(file_path, &self.base_configs, gs),
-            FileType::MarkDown => Editor::from_path_md(file_path, &self.base_configs, gs),
-            file_type => {
+    fn build_editor(&mut self, file_path: PathBuf, gs: &mut GlobalState) -> IdiomResult<Editor> {
+        match FileFamily::derive_type(&file_path) {
+            FileFamily::Text => Editor::from_path_text(file_path, &self.base_configs, gs),
+            FileFamily::MarkDown => Editor::from_path_md(file_path, &self.base_configs, gs),
+            FileFamily::Code(file_type) => {
                 let mut editor = Editor::from_path(file_path, file_type, &self.base_configs, gs)?;
-                self.lsp_enroll(&mut editor, gs).await;
+                lsp_enroll(&mut editor, &mut self.lsp_servers, &self.base_configs, gs);
                 Ok(editor)
             }
         }
@@ -322,104 +330,58 @@ impl Workspace {
 
     // LSP HANDLES
 
-    async fn lsp_enroll(&mut self, editor: &mut Editor, gs: &mut GlobalState) {
-        if !editor.file_type().is_code() {
-            return; // no lsp for text / markdown files
+    pub fn connect_ready_lsp_servs(&mut self, gs: &mut GlobalState) {
+        if self.lsp_servers.are_all_servers_ready() {
+            return;
         }
-        let lsp_cmd = match self.base_configs.derive_lsp(editor.file_type()) {
-            None => {
-                editor.lsp_local(gs);
-                return;
-            }
-            Some(cmd) => cmd,
-        };
-
-        // set initial tokens while LSP is indexing
-        editor.force_local_lsp_tokens(gs);
-        match self.lsp_servers.entry(*editor.file_type()) {
-            Entry::Vacant(entry) => match LSP::new(lsp_cmd, *editor.file_type()).await {
-                Ok(lsp) => {
-                    let client = lsp.aquire_client();
-                    editor.lsp_set(client, gs);
-                    for editor in self.editors.iter_mut().filter(|e| e.file_type() == editor.file_type()) {
-                        editor.lsp_set(lsp.aquire_client(), gs);
-                    }
-                    entry.insert(lsp);
-                }
-                Err(err) => {
-                    gs.error(err.to_string());
-                    editor.lsp_local(gs);
-                }
-            },
-            Entry::Occupied(entry) => {
-                editor.lsp_set(entry.get().aquire_client(), gs);
-            }
-        }
-    }
-
-    pub async fn force_lsp_type_on_active(&mut self, file_type: FileType, gs: &mut GlobalState) -> IdiomResult<()> {
-        let new_indent_cfg = self.base_configs.get_indent_cfg(file_type);
-        match self.get_active() {
-            Some(editor) => editor.file_type_set(file_type, new_indent_cfg, gs),
-            None => return Err(IdiomError::LSP(crate::lsp::LSPError::Null)),
-        };
-
-        if !file_type.is_code() {
-            return Ok(());
-        }
-
-        let lsp_cmd = match self.base_configs.derive_lsp(&file_type) {
-            Some(lsp_cmd) => lsp_cmd,
-            None => {
-                _ = self.get_active().map(|e| e.lsp_local(gs));
-                return Ok(());
-            }
-        };
-
-        match self.lsp_servers.entry(file_type) {
-            Entry::Vacant(entry) => {
-                let lsp = match LSP::new(lsp_cmd, file_type).await {
-                    Ok(lsp) => lsp,
-                    Err(err) => {
-                        _ = self.get_active().map(|e| e.lsp_local(gs));
-                        return Err(IdiomError::LSP(err));
-                    }
-                };
-                for editor in self.editors.iter_mut().filter(|e| *e.file_type() == file_type) {
+        self.lsp_servers.apply_started_servers(|file_type, lsp_result| match lsp_result {
+            Ok(lsp) => {
+                for editor in self.editors.iter_mut().filter(|e| e.file_type() == &file_type) {
                     editor.lsp_set(lsp.aquire_client(), gs);
                 }
-                entry.insert(lsp);
-                Ok(())
             }
-            Entry::Occupied(entry) => {
-                let client = entry.get().aquire_client();
-                _ = self.get_active().map(|e| e.lsp_set(client, gs));
-                Ok(())
+            Err(error) => {
+                gs.error(error);
+                for editor in self.editors.iter_mut().filter(|e| e.file_type() == &file_type) {
+                    editor.lsp_local(gs);
+                }
             }
+        });
+    }
+
+    pub fn force_lsp_type_on_active(&mut self, file_type: FileType, gs: &mut GlobalState) -> IdiomResult<()> {
+        let new_indent_cfg = self.base_configs.get_indent_cfg(file_type);
+        let Some(editor) = self.editors.get_mut_no_update(0) else {
+            return Err(IdiomError::LSP(crate::lsp::LSPError::Null));
+        };
+
+        editor.file_type_set(file_type, new_indent_cfg, gs);
+
+        if file_type.is_code() {
+            lsp_enroll(editor, &mut self.lsp_servers, &self.base_configs, gs);
         }
+
+        Ok(())
     }
 
     #[inline]
-    pub async fn check_lsp(&mut self, file_type: FileType, gs: &mut GlobalState) {
-        if let Some(lsp) = self.lsp_servers.get_mut(&file_type) {
-            match lsp.check_status(file_type).await {
-                Ok(data) => match data {
-                    None => gs.success("LSP function is normal".to_owned()),
-                    Some(err) => {
-                        self.full_sync(&file_type, gs);
-                        gs.success(format!("LSP recoved after: {err}"));
-                    }
-                },
-                Err(err) => gs.error(err.to_string()),
+    pub fn check_lsp(&mut self, file_type: FileType, gs: &mut GlobalState) {
+        let Some(status) = self.lsp_servers.check_running_lsp(file_type, &self.base_configs) else {
+            return;
+        };
+        match status {
+            LSPRunningStatus::Running => gs.success("LSP function is normal".to_owned()),
+            LSPRunningStatus::Dead => {
+                gs.error(format!("LSP ({}) failed recovery >> moving to local LSP!", file_type.as_str()));
+                for editor in self.editors.iter_mut().filter(|e| e.file_type() == &file_type) {
+                    editor.lsp_local(gs);
+                }
             }
-        }
-    }
-
-    #[inline]
-    pub fn full_sync(&mut self, file_type: &FileType, gs: &mut GlobalState) {
-        if let Some(lsp) = self.lsp_servers.get(file_type) {
-            for editor in self.editors.iter_mut().filter(|e| e.file_type() == file_type) {
-                editor.lsp_set(lsp.aquire_client(), gs);
+            LSPRunningStatus::Failing => {
+                gs.error(format!("LSP ({}) is failing >> attemping to recover ...", file_type.as_str()));
+                for editor in self.editors.iter_mut().filter(|e| e.file_type() == &file_type) {
+                    editor.lsp_drop();
+                }
             }
         }
     }
@@ -427,12 +389,12 @@ impl Workspace {
     pub fn notify_update(&mut self, path: PathBuf, gs: &mut GlobalState) {
         for (idx, editor) in self.editors.iter_mut().enumerate() {
             if editor.path() == &path {
-                let save_status_result = editor.is_saved();
+                let save_status_result = editor.is_saved_check_content();
                 if gs.unwrap_or_default(save_status_result, FILE_STATUS_ERR) {
                     return;
                 }
-                editor.update_status.mark_updated();
-                if idx == 0 && editor.update_status.collect() {
+                editor.file_status_mark_updated();
+                if idx == 0 && editor.file_status_is_update() {
                     gs.event.push(file_updated(path).into());
                 }
                 return;
@@ -467,21 +429,11 @@ impl Workspace {
             }
             Some(editor) => {
                 editor.clear_screen_cache(gs);
-                if editor.update_status.collect() {
+                if editor.file_status_is_update() {
                     gs.event.push(file_updated(editor.path().to_owned()).into());
                 }
             }
         }
-    }
-
-    pub fn are_updates_saved(&self, gs: &mut GlobalState) -> bool {
-        for editor in self.editors.iter() {
-            let save_status_result = editor.is_saved();
-            if !gs.unwrap_or_default(save_status_result, FILE_STATUS_ERR) {
-                return false;
-            }
-        }
-        true
     }
 
     pub fn go_to_tab(&mut self, idx: usize, gs: &mut GlobalState) {
@@ -497,7 +449,7 @@ impl Workspace {
             if idx >= self.editors.len() { self.editors.pop().expect("garded") } else { self.editors.remove(idx) };
         gs.event.push(IdiomEvent::SelectPath(editor.path().to_owned()));
         editor.clear_screen_cache(gs);
-        if editor.update_status.collect() {
+        if editor.file_status_is_update() {
             gs.event.push(file_updated(editor.path().to_owned()).into());
         }
         self.editors.insert(0, editor);
@@ -516,10 +468,11 @@ impl Workspace {
         self.base_configs = gs.reload_confgs();
         for editor in self.editors.iter_mut() {
             editor.refresh_cfg(&self.base_configs, gs);
-            if let Some(lsp) = self.lsp_servers.get(editor.file_type()) {
-                if !editor.lexer().lsp {
-                    editor.lsp_set(lsp.aquire_client(), gs);
-                }
+            if editor.lexer().is_external_lsp() {
+                continue;
+            }
+            if let Some(lsp) = self.lsp_servers.get_running(editor.file_type()) {
+                editor.lsp_set(lsp.aquire_client(), gs);
             }
         }
         &mut self.base_configs
@@ -539,9 +492,10 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
     if !editor.map(action, gs) {
         match action {
             EditorAction::Save => {
-                editor.save(gs);
-                if ws.base_configs.format_on_save {
-                    editor.call_formatter_and_save(gs);
+                if !ws.base_configs.format_on_save || !editor.try_formatter_and_save(gs) {
+                    editor.save(gs);
+                    ws.editors.mark_updated();
+                    ws.map_callback = map_editor_post_save;
                 }
             }
             EditorAction::Close => ws.close_active(gs),
@@ -550,6 +504,17 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
         }
     }
     true
+}
+
+fn map_editor_post_save(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
+    let result = map_editor(ws, key, gs);
+    if let Some(editor) = ws.get_active() {
+        if !editor.is_saved() {
+            ws.map_callback = map_editor;
+            ws.editors.mark_updated();
+        }
+    }
+    result
 }
 
 /// Handles keybinding while on tabs
@@ -576,7 +541,7 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
                 ws.editors.push(editor);
                 let editor = &mut ws.editors.inner_mut_no_update()[0];
                 editor.clear_screen_cache(gs);
-                if editor.update_status.collect() {
+                if editor.file_status_is_update() {
                     gs.event.push(file_updated(editor.path().to_owned()).into());
                 }
                 gs.event.push(IdiomEvent::SelectPath(ws.editors.inner()[0].path().to_owned()));
@@ -585,7 +550,7 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
                 if let Some(mut editor) = ws.editors.pop() {
                     gs.event.push(IdiomEvent::SelectPath(editor.path().to_owned()));
                     editor.clear_screen_cache(gs);
-                    if editor.update_status.collect() {
+                    if editor.file_status_is_update() {
                         gs.event.push(file_updated(editor.path().to_owned()).into());
                     }
                     ws.editors.insert(0, editor);
@@ -608,6 +573,23 @@ fn map_tabs(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
     false
 }
 
+/// helper to match behavior on all lsp application
+fn lsp_enroll(editor: &mut Editor, lsp_servers: &mut LSPServers, cfg: &EditorConfigs, gs: &mut GlobalState) {
+    match lsp_servers.get_or_init_server(editor.file_type(), cfg) {
+        LSPServerStatus::ReadyClient(client) => editor.lsp_set(*client, gs),
+        LSPServerStatus::None => editor.lsp_local(gs),
+        LSPServerStatus::Pending => editor.force_local_lsp_tokens(gs),
+    }
+}
+
+#[inline]
+fn saved_mark(editor: &Editor) -> &str {
+    match editor.is_saved() {
+        true => " ",
+        false => "*",
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::{map_editor, Workspace};
@@ -621,18 +603,18 @@ pub mod tests {
         editor_line::EditorLine,
         ext_tui::CrossTerm,
         global_state::GlobalState,
+        lsp::servers::LSPServers,
     };
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use crossterm::style::ContentStyle;
     use idiom_tui::{layout::Rect, Backend};
-    use std::collections::HashMap;
 
     pub fn mock_ws(content: Vec<String>) -> Workspace {
         let mut ws = Workspace {
             editors: vec![mock_editor(content)].into(),
             base_configs: EditorConfigs::default(),
             key_map: mock_editor_key_map(),
-            lsp_servers: HashMap::default(),
+            lsp_servers: LSPServers::default(),
             map_callback: map_editor,
             tab_style: ContentStyle::default(),
         };
@@ -645,7 +627,7 @@ pub mod tests {
             editors: vec![].into(),
             base_configs: EditorConfigs::default(),
             key_map: mock_editor_key_map(),
-            lsp_servers: HashMap::default(),
+            lsp_servers: LSPServers::default(),
             map_callback: map_editor,
             tab_style: ContentStyle::default(),
         }
@@ -875,7 +857,7 @@ pub mod tests {
         ctrl_press(&mut ws, KeyCode::Char('a'), &mut gs);
         assert_position(&mut ws, CursorPosition { char: base_line.len(), line: last_line });
         assert!(select_eq(all, active(&mut ws)));
-        active(&mut ws).unsafe_cursor_mut().select_set(all.1, all.0); // swap select 'from' and 'to'
+        unsafe { active(&mut ws).cursor_mut().select_set(all.1, all.0) }; // swap select 'from' and 'to'
         shift_press(&mut ws, KeyCode::Down, &mut gs);
         assert!(select_eq((CursorPosition { line: 1, char: 0 }, all.1), active(&mut ws)));
         shift_press(&mut ws, KeyCode::Left, &mut gs);

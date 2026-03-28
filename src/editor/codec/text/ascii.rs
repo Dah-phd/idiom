@@ -1,14 +1,14 @@
-use super::{pad_select, SelectManagerSimple};
+use super::{pad_select, CodecContext, SelectManagerSimple};
 use crate::{
     cursor::CharRangeUnbound,
-    editor_line::{EditorLine, LineContext},
+    editor_line::EditorLine,
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
 };
 use crossterm::style::ContentStyle;
 use idiom_tui::{layout::RectIter, utils::ByteChunks, Backend};
 
-pub fn line(text: &EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
+pub fn line(text: &EditorLine, lines: &mut RectIter, ctx: &mut CodecContext, backend: &mut CrossTerm) {
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
     let mut chunks = ByteChunks::new(text.as_str(), line_width);
@@ -34,7 +34,7 @@ pub fn line_with_select(
     text: &EditorLine,
     mut select: SelectManagerSimple,
     lines: &mut RectIter,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) {
     let backend = gs.backend();
@@ -75,7 +75,7 @@ pub fn cursor(
     select: Option<CharRangeUnbound>,
     skip: usize,
     lines: &mut RectIter,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) {
     match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
@@ -84,7 +84,7 @@ pub fn cursor(
     }
 }
 
-pub fn basic(text: &EditorLine, skip: usize, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
+pub fn basic(text: &EditorLine, skip: usize, lines: &mut RectIter, ctx: &mut CodecContext, backend: &mut CrossTerm) {
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
     let cursor_idx = ctx.cursor_char();
@@ -108,9 +108,9 @@ pub fn basic(text: &EditorLine, skip: usize, lines: &mut RectIter, ctx: &mut Lin
         ctx.wrap_line(line, backend);
     }
     if idx <= cursor_idx {
-        backend.print_styled(" ", ContentStyle::reversed());
+        backend.print_styled(text.end_view(), ContentStyle::reversed());
     } else {
-        backend.print(" ");
+        backend.print(text.end_view());
     }
 }
 
@@ -120,7 +120,7 @@ pub fn select(
     skip: usize,
     mut select: SelectManagerSimple,
     lines: &mut RectIter,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) {
     let backend = gs.backend();
@@ -155,7 +155,7 @@ pub fn select(
         ctx.wrap_line(line, backend);
     }
     if idx <= cursor_idx {
-        backend.print_styled(" ", ContentStyle::reversed());
+        backend.print_styled(' ', ContentStyle::reversed());
     } else {
         select.pad(gs);
     }

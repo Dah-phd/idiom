@@ -24,8 +24,7 @@ pub fn single_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glo
         EditorAction::Char(ch) => {
             editor.actions.push_char(ch, &mut editor.cursor, &mut editor.content, &mut editor.lexer);
             let line = &editor.content[editor.cursor.line];
-            if !editor.modal.is_autocomplete() && editor.lexer.should_autocomplete(editor.cursor.char, line) {
-                editor.actions.push_buffer(&mut editor.lexer);
+            if !editor.modal.is_autocomplete() && editor.lexer.is_completable(&editor.cursor, line, ch) {
                 editor.lexer.get_autocomplete(editor.cursor.get_position(), gs);
             }
             return true;
@@ -192,7 +191,7 @@ pub fn multi_cursor_map(editor: &mut Editor, action: EditorAction, gs: &mut Glob
                 actions.push_char(ch, cursor, content, lexer);
                 if cursor.max_rows != 0 {
                     let line = &content[cursor.line];
-                    if !modal_is_autocomplete && lexer.should_autocomplete(cursor.char, line) {
+                    if !modal_is_autocomplete && lexer.is_completable(cursor, line, ch) {
                         auto_complete = Some(cursor.get_position());
                     }
                 }

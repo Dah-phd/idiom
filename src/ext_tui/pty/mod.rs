@@ -2,6 +2,7 @@ mod cursor;
 mod parser;
 
 use crate::{
+    app::ASYNC_RT,
     cursor::CursorPosition,
     error::{IdiomError, IdiomResult},
     ext_tui::{CrossTerm, StyleExt},
@@ -59,7 +60,7 @@ impl PtyShell {
         let parser = TrackedParser::new(size.rows, size.cols);
         let buffer = parser.buffer_access();
 
-        let process_handle = tokio::spawn(async move {
+        let process_handle = ASYNC_RT.spawn(async move {
             let mut buf = [0u8; 8192];
             loop {
                 let size = reader.read(&mut buf)?;

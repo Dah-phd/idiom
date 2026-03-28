@@ -1,7 +1,7 @@
-use super::SelectManagerSimple;
+use super::{CodecContext, SelectManagerSimple};
 use crate::{
     cursor::CharRangeUnbound,
-    editor_line::{EditorLine, LineContext},
+    editor_line::EditorLine,
     ext_tui::{CrossTerm, StyleExt},
     global_state::GlobalState,
 };
@@ -12,7 +12,7 @@ use idiom_tui::{
     Backend,
 };
 
-pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut LineContext, backend: &mut CrossTerm) {
+pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut CodecContext, backend: &mut CrossTerm) {
     let Some(line) = lines.next() else { return };
     let line_width = ctx.setup_line(line, backend);
     let mut chunks = WriteChunks::new(text.as_str(), line_width);
@@ -38,7 +38,7 @@ pub fn line_with_select(
     text: &EditorLine,
     mut select: SelectManagerSimple,
     lines: &mut RectIter,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) {
     let backend = gs.backend();
@@ -73,7 +73,7 @@ pub fn cursor(
     select: Option<CharRangeUnbound>,
     skip: usize,
     lines: &mut RectIter,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) {
     match select.and_then(|select| SelectManagerSimple::new(select, gs.theme.selected)) {
@@ -86,7 +86,7 @@ pub fn basic(
     text: &mut EditorLine,
     mut skip: usize,
     lines: &mut RectIter,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     backend: &mut CrossTerm,
 ) {
     let Some(line) = lines.next() else { return };
@@ -131,9 +131,9 @@ pub fn basic(
         ctx.wrap_line(line, backend);
     }
     if idx <= cursor_idx {
-        backend.print_styled(" ", ContentStyle::reversed());
+        backend.print_styled(text.end_view(), ContentStyle::reversed());
     } else {
-        backend.print(" ");
+        backend.print(text.end_view());
     }
 }
 
@@ -143,7 +143,7 @@ pub fn select(
     mut select: SelectManagerSimple,
     mut skip: usize,
     lines: &mut RectIter,
-    ctx: &mut LineContext,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) {
     let backend = gs.backend();
@@ -196,7 +196,7 @@ pub fn select(
         ctx.wrap_line(line, backend);
     }
     if idx <= cursor_idx {
-        backend.print_styled(" ", ContentStyle::reversed());
+        backend.print_styled(' ', ContentStyle::reversed());
     } else {
         select.pad(gs);
     }

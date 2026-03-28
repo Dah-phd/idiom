@@ -1,6 +1,6 @@
-use super::word::{PositionedWord, WordRange};
 use super::{
     positions::{checked_select, checked_select_with_direction},
+    word::{PositionedWord, WordRange},
     CursorPosition,
 };
 use crate::{editor_line::EditorLine, utils::Direction};

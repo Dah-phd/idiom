@@ -119,17 +119,14 @@ impl Popup for ReplacePopup {
                     return Status::Pending;
                 }
                 let (from, to) = self.drain_next();
-                gs.backend.freeze();
                 editor.replace_select(from, to, self.new_text.as_str());
                 if let Some((from, to)) = self.get_state() {
                     editor.go_to_select(from, to);
                     editor.render(gs);
                 } else {
-                    gs.backend.unfreeze();
                     return Status::Finished;
                 }
                 self.force_render(gs);
-                gs.backend.unfreeze();
             }
             KeyCode::Char('a' | 'A') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 if !self.options.is_empty() {

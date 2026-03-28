@@ -4,16 +4,17 @@ pub use super::{
     Encoding, Legend, Lexer, Token,
 };
 use crate::{
-    actions::Action,
-    configs::FileType,
-    cursor::EncodedWordRange,
+    actions::{Action, Edit, EditMetaData},
+    configs::{FileType, ERR, MUTED, WARN},
+    cursor::{Cursor, EncodedWordRange},
     editor_line::EditorLine,
     ext_tui::{CrossTerm, StyleExt},
+    global_state::GlobalState,
     lsp::LSPResult,
 };
-use crossterm::style::{Color, ContentStyle};
+use crossterm::style::ContentStyle;
 use idiom_tui::Backend;
-use lsp_types::SemanticToken;
+use lsp_types::{SemanticToken, TextDocumentContentChangeEvent};
 use std::path::PathBuf;
 
 pub fn intercept_sync(lexer: &mut Lexer, sync: fn(&mut Lexer, &Action, &[EditorLine]) -> LSPResult<()>) {
@@ -22,6 +23,17 @@ pub fn intercept_sync(lexer: &mut Lexer, sync: fn(&mut Lexer, &Action, &[EditorL
 
 pub fn intercept_sync_rev(lexer: &mut Lexer, sync: fn(&mut Lexer, &Action, &[EditorLine]) -> LSPResult<()>) {
     lexer.sync_rev = sync;
+}
+
+pub fn intercept_sync_changes(
+    lexer: &mut Lexer,
+    sync_changes: fn(&mut Lexer, Vec<TextDocumentContentChangeEvent>) -> LSPResult<()>,
+) {
+    lexer.sync_changes = sync_changes;
+}
+
+pub fn intercept_tokens(lexer: &mut Lexer, sync_tokens: fn(&mut Lexer, EditMetaData)) {
+    lexer.sync_tokens = sync_tokens;
 }
 
 fn get_text() -> Vec<String> {
@@ -453,7 +465,7 @@ pub fn create_token_pairs_utf32() -> (Vec<SemanticToken>, Vec<String>) {
 }
 
 pub fn zip_text_tokens(text: Vec<String>, tokens: Vec<SemanticToken>) -> Vec<EditorLine> {
-    let mut content = text.into_iter().map(EditorLine::new).collect::<Vec<_>>();
+    let mut content = text.into_iter().map(EditorLine::new_posix).collect::<Vec<_>>();
     let legend = Legend::default();
     set_tokens(tokens, &legend, &mut content);
     content
@@ -645,6 +657,53 @@ fn test_clear_delta_start_empty_overlap() {
     assert_ne!(expected, invalid);
     validate_and_format_delta_tokens(&mut invalid);
     assert_eq!(expected, invalid);
+}
+
+#[test]
+fn test_validate_tokens() {
+    let mut tokens = vec![
+        SemanticToken { delta_line: 0, delta_start: 0, length: 3, token_type: 0, token_modifiers_bitset: 2 },
+        SemanticToken { delta_line: 1, delta_start: 0, length: 0, token_type: 0, token_modifiers_bitset: 2 },
+        SemanticToken { delta_line: 1, delta_start: 0, length: 40, token_type: 0, token_modifiers_bitset: 2 },
+        SemanticToken { delta_line: 1, delta_start: 0, length: 0, token_type: 0, token_modifiers_bitset: 2 },
+        SemanticToken { delta_line: 1, delta_start: 0, length: 78, token_type: 0, token_modifiers_bitset: 2 },
+        SemanticToken { delta_line: 1, delta_start: 0, length: 0, token_type: 0, token_modifiers_bitset: 2 },
+        SemanticToken { delta_line: 1, delta_start: 0, length: 2, token_type: 0, token_modifiers_bitset: 2 },
+        SemanticToken { delta_line: 1, delta_start: 0, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 1, length: 5, token_type: 27, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 6, length: 22, token_type: 40, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 23, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 1, delta_start: 0, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 1, length: 6, token_type: 27, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 7, length: 11, token_type: 40, token_modifiers_bitset: 128 },
+        SemanticToken { delta_line: 0, delta_start: 12, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+    ];
+    validate_and_format_delta_tokens(&mut tokens);
+    assert_eq!(
+        tokens,
+        [
+            SemanticToken { delta_line: 0, delta_start: 0, length: 3, token_type: 0, token_modifiers_bitset: 2 },
+            SemanticToken { delta_line: 2, delta_start: 0, length: 40, token_type: 0, token_modifiers_bitset: 2 },
+            SemanticToken { delta_line: 2, delta_start: 0, length: 78, token_type: 0, token_modifiers_bitset: 2 },
+            SemanticToken { delta_line: 2, delta_start: 0, length: 2, token_type: 0, token_modifiers_bitset: 2 },
+            SemanticToken { delta_line: 1, delta_start: 0, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 5, token_type: 27, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 6, length: 22, token_type: 40, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 23, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 1, delta_start: 0, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 1, length: 6, token_type: 27, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 7, length: 11, token_type: 40, token_modifiers_bitset: 128 },
+            SemanticToken { delta_line: 0, delta_start: 12, length: 1, token_type: 21, token_modifiers_bitset: 128 },
+        ]
+    );
 }
 
 #[test]
@@ -936,10 +995,7 @@ fn diagnostic_inline() {
     let mut backend = CrossTerm::init();
     let dline = create_dline();
     dline.render_pad_5(200, &mut backend);
-    assert_eq!(
-        backend.drain(),
-        [(ContentStyle::ital().with_fg(crossterm::style::Color::Red), String::from("     first err"))]
-    );
+    assert_eq!(backend.drain(), [(ContentStyle::ital().with_fg(ERR), String::from("     first err"))]);
 }
 
 #[test]
@@ -947,10 +1003,7 @@ fn diagnostic_incursor() {
     let mut backend = CrossTerm::init();
     let dline = create_dline();
     dline.render_pad_4(200, &mut backend);
-    assert_eq!(
-        backend.drain(),
-        [(ContentStyle::ital().with_fg(crossterm::style::Color::Red), String::from("    first err"))]
-    );
+    assert_eq!(backend.drain(), [(ContentStyle::ital().with_fg(ERR), String::from("    first err"))]);
 }
 
 #[test]
@@ -964,10 +1017,91 @@ fn dianostic_info() {
     assert_eq!(
         info.messages,
         [
-            ("first err".to_owned(), Color::Red),
-            ("big err".to_owned(), Color::Red),
-            ("warn".to_owned(), Color::Yellow),
-            ("hint".to_owned(), Color::DarkGrey)
+            ("first err".to_owned(), ERR),
+            ("big err".to_owned(), ERR),
+            ("warn".to_owned(), WARN),
+            ("hint".to_owned(), MUTED)
         ]
     );
+}
+
+#[test]
+fn test_mock() {
+    fn mocked_comp(_: &Lexer, _: usize, _: &EditorLine) -> bool {
+        true
+    }
+
+    let mut gs = GlobalState::new(idiom_tui::layout::Rect::default(), CrossTerm::init());
+    let mut lexer = mock_utf8_lexer(FileType::Rust);
+    lexer.completable = mocked_comp;
+    lexer.completion_cache = Some((0, 1).into());
+
+    let eline = EditorLine::from("");
+    let mut cursor = Cursor::default();
+    cursor.set_char(2);
+
+    assert!(!lexer.is_completable(&cursor, &eline, 'a'));
+    assert!(lexer.is_completable(&cursor, &eline, 'a'));
+
+    cursor.set_position((1, 3).into());
+    assert!(lexer.is_completable(&cursor, &eline, 'a'));
+    lexer.get_autocomplete(cursor.get_position(), &mut gs);
+    cursor.set_char(cursor.char + 1);
+    assert!(!lexer.is_completable(&cursor, &eline, 'a'));
+    cursor.set_char(cursor.char + 1);
+    assert!(lexer.is_completable(&cursor, &eline, ' '));
+}
+
+#[test]
+fn test_sync_struct() {
+    use super::lsp_calls::{sync_action, sync_changes, sync_tokens};
+
+    let meta = EditMetaData { start_line: 3, from: 2, to: 1 };
+
+    let edit = Edit {
+        meta: meta,
+        cursor: (3, 0).into(),
+        reverse: "bumba\n".into(),
+        text: "".into(),
+        select: None,
+        new_select: None,
+    };
+
+    let expect = String::from(
+        "Content-Length: 212\r\n\r\n{\"jsonrpc\":\"2.0\",\"method\":\"textDocument/didChange\",\
+        \"params\":{\"textDocument\":{\"uri\":\"file://\",\"version\":1},\"contentChanges\":\
+        [{\"range\":{\"start\":{\"line\":3,\"character\":0},\"end\":{\"line\":4,\"character\":0}},\
+        \"text\":\"\"}]}}",
+    );
+
+    let content = vec![
+        EditorLine::from("asd"),
+        EditorLine::from("mnambasdfa"),
+        EditorLine::from("mnambasdfabumba"),
+        EditorLine::from("test"),
+        EditorLine::from("end"),
+    ];
+    let action = Action::Single(edit);
+
+    let mut lexer_part = mock_utf16_lexer(FileType::Rust);
+    intercept_tokens(&mut lexer_part, sync_tokens);
+    intercept_sync_changes(&mut lexer_part, sync_changes);
+    let mut lexer_full = mock_utf16_lexer(FileType::Rust);
+    intercept_sync(&mut lexer_full, sync_action);
+
+    let mut rx_part = lexer_part.client.get_receiver();
+    let mut rx_full = lexer_full.client.get_receiver();
+
+    lexer_part.sync_changes_from_action(&action, &content);
+
+    let payload = rx_part.try_recv().unwrap();
+    assert_eq!(payload.try_stringify().unwrap().0, expect.as_str());
+    assert!(lexer_part.meta.is_none());
+    lexer_part.sync_tokens(action.map_to_meta());
+    assert_eq!(lexer_part.meta, Some(meta));
+
+    lexer_full.sync(&action, &content);
+    let payload = rx_full.try_recv().unwrap();
+    assert_eq!(payload.try_stringify().unwrap().0, expect.as_str());
+    assert_eq!(lexer_part.meta, Some(meta));
 }

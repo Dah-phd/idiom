@@ -1,12 +1,11 @@
-use std::{
-    ffi::{OsStr, OsString},
-    path::{Path, PathBuf},
-};
-
 use crate::{
     error::{IdiomError, IdiomResult},
     global_state::{GlobalState, IdiomEvent},
     popups::generic_selector::PopupSelector,
+};
+use std::{
+    ffi::{OsStr, OsString},
+    path::{Path, PathBuf},
 };
 
 #[derive(Default, Debug)]

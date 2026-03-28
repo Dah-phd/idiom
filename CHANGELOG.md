@@ -1,8 +1,25 @@
 ## Includes only major changes (manual updates)
+# Version 0.8.0
+- fix to validate tokens that was causing drop on non-0 delta line and 0 len
+- restructuring editor configs - moving floating LSP's to LSP group
+- jsonRPC stream reading cleanup
+- async start of LSP servers
+- added sanitize popup for tabs or exotic lineends
+- fix issue when removing lines on cached render
+- privatized encoding
+- fixed issue on EditorLine.insert_simple
+- reduced completion calls
+- fixed tab render
+- added mark for unsaved files
+- extracted consts for hardstyle colors
+- moved inline warnings to DarkYellow
+- marked word is now error-like color
+
 # Version 0.7.1
 - added formatting to pallet
 - added formatting on save
 - cleanup lsp handles
+- fixed completion stuck
 
 # Version 0.7.0
 - added IdiomCommand

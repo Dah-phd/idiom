@@ -8,6 +8,7 @@ use lsp_types::TextDocumentContentChangeEvent;
 
 use crate::{
     cursor::{CursorPosition, Select},
+    editor::syntax::Encoding,
     editor_line::EditorLine,
 };
 
@@ -59,26 +60,21 @@ impl Action {
         }
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn change_event(
         &self,
-        encoding: fn(usize, &str) -> usize,
-        char_lsp: fn(char) -> usize,
+        encoding: &Encoding,
         content: &[EditorLine],
     ) -> (EditMetaData, Vec<TextDocumentContentChangeEvent>) {
         match self {
-            Self::Single(edit) => {
-                let (meta, event) = edit.text_change(encoding, char_lsp, content);
-                (meta, vec![event])
-            }
+            Self::Single(edit) => (edit.meta, vec![edit.text_change(encoding, content)]),
             Self::Multi(edits) => {
                 let mut events = vec![];
                 let meta = edits
                     .iter()
                     .map(|e| {
-                        let (meta, event) = e.text_change(encoding, char_lsp, content);
-                        events.push(event);
-                        meta
+                        events.push(e.text_change(encoding, content));
+                        e.meta
                     })
                     .reduce(|curr, next| curr + next)
                     .expect("EditMeta should exist");
@@ -87,32 +83,43 @@ impl Action {
         }
     }
 
-    #[inline(always)]
+    #[inline]
+    pub fn text_changes(&self, encoding: &Encoding, content: &[EditorLine]) -> Vec<TextDocumentContentChangeEvent> {
+        match self {
+            Self::Single(edit) => vec![edit.text_change(encoding, content)],
+            Self::Multi(edits) => edits.iter().map(|e| e.text_change(encoding, content)).collect(),
+        }
+    }
+
+    #[inline]
     pub fn change_event_rev(
         &self,
-        encoding: fn(usize, &str) -> usize,
-        char_lsp: fn(char) -> usize,
+        encoding: &Encoding,
         content: &[EditorLine],
     ) -> (EditMetaData, Vec<TextDocumentContentChangeEvent>) {
         match self {
-            Self::Single(edit) => {
-                let (meta, event) = edit.text_change_rev(encoding, char_lsp, content);
-                (meta, vec![event])
-            }
+            Self::Single(edit) => (edit.meta.rev(), vec![edit.text_change_rev(encoding, content)]),
             Self::Multi(edits) => {
                 let mut events = vec![];
                 let meta = edits
                     .iter()
                     .rev()
                     .map(|e| {
-                        let (meta, event) = e.text_change_rev(encoding, char_lsp, content);
-                        events.push(event);
-                        meta
+                        events.push(e.text_change_rev(encoding, content));
+                        e.meta.rev()
                     })
                     .reduce(|curr, next| curr + next)
                     .expect("EditMeta should exist");
                 (meta, events)
             }
+        }
+    }
+
+    #[inline]
+    pub fn text_changes_rev(&self, encoding: &Encoding, content: &[EditorLine]) -> Vec<TextDocumentContentChangeEvent> {
+        match self {
+            Self::Single(edit) => vec![edit.text_change_rev(encoding, content)],
+            Self::Multi(edits) => edits.iter().rev().map(|e| e.text_change_rev(encoding, content)).collect(),
         }
     }
 }

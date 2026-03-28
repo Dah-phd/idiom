@@ -61,17 +61,9 @@ impl EditorModal {
     }
 
     #[inline]
-    pub fn forece_render_if_exists(&mut self, relative_pos: Position, gs: &mut GlobalState) {
+    pub fn render_if_exists(&mut self, relative_pos: Position, gs: &mut GlobalState) {
         let Some(modal) = self.inner.as_mut() else { return };
         self.last_render = modal.render_at(relative_pos, gs);
-    }
-
-    #[inline]
-    pub fn render_if_exist(&mut self, relative_pos: Position, gs: &mut GlobalState) {
-        let Some(modal) = self.inner.as_mut() else { return };
-        if self.last_render.is_none() {
-            self.last_render = modal.render_at(relative_pos, gs);
-        };
     }
 
     #[inline]
@@ -149,7 +141,7 @@ impl EditorModal {
     }
 
     #[inline]
-    pub fn cleanr_render_cache(&mut self) {
+    pub fn clear_render_cache(&mut self) {
         self.last_render = None;
     }
 
@@ -231,7 +223,7 @@ impl EditorModal {
     pub fn map_signatures(&mut self, signature: SignatureHelp, theme: &Theme) {
         if let Some(modal) = self.inner.as_mut() {
             modal.signature_map(signature, theme);
-            self.cleanr_render_cache();
+            self.clear_render_cache();
         } else {
             self.inner = Some(LSPModal::from_signature(signature, theme));
         }
@@ -239,7 +231,7 @@ impl EditorModal {
     pub fn map_hover(&mut self, hover: Hover, theme: &Theme) {
         if let Some(modal) = self.inner.as_mut() {
             modal.hover_map(hover, theme);
-            self.cleanr_render_cache();
+            self.clear_render_cache();
         } else {
             self.inner = Some(LSPModal::from_hover(hover, theme));
         }

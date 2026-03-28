@@ -1,7 +1,7 @@
-use super::{WRAP_CLOSE, WRAP_OPEN};
+use super::{CodecContext, WRAP_CLOSE, WRAP_OPEN};
 use crate::{
     cursor::{CharRange, CursorPosition},
-    editor_line::{EditorLine, LineContext},
+    editor_line::EditorLine,
     ext_tui::StyleExt,
     global_state::GlobalState,
 };
@@ -10,10 +10,10 @@ use idiom_tui::Backend;
 
 pub fn render(
     line: &mut EditorLine,
-    ctx: &mut LineContext,
     line_width: usize,
     cursors: Vec<CursorPosition>,
     selects: Vec<CharRange>,
+    ctx: &mut CodecContext,
     gs: &mut GlobalState,
 ) {
     if line_width > line.char_len() {
@@ -24,7 +24,7 @@ pub fn render(
             diagnostics.render_pad_4(diagnostic_width, gs.backend());
         }
     } else {
-        self::partial(line, ctx, line_width, cursors, selects, gs);
+        self::partial(line, line_width, cursors, selects, ctx, gs);
     }
 }
 
@@ -119,10 +119,10 @@ pub fn basic(line: &EditorLine, cursors: Vec<CursorPosition>, selects: Vec<CharR
 
 pub fn partial(
     line: &mut EditorLine,
-    ctx: &LineContext,
     line_width: usize,
     cursors: Vec<CursorPosition>,
     selects: Vec<CharRange>,
+    ctx: &CodecContext,
     gs: &mut GlobalState,
 ) {
     let last_idx = cursors.last().map(|c| c.char).unwrap_or_default();

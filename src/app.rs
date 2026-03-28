@@ -19,14 +19,19 @@ use crate::{
 };
 use crossterm::event::Event;
 use std::{path::PathBuf, time::Duration};
+use tokio::runtime::Runtime;
 
+// async runtime is mainly used for longrunning task > using manually create rt
+lazy_static::lazy_static! {
+    pub static ref ASYNC_RT: Runtime = {
+        Runtime::new().unwrap()
+    };
+}
 pub const MIN_FRAMERATE: Duration = Duration::from_millis(16);
 pub const MIN_HEIGHT: u16 = 6;
 pub const MIN_WIDTH: u16 = 40;
 
-pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomResult<()> {
-    // builtin cursor is not used - cursor is positioned during render
-
+pub fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomResult<()> {
     let screen_rect = get_init_screen(&mut backend)?;
     let mut gs = GlobalState::new(screen_rect, backend);
     let (mut general_key_map, editor_key_map, tree_key_map) = gs.get_key_maps();
@@ -37,20 +42,23 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
     // INIT COMPONENTS
     let mut tree = Tree::new(tree_key_map, &mut gs);
     let mut term = EditorTerminal::new(integrated_shell);
-    let lsp_servers = base_configs.init_preloaded_lsp_servers(tree.get_base_file_names(), &mut gs).await;
-    let mut workspace = Workspace::new(editor_key_map, base_configs, lsp_servers);
+    let lsp_preloads = base_configs.derive_lsp_preloads(tree.get_base_file_names(), &mut gs);
+    if !lsp_preloads.is_empty() {
+        gs.message(format!("Preloading: {:?}", &lsp_preloads))
+    };
+    let mut workspace = Workspace::new(editor_key_map, base_configs, lsp_preloads);
 
     // CLI SETUP
     if let Some(path) = open_file {
         tree.select_by_path(&path)?;
-        gs.event.push(IdiomEvent::OpenAtLine(path, 0));
+        gs.event.push(IdiomEvent::Open { path, config: Default::default() });
         gs.toggle_tree();
     }
 
     // LOAD SESSION
     if max_sessions != 0 {
         gs.force_area_calc();
-        load_session(&mut workspace, &mut gs).await;
+        load_session(&mut workspace, &mut gs);
     };
 
     loop {
@@ -168,7 +176,9 @@ pub async fn app(open_file: Option<PathBuf>, mut backend: CrossTerm) -> IdiomRes
         // render updates
         gs.draw(&mut workspace, &mut tree, &mut term);
 
-        // do event exchanges
-        gs.handle_events(&mut tree, &mut workspace, &mut term).await
+        // sync components
+        tree.sync(&mut gs);
+        workspace.connect_ready_lsp_servs(&mut gs);
+        gs.handle_events(&mut tree, &mut workspace, &mut term);
     }
 }

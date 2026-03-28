@@ -30,7 +30,7 @@ use crossterm::{
     event::{KeyEvent, MouseEvent},
     style::ContentStyle,
 };
-pub use events::{IdiomEvent, StartInplacePopup};
+pub use events::{EditorOpenConfig, IdiomEvent, StartInplacePopup};
 use idiom_tui::{
     layout::{Line, Rect},
     Backend,
@@ -291,8 +291,9 @@ impl GlobalState {
 
     #[inline]
     pub fn draw(&mut self, workspace: &mut Workspace, tree: &mut Tree, term: &mut EditorTerminal) {
+        self.backend.freeze();
         (self.draw_callback)(self, workspace, tree, term);
-        self.backend.flush_buf();
+        self.backend.unfreeze();
     }
 
     pub fn render_footer_standalone(&mut self) {
@@ -428,10 +429,9 @@ impl GlobalState {
         }
     }
 
-    pub async fn handle_events(&mut self, tree: &mut Tree, ws: &mut Workspace, term: &mut EditorTerminal) {
-        tree.sync(self);
+    pub fn handle_events(&mut self, tree: &mut Tree, ws: &mut Workspace, term: &mut EditorTerminal) {
         while let Some(event) = self.event.pop() {
-            event.handle(self, ws, tree, term).await
+            event.handle(self, ws, tree, term);
         }
     }
 }

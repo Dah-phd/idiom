@@ -23,15 +23,18 @@ fn uppercase_test() {
     assert_eq!(to_str_list(&mut ws), [""]);
 
     let mut ws = mock_ws(vec![" test ".to_string()]);
-    ws.get_active().unwrap().unsafe_cursor_mut().char = 2;
+    unsafe { ws.get_active().unwrap().cursor_mut().char = 2 };
+
     uppercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [" TEST "]);
 
     let mut ws = mock_ws(vec![" test_part ".to_string()]);
-    ws.get_active()
-        .unwrap()
-        .unsafe_cursor_mut()
-        .select_set(CursorPosition { line: 0, char: 4 }, CursorPosition { line: 0, char: 7 });
+    unsafe {
+        ws.get_active()
+            .unwrap()
+            .cursor_mut()
+            .select_set(CursorPosition { line: 0, char: 4 }, CursorPosition { line: 0, char: 7 })
+    };
     uppercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [" tesT_Part "]);
 
@@ -40,10 +43,12 @@ fn uppercase_test() {
         " mOre lInes ".to_string(),
         " morE lines ".to_string(),
     ]);
-    ws.get_active()
-        .unwrap()
-        .unsafe_cursor_mut()
-        .select_set(CursorPosition { line: 0, char: 8 }, CursorPosition { line: 2, char: 5 });
+    unsafe {
+        ws.get_active()
+            .unwrap()
+            .cursor_mut()
+            .select_set(CursorPosition { line: 0, char: 8 }, CursorPosition { line: 2, char: 5 })
+    };
     uppercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [" test on MANY LINES", " MORE LINES ", " MORE lines "]);
 }
@@ -58,15 +63,17 @@ fn lowercase_test() {
     assert_eq!(to_str_list(&mut ws), [""]);
 
     let mut ws = mock_ws(vec![" TEST ".to_string()]);
-    ws.get_active().unwrap().unsafe_cursor_mut().char = 2;
+    unsafe { ws.get_active().unwrap().cursor_mut().char = 2 };
     lowercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [" test "]);
 
     let mut ws = mock_ws(vec![" TEST_PART ".to_string()]);
-    ws.get_active()
-        .unwrap()
-        .unsafe_cursor_mut()
-        .select_set(CursorPosition { line: 0, char: 4 }, CursorPosition { line: 0, char: 7 });
+    unsafe {
+        ws.get_active()
+            .unwrap()
+            .cursor_mut()
+            .select_set(CursorPosition { line: 0, char: 4 }, CursorPosition { line: 0, char: 7 })
+    };
     lowercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [" TESt_pART "]);
 
@@ -75,10 +82,12 @@ fn lowercase_test() {
         " mORE LINEs ".to_string(),
         " MORe lines ".to_string(),
     ]);
-    ws.get_active()
-        .unwrap()
-        .unsafe_cursor_mut()
-        .select_set(CursorPosition { line: 0, char: 8 }, CursorPosition { line: 2, char: 5 });
+    unsafe {
+        ws.get_active()
+            .unwrap()
+            .cursor_mut()
+            .select_set(CursorPosition { line: 0, char: 8 }, CursorPosition { line: 2, char: 5 })
+    };
     lowercase(&mut gs, &mut ws, &mut tree, &mut term);
     assert_eq!(to_str_list(&mut ws), [" TEST ON many lines", " more lines ", " more lines "]);
 }

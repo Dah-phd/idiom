@@ -1,25 +1,22 @@
-use ignore::{gitignore::Gitignore, Match};
-use tokio::task::JoinSet;
-
+use super::{watcher::TreeWatcher, PathParser};
 use crate::{
+    app::ASYNC_RT,
+    configs::{ERR, WARN},
     error::IdiomResult,
     ext_tui::{CrossTerm, StyleExt},
     lsp::DiagnosticType,
     utils::get_nested_paths,
 };
-use crossterm::style::{Color, ContentStyle};
+use crossterm::style::ContentStyle;
 use idiom_tui::layout::Line;
+use ignore::{gitignore::Gitignore, Match};
 use std::{
     cmp::Ordering,
     collections::HashSet,
     path::{Path, PathBuf},
     sync::Arc,
 };
-
-use super::{watcher::TreeWatcher, PathParser};
-
-const ERR: Color = Color::Red;
-const WAR: Color = Color::DarkYellow;
+use tokio::task::JoinSet;
 
 #[derive(Debug, Clone)]
 pub enum TreePath {
@@ -54,8 +51,8 @@ impl TreePath {
             TreePath::Folder { display, diagnostic, .. } => (&display[char_offset..], *diagnostic),
         };
         match diagnostic {
+            DiagnosticType::Warn => line.render_styled(display, base_style.with_fg(WARN), backend),
             DiagnosticType::Err => line.render_styled(display, base_style.with_fg(ERR), backend),
-            DiagnosticType::Warn => line.render_styled(display, base_style.with_fg(WAR), backend),
             DiagnosticType::None => line.render_styled(display, base_style, backend),
         };
     }
@@ -207,7 +204,8 @@ impl TreePath {
         SerachResult::Remainder(idx)
     }
 
-    pub fn search_in_files(
+    /// requires tokio runtime
+    fn search_in_files(
         mut self,
         pattern: Arc<str>,
         buffer: &mut JoinSet<Vec<(PathBuf, String, usize)>>,
@@ -220,18 +218,21 @@ impl TreePath {
         let _ = self.expand(); // ignored for now
         match self {
             Self::File { path, .. } => {
-                buffer.spawn(async move {
-                    let maybe_content = std::fs::read_to_string(&path);
-                    let mut buffer = Vec::new();
-                    if let Ok(content) = maybe_content {
-                        for (idx, line) in content.lines().enumerate() {
-                            if line.contains(&*pattern) {
-                                buffer.push((path.clone(), line.trim_start().to_owned(), idx))
+                buffer.spawn_on(
+                    async move {
+                        let maybe_content = std::fs::read_to_string(&path);
+                        let mut buffer = Vec::new();
+                        if let Ok(content) = maybe_content {
+                            for (idx, line) in content.lines().enumerate() {
+                                if line.contains(&*pattern) {
+                                    buffer.push((path.clone(), line.trim_start().to_owned(), idx))
+                                }
                             }
                         }
-                    }
-                    buffer
-                });
+                        buffer
+                    },
+                    ASYNC_RT.handle(),
+                );
             }
             Self::Folder { tree: Some(tree), .. } => {
                 for tree_path in tree {

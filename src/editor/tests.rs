@@ -1,4 +1,4 @@
-use super::super::editor::{utils::build_display, FileUpdate};
+use super::super::editor::utils::build_display;
 use super::{
     calc_line_number_offset,
     controls::{filter_multi_cursors_per_line_if_no_select, ControlMap},
@@ -23,25 +23,28 @@ impl Editor {
     }
 }
 
-pub fn mock_editor(content: Vec<String>) -> Editor {
+/// editor for FileType::Rust
+pub fn mock_editor_from_elines(content: Vec<EditorLine>) -> Editor {
     let ft = FileType::Rust;
     let path = PathBuf::from("test-path");
-    let content: Vec<EditorLine> = content.into_iter().map(EditorLine::from).collect();
     Editor {
         line_number_padding: if content.is_empty() { 0 } else { (content.len().ilog10() + 1) as usize },
         lexer: Lexer::with_context(ft, &path),
         file_type: ft,
         display: "".to_string(),
         path,
-        update_status: FileUpdate::None,
+        saved_version: 0,
         cursor: Cursor::default(),
         modal: EditorModal::default(),
         actions: Actions::default(),
         controls: ControlMap::default(),
         content,
-        renderer: TuiCodec::code(),
-        last_render_at_line: None,
+        codec: TuiCodec::code(),
     }
+}
+
+pub fn mock_editor(content: Vec<String>) -> Editor {
+    mock_editor_from_elines(content.into_iter().map(EditorLine::from).collect())
 }
 
 pub fn mock_editor_text_render(content: Vec<String>) -> Editor {
@@ -54,14 +57,13 @@ pub fn mock_editor_text_render(content: Vec<String>) -> Editor {
         file_type: ft,
         display: "".to_string(),
         path,
-        update_status: FileUpdate::None,
+        saved_version: 0,
         cursor: Cursor::default(),
         modal: EditorModal::default(),
         actions: Actions::default(),
         controls: ControlMap::default(),
         content,
-        renderer: TuiCodec::text(),
-        last_render_at_line: None,
+        codec: TuiCodec::text(),
     }
 }
 
@@ -75,14 +77,13 @@ pub fn mock_editor_md_render(content: Vec<String>) -> Editor {
         file_type: ft,
         display: "".to_string(),
         path,
-        update_status: FileUpdate::None,
+        saved_version: 0,
         cursor: Cursor::default(),
         modal: EditorModal::default(),
         actions: Actions::default(),
         controls: ControlMap::default(),
         content,
-        renderer: TuiCodec::markdown(),
-        last_render_at_line: None,
+        codec: TuiCodec::markdown(),
     }
 }
 
@@ -385,4 +386,42 @@ fn test_select_betwee_same_char_inc() {
 
     let result = select_between_chars_inc(&editor, '"', '"');
     assert_eq!(result, Some((CursorPosition { line: 1, char: 11 }, CursorPosition { line: 1, char: 29 })))
+}
+
+#[test]
+fn test_stringify() {
+    let editor = mock_editor(vec!["ta💀st".into(), "dwadad".into(), "adwdawd".into()]);
+    let text = editor.stringify();
+    assert_eq!(text, String::from("ta💀st\ndwadad\nadwdawd"));
+    assert_eq!(text.capacity(), text.len() + 1);
+
+    let editor = mock_editor(vec!["tast".into(), "dwad".into(), "adwdawd".into()]);
+    let text = editor.stringify();
+    assert_eq!(text, String::from("tast\ndwad\nadwdawd"));
+    assert_eq!(text.capacity(), text.len() + 1);
+
+    let mut editor = mock_editor(vec!["tast".into(), "adwdawd".into()]);
+    editor.content.insert(1, EditorLine::new("dwad".into(), crate::editor_line::tests::RISCOS_NLINE));
+    let text = editor.stringify();
+    assert_eq!(text, String::from("tast\ndwad\n\radwdawd"));
+    assert_eq!(text.capacity(), text.len() + 1);
+}
+
+#[test]
+pub fn test_apply_edits_cache_render() {
+    use crate::{editor::tests::mock_editor, ext_tui::CrossTerm, global_state::GlobalState};
+    use idiom_tui::{layout::Rect, Backend};
+
+    let mut gs = GlobalState::new(Rect::new(0, 0, 20, 20), CrossTerm::init());
+    gs.force_area_calc();
+    let mut editor = mock_editor(vec![String::new()]);
+    editor.resize(gs.editor_area().width, gs.editor_area().height as usize);
+
+    editor.render(&mut gs);
+    let is_cached = editor.codec.is_cached_at_line(editor.cursor.at_line);
+    assert!(is_cached);
+
+    editor.apply_file_edits(vec![]);
+    let is_cached = editor.codec.is_cached_at_line(editor.cursor.at_line);
+    assert!(!is_cached);
 }

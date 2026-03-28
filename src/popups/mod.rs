@@ -15,7 +15,6 @@ use std::time::Duration;
 
 use crate::{
     app::{MIN_FRAMERATE, MIN_HEIGHT, MIN_WIDTH},
-    configs::APP_FOLDER,
     embeded_term::EditorTerminal,
     error::{IdiomError, IdiomResult},
     ext_tui::{CrossTerm, StyleExt},
@@ -27,9 +26,10 @@ use crossterm::{
     event::{Event, KeyCode, KeyEvent, KeyModifiers, MouseEvent},
     style::{Color, ContentStyle},
 };
-use dirs::config_dir;
 pub use generic_popup::{save_and_exit, PopupChoice};
 use idiom_tui::{layout::Rect, Backend};
+
+type InplacePopup = Box<dyn FnMut(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal)>;
 
 pub enum Status {
     Finished,
@@ -67,7 +67,7 @@ pub trait Popup {
         components.re_draw();
         self.force_render(components.gs);
         components.gs.backend.flush_buf();
-        loop {
+        let mut main_loop = || loop {
             self.main_loop_handler(&mut components)?;
             if crossterm::event::poll(MIN_FRAMERATE)? {
                 match crossterm::event::read()? {
@@ -98,8 +98,14 @@ pub trait Popup {
                 };
             }
             self.render(components.gs);
-            components.gs.backend.flush_buf();
-        }
+            components.gs.backend.unfreeze();
+            components.gs.backend.freeze();
+        };
+
+        let result = main_loop();
+        // ensure screen is unfrozen upon finish
+        components.gs.backend.unfreeze();
+        result
     }
 
     /// extend the main loop => default to noop
@@ -126,41 +132,6 @@ pub trait Popup {
     fn resize_success(&mut self, gs: &mut GlobalState) -> bool;
     fn map_keyboard(&mut self, key: KeyEvent, components: &mut Components) -> Status;
     fn map_mouse(&mut self, event: MouseEvent, components: &mut Components) -> Status;
-}
-
-struct Command {
-    label: &'static str,
-    result: CommandResult,
-}
-
-impl Command {
-    fn execute(self) -> CommandResult {
-        self.result
-    }
-
-    fn cfg_open(label: &'static str, file_path: &'static str) -> Option<Self> {
-        let mut path = config_dir()?;
-        path.push(APP_FOLDER);
-        path.push(file_path);
-        Some(Command { label, result: CommandResult::Simple(IdiomEvent::OpenAtLine(path, 0)) })
-    }
-
-    fn pass_event(label: &'static str, event: IdiomEvent) -> Self {
-        Command { label, result: CommandResult::Simple(event) }
-    }
-
-    fn components(
-        label: &'static str,
-        cb: fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal),
-    ) -> Self {
-        Command { label, result: CommandResult::BigCB(cb) }
-    }
-}
-
-// #[derive(Debug, Clone)]
-enum CommandResult {
-    Simple(IdiomEvent),
-    BigCB(fn(&mut GlobalState, &mut Workspace, &mut Tree, &mut EditorTerminal)),
 }
 
 type Width = u16;

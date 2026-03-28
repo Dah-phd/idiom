@@ -20,7 +20,7 @@ use lsp_types::{
     OneOf, Range, SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities,
     TextDocumentContentChangeEvent, Uri, WorkspaceEdit,
 };
-use std::path::Path;
+use std::{cmp::Ordering, path::Path};
 
 /// maps LSP state without runtime checks
 #[inline]
@@ -93,13 +93,13 @@ pub fn map_lsp(lexer: &mut Lexer, client: LSPClient, theme: &Theme) {
     if client.capabilities.text_document_sync.is_some() {
         lexer.sync_tokens = sync_tokens;
         lexer.sync_changes = sync_changes;
-        lexer.sync = sync_edits;
+        lexer.sync = sync_action;
         lexer.sync_rev = sync_edits_rev;
     } else {
         lexer.sync_tokens = sync_tokens_dead;
         lexer.sync_changes = sync_changes_dead;
-        lexer.sync = sync_edits_dead;
-        lexer.sync_rev = sync_edits_dead_rev;
+        lexer.sync = sync_action_dead;
+        lexer.sync_rev = sync_edits_rev_dead;
     }
 
     match client.capabilities.position_encoding.as_ref().map(|encode| encode.as_str()) {
@@ -137,8 +137,9 @@ pub fn remove_lsp(lexer: &mut Lexer) {
     lexer.declarations = info_position_dead;
     lexer.hover = info_position_dead;
     lexer.signatures = info_position_dead;
-    lexer.sync = sync_edits_dead;
-    lexer.sync_rev = sync_edits_dead_rev;
+    lexer.sync = sync_action_dead;
+    lexer.sync_rev = sync_edits_rev_dead;
+    lexer.formatting = formatting_dead;
     lexer.encoding = Encoding::utf32();
 }
 
@@ -147,7 +148,7 @@ pub fn context_local(_: &mut Editor, _: &mut GlobalState) {}
 pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     if editor.lexer.question_lsp && editor.lexer.client.is_closed() {
         gs.error("LSP failure ...");
-        gs.event.push(crate::global_state::IdiomEvent::CheckLSP(editor.file_type));
+        gs.event.push(IdiomEvent::CheckLSP(editor.file_type));
         return;
     }
 
@@ -155,14 +156,8 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
     handle_responses(editor, gs);
 
     if let Some(meta) = editor.lexer.meta.take() {
-        let max_lines = (meta.start_line + meta.to) - 1;
-        if max_lines >= editor.content.len() {
-            return;
-        }
-        match (editor.lexer.tokens_partial)(&mut editor.lexer, meta.into(), max_lines) {
-            Ok(request) => editor.lexer.requests.push(request),
-            Err(error) => gs.send_error(error, editor.lexer.lang.file_type),
-        };
+        let Editor { lexer, content, .. } = editor;
+        (lexer.tokens_partial)(lexer, meta, content, gs);
     }
 }
 
@@ -170,12 +165,13 @@ pub fn context(editor: &mut Editor, gs: &mut GlobalState) {
 pub fn context_awaiting_tokens(editor: &mut Editor, gs: &mut GlobalState) {
     if editor.lexer.question_lsp && editor.lexer.client.is_closed() {
         gs.error("LSP failure ...");
-        gs.event.push(crate::global_state::IdiomEvent::CheckLSP(editor.file_type));
+        gs.event.push(IdiomEvent::CheckLSP(editor.file_type));
         return;
     }
 
     handle_diagnosticts(editor, gs);
     handle_responses(editor, gs);
+    editor.lexer.meta = None;
 }
 
 #[inline(always)]
@@ -187,13 +183,13 @@ fn handle_responses(editor: &mut Editor, gs: &mut GlobalState) {
     let modal = &mut editor.modal;
     let content = &mut editor.content;
 
-    for id in std::mem::take(&mut editor.lexer.requests) {
-        let Some(response) = responses.remove(&id) else {
-            editor.lexer.requests.push(id);
-            continue;
+    editor.lexer.requests.retain(|id| {
+        let Some(response) = responses.remove(id) else {
+            return true;
         };
         match response {
             LSPResponse::Completion(completions, line_idx) => {
+                editor.lexer.completion_cache = None;
                 if editor.cursor.line == line_idx {
                     let line = content[line_idx].as_str();
                     modal.auto_complete(completions, line, editor.cursor.get_position(), &gs.matcher);
@@ -201,22 +197,27 @@ fn handle_responses(editor: &mut Editor, gs: &mut GlobalState) {
             }
             LSPResponse::Hover(hover) => modal.map_hover(hover, &gs.theme),
             LSPResponse::SignatureHelp(signature) => modal.map_signatures(signature, &gs.theme),
-            LSPResponse::Renames(workspace_edit) => gs.event.push(workspace_edit.into()),
+            LSPResponse::Renames(workspace_edit) => gs.event.push((workspace_edit, false).into()),
             LSPResponse::Formatting { edits, save } => {
-                if save {
-                    gs.event.push(crate::global_state::IdiomEvent::Save)
-                };
-                gs.event.push(WorkspaceEdit::new([(editor.lexer.uri.clone(), edits)].into_iter().collect()).into());
+                let edits = WorkspaceEdit::new([(editor.lexer.uri.clone(), edits)].into_iter().collect());
+                gs.event.push((edits, save).into());
             }
-            LSPResponse::Tokens(tokens) => {
-                match tokens {
-                    SemanticTokensResult::Partial(data) => set_tokens(data.data, &editor.lexer.legend, content),
-                    SemanticTokensResult::Tokens(data) => {
-                        set_tokens(data.data, &editor.lexer.legend, content);
-                        gs.success("LSP tokens mapped! Refresh UI to remove artifacts (default F5)");
+            LSPResponse::Tokens(token_result) => {
+                editor.lexer.context = context;
+                match token_result {
+                    Ok(tokens) => match tokens {
+                        SemanticTokensResult::Partial(data) => set_tokens(data.data, &editor.lexer.legend, content),
+                        SemanticTokensResult::Tokens(data) => {
+                            set_tokens(data.data, &editor.lexer.legend, content);
+                            gs.success("LSP tokens mapped! Refresh UI to remove artifacts (default F5)");
+                        }
+                    },
+                    Err(error) => {
+                        // force refresh LSP
+                        gs.error(error);
+                        gs.event.push(IdiomEvent::EditorActionCall(crate::configs::EditorAction::RefreshUI));
                     }
                 };
-                editor.lexer.context = context;
             }
             LSPResponse::TokensPartial { result, max_lines } => {
                 let tokens = match result {
@@ -239,7 +240,8 @@ fn handle_responses(editor: &mut Editor, gs: &mut GlobalState) {
             LSPResponse::Error(text) => gs.error(text),
             LSPResponse::Empty => (),
         }
-    }
+        false
+    });
 }
 
 #[inline(always)]
@@ -247,7 +249,7 @@ fn handle_diagnosticts(editor: &mut Editor, gs: &mut GlobalState) {
     let (editor_diagnostics, tree_diagnostics) = editor.lexer.client.get_diagnostics(&editor.lexer.uri);
     if let Some(diagnostics) = editor_diagnostics {
         set_diganostics(&mut editor.content, diagnostics);
-        editor.modal.cleanr_render_cache(); // force rebuild
+        editor.modal.clear_render_cache(); // force rebuild
     }
 
     if let Some(tree_diagnostics) = tree_diagnostics {
@@ -255,36 +257,12 @@ fn handle_diagnosticts(editor: &mut Editor, gs: &mut GlobalState) {
     }
 }
 
-// HANDLERS
+// SYNC
 
-pub fn sync_changes(lexer: &mut Lexer, change_events: Vec<TextDocumentContentChangeEvent>) -> LSPResult<()> {
-    lexer.version += 1;
-    lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)
-}
+#[inline]
+pub fn sync_tokens_dead(_lexer: &mut Lexer, _meta: EditMetaData) {}
 
-pub fn sync_edits(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
-    lexer.version += 1;
-    let (meta, change_events) = action.change_event(lexer.encoding.encode_position, lexer.encoding.char_len, content);
-    lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
-    match lexer.meta.take() {
-        Some(existing_meta) => lexer.meta.replace(existing_meta + meta),
-        None => lexer.meta.replace(meta),
-    };
-    Ok(())
-}
-
-pub fn sync_edits_rev(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
-    lexer.version += 1;
-    let (meta, change_events) =
-        action.change_event_rev(lexer.encoding.encode_position, lexer.encoding.char_len, content);
-    lexer.client.sync(lexer.uri.clone(), lexer.version, change_events)?;
-    match lexer.meta.take() {
-        Some(existing_meta) => lexer.meta.replace(existing_meta + meta),
-        None => lexer.meta.replace(meta),
-    };
-    Ok(())
-}
-
+#[inline(always)]
 pub fn sync_tokens(lexer: &mut Lexer, meta: EditMetaData) {
     match lexer.meta.take() {
         Some(existing_meta) => lexer.meta.replace(existing_meta + meta),
@@ -292,23 +270,96 @@ pub fn sync_tokens(lexer: &mut Lexer, meta: EditMetaData) {
     };
 }
 
-#[inline(always)]
-pub fn sync_tokens_dead(_lexer: &mut Lexer, _meta: EditMetaData) {}
-
-#[inline(always)]
-pub fn sync_changes_dead(_lexer: &mut Lexer, _change_events: Vec<TextDocumentContentChangeEvent>) -> LSPResult<()> {
+#[inline]
+pub fn sync_changes_dead(lexer: &mut Lexer, _change_events: Vec<TextDocumentContentChangeEvent>) -> LSPResult<()> {
+    lexer.version += 1;
     Ok(())
 }
 
 #[inline(always)]
-pub fn sync_edits_dead(_lexer: &mut Lexer, _action: &Action, _content: &[EditorLine]) -> LSPResult<()> {
+pub fn sync_changes(lexer: &mut Lexer, events: Vec<TextDocumentContentChangeEvent>) -> LSPResult<()> {
+    lexer.version += 1;
+    lexer.client.sync(lexer.uri.clone(), lexer.version, events)
+}
+
+#[inline]
+pub fn sync_action_dead(_lexer: &mut Lexer, _action: &Action, _content: &[EditorLine]) -> LSPResult<()> {
     Ok(())
 }
 
-#[inline(always)]
-pub fn sync_edits_dead_rev(_lexer: &mut Lexer, _action: &Action, _content: &[EditorLine]) -> LSPResult<()> {
+pub fn sync_action(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
+    let (meta, events) = action.change_event(&lexer.encoding, content);
+    sync_tokens(lexer, meta);
+    sync_changes(lexer, events)
+}
+
+#[inline]
+pub fn sync_edits_rev_dead(_lexer: &mut Lexer, _action: &Action, _content: &[EditorLine]) -> LSPResult<()> {
     Ok(())
 }
+
+pub fn sync_edits_rev(lexer: &mut Lexer, action: &Action, content: &[EditorLine]) -> LSPResult<()> {
+    let (meta, change) = action.change_event_rev(&lexer.encoding, content);
+    sync_tokens(lexer, meta);
+    sync_changes(lexer, change)
+}
+
+// TOKENS
+
+pub fn tokens_dead(_: &mut Lexer, _: &mut GlobalState) {}
+
+pub fn tokens(lexer: &mut Lexer, gs: &mut GlobalState) {
+    match lexer.client.request_full_tokens(lexer.uri.clone()) {
+        Ok(request) => {
+            lexer.context = context_awaiting_tokens;
+            lexer.meta = None;
+            lexer.requests.push(request);
+        }
+        Err(err) => gs.send_error(err, lexer.lang.file_type),
+    }
+}
+
+pub fn tokens_partial_dead(_: &mut Lexer, _: EditMetaData, _: &[EditorLine], _: &mut GlobalState) {}
+
+pub fn tokens_partial(lexer: &mut Lexer, meta: EditMetaData, content: &[EditorLine], gs: &mut GlobalState) {
+    // TODO: add tests for the edge cases (already manually tested)
+    let max_lines = (meta.start_line + meta.to) - 1;
+    if max_lines >= content.len() {
+        return;
+    }
+    let mut range = Range::from(meta);
+    let content_len = content.len() as u32;
+    if range.end.line >= content_len {
+        let end_line = content_len.saturating_sub(1);
+        match range.start.line.cmp(&end_line) {
+            Ordering::Less => {
+                let eline = &content[end_line as usize];
+                range.end.line = end_line;
+                range.end.character = eline.encoded_len(lexer.encoding()) as u32;
+            }
+            Ordering::Equal => {
+                let eline = &content[end_line as usize];
+                if eline.is_empty() {
+                    return;
+                }
+                range.end.line = end_line;
+                range.end.character = eline.encoded_len(lexer.encoding()) as u32;
+            }
+            Ordering::Greater => return,
+        }
+    }
+    match lexer.client.request_partial_tokens(lexer.uri.clone(), range, max_lines) {
+        Ok(request) => lexer.requests.push(request),
+        Err(err) => gs.send_error(err, lexer.lang.file_type),
+    }
+}
+
+/// partial tokens not supported
+pub fn tokens_partial_redirect(lexer: &mut Lexer, _: EditMetaData, _: &[EditorLine], gs: &mut GlobalState) {
+    (lexer.tokens)(lexer, gs)
+}
+
+// COMPLETION
 
 pub fn completable(lexer: &Lexer, char_idx: usize, line: &EditorLine) -> bool {
     lexer.lang.completable(line, char_idx)
@@ -327,35 +378,26 @@ pub fn get_autocomplete(lexer: &mut Lexer, c: CursorPosition, gs: &mut GlobalSta
 
 pub fn get_autocomplete_dead(_: &mut Lexer, _: CursorPosition, _: &mut GlobalState) {}
 
-pub fn tokens(lexer: &mut Lexer) -> LSPResult<i64> {
-    lexer.context = context_awaiting_tokens;
-    lexer.client.request_full_tokens(lexer.uri.clone())
-}
+// FORMATTING
 
-pub fn tokens_dead(_: &mut Lexer) -> LSPResult<i64> {
-    Ok(0)
-}
-
-pub fn tokens_partial(lexer: &mut Lexer, range: Range, max_lines: usize) -> LSPResult<i64> {
-    lexer.client.request_partial_tokens(lexer.uri.clone(), range, max_lines)
-}
-
-pub fn tokens_partial_redirect(lexer: &mut Lexer, _: Range, _: usize) -> LSPResult<i64> {
-    tokens(lexer)
-}
-
-pub fn tokens_partial_dead(_: &mut Lexer, _: Range, _: usize) -> LSPResult<i64> {
-    Ok(0)
-}
-
-pub fn formatting(lexer: &mut Lexer, indent: usize, save: bool, gs: &mut GlobalState) {
+pub fn formatting(lexer: &mut Lexer, indent: usize, save: bool, gs: &mut GlobalState) -> bool {
     match lexer.client.formatting(lexer.uri.clone(), indent, save) {
-        Ok(request) => lexer.requests.push(request),
-        Err(err) => gs.send_error(err, lexer.lang.file_type),
+        Ok(request) => {
+            lexer.requests.push(request);
+            true
+        }
+        Err(err) => {
+            gs.send_error(err, lexer.lang.file_type);
+            false
+        }
     }
 }
 
-pub fn formatting_dead(_: &mut Lexer, _: usize, _: bool, _: &mut GlobalState) {}
+pub fn formatting_dead(_: &mut Lexer, _: usize, _: bool, _: &mut GlobalState) -> bool {
+    false
+}
+
+// INFO
 
 pub fn info_position_dead(_: &mut Lexer, _: CursorPosition, _: &mut GlobalState) {}
 
