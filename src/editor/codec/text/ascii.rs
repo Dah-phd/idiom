@@ -1,4 +1,4 @@
-use super::{pad_select, CodecContext, SelectManagerSimple};
+use super::{CodecContext, SelectManagerSimple, pad_select};
 use crate::{
     cursor::CharRangeUnbound,
     editor_line::EditorLine,
@@ -6,7 +6,7 @@ use crate::{
     global_state::GlobalState,
 };
 use crossterm::style::ContentStyle;
-use idiom_tui::{layout::RectIter, utils::ByteChunks, Backend};
+use idiom_tui::{Backend, layout::RectIter, utils::ByteChunks};
 
 pub fn line(text: &EditorLine, lines: &mut RectIter, ctx: &mut CodecContext, backend: &mut CrossTerm) {
     let Some(line) = lines.next() else { return };

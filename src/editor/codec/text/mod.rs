@@ -2,8 +2,8 @@ mod ascii;
 mod complex;
 mod markdown;
 
-use super::utils::{pad_select, try_cache_wrap_data_from_lines, SelectManagerSimple};
 use super::CodecContext;
+use super::utils::{SelectManagerSimple, pad_select, try_cache_wrap_data_from_lines};
 use crate::{
     cursor::{CharRangeUnbound, Cursor},
     editor::syntax::tokens::WrapData,

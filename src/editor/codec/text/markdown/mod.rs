@@ -6,10 +6,10 @@ use super::CodecContext;
 use crate::{
     editor::syntax::tokens::WrapData,
     editor_line::EditorLine,
-    ext_tui::{iter::TakeLiens, CrossTerm},
+    ext_tui::{CrossTerm, iter::TakeLiens},
 };
 use crossterm::style::{Attribute, Attributes, Color, ContentStyle};
-use idiom_tui::{layout::RectIter, Backend};
+use idiom_tui::{Backend, layout::RectIter};
 pub use parser::{Span, Tag};
 use tag::parse_tag;
 

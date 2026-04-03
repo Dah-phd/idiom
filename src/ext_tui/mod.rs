@@ -15,9 +15,9 @@ pub mod text_field;
 use crate::cursor::CursorPosition;
 use crossterm::style::{Attribute, Attributes, Color, ContentStyle};
 use idiom_tui::{
+    Position,
     layout::LineBuilder as BaseLineBuilder,
     widgets::{State as BaseState, StyledLine as BaseStyledLine, Text as BaseText},
-    Position,
 };
 use serde_json::{Map, Value};
 use std::collections::HashMap;

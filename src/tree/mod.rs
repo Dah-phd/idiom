@@ -16,7 +16,7 @@ use clipboard::FileClipboard;
 use crossterm::event::KeyEvent;
 use idiom_tui::Backend;
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{HashMap, hash_map::Entry},
     path::{Path, PathBuf},
 };
 pub use tree_paths::TreePath;

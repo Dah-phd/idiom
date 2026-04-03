@@ -1,7 +1,7 @@
 use super::{CodecContext, HEADING, HEADING_2, HEADING_3, HEADING_NEXT};
 use crate::ext_tui::CrossTerm;
 use crossterm::style::Stylize;
-use idiom_tui::{layout::Line, utils::CharLimitedWidths, Backend, UTFSafe};
+use idiom_tui::{Backend, UTFSafe, layout::Line, utils::CharLimitedWidths};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Tag<'a> {

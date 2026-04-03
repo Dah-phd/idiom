@@ -4,7 +4,7 @@ use crate::{
     ext_tui::{CrossTerm, StyleExt},
 };
 use crossterm::style::{Color, ContentStyle};
-use idiom_tui::{layout::Line, Backend, UTFSafe};
+use idiom_tui::{Backend, UTFSafe, layout::Line};
 use std::{
     collections::VecDeque,
     error::Error,

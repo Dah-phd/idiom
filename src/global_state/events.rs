@@ -13,7 +13,7 @@ use crate::popups::popup_tree_search::ActiveFileSearch;
 use crate::popups::{Popup, PopupChoice};
 use crate::tree::Tree;
 use crate::workspace::Workspace;
-use lsp_types::{request::GotoDeclarationResponse, Location, LocationLink, Range, WorkspaceEdit};
+use lsp_types::{Location, LocationLink, Range, WorkspaceEdit, request::GotoDeclarationResponse};
 use std::path::PathBuf;
 
 #[derive(Debug, PartialEq)]

@@ -14,7 +14,7 @@ use crate::{
     global_state::{GlobalState, IdiomEvent},
     lsp::{LSPClient, LSPError, LSPResult},
 };
-pub use diagnostics::{set_diganostics, DiagnosticInfo, DiagnosticLine, Fix};
+pub use diagnostics::{DiagnosticInfo, DiagnosticLine, Fix, set_diganostics};
 pub use encoding::Encoding;
 pub use langs::Lang;
 pub use legend::Legend;

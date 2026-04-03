@@ -4,10 +4,10 @@ pub use parser::{LineEnd, LineParser, POSIX_NLINE};
 pub use status::{Reduction, RenderStatus};
 
 use crate::{
-    editor::syntax::{tokens::TokenLine, DiagnosticInfo, DiagnosticLine, Encoding, Lang, Token},
+    editor::syntax::{DiagnosticInfo, DiagnosticLine, Encoding, Lang, Token, tokens::TokenLine},
     error::IdiomResult,
 };
-use idiom_tui::{utils::UTFSafeStringExt, UTFSafe};
+use idiom_tui::{UTFSafe, utils::UTFSafeStringExt};
 use std::{
     fmt::Display,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
@@ -337,11 +337,7 @@ impl EditorLine {
 
     #[inline]
     pub fn split_at(&self, mid: usize) -> (&str, &str) {
-        if self.content.len() == self.char_len {
-            self.content.split_at(mid)
-        } else {
-            self.content.split_at_char(mid)
-        }
+        if self.content.len() == self.char_len { self.content.split_at(mid) } else { self.content.split_at_char(mid) }
     }
 
     #[inline]

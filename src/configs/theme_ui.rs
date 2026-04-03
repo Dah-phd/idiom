@@ -1,7 +1,7 @@
 use crate::{
-    configs::{load_or_create_config, THEME_UI},
+    configs::{THEME_UI, load_or_create_config},
     error::IdiomError,
-    ext_tui::{background_rgb, parse_raw_rgb, pull_color, serialize_rgb, StyleExt},
+    ext_tui::{StyleExt, background_rgb, parse_raw_rgb, pull_color, serialize_rgb},
 };
 use crossterm::style::{Color, ContentStyle, Stylize};
 use serde::ser::{Serialize, SerializeStruct};

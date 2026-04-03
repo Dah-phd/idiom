@@ -2,8 +2,8 @@ use crate::{
     embeded_term::EditorTerminal,
     error::{IdiomError, IdiomResult},
     ext_tui::{
-        pty::{Message, PtyShell, OVERLAY_INFO},
         CrossTerm,
+        pty::{Message, OVERLAY_INFO, PtyShell},
     },
     global_state::GlobalState,
     popups::checked_new_screen_size,

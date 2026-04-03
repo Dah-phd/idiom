@@ -1,8 +1,8 @@
+use super::{LSP, LSPClient, LSPResult};
 pub use super::{
     builder::{InitCfg, LSPBuilder},
     error::LSPError,
 };
-use super::{LSPClient, LSPResult, LSP};
 use crate::{
     app::ASYNC_RT,
     configs::{EditorConfigs, FileType},
@@ -53,7 +53,7 @@ impl LSPServers {
     pub fn get_or_init_server(&mut self, ft: &FileType, cfg: &EditorConfigs) -> LSPServerStatus {
         let attempt = match self.ready_servers.get(ft) {
             Some(lsp) if lsp.is_running() || lsp.attempts != 0 => {
-                return LSPServerStatus::ReadyClient(Box::new(lsp.aquire_client()))
+                return LSPServerStatus::ReadyClient(Box::new(lsp.aquire_client()));
             }
             Some(lsp) if lsp.attempts == 0 => {
                 return LSPServerStatus::None;

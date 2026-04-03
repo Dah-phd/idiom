@@ -5,7 +5,7 @@ pub mod syntax;
 mod utils;
 
 use crate::{
-    actions::{find_line_start, Actions},
+    actions::{Actions, find_line_start},
     configs::{EditorAction, EditorConfigs, FileFamily, FileType, IndentConfigs, ScopeType},
     cursor::{Cursor, CursorPosition},
     editor_line::{EditorLine, LineParser},
@@ -15,7 +15,7 @@ use crate::{
 };
 use codec::TuiCodec;
 use controls::ControlMap;
-use idiom_tui::{layout::Rect, Position};
+use idiom_tui::{Position, layout::Rect};
 use lsp_types::TextEdit;
 pub use modal::EditorModal;
 use std::{
@@ -23,11 +23,11 @@ use std::{
     path::PathBuf,
 };
 use syntax::Lexer;
+pub use utils::{EditorStats, editor_from_data};
 use utils::{
     big_file_protection, build_display, calc_line_number_offset, select_between_chars, select_between_chars_inc,
     select_indent,
 };
-pub use utils::{editor_from_data, EditorStats};
 
 const WARN_TXT: &str = "The file is opened in text mode, \
     beware idiom is not designed with plain text performance in mind!";

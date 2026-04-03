@@ -1,15 +1,16 @@
 use super::{
+    EDITOR_CFG_FILE,
     defaults::{get_indent_after, get_indent_spaces, get_unident_before},
     load_or_create_config,
     types::FileType,
-    write_config_file, EDITOR_CFG_FILE,
+    write_config_file,
 };
 use crate::{
     configs::lsp_cfg::LSPConfig,
     editor_line::EditorLine,
     global_state::GlobalState,
     lsp::servers::InitCfg,
-    utils::{trim_start_inplace, Offset},
+    utils::{Offset, trim_start_inplace},
 };
 use regex::Regex;
 use serde::{Deserialize, Serialize};

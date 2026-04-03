@@ -1,4 +1,4 @@
-use super::{clipboard::FileClipboard, watcher::TreeWatcher, Tree, TreePath};
+use super::{Tree, TreePath, clipboard::FileClipboard, watcher::TreeWatcher};
 use crate::{configs::KeyMap, error::IdiomResult, ext_tui::State, lsp::DiagnosticType};
 use std::{
     collections::HashMap,

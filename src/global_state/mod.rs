@@ -7,8 +7,8 @@ mod footbar;
 
 use crate::{
     configs::{
-        EditorConfigs, EditorKeyMap, FileType, GeneralKeyMap, KeyMap, Theme, TreeKeyMap, UITheme, EDITOR_CFG_FILE,
-        KEY_MAP, THEME_FILE, THEME_UI,
+        EDITOR_CFG_FILE, EditorConfigs, EditorKeyMap, FileType, GeneralKeyMap, KEY_MAP, KeyMap, THEME_FILE, THEME_UI,
+        Theme, TreeKeyMap, UITheme,
     },
     cursor::CursorPosition,
     editor::EditorStats,
@@ -17,9 +17,8 @@ use crate::{
     ext_tui::{CrossTerm, StyleExt},
     lsp::{LSPError, LSPResult},
     popups::{
-        checked_new_screen_size,
+        Popup, checked_new_screen_size,
         menu::{menu_context_editor_inplace, menu_context_tree_inplace},
-        Popup,
     },
     tree::Tree,
     workspace::Workspace,
@@ -32,8 +31,8 @@ use crossterm::{
 };
 pub use events::{EditorOpenConfig, IdiomEvent, StartInplacePopup};
 use idiom_tui::{
-    layout::{Line, Rect},
     Backend,
+    layout::{Line, Rect},
 };
 
 use draw::Components;

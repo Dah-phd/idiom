@@ -7,8 +7,8 @@ use crate::{
     configs::{FileFamily, FileType},
     editor::utils::EditorStats,
     editor::{
-        syntax::{tokens::WrapData, Lexer},
         Editor,
+        syntax::{Lexer, tokens::WrapData},
     },
     global_state::GlobalState,
 };

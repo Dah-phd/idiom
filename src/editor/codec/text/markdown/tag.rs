@@ -1,5 +1,5 @@
-use super::span::parse_spans;
 use super::Tag;
+use super::span::parse_spans;
 
 pub fn parse_tag<'a>(line: &'a str) -> Tag<'a> {
     if let Some(val) = parse_hr(line) {
@@ -38,11 +38,7 @@ pub fn parse_code_block<'a>(line: &'a str) -> Option<Tag<'a>> {
     if !line.starts_with("```") {
         return None;
     }
-    if line.len() == 3 {
-        Some(Tag::Code(None))
-    } else {
-        Some(Tag::Code(Some(line[3..].to_owned())))
-    }
+    if line.len() == 3 { Some(Tag::Code(None)) } else { Some(Tag::Code(Some(line[3..].to_owned()))) }
 }
 
 pub fn parse_hr<'a>(line: &'a str) -> Option<Tag<'a>> {

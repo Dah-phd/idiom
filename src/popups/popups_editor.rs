@@ -1,6 +1,6 @@
+use super::Components;
 use super::generic_popup::{CommandButton, PopupChoice};
 use super::generic_selector::PopupSelector;
-use super::Components;
 use crossterm::event::KeyCode;
 use std::path::PathBuf;
 

@@ -1,11 +1,11 @@
 use super::{
-    controls::ControlMap, Actions, Cursor, CursorPosition, Editor, EditorConfigs, EditorLine, EditorModal, FileFamily,
-    FileType, GlobalState, Lexer, TuiCodec,
+    Actions, Cursor, CursorPosition, Editor, EditorConfigs, EditorLine, EditorModal, FileFamily, FileType, GlobalState,
+    Lexer, TuiCodec, controls::ControlMap,
 };
 use crate::error::{IdiomError, IdiomResult};
 use std::{
     os::unix::fs::MetadataExt,
-    path::{Path, PathBuf, MAIN_SEPARATOR, MAIN_SEPARATOR_STR},
+    path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR, Path, PathBuf},
 };
 
 #[derive(Debug, PartialEq)]
@@ -41,11 +41,7 @@ pub fn big_file_protection(path: &Path) -> IdiomResult<()> {
 /// calculates the max digits for line number
 #[inline(always)]
 pub const fn calc_line_number_offset(len: usize) -> usize {
-    if len == 0 {
-        1
-    } else {
-        (len.ilog10() + 1) as usize
-    }
+    if len == 0 { 1 } else { (len.ilog10() + 1) as usize }
 }
 
 pub fn select_indent(editor: &Editor) -> Option<(CursorPosition, CursorPosition)> {

@@ -13,7 +13,7 @@ use crossterm::{
 use dirs::config_dir;
 pub use editor::{EditorConfigs, IndentConfigs};
 pub use keymap::{EditorAction, EditorUserKeyMap, GeneralAction, GeneralUserKeyMap, TreeAction, TreeUserKeyMap};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{collections::HashMap, path::PathBuf};
 pub use theme::Theme;
 pub use theme_ui::UITheme;

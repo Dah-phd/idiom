@@ -1,6 +1,6 @@
 use crate::{
     embeded_term::EditorTerminal,
-    ext_tui::{text_field::map_key, CrossTerm, StyleExt},
+    ext_tui::{CrossTerm, StyleExt, text_field::map_key},
     global_state::GlobalState,
     popups::{Components, Popup, Status},
     tree::Tree,

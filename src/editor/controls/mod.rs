@@ -2,10 +2,10 @@ mod event;
 mod methods;
 
 use crate::{
-    actions::{transaction, Actions},
+    actions::{Actions, transaction},
     configs::EditorAction,
     cursor::{Cursor, CursorPosition, PositionedWord},
-    editor::{syntax::Lexer, Editor, EditorLine},
+    editor::{Editor, EditorLine, syntax::Lexer},
     global_state::GlobalState,
 };
 use lsp_types::TextEdit;

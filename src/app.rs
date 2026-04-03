@@ -5,15 +5,15 @@ use crate::{
     ext_tui::CrossTerm,
     global_state::{GlobalState, IdiomEvent},
     popups::{
-        get_init_screen,
+        Popup, get_init_screen,
         pallet::Pallet,
         popup_find::{FindPopup, GoToLinePopup},
         popup_replace::ReplacePopup,
         popup_tree_search::ActivePathSearch,
         popups_editor::selector_editors,
-        save_and_exit, Popup,
+        save_and_exit,
     },
-    session::{load_session, store_session, SessionStatus},
+    session::{SessionStatus, load_session, store_session},
     tree::Tree,
     workspace::Workspace,
 };

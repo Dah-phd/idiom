@@ -1,10 +1,10 @@
 use crate::ext_tui::{
-    pty::{Message, PtyShell, OVERLAY_INFO},
     CrossTerm,
+    pty::{Message, OVERLAY_INFO, PtyShell},
 };
 use crate::global_state::GlobalState;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
-use idiom_tui::layout::{Line, Rect, BORDERS};
+use idiom_tui::layout::{BORDERS, Line, Rect};
 
 #[derive(Default)]
 pub struct EditorTerminal {

@@ -1,4 +1,4 @@
-use super::{watcher::TreeWatcher, PathParser};
+use super::{PathParser, watcher::TreeWatcher};
 use crate::{
     app::ASYNC_RT,
     configs::{ERR, WARN},
@@ -9,7 +9,7 @@ use crate::{
 };
 use crossterm::style::ContentStyle;
 use idiom_tui::layout::Line;
-use ignore::{gitignore::Gitignore, Match};
+use ignore::{Match, gitignore::Gitignore};
 use std::{
     cmp::Ordering,
     collections::HashSet,
@@ -440,11 +440,7 @@ fn get_path_display(path: &Path) -> String {
     let mut buffer = String::from(" ");
     let mut path_split = path_str.split(std::path::MAIN_SEPARATOR).peekable();
     while let Some(path_element) = path_split.next() {
-        if path_split.peek().is_none() {
-            buffer.push_str(path_element)
-        } else {
-            buffer.push_str("  ")
-        }
+        if path_split.peek().is_none() { buffer.push_str(path_element) } else { buffer.push_str("  ") }
     }
     if path.is_dir() {
         buffer.push_str("/..");

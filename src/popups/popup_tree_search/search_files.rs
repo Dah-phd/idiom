@@ -2,7 +2,7 @@ use super::{Components, Popup, Status};
 use crate::{
     app::ASYNC_RT,
     embeded_term::EditorTerminal,
-    ext_tui::{text_field::map_key, LineBuilder, State, StyleExt},
+    ext_tui::{LineBuilder, State, StyleExt, text_field::map_key},
     global_state::{EditorOpenConfig, GlobalState, IdiomEvent},
     tree::{Tree, TreePath},
     workspace::Workspace,
@@ -10,7 +10,7 @@ use crate::{
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{
-    layout::{Rect, BORDERS},
+    layout::{BORDERS, Rect},
     text_field::{Status as InputStatus, TextField},
 };
 use std::path::PathBuf;

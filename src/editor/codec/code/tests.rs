@@ -1,12 +1,12 @@
 use super::{
     super::tests::{expect_cursor, expect_select, parse_complex_line, parse_simple_line},
-    cursor as rend_cursor, line_render, CodecContext,
+    CodecContext, cursor as rend_cursor, line_render,
 };
 use crate::cursor::{Cursor, CursorPosition};
 use crate::editor::codec::tests::count_to_cursor;
 use crate::editor::syntax::tests::{
-    create_token_pairs_utf16, create_token_pairs_utf32, create_token_pairs_utf8, longline_token_pair_utf16,
-    longline_token_pair_utf32, longline_token_pair_utf8, mock_utf16_lexer, mock_utf32_lexer, mock_utf8_lexer,
+    create_token_pairs_utf8, create_token_pairs_utf16, create_token_pairs_utf32, longline_token_pair_utf8,
+    longline_token_pair_utf16, longline_token_pair_utf32, mock_utf8_lexer, mock_utf16_lexer, mock_utf32_lexer,
     zip_text_tokens,
 };
 use crate::editor::tests::mock_editor;
@@ -17,8 +17,8 @@ use crate::{
 };
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{
-    layout::{Line, Rect},
     Backend,
+    layout::{Line, Rect},
 };
 use lsp_types::SemanticToken;
 
@@ -103,7 +103,12 @@ fn test_content(mut render_data: Vec<(ContentStyle, String)>) {
     );
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(7));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "4", ");"]);
+    assert_eq!(
+        line,
+        vec![
+            "    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "4", ");"
+        ]
+    );
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(8));
     assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'e'", ");"]);
@@ -115,7 +120,12 @@ fn test_content(mut render_data: Vec<(ContentStyle, String)>) {
     assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'🚀'", ");"]);
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(11));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "6", ");"]);
+    assert_eq!(
+        line,
+        vec![
+            "    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "6", ");"
+        ]
+    );
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(12));
     assert_eq!(line, vec!["    ", "assert", "!", "(", "!", "line", ".", "is_ascii", "());"]);
@@ -124,7 +134,12 @@ fn test_content(mut render_data: Vec<(ContentStyle, String)>) {
     assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "3", ", ", "'x'", ");"]);
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(14));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "7", ");"]);
+    assert_eq!(
+        line,
+        vec![
+            "    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "7", ");"
+        ]
+    );
     let (line_num, line) = parse_complex_line(&mut render_data);
     assert_eq!(line_num, Some(15));
     assert_eq!(
@@ -180,7 +195,12 @@ fn test_content_select(mut render_data: Vec<(ContentStyle, String)>) {
     );
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(7));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "4", ");"]);
+    assert_eq!(
+        line,
+        vec![
+            "    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "4", ");"
+        ]
+    );
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(8));
     assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'e'", ");"]);
@@ -192,7 +212,12 @@ fn test_content_select(mut render_data: Vec<(ContentStyle, String)>) {
     assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'🚀'", ");"]);
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(11));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "6", ");"]);
+    assert_eq!(
+        line,
+        vec![
+            "    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "6", ");"
+        ]
+    );
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(12));
     assert_eq!(line, vec!["    ", "assert", "!", "(", "!", "line", ".", "is_ascii", "());"]);
@@ -201,7 +226,12 @@ fn test_content_select(mut render_data: Vec<(ContentStyle, String)>) {
     assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "3", ", ", "'x'", ");"]);
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(14));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "7", ");"]);
+    assert_eq!(
+        line,
+        vec![
+            "    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "7", ");"
+        ]
+    );
     let (line_num, line) = parse_complex_line(&mut render_data);
     assert_eq!(line_num, Some(15));
     #[rustfmt::skip]
@@ -236,11 +266,18 @@ fn test_content_shrunk(mut render_data: Vec<(ContentStyle, String)>) {
     assert_eq!(line_num, Some(6));
     assert_eq!(
         line,
-        vec!["    ", "let", " ", "mut", " ", "line", " ", "=", " ", "CodeLine", "::", "new", "(", "\"text", ">",]
+        vec![
+            "    ", "let", " ", "mut", " ", "line", " ", "=", " ", "CodeLine", "::", "new", "(", "\"text", ">",
+        ]
     );
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(7));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "4", ");"]);
+    assert_eq!(
+        line,
+        vec![
+            "    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "4", ");"
+        ]
+    );
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(8));
     assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'e'", ");"]);
@@ -252,7 +289,12 @@ fn test_content_shrunk(mut render_data: Vec<(ContentStyle, String)>) {
     assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "2", ", ", "'🚀'", ");"]);
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(11));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "6", ");"]);
+    assert_eq!(
+        line,
+        vec![
+            "    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "6", ");"
+        ]
+    );
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(12));
     assert_eq!(line, vec!["    ", "assert", "!", "(", "!", "line", ".", "is_ascii", "());"]);
@@ -261,7 +303,12 @@ fn test_content_shrunk(mut render_data: Vec<(ContentStyle, String)>) {
     assert_eq!(line, vec!["    ", "line", ".", "insert", "(", "3", ", ", "'x'", ");"]);
     let (line_num, line) = parse_simple_line(&mut render_data);
     assert_eq!(line_num, Some(14));
-    assert_eq!(line, vec!["    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "7", ");"]);
+    assert_eq!(
+        line,
+        vec![
+            "    ", "assert", "!", "(", "line", ".", "char_len", "() ", "=", "=", " ", "7", ");"
+        ]
+    );
     let (line_num, line) = parse_complex_line(&mut render_data);
     assert_eq!(line_num, Some(15));
     #[rustfmt::skip]

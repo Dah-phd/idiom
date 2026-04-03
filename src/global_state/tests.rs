@@ -9,8 +9,8 @@ use crate::{
 };
 use crossterm::style::ContentStyle;
 use idiom_tui::{
-    layout::{Borders, Line, Rect},
     Backend,
+    layout::{Borders, Line, Rect},
 };
 
 fn full_draw_select(h: u16, w: u16) -> GlobalState {

@@ -1,4 +1,4 @@
-use crate::configs::{FileType, APP_FOLDER};
+use crate::configs::{APP_FOLDER, FileType};
 use crate::cursor::Cursor;
 use crate::error::{IdiomError, IdiomResult};
 use crate::global_state::{GlobalState, IdiomEvent};
@@ -274,8 +274,8 @@ fn hash_path(path: &Path) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        create_and_store_session, load_session_if_exists, read_last_session_working_dir, LoadedFileData, SessionStatus,
-        StoreFileData,
+        LoadedFileData, SessionStatus, StoreFileData, create_and_store_session, load_session_if_exists,
+        read_last_session_working_dir,
     };
     use crate::configs::FileType;
     use crate::cursor::Cursor;
@@ -283,7 +283,7 @@ mod tests {
     use crate::global_state::GlobalState;
     use crate::utils::test::TempDir;
     use crate::workspace::tests::{mock_ws, mock_ws_empty};
-    use idiom_tui::{layout::Rect, Backend};
+    use idiom_tui::{Backend, layout::Rect};
     use std::path::PathBuf;
 
     #[test]

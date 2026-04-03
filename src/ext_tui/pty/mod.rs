@@ -12,9 +12,9 @@ use crossterm::{
     style::ContentStyle,
 };
 use cursor::{CursorState, Position, Select};
-use idiom_tui::{layout::Rect, Backend};
-use parser::{get_ctrl_char, parse_cell_style, TrackedParser};
-use portable_pty::{native_pty_system, Child, CommandBuilder, ExitStatus, PtyPair, PtySize};
+use idiom_tui::{Backend, layout::Rect};
+use parser::{TrackedParser, get_ctrl_char, parse_cell_style};
+use portable_pty::{Child, CommandBuilder, ExitStatus, PtyPair, PtySize, native_pty_system};
 use std::io::{Read, Write};
 use tokio::task::JoinHandle;
 

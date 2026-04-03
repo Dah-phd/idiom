@@ -2,18 +2,18 @@ use super::{Components, Popup, Status};
 use crate::{
     configs::FileType,
     embeded_term::EditorTerminal,
-    ext_tui::{text_field::map_key, State, StyleExt},
+    ext_tui::{State, StyleExt, text_field::map_key},
     global_state::{GlobalState, IdiomEvent},
     tree::Tree,
     workspace::Workspace,
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
-use fuzzy_matcher::{skim::SkimMatcherV2, FuzzyMatcher};
+use fuzzy_matcher::{FuzzyMatcher, skim::SkimMatcherV2};
 use idiom_tui::{
+    Position,
     layout::{IterLines, Rect},
     text_field::{Status as InputStatus, TextField},
-    Position,
 };
 
 pub struct SelectorLSP {

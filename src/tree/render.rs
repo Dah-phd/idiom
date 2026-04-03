@@ -2,7 +2,7 @@ use super::{FileClipboard, Tree, TreePath};
 use crate::ext_tui::{CrossTerm, StyleExt};
 use crate::global_state::GlobalState;
 use crossterm::style::ContentStyle;
-use idiom_tui::{layout::Line, Backend};
+use idiom_tui::{Backend, layout::Line};
 
 const UP: char = '⭡';
 const DOWN: char = '⭣';

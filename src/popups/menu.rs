@@ -8,7 +8,7 @@ use crate::{
 };
 use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::ContentStyle;
-use idiom_tui::{layout::Rect, Backend, Position};
+use idiom_tui::{Backend, Position, layout::Rect};
 
 pub fn menu_context_editor_inplace(position: Position, screen: Rect, accent_style: ContentStyle) -> ContextMenu<9> {
     let commands = [

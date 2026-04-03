@@ -7,8 +7,8 @@ use crate::{
 };
 use bitflags::bitflags;
 use notify::{
-    event::{AccessKind, AccessMode, ModifyKind},
     Config, Error, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
+    event::{AccessKind, AccessMode, ModifyKind},
 };
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};

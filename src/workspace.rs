@@ -1,7 +1,7 @@
 use crate::{
     configs::{EditorAction, EditorConfigs, EditorKeyMap, FileFamily, FileType},
     cursor::Cursor,
-    editor::{editor_from_data, Editor},
+    editor::{Editor, editor_from_data},
     editor_line::EditorLine,
     error::{IdiomError, IdiomResult},
     ext_tui::StyleExt,
@@ -12,7 +12,7 @@ use crate::{
 };
 use crossterm::event::KeyEvent;
 use crossterm::style::{Color, ContentStyle};
-use idiom_tui::{layout::Rect, Backend};
+use idiom_tui::{Backend, layout::Rect};
 use lsp_types::{DocumentChangeOperation, DocumentChanges, OneOf, ResourceOp, TextDocumentEdit, WorkspaceEdit};
 use std::path::PathBuf;
 
@@ -592,13 +592,13 @@ fn saved_mark(editor: &Editor) -> &str {
 
 #[cfg(test)]
 pub mod tests {
-    use super::{map_editor, Workspace};
+    use super::{Workspace, map_editor};
     use crate::{
-        configs::{test::mock_editor_key_map, EditorConfigs},
+        configs::{EditorConfigs, test::mock_editor_key_map},
         cursor::{Cursor, CursorPosition},
         editor::{
-            tests::{mock_editor, pull_line, select_eq},
             Editor,
+            tests::{mock_editor, pull_line, select_eq},
         },
         editor_line::EditorLine,
         ext_tui::CrossTerm,
@@ -607,7 +607,7 @@ pub mod tests {
     };
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     use crossterm::style::ContentStyle;
-    use idiom_tui::{layout::Rect, Backend};
+    use idiom_tui::{Backend, layout::Rect};
 
     pub fn mock_ws(content: Vec<String>) -> Workspace {
         let mut ws = Workspace {

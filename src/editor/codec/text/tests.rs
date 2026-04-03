@@ -1,6 +1,6 @@
 use super::{
     super::tests::{expect_cursor, expect_select, parse_complex_line},
-    ascii, complex, line, CodecContext,
+    CodecContext, ascii, complex, line,
 };
 use crate::{
     cursor::{Cursor, CursorPosition},
@@ -11,8 +11,8 @@ use crate::{
 };
 use crossterm::style::{Color, ContentStyle};
 use idiom_tui::{
-    layout::{Borders, Rect},
     Backend,
+    layout::{Borders, Rect},
 };
 
 fn generate_lines() -> Vec<EditorLine> {

@@ -4,7 +4,7 @@ use crossterm::{
     cursor::{Hide, MoveTo, RestorePosition, SavePosition, Show},
     execute, queue,
     style::{ContentStyle, Print, ResetColor, SetStyle},
-    terminal::{size, BeginSynchronizedUpdate, Clear, ClearType, EndSynchronizedUpdate},
+    terminal::{BeginSynchronizedUpdate, Clear, ClearType, EndSynchronizedUpdate, size},
 };
 use std::fmt::Debug;
 use std::{

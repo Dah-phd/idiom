@@ -339,11 +339,7 @@ pub fn to_relative_path(target_dir: &Path) -> IdiomResult<PathBuf> {
             after_current_dir = true;
         }
     }
-    if result.to_string_lossy().is_empty() {
-        Err(IdiomError::io_other("Empty buffer!"))
-    } else {
-        Ok(result)
-    }
+    if result.to_string_lossy().is_empty() { Err(IdiomError::io_other("Empty buffer!")) } else { Ok(result) }
 }
 
 pub fn to_canon_path(target_dir: &Path) -> IdiomResult<PathBuf> {

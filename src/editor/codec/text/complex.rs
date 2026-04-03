@@ -7,9 +7,9 @@ use crate::{
 };
 use crossterm::style::ContentStyle;
 use idiom_tui::{
+    Backend,
     layout::RectIter,
     utils::{CharLimitedWidths, WriteChunks},
-    Backend,
 };
 
 pub fn line(text: &mut EditorLine, lines: &mut RectIter, ctx: &mut CodecContext, backend: &mut CrossTerm) {

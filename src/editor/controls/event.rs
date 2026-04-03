@@ -1,7 +1,7 @@
 use super::{
-    apply_multi_cursor_transaction,
+    ControlMap, apply_multi_cursor_transaction,
     methods::{copy, cut, multic_copy, multic_cut, multic_paste, paste},
-    multi_cursor_word_select, ControlMap,
+    multi_cursor_word_select,
 };
 use crate::{
     actions::transaction,

@@ -8,8 +8,8 @@ use crossterm::{
     style::ContentStyle,
 };
 use idiom_tui::{
-    layout::{IterLines, Line, Rect},
     Backend,
+    layout::{IterLines, Line, Rect},
 };
 
 #[allow(unpredictable_function_pointer_comparisons)]

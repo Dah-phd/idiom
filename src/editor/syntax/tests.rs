@@ -1,11 +1,11 @@
 pub use super::{
-    diagnostics::DiagnosticLine,
-    tokens::{set_tokens, validate_and_format_delta_tokens, TokenLine},
     Encoding, Legend, Lexer, Token,
+    diagnostics::DiagnosticLine,
+    tokens::{TokenLine, set_tokens, validate_and_format_delta_tokens},
 };
 use crate::{
     actions::{Action, Edit, EditMetaData},
-    configs::{FileType, ERR, MUTED, WARN},
+    configs::{ERR, FileType, MUTED, WARN},
     cursor::{Cursor, EncodedWordRange},
     editor_line::EditorLine,
     ext_tui::{CrossTerm, StyleExt},
@@ -732,7 +732,7 @@ fn token_inc_encoded() {
     tokens.push(Token { len: 1, delta_start: 8, style: ContentStyle::reversed() }); // "
     tokens.push(Token { len: 5, delta_start: 1, style: ContentStyle::bold() }); // .hars
     tokens.push(Token { len: 1, delta_start: 7, style: ContentStyle::bold() }); // ;
-                                                                                // simple handles only keyboard imputs
+    // simple handles only keyboard imputs
     eline_utf8.insert_simple(13, 'c', &Encoding::utf8());
     assert_eq!(eline_utf8.as_str(), "let d = \"🚀🚀\".chars();");
     let token = eline_utf8.tokens().iter().nth(5).unwrap();

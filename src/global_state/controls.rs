@@ -1,8 +1,8 @@
 use super::{GlobalState, IdiomEvent};
 use crate::ext_tui::{CrossTerm, StyleExt};
+use crate::popups::Popup;
 use crate::popups::menu::{menu_context_editor_inplace, menu_context_tree_inplace};
 use crate::popups::pallet::Pallet;
-use crate::popups::Popup;
 use crate::{embeded_term::EditorTerminal, tree::Tree, workspace::Workspace};
 use crossterm::event::{KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::style::{Color, ContentStyle};

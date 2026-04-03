@@ -5,9 +5,9 @@ use crate::{
     ext_tui::CrossTerm,
     global_state::GlobalState,
     tree::tests::mock_tree,
-    workspace::{tests::mock_ws, Workspace},
+    workspace::{Workspace, tests::mock_ws},
 };
-use idiom_tui::{layout::Rect, Backend};
+use idiom_tui::{Backend, layout::Rect};
 
 fn to_str_list<'a>(ws: &'a mut Workspace) -> Vec<&'a str> {
     ws.get_active().unwrap().content().iter().map(|el| el.as_str()).collect()

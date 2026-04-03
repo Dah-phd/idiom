@@ -4,7 +4,7 @@ use crate::{
 };
 use crossterm::style::ContentStyle;
 use idiom_tui::Position;
-use idiom_tui::{layout::Line, Backend};
+use idiom_tui::{Backend, layout::Line};
 use std::cmp::Ordering;
 
 pub struct CodecContext {

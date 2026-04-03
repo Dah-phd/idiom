@@ -1,5 +1,5 @@
-use super::utils::{clip_content, insert_clip, insert_lines_indented, is_scope, remove_content};
 use super::EditMetaData;
+use super::utils::{clip_content, insert_clip, insert_lines_indented, is_scope, remove_content};
 use idiom_tui::UTFSafe;
 use lsp_types::{Position, Range, TextDocumentContentChangeEvent};
 use std::{cmp::Ordering, fmt::Debug};

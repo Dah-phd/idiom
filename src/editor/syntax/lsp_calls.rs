@@ -3,12 +3,11 @@ use crate::{
     configs::Theme,
     cursor::CursorPosition,
     editor::{
-        syntax::{
-            set_diganostics,
-            tokens::{set_tokens, set_tokens_partial},
-            Encoding, Lexer,
-        },
         Editor,
+        syntax::{
+            Encoding, Lexer, set_diganostics,
+            tokens::{set_tokens, set_tokens_partial},
+        },
     },
     editor_line::EditorLine,
     global_state::{GlobalState, IdiomEvent},

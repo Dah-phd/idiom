@@ -4,9 +4,9 @@ mod formatting;
 use crate::{
     configs::{APP_FOLDER, EDITOR_CFG_FILE, KEY_MAP, THEME_FILE, THEME_UI},
     embeded_term::EditorTerminal,
-    ext_tui::{text_field::map_key, State, StyleExt},
+    ext_tui::{State, StyleExt, text_field::map_key},
     global_state::{GlobalState, IdiomEvent},
-    popups::{popup_file_open::OpenFileSelector, Components, Popup, Status},
+    popups::{Components, Popup, Status, popup_file_open::OpenFileSelector},
     tree::Tree,
     workspace::Workspace,
 };
@@ -16,9 +16,9 @@ use crossterm::style::ContentStyle;
 use dirs::config_dir;
 use fuzzy_matcher::FuzzyMatcher;
 use idiom_tui::{
+    Position,
     layout::Rect,
     text_field::{Status as InputStatus, TextField},
-    Position,
 };
 
 enum Mode {
