@@ -66,26 +66,23 @@ pub fn undo_multi_cursor(
             }
             vec![cursor]
         }
-        Action::Multi(edits) => {
-            let cursors = edits
-                .iter()
-                .rev()
-                .map(|edit| {
-                    let (position, select) = edit.apply_rev(content);
-                    let mut cursor = Cursor::default();
-                    cursor.text_width = text_width;
-                    match select {
-                        Some((from, to)) => cursor.select_set(from, to),
-                        None => {
-                            cursor.select_drop();
-                            cursor.set_position(position)
-                        }
+        Action::Multi(edits) => edits
+            .iter()
+            .rev()
+            .map(|edit| {
+                let (position, select) = edit.apply_rev(content);
+                let mut cursor = Cursor::default();
+                cursor.text_width = text_width;
+                match select {
+                    Some((from, to)) => cursor.select_set(from, to),
+                    None => {
+                        cursor.select_drop();
+                        cursor.set_position(position)
                     }
-                    cursor
-                })
-                .collect();
-            cursors
-        }
+                }
+                cursor
+            })
+            .collect(),
     };
     lexer.sync_rev(&action, content);
     actions.undone.push(action);
@@ -111,25 +108,22 @@ pub fn redo_multi_cursor(
             }
             vec![cursor]
         }
-        Action::Multi(edits) => {
-            let cursors = edits
-                .iter()
-                .map(|edit| {
-                    let (position, select) = edit.apply(content);
-                    let mut cursor = Cursor::default();
-                    cursor.text_width = text_width;
-                    match select {
-                        Some((from, to)) => cursor.select_set(from, to),
-                        None => {
-                            cursor.select_drop();
-                            cursor.set_position(position)
-                        }
+        Action::Multi(edits) => edits
+            .iter()
+            .map(|edit| {
+                let (position, select) = edit.apply(content);
+                let mut cursor = Cursor::default();
+                cursor.text_width = text_width;
+                match select {
+                    Some((from, to)) => cursor.select_set(from, to),
+                    None => {
+                        cursor.select_drop();
+                        cursor.set_position(position)
                     }
-                    cursor
-                })
-                .collect();
-            cursors
-        }
+                }
+                cursor
+            })
+            .collect(),
     };
     lexer.sync(&action, content);
     actions.undone.push(action);

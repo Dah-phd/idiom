@@ -508,11 +508,10 @@ fn map_editor(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool 
 
 fn map_editor_post_save(ws: &mut Workspace, key: &KeyEvent, gs: &mut GlobalState) -> bool {
     let result = map_editor(ws, key, gs);
-    if let Some(editor) = ws.get_active() {
-        if !editor.is_saved() {
-            ws.map_callback = map_editor;
-            ws.editors.mark_updated();
-        }
+    let Some(editor) = ws.get_active() else { return result };
+    if !editor.is_saved() {
+        ws.map_callback = map_editor;
+        ws.editors.mark_updated();
     }
     result
 }
