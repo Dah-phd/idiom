@@ -297,10 +297,10 @@ impl IndentConfigs {
 
     pub fn derive_indent_from(&self, prev_line: &EditorLine) -> String {
         let mut indent = prev_line.chars().take_while(|&c| c.is_whitespace()).collect::<String>();
-        if let Some(last) = prev_line.trim_end().chars().last() {
-            if self.indent_after.contains(last) {
-                indent.insert_str(0, &self.indent);
-            }
+        if let Some(last) = prev_line.trim_end().chars().last()
+            && self.indent_after.contains(last)
+        {
+            indent.insert_str(0, &self.indent);
         };
         indent
     }
